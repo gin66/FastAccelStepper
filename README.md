@@ -18,16 +18,31 @@ The library is used with A4988, but others with two/three pin control should wor
 ```
 #include "FastAccelStepper.h"
 
+#define dirPinStepper1    5
+#define enablePinStepper1 6
+#define stepPinStepper1   9  /* OC1A */
+
 FastAccelStepperEngine fas_engine = FastAccelStepperEngine();
 FastAccelStepper stepper1 = fas_engine.stepperA(DirPin);
-FastAccelStepper stepper2 = fas_engine.stepperB(DirPin);
+//FastAccelStepper stepper2 = fas_engine.stepperB(DirPin);
 
 void setup() {
-  stepper1.setMaxSpeed(100);
-  stepper1.setAcceleration(20);
-  stepper1.moveTo(500);
+   engine.init();
+   engine.setDebugLed(LED);
+   stepper1->setEnablePin(enablePinStepper1);
+
+   stepper1->set_auto_enable(true);
+
+   stepper1->set_dynamics(speed*1.0, accel*1.0);
+   stepper1->calculate_move(move);
+   stepper1->start();
 }
 
 void loop() {
 }
 ```
+
+## TODO
+
+1. Change from speed [steps/s] into time delta [µs/steps]
+2. Avoid float after use of time delta
