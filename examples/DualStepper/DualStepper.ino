@@ -107,6 +107,10 @@ void loop() {
       else {
          Serial.print("  PAUSED ");
       }
+      Serial.print("  Queue End: Dir=");
+      Serial.print(stepper2->dir_high_at_queue_end ? 'H' : 'L');
+      Serial.print("  Pos=");
+      Serial.print(stepper2->pos_at_queue_end);
       Serial.print("  TCCR1A=");
       Serial.print(TCCR1A);
       Serial.print("  TCCR1B=");
@@ -119,5 +123,8 @@ void loop() {
          Serial.println("Please enter one line with <motor> <steps> <speed> <acceleration> e.g.");
          Serial.println("1 10000 1000 100");
       }
+   }
+   else {
+      stopped = !(stepper1->isRunning() || stepper2->isRunning());
    }
 }

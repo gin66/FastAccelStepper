@@ -22,16 +22,18 @@ class FastAccelStepper {
       // unstable API functions
       void set_dynamics(float speed, float accel);
 
-      inline void FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps);
+      inline bool add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high);
 
       // MUST BE ONLY CALLED FROM THIS MODULES INTERRUPT SERVICE ROUTINE !
-      inline void isr_update_move(unsigned long remaining_steps);
+      inline void isr_update_move(long remaining_steps);
+      unsigned long pos_at_queue_end;    // in steps
+      bool dir_high_at_queue_end;        // direction high corresponds to position counting upwards
+      uint8_t _dirPin;
 
    private:
       void _calculate_move(long steps);
       bool _channelA;
       uint8_t _auto_enablePin;
-      uint8_t _dirPin;
       uint8_t _enablePin;
       float _speed;             // in steps/s
       float _accel;             // in steps/s²
