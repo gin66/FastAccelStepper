@@ -2,7 +2,7 @@
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). It makes use of the 16 bit Timer 1 ot the Atmega 328 and as such supports one or two stepper motors.
 
-The stepper motors should be connected via a driver IC (like 4988) with a 1/2 or 3-wire connection:
+The stepper motors should be connected via a driver IC (like 4988) with a 1, 2 or 3-wire connection:
 * Step Signal
 	- This must be connected for stepper A to Pin 9 and for Stepper B to Pin 10.
 	- Step should be done on transition Low to High. High time will be only a few us.
@@ -29,24 +29,23 @@ The library is used with A4988, but other driver ICs could work, too.
 ```
 #include "FastAccelStepper.h"
 
-#define dirPinStepper1    5
-#define enablePinStepper1 6
-#define stepPinStepper1   9  /* OC1A, just for information here */
+#define dirPinStepperA    5
+#define enablePinStepperA 6
+#define stepPinStepperA   9  /* OC1A, just for information here */
 
 FastAccelStepperEngine fas_engine = FastAccelStepperEngine();
-FastAccelStepper stepper1 = fas_engine.stepperA();
-//FastAccelStepper stepper2 = fas_engine.stepperB();
+FastAccelStepper stepperA = fas_engine.stepperA();
+//FastAccelStepper stepperB = fas_engine.stepperB();
 
 void setup() {
-   engine.init();
-   engine.setDebugLed(LED);
-   stepper1->setDirectionPin(dirPinStepper1);
-   stepper1->setEnablePin(enablePinStepper1);
+   fas_engine.init();
+   stepperA->setDirectionPin(dirPinStepperA);
+   stepperA->setEnablePin(enablePinStepperA);
 
-   stepper1->set_auto_enable(true);
+   stepperA->set_auto_enable(true);
 
-   stepper1->set_dynamics(100.0, 10.0);
-   stepper1->move(1000);
+   stepperA->set_dynamics(100.0, 10.0);
+   stepperA->move(1000);
 }
 
 void loop() {
