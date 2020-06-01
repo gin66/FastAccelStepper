@@ -4,22 +4,30 @@
 
 class FastAccelStepper {
    public:
+      // stable API functions
       FastAccelStepper(bool channelA);
       void setDirectionPin(uint8_t dirPin);
       void setEnablePin(uint8_t enablePin);
-      void set_dynamics(float speed, float accel);
-      void calculate_move(long steps);
-      void start();
 
       inline uint8_t auto_enablePin();
       void set_auto_enable(bool auto_enable);
+      void enableOutputs();
+      void disableOutputs();
 
-      long current_pos();
+      long getCurrentPosition();
+      bool isRunning();
+      void move(long move);
+      void moveTo(long position);
+
+      // unstable API functions
+      void set_dynamics(float speed, float accel);
+
 
       // MUST BE ONLY CALLED FROM THIS MODULES INTERRUPT SERVICE ROUTINE !
       inline void isr_update_move(unsigned long remaining_steps);
 
    private:
+      void _calculate_move(long steps);
       bool _channelA;
       uint8_t _auto_enablePin;
       uint8_t _dirPin;
@@ -40,13 +48,15 @@ class FastAccelStepper {
 
 class FastAccelStepperEngine {
    public:
-      FastAccelStepperEngine();
+      // stable API functions
       void init();
-      void setDebugLed(uint8_t ledPin);
-      FastAccelStepper *stepperA(uint8_t dirPin);
-      FastAccelStepper *stepperB(uint8_t dirPin);
+      FastAccelStepper *stepperA();
+      FastAccelStepper *stepperB();
 
-   private:
+      // unstable API functions
+      //
+      // If this is called, then the periodic task will let the associated LED blink with 1 Hz
+      void setDebugLed(uint8_t ledPin);
 };
 #else
   #error “This library only supports boards with an AVR processor.”

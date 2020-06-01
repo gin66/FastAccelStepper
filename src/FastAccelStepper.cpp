@@ -1,7 +1,7 @@
 #include "FastAccelStepper.h"
 
-#define stepPinStepper1   9  /* OC1A */
-#define stepPinStepper2   10 /* OC1B */
+#define stepPinStepperA   9  /* OC1A */
+#define stepPinStepperB   10 /* OC1B */
 
 // Here are the global variables to interface with the interrupts
 
@@ -20,8 +20,6 @@ long fas_pos_A = 0;
 long fas_pos_B = 0;
 uint8_t fas_skip_A = 0;
 uint8_t fas_skip_B = 0;
-bool fas_stepperA_is_used = false;
-bool fas_stepperB_is_used = false;
 
 FastAccelStepper fas_stepperA = FastAccelStepper(true);
 FastAccelStepper fas_stepperB = FastAccelStepper(false);
@@ -32,11 +30,6 @@ FastAccelStepper fas_stepperB = FastAccelStepper(false);
 #define StepperB_Toggle       TCCR1A =  (TCCR1A | _BV(COM1B0)) & ~_BV(COM1B1)
 #define StepperB_Zero         TCCR1A =  (TCCR1A | _BV(COM1B1)) & ~_BV(COM1B0)
 #define StepperB_Disconnect   TCCR1A =  (TCCR1A & ~(_BV(COM1B1) | _BV(COM1B0)))
-
-FastAccelStepperEngine::FastAccelStepperEngine() {
-   // constructor is not called !? => thus need init call
-   init();
-}
 
 void FastAccelStepperEngine::init() {
    noInterrupts();
@@ -133,8 +126,9 @@ ISR(TIMER1_OVF_vect) {
    }
    // Manage stepper A
    if (dpA == 0) {
-      if (fas_stepperA.auto_enablePin() != 255) {
-        digitalWrite(fas_stepperA.auto_enablePin(), HIGH);
+      uint8_t pin =fas_stepperA.auto_enablePin();
+      if (pin != 255) {
+        digitalWrite(pin, HIGH);
       }
    }
    else {
@@ -149,14 +143,20 @@ ISR(TIMER1_OVF_vect) {
          fas_skip_A = 0;
          TIFR1 = _BV(OCF1A);    // clear interrupt flag
          TIMSK1 |= _BV(OCIE1A); // enable compare A interrupt
+         fas_dir_cw_A = dpA > 0 ? 1 : 0;
+         uint8_t pin = fas_stepperA.auto_enablePin();
+         if (pin != 255) {
+            digitalWrite(pin, LOW);
+         }
 	 interrupts();
       }
    }
 
    // Manage stepper B
    if (dpB == 0) {
-      if (fas_stepperB.auto_enablePin() != 255) {
-        digitalWrite(fas_stepperB.auto_enablePin(), HIGH);
+      uint8_t pin =fas_stepperB.auto_enablePin();
+      if (pin != 255) {
+        digitalWrite(pin, HIGH);
       }
    }
    else {
@@ -171,6 +171,11 @@ ISR(TIMER1_OVF_vect) {
          fas_skip_B = 0;
          TIFR1 = _BV(OCF1B);    // clear interrupt flag
          TIMSK1 |= _BV(OCIE1B); // enable compare B interrupt
+         fas_dir_cw_B = dpB > 0 ? 1 : 0;
+         uint8_t pin = fas_stepperB.auto_enablePin();
+         if (pin != 255) {
+            digitalWrite(pin, LOW);
+         }
 	 interrupts();
       }
    }
@@ -251,16 +256,10 @@ ISR(TIMER1_COMPB_vect) {
    }
 }
 
-FastAccelStepper *FastAccelStepperEngine::stepperA(uint8_t dirPin) {
-   fas_stepperA.setDirectionPin(dirPin);
-   pinMode(stepPinStepper1, OUTPUT);
-   fas_stepperA_is_used = true;
+FastAccelStepper *FastAccelStepperEngine::stepperA() {
    return &fas_stepperA;
 }
-FastAccelStepper *FastAccelStepperEngine::stepperB(uint8_t dirPin) {
-   fas_stepperB.setDirectionPin(dirPin);
-   pinMode(stepPinStepper2, OUTPUT);
-   fas_stepperB_is_used = true;
+FastAccelStepper *FastAccelStepperEngine::stepperB() {
    return &fas_stepperB;
 }
 
@@ -268,6 +267,10 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
    _channelA = channelA;
    _auto_enablePin = 255;
    _curr_speed = 0.0;
+
+   uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
+   digitalWrite(pin, LOW);
+   pinMode(pin, OUTPUT);
 }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
    _dirPin = dirPin;
@@ -289,42 +292,12 @@ void FastAccelStepper::set_auto_enable(bool auto_enable) {
 uint8_t FastAccelStepper::auto_enablePin() {
    return _auto_enablePin;
 }
-void FastAccelStepper::start() {
-   if (digitalRead(_enablePin) == HIGH) {
-      long delta;
-      noInterrupts();
-      if (_channelA) {
-          delta = fas_target_pos_A - fas_pos_A;
-      }
-      else {
-          delta = fas_target_pos_B - fas_pos_B;
-      }
-      interrupts();
-      if (delta != 0) {
-         bool dir_cw = (delta > 0);
-         digitalWrite(_dirPin,dir_cw ? 1:0);
-         digitalWrite(_enablePin, LOW);
-	 if (_channelA) {
-            fas_dir_cw_A = dir_cw;
-            if (_auto_enablePin != 255) {
-              digitalWrite(_enablePin, LOW);
-            }
-	 }
-	 else {
-            fas_dir_cw_B = dir_cw;
-            if (_auto_enablePin != 255) {
-              digitalWrite(_enablePin, LOW);
-            }
-         }
-      }
-   }
-}
 void FastAccelStepper::set_dynamics(float speed, float accel) {
    _speed = speed;
    _accel = accel;
    _min_steps = round(speed*speed/accel);
 }
-void FastAccelStepper::calculate_move(long move) {
+void FastAccelStepper::move(long move) {
    if (_channelA) {
       noInterrupts();
       fas_target_pos_A = fas_pos_A + move;
@@ -335,6 +308,25 @@ void FastAccelStepper::calculate_move(long move) {
       fas_target_pos_B = fas_pos_B + move;
       interrupts();
    }
+   _calculate_move(move);
+}
+void FastAccelStepper::moveTo(long position) {
+   long move;
+   if (_channelA) {
+      noInterrupts();
+      fas_target_pos_A = position;
+      move = position - fas_pos_A;
+      interrupts();
+   }
+   else {
+      noInterrupts();
+      fas_target_pos_B = position;
+      move = position - fas_pos_A;
+      interrupts();
+   }
+   _calculate_move(move);
+}
+void FastAccelStepper::_calculate_move(long move) {
    unsigned long steps = abs(move);
    // The movement consists of three phases.
    // 1. Change current speed to constant speed
@@ -409,7 +401,17 @@ void FastAccelStepper::calculate_move(long move) {
    _last_ms = millis();
    interrupts();
 }
-long FastAccelStepper::current_pos() {
+void FastAccelStepper::disableOutputs() {
+   if (_enablePin != 255) {
+     digitalWrite(_enablePin, HIGH);
+   }
+}
+void FastAccelStepper::enableOutputs() {
+   if (_enablePin != 255) {
+     digitalWrite(_enablePin, LOW);
+   }
+}
+long FastAccelStepper::getCurrentPosition() {
    long pos;
    if (_channelA) {
       noInterrupts();
@@ -422,4 +424,18 @@ long FastAccelStepper::current_pos() {
       interrupts();
    }
    return pos;
+}
+bool FastAccelStepper::isRunning() {
+   bool is_running;
+   if (_channelA) {
+      noInterrupts();
+      is_running = (fas_pos_A != fas_target_pos_A);
+      interrupts();
+   }
+   else {
+      noInterrupts();
+      is_running = (fas_pos_B != fas_target_pos_B);
+      interrupts();
+   }
+   return is_running;
 }
