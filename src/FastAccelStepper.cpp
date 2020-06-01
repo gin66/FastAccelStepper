@@ -187,13 +187,10 @@ ISR(TIMER1_OVF_vect) {
 
 ISR(TIMER1_COMPA_vect) {
    if (fas_skip_A) {
-      if (--fas_skip_A) {
-         OCR1A += 16384;
-      }
-      else {
+      if ((--fas_skip_A) == 0) {
          StepperA_Toggle;
-         OCR1A += fas_delta_lsw_A;
       }
+      OCR1A += 16384;
    }
    else {
       TCCR1C = _BV(FOC1A); // clear bit
@@ -209,12 +206,9 @@ ISR(TIMER1_COMPA_vect) {
          TIMSK1 &= ~_BV(OCIE1A);
       }
       else {
+         OCR1A += fas_delta_lsw_A;
          if (fas_skip_A = fas_delta_msb_A) { // assign to skip and test for not zero
             StepperA_Zero;
-            OCR1A += 16384;
-         }
-         else {
-            OCR1A += fas_delta_lsw_A;
          }
       }
    }
@@ -222,13 +216,10 @@ ISR(TIMER1_COMPA_vect) {
 
 ISR(TIMER1_COMPB_vect) {
    if (fas_skip_B) {
-      if (--fas_skip_B) {
-         OCR1B += 16384;
-      }
-      else {
+      if ((--fas_skip_B) == 0) {
 	 StepperB_Toggle;
-         OCR1B += fas_delta_lsw_B;
       }
+      OCR1B += 16384;
    }
    else {
       TCCR1C = _BV(FOC1B); // clear bit
@@ -245,12 +236,9 @@ ISR(TIMER1_COMPB_vect) {
          TIMSK1 &= ~_BV(OCIE1B);
       }
       else {
+         OCR1B += fas_delta_lsw_B;
          if (fas_skip_B = fas_delta_msb_B) { // assign to skip and test for not zero
 	    StepperB_Zero;
-            OCR1B += 16384;
-         }
-         else {
-            OCR1B += fas_delta_lsw_B;
          }
       }
    }

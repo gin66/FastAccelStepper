@@ -52,11 +52,19 @@ void loop() {
 }
 ```
 
+
+## Behind the curtains
+
+The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This interrupt is used for adjusting the acceleration. 
+
+The timer compare unit toggles the step pin from Low to High very precisely. The transition High to Low is done in the interrupt routine, thus the High state is only few us.
+
+
 ## TODO
 
 1. Change from speed [steps/s] into time delta [µs/steps]
 2. Avoid float after use of time delta
-3. Introduce command queue of speed/accel commands - one per stepper
+3. Introduce command queue of speed/accel commands - one per stepper. This will allow exact speed control.
 4. Change in direction requires motor stop !
 5. Using constant acceleration leads to force jumps at start and max speed => smooth this out
 

@@ -1,7 +1,4 @@
 #include "FastAccelStepper.h"
-// 360/1,8 = 200
-#define fullStepsPerRevolution 200
-#define fineStepsPerRevolution (16*fullStepsPerRevolution)
 
 #define dirPinStepper1    5
 #define enablePinStepper1 6
@@ -11,7 +8,6 @@
 #define enablePinStepper2 8
 #define stepPinStepper2   10 /* OC1B */
 
-// An Pin 13 ist eine LED angeschlossen
 #define LED 13
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
