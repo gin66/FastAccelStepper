@@ -106,9 +106,12 @@ inline void FastAccelStepper::isr_update_move(long remaining_steps) {
    else if (_curr_speed > _speed) {
       reduce_speed = true;
    }
-   long curr_ms = millis();
-   long dt_ms = curr_ms - _last_ms;
-   _last_ms = curr_ms;
+//   long curr_ms = millis();
+   long dt_ms = 16000000 / 65536;
+//   if (_last_ms != 0) {
+//      dt_ms = curr_ms - _last_ms;
+//   }
+//   _last_ms = curr_ms;
    if (accelerating) {
       _curr_speed += _accel / 1000.0 * dt_ms;
       _curr_speed = min(_curr_speed, _speed);
@@ -161,20 +164,24 @@ ISR(TIMER1_OVF_vect) {
    }
    // Manage stepper A
    if (dpA == 0) {
+      fas_stepperA._last_ms = 0;
+      fas_stepperA.isr_speed_control = false;
       uint8_t pin =fas_stepperA.auto_enablePin();
       if (pin != 255) {
         digitalWrite(pin, HIGH);
       }
    }
    else {
-      fas_stepperA.isr_update_move(abs(dpA));
+      if (fas_stepperA.isr_speed_control) {
+         fas_stepperA.isr_update_move(abs(dpA));
+      }
       if ((TIMSK1 & _BV(OCIE1A)) == 0) {
-	 // motor is not yet running.
-	 noInterrupts();
+      // motor is not yet running.
+      noInterrupts();
          OCR1A = TCNT1+16000; // delay 1ms for enable to act
-	 StepperA_Zero;
+      StepperA_Zero;
          TCCR1C = _BV(FOC1A); // force compare to ensure cleared output bits
-	 StepperA_Toggle;
+      StepperA_Toggle;
          fas_skip_A = 0;
          TIFR1 = _BV(OCF1A);    // clear interrupt flag
          TIMSK1 |= _BV(OCIE1A); // enable compare A interrupt
@@ -183,40 +190,45 @@ ISR(TIMER1_OVF_vect) {
          if (pin != 255) {
             digitalWrite(pin, LOW);
          }
-	 interrupts();
+      interrupts();
       }
    }
 
    // Manage stepper B
-   if (tpB == fas_stepperB.pos_at_queue_end) {
+   // if (tpB == fas_stepperB.pos_at_queue_end) {
+   if (!fas_stepperB.isRunning()) {
+      fas_stepperB._last_ms = 0;
+      fas_stepperB.isr_speed_control = false;
       uint8_t pin = fas_stepperB.auto_enablePin();
       if (pin != 255) {
         digitalWrite(pin, HIGH);
       }
    }
    else {
-      fas_stepperB.isr_update_move(tpB - fas_stepperB.pos_at_queue_end);
+      if (fas_stepperB.isr_speed_control) {
+         fas_stepperB.isr_update_move(tpB - fas_stepperB.pos_at_queue_end);
+      }
       if ((TIMSK1 & _BV(OCIE1B)) == 0) {
-	 // motor is not yet running.
-	 noInterrupts();
+      // motor is not yet running.
+      noInterrupts();
          OCR1B = TCNT1+16000; // delay 1ms for enable to act
-	 StepperB_Zero;
+      StepperB_Zero;
          TCCR1C = _BV(FOC1B); // force compare to ensure cleared output bits
-	 StepperB_Toggle;
+      StepperB_Toggle;
          fas_skip_B = 0;
-	 uint8_t steps = fas_queue_steps_B[fas_q_readptr_B];
-	 fas_steps_B = steps & 0x7f;
-	 if ((steps & 0x80) != 0) {
+      uint8_t steps = fas_queue_steps_B[fas_q_readptr_B];
+      fas_steps_B = steps & 0x7f;
+      if ((steps & 0x80) != 0) {
             fas_count_up_B = !fas_count_up_B;
             digitalWrite(fas_stepperB._dirPin, fas_count_up_B ? HIGH : LOW);
-	 }
+      }
          TIFR1 = _BV(OCF1B);    // clear interrupt flag
          uint8_t pin = fas_stepperB.auto_enablePin();
          if (pin != 255) {
             digitalWrite(pin, LOW);
          }
          TIMSK1 |= _BV(OCIE1B); // enable compare B interrupt
-	 interrupts();
+      interrupts();
       }
    }
 
@@ -270,6 +282,8 @@ ISR(TIMER1_COMPB_vect) {
       }
       uint8_t rp = fas_q_readptr_B;
       if (--fas_steps_B == 0) {
+	 rp = (rp + 1) & QUEUE_LEN_MASK;
+	 fas_q_readptr_B = rp;
 	 if (rp == fas_q_next_writeptr_B) {
             // set to output zero mode
             StepperB_Disconnect;
@@ -286,8 +300,6 @@ ISR(TIMER1_COMPB_vect) {
                fas_count_up_B = !fas_count_up_B;
                digitalWrite(fas_stepperB._dirPin, fas_count_up_B ? HIGH : LOW);
 	    }
-	    rp = (rp + 1) & QUEUE_LEN_MASK;
-	    fas_q_readptr_B = rp;
 	 }
       }
       else {
@@ -351,7 +363,7 @@ void FastAccelStepper::move(long move) {
    }
    else {
       noInterrupts();
-      fas_target_pos_B = fas_pos_B + move;
+      fas_target_pos_B = fas_stepperB.pos_at_queue_end + move;
       interrupts();
    }
    _calculate_move(move);
@@ -444,8 +456,8 @@ void FastAccelStepper::_calculate_move(long move) {
    noInterrupts();
    _deceleration_start = new_deceleration_start;
    _dec_time_ms = new_dec_time_ms;
-   _last_ms = millis();
    interrupts();
+   isr_speed_control = true;
 }
 void FastAccelStepper::disableOutputs() {
    if (_enablePin != 255) {

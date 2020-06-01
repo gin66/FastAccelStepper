@@ -26,9 +26,12 @@ class FastAccelStepper {
 
       // MUST BE ONLY CALLED FROM THIS MODULES INTERRUPT SERVICE ROUTINE !
       inline void isr_update_move(long remaining_steps);
-      unsigned long pos_at_queue_end;    // in steps
+      long pos_at_queue_end;    // in steps
       bool dir_high_at_queue_end;        // direction high corresponds to position counting upwards
       uint8_t _dirPin;
+      long _last_ms;            // in ms
+
+      bool isr_speed_control;
 
    private:
       void _calculate_move(long steps);
@@ -41,7 +44,6 @@ class FastAccelStepper {
       unsigned long _min_steps;          // in steps
 
       // used in interrupt routine isr_update_move
-      long _last_ms;            // in ms
       unsigned long _deceleration_start; // in steps
       long _dec_time_ms;        // in ms
 
