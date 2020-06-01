@@ -5,19 +5,32 @@
 
 // Here are the global variables to interface with the interrupts
 
+// To realize the 1 Hz debug led
 uint8_t fas_ledPin = 255;   // 255 if led blinking off
-
 uint16_t fas_debug_led_cnt = 0;
-uint16_t fas_delta_lsw_A = 0;
-uint8_t fas_delta_msb_A = 0;
-uint16_t fas_delta_lsw_B = 0;
-uint8_t fas_delta_msb_B = 0;
+
+// These variables control the stepper timing behaviour
+# define QUEUE_LEN 16
+uint8_t fas_queue_delta_msb_A[QUEUE_LEN];
+uint16_t fas_queue_delta_lsw_A[QUEUE_LEN];
+uint8_t fas_queue_steps_A[QUEUE_LEN];
+uint8_t fas_queue_delta_msb_B[QUEUE_LEN];
+uint16_t fas_queue_delta_lsw_B[QUEUE_LEN];
+uint8_t fas_queue_steps_B[QUEUE_LEN];
+uint8_t fas_q_readptr_A = 0;   // ISR stops if readptr == writeptr
+uint8_t fas_q_writeptr_A = 0;
+uint8_t fas_q_readptr_B = 0;
+uint8_t fas_q_writeptr_B = 0;
+
+// These variables are used to keep track of the stepper position and the target
 long fas_target_pos_A = 0;
 long fas_target_pos_B = 0;
 bool fas_dir_cw_A = true;
 bool fas_dir_cw_B = true;
 long fas_pos_A = 0;
 long fas_pos_B = 0;
+
+// This is used in the timer compare unit as extension of the 16 timer
 uint8_t fas_skip_A = 0;
 uint8_t fas_skip_B = 0;
 
@@ -48,6 +61,20 @@ void FastAccelStepperEngine::init() {
 }
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
    fas_ledPin = ledPin;
+}
+inline void FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps) {
+   if (_channelA) {
+      noInterrupts();
+      fas_queue_delta_msb_A[0] = msb;
+      fas_queue_delta_lsw_A[0] = lsw;
+      interrupts();
+   }
+   else {
+      noInterrupts();
+      fas_queue_delta_msb_B[0] = msb;
+      fas_queue_delta_lsw_B[0] = lsw;
+      interrupts();
+   }
 }
 
 inline void FastAccelStepper::isr_update_move(unsigned long remaining_steps) {
@@ -90,22 +117,10 @@ inline void FastAccelStepper::isr_update_move(unsigned long remaining_steps) {
    else {
       delta_lsw = delta;
    }
-   if (_channelA) {
-      noInterrupts();
-      fas_delta_msb_A = x;
-      fas_delta_lsw_A = delta_lsw;
-      interrupts();
-   }
-   else {
-      noInterrupts();
-      fas_delta_msb_B = x;
-      fas_delta_lsw_B = delta_lsw;
-      interrupts();
-   }
+   add_queue_entry(x, delta_lsw, 255);
 }
 ISR(TIMER1_OVF_vect) {
    // disable OVF interrupt to avoid nesting
-   digitalWrite(fas_ledPin, HIGH);
    TIMSK1 &= ~_BV(TOIE1);
 
    long dpA = fas_target_pos_A - fas_pos_A;
@@ -117,10 +132,10 @@ ISR(TIMER1_OVF_vect) {
    if (fas_ledPin < 255) {
       fas_debug_led_cnt++;
       if (fas_debug_led_cnt == 144) {
-        //digitalWrite(fas_ledPin, HIGH);
+        digitalWrite(fas_ledPin, HIGH);
       }
       if (fas_debug_led_cnt == 288) {
-        //digitalWrite(fas_ledPin, LOW);
+        digitalWrite(fas_ledPin, LOW);
 	fas_debug_led_cnt = 0;
       }
    }
@@ -182,7 +197,6 @@ ISR(TIMER1_OVF_vect) {
 
    // enable OVF interrupt
    TIMSK1 |= _BV(TOIE1);
-   digitalWrite(fas_ledPin, LOW);
 }
 
 ISR(TIMER1_COMPA_vect) {
@@ -206,8 +220,8 @@ ISR(TIMER1_COMPA_vect) {
          TIMSK1 &= ~_BV(OCIE1A);
       }
       else {
-         OCR1A += fas_delta_lsw_A;
-         if (fas_skip_A = fas_delta_msb_A) { // assign to skip and test for not zero
+         OCR1A += fas_queue_delta_lsw_A[0];
+         if (fas_skip_A = fas_queue_delta_msb_A[0]) { // assign to skip and test for not zero
             StepperA_Zero;
          }
       }
@@ -236,9 +250,9 @@ ISR(TIMER1_COMPB_vect) {
          TIMSK1 &= ~_BV(OCIE1B);
       }
       else {
-         OCR1B += fas_delta_lsw_B;
-         if (fas_skip_B = fas_delta_msb_B) { // assign to skip and test for not zero
-	    StepperB_Zero;
+         OCR1B += fas_queue_delta_lsw_B[0];
+         if (fas_skip_B = fas_queue_delta_msb_B[0]) { // assign to skip and test for not zero
+            StepperB_Zero;
          }
       }
    }
