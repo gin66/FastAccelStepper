@@ -11,12 +11,13 @@ class FastAccelStepper {
       void calculate_move(long steps);
       void start();
 
-      inline void isr_update_move(unsigned long remaining_steps);
-
       inline uint8_t auto_enablePin();
       void set_auto_enable(bool auto_enable);
 
       long current_pos();
+
+      // MUST BE ONLY CALLED FROM THIS MODULES INTERRUPT SERVICE ROUTINE !
+      inline void isr_update_move(unsigned long remaining_steps);
 
    private:
       bool _channelA;
@@ -25,15 +26,16 @@ class FastAccelStepper {
       uint8_t _enablePin;
       float _speed;             // in steps/s
       float _accel;             // in steps/s²
+
+      unsigned long _min_steps;          // in steps
+
+      // used in interrupt routine isr_update_move
       long _last_ms;            // in ms
+      unsigned long _deceleration_start; // in steps
       long _dec_time_ms;        // in ms
 
-      // target
-      unsigned long _min_steps; // in steps
-      unsigned long _deceleration_start; // in steps
-
       // current state
-      float _curr_speed;        // in steps/s
+      float _curr_speed;                 // in steps/s
 };
 
 class FastAccelStepperEngine {

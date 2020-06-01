@@ -383,26 +383,31 @@ void FastAccelStepper::calculate_move(long move) {
    //
 
    // Steps needed to stop from current speed with defined acceleration
+   unsigned long new_deceleration_start;
+   unsigned long new_dec_time_ms;
    unsigned long s_stop = round(_curr_speed * _curr_speed / 2.0 / _accel);
    if (s_stop > steps) {
-       // start deceleration immediately
-       _deceleration_start = steps;
-      _dec_time_ms = round(2000.0 * steps / _curr_speed);
+      // start deceleration immediately
+      new_deceleration_start = steps;
+      new_dec_time_ms = round(2000.0 * steps / _curr_speed);
    }
    else if (_curr_speed <= _speed) {
       // add steps to reach current speed to full ramp
       unsigned long s_full_ramp = steps + s_stop;
       unsigned long ramp_steps = min(s_full_ramp, _min_steps);
-      _deceleration_start = ramp_steps/2;
-      _dec_time_ms = round(sqrt(ramp_steps/_accel)*1000.0);
+      new_deceleration_start = ramp_steps/2;
+      new_dec_time_ms = round(sqrt(ramp_steps/_accel)*1000.0);
    }
    else {
       // need decelerate first in phase 1, then normal deceleration
-      _deceleration_start = _min_steps/2;
-      _dec_time_ms = round(_speed/_accel*1000.0);
+      new_deceleration_start = _min_steps/2;
+      new_dec_time_ms = round(_speed/_accel*1000.0);
    }
-   // DANGEROUS settings of interrupt used variables
+   noInterrupts();
+   _deceleration_start = new_deceleration_start;
+   _dec_time_ms = new_dec_time_ms;
    _last_ms = millis();
+   interrupts();
 }
 long FastAccelStepper::current_pos() {
    long pos;
