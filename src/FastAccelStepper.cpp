@@ -132,23 +132,47 @@ ISR(TIMER1_OVF_vect) {
       }
    }
    // Manage stepper A
-   if ((TIMSK1 & _BV(OCIE1A)) == 0) {
+   if (dpA == 0) {
       if (fas_stepperA.auto_enablePin() != 255) {
         digitalWrite(fas_stepperA.auto_enablePin(), HIGH);
       }
    }
    else {
       fas_stepperA.isr_update_move(abs(dpA));
+      if ((TIMSK1 & _BV(OCIE1A)) == 0) {
+	 // motor is not yet running.
+	 noInterrupts();
+         OCR1A = TCNT1+16000; // delay 1ms for enable to act
+	 StepperA_Zero;
+         TCCR1C |= _BV(FOC1A); // force compare to ensure cleared output bits
+	 StepperA_Toggle;
+         fas_skip_A = 0;
+         TIFR1 = _BV(OCF1A);    // clear interrupt flag
+         TIMSK1 |= _BV(OCIE1A); // enable compare A interrupt
+	 interrupts();
+      }
    }
 
    // Manage stepper B
-   if ((TIMSK1 & _BV(OCIE1B)) == 0) {
+   if (dpB == 0) {
       if (fas_stepperB.auto_enablePin() != 255) {
         digitalWrite(fas_stepperB.auto_enablePin(), HIGH);
       }
    }
    else {
       fas_stepperB.isr_update_move(abs(dpB));
+      if ((TIMSK1 & _BV(OCIE1B)) == 0) {
+	 // motor is not yet running.
+	 noInterrupts();
+         OCR1B = TCNT1+16000; // delay 1ms for enable to act
+	 StepperB_Zero;
+         TCCR1C |= _BV(FOC1B); // force compare to ensure cleared output bits
+	 StepperB_Toggle;
+         fas_skip_B = 0;
+         TIFR1 = _BV(OCF1B);    // clear interrupt flag
+         TIMSK1 |= _BV(OCIE1B); // enable compare B interrupt
+	 interrupts();
+      }
    }
 
    // enable OVF interrupt
@@ -285,36 +309,12 @@ void FastAccelStepper::start() {
             if (_auto_enablePin != 255) {
               digitalWrite(_enablePin, LOW);
             }
-	    noInterrupts();
-            OCR1A = TCNT1+16000; // delay 1ms for enable to act
-	    StepperA_Zero;
-            TCCR1C |= _BV(FOC1A); // force compare to ensure cleared output bits
-	    StepperA_Toggle;
-
-	    // TODO: motor should be started in update_move
-            fas_skip_A = 0;
-            fas_delta_msb_A = 0;
-            fas_delta_lsw_A = 60000;
-            TIFR1 = _BV(OCF1A);
-            TIMSK1 |= _BV(OCIE1A); // enable compare A interrupt
-	    interrupts();
 	 }
 	 else {
             fas_dir_cw_B = dir_cw;
             if (_auto_enablePin != 255) {
               digitalWrite(_enablePin, LOW);
             }
-	    noInterrupts();
-            OCR1B = TCNT1+16000; // delay 1ms for enable to act
-	    StepperB_Zero;
-            TCCR1C |= _BV(FOC1B); // force compare to ensure cleared output bits
-	    StepperB_Toggle;
-            fas_skip_B = 0;
-            fas_delta_msb_B = 0;
-            fas_delta_lsw_B = 30000;
-            TIFR1 = _BV(OCF1B);    // clear interrupt flag
-            TIMSK1 |= _BV(OCIE1B); // enable compare B interrupt
-	    interrupts();
          }
       }
    }
