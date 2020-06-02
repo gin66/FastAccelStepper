@@ -20,19 +20,22 @@ class FastAccelStepper {
       void moveTo(long position);
 
       // unstable API functions
-      void set_dynamics(float speed, float accel);
 
+      // stepper queue management (low level access)
       inline bool add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high, int16_t change);
-
-      // MUST BE ONLY CALLED FROM THIS MODULES INTERRUPT SERVICE ROUTINE !
-      inline void isr_update_move(long remaining_steps);
-      long pos_at_queue_end;    // in steps
+      long pos_at_queue_end;             // in steps
       bool dir_high_at_queue_end;        // direction high corresponds to position counting upwards
+      bool isQueueEmpty();
+      bool isQueueFull();
+
+      // For stepper movement control by FastAccelStepper
+      void set_dynamics(float speed, float accel);
+      long target_pos;
+      bool isr_speed_control_enabled;
+      inline void isr_fill_queue(); // MUST BE ONLY CALLED FROM THIS MODULE'S INTERRUPT SERVICE ROUTINE !
+
       uint8_t _dirPin;
       long _last_ms;            // in ms
-
-      bool isr_speed_control;
-      bool fill_queue;
 
    private:
       void _calculate_move(long steps);
