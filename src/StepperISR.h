@@ -1,10 +1,13 @@
+#ifndef TEST
 #include <Arduino.h>
+#endif
 #include <stdint.h>
 
 // Here are the global variables to interface with the interrupts
 
+// CURRENT QUEUE IMPLEMENTATION WASTES ONE UNUSED ENTRY => BUG/TODO
+
 // These variables control the stepper timing behaviour
-// Current queue implementation cannot fill all elements. TODO
 #define QUEUE_LEN (1 << 4)
 #define QUEUE_LEN_MASK 15
 extern uint8_t fas_q_readptr_A;  // ISR stops if readptr == next_writeptr

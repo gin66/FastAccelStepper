@@ -1,6 +1,6 @@
 
-CFLAGS=-DTEST
-CXXFLAGS=-DTEST
+CFLAGS=-DTEST -Werror
+CXXFLAGS=-DTEST -Werror
 LDLIBS=-lm
 
 test: tests/test_01 tests/test_02

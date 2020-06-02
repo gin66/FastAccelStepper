@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #else
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "stubs.h"
 #endif
 #include <stdint.h>
@@ -27,6 +29,7 @@ class FastAccelStepper {
   void enableOutputs();
   void disableOutputs();
 
+  long getPositionAfterCommandsCompleted();
   long getCurrentPosition();
   bool isRunning();
   void move(long move);
@@ -38,10 +41,6 @@ class FastAccelStepper {
   // stepper queue management (low level access)
   inline int add_queue_entry(uint32_t start_delta_ticks, uint8_t steps,
                              bool dir_high, int16_t change_ticks);
-  long pos_at_queue_end;       // in steps
-  long ticks_at_queue_end;     // in timer ticks, 0 on stopped stepper
-  bool dir_high_at_queue_end;  // direction high corresponds to position
-                               // counting upwards
   bool isQueueEmpty();
   bool isQueueFull();
 
@@ -52,10 +51,15 @@ class FastAccelStepper {
   inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
                                  // INTERRUPT SERVICE ROUTINE !
 
-  uint8_t _dirPin;
   long _last_ms;  // in ms
 
  private:
+  uint8_t _dirPin;
+  long _pos_at_queue_end;       // in steps
+  long _ticks_at_queue_end;     // in timer ticks, 0 on stopped stepper
+  bool _dir_high_at_queue_end;  // direction high corresponds to position
+                                // counting upwards
+
   void _calculate_move(long steps);
   bool _channelA;
   uint8_t _auto_enablePin;

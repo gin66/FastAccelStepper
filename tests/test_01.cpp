@@ -30,7 +30,7 @@ void init_queue() {
   fas_q_next_writeptr_B = 0;
 }
 
-int basic_test() {
+void basic_test() {
   init_queue();
   FastAccelStepper s = FastAccelStepper(true);
   assert(0 == s.getCurrentPosition());
@@ -40,7 +40,29 @@ int basic_test() {
   assert(!s.isQueueEmpty());
 }
 
-int queue_out_of_range() {
+void queue_full() {
+  puts("queue_full...");
+  init_queue();
+  FastAccelStepper s = FastAccelStepper(true);
+  assert(0 == s.getCurrentPosition());
+  assert(s.isQueueEmpty());
+  assert(s.isQueueEmpty());
+  printf("Queue read/write = %d/%d\n", fas_q_readptr_A, fas_q_next_writeptr_A);
+  for (int i = 0; i < QUEUE_LEN - 2; i++) {
+    s.add_queue_entry(10000, 100, true, 0);
+    assert(!s.isQueueEmpty());
+    assert(!s.isQueueFull());
+    printf("%d: Queue read/write = %d/%d\n", i, fas_q_readptr_A,
+           fas_q_next_writeptr_A);
+  }
+  s.add_queue_entry(10000, 100, true, 0);
+  printf("Queue read/write = %d/%d\n", fas_q_readptr_A, fas_q_next_writeptr_A);
+  assert(!s.isQueueEmpty());
+  assert(s.isQueueFull());
+  puts("...done");
+}
+
+void queue_out_of_range() {
   int8_t res;
 
   init_queue();
@@ -49,24 +71,28 @@ int queue_out_of_range() {
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
 
-  res = s.add_queue_entry(1<<23, 100, true, 0);
+  res = s.add_queue_entry(1 << 23, 100, true, 0);
   test(res == AQE_TOO_HIGH, "Too high provided should trigger error");
   assert(s.isQueueEmpty());
 
   res = s.add_queue_entry(10000, 100, true, 30000);
-  test(res == AQE_CHANGE_TOO_HIGH, "Too high change provided should trigger error");
+  test(res == AQE_CHANGE_TOO_HIGH,
+       "Too high change provided should trigger error");
   assert(s.isQueueEmpty());
 
   res = s.add_queue_entry(10000, 100, true, -30000);
-  test(res == AQE_CHANGE_TOO_LOW, "Too low change provided should trigger error");
+  test(res == AQE_CHANGE_TOO_LOW,
+       "Too low change provided should trigger error");
   assert(s.isQueueEmpty());
 
   res = s.add_queue_entry(10000, 100, true, -100);
-  test(res == AQE_CHANGE_TOO_LOW, "Too low change provided should trigger error");
+  test(res == AQE_CHANGE_TOO_LOW,
+       "Too low change provided should trigger error");
   assert(s.isQueueEmpty());
 
   res = s.add_queue_entry(65536, 100, true, 328);
-  test(res == AQE_CHANGE_TOO_HIGH, "Too high change provided should trigger error");
+  test(res == AQE_CHANGE_TOO_HIGH,
+       "Too high change provided should trigger error");
   assert(s.isQueueEmpty());
 
   res = s.add_queue_entry(65535, 10, true, 728);
@@ -86,8 +112,18 @@ int queue_out_of_range() {
   assert(!s.isQueueEmpty());
 }
 
+void end_pos_test() {
+  init_queue();
+  FastAccelStepper s = FastAccelStepper(true);
+  assert(0 == s.getPositionAfterCommandsCompleted());
+  s.add_queue_entry(65535, 1, true, 0);
+  assert(1 == s.getPositionAfterCommandsCompleted());
+}
+
 int main() {
   basic_test();
   queue_out_of_range();
+  queue_full();
+  end_pos_test();
   printf("TEST_01 PASSED\n");
 }
