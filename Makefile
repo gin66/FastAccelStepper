@@ -3,14 +3,16 @@ CFLAGS=-DTEST
 CXXFLAGS=-DTEST
 LDLIBS=-lm
 
-test: tests/test_01
+test: tests/test_01 tests/test_02
 	tests/test_01
+	tests/test_02
 
-tests/test_01: tests/test_01.o tests/FastAccelStepper.o
+tests/test_01: tests/test_01.cpp tests/stubs.h tests/FastAccelStepper.o
+tests/test_02: tests/test_02.cpp tests/stubs.h tests/FastAccelStepper.o
 
 tests/FastAccelStepper.o: tests/FastAccelStepper.cpp tests/FastAccelStepper.h tests/stubs.h
 
-tests/test_01.o: tests/test_01.cpp tests/stubs.h
+tests/test_%.o: tests/test_%.cpp tests/stubs.h
 
 
 fmt:

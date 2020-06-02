@@ -31,9 +31,46 @@ void FastAccelStepperEngine::init() {
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
 }
-inline int FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw,
+inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
                                              uint8_t steps, bool dir_high,
-                                             int16_t change) {
+                                             int16_t change_ticks) {
+  int32_t c_sum = 0;
+  if (steps >= 128) {
+    return AQE_STEPS_ERROR;
+  }
+  if (start_delta_ticks > 255 * 16384 + 65535) {
+    return AQE_TOO_HIGH;
+  }
+  if (change_ticks != 0) {
+    c_sum = change_ticks;
+    c_sum *= steps;
+    c_sum *= (steps - 1);
+    c_sum /= 2;
+  }
+  if (change_ticks > 0) {
+    if (c_sum > 32768) {
+      return AQE_CHANGE_TOO_HIGH;
+    }
+  }
+  else if (change_ticks < 0) {
+    if (c_sum < -32768) {
+      return AQE_CHANGE_TOO_LOW;
+    }
+    if (start_delta_ticks + c_sum < min_delta_ticks()) {
+      return AQE_CHANGE_TOO_LOW;
+    }
+  }
+
+  uint16_t msb = start_delta_ticks >> 14;
+  uint16_t lsw;
+  if (msb > 1) {
+    msb--;
+    lsw = start_delta_ticks & 16383;
+    lsw |= 16384;
+  } else {
+    lsw = start_delta_ticks;
+  }
+
   if (_channelA) {
     uint8_t wp = fas_q_next_writeptr_A;
     uint8_t rp = fas_q_readptr_A;
@@ -44,7 +81,7 @@ inline int FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw,
       struct queue_entry* e = &fas_queue_A[wp];
       e->delta_msb = msb;
       e->delta_lsw = lsw;
-      e->delta_change = change;
+      e->delta_change = change_ticks;
       e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
       dir_high_at_queue_end = dir_high;
       fas_q_next_writeptr_A = next_wp;
@@ -60,7 +97,7 @@ inline int FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw,
       struct queue_entry* e = &fas_queue_B[wp];
       e->delta_msb = msb;
       e->delta_lsw = lsw;
-      e->delta_change = change;
+      e->delta_change = change_ticks;
       e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
       dir_high_at_queue_end = dir_high;
       fas_q_next_writeptr_B = next_wp;
@@ -113,22 +150,13 @@ inline void FastAccelStepper::isr_fill_queue() {
     _curr_speed -= _accel / 1000.0 * dt_ms;
     _curr_speed = max(_curr_speed, _speed);
   }
-  long delta = round(16000000.0 / _curr_speed);
+  unsigned long delta = round(16000000.0 / _curr_speed);
 
   uint16_t steps = (16000000 * 8 / 1000) / delta;  // How many steps in 8 ms ?
   steps = min(steps, 127);
   steps = max(steps, 1);
 
-  uint16_t x = delta >> 14;
-  uint16_t delta_lsw;
-  if (x > 1) {
-    x--;
-    delta_lsw = delta & 16383;
-    delta_lsw |= 16384;
-  } else {
-    delta_lsw = delta;
-  }
-  add_queue_entry(x, delta_lsw, min(steps, abs(remaining_steps)),
+  add_queue_entry(delta, min(steps, abs(remaining_steps)),
                   remaining_steps > 0, 0);
 }
 ISR(TIMER1_OVF_vect) {
@@ -189,6 +217,9 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
     TIMSK1 |= _BV(OCIE1B);  // enable compare B interrupt
     interrupts();
   }
+}
+uint32_t FastAccelStepper::min_delta_ticks() {
+	return 16000000 / 32000;
 }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;

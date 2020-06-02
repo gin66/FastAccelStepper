@@ -24,3 +24,9 @@ extern char TIMSK1;
 extern char TIFR1;
 extern unsigned short OCR1A;
 extern unsigned short OCR1B;
+
+#define test(x, msg) \
+  if (!(x)) {        \
+    puts(msg);       \
+    assert(false);   \
+  };

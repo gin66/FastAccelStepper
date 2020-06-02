@@ -11,7 +11,10 @@
 #define AQE_OK 0
 #define AQE_FULL -1
 #define AQE_TOO_HIGH -2
-#define AQE_TOO_LOW -2
+#define AQE_TOO_LOW -3
+#define AQE_CHANGE_TOO_HIGH -4
+#define AQE_CHANGE_TOO_LOW -5
+#define AQE_STEPS_ERROR -6
 
 class FastAccelStepper {
  public:
@@ -30,11 +33,13 @@ class FastAccelStepper {
   void moveTo(long position);
 
   // unstable API functions
+  uint32_t min_delta_ticks();
 
   // stepper queue management (low level access)
-  inline int add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps,
-                             bool dir_high, int16_t change);
+  inline int add_queue_entry(uint32_t start_delta_ticks, uint8_t steps,
+                             bool dir_high, int16_t change_ticks);
   long pos_at_queue_end;       // in steps
+  long ticks_at_queue_end;     // in timer ticks, 0 on stopped stepper
   bool dir_high_at_queue_end;  // direction high corresponds to position
                                // counting upwards
   bool isQueueEmpty();
