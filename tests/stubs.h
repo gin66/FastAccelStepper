@@ -1,5 +1,7 @@
-#define noInterrupts() {}
-#define interrupts() {}
+#define noInterrupts() \
+  {}
+#define interrupts() \
+  {}
 #define _BV(x) 0
 #define ISR(x) void x()
 #define inline
@@ -7,11 +9,13 @@
 #include <math.h>
 
 #define abs(x) (x > 0 ? x : -x)
-#define min(a,b) (a > b ? b : a)
-#define max(a,b) (a > b ? a : b)
+#define min(a, b) (a > b ? b : a)
+#define max(a, b) (a > b ? a : b)
 
-#define digitalWrite(a,b) {}
-#define pinMode(a,b) {}
+#define digitalWrite(a, b) \
+  {}
+#define pinMode(a, b) \
+  {}
 
 extern char TCCR1A;
 extern char TCCR1B;

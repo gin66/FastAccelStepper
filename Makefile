@@ -12,5 +12,9 @@ tests/FastAccelStepper.o: tests/FastAccelStepper.cpp tests/FastAccelStepper.h te
 
 tests/test_01.o: tests/test_01.cpp tests/stubs.h
 
+
+fmt:
+	clang-format --style=Google -i src/* tests/*.cpp tests/*.h
+
 clean:
 	rm tests/*.o tests/test_[0-9][0-9]
