@@ -7,6 +7,13 @@
 #endif
 #include <stdint.h>
 
+// Return codes for add_queue_entry
+#define AQE_OK        0
+#define AQE_FULL     -1
+#define AQE_TOO_HIGH -2
+#define AQE_TOO_LOW  -2
+
+
 class FastAccelStepper {
    public:
       // stable API functions
@@ -26,7 +33,7 @@ class FastAccelStepper {
       // unstable API functions
 
       // stepper queue management (low level access)
-      inline bool add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high, int16_t change);
+      inline int add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high, int16_t change);
       long pos_at_queue_end;             // in steps
       bool dir_high_at_queue_end;        // direction high corresponds to position counting upwards
       bool isQueueEmpty();

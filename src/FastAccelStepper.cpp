@@ -31,7 +31,7 @@ void FastAccelStepperEngine::init() {
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
    fas_ledPin = ledPin;
 }
-inline bool FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high, int16_t change) {
+inline int FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high, int16_t change) {
    if (_channelA) {
       uint8_t wp = fas_q_next_writeptr_A;
       uint8_t rp = fas_q_readptr_A;
@@ -46,7 +46,7 @@ inline bool FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t
          e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
          dir_high_at_queue_end = dir_high;
          fas_q_next_writeptr_A = next_wp;
-	 return true;
+	 return AQE_OK;
       }
    }
    else {
@@ -63,10 +63,10 @@ inline bool FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t
          e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
          dir_high_at_queue_end = dir_high;
          fas_q_next_writeptr_B = next_wp;
-	 return true;
+	 return AQE_OK;
       }
    }
-   return false;
+   return AQE_FULL;
 }
 
 inline void FastAccelStepper::isr_fill_queue() {
