@@ -117,7 +117,6 @@ inline void FastAccelStepper::isr_fill_queue() {
   }
   if (isQueueEmpty()) {
     if (target_pos == _pos_at_queue_end) {
-      _last_ms = 0;
       isr_speed_control_enabled = false;
       return;
     }
@@ -129,20 +128,17 @@ inline void FastAccelStepper::isr_fill_queue() {
   bool accelerating = false;
   bool decelerate_to_stop = false;
   bool reduce_speed = false;
-  float curr_speed = _min_travel_speed ? 16000000.0 / _min_travel_speed : 0;
   if (abs(remaining_steps) <= _deceleration_start) {
     decelerate_to_stop = true;
-  } else if (curr_speed < _speed) {
+  } else if (_min_travel_ticks < _ticks_at_queue_end) {
     accelerating = true;
-  } else if (curr_speed > _speed) {
+  } else if (_min_travel_ticks > _ticks_at_queue_end) {
     reduce_speed = true;
   }
+
+  float curr_speed = _min_travel_ticks ? 16000000.0 / _min_travel_ticks : 0;
   //   long curr_ms = millis();
-  long dt_ms = 16000000 / 65536;
-  //   if (_last_ms != 0) {
-  //      dt_ms = curr_ms - _last_ms;
-  //   }
-  //   _last_ms = curr_ms;
+  // long dt_ms = 16000000 / 65536;
   if (accelerating) {
     curr_speed += _accel / 1000.0 * dt_ms;
     curr_speed = min(curr_speed, _speed);
@@ -208,7 +204,7 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
   _pos_at_queue_end = 0;
   _dir_high_at_queue_end = true;
   isr_speed_control_enabled = false;
-  _min_travel_speed = 0;
+  _min_travel_ticks = 0;
 
   uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
   digitalWrite(pin, LOW);
@@ -261,10 +257,10 @@ void FastAccelStepper::set_auto_enable(bool auto_enable) {
     fas_autoEnablePin_B = _auto_enablePin;
   }
 }
-void FastAccelStepper::set_dynamics(uint32_t min_travel_speed, float accel) {
-  _min_travel_speed = min_travel_speed;
+void FastAccelStepper::set_dynamics(uint32_t min_travel_ticks, float accel) {
+  _min_travel_ticks = min_travel_ticks;
   _accel = accel;
-  _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_speed / min_travel_speed);
+  _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_ticks / min_travel_ticks);
   if (target_pos != _pos_at_queue_end) {
     moveTo(target_pos);
   }
@@ -334,7 +330,7 @@ void FastAccelStepper::_calculate_move(long move) {
   // Steps needed to stop from current speed with defined acceleration
   unsigned long new_deceleration_start;
   unsigned long new_dec_time_ms;
-  float curr_speed = _min_travel_speed ? 16000000.0 / _min_travel_speed : 0;
+  float curr_speed = _min_travel_ticks ? 16000000.0 / _min_travel_ticks : 0;
   unsigned long s_stop = round(curr_speed * curr_speed / 2.0 / _accel);
   if (s_stop > steps) {
     // start deceleration immediately
