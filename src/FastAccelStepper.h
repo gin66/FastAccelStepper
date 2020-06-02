@@ -1,5 +1,10 @@
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) || defined(TEST)
+#ifndef TEST
 #include <Arduino.h>
+#else
+#include <math.h>
+#include "stubs.h"
+#endif
 #include <stdint.h>
 
 class FastAccelStepper {
