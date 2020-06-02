@@ -29,10 +29,8 @@ struct queue_entry {
 long fas_target_pos_A = 0;
 long fas_target_pos_B = 0;
 bool fas_dir_cw_A = true;
-bool fas_count_up_B = true;
 uint8_t fas_steps_B = 0;
 long fas_pos_A = 0;
-long fas_pos_B = 0;
 
 // This is used in the timer compare unit as extension of the 16 timer
 uint8_t fas_skip_A = 0;
@@ -47,6 +45,7 @@ FastAccelStepper fas_stepperB = FastAccelStepper(false);
 #define StepperB_Toggle       TCCR1A =  (TCCR1A | _BV(COM1B0)) & ~_BV(COM1B1)
 #define StepperB_Zero         TCCR1A =  (TCCR1A | _BV(COM1B1)) & ~_BV(COM1B0)
 #define StepperB_Disconnect   TCCR1A =  (TCCR1A & ~(_BV(COM1B1) | _BV(COM1B0)))
+#define StepperB_IsToggling   ((TCCR1A & (_BV(COM1B0) | _BV(COM1B1))) == _BV(COM1B0))
 
 void FastAccelStepperEngine::init() {
    noInterrupts();
@@ -79,9 +78,6 @@ inline bool FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t
       uint8_t rp = fas_q_readptr_B;
       uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
       if (next_wp != rp) {
-         if (wp == rp) {
-            pos_at_queue_end = fas_pos_B;
-         }
 	 steps <<= 1;
          pos_at_queue_end += dir_high ? steps : -steps;
          struct queue_entry *e = &fas_queue_B[wp];
@@ -203,38 +199,11 @@ ISR(TIMER1_OVF_vect) {
    if (!fas_stepperB.isRunning() && !fas_stepperB.fill_queue) {
       fas_stepperB._last_ms = 0;
       fas_stepperB.isr_speed_control = false;
-      uint8_t pin = fas_stepperB.auto_enablePin();
-      if (pin != 255) {
-        digitalWrite(pin, HIGH);
-      }
    }
    else {
       fas_stepperB.fill_queue = false;
       if (fas_stepperB.isr_speed_control) {
          fas_stepperB.isr_update_move(tpB - fas_stepperB.pos_at_queue_end);
-      }
-      if ((TIMSK1 & _BV(OCIE1B)) == 0) {
-         // motor is not yet running.
-         noInterrupts();
-         OCR1B = 32768;       // definite start point
-         StepperB_Zero;
-         TCCR1C = _BV(FOC1B); // force compare to ensure cleared output bits
-         StepperB_Toggle;
-         fas_skip_B = 0;
-         struct queue_entry *e = &fas_queue_B[fas_q_readptr_B];
-         uint8_t steps = e->steps;
-         fas_steps_B = steps;
-         if ((steps & 0x01) != 0) {
-            fas_count_up_B = !fas_count_up_B;
-            digitalWrite(fas_stepperB._dirPin, fas_count_up_B ? HIGH : LOW);
-         }
-         TIFR1 = _BV(OCF1B);    // clear interrupt flag
-         uint8_t pin = fas_stepperB.auto_enablePin();
-         if (pin != 255) {
-            digitalWrite(pin, LOW);
-         }
-         TIMSK1 |= _BV(OCIE1B); // enable compare B interrupt
-      interrupts();
       }
    }
 
@@ -277,46 +246,52 @@ ISR(TIMER1_COMPB_vect) {
 	 StepperB_Toggle;
       }
       OCR1B += 16384;
+      return;
    }
-   else {
+   else if (StepperB_IsToggling) {
       TCCR1C = _BV(FOC1B); // clear bit
-      // count the pulse
-      if (fas_count_up_B) {
-         fas_pos_B++;
-      } else {
-         fas_pos_B--;
-      }
       uint8_t rp = fas_q_readptr_B;
       struct queue_entry *e = &fas_queue_B[rp];
-      if ((e->steps -= 2) <= 1) {
-	 rp = (rp + 1) & QUEUE_LEN_MASK;
-	 fas_q_readptr_B = rp;
-	 if (rp == fas_q_next_writeptr_B) {
-            // queue is empty => set to output zero mode
-            StepperB_Disconnect;
-            TIMSK1 &= ~_BV(OCIE1B);
-	 }
-	 else {
-            // process next queue entry
-            e = &fas_queue_B[rp];
-            OCR1B += e->delta_lsw;
-            if (fas_skip_B = e->delta_msb) { // assign to skip and test for not zero
-               StepperB_Zero;
-	    }
-	    uint8_t steps = e->steps;
-	    fas_steps_B = steps;
-	    if ((steps & 0x01) != 0) {
-               fas_count_up_B = !fas_count_up_B;
-               digitalWrite(fas_stepperB._dirPin, fas_count_up_B ? HIGH : LOW);
-	    }
-	 }
-      }
-      else {
+      if ((e->steps -= 2) > 1) {
          // perform another step with this queue entry
 	 OCR1B += (e->delta_lsw += e->delta_change);
          if (fas_skip_B = e->delta_msb) { // assign to skip and test for not zero
             StepperB_Zero;
 	 }
+	 return;
+      }
+      rp = (rp + 1) & QUEUE_LEN_MASK;
+      fas_q_readptr_B = rp;
+      if (rp == fas_q_next_writeptr_B) {
+         // queue is empty => set to disconnect
+         StepperB_Disconnect;
+         uint8_t pin = fas_stepperB.auto_enablePin();
+         if (pin != 255) {
+            digitalWrite(pin, HIGH);
+         }
+         return;
+      }
+   }
+   // If reach here, then the next command entry to be processed - if any
+   uint8_t rp = fas_q_readptr_B;
+   if (rp != fas_q_next_writeptr_B) {
+      // command in queue
+      struct queue_entry *e = &fas_queue_B[rp];
+      OCR1B += e->delta_lsw;
+      if (fas_skip_B = e->delta_msb) { // assign to skip and test for not zero
+         StepperB_Zero;
+      }
+      else {
+         StepperB_Toggle;
+      }
+      uint8_t steps = e->steps;
+      fas_steps_B = steps;
+      if ((steps & 0x01) != 0) {
+         digitalWrite(fas_stepperB._dirPin, digitalRead(fas_stepperB._dirPin) == HIGH ? LOW : HIGH);
+      }
+      uint8_t pin = fas_stepperB.auto_enablePin();
+      if (pin != 255) {
+         digitalWrite(pin, LOW);
       }
    }
 }
@@ -340,6 +315,20 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
    uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
    digitalWrite(pin, LOW);
    pinMode(pin, OUTPUT);
+
+   // start interrupt
+   if (channelA) {
+   }
+   else {
+      noInterrupts();
+      OCR1B = 32768;         // definite start point
+      StepperB_Disconnect;
+      TCCR1C = _BV(FOC1B);   // force compare to ensure disconnect
+      fas_skip_B = 0;
+      TIFR1 = _BV(OCF1B);    // clear interrupt flag
+      TIMSK1 |= _BV(OCIE1B); // enable compare B interrupt
+      interrupts();
+   }
 }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
    _dirPin = dirPin;
@@ -490,7 +479,7 @@ long FastAccelStepper::getCurrentPosition() {
    }
    else {
       noInterrupts();
-      pos = fas_pos_B;
+      pos = 0; // TODO fas_pos_B;
       interrupts();
    }
    return pos;
