@@ -122,15 +122,19 @@ inline void FastAccelStepper::isr_fill_queue() {
       return;
     }
   }
+  if (target_pos == _pos_at_queue_end) {
+	  return;
+  }
   long remaining_steps = target_pos - _pos_at_queue_end;
   bool accelerating = false;
   bool decelerate_to_stop = false;
   bool reduce_speed = false;
+  float curr_speed = _min_travel_speed ? 16000000.0 / _min_travel_speed : 0;
   if (abs(remaining_steps) <= _deceleration_start) {
     decelerate_to_stop = true;
-  } else if (_curr_speed < _speed) {
+  } else if (curr_speed < _speed) {
     accelerating = true;
-  } else if (_curr_speed > _speed) {
+  } else if (curr_speed > _speed) {
     reduce_speed = true;
   }
   //   long curr_ms = millis();
@@ -140,18 +144,18 @@ inline void FastAccelStepper::isr_fill_queue() {
   //   }
   //   _last_ms = curr_ms;
   if (accelerating) {
-    _curr_speed += _accel / 1000.0 * dt_ms;
-    _curr_speed = min(_curr_speed, _speed);
+    curr_speed += _accel / 1000.0 * dt_ms;
+    curr_speed = min(curr_speed, _speed);
   }
   if (decelerate_to_stop) {
     _dec_time_ms = max(_dec_time_ms - dt_ms, 1.0);
-    _curr_speed = 2 * abs(remaining_steps) * 1000.0 / _dec_time_ms;
+    curr_speed = 2 * abs(remaining_steps) * 1000.0 / _dec_time_ms;
   }
   if (reduce_speed) {
-    _curr_speed -= _accel / 1000.0 * dt_ms;
-    _curr_speed = max(_curr_speed, _speed);
+    curr_speed -= _accel / 1000.0 * dt_ms;
+    curr_speed = max(curr_speed, _speed);
   }
-  unsigned long delta = round(16000000.0 / _curr_speed);
+  unsigned long delta = round(16000000.0 / curr_speed);
 
   uint16_t steps = (16000000 * 8 / 1000) / delta;  // How many steps in 8 ms ?
   steps = min(steps, 127);
@@ -161,7 +165,8 @@ inline void FastAccelStepper::isr_fill_queue() {
 #ifdef TEST
   int8_t res = add_queue_entry(delta, steps, remaining_steps > 0, 0);
   printf(
-      "add Delta = %ld  Steps = %d  Queue End Pos = %ld  Target pos = %ld Remaining steps = %ld "
+      "add Delta = %ld  Steps = %d  Queue End Pos = %ld  Target pos = %ld "
+      "Remaining steps = %ld "
       " => %d\n",
       delta, steps, _pos_at_queue_end, target_pos, remaining_steps, res);
 #else
@@ -199,11 +204,11 @@ FastAccelStepper* FastAccelStepperEngine::stepperB() { return &fas_stepperB; }
 FastAccelStepper::FastAccelStepper(bool channelA) {
   _channelA = channelA;
   _auto_enablePin = 255;
-  _curr_speed = 0.0;
   target_pos = 0;
   _pos_at_queue_end = 0;
   _dir_high_at_queue_end = true;
   isr_speed_control_enabled = false;
+  _min_travel_speed = 0;
 
   uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
   digitalWrite(pin, LOW);
@@ -256,10 +261,10 @@ void FastAccelStepper::set_auto_enable(bool auto_enable) {
     fas_autoEnablePin_B = _auto_enablePin;
   }
 }
-void FastAccelStepper::set_dynamics(float speed, float accel) {
-  _speed = speed;
+void FastAccelStepper::set_dynamics(uint32_t min_travel_speed, float accel) {
+  _min_travel_speed = min_travel_speed;
   _accel = accel;
-  _min_steps = round(speed * speed / accel);
+  _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_speed / min_travel_speed);
   if (target_pos != _pos_at_queue_end) {
     moveTo(target_pos);
   }
@@ -329,12 +334,13 @@ void FastAccelStepper::_calculate_move(long move) {
   // Steps needed to stop from current speed with defined acceleration
   unsigned long new_deceleration_start;
   unsigned long new_dec_time_ms;
-  unsigned long s_stop = round(_curr_speed * _curr_speed / 2.0 / _accel);
+  float curr_speed = _min_travel_speed ? 16000000.0 / _min_travel_speed : 0;
+  unsigned long s_stop = round(curr_speed * curr_speed / 2.0 / _accel);
   if (s_stop > steps) {
     // start deceleration immediately
     new_deceleration_start = steps;
-    new_dec_time_ms = round(2000.0 * steps / _curr_speed);
-  } else if (_curr_speed <= _speed) {
+    new_dec_time_ms = round(2000.0 * steps / curr_speed);
+  } else if (curr_speed <= _speed) {
     // add steps to reach current speed to full ramp
     unsigned long s_full_ramp = steps + s_stop;
     unsigned long ramp_steps = min(s_full_ramp, _min_steps);
@@ -362,7 +368,7 @@ void FastAccelStepper::enableOutputs() {
   }
 }
 long FastAccelStepper::getPositionAfterCommandsCompleted() {
-	return _pos_at_queue_end;
+  return _pos_at_queue_end;
 }
 long FastAccelStepper::getCurrentPosition() {
   long pos = _pos_at_queue_end;

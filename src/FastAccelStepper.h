@@ -45,7 +45,7 @@ class FastAccelStepper {
   bool isQueueFull();
 
   // For stepper movement control by FastAccelStepper
-  void set_dynamics(float speed, float accel);
+  void set_dynamics(uint32_t min_travel_speed, float accel);
   long target_pos;
   bool isr_speed_control_enabled;
   inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
@@ -67,14 +67,12 @@ class FastAccelStepper {
   float _speed;  // in steps/s
   float _accel;  // in steps/s²
 
-  unsigned long _min_steps;  // in steps
+  unsigned long _min_steps;    // in steps
+  uint32_t _min_travel_speed;  // in ticks, means 0.25us
 
   // used in interrupt routine isr_update_move
   unsigned long _deceleration_start;  // in steps
   long _dec_time_ms;                  // in ms
-
-  // current state
-  float _curr_speed;  // in steps/s
 };
 
 class FastAccelStepperEngine {
