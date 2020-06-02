@@ -272,27 +272,30 @@ ISR(TIMER1_COMPB_vect) {
          return;
       }
    }
-   // If reach here, then the next command entry to be processed - if any
-   uint8_t rp = fas_q_readptr_B;
-   if (rp != fas_q_next_writeptr_B) {
-      // command in queue
-      struct queue_entry *e = &fas_queue_B[rp];
-      OCR1B += e->delta_lsw;
-      if (fas_skip_B = e->delta_msb) { // assign to skip and test for not zero
-         StepperB_Zero;
+   else {
+      // If reach here, then stepper is idle and waiting for a command
+      uint8_t rp = fas_q_readptr_B;
+      if (rp == fas_q_next_writeptr_B) {
+         return;
       }
-      else {
-         StepperB_Toggle;
-      }
-      uint8_t steps = e->steps;
-      fas_steps_B = steps;
-      if ((steps & 0x01) != 0) {
-         digitalWrite(fas_stepperB._dirPin, digitalRead(fas_stepperB._dirPin) == HIGH ? LOW : HIGH);
-      }
-      uint8_t pin = fas_stepperB.auto_enablePin();
-      if (pin != 255) {
-         digitalWrite(pin, LOW);
-      }
+   }
+   // command in queue
+   struct queue_entry *e = &fas_queue_B[fas_q_readptr_B];
+   OCR1B += e->delta_lsw;
+   if (fas_skip_B = e->delta_msb) { // assign to skip and test for not zero
+      StepperB_Zero;
+   }
+   else {
+      StepperB_Toggle;
+   }
+   uint8_t steps = e->steps;
+   fas_steps_B = steps;
+   if ((steps & 0x01) != 0) {
+      digitalWrite(fas_stepperB._dirPin, digitalRead(fas_stepperB._dirPin) == HIGH ? LOW : HIGH);
+   }
+   uint8_t pin = fas_stepperB.auto_enablePin();
+   if (pin != 255) {
+      digitalWrite(pin, LOW);
    }
 }
 
