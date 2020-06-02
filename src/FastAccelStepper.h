@@ -9,7 +9,6 @@ class FastAccelStepper {
       void setDirectionPin(uint8_t dirPin);
       void setEnablePin(uint8_t enablePin);
 
-      inline uint8_t auto_enablePin();
       void set_auto_enable(bool auto_enable);
       void enableOutputs();
       void disableOutputs();
