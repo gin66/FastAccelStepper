@@ -15,14 +15,16 @@ uint16_t fas_debug_led_cnt = 0;
 uint8_t fas_queue_delta_msb_A[QUEUE_LEN];
 uint16_t fas_queue_delta_lsw_A[QUEUE_LEN];
 uint8_t fas_queue_steps_A[QUEUE_LEN];
-uint8_t fas_queue_delta_msb_B[QUEUE_LEN];
-uint16_t fas_queue_delta_lsw_B[QUEUE_LEN];
-uint8_t fas_queue_steps_B[QUEUE_LEN];
 uint8_t fas_q_readptr_A = 0;   // ISR stops if readptr == next_writeptr
 uint8_t fas_q_next_writeptr_A = 0;
 uint8_t fas_q_readptr_B = 0;
 uint8_t fas_q_next_writeptr_B = 0;
-
+struct queue_entry {
+   uint8_t steps;          // coding is bit7..1 is nr of steps and bit 0 is direction
+   uint8_t delta_msb;
+   uint16_t delta_lsw;     // using small values is not safe
+   int16_t  delta_change;  // change of delta on each step. delta_lsw + steps*delta_change must not over/underflow
+} fas_queue_A[QUEUE_LEN],fas_queue_B[QUEUE_LEN];
 // These variables are used to keep track of the stepper position and the target
 long fas_target_pos_A = 0;
 long fas_target_pos_B = 0;
@@ -64,7 +66,7 @@ void FastAccelStepperEngine::init() {
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
    fas_ledPin = ledPin;
 }
-inline bool FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high) {
+inline bool FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high, int16_t change) {
    if (_channelA) {
       noInterrupts();
       fas_queue_delta_msb_A[0] = msb;
@@ -80,11 +82,13 @@ inline bool FastAccelStepper::add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t
          if (wp == rp) {
             pos_at_queue_end = fas_pos_B;
          }
-	 steps &= 0x7f;
+	 steps <<= 1;
          pos_at_queue_end += dir_high ? steps : -steps;
-         fas_queue_delta_msb_B[wp] = msb;
-         fas_queue_delta_lsw_B[wp] = lsw;
-         fas_queue_steps_B[wp] = (dir_high != dir_high_at_queue_end) ? steps | 0x80 : steps;
+         struct queue_entry *e = &fas_queue_B[wp];
+         e->delta_msb = msb;
+         e->delta_lsw = lsw;
+	 e->delta_change = change;
+         e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
          dir_high_at_queue_end = dir_high;
          fas_q_next_writeptr_B = next_wp;
 	 return true;
@@ -140,7 +144,7 @@ inline void FastAccelStepper::isr_update_move(long remaining_steps) {
    else {
       delta_lsw = delta;
    }
-   add_queue_entry(x, delta_lsw, min(steps, abs(remaining_steps)), remaining_steps > 0);
+   add_queue_entry(x, delta_lsw, min(steps, abs(remaining_steps)), remaining_steps > 0, 0);
 }
 ISR(TIMER1_OVF_vect) {
    // disable OVF interrupt to avoid nesting
@@ -196,7 +200,7 @@ ISR(TIMER1_OVF_vect) {
 
    // Manage stepper B
    // if (tpB == fas_stepperB.pos_at_queue_end) {
-   if (!fas_stepperB.isRunning()) {
+   if (!fas_stepperB.isRunning() && !fas_stepperB.fill_queue) {
       fas_stepperB._last_ms = 0;
       fas_stepperB.isr_speed_control = false;
       uint8_t pin = fas_stepperB.auto_enablePin();
@@ -205,23 +209,25 @@ ISR(TIMER1_OVF_vect) {
       }
    }
    else {
+      fas_stepperB.fill_queue = false;
       if (fas_stepperB.isr_speed_control) {
          fas_stepperB.isr_update_move(tpB - fas_stepperB.pos_at_queue_end);
       }
       if ((TIMSK1 & _BV(OCIE1B)) == 0) {
-      // motor is not yet running.
-      noInterrupts();
-         OCR1B = TCNT1+16000; // delay 1ms for enable to act
-      StepperB_Zero;
+         // motor is not yet running.
+         noInterrupts();
+         OCR1B = 32768;       // definite start point
+         StepperB_Zero;
          TCCR1C = _BV(FOC1B); // force compare to ensure cleared output bits
-      StepperB_Toggle;
+         StepperB_Toggle;
          fas_skip_B = 0;
-      uint8_t steps = fas_queue_steps_B[fas_q_readptr_B];
-      fas_steps_B = steps & 0x7f;
-      if ((steps & 0x80) != 0) {
+         struct queue_entry *e = &fas_queue_B[fas_q_readptr_B];
+         uint8_t steps = e->steps;
+         fas_steps_B = steps;
+         if ((steps & 0x01) != 0) {
             fas_count_up_B = !fas_count_up_B;
             digitalWrite(fas_stepperB._dirPin, fas_count_up_B ? HIGH : LOW);
-      }
+         }
          TIFR1 = _BV(OCF1B);    // clear interrupt flag
          uint8_t pin = fas_stepperB.auto_enablePin();
          if (pin != 255) {
@@ -281,30 +287,34 @@ ISR(TIMER1_COMPB_vect) {
          fas_pos_B--;
       }
       uint8_t rp = fas_q_readptr_B;
-      if (--fas_steps_B == 0) {
+      struct queue_entry *e = &fas_queue_B[rp];
+      if ((e->steps -= 2) <= 1) {
 	 rp = (rp + 1) & QUEUE_LEN_MASK;
 	 fas_q_readptr_B = rp;
 	 if (rp == fas_q_next_writeptr_B) {
-            // set to output zero mode
+            // queue is empty => set to output zero mode
             StepperB_Disconnect;
             TIMSK1 &= ~_BV(OCIE1B);
 	 }
 	 else {
-            OCR1B += fas_queue_delta_lsw_B[rp];
-            if (fas_skip_B = fas_queue_delta_msb_B[rp]) { // assign to skip and test for not zero
+            // process next queue entry
+            e = &fas_queue_B[rp];
+            OCR1B += e->delta_lsw;
+            if (fas_skip_B = e->delta_msb) { // assign to skip and test for not zero
                StepperB_Zero;
 	    }
-	    uint8_t steps = fas_queue_steps_B[rp];
-	    fas_steps_B = steps & 0x7f;
-	    if ((steps & 0x80) != 0) {
+	    uint8_t steps = e->steps;
+	    fas_steps_B = steps;
+	    if ((steps & 0x01) != 0) {
                fas_count_up_B = !fas_count_up_B;
                digitalWrite(fas_stepperB._dirPin, fas_count_up_B ? HIGH : LOW);
 	    }
 	 }
       }
       else {
-         OCR1B += fas_queue_delta_lsw_B[rp];
-         if (fas_skip_B = fas_queue_delta_msb_B[rp]) { // assign to skip and test for not zero
+         // perform another step with this queue entry
+	 OCR1B += (e->delta_lsw += e->delta_change);
+         if (fas_skip_B = e->delta_msb) { // assign to skip and test for not zero
             StepperB_Zero;
 	 }
       }
@@ -324,6 +334,8 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
    _curr_speed = 0.0;
    pos_at_queue_end = 0;
    dir_high_at_queue_end = true;
+   isr_speed_control = false;
+   fill_queue = false;
 
    uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
    digitalWrite(pin, LOW);

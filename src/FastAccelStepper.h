@@ -22,7 +22,7 @@ class FastAccelStepper {
       // unstable API functions
       void set_dynamics(float speed, float accel);
 
-      inline bool add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high);
+      inline bool add_queue_entry(uint8_t msb, uint16_t lsw, uint8_t steps, bool dir_high, int16_t change);
 
       // MUST BE ONLY CALLED FROM THIS MODULES INTERRUPT SERVICE ROUTINE !
       inline void isr_update_move(long remaining_steps);
@@ -32,6 +32,7 @@ class FastAccelStepper {
       long _last_ms;            // in ms
 
       bool isr_speed_control;
+      bool fill_queue;
 
    private:
       void _calculate_move(long steps);

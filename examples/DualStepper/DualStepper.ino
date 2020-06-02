@@ -67,20 +67,20 @@ void loop() {
    if (queue_ok) {
      long motor = in_vals[0];
      FastAccelStepper *stepper = motor == 1 ? stepper1 : stepper2;
-     stepper->add_queue_entry(8,16384,120,true);
-     stepper->add_queue_entry(7,16384,120,true);
-     stepper->add_queue_entry(6,16384,120,true);
-     stepper->add_queue_entry(5,16384,120,true);
-     stepper->add_queue_entry(4,16384,120,true);
-     stepper->add_queue_entry(3,16384,120,true);
-     stepper->add_queue_entry(2,16384, 80,true);
-     stepper->add_queue_entry(2,16384, 80,true);
-     stepper->add_queue_entry(3,16384,120,true);
-     stepper->add_queue_entry(4,16384,120,true);
-     stepper->add_queue_entry(5,16384,120,true);
-     stepper->add_queue_entry(6,16384,120,true);
-     stepper->add_queue_entry(7,16384,120,true);
-     stepper->add_queue_entry(8,16384,120,true);
+     stepper->add_queue_entry(4,32768,120,true,-16384/120);
+     stepper->add_queue_entry(3,32768,120,true,-16384/120);
+     stepper->add_queue_entry(2,32768,120,true,-16384/120);
+     stepper->add_queue_entry(1,32768,120,true,         0);
+     stepper->add_queue_entry(1,32768,120,true, 16384/120);
+     stepper->add_queue_entry(2,32768,120,true, 16384/120);
+     stepper->add_queue_entry(3,32768, 80,true,         0);
+     stepper->add_queue_entry(3,32768, 80,false,        0);
+     stepper->add_queue_entry(3,32768,120,false,-16384/120);
+     stepper->add_queue_entry(2,32768,120,false,-16384/120);
+     stepper->add_queue_entry(1,32768,120,false, 16384/120);
+     stepper->add_queue_entry(2,32768,120,false, 16384/120);
+     stepper->add_queue_entry(3,32768,120,false, 16384/120);
+     stepper->add_queue_entry(4,32768,120,false,         0);
    }
 
    if (cmd_ok) {
