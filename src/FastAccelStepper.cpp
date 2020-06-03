@@ -122,7 +122,7 @@ inline void FastAccelStepper::isr_fill_queue() {
     }
   }
   if (target_pos == _pos_at_queue_end) {
-	  return;
+    return;
   }
   long remaining_steps = target_pos - _pos_at_queue_end;
   bool accelerating = false;
@@ -260,7 +260,8 @@ void FastAccelStepper::set_auto_enable(bool auto_enable) {
 void FastAccelStepper::set_dynamics(uint32_t min_travel_ticks, float accel) {
   _min_travel_ticks = min_travel_ticks;
   _accel = accel;
-  _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_ticks / min_travel_ticks);
+  _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_ticks /
+                     min_travel_ticks);
   if (target_pos != _pos_at_queue_end) {
     moveTo(target_pos);
   }
