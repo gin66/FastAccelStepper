@@ -59,7 +59,7 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
       return AQE_CHANGE_TOO_LOW;
     }
     if (start_delta_ticks + c_sum < min_delta_ticks()) {
-      return AQE_CHANGE_TOO_LOW;
+      return AQE_CUMULATED_CHANGE_TOO_LOW;
     }
   }
 
@@ -163,7 +163,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   }
 
   // Forward planning of minimum 10ms or more on slow speed.
-  uint32_t planning_ticks = max(2 * curr_ticks, 16*20000);
+  uint32_t planning_ticks = max(2 * curr_ticks, 16*10000);
 #ifdef TEST
   printf("accel=%f  curr_ticks=%d dticks=%d   %s %s %s\n", _accel, curr_ticks,
          planning_ticks, accelerating ? "ACC" : "",
@@ -230,7 +230,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   }
 
   // Number of commands
-  uint8_t command_cnt = min(steps,max(steps / 128 + 1, abs(total_change) / 32768));
+  uint8_t command_cnt = min(steps,max(steps / 128 + 1, (abs(total_change)+32767) / 32768));
 
   // Steps per command
   uint16_t steps_per_command = (steps+command_cnt-1) / command_cnt;

@@ -16,7 +16,8 @@
 #define AQE_TOO_LOW -3
 #define AQE_CHANGE_TOO_HIGH -4
 #define AQE_CHANGE_TOO_LOW -5
-#define AQE_STEPS_ERROR -6
+#define AQE_CUMULATED_CHANGE_TOO_LOW -6
+#define AQE_STEPS_ERROR -7
 
 // Limit to 40.000 Steps/s
 #define ABSOLUTE_MIN_TICKS (16000000 / 40000)

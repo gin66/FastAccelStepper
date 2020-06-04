@@ -173,5 +173,6 @@ int main() {
   test_with_pars( 1600, 100000, 10000.0, true,     11.0);
   test_with_pars( 1600, 100000,  1000.0, true,     11.0);
   test_with_pars(15000,   1600, 10000.0, true,      3.0);
+  test_with_pars(  100, 100000, 10000.0, true,      0.7);
   printf("TEST_02 PASSED\n");
 }
