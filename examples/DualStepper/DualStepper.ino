@@ -175,5 +175,11 @@ else {
    }
    else {
       stopped = !(stepper1->isRunning() || stepper2->isRunning());
-   }
+  }
+stepper1->isr_fill_queue(); 
+stepper2->isr_fill_queue();
+while (stepper1->isRunning() || stepper2->isRunning()) {
+stepper1->isr_fill_queue(); 
+stepper2->isr_fill_queue();
+}
 }

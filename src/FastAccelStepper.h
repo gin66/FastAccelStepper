@@ -59,8 +59,8 @@ class FastAccelStepper {
 
  private:
   uint8_t _dirPin;
-  int32_t _pos_at_queue_end;       // in steps
-  int32_t _ticks_at_queue_end;     // in timer ticks, 0 on stopped stepper
+  int32_t _pos_at_queue_end;    // in steps
+  int32_t _ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
   bool _dir_high_at_queue_end;  // direction high corresponds to position
                                 // counting upwards
 
@@ -71,13 +71,13 @@ class FastAccelStepper {
   float _speed;  // in steps/s
   float _accel;  // in steps/s²
 
-  uint32_t _min_steps;    // in steps
+  uint32_t _min_steps;         // in steps
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
   uint32_t _starting_ticks;    // in ticks, means 0.25us
 
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps
-  uint32_t _dec_time_ms;                  // in ms
+  uint32_t _dec_time_ms;         // in ms
 };
 
 class FastAccelStepperEngine {
