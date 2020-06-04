@@ -90,7 +90,7 @@ void queue_out_of_range() {
        "Too low change provided should trigger error");
   assert(s.isQueueEmpty());
 
-  res = s.add_queue_entry(65536, 100, true, 328);
+  res = s.add_queue_entry(65536, 100, true, 32768 / 99 + 1);
   test(res == AQE_CHANGE_TOO_HIGH,
        "Too high change provided should trigger error");
   assert(s.isQueueEmpty());

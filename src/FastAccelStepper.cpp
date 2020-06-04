@@ -44,8 +44,8 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
   if (start_delta_ticks > 255L * 16384L + 65535L) {
     return AQE_TOO_HIGH;
   }
-  if (change_ticks != 0) {
-    c_sum = change_ticks * steps;
+  if ((change_ticks != 0) && (steps > 1)) {
+    c_sum = change_ticks * (steps - 1);
   }
   if (change_ticks > 0) {
     if (c_sum > 32768) {
@@ -103,7 +103,29 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
   return AQE_FULL;
 }
 
+//*************************************************************************************************
+// fill_queue generates commands to the stepper for executing a ramp
+//
+// Plan is to fill the queue with commmands with approx. 10 ms ahead (or more).
+// For low speeds, this results in singlestepping
+// For high speeds (40kSteps/s) approx. 400 Steps to be created an as such min.
+// 3 commands to generate
+//
+// Calculation is done in time domain
+//
+// Assume current speed - represented by curr_ticks, then the next speed shall
+// be:
+//
+// - in case of acceleration:
+//		   next_ticks = curr_ticks / ( 1 + accel * dt * curr_ticks)
+//
+// - in case of deceleration:
+//		   next_ticks = curr_ticks / ( 1 - accel * dt * curr_ticks)
+//
+//*************************************************************************************************
+
 inline void FastAccelStepper::isr_fill_queue() {
+  // Check preconditions to be allowed to fill the queue
   if (!isr_speed_control_enabled) {
     return;
   }
@@ -119,101 +141,127 @@ inline void FastAccelStepper::isr_fill_queue() {
   if (target_pos == _pos_at_queue_end) {
     return;
   }
+  if (_min_travel_ticks == 0) {
+    puts("HERE");
+    return;
+  }
+
+  // preconditions are fulfilled, so create the command(s)
+
+  // check state for acceleration/deceleration or deceleration to stop
   long remaining_steps = target_pos - _pos_at_queue_end;
   bool accelerating = false;
   bool decelerate_to_stop = false;
   bool reduce_speed = false;
-  if (_ticks_at_queue_end == 0) {
-    // motor start with minimum speed
-    _ticks_at_queue_end = round(16000000.0 * sqrt(2.0 / _accel));
+  uint32_t curr_ticks = _ticks_at_queue_end;
+  if (curr_ticks == 0) {  // motor start with minimum speed
+    curr_ticks = _starting_ticks;
   }
   if (abs(remaining_steps) <= _deceleration_start) {
     decelerate_to_stop = true;
-  } else if (_min_travel_ticks < _ticks_at_queue_end) {
+  } else if (_min_travel_ticks < curr_ticks) {
     accelerating = true;
-  } else if (_min_travel_ticks > _ticks_at_queue_end) {
+  } else if (_min_travel_ticks > curr_ticks) {
     reduce_speed = true;
   }
 
-  float curr_speed = 16000000.0 / _ticks_at_queue_end;
-  float requested_speed =
-      _min_travel_ticks ? 16000000.0 / _min_travel_ticks : 0;
-  uint32_t dticks =
-      max(_ticks_at_queue_end, 16000000 / 4000);  // min dt is 4 ms
+  // Forward planning of minimum 10ms or more on slow speed.
+  uint32_t planning_ticks = max(2 * curr_ticks, 16000000 / 10000);
 #ifdef TEST
-  printf(
-      "accel=%f  ticks_at_queue_end=%ld  curr_speed=%f  req_speed=%f  "
-      "dticks=%d   %s %s %s\n",
-      _accel, _ticks_at_queue_end, curr_speed, requested_speed, dticks,
-	  accelerating ? "ACC":"", decelerate_to_stop ? "STOP":"", reduce_speed ? "RED":"");
+  printf("accel=%f  curr_ticks=%d dticks=%d   %s %s %s\n", _accel, curr_ticks,
+         planning_ticks, accelerating ? "ACC" : "",
+         decelerate_to_stop ? "STOP" : "", reduce_speed ? "RED" : "");
 #endif
 
+  // Calculate the new speed based on the planning_ticks
+  uint32_t next_ticks = curr_ticks;
   if (accelerating) {
-    float dv = _accel * dticks / 16000000.0;
-    if (dv < 1.0) {
-      dticks = round(16000000.0 / _accel);
-    }
-    curr_speed += dv;
-    curr_speed = min(curr_speed, requested_speed);
+    float delta =
+        1.0 + _accel * planning_ticks * curr_ticks / 16000000.0 / 16000000.0;
+    next_ticks = round(curr_ticks / delta);
+    // avoid overshoot
+    next_ticks = max(next_ticks, _min_travel_ticks);
 #ifdef TEST
-    printf("accelerate to speed=%f  with dv=%f  and dticks=%d\n", curr_speed,
-           dv, dticks);
+    printf("accelerate ticks=%d => %d  during %d ticks (delta = %f)\n",
+           curr_ticks, next_ticks, planning_ticks, delta);
 #endif
   }
-  if (reduce_speed) {
-    curr_speed -= _accel * dticks / 16000000.0;
-    curr_speed = max(curr_speed, requested_speed);
+  if (reduce_speed || decelerate_to_stop) {
+    float delta =
+        1.0 - _accel * planning_ticks * curr_ticks / 16000000.0 / 16000000.0;
+    next_ticks = round(curr_ticks / delta);
+    // avoid undershoot
+    next_ticks = max(next_ticks, _min_travel_ticks);
+    next_ticks = min(next_ticks, _min_travel_ticks);
 #ifdef TEST
-    printf("reduce to speed=%f\n", curr_speed);
+    printf("reduce ticks=%d => %d  during %d ticks\n", curr_ticks, next_ticks,
+           planning_ticks);
 #endif
   }
   if (decelerate_to_stop) {
-    _dec_time_ms = max(_dec_time_ms - dticks / 16000.0, 1.0);
-    curr_speed = min(2 * abs(remaining_steps) * 1000.0 / _dec_time_ms, curr_speed);
+//    _dec_time_ms = max(_dec_time_ms - dticks / 16000.0, 1.0);
+//    curr_speed =
+//        min(2 * abs(remaining_steps) * 1000.0 / _dec_time_ms, curr_speed);
+//    ticks_after_command = round(16000000.0 / curr_speed);
 #ifdef TEST
-    printf("towards stop with speed=%f  remaining time=%ld\n", curr_speed,
-           _dec_time_ms);
+//    printf("towards stop with speed=%f  remaining time=%ld\n", curr_speed,
+//           _dec_time_ms);
 #endif
   }
-  unsigned long ticks_after_command = round(16000000.0 / curr_speed);
 #ifdef TEST
-  printf("=> expected ticks after command=%ld\n", ticks_after_command);
+  printf("=> expected ticks after command(s) = %d\n", next_ticks);
 #endif
 
-  uint16_t steps = dticks / ticks_after_command;
-  steps = min(steps, 127);
+  // Number of steps to execute with llmitation to min 1 and max remaining steps
+  uint16_t steps = planning_ticks / next_ticks;
   steps = max(steps, 1);
   steps = min(steps, abs(remaining_steps));
 
-  uint32_t ticks_at_start = _ticks_at_queue_end;
-  int32_t change = 0;
-  if (steps > 1) {
-    int16_t s2 = steps * (steps - 1) / 2;
-    change = (int32_t)ticks_after_command - (int32_t)_ticks_at_queue_end;
-    if (abs(change) > 32768) {
-#ifdef TEST
-      printf("Single step\n");
-#endif
-      ticks_at_start = _ticks_at_queue_end + change;
-      steps = 1;
-      change = 0;
-    }
-    change /= s2;
-  } else {
-    ticks_at_start = ticks_after_command;
-  }
+  // Calculate change per step
+  int32_t total_change = (int32_t)next_ticks - (int32_t)curr_ticks;
+  int32_t change = total_change / steps;
+  
+  // Apply change to curr_ticks
+  curr_ticks += change;
 
-  int8_t res =
-      add_queue_entry(ticks_at_start, steps, remaining_steps > 0, change);
+  // Number of commands
+  uint8_t command_cnt = min(steps,max(steps / 128 + 1, abs(total_change) / 32768));
+
+  // Steps per command
+  uint16_t steps_per_command = (steps+command_cnt-1) / command_cnt;
+
+  bool dir = remaining_steps > 0;
+
 #ifdef TEST
-  printf(
-      "add command Steps = %d start_ticks = %d  Queue End Pos = %ld  Target "
-      "pos = %ld "
-      "Remaining steps = %ld  tick_change=%d"
-      " => %d\n",
-      steps, ticks_at_start, _pos_at_queue_end, target_pos, remaining_steps,
-      change, res);
+  printf("Issue %d commands for %d steps with %d steps per command for total change %d and %d change per step\n",
+		  command_cnt, steps, steps_per_command, total_change, change);
 #endif
+
+  for (uint16_t c = 1; c < command_cnt; c++) {
+    int8_t res = add_queue_entry(curr_ticks, steps_per_command, dir, change);
+    curr_ticks += steps_per_command * change;
+    steps -= steps_per_command;
+    remaining_steps -= steps_per_command;
+#ifdef TEST
+    printf(
+        "add command %d Steps = %d start_ticks = %d  Target "
+        "pos = %ld "
+        "Remaining steps = %ld  tick_change=%d"
+        " => res=%d   ticks_at_queue_end = %d\n",
+        (command_cnt+1-c), steps_per_command, curr_ticks, target_pos, remaining_steps, change, res, _ticks_at_queue_end);
+#endif
+  }
+  int8_t res = add_queue_entry(curr_ticks, steps, dir, change);
+#ifdef TEST
+    printf(
+        "add command Steps = %d start_ticks = %d  Target "
+        "pos = %ld "
+        "Remaining steps = %ld  tick_change=%d"
+        " => res=%d   ticks_at_queue_end = %d\n",
+        steps, curr_ticks, target_pos, remaining_steps, change, res, _ticks_at_queue_end);
+#endif
+  curr_ticks += steps_per_command * change;
+  steps -= steps_per_command;
   if (steps == abs(remaining_steps)) {
     add_queue_stepper_stop();
 #ifdef TEST
@@ -318,6 +366,7 @@ void FastAccelStepper::set_dynamics(uint32_t min_travel_ticks, float accel) {
   _accel = accel;
   _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_ticks /
                      min_travel_ticks);
+  _starting_ticks = round(16000000.0 * sqrt(2.0 / _accel));
   if (target_pos != _pos_at_queue_end) {
     // moveTo(target_pos);
   }

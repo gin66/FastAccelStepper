@@ -18,6 +18,9 @@
 #define AQE_CHANGE_TOO_LOW -5
 #define AQE_STEPS_ERROR -6
 
+// Limit to 40.000 Steps/s
+#define ABSOLUTE_MIN_TICKS (16000000 / 40000)
+
 class FastAccelStepper {
  public:
   // stable API functions
@@ -54,8 +57,8 @@ class FastAccelStepper {
 
  private:
   uint8_t _dirPin;
-  long _pos_at_queue_end;       // in steps
-  long _ticks_at_queue_end;     // in timer ticks, 0 on stopped stepper
+  int32_t _pos_at_queue_end;       // in steps
+  int32_t _ticks_at_queue_end;     // in timer ticks, 0 on stopped stepper
   bool _dir_high_at_queue_end;  // direction high corresponds to position
                                 // counting upwards
 
@@ -68,6 +71,7 @@ class FastAccelStepper {
 
   unsigned long _min_steps;    // in steps
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
+  uint32_t _starting_ticks;    // in ticks, means 0.25us
 
   // used in interrupt routine isr_update_move
   unsigned long _deceleration_start;  // in steps
