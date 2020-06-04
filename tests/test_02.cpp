@@ -163,6 +163,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, float accel,
   }
   printf("Total time %f\n", rc.total_ticks/16000000.0);
   test(rc.total_ticks / 16000000.0 < max_time, "ramp too slow");
+  test(s.isStopped(), "is not stopped");
 }
 
 int main() {

@@ -33,6 +33,9 @@ void FastAccelStepperEngine::init() {
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
 }
+bool FastAccelStepper::isStopped() {
+	return _ticks_at_queue_end == 0;
+}
 void FastAccelStepper::add_queue_stepper_stop() { _ticks_at_queue_end = 0; }
 inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
                                              uint8_t steps, bool dir_high,
@@ -214,9 +217,10 @@ inline void FastAccelStepper::isr_fill_queue() {
 #endif
 
   // Number of steps to execute with llmitation to min 1 and max remaining steps
-  uint16_t steps = planning_ticks / next_ticks;
-  steps = max(steps, 1);
-  steps = min(steps, abs(remaining_steps));
+  uint16_t total_steps = planning_ticks / next_ticks;
+  total_steps = max(total_steps, 1);
+  total_steps = min(total_steps, abs(remaining_steps));
+  uint16_t steps = total_steps;
 
   // Calculate change per step
   int32_t total_change = (int32_t)next_ticks - (int32_t)curr_ticks;
@@ -264,7 +268,6 @@ inline void FastAccelStepper::isr_fill_queue() {
 #endif
     curr_ticks += steps_per_command * change;
     steps -= steps_per_command;
-    remaining_steps -= steps_per_command;
   }
   int8_t res = add_queue_entry(curr_ticks, steps, dir, change);
 #ifdef TEST
@@ -276,8 +279,7 @@ inline void FastAccelStepper::isr_fill_queue() {
         steps, curr_ticks, target_pos, remaining_steps, change, res, _ticks_at_queue_end);
 #endif
   curr_ticks += steps_per_command * change;
-  steps -= steps_per_command;
-  if (steps == abs(remaining_steps)) {
+  if (total_steps == abs(remaining_steps)) {
     add_queue_stepper_stop();
      isr_speed_control_enabled = false;
 #ifdef TEST

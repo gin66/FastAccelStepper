@@ -47,6 +47,7 @@ class FastAccelStepper {
   void add_queue_stepper_stop();
   bool isQueueEmpty();
   bool isQueueFull();
+  bool isStopped();
 
   // For stepper movement control by FastAccelStepper
   void set_dynamics(uint32_t min_travel_ticks, float accel);
