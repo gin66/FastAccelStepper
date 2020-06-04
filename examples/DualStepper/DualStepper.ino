@@ -67,44 +67,64 @@ void loop() {
    if (queue_ok) {
      long motor = in_vals[0];
      FastAccelStepper *stepper = motor == 1 ? stepper1 : stepper2;
-     stepper->add_queue_entry(4,32768,120,true,-16384/120);
-     stepper->add_queue_entry(3,32768,120,true,-16384/120);
-     stepper->add_queue_entry(2,32768,120,true,-16384/120);
-     stepper->add_queue_entry(1,32768,120,true,         0);
-     stepper->add_queue_entry(1,32768,120,true, 16384/120);
-     stepper->add_queue_entry(2,32768,120,true, 16384/120);
-     stepper->add_queue_entry(3,32768, 80,true,         0);
-     stepper->add_queue_entry(3,32768, 80,false,        0);
-     stepper->add_queue_entry(3,32768,120,false,-16384/120);
-     stepper->add_queue_entry(2,32768,120,false,-16384/120);
-     stepper->add_queue_entry(1,32768,120,false, 16384/120);
-     stepper->add_queue_entry(2,32768,120,false, 16384/120);
-     stepper->add_queue_entry(3,32768,120,false, 16384/120);
-     stepper->add_queue_entry(4,32768,120,false,         0);
+     stepper->set_dynamics(16384, 100.0);
+     if (false) {
+     Serial.println(stepper->add_queue_entry(5L*16384,120,true,-16384/120));
+     Serial.println(stepper->add_queue_entry(4L*16384,120,true,-16384/120));
+     Serial.println(stepper->add_queue_entry(3L*16384,120,true,-16384/120));
+     Serial.println(stepper->add_queue_entry(2L*16384,120,true,         0));
+     Serial.println(stepper->add_queue_entry(2L*16384,120,true, 16384/120));
+     Serial.println(stepper->add_queue_entry(3L*16384,120,true, 16384/120));
+     Serial.println(stepper->add_queue_entry(4L*16384, 80,true,         0));
+     Serial.println(stepper->add_queue_entry(4L*16384, 80,false,        0));
+     Serial.println(stepper->add_queue_entry(4L*16384,120,false,-16384/120));
+     Serial.println(stepper->add_queue_entry(3L*16384,120,false,-16384/120));
+     Serial.println(stepper->add_queue_entry(2L*16384,120,false, 16384/120));
+     Serial.println(stepper->add_queue_entry(3L*16384,120,false, 16384/120));
+     Serial.println(stepper->add_queue_entry(4L*16384,120,false, 16384/120));
+     Serial.println(stepper->add_queue_entry(5L*16384,120,false,         0));
+}
+else {
+     Serial.println(stepper->add_queue_entry(5L*16384,120,true,-16384/119));
+     Serial.println(stepper->add_queue_entry(4L*16384,120,true,-16384/119));
+     Serial.println(stepper->add_queue_entry(3L*16384,120,true,-16384/119));
+     Serial.println(stepper->add_queue_entry(2L*16384,120,true,- 8192/119));
+     Serial.println(stepper->add_queue_entry(6L* 4096,120,true,- 4096/119));
+     Serial.println(stepper->add_queue_entry(5L* 4096,120,true,- 4096/119));
+     Serial.println(stepper->add_queue_entry(4L* 4096,120,true,- 4096/119));
+     Serial.println(stepper->add_queue_entry(3L* 4096,120,true,- 4096/119));
+     Serial.println(stepper->add_queue_entry(2L* 4096,120,true,         0));
+     Serial.println(stepper->add_queue_entry(2L* 4096,120,true,         0));
+     Serial.println(stepper->add_queue_entry(2L* 4096,120,true,         0));
+     Serial.println(stepper->add_queue_entry(2L* 4096,120,true,         0));
+     Serial.println(stepper->add_queue_entry(2L* 4096,120,true,         0));
+     Serial.println(stepper->add_queue_entry(2L* 4096,120,true,         0));
+     Serial.println(stepper->add_queue_entry(2L* 4096,120,true,         0));
+}
    }
 
    if (cmd_ok) {
      long motor = in_vals[0];
      long move = in_vals[1];
-     long speed = in_vals[2];
+     long ticks = in_vals[2];
      long accel = in_vals[3];
      if  (((motor == 1) || (motor == 2)) && move) {
-        Serial.print("speed=");
-        Serial.print(speed);
+        Serial.print("ticks=");
+        Serial.print(ticks);
         Serial.print("  accel=");
         Serial.print(accel);
         Serial.print("  move=");
         Serial.print(move);
         if (motor == 1) {
            stopped = false;
-           stepper1->set_dynamics(speed*1.0, accel*1.0);
+           stepper1->set_dynamics(ticks, accel*1.0);
            stepper1->move(move);
            Serial.print("  Start stepper 1: ");
            Serial.println(stepper1->getCurrentPosition());
         }
         if (motor == 2) {
            stopped = false;
-           stepper2->set_dynamics(speed*1.0, accel*1.0);
+           stepper2->set_dynamics(ticks, accel*1.0);
            stepper2->move(move);
            Serial.print("  Start stepper 2: ");
            Serial.println(stepper2->getCurrentPosition());
@@ -115,6 +135,7 @@ void loop() {
 
    if (!stopped) {
       Serial.print("Stepper 1: ");
+      Serial.print(stepper1->isr_speed_control_enabled ? " AUTO ":" MANU ");
       Serial.print(stepper1->getCurrentPosition());
       if (stepper1->isRunning()) {
          Serial.print("  RUNNING");
@@ -123,6 +144,7 @@ void loop() {
          Serial.print("  PAUSED ");
       }
       Serial.print("  Stepper 2: ");
+      Serial.print(stepper2->isr_speed_control_enabled ? " AUTO ":" MANU ");
       Serial.print(stepper2->getCurrentPosition());
       if (stepper2->isRunning()) {
          Serial.print("  RUNNING");
@@ -130,10 +152,10 @@ void loop() {
       else {
          Serial.print("  PAUSED ");
       }
-      Serial.print("  Queue End: Dir=");
-      Serial.print(stepper2->dir_high_at_queue_end ? 'H' : 'L');
-      Serial.print("  Pos=");
-      Serial.print(stepper2->pos_at_queue_end);
+      //Serial.print("  Queue End: Dir=");
+      //Serial.print(stepper2->dir_high_at_queue_end ? 'H' : 'L');
+      //Serial.print("  Pos=");
+      //Serial.print(stepper2->pos_at_queue_end);
       Serial.print("  TCCR1A=");
       Serial.print(TCCR1A);
       Serial.print("  TCCR1B=");

@@ -14,6 +14,8 @@ FastAccelStepper fas_stepperA = FastAccelStepper(true);
 FastAccelStepper fas_stepperB = FastAccelStepper(false);
 
 void FastAccelStepperEngine::init() {
+  fas_stepperA.isr_speed_control_enabled = false;
+  fas_stepperB.isr_speed_control_enabled = false;
   noInterrupts();
 
   // Set WGM13:0 to all zero => Normal mode
@@ -31,6 +33,7 @@ void FastAccelStepperEngine::init() {
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
 }
+void FastAccelStepper::add_queue_stepper_stop() { _ticks_at_queue_end = 0; }
 inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
                                              uint8_t steps, bool dir_high,
                                              int16_t change_ticks) {
@@ -38,14 +41,11 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
   if (steps >= 128) {
     return AQE_STEPS_ERROR;
   }
-  if (start_delta_ticks > 255 * 16384 + 65535) {
+  if (start_delta_ticks > 255L * 16384L + 65535L) {
     return AQE_TOO_HIGH;
   }
   if (change_ticks != 0) {
-    c_sum = change_ticks;
-    c_sum *= steps;
-    c_sum *= (steps - 1);
-    c_sum /= 2;
+    c_sum = change_ticks * steps;
   }
   if (change_ticks > 0) {
     if (c_sum > 32768) {
@@ -67,43 +67,38 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
     lsw = start_delta_ticks & 16383;
     lsw |= 16384;
   } else {
+    msb = 0;
     lsw = start_delta_ticks;
   }
 
+  uint8_t wp;
+  uint8_t rp;
+  struct queue_entry* e;
   if (_channelA) {
-    uint8_t wp = fas_q_next_writeptr_A;
-    uint8_t rp = fas_q_readptr_A;
-    uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
-    if (next_wp != rp) {
-      _pos_at_queue_end += dir_high ? steps : -steps;
-      steps <<= 1;
-      struct queue_entry* e = &fas_queue_A[wp];
-      e->delta_msb = msb;
-      e->delta_lsw = lsw;
-      e->delta_change = change_ticks;
-      e->steps = (dir_high != _dir_high_at_queue_end) ? steps | 0x01 : steps;
-      _ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
-      _dir_high_at_queue_end = dir_high;
-      fas_q_next_writeptr_A = next_wp;
-      return AQE_OK;
-    }
+    wp = fas_q_next_writeptr_A;
+    rp = fas_q_readptr_A;
+    e = &fas_queue_A[wp];
   } else {
-    uint8_t wp = fas_q_next_writeptr_B;
-    uint8_t rp = fas_q_readptr_B;
-    uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
-    if (next_wp != rp) {
-      _pos_at_queue_end += dir_high ? steps : -steps;
-      steps <<= 1;
-      struct queue_entry* e = &fas_queue_B[wp];
-      e->delta_msb = msb;
-      e->delta_lsw = lsw;
-      e->delta_change = change_ticks;
-      e->steps = (dir_high != _dir_high_at_queue_end) ? steps | 0x01 : steps;
-      _ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
-      _dir_high_at_queue_end = dir_high;
+    wp = fas_q_next_writeptr_B;
+    rp = fas_q_readptr_B;
+    e = &fas_queue_B[wp];
+  }
+  uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
+  if (next_wp != rp) {
+    _pos_at_queue_end += dir_high ? steps : -steps;
+    steps <<= 1;
+    e->delta_msb = msb;
+    e->delta_lsw = lsw;
+    e->delta_change = change_ticks;
+    e->steps = (dir_high != _dir_high_at_queue_end) ? steps | 0x01 : steps;
+    _ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
+    _dir_high_at_queue_end = dir_high;
+    if (_channelA) {
+      fas_q_next_writeptr_A = next_wp;
+    } else {
       fas_q_next_writeptr_B = next_wp;
-      return AQE_OK;
     }
+    return AQE_OK;
   }
   return AQE_FULL;
 }
@@ -128,6 +123,10 @@ inline void FastAccelStepper::isr_fill_queue() {
   bool accelerating = false;
   bool decelerate_to_stop = false;
   bool reduce_speed = false;
+  if (_ticks_at_queue_end == 0) {
+    // motor start with minimum speed
+    _ticks_at_queue_end = round(16000000.0 * sqrt(2.0 / _accel));
+  }
   if (abs(remaining_steps) <= _deceleration_start) {
     decelerate_to_stop = true;
   } else if (_min_travel_ticks < _ticks_at_queue_end) {
@@ -136,37 +135,93 @@ inline void FastAccelStepper::isr_fill_queue() {
     reduce_speed = true;
   }
 
-  float curr_speed = _min_travel_ticks ? 16000000.0 / _min_travel_ticks : 0;
-  //   long curr_ms = millis();
-  // long dt_ms = 16000000 / 65536;
+  float curr_speed = 16000000.0 / _ticks_at_queue_end;
+  float requested_speed =
+      _min_travel_ticks ? 16000000.0 / _min_travel_ticks : 0;
+  uint32_t dticks =
+      max(_ticks_at_queue_end, 16000000 / 4000);  // min dt is 4 ms
+#ifdef TEST
+  printf(
+      "accel=%f  ticks_at_queue_end=%ld  curr_speed=%f  req_speed=%f  "
+      "dticks=%d   %s %s %s\n",
+      _accel, _ticks_at_queue_end, curr_speed, requested_speed, dticks,
+	  accelerating ? "ACC":"", decelerate_to_stop ? "STOP":"", reduce_speed ? "RED":"");
+#endif
+
   if (accelerating) {
-    curr_speed += _accel / 1000.0 * dt_ms;
-    curr_speed = min(curr_speed, _speed);
-  }
-  if (decelerate_to_stop) {
-    _dec_time_ms = max(_dec_time_ms - dt_ms, 1.0);
-    curr_speed = 2 * abs(remaining_steps) * 1000.0 / _dec_time_ms;
+    float dv = _accel * dticks / 16000000.0;
+    if (dv < 1.0) {
+      dticks = round(16000000.0 / _accel);
+    }
+    curr_speed += dv;
+    curr_speed = min(curr_speed, requested_speed);
+#ifdef TEST
+    printf("accelerate to speed=%f  with dv=%f  and dticks=%d\n", curr_speed,
+           dv, dticks);
+#endif
   }
   if (reduce_speed) {
-    curr_speed -= _accel / 1000.0 * dt_ms;
-    curr_speed = max(curr_speed, _speed);
+    curr_speed -= _accel * dticks / 16000000.0;
+    curr_speed = max(curr_speed, requested_speed);
+#ifdef TEST
+    printf("reduce to speed=%f\n", curr_speed);
+#endif
   }
-  unsigned long delta = round(16000000.0 / curr_speed);
+  if (decelerate_to_stop) {
+    _dec_time_ms = max(_dec_time_ms - dticks / 16000.0, 1.0);
+    curr_speed = min(2 * abs(remaining_steps) * 1000.0 / _dec_time_ms, curr_speed);
+#ifdef TEST
+    printf("towards stop with speed=%f  remaining time=%ld\n", curr_speed,
+           _dec_time_ms);
+#endif
+  }
+  unsigned long ticks_after_command = round(16000000.0 / curr_speed);
+#ifdef TEST
+  printf("=> expected ticks after command=%ld\n", ticks_after_command);
+#endif
 
-  uint16_t steps = (16000000 * 8 / 1000) / delta;  // How many steps in 8 ms ?
+  uint16_t steps = dticks / ticks_after_command;
   steps = min(steps, 127);
   steps = max(steps, 1);
   steps = min(steps, abs(remaining_steps));
 
+  uint32_t ticks_at_start = _ticks_at_queue_end;
+  int32_t change = 0;
+  if (steps > 1) {
+    int16_t s2 = steps * (steps - 1) / 2;
+    change = (int32_t)ticks_after_command - (int32_t)_ticks_at_queue_end;
+    if (abs(change) > 32768) {
 #ifdef TEST
-  int8_t res = add_queue_entry(delta, steps, remaining_steps > 0, 0);
+      printf("Single step\n");
+#endif
+      ticks_at_start = _ticks_at_queue_end + change;
+      steps = 1;
+      change = 0;
+    }
+    change /= s2;
+  } else {
+    ticks_at_start = ticks_after_command;
+  }
+
+  int8_t res =
+      add_queue_entry(ticks_at_start, steps, remaining_steps > 0, change);
+#ifdef TEST
   printf(
-      "add Delta = %ld  Steps = %d  Queue End Pos = %ld  Target pos = %ld "
-      "Remaining steps = %ld "
+      "add command Steps = %d start_ticks = %d  Queue End Pos = %ld  Target "
+      "pos = %ld "
+      "Remaining steps = %ld  tick_change=%d"
       " => %d\n",
-      delta, steps, _pos_at_queue_end, target_pos, remaining_steps, res);
-#else
-  add_queue_entry(delta, steps, remaining_steps > 0, 0);
+      steps, ticks_at_start, _pos_at_queue_end, target_pos, remaining_steps,
+      change, res);
+#endif
+  if (steps == abs(remaining_steps)) {
+    add_queue_stepper_stop();
+#ifdef TEST
+    puts("Stepper stop");
+#endif
+  }
+#ifdef TEST
+  puts("");
 #endif
 }
 ISR(TIMER1_OVF_vect) {
@@ -205,6 +260,7 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
   _dir_high_at_queue_end = true;
   isr_speed_control_enabled = false;
   _min_travel_ticks = 0;
+  _ticks_at_queue_end = 0;
 
   uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
   digitalWrite(pin, LOW);
@@ -263,7 +319,7 @@ void FastAccelStepper::set_dynamics(uint32_t min_travel_ticks, float accel) {
   _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_ticks /
                      min_travel_ticks);
   if (target_pos != _pos_at_queue_end) {
-    moveTo(target_pos);
+    // moveTo(target_pos);
   }
 }
 void FastAccelStepper::move(long move) {
@@ -331,13 +387,18 @@ void FastAccelStepper::_calculate_move(long move) {
   // Steps needed to stop from current speed with defined acceleration
   unsigned long new_deceleration_start;
   unsigned long new_dec_time_ms;
-  float curr_speed = _min_travel_ticks ? 16000000.0 / _min_travel_ticks : 0;
+  if (_ticks_at_queue_end == 0) {
+    // motor start with minimum speed
+    _ticks_at_queue_end = round(16000000.0 * sqrt(2.0 / _accel));
+  }
+  float curr_speed = _ticks_at_queue_end ? 16000000.0 / _ticks_at_queue_end : 0;
   unsigned long s_stop = round(curr_speed * curr_speed / 2.0 / _accel);
+
   if (s_stop > steps) {
     // start deceleration immediately
     new_deceleration_start = steps;
     new_dec_time_ms = round(2000.0 * steps / curr_speed);
-  } else if (curr_speed <= _speed) {
+  } else if (_ticks_at_queue_end > _min_travel_ticks) {
     // add steps to reach current speed to full ramp
     unsigned long s_full_ramp = steps + s_stop;
     unsigned long ramp_steps = min(s_full_ramp, _min_steps);
@@ -348,6 +409,10 @@ void FastAccelStepper::_calculate_move(long move) {
     new_deceleration_start = _min_steps / 2;
     new_dec_time_ms = round(_speed / _accel * 1000.0);
   }
+#ifdef TEST
+  printf("deceleration_start=%ld  deceleration_time=%ld ms\n",
+         new_deceleration_start, new_dec_time_ms);
+#endif
   noInterrupts();
   _deceleration_start = new_deceleration_start;
   _dec_time_ms = new_dec_time_ms;

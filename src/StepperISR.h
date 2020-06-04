@@ -8,8 +8,8 @@
 // CURRENT QUEUE IMPLEMENTATION WASTES ONE UNUSED ENTRY => BUG/TODO
 
 // These variables control the stepper timing behaviour
-#define QUEUE_LEN (1 << 4)
-#define QUEUE_LEN_MASK 15
+#define QUEUE_LEN 16
+#define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 extern uint8_t fas_q_readptr_A;  // ISR stops if readptr == next_writeptr
 extern uint8_t fas_q_next_writeptr_A;
 extern uint8_t fas_q_readptr_B;

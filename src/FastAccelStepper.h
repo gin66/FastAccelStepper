@@ -36,11 +36,12 @@ class FastAccelStepper {
   void moveTo(long position);
 
   // unstable API functions
-  uint32_t min_delta_ticks();
+  uint32_t min_delta_ticks();  // this translates into maximum speed
 
   // stepper queue management (low level access)
   inline int add_queue_entry(uint32_t start_delta_ticks, uint8_t steps,
                              bool dir_high, int16_t change_ticks);
+  void add_queue_stepper_stop();
   bool isQueueEmpty();
   bool isQueueFull();
 
