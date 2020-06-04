@@ -86,12 +86,12 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
   uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
   if (next_wp != rp) {
     _pos_at_queue_end += dir_high ? steps : -steps;
+    _ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
     steps <<= 1;
     e->delta_msb = msb;
     e->delta_lsw = lsw;
     e->delta_change = change_ticks;
     e->steps = (dir_high != _dir_high_at_queue_end) ? steps | 0x01 : steps;
-    _ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
     _dir_high_at_queue_end = dir_high;
     if (_channelA) {
       fas_q_next_writeptr_A = next_wp;
@@ -132,17 +132,11 @@ inline void FastAccelStepper::isr_fill_queue() {
   if (isQueueFull()) {
     return;
   }
-  if (isQueueEmpty()) {
-    if (target_pos == _pos_at_queue_end) {
-      isr_speed_control_enabled = false;
-      return;
-    }
-  }
   if (target_pos == _pos_at_queue_end) {
-    return;
+     isr_speed_control_enabled = false;
+     return;
   }
   if (_min_travel_ticks == 0) {
-    puts("HERE");
     return;
   }
 
@@ -166,7 +160,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   }
 
   // Forward planning of minimum 10ms or more on slow speed.
-  uint32_t planning_ticks = max(2 * curr_ticks, 16000000 / 10000);
+  uint32_t planning_ticks = max(2 * curr_ticks, 16*20000);
 #ifdef TEST
   printf("accel=%f  curr_ticks=%d dticks=%d   %s %s %s\n", _accel, curr_ticks,
          planning_ticks, accelerating ? "ACC" : "",
@@ -186,20 +180,27 @@ inline void FastAccelStepper::isr_fill_queue() {
            curr_ticks, next_ticks, planning_ticks, delta);
 #endif
   }
-  if (reduce_speed || decelerate_to_stop) {
+  if (reduce_speed) {
     float delta =
         1.0 - _accel * planning_ticks * curr_ticks / 16000000.0 / 16000000.0;
     next_ticks = round(curr_ticks / delta);
     // avoid undershoot
-    next_ticks = max(next_ticks, _min_travel_ticks);
     next_ticks = min(next_ticks, _min_travel_ticks);
 #ifdef TEST
-    printf("reduce ticks=%d => %d  during %d ticks\n", curr_ticks, next_ticks,
-           planning_ticks);
+    printf("reduce ticks=%d => %d  during %d ticks (delta = %f)\n", curr_ticks, next_ticks,
+           planning_ticks, delta);
 #endif
   }
   if (decelerate_to_stop) {
-//    _dec_time_ms = max(_dec_time_ms - dticks / 16000.0, 1.0);
+    _dec_time_ms = max(_dec_time_ms - planning_ticks / 16000, 1.0);
+    next_ticks = _dec_time_ms * 16000 / 2 / abs(remaining_steps);
+
+    // avoid undershoot
+    next_ticks = max(next_ticks, _min_travel_ticks);
+#ifdef TEST
+    printf("declerate to stop ticks=%d => %d  during %d ticks\n", curr_ticks, next_ticks,
+           planning_ticks);
+#endif
 //    curr_speed =
 //        min(2 * abs(remaining_steps) * 1000.0 / _dec_time_ms, curr_speed);
 //    ticks_after_command = round(16000000.0 / curr_speed);
@@ -219,16 +220,30 @@ inline void FastAccelStepper::isr_fill_queue() {
 
   // Calculate change per step
   int32_t total_change = (int32_t)next_ticks - (int32_t)curr_ticks;
-  int32_t change = total_change / steps;
-  
-  // Apply change to curr_ticks
-  curr_ticks += change;
+  int32_t change = total_change;
+  if (steps > 1) {
+	  change /= steps; // each step will change
+  }
 
   // Number of commands
   uint8_t command_cnt = min(steps,max(steps / 128 + 1, abs(total_change) / 32768));
 
   // Steps per command
   uint16_t steps_per_command = (steps+command_cnt-1) / command_cnt;
+
+  if (steps_per_command * command_cnt > steps) {
+	  steps_per_command -= 1;
+  }
+
+  // Apply change to curr_ticks
+  if (change == 0) {
+	 printf("curr=%d\n",curr_ticks);
+     curr_ticks += total_change;
+	 printf("curr=%d\n",curr_ticks);
+  }
+  else {
+     curr_ticks += change;
+  }
 
   bool dir = remaining_steps > 0;
 
@@ -239,9 +254,6 @@ inline void FastAccelStepper::isr_fill_queue() {
 
   for (uint16_t c = 1; c < command_cnt; c++) {
     int8_t res = add_queue_entry(curr_ticks, steps_per_command, dir, change);
-    curr_ticks += steps_per_command * change;
-    steps -= steps_per_command;
-    remaining_steps -= steps_per_command;
 #ifdef TEST
     printf(
         "add command %d Steps = %d start_ticks = %d  Target "
@@ -250,6 +262,9 @@ inline void FastAccelStepper::isr_fill_queue() {
         " => res=%d   ticks_at_queue_end = %d\n",
         (command_cnt+1-c), steps_per_command, curr_ticks, target_pos, remaining_steps, change, res, _ticks_at_queue_end);
 #endif
+    curr_ticks += steps_per_command * change;
+    steps -= steps_per_command;
+    remaining_steps -= steps_per_command;
   }
   int8_t res = add_queue_entry(curr_ticks, steps, dir, change);
 #ifdef TEST
@@ -264,6 +279,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   steps -= steps_per_command;
   if (steps == abs(remaining_steps)) {
     add_queue_stepper_stop();
+     isr_speed_control_enabled = false;
 #ifdef TEST
     puts("Stepper stop");
 #endif

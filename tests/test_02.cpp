@@ -28,6 +28,7 @@ class RampChecker {
   RampChecker();
   void check_section(struct queue_entry *e);
 
+  uint32_t total_ticks;
   uint32_t last_dt;
   uint32_t min_dt;
   bool increase_ok;
@@ -37,6 +38,7 @@ class RampChecker {
 };
 
 RampChecker::RampChecker() {
+  total_ticks = 0;
   last_dt = ~0;
   min_dt = ~0;
   first = true;
@@ -54,7 +56,9 @@ void RampChecker::check_section(struct queue_entry *e) {
   uint32_t end_dt = start_dt + (steps - 1) * e->delta_change;
 
   min_dt = min(min_dt, min(start_dt, end_dt));
-  printf("process command in ramp checker: min_dt = %d\n", min_dt);
+  printf("process command in ramp checker: last = %d start = %d  end = %d  min_dt = %d\n", last_dt, start_dt, end_dt, min_dt);
+
+  total_ticks += steps * start_dt + (steps-1)*steps/2*e->delta_change;
 
   if (last_dt > start_dt) {
     assert(increase_ok);
@@ -69,6 +73,8 @@ void RampChecker::check_section(struct queue_entry *e) {
     assert(decrease_ok);
     increase_ok = false;
   }
+
+  last_dt = end_dt;
 
   first = false;
 }
@@ -117,7 +123,9 @@ void basic_test_with_empty_queue() {
 }
 
 void test_with_pars(int32_t steps, uint32_t travel_dt, float accel,
-                    bool reach_max_speed) {
+                    bool reach_max_speed, float max_time) {
+  printf("Test test_with_pars steps=%d travel_dt=%d accel=%f dir=%s\n",
+				steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
   FastAccelStepper s = FastAccelStepper(true);
   RampChecker rc = RampChecker();
@@ -149,14 +157,20 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, float accel,
     }
   }
   test(!s.isr_speed_control_enabled, "too many commands created");
-  printf("%d\n", rc.min_dt);
   if (reach_max_speed) {
+    printf("%d\n", rc.min_dt);
     test(rc.min_dt == travel_dt, "max speed not reached");
   }
+  printf("Total time %f\n", rc.total_ticks/16000000.0);
+  test(rc.total_ticks / 16000000.0 < max_time, "ramp too slow");
 }
 
 int main() {
   basic_test_with_empty_queue();
-  test_with_pars(10000, 100000, 100.0, true);
+  //             steps  dticks  accel    maxspeed  total_time
+  test_with_pars(10000, 100000,   100.0, true,     64.0);
+  test_with_pars( 1600, 100000, 10000.0, true,     11.0);
+  test_with_pars( 1600, 100000,  1000.0, true,     11.0);
+  test_with_pars(15000,   1600, 10000.0, true,      3.0);
   printf("TEST_02 PASSED\n");
 }

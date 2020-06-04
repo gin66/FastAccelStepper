@@ -43,11 +43,13 @@ void loop() {
    if (Serial.available()) {
       char ch = Serial.read();
       if ((ch == '\n') || (ch == ' ')) {
+         if (in_ptr > 0) {
          in_buffer[in_ptr] = 0;
          in_ptr = 0;
          if (in_val_ptr < 8) {
             in_vals[in_val_ptr++] = atol(in_buffer);
          }
+}
       }
       else {
          in_buffer[in_ptr++] = ch;
@@ -58,6 +60,9 @@ void loop() {
          }
          if (in_val_ptr == 1) {
             queue_ok = true;
+         }
+         if (in_val_ptr == 0) {
+            stopped = false;
          }
          in_val_ptr = 0;
          in_ptr = 0;
@@ -131,7 +136,6 @@ else {
         }
       }
    }
-   delay(100);
 
    if (!stopped) {
       Serial.print("Stepper 1: ");
