@@ -32,11 +32,11 @@ class FastAccelStepper {
   void enableOutputs();
   void disableOutputs();
 
-  long getPositionAfterCommandsCompleted();
-  long getCurrentPosition();
+  int32_t getPositionAfterCommandsCompleted();
+  int32_t getCurrentPosition();
   bool isRunning();
-  void move(long move);
-  void moveTo(long position);
+  void move(int32_t move);
+  void moveTo(int32_t position);
 
   // unstable API functions
   uint32_t min_delta_ticks();  // this translates into maximum speed
@@ -50,7 +50,7 @@ class FastAccelStepper {
 
   // For stepper movement control by FastAccelStepper
   void set_dynamics(uint32_t min_travel_ticks, float accel);
-  long target_pos;
+  int32_t target_pos;
   bool isr_speed_control_enabled;
   inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
                                  // INTERRUPT SERVICE ROUTINE !
@@ -62,20 +62,20 @@ class FastAccelStepper {
   bool _dir_high_at_queue_end;  // direction high corresponds to position
                                 // counting upwards
 
-  void _calculate_move(long steps);
+  void _calculate_move(int32_t steps);
   bool _channelA;
   uint8_t _auto_enablePin;
   uint8_t _enablePin;
   float _speed;  // in steps/s
   float _accel;  // in steps/s²
 
-  unsigned long _min_steps;    // in steps
+  uint32_t _min_steps;    // in steps
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
   uint32_t _starting_ticks;    // in ticks, means 0.25us
 
   // used in interrupt routine isr_update_move
-  unsigned long _deceleration_start;  // in steps
-  long _dec_time_ms;                  // in ms
+  uint32_t _deceleration_start;  // in steps
+  uint32_t _dec_time_ms;                  // in ms
 };
 
 class FastAccelStepperEngine {

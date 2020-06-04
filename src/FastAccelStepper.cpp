@@ -143,7 +143,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   // preconditions are fulfilled, so create the command(s)
 
   // check state for acceleration/deceleration or deceleration to stop
-  long remaining_steps = target_pos - _pos_at_queue_end;
+  int32_t remaining_steps = target_pos - _pos_at_queue_end;
   bool accelerating = false;
   bool decelerate_to_stop = false;
   bool reduce_speed = false;
@@ -205,7 +205,7 @@ inline void FastAccelStepper::isr_fill_queue() {
 //        min(2 * abs(remaining_steps) * 1000.0 / _dec_time_ms, curr_speed);
 //    ticks_after_command = round(16000000.0 / curr_speed);
 #ifdef TEST
-//    printf("towards stop with speed=%f  remaining time=%ld\n", curr_speed,
+//    printf("towards stop with speed=%f  remaining time=%d\n", curr_speed,
 //           _dec_time_ms);
 #endif
   }
@@ -257,8 +257,8 @@ inline void FastAccelStepper::isr_fill_queue() {
 #ifdef TEST
     printf(
         "add command %d Steps = %d start_ticks = %d  Target "
-        "pos = %ld "
-        "Remaining steps = %ld  tick_change=%d"
+        "pos = %d "
+        "Remaining steps = %d  tick_change=%d"
         " => res=%d   ticks_at_queue_end = %d\n",
         (command_cnt+1-c), steps_per_command, curr_ticks, target_pos, remaining_steps, change, res, _ticks_at_queue_end);
 #endif
@@ -270,8 +270,8 @@ inline void FastAccelStepper::isr_fill_queue() {
 #ifdef TEST
     printf(
         "add command Steps = %d start_ticks = %d  Target "
-        "pos = %ld "
-        "Remaining steps = %ld  tick_change=%d"
+        "pos = %d "
+        "Remaining steps = %d  tick_change=%d"
         " => res=%d   ticks_at_queue_end = %d\n",
         steps, curr_ticks, target_pos, remaining_steps, change, res, _ticks_at_queue_end);
 #endif
@@ -387,21 +387,21 @@ void FastAccelStepper::set_dynamics(uint32_t min_travel_ticks, float accel) {
     // moveTo(target_pos);
   }
 }
-void FastAccelStepper::move(long move) {
+void FastAccelStepper::move(int32_t move) {
   target_pos = _pos_at_queue_end + move;
   _calculate_move(move);
 }
-void FastAccelStepper::moveTo(long position) {
-  long move;
+void FastAccelStepper::moveTo(int32_t position) {
+  int32_t move;
   target_pos = position;
   move = position - _pos_at_queue_end;
   _calculate_move(move);
 }
-void FastAccelStepper::_calculate_move(long move) {
+void FastAccelStepper::_calculate_move(int32_t move) {
   if (move == 0) {
     return;
   }
-  unsigned long steps = abs(move);
+  uint32_t steps = abs(move);
   // The movement consists of three phases.
   // 1. Change current speed to constant speed
   // 2. Constant travel speed
@@ -450,14 +450,14 @@ void FastAccelStepper::_calculate_move(long move) {
   //
 
   // Steps needed to stop from current speed with defined acceleration
-  unsigned long new_deceleration_start;
-  unsigned long new_dec_time_ms;
+  uint32_t new_deceleration_start;
+  uint32_t new_dec_time_ms;
   if (_ticks_at_queue_end == 0) {
     // motor start with minimum speed
     _ticks_at_queue_end = round(16000000.0 * sqrt(2.0 / _accel));
   }
   float curr_speed = _ticks_at_queue_end ? 16000000.0 / _ticks_at_queue_end : 0;
-  unsigned long s_stop = round(curr_speed * curr_speed / 2.0 / _accel);
+  uint32_t s_stop = round(curr_speed * curr_speed / 2.0 / _accel);
 
   if (s_stop > steps) {
     // start deceleration immediately
@@ -465,8 +465,8 @@ void FastAccelStepper::_calculate_move(long move) {
     new_dec_time_ms = round(2000.0 * steps / curr_speed);
   } else if (_ticks_at_queue_end > _min_travel_ticks) {
     // add steps to reach current speed to full ramp
-    unsigned long s_full_ramp = steps + s_stop;
-    unsigned long ramp_steps = min(s_full_ramp, _min_steps);
+    uint32_t s_full_ramp = steps + s_stop;
+    uint32_t ramp_steps = min(s_full_ramp, _min_steps);
     new_deceleration_start = ramp_steps / 2;
     new_dec_time_ms = round(sqrt(ramp_steps / _accel) * 1000.0);
   } else {
@@ -475,7 +475,7 @@ void FastAccelStepper::_calculate_move(long move) {
     new_dec_time_ms = round(_speed / _accel * 1000.0);
   }
 #ifdef TEST
-  printf("deceleration_start=%ld  deceleration_time=%ld ms\n",
+  printf("deceleration_start=%d  deceleration_time=%d ms\n",
          new_deceleration_start, new_dec_time_ms);
 #endif
   noInterrupts();
@@ -494,11 +494,11 @@ void FastAccelStepper::enableOutputs() {
     digitalWrite(_enablePin, LOW);
   }
 }
-long FastAccelStepper::getPositionAfterCommandsCompleted() {
+int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return _pos_at_queue_end;
 }
-long FastAccelStepper::getCurrentPosition() {
-  long pos = _pos_at_queue_end;
+int32_t FastAccelStepper::getCurrentPosition() {
+  int32_t pos = _pos_at_queue_end;
   bool dir = _dir_high_at_queue_end;
   struct queue_entry* q;
   uint8_t rp, wp;

@@ -102,8 +102,8 @@ void basic_test_with_empty_queue() {
   for (int i = 0; i < 1000; i++) {
     if (false) {
       printf(
-          "Loop %d: Queue read/write = %d/%d    Target pos = %ld, Queue End "
-          "pos = %ld  QueueEmpty=%s\n",
+          "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
+          "pos = %d  QueueEmpty=%s\n",
           i, fas_q_readptr_A, fas_q_next_writeptr_A, s.target_pos,
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
@@ -141,8 +141,8 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, float accel,
   for (int i = 0; i < steps; i++) {
     if (true) {
       printf(
-          "Loop %d: Queue read/write = %d/%d    Target pos = %ld, Queue End "
-          "pos = %ld  QueueEmpty=%s\n",
+          "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
+          "pos = %d  QueueEmpty=%s\n",
           i, fas_q_readptr_A, fas_q_next_writeptr_A, s.target_pos,
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
