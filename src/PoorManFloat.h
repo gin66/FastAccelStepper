@@ -11,3 +11,4 @@ uint32_t upm_to_u32(upm_float x);
 upm_float multiply(upm_float x,upm_float y);
 upm_float divide(upm_float x,upm_float y);
 upm_float abs_diff(upm_float x,upm_float y);
+upm_float sum(upm_float x,upm_float y);

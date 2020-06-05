@@ -177,6 +177,14 @@ int main() {
   back = upm_to_u32(x);
   printf("|%x-%x|=%x (%d)\n",x1,x2,x,back);
   test(back == 0, "wrong abs_diff");
+  x = sum(x1,x2);
+  back = upm_to_u32(x);
+  printf("%x+%x=%x (%d)\n",x1,x2,x,back);
+  test(back == 0x1e800, "wrong sum");
+  x = sum(x2,x1);
+  back = upm_to_u32(x);
+  printf("%x+%x=%x (%d)\n",x1,x2,x,back);
+  test(back == 0x1e800, "wrong sum");
 
   x1 = upm_from((uint32_t) 0xf455);
   x2 = upm_from((uint32_t) 0xf3ff);
@@ -188,6 +196,14 @@ int main() {
   back = upm_to_u32(x);
   printf("|%x-%x|=%x (%d)\n",x1,x2,x,back);
   test(back == 0x0100, "wrong abs_diff");
+  x = sum(x1,x2);
+  back = upm_to_u32(x);
+  printf("%x+%x=%x (%d)\n",x1,x2,x,back);
+  test(back == 0x1e600, "wrong sum");
+  x = sum(x2,x1);
+  back = upm_to_u32(x);
+  printf("%x+%x=%x (%d)\n",x1,x2,x,back);
+  test(back == 0x1e600, "wrong sum");
 
   x1 = upm_from((uint32_t) 0xf4555);
   x2 = upm_from((uint32_t) 0x0f3ff);
@@ -199,7 +215,14 @@ int main() {
   back = upm_to_u32(x);
   printf("|%x-%x|=%x (%d)\n",x1,x2,x,back);
   test(back == 0xe5000, "wrong abs_diff");
-
+  x = sum(x1,x2);
+  back = upm_to_u32(x);
+  printf("%x+%x=%x (%x)\n",x1,x2,x,back);
+  test(back == 0x102000, "wrong sum");
+  x = sum(x2,x1);
+  back = upm_to_u32(x);
+  printf("%x+%x=%x (%x)\n",x1,x2,x,back);
+  test(back == 0x102000, "wrong sum");
 
   printf("TEST_03 PASSED\n");
 }
