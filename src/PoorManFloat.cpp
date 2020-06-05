@@ -121,22 +121,55 @@ upm_float divide(upm_float x,upm_float y) {
 	uint8_t a = x & 255;
 	uint8_t b = y & 255;
 
-	uint8_t res = (x & 0xff00) - (y & 0xff00);
+	uint8_t exponent = (x >> 8) - (y >> 8);
+	uint8_t mantissa = 0;
 	uint8_t mask = 0x80;
 	while(mask) {
-		if (a == b) {
-			break;
-		}
-		if (a > b) {
+		if (a >= b) {
 			a -= b;
-			res |= mask;
+			mantissa |= mask;
+		}
+		if (a == 0) {
+			break;
 		}
 		a <<= 1;
 		mask >>= 1;
 	}
-	if ((mask & 0x80) == 0) {
-		res -= 0x0100;
+	if ((mantissa & 0x80) == 0) {
+		exponent -= 1;
 	}
-	res |= mask;
+	uint16_t res = exponent;
+	res <<= 8;
+	res |= mantissa;
+	return res;
+}
+uint16_t upm_to_u16(upm_float x) {
+	uint8_t exponent = x >> 8;
+	if (exponent > 15) {
+		return 0xffff;
+	}
+	uint8_t mantissa = x & 0x00ff;
+	uint16_t res = mantissa;
+	if (exponent < 8) {
+		res >>= (7-exponent);
+	}
+	else {
+		res <<= exponent - 7;
+	}
+	return res;
+}
+uint32_t upm_to_u32(upm_float x) {
+	uint8_t exponent = x >> 8;
+	if (exponent > 31) {
+		return 0xffffffff;
+	}
+	uint8_t mantissa = x & 0x00ff;
+	uint32_t res = mantissa;
+	if (exponent < 8) {
+		res >>= (7-exponent);
+	}
+	else {
+		res <<= exponent - 7;
+	}
 	return res;
 }

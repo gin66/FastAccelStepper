@@ -115,5 +115,35 @@ int main() {
   test(x == x3, "multiply error 3*5");
   test(x == 0x03f0, "multiply error 3*5");
 
+  for (uint64_t i = 1;i <  (1L<<16);i *= 5) {
+	  x = upm_from((uint16_t) i);
+	  uint16_t back = upm_to_u16(x);
+
+	  test(i >= back, "conversion error to/back");
+	  test((i & back) == back, "conversion error to/back");
+  }
+
+  for (uint64_t i = 1;i <  (1L<<32);i *= 3) {
+	  x = upm_from((uint32_t) i);
+	  uint32_t back = upm_to_u32(x);
+
+	  test(i >= back, "conversion error to/back");
+	  test((i & back) == back, "conversion error to/back");
+  }
+
+  // Check overflows
+  x1 = upm_from((uint32_t) 0x0ffff);
+  x2 = upm_from((uint32_t) 0x1fffe);
+  x = multiply(x1,x2);
+  uint32_t back = upm_to_u32(x);
+  test(back == 0xffffffff, "overflow not catched");
+
+  x1 = upm_from((uint32_t) 0x5555);
+  x2 = upm_from((uint32_t) 0x0055);
+  x = divide(x1,x2);
+  printf("%x/%x=%x\n",x1,x2,x);
+  back = upm_to_u32(x);
+  test(back == 0x0100, "wrong division");
+
   printf("TEST_03 PASSED\n");
 }
