@@ -181,14 +181,14 @@ upm_float abs_diff(upm_float x,upm_float y) {
 	if (x > y) {
 		exponent = exp_x;
 		uint8_t m_y = y & 0xff;
-		m_y >> (exp_x - exp_y);
+		m_y >>= (exp_x - exp_y);
 		mantissa = x & 0xff;
 	    mantissa -= m_y;
 	}
 	else if (x < y) {
 		exponent = exp_y;
 		uint8_t m_x = x & 0xff;
-		m_x >> (exp_y - exp_x);
+		m_x >>= (exp_y - exp_x);
 		mantissa = y & 0xff;
 	    mantissa -= m_x;
 	}
