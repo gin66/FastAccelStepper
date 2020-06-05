@@ -224,5 +224,17 @@ int main() {
   printf("%x+%x=%x (%x)\n",x1,x2,x,back);
   test(back == 0x102000, "wrong sum");
 
+  x1 = upm_from((uint32_t) 0xf4555);
+  x = shl(x1, 4);
+  back = upm_to_u32(x);
+  printf("%x+%x=%x (%x)\n",x1,x2,x,back);
+  test(back == 0xf40000, "wrong shl");
+  x1 = upm_from((uint32_t) 0xf4555);
+  x = shr(x1, 4);
+  back = upm_to_u32(x);
+  test(back == 0xf400, "wrong shr");
+
+
+
   printf("TEST_03 PASSED\n");
 }

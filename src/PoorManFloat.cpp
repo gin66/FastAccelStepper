@@ -235,4 +235,10 @@ upm_float sum(upm_float x,upm_float y) {
 	res |= (mantissa & 0x00ff);
 	return res;
 }
+upm_float shl(upm_float x,uint8_t n) {
+	return x + (((uint16_t)n)<<8); 
+}
+upm_float shr(upm_float x,uint8_t n) {
+	return x - (((uint16_t)n)<<8); 
+}
 

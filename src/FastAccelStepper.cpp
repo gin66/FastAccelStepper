@@ -341,7 +341,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   upm_float p_2 = divide(UPM_TIMER_FREQ2,multiply(d_ticks_2,_accel));
   upm_float p_1 = divide(UPM_TIMER_FREQ2,multiply(d_ticks_1,_accel));
   upm_float upm_Tx = abs_diff(p_1,p_2);
-  
+  upm_float upm_s = sum(divide(upm_Tx,d_ticks_1),divide(upm_Tx,d_ticks_2)); 
 
   // The movement consists of three phases.
   // 1. Change current speed to constant speed
