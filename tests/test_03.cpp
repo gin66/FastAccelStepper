@@ -227,14 +227,30 @@ int main() {
   x1 = upm_from((uint32_t) 0xf4555);
   x = shl(x1, 4);
   back = upm_to_u32(x);
-  printf("%x+%x=%x (%x)\n",x1,x2,x,back);
   test(back == 0xf40000, "wrong shl");
   x1 = upm_from((uint32_t) 0xf4555);
   x = shr(x1, 4);
   back = upm_to_u32(x);
   test(back == 0xf400, "wrong shr");
 
-
+  x1 = upm_from((uint32_t) 0x10000);
+  x = sqrt(x1);
+  back = upm_to_u32(x);
+  printf("sqrt(%x)=0x%x (%x)\n",x1,x,back);
+  test(back == 0x100, "sqrt");
+  
+  x1 = upm_from((uint32_t) (244*244));
+  x = sqrt(x1);
+  back = upm_to_u32(x);
+  printf("sqrt(%x)=0x%x (%x)\n",x1,x,back);
+  test(back == 244, "sqrt");
+  
+  x1 = upm_from((uint32_t) (122*122));
+  x = sqrt(x1);
+  back = upm_to_u32(x);
+  printf("sqrt(%x)=0x%x (%x)\n",x1,x,back);
+  test(back == 122, "sqrt");
+  
 
   printf("TEST_03 PASSED\n");
 }

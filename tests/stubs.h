@@ -1,3 +1,9 @@
+#ifndef STUBS_H
+#define STUBS_H
+
+#define PROGMEM
+#define pgm_read_byte_near(x) (*x)
+
 #define noInterrupts() \
   {}
 #define interrupts() \
@@ -30,3 +36,4 @@ extern unsigned short OCR1B;
     puts(msg);       \
     assert(false);   \
   };
+#endif

@@ -343,7 +343,16 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   upm_float upm_Tx = abs_diff(p_1,p_2);
   upm_float upm_S = shr(sum(divide(upm_Tx,d_ticks_1),divide(upm_Tx,d_ticks_2)),1);
   upm_float upm_F = shl(divide(d_ticks_2,sum(d_ticks_1,d_ticks_2)),1);
-
+#ifdef TEST
+	printf("Ramp data: starting_ticks = %d curr_ticks = %d travel_ticks = %d accel = %d Tx = %d S = %d F*65536 = %d\n",
+			_starting_ticks,
+			curr_ticks,
+			_min_travel_ticks,
+			upm_to_u32(_accel),
+			upm_to_u32(upm_Tx),
+			upm_to_u32(upm_S),
+			upm_to_u32(shl(upm_F,16)));
+#endif
   // The movement consists of three phases.
   // 1. Change current speed to constant speed
   // 2. Constant travel speed
@@ -690,6 +699,7 @@ void FastAccelStepper::setSpeed(uint32_t min_step_us) {
 //  }
 }
 void FastAccelStepper::setAcceleration(uint16_t accel) {
+  _starting_ticks = round(16000000.0 * sqrt(2.0 / (1.0*accel)));
   _accel = upm_from(accel);
 }
 void FastAccelStepper::move(int32_t move) {
