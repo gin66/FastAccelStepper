@@ -11,8 +11,8 @@ uint8_t fas_ledPin = 255;  // 255 if led blinking off
 uint16_t fas_debug_led_cnt = 0;
 
 #define TIMER_FREQ 16000000
-#define UPM_TIMER_FREQ  ((upm_float)0x17f4)
-#define UPM_TIMER_FREQ2 ((upm_float)0x2fe8)
+#define UPM_TIMER_FREQ  ((upm_float)0x97f4)
+#define UPM_TIMER_FREQ2 ((upm_float)0xafe8)
 
 FastAccelStepper fas_stepperA = FastAccelStepper(true);
 FastAccelStepper fas_stepperB = FastAccelStepper(false);
@@ -341,7 +341,8 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   upm_float p_2 = divide(UPM_TIMER_FREQ2,multiply(d_ticks_2,_accel));
   upm_float p_1 = divide(UPM_TIMER_FREQ2,multiply(d_ticks_1,_accel));
   upm_float upm_Tx = abs_diff(p_1,p_2);
-  upm_float upm_s = sum(divide(upm_Tx,d_ticks_1),divide(upm_Tx,d_ticks_2)); 
+  upm_float upm_S = shr(sum(divide(upm_Tx,d_ticks_1),divide(upm_Tx,d_ticks_2)),1);
+  upm_float upm_F = shl(divide(d_ticks_2,sum(d_ticks_1,d_ticks_2)),1);
 
   // The movement consists of three phases.
   // 1. Change current speed to constant speed

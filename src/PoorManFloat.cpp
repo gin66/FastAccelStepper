@@ -7,7 +7,9 @@
 //     XXXXXXXX:1XXXXXXX
 //     exponent mantissa
 //
-//  0x0080 => is 1
+// exponent is shifted by 128 in order to allow numbers < 1
+//
+//  0x8080 => is 1
 
 
 upm_float upm_from(uint8_t x) {
@@ -55,7 +57,7 @@ upm_float upm_from(uint8_t x) {
 		   }
 	   }
 	}
-	return res;
+	return res | 0x8000;
 }
 upm_float upm_from(uint16_t x) {
 	uint8_t exponent;
@@ -83,6 +85,7 @@ upm_float upm_from(uint16_t x) {
 		exponent += 1;
 	}
 	x >>= 8;
+	exponent |= 0x80;
 	return x | (exponent << 8);
 }
 upm_float upm_from(uint32_t x) {
@@ -105,13 +108,12 @@ upm_float multiply(upm_float x,upm_float y) {
 	uint16_t ab = a*b;
 	if (ab & 0x8000)  {
 		ab >>= 8;
-		ab += (x & 0xff00) + (y & 0xff00);
 		ab += 0x0100;
 	}
 	else {
 		ab >>= 7;
-		ab += (x & 0xff00) + (y & 0xff00);
 	}
+	ab += ((x & 0xff00) - 0x4000) + ((y & 0xff00) - 0x4000);
 	return ab;
 }
 upm_float divide(upm_float x,upm_float y) {
@@ -138,16 +140,20 @@ upm_float divide(upm_float x,upm_float y) {
 	if ((mantissa & 0x80) == 0) {
 		exponent -= 1;
 	}
-	uint16_t res = exponent;
+	uint16_t res = exponent + 128;
 	res <<= 8;
 	res |= mantissa;
 	return res;
 }
 uint16_t upm_to_u16(upm_float x) {
 	uint8_t exponent = x >> 8;
-	if (exponent > 15) {
+	if (exponent > 15+128) {
 		return 0xffff;
 	}
+	if (exponent < 128) {
+		return 0;
+	}
+	exponent -= 128;
 	uint8_t mantissa = x & 0x00ff;
 	uint16_t res = mantissa;
 	if (exponent < 8) {
@@ -160,9 +166,13 @@ uint16_t upm_to_u16(upm_float x) {
 }
 uint32_t upm_to_u32(upm_float x) {
 	uint8_t exponent = x >> 8;
-	if (exponent > 31) {
+	if (exponent > 31+128) {
 		return 0xffffffff;
 	}
+	if (exponent < 128) {
+		return 0;
+	}
+	exponent -= 128;
 	uint8_t mantissa = x & 0x00ff;
 	uint32_t res = mantissa;
 	if (exponent < 8) {
