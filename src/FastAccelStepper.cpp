@@ -363,7 +363,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   // Forward planning of minimum 10ms or more on slow speed.
   uint32_t planning_ticks = max(2 * curr_ticks, 16 * 10000);
 #ifdef TEST
-  printf("accel=%f  curr_ticks=%d dticks=%d   %s %s %s\n", _accel, curr_ticks,
+  printf("accel=%d  curr_ticks=%d dticks=%d   %s %s %s\n", _accel, curr_ticks,
          planning_ticks, accelerating ? "ACC" : "",
          decelerate_to_stop ? "STOP" : "", reduce_speed ? "RED" : "");
 #endif
@@ -578,15 +578,17 @@ void FastAccelStepper::set_auto_enable(bool auto_enable) {
     fas_autoEnablePin_B = _auto_enablePin;
   }
 }
-void FastAccelStepper::set_dynamics(uint32_t min_travel_ticks, float accel) {
-  _min_travel_ticks = min_travel_ticks;
+void FastAccelStepper::setSpeed(uint32_t min_step_us) {
+  _min_travel_ticks = min_step_us * 16;
+//  _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_ticks /
+//                     min_travel_ticks);
+//  _starting_ticks = round(16000000.0 * sqrt(2.0 / _accel));
+//  if (target_pos != _pos_at_queue_end) {
+//    // moveTo(target_pos);
+//  }
+}
+void FastAccelStepper::setAcceleration(uint16_t accel) {
   _accel = accel;
-  _min_steps = round(16000000.0 * 16000000.0 / accel / min_travel_ticks /
-                     min_travel_ticks);
-  _starting_ticks = round(16000000.0 * sqrt(2.0 / _accel));
-  if (target_pos != _pos_at_queue_end) {
-    // moveTo(target_pos);
-  }
 }
 void FastAccelStepper::move(int32_t move) {
   target_pos = _pos_at_queue_end + move;

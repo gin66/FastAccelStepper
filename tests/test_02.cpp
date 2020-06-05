@@ -96,7 +96,8 @@ void basic_test_with_empty_queue() {
   assert(0 == s.getCurrentPosition());
 
   assert(s.isQueueEmpty());
-  s.set_dynamics(160000, 100.0);
+  s.setSpeed(160000);
+  s.setAcceleration(100);
   s.isr_fill_queue();
   assert(s.isQueueEmpty());
   s.move(1000);
@@ -125,9 +126,9 @@ void basic_test_with_empty_queue() {
   test(rc.min_dt == 160000, "max speed not reached");
 }
 
-void test_with_pars(int32_t steps, uint32_t travel_dt, float accel,
+void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
                     bool reach_max_speed, float max_time) {
-  printf("Test test_with_pars steps=%d travel_dt=%d accel=%f dir=%s\n", steps,
+  printf("Test test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", steps,
          travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
   FastAccelStepper s = FastAccelStepper(true);
@@ -135,7 +136,8 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, float accel,
   assert(0 == s.getCurrentPosition());
 
   assert(s.isQueueEmpty());
-  s.set_dynamics(travel_dt, accel);
+  s.setSpeed(travel_dt);
+  s.setAcceleration(accel);
   s.isr_fill_queue();
   assert(s.isQueueEmpty());
   s.move(steps);
