@@ -11,6 +11,8 @@ uint8_t fas_ledPin = 255;  // 255 if led blinking off
 uint16_t fas_debug_led_cnt = 0;
 
 #define TIMER_FREQ 16000000
+#define UPM_TIMER_FREQ  ((upm_float)0x17f4)
+#define UPM_TIMER_FREQ2 ((upm_float)0x2fe8)
 
 FastAccelStepper fas_stepperA = FastAccelStepper(true);
 FastAccelStepper fas_stepperB = FastAccelStepper(false);
@@ -324,6 +326,105 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
 //
 //
 //*************************************************************************************************
+void FastAccelStepper::_calculate_move(int32_t move) {
+  if (move == 0) {
+    return;
+  }
+  uint32_t steps = abs(move);
+
+  uint32_t curr_ticks = _ticks_at_queue_end;
+  if (curr_ticks == 0) {  // motor start with minimum speed
+    curr_ticks = _starting_ticks;
+  }
+  upm_float d_ticks_1 = upm_from(curr_ticks);
+  upm_float d_ticks_2 = upm_from(_min_travel_ticks);
+  upm_float p_2 = divide(UPM_TIMER_FREQ2,multiply(d_ticks_2,_accel));
+  upm_float p_1 = divide(UPM_TIMER_FREQ2,multiply(d_ticks_1,_accel));
+  upm_float upm_Tx = abs_diff(p_1,p_2);
+  
+
+  // The movement consists of three phases.
+  // 1. Change current speed to constant speed
+  // 2. Constant travel speed
+  // 3. Decelerate to stop
+  //
+  // With v_t being travel speed
+  //
+  // Steps for 3 (no emergency stop):
+  //     t_dec = v_t / a
+  //     s_3   = 1/2 * a * t_dec² = v_t² / 2a
+  //
+  // Steps for 1:
+  //     if v <= v_t
+  //        t_acc_1 = v_t / a
+  //        t_acc_2 = v   / a
+  //        s_1 = 1/2 * a * t_acc_1² - 1/2 * a * t_acc_2²
+  //            = 1/2 * v_t² / a - 1/2 * v² / a
+  //            = (v_t² - v²) / 2a
+  //            = s_3 - v^2 / 2a
+  //
+  //     if v > v_t
+  //        s_1 = (v^2 - v_t^2) / 2a
+  //            = v^2 / 2a - s_3
+  //
+  // Steps for 2:
+  //     s_2 = steps - s_1 - s_3
+  //     if v <= v_t
+  //        s_2 = steps - 2 s_3 + v^2 / 2a
+  //     if v > v_t
+  //        s_2 = steps - v^2 / 2a
+  //
+  // Case 1: Normal operation
+  //     steps >= s_1 + s_3 for a proper v_t
+  //     if v <= v_t
+  //        steps >= 2 s_3 - v^2 / 2a for a proper v_t
+  //     if v > v_t
+  //        steps >= v^2 / 2a for v_t = v_max
+  //
+  // Case 2: Emergency stop
+  //     steps < v^2 / 2a
+  //     this can be covered by a generic step 3, using constant decelaration
+  //     a_3:
+  //         s_remain = 1/2 * v * t_dec
+  //         t_dec = 2 s_remain / v
+  //         a_3 = v / t_dec = v^2 / 2 s_remain
+  //
+
+  // Steps needed to stop from current speed with defined acceleration
+  uint32_t new_deceleration_start;
+  uint32_t new_dec_time_ms;
+  if (_ticks_at_queue_end == 0) {
+    // motor start with minimum speed
+    _ticks_at_queue_end = round(16000000.0 * sqrt(2.0 / _accel));
+  }
+  float curr_speed = _ticks_at_queue_end ? 16000000.0 / _ticks_at_queue_end : 0;
+  uint32_t s_stop = round(curr_speed * curr_speed / 2.0 / _accel);
+
+  if (s_stop > steps) {
+    // start deceleration immediately
+    new_deceleration_start = steps;
+    new_dec_time_ms = round(2000.0 * steps / curr_speed);
+  } else if (_ticks_at_queue_end > _min_travel_ticks) {
+    // add steps to reach current speed to full ramp
+    uint32_t s_full_ramp = steps + s_stop;
+    uint32_t ramp_steps = min(s_full_ramp, _min_steps);
+    new_deceleration_start = ramp_steps / 2;
+    new_dec_time_ms = round(sqrt(ramp_steps / _accel) * 1000.0);
+  } else {
+    // need decelerate first in phase 1, then normal deceleration
+    new_deceleration_start = _min_steps / 2;
+    new_dec_time_ms = round(_speed / _accel * 1000.0);
+  }
+#ifdef TEST
+  printf("deceleration_start=%d  deceleration_time=%d ms\n",
+         new_deceleration_start, new_dec_time_ms);
+#endif
+  noInterrupts();
+  _deceleration_start = new_deceleration_start;
+  _dec_time_ms = new_dec_time_ms;
+  interrupts();
+  isr_speed_control_enabled = true;
+}
 
 inline void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
@@ -363,7 +464,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   // Forward planning of minimum 10ms or more on slow speed.
   uint32_t planning_ticks = max(2 * curr_ticks, 16 * 10000);
 #ifdef TEST
-  printf("accel=%d  curr_ticks=%d dticks=%d   %s %s %s\n", _accel, curr_ticks,
+  printf("accel=%d  curr_ticks=%d dticks=%d   %s %s %s\n", upm_to_u32(_accel), curr_ticks,
          planning_ticks, accelerating ? "ACC" : "",
          decelerate_to_stop ? "STOP" : "", reduce_speed ? "RED" : "");
 #endif
@@ -588,7 +689,7 @@ void FastAccelStepper::setSpeed(uint32_t min_step_us) {
 //  }
 }
 void FastAccelStepper::setAcceleration(uint16_t accel) {
-  _accel = accel;
+  _accel = upm_from(accel);
 }
 void FastAccelStepper::move(int32_t move) {
   target_pos = _pos_at_queue_end + move;
@@ -599,93 +700,6 @@ void FastAccelStepper::moveTo(int32_t position) {
   target_pos = position;
   move = position - _pos_at_queue_end;
   _calculate_move(move);
-}
-void FastAccelStepper::_calculate_move(int32_t move) {
-  if (move == 0) {
-    return;
-  }
-  uint32_t steps = abs(move);
-  // The movement consists of three phases.
-  // 1. Change current speed to constant speed
-  // 2. Constant travel speed
-  // 3. Decelerate to stop
-  //
-  // With v_t being travel speed
-  //
-  // Steps for 3 (no emergency stop):
-  //     t_dec = v_t / a
-  //     s_3   = 1/2 * a * t_dec² = v_t² / 2a
-  //
-  // Steps for 1:
-  //     if v <= v_t
-  //        t_acc_1 = v_t / a
-  //        t_acc_2 = v   / a
-  //        s_1 = 1/2 * a * t_acc_1² - 1/2 * a * t_acc_2²
-  //            = 1/2 * v_t² / a - 1/2 * v² / a
-  //            = (v_t² - v²) / 2a
-  //            = s_3 - v^2 / 2a
-  //
-  //     if v > v_t
-  //        s_1 = (v^2 - v_t^2) / 2a
-  //            = v^2 / 2a - s_3
-  //
-  // Steps for 2:
-  //     s_2 = steps - s_1 - s_3
-  //     if v <= v_t
-  //        s_2 = steps - 2 s_3 + v^2 / 2a
-  //     if v > v_t
-  //        s_2 = steps - v^2 / 2a
-  //
-  // Case 1: Normal operation
-  //     steps >= s_1 + s_3 for a proper v_t
-  //     if v <= v_t
-  //        steps >= 2 s_3 - v^2 / 2a for a proper v_t
-  //     if v > v_t
-  //        steps >= v^2 / 2a for v_t = v_max
-  //
-  // Case 2: Emergency stop
-  //     steps < v^2 / 2a
-  //     this can be covered by a generic step 3, using constant decelaration
-  //     a_3:
-  //         s_remain = 1/2 * v * t_dec
-  //         t_dec = 2 s_remain / v
-  //         a_3 = v / t_dec = v^2 / 2 s_remain
-  //
-
-  // Steps needed to stop from current speed with defined acceleration
-  uint32_t new_deceleration_start;
-  uint32_t new_dec_time_ms;
-  if (_ticks_at_queue_end == 0) {
-    // motor start with minimum speed
-    _ticks_at_queue_end = round(16000000.0 * sqrt(2.0 / _accel));
-  }
-  float curr_speed = _ticks_at_queue_end ? 16000000.0 / _ticks_at_queue_end : 0;
-  uint32_t s_stop = round(curr_speed * curr_speed / 2.0 / _accel);
-
-  if (s_stop > steps) {
-    // start deceleration immediately
-    new_deceleration_start = steps;
-    new_dec_time_ms = round(2000.0 * steps / curr_speed);
-  } else if (_ticks_at_queue_end > _min_travel_ticks) {
-    // add steps to reach current speed to full ramp
-    uint32_t s_full_ramp = steps + s_stop;
-    uint32_t ramp_steps = min(s_full_ramp, _min_steps);
-    new_deceleration_start = ramp_steps / 2;
-    new_dec_time_ms = round(sqrt(ramp_steps / _accel) * 1000.0);
-  } else {
-    // need decelerate first in phase 1, then normal deceleration
-    new_deceleration_start = _min_steps / 2;
-    new_dec_time_ms = round(_speed / _accel * 1000.0);
-  }
-#ifdef TEST
-  printf("deceleration_start=%d  deceleration_time=%d ms\n",
-         new_deceleration_start, new_dec_time_ms);
-#endif
-  noInterrupts();
-  _deceleration_start = new_deceleration_start;
-  _dec_time_ms = new_dec_time_ms;
-  interrupts();
-  isr_speed_control_enabled = true;
 }
 void FastAccelStepper::disableOutputs() {
   if (_enablePin != 255) {

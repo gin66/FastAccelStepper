@@ -94,7 +94,7 @@ class FastAccelStepper {
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps
   uint32_t _dec_time_ms;         // in ms
-  uint32_t _accel;
+  upm_float _accel;
   uint32_t _speed;
 };
 

@@ -153,5 +153,34 @@ int main() {
   test((back * 0x0030) <= 0xf455, "wrong division");
   test((back * 0x0031) >  0xf455, "wrong division");
 
+  x = upm_from((uint32_t) 16000000);
+  printf("%x\n",x);
+  test(x == 0x17f4,"conversion error from uint32_t 16000000");
+  x = multiply(x,x);
+  printf("%x\n",x);
+  test(x == 0x2fe8,"multiply error from uint32_t 16000000²");
+
+  x1 = upm_from((uint32_t) 0xf455);
+  x2 = upm_from((uint32_t) 0xf455);
+  x = abs_diff(x1,x2);
+  back = upm_to_u32(x);
+  printf("|%x-%x|=%x (%d)\n",x1,x2,x,back);
+  test(back == 0, "wrong abs_diff");
+
+  x1 = upm_from((uint32_t) 0xf455);
+  x2 = upm_from((uint32_t) 0xf400);
+  x = abs_diff(x1,x2);
+  back = upm_to_u32(x);
+  printf("|%x-%x|=%x (%d)\n",x1,x2,x,back);
+  test(back == 0, "wrong abs_diff");
+
+  x1 = upm_from((uint32_t) 0xf455);
+  x2 = upm_from((uint32_t) 0xf3ff);
+  x = abs_diff(x1,x2);
+  back = upm_to_u32(x);
+  printf("|%x-%x|=%x (%d)\n",x1,x2,x,back);
+  test(back == 0x0100, "wrong abs_diff");
+
+
   printf("TEST_03 PASSED\n");
 }

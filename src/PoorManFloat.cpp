@@ -173,3 +173,35 @@ uint32_t upm_to_u32(upm_float x) {
 	}
 	return res;
 }
+upm_float abs_diff(upm_float x,upm_float y) {
+	uint8_t exp_x = x >> 8;
+	uint8_t exp_y = y >> 8;
+	uint8_t mantissa;
+	uint8_t exponent;
+	if (x > y) {
+		exponent = exp_x;
+		uint8_t m_y = y & 0xff;
+		m_y >> (exp_x - exp_y);
+		mantissa = x & 0xff;
+	    mantissa -= m_y;
+	}
+	else if (x < y) {
+		exponent = exp_y;
+		uint8_t m_x = x & 0xff;
+		m_x >> (exp_y - exp_x);
+		mantissa = y & 0xff;
+	    mantissa -= m_x;
+	}
+	else {
+		return 0;
+	}
+	while ((mantissa & 0x80) == 0) {
+		mantissa <<= 1;
+		exponent--;
+	}
+	uint16_t res = exponent;
+	res <<= 8;
+	res |= mantissa;
+	return res;
+}
+
