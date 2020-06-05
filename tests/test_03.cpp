@@ -145,5 +145,13 @@ int main() {
   back = upm_to_u32(x);
   test(back == 0x0100, "wrong division");
 
+  x1 = upm_from((uint32_t) 0xf455);
+  x2 = upm_from((uint32_t) 0x0030);
+  x = divide(x1,x2);
+  back = upm_to_u32(x);
+  printf("%x/%x=%x (%d)\n",x1,x2,x,back);
+  test((back * 0x0030) <= 0xf455, "wrong division");
+  test((back * 0x0031) >  0xf455, "wrong division");
+
   printf("TEST_03 PASSED\n");
 }
