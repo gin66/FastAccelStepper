@@ -141,8 +141,8 @@ int main() {
   x1 = upm_from((uint32_t) 0x5555);
   x2 = upm_from((uint32_t) 0x0055);
   x = divide(x1,x2);
-  printf("%x/%x=%x\n",x1,x2,x);
   back = upm_to_u32(x);
+  printf("%x/%x=%x (back=%d)\n",x1,x2,x,back);
   test(back == 0x0100, "wrong division");
 
   x1 = upm_from((uint32_t) 0xf455);
