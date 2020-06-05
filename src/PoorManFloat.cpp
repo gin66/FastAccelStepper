@@ -13,8 +13,8 @@
 upm_float upm_from(uint8_t x) {
 	uint16_t res;
 	if ((x & 0xf0) == 0) {
-	   if (x & 0x03) {
-		   if (x & 0x01) {
+	   if ((x & 0x0c) == 0) {
+		   if ((x & 0x02) == 0) {
 			   x <<= 7;
 			   res = x;
 		   }
@@ -24,7 +24,7 @@ upm_float upm_from(uint8_t x) {
 		   }
 	   }
 	   else {
-		   if (x & 0x04) {
+		   if ((x & 0x08) == 0) {
 			   x <<= 5;
 			   res = x | 0x0200;
 		   }
@@ -35,8 +35,8 @@ upm_float upm_from(uint8_t x) {
 	   }
 	}
 	else {
-	   if (x & 0x30) {
-		   if (x & 0x10) {
+	   if ((x & 0xc0) == 0) {
+		   if ((x & 0x20) == 0) {
 			   x <<= 3;
 			   res = x | 0x0400;
 		   }
@@ -46,7 +46,7 @@ upm_float upm_from(uint8_t x) {
 		   }
 	   }
 	   else {
-		   if (x & 0x40) {
+		   if ((x & 0x80) == 0) {
 			   x <<= 1;
 			   res = x | 0x0600;
 		   }
@@ -103,13 +103,40 @@ upm_float multiply(upm_float x,upm_float y) {
 	uint8_t a = x & 255;
 	uint8_t b = y & 255;
 	uint16_t ab = a*b;
-	if (ab >= 32768) {
+	if (ab & 0x8000)  {
 		ab >>= 8;
-		ab += (a & 0xff00) + (b & 0xff00) + 0x0800;
+		ab += (x & 0xff00) + (y & 0xff00);
+		ab += 0x0100;
 	}
 	else {
 		ab >>= 7;
-		ab += (a & 0xff00) + (b & 0xff00) + 0x0700;
+		ab += (x & 0xff00) + (y & 0xff00);
 	}
 	return ab;
+}
+upm_float divide(upm_float x,upm_float y) {
+	if (x < y) {
+		return 0;
+	}
+	uint8_t a = x & 255;
+	uint8_t b = y & 255;
+
+	uint8_t res = (x & 0xff00) - (y & 0xff00);
+	uint8_t mask = 0x80;
+	while(mask) {
+		if (a == b) {
+			break;
+		}
+		if (a > b) {
+			a -= b;
+			res |= mask;
+		}
+		a <<= 1;
+		mask >>= 1;
+	}
+	if ((mask & 0x80) == 0) {
+		res -= 0x0100;
+	}
+	res |= mask;
+	return res;
 }

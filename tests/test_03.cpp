@@ -31,7 +31,10 @@ int main() {
   test(x == 0x0080,"conversion error from uint8_t 1");
   x = upm_from((uint8_t) 2);
   test(x == 0x0180,"conversion error from uint8_t 2");
+  x = upm_from((uint8_t) 3);
+  test(x == 0x01c0,"conversion error from uint8_t 3");
   x = upm_from((uint8_t) 4);
+  printf("%x\n",x);
   test(x == 0x0280,"conversion error from uint8_t 4");
   x = upm_from((uint8_t) 8);
   test(x == 0x0380,"conversion error from uint8_t 8");
@@ -65,6 +68,11 @@ int main() {
 
   x = upm_from((uint32_t) 1);
   test(x == 0x0080,"conversion error from uint32_t 1");
+  x = upm_from((uint32_t) 3);
+  printf("%x\n",x);
+  test(x == 0x01c0,"conversion error from uint32_t 3");
+  x = upm_from((uint32_t) 5);
+  test(x == 0x02a0,"conversion error from uint32_t 5");
   x = upm_from((uint32_t) 65536);
   test(x == 0x1080,"conversion error from uint32_t 65536");
   x = upm_from((uint32_t) 131072);
@@ -97,6 +105,15 @@ int main() {
   test(x == 0x1e80,"conversion error from uint32_t 1073741824");
   x = upm_from((uint32_t) 2147483648);
   test(x == 0x1f80,"conversion error from uint32_t 2147483648");
+
+  upm_float x1,x2,x3;
+  x1 = upm_from((uint32_t) 3);
+  x2 = upm_from((uint32_t) 5);
+  x3 = upm_from((uint32_t) 15);
+  x = multiply(x1,x2);
+  printf("%x*%x=%x\n",x1,x2,x);
+  test(x == x3, "multiply error 3*5");
+  test(x == 0x03f0, "multiply error 3*5");
 
   printf("TEST_03 PASSED\n");
 }
