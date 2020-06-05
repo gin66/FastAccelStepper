@@ -51,7 +51,24 @@ class FastAccelStepper {
   bool isStopped();
 
   // For stepper movement control by FastAccelStepper
-  void set_dynamics(uint32_t min_travel_ticks, float accel);
+  //
+  // setSpeed expects as parameter the minimum time between two steps.
+  // If for example 5 steps/s shall be the maximum speed of the stepper,
+  // then this call will be
+  //      t = 0.2 s/steps = 200000 us/step
+  //      setSpeed(200000);
+  //
+  void setSpeed(uint32_t min_step_us);
+  //  set Acceleration expects as parameter the change of speed
+  //  as step/s². 
+  //  If for example the speed should ramp up from 0 to 10000 steps/s within 10s,
+  //  then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
+  //
+  //  If the speed should ramp up from 0 to 10000 steps/s within 0.01s,
+  //  then the acceleration is 10000 steps/s / 0.01s = 100000 steps/s²
+  //  This value is above the max value of an uint16_t (65535).
+  void setAcceleration(uint16_t step_s_s); 
+
   int32_t target_pos;
   bool isr_speed_control_enabled;
   inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
@@ -68,8 +85,6 @@ class FastAccelStepper {
   bool _channelA;
   uint8_t _auto_enablePin;
   uint8_t _enablePin;
-  float _speed;  // in steps/s
-  float _accel;  // in steps/s²
 
   uint32_t _min_steps;         // in steps
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us

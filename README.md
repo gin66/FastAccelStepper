@@ -18,6 +18,7 @@ FastAccelStepper offers the following features:
 * 3-pin operation for power reduction
 * supports up to two stepper motors using DIR/STEP/Enable Control (Direction and Enable is optional)
 * allows up to roughly 32000 generated steps per second in dual stepper operation
+* Lower limit of 3.8 steps/s
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * speed/acceleration can be varied while stepper is running
@@ -71,5 +72,5 @@ The compare interrupt routines uses two staged tick counters. One byte (msb) + o
 3. Introduce command queue of speed/accel commands - one per stepper. This will allow exact speed control.
 4. Change in direction requires motor stop !
 5. Using constant acceleration leads to force jumps at start and max speed => smooth this out
-
+6. Extend command queue entry to perform ai delay only (steps=0) to reduce the 3.8 steps/s
 

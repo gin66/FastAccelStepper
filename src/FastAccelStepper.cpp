@@ -10,9 +10,18 @@
 uint8_t fas_ledPin = 255;  // 255 if led blinking off
 uint16_t fas_debug_led_cnt = 0;
 
+#define TIMER_FREQ 16000000
+
 FastAccelStepper fas_stepperA = FastAccelStepper(true);
 FastAccelStepper fas_stepperB = FastAccelStepper(false);
 
+//*************************************************************************************************
+//*************************************************************************************************
+//
+// Main purpose of FastAccelStepperEngine is timer 1 initialization and access to the steppers.
+//
+//*************************************************************************************************
+//*************************************************************************************************
 void FastAccelStepperEngine::init() {
   fas_stepperA.isr_speed_control_enabled = false;
   fas_stepperB.isr_speed_control_enabled = false;
@@ -30,11 +39,33 @@ void FastAccelStepperEngine::init() {
 
   interrupts();
 }
+//*************************************************************************************************
+FastAccelStepper* FastAccelStepperEngine::stepperA() { return &fas_stepperA; }
+//*************************************************************************************************
+FastAccelStepper* FastAccelStepperEngine::stepperB() { return &fas_stepperB; }
+//*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
 }
+
+
+//*************************************************************************************************
+//*************************************************************************************************
+//
+// FastAccelStepper is associated with either stepperA or stepperB and provides:
+// - movement control
+//       either raw access to the stepper command queue
+//       or ramp generator driven by speed/acceleration and move
+// - stepper position
+//
+//*************************************************************************************************
+//*************************************************************************************************
+
+//*************************************************************************************************
 bool FastAccelStepper::isStopped() { return _ticks_at_queue_end == 0; }
+//*************************************************************************************************
 void FastAccelStepper::add_queue_stepper_stop() { _ticks_at_queue_end = 0; }
+//*************************************************************************************************
 inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
                                              uint8_t steps, bool dir_high,
                                              int16_t change_ticks) {
@@ -108,11 +139,162 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
 // fill_queue generates commands to the stepper for executing a ramp
 //
 // Plan is to fill the queue with commmands with approx. 10 ms ahead (or more).
-// For low speeds, this results in singlestepping
-// For high speeds (40kSteps/s) approx. 400 Steps to be created an as such min.
-// 3 commands to generate
+// For low speeds, this results in single stepping
+// For high speeds (40kSteps/s) approx. 400 Steps to be created using 3 commands
 //
-// Calculation is done in time domain
+// Required steps and time from speed v_1 to v_2 with constant acceleration a is
+//
+//      v(t) = v_1 + (v_2 - v_1) * t / T = v_1 + a * t
+//
+//      T = (v_2 - v_1) / a
+//
+// The steps over time are calculated like this
+//
+//      s(t) = int_0_t [v_1 + (v_2 - v_1) * t / T] dt
+//           = [v_1 * t + (v_2 - v_1)/T * 1/2 * t²] at [0,t]
+//           = v_1 * t + (v_2 - v_1)/T * 1/2 * t²
+//           = v_1 * t + a * 1/2 * t²
+//
+// Consequently the required steps S for this speed change is:
+//
+//		S = s(T) = v_1 * (v_2 - v_1) / a + a * 1/2 * (v_2 - v_1)² /a²
+//		         = v_1 * (v_2 - v_1) / a + (v_2 - v_1)² / 2a
+//		         = [2 * v_1 + (v_2 - v_1)] * (v_2 - v_1) / 2a
+//		         = [2 * v_1 + (v_2 - v_1)] * (v_2 - v_1) / 2a
+//		         = [v_1 + v_2] * (v_2 - v_1) / 2a
+//		         = [v_1 + v_2] * T / 2
+//
+// During the speed change the remaining time Tr and steps Sr are updated:
+//
+//		Sr = S - Δs
+//      Tr = T + Δt
+//
+// At ramp start the ratio S to T is:
+//
+//		S / T = (v_1 + v_2) / 2
+//
+// With the factor F this ratio can be made identical to v_1 at ramp_start:
+//
+//		v_1 = F * S / T
+//
+//		F = 2 v_1 / (v_1 + v_2)
+//
+// During speed change the value will be updated as f:
+//
+//		f = 2 v / (v + v_2)
+//
+// An demonstration in python is in doc/ramp_calculation.py
+//
+//
+// The formulas in short:
+//    Special care for a: this must be negative for v_2 < v_1
+//    ... or better use abs() for time difference
+//    at ramp start:
+//			T = abs(v_2 - v_1) / a
+//		    S = [v_1 + v_2] * T / 2
+//		    F = 2 v_1 / (v_1 + v_2)
+//		    Tr = T
+//		    Sr = S
+//		    f = F
+//	  during ramp:
+//			v = f * Sr / Tr
+//			Δs = v * Δt or Δt = Δs/v
+//			Sr = Sr - Δs
+//			Tr = Tr + Δt
+//			f = 2 v / (v + v_2)
+//
+// Technical implementation by using delta_ticks in TIMESTEPS and FREQ instead of speed.
+//			TIMESTEPS * FREQ = 1
+//			FREQ = 16 MHz
+//
+// Instead of T in s use Tx in TIMESTEPS
+//
+//			Tx = abs(v_2 - v_1) / a / TIMESTEPS
+//			   = abs(FREQ/d_ticks_2 - FREQ/d_ticks_1)/a * FREQ
+//			   = abs(FREQ²/(a*d_ticks_2) - FREQ²/(a*d_ticks_1))
+//
+// a is an uint16_t and d_ticks actually uint24_t. FREQ² is ~48 bits.
+// Tx should be 32 bit, so ramp up time is limited to ~8 bits aka 256s.
+//
+// Similar for S:
+//		    S = [v_1 + v_2] * T / 2
+//		      = [FREQ/d_ticks_1 + FREQ/d_ticks_2] * Tx * TIMESTEPS / 2
+//		      = [Tx/d_ticks_1 + Tx/d_ticks_2] / 2
+//
+// Tx is 32bits and d_ticks uint24_t. So S with 32bits is ok.
+//
+// Finally for F:
+//		    F = 2 v_1 / (v_1 + v_2)
+//		      = 2 (FREQ/d_ticks_1) / ((FREQ/d_ticks_1) + (FREQ/d_ticks_2))
+//		      = 2 (1/d_ticks_1) / ((1/d_ticks_1) + (1/d_ticks_2))
+//		      = 2 d_ticks_2 / (d_ticks_2 + d_ticks_1)
+//
+// F/2 is < 1, thus better to use F_2 as 16bit:
+//			F_2 = F/2 * 65536
+//
+// Finally calculation of v aka d_ticks:
+//
+//			v = f * Sr / Tr
+//			FREQ/d_ticks = (F_2*2/65536) * Sr / Tr
+//			d_ticks = FREQ/((F_2*2/65536) * Sr / Tr)
+//			        = FREQ*65536*Tr/(F_2*2 * Sr)
+//			        = FREQ*65536*Txr*TIMESTEPS/(F_2*2 * Sr)
+//			        = Txr /[(F_2 * Sr)/65536] / 2
+//
+// Sr is 32 bit, the product F_2 * Sr / 65536 should yield 32bit again.
+// Then still division 32bit/32bit is needed.
+//
+// Perhaps better to replace 32bit multiplication/division in ramp by a
+// poor man's float implementation: 8 bit mantissa and 8 bit exponent
+// For the stepper control sufficient. Only risk is numeric stability
+// aka unwanted speed variations
+//
+//
+// Any movement consists of three phases.
+// 1. Change current speed to constant speed
+// 2. Constant travel speed
+// 3. Decelerate to stop
+//
+// With v_t being travel speed
+//
+// Steps for 1:
+//     if v <= v_t
+//        t_acc_1 = v_t / a
+//        t_acc_2 = v   / a
+//        s_1 = 1/2 * a * t_acc_1² - 1/2 * a * t_acc_2²
+//            = 1/2 * v_t² / a - 1/2 * v² / a
+//            = (v_t² - v²) / 2a
+//            = s_3 - v^2 / 2a
+//
+//     if v > v_t
+//        s_1 = (v^2 - v_t^2) / 2a
+//            = v^2 / 2a - s_3
+//
+// Steps for 2:
+//     s_2 = steps - s_1 - s_3
+//     if v <= v_t
+//        s_2 = steps - 2 s_3 + v^2 / 2a
+//     if v > v_t
+//        s_2 = steps - v^2 / 2a
+//
+// Steps for 3 (no emergency stop):
+//     t_dec = v_t / a
+//     s_3   = 1/2 * a * t_dec² = v_t² / 2a
+//
+// Case 1: Normal operation
+//     steps >= s_1 + s_3 for a proper v_t
+//     if v <= v_t
+//        steps >= 2 s_3 - v^2 / 2a for a proper v_t
+//     if v > v_t
+//        steps >= v^2 / 2a for v_t = v_max
+//
+// Case 2: Emergency stop
+//     steps < v^2 / 2a
+//     this can be covered by a generic step 3, using constant decelaration
+//     a_3:
+//         s_remain = 1/2 * v * t_dec
+//         t_dec = 2 s_remain / v
+//         a_3 = v / t_dec = v^2 / 2 s_remain
 //
 // Assume current speed - represented by curr_ticks, then the next speed shall
 // be:
@@ -122,6 +304,24 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
 //
 // - in case of deceleration:
 //		   next_ticks = curr_ticks / ( 1 - accel * dt * curr_ticks)
+//
+// Rephrased
+//		   next_ticks - curr_ticks = curr_ticks / ( 1 + accel * dt * curr_ticks) - curr_ticks
+//		   next_ticks - curr_ticks = - accel * dt * curr_ticks²  / ( 1 + accel * dt * curr_ticks)
+//                                 = - curr_ticks * x / (1 + x)
+// with x = accel * dt * curr_ticks
+//
+// dt and curr_ticks are measured in units of 1/16000000s and steps/16000000s respectively.
+// accel in steps/s^2. Thus the formula can be written dimensionless:
+//
+//	  x / (1 + x) = [accel] * [dt] * [curr_ticks] / (256*10^12 + [accel] * [dt] * [curr_ticks])
+//
+// 256*10^12 is approx 2^48 with 10% error
+// accel is up to 16 bit
+// dt is approx. 160000 to 4000000  aka 10ms..0.4s
+// curr_ticks is approx. 640 to 4000000
+//
+//
 //
 //*************************************************************************************************
 
@@ -317,9 +517,6 @@ ISR(TIMER1_OVF_vect) {
   TIMSK1 |= _BV(TOIE1);
 }
 
-FastAccelStepper* FastAccelStepperEngine::stepperA() { return &fas_stepperA; }
-FastAccelStepper* FastAccelStepperEngine::stepperB() { return &fas_stepperB; }
-
 FastAccelStepper::FastAccelStepper(bool channelA) {
   _channelA = channelA;
   _auto_enablePin = 255;
@@ -353,7 +550,7 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
     interrupts();
   }
 }
-uint32_t FastAccelStepper::min_delta_ticks() { return 16000000 / 32000; }
+uint32_t FastAccelStepper::min_delta_ticks() { return TIMER_FREQ / 32000; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;
   digitalWrite(dirPin, HIGH);
