@@ -60,9 +60,43 @@ int main() {
   test(x == 0x0d80,"conversion error from uint16_t 8192");
   x = upm_from((uint16_t) 16384);
   test(x == 0x0e80,"conversion error from uint16_t 16384");
+  x = upm_from((uint16_t) 32768);
+  test(x == 0x0f80,"conversion error from uint16_t 32768");
 
   x = upm_from((uint32_t) 1);
   test(x == 0x0080,"conversion error from uint32_t 1");
+  x = upm_from((uint32_t) 65536);
+  test(x == 0x1080,"conversion error from uint32_t 65536");
+  x = upm_from((uint32_t) 131072);
+  test(x == 0x1180,"conversion error from uint32_t 131072");
+  x = upm_from((uint32_t) 262144);
+  test(x == 0x1280,"conversion error from uint32_t 262144");
+  x = upm_from((uint32_t) 524288);
+  test(x == 0x1380,"conversion error from uint32_t 524288");
+  x = upm_from((uint32_t) 1048576);
+  test(x == 0x1480,"conversion error from uint32_t 1048576");
+  x = upm_from((uint32_t) 2097152);
+  test(x == 0x1580,"conversion error from uint32_t 2097152");
+  x = upm_from((uint32_t) 4194304);
+  test(x == 0x1680,"conversion error from uint32_t 4194304");
+  x = upm_from((uint32_t) 8388608);
+  test(x == 0x1780,"conversion error from uint32_t 8388608");
+  x = upm_from((uint32_t) 16777216);
+  test(x == 0x1880,"conversion error from uint32_t 16777216");
+  x = upm_from((uint32_t) 33554432);
+  test(x == 0x1980,"conversion error from uint32_t 33554432");
+  x = upm_from((uint32_t) 67108864);
+  test(x == 0x1a80,"conversion error from uint32_t 67108864");
+  x = upm_from((uint32_t) 134217728);
+  test(x == 0x1b80,"conversion error from uint32_t 134217728");
+  x = upm_from((uint32_t) 268435456);
+  test(x == 0x1c80,"conversion error from uint32_t 268435456");
+  x = upm_from((uint32_t) 536870912);
+  test(x == 0x1d80,"conversion error from uint32_t 536870912");
+  x = upm_from((uint32_t) 1073741824);
+  test(x == 0x1e80,"conversion error from uint32_t 1073741824");
+  x = upm_from((uint32_t) 2147483648);
+  test(x == 0x1f80,"conversion error from uint32_t 2147483648");
 
   printf("TEST_03 PASSED\n");
 }

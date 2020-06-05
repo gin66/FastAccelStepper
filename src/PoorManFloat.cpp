@@ -90,6 +90,14 @@ upm_float upm_from(uint32_t x) {
 		uint16_t w = x & 0xffff;
 		return upm_from(w);
 	}
+	if ((x & 0xff000000) == 0) {
+		uint16_t w = x >> 8;
+		return upm_from(w) + 0x0800;
+	}
+	else {
+		uint16_t w = x >> 16;
+		return upm_from(w) + 0x1000;
+	}
 }
 upm_float multiply(upm_float x,upm_float y) {
 	uint8_t a = x & 255;
