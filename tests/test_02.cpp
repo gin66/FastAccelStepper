@@ -96,7 +96,7 @@ void basic_test_with_empty_queue() {
   assert(0 == s.getCurrentPosition());
 
   assert(s.isQueueEmpty());
-  s.setSpeed(160000/16);
+  s.setSpeed(160000 / 16);
   s.setAcceleration(100);
   s.isr_fill_queue();
   assert(s.isQueueEmpty());
@@ -164,7 +164,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
   test(!s.isr_speed_control_enabled, "too many commands created");
   if (reach_max_speed) {
     printf("%d\n", rc.min_dt);
-//    test(rc.min_dt == travel_dt, "max speed not reached");
+    //    test(rc.min_dt == travel_dt, "max speed not reached");
   }
   printf("Total time %f\n", rc.total_ticks / 16000000.0);
   test(rc.total_ticks / 16000000.0 > min_time, "ramp too fast");
@@ -174,13 +174,14 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
 
 int main() {
   basic_test_with_empty_queue();
-  //             steps  ticks_us  accel    maxspeed  min_total_time max_total_time
-  test_with_pars(10000, 100000/16, 100.0, true, 1.0, 64.0);
-  test_with_pars(1600, 100000/16, 10000.0, true, 1.0, 11.0);
-  test_with_pars(1600, 100000/16, 1000.0, true, 1.0, 11.0);
-  test_with_pars(15000, 1600/16, 10000.0, true, 1.0, 3.0);
-  test_with_pars(100, 100000/16, 10000.0, true, 0.1, 0.7);
-  test_with_pars(500, 1000/16, 10000.0, false, 0.1,7.1);
-  test_with_pars(1000, 200/16, 1000.0, true, 0.1, 45.0);
+  //             steps  ticks_us  accel    maxspeed  min_total_time
+  //             max_total_time
+  test_with_pars(10000, 100000 / 16, 100.0, true, 1.0, 64.0);
+  test_with_pars(1600, 100000 / 16, 10000.0, true, 1.0, 11.0);
+  test_with_pars(1600, 100000 / 16, 1000.0, true, 1.0, 11.0);
+  test_with_pars(15000, 1600 / 16, 10000.0, true, 1.0, 3.0);
+  test_with_pars(100, 100000 / 16, 10000.0, true, 0.1, 0.7);
+  test_with_pars(500, 1000 / 16, 10000.0, false, 0.1, 7.1);
+  test_with_pars(1000, 200 / 16, 1000.0, true, 0.1, 45.0);
   printf("TEST_02 PASSED\n");
 }

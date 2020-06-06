@@ -61,21 +61,21 @@ class FastAccelStepper {
   //
   void setSpeed(uint32_t min_step_us);
   //  set Acceleration expects as parameter the change of speed
-  //  as step/s². 
-  //  If for example the speed should ramp up from 0 to 10000 steps/s within 10s,
-  //  then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
+  //  as step/s².
+  //  If for example the speed should ramp up from 0 to 10000 steps/s within
+  //  10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
   //
   //  If the speed should ramp up from 0 to 10000 steps/s within 0.01s,
   //  then the acceleration is 10000 steps/s / 0.01s = 100000 steps/s²
   //  This value is above the max value of an uint16_t (65535).
-  void setAcceleration(uint16_t step_s_s); 
+  void setAcceleration(uint16_t step_s_s);
 
   int32_t target_pos;
   bool isr_speed_control_enabled;
   inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
                                  // INTERRUPT SERVICE ROUTINE !
-  inline void isr_single_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
-                                 // INTERRUPT SERVICE ROUTINE !
+  inline void isr_single_fill_queue();  // MUST BE ONLY CALLED FROM THIS
+                                        // MODULE'S INTERRUPT SERVICE ROUTINE !
 
   uint32_t max_micros;
 
