@@ -148,202 +148,15 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
 // For low speeds, this results in single stepping
 // For high speeds (40kSteps/s) approx. 400 Steps to be created using 3 commands
 //
-// Required steps and time from speed v_1 to v_2 with constant acceleration a is
+// Basis of the calculation is the relation between steps and time via acceleration a:
 //
-//      v(t) = v_1 + (v_2 - v_1) * t / T = v_1 + a * t
+//		s = 1/2 * a * t²
 //
-//      T = (v_2 - v_1) / a
+// With v = a * t for the acceleration case, then v can be deducted:
 //
-// The steps over time are calculated like this
+//		s = 1/2 * v² / a
 //
-//      s(t) = int_0_t [v_1 + (v_2 - v_1) * t / T] dt
-//           = [v_1 * t + (v_2 - v_1)/T * 1/2 * t²] at [0,t]
-//           = v_1 * t + (v_2 - v_1)/T * 1/2 * t²
-//           = v_1 * t + a * 1/2 * t²
-//
-// Consequently the required steps S for this speed change is:
-//
-//		S = s(T) = v_1 * (v_2 - v_1) / a + a * 1/2 * (v_2 - v_1)² /a²
-//		         = v_1 * (v_2 - v_1) / a + (v_2 - v_1)² / 2a
-//		         = [2 * v_1 + (v_2 - v_1)] * (v_2 - v_1) / 2a
-//		         = [2 * v_1 + (v_2 - v_1)] * (v_2 - v_1) / 2a
-//		         = [v_1 + v_2] * (v_2 - v_1) / 2a
-//		         = [v_1 + v_2] * T / 2
-//
-// During the speed change the remaining time Tr and steps Sr are updated:
-//
-//		Sr = S - Δs
-//      Tr = T + Δt
-//
-// At ramp start the ratio S to T is:
-//
-//		S / T = (v_1 + v_2) / 2
-//
-// With the factor F this ratio can be made identical to v_1 at ramp_start:
-//
-//		v_1 = F * S / T
-//
-//		F = 2 v_1 / (v_1 + v_2)
-//
-// During speed change the value will be updated as f:
-//
-//		f = 2 v / (v + v_2)
-//
-// An demonstration in python is in doc/ramp_calculation.py
-//
-//
-// The formulas in short:
-//    Special care for a: this must be negative for v_2 < v_1
-//    ... or better use abs() for time difference
-//    at ramp start:
-//			T = abs(v_2 - v_1) / a
-//		    S = [v_1 + v_2] * T / 2
-//		    Tr = T
-//		    Sr = S
-//	  during ramp:
-//			f = 2 v / (v + v_2)
-//			v = f * Sr / Tr
-//			Δs = v * Δt or Δt = Δs/v
-//			Sr = Sr - Δs
-//			Tr = Tr + Δt
-//
-// Technical implementation by using delta_ticks in TIMESTEPS and FREQ instead
-// of speed.
-//			TIMESTEPS * FREQ = 1
-//			FREQ = 16 MHz
-//
-// Instead of T in s use Tx in TIMESTEPS
-//
-//			Tx = abs(v_2 - v_1) / a / TIMESTEPS
-//			   = abs(FREQ/d_ticks_2 - FREQ/d_ticks_1)/a * FREQ
-//			   = abs(FREQ²/(a*d_ticks_2) - FREQ²/(a*d_ticks_1))
-//
-// a is an uint16_t and d_ticks actually uint24_t. FREQ² is ~48 bits.
-// Tx should be 32 bit, so ramp up time is limited to ~8 bits aka 256s.
-//
-// Similar for S:
-//		    S = [v_1 + v_2] * T / 2
-//		      = [FREQ/d_ticks_1 + FREQ/d_ticks_2] * Tx * TIMESTEPS / 2
-//		      = [Tx/d_ticks_1 + Tx/d_ticks_2] / 2
-//
-// Tx is 32bits and d_ticks uint24_t. So S with 32bits is ok.
-//
-// Finally for F:
-//		    F = 2 v_1 / (v_1 + v_2)
-//		      = 2 (FREQ/d_ticks_1) / ((FREQ/d_ticks_1) +
-//(FREQ/d_ticks_2)) 		      = 2 (1/d_ticks_1) / ((1/d_ticks_1) +
-//(1/d_ticks_2)) 		      = 2 d_ticks_2 / (d_ticks_2 + d_ticks_1)
-//
-// Finally calculation of v aka d_ticks:
-//
-//			v = f * Sr / Tr
-//			FREQ/d_ticks = F * Sr / Tr
-//			d_ticks = FREQ * Tr/(F * Sr)
-//			        = FREQ * Txr * TIMESTEPS / (F * Sr)
-//			        = Txr / (F * Sr)
-//
-//	With G = 2 / F:
-//		    G = 2 / F = (d_ticks_2 + d_ticks_1) / d_ticks_2
-//	or g during ramp:
-//		    g = 2 / f = (d_ticks_2 + d_ticks) / d_ticks_2
-//			d_ticks_new = Txr * G / 2 / Sr
-//
-// Perhaps better to replace 32bit multiplication/division in ramp by a
-// poor man's float implementation: 8 bit mantissa and 8 bit exponent
-// For the stepper control sufficient. Only risk is numeric stability
-// aka unwanted speed variations
-//
-// Updated formulas in short with forward looking speed:
-//    at ramp start:
-//			Txr = abs(FREQ²/(a*d_ticks_2) - FREQ²/(a*d_ticks_1))
-//		    S = [Tx/d_ticks_1 + Tx/d_ticks_2] / 2
-//	  during ramp:
-//			Δs = Δt / d_ticks or Δt = Δs * d_ticks
-//			Sr_scenario = Sr - Δs
-//			Txr_scenario = Txr + Δt
-//		    g = 1 / f = (d_ticks_2 + d_ticks) / d_ticks_2
-//				IF d_ticks_2 equals standstill, then g = 1
-//			d_ticks_new = Txr_scenario * g / 2 / Sr_scenario
-//			Sr_new = Sr - Δs_executed
-//			Txr_new = Txr - Δt_executed
-//
-// Any movement consists of three phases.
-// 1. Change current speed to constant speed
-// 2. Constant travel speed
-// 3. Decelerate to stop
-//
-// With v_t being travel speed
-//
-// Steps for 1:
-//     if v <= v_t
-//        t_acc_1 = v_t / a
-//        t_acc_2 = v   / a
-//        s_1 = 1/2 * a * t_acc_1² - 1/2 * a * t_acc_2²
-//            = 1/2 * v_t² / a - 1/2 * v² / a
-//            = (v_t² - v²) / 2a
-//            = s_3 - v^2 / 2a
-//
-//     if v > v_t
-//        s_1 = (v^2 - v_t^2) / 2a
-//            = v^2 / 2a - s_3
-//
-// Steps for 2:
-//     s_2 = steps - s_1 - s_3
-//     if v <= v_t
-//        s_2 = steps - 2 s_3 + v^2 / 2a
-//     if v > v_t
-//        s_2 = steps - v^2 / 2a
-//
-// Steps for 3 (no emergency stop):
-//     t_dec = v_t / a
-//     s_3   = 1/2 * a * t_dec² = v_t² / 2a
-//
-// Case 1: Normal operation
-//     steps >= s_1 + s_3 for a proper v_t
-//     if v <= v_t
-//        steps >= 2 s_3 - v^2 / 2a for a proper v_t
-//     if v > v_t
-//        steps >= v^2 / 2a for v_t = v_max
-//
-// Case 2: Emergency stop
-//     steps < v^2 / 2a
-//     this can be covered by a generic step 3, using constant decelaration
-//     a_3:
-//         s_remain = 1/2 * v * t_dec
-//         t_dec = 2 s_remain / v
-//         a_3 = v / t_dec = v^2 / 2 s_remain
-//
-// Assume current speed - represented by curr_ticks, then the next speed shall
-// be:
-//
-// - in case of acceleration:
-//		   next_ticks = curr_ticks / ( 1 + accel * dt * curr_ticks)
-//
-// - in case of deceleration:
-//		   next_ticks = curr_ticks / ( 1 - accel * dt * curr_ticks)
-//
-// Rephrased
-//		   next_ticks - curr_ticks = curr_ticks / ( 1 + accel * dt *
-// curr_ticks) - curr_ticks 		   next_ticks - curr_ticks = - accel *
-// dt
-// * curr_ticks²
-/// ( 1 + accel * dt * curr_ticks)
-//                                 = - curr_ticks * x / (1 + x)
-// with x = accel * dt * curr_ticks
-//
-// dt and curr_ticks are measured in units of 1/16000000s and steps/16000000s
-// respectively. accel in steps/s^2. Thus the formula can be written
-// dimensionless:
-//
-//	  x / (1 + x) = [accel] * [dt] * [curr_ticks] / (256*10^12 + [accel] *
-//[dt] * [curr_ticks])
-//
-// 256*10^12 is approx 2^48 with 10% error
-// accel is up to 16 bit
-// dt is approx. 160000 to 4000000  aka 10ms..0.4s
-// curr_ticks is approx. 640 to 4000000
-//
-//
+//	    v = sqrt(2 * s * a)
 //
 //*************************************************************************************************
 void FastAccelStepper::_calculate_move(int32_t move) {
@@ -374,11 +187,12 @@ void FastAccelStepper::_calculate_move(int32_t move) {
     Tx = upm_to_u32(upm_Tx);
   }
 
-  _ramp_up_Tx = Tx;
-  _ramp_up_S = ramp_steps;
-  _deceleration_start = _ramp_up_S;
-  _ramp_down_Tx = 0;
-  _ramp_down_S = 0;
+  noInterrupts();
+  _deceleration_start = ramp_steps;
+  _performed_ramp_up_steps = 0;
+  isr_speed_control_enabled = true;
+  interrupts();
+
 #ifdef TEST
   printf(
       "Ramp data: starting_ticks = %d curr_ticks = %d travel_ticks = %d accel "
@@ -386,95 +200,6 @@ void FastAccelStepper::_calculate_move(int32_t move) {
       _starting_ticks, curr_ticks, _min_travel_ticks, upm_to_u32(_upm_accel),
       upm_to_u32(upm_Tx), ramp_steps);
 
-#endif
-  _ramp_up_time = 0;
-  _ramp_down_time = Tx;
-  _ramp_down_steps = ramp_steps;
-  _performed_steps = 0;
-  isr_speed_control_enabled = true;
-  return;
-#ifdef OLD
-  // The movement consists of three phases.
-  // 1. Change current speed to constant speed
-  // 2. Constant travel speed
-  // 3. Decelerate to stop
-  //
-  // With v_t being travel speed
-  //
-  // Steps for 3 (no emergency stop):
-  //     t_dec = v_t / a
-  //     s_3   = 1/2 * a * t_dec² = v_t² / 2a
-  //
-  // Steps for 1:
-  //     if v <= v_t
-  //        t_acc_1 = v_t / a
-  //        t_acc_2 = v   / a
-  //        s_1 = 1/2 * a * t_acc_1² - 1/2 * a * t_acc_2²
-  //            = 1/2 * v_t² / a - 1/2 * v² / a
-  //            = (v_t² - v²) / 2a
-  //            = s_3 - v^2 / 2a
-  //
-  //     if v > v_t
-  //        s_1 = (v^2 - v_t^2) / 2a
-  //            = v^2 / 2a - s_3
-  //
-  // Steps for 2:
-  //     s_2 = steps - s_1 - s_3
-  //     if v <= v_t
-  //        s_2 = steps - 2 s_3 + v^2 / 2a
-  //     if v > v_t
-  //        s_2 = steps - v^2 / 2a
-  //
-  // Case 1: Normal operation
-  //     steps >= s_1 + s_3 for a proper v_t
-  //     if v <= v_t
-  //        steps >= 2 s_3 - v^2 / 2a for a proper v_t
-  //     if v > v_t
-  //        steps >= v^2 / 2a for v_t = v_max
-  //
-  // Case 2: Emergency stop
-  //     steps < v^2 / 2a
-  //     this can be covered by a generic step 3, using constant decelaration
-  //     a_3:
-  //         s_remain = 1/2 * v * t_dec
-  //         t_dec = 2 s_remain / v
-  //         a_3 = v / t_dec = v^2 / 2 s_remain
-  //
-
-  // Steps needed to stop from current speed with defined acceleration
-  uint32_t new_deceleration_start;
-  uint32_t new_dec_time_ms;
-  if (_ticks_at_queue_end == 0) {
-    // motor start with minimum speed
-    _ticks_at_queue_end = round(16000000.0 * sqrt(2.0 / _upm_accel));
-  }
-  float curr_speed = _ticks_at_queue_end ? 16000000.0 / _ticks_at_queue_end : 0;
-  uint32_t s_stop = round(curr_speed * curr_speed / 2.0 / _upm_accel);
-
-  if (s_stop > steps) {
-    // start deceleration immediately
-    new_deceleration_start = steps;
-    new_dec_time_ms = round(2000.0 * steps / curr_speed);
-  } else if (_ticks_at_queue_end > _min_travel_ticks) {
-    // add steps to reach current speed to full ramp
-    uint32_t s_full_ramp = steps + s_stop;
-    uint32_t ramp_steps = min(s_full_ramp, _min_steps);
-    new_deceleration_start = ramp_steps / 2;
-    new_dec_time_ms = round(sqrt(ramp_steps / _upm_accel) * 1000.0);
-  } else {
-    // need decelerate first in phase 1, then normal deceleration
-    new_deceleration_start = _min_steps / 2;
-    new_dec_time_ms = round(_speed / _upm_accel * 1000.0);
-  }
-#ifdef TEST
-  printf("deceleration_start=%d  deceleration_time=%d ms\n",
-         new_deceleration_start, new_dec_time_ms);
-#endif
-  noInterrupts();
-  _deceleration_start = new_deceleration_start;
-  _dec_time_ms = new_dec_time_ms;
-  interrupts();
-  isr_speed_control_enabled = true;
 #endif
 }
 
@@ -487,6 +212,8 @@ inline void FastAccelStepper::isr_fill_queue() {
   if (_min_travel_ticks == 0) {
     return;
   }
+
+  // preconditions are fulfilled, so create the command(s)
   while (!isQueueFull() && isr_speed_control_enabled) {
     isr_single_fill_queue();
   }
@@ -495,26 +222,18 @@ inline void FastAccelStepper::isr_fill_queue() {
 inline void FastAccelStepper::isr_single_fill_queue() {
   uint32_t runtime_us = micros();
 
-  // preconditions are fulfilled, so create the command(s)
-
   // check state for acceleration/deceleration or deceleration to stop
-  int32_t remaining_steps = target_pos - _pos_at_queue_end;
-  bool accelerating = false;
-  bool decelerate_to_stop = false;
-  bool reduce_speed = false;
+  uint32_t remaining_steps = abs(target_pos - _pos_at_queue_end);
   uint32_t curr_ticks = _ticks_at_queue_end;
   if (curr_ticks == 0) {  // motor start with minimum speed
     curr_ticks = _starting_ticks;
   }
   ramp_state = RAMP_STATE_COAST;
-  if (abs(remaining_steps) <= _deceleration_start) {
-    decelerate_to_stop = true;
+  if (remaining_steps <= _deceleration_start) {
     ramp_state = RAMP_STATE_DECELERATE_TO_STOP;
   } else if (_min_travel_ticks < curr_ticks) {
-    accelerating = true;
     ramp_state = RAMP_STATE_ACCELERATE;
   } else if (_min_travel_ticks > curr_ticks) {
-    reduce_speed = true;
     ramp_state = RAMP_STATE_DECELERATE;
   }
 
@@ -524,121 +243,16 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   uint32_t planning_steps = planning_ticks / curr_ticks;
 
 #ifdef TEST
-  printf("remaining=%u deceleration_start=%u accel=%d  curr_ticks=%d planning ticks=%d   %s %s %s\n",
+  printf("remaining=%u deceleration_start=%u accel=%d  curr_ticks=%d planning ticks=%d   ",
 		  remaining_steps, _deceleration_start,
-         upm_to_u32(_upm_accel), curr_ticks, planning_ticks,
-         accelerating ? "ACC" : "", decelerate_to_stop ? "STOP" : "",
-         reduce_speed ? "RED" : "");
-#endif
-
-#ifdef OLD
-  // Calculate the new speed based on the planning_ticks aka Δt
-  uint32_t Tx_scenario;
-  uint32_t S_scenario;
-  uint32_t planning_steps;
-  if (accelerating) {
-    Tx_scenario = _ramp_up_Tx;
-    S_scenario = _ramp_up_S;
-  if (Tx_scenario > planning_ticks) {
-     Tx_scenario -= planning_ticks;
+         upm_to_u32(_upm_accel), curr_ticks, planning_ticks);
+  switch(ramp_state) {
+      case RAMP_STATE_COAST: printf("COAST");break;
+      case RAMP_STATE_ACCELERATE: printf("ACC");break;
+      case RAMP_STATE_DECELERATE: printf("DEC");break;
+      case RAMP_STATE_DECELERATE_TO_STOP: printf("STOP");break;
   }
-  else {
-	  if (accelerating) {
-		  next_ticks = _min_travel_ticks;
-		  accelerating = false;
-	  }
-	  if (decelerate_to_stop) {
-		  next_ticks = _starting_ticks;
-		  decelerate_to_stop = false;
-	  }
-  } 
-  planning_steps = planning_ticks / curr_ticks;
-  if (S_scenario > planning_steps) {
-	S_scenario -= planning_steps;
-  }
-  else {
-	  if (S_scenario > 1) {
-		  planning_steps = S_scenario - 1;
-		  planning_ticks = planning_steps * curr_ticks;
-		  S_scenario = 1;
-		}
-	  else {
-	  if (accelerating) {
-		  next_ticks = _min_travel_ticks;
-		  accelerating = false;
-	  }
-	  if (decelerate_to_stop) {
-		  next_ticks = _starting_ticks;
-		  decelerate_to_stop = false;
-	  }
-	  }
-  }
-  }
-  if (decelerate_to_stop) {
-    Tx_scenario = _ramp_down_Tx + planning_ticks;
-    S_scenario = _ramp_down_S + planning_steps;
-  }
-	
-#ifdef TEST
-    printf("internal Tx=%u  S=%u\n", Tx_scenario, S_scenario);
-#endif
-  if (accelerating) {
-    upm_float upm_Tx = upm_from(Tx_scenario);
-    upm_float upm_S = upm_from(S_scenario);
-    upm_float upm_d_ticks = upm_from(curr_ticks);
-    upm_float upm_d_ticks_2 = upm_from(_min_travel_ticks);
-    upm_float upm_G = divide(sum(upm_d_ticks, upm_d_ticks_2), upm_d_ticks_2);
-    upm_float upm_d_ticks_new = shr(divide(multiply(upm_Tx, upm_G), upm_S), 1);
-    uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
-#ifdef TEST
-    printf("accelerate internal Tx=%u  S=%u  G=%u\n", Tx_scenario, S_scenario, upm_to_u32(upm_G));
-#endif
-
-    // avoid overshoot
-    next_ticks = max(d_ticks_new, _min_travel_ticks);
-
-    // avoid reduction
-    next_ticks = min(next_ticks, curr_ticks);
-
-#ifdef TEST
-    printf("accelerate ticks=%d => %d  during %d ticks (d_ticks_new = %u)\n",
-           curr_ticks, next_ticks, planning_ticks, d_ticks_new);
-#endif
-  }
-  if (reduce_speed) {
-  }
-  if (decelerate_to_stop) {
-    upm_float upm_Tx = upm_from(Tx_scenario);
-    upm_float upm_S = upm_from(S_scenario);
-    upm_float upm_d_ticks = upm_from(curr_ticks);
-    upm_float upm_d_ticks_2 = upm_from(_starting_ticks);
-    upm_float upm_G = divide(sum(upm_d_ticks, upm_d_ticks_2), upm_d_ticks_2);
-    upm_float upm_d_ticks_new = shr(divide(multiply(upm_Tx, upm_G), upm_S), 1);
-    uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
-#ifdef TEST
-    printf("decelerate internal Tx=%u  S=%u\n", Tx_scenario, S_scenario);
-#endif
-
-    // avoid undershoot
-    next_ticks = max(d_ticks_new, _min_travel_ticks);
-
-    // avoid increase
-    next_ticks = max(next_ticks, curr_ticks);
-#ifdef TEST
-    printf("declerate to stop curr_ticks=%d => %d  during %d ticks (d_ticks_new = %u)\n",
-           curr_ticks, next_ticks, planning_ticks, d_ticks_new);
-#endif
-//    curr_speed =
-//        min(2 * abs(remaining_steps) * 1000.0 / _dec_time_ms, curr_speed);
-//    ticks_after_command = round(16000000.0 / curr_speed);
-#ifdef TEST
-//    printf("towards stop with speed=%f  remaining time=%d\n", curr_speed,
-//           _dec_time_ms);
-#endif
-  }
-#ifdef TEST
-  printf("=> expected ticks after command(s) = %d\n", next_ticks);
-#endif
+  printf("\n");
 #endif
 
 //
@@ -646,8 +260,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 // v = sqrt(2 a s)
 // dt = sqrt(1 / 2 a s) = sqrt(a' / s)
 //
-  if (accelerating) {
-		uint32_t upm_rem_steps = upm_from(_performed_steps + planning_steps);
+  if (ramp_state == RAMP_STATE_ACCELERATE) {
+		uint32_t upm_rem_steps = upm_from(_performed_ramp_up_steps + planning_steps);
 		upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel, upm_rem_steps));
 
    uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
@@ -659,14 +273,14 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     next_ticks = min(next_ticks, curr_ticks);
 
 #ifdef TEST
-	float v2 = 1.0*(_performed_steps + planning_steps) * _accel * 2.0;
+	float v2 = 1.0*(_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
     printf("accelerate ticks=%d => %d  during %d ticks (d_ticks_new = %u)\n",
            curr_ticks, next_ticks, planning_ticks, d_ticks_new);
-	printf("... ramp_up_time = %d   v²=%.1f @ %u+%u steps\n",
-			_ramp_up_time, v2, _performed_steps , planning_steps);
+	printf("... v²=%.1f @ %u+%u steps\n",
+			v2, _performed_ramp_up_steps , planning_steps);
 #endif
   }
-  if (decelerate_to_stop) {
+  if (ramp_state == RAMP_STATE_DECELERATE_TO_STOP) {
 		uint32_t upm_rem_steps = upm_from(remaining_steps - planning_steps);
 		upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel, upm_rem_steps));
 
@@ -680,8 +294,6 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #ifdef TEST
     printf("decelerate ticks=%d => %d  during %d ticks (d_ticks_new = %u)\n",
            curr_ticks, next_ticks, planning_ticks, d_ticks_new);
-	printf("... ramp_down_time = %d ramp_down_steps = %u\n",
-			_ramp_down_time, _ramp_down_steps);
 #endif
   }
 
@@ -715,25 +327,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     steps_per_command -= 1;
   }
 
-  if (accelerating) {
-	  _performed_steps += steps;
+  if (ramp_state == RAMP_STATE_ACCELERATE) {
+	  _performed_ramp_up_steps += steps;
   }
-#ifdef OLD
-  if (accelerating) {
-    uint32_t dd = curr_ticks * steps + total_change * steps / 2;
-    if (_ramp_up_Tx > dd) {
-      _ramp_up_Tx -= dd;
-    } else {
-      _ramp_up_Tx = 0;
-    }
-    _ramp_up_S -= steps;
-  }
-  if (decelerate_to_stop) {
-    uint32_t dd = curr_ticks * steps + change * steps / 2;
-    _ramp_down_Tx += dd;
-    _ramp_down_S += steps;
-  }
-#endif
   // Apply change to curr_ticks
   if (change == 0) {
     curr_ticks += total_change;
@@ -775,7 +371,6 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       steps, curr_ticks, target_pos, remaining_steps, change, res,
       _ticks_at_queue_end);
 #endif
-  curr_ticks += steps_per_command * change;
   if (total_steps == abs(remaining_steps)) {
     add_queue_stepper_stop();
     isr_speed_control_enabled = false;
@@ -787,6 +382,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #ifdef TEST
   puts("");
 #endif
+
+  // For run time measurement
   runtime_us = micros() - runtime_us;
   max_micros = max(max_micros, runtime_us);
 }
@@ -816,17 +413,15 @@ ISR(TIMER1_OVF_vect) {
 }
 
 FastAccelStepper::FastAccelStepper(bool channelA) {
+  max_micros = 0;
+  target_pos = 0;
+  isr_speed_control_enabled = false;
   _channelA = channelA;
   _auto_enablePin = 255;
-  target_pos = 0;
   _pos_at_queue_end = 0;
   _dir_high_at_queue_end = true;
-  isr_speed_control_enabled = false;
   _min_travel_ticks = 0;
   _ticks_at_queue_end = 0;
-  max_micros = 0;
-  magic1 = 0xde;
-  magic2 = 0xad;
 
   uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
   digitalWrite(pin, LOW);
