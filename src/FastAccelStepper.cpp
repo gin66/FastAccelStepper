@@ -514,7 +514,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   // Calculate the new speed based on the planning_ticks aka Δt
   uint32_t next_ticks = curr_ticks;
   if (accelerating) {
-    planning_ticks = min(planning_ticks/curr_ticks,_ramp_up_S);
+    planning_ticks = min(planning_ticks,_ramp_up_S*curr_ticks);
     uint32_t Tx_scenario = _ramp_up_Tx - planning_ticks;
     uint32_t S_scenario = _ramp_up_S - planning_ticks / curr_ticks;
     upm_float upm_Tx = upm_from(Tx_scenario);
@@ -583,6 +583,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t total_steps = planning_ticks / next_ticks;
+#ifdef TEST
+  printf("total_steps for the command = %d  with planning_ticks = %u and next_ticks = %u\n", total_steps, planning_ticks,next_ticks);
+#endif
   total_steps = max(total_steps, 1);
   total_steps = min(total_steps, abs(remaining_steps));
   uint16_t steps = total_steps;

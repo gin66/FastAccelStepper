@@ -57,9 +57,9 @@ void RampChecker::check_section(struct queue_entry *e) {
 
   min_dt = min(min_dt, min(start_dt, end_dt));
   printf(
-      "process command in ramp checker: %.6fs last = %d start = %d  end = %d  min_dt "
-      "= %d\n",
-      total_ticks / 16000000.0, last_dt, start_dt, end_dt, min_dt);
+      "process command in ramp checker @%.6fs: steps = %d last = %d start = %d  end = %d  min_dt "
+      "= %d\n", 
+      total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt);
 
   total_ticks += steps * start_dt + (steps - 1) * steps / 2 * e->delta_change;
 
@@ -143,6 +143,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
   s.move(steps);
   s.isr_fill_queue();
   assert(!s.isQueueEmpty());
+  float old_planned_time_in_buffer = 0;
   for (int i = 0; i < steps; i++) {
     if (true) {
       printf(
@@ -156,10 +157,17 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
       break;
     }
     s.isr_fill_queue();
+	uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
       rc.check_section(&fas_queue_A[fas_q_readptr_A]);
       fas_q_readptr_A = (fas_q_readptr_A + 1) & QUEUE_LEN_MASK;
     }
+	uint32_t to_dt = rc.total_ticks;
+	float planned_time = (to_dt - from_dt)*1.0/16000000;
+	printf("planned time in buffer: %.6fs\n", planned_time);
+	// This must be ensured, so that the stepper does not run out of commands
+	assert((i == 0) || (old_planned_time_in_buffer > 0.005));
+    old_planned_time_in_buffer = planned_time;
   }
   test(!s.isr_speed_control_enabled, "too many commands created");
   if (reach_max_speed) {
