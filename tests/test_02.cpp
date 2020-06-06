@@ -185,6 +185,10 @@ int main() {
   test_with_pars(15000, 100, 10000, true, 2*1.0+0.5-0.17, 2*1.0+0.5+0.1);// ramp time 1s, 5000 steps
   test_with_pars(100, 5000, 10000, true, 2*0.02+0.48-0.1, 2*0.02+0.48+0.1);// ramp time 0.02s, 4 steps
   test_with_pars(500, 50, 10000, false, 2*0.22-0.1, 2*0.22+0.11);// ramp time 2s, 20000 steps => only ramp 0.22s
+  test_with_pars(128000, 250, 1000, true, 2*2.0+30.0-0.1, 2*2.0+30.0+0.1  +1.7);// ramp time 4s, 8000 steps
+  test_with_pars(72000, 250, 1000, true, 2*2.0+15.0-0.1, 2*2.0+15.0+0.1  +2*1.7);// ramp time 4s, 8000 steps
+  test_with_pars(44000, 250, 1000, true, 2*2.0+7.5-0.1, 2*2.0+7.5+0.1  +2*1.7);// ramp time 4s, 8000 steps
+  test_with_pars(16002, 250, 1000, true, 2*2.0+0.0-0.1, 2*2.0+0.0+0.1  +4.0);// ramp time 4s, 8000 steps
 //  test_with_pars(1000, 20, 1000, false, 0.5, 1.0); // expect t = sqrt(500/a)
   printf("TEST_02 PASSED\n");
 }
