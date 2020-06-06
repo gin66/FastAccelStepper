@@ -150,6 +150,8 @@ else {
       else {
          Serial.print("  PAUSED ");
       }
+	  Serial.print("  state=");
+      Serial.print(stepper1->ramp_state);
       Serial.print("  max/us=");
       Serial.print(stepper1->max_micros);
 
@@ -162,6 +164,8 @@ else {
       else {
          Serial.print("  PAUSED ");
       }
+	  Serial.print("  state=");
+      Serial.print(stepper2->ramp_state);
       Serial.print("  max/us=");
       Serial.print(stepper2->max_micros);
 

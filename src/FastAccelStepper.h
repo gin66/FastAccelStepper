@@ -70,6 +70,7 @@ class FastAccelStepper {
   //  This value is above the max value of an uint16_t (65535).
   void setAcceleration(uint16_t step_s_s);
 
+# define RAMP_STATE_IDLE 0
 # define RAMP_STATE_ACCELERATE 1
 # define RAMP_STATE_DECELERATE_TO_STOP 2
 # define RAMP_STATE_DECELERATE 3
@@ -98,13 +99,12 @@ class FastAccelStepper {
 
   uint32_t _min_steps;         // in steps
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
-  uint32_t _starting_ticks;    // in ticks, means 0.25us
 
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps
   uint16_t _accel;
   upm_float _upm_accel;
-  upm_float _upm_inv_accel;
+  upm_float _upm_inv_accel2;
 
   uint32_t _performed_ramp_up_steps;
 };

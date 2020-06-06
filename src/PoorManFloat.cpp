@@ -160,6 +160,18 @@ upm_float multiply(upm_float x, upm_float y) {
   ab += ((x & 0xff00) - 0x4000) + ((y & 0xff00) - 0x4000);
   return ab;
 }
+upm_float square(upm_float x) {
+  uint8_t a = x & 255;
+  uint16_t aa = a * a;
+  if (aa & 0x8000) {
+    aa >>= 8;
+    aa += 0x0100;
+  } else {
+    aa >>= 7;
+  }
+  aa += ((x & 0xff00) - 0x4000) << 1;
+  return aa;
+}
 #ifdef LOG_DIVIDE
 upm_float divide(upm_float x, upm_float y) {
   uint8_t exp_x = x >> 8;
