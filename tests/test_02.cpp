@@ -58,11 +58,15 @@ void RampChecker::check_section(struct queue_entry *e, uint8_t ramp_state) {
   uint32_t end_dt = start_dt + (steps - 1) * e->delta_change;
 
   min_dt = min(min_dt, min(start_dt, end_dt));
+  float accel = 0;
+  if (!first) {
+	  accel = (16000000.0/end_dt - 16000000.0/last_dt) / (1.0/16000000.0 * 0.5 * (start_dt + end_dt));
+  }
   printf(
       "process command in ramp checker @%.6fs: steps = %d last = %d start = %d "
       " end = %d  min_dt "
-      "= %d\n",
-      total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt);
+      "= %d   accel=%.6f\n",
+      total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt, accel);
 
   total_ticks += steps * start_dt + (steps - 1) * steps / 2 * e->delta_change;
 
@@ -206,7 +210,7 @@ int main() {
   basic_test_with_empty_queue();
   //             steps  ticks_us  accel    maxspeed  min/max_total_time
   test_with_pars(10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,
-                 2 * 2.0 + 46.0 + 2.0);  // ramp time 2s, 400 steps TODO
+                 2 * 2.0 + 46.0 + 1.0);  // ramp time 2s, 400 steps TODO
   test_with_pars(1600, 5000, 10000, true, 7.9,
                  8.1);  // ramp time 0.02s, 4 steps
   test_with_pars(1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1,

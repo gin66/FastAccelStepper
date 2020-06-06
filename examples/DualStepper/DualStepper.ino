@@ -152,6 +152,9 @@ else {
       }
       Serial.print("  max/us=");
       Serial.print(stepper1->max_micros);
+      Serial.print("  magic=");
+      Serial.print(stepper1->magic1);
+      Serial.print(stepper1->magic2);
 
       Serial.print("  Stepper 2: ");
       Serial.print(stepper2->isr_speed_control_enabled ? " AUTO ":" MANU ");
@@ -164,6 +167,10 @@ else {
       }
       Serial.print("  max/us=");
       Serial.print(stepper2->max_micros);
+      Serial.print("  magic=");
+      Serial.print(stepper2->magic1);
+      Serial.print(stepper2->magic2);
+
       //Serial.print("  Queue End: Dir=");
       //Serial.print(stepper2->dir_high_at_queue_end ? 'H' : 'L');
       //Serial.print("  Pos=");

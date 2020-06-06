@@ -82,7 +82,9 @@ class FastAccelStepper {
   inline void isr_single_fill_queue();  // MUST BE ONLY CALLED FROM THIS
                                         // MODULE'S INTERRUPT SERVICE ROUTINE !
 
+  uint8_t magic1;
   uint32_t max_micros;
+  uint8_t magic2;
 
  private:
   uint8_t _dirPin;
@@ -103,13 +105,20 @@ class FastAccelStepper {
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps
   uint32_t _dec_time_ms;         // in ms
+  uint16_t _accel;
   upm_float _upm_accel;
+  upm_float _upm_inv_accel;
   uint32_t _speed;
 
   uint32_t _ramp_up_Tx;
   uint32_t _ramp_up_S;
   uint32_t _ramp_down_Tx;
   uint32_t _ramp_down_S;
+
+  uint32_t _performed_steps;
+  uint32_t _ramp_up_time;
+  uint32_t _ramp_down_time;
+  uint32_t _ramp_down_steps;
 };
 
 class FastAccelStepperEngine {
