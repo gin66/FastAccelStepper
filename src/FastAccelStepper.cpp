@@ -37,7 +37,7 @@ void FastAccelStepperEngine::init() {
   TCCR1B = (TCCR1B & ~(_BV(CS12) | _BV(CS11) | _BV(CS10))) | _BV(CS10);
 
   // enable OVF interrupt
-//  TIMSK1 |= _BV(TOIE1);
+  TIMSK1 |= _BV(TOIE1);
 
   interrupts();
 }
@@ -194,16 +194,14 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
 //    at ramp start:
 //			T = abs(v_2 - v_1) / a
 //		    S = [v_1 + v_2] * T / 2
-//		    F = 2 v_1 / (v_1 + v_2)
 //		    Tr = T
 //		    Sr = S
-//		    f = F
 //	  during ramp:
+//			f = 2 v / (v + v_2)
 //			v = f * Sr / Tr
 //			Δs = v * Δt or Δt = Δs/v
 //			Sr = Sr - Δs
 //			Tr = Tr + Δt
-//			f = 2 v / (v + v_2)
 //
 // Technical implementation by using delta_ticks in TIMESTEPS and FREQ instead of speed.
 //			TIMESTEPS * FREQ = 1
@@ -231,26 +229,38 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
 //		      = 2 (1/d_ticks_1) / ((1/d_ticks_1) + (1/d_ticks_2))
 //		      = 2 d_ticks_2 / (d_ticks_2 + d_ticks_1)
 //
-// F/2 is < 1, thus better to use F_2 as 16bit:
-//			F_2 = F/2 * 65536
-//
 // Finally calculation of v aka d_ticks:
 //
 //			v = f * Sr / Tr
-//			FREQ/d_ticks = (F_2*2/65536) * Sr / Tr
-//			d_ticks = FREQ/((F_2*2/65536) * Sr / Tr)
-//			        = FREQ*65536*Tr/(F_2*2 * Sr)
-//			        = FREQ*65536*Txr*TIMESTEPS/(F_2*2 * Sr)
-//			        = Txr /[(F_2 * Sr)/65536] / 2
+//			FREQ/d_ticks = F * Sr / Tr
+//			d_ticks = FREQ * Tr/(F * Sr)
+//			        = FREQ * Txr * TIMESTEPS / (F * Sr)
+//			        = Txr / (F * Sr)
 //
-// Sr is 32 bit, the product F_2 * Sr / 65536 should yield 32bit again.
-// Then still division 32bit/32bit is needed.
+//	With G = 2 / F:
+//		    G = 2 / F = (d_ticks_2 + d_ticks_1) / d_ticks_2
+//	or g during ramp:
+//		    g = 2 / f = (d_ticks_2 + d_ticks) / d_ticks_2
+//			d_ticks_new = Txr * G / 2 / Sr
 //
 // Perhaps better to replace 32bit multiplication/division in ramp by a
 // poor man's float implementation: 8 bit mantissa and 8 bit exponent
 // For the stepper control sufficient. Only risk is numeric stability
 // aka unwanted speed variations
 //
+// Updated formulas in short with forward looking speed:
+//    at ramp start:
+//			Txr = abs(FREQ²/(a*d_ticks_2) - FREQ²/(a*d_ticks_1))
+//		    S = [Tx/d_ticks_1 + Tx/d_ticks_2] / 2
+//	  during ramp:
+//			Δs = Δt / d_ticks or Δt = Δs * d_ticks
+//			Sr_scenario = Sr - Δs
+//			Txr_scenario = Txr + Δt
+//		    g = 1 / f = (d_ticks_2 + d_ticks) / d_ticks_2
+//				IF d_ticks_2 equals standstill, then g = 1
+//			d_ticks_new = Txr_scenario * g / 2 / Sr_scenario
+//			Sr_new = Sr - Δs_executed
+//			Txr_new = Txr - Δt_executed
 //
 // Any movement consists of three phases.
 // 1. Change current speed to constant speed
@@ -342,17 +352,24 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   upm_float p_1 = divide(UPM_TIMER_FREQ2,multiply(d_ticks_1,_accel));
   upm_float upm_Tx = abs_diff(p_1,p_2);
   upm_float upm_S = shr(sum(divide(upm_Tx,d_ticks_1),divide(upm_Tx,d_ticks_2)),1);
-  upm_float upm_F = shl(divide(d_ticks_2,sum(d_ticks_1,d_ticks_2)),1);
+
+  _ramp_up_Tx = upm_to_u32(upm_Tx);
+  _ramp_down_Tx = _ramp_up_Tx;
+  _ramp_up_S = upm_to_u32(upm_S);
+  _ramp_down_S = _ramp_up_S;
+  _deceleration_start = _ramp_down_S;
 #ifdef TEST
-	printf("Ramp data: starting_ticks = %d curr_ticks = %d travel_ticks = %d accel = %d Tx = %d S = %d F*65536 = %d\n",
+	printf("Ramp data: starting_ticks = %d curr_ticks = %d travel_ticks = %d accel = %d Tx = %d S = %d\n",
 			_starting_ticks,
 			curr_ticks,
 			_min_travel_ticks,
 			upm_to_u32(_accel),
 			upm_to_u32(upm_Tx),
-			upm_to_u32(upm_S),
-			upm_to_u32(shl(upm_F,16)));
+			upm_to_u32(upm_S));
 #endif
+  isr_speed_control_enabled = true;
+  return;
+#ifdef OLD
   // The movement consists of three phases.
   // 1. Change current speed to constant speed
   // 2. Constant travel speed
@@ -434,6 +451,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   _dec_time_ms = new_dec_time_ms;
   interrupts();
   isr_speed_control_enabled = true;
+#endif
 }
 
 inline void FastAccelStepper::isr_fill_queue() {
@@ -472,24 +490,35 @@ inline void FastAccelStepper::isr_fill_queue() {
   }
 
   // Forward planning of minimum 10ms or more on slow speed.
-  uint32_t planning_ticks = max(2 * curr_ticks, 16 * 10000);
+  uint32_t planning_ticks = max(curr_ticks, 16 * 10000);
 #ifdef TEST
   printf("accel=%d  curr_ticks=%d dticks=%d   %s %s %s\n", upm_to_u32(_accel), curr_ticks,
          planning_ticks, accelerating ? "ACC" : "",
          decelerate_to_stop ? "STOP" : "", reduce_speed ? "RED" : "");
 #endif
 
-  // Calculate the new speed based on the planning_ticks
+  // Calculate the new speed based on the planning_ticks aka Δt 
   uint32_t next_ticks = curr_ticks;
   if (accelerating) {
-    float delta =
-        1.0 + _accel * planning_ticks * curr_ticks / 16000000.0 / 16000000.0;
-    next_ticks = round(curr_ticks / delta);
+    uint32_t Tx_scenario = _ramp_up_Tx - planning_ticks;
+	uint32_t S_scenario = _ramp_up_S - planning_ticks / curr_ticks;
+    upm_float upm_Tx = upm_from(Tx_scenario);
+    upm_float upm_S = upm_from(S_scenario);
+	upm_float upm_d_ticks = upm_from(curr_ticks);
+	upm_float upm_d_ticks_2 = upm_from(_min_travel_ticks);
+    upm_float upm_G = divide(sum(upm_d_ticks,upm_d_ticks_2),upm_d_ticks_2);
+	upm_float upm_d_ticks_new = shr(divide(multiply(upm_Tx,upm_G),upm_S),1);
+	uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
+    
     // avoid overshoot
-    next_ticks = max(next_ticks, _min_travel_ticks);
+    next_ticks = max(d_ticks_new, _min_travel_ticks);
+
+    // avoid reduction
+    next_ticks = min(next_ticks, curr_ticks);
+
 #ifdef TEST
-    printf("accelerate ticks=%d => %d  during %d ticks (delta = %f)\n",
-           curr_ticks, next_ticks, planning_ticks, delta);
+    printf("accelerate ticks=%d => %d  during %d ticks\n",
+           curr_ticks, next_ticks, planning_ticks);
 #endif
   }
   if (reduce_speed) {
@@ -504,8 +533,13 @@ inline void FastAccelStepper::isr_fill_queue() {
 #endif
   }
   if (decelerate_to_stop) {
-    _dec_time_ms = max(_dec_time_ms - planning_ticks / 16000, 1.0);
-    next_ticks = _dec_time_ms * 16000 / 2 / abs(remaining_steps);
+    uint32_t Tx_scenario = _ramp_down_Tx - planning_ticks;
+	uint32_t S_scenario = _ramp_down_S - planning_ticks / curr_ticks;
+    upm_float upm_Tx = upm_from(Tx_scenario);
+    upm_float upm_S = upm_from(S_scenario);
+	upm_float upm_d_ticks = upm_from(curr_ticks);
+	upm_float upm_d_ticks_new = shr(divide(upm_Tx,upm_S),1);
+	uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
     // avoid undershoot
     next_ticks = max(next_ticks, _min_travel_ticks);
@@ -525,7 +559,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   printf("=> expected ticks after command(s) = %d\n", next_ticks);
 #endif
 
-  // Number of steps to execute with llmitation to min 1 and max remaining steps
+  // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t total_steps = planning_ticks / next_ticks;
   total_steps = max(total_steps, 1);
   total_steps = min(total_steps, abs(remaining_steps));
@@ -547,6 +581,15 @@ inline void FastAccelStepper::isr_fill_queue() {
 
   if (steps_per_command * command_cnt > steps) {
     steps_per_command -= 1;
+  }
+
+  if (accelerating) {
+     _ramp_up_Tx -= curr_ticks*steps + total_change * steps / 2;
+	 _ramp_up_S -= steps;
+  }
+  if (decelerate_to_stop) {
+     _ramp_down_Tx -= curr_ticks*steps + total_change * steps / 2;
+	 _ramp_down_S -= steps;
   }
 
   // Apply change to curr_ticks

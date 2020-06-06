@@ -72,7 +72,8 @@ void loop() {
    if (queue_ok) {
      long motor = in_vals[0];
      FastAccelStepper *stepper = motor == 1 ? stepper1 : stepper2;
-     stepper->set_dynamics(16384, 100.0);
+     stepper->setSpeed(16384);
+     stepper->setAcceleration(100.0);
      if (false) {
      Serial.println(stepper->add_queue_entry(5L*16384,120,true,-16384/120));
      Serial.println(stepper->add_queue_entry(4L*16384,120,true,-16384/120));
@@ -122,14 +123,16 @@ else {
         Serial.print(move);
         if (motor == 1) {
            stopped = false;
-           stepper1->set_dynamics(ticks, accel*1.0);
+           stepper1->setSpeed(ticks);
+           stepper1->setAcceleration(accel);
            stepper1->move(move);
            Serial.print("  Start stepper 1: ");
            Serial.println(stepper1->getCurrentPosition());
         }
         if (motor == 2) {
            stopped = false;
-           stepper2->set_dynamics(ticks, accel*1.0);
+           stepper2->setSpeed(ticks);
+           stepper2->setAcceleration(accel);
            stepper2->move(move);
            Serial.print("  Start stepper 2: ");
            Serial.println(stepper2->getCurrentPosition());
@@ -176,10 +179,12 @@ else {
    else {
       stopped = !(stepper1->isRunning() || stepper2->isRunning());
   }
+#ifdef OLD
 stepper1->isr_fill_queue(); 
 stepper2->isr_fill_queue();
 while (stepper1->isRunning() || stepper2->isRunning()) {
 stepper1->isr_fill_queue(); 
 stepper2->isr_fill_queue();
 }
+#endif
 }

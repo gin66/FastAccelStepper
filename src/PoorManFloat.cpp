@@ -1,5 +1,9 @@
 #include <stdint.h>
+#ifdef TEST
 #include "stubs.h"
+#else
+#include <avr/pgmspace.h>
+#endif
 #include "PoorManFloat.h"
 
 #define LOG_DIVIDE

@@ -96,6 +96,11 @@ class FastAccelStepper {
   uint32_t _dec_time_ms;         // in ms
   upm_float _accel;
   uint32_t _speed;
+
+  uint32_t _ramp_up_Tx;
+  uint32_t _ramp_up_S;
+  uint32_t _ramp_down_Tx;
+  uint32_t _ramp_down_S;
 };
 
 class FastAccelStepperEngine {
