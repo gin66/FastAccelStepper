@@ -150,6 +150,9 @@ else {
       else {
          Serial.print("  PAUSED ");
       }
+      Serial.print("  max/us=");
+      Serial.print(stepper1->max_micros);
+
       Serial.print("  Stepper 2: ");
       Serial.print(stepper2->isr_speed_control_enabled ? " AUTO ":" MANU ");
       Serial.print(stepper2->getCurrentPosition());
@@ -159,6 +162,8 @@ else {
       else {
          Serial.print("  PAUSED ");
       }
+      Serial.print("  max/us=");
+      Serial.print(stepper2->max_micros);
       //Serial.print("  Queue End: Dir=");
       //Serial.print(stepper2->dir_high_at_queue_end ? 'H' : 'L');
       //Serial.print("  Pos=");

@@ -456,12 +456,6 @@ void FastAccelStepper::_calculate_move(int32_t move) {
 
 inline void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
-  if (!isr_speed_control_enabled) {
-    return;
-  }
-  if (isQueueFull()) {
-    return;
-  }
   if (target_pos == _pos_at_queue_end) {
     isr_speed_control_enabled = false;
     return;
@@ -469,6 +463,13 @@ inline void FastAccelStepper::isr_fill_queue() {
   if (_min_travel_ticks == 0) {
     return;
   }
+  while (!isQueueFull() && isr_speed_control_enabled) {
+    isr_single_fill_queue();
+  }
+}
+
+inline void FastAccelStepper::isr_single_fill_queue() {
+  uint32_t runtime_us = micros();
 
   // preconditions are fulfilled, so create the command(s)
 
@@ -645,6 +646,8 @@ inline void FastAccelStepper::isr_fill_queue() {
 #ifdef TEST
   puts("");
 #endif
+  runtime_us = micros() - runtime_us;
+  max_micros = max(max_micros, runtime_us);
 }
 ISR(TIMER1_OVF_vect) {
   // disable OVF interrupt to avoid nesting
@@ -680,6 +683,7 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
   isr_speed_control_enabled = false;
   _min_travel_ticks = 0;
   _ticks_at_queue_end = 0;
+  max_micros = 0;
 
   uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
   digitalWrite(pin, LOW);

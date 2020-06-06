@@ -74,6 +74,10 @@ class FastAccelStepper {
   bool isr_speed_control_enabled;
   inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
                                  // INTERRUPT SERVICE ROUTINE !
+  inline void isr_single_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
+                                 // INTERRUPT SERVICE ROUTINE !
+
+  uint32_t max_micros;
 
  private:
   uint8_t _dirPin;
