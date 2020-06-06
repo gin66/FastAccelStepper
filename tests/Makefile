@@ -20,7 +20,7 @@ test_%.o: test_%.cpp stubs.h
 
 
 fmt:
-	clang-format --style=Google -i ../src/* test_*.cpp stubs.h
+	clang-format --style=Google -i ../src/* test_*.cpp stubs.h ../examples/DualStepper/DualStepper.ino
 
 clean:
 	rm *.o test_[0-9][0-9]

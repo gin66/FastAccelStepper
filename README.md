@@ -13,18 +13,19 @@ The stepper motors should be connected via a driver IC (like 4988) with a 1, 2 o
         - Stepper drive enabled on LOW
 
 FastAccelStepper offers the following features:
-* 1-pin operation e.g. peristaltic pump
-* 2-pin operation e.g. axis control
+* 1-pin operation for e.g. peristaltic pump
+* 2-pin operation for e.g. axis control
 * 3-pin operation for power reduction
-* supports up to two stepper motors using DIR/STEP/Enable Control (Direction and Enable is optional)
-* allows up to roughly 32000 generated steps per second in dual stepper operation
+* supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* allows up to roughly 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
 * Lower limit of 3.8 steps/s
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * speed/acceleration can be varied while stepper is running
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards
+* No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 
-The library is used with A4988, but other driver ICs could work, too.
+The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
 
@@ -33,7 +34,7 @@ The library is used with A4988, but other driver ICs could work, too.
 
 #define dirPinStepperA    5
 #define enablePinStepperA 6
-#define stepPinStepperA   9  /* OC1A, just for information here */
+//#define stepPinStepperA   9  // OC1A
 
 FastAccelStepperEngine fas_engine = FastAccelStepperEngine();
 FastAccelStepper stepperA = fas_engine.stepperA();
@@ -42,18 +43,18 @@ FastAccelStepper stepperA = fas_engine.stepperA();
 void setup() {
    fas_engine.init();
    stepperA->setDirectionPin(dirPinStepperA);
-   stepperA->setEnablePin(enablePinStepperA);
 
+   stepperA->setEnablePin(enablePinStepperA);
    stepperA->set_auto_enable(true);
 
-   stepperA->set_dynamics(100.0, 10.0);
+   stepperA->setSpeed(1000);       // the parameter is us/step !!!
+   stepperA->setAcceleration(100);
    stepperA->move(1000);
 }
 
 void loop() {
 }
 ```
-
 
 ## Behind the curtains
 
@@ -65,12 +66,17 @@ After stepper movement is completed, the timer compare unit is disconnected from
 
 The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is msb * 16384 + lsw, msb 0..255, lsw 0..32767 => 4,410,687. At 16 MHz this comes down to 0.26s. Thus the speed is limited down to approx 3.8 steps/s.
 
+The acceleration/deacceration interrupt reports to perform one calculation round in 212us. Thus it can keep up with the chosen 10 ms planning ahead time.
+
+The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
+
 ## TODO
 
-1. Change from speed [steps/s] into time delta [µs/steps]
-2. Avoid float after use of time delta
-3. Introduce command queue of speed/accel commands - one per stepper. This will allow exact speed control.
-4. Change in direction requires motor stop !
-5. Using constant acceleration leads to force jumps at start and max speed => smooth this out
-6. Extend command queue entry to perform ai delay only (steps=0) to reduce the 3.8 steps/s
+* API stabilization
+* Better API documentation
+* ensure 1-pin operation consequently
+* Introduce command queue of speed/accel commands - one per stepper. This will allow exact speed control.
+* Change in direction requires motor stop !
+* Using constant acceleration leads to force jumps at start and max speed => smooth this out
+* Extend command queue entry to perform delay only without step (steps=0) to reduce the 3.8 steps/s
 

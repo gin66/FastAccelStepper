@@ -325,7 +325,7 @@ int main() {
   test(back == 39936, "divide/sqrt/multiply");
 
   x1 = upm_from((uint32_t)(174));
-  x = multiply(x1,x1);
+  x = multiply(x1, x1);
   back = upm_to_u32(x);
   printf("multiply(%x,%x)=0x%x (%d)\n", x1, x1, x, back);
   test(back == 30208, "square");

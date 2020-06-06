@@ -60,13 +60,15 @@ void RampChecker::check_section(struct queue_entry *e, uint8_t ramp_state) {
   min_dt = min(min_dt, min(start_dt, end_dt));
   float accel = 0;
   if (!first) {
-	  accel = (16000000.0/end_dt - 16000000.0/last_dt) / (1.0/16000000.0 * 0.5 * (start_dt + end_dt));
+    accel = (16000000.0 / end_dt - 16000000.0 / last_dt) /
+            (1.0 / 16000000.0 * 0.5 * (start_dt + end_dt));
   }
   printf(
       "process command in ramp checker @%.6fs: steps = %d last = %d start = %d "
       " end = %d  min_dt "
       "= %d   accel=%.6f\n",
-      total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt, accel);
+      total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt,
+      accel);
 
   total_ticks += steps * start_dt + (steps - 1) * steps / 2 * e->delta_change;
 
@@ -86,17 +88,17 @@ void RampChecker::check_section(struct queue_entry *e, uint8_t ramp_state) {
 
   last_dt = end_dt;
 
-  switch(ramp_state) {
-	  case RAMP_STATE_ACCELERATE:
-		  accelerate_till = end_dt;
-		  break;
-	  case RAMP_STATE_DECELERATE_TO_STOP:
-		  break;
-	  case RAMP_STATE_DECELERATE:
-		  break;
-	  case RAMP_STATE_COAST:
-		  coast_till = end_dt;
-		  break;
+  switch (ramp_state) {
+    case RAMP_STATE_ACCELERATE:
+      accelerate_till = end_dt;
+      break;
+    case RAMP_STATE_DECELERATE_TO_STOP:
+      break;
+    case RAMP_STATE_DECELERATE:
+      break;
+    case RAMP_STATE_COAST:
+      coast_till = end_dt;
+      break;
   }
 
   first = false;
