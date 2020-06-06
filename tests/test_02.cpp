@@ -57,9 +57,9 @@ void RampChecker::check_section(struct queue_entry *e) {
 
   min_dt = min(min_dt, min(start_dt, end_dt));
   printf(
-      "process command in ramp checker: last = %d start = %d  end = %d  min_dt "
+      "process command in ramp checker: %.6fs last = %d start = %d  end = %d  min_dt "
       "= %d\n",
-      last_dt, start_dt, end_dt, min_dt);
+      total_ticks / 16000000.0, last_dt, start_dt, end_dt, min_dt);
 
   total_ticks += steps * start_dt + (steps - 1) * steps / 2 * e->delta_change;
 
@@ -163,10 +163,14 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
   }
   test(!s.isr_speed_control_enabled, "too many commands created");
   if (reach_max_speed) {
-    printf("%d\n", rc.min_dt);
-    //    test(rc.min_dt == travel_dt, "max speed not reached");
+    printf("%d = %d ?\n", rc.min_dt, travel_dt*16);
+    test(rc.min_dt == travel_dt*16, "max speed not reached");
   }
-  printf("Total time %f\n", rc.total_ticks / 16000000.0);
+  else {
+    printf("%d > %d ?\n", rc.min_dt, travel_dt*16);
+    test(rc.min_dt > travel_dt*16, "max speed reached");
+  }
+  printf("Total time  %f < %f < %f ?\n", min_time, rc.total_ticks / 16000000.0, max_time);
   test(rc.total_ticks / 16000000.0 > min_time, "ramp too fast");
   test(rc.total_ticks / 16000000.0 < max_time, "ramp too slow");
   test(s.isStopped(), "is not stopped");
@@ -175,12 +179,12 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
 int main() {
   basic_test_with_empty_queue();
   //             steps  ticks_us  accel    maxspeed  min/max_total_time
-  test_with_pars(10000, 100000 / 16, 100.0, true, 1.0, 64.0);
-  test_with_pars(1600, 100000 / 16, 10000.0, true, 1.0, 11.0);
-  test_with_pars(1600, 100000 / 16, 1000.0, true, 1.0, 11.0);
-  test_with_pars(15000, 1600 / 16, 10000.0, true, 1.0, 3.0);
-  test_with_pars(100, 100000 / 16, 10000.0, true, 0.1, 0.7);
-  test_with_pars(500, 1000 / 16, 10000.0, false, 0.1, 7.1);
-  test_with_pars(1000, 200 / 16, 1000.0, true, 0.1, 45.0);
+  test_with_pars(10000, 5000, 100, true, 2*2.0+46.0-1.0, 2*2.0+46.0   +2.0);// ramp time 2s, 400 steps TODO
+  test_with_pars(1600, 5000, 10000, true, 7.9, 8.1);// ramp time 0.02s, 4 steps
+  test_with_pars(1600, 5000, 1000, true, 2*0.2+7.8-0.1, 2*0.2+7.8+0.1);// ramp time 0.2s, 20 steps
+  test_with_pars(15000, 100, 10000, true, 2*1.0+0.5-0.17, 2*1.0+0.5+0.1);// ramp time 1s, 5000 steps
+  test_with_pars(100, 5000, 10000, true, 2*0.02+0.48-0.1, 2*0.02+0.48+0.1);// ramp time 0.02s, 4 steps
+  test_with_pars(500, 50, 10000, false, 2*0.22-0.1, 2*0.22+0.11);// ramp time 2s, 20000 steps => only ramp 0.22s
+//  test_with_pars(1000, 20, 1000, false, 0.5, 1.0); // expect t = sqrt(500/a)
   printf("TEST_02 PASSED\n");
 }

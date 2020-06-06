@@ -232,6 +232,12 @@ int main() {
   back = upm_to_u32(x);
   test(back == 0xf400, "wrong shr");
 
+  x1 = upm_from((uint32_t)0x20000);
+  x = sqrt(x1);
+  back = upm_to_u32(x);
+  printf("sqrt(%x)=0x%x (%d)  = 362 ?\n", x1, x, back);
+  test(back == 362, "sqrt");
+
   x1 = upm_from((uint32_t)0x10000);
   x = sqrt(x1);
   back = upm_to_u32(x);
@@ -249,6 +255,76 @@ int main() {
   back = upm_to_u32(x);
   printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
   test(back == 122, "sqrt");
+
+  x1 = upm_from((uint32_t)(174 * 174));
+  x = sqrt(x1);
+  back = upm_to_u32(x);
+  printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
+  test(back == 174, "sqrt");
+
+  x1 = upm_from((uint32_t)4);
+  x = sqrt(x1);
+  back = upm_to_u32(x);
+  printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
+  test(back == 2, "sqrt");
+  x = shl(sqrt(shr(x1,2)),1);
+  back = upm_to_u32(x);
+  printf("shl(sqrt(shr(%x,2)),1)=0x%x (%x)\n", x1, x, back);
+  test(back == 2, "sqrt");
+  x = shl(sqrt(shr(x1,4)),2);
+  back = upm_to_u32(x);
+  printf("shl(sqrt(shr(%x,4)),2)=0x%x (%x)\n", x1, x, back);
+  x = shl(sqrt(shr(x1,42)),21);
+  back = upm_to_u32(x);
+  printf("shl(sqrt(shr(%x,42)),21)=0x%x (%x)\n", x1, x, back);
+  test(back == 2, "sqrt");
+
+  x1 = upm_from((uint32_t)250);
+  x2 = upm_from((uint32_t)10000);
+  x = divide(x1, x2);
+  back = upm_to_u32(x);
+  printf("%x/%x=%x (%d)\n", x1, x2, x, back);
+  test(back == 0, "divide");
+  x = multiply(x, x2);
+  back = upm_to_u32(x);
+  printf("%x/%x*%x=%x (%d)\n", x1, x2, x2, x, back);
+  test(back == 251, "divide");
+
+  x1 = upm_from((uint32_t)250);
+  x2 = upm_from((uint32_t)10000);
+  x = divide(x1, x2);
+  back = upm_to_u32(x);
+  printf("%x/%x=%x (%d)\n", x1, x2, x, back);
+  test(back == 0, "divide");
+  x = shl(x, 10);
+  back = upm_to_u32(x);
+  printf("shl(%x/%x,10)=%x (%d)\n", x1, x2, x, back);
+  test(back == 25, "divide/shl");
+
+  x1 = upm_from((uint32_t)1600);
+  x2 = upm_from((uint32_t)1000000);
+  x = divide(x1, x2);
+  back = upm_to_u32(x);
+  printf("%x/%x=%x (%d)\n", x1, x2, x, back);
+  test(back == 0, "divide");
+  x = shl(x, 20);
+  back = upm_to_u32(x);
+  printf("shl(%x/%x,20)=%x (%d)\n", x1, x2, x, back);
+  test(back == 1680, "divide/shl");
+  x = shr(x, 20);
+  back = upm_to_u32(x);
+  printf("shr(shl(%x/%x,20),20)=%x (%d)\n", x1, x2, x, back);
+  test(back == 0, "divide/shl");
+  x = sqrt(x);
+  back = upm_to_u32(x);
+  printf("sqrt(%x/%x)=%x (%d)\n", x1, x2, x, back);
+  test(back == 0, "divide/sqrt");
+  x = multiply(x, x2);
+  back = upm_to_u32(x);
+  printf("sqrt(%x/%x)*%x=%x (%d)\n", x1, x2, x2, x, back);
+  test(back == 39936, "divide/sqrt/multiply");
+
+
 
   printf("TEST_03 PASSED\n");
 }

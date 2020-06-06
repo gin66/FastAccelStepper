@@ -328,8 +328,9 @@ upm_float sqrt(upm_float x) {
     exponent >>= 1;
     exponent += 128;
   } else {
-    exponent <<= 1;
-    exponent -= 128;
+	exponent = 129-exponent; // this difference to 128 is needed
+    exponent >>= 1;
+	exponent = 128-exponent;
   }
   uint16_t res = ((uint16_t)exponent) << 8;
   return res | sqrt_mantissa;
