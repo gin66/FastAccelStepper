@@ -498,12 +498,16 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   if (curr_ticks == 0) {  // motor start with minimum speed
     curr_ticks = _starting_ticks;
   }
+  ramp_state = RAMP_STATE_COAST;
   if (abs(remaining_steps) <= _deceleration_start) {
     decelerate_to_stop = true;
+    ramp_state = RAMP_STATE_DECELERATE_TO_STOP;
   } else if (_min_travel_ticks < curr_ticks) {
     accelerating = true;
+    ramp_state = RAMP_STATE_ACCELERATE;
   } else if (_min_travel_ticks > curr_ticks) {
     reduce_speed = true;
+    ramp_state = RAMP_STATE_DECELERATE;
   }
 
   // Forward planning of minimum 10ms or more on slow speed.

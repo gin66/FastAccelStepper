@@ -70,6 +70,11 @@ class FastAccelStepper {
   //  This value is above the max value of an uint16_t (65535).
   void setAcceleration(uint16_t step_s_s);
 
+# define RAMP_STATE_ACCELERATE 1
+# define RAMP_STATE_DECELERATE_TO_STOP 2
+# define RAMP_STATE_DECELERATE 3
+# define RAMP_STATE_COAST 4
+  uint8_t ramp_state; // updated by isr_fill_queue
   int32_t target_pos;
   bool isr_speed_control_enabled;
   inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
