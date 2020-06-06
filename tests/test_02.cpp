@@ -174,8 +174,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
 
 int main() {
   basic_test_with_empty_queue();
-  //             steps  ticks_us  accel    maxspeed  min_total_time
-  //             max_total_time
+  //             steps  ticks_us  accel    maxspeed  min/max_total_time
   test_with_pars(10000, 100000 / 16, 100.0, true, 1.0, 64.0);
   test_with_pars(1600, 100000 / 16, 10000.0, true, 1.0, 11.0);
   test_with_pars(1600, 100000 / 16, 1000.0, true, 1.0, 11.0);
