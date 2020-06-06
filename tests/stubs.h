@@ -11,7 +11,7 @@
 #define _BV(x) 0
 #define ISR(x) void x()
 #define inline
-#define micros() {}
+#define micros() 0
 
 #include <math.h>
 

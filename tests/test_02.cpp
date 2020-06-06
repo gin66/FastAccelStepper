@@ -127,7 +127,7 @@ void basic_test_with_empty_queue() {
 }
 
 void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
-                    bool reach_max_speed, float max_time) {
+                    bool reach_max_speed, float min_time, float max_time) {
   printf("Test test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", steps,
          travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
@@ -167,18 +167,20 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
 //    test(rc.min_dt == travel_dt, "max speed not reached");
   }
   printf("Total time %f\n", rc.total_ticks / 16000000.0);
+  test(rc.total_ticks / 16000000.0 > min_time, "ramp too fast");
   test(rc.total_ticks / 16000000.0 < max_time, "ramp too slow");
   test(s.isStopped(), "is not stopped");
 }
 
 int main() {
   basic_test_with_empty_queue();
-  //             steps  dticks  accel    maxspeed  total_time
-  test_with_pars(10000/16, 100000, 100.0, true, 64.0);
-  test_with_pars(1600/16, 100000, 10000.0, true, 11.0);
-  test_with_pars(1600/16, 100000, 1000.0, true, 11.0);
-  test_with_pars(15000/16, 1600, 10000.0, true, 3.0);
-  test_with_pars(100/16, 100000, 10000.0, true, 0.7);
-  test_with_pars(500/16, 1000, 10000.0, false, 0.7);
+  //             steps  ticks_us  accel    maxspeed  min_total_time max_total_time
+  test_with_pars(10000, 100000/16, 100.0, true, 1.0, 64.0);
+  test_with_pars(1600, 100000/16, 10000.0, true, 1.0, 11.0);
+  test_with_pars(1600, 100000/16, 1000.0, true, 1.0, 11.0);
+  test_with_pars(15000, 1600/16, 10000.0, true, 1.0, 3.0);
+  test_with_pars(100, 100000/16, 10000.0, true, 0.1, 0.7);
+  test_with_pars(500, 1000/16, 10000.0, false, 0.1,7.1);
+  test_with_pars(1000, 200/16, 1000.0, true, 0.1, 45.0);
   printf("TEST_02 PASSED\n");
 }
