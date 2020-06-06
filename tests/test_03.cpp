@@ -267,14 +267,14 @@ int main() {
   back = upm_to_u32(x);
   printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
   test(back == 2, "sqrt");
-  x = shl(sqrt(shr(x1,2)),1);
+  x = shl(sqrt(shr(x1, 2)), 1);
   back = upm_to_u32(x);
   printf("shl(sqrt(shr(%x,2)),1)=0x%x (%x)\n", x1, x, back);
   test(back == 2, "sqrt");
-  x = shl(sqrt(shr(x1,4)),2);
+  x = shl(sqrt(shr(x1, 4)), 2);
   back = upm_to_u32(x);
   printf("shl(sqrt(shr(%x,4)),2)=0x%x (%x)\n", x1, x, back);
-  x = shl(sqrt(shr(x1,42)),21);
+  x = shl(sqrt(shr(x1, 42)), 21);
   back = upm_to_u32(x);
   printf("shl(sqrt(shr(%x,42)),21)=0x%x (%x)\n", x1, x, back);
   test(back == 2, "sqrt");
@@ -323,8 +323,6 @@ int main() {
   back = upm_to_u32(x);
   printf("sqrt(%x/%x)*%x=%x (%d)\n", x1, x2, x2, x, back);
   test(back == 39936, "divide/sqrt/multiply");
-
-
 
   printf("TEST_03 PASSED\n");
 }
