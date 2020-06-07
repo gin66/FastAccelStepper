@@ -114,7 +114,7 @@ The timer compare unit toggles the step pin from Low to High precisely. The tran
 
 After stepper movement is completed, the timer compare unit is disconnected from the step pin. Thus the application could change the state freely, while the stepper is not controlled by this library.
 
-The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is msb * 16384 + lsw, msb 0..255, lsw 0..32767 => 4,410,687. At 16 MHz this comes down to 0.26s. Thus the speed is limited down to approx 3.8 steps/s.
+The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is 4,194,303. At 16 MHz this comes down to 0.2621s. Thus the speed is limited down to approx 3.82 steps/s.
 
 The acceleration/deacceration interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
