@@ -78,10 +78,6 @@ void setup() {
 
    stepperA->setEnablePin(enablePinStepperA);
    stepperA->set_auto_enable(true);
-
-   stepperA->setSpeed(1000);       // the parameter is us/step !!!
-   stepperA->setAcceleration(100);
-   stepperA->move(1000);
 }
 
 uint32_t dt = ABSOLUTE_MAX_TICKS;
