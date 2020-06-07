@@ -71,8 +71,8 @@ void loop() {
   if (queue_ok) {
     long motor = in_vals[0];
     FastAccelStepper *stepper = motor == 1 ? stepper1 : stepper2;
-    stepper->setSpeed(16384);
-    stepper->setAcceleration(100.0);
+    // NOT NEEDED IN RAW ACCESS: stepper->setSpeed(16384);
+    // NOT NEEDED IN RAW ACCESS: stepper->setAcceleration(100.0);
     if (false) {
       Serial.println(
           stepper->add_queue_entry(5L * 16384, 120, true, -16384 / 120));
@@ -183,10 +183,6 @@ void loop() {
     Serial.print("  max/us=");
     Serial.print(stepper2->max_micros);
 
-    // Serial.print("  Queue End: Dir=");
-    // Serial.print(stepper2->dir_high_at_queue_end ? 'H' : 'L');
-    // Serial.print("  Pos=");
-    // Serial.print(stepper2->pos_at_queue_end);
     Serial.print("  TCCR1A=");
     Serial.print(TCCR1A);
     Serial.print("  TCCR1B=");

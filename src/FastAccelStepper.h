@@ -20,8 +20,7 @@
 #define AQE_CUMULATED_CHANGE_TOO_LOW -6
 #define AQE_STEPS_ERROR -7
 
-// Limit to 40.000 Steps/s
-#define ABSOLUTE_MIN_TICKS (16000000 / 40000)
+#define ABSOLUTE_MAX_TICKS (255L*16384+65535L)
 
 class FastAccelStepper {
  public:

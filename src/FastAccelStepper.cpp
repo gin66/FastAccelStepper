@@ -79,7 +79,7 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
   if (steps >= 128) {
     return AQE_STEPS_ERROR;
   }
-  if (start_delta_ticks > 255L * 16384L + 65535L) {
+  if (start_delta_ticks > ABSOLUTE_MAX_TICKS) {
     return AQE_TOO_HIGH;
   }
   if ((change_ticks != 0) && (steps > 1)) {

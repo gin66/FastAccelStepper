@@ -1,2 +1,5 @@
 *.swp
 *.o
+examples/*/*.h
+examples/*/*.cpp
+tests/test_[0-9][0-9]
