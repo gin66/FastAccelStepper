@@ -289,7 +289,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   if (ramp_state == RAMP_STATE_COAST) {
     next_ticks = _min_travel_ticks;
   }
-  if (ramp_state == RAMP_STATE_ACCELERATE) {
+  else if (ramp_state == RAMP_STATE_ACCELERATE) {
     uint32_t upm_rem_steps =
         upm_from(_performed_ramp_up_steps + planning_steps);
     upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
@@ -301,9 +301,10 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     if (_performed_ramp_up_steps == 0) {
       curr_ticks = d_ticks_new;
     }
-
-    // avoid reduction
-    //    next_ticks = min(next_ticks, curr_ticks);
+	else {
+      // CLIPPING: avoid increase
+      next_ticks = min(next_ticks, curr_ticks);
+	}
 
 #ifdef TEST
     float v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
@@ -313,7 +314,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
            planning_steps);
 #endif
   }
-  if (ramp_state == RAMP_STATE_DECELERATE) {
+  else if (ramp_state == RAMP_STATE_DECELERATE) {
     uint32_t upm_rem_steps =
         upm_from(_performed_ramp_up_steps + planning_steps);
     upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
@@ -323,8 +324,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     // avoid undershoot
     next_ticks = min(d_ticks_new, _min_travel_ticks);
 
-    // avoid reduction
-    //    next_ticks = min(next_ticks, curr_ticks);
+    // CLIPPING: avoid reduction
+    next_ticks = max(next_ticks, curr_ticks);
 
 #ifdef TEST
     float v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
@@ -334,7 +335,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
            planning_steps);
 #endif
   }
-  if (ramp_state == RAMP_STATE_DECELERATE_TO_STOP) {
+  else if (ramp_state == RAMP_STATE_DECELERATE_TO_STOP) {
     uint32_t upm_rem_steps = upm_from(remaining_steps - planning_steps);
     upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
 
@@ -343,8 +344,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     // avoid undershoot
     next_ticks = max(d_ticks_new, _min_travel_ticks);
 
-    // avoid increase
-//		next_ticks = max(next_ticks, curr_ticks);
+    // CLIPPING: avoid reduction
+    next_ticks = max(next_ticks, curr_ticks);
 #ifdef TEST
     printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
            next_ticks, planning_steps, d_ticks_new);

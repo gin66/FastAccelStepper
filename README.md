@@ -24,7 +24,7 @@ FastAccelStepper offers the following features:
 * speed/acceleration can be varied while stepper is running
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
-* Provide API to each stepper's command queue (15 commands long)
+* Provide API to each stepper's command queue (can hold 15 commands)
 
 The library is in use with A4988, but other driver ICs could work, too.
 
@@ -110,7 +110,7 @@ void loop() {
 
 The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This interrupt is used for adjusting the acceleration. 
 
-The timer compare unit toggles the step pin from Low to High very precisely. The transition High to Low is done in the interrupt routine, thus the High state is only few us.
+The timer compare unit toggles the step pin from Low to High precisely. The transition High to Low is done in the interrupt routine, thus the High state is only few us.
 
 After stepper movement is completed, the timer compare unit is disconnected from the step pin. Thus the application could change the state freely, while the stepper is not controlled by this library.
 
@@ -120,13 +120,16 @@ The acceleration/deacceration interrupt reports to perform one calculation round
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 
+The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed.
+
 ## TODO
 
 * API stabilization
 * Better API documentation
 * ensure 1-pin operation consequently
-* Introduce command queue of speed/accel commands - one per stepper. This will allow exact speed control.
+* Introduce command queue of speed/accel commands - one per stepper.
 * Change in direction requires motor stop !
 * Using constant acceleration leads to force jumps at start and max speed => smooth this out
 * Extend command queue entry to perform delay only without step (steps=0) to reduce the 3.8 steps/s
+* There are few clippings done to catch calculation error (not happening during test) => unclear cause
 
