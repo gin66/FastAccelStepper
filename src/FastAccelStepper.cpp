@@ -295,6 +295,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     upm_float upm_d_ticks_new;
     case RAMP_STATE_COAST:
       next_ticks = _min_travel_ticks;
+	  // do not overshoot ramp down start
+	  planning_steps = min(planning_steps, remaining_steps - _deceleration_start);
       break;
     case RAMP_STATE_ACCELERATE:
       upm_rem_steps = upm_from(_performed_ramp_up_steps + planning_steps);
