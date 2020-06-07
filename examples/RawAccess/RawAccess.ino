@@ -26,15 +26,15 @@ void setup() {
   stepper1->setEnablePin(enablePinStepper1);
   stepper2->setEnablePin(enablePinStepper2);
 
-  stepper1->set_auto_enable(true);
-  stepper2->set_auto_enable(true);
+  stepper1->setAutoEnable(true);
+  stepper2->setAutoEnable(true);
 }
 
 uint32_t dt = ABSOLUTE_MAX_TICKS;
 bool up = true;
 
 void loop() {
-  if (stepper2->add_queue_entry(dt, 2, true, 0) == AQE_OK) {
+  if (stepper2->addQueueEntry(dt, 2, true, 0) == AQE_OK) {
      if (up) {
         dt -= dt / 100;
         if (dt < 16000000/40000) {

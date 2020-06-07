@@ -70,9 +70,9 @@ void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
 //*************************************************************************************************
 bool FastAccelStepper::isStopped() { return _ticks_at_queue_end == 0; }
 //*************************************************************************************************
-void FastAccelStepper::add_queue_stepper_stop() { _ticks_at_queue_end = 0; }
+void FastAccelStepper::addQueueStepperStop() { _ticks_at_queue_end = 0; }
 //*************************************************************************************************
-inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
+inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
                                              uint8_t steps, bool dir_high,
                                              int16_t change_ticks) {
   int32_t c_sum = 0;
@@ -93,7 +93,7 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
     if (c_sum < -32768) {
       return AQE_CHANGE_TOO_LOW;
     }
-    if (start_delta_ticks + c_sum < min_delta_ticks()) {
+    if (start_delta_ticks + c_sum < MIN_DELTA_TICKS) {
       return AQE_CUMULATED_CHANGE_TOO_LOW;
     }
   }
@@ -405,7 +405,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
   uint32_t sum_dt = 0;
   for (uint16_t c = 1; c < command_cnt; c++) {
-    int8_t res = add_queue_entry(curr_ticks, steps_per_command, dir, change);
+    int8_t res = addQueueEntry(curr_ticks, steps_per_command, dir, change);
 #ifdef TEST
     printf(
         "add command %d Steps = %d start_ticks = %d  Target "
@@ -418,7 +418,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     curr_ticks += steps_per_command * change;
     steps -= steps_per_command;
   }
-  int8_t res = add_queue_entry(curr_ticks, steps, dir, change);
+  int8_t res = addQueueEntry(curr_ticks, steps, dir, change);
 #ifdef TEST
   printf(
       "add command Steps = %d start_ticks = %d  Target "
@@ -429,12 +429,12 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       _ticks_at_queue_end);
 #endif
   if (res != 0) { // Emergency stop on internal error
-    add_queue_stepper_stop();
+    addQueueStepperStop();
     ramp_state = RAMP_STATE_IDLE;
     isr_speed_control_enabled = false;
   }
   if (total_steps == abs(remaining_steps)) {
-    add_queue_stepper_stop();
+    addQueueStepperStop();
     ramp_state = RAMP_STATE_IDLE;
     isr_speed_control_enabled = false;
 #ifdef TEST
@@ -510,7 +510,6 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
     interrupts();
   }
 }
-uint32_t FastAccelStepper::min_delta_ticks() { return TIMER_FREQ / 32000; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;
   digitalWrite(dirPin, HIGH);
@@ -526,7 +525,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin) {
   digitalWrite(enablePin, HIGH);
   pinMode(enablePin, OUTPUT);
 }
-void FastAccelStepper::set_auto_enable(bool auto_enable) {
+void FastAccelStepper::setAutoEnable(bool auto_enable) {
   if (auto_enable) {
     _auto_enablePin = _enablePin;
   } else {

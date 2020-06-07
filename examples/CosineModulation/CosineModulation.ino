@@ -32,8 +32,8 @@ void setup() {
   stepper1->setEnablePin(enablePinStepper1);
   stepper2->setEnablePin(enablePinStepper2);
 
-  stepper1->set_auto_enable(true);
-  stepper2->set_auto_enable(true);
+  stepper1->setAutoEnable(true);
+  stepper2->setAutoEnable(true);
 }
 
 uint32_t dt = 100000; // start with 10steps/s
@@ -45,7 +45,7 @@ const uint8_t cos_tab[64] = {
 };
 
 void loop() {
-  while (stepper2->add_queue_entry(dt, 3, true, 0) == AQE_OK) {
+  while (stepper2->addQueueEntry(dt, 3, true, 0) == AQE_OK) {
      if (!run_saw) {
         dt -= dt / 100;
         if (dt < 16000000/30000) { // 30000 steps/s

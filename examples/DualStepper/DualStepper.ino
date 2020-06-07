@@ -26,8 +26,8 @@ void setup() {
   stepper1->setEnablePin(enablePinStepper1);
   stepper2->setEnablePin(enablePinStepper2);
 
-  stepper1->set_auto_enable(true);
-  stepper2->set_auto_enable(true);
+  stepper1->setAutoEnable(true);
+  stepper2->setAutoEnable(true);
 }
 
 uint8_t in_ptr = 0;
@@ -75,53 +75,53 @@ void loop() {
     // NOT NEEDED IN RAW ACCESS: stepper->setAcceleration(100.0);
     if (false) {
       Serial.println(
-          stepper->add_queue_entry(5L * 16384, 120, true, -16384 / 120));
+          stepper->addQueueEntry(5L * 16384, 120, true, -16384 / 120));
       Serial.println(
-          stepper->add_queue_entry(4L * 16384, 120, true, -16384 / 120));
+          stepper->addQueueEntry(4L * 16384, 120, true, -16384 / 120));
       Serial.println(
-          stepper->add_queue_entry(3L * 16384, 120, true, -16384 / 120));
-      Serial.println(stepper->add_queue_entry(2L * 16384, 120, true, 0));
+          stepper->addQueueEntry(3L * 16384, 120, true, -16384 / 120));
+      Serial.println(stepper->addQueueEntry(2L * 16384, 120, true, 0));
       Serial.println(
-          stepper->add_queue_entry(2L * 16384, 120, true, 16384 / 120));
+          stepper->addQueueEntry(2L * 16384, 120, true, 16384 / 120));
       Serial.println(
-          stepper->add_queue_entry(3L * 16384, 120, true, 16384 / 120));
-      Serial.println(stepper->add_queue_entry(4L * 16384, 80, true, 0));
-      Serial.println(stepper->add_queue_entry(4L * 16384, 80, false, 0));
+          stepper->addQueueEntry(3L * 16384, 120, true, 16384 / 120));
+      Serial.println(stepper->addQueueEntry(4L * 16384, 80, true, 0));
+      Serial.println(stepper->addQueueEntry(4L * 16384, 80, false, 0));
       Serial.println(
-          stepper->add_queue_entry(4L * 16384, 120, false, -16384 / 120));
+          stepper->addQueueEntry(4L * 16384, 120, false, -16384 / 120));
       Serial.println(
-          stepper->add_queue_entry(3L * 16384, 120, false, -16384 / 120));
+          stepper->addQueueEntry(3L * 16384, 120, false, -16384 / 120));
       Serial.println(
-          stepper->add_queue_entry(2L * 16384, 120, false, 16384 / 120));
+          stepper->addQueueEntry(2L * 16384, 120, false, 16384 / 120));
       Serial.println(
-          stepper->add_queue_entry(3L * 16384, 120, false, 16384 / 120));
+          stepper->addQueueEntry(3L * 16384, 120, false, 16384 / 120));
       Serial.println(
-          stepper->add_queue_entry(4L * 16384, 120, false, 16384 / 120));
-      Serial.println(stepper->add_queue_entry(5L * 16384, 120, false, 0));
+          stepper->addQueueEntry(4L * 16384, 120, false, 16384 / 120));
+      Serial.println(stepper->addQueueEntry(5L * 16384, 120, false, 0));
     } else {
       Serial.println(
-          stepper->add_queue_entry(5L * 16384, 120, true, -16384 / 119));
+          stepper->addQueueEntry(5L * 16384, 120, true, -16384 / 119));
       Serial.println(
-          stepper->add_queue_entry(4L * 16384, 120, true, -16384 / 119));
+          stepper->addQueueEntry(4L * 16384, 120, true, -16384 / 119));
       Serial.println(
-          stepper->add_queue_entry(3L * 16384, 120, true, -16384 / 119));
+          stepper->addQueueEntry(3L * 16384, 120, true, -16384 / 119));
       Serial.println(
-          stepper->add_queue_entry(2L * 16384, 120, true, -8192 / 119));
+          stepper->addQueueEntry(2L * 16384, 120, true, -8192 / 119));
       Serial.println(
-          stepper->add_queue_entry(6L * 4096, 120, true, -4096 / 119));
+          stepper->addQueueEntry(6L * 4096, 120, true, -4096 / 119));
       Serial.println(
-          stepper->add_queue_entry(5L * 4096, 120, true, -4096 / 119));
+          stepper->addQueueEntry(5L * 4096, 120, true, -4096 / 119));
       Serial.println(
-          stepper->add_queue_entry(4L * 4096, 120, true, -4096 / 119));
+          stepper->addQueueEntry(4L * 4096, 120, true, -4096 / 119));
       Serial.println(
-          stepper->add_queue_entry(3L * 4096, 120, true, -4096 / 119));
-      Serial.println(stepper->add_queue_entry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->add_queue_entry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->add_queue_entry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->add_queue_entry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->add_queue_entry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->add_queue_entry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->add_queue_entry(2L * 4096, 120, true, 0));
+          stepper->addQueueEntry(3L * 4096, 120, true, -4096 / 119));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
     }
   }
 

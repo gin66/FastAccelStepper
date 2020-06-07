@@ -10,16 +10,7 @@
 #include <stdint.h>
 #include "PoorManFloat.h"
 
-// Return codes for add_queue_entry
-#define AQE_OK 0
-#define AQE_FULL -1
-#define AQE_TOO_HIGH -2
-#define AQE_TOO_LOW -3
-#define AQE_CHANGE_TOO_HIGH -4
-#define AQE_CHANGE_TOO_LOW -5
-#define AQE_CUMULATED_CHANGE_TOO_LOW -6
-#define AQE_STEPS_ERROR -7
-
+#define MIN_DELTA_TICKS (16000000L/50000)
 #define ABSOLUTE_MAX_TICKS (255L*16384+65535L)
 
 class FastAccelStepper {
@@ -29,7 +20,7 @@ class FastAccelStepper {
   void setDirectionPin(uint8_t dirPin);
   void setEnablePin(uint8_t enablePin);
 
-  void set_auto_enable(bool auto_enable);
+  void setAutoEnable(bool auto_enable);
   void enableOutputs();
   void disableOutputs();
 
@@ -40,12 +31,21 @@ class FastAccelStepper {
   void moveTo(int32_t position);
 
   // unstable API functions
-  uint32_t min_delta_ticks();  // this translates into maximum speed
 
   // stepper queue management (low level access)
-  inline int add_queue_entry(uint32_t start_delta_ticks, uint8_t steps,
+  inline int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
                              bool dir_high, int16_t change_ticks);
-  void add_queue_stepper_stop();
+  // Return codes for add_queue_entry
+#define AQE_OK 0
+#define AQE_FULL -1
+#define AQE_TOO_HIGH -2
+#define AQE_TOO_LOW -3
+#define AQE_CHANGE_TOO_HIGH -4
+#define AQE_CHANGE_TOO_LOW -5
+#define AQE_CUMULATED_CHANGE_TOO_LOW -6
+#define AQE_STEPS_ERROR -7
+
+  void addQueueStepperStop();
   bool isQueueEmpty();
   bool isQueueFull();
   bool isStopped();
