@@ -108,15 +108,15 @@ void loop() {
 
 ## Behind the curtains
 
-The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This interrupt is used for adjusting the acceleration. 
+The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This timer overflow interrupt is used for adjusting the speed. 
 
-The timer compare unit toggles the step pin from Low to High precisely. The transition High to Low is done in the interrupt routine, thus the High state is only few us.
+The timer compare unit toggles the step pin from Low to High precisely. The transition High to Low is done in the timer compare interrupt routine, thus the High state is only few us.
 
 After stepper movement is completed, the timer compare unit is disconnected from the step pin. Thus the application could change the state freely, while the stepper is not controlled by this library.
 
 The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is 4,194,303. At 16 MHz this comes down to 0.2621s. Thus the speed is limited down to approx 3.82 steps/s.
 
-The acceleration/deacceleration interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
+The acceleration/deacceleration aka timer overflow interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 
