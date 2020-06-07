@@ -24,10 +24,13 @@ FastAccelStepper offers the following features:
 * speed/acceleration can be varied while stepper is running
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
+* Provide API to each stepper's command queue (15 commands long)
 
 The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
+
+Using the high level interface with ramp up/down:
 
 ```
 #include "FastAccelStepper.h"
@@ -53,6 +56,57 @@ void setup() {
 }
 
 void loop() {
+}
+```
+
+Using the low level interface to stepper command queue:
+
+```
+#include "FastAccelStepper.h"
+
+#define dirPinStepperA    5
+#define enablePinStepperA 6
+//#define stepPinStepperA   9  // OC1A
+
+FastAccelStepperEngine fas_engine = FastAccelStepperEngine();
+FastAccelStepper stepperA = fas_engine.stepperA();
+//FastAccelStepper stepperB = fas_engine.stepperB();
+
+void setup() {
+   fas_engine.init();
+   stepperA->setDirectionPin(dirPinStepperA);
+
+   stepperA->setEnablePin(enablePinStepperA);
+   stepperA->set_auto_enable(true);
+
+   stepperA->setSpeed(1000);       // the parameter is us/step !!!
+   stepperA->setAcceleration(100);
+   stepperA->move(1000);
+}
+
+uint32_t dt = ABSOLUTE_MAX_TICKS;
+bool up = true;
+
+void loop() {
+  // Issue command with parameters:
+  //          time delta:            dt  [*0.25us/Step]
+  //          steps:                 2
+  //          direction pin:         high
+  //          vary dt on each step:  0   [*0.25us/Step]
+  if (stepperA->add_queue_entry(dt, 2, true, 0) == AQE_OK) {
+     if (up) {
+        dt -= dt / 100;
+        if (dt < 16000000/40000) {
+	        up = false;
+        }
+     }
+     else {
+        dt += 1;
+        if (dt == ABSOLUTE_MAX_TICKS) {
+	        up = true;
+        }
+     }
+  }
 }
 ```
 
