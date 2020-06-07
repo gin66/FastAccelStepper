@@ -132,4 +132,5 @@ The low level command queue for each stepper allows direct speed control - when 
 * Using constant acceleration leads to force jumps at start and max speed => smooth this out
 * Extend command queue entry to perform delay only without step (steps=0) to reduce the 3.8 steps/s
 * There are few clippings done to catch calculation error (not happening during test) => unclear cause
+* Performance on the stepper for slow speed does not meet test on pc => calculation error ?
 
