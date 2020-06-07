@@ -176,6 +176,9 @@ inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
 //
 //*************************************************************************************************
 void FastAccelStepper::_calculate_move(int32_t move) {
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  checksum = 0;
+#endif
   if (move == 0) {
     return;
   }
