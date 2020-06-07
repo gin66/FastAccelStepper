@@ -21,7 +21,7 @@ FastAccelStepper offers the following features:
 * Lower limit of 3.8 steps/s
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
-* speed/acceleration can be varied while stepper is running
+* speed/acceleration can be varied while stepper is running (need call to move/moveTo for application of new values, not done implicitly)
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each stepper's command queue (can hold 15 commands)
