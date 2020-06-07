@@ -225,7 +225,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
      printf(" %f", 1.0*(rc.total_ticks - rc.accelerate_till) / 16000000.0); 
   }
   printf(" %f\n", 1.0*rc.total_ticks / 16000000.0);
-  test(1.0*abs(up_time - down_time) < 0.5*(up_time + down_time) * allowed_ramp_time_delta, "assymmetric ramp");
+  test(abs(1.0*up_time - 1.0*down_time) < 0.5*(up_time + down_time) * allowed_ramp_time_delta, "assymmetric ramp");
   test(s.isStopped(), "is not stopped");
 }
 
