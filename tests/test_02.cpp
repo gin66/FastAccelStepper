@@ -26,7 +26,7 @@ uint8_t fas_dirPin_B = 255;
 class RampChecker {
  public:
   RampChecker();
-  void check_section(struct queue_entry *e, uint8_t ramp_state);
+  void check_section(struct queue_entry *e);
 
   uint32_t total_ticks;
   uint32_t last_dt;
@@ -49,7 +49,7 @@ RampChecker::RampChecker() {
   coast_till = 0;
   accelerate_till = 0;
 }
-void RampChecker::check_section(struct queue_entry *e, uint8_t ramp_state) {
+void RampChecker::check_section(struct queue_entry *e) {
   uint8_t steps = e->steps;
   if (!first) {
     assert((steps & 1) == 0);
@@ -77,8 +77,12 @@ void RampChecker::check_section(struct queue_entry *e, uint8_t ramp_state) {
 
   if (last_dt > start_dt) {
     assert(increase_ok);
+    accelerate_till = total_ticks;
     decrease_ok = true;
   } else if (last_dt < start_dt) {
+	if (increase_ok) {
+      coast_till = total_ticks;
+	}
     assert(decrease_ok);
     increase_ok = false;
   }
@@ -90,19 +94,6 @@ void RampChecker::check_section(struct queue_entry *e, uint8_t ramp_state) {
   }
 
   last_dt = end_dt;
-
-  switch (ramp_state) {
-    case RAMP_STATE_ACCELERATE:
-      accelerate_till = total_ticks;
-      break;
-    case RAMP_STATE_DECELERATE_TO_STOP:
-      break;
-    case RAMP_STATE_DECELERATE:
-      break;
-    case RAMP_STATE_COAST:
-      coast_till = total_ticks;
-      break;
-  }
 
   first = false;
 }
@@ -142,7 +133,7 @@ void basic_test_with_empty_queue() {
     }
     s.isr_fill_queue();
     while (!s.isQueueEmpty()) {
-      rc.check_section(&fas_queue_A[fas_q_readptr_A], s.ramp_state);
+      rc.check_section(&fas_queue_A[fas_q_readptr_A]);
       fas_q_readptr_A = (fas_q_readptr_A + 1) & QUEUE_LEN_MASK;
     }
   }
@@ -185,7 +176,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
     s.isr_fill_queue();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
-      rc.check_section(&fas_queue_A[fas_q_readptr_A], s.ramp_state);
+      rc.check_section(&fas_queue_A[fas_q_readptr_A]);
       fas_q_readptr_A = (fas_q_readptr_A + 1) & QUEUE_LEN_MASK;
     }
     uint32_t to_dt = rc.total_ticks;
