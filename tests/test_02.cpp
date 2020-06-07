@@ -252,7 +252,7 @@ int main() {
   test_with_pars(500, 4000, 5, false, 19.0 - 0.1,
                  19.0 + 0.2, 0.2);
   test_with_pars(256000, 40, 5000, true, 15.2 - 0.1,
-                 15.2 + 0.2, 0.2);  // jumps in speed in real
+                 15.2 + 0.2, 0.2);  // jumps in speed in real => WORKS NOW
   //  test_with_pars(2000000, 40, 40, false, 2*223.0, 2*223.0); // ramp time
   //  625s, 7812500 steps
   printf("TEST_02 PASSED\n");
