@@ -148,17 +148,27 @@ upm_float upm_from(uint32_t x) {
   }
 }
 upm_float multiply(upm_float x, upm_float y) {
-  uint8_t a = x & 255;
-  uint8_t b = y & 255;
-  uint16_t ab = a * b;
-  if (ab & 0x8000) {
-    ab >>= 8;
-    ab += 0x0100;
-  } else {
-    ab >>= 7;
+  uint16_t mant_x = x & 255;
+  uint16_t mant_y = y & 255;
+  uint16_t xy = mant_x * mant_y;
+  uint8_t mant;
+  uint8_t exponent = (x >> 8) + (y >> 8) - 0x80;
+  if ((xy & 0x8000) != 0) {
+     mant = xy >> 8;
+	 exponent += 1;
   }
-  ab += ((x & 0xff00) - 0x4000) + ((y & 0xff00) - 0x4000);
-  return ab;
+  else {
+     mant = xy >> 7;
+  }
+
+//  if ((ab & 0x8000) != 0) {
+//    ab >>= 8;
+//    ab += 0x0100;
+//  } else {
+//    ab >>= 7;
+//  }
+//  ab += ((x & 0xff00) - 0x4000) + ((y & 0xff00) - 0x4000);
+  return (((uint16_t) exponent) << 8) | mant;
 }
 upm_float square(upm_float x) {
   uint8_t a = x & 255;
@@ -334,7 +344,8 @@ upm_float sqrt(upm_float x) {
     exponent += 1;
     mantissa >>= 1;
   }
-  uint8_t sqrt_mantissa = pgm_read_byte_near(&isqrt_tab[mantissa - 64]);
+  mantissa -= 64;
+  uint8_t sqrt_mantissa = pgm_read_byte_near(&isqrt_tab[mantissa]);
   if (exponent >= 128) {
     exponent -= 128;
     exponent >>= 1;

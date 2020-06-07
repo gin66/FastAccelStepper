@@ -10,7 +10,7 @@ test: test_01 test_02 test_03
 
 test_01: test_01.cpp stubs.h FastAccelStepper.o PoorManFloat.o
 test_02: test_02.cpp stubs.h FastAccelStepper.o PoorManFloat.o
-test_03: test_03.cpp stubs.h FastAccelStepper.o PoorManFloat.o
+test_03: test_03.cpp stubs.h PoorManFloat.o
 
 FastAccelStepper.o: FastAccelStepper.cpp FastAccelStepper.h PoorManFloat.h stubs.h
 

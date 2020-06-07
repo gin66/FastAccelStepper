@@ -1,29 +1,37 @@
+#include <stdint.h>
+#include "PoorManFloat.h"
+
+#ifdef TEST
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "FastAccelStepper.h"
-#include "StepperISR.h"
+#define xprintf  printf
+#define test(x, msg) \
+  if (!(x)) {        \
+    puts(msg);       \
+    assert(false);   \
+  };
+#else
+#include <Arduino.h>
+uint16_t error_cnt = 0;
+char buffer[256];
+#define xprintf(...) { \
+	sprintf(buffer, __VA_ARGS__); \
+	Serial.print(buffer); \
+}
+#define test(x, msg) \
+  if (!(x)) {        \
+	error_cnt++; \
+    Serial.print("ERROR: ");       \
+    Serial.println(__LINE__);       \
+  } else { \
+    Serial.print("OK: ");       \
+    Serial.println(__LINE__);       \
+  };
+#endif
 
-char TCCR1A;
-char TCCR1B;
-char TCCR1C;
-char TIMSK1;
-char TIFR1;
-unsigned short OCR1A;
-unsigned short OCR1B;
 
-uint8_t fas_q_readptr_A = 0;  // ISR stops if readptr == next_writeptr
-uint8_t fas_q_next_writeptr_A = 0;
-uint8_t fas_q_readptr_B = 0;
-uint8_t fas_q_next_writeptr_B = 0;
-struct queue_entry fas_queue_A[QUEUE_LEN], fas_queue_B[QUEUE_LEN];
-
-uint8_t fas_autoEnablePin_A = 255;
-uint8_t fas_autoEnablePin_B = 255;
-uint8_t fas_dirPin_A = 255;
-uint8_t fas_dirPin_B = 255;
-
-int main() {
+void perform_test() {
   upm_float x;
 
   x = upm_from((uint8_t)1);
@@ -33,7 +41,7 @@ int main() {
   x = upm_from((uint8_t)3);
   test(x == 0x81c0, "conversion error from uint8_t 3");
   x = upm_from((uint8_t)4);
-  printf("%x\n", x);
+  xprintf("%x\n", x);
   test(x == 0x8280, "conversion error from uint8_t 4");
   x = upm_from((uint8_t)8);
   test(x == 0x8380, "conversion error from uint8_t 8");
@@ -68,7 +76,7 @@ int main() {
   x = upm_from((uint32_t)1);
   test(x == 0x8080, "conversion error from uint32_t 1");
   x = upm_from((uint32_t)3);
-  printf("%x\n", x);
+  xprintf("%x\n", x);
   test(x == 0x81c0, "conversion error from uint32_t 3");
   x = upm_from((uint32_t)5);
   test(x == 0x82a0, "conversion error from uint32_t 5");
@@ -110,7 +118,7 @@ int main() {
   x2 = upm_from((uint32_t)5);
   x3 = upm_from((uint32_t)15);
   x = multiply(x1, x2);
-  printf("%x*%x=%x\n", x1, x2, x);
+  xprintf("%x*%x=%x\n", x1, x2, x);
   test(x == x3, "multiply error 3*5");
   test(x == 0x83f0, "multiply error 3*5");
 
@@ -135,92 +143,94 @@ int main() {
   x2 = upm_from((uint32_t)0x1fffe);
   x = multiply(x1, x2);
   uint32_t back = upm_to_u32(x);
+  xprintf("%x*%x=%x (back=%d)\n", x1, x2, x, back);
+  test(x == 0xa0fe, "multiply error");
   test(back == 0xffffffff, "overflow not catched");
 
   x1 = upm_from((uint32_t)0x5555);
   x2 = upm_from((uint32_t)0x0055);
   x = divide(x1, x2);
   back = upm_to_u32(x);
-  printf("%x/%x=%x (back=%d)\n", x1, x2, x, back);
+  xprintf("%x/%x=%x (back=%d)\n", x1, x2, x, back);
   test(back == 0x0100, "wrong division");
 
   x1 = upm_from((uint32_t)0xf455);
   x2 = upm_from((uint32_t)0x0030);
   x = divide(x1, x2);
   back = upm_to_u32(x);
-  printf("%x/%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x/%x=%x (%d)\n", x1, x2, x, back);
   test((back * 0x0030) <= 0xf455, "wrong division");
   test((back * 0x0031) > 0xf455, "wrong division");
 
   x = upm_from((uint32_t)16000000);
-  printf("%x\n", x);
+  xprintf("%x\n", x);
   test(x == 0x97f4, "conversion error from uint32_t 16000000");
   x = multiply(x, x);
-  printf("%x\n", x);
+  xprintf("%x\n", x);
   test(x == 0xafe8, "multiply error from uint32_t 16000000²");
 
   x1 = upm_from((uint32_t)0xf455);
   x2 = upm_from((uint32_t)0xf455);
   x = abs_diff(x1, x2);
   back = upm_to_u32(x);
-  printf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
+  xprintf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "wrong abs_diff");
 
   x1 = upm_from((uint32_t)0xf455);
   x2 = upm_from((uint32_t)0xf400);
   x = abs_diff(x1, x2);
   back = upm_to_u32(x);
-  printf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
+  xprintf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "wrong abs_diff");
   x = abs_diff(x2, x1);
   back = upm_to_u32(x);
-  printf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
+  xprintf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "wrong abs_diff");
   x = sum(x1, x2);
   back = upm_to_u32(x);
-  printf("%x+%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x+%x=%x (%d)\n", x1, x2, x, back);
   test(back == 0x1e800, "wrong sum");
   x = sum(x2, x1);
   back = upm_to_u32(x);
-  printf("%x+%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x+%x=%x (%d)\n", x1, x2, x, back);
   test(back == 0x1e800, "wrong sum");
 
   x1 = upm_from((uint32_t)0xf455);
   x2 = upm_from((uint32_t)0xf3ff);
   x = abs_diff(x1, x2);
   back = upm_to_u32(x);
-  printf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
+  xprintf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
   test(back == 0x0100, "wrong abs_diff");
   x = abs_diff(x2, x1);
   back = upm_to_u32(x);
-  printf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
+  xprintf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
   test(back == 0x0100, "wrong abs_diff");
   x = sum(x1, x2);
   back = upm_to_u32(x);
-  printf("%x+%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x+%x=%x (%d)\n", x1, x2, x, back);
   test(back == 0x1e600, "wrong sum");
   x = sum(x2, x1);
   back = upm_to_u32(x);
-  printf("%x+%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x+%x=%x (%d)\n", x1, x2, x, back);
   test(back == 0x1e600, "wrong sum");
 
   x1 = upm_from((uint32_t)0xf4555);
   x2 = upm_from((uint32_t)0x0f3ff);
   x = abs_diff(x1, x2);
   back = upm_to_u32(x);
-  printf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
+  xprintf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
   test(back == 0xe5000, "wrong abs_diff");
   x = abs_diff(x2, x1);
   back = upm_to_u32(x);
-  printf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
+  xprintf("|%x-%x|=%x (%d)\n", x1, x2, x, back);
   test(back == 0xe5000, "wrong abs_diff");
   x = sum(x1, x2);
   back = upm_to_u32(x);
-  printf("%x+%x=%x (%x)\n", x1, x2, x, back);
+  xprintf("%x+%x=%x (%x)\n", x1, x2, x, back);
   test(back == 0x102000, "wrong sum");
   x = sum(x2, x1);
   back = upm_to_u32(x);
-  printf("%x+%x=%x (%x)\n", x1, x2, x, back);
+  xprintf("%x+%x=%x (%x)\n", x1, x2, x, back);
   test(back == 0x102000, "wrong sum");
 
   x1 = upm_from((uint32_t)0xf4555);
@@ -235,104 +245,134 @@ int main() {
   x1 = upm_from((uint32_t)0x20000);
   x = sqrt(x1);
   back = upm_to_u32(x);
-  printf("sqrt(%x)=0x%x (%d)  = 362 ?\n", x1, x, back);
+  xprintf("sqrt(%x)=0x%x (%d)  = 362 ?\n", x1, x, back);
   test(back == 362, "sqrt");
 
   x1 = upm_from((uint32_t)0x10000);
   x = sqrt(x1);
   back = upm_to_u32(x);
-  printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
+  xprintf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
   test(back == 0x100, "sqrt");
 
-  x1 = upm_from((uint32_t)(244 * 244));
+  x1 = upm_from((uint16_t)59536);
+  test(x1 == 0x8fe8, "upm_from");
+  x1 = upm_from((uint32_t)59536);
+  test(x1 == 0x8fe8, "upm_from");
+  x1 = upm_from((uint32_t)(244L * 244L));
+  test(x1 == 0x8fe8, "upm_from");
   x = sqrt(x1);
   back = upm_to_u32(x);
-  printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
+  xprintf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
   test(back == 244, "sqrt");
 
   x1 = upm_from((uint32_t)(122 * 122));
   x = sqrt(x1);
   back = upm_to_u32(x);
-  printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
+  xprintf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
   test(back == 122, "sqrt");
 
-  x1 = upm_from((uint32_t)(174 * 174));
+  x1 = upm_from((uint32_t)(174L * 174));
   x = sqrt(x1);
   back = upm_to_u32(x);
-  printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
+  xprintf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
   test(back == 174, "sqrt");
 
   x1 = upm_from((uint32_t)4);
   x = sqrt(x1);
   back = upm_to_u32(x);
-  printf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
+  xprintf("sqrt(%x)=0x%x (%x)\n", x1, x, back);
   test(back == 2, "sqrt");
   x = shl(sqrt(shr(x1, 2)), 1);
   back = upm_to_u32(x);
-  printf("shl(sqrt(shr(%x,2)),1)=0x%x (%x)\n", x1, x, back);
+  xprintf("shl(sqrt(shr(%x,2)),1)=0x%x (%x)\n", x1, x, back);
   test(back == 2, "sqrt");
   x = shl(sqrt(shr(x1, 4)), 2);
   back = upm_to_u32(x);
-  printf("shl(sqrt(shr(%x,4)),2)=0x%x (%x)\n", x1, x, back);
+  xprintf("shl(sqrt(shr(%x,4)),2)=0x%x (%x)\n", x1, x, back);
   x = shl(sqrt(shr(x1, 42)), 21);
   back = upm_to_u32(x);
-  printf("shl(sqrt(shr(%x,42)),21)=0x%x (%x)\n", x1, x, back);
+  xprintf("shl(sqrt(shr(%x,42)),21)=0x%x (%x)\n", x1, x, back);
   test(back == 2, "sqrt");
 
   x1 = upm_from((uint32_t)250);
   x2 = upm_from((uint32_t)10000);
   x = divide(x1, x2);
   back = upm_to_u32(x);
-  printf("%x/%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x/%x=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "divide");
   x = multiply(x, x2);
   back = upm_to_u32(x);
-  printf("%x/%x*%x=%x (%d)\n", x1, x2, x2, x, back);
+  xprintf("%x/%x*%x=%x (%d)\n", x1, x2, x2, x, back);
   test(back == 251, "divide");
 
   x1 = upm_from((uint32_t)250);
   x2 = upm_from((uint32_t)10000);
   x = divide(x1, x2);
   back = upm_to_u32(x);
-  printf("%x/%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x/%x=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "divide");
   x = shl(x, 10);
   back = upm_to_u32(x);
-  printf("shl(%x/%x,10)=%x (%d)\n", x1, x2, x, back);
+  xprintf("shl(%x/%x,10)=%x (%d)\n", x1, x2, x, back);
   test(back == 25, "divide/shl");
 
   x1 = upm_from((uint32_t)1600);
   x2 = upm_from((uint32_t)1000000);
   x = divide(x1, x2);
   back = upm_to_u32(x);
-  printf("%x/%x=%x (%d)\n", x1, x2, x, back);
+  xprintf("%x/%x=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "divide");
   x = shl(x, 20);
   back = upm_to_u32(x);
-  printf("shl(%x/%x,20)=%x (%d)\n", x1, x2, x, back);
+  xprintf("shl(%x/%x,20)=%x (%d)\n", x1, x2, x, back);
   test(back == 1680, "divide/shl");
   x = shr(x, 20);
   back = upm_to_u32(x);
-  printf("shr(shl(%x/%x,20),20)=%x (%d)\n", x1, x2, x, back);
+  xprintf("shr(shl(%x/%x,20),20)=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "divide/shl");
   x = sqrt(x);
   back = upm_to_u32(x);
-  printf("sqrt(%x/%x)=%x (%d)\n", x1, x2, x, back);
+  xprintf("sqrt(%x/%x)=%x (%d)\n", x1, x2, x, back);
   test(back == 0, "divide/sqrt");
   x = multiply(x, x2);
   back = upm_to_u32(x);
-  printf("sqrt(%x/%x)*%x=%x (%d)\n", x1, x2, x2, x, back);
+  xprintf("sqrt(%x/%x)*%x=%x (%d)\n", x1, x2, x2, x, back);
   test(back == 39936, "divide/sqrt/multiply");
 
   x1 = upm_from((uint32_t)(174));
   x = multiply(x1, x1);
   back = upm_to_u32(x);
-  printf("multiply(%x,%x)=0x%x (%d)\n", x1, x1, x, back);
+  xprintf("multiply(%x,%x)=0x%x (%d)\n", x1, x1, x, back);
   test(back == 30208, "square");
   x = square(x1);
   back = upm_to_u32(x);
-  printf("square(%x)=0x%x (%d)\n", x1, x, back);
+  xprintf("square(%x)=0x%x (%d)\n", x1, x, back);
   test(back == 30208, "sqrt");
 
-  printf("TEST_03 PASSED\n");
+#ifdef TEST
+  xprintf("TEST_03 PASSED\n");
+#else
+  if (error_cnt == 0) {
+	  Serial.println("TEST PASSED");
+  }
+  else {
+	  Serial.print("TEST FAILED: ");
+	  Serial.print(error_cnt);
+	  Serial.println(" errors");
+  }
+#endif
 }
+#ifdef TEST
+int main() {
+	perform_test();
+}
+#else
+void setup() {
+  Serial.begin(115200);
+  Serial.println("Start test...");
+  perform_test();
+}
+
+void loop() {
+}
+#endif
