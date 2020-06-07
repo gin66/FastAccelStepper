@@ -286,65 +286,73 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #endif
 
   uint32_t curr_ticks = _ticks_at_queue_end;
-  if (ramp_state == RAMP_STATE_COAST) {
-    next_ticks = _min_travel_ticks;
-  } else if (ramp_state == RAMP_STATE_ACCELERATE) {
-    uint32_t upm_rem_steps =
-        upm_from(_performed_ramp_up_steps + planning_steps);
-    upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
-
-    uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
-
-    // avoid overshoot
-    next_ticks = max(d_ticks_new, _min_travel_ticks);
-    if (_performed_ramp_up_steps == 0) {
-      curr_ticks = d_ticks_new;
-    } else {
-      // CLIPPING: avoid increase
-      next_ticks = min(next_ticks, curr_ticks);
-    }
-
 #ifdef TEST
-    float v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
-    printf("accelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
-           next_ticks, planning_steps, d_ticks_new);
-    printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
-           planning_steps);
+  float v2;
 #endif
-  } else if (ramp_state == RAMP_STATE_DECELERATE) {
-    uint32_t upm_rem_steps =
-        upm_from(_performed_ramp_up_steps + planning_steps);
-    upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
+  switch (ramp_state) {
+    uint32_t d_ticks_new;
+    uint32_t upm_rem_steps;
+    upm_float upm_d_ticks_new;
+    case RAMP_STATE_COAST:
+      next_ticks = _min_travel_ticks;
+      break;
+    case RAMP_STATE_ACCELERATE:
+      upm_rem_steps = upm_from(_performed_ramp_up_steps + planning_steps);
+      upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
 
-    uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
+      d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-    // avoid undershoot
-    next_ticks = min(d_ticks_new, _min_travel_ticks);
-
-    // CLIPPING: avoid reduction
-    next_ticks = max(next_ticks, curr_ticks);
+      // avoid overshoot
+      next_ticks = max(d_ticks_new, _min_travel_ticks);
+      if (_performed_ramp_up_steps == 0) {
+        curr_ticks = d_ticks_new;
+      } else {
+        // CLIPPING: avoid increase
+        next_ticks = min(next_ticks, curr_ticks);
+      }
 
 #ifdef TEST
-    float v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
-    printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
-           next_ticks, planning_steps, d_ticks_new);
-    printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
-           planning_steps);
+      v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
+      printf("accelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
+             next_ticks, planning_steps, d_ticks_new);
+      printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
+             planning_steps);
 #endif
-  } else if (ramp_state == RAMP_STATE_DECELERATE_TO_STOP) {
-    uint32_t upm_rem_steps = upm_from(remaining_steps - planning_steps);
-    upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
+      break;
+    case RAMP_STATE_DECELERATE:
+      upm_rem_steps = upm_from(_performed_ramp_up_steps + planning_steps);
+      upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
 
-    uint32_t d_ticks_new = upm_to_u32(upm_d_ticks_new);
+      d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-    // avoid undershoot
-    next_ticks = max(d_ticks_new, _min_travel_ticks);
+      // avoid undershoot
+      next_ticks = min(d_ticks_new, _min_travel_ticks);
 
-    // CLIPPING: avoid reduction
-    next_ticks = max(next_ticks, curr_ticks);
+      // CLIPPING: avoid reduction
+      next_ticks = max(next_ticks, curr_ticks);
+
 #ifdef TEST
-    printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
-           next_ticks, planning_steps, d_ticks_new);
+      v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
+      printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
+             next_ticks, planning_steps, d_ticks_new);
+      printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
+             planning_steps);
+#endif
+      break;
+    case RAMP_STATE_DECELERATE_TO_STOP:
+      upm_rem_steps = upm_from(remaining_steps - planning_steps);
+      upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
+
+      d_ticks_new = upm_to_u32(upm_d_ticks_new);
+
+      // avoid undershoot
+      next_ticks = max(d_ticks_new, _min_travel_ticks);
+
+      // CLIPPING: avoid reduction
+      next_ticks = max(next_ticks, curr_ticks);
+#ifdef TEST
+      printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
+             next_ticks, planning_steps, d_ticks_new);
 #endif
   }
 
