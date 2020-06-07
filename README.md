@@ -48,7 +48,7 @@ void setup() {
    stepperA->setDirectionPin(dirPinStepperA);
 
    stepperA->setEnablePin(enablePinStepperA);
-   stepperA->set_auto_enable(true);
+   stepperA->setAutoEnable(true);
 
    stepperA->setSpeed(1000);       // the parameter is us/step !!!
    stepperA->setAcceleration(100);
@@ -77,7 +77,7 @@ void setup() {
    stepperA->setDirectionPin(dirPinStepperA);
 
    stepperA->setEnablePin(enablePinStepperA);
-   stepperA->set_auto_enable(true);
+   stepperA->setAutoEnable(true);
 }
 
 uint32_t dt = ABSOLUTE_MAX_TICKS;
@@ -89,7 +89,7 @@ void loop() {
   //          steps:                 2
   //          direction pin:         high
   //          vary dt on each step:  0   [*0.25us/Step]
-  if (stepperA->add_queue_entry(dt, 2, true, 0) == AQE_OK) {
+  if (stepperA->addQueueEntry(dt, 2, true, 0) == AQE_OK) {
      if (up) {
         dt -= dt / 100;
         if (dt < 16000000/40000) {
