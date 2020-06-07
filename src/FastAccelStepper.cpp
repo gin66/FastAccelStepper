@@ -216,9 +216,9 @@ void FastAccelStepper::_calculate_move(int32_t move) {
 
 #ifdef TEST
   printf(
-      "Ramp data: steps to move = %d  curr_ticks = %d travel_ticks = %d accel "
-      "= %d  Ramp steps = %d deceleration start = %u\n",
-      steps, curr_ticks, _min_travel_ticks, upm_to_u32(_upm_accel), ramp_steps,
+      "Ramp data: steps to move = %d  curr_ticks = %d travel_ticks = %d"
+      "Ramp steps = %d deceleration start = %u\n",
+      steps, curr_ticks, _min_travel_ticks, ramp_steps,
       deceleration_start);
 #endif
 }
@@ -265,8 +265,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   // Forward planning of minimum 10ms or more on slow speed.
 
 #ifdef TEST
-  printf("remaining=%u deceleration_start=%u accel=%d  planning steps=%d   ",
-         remaining_steps, _deceleration_start, upm_to_u32(_upm_accel),
+  printf("remaining=%u deceleration_start=%u planning steps=%d   ",
+         remaining_steps, _deceleration_start,
          planning_steps);
   switch (ramp_state) {
     case RAMP_STATE_COAST:
@@ -314,10 +314,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       }
 
 #ifdef TEST
-      v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
       printf("accelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
-      printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
+      printf("... %u+%u steps\n", _performed_ramp_up_steps,
              planning_steps);
 #endif
       break;
@@ -334,10 +333,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       next_ticks = max(next_ticks, curr_ticks);
 
 #ifdef TEST
-      v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
       printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
-      printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
+      printf("... %u+%u steps\n", _performed_ramp_up_steps,
              planning_steps);
 #endif
       break;
@@ -559,8 +557,6 @@ void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   _min_travel_ticks = min_step_us * 16;
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
-  _accel = accel;
-  _upm_accel = upm_from(accel);
   uint32_t tmp = TIMER_FREQ / 2;
   upm_float upm_inv_accel = upm_from(tmp / accel);
   _upm_inv_accel2 = multiply(UPM_TIMER_FREQ, upm_inv_accel);
