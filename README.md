@@ -13,7 +13,7 @@ The stepper motors should be connected via a driver IC (like 4988) with a 1, 2 o
         - Stepper drive enabled on LOW
 
 FastAccelStepper offers the following features:
-* 1-pin operation for e.g. peristaltic pump
+* 1-pin operation for e.g. peristaltic pump => only positive move
 * 2-pin operation for e.g. axis control
 * 3-pin operation for power reduction
 * supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
@@ -126,11 +126,15 @@ The low level command queue for each stepper allows direct speed control - when 
 
 * API stabilization
 * Better API documentation
-* ensure 1-pin operation consequently
 * Introduce command queue of speed/accel commands - one per stepper.
-* Change in direction requires motor stop !
-* Using constant acceleration leads to force jumps at start and max speed => smooth this out
+* Add command to set current position
 * Extend command queue entry to perform delay only without step (steps=0) to reduce the 3.8 steps/s
-* There are few clippings done to catch calculation error (not happening during test) => unclear cause
-* Performance on the stepper for slow speed does not meet test on pc => calculation error ?
+* Calculation on pc and on arduino do not create same commands. Queue checksum differ !
+	* There are few clippings done to catch calculation error (not happening during test) => unclear cause
+	* Performance on the stepper for slow speed does not meet test on pc => calculation error ?
+
+## NOT TODO
+
+* Change in direction requires motor stop ! => it's a feature
+* Using constant acceleration leads to force jumps at start and max speed => smooth this out => will not happen
 

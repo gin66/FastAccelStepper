@@ -182,6 +182,9 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   if (move == 0) {
     return;
   }
+  if ((move < 0) && (dirPin == 255)) {
+	  return;
+  }
   uint32_t steps = abs(move);
 
   uint32_t curr_ticks = _ticks_at_queue_end;
