@@ -93,7 +93,6 @@ class FastAccelStepper {
   uint8_t _auto_enablePin;
   uint8_t _enablePin;
 
-  uint32_t _min_steps;         // in steps
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
 
   // used in interrupt routine isr_update_move
