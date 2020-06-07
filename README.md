@@ -116,7 +116,7 @@ After stepper movement is completed, the timer compare unit is disconnected from
 
 The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is 4,194,303. At 16 MHz this comes down to 0.2621s. Thus the speed is limited down to approx 3.82 steps/s.
 
-The acceleration/deacceration interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
+The acceleration/deacceleration interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 
