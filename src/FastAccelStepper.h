@@ -10,8 +10,8 @@
 #include <stdint.h>
 #include "PoorManFloat.h"
 
-#define MIN_DELTA_TICKS (16000000L/50000)
-#define ABSOLUTE_MAX_TICKS (255L*16384+65535L)
+#define MIN_DELTA_TICKS (16000000L / 50000)
+#define ABSOLUTE_MAX_TICKS (255L * 16384 + 65535L)
 
 class FastAccelStepper {
  public:
@@ -34,7 +34,7 @@ class FastAccelStepper {
 
   // stepper queue management (low level access)
   inline int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
-                             bool dir_high, int16_t change_ticks);
+                           bool dir_high, int16_t change_ticks);
   // Return codes for add_queue_entry
 #define AQE_OK 0
 #define AQE_FULL -1
@@ -64,10 +64,7 @@ class FastAccelStepper {
   //  If for example the speed should ramp up from 0 to 10000 steps/s within
   //  10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
   //
-  //  If the speed should ramp up from 0 to 10000 steps/s within 0.01s,
-  //  then the acceleration is 10000 steps/s / 0.01s = 100000 steps/s²
-  //  This value is above the max value of an uint16_t (65535).
-  void setAcceleration(uint16_t step_s_s);
+  void setAcceleration(uint32_t step_s_s);
 
 #define RAMP_STATE_IDLE 0
 #define RAMP_STATE_ACCELERATE 1
@@ -101,7 +98,7 @@ class FastAccelStepper {
 
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps
-  uint16_t _accel;
+  uint32_t _accel;
   upm_float _upm_accel;
   upm_float _upm_inv_accel2;
 

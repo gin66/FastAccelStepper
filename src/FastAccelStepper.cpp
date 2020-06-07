@@ -73,8 +73,8 @@ bool FastAccelStepper::isStopped() { return _ticks_at_queue_end == 0; }
 void FastAccelStepper::addQueueStepperStop() { _ticks_at_queue_end = 0; }
 //*************************************************************************************************
 inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
-                                             uint8_t steps, bool dir_high,
-                                             int16_t change_ticks) {
+                                           uint8_t steps, bool dir_high,
+                                           int16_t change_ticks) {
   int32_t c_sum = 0;
   if (steps >= 128) {
     return AQE_STEPS_ERROR;
@@ -288,8 +288,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   uint32_t curr_ticks = _ticks_at_queue_end;
   if (ramp_state == RAMP_STATE_COAST) {
     next_ticks = _min_travel_ticks;
-  }
-  else if (ramp_state == RAMP_STATE_ACCELERATE) {
+  } else if (ramp_state == RAMP_STATE_ACCELERATE) {
     uint32_t upm_rem_steps =
         upm_from(_performed_ramp_up_steps + planning_steps);
     upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
@@ -300,11 +299,10 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     next_ticks = max(d_ticks_new, _min_travel_ticks);
     if (_performed_ramp_up_steps == 0) {
       curr_ticks = d_ticks_new;
-    }
-	else {
+    } else {
       // CLIPPING: avoid increase
       next_ticks = min(next_ticks, curr_ticks);
-	}
+    }
 
 #ifdef TEST
     float v2 = 1.0 * (_performed_ramp_up_steps + planning_steps) * _accel * 2.0;
@@ -313,8 +311,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
            planning_steps);
 #endif
-  }
-  else if (ramp_state == RAMP_STATE_DECELERATE) {
+  } else if (ramp_state == RAMP_STATE_DECELERATE) {
     uint32_t upm_rem_steps =
         upm_from(_performed_ramp_up_steps + planning_steps);
     upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
@@ -334,8 +331,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     printf("... v²=%.1f @ %u+%u steps\n", v2, _performed_ramp_up_steps,
            planning_steps);
 #endif
-  }
-  else if (ramp_state == RAMP_STATE_DECELERATE_TO_STOP) {
+  } else if (ramp_state == RAMP_STATE_DECELERATE_TO_STOP) {
     uint32_t upm_rem_steps = upm_from(remaining_steps - planning_steps);
     upm_float upm_d_ticks_new = sqrt(divide(_upm_inv_accel2, upm_rem_steps));
 
@@ -429,7 +425,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       steps, curr_ticks, target_pos, remaining_steps, change, res,
       _ticks_at_queue_end);
 #endif
-  if (res != 0) { // Emergency stop on internal error
+  if (res != 0) {  // Emergency stop on internal error
     addQueueStepperStop();
     ramp_state = RAMP_STATE_IDLE;
     isr_speed_control_enabled = false;
@@ -541,7 +537,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   _min_travel_ticks = min_step_us * 16;
 }
-void FastAccelStepper::setAcceleration(uint16_t accel) {
+void FastAccelStepper::setAcceleration(uint32_t accel) {
   _accel = accel;
   _upm_accel = upm_from(accel);
   uint32_t tmp = TIMER_FREQ / 2;
