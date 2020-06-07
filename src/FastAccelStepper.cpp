@@ -348,6 +348,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #endif
   }
 
+  // CLIPPING: avoid increase
+  next_ticks = min(next_ticks, ABSOLUTE_MAX_TICKS);
+
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t total_steps = planning_steps;
 #ifdef TEST
@@ -394,10 +397,18 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   bool dir = remaining_steps > 0;
 
 #ifdef TEST
-  printf(
-      "Issue %d commands for %d steps with %d steps per command for total "
-      "change %d and %d change per step\n",
-      command_cnt, steps, steps_per_command, total_change, change);
+  if (steps > 1) {
+    printf(
+        "Issue %d commands for %d steps with %d steps/command for total "
+        "change %d and %d change/step and start with %u ticks\n",
+        command_cnt, steps, steps_per_command, total_change, change,
+        curr_ticks);
+  } else {
+    printf(
+        "Issue %d command for %d steps "
+        "and start with %u ticks\n",
+        command_cnt, steps, curr_ticks);
+  }
 #endif
 
   uint32_t sum_dt = 0;

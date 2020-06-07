@@ -11,7 +11,7 @@
 #include "PoorManFloat.h"
 
 #define MIN_DELTA_TICKS (16000000L / 50000)
-#define ABSOLUTE_MAX_TICKS (255L * 16384 + 65535L)
+#define ABSOLUTE_MAX_TICKS (254L * 16384 + 32767)
 
 class FastAccelStepper {
  public:

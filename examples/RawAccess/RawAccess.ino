@@ -35,17 +35,16 @@ bool up = true;
 
 void loop() {
   if (stepper2->addQueueEntry(dt, 2, true, 0) == AQE_OK) {
-     if (up) {
-        dt -= dt / 100;
-        if (dt < 16000000/40000) {
-	        up = false;
-        }
-     }
-     else {
-        dt += 1;
-        if (dt == ABSOLUTE_MAX_TICKS) {
-	        up = true;
-        }
-     }
+    if (up) {
+      dt -= dt / 100;
+      if (dt < 16000000 / 40000) {
+        up = false;
+      }
+    } else {
+      dt += 1;
+      if (dt == ABSOLUTE_MAX_TICKS) {
+        up = true;
+      }
+    }
   }
 }
