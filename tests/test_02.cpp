@@ -212,7 +212,7 @@ int main() {
   basic_test_with_empty_queue();
   //             steps  ticks_us  accel    maxspeed  min/max_total_time
   test_with_pars(10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,
-                 2 * 2.0 + 46.0 + 1.0);  // ramp time 2s, 400 steps TODO
+                 2 * 2.0 + 46.0 + 2.0);  // ramp time 2s, 400 steps TODO
   test_with_pars(1600, 5000, 10000, true, 7.9,
                  8.1);  // ramp time 0.02s, 4 steps
   test_with_pars(1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1,
@@ -225,13 +225,15 @@ int main() {
       500, 50, 10000, false, 2 * 0.22 - 0.1,
       2 * 0.22 + 0.11);  // ramp time 2s, 20000 steps => only ramp 0.22s
   test_with_pars(128000, 250, 1000, true, 2 * 2.0 + 30.0 - 0.1,
-                 2 * 2.0 + 30.0 + 0.1 + 1.7);  // ramp time 4s, 8000 steps
+                 2 * 2.0 + 30.0 + 0.1 + 1.9);  // ramp time 4s, 8000 steps
   test_with_pars(72000, 250, 1000, true, 2 * 2.0 + 15.0 - 0.1,
                  2 * 2.0 + 15.0 + 0.1 + 2 * 1.7);  // ramp time 4s, 8000 steps
   test_with_pars(44000, 250, 1000, true, 2 * 2.0 + 7.5 - 0.1,
                  2 * 2.0 + 7.5 + 0.1 + 2 * 1.7);  // ramp time 4s, 8000 steps
   test_with_pars(16002, 250, 1000, true, 2 * 2.0 + 0.0 - 0.1,
                  2 * 2.0 + 0.0 + 0.1 + 4.0);  // ramp time 4s, 8000 steps
-  //  test_with_pars(1000, 20, 1000, false, 0.5, 1.0); // expect t = sqrt(500/a)
+  test_with_pars(1000, 20, 1000, false, 2*1.0-0.1, 2*1.0+0.1); // ramp time 50s => 2s
+  test_with_pars(500, 4000, 5, false, 2*1.0-0.1, 2*1.0+0.1); // ramp time 50s => 2s. jumps in speed in real
+//  test_with_pars(2000000, 40, 40, false, 2*223.0, 2*223.0); // ramp time 625s, 7812500 steps
   printf("TEST_02 PASSED\n");
 }

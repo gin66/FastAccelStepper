@@ -102,8 +102,8 @@ inline int FastAccelStepper::add_queue_entry(uint32_t start_delta_ticks,
   uint16_t lsw;
   if (msb > 1) {
     msb--;
-    lsw = start_delta_ticks & 16383;
-    lsw |= 16384;
+    lsw = start_delta_ticks & 0x3fff;
+    lsw |= 0x4000;
   } else {
     msb = 0;
     lsw = start_delta_ticks;
@@ -428,6 +428,11 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       steps, curr_ticks, target_pos, remaining_steps, change, res,
       _ticks_at_queue_end);
 #endif
+  if (res != 0) { // Emergency stop on internal error
+    add_queue_stepper_stop();
+    ramp_state = RAMP_STATE_IDLE;
+    isr_speed_control_enabled = false;
+  }
   if (total_steps == abs(remaining_steps)) {
     add_queue_stepper_stop();
     ramp_state = RAMP_STATE_IDLE;
