@@ -131,6 +131,21 @@ inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
     e->delta_change = change_ticks;
     e->steps = (dir_high != _dir_high_at_queue_end) ? steps | 0x01 : steps;
     _dir_high_at_queue_end = dir_high;
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+	{
+	unsigned char *x = (unsigned char *)e;
+	for (uint8_t i = 0;i < sizeof(struct queue_entry);i++) {
+		if (checksum & 0x80) {
+			checksum<<= 1;
+			checksum ^= 0xde;
+		}
+		else {
+			checksum<<= 1;
+		}
+		checksum ^= *x++;
+	}
+	}
+#endif
     if (_channelA) {
       fas_q_next_writeptr_A = next_wp;
     } else {
@@ -240,7 +255,10 @@ inline void FastAccelStepper::isr_fill_queue() {
 }
 
 inline void FastAccelStepper::isr_single_fill_queue() {
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
+  // For run time measurement
   uint32_t runtime_us = micros();
+#endif
 
   // check state for acceleration/deceleration or deceleration to stop
   uint32_t remaining_steps = abs(target_pos - _pos_at_queue_end);
@@ -462,9 +480,11 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   puts("");
 #endif
 
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   runtime_us = micros() - runtime_us;
   max_micros = max(max_micros, runtime_us);
+#endif
 }
 ISR(TIMER1_OVF_vect) {
   // disable OVF interrupt to avoid nesting
@@ -492,7 +512,14 @@ ISR(TIMER1_OVF_vect) {
 }
 
 FastAccelStepper::FastAccelStepper(bool channelA) {
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
+  // For run time measurement
   max_micros = 0;
+#endif
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  checksum = 0;
+#endif
+
   target_pos = 0;
   isr_speed_control_enabled = false;
   ramp_state = RAMP_STATE_IDLE;

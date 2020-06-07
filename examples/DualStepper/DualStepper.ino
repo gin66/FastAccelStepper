@@ -163,8 +163,14 @@ void loop() {
     }
     Serial.print("  state=");
     Serial.print(stepper1->ramp_state);
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     Serial.print("  max/us=");
     Serial.print(stepper1->max_micros);
+#endif
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+    Serial.print("  checksum=");
+    Serial.print(stepper1->checksum);
+#endif
 
     Serial.print("  Stepper 2: ");
     Serial.print(stepper2->isr_speed_control_enabled ? " AUTO " : " MANU ");
@@ -176,8 +182,14 @@ void loop() {
     }
     Serial.print("  state=");
     Serial.print(stepper2->ramp_state);
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     Serial.print("  max/us=");
     Serial.print(stepper2->max_micros);
+#endif
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+    Serial.print("  checksum=");
+    Serial.print(stepper2->checksum);
+#endif
 
     Serial.print("  TCCR1A=");
     Serial.print(TCCR1A);

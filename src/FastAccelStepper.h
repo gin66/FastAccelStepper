@@ -10,6 +10,9 @@
 #include <stdint.h>
 #include "PoorManFloat.h"
 
+#define TEST_MEASURE_ISR_SINGLE_FILL 1
+#define TEST_CREATE_QUEUE_CHECKSUM 1
+
 #define MIN_DELTA_TICKS (16000000L / 50000)
 #define ABSOLUTE_MAX_TICKS (254L * 16384 + 32767)
 
@@ -79,7 +82,13 @@ class FastAccelStepper {
   inline void isr_single_fill_queue();  // MUST BE ONLY CALLED FROM THIS
                                         // MODULE'S INTERRUPT SERVICE ROUTINE !
 
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
+#endif
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  uint8_t checksum;
+#endif
+
 
  private:
   uint8_t _dirPin;

@@ -218,6 +218,9 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
   printf(" %f\n", 1.0*rc.total_ticks / 16000000.0);
   test(abs(up_time - down_time) < 0.5*(up_time + down_time) * allowed_ramp_time_delta, "assymmetric ramp");
   test(s.isStopped(), "is not stopped");
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
+#endif
 }
 
 int main() {
