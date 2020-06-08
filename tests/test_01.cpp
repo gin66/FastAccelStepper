@@ -121,6 +121,7 @@ void end_pos_test() {
 }
 
 int main() {
+  assert(sizeof(struct queue_entry) == 6);
   basic_test();
   queue_out_of_range();
   queue_full();
