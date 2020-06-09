@@ -1,6 +1,11 @@
 #include <stdint.h>
 #include "PoorManFloat.h"
 
+//
+// This file can be renamed to a .ino and compiled as sketch to be run on the target e.g. arduino nano.
+//
+
+
 #ifdef TEST
 #include <assert.h>
 #include <stdio.h>
