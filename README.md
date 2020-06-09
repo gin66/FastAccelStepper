@@ -1,5 +1,4 @@
 # FastAccelStepper 
-## LATEST VERSION 0.3.9 (in case Library Manager offers only 0.1.2)
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). It makes use of the 16 bit Timer 1 ot the Atmega 328 and as such supports one or two stepper motors.
 
