@@ -14,9 +14,13 @@
 uint8_t fas_ledPin = 255;  // 255 if led blinking off
 uint16_t fas_debug_led_cnt = 0;
 
-#define TIMER_FREQ 16000000
+#define TIMER_FREQ F_CPU
+#if (TIMER_FREQ == 16000000)
 #define UPM_TIMER_FREQ ((upm_float)0x97f4)
-#define UPM_TIMER_FREQ2 ((upm_float)0xafe8)
+#else
+upm_float upm_timer_freq;
+#define UPM_TIMER_FREQ upm_timer_freq
+#endif
 
 FastAccelStepper fas_stepperA = FastAccelStepper(true);
 FastAccelStepper fas_stepperB = FastAccelStepper(false);
@@ -30,6 +34,10 @@ FastAccelStepper fas_stepperB = FastAccelStepper(false);
 //*************************************************************************************************
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
+#if (TIMER_FREQ != 16000000)
+	upm_timer_freq = upm_from(TIMER_FREQ); 
+	upm_timer_freq2 = shr(multiply(upm_timer_freq2, upm_timer_freq2),1); 
+#endif
   fas_stepperA.isr_speed_control_enabled = false;
   fas_stepperB.isr_speed_control_enabled = false;
   noInterrupts();
@@ -587,7 +595,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   }
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
-  _min_travel_ticks = min_step_us * 16;
+  _min_travel_ticks = min_step_us * (TIMER_FREQ/1000L) / 1000L;
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
   uint32_t tmp = TIMER_FREQ / 2;
