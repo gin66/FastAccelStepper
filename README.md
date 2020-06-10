@@ -18,13 +18,14 @@ FastAccelStepper offers the following features:
 * 3-pin operation for power reduction
 * supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * allows up to roughly 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
-* Lower limit of 3.8 steps/s
+* Lower limit of 3.8 steps/s @ 16MHz
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * speed/acceleration can be varied while stepper is running (need call to move/moveTo for application of new values, not done implicitly)
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
-* Provide API to each stepper's command queue (can hold 15 commands)
+* Provide API to each stepper's command queue (can hold 15 commands). Those commands are tied to timer ticks aka the CPU frequency!
+* Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency
 
 The library is in use with A4988, but other driver ICs could work, too.
 
@@ -89,11 +90,12 @@ void loop() {
   //          steps:                 2
   //          direction pin:         high
   //          vary dt on each step:  0   [*0.25us/Step]
-  if (stepperA->addQueueEntry(dt, 2, true, 0) == AQE_OK) {
+  uint8_t steps = min(max(100000L/dt,1), 127);
+  if (stepperA->addQueueEntry(dt, steps, true, 0) == AQE_OK) {
      if (up) {
         dt -= dt / 100;
-        if (dt < 16000000/40000) {
-	        up = false;
+        if (dt < F_CPU/40000) { // 40000 steps/s
+            up = false;
         }
      }
      else {
@@ -114,7 +116,7 @@ The timer compare unit toggles the step pin from Low to High precisely. The tran
 
 After stepper movement is completed, the timer compare unit is disconnected from the step pin. Thus the application could change the state freely, while the stepper is not controlled by this library.
 
-The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is 4,194,303. At 16 MHz this comes down to 0.2621s. Thus the speed is limited down to approx 3.82 steps/s.
+The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is 4,194,303. At 16 MHz this comes down to 0.2621s. Thus the lower speed limit is approx 3.82 steps/s.
 
 The acceleration/deacceleration aka timer overflow interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
