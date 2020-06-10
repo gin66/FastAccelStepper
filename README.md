@@ -10,7 +10,7 @@ The stepper motors should be connected via a driver IC (like 4988) with a 1, 2 o
 	- This can be any port pin.
 * Enable Signal (optional)
 	- This can be any port pin.
-        - Stepper drive enabled on LOW
+    - Stepper shall be enabled on LOW
 
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
