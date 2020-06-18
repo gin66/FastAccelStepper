@@ -434,7 +434,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     curr_ticks += change;
   }
 
-  bool dir = remaining_steps > 0;
+  bool dir = target_pos > _pos_at_queue_end;
 
 #ifdef TEST
   if (steps > 1) {
