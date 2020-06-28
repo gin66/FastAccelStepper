@@ -171,7 +171,7 @@ upm_float multiply(upm_float x, upm_float y) {
   return (((uint16_t) exponent) << 8) | mant;
 }
 upm_float square(upm_float x) {
-  uint8_t a = x & 255;
+  uint16_t a = x & 0x00ff;
   uint16_t aa = a * a;
   if (aa & 0x8000) {
     aa >>= 8;
