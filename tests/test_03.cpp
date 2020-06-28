@@ -348,11 +348,21 @@ void perform_test() {
   x = multiply(x1, x1);
   back = upm_to_u32(x);
   xprintf("multiply(%x,%x)=0x%x (%d)\n", x1, x1, x, back);
-  test(back == 30208, "square");
+  test(back == 30208, "multiply x*x");
   x = square(x1);
   back = upm_to_u32(x);
   xprintf("square(%x)=0x%x (%d)\n", x1, x, back);
-  test(back == 30208, "sqrt");
+  test(back == 30208, "square");
+
+  x1 = upm_from((uint32_t)(6400));
+  x = multiply(x1, x1);
+  back = upm_to_u32(x);
+  xprintf("multiply(%x,%x)=0x%x (%d)\n", x1, x1, x, back);
+  test(back == 40894464, "multiply x*x");
+  x = square(x1);
+  back = upm_to_u32(x);
+  xprintf("square(%x)=0x%x (%d)\n", x1, x, back);
+  test(back == 40894464, "square");
 
 #ifdef TEST
   xprintf("TEST_03 PASSED\n");
