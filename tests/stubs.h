@@ -1,6 +1,7 @@
 #ifndef STUBS_H
 #define STUBS_H
 
+#define F_CPU 16000000L
 #define PROGMEM
 #define pgm_read_byte_near(x) (*(x))
 
