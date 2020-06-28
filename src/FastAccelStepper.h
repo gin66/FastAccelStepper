@@ -1,4 +1,4 @@
-#if defined(ARDUINO_ARCH_AVR) || defined(TEST)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || defined(TEST)
 #ifndef TEST
 #include <Arduino.h>
 #else
@@ -91,6 +91,7 @@ class FastAccelStepper {
 
 
  private:
+  bool _is_used;
   uint8_t _dirPin;
   int32_t _pos_at_queue_end;    // in steps
   int32_t _ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
@@ -117,6 +118,17 @@ class FastAccelStepperEngine {
  public:
   // stable API functions
   void init();
+
+  // ESP32:
+  // The first three steppers use mcpwm0, the next three steppers use mcpwm1
+  //
+  // AVR:
+  // Only the pins connected to OC1A and OC1B are allowed
+  //
+  // If no stepper resources available or pin is wrong, then NULL is returned
+  FastAccelStepper* stepperConnectToPin(uint8_t pin);
+
+  // deprecated API functions
   FastAccelStepper* stepperA();
   FastAccelStepper* stepperB();
 
@@ -127,5 +139,5 @@ class FastAccelStepperEngine {
   void setDebugLed(uint8_t ledPin);
 };
 #else
-#error “This library only supports boards with an AVR processor.”
+#error “This library only supports boards with an AVR or ESP32 processor.”
 #endif

@@ -55,6 +55,22 @@ void FastAccelStepperEngine::init() {
   interrupts();
 }
 //*************************************************************************************************
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t pin) {
+	if (pin == 9) {
+	   if (!fas_stepperA._is_used) {
+		  fas_stepperA._is_used = true;
+	      return &fas_stepperA;
+	   }
+	}
+	if (pin == 10) {
+	   if (!fas_stepperB._is_used) {
+		  fas_stepperB._is_used = true;
+	      return &fas_stepperB;
+	   }
+	}
+	return NULL;
+}
+//*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperA() { return &fas_stepperA; }
 //*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperB() { return &fas_stepperB; }
