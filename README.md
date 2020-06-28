@@ -132,6 +132,8 @@ The low level command queue for each stepper allows direct speed control - when 
 * Add command to set current position
 * Extend command queue entry to perform delay only without step (steps=0) to reduce the 3.8 steps/s
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ !
+* Add ESP32 as target
+* Support different values for acceleration and deceleration
 
 ## NOT TODO
 
