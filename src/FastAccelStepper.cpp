@@ -37,8 +37,8 @@ FastAccelStepper fas_stepperB = FastAccelStepper(0, stepPinStepperB);
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
 #if (TIMER_FREQ != 16000000)
-	upm_timer_freq = upm_from(TIMER_FREQ); 
-	upm_timer_freq2 = shr(multiply(upm_timer_freq2, upm_timer_freq2),1); 
+  upm_timer_freq = upm_from(TIMER_FREQ);
+  upm_timer_freq2 = shr(multiply(upm_timer_freq2, upm_timer_freq2), 1);
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   fas_stepperA.isr_speed_control_enabled = false;
@@ -61,22 +61,22 @@ void FastAccelStepperEngine::init() {
 //*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t pin) {
 #if defined(ARDUINO_ARCH_AVR)
-	if (pin == 9) {
-	   if (!fas_stepperA._is_used) {
-		  fas_stepperA._is_used = true;
-	      return &fas_stepperA;
-	   }
-	}
-	if (pin == 10) {
-	   if (!fas_stepperB._is_used) {
-		  fas_stepperB._is_used = true;
-	      return &fas_stepperB;
-	   }
-	}
+  if (pin == 9) {
+    if (!fas_stepperA._is_used) {
+      fas_stepperA._is_used = true;
+      return &fas_stepperA;
+    }
+  }
+  if (pin == 10) {
+    if (!fas_stepperB._is_used) {
+      fas_stepperB._is_used = true;
+      return &fas_stepperB;
+    }
+  }
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #endif
-	return NULL;
+  return NULL;
 }
 //*************************************************************************************************
 #if defined(ARDUINO_ARCH_AVR)
@@ -165,19 +165,18 @@ inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
     e->steps = (dir_high != _dir_high_at_queue_end) ? steps | 0x01 : steps;
     _dir_high_at_queue_end = dir_high;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-	{
-	unsigned char *x = (unsigned char *)e;
-	for (uint8_t i = 0;i < sizeof(struct queue_entry);i++) {
-		if (checksum & 0x80) {
-			checksum<<= 1;
-			checksum ^= 0xde;
-		}
-		else {
-			checksum<<= 1;
-		}
-		checksum ^= *x++;
-	}
-	}
+    {
+      unsigned char* x = (unsigned char*)e;
+      for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
+        if (checksum & 0x80) {
+          checksum <<= 1;
+          checksum ^= 0xde;
+        } else {
+          checksum <<= 1;
+        }
+        checksum ^= *x++;
+      }
+    }
 #endif
     if (_stepper_num == 1) {
       fas_q_next_writeptr_A = next_wp;
@@ -216,7 +215,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
     return;
   }
   if ((move < 0) && (_dirPin == 255)) {
-	  return;
+    return;
   }
   uint32_t steps = abs(move);
 
@@ -271,16 +270,18 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   printf(
       "Ramp data: steps to move = %d  curr_ticks = %d travel_ticks = %d "
       "Ramp steps = %d Performed ramp steps = %d deceleration start = %u\n",
-      steps, curr_ticks, _min_travel_ticks, ramp_steps,
-      performed_ramp_up_steps, deceleration_start);
+      steps, curr_ticks, _min_travel_ticks, ramp_steps, performed_ramp_up_steps,
+      deceleration_start);
 #endif
 #ifdef DEBUG
   char buf[256];
-   sprintf(buf,"Ramp data: steps to move = %ld  curr_ticks = %ld travel_ticks = %ld "
+  sprintf(
+      buf,
+      "Ramp data: steps to move = %ld  curr_ticks = %ld travel_ticks = %ld "
       "Ramp steps = %ld Performed ramp steps = %ld deceleration start = %lu\n",
-      steps, curr_ticks, _min_travel_ticks, ramp_steps,
-      performed_ramp_up_steps, deceleration_start);
-   Serial.println(buf);
+      steps, curr_ticks, _min_travel_ticks, ramp_steps, performed_ramp_up_steps,
+      deceleration_start);
+  Serial.println(buf);
 #endif
 }
 
@@ -330,8 +331,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
 #ifdef TEST
   printf("remaining=%u deceleration_start=%u planning steps=%d   ",
-         remaining_steps, _deceleration_start,
-         planning_steps);
+         remaining_steps, _deceleration_start, planning_steps);
   switch (ramp_state) {
     case RAMP_STATE_COAST:
       printf("COAST");
@@ -359,8 +359,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     upm_float upm_d_ticks_new;
     case RAMP_STATE_COAST:
       next_ticks = _min_travel_ticks;
-	  // do not overshoot ramp down start
-	  planning_steps = min(planning_steps, remaining_steps - _deceleration_start);
+      // do not overshoot ramp down start
+      planning_steps =
+          min(planning_steps, remaining_steps - _deceleration_start);
       break;
     case RAMP_STATE_ACCELERATE:
       upm_rem_steps = upm_from(_performed_ramp_up_steps + planning_steps);
@@ -380,8 +381,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #ifdef TEST
       printf("accelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
-      printf("... %u+%u steps\n", _performed_ramp_up_steps,
-             planning_steps);
+      printf("... %u+%u steps\n", _performed_ramp_up_steps, planning_steps);
 #endif
       break;
     case RAMP_STATE_DECELERATE:
@@ -399,8 +399,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #ifdef TEST
       printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
-      printf("... %u+%u steps\n", _performed_ramp_up_steps,
-             planning_steps);
+      printf("... %u+%u steps\n", _performed_ramp_up_steps, planning_steps);
 #endif
       break;
     case RAMP_STATE_DECELERATE_TO_STOP:
@@ -630,7 +629,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   }
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
-  _min_travel_ticks = min_step_us * (TIMER_FREQ/1000L) / 1000L;
+  _min_travel_ticks = min_step_us * (TIMER_FREQ / 1000L) / 1000L;
   _update_ramp_steps();
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {

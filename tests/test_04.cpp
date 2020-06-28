@@ -80,9 +80,9 @@ void RampChecker::check_section(struct queue_entry *e) {
     accelerate_till = total_ticks;
     decrease_ok = true;
   } else if (last_dt < start_dt) {
-	if (increase_ok) {
+    if (increase_ok) {
       coast_till = total_ticks;
-	}
+    }
     assert(decrease_ok);
     increase_ok = false;
   }
@@ -107,7 +107,7 @@ void init_queue() {
 
 int main() {
   init_queue();
-  FastAccelStepper s = FastAccelStepper(1,0);
+  FastAccelStepper s = FastAccelStepper(1, 0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 
@@ -126,13 +126,13 @@ int main() {
   float old_planned_time_in_buffer = 0;
   int speed_increased = false;
   for (int i = 0; i < steps; i++) {
-	if (!speed_increased && (s.getCurrentPosition() >= 5000)) {
-	   puts("Change speed");
-       s.isr_fill_queue(); // ensure queue is no empty
-	   speed_increased = true;
-       s.setSpeed(300);
-       s.move(steps);
-	}
+    if (!speed_increased && (s.getCurrentPosition() >= 5000)) {
+      puts("Change speed");
+      s.isr_fill_queue();  // ensure queue is no empty
+      speed_increased = true;
+      s.setSpeed(300);
+      s.move(steps);
+    }
     if (true) {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "

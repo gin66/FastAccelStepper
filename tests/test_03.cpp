@@ -2,15 +2,15 @@
 #include "PoorManFloat.h"
 
 //
-// This file can be renamed to a .ino and compiled as sketch to be run on the target e.g. arduino nano.
+// This file can be renamed to a .ino and compiled as sketch to be run on the
+// target e.g. arduino nano.
 //
-
 
 #ifdef TEST
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#define xprintf  printf
+#define xprintf printf
 #define test(x, msg) \
   if (!(x)) {        \
     puts(msg);       \
@@ -20,21 +20,21 @@
 #include <Arduino.h>
 uint16_t error_cnt = 0;
 char buffer[256];
-#define xprintf(...) { \
-	sprintf(buffer, __VA_ARGS__); \
-	Serial.print(buffer); \
-}
-#define test(x, msg) \
-  if (!(x)) {        \
-	error_cnt++; \
-    Serial.print("ERROR: ");       \
-    Serial.println(__LINE__);       \
-  } else { \
-    Serial.print("OK: ");       \
-    Serial.println(__LINE__);       \
+#define xprintf(...)              \
+  {                               \
+    sprintf(buffer, __VA_ARGS__); \
+    Serial.print(buffer);         \
+  }
+#define test(x, msg)          \
+  if (!(x)) {                 \
+    error_cnt++;              \
+    Serial.print("ERROR: ");  \
+    Serial.println(__LINE__); \
+  } else {                    \
+    Serial.print("OK: ");     \
+    Serial.println(__LINE__); \
   };
 #endif
-
 
 void perform_test() {
   upm_float x;
@@ -368,19 +368,16 @@ void perform_test() {
   xprintf("TEST_03 PASSED\n");
 #else
   if (error_cnt == 0) {
-	  Serial.println("TEST PASSED");
-  }
-  else {
-	  Serial.print("TEST FAILED: ");
-	  Serial.print(error_cnt);
-	  Serial.println(" errors");
+    Serial.println("TEST PASSED");
+  } else {
+    Serial.print("TEST FAILED: ");
+    Serial.print(error_cnt);
+    Serial.println(" errors");
   }
 #endif
 }
 #ifdef TEST
-int main() {
-	perform_test();
-}
+int main() { perform_test(); }
 #else
 void setup() {
   Serial.begin(115200);
@@ -388,6 +385,5 @@ void setup() {
   perform_test();
 }
 
-void loop() {
-}
+void loop() {}
 #endif

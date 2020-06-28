@@ -91,7 +91,6 @@ class FastAccelStepper {
   uint8_t checksum;
 #endif
 
-
  private:
   bool _is_used;
 
@@ -119,7 +118,7 @@ class FastAccelStepper {
   uint8_t _stepper_num;
 
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
-  uint32_t _ramp_steps; // ramp steps from 0 to max speed
+  uint32_t _ramp_steps;        // ramp steps from 0 to max speed
 
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps

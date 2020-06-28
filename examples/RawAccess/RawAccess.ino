@@ -34,11 +34,11 @@ uint32_t dt = ABSOLUTE_MAX_TICKS;
 bool up = true;
 
 void loop() {
-  uint8_t steps = min(max(100000L/dt,1), 127);
+  uint8_t steps = min(max(100000L / dt, 1), 127);
   if (stepper2->addQueueEntry(dt, steps, true, 0) == AQE_OK) {
     if (up) {
       dt -= dt / 100;
-      if (dt < F_CPU/40000) { // 40000 steps/s
+      if (dt < F_CPU / 40000) {  // 40000 steps/s
         up = false;
       }
     } else {
