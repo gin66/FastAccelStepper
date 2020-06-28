@@ -23,8 +23,8 @@ upm_float upm_timer_freq;
 #endif
 
 #if defined(ARDUINO_ARCH_AVR)
-FastAccelStepper fas_stepperA = FastAccelStepper(true);
-FastAccelStepper fas_stepperB = FastAccelStepper(false);
+FastAccelStepper fas_stepperA = FastAccelStepper(1, stepPinStepperA);
+FastAccelStepper fas_stepperB = FastAccelStepper(0, stepPinStepperB);
 #endif
 
 //*************************************************************************************************
@@ -145,7 +145,7 @@ inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
   uint8_t wp;
   uint8_t rp;
   struct queue_entry* e;
-  if (_channelA) {
+  if (_stepper_num == 1) {
     wp = fas_q_next_writeptr_A;
     rp = fas_q_readptr_A;
     e = &fas_queue_A[wp];
@@ -179,7 +179,7 @@ inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
 	}
 	}
 #endif
-    if (_channelA) {
+    if (_stepper_num == 1) {
       fas_q_next_writeptr_A = next_wp;
     } else {
       fas_q_next_writeptr_B = next_wp;
@@ -559,7 +559,7 @@ ISR(TIMER1_OVF_vect) {
 }
 #endif
 
-FastAccelStepper::FastAccelStepper(bool channelA) {
+FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   max_micros = 0;
@@ -571,19 +571,19 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
   target_pos = 0;
   isr_speed_control_enabled = false;
   ramp_state = RAMP_STATE_IDLE;
-  _channelA = channelA;
+  _stepper_num = num;
   _auto_enablePin = 255;
   _pos_at_queue_end = 0;
   _dir_high_at_queue_end = true;
   _min_travel_ticks = 0;
   _ticks_at_queue_end = 0;
 
-  uint8_t pin = _channelA ? stepPinStepperA : stepPinStepperB;
-  digitalWrite(pin, LOW);
-  pinMode(pin, OUTPUT);
+  digitalWrite(step_pin, LOW);
+  pinMode(step_pin, OUTPUT);
 
+#if defined(ARDUINO_ARCH_AVR)
   // start interrupt
-  if (channelA) {
+  if (_stepper_num == 1) {
     noInterrupts();
     OCR1A = 32768;  // definite start point
     StepperA_Disconnect;
@@ -600,12 +600,13 @@ FastAccelStepper::FastAccelStepper(bool channelA) {
     TIMSK1 |= _BV(OCIE1B);  // enable compare B interrupt
     interrupts();
   }
+#endif
 }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;
   digitalWrite(dirPin, HIGH);
   pinMode(dirPin, OUTPUT);
-  if (_channelA) {
+  if (_stepper_num == 1) {
     fas_dirPin_A = dirPin;
   } else {
     fas_dirPin_B = dirPin;
@@ -622,7 +623,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   } else {
     _auto_enablePin = 255;
   }
-  if (_channelA) {
+  if (_stepper_num == 1) {
     fas_autoEnablePin_A = _auto_enablePin;
   } else {
     fas_autoEnablePin_B = _auto_enablePin;
@@ -671,7 +672,7 @@ int32_t FastAccelStepper::getCurrentPosition() {
   struct queue_entry* q;
   uint8_t rp, wp;
   noInterrupts();
-  if (_channelA) {
+  if (_stepper_num == 1) {
     q = fas_queue_A;
     rp = fas_q_readptr_A;
     wp = fas_q_next_writeptr_A;
@@ -699,7 +700,7 @@ int32_t FastAccelStepper::getCurrentPosition() {
 }
 bool FastAccelStepper::isQueueFull() {
   bool full;
-  if (_channelA) {
+  if (_stepper_num == 1) {
     full = (((fas_q_next_writeptr_A + 1) & QUEUE_LEN_MASK) == fas_q_readptr_A);
   } else {
     full = (((fas_q_next_writeptr_B + 1) & QUEUE_LEN_MASK) == fas_q_readptr_B);
@@ -708,7 +709,7 @@ bool FastAccelStepper::isQueueFull() {
 }
 bool FastAccelStepper::isQueueEmpty() {
   bool empty;
-  if (_channelA) {
+  if (_stepper_num == 1) {
     empty = (fas_q_readptr_A == fas_q_next_writeptr_A);
   } else {
     empty = (fas_q_readptr_B == fas_q_next_writeptr_B);

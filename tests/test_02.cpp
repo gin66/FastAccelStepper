@@ -107,7 +107,7 @@ void init_queue() {
 
 void basic_test_with_empty_queue() {
   init_queue();
-  FastAccelStepper s = FastAccelStepper(true);
+  FastAccelStepper s = FastAccelStepper(1,0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 
@@ -148,7 +148,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
   printf("Test test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", steps,
          travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
-  FastAccelStepper s = FastAccelStepper(true);
+  FastAccelStepper s = FastAccelStepper(1,0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 

@@ -13,13 +13,15 @@
 #define TEST_MEASURE_ISR_SINGLE_FILL 0
 #define TEST_CREATE_QUEUE_CHECKSUM 0
 
-#define MIN_DELTA_TICKS (16000000L / 50000)
+#define MIN_DELTA_TICKS (F_CPU / 50000)
 #define ABSOLUTE_MAX_TICKS (254L * 16384 + 32767)
 
 class FastAccelStepper {
  public:
+  // This should be only called by FastAccelStepperEngine !
+  FastAccelStepper(uint8_t num, uint8_t step_pin);
+
   // stable API functions
-  FastAccelStepper(bool channelA);
   void setDirectionPin(uint8_t dirPin);
   void setEnablePin(uint8_t enablePin);
 
@@ -92,7 +94,11 @@ class FastAccelStepper {
 
  private:
   bool _is_used;
+
   uint8_t _dirPin;
+  uint8_t _auto_enablePin;
+  uint8_t _enablePin;
+
   int32_t _pos_at_queue_end;    // in steps
   int32_t _ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
   bool _dir_high_at_queue_end;  // direction high corresponds to position
@@ -100,9 +106,17 @@ class FastAccelStepper {
 
   void _calculate_move(int32_t steps);
   void _update_ramp_steps();
-  bool _channelA;
-  uint8_t _auto_enablePin;
-  uint8_t _enablePin;
+
+  // stepper_num's meaning depends on processor type:
+  //		AVR:	0 => OC1B
+  //		    	1 => OC1A
+  //		ESP32:	0 => MCPWM0 Timer 0
+  //				1 => MCPWM0 Timer 1
+  //				2 => MCPWM0 Timer 2
+  //				3 => MCPWM1 Timer 0
+  //				4 => MCPWM1 Timer 1
+  //				5 => MCPWM1 Timer 2
+  uint8_t _stepper_num;
 
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
   uint32_t _ramp_steps; // ramp steps from 0 to max speed
