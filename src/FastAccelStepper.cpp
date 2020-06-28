@@ -22,8 +22,10 @@ upm_float upm_timer_freq;
 #define UPM_TIMER_FREQ upm_timer_freq
 #endif
 
+#if defined(ARDUINO_ARCH_AVR)
 FastAccelStepper fas_stepperA = FastAccelStepper(true);
 FastAccelStepper fas_stepperB = FastAccelStepper(false);
+#endif
 
 //*************************************************************************************************
 //*************************************************************************************************
@@ -38,6 +40,7 @@ void FastAccelStepperEngine::init() {
 	upm_timer_freq = upm_from(TIMER_FREQ); 
 	upm_timer_freq2 = shr(multiply(upm_timer_freq2, upm_timer_freq2),1); 
 #endif
+#if defined(ARDUINO_ARCH_AVR)
   fas_stepperA.isr_speed_control_enabled = false;
   fas_stepperB.isr_speed_control_enabled = false;
   noInterrupts();
@@ -53,9 +56,11 @@ void FastAccelStepperEngine::init() {
   TIMSK1 |= _BV(TOIE1);
 
   interrupts();
+#endif
 }
 //*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t pin) {
+#if defined(ARDUINO_ARCH_AVR)
 	if (pin == 9) {
 	   if (!fas_stepperA._is_used) {
 		  fas_stepperA._is_used = true;
@@ -68,12 +73,16 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t pin) {
 	      return &fas_stepperB;
 	   }
 	}
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+#endif
 	return NULL;
 }
 //*************************************************************************************************
+#if defined(ARDUINO_ARCH_AVR)
 FastAccelStepper* FastAccelStepperEngine::stepperA() { return &fas_stepperA; }
-//*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperB() { return &fas_stepperB; }
+#endif
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
@@ -523,6 +532,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   max_micros = max(max_micros, runtime_us);
 #endif
 }
+#if defined(ARDUINO_ARCH_AVR)
 ISR(TIMER1_OVF_vect) {
   // disable OVF interrupt to avoid nesting
   TIMSK1 &= ~_BV(TOIE1);
@@ -547,6 +557,7 @@ ISR(TIMER1_OVF_vect) {
   // enable OVF interrupt again
   TIMSK1 |= _BV(TOIE1);
 }
+#endif
 
 FastAccelStepper::FastAccelStepper(bool channelA) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)

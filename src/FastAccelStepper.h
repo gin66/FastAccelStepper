@@ -128,9 +128,11 @@ class FastAccelStepperEngine {
   // If no stepper resources available or pin is wrong, then NULL is returned
   FastAccelStepper* stepperConnectToPin(uint8_t pin);
 
+#if defined(ARDUINO_ARCH_AVR)
   // deprecated API functions
   FastAccelStepper* stepperA();
   FastAccelStepper* stepperB();
+#endif
 
   // unstable API functions
   //
