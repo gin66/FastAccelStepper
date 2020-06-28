@@ -98,11 +98,13 @@ class FastAccelStepper {
                                 // counting upwards
 
   void _calculate_move(int32_t steps);
+  void _update_ramp_steps();
   bool _channelA;
   uint8_t _auto_enablePin;
   uint8_t _enablePin;
 
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
+  uint32_t _ramp_steps; // ramp steps from 0 to max speed
 
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps

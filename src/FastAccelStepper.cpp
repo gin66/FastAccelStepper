@@ -199,8 +199,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   uint32_t performed_ramp_up_steps;
   uint32_t deceleration_start;
   uint32_t upm_sq_min_travel;
-  uint32_t ramp_steps =
-      upm_to_u32(divide(_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
+  uint32_t ramp_steps = _ramp_steps;
   if ((curr_ticks == 0) || isQueueEmpty()) {
     // motor is not running
     //
@@ -245,10 +244,18 @@ void FastAccelStepper::_calculate_move(int32_t move) {
 
 #ifdef TEST
   printf(
-      "Ramp data: steps to move = %d  curr_ticks = %d travel_ticks = %d"
-      "Ramp steps = %d deceleration start = %u\n",
+      "Ramp data: steps to move = %d  curr_ticks = %d travel_ticks = %d "
+      "Ramp steps = %d Performed ramp steps = %d deceleration start = %u\n",
       steps, curr_ticks, _min_travel_ticks, ramp_steps,
-      deceleration_start);
+      performed_ramp_up_steps, deceleration_start);
+#endif
+#ifdef DEBUG
+  char buf[256];
+   sprintf(buf,"Ramp data: steps to move = %ld  curr_ticks = %ld travel_ticks = %ld "
+      "Ramp steps = %ld Performed ramp steps = %ld deceleration start = %lu\n",
+      steps, curr_ticks, _min_travel_ticks, ramp_steps,
+      performed_ramp_up_steps, deceleration_start);
+   Serial.println(buf);
 #endif
 }
 
@@ -596,11 +603,17 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   _min_travel_ticks = min_step_us * (TIMER_FREQ/1000L) / 1000L;
+  _update_ramp_steps();
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
   uint32_t tmp = TIMER_FREQ / 2;
   upm_float upm_inv_accel = upm_from(tmp / accel);
   _upm_inv_accel2 = multiply(UPM_TIMER_FREQ, upm_inv_accel);
+  _update_ramp_steps();
+}
+void FastAccelStepper::_update_ramp_steps() {
+  _ramp_steps =
+      upm_to_u32(divide(_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
 }
 void FastAccelStepper::move(int32_t move) {
   target_pos = _pos_at_queue_end + move;
