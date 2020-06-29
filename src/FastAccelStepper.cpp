@@ -1,9 +1,12 @@
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
 
+#if defined(ARDUINO_ARCH_AVR)
 #define stepPinStepperA 9  /* OC1A */
 #define stepPinStepperB 10 /* OC1B */
+#endif
 
+// This define in order to not shoot myself.
 #ifndef TEST
 #define printf DO_NOT_USE_PRINTF
 #endif
@@ -37,8 +40,7 @@ FastAccelStepper fas_stepperB = FastAccelStepper(0, stepPinStepperB);
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
 #if (TIMER_FREQ != 16000000)
-  upm_timer_freq = upm_from(TIMER_FREQ);
-  upm_timer_freq2 = shr(multiply(upm_timer_freq2, upm_timer_freq2), 1);
+  upm_timer_freq = upm_from((uint32_t)TIMER_FREQ);
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   fas_stepperA.isr_speed_control_enabled = false;
@@ -105,7 +107,7 @@ bool FastAccelStepper::isStopped() { return _ticks_at_queue_end == 0; }
 //*************************************************************************************************
 void FastAccelStepper::addQueueStepperStop() { _ticks_at_queue_end = 0; }
 //*************************************************************************************************
-inline int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
+int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
                                            uint8_t steps, bool dir_high,
                                            int16_t change_ticks) {
   int32_t c_sum = 0;

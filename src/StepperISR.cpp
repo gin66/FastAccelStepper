@@ -19,6 +19,7 @@ uint8_t fas_dirPin_B = 255;
 uint8_t fas_skip_A = 0;
 uint8_t fas_skip_B = 0;
 
+#if defined(ARDUINO_ARCH_AVR)
 ISR(TIMER1_COMPA_vect) {
   if (fas_skip_A) {
     if ((--fas_skip_A) == 0) {
@@ -128,3 +129,4 @@ ISR(TIMER1_COMPB_vect) {
     digitalWrite(fas_autoEnablePin_B, LOW);
   }
 }
+#endif

@@ -38,7 +38,7 @@ class FastAccelStepper {
   // unstable API functions
 
   // stepper queue management (low level access)
-  inline int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
+  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
                            bool dir_high, int16_t change_ticks);
   // Return codes for add_queue_entry
 #define AQE_OK 0
@@ -152,6 +152,11 @@ class FastAccelStepperEngine {
   // If this is called, then the periodic task will let the associated LED
   // blink with 1 Hz
   void setDebugLed(uint8_t ledPin);
+
+#if defined(ARDUINO_ARCH_ESP32)
+ private:
+  uint8_t _next_stepper_num;
+#endif
 };
 #else
 #error “This library only supports boards with an AVR or ESP32 processor.”

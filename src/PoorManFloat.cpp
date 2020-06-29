@@ -1,8 +1,12 @@
 #include <stdint.h>
 #ifdef TEST
 #include "stubs.h"
-#else
+#endif
+#if defined(ARDUINO_ARCH_AVR)
 #include <avr/pgmspace.h>
+#else
+#define PROGMEM
+#define pgm_read_byte_near(x) (*(x))
 #endif
 #include "PoorManFloat.h"
 
