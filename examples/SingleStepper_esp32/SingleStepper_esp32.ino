@@ -10,27 +10,56 @@
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = engine.stepperConnectToPin(stepPinStepper);
 
+#include <driver/pcnt.h>
 #include <driver/mcpwm.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 static void IRAM_ATTR mcpwm_isr(void *arg) {
+  // is invoked twice 
   uint32_t mcpwm_intr_status = MCPWM0.int_st.val;
-  uint32_t x = REG_READ(MCPWM_CLK_CFG_REG(0));
-  x = x - 1;
-  REG_WRITE(MCPWM_CLK_CFG_REG(0), x);
-  MCPWM0.int_clr.timer0_tez_int_clr = 1;
+  if (mcpwm_intr_status & MCPWM_TIMER0_TEZ_INT_CLR) {
+    uint8_t x = REG_READ(MCPWM_CLK_CFG_REG(0));
+    x = x - 1;
+    REG_WRITE(MCPWM_CLK_CFG_REG(0), x);
+    //MCPWM0.int_clr.timer0_tez_int_clr = 1;
+  }
+  else {
+    Serial.print("Spurious interrupt: ");
+    Serial.println(mcpwm_intr_status);
+  }
+  MCPWM0.int_clr.val = mcpwm_intr_status;
 }
 
 void pwm_setup() {
+
+  pcnt_config_t cfg;
+  cfg.pulse_gpio_num = LED_PIN;
+  cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
+  cfg.lctrl_mode = PCNT_MODE_KEEP;
+  cfg.hctrl_mode = PCNT_MODE_KEEP;
+  cfg.pos_mode = PCNT_COUNT_INC;
+  cfg.neg_mode = PCNT_COUNT_DIS;
+  cfg.counter_h_lim = 10000;
+  cfg.counter_l_lim = -10;
+  cfg.unit = PCNT_UNIT_0;
+  cfg.channel = PCNT_CHANNEL_0;
+  pcnt_unit_config(&cfg);
+  pcnt_counter_clear(PCNT_UNIT_0);
+  pcnt_counter_resume(PCNT_UNIT_0);
+
   mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, LED_PIN);
   REG_WRITE(MCPWM_CLK_CFG_REG(0), 160-1);  // 160 MHz/160  => 1 us
   REG_WRITE(MCPWM_TIMER0_CFG0_REG(0), (250-1) + (4000L << 8));  // => 1 Hz bei Up
   REG_WRITE(MCPWM_TIMER0_CFG1_REG(0), 0x0a);
   REG_WRITE(MCPWM_GEN0_TSTMP_A_REG(0), 2000);
   REG_WRITE(MCPWM_GEN0_A_REG(0), (2<<0) | (1<<4));
-  mcpwm_isr_register(MCPWM_UNIT_0, mcpwm_isr, 0, ESP_INTR_FLAG_IRAM, NULL);
+  mcpwm_isr_register(MCPWM_UNIT_0, mcpwm_isr, 0, ESP_INTR_FLAG_EDGE | ESP_INTR_FLAG_IRAM, NULL);
+  MCPWM0.int_ena.val = 0;
   MCPWM0.int_ena.timer0_tez_int_ena = 1;
   MCPWM0.int_clr.timer0_tez_int_clr = 1;
+
+  int input_sig_index = PCNT_SIG_CH0_IN0_IDX;
+  gpio_iomux_in(LED_PIN, input_sig_index);
 }
 
 void setup() {
@@ -55,6 +84,14 @@ long in_vals[8];
 bool stopped = false;
 
 void loop() {
+  int16_t cnt;
+  Serial.print(pcnt_get_counter_value(PCNT_UNIT_0, &cnt));
+  Serial.print(" ");
+  Serial.print(cnt);
+  Serial.print(" ");
+  Serial.println(digitalRead(0));
+  delay(100);
+
   bool cmd_ok = false;
   bool queue_ok = false;
 
