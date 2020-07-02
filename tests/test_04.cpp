@@ -12,16 +12,7 @@ char TIFR1;
 unsigned short OCR1A;
 unsigned short OCR1B;
 
-uint8_t fas_q_readptr_A = 0;  // ISR stops if readptr == next_writeptr
-uint8_t fas_q_next_writeptr_A = 0;
-uint8_t fas_q_readptr_B = 0;
-uint8_t fas_q_next_writeptr_B = 0;
-struct queue_entry fas_queue_A[QUEUE_LEN], fas_queue_B[QUEUE_LEN];
-
-uint8_t fas_autoEnablePin_A = 255;
-uint8_t fas_autoEnablePin_B = 255;
-uint8_t fas_dirPin_A = 255;
-uint8_t fas_dirPin_B = 255;
+struct queue fas_queue[NUM_QUEUES];
 
 class RampChecker {
  public:
@@ -99,10 +90,10 @@ void RampChecker::check_section(struct queue_entry *e) {
 }
 
 void init_queue() {
-  fas_q_readptr_A = 0;
-  fas_q_readptr_B = 0;
-  fas_q_next_writeptr_A = 0;
-  fas_q_next_writeptr_B = 0;
+  fas_queue[0].read_ptr = 0;
+  fas_queue[1].read_ptr = 0;
+  fas_queue[0].next_write_ptr = 0;
+  fas_queue[1].next_write_ptr = 0;
 }
 
 int main() {
@@ -137,7 +128,7 @@ int main() {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
           "pos = %d  QueueEmpty=%s\n",
-          i, fas_q_readptr_A, fas_q_next_writeptr_A, s.target_pos,
+          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.target_pos,
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
@@ -147,8 +138,8 @@ int main() {
     s.isr_fill_queue();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
-      rc.check_section(&fas_queue_A[fas_q_readptr_A]);
-      fas_q_readptr_A = (fas_q_readptr_A + 1) & QUEUE_LEN_MASK;
+      rc.check_section(&fas_queue[0].entry[fas_queue[0].read_ptr]);
+      fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;

@@ -12,22 +12,13 @@ char TIFR1;
 unsigned short OCR1A;
 unsigned short OCR1B;
 
-uint8_t fas_q_readptr_A = 0;  // ISR stops if readptr == next_writeptr
-uint8_t fas_q_next_writeptr_A = 0;
-uint8_t fas_q_readptr_B = 0;
-uint8_t fas_q_next_writeptr_B = 0;
-struct queue_entry fas_queue_A[QUEUE_LEN], fas_queue_B[QUEUE_LEN];
-
-uint8_t fas_autoEnablePin_A = 255;
-uint8_t fas_autoEnablePin_B = 255;
-uint8_t fas_dirPin_A = 255;
-uint8_t fas_dirPin_B = 255;
+struct queue fas_queue[NUM_QUEUES];
 
 void init_queue() {
-  fas_q_readptr_A = 0;
-  fas_q_readptr_B = 0;
-  fas_q_next_writeptr_A = 0;
-  fas_q_next_writeptr_B = 0;
+  fas_queue[0].read_ptr = 0;
+  fas_queue[0].next_write_ptr = 0;
+  fas_queue[1].read_ptr = 0;
+  fas_queue[1].next_write_ptr = 0;
 }
 
 void basic_test() {
@@ -47,16 +38,15 @@ void queue_full() {
   assert(0 == s.getCurrentPosition());
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
-  printf("Queue read/write = %d/%d\n", fas_q_readptr_A, fas_q_next_writeptr_A);
+  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr, fas_queue[0].next_write_ptr);
   for (int i = 0; i < QUEUE_LEN - 2; i++) {
     s.addQueueEntry(10000, 100, true, 0);
     assert(!s.isQueueEmpty());
     assert(!s.isQueueFull());
-    printf("%d: Queue read/write = %d/%d\n", i, fas_q_readptr_A,
-           fas_q_next_writeptr_A);
+    printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr, fas_queue[0].next_write_ptr);
   }
   s.addQueueEntry(10000, 100, true, 0);
-  printf("Queue read/write = %d/%d\n", fas_q_readptr_A, fas_q_next_writeptr_A);
+  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr, fas_queue[0].next_write_ptr);
   assert(!s.isQueueEmpty());
   assert(s.isQueueFull());
   puts("...done");

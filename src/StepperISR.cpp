@@ -8,7 +8,7 @@ uint8_t fas_q_readptr_A = 0;  // ISR stops if readptr == next_writeptr
 uint8_t fas_q_next_writeptr_A = 0;
 uint8_t fas_q_readptr_B = 0;
 uint8_t fas_q_next_writeptr_B = 0;
-struct queue_entry fas_queue_A[QUEUE_LEN], fas_queue_B[QUEUE_LEN];
+struct queue fas_queue[NUM_QUEUES];
 
 uint8_t fas_autoEnablePin_A = 255;
 uint8_t fas_autoEnablePin_B = 255;

@@ -148,13 +148,13 @@ int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
   uint8_t rp;
   struct queue_entry* e;
   if (_stepper_num == 1) {
-    wp = fas_q_next_writeptr_A;
-    rp = fas_q_readptr_A;
-    e = &fas_queue_A[wp];
+    wp = fas_queue_A.next_write_ptr;
+    rp = fas_queue_A.read_ptr;
+    e = &fas_queue_A.entry[wp];
   } else {
-    wp = fas_q_next_writeptr_B;
-    rp = fas_q_readptr_B;
-    e = &fas_queue_B[wp];
+    wp = fas_queue_B.next_write_ptr;
+    rp = fas_queue_B.read_ptr;
+    e = &fas_queue_B.entry[wp];
   }
   uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
   if (next_wp != rp) {
@@ -181,9 +181,9 @@ int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
     }
 #endif
     if (_stepper_num == 1) {
-      fas_q_next_writeptr_A = next_wp;
+      fas_queue_A.next_write_ptr = next_wp;
     } else {
-      fas_q_next_writeptr_B = next_wp;
+      fas_queue_B.next_write_ptr = next_wp;
     }
     return AQE_OK;
   }
@@ -608,9 +608,9 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   digitalWrite(dirPin, HIGH);
   pinMode(dirPin, OUTPUT);
   if (_stepper_num == 1) {
-    fas_dirPin_A = dirPin;
+    fas_queue_A.dirPin = dirPin;
   } else {
-    fas_dirPin_B = dirPin;
+    fas_queue_B.dirPin = dirPin;
   }
 }
 void FastAccelStepper::setEnablePin(uint8_t enablePin) {
@@ -625,9 +625,9 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
     _auto_enablePin = 255;
   }
   if (_stepper_num == 1) {
-    fas_autoEnablePin_A = _auto_enablePin;
+    fas_queue_A.autoEnablePin = _auto_enablePin;
   } else {
-    fas_autoEnablePin_B = _auto_enablePin;
+    fas_queue_B.autoEnablePin = _auto_enablePin;
   }
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
@@ -674,13 +674,13 @@ int32_t FastAccelStepper::getCurrentPosition() {
   uint8_t rp, wp;
   noInterrupts();
   if (_stepper_num == 1) {
-    q = fas_queue_A;
-    rp = fas_q_readptr_A;
-    wp = fas_q_next_writeptr_A;
+    q = fas_queue_A.entry;
+    rp = fas_queue_A.read_ptr;
+    wp = fas_queue_A.next_write_ptr;
   } else {
-    q = fas_queue_B;
-    rp = fas_q_readptr_B;
-    wp = fas_q_next_writeptr_B;
+    q = fas_queue_B.entry;
+    rp = fas_queue_B.read_ptr;
+    wp = fas_queue_B.next_write_ptr;
   }
   interrupts();
   if (rp != wp) {
@@ -702,18 +702,18 @@ int32_t FastAccelStepper::getCurrentPosition() {
 bool FastAccelStepper::isQueueFull() {
   bool full;
   if (_stepper_num == 1) {
-    full = (((fas_q_next_writeptr_A + 1) & QUEUE_LEN_MASK) == fas_q_readptr_A);
+    full = (((fas_queue_A.next_write_ptr + 1) & QUEUE_LEN_MASK) == fas_queue_A.read_ptr);
   } else {
-    full = (((fas_q_next_writeptr_B + 1) & QUEUE_LEN_MASK) == fas_q_readptr_B);
+    full = (((fas_queue_B.next_write_ptr + 1) & QUEUE_LEN_MASK) == fas_queue_B.read_ptr);
   }
   return full;
 }
 bool FastAccelStepper::isQueueEmpty() {
   bool empty;
   if (_stepper_num == 1) {
-    empty = (fas_q_readptr_A == fas_q_next_writeptr_A);
+    empty = (fas_queue_A.read_ptr == fas_queue_A.next_write_ptr);
   } else {
-    empty = (fas_q_readptr_B == fas_q_next_writeptr_B);
+    empty = (fas_queue_B.read_ptr == fas_queue_B.next_write_ptr);
   }
   return empty;
 }
