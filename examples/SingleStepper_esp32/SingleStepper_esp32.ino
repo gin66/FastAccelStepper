@@ -12,10 +12,19 @@ FastAccelStepper *stepper = engine.stepperConnectToPin(stepPinStepper);
 
 #include <driver/pcnt.h>
 #include <driver/mcpwm.h>
+#include <soc/pcnt_reg.h>
+#include <soc/pcnt_struct.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
+static void IRAM_ATTR pcnt_isr(void *arg) {
+    Serial.print("PCNT interrupt: ");
+    Serial.print(PCNT.int_st.val);
+    Serial.print(" ");
+    Serial.println(PCNT.status_unit[0].val);
+    PCNT.int_clr.val = PCNT.int_st.val;
+}
 static void IRAM_ATTR mcpwm_isr(void *arg) {
-  // is invoked twice 
+  // only needed to add change
   uint32_t mcpwm_intr_status = MCPWM0.int_st.val;
   if (mcpwm_intr_status & MCPWM_TIMER0_TEZ_INT_CLR) {
     uint8_t x = REG_READ(MCPWM_CLK_CFG_REG(0));
@@ -31,7 +40,6 @@ static void IRAM_ATTR mcpwm_isr(void *arg) {
 }
 
 void pwm_setup() {
-
   pcnt_config_t cfg;
   cfg.pulse_gpio_num = LED_PIN;
   cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
@@ -39,13 +47,27 @@ void pwm_setup() {
   cfg.hctrl_mode = PCNT_MODE_KEEP;
   cfg.pos_mode = PCNT_COUNT_INC;
   cfg.neg_mode = PCNT_COUNT_DIS;
-  cfg.counter_h_lim = 10000;
-  cfg.counter_l_lim = -10;
+  cfg.counter_h_lim = 1;
+  cfg.counter_l_lim = 0;
   cfg.unit = PCNT_UNIT_0;
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
+  PCNT.conf_unit[0].conf0.thr_h_lim_en = 1;
+  PCNT.conf_unit[0].conf0.thr_l_lim_en = 0;
+
   pcnt_counter_clear(PCNT_UNIT_0);
   pcnt_counter_resume(PCNT_UNIT_0);
+  pcnt_set_event_value(PCNT_UNIT_0, PCNT_EVT_THRES_0, 5);
+  pcnt_event_enable(PCNT_UNIT_0, PCNT_EVT_THRES_0);
+  pcnt_set_event_value(PCNT_UNIT_0, PCNT_EVT_THRES_1, 10);
+  pcnt_event_enable(PCNT_UNIT_0, PCNT_EVT_THRES_1);
+  //pcnt_event_enable(PCNT_UNIT_0, PCNT_EVT_H_LIM);
+  pcnt_counter_pause(PCNT_UNIT_0);
+  pcnt_counter_clear(PCNT_UNIT_0);
+  pcnt_counter_resume(PCNT_UNIT_0);
+  pcnt_isr_service_install(ESP_INTR_FLAG_EDGE | ESP_INTR_FLAG_IRAM);
+  pcnt_isr_handler_add(PCNT_UNIT_0, pcnt_isr, 0);
+  pcnt_intr_enable(PCNT_UNIT_0);
 
   mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, LED_PIN);
   REG_WRITE(MCPWM_CLK_CFG_REG(0), 160-1);  // 160 MHz/160  => 1 us
