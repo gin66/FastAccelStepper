@@ -12,6 +12,12 @@
 // To realize the 1 Hz debug led
 uint8_t fas_ledPin = 255;  // 255 if led blinking off
 uint16_t fas_debug_led_cnt = 0;
+#if defined(ARDUINO_ARCH_AVR)
+#define DEBUG_LED_HALF_PERIOD 144
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+#define DEBUG_LED_HALF_PERIOD 50
+#endif
 
 #define TIMER_FREQ F_CPU
 #if (TIMER_FREQ == 16000000)
@@ -46,6 +52,14 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepp
 // to the steppers.
 //
 //*************************************************************************************************
+void StepperTask(void *parameter) {
+	FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
+	const TickType_t delay = 10 / portTICK_PERIOD_MS; // block for 10ms
+	while(true) {
+		engine->manageSteppers();
+		vTaskDelay(delay);
+	}
+}
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
 #if (TIMER_FREQ != 16000000)
@@ -68,6 +82,11 @@ void FastAccelStepperEngine::init() {
   TIMSK1 |= _BV(TOIE1);
 
   interrupts();
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+#define STACK_SIZE 1000
+#define PRIORITY 1
+  xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
 #endif
 }
 //*************************************************************************************************
@@ -110,10 +129,10 @@ void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
 void FastAccelStepperEngine::manageSteppers() {
   if (fas_ledPin < 255) {
     fas_debug_led_cnt++;
-    if (fas_debug_led_cnt == 144) {
+    if (fas_debug_led_cnt == DEBUG_LED_HALF_PERIOD) {
       digitalWrite(fas_ledPin, HIGH);
     }
-    if (fas_debug_led_cnt == 288) {
+    if (fas_debug_led_cnt == 2*DEBUG_LED_HALF_PERIOD) {
       digitalWrite(fas_ledPin, LOW);
       fas_debug_led_cnt = 0;
     }
@@ -593,10 +612,12 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   _stepPin = step_pin;
 
 #if defined(ARDUINO_ARCH_AVR)
-  // start interrupt
   _queue_num = step_pin == stepPinStepperA ? 0 : 1;
-  fas_queue[_queue_num].init(step_pin);
 #endif
+#if defined(ARDUINO_ARCH_ESP32)
+  _queue_num = num;
+#endif
+  fas_queue[_queue_num].init(step_pin);
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
@@ -658,11 +679,10 @@ int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
 int32_t FastAccelStepper::getCurrentPosition() {
   int32_t pos = _pos_at_queue_end;
   bool dir = _dir_high_at_queue_end;
-  struct queue_entry* q;
   noInterrupts();
   uint8_t wp = fas_queue[_queue_num].next_write_ptr;
   uint8_t rp = fas_queue[_queue_num].read_ptr;
-  struct queue_entry* e = &fas_queue[_queue_num].entry[wp];
+  struct queue_entry* q = &fas_queue[_queue_num].entry[wp];
   interrupts();
   if (rp != wp) {
     while (rp != wp) {
