@@ -1,6 +1,7 @@
 #include "StepperISR.h"
 
 #if defined(ARDUINO_ARCH_AVR)
+
 #define Stepper_Toggle(X) \
   TCCR1##X = (TCCR1##X | _BV(COM1##X##0)) & ~_BV(COM1##X##1)
 #define Stepper_Zero(X) \
@@ -9,7 +10,6 @@
   TCCR1##X = (TCCR1##X & ~(_BV(COM1##X##1) | _BV(COM1##X##0)))
 #define Stepper_IsToggling(X) \
   ((TCCR1##X & (_BV(COM1##X##0) | _BV(COM1##X##1))) == _BV(COM1##X##0))
-#endif
 
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
@@ -19,7 +19,6 @@ void StepperQueue::init(uint8_t step_pin) {
   autoEnablePin = 255;
   read_ptr = 0;
   next_write_ptr = 0;
-#if defined(ARDUINO_ARCH_AVR)
   skip = 0;
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
@@ -41,10 +40,8 @@ void StepperQueue::init(uint8_t step_pin) {
     TIMSK1 |= _BV(OCIE1B);  // enable compare B interrupt
     interrupts();
   }
-#endif
 }
 
-#if defined(ARDUINO_ARCH_AVR)
 #define AVR_STEPPER_ISR(CHANNEL, queue, ocr, foc)                          \
   ISR(TIMER1_COMP##CHANNEL##_vect) {                                       \
     if (queue.skip) {                                                      \
