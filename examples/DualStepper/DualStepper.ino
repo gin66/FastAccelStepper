@@ -73,32 +73,6 @@ void loop() {
     FastAccelStepper *stepper = motor == 1 ? stepper1 : stepper2;
     // NOT NEEDED IN RAW ACCESS: stepper->setSpeed(16384);
     // NOT NEEDED IN RAW ACCESS: stepper->setAcceleration(100.0);
-    if (false) {
-      Serial.println(
-          stepper->addQueueEntry(5L * 16384, 120, true, -16384 / 120));
-      Serial.println(
-          stepper->addQueueEntry(4L * 16384, 120, true, -16384 / 120));
-      Serial.println(
-          stepper->addQueueEntry(3L * 16384, 120, true, -16384 / 120));
-      Serial.println(stepper->addQueueEntry(2L * 16384, 120, true, 0));
-      Serial.println(
-          stepper->addQueueEntry(2L * 16384, 120, true, 16384 / 120));
-      Serial.println(
-          stepper->addQueueEntry(3L * 16384, 120, true, 16384 / 120));
-      Serial.println(stepper->addQueueEntry(4L * 16384, 80, true, 0));
-      Serial.println(stepper->addQueueEntry(4L * 16384, 80, false, 0));
-      Serial.println(
-          stepper->addQueueEntry(4L * 16384, 120, false, -16384 / 120));
-      Serial.println(
-          stepper->addQueueEntry(3L * 16384, 120, false, -16384 / 120));
-      Serial.println(
-          stepper->addQueueEntry(2L * 16384, 120, false, 16384 / 120));
-      Serial.println(
-          stepper->addQueueEntry(3L * 16384, 120, false, 16384 / 120));
-      Serial.println(
-          stepper->addQueueEntry(4L * 16384, 120, false, 16384 / 120));
-      Serial.println(stepper->addQueueEntry(5L * 16384, 120, false, 0));
-    } else {
       Serial.println(
           stepper->addQueueEntry(5L * 16384, 120, true, -16384 / 119));
       Serial.println(
@@ -118,7 +92,6 @@ void loop() {
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-    }
   }
 
   if (cmd_ok) {

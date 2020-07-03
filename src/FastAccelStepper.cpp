@@ -57,8 +57,7 @@ void FastAccelStepperEngine::init() {
 #endif
 }
 //*************************************************************************************************
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin) {
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) {
   uint8_t i;
   for (i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
@@ -69,12 +68,12 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     }
   }
 #if defined(ARDUINO_ARCH_AVR)
-  if ((step_pin != 9) && (step_pin != 10)) {
-    return NULL;
+  if (step_pin == 9) {
+    return &fas_stepperA;
   }
-  i = 10 - step_pin;
-  _stepper[i] = &FastAccelStepper(i, step_pin);
-  return _stepper[i];
+  if (step_pin == 10) {
+    return &fas_stepperB;
+  }
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #endif
