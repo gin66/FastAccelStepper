@@ -17,22 +17,23 @@ void StepperQueue::init() {
 }
 
 #if defined(ARDUINO_ARCH_AVR)
-#define AVR_STEPPER_ISR(CHANNEL,queue) ISR(TIMER1_COMP ## CHANNEL ## _vect) { \
+#define AVR_STEPPER_ISR(CHANNEL,queue,ocr,foc) \
+ISR(TIMER1_COMP ## CHANNEL ## _vect) { \
   if (queue.skip) { \
     if ((--queue.skip) == 0) { \
-      Stepper ## CHANNEL ## _Toggle; \
+      Stepper_Toggle(CHANNEL); \
     } \
-    OCR1 ## CHANNEL += 16384; \
+    ocr += 16384; \
     return; \
-  } else if (Stepper ## CHANNEL ## _IsToggling) { \
-    TCCR1C = _BV(FOC1 ## CHANNEL);  /* clear bit */ \
+  } else if (Stepper_IsToggling(CHANNEL)) { \
+    TCCR1C = _BV(foc);  /* clear bit */ \
     uint8_t rp = queue.read_ptr; \
     struct queue_entry* e = &queue.entry[rp]; \
     if ((e->steps -= 2) > 1) { \
       /* perform another step with this queue entry */ \
-      OCR1 ## CHANNEL += (e->delta_lsw += e->delta_change); \
+      ocr += (e->delta_lsw += e->delta_change); \
       if (queue.skip = e->delta_msb) {  /* assign to skip and test for not zero */ \
-        Stepper ## CHANNEL ## _Zero; \
+        Stepper_Zero(CHANNEL); \
       } \
       return; \
     } \
@@ -40,7 +41,7 @@ void StepperQueue::init() {
     queue.read_ptr = rp; \
     if (rp == queue.next_write_ptr) { \
       /* queue is empty => set to disconnect */ \
-      Stepper ## CHANNEL ## _Disconnect; \
+      Stepper_Disconnect(CHANNEL); \
       if (queue.autoEnablePin != 255) { \
         digitalWrite(queue.autoEnablePin, HIGH); \
       } \
@@ -57,11 +58,11 @@ void StepperQueue::init() {
   } \
   /* command in queue */ \
   struct queue_entry* e = &queue.entry[queue.read_ptr]; \
-  OCR1 ## CHANNEL += e->delta_lsw; \
+  ocr += e->delta_lsw; \
   if (queue.skip = e->delta_msb) {  /* assign to skip and test for not zero */ \
-    Stepper ## CHANNEL ## _Zero; \
+    Stepper_Zero(CHANNEL); \
   } else { \
-    Stepper ## CHANNEL ## _Toggle; \
+    Stepper_Toggle(CHANNEL); \
   } \
   uint8_t steps = e->steps; \
   if ((steps & 0x01) != 0) { \
@@ -71,6 +72,6 @@ void StepperQueue::init() {
     digitalWrite(queue.autoEnablePin, LOW); \
   } \
 }
-AVR_STEPPER_ISR(A, fas_queue_A)
-AVR_STEPPER_ISR(B, fas_queue_B)
+AVR_STEPPER_ISR(A, fas_queue_A, OCR1A, FOC1A)
+AVR_STEPPER_ISR(B, fas_queue_B, OCR1B, FOC1B)
 #endif
