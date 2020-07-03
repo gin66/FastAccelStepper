@@ -35,6 +35,9 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
 	FastAccelStepper(), FastAccelStepper()
 };
 #endif
+#if defined(TEST)
+FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepper() };
+#endif
 
 //*************************************************************************************************
 //*************************************************************************************************
