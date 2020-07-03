@@ -170,9 +170,9 @@ int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
     lsw = start_delta_ticks;
   }
 
-  uint8_t wp = fas_queue[_stepper_num].next_write_ptr;
-  uint8_t rp = fas_queue[_stepper_num].read_ptr;
-  struct queue_entry* e = &fas_queue[_stepper_num].entry[wp];
+  uint8_t wp = fas_queue[_queue_num].next_write_ptr;
+  uint8_t rp = fas_queue[_queue_num].read_ptr;
+  struct queue_entry* e = &fas_queue[_queue_num].entry[wp];
 
   uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
   if (next_wp != rp) {
@@ -198,7 +198,7 @@ int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
       }
     }
 #endif
-    fas_queue[_stepper_num].next_write_ptr = next_wp;
+    fas_queue[_queue_num].next_write_ptr = next_wp;
     return AQE_OK;
   }
   return AQE_FULL;
@@ -224,10 +224,6 @@ int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
 //
 //*************************************************************************************************
 void FastAccelStepper::_calculate_move(int32_t move) {
-	Serial.print("QUEUE=");
-	Serial.print(_stepper_num);
-	Serial.print(" ");
-	Serial.println(_queue_num);
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   checksum = 0;
 #endif
@@ -598,7 +594,7 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;
   digitalWrite(dirPin, HIGH);
   pinMode(dirPin, OUTPUT);
-  fas_queue[_stepper_num].dirPin = dirPin;
+  fas_queue[_queue_num].dirPin = dirPin;
 }
 void FastAccelStepper::setEnablePin(uint8_t enablePin) {
   _enablePin = enablePin;
@@ -611,7 +607,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   } else {
     _auto_enablePin = 255;
   }
-  fas_queue[_stepper_num].autoEnablePin = _auto_enablePin;
+  fas_queue[_queue_num].autoEnablePin = _auto_enablePin;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   _min_travel_ticks = min_step_us * (TIMER_FREQ / 1000L) / 1000L;
@@ -655,9 +651,9 @@ int32_t FastAccelStepper::getCurrentPosition() {
   bool dir = _dir_high_at_queue_end;
   struct queue_entry* q;
   noInterrupts();
-  uint8_t wp = fas_queue[_stepper_num].next_write_ptr;
-  uint8_t rp = fas_queue[_stepper_num].read_ptr;
-  struct queue_entry* e = &fas_queue[_stepper_num].entry[wp];
+  uint8_t wp = fas_queue[_queue_num].next_write_ptr;
+  uint8_t rp = fas_queue[_queue_num].read_ptr;
+  struct queue_entry* e = &fas_queue[_queue_num].entry[wp];
   interrupts();
   if (rp != wp) {
     while (rp != wp) {
@@ -676,11 +672,11 @@ int32_t FastAccelStepper::getCurrentPosition() {
   return pos;
 }
 bool FastAccelStepper::isQueueFull() {
-  StepperQueue* q = &fas_queue[_stepper_num];
+  StepperQueue* q = &fas_queue[_queue_num];
   return (((q->next_write_ptr + 1) & QUEUE_LEN_MASK) == q->read_ptr);
 }
 bool FastAccelStepper::isQueueEmpty() {
-  StepperQueue* q = &fas_queue[_stepper_num];
+  StepperQueue* q = &fas_queue[_queue_num];
   return (q->read_ptr == q->next_write_ptr);
 }
 bool FastAccelStepper::isRunning() { return !isQueueEmpty(); }
