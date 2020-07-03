@@ -22,8 +22,9 @@ upm_float upm_timer_freq;
 #endif
 
 #if defined(ARDUINO_ARCH_AVR)
-FastAccelStepper fas_stepperA = FastAccelStepper(1, stepPinStepperA);
-FastAccelStepper fas_stepperB = FastAccelStepper(0, stepPinStepperB);
+// create variables here, so that in ISR no pointer indirection need to be resolved
+FastAccelStepper fas_stepperA = FastAccelStepper();
+FastAccelStepper fas_stepperB = FastAccelStepper();
 #endif
 
 //*************************************************************************************************
@@ -68,10 +69,14 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) 
     }
   }
 #if defined(ARDUINO_ARCH_AVR)
-  if (step_pin == 9) {
+  if (step_pin == stepPinStepperA) {
+	_stepper[1] = &fas_stepperA;
+	fas_stepperA.init(1, stepPinStepperA);
     return &fas_stepperA;
   }
-  if (step_pin == 10) {
+  if (step_pin == stepPinStepperB) {
+	_stepper[0] = &fas_stepperB;
+	fas_stepperB.init(0, stepPinStepperB);
     return &fas_stepperB;
   }
 #endif
@@ -553,7 +558,7 @@ ISR(TIMER1_OVF_vect) {
 }
 #endif
 
-FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
+FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   max_micros = 0;

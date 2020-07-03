@@ -31,7 +31,7 @@
 class FastAccelStepper {
  public:
   // This should be only called by FastAccelStepperEngine !
-  FastAccelStepper(uint8_t num, uint8_t step_pin);
+  init(uint8_t num, uint8_t step_pin);
 
   // stable API functions
   void setDirectionPin(uint8_t dirPin);
