@@ -24,9 +24,8 @@ upm_float upm_timer_freq;
 #if defined(ARDUINO_ARCH_AVR)
 FastAccelStepperEngine *fas_engine = NULL;
 
-// dynamic allocation seem to not work so well
-FastAccelStepper fas_stepperA = FastAccelStepper();
-FastAccelStepper fas_stepperB = FastAccelStepper();
+// dynamic allocation seem to not work so well..try again
+FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepper() };
 #endif
 
 //*************************************************************************************************
@@ -72,25 +71,17 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) 
     }
   }
 #if defined(ARDUINO_ARCH_AVR)
-	FastAccelStepper* s;
-  if (step_pin == stepPinStepperA) {
-	s = &fas_stepperA;
-  }
-  else if (step_pin == stepPinStepperB) {
-	s = &fas_stepperB;
-  }
-  else {
-	return NULL;
-  }
-
+  if ((step_pin == stepPinStepperA) || (step_pin == stepPinStepperB)) {
+	FastAccelStepper* s = &fas_stepper[_next_stepper_num];
 	_stepper[_next_stepper_num] = s;
 	s->init(_next_stepper_num, step_pin);
 	_next_stepper_num++;
     return s;
+  }
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
-  return NULL;
 #endif
+  return NULL;
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
