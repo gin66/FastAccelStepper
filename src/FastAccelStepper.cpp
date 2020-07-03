@@ -22,7 +22,7 @@ upm_float upm_timer_freq;
 #endif
 
 #if defined(ARDUINO_ARCH_AVR)
-FastAccelStepperEngine *fas_engine = NULL;
+FastAccelStepperEngine* fas_engine = NULL;
 
 // dynamic allocation seem to not work so well
 FastAccelStepper fas_stepperA = FastAccelStepper();
@@ -61,7 +61,8 @@ void FastAccelStepperEngine::init() {
 #endif
 }
 //*************************************************************************************************
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) {
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin) {
   uint8_t i;
   for (i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
@@ -72,21 +73,19 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) 
     }
   }
 #if defined(ARDUINO_ARCH_AVR)
-	FastAccelStepper* s;
+  FastAccelStepper* s;
   if (step_pin == stepPinStepperA) {
-	s = &fas_stepperA;
-  }
-  else if (step_pin == stepPinStepperB) {
-	s = &fas_stepperB;
-  }
-  else {
-	return NULL;
+    s = &fas_stepperA;
+  } else if (step_pin == stepPinStepperB) {
+    s = &fas_stepperB;
+  } else {
+    return NULL;
   }
 
-	_stepper[_next_stepper_num] = s;
-	s->init(_next_stepper_num, step_pin);
-	_next_stepper_num++;
-    return s;
+  _stepper[_next_stepper_num] = s;
+  s->init(_next_stepper_num, step_pin);
+  _next_stepper_num++;
+  return s;
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
   return NULL;
@@ -108,14 +107,13 @@ void FastAccelStepperEngine::manageSteppers() {
       fas_debug_led_cnt = 0;
     }
   }
-  for (uint8_t i = 0; i < _next_stepper_num;i++) {
-	 FastAccelStepper* s = _stepper[i];
-	if (s) {
-	  s->isr_fill_queue();
-	}
+  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+    FastAccelStepper* s = _stepper[i];
+    if (s) {
+      s->isr_fill_queue();
+    }
   }
 }
-
 
 //*************************************************************************************************
 //*************************************************************************************************
