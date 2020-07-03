@@ -1,18 +1,46 @@
 #include "StepperISR.h"
 
-// Here are the global variables to interface with the interrupts
+#if defined(ARDUINO_ARCH_AVR)
+#define Stepper_Toggle(X) \
+	TCCR1 ## X= (TCCR1 ## X| _BV(COM1 ## X ## 0)) & ~_BV(COM1 ## X ## 1)
+#define Stepper_Zero(X) \
+	TCCR1 ## X= (TCCR1 ## X| _BV(COM1 ## X ## 1)) & ~_BV(COM1 ## X ## 0)
+#define Stepper_Disconnect(X) \
+	TCCR1 ## X= (TCCR1 ## X& ~(_BV(COM1 ## X ## 1) | _BV(COM1 ## X ## 0)))
+#define Stepper_IsToggling(X) \
+	((TCCR1 ## X& (_BV(COM1 ## X ## 0) | _BV(COM1 ## X ## 1))) == _BV(COM1 ## X ## 0))
+#endif
 
-// These variables control the stepper timing behaviour
-// Current queue implementation cannot fill all elements. TODO
+// Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
-void StepperQueue::init() {
+void StepperQueue::init(uint8_t step_pin) {
 	dirPin = 255;
 	autoEnablePin = 255;
 	read_ptr = 0;
 	next_write_ptr = 0;
 #if defined(ARDUINO_ARCH_AVR)
 	skip = 0;
+    digitalWrite(step_pin, LOW);
+    pinMode(step_pin, OUTPUT);
+	if (step_pin == 9) {
+      noInterrupts();
+      OCR1A = 32768;  // definite start point
+      Stepper_Disconnect(A);
+      TCCR1C = _BV(FOC1A);    // force compare to ensure disconnect
+      TIFR1 = _BV(OCF1A);     // clear interrupt flag
+      TIMSK1 |= _BV(OCIE1A);  // enable compare A interrupt
+      interrupts();
+	}
+	if (step_pin == 10) {
+      noInterrupts();
+      OCR1B = 32768;  // definite start point
+      Stepper_Disconnect(B);
+      TCCR1C = _BV(FOC1B);    // force compare to ensure disconnect
+      TIFR1 = _BV(OCF1B);     // clear interrupt flag
+      TIMSK1 |= _BV(OCIE1B);  // enable compare B interrupt
+      interrupts();
+	}
 #endif
 }
 

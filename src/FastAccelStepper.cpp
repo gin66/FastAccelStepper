@@ -578,30 +578,10 @@ FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
   _ticks_at_queue_end = 0;
   _stepPin = step_pin;
 
-  digitalWrite(step_pin, LOW);
-  pinMode(step_pin, OUTPUT);
-
 #if defined(ARDUINO_ARCH_AVR)
   // start interrupt
-  if (_stepper_num == 1) {
-	fas_queue[0].init();
-    noInterrupts();
-    OCR1A = 32768;  // definite start point
-    Stepper_Disconnect(A);
-    TCCR1C = _BV(FOC1A);    // force compare to ensure disconnect
-    TIFR1 = _BV(OCF1A);     // clear interrupt flag
-    TIMSK1 |= _BV(OCIE1A);  // enable compare A interrupt
-    interrupts();
-  } else {
-	fas_queue[1].init();
-    noInterrupts();
-    OCR1B = 32768;  // definite start point
-    Stepper_Disconnect(B);
-    TCCR1C = _BV(FOC1B);    // force compare to ensure disconnect
-    TIFR1 = _BV(OCF1B);     // clear interrupt flag
-    TIMSK1 |= _BV(OCIE1B);  // enable compare B interrupt
-    interrupts();
-  }
+  uint8_t i = 10 - step_pin;
+  fas_queue[i].init(step_pin);
 #endif
 }
 uint8_t FastAccelStepper::getStepPin() {
