@@ -1,7 +1,6 @@
 #include "StepperISR.h"
 
 #if defined(ARDUINO_ARCH_ESP32)
-
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 

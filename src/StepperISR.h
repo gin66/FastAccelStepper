@@ -22,6 +22,9 @@
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #endif
+#if defined(ARDUINO_ARCH_ESP32)
+#define NUM_QUEUES 6
+#endif
 
 // These variables control the stepper timing behaviour
 #define QUEUE_LEN 16
