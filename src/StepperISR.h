@@ -36,7 +36,9 @@ class StepperQueue {
   uint8_t autoEnablePin;
   uint8_t dirPin;
   // This is used in the timer compare unit as extension of the 16 timer
+#if defined(ARDUINO_ARCH_AVR)
   uint8_t skip;
+#endif
 
   void init();
 };
