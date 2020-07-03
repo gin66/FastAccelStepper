@@ -2,11 +2,6 @@
 
 #include "StepperISR.h"
 
-#if defined(ARDUINO_ARCH_AVR)
-#define stepPinStepperA 9  /* OC1A */
-#define stepPinStepperB 10 /* OC1B */
-#endif
-
 // This define in order to not shoot myself.
 #ifndef TEST
 #define printf DO_NOT_USE_PRINTF

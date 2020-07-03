@@ -23,7 +23,7 @@ void StepperQueue::init(uint8_t step_pin) {
   skip = 0;
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
-  if (step_pin == 9) {
+  if (step_pin == stepPinStepperA) {
     noInterrupts();
     OCR1A = 32768;  // definite start point
     Stepper_Disconnect(A);
@@ -32,7 +32,7 @@ void StepperQueue::init(uint8_t step_pin) {
     TIMSK1 |= _BV(OCIE1A);  // enable compare A interrupt
     interrupts();
   }
-  if (step_pin == 10) {
+  if (step_pin == stepPinStepperB) {
     noInterrupts();
     OCR1B = 32768;  // definite start point
     Stepper_Disconnect(B);

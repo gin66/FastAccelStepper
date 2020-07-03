@@ -3,6 +3,11 @@
 #endif
 #include <stdint.h>
 
+#if defined(ARDUINO_ARCH_AVR)
+#define stepPinStepperA 9  /* OC1A */
+#define stepPinStepperB 10 /* OC1B */
+#endif
+
 // Here are the global variables to interface with the interrupts
 
 // CURRENT QUEUE IMPLEMENTATION WASTES ONE UNUSED ENTRY => BUG/TODO
@@ -44,3 +49,4 @@ class StepperQueue {
 };
 
 extern struct StepperQueue fas_queue[NUM_QUEUES];
+
