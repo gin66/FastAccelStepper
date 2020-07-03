@@ -622,7 +622,6 @@ int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   int32_t pos = getPositionAfterCommandsCompleted();
-  printf("%d %d\n",_queue_num,pos);
   bool dir = fas_queue[_queue_num].dir_high_at_queue_end;
   noInterrupts();
   uint8_t wp = fas_queue[_queue_num].next_write_ptr;
