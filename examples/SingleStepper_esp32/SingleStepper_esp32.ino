@@ -16,27 +16,16 @@ FastAccelStepper *stepper = engine.stepperConnectToPin(stepPinStepper);
 #include <soc/pcnt_struct.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
+
 static void IRAM_ATTR pcnt_isr(void *arg) {
     Serial.print("PCNT interrupt: ");
     Serial.print(PCNT.int_st.val);
     Serial.print(" ");
     Serial.println(PCNT.status_unit[0].val);
     PCNT.int_clr.val = PCNT.int_st.val;
-}
-static void IRAM_ATTR mcpwm_isr(void *arg) {
-  // only needed to add change
-  uint32_t mcpwm_intr_status = MCPWM0.int_st.val;
-  if (mcpwm_intr_status & MCPWM_TIMER0_TEZ_INT_CLR) {
     uint8_t x = REG_READ(MCPWM_CLK_CFG_REG(0));
     x = x - 1;
     REG_WRITE(MCPWM_CLK_CFG_REG(0), x);
-    //MCPWM0.int_clr.timer0_tez_int_clr = 1;
-  }
-  else {
-    Serial.print("Spurious interrupt: ");
-    Serial.println(mcpwm_intr_status);
-  }
-  MCPWM0.int_clr.val = mcpwm_intr_status;
 }
 
 void pwm_setup() {
@@ -52,7 +41,7 @@ void pwm_setup() {
   cfg.unit = PCNT_UNIT_0;
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
-  PCNT.conf_unit[0].conf0.thr_h_lim_en = 1;
+  PCNT.conf_unit[0].conf0.thr_h_lim_en = 1; // update only on zero
   PCNT.conf_unit[0].conf0.thr_l_lim_en = 0;
 
   pcnt_counter_clear(PCNT_UNIT_0);
@@ -70,15 +59,21 @@ void pwm_setup() {
   pcnt_intr_enable(PCNT_UNIT_0);
 
   mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, LED_PIN);
-  REG_WRITE(MCPWM_CLK_CFG_REG(0), 160-1);  // 160 MHz/160  => 1 us
-  REG_WRITE(MCPWM_TIMER0_CFG0_REG(0), (250-1) + (4000L << 8));  // => 1 Hz bei Up
-  REG_WRITE(MCPWM_TIMER0_CFG1_REG(0), 0x0a);
-  REG_WRITE(MCPWM_GEN0_TSTMP_A_REG(0), 2000);
-  REG_WRITE(MCPWM_GEN0_A_REG(0), (2<<0) | (1<<4));
-  mcpwm_isr_register(MCPWM_UNIT_0, mcpwm_isr, 0, ESP_INTR_FLAG_EDGE | ESP_INTR_FLAG_IRAM, NULL);
-  MCPWM0.int_ena.val = 0;
-  MCPWM0.int_ena.timer0_tez_int_ena = 1;
-  MCPWM0.int_clr.timer0_tez_int_clr = 1;
+  MCPWM0.clk_cfg.prescale = 160-1;  // 160 MHz/160  => 1 us
+  MCPWM0.timer[0].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
+  MCPWM0.timer[0].period.period = 4000;
+  MCPWM0.timer[0].period.prescale = 250-1; // => 1 Hz
+  MCPWM0.timer[0].mode.start = 2; // free run
+  MCPWM0.timer[0].mode.mode = 1; // increase mod
+  MCPWM0.timer[0].sync.val = 0; // no sync
+  MCPWM0.timer_sel.operator0_sel = 0;
+  MCPWM0.timer_sel.operator1_sel = 1; // timer 1
+  MCPWM0.timer_sel.operator2_sel = 2; // timer 2
+  MCPWM0.channel[0].cmpr_cfg.a_upmethod = 0; // timer 0 compare A update method: immediate
+  MCPWM0.channel[0].cmpr_value[0].cmpr_val = 2000;
+  MCPWM0.channel[0].generator[0].val = 0;
+  MCPWM0.channel[0].generator[0].utez = 2; // high at zero
+  MCPWM0.channel[0].generator[0].utea = 1; // low at compare A match
 
   int input_sig_index = PCNT_SIG_CH0_IN0_IDX;
   gpio_iomux_in(LED_PIN, input_sig_index);

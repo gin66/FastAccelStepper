@@ -12,7 +12,7 @@ char TIFR1;
 unsigned short OCR1A;
 unsigned short OCR1B;
 
-struct queue fas_queue[NUM_QUEUES];
+StepperQueue fas_queue[NUM_QUEUES];
 
 class RampChecker {
  public:

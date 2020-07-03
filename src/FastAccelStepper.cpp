@@ -61,30 +61,28 @@ void FastAccelStepperEngine::init() {
 #endif
 }
 //*************************************************************************************************
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t pin) {
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) {
+	uint8_t i;
+  for (i = 0; i < MAX_STEPPER;i++) {
+	  FastAccelStepper* s = _stepper[i];
+	  if (s) {
+		  if (s->getStepPin() == step_pin) {
+			  return NULL;
+		  }
+	  }
+  }
 #if defined(ARDUINO_ARCH_AVR)
-  if (pin == 9) {
-    if (!fas_stepperA._is_used) {
-      fas_stepperA._is_used = true;
-      return &fas_stepperA;
-    }
+  if ((step_pin != 9) && (step_pin != 10)) {
+	  return NULL;
   }
-  if (pin == 10) {
-    if (!fas_stepperB._is_used) {
-      fas_stepperB._is_used = true;
-      return &fas_stepperB;
-    }
-  }
+  i = 10 - step_pin;
+  _stepper[i] = &FastAccelStepper(i, step_pin);
+  return _stepper[i];
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #endif
   return NULL;
 }
-//*************************************************************************************************
-#if defined(ARDUINO_ARCH_AVR)
-FastAccelStepper* FastAccelStepperEngine::stepperA() { return &fas_stepperA; }
-FastAccelStepper* FastAccelStepperEngine::stepperB() { return &fas_stepperB; }
-#endif
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
@@ -578,6 +576,7 @@ FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
   _dir_high_at_queue_end = true;
   _min_travel_ticks = 0;
   _ticks_at_queue_end = 0;
+  _stepPin = step_pin;
 
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
@@ -585,6 +584,7 @@ FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
 #if defined(ARDUINO_ARCH_AVR)
   // start interrupt
   if (_stepper_num == 1) {
+	fas_queue[0].init();
     noInterrupts();
     OCR1A = 32768;  // definite start point
     StepperA_Disconnect;
@@ -593,6 +593,7 @@ FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
     TIMSK1 |= _BV(OCIE1A);  // enable compare A interrupt
     interrupts();
   } else {
+	fas_queue[1].init();
     noInterrupts();
     OCR1B = 32768;  // definite start point
     StepperB_Disconnect;
@@ -602,6 +603,9 @@ FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
     interrupts();
   }
 #endif
+}
+uint8_t FastAccelStepper::getStepPin() {
+	return _stepPin;
 }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;

@@ -28,15 +28,20 @@ struct queue_entry {
   int16_t delta_change;  // change of delta on each step. delta_lsw +
                          // steps*delta_change must not over/underflow
 };
-struct queue {
+class StepperQueue {
+	public:
   struct queue_entry entry[QUEUE_LEN];
   uint8_t read_ptr; // ISR stops if readptr == next_writeptr
   uint8_t next_write_ptr;
   uint8_t autoEnablePin;
   uint8_t dirPin;
+  // This is used in the timer compare unit as extension of the 16 timer
+  uint8_t skip;
+
+  void init();
 };
 
-extern struct queue fas_queue[NUM_QUEUES];
+extern struct StepperQueue fas_queue[NUM_QUEUES];
 
 #if defined(ARDUINO_ARCH_AVR)
 #define StepperA_Toggle TCCR1A = (TCCR1A | _BV(COM1A0)) & ~_BV(COM1A1)

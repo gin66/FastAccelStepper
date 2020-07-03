@@ -13,6 +13,16 @@
 #define TEST_MEASURE_ISR_SINGLE_FILL 0
 #define TEST_CREATE_QUEUE_CHECKSUM 0
 
+#if defined(TEST)
+#define MAX_STEPPER 2
+#endif
+#if defined(ARDUINO_ARCH_AVR)
+#define MAX_STEPPER 2
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+#define MAX_STEPPER 6
+#endif
+
 #define MIN_DELTA_TICKS (F_CPU / 50000)
 #define ABSOLUTE_MAX_TICKS (254L * 16384 + 32767)
 
@@ -24,6 +34,7 @@ class FastAccelStepper {
   // stable API functions
   void setDirectionPin(uint8_t dirPin);
   void setEnablePin(uint8_t enablePin);
+  uint8_t getStepPin();
 
   void setAutoEnable(bool auto_enable);
   void enableOutputs();
@@ -92,8 +103,7 @@ class FastAccelStepper {
 #endif
 
  private:
-  bool _is_used;
-
+  uint8_t _stepPin;
   uint8_t _dirPin;
   uint8_t _auto_enablePin;
   uint8_t _enablePin;
@@ -139,12 +149,11 @@ class FastAccelStepperEngine {
   // Only the pins connected to OC1A and OC1B are allowed
   //
   // If no stepper resources available or pin is wrong, then NULL is returned
-  FastAccelStepper* stepperConnectToPin(uint8_t pin);
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 
 #if defined(ARDUINO_ARCH_AVR)
-  // deprecated API functions
-  FastAccelStepper* stepperA();
-  FastAccelStepper* stepperB();
+#define stepperA() stepperConnectToPin(9)
+#define stepperB() stepperConnectToPin(10)
 #endif
 
   // unstable API functions
@@ -153,10 +162,9 @@ class FastAccelStepperEngine {
   // blink with 1 Hz
   void setDebugLed(uint8_t ledPin);
 
-#if defined(ARDUINO_ARCH_ESP32)
  private:
   uint8_t _next_stepper_num;
-#endif
+  FastAccelStepper* _stepper[MAX_STEPPER];
 };
 #else
 #error “This library only supports boards with an AVR or ESP32 processor.”
