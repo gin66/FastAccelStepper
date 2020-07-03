@@ -52,6 +52,7 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepp
 // to the steppers.
 //
 //*************************************************************************************************
+#if defined(ARDUINO_ARCH_ESP32)
 void StepperTask(void *parameter) {
 	FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
 	const TickType_t delay = 10 / portTICK_PERIOD_MS; // block for 10ms
@@ -60,6 +61,7 @@ void StepperTask(void *parameter) {
 		vTaskDelay(delay);
 	}
 }
+#endif
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
 #if (TIMER_FREQ != 16000000)
@@ -640,10 +642,16 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   fas_queue[_queue_num].autoEnablePin = _auto_enablePin;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
+	if (min_step_us == 0) {
+		return;
+	}
   _min_travel_ticks = min_step_us * (TIMER_FREQ / 1000L) / 1000L;
   _update_ramp_steps();
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
+	if (accel == 0) {
+		return;
+	}
   uint32_t tmp = TIMER_FREQ / 2;
   upm_float upm_inv_accel = upm_from(tmp / accel);
   _upm_inv_accel2 = multiply(UPM_TIMER_FREQ, upm_inv_accel);

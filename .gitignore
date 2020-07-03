@@ -7,6 +7,6 @@ tests/FastAccelStepper.cpp
 tests/FastAccelStepper.h
 tests/PoorManFloat.cpp
 tests/PoorManFloat.h
-tests/StepperISR.cpp
+tests/StepperISR*.cpp
 tests/StepperISR.h
 

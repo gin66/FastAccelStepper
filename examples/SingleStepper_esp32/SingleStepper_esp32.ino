@@ -85,9 +85,9 @@ void loop() {
     }
 
     if (cmd_ok) {
-      long move = in_vals[1];
-      long ticks = in_vals[2];
-      long accel = in_vals[3];
+      long move = in_vals[0];
+      long ticks = in_vals[1];
+      long accel = in_vals[2];
       if (move) {
         Serial.print("ticks=");
         Serial.print(ticks);
