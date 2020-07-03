@@ -171,6 +171,8 @@ class FastAccelStepperEngine {
  private:
   uint8_t _next_stepper_num;
   FastAccelStepper* _stepper[MAX_STEPPER];
+
+  bool _isValidStepPin(uint8_t step_pin);
 };
 #else
 #error “This library only supports boards with an AVR or ESP32 processor.”

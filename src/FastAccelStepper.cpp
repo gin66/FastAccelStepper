@@ -22,10 +22,18 @@ upm_float upm_timer_freq;
 #endif
 
 #if defined(ARDUINO_ARCH_AVR)
+// this is needed to give the background task isr access to engine
 FastAccelStepperEngine *fas_engine = NULL;
 
-// dynamic allocation seem to not work so well..try again
+// dynamic allocation seem to not work so well on avr
 FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepper() };
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+FastAccelStepper fas_stepper[MAX_STEPPER] = { 
+	FastAccelStepper(), FastAccelStepper(),
+	FastAccelStepper(), FastAccelStepper(),
+	FastAccelStepper(), FastAccelStepper()
+};
 #endif
 
 //*************************************************************************************************
@@ -60,6 +68,18 @@ void FastAccelStepperEngine::init() {
 #endif
 }
 //*************************************************************************************************
+bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
+#if defined(ARDUINO_ARCH_AVR)
+  return ((step_pin == stepPinStepperA) || (step_pin == stepPinStepperB));
+#endif
+#if defined(TEST)
+  return true;
+#endif
+#if defined(ESP32)
+  return true; // for now
+#endif
+}
+//*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) {
   uint8_t i;
   for (i = 0; i < MAX_STEPPER; i++) {
@@ -70,18 +90,14 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) 
       }
     }
   }
-#if defined(ARDUINO_ARCH_AVR)
-  if ((step_pin == stepPinStepperA) || (step_pin == stepPinStepperB)) {
+  if (!_isValidStepPin(step_pin)) {
+	  return NULL;
+  }
 	FastAccelStepper* s = &fas_stepper[_next_stepper_num];
 	_stepper[_next_stepper_num] = s;
 	s->init(_next_stepper_num, step_pin);
 	_next_stepper_num++;
     return s;
-  }
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
-#endif
-  return NULL;
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
