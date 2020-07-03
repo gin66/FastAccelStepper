@@ -129,6 +129,7 @@ void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::manageSteppers() {
+#ifndef TEST
   if (fas_ledPin < 255) {
     fas_debug_led_cnt++;
     if (fas_debug_led_cnt == DEBUG_LED_HALF_PERIOD) {
@@ -139,6 +140,7 @@ void FastAccelStepperEngine::manageSteppers() {
       fas_debug_led_cnt = 0;
     }
   }
+#endif
   for (uint8_t i = 0; i < _next_stepper_num;i++) {
 	 FastAccelStepper* s = _stepper[i];
 	if (s) {
@@ -709,11 +711,9 @@ int32_t FastAccelStepper::getCurrentPosition() {
   return pos;
 }
 bool FastAccelStepper::isQueueFull() {
-  StepperQueue* q = &fas_queue[_queue_num];
-  return (((q->next_write_ptr + 1) & QUEUE_LEN_MASK) == q->read_ptr);
+  return fas_queue[_queue_num].isQueueFull();
 }
 bool FastAccelStepper::isQueueEmpty() {
-  StepperQueue* q = &fas_queue[_queue_num];
-  return (q->read_ptr == q->next_write_ptr);
+  return fas_queue[_queue_num].isQueueEmpty();
 }
 bool FastAccelStepper::isRunning() { return !isQueueEmpty(); }

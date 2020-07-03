@@ -49,6 +49,12 @@ class StepperQueue {
 #endif
 
   void init(uint8_t step_pin);
+  bool isQueueFull() {
+	return (((next_write_ptr + 1) & QUEUE_LEN_MASK) == read_ptr);
+  }
+  bool isQueueEmpty() {
+	return (read_ptr == next_write_ptr);
+  }
 };
 
 extern struct StepperQueue fas_queue[NUM_QUEUES];
