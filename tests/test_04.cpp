@@ -99,7 +99,7 @@ void init_queue() {
 
 int main() {
   init_queue();
-  FastAccelStepper s = FastAccelStepper(1, 0);
+  FastAccelStepper s = FastAccelStepper();
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 

@@ -31,7 +31,7 @@
 class FastAccelStepper {
  public:
   // This should be only called by FastAccelStepperEngine !
-  init(uint8_t num, uint8_t step_pin);
+  void init(uint8_t num, uint8_t step_pin);
 
   // stable API functions
   void setDirectionPin(uint8_t dirPin);
@@ -128,6 +128,7 @@ class FastAccelStepper {
   //				4 => MCPWM1 Timer 1
   //				5 => MCPWM1 Timer 2
   uint8_t _stepper_num;
+  uint8_t _queue_num;
 
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
   uint32_t _ramp_steps;        // ramp steps from 0 to max speed
