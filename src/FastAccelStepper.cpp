@@ -1,4 +1,5 @@
 #include "FastAccelStepper.h"
+
 #include "StepperISR.h"
 
 #if defined(ARDUINO_ARCH_AVR)
@@ -61,19 +62,20 @@ void FastAccelStepperEngine::init() {
 #endif
 }
 //*************************************************************************************************
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) {
-	uint8_t i;
-  for (i = 0; i < MAX_STEPPER;i++) {
-	  FastAccelStepper* s = _stepper[i];
-	  if (s) {
-		  if (s->getStepPin() == step_pin) {
-			  return NULL;
-		  }
-	  }
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin) {
+  uint8_t i;
+  for (i = 0; i < MAX_STEPPER; i++) {
+    FastAccelStepper* s = _stepper[i];
+    if (s) {
+      if (s->getStepPin() == step_pin) {
+        return NULL;
+      }
+    }
   }
 #if defined(ARDUINO_ARCH_AVR)
   if ((step_pin != 9) && (step_pin != 10)) {
-	  return NULL;
+    return NULL;
   }
   i = 10 - step_pin;
   _stepper[i] = &FastAccelStepper(i, step_pin);
@@ -105,9 +107,8 @@ bool FastAccelStepper::isStopped() { return _ticks_at_queue_end == 0; }
 //*************************************************************************************************
 void FastAccelStepper::addQueueStepperStop() { _ticks_at_queue_end = 0; }
 //*************************************************************************************************
-int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks,
-                                           uint8_t steps, bool dir_high,
-                                           int16_t change_ticks) {
+int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
+                                    bool dir_high, int16_t change_ticks) {
   int32_t c_sum = 0;
   if (steps >= 128) {
     return AQE_STEPS_ERROR;
@@ -584,9 +585,7 @@ FastAccelStepper::FastAccelStepper(uint8_t num, uint8_t step_pin) {
   fas_queue[i].init(step_pin);
 #endif
 }
-uint8_t FastAccelStepper::getStepPin() {
-	return _stepPin;
-}
+uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;
   digitalWrite(dirPin, HIGH);
@@ -686,9 +685,11 @@ int32_t FastAccelStepper::getCurrentPosition() {
 bool FastAccelStepper::isQueueFull() {
   bool full;
   if (_stepper_num == 1) {
-    full = (((fas_queue_A.next_write_ptr + 1) & QUEUE_LEN_MASK) == fas_queue_A.read_ptr);
+    full = (((fas_queue_A.next_write_ptr + 1) & QUEUE_LEN_MASK) ==
+            fas_queue_A.read_ptr);
   } else {
-    full = (((fas_queue_B.next_write_ptr + 1) & QUEUE_LEN_MASK) == fas_queue_B.read_ptr);
+    full = (((fas_queue_B.next_write_ptr + 1) & QUEUE_LEN_MASK) ==
+            fas_queue_B.read_ptr);
   }
   return full;
 }

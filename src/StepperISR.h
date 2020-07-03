@@ -29,9 +29,9 @@ struct queue_entry {
                          // steps*delta_change must not over/underflow
 };
 class StepperQueue {
-	public:
+ public:
   struct queue_entry entry[QUEUE_LEN];
-  uint8_t read_ptr; // ISR stops if readptr == next_writeptr
+  uint8_t read_ptr;  // ISR stops if readptr == next_writeptr
   uint8_t next_write_ptr;
   uint8_t autoEnablePin;
   uint8_t dirPin;

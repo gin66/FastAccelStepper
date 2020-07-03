@@ -2,30 +2,29 @@
 
 #define dirPinStepper 5
 #define enablePinStepper 6
-#define stepPinStepper 9 
-
+#define stepPinStepper 9
 
 #define LED_PIN 2
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = engine.stepperConnectToPin(stepPinStepper);
 
-#include <driver/pcnt.h>
 #include <driver/mcpwm.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
+#include <driver/pcnt.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
+#include <soc/pcnt_reg.h>
+#include <soc/pcnt_struct.h>
 
 static void IRAM_ATTR pcnt_isr(void *arg) {
-    Serial.print("PCNT interrupt: ");
-    Serial.print(PCNT.int_st.val);
-    Serial.print(" ");
-    Serial.println(PCNT.status_unit[0].val);
-    PCNT.int_clr.val = PCNT.int_st.val;
-    uint8_t x = REG_READ(MCPWM_CLK_CFG_REG(0));
-    x = x - 1;
-    REG_WRITE(MCPWM_CLK_CFG_REG(0), x);
+  Serial.print("PCNT interrupt: ");
+  Serial.print(PCNT.int_st.val);
+  Serial.print(" ");
+  Serial.println(PCNT.status_unit[0].val);
+  PCNT.int_clr.val = PCNT.int_st.val;
+  uint8_t x = REG_READ(MCPWM_CLK_CFG_REG(0));
+  x = x - 1;
+  REG_WRITE(MCPWM_CLK_CFG_REG(0), x);
 }
 
 void pwm_setup() {
@@ -41,7 +40,7 @@ void pwm_setup() {
   cfg.unit = PCNT_UNIT_0;
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
-  PCNT.conf_unit[0].conf0.thr_h_lim_en = 1; // update only on zero
+  PCNT.conf_unit[0].conf0.thr_h_lim_en = 1;  // update only on zero
   PCNT.conf_unit[0].conf0.thr_l_lim_en = 0;
 
   pcnt_counter_clear(PCNT_UNIT_0);
@@ -50,7 +49,7 @@ void pwm_setup() {
   pcnt_event_enable(PCNT_UNIT_0, PCNT_EVT_THRES_0);
   pcnt_set_event_value(PCNT_UNIT_0, PCNT_EVT_THRES_1, 10);
   pcnt_event_enable(PCNT_UNIT_0, PCNT_EVT_THRES_1);
-  //pcnt_event_enable(PCNT_UNIT_0, PCNT_EVT_H_LIM);
+  // pcnt_event_enable(PCNT_UNIT_0, PCNT_EVT_H_LIM);
   pcnt_counter_pause(PCNT_UNIT_0);
   pcnt_counter_clear(PCNT_UNIT_0);
   pcnt_counter_resume(PCNT_UNIT_0);
@@ -59,21 +58,22 @@ void pwm_setup() {
   pcnt_intr_enable(PCNT_UNIT_0);
 
   mcpwm_gpio_init(MCPWM_UNIT_0, MCPWM0A, LED_PIN);
-  MCPWM0.clk_cfg.prescale = 160-1;  // 160 MHz/160  => 1 us
+  MCPWM0.clk_cfg.prescale = 160 - 1;    // 160 MHz/160  => 1 us
   MCPWM0.timer[0].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
   MCPWM0.timer[0].period.period = 4000;
-  MCPWM0.timer[0].period.prescale = 250-1; // => 1 Hz
-  MCPWM0.timer[0].mode.start = 2; // free run
-  MCPWM0.timer[0].mode.mode = 1; // increase mod
-  MCPWM0.timer[0].sync.val = 0; // no sync
+  MCPWM0.timer[0].period.prescale = 250 - 1;  // => 1 Hz
+  MCPWM0.timer[0].mode.start = 2;             // free run
+  MCPWM0.timer[0].mode.mode = 1;              // increase mod
+  MCPWM0.timer[0].sync.val = 0;               // no sync
   MCPWM0.timer_sel.operator0_sel = 0;
-  MCPWM0.timer_sel.operator1_sel = 1; // timer 1
-  MCPWM0.timer_sel.operator2_sel = 2; // timer 2
-  MCPWM0.channel[0].cmpr_cfg.a_upmethod = 0; // timer 0 compare A update method: immediate
+  MCPWM0.timer_sel.operator1_sel = 1;  // timer 1
+  MCPWM0.timer_sel.operator2_sel = 2;  // timer 2
+  MCPWM0.channel[0].cmpr_cfg.a_upmethod =
+      0;  // timer 0 compare A update method: immediate
   MCPWM0.channel[0].cmpr_value[0].cmpr_val = 2000;
   MCPWM0.channel[0].generator[0].val = 0;
-  MCPWM0.channel[0].generator[0].utez = 2; // high at zero
-  MCPWM0.channel[0].generator[0].utea = 1; // low at compare A match
+  MCPWM0.channel[0].generator[0].utez = 2;  // high at zero
+  MCPWM0.channel[0].generator[0].utea = 1;  // low at compare A match
 
   int input_sig_index = PCNT_SIG_CH0_IN0_IDX;
   gpio_iomux_in(LED_PIN, input_sig_index);
@@ -83,14 +83,14 @@ void setup() {
   Serial.begin(115200);
 
   engine.init();
-//  engine.setDebugLed(LED_PIN);
+  //  engine.setDebugLed(LED_PIN);
 
   pwm_setup();
 
   if (stepper) {
-	  stepper->setDirectionPin(dirPinStepper);
-	  stepper->setEnablePin(enablePinStepper);
-	  stepper->setAutoEnable(true);
+    stepper->setDirectionPin(dirPinStepper);
+    stepper->setEnablePin(enablePinStepper);
+    stepper->setAutoEnable(true);
   }
 }
 
@@ -140,8 +140,7 @@ void loop() {
     }
   }
   if (stepper) {
-
-  if (queue_ok) {
+    if (queue_ok) {
       Serial.println(
           stepper->addQueueEntry(5L * 16384, 120, true, -16384 / 119));
       Serial.println(
@@ -161,57 +160,57 @@ void loop() {
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-  }
-
-  if (cmd_ok) {
-    long move = in_vals[1];
-    long ticks = in_vals[2];
-    long accel = in_vals[3];
-    if (move) {
-      Serial.print("ticks=");
-      Serial.print(ticks);
-      Serial.print("  accel=");
-      Serial.print(accel);
-      Serial.print("  move=");
-      Serial.print(move);
-      stopped = false;
-      stepper->setSpeed(ticks);
-      stepper->setAcceleration(accel);
-      stepper->move(move);
-      Serial.print("  Start stepper: ");
-      Serial.println(stepper->getCurrentPosition());
     }
-  }
 
-  if (!stopped) {
-    Serial.print("Stepper: ");
-    Serial.print(stepper->isr_speed_control_enabled ? " AUTO " : " MANU ");
-    Serial.print(stepper->getCurrentPosition());
-    if (stepper->isRunning()) {
-      Serial.print("  RUNNING");
-    } else {
-      Serial.print("  PAUSED ");
+    if (cmd_ok) {
+      long move = in_vals[1];
+      long ticks = in_vals[2];
+      long accel = in_vals[3];
+      if (move) {
+        Serial.print("ticks=");
+        Serial.print(ticks);
+        Serial.print("  accel=");
+        Serial.print(accel);
+        Serial.print("  move=");
+        Serial.print(move);
+        stopped = false;
+        stepper->setSpeed(ticks);
+        stepper->setAcceleration(accel);
+        stepper->move(move);
+        Serial.print("  Start stepper: ");
+        Serial.println(stepper->getCurrentPosition());
+      }
     }
-    Serial.print("  state=");
-    Serial.print(stepper->ramp_state);
+
+    if (!stopped) {
+      Serial.print("Stepper: ");
+      Serial.print(stepper->isr_speed_control_enabled ? " AUTO " : " MANU ");
+      Serial.print(stepper->getCurrentPosition());
+      if (stepper->isRunning()) {
+        Serial.print("  RUNNING");
+      } else {
+        Serial.print("  PAUSED ");
+      }
+      Serial.print("  state=");
+      Serial.print(stepper->ramp_state);
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-    Serial.print("  max/us=");
-    Serial.print(stepper->max_micros);
+      Serial.print("  max/us=");
+      Serial.print(stepper->max_micros);
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    Serial.print("  checksum=");
-    Serial.print(stepper->checksum);
+      Serial.print("  checksum=");
+      Serial.print(stepper->checksum);
 #endif
 
-    stopped = !stepper->isRunning();
-    if (stopped) {
-      Serial.println(
-          "Please enter one line with <steps> <speed> <acceleration> "
-          "e.g.");
-      Serial.println("10000 1000 100");
+      stopped = !stepper->isRunning();
+      if (stopped) {
+        Serial.println(
+            "Please enter one line with <steps> <speed> <acceleration> "
+            "e.g.");
+        Serial.println("10000 1000 100");
+      }
+    } else {
+      stopped = !stepper->isRunning();
     }
-  } else {
-    stopped = !stepper->isRunning();
   }
-}
 }

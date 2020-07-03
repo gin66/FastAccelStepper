@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
 
@@ -38,15 +39,18 @@ void queue_full() {
   assert(0 == s.getCurrentPosition());
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
-  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr, fas_queue[0].next_write_ptr);
+  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr,
+         fas_queue[0].next_write_ptr);
   for (int i = 0; i < QUEUE_LEN - 2; i++) {
     s.addQueueEntry(10000, 100, true, 0);
     assert(!s.isQueueEmpty());
     assert(!s.isQueueFull());
-    printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr, fas_queue[0].next_write_ptr);
+    printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr,
+           fas_queue[0].next_write_ptr);
   }
   s.addQueueEntry(10000, 100, true, 0);
-  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr, fas_queue[0].next_write_ptr);
+  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr,
+         fas_queue[0].next_write_ptr);
   assert(!s.isQueueEmpty());
   assert(s.isQueueFull());
   puts("...done");

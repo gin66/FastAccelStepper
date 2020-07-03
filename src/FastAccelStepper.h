@@ -5,9 +5,11 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "stubs.h"
 #endif
 #include <stdint.h>
+
 #include "PoorManFloat.h"
 
 #define TEST_MEASURE_ISR_SINGLE_FILL 0
@@ -49,8 +51,8 @@ class FastAccelStepper {
   // unstable API functions
 
   // stepper queue management (low level access)
-  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
-                           bool dir_high, int16_t change_ticks);
+  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high,
+                    int16_t change_ticks);
   // Return codes for add_queue_entry
 #define AQE_OK 0
 #define AQE_FULL -1
