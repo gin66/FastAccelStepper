@@ -100,6 +100,7 @@ void init_queue() {
 void basic_test_with_empty_queue() {
   init_queue();
   FastAccelStepper s = FastAccelStepper();
+  s.init(0,0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 
@@ -141,6 +142,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
          travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
+  s.init(0,0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 

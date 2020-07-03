@@ -110,11 +110,6 @@ class FastAccelStepper {
   uint8_t _auto_enablePin;
   uint8_t _enablePin;
 
-  int32_t _pos_at_queue_end;    // in steps
-  int32_t _ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
-  bool _dir_high_at_queue_end;  // direction high corresponds to position
-                                // counting upwards
-
   void _calculate_move(int32_t steps);
   void _update_ramp_steps();
 

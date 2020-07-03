@@ -152,7 +152,7 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 //*************************************************************************************************
 //
-// FastAccelStepper is associated with either stepperA or stepperB and provides:
+// FastAccelStepper provides:
 // - movement control
 //       either raw access to the stepper command queue
 //       or ramp generator driven by speed/acceleration and move
@@ -162,78 +162,13 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-bool FastAccelStepper::isStopped() { return _ticks_at_queue_end == 0; }
+bool FastAccelStepper::isStopped() { return fas_queue[_queue_num].isStopped(); }
 //*************************************************************************************************
-void FastAccelStepper::addQueueStepperStop() { _ticks_at_queue_end = 0; }
+void FastAccelStepper::addQueueStepperStop() { fas_queue[_queue_num].addQueueStepperStop(); }
 //*************************************************************************************************
 int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
                                     bool dir_high, int16_t change_ticks) {
-  int32_t c_sum = 0;
-  if (steps >= 128) {
-    return AQE_STEPS_ERROR;
-  }
-  if (start_delta_ticks > ABSOLUTE_MAX_TICKS) {
-    return AQE_TOO_HIGH;
-  }
-  if ((change_ticks != 0) && (steps > 1)) {
-    c_sum = change_ticks * (steps - 1);
-  }
-  if (change_ticks > 0) {
-    if (c_sum > 32768) {
-      return AQE_CHANGE_TOO_HIGH;
-    }
-  } else if (change_ticks < 0) {
-    if (c_sum < -32768) {
-      return AQE_CHANGE_TOO_LOW;
-    }
-    if (start_delta_ticks + c_sum < MIN_DELTA_TICKS) {
-      return AQE_CUMULATED_CHANGE_TOO_LOW;
-    }
-  }
-
-  uint16_t msb = start_delta_ticks >> 14;
-  uint16_t lsw;
-  if (msb > 1) {
-    msb--;
-    lsw = start_delta_ticks & 0x3fff;
-    lsw |= 0x4000;
-  } else {
-    msb = 0;
-    lsw = start_delta_ticks;
-  }
-
-  uint8_t wp = fas_queue[_queue_num].next_write_ptr;
-  uint8_t rp = fas_queue[_queue_num].read_ptr;
-  struct queue_entry* e = &fas_queue[_queue_num].entry[wp];
-
-  uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
-  if (next_wp != rp) {
-    _pos_at_queue_end += dir_high ? steps : -steps;
-    _ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
-    steps <<= 1;
-    e->delta_msb = msb;
-    e->delta_lsw = lsw;
-    e->delta_change = change_ticks;
-    e->steps = (dir_high != _dir_high_at_queue_end) ? steps | 0x01 : steps;
-    _dir_high_at_queue_end = dir_high;
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    {
-      unsigned char* x = (unsigned char*)e;
-      for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
-        if (checksum & 0x80) {
-          checksum <<= 1;
-          checksum ^= 0xde;
-        } else {
-          checksum <<= 1;
-        }
-        checksum ^= *x++;
-      }
-    }
-#endif
-    fas_queue[_queue_num].next_write_ptr = next_wp;
-    return AQE_OK;
-  }
-  return AQE_FULL;
+  return fas_queue[_queue_num].addQueueEntry(start_delta_ticks, steps,dir_high,change_ticks);
 }
 
 //*************************************************************************************************
@@ -267,7 +202,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   }
   uint32_t steps = abs(move);
 
-  uint32_t curr_ticks = _ticks_at_queue_end;
+  uint32_t curr_ticks = fas_queue[_queue_num].ticks_at_queue_end;
   uint32_t performed_ramp_up_steps;
   uint32_t deceleration_start;
   uint32_t upm_sq_min_travel;
@@ -335,7 +270,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
 
 inline void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
-  if (target_pos == _pos_at_queue_end) {
+  if (target_pos == getPositionAfterCommandsCompleted()) {
     isr_speed_control_enabled = false;
     return;
   }
@@ -355,20 +290,22 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   uint32_t runtime_us = micros();
 #endif
 
+  int32_t ticks_at_queue_end = fas_queue[_queue_num].ticks_at_queue_end;
+
   // check state for acceleration/deceleration or deceleration to stop
-  uint32_t remaining_steps = abs(target_pos - _pos_at_queue_end);
+  uint32_t remaining_steps = abs(target_pos - getPositionAfterCommandsCompleted());
   uint32_t planning_steps;
   uint32_t next_ticks;
   if (ramp_state == RAMP_STATE_IDLE) {  // motor is stopped. Set to max value
     planning_steps = 1;
     ramp_state = RAMP_STATE_ACCELERATE;
   } else {
-    planning_steps = max(16000 / _ticks_at_queue_end, 1);
+    planning_steps = max(16000 / ticks_at_queue_end, 1);
     if (remaining_steps <= _deceleration_start) {
       ramp_state = RAMP_STATE_DECELERATE_TO_STOP;
-    } else if (_min_travel_ticks < _ticks_at_queue_end) {
+    } else if (_min_travel_ticks < ticks_at_queue_end) {
       ramp_state = RAMP_STATE_ACCELERATE;
-    } else if (_min_travel_ticks > _ticks_at_queue_end) {
+    } else if (_min_travel_ticks > ticks_at_queue_end) {
       ramp_state = RAMP_STATE_DECELERATE;
     } else {
       ramp_state = RAMP_STATE_COAST;
@@ -397,7 +334,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   printf("\n");
 #endif
 
-  uint32_t curr_ticks = _ticks_at_queue_end;
+  uint32_t curr_ticks = fas_queue[_queue_num].ticks_at_queue_end;
 #ifdef TEST
   float v2;
 #endif
@@ -513,7 +450,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     curr_ticks += change;
   }
 
-  bool dir = target_pos > _pos_at_queue_end;
+  bool dir = target_pos > getPositionAfterCommandsCompleted();
 
 #ifdef TEST
   if (steps > 1) {
@@ -540,7 +477,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         "Remaining steps = %d  tick_change=%d"
         " => res=%d   ticks_at_queue_end = %d\n",
         (command_cnt + 1 - c), steps_per_command, curr_ticks, target_pos,
-        remaining_steps, change, res, _ticks_at_queue_end);
+        remaining_steps, change, res, fas_queue[_queue_num].ticks_at_queue_end);
 #endif
     curr_ticks += steps_per_command * change;
     steps -= steps_per_command;
@@ -553,7 +490,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       "Remaining steps = %d  tick_change=%d"
       " => res=%d   ticks_at_queue_end = %d\n",
       steps, curr_ticks, target_pos, remaining_steps, change, res,
-      _ticks_at_queue_end);
+      fas_queue[_queue_num].ticks_at_queue_end);
 #endif
   if (res != 0) {  // Emergency stop on internal error
     addQueueStepperStop();
@@ -609,10 +546,7 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   ramp_state = RAMP_STATE_IDLE;
   _stepper_num = num;
   _auto_enablePin = 255;
-  _pos_at_queue_end = 0;
-  _dir_high_at_queue_end = true;
   _min_travel_ticks = 0;
-  _ticks_at_queue_end = 0;
   _stepPin = step_pin;
 
 #if defined(ARDUINO_ARCH_AVR)
@@ -664,13 +598,13 @@ void FastAccelStepper::_update_ramp_steps() {
       upm_to_u32(divide(_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
 }
 void FastAccelStepper::move(int32_t move) {
-  target_pos = _pos_at_queue_end + move;
+  target_pos = getPositionAfterCommandsCompleted() + move;
   _calculate_move(move);
 }
 void FastAccelStepper::moveTo(int32_t position) {
   int32_t move;
   target_pos = position;
-  move = position - _pos_at_queue_end;
+  move = position - getPositionAfterCommandsCompleted();
   _calculate_move(move);
 }
 void FastAccelStepper::disableOutputs() {
@@ -684,11 +618,12 @@ void FastAccelStepper::enableOutputs() {
   }
 }
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
-  return _pos_at_queue_end;
+  return fas_queue[_queue_num].pos_at_queue_end;
 }
 int32_t FastAccelStepper::getCurrentPosition() {
-  int32_t pos = _pos_at_queue_end;
-  bool dir = _dir_high_at_queue_end;
+  int32_t pos = getPositionAfterCommandsCompleted();
+  printf("%d %d\n",_queue_num,pos);
+  bool dir = fas_queue[_queue_num].dir_high_at_queue_end;
   noInterrupts();
   uint8_t wp = fas_queue[_queue_num].next_write_ptr;
   uint8_t rp = fas_queue[_queue_num].read_ptr;

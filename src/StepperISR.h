@@ -48,12 +48,35 @@ class StepperQueue {
   uint8_t skip;
 #endif
 
+  int32_t pos_at_queue_end;    // in steps
+  int32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
+  bool dir_high_at_queue_end;  // direction high corresponds to position
+                                // counting upwards
+
   void init(uint8_t step_pin);
   bool isQueueFull() {
 	return (((next_write_ptr + 1) & QUEUE_LEN_MASK) == read_ptr);
   }
   bool isQueueEmpty() {
 	return (read_ptr == next_write_ptr);
+  }
+  bool isStopped() {
+	  return ticks_at_queue_end == 0;
+  }
+  void addQueueStepperStop() {
+	  ticks_at_queue_end = 0;
+  }
+  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high,
+                    int16_t change_ticks);
+ private:
+  void _initVars() {
+	  dirPin = 255;
+	  autoEnablePin = 255;
+	  read_ptr = 0;
+	  next_write_ptr = 0;
+	  dir_high_at_queue_end = true;
+	  pos_at_queue_end = 0;
+	  ticks_at_queue_end = 0;
   }
 };
 
