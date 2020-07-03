@@ -54,16 +54,4 @@ extern struct StepperQueue fas_queue[NUM_QUEUES];
 	TCCR1 ## X= (TCCR1 ## X& ~(_BV(COM1 ## X ## 1) | _BV(COM1 ## X ## 0)))
 #define Stepper_IsToggling(X) \
 	((TCCR1 ## X& (_BV(COM1 ## X ## 0) | _BV(COM1 ## X ## 1))) == _BV(COM1 ## X ## 0))
-
-#define StepperA_Toggle TCCR1A = (TCCR1A | _BV(COM1A0)) & ~_BV(COM1A1)
-#define StepperA_Zero TCCR1A = (TCCR1A | _BV(COM1A1)) & ~_BV(COM1A0)
-#define StepperA_Disconnect TCCR1A = (TCCR1A & ~(_BV(COM1A1) | _BV(COM1A0)))
-#define StepperA_IsToggling \
-  ((TCCR1A & (_BV(COM1A0) | _BV(COM1A1))) == _BV(COM1A0))
-
-#define StepperB_Toggle TCCR1A = (TCCR1A | _BV(COM1B0)) & ~_BV(COM1B1)
-#define StepperB_Zero TCCR1A = (TCCR1A | _BV(COM1B1)) & ~_BV(COM1B0)
-#define StepperB_Disconnect TCCR1A = (TCCR1A & ~(_BV(COM1B1) | _BV(COM1B0)))
-#define StepperB_IsToggling \
-  ((TCCR1A & (_BV(COM1B0) | _BV(COM1B1))) == _BV(COM1B0))
 #endif
