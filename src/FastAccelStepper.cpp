@@ -22,7 +22,9 @@ upm_float upm_timer_freq;
 #endif
 
 #if defined(ARDUINO_ARCH_AVR)
-// create variables here, so that in ISR no pointer indirection need to be resolved
+FastAccelStepperEngine *fas_engine = NULL;
+
+// dynamic allocation seem to not work so well
 FastAccelStepper fas_stepperA = FastAccelStepper();
 FastAccelStepper fas_stepperB = FastAccelStepper();
 #endif
@@ -40,8 +42,9 @@ void FastAccelStepperEngine::init() {
   upm_timer_freq = upm_from((uint32_t)TIMER_FREQ);
 #endif
 #if defined(ARDUINO_ARCH_AVR)
-  fas_stepperA.isr_speed_control_enabled = false;
-  fas_stepperB.isr_speed_control_enabled = false;
+  fas_engine = this;
+
+  // Initialize timer for stepper background task and correct time base
   noInterrupts();
 
   // Set WGM13:0 to all zero => Normal mode
@@ -69,25 +72,50 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) 
     }
   }
 #if defined(ARDUINO_ARCH_AVR)
+	FastAccelStepper* s;
   if (step_pin == stepPinStepperA) {
-	_stepper[1] = &fas_stepperA;
-	fas_stepperA.init(1, stepPinStepperA);
-    return &fas_stepperA;
+	s = &fas_stepperA;
   }
-  if (step_pin == stepPinStepperB) {
-	_stepper[0] = &fas_stepperB;
-	fas_stepperB.init(0, stepPinStepperB);
-    return &fas_stepperB;
+  else if (step_pin == stepPinStepperB) {
+	s = &fas_stepperB;
   }
+  else {
+	return NULL;
+  }
+
+	_stepper[_next_stepper_num] = s;
+	s->init(_next_stepper_num, step_pin);
+	_next_stepper_num++;
+    return s;
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
-#endif
   return NULL;
+#endif
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
 }
+//*************************************************************************************************
+void FastAccelStepperEngine::manageSteppers() {
+  if (fas_ledPin < 255) {
+    fas_debug_led_cnt++;
+    if (fas_debug_led_cnt == 144) {
+      digitalWrite(fas_ledPin, HIGH);
+    }
+    if (fas_debug_led_cnt == 288) {
+      digitalWrite(fas_ledPin, LOW);
+      fas_debug_led_cnt = 0;
+    }
+  }
+  for (uint8_t i = 0; i < _next_stepper_num;i++) {
+	 FastAccelStepper* s = _stepper[i];
+	if (s) {
+	  s->isr_fill_queue();
+	}
+  }
+}
+
 
 //*************************************************************************************************
 //*************************************************************************************************
@@ -142,18 +170,10 @@ int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
     lsw = start_delta_ticks;
   }
 
-  uint8_t wp;
-  uint8_t rp;
-  struct queue_entry* e;
-  if (_stepper_num == 1) {
-    wp = fas_queue_A.next_write_ptr;
-    rp = fas_queue_A.read_ptr;
-    e = &fas_queue_A.entry[wp];
-  } else {
-    wp = fas_queue_B.next_write_ptr;
-    rp = fas_queue_B.read_ptr;
-    e = &fas_queue_B.entry[wp];
-  }
+  uint8_t wp = fas_queue[_stepper_num].next_write_ptr;
+  uint8_t rp = fas_queue[_stepper_num].read_ptr;
+  struct queue_entry* e = &fas_queue[_stepper_num].entry[wp];
+
   uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
   if (next_wp != rp) {
     _pos_at_queue_end += dir_high ? steps : -steps;
@@ -178,11 +198,7 @@ int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
       }
     }
 #endif
-    if (_stepper_num == 1) {
-      fas_queue_A.next_write_ptr = next_wp;
-    } else {
-      fas_queue_B.next_write_ptr = next_wp;
-    }
+    fas_queue[_stepper_num].next_write_ptr = next_wp;
     return AQE_OK;
   }
   return AQE_FULL;
@@ -539,19 +555,8 @@ ISR(TIMER1_OVF_vect) {
   // enable interrupts for nesting
   interrupts();
 
-  if (fas_ledPin < 255) {
-    fas_debug_led_cnt++;
-    if (fas_debug_led_cnt == 144) {
-      digitalWrite(fas_ledPin, HIGH);
-    }
-    if (fas_debug_led_cnt == 288) {
-      digitalWrite(fas_ledPin, LOW);
-      fas_debug_led_cnt = 0;
-    }
-  }
-
-  fas_stepperA.isr_fill_queue();
-  fas_stepperB.isr_fill_queue();
+  // manage steppers
+  fas_engine->manageSteppers();
 
   // enable OVF interrupt again
   TIMSK1 |= _BV(TOIE1);
@@ -589,11 +594,7 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   _dirPin = dirPin;
   digitalWrite(dirPin, HIGH);
   pinMode(dirPin, OUTPUT);
-  if (_stepper_num == 1) {
-    fas_queue_A.dirPin = dirPin;
-  } else {
-    fas_queue_B.dirPin = dirPin;
-  }
+  fas_queue[_stepper_num].dirPin = dirPin;
 }
 void FastAccelStepper::setEnablePin(uint8_t enablePin) {
   _enablePin = enablePin;
@@ -606,11 +607,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   } else {
     _auto_enablePin = 255;
   }
-  if (_stepper_num == 1) {
-    fas_queue_A.autoEnablePin = _auto_enablePin;
-  } else {
-    fas_queue_B.autoEnablePin = _auto_enablePin;
-  }
+  fas_queue[_stepper_num].autoEnablePin = _auto_enablePin;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   _min_travel_ticks = min_step_us * (TIMER_FREQ / 1000L) / 1000L;
@@ -653,17 +650,10 @@ int32_t FastAccelStepper::getCurrentPosition() {
   int32_t pos = _pos_at_queue_end;
   bool dir = _dir_high_at_queue_end;
   struct queue_entry* q;
-  uint8_t rp, wp;
   noInterrupts();
-  if (_stepper_num == 1) {
-    q = fas_queue_A.entry;
-    rp = fas_queue_A.read_ptr;
-    wp = fas_queue_A.next_write_ptr;
-  } else {
-    q = fas_queue_B.entry;
-    rp = fas_queue_B.read_ptr;
-    wp = fas_queue_B.next_write_ptr;
-  }
+  uint8_t wp = fas_queue[_stepper_num].next_write_ptr;
+  uint8_t rp = fas_queue[_stepper_num].read_ptr;
+  struct queue_entry* e = &fas_queue[_stepper_num].entry[wp];
   interrupts();
   if (rp != wp) {
     while (rp != wp) {
@@ -682,23 +672,11 @@ int32_t FastAccelStepper::getCurrentPosition() {
   return pos;
 }
 bool FastAccelStepper::isQueueFull() {
-  bool full;
-  if (_stepper_num == 1) {
-    full = (((fas_queue_A.next_write_ptr + 1) & QUEUE_LEN_MASK) ==
-            fas_queue_A.read_ptr);
-  } else {
-    full = (((fas_queue_B.next_write_ptr + 1) & QUEUE_LEN_MASK) ==
-            fas_queue_B.read_ptr);
-  }
-  return full;
+  StepperQueue* q = &fas_queue[_stepper_num];
+  return (((q->next_write_ptr + 1) & QUEUE_LEN_MASK) == q->read_ptr);
 }
 bool FastAccelStepper::isQueueEmpty() {
-  bool empty;
-  if (_stepper_num == 1) {
-    empty = (fas_queue_A.read_ptr == fas_queue_A.next_write_ptr);
-  } else {
-    empty = (fas_queue_B.read_ptr == fas_queue_B.next_write_ptr);
-  }
-  return empty;
+  StepperQueue* q = &fas_queue[_stepper_num];
+  return (q->read_ptr == q->next_write_ptr);
 }
 bool FastAccelStepper::isRunning() { return !isQueueEmpty(); }

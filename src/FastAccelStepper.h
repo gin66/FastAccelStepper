@@ -164,6 +164,9 @@ class FastAccelStepperEngine {
   // blink with 1 Hz
   void setDebugLed(uint8_t ledPin);
 
+  // This should be only called from ISR or stepper task
+  void manageSteppers();
+
  private:
   uint8_t _next_stepper_num;
   FastAccelStepper* _stepper[MAX_STEPPER];
