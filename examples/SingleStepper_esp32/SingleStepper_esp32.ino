@@ -1,8 +1,8 @@
 #include "FastAccelStepper.h"
 
-#define dirPinStepper 11 
-#define enablePinStepper 12
-#define stepPinStepper 2
+#define dirPinStepper 22
+#define enablePinStepper 21
+#define stepPinStepper 23
 
 #define LED_PIN 2
 
@@ -29,6 +29,17 @@ long in_vals[8];
 bool stopped = false;
 
 void loop() {
+  if (false) {
+	  pinMode(stepPinStepper,OUTPUT);
+	  pinMode(dirPinStepper,OUTPUT);
+	  pinMode(enablePinStepper,OUTPUT);
+	  digitalWrite(dirPinStepper, LOW);
+	  digitalWrite(enablePinStepper, HIGH);
+	  digitalWrite(stepPinStepper, HIGH);
+	  delay(100);
+	  digitalWrite(stepPinStepper, LOW);
+	  delay(100);
+  }
   delay(100);
 
   bool cmd_ok = false;

@@ -31,10 +31,22 @@
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 struct queue_entry {
   uint8_t steps;  // coding is bit7..1 is nr of steps and bit 0 is direction
+#if defined(TEST)
   uint8_t delta_msb;
   uint16_t delta_lsw;    // using small values is not safe
   int16_t delta_change;  // change of delta on each step. delta_lsw +
                          // steps*delta_change must not over/underflow
+#endif
+#if defined(ARDUINO_ARCH_AVR)
+  uint8_t delta_msb;
+  uint16_t delta_lsw;    // using small values is not safe
+  int16_t delta_change;  // change of delta on each step. delta_lsw +
+                         // steps*delta_change must not over/underflow
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+  uint8_t prescaler;
+  uint16_t period;
+#endif
 };
 class StepperQueue {
  public:

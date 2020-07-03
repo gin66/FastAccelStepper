@@ -126,6 +126,8 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) 
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
+  pinMode(fas_ledPin,OUTPUT);
+  digitalWrite(fas_ledPin, LOW);
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::manageSteppers() {
