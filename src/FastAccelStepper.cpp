@@ -19,7 +19,16 @@ uint16_t fas_debug_led_cnt = 0;
 #define DEBUG_LED_HALF_PERIOD 50
 #endif
 
+#if defined(ARDUINO_ARCH_AVR)
 #define TIMER_FREQ F_CPU
+#endif
+#if defined(TEST)
+#define TIMER_FREQ F_CPU
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+#define TIMER_FREQ 16000000
+#endif
+
 #if (TIMER_FREQ == 16000000)
 #define UPM_TIMER_FREQ ((upm_float)0x97f4)
 #else
@@ -557,7 +566,7 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
 #if defined(ARDUINO_ARCH_ESP32)
   _queue_num = num;
 #endif
-  fas_queue[_queue_num].init(step_pin);
+  fas_queue[_queue_num].init(_queue_num, step_pin);
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin) {

@@ -5,7 +5,7 @@
 // Here are the global variables to interface with the interrupts
 //StepperQueue fas_queue[NUM_QUEUES];
 
-void StepperQueue::init(uint8_t step_pin) {
+void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 	_initVars();
 }
 int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,

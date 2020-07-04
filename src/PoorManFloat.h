@@ -1,5 +1,5 @@
+#include <stdint.h>
 #if defined(ARDUINO_ARCH_ESP32)
-#define abs(x) ((x) > 0 ? (x) : -(x))
 #define min(a, b) ((a) > (b) ? (b) : (a))
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #endif

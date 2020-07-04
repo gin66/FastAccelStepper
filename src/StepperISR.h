@@ -55,6 +55,9 @@ class StepperQueue {
   uint8_t next_write_ptr;
   uint8_t autoEnablePin;
   uint8_t dirPin;
+#if defined(ARDUINO_ARCH_ESP32)
+  uint8_t queueNum;
+#endif
   // This is used in the timer compare unit as extension of the 16 timer
 #if defined(ARDUINO_ARCH_AVR)
   uint8_t skip;
@@ -65,7 +68,7 @@ class StepperQueue {
   bool dir_high_at_queue_end;  // direction high corresponds to position
                                 // counting upwards
 
-  void init(uint8_t step_pin);
+  void init(uint8_t queue_num, uint8_t step_pin);
   bool isQueueFull() {
 	return (((next_write_ptr + 1) & QUEUE_LEN_MASK) == read_ptr);
   }
