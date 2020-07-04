@@ -7,11 +7,13 @@
 #define LED_PIN 2
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper = engine.stepperConnectToPin(stepPinStepper);
+FastAccelStepper *stepper;
 
 void setup() {
   Serial.begin(115200);
+  Serial.println("Start");
 
+  stepper = engine.stepperConnectToPin(stepPinStepper);
   engine.init();
   engine.setDebugLed(LED_PIN);
 

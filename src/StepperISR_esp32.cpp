@@ -9,6 +9,9 @@
 #include "FastAccelStepper.h"
 
 #if defined(ARDUINO_ARCH_ESP32)
+
+#define TIMER_H_L_TRANSITION 20
+
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
@@ -17,10 +20,10 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
   mcpwm_dev_t *mcpwm = q->queueNum < 3 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = q->queueNum % 3;
   uint8_t rp = q->read_ptr;
-  rp = (rp + 1) & QUEUE_LEN_MASK;
-  q->read_ptr = rp;
   if (rp != q->next_write_ptr) {
-	  struct queue_entry *e = &q->entry[rp];
+      struct queue_entry *e = &q->entry[rp];
+	  rp = (rp + 1) & QUEUE_LEN_MASK;
+	  q->read_ptr = rp;
 	  mcpwm->timer[timer].period.val = (1L<<24) /* update at TEZ */
 								+ (((uint32_t) e->period) << 8)
 								+ e->prescaler;
@@ -33,18 +36,34 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
   else {
 	  // no more commands: stop timer at period end
 	  mcpwm->timer[timer].mode.start = 1; // stop at TEP
+      mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+      q->isRunning = false;
         if (q->autoEnablePin != 255) {
           digitalWrite(q->autoEnablePin, HIGH);
         }
   }
+//  Serial.print("X");
+//  Serial.println(PCNT.int_st.val);
   PCNT.int_clr.val = PCNT.int_st.val; // necessary ?
 }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+	Serial.println("StepperQueue init");
   _initVars();
+
+  Serial.print("rp=");
+  Serial.print(read_ptr);
+  Serial.print(" next_wp=");
+  Serial.println(next_write_ptr);
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
   queueNum = queue_num;
+  isRunning = false;
+
+  Serial.print("rp=");
+  Serial.print(read_ptr);
+  Serial.print(" next_wp=");
+  Serial.println(next_write_ptr);
 
   mcpwm_dev_t *mcpwm = queue_num < 3 ? &MCPWM0 : &MCPWM1;
   mcpwm_unit_t mcpwm_unit = queue_num < 3 ? MCPWM_UNIT_0 : MCPWM_UNIT_1;
@@ -68,14 +87,20 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pcnt_event_enable(pcnt_unit, PCNT_EVT_H_LIM);
   if (queue_num == 0) {
      // isr_service_install apparently enables the interrupt
+     PCNT.int_clr.val = PCNT.int_st.val;
      pcnt_isr_service_install(ESP_INTR_FLAG_EDGE | ESP_INTR_FLAG_IRAM);
      pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
   }
 
+  Serial.print("rp=");
+  Serial.print(read_ptr);
+  Serial.print(" next_wp=");
+  Serial.println(next_write_ptr);
+
   uint8_t timer = queue_num %3;
   if (timer == 0) {
 	  // Init mcwpm module for use
-      mcpwm->clk_cfg.prescale = 2 - 1;    // 160 MHz/10  => 16 MHz
+      mcpwm->clk_cfg.prescale = 10 - 1;    // 160 MHz/10  => 16 MHz
 	  mcpwm->timer_sel.operator0_sel = 0;  // timer 0 is input for operator 0
 	  mcpwm->timer_sel.operator1_sel = 1;  // timer 1 is input for operator 1
 	  mcpwm->timer_sel.operator2_sel = 2;  // timer 2 is input for operator 2
@@ -95,16 +120,17 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->timer[timer].period.period = 400;
   mcpwm->timer[timer].period.prescale = 25 - 1;  // => 1 Hz
   mcpwm->timer[timer].mode.val = 0;              // freeze
-  mcpwm->timer[timer].mode.val = 10;             // free run incrementing
   mcpwm->timer[timer].sync.val = 0;              // no sync
   mcpwm->channel[timer].cmpr_cfg.a_upmethod = 0;
-  mcpwm->channel[timer].cmpr_value[0].cmpr_val = 20;
+  mcpwm->channel[timer].cmpr_value[0].cmpr_val = TIMER_H_L_TRANSITION;
   mcpwm->channel[timer].generator[0].val = 0;
   mcpwm->channel[timer].generator[1].val = 0;
   mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
   mcpwm->channel[timer].generator[0].utea = 1;  // low at compare A match
   mcpwm->channel[timer].db_cfg.val = 0;
   mcpwm->channel[timer].carrier_cfg.val = 0; // carrier disabled
+
+  // TODO: still hardcoded channel
   mcpwm->update_cfg.op0_force_up = 1; // force update
 
   // at last link the output to pcnt input
@@ -118,6 +144,11 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 	  case 5: input_sig_index = PCNT_SIG_CH0_IN5_IDX; break;
   }
   gpio_iomux_in(step_pin, input_sig_index);
+
+  Serial.print("end of init rp=");
+  Serial.print(read_ptr);
+  Serial.print(" next_wp=");
+  Serial.println(next_write_ptr);
 }
 
 // Mechanism is like this, starting from stopped motor:
@@ -131,12 +162,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 //			read next commmand: store period in counter shadow and steps in pcnt
 //			without next command: set mcpwm to stop mode on reaching period
 //
-
-void pwm_setup(StepperQueue *queue) {
-  mcpwm_dev_t *mcpwm = queue->queueNum < 3 ? &MCPWM0 : &MCPWM1;
-  uint8_t timer = queue->queueNum % 3;
-  mcpwm->timer[timer].mode.val = 10;             // free run incrementing
-}
 
 int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
                                     bool dir_high, int16_t change_ticks) {
@@ -178,6 +203,11 @@ Serial.println(period);
   uint8_t rp = read_ptr;
   struct queue_entry* e = &entry[wp];
 
+  Serial.print("rp=");
+  Serial.print(read_ptr);
+  Serial.print(" next_wp=");
+  Serial.println(next_write_ptr);
+
   uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
   if (next_wp != rp) {
     pos_at_queue_end += dir_high ? steps : -steps;
@@ -201,16 +231,50 @@ Serial.println(period);
       }
     }
 #endif
+Serial.print("before update rp=");
+Serial.print(read_ptr);
+Serial.print(" next_wp=");
+Serial.println(next_write_ptr);
     next_write_ptr = next_wp;
-	if (wp == 0) {
-		if (MCPWM0.timer_sel.val == 0) {
-    pwm_setup(this);
-		}
-	}
-  MCPWM0.timer[0].mode.start = 2;             // free run
+Serial.print("after update rp=");
+Serial.print(read_ptr);
+Serial.print(" next_wp=");
+Serial.println(next_write_ptr);
+	if (!isRunning) {
+	  mcpwm_dev_t *mcpwm = queueNum < 3 ? &MCPWM0 : &MCPWM1;
+      pcnt_unit_t pcnt_unit = (pcnt_unit_t)queueNum;
+	  uint8_t timer = queueNum % 3;
+	  // timer should be either a TEP or at zero
+      mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+	  mcpwm->timer[timer].period.val = 0 /* update immediate */
+								+ (10000L << 8)
+								+ (100-1);
+      PCNT.conf_unit[timer].conf2.cnt_h_lim = 1;
+      pcnt_counter_clear(pcnt_unit);
+      pcnt_counter_resume(pcnt_unit);
+	  isRunning = true;
+
+	  mcpwm->timer[timer].mode.val = 10;            // free run incrementing
+
+      // wait period at zero
+	  uint32_t i;
+	  while (mcpwm->timer[timer].status.value >= TIMER_H_L_TRANSITION) {
+		  i++;
+	  }
+	  Serial.print("Loops=");
+	  Serial.println(i);
+
+      mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
+
         if (autoEnablePin != 255) {
           digitalWrite(autoEnablePin, LOW);
         }
+	}
+Serial.print("rp=");
+Serial.print(read_ptr);
+Serial.print(" next_wp=");
+Serial.println(next_write_ptr);
+
     return AQE_OK;
   }
   return AQE_FULL;

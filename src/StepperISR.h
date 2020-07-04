@@ -57,6 +57,7 @@ class StepperQueue {
   uint8_t dirPin;
 #if defined(ARDUINO_ARCH_ESP32)
   uint8_t queueNum;
+  bool isRunning;
 #endif
   // This is used in the timer compare unit as extension of the 16 timer
 #if defined(ARDUINO_ARCH_AVR)
