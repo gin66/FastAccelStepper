@@ -13,6 +13,17 @@ void setup() {
   Serial.begin(115200);
   Serial.println("Start");
 
+  while (false) {
+	  pinMode(stepPinStepper,OUTPUT);
+	  pinMode(dirPinStepper,OUTPUT);
+	  pinMode(enablePinStepper,OUTPUT);
+	  digitalWrite(dirPinStepper, LOW);
+	  digitalWrite(enablePinStepper, LOW);
+	  digitalWrite(stepPinStepper, HIGH);
+	  delay(10);
+	  digitalWrite(stepPinStepper, LOW);
+	  delay(10);
+  }
   stepper = engine.stepperConnectToPin(stepPinStepper);
   engine.init();
   engine.setDebugLed(LED_PIN);
@@ -31,17 +42,6 @@ long in_vals[8];
 bool stopped = false;
 
 void loop() {
-  if (false) {
-	  pinMode(stepPinStepper,OUTPUT);
-	  pinMode(dirPinStepper,OUTPUT);
-	  pinMode(enablePinStepper,OUTPUT);
-	  digitalWrite(dirPinStepper, LOW);
-	  digitalWrite(enablePinStepper, HIGH);
-	  digitalWrite(stepPinStepper, HIGH);
-	  delay(100);
-	  digitalWrite(stepPinStepper, LOW);
-	  delay(100);
-  }
   delay(100);
 
   bool cmd_ok = false;
@@ -76,6 +76,8 @@ void loop() {
   }
   if (stepper) {
     if (queue_ok) {
+      // 3200 steps is one round with 16 microsteps and 200 steps for revolution
+      // 25 * 120 + 2 * 100
       Serial.println(
           stepper->addQueueEntry(5L * 16384, 120, true, -16384 / 119));
       Serial.println(
@@ -95,6 +97,18 @@ void loop() {
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
       Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 100, true, 0));
+      Serial.println(stepper->addQueueEntry(2L * 4096, 100, true, 0));
     }
 
     if (cmd_ok) {

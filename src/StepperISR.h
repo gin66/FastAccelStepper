@@ -16,19 +16,22 @@
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
+#define QUEUE_LEN 16
 #endif
 #if defined(ARDUINO_ARCH_AVR)
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
+#define QUEUE_LEN 16
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #define NUM_QUEUES 6
+#define QUEUE_LEN 32
 #endif
 
 // These variables control the stepper timing behaviour
-#define QUEUE_LEN 16
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
+
 struct queue_entry {
   uint8_t steps;  // coding is bit7..1 is nr of steps and bit 0 is direction
 #if defined(TEST)
