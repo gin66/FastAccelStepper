@@ -141,6 +141,7 @@ The low level command queue for each stepper allows direct speed control - when 
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
 * Support different values for acceleration and deceleration
 * Add preprocessor constant: TICKS_PER_S for raw commands
+* Rework FastAccelStepper.cpp after remove of "change"
 
 ## NOT TODO
 

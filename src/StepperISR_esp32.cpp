@@ -112,11 +112,8 @@ static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
 }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
-	Serial.println("StepperQueue init");
   _initVars();
 
-  Serial.print("queue_num=");
-  Serial.println(queue_num);
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
   queueNum = queue_num;
@@ -149,11 +146,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
      pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
   }
 
-  Serial.print("rp=");
-  Serial.print(read_ptr);
-  Serial.print(" next_wp=");
-  Serial.println(next_write_ptr);
-
   uint8_t timer = queue_num %3;
   switch(timer) {
 	  case 0:
@@ -167,7 +159,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 		 break;
   }
   if (timer == 0) {
-	  Serial.println("INIT MODULE");
 	  // Init mcwpm module for use
 	  //
 	  periph_module_enable(queue_num < 3 ? PERIPH_PWM0_MODULE : PERIPH_PWM1_MODULE);
@@ -178,50 +169,12 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 					ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_EDGE,
 					NULL);
 
-//	  mcpwm->update_cfg.global_up_en = 1;
-//	  mcpwm->update_cfg.global_force_up = 1;
-//	  mcpwm->update_cfg.global_force_up = 0;
-//	  REG_WRITE(MCPWM_CLK_REG(0), 0);
-//	  REG_WRITE(MCPWM_CLK_CFG_REG(0), 0xffffffffL);
-//	  REG_WRITE(MCPWM_CLK_REG(0), 1);
- //     mcpwm->clk_cfg.prescale = 255 - 1;    // 160 MHz/10  => 16 MHz
-  //    mcpwm->clk_cfg.prescale = 255 - 1;    // 160 MHz/10  => 16 MHz
-//	  mcpwm->update_cfg.global_up_en = 1;
-//	  mcpwm->update_cfg.global_force_up = 1;
- //     mcpwm->clk_cfg.prescale = 255 - 1;    // 160 MHz/10  => 16 MHz
       mcpwm->clk_cfg.prescale = 10 - 1;    // 160 MHz/10  => 16 MHz
 
-mcpwm_config_t pc;
-pc.frequency = 16000000;
-pc.counter_mode= MCPWM_UP_COUNTER;
-pc.duty_mode = MCPWM_DUTY_MODE_0;
-//mcpwm_init(MCPWM_UNIT_0, MCPWM_TIMER_0, &pc);
-
-
-Serial.print("clk prescaler=");
-Serial.print(mcpwm->clk_cfg.prescale);
-Serial.print(" clk prescaler=");
-Serial.print(REG_READ(MCPWM_CLK_CFG_REG(0)));
-Serial.print("  timer prescaler=");
-Serial.print(MCPWM0.timer[0].period.prescale);
-Serial.print("  period=");
-Serial.println(MCPWM0.timer[0].period.period);
 	  mcpwm->timer_sel.operator0_sel = 0;  // timer 0 is input for operator 0
 	  mcpwm->timer_sel.operator1_sel = 1;  // timer 1 is input for operator 1
 	  mcpwm->timer_sel.operator2_sel = 2;  // timer 2 is input for operator 2
   }
-Serial.print("clk prescaler=");
-Serial.print(MCPWM0.clk_cfg.val);
-Serial.print("  timer prescaler=");
-Serial.print(MCPWM0.timer[0].period.prescale);
-Serial.print("  period=");
-Serial.println(MCPWM0.timer[0].period.period);
-Serial.print("clk prescaler=");
-Serial.print(MCPWM0.clk_cfg.val);
-Serial.print("  timer prescaler=");
-Serial.print(MCPWM0.timer[0].period.prescale);
-Serial.print("  period=");
-Serial.println(MCPWM0.timer[0].period.period);
   mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
   mcpwm->timer[timer].period.prescale = TIMER_PRESCALER;
   mcpwm->timer[timer].period.period = 400;
@@ -237,9 +190,6 @@ Serial.println(MCPWM0.timer[0].period.period);
   mcpwm->channel[timer].db_cfg.val = 0;
   mcpwm->channel[timer].carrier_cfg.val = 0; // carrier disabled
 
-  // TODO: still hardcoded channel
-  mcpwm->update_cfg.op0_force_up = 1; // force update
-
   // at last link the output to pcnt input
   int input_sig_index;
   switch(queue_num) {
@@ -251,11 +201,6 @@ Serial.println(MCPWM0.timer[0].period.period);
 	  case 5: input_sig_index = PCNT_SIG_CH0_IN5_IDX; break;
   }
   gpio_iomux_in(step_pin, input_sig_index);
-
-  Serial.print("end of init rp=");
-  Serial.print(read_ptr);
-  Serial.print(" next_wp=");
-  Serial.println(next_write_ptr);
 }
 
 // Mechanism is like this, starting from stopped motor:
