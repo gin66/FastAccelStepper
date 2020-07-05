@@ -29,6 +29,18 @@ void IRAM_ATTR next_command(uint8_t queueNum, uint8_t dirPin, struct queue_entry
       if ((steps & 0x01) != 0) {
          digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
       }
+	  if (e->n_periods == 0) {
+		  mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
+	  }
+	  else {
+		  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+		  switch(timer) {
+			  case 0:
+				mcpwm->int_ena.timer0_tez_int_ena = 1;
+				mcpwm->int_clr.timer0_tez_int_clr = 1;
+				break;
+		  }
+	  }
 }
 
 static void IRAM_ATTR pcnt_isr_service(void *arg) {
@@ -54,6 +66,12 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 //  Serial.println("X");
 //  Serial.println(PCNT.int_st.val);
   PCNT.int_clr.val = PCNT.int_st.val; // necessary ?
+}
+
+static void IRAM_ATTR mcpwm_isr_service(void *arg) {
+MCPWM0.int_clr.timer0_tez_int_clr = 1;
+		  MCPWM0.channel[0].generator[0].utez = 2;  // high at zero
+
 }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
@@ -105,10 +123,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   Serial.println(next_write_ptr);
 
   uint8_t timer = queue_num %3;
-  if (timer == 0) {
-	  Serial.println("INIT MODULE");
-	  // Init mcwpm module for use
-	  //
   switch(timer) {
 	  case 0:
          mcpwm_gpio_init(mcpwm_unit, MCPWM0A, step_pin);
@@ -120,7 +134,17 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
          mcpwm_gpio_init(mcpwm_unit, MCPWM2A, step_pin);
 		 break;
   }
-	  periph_module_enable(PERIPH_PWM0_MODULE);
+  if (timer == 0) {
+	  Serial.println("INIT MODULE");
+	  // Init mcwpm module for use
+	  //
+	  periph_module_enable(queue_num < 3 ? PERIPH_PWM0_MODULE : PERIPH_PWM1_MODULE);
+	  mcpwm->int_ena.val = 0; // disable all interrupts
+	  mcpwm_isr_register(mcpwm_unit,
+					mcpwm_isr_service,
+					NULL,
+					ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_EDGE,
+					NULL);
 
 //	  mcpwm->update_cfg.global_up_en = 1;
 //	  mcpwm->update_cfg.global_force_up = 1;
@@ -278,10 +302,13 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
       }
     }
 #endif
-	if (isRunning) { // interrupts should be disabled
-      next_write_ptr = next_wp;
+	noInterrupts();
+	if (isRunning) {
+		  next_write_ptr = next_wp;
+	      interrupts();
 	}
 	else {
+	  interrupts();
 		// TODO steps and direction update
 	  mcpwm_dev_t *mcpwm = queueNum < 3 ? &MCPWM0 : &MCPWM1;
       pcnt_unit_t pcnt_unit = (pcnt_unit_t)queueNum;
@@ -289,7 +316,7 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
 	  // timer should be either a TEP or at zero
       mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
       mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
-      mcpwm->timer[timer].period.period = 16000; // stepper start 1ms later
+      mcpwm->timer[timer].period.period = 65535; // will be overwritten in next_command
       PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;
       pcnt_counter_clear(pcnt_unit);
       pcnt_counter_resume(pcnt_unit);
@@ -297,16 +324,13 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
 
 	  mcpwm->timer[timer].mode.val = 10;            // free run incrementing
 
-      // wait period at zero
+      // busy wait period for timer zero
 	  uint32_t i;
 	  while (mcpwm->timer[timer].status.value >= TIMER_H_L_TRANSITION) {
 		  i++;
 	  }
 	  //Serial.print("Loops=");
 	  //Serial.println(i);
-
-      mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
-      mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
 
 	  next_command(queueNum, dirPin, e);
 
