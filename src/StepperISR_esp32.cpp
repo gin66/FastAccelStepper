@@ -12,11 +12,13 @@
 
 #define TIMER_H_L_TRANSITION 200
 
+#define TIMER_PRESCALER 0		// cannot be updated will timer is running
+
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
-//           UUPPPPSS
-#define TP 0x00100001L
+//                           UUPPPPSS
+#define TP_3200STEPS_PER_S 0x00138800L
 
 static void IRAM_ATTR pcnt_isr_service(void *arg) {
   StepperQueue *q = (StepperQueue *)arg;
@@ -30,7 +32,7 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 //	  mcpwm->timer[timer].period.val = (1L<<24) /* update at TEZ */
 //								+ (((uint32_t) e->period) << 8)
 //								+ e->prescaler;
-	  mcpwm->timer[timer].period.val = 0x01000000 | TP;
+	  mcpwm->timer[timer].period.val = 0x01000000 | TP_3200STEPS_PER_S;
 	  uint8_t steps = e->steps;
       PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // update only on zero
       if ((steps & 0x01) != 0) {
@@ -162,8 +164,8 @@ Serial.print(MCPWM0.timer[0].period.prescale);
 Serial.print("  period=");
 Serial.println(MCPWM0.timer[0].period.period);
   mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
+  mcpwm->timer[timer].period.prescale = TIMER_PRESCALER;
   mcpwm->timer[timer].period.period = 400;
-  mcpwm->timer[timer].period.prescale = 25 - 1;  // => 1 Hz
   mcpwm->timer[timer].mode.val = 0;              // freeze
   mcpwm->timer[timer].sync.val = 0;              // no sync
   mcpwm->channel[timer].cmpr_cfg.a_upmethod = 0;
@@ -259,7 +261,6 @@ Serial.println(period);
     pos_at_queue_end += dir_high ? steps : -steps;
     ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
     steps <<= 1;
-    e->prescaler = prescaler;
     e->period = period;
     e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
     dir_high_at_queue_end = dir_high;
@@ -297,10 +298,8 @@ Serial.println(next_write_ptr);
 	  uint8_t timer = queueNum % 3;
 	  // timer should be either a TEP or at zero
       mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
-	  mcpwm->timer[timer].period.val = TP;
-	  //mcpwm->timer[timer].period.val = 0 /* update immediate */
-//								+ (10000L << 8)
-//								+ (100-1);
+      mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
+      mcpwm->timer[timer].period.period = 16000; // stepper start 1ms later
       PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;
       pcnt_counter_clear(pcnt_unit);
       pcnt_counter_resume(pcnt_unit);
@@ -317,13 +316,11 @@ Serial.println(next_write_ptr);
 	  Serial.println(i);
 
       mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
-//	  mcpwm->timer[timer].period.val = (1L<<24) /* update at TEZ */
-//								+ (((uint32_t) period) << 8)
-//								+ prescaler;
-
-        if (autoEnablePin != 255) {
-          digitalWrite(autoEnablePin, LOW);
-        }
+      mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
+      mcpwm->timer[timer].period.period = period;
+      if (autoEnablePin != 255) {
+        digitalWrite(autoEnablePin, LOW);
+      }
 	}
 Serial.print("rp=");
 Serial.print(read_ptr);
@@ -336,12 +333,12 @@ Serial.print("  timer prescaler=");
 Serial.print(MCPWM0.timer[0].period.prescale);
 Serial.print("  period=");
 Serial.println(MCPWM0.timer[0].period.period);
-Serial.print("clk prescaler=");
-Serial.print(MCPWM1.clk_cfg.val);
-Serial.print("  timer prescaler=");
-Serial.print(MCPWM1.timer[0].period.prescale);
-Serial.print("  period=");
-Serial.println(MCPWM1.timer[0].period.period);
+
+Serial.print("steps/2=");
+Serial.println(160000000.0 / MCPWM0.timer[0].period.period
+						   / (MCPWM0.timer[0].period.prescale+1)
+						   / (MCPWM0.clk_cfg.val+1)
+		);
 
     return AQE_OK;
   }

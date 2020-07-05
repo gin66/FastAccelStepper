@@ -47,7 +47,7 @@ struct queue_entry {
                          // steps*delta_change must not over/underflow
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
-  uint8_t prescaler;
+  uint8_t n_periods;
   uint16_t period;
 #endif
 };

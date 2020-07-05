@@ -142,3 +142,7 @@ The low level command queue for each stepper allows direct speed control - when 
 * Change in direction requires motor stop ! => it's a feature
 * Using constant acceleration leads to force jumps at start and max speed => smooth this out => will not happen
 
+## Lessons Learned
+
+Spent more than half a day debugging, till I have found out, that the cable to the stepper was broken.
+
