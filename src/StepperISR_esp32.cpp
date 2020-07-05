@@ -20,24 +20,30 @@ StepperQueue fas_queue[NUM_QUEUES];
 //                           UUPPPPSS
 #define TP_3200STEPS_PER_S 0x00138800L
 
+void IRAM_ATTR next_command(uint8_t queueNum, uint8_t dirPin, struct queue_entry *e) {
+  mcpwm_dev_t *mcpwm = queueNum < 3 ? &MCPWM0 : &MCPWM1;
+  uint8_t timer = queueNum % 3;
+      mcpwm->timer[timer].period.period = e->period;
+	  uint8_t steps = e->steps;
+      PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // update only on zero
+      if ((steps & 0x01) != 0) {
+         digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
+      }
+}
+
 static void IRAM_ATTR pcnt_isr_service(void *arg) {
   StepperQueue *q = (StepperQueue *)arg;
-  mcpwm_dev_t *mcpwm = q->queueNum < 3 ? &MCPWM0 : &MCPWM1;
-  uint8_t timer = q->queueNum % 3;
   uint8_t rp = q->read_ptr;
   if (rp != q->next_write_ptr) {
       struct queue_entry *e = &q->entry[rp];
 	  rp = (rp + 1) & QUEUE_LEN_MASK;
 	  q->read_ptr = rp;
-      mcpwm->timer[timer].period.period = e->period;
-	  uint8_t steps = e->steps;
-      PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // update only on zero
-      if ((steps & 0x01) != 0) {
-         digitalWrite(q->dirPin, digitalRead(q->dirPin) == HIGH ? LOW : HIGH);
-      }
+	  next_command(q->queueNum, q->dirPin, e);
   }
   else {
 	  // no more commands: stop timer at period end
+  mcpwm_dev_t *mcpwm = q->queueNum < 3 ? &MCPWM0 : &MCPWM1;
+  uint8_t timer = q->queueNum % 3;
 	  mcpwm->timer[timer].mode.start = 1; // stop at TEP
       mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
       q->isRunning = false;
@@ -234,12 +240,15 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
   }
 
   uint16_t period;
-
+  uint8_t n_periods;
   if (start_delta_ticks > 65535) {
-	  period = 65535;
+	  n_periods = start_delta_ticks >> 16;
+	  n_periods += 1;
+	  period = start_delta_ticks / n_periods;
   }
   else {
 	  period = start_delta_ticks;
+	  n_periods = 0;
   }
 
   uint8_t wp = next_write_ptr;
@@ -252,6 +261,7 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
     ticks_at_queue_end = change_ticks * (steps - 1) + start_delta_ticks;
     steps <<= 1;
     e->period = period;
+	e->n_periods = n_periods;
     e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
     dir_high_at_queue_end = dir_high;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
@@ -297,7 +307,9 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
 
       mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
       mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
-      mcpwm->timer[timer].period.period = period;
+
+	  next_command(queueNum, dirPin, e);
+
       if (autoEnablePin != 255) {
         digitalWrite(autoEnablePin, LOW);
       }

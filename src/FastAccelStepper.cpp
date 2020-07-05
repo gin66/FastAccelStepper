@@ -566,7 +566,6 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
 #if defined(ARDUINO_ARCH_ESP32)
   _queue_num = num;
 #endif
-  Serial.println("FastAccelStepper::init call queue_init");
   fas_queue[_queue_num].init(_queue_num, step_pin);
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
