@@ -84,24 +84,31 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
           digitalWrite(q->autoEnablePin, HIGH);
         }
   }
-//  Serial.println("X");
-//  Serial.println(PCNT.int_st.val);
-//  PCNT.int_clr.val = PCNT.int_st.val; // not necessary
 }
 
-static void IRAM_ATTR mcpwm_isr_service(void *arg) {
-	if (MCPWM0.int_st.timer0_tez_int_st != 0) {
-		MCPWM0.int_clr.timer0_tez_int_clr = 1;
-		  uint8_t cp = fas_queue[0].current_period + 1;
-		  if (fas_queue[0].current_n_periods == cp) {
-		    MCPWM0.channel[0].generator[0].utez = 2;  // high at zero
-			fas_queue[0].current_period = 0;
-		  }
-		  else {
-		      MCPWM0.channel[0].generator[0].utez = 1;  // low at zero
-			  fas_queue[0].current_period = cp;
-		  }
+#define MCPWM_SERVICE(mcpwm, TIMER, pcnt) \
+	if (mcpwm.int_st.timer ## TIMER ## _tez_int_st != 0) { \
+		mcpwm.int_clr.timer ## TIMER ## _tez_int_clr = 1; \
+		  uint8_t cp = fas_queue[pcnt].current_period + 1; \
+		  if (fas_queue[pcnt].current_n_periods == cp) { \
+		    mcpwm.channel[TIMER].generator[0].utez = 2;  /* high at zero */ \
+			fas_queue[pcnt].current_period = 0; \
+		  } \
+		  else { \
+		      mcpwm.channel[TIMER].generator[0].utez = 1;  /* low at zero */ \
+			  fas_queue[pcnt].current_period = cp; \
+		  } \
 	}
+
+static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
+	MCPWM_SERVICE(MCPWM0,0,0);
+	MCPWM_SERVICE(MCPWM0,1,1);
+	MCPWM_SERVICE(MCPWM0,2,2);
+}
+static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
+	MCPWM_SERVICE(MCPWM1,0,3);
+	MCPWM_SERVICE(MCPWM1,1,4);
+	MCPWM_SERVICE(MCPWM1,2,5);
 }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
@@ -166,7 +173,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 	  periph_module_enable(queue_num < 3 ? PERIPH_PWM0_MODULE : PERIPH_PWM1_MODULE);
 	  mcpwm->int_ena.val = 0; // disable all interrupts
 	  mcpwm_isr_register(mcpwm_unit,
-					mcpwm_isr_service,
+					queueNum < 3 ? mcpwm0_isr_service : mcpwm1_isr_service,
 					NULL,
 					ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_EDGE,
 					NULL);
