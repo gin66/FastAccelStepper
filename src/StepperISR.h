@@ -37,8 +37,6 @@ struct queue_entry {
 #if defined(TEST)
   uint8_t delta_msb;
   uint16_t delta_lsw;    // using small values is not safe
-  int16_t delta_change;  // change of delta on each step. delta_lsw +
-                         // steps*delta_change must not over/underflow
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   uint8_t delta_msb;

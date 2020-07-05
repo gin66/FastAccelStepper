@@ -49,7 +49,7 @@ void RampChecker::check_section(struct queue_entry *e) {
   steps >>= 1;
   assert(steps >= 1);
   uint32_t start_dt = e->delta_msb * 16384 + e->delta_lsw;
-  uint32_t end_dt = start_dt + (steps - 1) * e->delta_change;
+  uint32_t end_dt = start_dt;
 
   min_dt = min(min_dt, min(start_dt, end_dt));
   float accel = 0;
@@ -64,8 +64,8 @@ void RampChecker::check_section(struct queue_entry *e) {
       total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt,
       accel);
 
-  total_ticks += steps * start_dt + (steps - 1) * steps / 2 * e->delta_change;
-  assert(steps * start_dt + (steps - 1) * steps / 2 * e->delta_change >= 0);
+  total_ticks += steps * start_dt;
+  assert(steps * start_dt >= 0);
 
   if (last_dt > start_dt) {
     assert(increase_ok);

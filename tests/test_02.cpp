@@ -49,23 +49,22 @@ void RampChecker::check_section(struct queue_entry *e) {
   steps >>= 1;
   assert(steps >= 1);
   uint32_t start_dt = e->delta_msb * 16384 + e->delta_lsw;
-  uint32_t end_dt = start_dt + (steps - 1) * e->delta_change;
 
-  min_dt = min(min_dt, min(start_dt, end_dt));
+  min_dt = min(min_dt, start_dt);
   float accel = 0;
   if (!first) {
-    accel = (16000000.0 / end_dt - 16000000.0 / last_dt) /
-            (1.0 / 16000000.0 * 0.5 * (start_dt + end_dt));
+    accel = (16000000.0 / start_dt - 16000000.0 / last_dt) /
+            (1.0 / 16000000.0  * start_dt);
   }
   printf(
       "process command in ramp checker @%.6fs: steps = %d last = %d start = %d "
-      " end = %d  min_dt "
+      " min_dt "
       "= %d   accel=%.6f\n",
-      total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt,
+      total_ticks / 16000000.0, steps, last_dt, start_dt, min_dt,
       accel);
 
-  total_ticks += steps * start_dt + (steps - 1) * steps / 2 * e->delta_change;
-  assert(steps * start_dt + (steps - 1) * steps / 2 * e->delta_change >= 0);
+  total_ticks += steps * start_dt;
+  assert(steps * start_dt >= 0);
 
   if (last_dt > start_dt) {
     assert(increase_ok);
@@ -78,14 +77,8 @@ void RampChecker::check_section(struct queue_entry *e) {
     assert(decrease_ok);
     increase_ok = false;
   }
-  if (start_dt > end_dt) {
-    assert(increase_ok);
-  } else if (start_dt < end_dt) {
-    assert(decrease_ok);
-    increase_ok = false;
-  }
 
-  last_dt = end_dt;
+  last_dt = start_dt;
 
   first = false;
 }
