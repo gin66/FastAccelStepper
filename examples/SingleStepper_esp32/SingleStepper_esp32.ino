@@ -87,38 +87,24 @@ void loop() {
   if (stepper) {
     if (queue_ok) {
       // 3200 steps is one round with 16 microsteps and 200 steps for revolution
-      // 25 * 120 + 2 * 100
-      Serial.println(
-          stepper->addQueueEntry(5L * 16384, 120, true, -16384 / 119));
-      Serial.println(
-          stepper->addQueueEntry(4L * 16384, 120, true, -16384 / 119));
-      Serial.println(
-          stepper->addQueueEntry(3L * 16384, 120, true, -16384 / 119));
-      Serial.println(
-          stepper->addQueueEntry(2L * 16384, 120, true, -8192 / 119));
-      Serial.println(stepper->addQueueEntry(6L * 4096, 120, true, -4096 / 119));
-      Serial.println(stepper->addQueueEntry(5L * 4096, 120, true, -4096 / 119));
-      Serial.println(stepper->addQueueEntry(4L * 4096, 120, true, -4096 / 119));
-      Serial.println(stepper->addQueueEntry(3L * 4096, 120, true, -4096 / 119));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 120, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 100, true, 0));
-      Serial.println(stepper->addQueueEntry(2L * 4096, 100, true, 0));
+
+	  // This loop drives the stepper up to 80000 microsteps/s.
+	  // with 16 microsteps, this means 25 revolutions/s
+      #define COMMAND_CNT 800
+      for (uint16_t i = 1;i < 2*COMMAND_CNT;i++) {
+		uint8_t steps = 100;
+        uint32_t steps_per_s = min(i,2*COMMAND_CNT-i) * 100;
+		uint32_t ticks = 16000000 / steps_per_s;
+        while (true) {
+	        int rc = stepper->addQueueEntry(ticks, steps, true, 0);
+		    Serial.println(rc);
+			if (rc == AQE_OK) {
+				break;
+			}
+			// adding a delay(1) causes problems
+			delayMicroseconds(1000);
+		}
+      }
     }
 
     if (cmd_ok) {

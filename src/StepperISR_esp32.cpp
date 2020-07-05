@@ -29,14 +29,11 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
       struct queue_entry *e = &q->entry[rp];
 	  rp = (rp + 1) & QUEUE_LEN_MASK;
 	  q->read_ptr = rp;
-//	  mcpwm->timer[timer].period.val = (1L<<24) /* update at TEZ */
-//								+ (((uint32_t) e->period) << 8)
-//								+ e->prescaler;
-	  mcpwm->timer[timer].period.val = 0x01000000 | TP_3200STEPS_PER_S;
+      mcpwm->timer[timer].period.period = e->period;
 	  uint8_t steps = e->steps;
       PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // update only on zero
       if ((steps & 0x01) != 0) {
-//         digitalWrite(q->dirPin, digitalRead(q->dirPin) == HIGH ? LOW : HIGH);
+         digitalWrite(q->dirPin, digitalRead(q->dirPin) == HIGH ? LOW : HIGH);
       }
   }
   else {
@@ -92,8 +89,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   if (queue_num == 0) {
      // isr_service_install apparently enables the interrupt
      PCNT.int_clr.val = PCNT.int_st.val;
-//     pcnt_isr_service_install(ESP_INTR_FLAG_EDGE | ESP_INTR_FLAG_IRAM);
-//     pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
+     pcnt_isr_service_install(ESP_INTR_FLAG_EDGE | ESP_INTR_FLAG_IRAM);
+     pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
   }
 
   Serial.print("rp=");
@@ -236,25 +233,18 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
     }
   }
 
-  uint32_t prescaler;
   uint16_t period;
 
-	  prescaler = (start_delta_ticks>>15);
-	  period = start_delta_ticks / (1+prescaler);
-Serial.print(start_delta_ticks);
-Serial.print(" (");
-Serial.print(prescaler);
-Serial.print("+1)*");
-Serial.println(period);
+  if (start_delta_ticks > 65535) {
+	  period = 65535;
+  }
+  else {
+	  period = start_delta_ticks;
+  }
 
   uint8_t wp = next_write_ptr;
   uint8_t rp = read_ptr;
   struct queue_entry* e = &entry[wp];
-
-  Serial.print("rp=");
-  Serial.print(read_ptr);
-  Serial.print(" next_wp=");
-  Serial.println(next_write_ptr);
 
   uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
   if (next_wp != rp) {
@@ -278,16 +268,6 @@ Serial.println(period);
       }
     }
 #endif
-Serial.print("steps*2+X=");
-Serial.print(steps);
-Serial.print("before update rp=");
-Serial.print(read_ptr);
-Serial.print(" next_wp=");
-Serial.println(next_write_ptr);
-Serial.print("after update rp=");
-Serial.print(read_ptr);
-Serial.print(" next_wp=");
-Serial.println(next_write_ptr);
 	if (isRunning) { // interrupts should be disabled
       next_write_ptr = next_wp;
 	}
@@ -312,8 +292,8 @@ Serial.println(next_write_ptr);
 	  while (mcpwm->timer[timer].status.value >= TIMER_H_L_TRANSITION) {
 		  i++;
 	  }
-	  Serial.print("Loops=");
-	  Serial.println(i);
+	  //Serial.print("Loops=");
+	  //Serial.println(i);
 
       mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
       mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
@@ -322,23 +302,6 @@ Serial.println(next_write_ptr);
         digitalWrite(autoEnablePin, LOW);
       }
 	}
-Serial.print("rp=");
-Serial.print(read_ptr);
-Serial.print(" next_wp=");
-Serial.println(next_write_ptr);
-
-Serial.print("clk prescaler=");
-Serial.print(MCPWM0.clk_cfg.val);
-Serial.print("  timer prescaler=");
-Serial.print(MCPWM0.timer[0].period.prescale);
-Serial.print("  period=");
-Serial.println(MCPWM0.timer[0].period.period);
-
-Serial.print("steps/2=");
-Serial.println(160000000.0 / MCPWM0.timer[0].period.period
-						   / (MCPWM0.timer[0].period.prescale+1)
-						   / (MCPWM0.clk_cfg.val+1)
-		);
 
     return AQE_OK;
   }
