@@ -51,17 +51,13 @@ class FastAccelStepper {
   // unstable API functions
 
   // stepper queue management (low level access)
-  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high,
-                    int16_t change_ticks);
+  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high);
   // Return codes for add_queue_entry
 #define AQE_OK 0
 #define AQE_FULL -1
 #define AQE_TOO_HIGH -2
 #define AQE_TOO_LOW -3
-#define AQE_CHANGE_TOO_HIGH -4
-#define AQE_CHANGE_TOO_LOW -5
-#define AQE_CUMULATED_CHANGE_TOO_LOW -6
-#define AQE_STEPS_ERROR -7
+#define AQE_STEPS_ERROR -4
 
   void addQueueStepperStop();
   bool isQueueEmpty();

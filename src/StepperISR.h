@@ -88,8 +88,7 @@ class StepperQueue {
   void addQueueStepperStop() {
 	  ticks_at_queue_end = 0;
   }
-  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high,
-                    int16_t change_ticks);
+  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high);
  private:
   void _initVars() {
 	  dirPin = 255;

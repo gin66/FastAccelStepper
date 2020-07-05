@@ -177,9 +177,8 @@ bool FastAccelStepper::isStopped() { return fas_queue[_queue_num].isStopped(); }
 //*************************************************************************************************
 void FastAccelStepper::addQueueStepperStop() { fas_queue[_queue_num].addQueueStepperStop(); }
 //*************************************************************************************************
-int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
-                                    bool dir_high, int16_t change_ticks) {
-  return fas_queue[_queue_num].addQueueEntry(start_delta_ticks, steps,dir_high,change_ticks);
+int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high) {
+  return fas_queue[_queue_num].addQueueEntry(start_delta_ticks, steps,dir_high);
 }
 
 //*************************************************************************************************
@@ -432,10 +431,6 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
   // Calculate change per step
   int32_t total_change = (int32_t)next_ticks - (int32_t)curr_ticks;
-  int32_t change = total_change;
-  if (steps > 1) {
-    change /= steps;  // each step will change
-  }
 
   // Number of commands
   uint8_t command_cnt =
@@ -455,11 +450,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     _performed_ramp_up_steps -= steps;
   }
   // Apply change to curr_ticks
-  if (change == 0) {
-    curr_ticks += total_change;
-  } else {
-    curr_ticks += change;
-  }
+  curr_ticks += total_change;
 
   bool dir = target_pos > getPositionAfterCommandsCompleted();
 
@@ -480,7 +471,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
   uint32_t sum_dt = 0;
   for (uint16_t c = 1; c < command_cnt; c++) {
-    int8_t res = addQueueEntry(curr_ticks, steps_per_command, dir, change);
+    int8_t res = addQueueEntry(curr_ticks, steps_per_command, dir);
 #ifdef TEST
     printf(
         "add command %d Steps = %d start_ticks = %d  Target "
@@ -490,10 +481,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         (command_cnt + 1 - c), steps_per_command, curr_ticks, target_pos,
         remaining_steps, change, res, fas_queue[_queue_num].ticks_at_queue_end);
 #endif
-    curr_ticks += steps_per_command * change;
     steps -= steps_per_command;
   }
-  int8_t res = addQueueEntry(curr_ticks, steps, dir, change);
+  int8_t res = addQueueEntry(curr_ticks, steps, dir);
 #ifdef TEST
   printf(
       "add command Steps = %d start_ticks = %d  Target "

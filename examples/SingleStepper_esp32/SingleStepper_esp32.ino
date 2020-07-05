@@ -52,7 +52,7 @@ long in_vals[8];
 bool stopped = false;
 
 void loop() {
-  delay(100);
+  delay(1);
 
   bool cmd_ok = false;
   bool queue_ok = false;
@@ -96,7 +96,7 @@ void loop() {
         uint32_t steps_per_s = min(i,2*COMMAND_CNT-i) * 100;
 		uint32_t ticks = 16000000 / steps_per_s;
         while (true) {
-	        int rc = stepper->addQueueEntry(ticks, steps, true, 0);
+	        int rc = stepper->addQueueEntry(ticks, steps, true);
 		    Serial.println(rc);
 			if (rc == AQE_OK) {
 				break;
