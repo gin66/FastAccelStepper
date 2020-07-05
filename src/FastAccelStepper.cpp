@@ -504,6 +504,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       fas_queue[_queue_num].ticks_at_queue_end);
 #endif
   if (res != 0) {  // Emergency stop on internal error
+    Serial.println(res);
     addQueueStepperStop();
     ramp_state = RAMP_STATE_IDLE;
     isr_speed_control_enabled = false;

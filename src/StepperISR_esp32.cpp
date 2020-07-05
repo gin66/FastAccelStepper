@@ -29,15 +29,19 @@ void IRAM_ATTR next_command(uint8_t queueNum, uint8_t dirPin, struct queue_entry
       if ((steps & 0x01) != 0) {
          digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
       }
-	  if (e->n_periods == 0) {
+	  uint8_t n_periods = e->n_periods;
+	  if (n_periods == 0) {
 		  mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
+	      mcpwm->int_ena.timer0_tez_int_ena = 0;
 	  }
 	  else {
 		  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
 		  switch(timer) {
 			  case 0:
-				mcpwm->int_ena.timer0_tez_int_ena = 1;
 				mcpwm->int_clr.timer0_tez_int_clr = 1;
+				mcpwm->int_ena.timer0_tez_int_ena = 1;
+				fas_queue[queueNum].current_n_periods = n_periods;
+				fas_queue[queueNum].current_period = 0;
 				break;
 		  }
 	  }
@@ -65,13 +69,22 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
   }
 //  Serial.println("X");
 //  Serial.println(PCNT.int_st.val);
-  PCNT.int_clr.val = PCNT.int_st.val; // necessary ?
+//  PCNT.int_clr.val = PCNT.int_st.val; // not necessary
 }
 
 static void IRAM_ATTR mcpwm_isr_service(void *arg) {
-MCPWM0.int_clr.timer0_tez_int_clr = 1;
-		  MCPWM0.channel[0].generator[0].utez = 2;  // high at zero
-
+	if (MCPWM0.int_st.timer0_tez_int_st != 0) {
+		MCPWM0.int_clr.timer0_tez_int_clr = 1;
+		  uint8_t cp = fas_queue[0].current_period + 1;
+		  if (fas_queue[0].current_n_periods == cp) {
+		    MCPWM0.channel[0].generator[0].utez = 2;  // high at zero
+			fas_queue[0].current_period = 0;
+		  }
+		  else {
+		      MCPWM0.channel[0].generator[0].utez = 1;  // low at zero
+			  fas_queue[0].current_period = cp;
+		  }
+	}
 }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
@@ -84,11 +97,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pinMode(step_pin, OUTPUT);
   queueNum = queue_num;
   isRunning = false;
-
-  Serial.print("rp=");
-  Serial.print(read_ptr);
-  Serial.print(" next_wp=");
-  Serial.println(next_write_ptr);
 
   mcpwm_dev_t *mcpwm = queue_num < 3 ? &MCPWM0 : &MCPWM1;
   mcpwm_unit_t mcpwm_unit = queue_num < 3 ? MCPWM_UNIT_0 : MCPWM_UNIT_1;
@@ -240,6 +248,7 @@ Serial.println(MCPWM0.timer[0].period.period);
 
 int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
                                     bool dir_high, int16_t change_ticks) {
+	change_ticks = 0;
   int32_t c_sum = 0;
   if (steps >= 128) {
     return AQE_STEPS_ERROR;

@@ -61,6 +61,9 @@ class StepperQueue {
 #if defined(ARDUINO_ARCH_ESP32)
   uint8_t queueNum;
   bool isRunning;
+  // These two variables are for the mcpwm interrupt
+  uint8_t current_period;
+  uint8_t current_n_periods;
 #endif
   // This is used in the timer compare unit as extension of the 16 timer
 #if defined(ARDUINO_ARCH_AVR)
