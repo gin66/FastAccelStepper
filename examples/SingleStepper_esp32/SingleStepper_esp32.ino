@@ -11,19 +11,29 @@ FastAccelStepper *stepper;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Start");
+  Serial.println("Check Stepper");
 
-  while (false) {
-	  pinMode(stepPinStepper,OUTPUT);
-	  pinMode(dirPinStepper,OUTPUT);
-	  pinMode(enablePinStepper,OUTPUT);
-	  digitalWrite(dirPinStepper, LOW);
-	  digitalWrite(enablePinStepper, LOW);
+  // Check stepper motor+driver is operational
+  pinMode(stepPinStepper,OUTPUT);
+  pinMode(dirPinStepper,OUTPUT);
+  pinMode(enablePinStepper,OUTPUT);
+  digitalWrite(enablePinStepper, LOW);
+  digitalWrite(dirPinStepper, LOW);
+  for (uint16_t i = 0;i < 3200;i++) {
 	  digitalWrite(stepPinStepper, HIGH);
-	  delay(10);
+      delayMicroseconds(10);
 	  digitalWrite(stepPinStepper, LOW);
-	  delay(10);
+      delayMicroseconds(190);
   }
+  digitalWrite(dirPinStepper, HIGH);
+  for (uint16_t i = 0;i < 3200;i++) {
+	  digitalWrite(stepPinStepper, HIGH);
+      delayMicroseconds(10);
+	  digitalWrite(stepPinStepper, LOW);
+      delayMicroseconds(190);
+  }
+  digitalWrite(enablePinStepper, HIGH);
+  Serial.println("Init FastAccelStepper");
   stepper = engine.stepperConnectToPin(stepPinStepper);
   engine.init();
   engine.setDebugLed(LED_PIN);
