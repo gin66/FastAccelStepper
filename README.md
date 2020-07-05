@@ -87,13 +87,12 @@ uint32_t dt = ABSOLUTE_MAX_TICKS;
 bool up = true;
 
 void loop() {
-  // Issue command with parameters:
+  // Issue command with parameters via addQueueEntry:
   //          time delta:            dt  [*0.25us/Step]
   //          steps:                 2
   //          direction pin:         high
-  //          vary dt on each step:  0   [*0.25us/Step]
   uint8_t steps = min(max(100000L/dt,1), 127);
-  if (stepperA->addQueueEntry(dt, steps, true, 0) == AQE_OK) {
+  if (stepperA->addQueueEntry(dt, steps, true) == AQE_OK) {
      if (up) {
         dt -= dt / 100;
         if (dt < F_CPU/40000) { // 40000 steps/s
@@ -112,6 +111,8 @@ void loop() {
 
 ## Behind the curtains
 
+### AVR
+
 The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This timer overflow interrupt is used for adjusting the speed. 
 
 The timer compare unit toggles the step pin from Low to High precisely. The transition High to Low is done in the timer compare interrupt routine, thus the High state is only few us.
@@ -122,9 +123,13 @@ The compare interrupt routines uses two staged tick counters. One byte (msb) + o
 
 The acceleration/deacceleration aka timer overflow interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
+### ESP32
+
+### BOTH
+
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 
-The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed.
+The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed (beware of any Serial.print in your hot path).
 
 ## TODO
 
@@ -133,9 +138,9 @@ The low level command queue for each stepper allows direct speed control - when 
 * Introduce command queue of speed/accel commands - one per stepper.
 * Add command to set current position
 * Extend command queue entry to perform delay only without step (steps=0) to reduce the 3.8 steps/s
-* Calculation on pc and on arduino do not create same commands. Queue checksum differ !
-* Add ESP32 as target
+* Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
 * Support different values for acceleration and deceleration
+* Add preprocessor constant: TICKS_PER_S for raw commands
 
 ## NOT TODO
 
@@ -144,5 +149,5 @@ The low level command queue for each stepper allows direct speed control - when 
 
 ## Lessons Learned
 
-Spent more than half a day debugging, till I have found out, that the cable to the stepper was broken.
+Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
 

@@ -17,31 +17,48 @@
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
-//                           UUPPPPSS
-#define TP_3200STEPS_PER_S 0x00138800L
-
-void IRAM_ATTR next_command(uint8_t queueNum, uint8_t dirPin, struct queue_entry *e) {
+void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
+  uint8_t queueNum = queue->queueNum;
   mcpwm_dev_t *mcpwm = queueNum < 3 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = queueNum % 3;
       mcpwm->timer[timer].period.period = e->period;
 	  uint8_t steps = e->steps;
       PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // update only on zero
       if ((steps & 0x01) != 0) {
+		  uint8_t dirPin = queue->dirPin;
          digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
       }
 	  uint8_t n_periods = e->n_periods;
 	  if (n_periods == 0) {
 		  mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
-	      mcpwm->int_ena.timer0_tez_int_ena = 0;
+		  switch(timer) {
+			  case 0:
+					mcpwm->int_ena.timer0_tez_int_ena = 0;
+					break;
+			  case 1:
+					mcpwm->int_ena.timer1_tez_int_ena = 0;
+					break;
+			  case 2:
+					mcpwm->int_ena.timer2_tez_int_ena = 0;
+					break;
+		  }
 	  }
 	  else {
+				queue->current_n_periods = n_periods;
+				queue->current_period = 0;
 		  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
 		  switch(timer) {
 			  case 0:
 				mcpwm->int_clr.timer0_tez_int_clr = 1;
 				mcpwm->int_ena.timer0_tez_int_ena = 1;
-				fas_queue[queueNum].current_n_periods = n_periods;
-				fas_queue[queueNum].current_period = 0;
+				break;
+			  case 1:
+				mcpwm->int_clr.timer1_tez_int_clr = 1;
+				mcpwm->int_ena.timer1_tez_int_ena = 1;
+				break;
+			  case 2:
+				mcpwm->int_clr.timer2_tez_int_clr = 1;
+				mcpwm->int_ena.timer2_tez_int_ena = 1;
 				break;
 		  }
 	  }
@@ -54,7 +71,7 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
       struct queue_entry *e = &q->entry[rp];
 	  rp = (rp + 1) & QUEUE_LEN_MASK;
 	  q->read_ptr = rp;
-	  next_command(q->queueNum, q->dirPin, e);
+	  next_command(q, e);
   }
   else {
 	  // no more commands: stop timer at period end
@@ -325,7 +342,7 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
 	  //Serial.print("Loops=");
 	  //Serial.println(i);
 
-	  next_command(queueNum, dirPin, e);
+	  next_command(this, e);
 
       if (autoEnablePin != 255) {
         digitalWrite(autoEnablePin, LOW);
