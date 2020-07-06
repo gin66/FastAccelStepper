@@ -48,7 +48,7 @@ const uint8_t cos_tab[64] = {0,   2,   9,   21,  37,  56,  79,  103,
                              128, 103, 79,  56,  37,  21,  9,   2};
 
 void loop() {
-  while (stepper2->addQueueEntry(dt, 3, true, 0) == AQE_OK) {
+  while (stepper2->addQueueEntry(dt, 3, true) == AQE_OK) {
     if (!run_saw) {
       dt -= dt / 100;
       if (dt < 16000000 / 30000) {  // 30000 steps/s
