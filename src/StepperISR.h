@@ -35,23 +35,22 @@
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
 #if defined(ARDUINO_ARCH_ESP32)
-#include <driver/pcnt.h>
 #include <driver/mcpwm.h>
+#include <driver/pcnt.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 struct mapping_s {
-	mcpwm_dev_t *mcpwm_dev;
-	mcpwm_unit_t mcpwm_unit;
-	uint8_t timer;
-	pcnt_unit_t pcnt_unit;
-	int input_sig_index;
-	uint32_t timer_tez_int_clr;
-	uint32_t timer_tez_int_ena;
+  mcpwm_dev_t* mcpwm_dev;
+  mcpwm_unit_t mcpwm_unit;
+  uint8_t timer;
+  pcnt_unit_t pcnt_unit;
+  int input_sig_index;
+  uint32_t timer_tez_int_clr;
+  uint32_t timer_tez_int_ena;
 };
 #endif
-
 
 struct queue_entry {
   uint8_t steps;  // coding is bit7..1 is nr of steps and bit 0 is direction
@@ -67,7 +66,7 @@ class StepperQueue {
   uint8_t dirPin;
   bool isRunning;
 #if defined(ARDUINO_ARCH_ESP32)
-  const struct mapping_s *mapping;
+  const struct mapping_s* mapping;
   // These two variables are for the mcpwm interrupt
   uint8_t current_period;
   uint8_t current_n_periods;

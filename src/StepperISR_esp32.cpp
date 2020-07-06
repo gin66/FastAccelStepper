@@ -11,18 +11,60 @@
 StepperQueue fas_queue[NUM_QUEUES];
 
 static const struct mapping_s queue2mapping[NUM_QUEUES] = {
-	{ &MCPWM0, MCPWM_UNIT_0, timer: 0, PCNT_UNIT_0, PCNT_SIG_CH0_IN0_IDX,
-		MCPWM_TIMER0_TEZ_INT_CLR, MCPWM_TIMER0_TEZ_INT_ENA },
-	{ &MCPWM0, MCPWM_UNIT_0, timer: 1, PCNT_UNIT_1, PCNT_SIG_CH0_IN1_IDX,
-		MCPWM_TIMER1_TEZ_INT_CLR, MCPWM_TIMER1_TEZ_INT_ENA },
-	{ &MCPWM0, MCPWM_UNIT_0, timer: 2, PCNT_UNIT_2, PCNT_SIG_CH0_IN2_IDX,
-		MCPWM_TIMER2_TEZ_INT_CLR, MCPWM_TIMER2_TEZ_INT_ENA },
-	{ &MCPWM1, MCPWM_UNIT_1, timer: 0, PCNT_UNIT_3, PCNT_SIG_CH0_IN3_IDX,
-		MCPWM_TIMER0_TEZ_INT_CLR, MCPWM_TIMER0_TEZ_INT_ENA },
-	{ &MCPWM1, MCPWM_UNIT_1, timer: 1, PCNT_UNIT_4, PCNT_SIG_CH0_IN4_IDX,
-		MCPWM_TIMER1_TEZ_INT_CLR, MCPWM_TIMER1_TEZ_INT_ENA },
-	{ &MCPWM1, MCPWM_UNIT_1, timer: 2, PCNT_UNIT_5, PCNT_SIG_CH0_IN5_IDX,
-		MCPWM_TIMER2_TEZ_INT_CLR, MCPWM_TIMER2_TEZ_INT_ENA },
+    {
+      &MCPWM0,
+      MCPWM_UNIT_0,
+      timer : 0,
+      PCNT_UNIT_0,
+      PCNT_SIG_CH0_IN0_IDX,
+      MCPWM_TIMER0_TEZ_INT_CLR,
+      MCPWM_TIMER0_TEZ_INT_ENA
+    },
+    {
+      &MCPWM0,
+      MCPWM_UNIT_0,
+      timer : 1,
+      PCNT_UNIT_1,
+      PCNT_SIG_CH0_IN1_IDX,
+      MCPWM_TIMER1_TEZ_INT_CLR,
+      MCPWM_TIMER1_TEZ_INT_ENA
+    },
+    {
+      &MCPWM0,
+      MCPWM_UNIT_0,
+      timer : 2,
+      PCNT_UNIT_2,
+      PCNT_SIG_CH0_IN2_IDX,
+      MCPWM_TIMER2_TEZ_INT_CLR,
+      MCPWM_TIMER2_TEZ_INT_ENA
+    },
+    {
+      &MCPWM1,
+      MCPWM_UNIT_1,
+      timer : 0,
+      PCNT_UNIT_3,
+      PCNT_SIG_CH0_IN3_IDX,
+      MCPWM_TIMER0_TEZ_INT_CLR,
+      MCPWM_TIMER0_TEZ_INT_ENA
+    },
+    {
+      &MCPWM1,
+      MCPWM_UNIT_1,
+      timer : 1,
+      PCNT_UNIT_4,
+      PCNT_SIG_CH0_IN4_IDX,
+      MCPWM_TIMER1_TEZ_INT_CLR,
+      MCPWM_TIMER1_TEZ_INT_ENA
+    },
+    {
+      &MCPWM1,
+      MCPWM_UNIT_1,
+      timer : 2,
+      PCNT_UNIT_5,
+      PCNT_SIG_CH0_IN5_IDX,
+      MCPWM_TIMER2_TEZ_INT_CLR,
+      MCPWM_TIMER2_TEZ_INT_ENA
+    },
 };
 
 void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
@@ -59,9 +101,9 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     next_command(q, e);
   } else {
     // no more commands: stop timer at period end
-  const struct mapping_s *mapping = q->mapping;
-  mcpwm_dev_t *mcpwm = mapping->mcpwm_dev;
-  uint8_t timer = mapping->timer;
+    const struct mapping_s *mapping = q->mapping;
+    mcpwm_dev_t *mcpwm = mapping->mcpwm_dev;
+    uint8_t timer = mapping->timer;
     mcpwm->timer[timer].mode.start = 1;           // stop at TEP
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     q->isRunning = false;
@@ -145,11 +187,12 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   if (timer == 0) {
     // Init mcwpm module for use
     periph_module_enable(mcpwm_unit == MCPWM_UNIT_0 ? PERIPH_PWM0_MODULE
-                                       : PERIPH_PWM1_MODULE);
+                                                    : PERIPH_PWM1_MODULE);
     mcpwm->int_ena.val = 0;  // disable all interrupts
-    mcpwm_isr_register(mcpwm_unit,
-			           mcpwm_unit == MCPWM_UNIT_0 ? mcpwm0_isr_service : mcpwm1_isr_service,
-                       NULL, ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_EDGE, NULL);
+    mcpwm_isr_register(
+        mcpwm_unit,
+        mcpwm_unit == MCPWM_UNIT_0 ? mcpwm0_isr_service : mcpwm1_isr_service,
+        NULL, ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_EDGE, NULL);
 
     mcpwm->clk_cfg.prescale = 10 - 1;  // 160 MHz/10  => 16 MHz
 
@@ -184,11 +227,12 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 //		start mcpwm
 //		-- mcpwm counter counts every L->H-transition at mcpwm.timer = 0
 //		-- if counter reaches planned steps, then counter is reset and
-//		interrupt is created 	
+//		interrupt is created
 //
-//		pcnt interrupt: available time is from mcpwm.timer = 0+x to period 			
-//		read next commmand: store period in counter shadow and steps in pcnt
-//			without next command: set mcpwm to stop mode on reaching period
+//		pcnt interrupt: available time is from mcpwm.timer = 0+x to
+//period 		read next commmand: store period in counter shadow and steps in pcnt
+//			without next command: set mcpwm to stop mode on reaching
+//period
 
 bool StepperQueue::startQueue(struct queue_entry *e) {
   mcpwm_dev_t *mcpwm = mapping->mcpwm_dev;
