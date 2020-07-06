@@ -44,8 +44,8 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
 		  }
 	  }
 	  else {
-				queue->current_n_periods = n_periods;
-				queue->current_period = 0;
+			queue->current_n_periods = n_periods;
+			queue->current_period = 1; // mcpwm is already running in period 1
 		  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
 		  switch(timer) {
 			  case 0:
@@ -92,7 +92,7 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 		  uint8_t cp = fas_queue[pcnt].current_period + 1; \
 		  if (fas_queue[pcnt].current_n_periods == cp) { \
 		    mcpwm.channel[TIMER].generator[0].utez = 2;  /* high at zero */ \
-			fas_queue[pcnt].current_period = 0; \
+			  fas_queue[pcnt].current_period = 0; \
 		  } \
 		  else { \
 		      mcpwm.channel[TIMER].generator[0].utez = 1;  /* low at zero */ \
@@ -249,6 +249,14 @@ int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
     e->period = period;
 	e->n_periods = n_periods;
     e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
+if (false) {
+	Serial.print("steps=");
+	Serial.print(steps);
+	Serial.print(" period=");
+	Serial.print(period);
+	Serial.print(" n_periods=");
+	Serial.println(n_periods);
+}
     dir_high_at_queue_end = dir_high;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     {

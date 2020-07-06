@@ -127,7 +127,7 @@ void loop() {
       }
     }
 
-    if (!stopped) {
+    if (!stopped && false) {
       Serial.print("Stepper: ");
       Serial.print(stepper->isr_speed_control_enabled ? " AUTO " : " MANU ");
       Serial.print(stepper->getCurrentPosition());

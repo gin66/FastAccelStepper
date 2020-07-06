@@ -214,6 +214,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
 int main() {
   basic_test_with_empty_queue();
   //             steps  ticks_us  accel    maxspeed  min/max_total_time
+  test_with_pars(1000,4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2, 0.5);  // jumps in speed in real on esp32
   test_with_pars(10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,
                  2 * 2.0 + 46.0 + 2.0, 0.2);  // ramp time 2s, 400 steps TODO
   test_with_pars(1600, 5000, 10000, true, 7.9, 8.1,
