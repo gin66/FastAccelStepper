@@ -45,22 +45,23 @@ class StepperQueue {
   uint8_t next_write_ptr;
   uint8_t autoEnablePin;
   uint8_t dirPin;
+  bool isRunning;
 #if defined(ARDUINO_ARCH_ESP32)
   uint8_t queueNum;
-#endif
-  bool isRunning;
   // These two variables are for the mcpwm interrupt
   uint8_t current_period;
   uint8_t current_n_periods;
+#endif
   // This is used in the timer compare unit as extension of the 16 timer
 #if defined(ARDUINO_ARCH_AVR)
   uint8_t skip;
+  uint16_t period;
 #endif
 
-  int32_t pos_at_queue_end;    // in steps
-  int32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
   bool dir_high_at_queue_end;  // direction high corresponds to position
                                 // counting upwards
+  int32_t pos_at_queue_end;    // in steps
+  int32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
 
   void init(uint8_t queue_num, uint8_t step_pin);
   bool isQueueFull() {
@@ -75,69 +76,69 @@ class StepperQueue {
   void addQueueStepperStop() {
 	  ticks_at_queue_end = 0;
   }
-  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high) {
-  int32_t c_sum = 0;
-  if (steps >= 128) {
-    return AQE_STEPS_ERROR;
-  }
-  if (start_delta_ticks > ABSOLUTE_MAX_TICKS) {
-    return AQE_TOO_HIGH;
-  }
-
-  uint16_t period;
-  uint8_t n_periods;
-  if (start_delta_ticks > 65535) {
-	  n_periods = start_delta_ticks >> 16;
-	  n_periods += 1;
-	  period = start_delta_ticks / n_periods;
-  }
-  else {
-	  period = start_delta_ticks;
-	  n_periods = 1;
-  }
-
-  uint8_t wp = next_write_ptr;
-  uint8_t rp = read_ptr;
-  struct queue_entry* e = &entry[wp];
-
-  uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
-  if (next_wp != rp) {
-    pos_at_queue_end += dir_high ? steps : -steps;
-    ticks_at_queue_end = start_delta_ticks;
-    steps <<= 1;
-    e->period = period;
-	e->n_periods = n_periods;
-    e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
-    dir_high_at_queue_end = dir_high;
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    {
-      unsigned char* x = (unsigned char*)e;
-      for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
-        if (checksum & 0x80) {
-          checksum <<= 1;
-          checksum ^= 0xde;
-        } else {
-          checksum <<= 1;
-        }
-        checksum ^= *x++;
-      }
-    }
-#endif
-	noInterrupts();
-	if (isRunning) {
-		  next_write_ptr = next_wp;
-	      interrupts();
-	}
-	else {
-	  interrupts();
-	  if (!startQueue(e)) {
-		  next_write_ptr = next_wp;
+  int addQueueEntry(uint32_t ticks, uint8_t steps, bool dir_high) {
+	  int32_t c_sum = 0;
+	  if (steps >= 128) {
+		return AQE_STEPS_ERROR;
 	  }
-	}
+	  if (ticks > ABSOLUTE_MAX_TICKS) {
+		return AQE_TOO_HIGH;
+	  }
 
-    return AQE_OK;
-  }
-  return AQE_FULL;
+	  uint16_t period;
+	  uint8_t n_periods;
+	  if (ticks > 65535) {
+		  n_periods = ticks >> 16;
+		  n_periods += 1;
+		  period = ticks / n_periods;
+	  }
+	  else {
+		  period = ticks;
+		  n_periods = 1;
+	  }
+
+	  uint8_t wp = next_write_ptr;
+	  uint8_t rp = read_ptr;
+	  struct queue_entry* e = &entry[wp];
+
+	  uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
+	  if (next_wp != rp) {
+		pos_at_queue_end += dir_high ? steps : -steps;
+		ticks_at_queue_end = ticks;
+		steps <<= 1;
+		e->period = period;
+		e->n_periods = n_periods;
+		e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
+		dir_high_at_queue_end = dir_high;
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+		{
+		  unsigned char* x = (unsigned char*)e;
+		  for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
+			if (checksum & 0x80) {
+			  checksum <<= 1;
+			  checksum ^= 0xde;
+			} else {
+			  checksum <<= 1;
+			}
+			checksum ^= *x++;
+		  }
+		}
+#endif
+		noInterrupts();
+		if (isRunning) {
+			  next_write_ptr = next_wp;
+			  interrupts();
+		}
+		else {
+		  interrupts();
+		  if (!startQueue(e)) {
+			  next_write_ptr = next_wp;
+		  }
+		}
+
+		return AQE_OK;
+	  }
+	  return AQE_FULL;
   }
  private:
   bool startQueue(struct queue_entry *e);
@@ -149,6 +150,7 @@ class StepperQueue {
 	  dir_high_at_queue_end = true;
 	  pos_at_queue_end = 0;
 	  ticks_at_queue_end = 0;
+	  isRunning = false;
   }
 };
 

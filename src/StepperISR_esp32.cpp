@@ -242,5 +242,4 @@ bool StepperQueue::startQueue(struct queue_entry *e) {
       }
 	  return true;
 }
-
 #endif

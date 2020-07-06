@@ -147,6 +147,7 @@ The low level command queue for each stepper allows direct speed control - when 
 
 * Speed changes at low speed and high acceleration do not come
 * Queue is filled too much, which cause slow response to speed/acceleration changes
+* getCurrentPosition() needs to be updated
 
 ## NOT TODO
 
