@@ -2,7 +2,7 @@
  
 ![C/C++ CI](https://github.com/gin66/FastAccelStepper/workflows/C/C++%20CI/badge.svg)
 
-This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). It makes use of the 16 bit Timer 1 ot the Atmega 328 and as such supports one or two stepper motors.
+This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are Atmega 328 and esp32.
 
 The stepper motors should be connected via a driver IC (like 4988) with a 1, 2 or 3-wire connection:
 * Step Signal
