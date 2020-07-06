@@ -16,9 +16,9 @@ unsigned short OCR1B;
 StepperQueue fas_queue[NUM_QUEUES];
 
 uint32_t normalize_speed(uint32_t ticks) {
-	uint32_t d = (ticks >> 16) + 1;
-	uint32_t period = ticks / d;
-	return period * d;
+  uint32_t d = (ticks >> 16) + 1;
+  uint32_t period = ticks / d;
+  return period * d;
 }
 
 class RampChecker {
@@ -54,20 +54,19 @@ void RampChecker::check_section(struct queue_entry *e) {
   }
   steps >>= 1;
   assert(steps >= 1);
-  uint32_t start_dt = e->period *  e->n_periods;
+  uint32_t start_dt = e->period * e->n_periods;
 
   min_dt = min(min_dt, start_dt);
   float accel = 0;
   if (!first) {
     accel = (16000000.0 / start_dt - 16000000.0 / last_dt) /
-            (1.0 / 16000000.0  * start_dt);
+            (1.0 / 16000000.0 * start_dt);
   }
   printf(
       "process command in ramp checker @%.6fs: steps = %d last = %d start = %d "
       " min_dt "
       "= %d   accel=%.6f\n",
-      total_ticks / 16000000.0, steps, last_dt, start_dt, min_dt,
-      accel);
+      total_ticks / 16000000.0, steps, last_dt, start_dt, min_dt, accel);
 
   total_ticks += steps * start_dt;
   assert(steps * start_dt >= 0);
@@ -99,7 +98,7 @@ void init_queue() {
 void basic_test_with_empty_queue() {
   init_queue();
   FastAccelStepper s = FastAccelStepper();
-  s.init(0,0);
+  s.init(0, 0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 
@@ -141,7 +140,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
          travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
-  s.init(0,0);
+  s.init(0, 0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 
@@ -220,7 +219,8 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
 int main() {
   basic_test_with_empty_queue();
   //             steps  ticks_us  accel    maxspeed  min/max_total_time
-  test_with_pars(1000,4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2, 0.5);  // jumps in speed in real on esp32
+  test_with_pars(1000, 4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2,
+                 0.5);  // jumps in speed in real on esp32
   test_with_pars(10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,
                  2 * 2.0 + 46.0 + 2.0, 0.2);  // ramp time 2s, 400 steps TODO
   test_with_pars(1600, 5000, 10000, true, 7.9, 8.1,

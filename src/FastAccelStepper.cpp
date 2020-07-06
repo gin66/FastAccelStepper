@@ -38,20 +38,20 @@ upm_float upm_timer_freq;
 
 #if defined(ARDUINO_ARCH_AVR)
 // this is needed to give the background task isr access to engine
-FastAccelStepperEngine *fas_engine = NULL;
+FastAccelStepperEngine* fas_engine = NULL;
 
 // dynamic allocation seem to not work so well on avr
-FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepper() };
+FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
+                                             FastAccelStepper()};
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
-FastAccelStepper fas_stepper[MAX_STEPPER] = { 
-	FastAccelStepper(), FastAccelStepper(),
-	FastAccelStepper(), FastAccelStepper(),
-	FastAccelStepper(), FastAccelStepper()
-};
+FastAccelStepper fas_stepper[MAX_STEPPER] = {
+    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(), FastAccelStepper()};
 #endif
 #if defined(TEST)
-FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepper() };
+FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
+                                             FastAccelStepper()};
 #endif
 
 //*************************************************************************************************
@@ -62,13 +62,13 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = { FastAccelStepper(), FastAccelStepp
 //
 //*************************************************************************************************
 #if defined(ARDUINO_ARCH_ESP32)
-void StepperTask(void *parameter) {
-	FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
-	const TickType_t delay = 10 / portTICK_PERIOD_MS; // block for 10ms
-	while(true) {
-		engine->manageSteppers();
-		vTaskDelay(delay);
-	}
+void StepperTask(void* parameter) {
+  FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
+  const TickType_t delay = 10 / portTICK_PERIOD_MS;  // block for 10ms
+  while (true) {
+    engine->manageSteppers();
+    vTaskDelay(delay);
+  }
 }
 #endif
 //*************************************************************************************************
@@ -109,11 +109,12 @@ bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
   return true;
 #endif
 #if defined(ESP32)
-  return true; // for now
+  return true;  // for now
 #endif
 }
 //*************************************************************************************************
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) {
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin) {
   uint8_t i;
   for (i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
@@ -124,18 +125,18 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) 
     }
   }
   if (!_isValidStepPin(step_pin)) {
-	  return NULL;
+    return NULL;
   }
-	FastAccelStepper* s = &fas_stepper[_next_stepper_num];
-	_stepper[_next_stepper_num] = s;
-	s->init(_next_stepper_num, step_pin);
-	_next_stepper_num++;
-    return s;
+  FastAccelStepper* s = &fas_stepper[_next_stepper_num];
+  _stepper[_next_stepper_num] = s;
+  s->init(_next_stepper_num, step_pin);
+  _next_stepper_num++;
+  return s;
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
-  pinMode(fas_ledPin,OUTPUT);
+  pinMode(fas_ledPin, OUTPUT);
   digitalWrite(fas_ledPin, LOW);
 }
 //*************************************************************************************************
@@ -146,17 +147,17 @@ void FastAccelStepperEngine::manageSteppers() {
     if (fas_debug_led_cnt == DEBUG_LED_HALF_PERIOD) {
       digitalWrite(fas_ledPin, HIGH);
     }
-    if (fas_debug_led_cnt == 2*DEBUG_LED_HALF_PERIOD) {
+    if (fas_debug_led_cnt == 2 * DEBUG_LED_HALF_PERIOD) {
       digitalWrite(fas_ledPin, LOW);
       fas_debug_led_cnt = 0;
     }
   }
 #endif
-  for (uint8_t i = 0; i < _next_stepper_num;i++) {
-	 FastAccelStepper* s = _stepper[i];
-	if (s) {
-	  s->isr_fill_queue();
-	}
+  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+    FastAccelStepper* s = _stepper[i];
+    if (s) {
+      s->isr_fill_queue();
+    }
   }
 }
 
@@ -175,10 +176,14 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 bool FastAccelStepper::isStopped() { return fas_queue[_queue_num].isStopped(); }
 //*************************************************************************************************
-void FastAccelStepper::addQueueStepperStop() { fas_queue[_queue_num].addQueueStepperStop(); }
+void FastAccelStepper::addQueueStepperStop() {
+  fas_queue[_queue_num].addQueueStepperStop();
+}
 //*************************************************************************************************
-int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high) {
-  return fas_queue[_queue_num].addQueueEntry(start_delta_ticks, steps,dir_high);
+int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
+                                    bool dir_high) {
+  return fas_queue[_queue_num].addQueueEntry(start_delta_ticks, steps,
+                                             dir_high);
 }
 
 //*************************************************************************************************
@@ -303,7 +308,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   int32_t ticks_at_queue_end = fas_queue[_queue_num].ticks_at_queue_end;
 
   // check state for acceleration/deceleration or deceleration to stop
-  uint32_t remaining_steps = abs(target_pos - getPositionAfterCommandsCompleted());
+  uint32_t remaining_steps =
+      abs(target_pos - getPositionAfterCommandsCompleted());
   uint32_t planning_steps;
   uint32_t next_ticks;
   if (ramp_state == RAMP_STATE_IDLE) {  // motor is stopped. Set to max value
@@ -452,11 +458,10 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   }
   // Apply change to curr_ticks
   if (command_cnt > 1) {
-	curr_ticks += change_per_command / 2;
-	}
-	else {
-	curr_ticks = next_ticks;
-	}
+    curr_ticks += change_per_command / 2;
+  } else {
+    curr_ticks = next_ticks;
+  }
 
   bool dir = target_pos > getPositionAfterCommandsCompleted();
 
@@ -485,10 +490,11 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         "Remaining steps = %d  tick_change=%d"
         " => res=%d   ticks_at_queue_end = %d\n",
         (command_cnt + 1 - c), steps_per_command, curr_ticks, target_pos,
-        remaining_steps, change_per_command, res, fas_queue[_queue_num].ticks_at_queue_end);
+        remaining_steps, change_per_command, res,
+        fas_queue[_queue_num].ticks_at_queue_end);
 #endif
     steps -= steps_per_command;
-	curr_ticks += change_per_command;
+    curr_ticks += change_per_command;
   }
   int8_t res = addQueueEntry(curr_ticks, steps, dir);
 #ifdef TEST
@@ -586,16 +592,16 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   fas_queue[_queue_num].autoEnablePin = _auto_enablePin;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
-	if (min_step_us == 0) {
-		return;
-	}
+  if (min_step_us == 0) {
+    return;
+  }
   _min_travel_ticks = min_step_us * (TIMER_FREQ / 1000L) / 1000L;
   _update_ramp_steps();
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
-	if (accel == 0) {
-		return;
-	}
+  if (accel == 0) {
+    return;
+  }
   uint32_t tmp = TIMER_FREQ / 2;
   upm_float upm_inv_accel = upm_from(tmp / accel);
   _upm_inv_accel2 = multiply(UPM_TIMER_FREQ, upm_inv_accel);

@@ -18,23 +18,23 @@ void setup() {
   Serial.begin(115200);
 
   // Check stepper motor+driver is operational
-  pinMode(stepPinStepper1,OUTPUT);
-  pinMode(dirPinStepper1,OUTPUT);
-  pinMode(enablePinStepper1,OUTPUT);
+  pinMode(stepPinStepper1, OUTPUT);
+  pinMode(dirPinStepper1, OUTPUT);
+  pinMode(enablePinStepper1, OUTPUT);
   digitalWrite(enablePinStepper1, LOW);
   digitalWrite(dirPinStepper1, LOW);
-  for (uint16_t i = 0;i < 3200;i++) {
-	  digitalWrite(stepPinStepper1, HIGH);
-      delayMicroseconds(10);
-	  digitalWrite(stepPinStepper1, LOW);
-      delayMicroseconds(190);
+  for (uint16_t i = 0; i < 3200; i++) {
+    digitalWrite(stepPinStepper1, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(stepPinStepper1, LOW);
+    delayMicroseconds(190);
   }
   digitalWrite(dirPinStepper1, HIGH);
-  for (uint16_t i = 0;i < 3200;i++) {
-	  digitalWrite(stepPinStepper1, HIGH);
-      delayMicroseconds(10);
-	  digitalWrite(stepPinStepper1, LOW);
-      delayMicroseconds(190);
+  for (uint16_t i = 0; i < 3200; i++) {
+    digitalWrite(stepPinStepper1, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(stepPinStepper1, LOW);
+    delayMicroseconds(190);
   }
   digitalWrite(enablePinStepper1, HIGH);
 
