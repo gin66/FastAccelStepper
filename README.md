@@ -141,13 +141,12 @@ The low level command queue for each stepper allows direct speed control - when 
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
 * Support different values for acceleration and deceleration
 * Add preprocessor constant: TICKS_PER_S for raw commands
-* Rework FastAccelStepper.cpp after remove of "change"
 
 ## ISSUES
 
 * Speed changes at low speed and high acceleration do not come
 * Queue is filled too much, which cause slow response to speed/acceleration changes
-* getCurrentPosition() needs to be updated
+* esp32: getCurrentPosition() does not take into account the current pulses
 
 ## NOT TODO
 
