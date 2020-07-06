@@ -1,3 +1,5 @@
+#ifndef FASTACCELSTEPPER_H
+#define FASTACCELSTEPPER_H
 #if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || defined(TEST)
 #ifndef TEST
 #include <Arduino.h>
@@ -167,4 +169,5 @@ class FastAccelStepperEngine {
 };
 #else
 #error “This library only supports boards with an AVR or ESP32 processor.”
+#endif
 #endif

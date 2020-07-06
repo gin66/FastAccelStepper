@@ -143,6 +143,11 @@ The low level command queue for each stepper allows direct speed control - when 
 * Add preprocessor constant: TICKS_PER_S for raw commands
 * Rework FastAccelStepper.cpp after remove of "change"
 
+## ISSUES
+
+* Speed changes at low speed and high acceleration do not come
+* Queue is filled too much, which cause slow response to speed/acceleration changes
+
 ## NOT TODO
 
 * Change in direction requires motor stop ! => it's a feature
@@ -150,5 +155,6 @@ The low level command queue for each stepper allows direct speed control - when 
 
 ## Lessons Learned
 
-Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
+* Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
+* In one setup, operating A4988 without microsteps lead to erratic behaviour and some specific low speed (erratic means step forward/backward). No issue with 16 microstep
 

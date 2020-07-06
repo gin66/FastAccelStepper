@@ -6,7 +6,6 @@
 #include <soc/pcnt_struct.h>
 
 #include "StepperISR.h"
-#include "FastAccelStepper.h"
 
 #if defined(ARDUINO_ARCH_ESP32)
 
@@ -29,7 +28,7 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
          digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
       }
 	  uint8_t n_periods = e->n_periods;
-	  if (n_periods == 0) {
+	  if (n_periods == 1) {
 		  mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
 		  switch(timer) {
 			  case 0:
@@ -215,70 +214,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 //			without next command: set mcpwm to stop mode on reaching period
 //
 
-int StepperQueue::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
-                                    bool dir_high) {
-  int32_t c_sum = 0;
-  if (steps >= 128) {
-    return AQE_STEPS_ERROR;
-  }
-  if (start_delta_ticks > ABSOLUTE_MAX_TICKS) {
-    return AQE_TOO_HIGH;
-  }
-
-  uint16_t period;
-  uint8_t n_periods;
-  if (start_delta_ticks > 65535) {
-	  n_periods = start_delta_ticks >> 16;
-	  n_periods += 1;
-	  period = start_delta_ticks / n_periods;
-  }
-  else {
-	  period = start_delta_ticks;
-	  n_periods = 0;
-  }
-
-  uint8_t wp = next_write_ptr;
-  uint8_t rp = read_ptr;
-  struct queue_entry* e = &entry[wp];
-
-  uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
-  if (next_wp != rp) {
-    pos_at_queue_end += dir_high ? steps : -steps;
-    ticks_at_queue_end = start_delta_ticks;
-    steps <<= 1;
-    e->period = period;
-	e->n_periods = n_periods;
-    e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
-if (false) {
-	Serial.print("steps=");
-	Serial.print(steps);
-	Serial.print(" period=");
-	Serial.print(period);
-	Serial.print(" n_periods=");
-	Serial.println(n_periods);
-}
-    dir_high_at_queue_end = dir_high;
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    {
-      unsigned char* x = (unsigned char*)e;
-      for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
-        if (checksum & 0x80) {
-          checksum <<= 1;
-          checksum ^= 0xde;
-        } else {
-          checksum <<= 1;
-        }
-        checksum ^= *x++;
-      }
-    }
-#endif
-	noInterrupts();
-	if (isRunning) {
-		  next_write_ptr = next_wp;
-	      interrupts();
-	}
-	else {
-	  interrupts();
+bool StepperQueue::startQueue(struct queue_entry *e) {
 		// TODO steps and direction update
 	  mcpwm_dev_t *mcpwm = queueNum < 3 ? &MCPWM0 : &MCPWM1;
       pcnt_unit_t pcnt_unit = (pcnt_unit_t)queueNum;
@@ -287,9 +223,6 @@ if (false) {
       mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
       mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
       mcpwm->timer[timer].period.period = 65535; // will be overwritten in next_command
-      PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;
-      pcnt_counter_clear(pcnt_unit);
-      pcnt_counter_resume(pcnt_unit);
 	  isRunning = true;
 
 	  mcpwm->timer[timer].mode.val = 10;            // free run incrementing
@@ -307,10 +240,7 @@ if (false) {
       if (autoEnablePin != 255) {
         digitalWrite(autoEnablePin, LOW);
       }
-	}
-
-    return AQE_OK;
-  }
-  return AQE_FULL;
+	  return true;
 }
+
 #endif
