@@ -7,6 +7,7 @@
 #define LED_PIN 2
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper *stepper1;
 FastAccelStepper *stepper;
 
 void setup() {
@@ -34,9 +35,11 @@ void setup() {
   }
   digitalWrite(enablePinStepper, HIGH);
   Serial.println("Init FastAccelStepper");
-  stepper = engine.stepperConnectToPin(stepPinStepper);
   engine.init();
   engine.setDebugLed(LED_PIN);
+
+  stepper1 = engine.stepperConnectToPin(5);
+  stepper = engine.stepperConnectToPin(stepPinStepper);
 
   if (stepper) {
     stepper->setDirectionPin(dirPinStepper);
