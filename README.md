@@ -1,5 +1,5 @@
 # FastAccelStepper 
-
+ 
 ![C/C++ CI](https://github.com/gin66/FastAccelStepper/workflows/C/C++%20CI/badge.svg)
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). It makes use of the 16 bit Timer 1 ot the Atmega 328 and as such supports one or two stepper motors.
@@ -18,20 +18,31 @@ FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
 * 2-pin operation for e.g. axis control
 * 3-pin operation for power reduction
-* supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* allows up to roughly 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
 * Lower limit of 3.8 steps/s @ 16MHz
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * speed/acceleration can be varied while stepper is running (need call to move/moveTo for application of new values, not done implicitly)
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
-* Provide API to each stepper's command queue (can hold 15 commands). Those commands are tied to timer ticks aka the CPU frequency!
-* Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency
+* Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
+
+### AVR
+
+* allows up to roughly 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
+* supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
+* Steppers' command queue depth: 15
+
+### ESP32
+
+* supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 31
 
 The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
+
+### AVR
 
 Using the high level interface with ramp up/down:
 
@@ -109,6 +120,10 @@ void loop() {
 }
 ```
 
+### ESP32
+
+Check the SingleStepper_esp32 example for an example.
+
 ## Behind the curtains
 
 ### AVR
@@ -124,6 +139,10 @@ The compare interrupt routines uses two staged tick counters. One byte (msb) + o
 The acceleration/deacceleration aka timer overflow interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
 ### ESP32
+
+This stepper driver use mcpwm modules of the esp32: for the first three stepper motors mcpwm0 and mcpwm1 for the steppers four to six. In addition the pulse counter module is used starting from unit_0 to unit_5. This driver uses the pcnt_isr_service, so unallocated modules can be used by the application.
+
+The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-modification.
 
 ### BOTH
 
