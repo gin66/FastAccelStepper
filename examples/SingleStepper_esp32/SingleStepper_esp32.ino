@@ -132,7 +132,7 @@ void loop() {
 
     if (!stopped && true) {
       Serial.print("Stepper: ");
-      Serial.print(stepper->isr_speed_control_enabled ? " AUTO " : " MANU ");
+      Serial.print(stepper->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
       Serial.print(stepper->getCurrentPosition());
       if (stepper->isRunning()) {
         Serial.print("  RUNNING");
@@ -140,7 +140,7 @@ void loop() {
         Serial.print("  PAUSED ");
       }
       Serial.print("  state=");
-      Serial.print(stepper->ramp_state);
+      Serial.print(stepper->rampState());
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
       Serial.print("  max/us=");
       Serial.print(stepper->max_micros);

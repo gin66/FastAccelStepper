@@ -3,67 +3,76 @@
 
 #if defined(ARDUINO_ARCH_ESP32)
 
-#define TIMER_H_L_TRANSITION 200
+// H-Period of Step signal is 10 us
+#define TIMER_H_L_TRANSITION 160
 
-#define TIMER_PRESCALER 0  // cannot be updated will timer is running
+// cannot be updated while timer is running => fix it to 0
+#define TIMER_PRESCALER 0
 
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
+// Here the associated mapping from queue to mcpwm/pcnt units
 static const struct mapping_s queue2mapping[NUM_QUEUES] = {
     {
-      &MCPWM0,
-      MCPWM_UNIT_0,
+      mcpwm_dev : &MCPWM0,
+      mcpwm_unit : MCPWM_UNIT_0,
       timer : 0,
-      PCNT_UNIT_0,
-      PCNT_SIG_CH0_IN0_IDX,
-      MCPWM_TIMER0_TEZ_INT_CLR,
-      MCPWM_TIMER0_TEZ_INT_ENA
+      pwm_output_pin : MCPWM0A,
+      pcnt_unit : PCNT_UNIT_0,
+      input_sig_index : PCNT_SIG_CH0_IN0_IDX,
+      timer_tez_int_clr : MCPWM_TIMER0_TEZ_INT_CLR,
+      timer_tez_int_ena : MCPWM_TIMER0_TEZ_INT_ENA
     },
     {
-      &MCPWM0,
-      MCPWM_UNIT_0,
+      mcpwm_dev : &MCPWM0,
+      mcpwm_unit : MCPWM_UNIT_0,
       timer : 1,
-      PCNT_UNIT_1,
-      PCNT_SIG_CH0_IN1_IDX,
-      MCPWM_TIMER1_TEZ_INT_CLR,
-      MCPWM_TIMER1_TEZ_INT_ENA
+      pwm_output_pin : MCPWM1A,
+      pcnt_unit : PCNT_UNIT_1,
+      input_sig_index : PCNT_SIG_CH0_IN1_IDX,
+      timer_tez_int_clr : MCPWM_TIMER1_TEZ_INT_CLR,
+      timer_tez_int_ena : MCPWM_TIMER1_TEZ_INT_ENA
     },
     {
-      &MCPWM0,
-      MCPWM_UNIT_0,
+      mcpwm_dev : &MCPWM0,
+      mcpwm_unit : MCPWM_UNIT_0,
       timer : 2,
-      PCNT_UNIT_2,
-      PCNT_SIG_CH0_IN2_IDX,
-      MCPWM_TIMER2_TEZ_INT_CLR,
-      MCPWM_TIMER2_TEZ_INT_ENA
+      pwm_output_pin : MCPWM2A,
+      pcnt_unit : PCNT_UNIT_2,
+      input_sig_index : PCNT_SIG_CH0_IN2_IDX,
+      timer_tez_int_clr : MCPWM_TIMER2_TEZ_INT_CLR,
+      timer_tez_int_ena : MCPWM_TIMER2_TEZ_INT_ENA
     },
     {
-      &MCPWM1,
-      MCPWM_UNIT_1,
+      mcpwm_dev : &MCPWM1,
+      mcpwm_unit : MCPWM_UNIT_1,
       timer : 0,
-      PCNT_UNIT_3,
-      PCNT_SIG_CH0_IN3_IDX,
-      MCPWM_TIMER0_TEZ_INT_CLR,
-      MCPWM_TIMER0_TEZ_INT_ENA
+      pwm_output_pin : MCPWM0A,
+      pcnt_unit : PCNT_UNIT_3,
+      input_sig_index : PCNT_SIG_CH0_IN3_IDX,
+      timer_tez_int_clr : MCPWM_TIMER0_TEZ_INT_CLR,
+      timer_tez_int_ena : MCPWM_TIMER0_TEZ_INT_ENA
     },
     {
-      &MCPWM1,
-      MCPWM_UNIT_1,
+      mcpwm_dev : &MCPWM1,
+      mcpwm_unit : MCPWM_UNIT_1,
       timer : 1,
-      PCNT_UNIT_4,
-      PCNT_SIG_CH0_IN4_IDX,
-      MCPWM_TIMER1_TEZ_INT_CLR,
-      MCPWM_TIMER1_TEZ_INT_ENA
+      pwm_output_pin : MCPWM1A,
+      pcnt_unit : PCNT_UNIT_4,
+      input_sig_index : PCNT_SIG_CH0_IN4_IDX,
+      timer_tez_int_clr : MCPWM_TIMER1_TEZ_INT_CLR,
+      timer_tez_int_ena : MCPWM_TIMER1_TEZ_INT_ENA
     },
     {
-      &MCPWM1,
-      MCPWM_UNIT_1,
+      mcpwm_dev : &MCPWM1,
+      mcpwm_unit : MCPWM_UNIT_1,
       timer : 2,
-      PCNT_UNIT_5,
-      PCNT_SIG_CH0_IN5_IDX,
-      MCPWM_TIMER2_TEZ_INT_CLR,
-      MCPWM_TIMER2_TEZ_INT_ENA
+      pwm_output_pin : MCPWM2A,
+      pcnt_unit : PCNT_UNIT_5,
+      input_sig_index : PCNT_SIG_CH0_IN5_IDX,
+      timer_tez_int_clr : MCPWM_TIMER2_TEZ_INT_CLR,
+      timer_tez_int_ena : MCPWM_TIMER2_TEZ_INT_ENA
     },
 };
 
@@ -173,9 +182,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   }
   pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
 
+  mcpwm_gpio_init(mcpwm_unit, mapping->pwm_output_pin, step_pin);
   switch (timer) {
     case 0:
-      mcpwm_gpio_init(mcpwm_unit, MCPWM0A, step_pin);
       break;
     case 1:
       mcpwm_gpio_init(mcpwm_unit, MCPWM1A, step_pin);
@@ -222,16 +231,17 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 
 // Mechanism is like this, starting from stopped motor:
 //
-//		init counter
-//		init mcpwm
-//		start mcpwm
-//		-- mcpwm counter counts every L->H-transition at mcpwm.timer = 0
-//		-- if counter reaches planned steps, then counter is reset and
-//		interrupt is created
+// *	init counter
+// *	init mcpwm
+// *	start mcpwm
+// *	-- mcpwm counter counts every L->H-transition at mcpwm.timer = 0
+// *	-- if counter reaches planned steps, then counter is reset and
+// *	interrupt is created
 //
-//		pcnt interrupt: available time is from mcpwm.timer = 0+x to
-//period 		read next commmand: store period in counter shadow and steps in pcnt
-//			without next command: set mcpwm to stop mode on reaching
+// *	pcnt interrupt: available time is from mcpwm.timer = 0+x to period
+//		-	read next commmand: store period in counter shadow and
+//steps in pcnt
+//		- 	without next command: set mcpwm to stop mode on reaching
 //period
 
 bool StepperQueue::startQueue(struct queue_entry *e) {

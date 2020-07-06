@@ -35,36 +35,28 @@ class FastAccelStepper {
   // This should be only called by FastAccelStepperEngine !
   void init(uint8_t num, uint8_t step_pin);
 
-  // stable API functions
-  void setDirectionPin(uint8_t dirPin);
-  void setEnablePin(uint8_t enablePin);
+  // step pin is defined at creation. Here can retrieve the pin
   uint8_t getStepPin();
 
-  void setAutoEnable(bool auto_enable);
+  // if direction pin is connected, call this function
+  void setDirectionPin(uint8_t dirPin);
+
+  // if enable pin is connected, then use this function
+  void setEnablePin(uint8_t enablePin);
+
+  // using enableOutputs/enableOutputs the stepper can be enabled
   void enableOutputs();
   void disableOutputs();
 
-  int32_t getPositionAfterCommandsCompleted();
+  // in auto enable mode, the stepper is enabled before stepping and disabled afterwards
+  void setAutoEnable(bool auto_enable);
+
+  // Retrieve the current position of the stepper - either in standstill or while moving
+  //    for esp32: the position while moving may deviate by the currently executed command steps
   int32_t getCurrentPosition();
+
+  // is true while the stepper is running
   bool isRunning();
-  void move(int32_t move);
-  void moveTo(int32_t position);
-
-  // unstable API functions
-
-  // stepper queue management (low level access)
-  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high);
-  // Return codes for add_queue_entry
-#define AQE_OK 0
-#define AQE_FULL -1
-#define AQE_TOO_HIGH -2
-#define AQE_TOO_LOW -3
-#define AQE_STEPS_ERROR -4
-
-  void addQueueStepperStop();
-  bool isQueueEmpty();
-  bool isQueueFull();
-  bool isStopped();
 
   // For stepper movement control by FastAccelStepper
   //
@@ -82,18 +74,51 @@ class FastAccelStepper {
   //
   void setAcceleration(uint32_t step_s_s);
 
+  // start the stepper for (move) steps
+  void move(int32_t move);
+
+  // start the stepper to the absolute position
+  void moveTo(int32_t position);
+
+  // get the target position for the current move
+  int32_t targetPos();
+
+  // Low level acccess via command queue
+  // stepper queue management (low level access)
+  int addQueueEntry(uint32_t start_delta_ticks, uint8_t steps, bool dir_high);
+
+  // Return codes for addQueueEntry
+#define AQE_OK 0
+#define AQE_FULL -1
+#define AQE_TOO_HIGH -2
+#define AQE_TOO_LOW -3
+#define AQE_STEPS_ERROR -4
+
+  // check function s for command queue being empty or full
+  bool isQueueEmpty();
+  bool isQueueFull();
+
+  // Get the future position of the stepper after all commands in queue are completed
+  int32_t getPositionAfterCommandsCompleted();
+
+  // to be deprecated
+  void addQueueStepperStop();
+  bool isStopped();
+
+  // This function provides info, in which state the high level stepper control is operating
 #define RAMP_STATE_IDLE 0
 #define RAMP_STATE_ACCELERATE 1
 #define RAMP_STATE_DECELERATE_TO_STOP 2
 #define RAMP_STATE_DECELERATE 3
 #define RAMP_STATE_COAST 4
-  uint8_t ramp_state;  // updated by isr_fill_queue
-  int32_t target_pos;
-  bool isr_speed_control_enabled;
-  inline void isr_fill_queue();  // MUST BE ONLY CALLED FROM THIS MODULE'S
-                                 // INTERRUPT SERVICE ROUTINE !
-  inline void isr_single_fill_queue();  // MUST BE ONLY CALLED FROM THIS
-                                        // MODULE'S INTERRUPT SERVICE ROUTINE !
+  uint8_t rampState();
+
+  // returns true, if the ramp generation is active
+  bool isrSpeedControlEnabled();
+
+  // This variable/these functions should NEVER be modified/called by the application
+  inline void isr_fill_queue();
+  inline void isr_single_fill_queue();
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
@@ -103,6 +128,9 @@ class FastAccelStepper {
 #endif
 
  private:
+  uint8_t _rampState;  // updated by isr_fill_queue
+  bool _isr_speed_control_enabled;
+  int32_t _target_pos;
   uint8_t _stepPin;
   uint8_t _dirPin;
   uint8_t _auto_enablePin;

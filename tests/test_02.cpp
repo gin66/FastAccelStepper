@@ -115,11 +115,11 @@ void basic_test_with_empty_queue() {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
           "pos = %d  QueueEmpty=%s\n",
-          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.target_pos,
+          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.targetPos(),
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-    if (!s.isr_speed_control_enabled) {
+    if (!s.isrSpeedControlEnabled()) {
       break;
     }
     s.isr_fill_queue();
@@ -128,7 +128,7 @@ void basic_test_with_empty_queue() {
       fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
     }
   }
-  test(!s.isr_speed_control_enabled, "too many commands created");
+  test(!s.isrSpeedControlEnabled(), "too many commands created");
   printf("%d\n", rc.min_dt);
   test(rc.min_dt == normalize_speed(160000), "max speed not reached");
 }
@@ -158,11 +158,11 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
           "pos = %d  QueueEmpty=%s\n",
-          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.target_pos,
+          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.targetPos(),
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-    if (!s.isr_speed_control_enabled) {
+    if (!s.isrSpeedControlEnabled()) {
       break;
     }
     s.isr_fill_queue();
@@ -178,7 +178,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
     assert((i == 0) || (old_planned_time_in_buffer > 0.005));
     old_planned_time_in_buffer = planned_time;
   }
-  test(!s.isr_speed_control_enabled, "too many commands created");
+  test(!s.isrSpeedControlEnabled(), "too many commands created");
   printf("Total time  %f < %f < %f ?\n", min_time, rc.total_ticks / 16000000.0,
          max_time);
   test(rc.total_ticks / 16000000.0 > min_time, "ramp too fast");

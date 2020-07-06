@@ -45,6 +45,7 @@ struct mapping_s {
   mcpwm_dev_t* mcpwm_dev;
   mcpwm_unit_t mcpwm_unit;
   uint8_t timer;
+  mcpwm_io_signals_t pwm_output_pin;
   pcnt_unit_t pcnt_unit;
   int input_sig_index;
   uint32_t timer_tez_int_clr;
@@ -71,8 +72,8 @@ class StepperQueue {
   uint8_t current_period;
   uint8_t current_n_periods;
 #endif
-  // This is used in the timer compare unit as extension of the 16 timer
 #if defined(ARDUINO_ARCH_AVR)
+  // This is used in the timer compare unit as extension of the 16 timer
   uint8_t skip;
   uint16_t period;
 #endif

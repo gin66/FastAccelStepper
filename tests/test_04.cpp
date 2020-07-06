@@ -129,11 +129,11 @@ int main() {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
           "pos = %d  QueueEmpty=%s\n",
-          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.target_pos,
+          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.targetPos(),
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-    if (!s.isr_speed_control_enabled) {
+    if (!s.isrSpeedControlEnabled()) {
       break;
     }
     s.isr_fill_queue();
@@ -149,7 +149,7 @@ int main() {
     assert((i == 0) || (old_planned_time_in_buffer > 0.005));
     old_planned_time_in_buffer = planned_time;
   }
-  test(!s.isr_speed_control_enabled, "too many commands created");
+  test(!s.isrSpeedControlEnabled(), "too many commands created");
   printf("Total time  %f\n", rc.total_ticks / 16000000.0);
   test(s.isStopped(), "is not stopped");
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)

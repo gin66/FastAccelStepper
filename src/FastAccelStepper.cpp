@@ -261,7 +261,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   noInterrupts();
   _deceleration_start = deceleration_start;
   _performed_ramp_up_steps = performed_ramp_up_steps;
-  isr_speed_control_enabled = true;
+  _isr_speed_control_enabled = true;
   interrupts();
 
 #ifdef TEST
@@ -285,8 +285,8 @@ void FastAccelStepper::_calculate_move(int32_t move) {
 
 inline void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
-  if (target_pos == getPositionAfterCommandsCompleted()) {
-    isr_speed_control_enabled = false;
+  if (_target_pos == getPositionAfterCommandsCompleted()) {
+    _isr_speed_control_enabled = false;
     return;
   }
   if (_min_travel_ticks == 0) {
@@ -294,7 +294,7 @@ inline void FastAccelStepper::isr_fill_queue() {
   }
 
   // preconditions are fulfilled, so create the command(s)
-  while (!isQueueFull() && isr_speed_control_enabled) {
+  while (!isQueueFull() && _isr_speed_control_enabled) {
     isr_single_fill_queue();
   }
 }
@@ -309,22 +309,22 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
   // check state for acceleration/deceleration or deceleration to stop
   uint32_t remaining_steps =
-      abs(target_pos - getPositionAfterCommandsCompleted());
+      abs(_target_pos - getPositionAfterCommandsCompleted());
   uint32_t planning_steps;
   uint32_t next_ticks;
-  if (ramp_state == RAMP_STATE_IDLE) {  // motor is stopped. Set to max value
+  if (_rampState == RAMP_STATE_IDLE) {  // motor is stopped. Set to max value
     planning_steps = 1;
-    ramp_state = RAMP_STATE_ACCELERATE;
+    _rampState = RAMP_STATE_ACCELERATE;
   } else {
     planning_steps = max(16000 / ticks_at_queue_end, 1);
     if (remaining_steps <= _deceleration_start) {
-      ramp_state = RAMP_STATE_DECELERATE_TO_STOP;
+      _rampState = RAMP_STATE_DECELERATE_TO_STOP;
     } else if (_min_travel_ticks < ticks_at_queue_end) {
-      ramp_state = RAMP_STATE_ACCELERATE;
+      _rampState = RAMP_STATE_ACCELERATE;
     } else if (_min_travel_ticks > ticks_at_queue_end) {
-      ramp_state = RAMP_STATE_DECELERATE;
+      _rampState = RAMP_STATE_DECELERATE;
     } else {
-      ramp_state = RAMP_STATE_COAST;
+      _rampState = RAMP_STATE_COAST;
     }
   }
 
@@ -333,7 +333,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #ifdef TEST
   printf("remaining=%u deceleration_start=%u planning steps=%d   ",
          remaining_steps, _deceleration_start, planning_steps);
-  switch (ramp_state) {
+  switch (_rampState) {
     case RAMP_STATE_COAST:
       printf("COAST");
       break;
@@ -354,7 +354,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #ifdef TEST
   float v2;
 #endif
-  switch (ramp_state) {
+  switch (_rampState) {
     uint32_t d_ticks_new;
     uint32_t upm_rem_steps;
     upm_float upm_d_ticks_new;
@@ -450,10 +450,10 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
   int32_t change_per_command = total_change / command_cnt;
 
-  if (ramp_state == RAMP_STATE_ACCELERATE) {
+  if (_rampState == RAMP_STATE_ACCELERATE) {
     _performed_ramp_up_steps += steps;
   }
-  if (ramp_state == RAMP_STATE_DECELERATE) {
+  if (_rampState == RAMP_STATE_DECELERATE) {
     _performed_ramp_up_steps -= steps;
   }
   // Apply change to curr_ticks
@@ -463,7 +463,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     curr_ticks = next_ticks;
   }
 
-  bool dir = target_pos > getPositionAfterCommandsCompleted();
+  bool dir = _target_pos > getPositionAfterCommandsCompleted();
 
 #ifdef TEST
   if (command_cnt > 1) {
@@ -489,7 +489,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         "pos = %d "
         "Remaining steps = %d  tick_change=%d"
         " => res=%d   ticks_at_queue_end = %d\n",
-        (command_cnt + 1 - c), steps_per_command, curr_ticks, target_pos,
+        (command_cnt + 1 - c), steps_per_command, curr_ticks, _target_pos,
         remaining_steps, change_per_command, res,
         fas_queue[_queue_num].ticks_at_queue_end);
 #endif
@@ -503,18 +503,18 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       "pos = %d "
       "Remaining steps = %d  tick_change=%d"
       " => res=%d   ticks_at_queue_end = %d\n",
-      steps, curr_ticks, target_pos, remaining_steps, change_per_command, res,
+      steps, curr_ticks, _target_pos, remaining_steps, change_per_command, res,
       fas_queue[_queue_num].ticks_at_queue_end);
 #endif
   if (res != 0) {  // Emergency stop on internal error
     addQueueStepperStop();
-    ramp_state = RAMP_STATE_IDLE;
-    isr_speed_control_enabled = false;
+    _rampState = RAMP_STATE_IDLE;
+    _isr_speed_control_enabled = false;
   }
   if (total_steps == abs(remaining_steps)) {
     addQueueStepperStop();
-    ramp_state = RAMP_STATE_IDLE;
-    isr_speed_control_enabled = false;
+    _rampState = RAMP_STATE_IDLE;
+    _isr_speed_control_enabled = false;
 #ifdef TEST
     puts("Stepper stop");
 #endif
@@ -555,9 +555,9 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   checksum = 0;
 #endif
 
-  target_pos = 0;
-  isr_speed_control_enabled = false;
-  ramp_state = RAMP_STATE_IDLE;
+  _target_pos = 0;
+  _isr_speed_control_enabled = false;
+  _rampState = RAMP_STATE_IDLE;
   _stepper_num = num;
   _auto_enablePin = 255;
   _min_travel_ticks = 0;
@@ -612,12 +612,12 @@ void FastAccelStepper::_update_ramp_steps() {
       upm_to_u32(divide(_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
 }
 void FastAccelStepper::move(int32_t move) {
-  target_pos = getPositionAfterCommandsCompleted() + move;
+  _target_pos = getPositionAfterCommandsCompleted() + move;
   _calculate_move(move);
 }
 void FastAccelStepper::moveTo(int32_t position) {
   int32_t move;
-  target_pos = position;
+  _target_pos = position;
   move = position - getPositionAfterCommandsCompleted();
   _calculate_move(move);
 }
@@ -664,4 +664,9 @@ bool FastAccelStepper::isQueueFull() {
 bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
+bool FastAccelStepper::isrSpeedControlEnabled() {
+	  return _isr_speed_control_enabled;
+  };
 bool FastAccelStepper::isRunning() { return !isQueueEmpty(); }
+int32_t FastAccelStepper::targetPos() { return _target_pos; }
+uint8_t FastAccelStepper::rampState() { return _rampState; }
