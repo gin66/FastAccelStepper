@@ -144,7 +144,7 @@ void loop() {
 
   if (!stopped) {
     Serial.print("Stepper 1: ");
-    Serial.print(stepper1->isr_speed_control_enabled ? " AUTO " : " MANU ");
+    Serial.print(stepper1->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
     Serial.print(stepper1->getCurrentPosition());
     if (stepper1->isRunning()) {
       Serial.print("  RUNNING");
@@ -163,7 +163,7 @@ void loop() {
 #endif
 
     Serial.print("  Stepper 2: ");
-    Serial.print(stepper2->isr_speed_control_enabled ? " AUTO " : " MANU ");
+    Serial.print(stepper2->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
     Serial.print(stepper2->getCurrentPosition());
     if (stepper2->isRunning()) {
       Serial.print("  RUNNING");

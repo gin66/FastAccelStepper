@@ -38,7 +38,8 @@ void setup() {
   engine.init();
   engine.setDebugLed(LED_PIN);
 
-  stepper1 = engine.stepperConnectToPin(5);
+  // stepper1 = engine.stepperConnectToPin(20); <= this causes an error
+  // stepper1 = engine.stepperConnectToPin(5);
   stepper = engine.stepperConnectToPin(stepPinStepper);
 
   if (stepper) {
