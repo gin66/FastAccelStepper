@@ -28,8 +28,10 @@ void setup() {
 
 bool direction = false;
 
+#define MAX_SPEED 80000 /* steps/s */
+
 void loop() {
-#define COMMAND_CNT 800
+#define COMMAND_CNT (MAX_SPEED/100)
   Serial.println("Start");
   for (uint16_t i = 1; i < 2 * COMMAND_CNT; i++) {
     uint8_t steps = 100;
