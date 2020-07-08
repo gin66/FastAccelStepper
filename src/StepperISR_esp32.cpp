@@ -240,9 +240,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 //
 // *	pcnt interrupt: available time is from mcpwm.timer = 0+x to period
 //		-	read next commmand: store period in counter shadow and
-//steps in pcnt
+// steps in pcnt
 //		- 	without next command: set mcpwm to stop mode on reaching
-//period
+// period
 
 bool StepperQueue::startQueue(struct queue_entry *e) {
   mcpwm_dev_t *mcpwm = mapping->mcpwm_dev;

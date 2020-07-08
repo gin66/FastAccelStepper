@@ -655,8 +655,8 @@ bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
 bool FastAccelStepper::isrSpeedControlEnabled() {
-	  return _isr_speed_control_enabled;
-  };
-bool FastAccelStepper::isRunning() { return !isQueueEmpty(); }
+  return _isr_speed_control_enabled;
+};
+bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
 int32_t FastAccelStepper::targetPos() { return _target_pos; }
 uint8_t FastAccelStepper::rampState() { return _rampState; }

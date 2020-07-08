@@ -51,11 +51,14 @@ class FastAccelStepper {
   void enableOutputs();
   void disableOutputs();
 
-  // in auto enable mode, the stepper is enabled before stepping and disabled afterwards
+  // in auto enable mode, the stepper is enabled before stepping and disabled
+  // afterwards
   void setAutoEnable(bool auto_enable);
 
-  // Retrieve the current position of the stepper - either in standstill or while moving
-  //    for esp32: the position while moving may deviate by the currently executed command steps
+  // Retrieve the current position of the stepper - either in standstill or
+  // while moving
+  //    for esp32: the position while moving may deviate by the currently
+  //    executed command steps
   int32_t getCurrentPosition();
 
   // is true while the stepper is running
@@ -101,14 +104,16 @@ class FastAccelStepper {
   bool isQueueEmpty();
   bool isQueueFull();
 
-  // Get the future position of the stepper after all commands in queue are completed
+  // Get the future position of the stepper after all commands in queue are
+  // completed
   int32_t getPositionAfterCommandsCompleted();
 
   // to be deprecated
   void addQueueStepperStop();
   bool isStopped();
 
-  // This function provides info, in which state the high level stepper control is operating
+  // This function provides info, in which state the high level stepper control
+  // is operating
 #define RAMP_STATE_IDLE 0
 #define RAMP_STATE_ACCELERATE 1
 #define RAMP_STATE_DECELERATE_TO_STOP 2
@@ -119,7 +124,8 @@ class FastAccelStepper {
   // returns true, if the ramp generation is active
   bool isrSpeedControlEnabled();
 
-  // This variable/these functions should NEVER be modified/called by the application
+  // This variable/these functions should NEVER be modified/called by the
+  // application
   inline void isr_fill_queue();
   inline void isr_single_fill_queue();
 

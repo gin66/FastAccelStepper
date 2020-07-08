@@ -38,7 +38,7 @@ void loop() {
   if (stepper2->addQueueEntry(dt, steps, true) == AQE_OK) {
     if (up) {
       dt -= dt / 100;
-      if (dt < F_CPU / 40000) {  // 40000 steps/s
+      if (dt < TICKS_PER_S / 40000) {  // 40000 steps/s
         up = false;
       }
     } else {

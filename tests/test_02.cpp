@@ -228,7 +228,8 @@ int main() {
   // ramp time 0.02s, 4 steps
   test_with_pars(1600, 5000, 10000, true, 7.9, 8.1, 0.2);
   // ramp time 0.2s, 20 steps
-  test_with_pars(1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1, 2 * 0.2 + 7.8 + 0.1, 0.2);
+  test_with_pars(1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1,
+                 2 * 0.2 + 7.8 + 0.1, 0.2);
   // ramp time 1s, 5000 steps
   test_with_pars(15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.17,
                  2 * 1.0 + 0.5 + 0.1, 0.2);
@@ -261,10 +262,8 @@ int main() {
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 16s
   test_with_pars(16500, 4000, 5, true, 116.0 - 0.7, 116.0 + 0.2, 0.2);
 
-
   // jumps in speed in real => WORKS NOW
-  test_with_pars(256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2,
-                 0.2);
+  test_with_pars(256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
 
   // ramp time  625s, 7812500 steps
   // test_with_pars(2000000, 40, 40, false, 2*223.0, 2*223.0);

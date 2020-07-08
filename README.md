@@ -125,7 +125,8 @@ void loop() {
 
 ### ESP32
 
-Check the SingleStepper_esp32 example.
+Check the examples: SingleStepper_esp32 and RawAccess_esp32.
+RawAccess_esp32 drives the stepper up to 80000 steps/s.
 
 ## Behind the curtains
 
@@ -161,7 +162,6 @@ The low level command queue for each stepper allows direct speed control - when 
 * Add command to set current position
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
 * Support different values for acceleration and deceleration.
-* Add preprocessor constant: TICKS_PER_S for raw commands
 
 ## ISSUES
 

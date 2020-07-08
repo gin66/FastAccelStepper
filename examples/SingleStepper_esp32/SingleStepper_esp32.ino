@@ -90,15 +90,14 @@ void loop() {
   }
   if (stepper) {
     if (queue_ok) {
-      // 3200 steps is one round with 16 microsteps and 200 steps for revolution
-
       // This loop drives the stepper up to 80000 microsteps/s.
-      // with 16 microsteps, this means 25 revolutions/s
+      // For a NEMA-17 with 200 steps/revolution and 16 microsteps, this means
+      // 25 revolutions/s
 #define COMMAND_CNT 800
       for (uint16_t i = 1; i < 2 * COMMAND_CNT; i++) {
         uint8_t steps = 100;
         uint32_t steps_per_s = min(i, 2 * COMMAND_CNT - i) * 100;
-        uint32_t ticks = 16000000 / steps_per_s;
+        uint32_t ticks = TICKS_PER_S / steps_per_s;
         while (true) {
           int rc = stepper->addQueueEntry(ticks, steps, true);
           Serial.println(rc);
