@@ -137,19 +137,19 @@ The timer compare unit toggles the step pin from Low to High precisely. The tran
 
 After stepper movement is completed, the timer compare unit is disconnected from the step pin. Thus the application could change the state freely, while the stepper is not controlled by this library.
 
-The compare interrupt routines uses two staged tick counters. One byte (msb) + one word (lsw). The max tick counter value is 4,194,303. At 16 MHz this comes down to 0.2621s. Thus the lower speed limit is approx 3.82 steps/s.
-
-The acceleration/deacceleration aka timer overflow interrupt reports to perform one calculation round in around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
+Measurement of the acceleration/deacceleration aka timer overflow interrupt yields: one calculation round needs around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
 ### ESP32
 
-This stepper driver use mcpwm modules of the esp32: for the first three stepper motors mcpwm0 and mcpwm1 for the steppers four to six. In addition the pulse counter module is used starting from unit_0 to unit_5. This driver uses the pcnt_isr_service, so unallocated modules can be used by the application.
+This stepper driver use mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six. In addition, the pulse counter module is used starting from unit_0 to unit_5. This driver uses the pcnt_isr_service, so unallocated modules can still be used by the application.
 
 The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-modification.
 
 ### BOTH
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
+
+The compare interrupt routines use two staged tick counters. One byte (n_periods) + one word (period). The max tick counter value is 254*65535. At 16 MHz this comes down to 1.04s. Thus the lower speed limit is approx 1 step per second.
 
 The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed (beware of any Serial.print in your hot path).
 
