@@ -7,7 +7,7 @@ This is an high speed alternative for the [AccelStepper library](http://www.airs
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
 	- avr: This must be connected for stepper A to Pin 9 and for Stepper B to Pin 10.
-	- esp32: This can be any out out capable port pin.
+	- esp32: This can be any output capable port pin.
 	- Step should be done on transition Low to High. High time will be only a few us.
       On esp32 is the high time fixed to 20us.
 * Direction Signal (optional)
