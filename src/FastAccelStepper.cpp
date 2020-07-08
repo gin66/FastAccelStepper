@@ -19,21 +19,11 @@ uint16_t fas_debug_led_cnt = 0;
 #define DEBUG_LED_HALF_PERIOD 50
 #endif
 
-#if defined(ARDUINO_ARCH_AVR)
-#define TIMER_FREQ F_CPU
-#endif
-#if defined(TEST)
-#define TIMER_FREQ F_CPU
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
-#define TIMER_FREQ 16000000
-#endif
-
-#if (TIMER_FREQ == 16000000)
-#define UPM_TIMER_FREQ ((upm_float)0x97f4)
+#if (TICKS_PER_S == 16000000)
+#define UPM_TICKS_PER_S ((upm_float)0x97f4)
 #else
 upm_float upm_timer_freq;
-#define UPM_TIMER_FREQ upm_timer_freq
+#define UPM_TICKS_PER_S upm_timer_freq
 #endif
 
 #if defined(ARDUINO_ARCH_AVR)
@@ -73,8 +63,8 @@ void StepperTask(void* parameter) {
 #endif
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
-#if (TIMER_FREQ != 16000000)
-  upm_timer_freq = upm_from((uint32_t)TIMER_FREQ);
+#if (TICKS_PER_S != 16000000)
+  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   fas_engine = this;
@@ -595,16 +585,16 @@ void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
     return;
   }
-  _min_travel_ticks = min_step_us * (TIMER_FREQ / 1000L) / 1000L;
+  _min_travel_ticks = min_step_us * (TICKS_PER_S / 1000L) / 1000L;
   _update_ramp_steps();
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
   if (accel == 0) {
     return;
   }
-  uint32_t tmp = TIMER_FREQ / 2;
+  uint32_t tmp = TICKS_PER_S / 2;
   upm_float upm_inv_accel = upm_from(tmp / accel);
-  _upm_inv_accel2 = multiply(UPM_TIMER_FREQ, upm_inv_accel);
+  _upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   _update_ramp_steps();
 }
 void FastAccelStepper::_update_ramp_steps() {

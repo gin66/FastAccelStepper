@@ -19,16 +19,19 @@
 
 #if defined(TEST)
 #define MAX_STEPPER 2
+#define TICKS_PER_S 16000000L
 #endif
 #if defined(ARDUINO_ARCH_AVR)
 #define MAX_STEPPER 2
+#define TICKS_PER_S F_CPU
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #define MAX_STEPPER 6
+#define TICKS_PER_S 16000000L
 #endif
 
 #define MIN_DELTA_TICKS (F_CPU / 50000)
-#define ABSOLUTE_MAX_TICKS (254L * 16384 + 32767)
+#define ABSOLUTE_MAX_TICKS (255L * 65535)
 
 class FastAccelStepper {
  public:

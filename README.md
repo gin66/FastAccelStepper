@@ -2,12 +2,14 @@
  
 ![C/C++ CI](https://github.com/gin66/FastAccelStepper/workflows/C/C++%20CI/badge.svg)
 
-This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are Atmega 328 and esp32.
+This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (Atmega 328) and esp32.
 
-The stepper motors should be connected via a driver IC (like 4988) with a 1, 2 or 3-wire connection:
+The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
-	- This must be connected for stepper A to Pin 9 and for Stepper B to Pin 10.
+	- avr: This must be connected for stepper A to Pin 9 and for Stepper B to Pin 10.
+	- esp32: This can be any out out capable port pin.
 	- Step should be done on transition Low to High. High time will be only a few us.
+      On esp32 is the high time fixed to 20us.
 * Direction Signal (optional)
 	- This can be any port pin.
 * Enable Signal (optional)
@@ -17,11 +19,11 @@ The stepper motors should be connected via a driver IC (like 4988) with a 1, 2 o
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
 * 2-pin operation for e.g. axis control
-* 3-pin operation for power reduction
-* Lower limit of 3.8 steps/s @ 16MHz
+* 3-pin operation to reduce power dissipation of driver/stepper
+* Lower limit of ~1 steps/s @ 16MHz
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
-* speed/acceleration can be varied while stepper is running (need call to move/moveTo for application of new values, not done implicitly)
+* speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
@@ -35,6 +37,7 @@ FastAccelStepper offers the following features:
 
 ### ESP32
 
+* allows up to roughly 50000 generated steps per second
 * supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 31
 
@@ -122,7 +125,7 @@ void loop() {
 
 ### ESP32
 
-Check the SingleStepper_esp32 example for an example.
+Check the SingleStepper_esp32 example.
 
 ## Behind the curtains
 
@@ -156,24 +159,24 @@ The low level command queue for each stepper allows direct speed control - when 
 * Better API documentation
 * Introduce command queue of speed/accel commands - one per stepper.
 * Add command to set current position
-* Extend command queue entry to perform delay only without step (steps=0) to reduce the 3.8 steps/s
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
-* Support different values for acceleration and deceleration
+* Support different values for acceleration and deceleration.
 * Add preprocessor constant: TICKS_PER_S for raw commands
 
 ## ISSUES
 
-* Speed changes at low speed and high acceleration do not come
+* Speed changes at very low speed with high acceleration values are not always performed
 * Queue is filled too much, which cause slow response to speed/acceleration changes
-* esp32: getCurrentPosition() does not take into account the current pulses
+* esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
 
-## NOT TODO
+## Not planned for now
 
 * Change in direction requires motor stop ! => it's a feature
 * Using constant acceleration leads to force jumps at start and max speed => smooth this out => will not happen
+* Extend command queue entry to perform delay only without step (steps=0) to reduce the 1.0 steps/s
 
 ## Lessons Learned
 
 * Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
-* In one setup, operating A4988 without microsteps lead to erratic behaviour and some specific low speed (erratic means step forward/backward). No issue with 16 microstep
+* In one setup, operating A4988 without microsteps has led to erratic behaviour at some specific low speed (erratic means step forward/backward, while DIR is kept low). No issue with 16 microstep
 

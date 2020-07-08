@@ -68,13 +68,17 @@ void queue_out_of_range() {
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
 
-  res = s.addQueueEntry(1 << 23, 100, true);
+  res = s.addQueueEntry(0xfeff02, 100, true);
   test(res == AQE_TOO_HIGH, "Too high provided should trigger error");
   assert(s.isQueueEmpty());
 
   res = s.addQueueEntry(65535, 128, true);
   test(res == AQE_STEPS_ERROR, "Too high step count should trigger an error");
   assert(s.isQueueEmpty());
+
+  res = s.addQueueEntry(0xfeff01, 100, true);
+  test(res == AQE_OK, "In range should be accepted");
+  assert(!s.isQueueEmpty());
 }
 
 void end_pos_test() {
