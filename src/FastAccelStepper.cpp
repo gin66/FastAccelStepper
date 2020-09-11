@@ -613,12 +613,11 @@ void FastAccelStepper::moveTo(int32_t position) {
 }
 void FastAccelStepper::stopMove() {
   if (isRunning() && isrSpeedControlEnabled()) {
-	  if (_target_pos > getPositionAfterCommandsCompleted()) {
-		  move(_performed_ramp_up_steps);
-	  }
-	  else {
-		  move(-_performed_ramp_up_steps);
-	  }
+    if (_target_pos > getPositionAfterCommandsCompleted()) {
+      move(_performed_ramp_up_steps);
+    } else {
+      move(-_performed_ramp_up_steps);
+    }
   }
 }
 void FastAccelStepper::disableOutputs() {

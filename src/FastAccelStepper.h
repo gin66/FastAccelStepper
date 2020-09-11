@@ -61,9 +61,10 @@ class FastAccelStepper {
   //    executed queue command's steps
   int32_t getCurrentPosition();
 
-  // Set the current position of the stepper - either in standstill or while moving.
+  // Set the current position of the stepper - either in standstill or while
+  // moving.
   //    for esp32: the implementation uses getCurrentPosition(), which does not
-  //               consider the steps of the current command 
+  //               consider the steps of the current command
   //               => recommend to use only in standstill
   void setCurrentPosition(int32_t new_pos);
 
