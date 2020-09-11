@@ -18,6 +18,7 @@ void setup() {
   Serial.begin(115200);
 
   // Check stepper motor+driver is operational
+  // This is not done via FastAccelStepper-Library for test purpose only
   pinMode(stepPinStepper1, OUTPUT);
   pinMode(dirPinStepper1, OUTPUT);
   pinMode(enablePinStepper1, OUTPUT);
@@ -37,6 +38,7 @@ void setup() {
     delayMicroseconds(190);
   }
   digitalWrite(enablePinStepper1, HIGH);
+  // Done
 
   engine.init();
   engine.setDebugLed(LED);
@@ -53,9 +55,8 @@ void setup() {
 
 uint8_t in_ptr = 0;
 char in_buffer[256];
-uint8_t in_val_ptr = 0;
-long in_vals[8];
 bool stopped = false;
+FastAccelStepper *selected = stepper1;
 
 void loop() {
   bool cmd_ok = false;
@@ -63,34 +64,51 @@ void loop() {
 
   if (Serial.available()) {
     char ch = Serial.read();
-    if ((ch == '\n') || (ch == ' ')) {
-      if (in_ptr > 0) {
-        in_buffer[in_ptr] = 0;
-        in_ptr = 0;
-        if (in_val_ptr < 8) {
-          in_vals[in_val_ptr++] = atol(in_buffer);
-        }
-      }
-    } else {
-      in_buffer[in_ptr++] = ch;
+    in_buffer[in_ptr++] = toupper(ch);
+    in_buffer[in_ptr] = 0;
+    if (in_ptr == 255) {
+      in_ptr = 0;
     }
-    if (ch == '\n') {
-      if (in_val_ptr == 4) {
-        cmd_ok = true;
-      }
-      if (in_val_ptr == 1) {
-        queue_ok = true;
-      }
-      if (in_val_ptr == 0) {
-        stopped = false;
-      }
-      in_val_ptr = 0;
+    else if (ch == '\n') {
+      int32_t val;
+      if (strcmp(in_buffer,"M1\n") == 0) {
+         Serial.println("Select stepper 1");
+         selected = stepper1;
+	  }
+      else if (strcmp(in_buffer,"M2\n") == 0) {
+         Serial.println("Select stepper 2");
+         selected = stepper2;
+	  }
+      else if (sscanf(in_buffer,"A %ld\n", &val) == 1) {
+         Serial.print("Set acceleration to ");
+         Serial.println(val);
+        selected->setAcceleration(val);
+	  }
+      else if (sscanf(in_buffer,"V %ld\n", &val) == 1) {
+         Serial.print("Set speed (us) to ");
+         Serial.println(val);
+        selected->setSpeed(val);
+	  }
+      else if (sscanf(in_buffer,"R %ld\n", &val) == 1) {
+         Serial.print("Move steps ");
+         Serial.println(val);
+        selected->move(val);
+	  }
+      else if (sscanf(in_buffer,"T %ld\n", &val) == 1) {
+         Serial.print("Move to position ");
+         Serial.println(val);
+        selected->moveTo(val);
+	  }
+      else if (strcmp(in_buffer,"S\n") == 0) {
+         Serial.print("Stop");
+        selected->stopMove();
+	  }
       in_ptr = 0;
     }
   }
 
   if (queue_ok) {
-    long motor = in_vals[0];
+    long motor = 0;
     FastAccelStepper *stepper = motor == 1 ? stepper1 : stepper2;
     // NOT NEEDED IN RAW ACCESS: stepper->setSpeed(16384);
     // NOT NEEDED IN RAW ACCESS: stepper->setAcceleration(100.0);
@@ -109,37 +127,6 @@ void loop() {
     Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
     Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
     Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-  }
-
-  if (cmd_ok) {
-    long motor = in_vals[0];
-    long move = in_vals[1];
-    long ticks = in_vals[2];
-    long accel = in_vals[3];
-    if (((motor == 1) || (motor == 2)) && move) {
-      Serial.print("ticks=");
-      Serial.print(ticks);
-      Serial.print("  accel=");
-      Serial.print(accel);
-      Serial.print("  move=");
-      Serial.print(move);
-      if (motor == 1) {
-        stopped = false;
-        stepper1->setSpeed(ticks);
-        stepper1->setAcceleration(accel);
-        stepper1->move(move);
-        Serial.print("  Start stepper 1: ");
-        Serial.println(stepper1->getCurrentPosition());
-      }
-      if (motor == 2) {
-        stopped = false;
-        stepper2->setSpeed(ticks);
-        stepper2->setAcceleration(accel);
-        stepper2->move(move);
-        Serial.print("  Start stepper 2: ");
-        Serial.println(stepper2->getCurrentPosition());
-      }
-    }
   }
 
   if (!stopped) {
@@ -190,10 +177,13 @@ void loop() {
     Serial.println("");
     stopped = !(stepper1->isRunning() || stepper2->isRunning());
     if (stopped) {
-      Serial.println(
-          "Please enter one line with <motor> <steps> <speed> <acceleration> "
-          "e.g.");
-      Serial.println("1 10000 1000 100");
+      Serial.println("Enter command:");
+      Serial.println("     M1/M2         ... to select stepper");
+      Serial.println("     A <accel>     ... Set selected stepper's acceleration");
+      Serial.println("     V <speed>     ... Set selected stepper's speed");
+      Serial.println("     T <position>  ... Move selected stepper to position (absolute +/-)");
+      Serial.println("     R <steps>     ... Move selected stepper to steps (+/-)");
+      Serial.println("     S             ... Stop selected stepper with deceleration");
     }
   } else {
     stopped = !(stepper1->isRunning() || stepper2->isRunning());

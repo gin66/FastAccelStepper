@@ -47,7 +47,7 @@ class FastAccelStepper {
   // if enable pin is connected, then use this function
   void setEnablePin(uint8_t enablePin);
 
-  // using enableOutputs/enableOutputs the stepper can be enabled
+  // using enableOutputs/disableOutputs the stepper can be enabled
   void enableOutputs();
   void disableOutputs();
 
@@ -58,12 +58,13 @@ class FastAccelStepper {
   // Retrieve the current position of the stepper - either in standstill or
   // while moving
   //    for esp32: the position while moving may deviate by the currently
-  //    executed command steps
+  //    executed queue command's steps
   int32_t getCurrentPosition();
 
   // Set the current position of the stepper - either in standstill or while moving.
-  //    for esp32: the implementation uses getCurrentPosition(), which does not provide
-  //               consider the steps of the current command => use only in standstill
+  //    for esp32: the implementation uses getCurrentPosition(), which does not
+  //               consider the steps of the current command 
+  //               => recommend to use only in standstill
   void setCurrentPosition(int32_t new_pos);
 
   // is true while the stepper is running
@@ -85,11 +86,14 @@ class FastAccelStepper {
   //
   void setAcceleration(uint32_t step_s_s);
 
-  // start the stepper for (move) steps
+  // start/move the stepper for (move) steps
   void move(int32_t move);
 
-  // start the stepper to the absolute position
+  // start/move the stepper to the absolute position
   void moveTo(int32_t position);
+
+  // stop the running stepper as fast as possible with deceleration
+  void stopMove();
 
   // get the target position for the current move
   int32_t targetPos();
