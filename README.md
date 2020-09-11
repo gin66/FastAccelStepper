@@ -56,12 +56,12 @@ Using the high level interface with ramp up/down:
 #define enablePinStepperA 6
 //#define stepPinStepperA   9  // OC1A
 
-FastAccelStepperEngine fas_engine = FastAccelStepperEngine();
-FastAccelStepper stepperA = fas_engine.stepperA();
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper *stepperA = fas_engine.stepperA();
 //FastAccelStepper stepperB = fas_engine.stepperB();
 
 void setup() {
-   fas_engine.init();
+   engine.init();
    stepperA->setDirectionPin(dirPinStepperA);
 
    stepperA->setEnablePin(enablePinStepperA);
@@ -85,12 +85,12 @@ Using the low level interface to stepper command queue:
 #define enablePinStepperA 6
 //#define stepPinStepperA   9  // OC1A
 
-FastAccelStepperEngine fas_engine = FastAccelStepperEngine();
-FastAccelStepper stepperA = fas_engine.stepperA();
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper *stepperA = fas_engine.stepperA();
 //FastAccelStepper stepperB = fas_engine.stepperB();
 
 void setup() {
-   fas_engine.init();
+   engine.init();
    stepperA->setDirectionPin(dirPinStepperA);
 
    stepperA->setEnablePin(enablePinStepperA);
@@ -161,6 +161,7 @@ The low level command queue for each stepper allows direct speed control - when 
 * Simplify the examples, avoid the loop for serial readin.
 * Introduce command queue of speed/accel commands - one per stepper.
 * Add command to set current position
+* Add command to stop stepper
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
 * Support different values for acceleration and deceleration.
 

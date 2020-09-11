@@ -10,8 +10,8 @@
 // Here are the global variables to interface with the interrupts
 
 // To realize the 1 Hz debug led
-uint8_t fas_ledPin = 255;  // 255 if led blinking off
-uint16_t fas_debug_led_cnt = 0;
+static uint8_t fas_ledPin = 255;  // 255 if led blinking off
+static uint16_t fas_debug_led_cnt = 0;
 #if defined(ARDUINO_ARCH_AVR)
 #define DEBUG_LED_HALF_PERIOD 144
 #endif

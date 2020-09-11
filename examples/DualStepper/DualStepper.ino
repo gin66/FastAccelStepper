@@ -152,7 +152,7 @@ void loop() {
       Serial.print("  PAUSED ");
     }
     Serial.print("  state=");
-    Serial.print(stepper1->ramp_state);
+    Serial.print(stepper1->rampState());
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     Serial.print("  max/us=");
     Serial.print(stepper1->max_micros);
@@ -171,7 +171,7 @@ void loop() {
       Serial.print("  PAUSED ");
     }
     Serial.print("  state=");
-    Serial.print(stepper2->ramp_state);
+    Serial.print(stepper2->rampState());
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     Serial.print("  max/us=");
     Serial.print(stepper2->max_micros);
