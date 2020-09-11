@@ -177,6 +177,7 @@ The low level command queue for each stepper allows direct speed control - when 
        1.) let stepper slowly increase speed to v1
        2.) before v1 is reached, increase accel and call stopMove()
        => result is, that the stepper first increases speed before ramping down
+* move/moveTo should ignore requests for opposite direction of a running motor
 
 ## Not planned for now
 
