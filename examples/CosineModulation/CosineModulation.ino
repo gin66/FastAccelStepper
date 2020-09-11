@@ -12,7 +12,6 @@
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper1 = engine.stepperA();
-FastAccelStepper *stepper2 = engine.stepperB();
 
 void setup() {
   Serial.begin(115200);
@@ -29,13 +28,8 @@ void setup() {
   engine.setDebugLed(LED);
 
   stepper1->setDirectionPin(dirPinStepper1);
-  stepper2->setDirectionPin(dirPinStepper2);
-
   stepper1->setEnablePin(enablePinStepper1);
-  stepper2->setEnablePin(enablePinStepper2);
-
   stepper1->setAutoEnable(true);
-  stepper2->setAutoEnable(true);
 }
 
 uint32_t dt = 100000;  // start with 10steps/s
@@ -48,7 +42,7 @@ const uint8_t cos_tab[64] = {0,   2,   9,   21,  37,  56,  79,  103,
                              128, 103, 79,  56,  37,  21,  9,   2};
 
 void loop() {
-  while (stepper2->addQueueEntry(dt, 3, true) == AQE_OK) {
+  while (stepper1->addQueueEntry(dt, 3, true) == AQE_OK) {
     if (!run_saw) {
       dt -= dt / 100;
       if (dt < 16000000 / 30000) {  // 30000 steps/s
