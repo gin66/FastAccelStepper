@@ -45,6 +45,8 @@ The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
 
+The module defines the global variable fas_queue. Do not use or redefine this variable.
+
 ### AVR
 
 Using the high level interface with ramp up/down:

@@ -28,7 +28,7 @@ upm_float upm_timer_freq;
 
 #if defined(ARDUINO_ARCH_AVR)
 // this is needed to give the background task isr access to engine
-FastAccelStepperEngine* fas_engine = NULL;
+static FastAccelStepperEngine* fas_engine = NULL;
 
 // dynamic allocation seem to not work so well on avr
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
