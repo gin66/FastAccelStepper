@@ -164,7 +164,6 @@ The low level command queue for each stepper allows direct speed control - when 
 * Better API documentation
 * Simplify the examples, avoid the loop for serial readin.
 * Introduce command queue of speed/accel commands - one per stepper.
-* Add command to stop stepper
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
 * Support different values for acceleration and deceleration.
 
