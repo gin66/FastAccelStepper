@@ -205,6 +205,13 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   if ((move < 0) && (_dirPin == 255)) {
     return;
   }
+  if (_min_step_us == 0) {
+    return;
+  }
+  if (_accel == 0) {
+    return;
+  }
+  _update_from_speed_acceleration();
   uint32_t steps = abs(move);
 
   uint32_t curr_ticks = fas_queue[_queue_num].ticks_at_queue_end;
@@ -585,19 +592,19 @@ void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
     return;
   }
-  _min_travel_ticks = min_step_us * (TICKS_PER_S / 1000L) / 1000L;
-  _update_ramp_steps();
+  _min_step_us = min_step_us;
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
   if (accel == 0) {
     return;
   }
-  uint32_t tmp = TICKS_PER_S / 2;
-  upm_float upm_inv_accel = upm_from(tmp / accel);
-  _upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
-  _update_ramp_steps();
+  _accel = accel;
 }
-void FastAccelStepper::_update_ramp_steps() {
+void FastAccelStepper::_update_from_speed_acceleration() {
+  _min_travel_ticks = _min_step_us * (TICKS_PER_S / 1000L) / 1000L;
+  uint32_t tmp = TICKS_PER_S / 2;
+  upm_float upm_inv_accel = upm_from(tmp / _accel);
+  _upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   _ramp_steps =
       upm_to_u32(divide(_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
 }

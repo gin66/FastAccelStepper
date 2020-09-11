@@ -79,11 +79,16 @@ class FastAccelStepper {
   //      t = 0.2 s/steps = 200000 us/step
   //      setSpeed(200000);
   //
+  // New value will be used after call to move/moveTo/stopMove
+  //
   void setSpeed(uint32_t min_step_us);
+
   //  set Acceleration expects as parameter the change of speed
   //  as step/s².
   //  If for example the speed should ramp up from 0 to 10000 steps/s within
   //  10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
+  //
+  // New value will be used after call to move/moveTo/stopMove
   //
   void setAcceleration(uint32_t step_s_s);
 
@@ -159,8 +164,11 @@ class FastAccelStepper {
   uint8_t _auto_enablePin;
   uint8_t _enablePin;
 
+  uint32_t _min_step_us;  // updated by setSpeed
+  uint32_t _accel;        // updated by setAcceleration
+
   void _calculate_move(int32_t steps);
-  void _update_ramp_steps();
+  void _update_from_speed_acceleration();
 
   // stepper_num's meaning depends on processor type:
   //		AVR:	0 => OC1B
