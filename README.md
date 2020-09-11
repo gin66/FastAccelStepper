@@ -45,6 +45,8 @@ The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
 
+For the API definition please consult the FastAccelStepper.h header file.
+
 The module defines the global variable fas_queue. Do not use or redefine this variable.
 
 ### AVR
@@ -162,7 +164,6 @@ The low level command queue for each stepper allows direct speed control - when 
 * Better API documentation
 * Simplify the examples, avoid the loop for serial readin.
 * Introduce command queue of speed/accel commands - one per stepper.
-* Add command to set current position
 * Add command to stop stepper
 * Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
 * Support different values for acceleration and deceleration.

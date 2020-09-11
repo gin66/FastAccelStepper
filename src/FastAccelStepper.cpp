@@ -624,6 +624,13 @@ void FastAccelStepper::enableOutputs() {
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return fas_queue[_queue_num].pos_at_queue_end;
 }
+void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
+  noInterrupts();
+  int32_t delta = new_pos - fas_queue[_queue_num].pos_at_queue_end;
+  fas_queue[_queue_num].pos_at_queue_end = new_pos;
+  _target_pos += delta;
+  interrupts();
+}
 int32_t FastAccelStepper::getCurrentPosition() {
   int32_t pos = getPositionAfterCommandsCompleted();
   bool dir = fas_queue[_queue_num].dir_high_at_queue_end;
@@ -647,6 +654,13 @@ int32_t FastAccelStepper::getCurrentPosition() {
     }
   }
   return pos;
+}
+void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
+  int32_t delta = new_pos - getCurrentPosition();
+  noInterrupts();
+  fas_queue[_queue_num].pos_at_queue_end += delta;
+  _target_pos += delta;
+  interrupts();
 }
 bool FastAccelStepper::isQueueFull() {
   return fas_queue[_queue_num].isQueueFull();
