@@ -170,6 +170,8 @@ The low level command queue for each stepper allows direct speed control - when 
 ## ISSUES
 
 * Speed changes at very low speed with high acceleration values are not always performed
+	==> Actually even worse. The setSpeed/setAcceleration functions overwrite live values for ramp generation.
+		Better to not change speed/acceleration for now !
 * Queue is filled too much, which cause slow response to speed/acceleration changes
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
 
