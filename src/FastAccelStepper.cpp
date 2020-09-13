@@ -30,7 +30,7 @@ upm_float upm_timer_freq;
 // this is needed to give the background task isr access to engine
 static FastAccelStepperEngine* fas_engine = NULL;
 
-// dynamic allocation seem to not work so well on avr
+// dynamic allocation seems to not work so well on avr
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
                                              FastAccelStepper()};
 #endif
@@ -105,8 +105,8 @@ bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
 //*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
-  uint8_t i;
-  for (i = 0; i < MAX_STEPPER; i++) {
+  // Check if already connected
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
       if (s->getStepPin() == step_pin) {
@@ -117,10 +117,28 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (!_isValidStepPin(step_pin)) {
     return NULL;
   }
-  FastAccelStepper* s = &fas_stepper[_next_stepper_num];
-  _stepper[_next_stepper_num] = s;
-  s->init(_next_stepper_num, step_pin);
+  uint8_t fas_stepper_num = 0;
+#if defined(ARDUINO_ARCH_AVR)
+  // The stepper connection is hardcoded for AVR
+  if (step_pin == stepPinStepperA) {
+	  fas_stepper_num = 0;
+  }
+  else {
+	  fas_stepper_num = 1;
+  }
+#endif
+#if defined(ESP32)
+  if (_next_stepper_num >= MAX_STEPPER) {
+	  return NULL;
+  }
+  fas_stepper_num = _next_stepper_num;
+#endif
+  uint8_t stepper_num = _next_stepper_num;
   _next_stepper_num++;
+
+  FastAccelStepper* s = &fas_stepper[fas_stepper_num];
+  _stepper[stepper_num] = s;
+  s->init(fas_stepper_num, step_pin);
   return s;
 }
 //*************************************************************************************************
