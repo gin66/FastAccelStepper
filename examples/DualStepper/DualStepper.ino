@@ -82,27 +82,27 @@ bool stopped = false;
 FastAccelStepper *selected = stepper1;
 
 void info(FastAccelStepper *s) {
-    Serial.print(s->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
-    Serial.print(" Curr=");
-    Serial.print(s->getCurrentPosition());
-    Serial.print(" QueueEnd=");
-    Serial.print(s->getPositionAfterCommandsCompleted());
-    Serial.print(" Target=");
-    Serial.print(s->targetPos());
-    if (s->isRunning()) {
-      Serial.print("  RUNNING");
-    } else {
-      Serial.print("  PAUSED ");
-    }
-    Serial.print("  state=");
-    Serial.print(s->rampState());
+  Serial.print(s->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
+  Serial.print(" Curr=");
+  Serial.print(s->getCurrentPosition());
+  Serial.print(" QueueEnd=");
+  Serial.print(s->getPositionAfterCommandsCompleted());
+  Serial.print(" Target=");
+  Serial.print(s->targetPos());
+  if (s->isRunning()) {
+    Serial.print("  RUNNING");
+  } else {
+    Serial.print("  PAUSED ");
+  }
+  Serial.print("  state=");
+  Serial.print(s->rampState());
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-    Serial.print("  max/us=");
-    Serial.print(s->max_micros);
+  Serial.print("  max/us=");
+  Serial.print(s->max_micros);
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    Serial.print("  checksum=");
-    Serial.print(s->checksum);
+  Serial.print("  checksum=");
+  Serial.print(s->checksum);
 #endif
 }
 

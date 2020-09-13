@@ -61,13 +61,13 @@ Using the high level interface with ramp up/down:
 //#define stepPinStepperA   9  // OC1A
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepperA = fas_engine.stepperA();
-//FastAccelStepper stepperB = fas_engine.stepperB();
+FastAccelStepper *stepperA = NULL;
 
 void setup() {
    engine.init();
-   stepperA->setDirectionPin(dirPinStepperA);
+   stepperA = engine.stepperConnectToPin(stepPinStepperA);
 
+   stepperA->setDirectionPin(dirPinStepperA);
    stepperA->setEnablePin(enablePinStepperA);
    stepperA->setAutoEnable(true);
 
@@ -87,14 +87,15 @@ Using the low level interface to stepper command queue:
 
 #define dirPinStepperA    5
 #define enablePinStepperA 6
-//#define stepPinStepperA   9  // OC1A
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepperA = fas_engine.stepperA();
-//FastAccelStepper stepperB = fas_engine.stepperB();
+FastAccelStepper *stepper1 = NULL;
+FastAccelStepper *stepper2 = NULL;
 
 void setup() {
    engine.init();
+   stepperA = engine.stepperConnectToPin(stepPinStepperA);
+
    stepperA->setDirectionPin(dirPinStepperA);
 
    stepperA->setEnablePin(enablePinStepperA);

@@ -121,15 +121,14 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 #if defined(ARDUINO_ARCH_AVR)
   // The stepper connection is hardcoded for AVR
   if (step_pin == stepPinStepperA) {
-	  fas_stepper_num = 0;
-  }
-  else {
-	  fas_stepper_num = 1;
+    fas_stepper_num = 0;
+  } else {
+    fas_stepper_num = 1;
   }
 #endif
 #if defined(ESP32)
   if (_next_stepper_num >= MAX_STEPPER) {
-	  return NULL;
+    return NULL;
   }
   fas_stepper_num = _next_stepper_num;
 #endif
@@ -659,7 +658,7 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   interrupts();
 }
 int32_t FastAccelStepper::getCurrentPosition() {
-  struct StepperQueue *q = &fas_queue[_queue_num];
+  struct StepperQueue* q = &fas_queue[_queue_num];
   noInterrupts();
   int32_t pos = q->pos_at_queue_end;
   bool dir = q->dir_high_at_queue_end;
