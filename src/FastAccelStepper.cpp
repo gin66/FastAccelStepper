@@ -617,10 +617,10 @@ void FastAccelStepper::moveTo(int32_t position) {
   if (move == 0) {
     return;
   }
-  if ((_target_pos >= curr_pos) && (move < 0)) {
+  if ((_target_pos > curr_pos) && (move < 0)) {
     return;
   }
-  if ((_target_pos <= curr_pos) && (move > 0)) {
+  if ((_target_pos < curr_pos) && (move > 0)) {
     return;
   }
   _target_pos = position;
