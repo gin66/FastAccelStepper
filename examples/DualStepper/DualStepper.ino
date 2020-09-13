@@ -58,9 +58,31 @@ char in_buffer[256];
 bool stopped = false;
 FastAccelStepper *selected = stepper1;
 
+void info(FastAccelStepper *s) {
+    Serial.print(s->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
+    Serial.print(" Curr=");
+    Serial.print(s->getCurrentPosition());
+    Serial.print(" QueueEnd=");
+    Serial.print(s->getPositionAfterCommandsCompleted());
+    if (s->isRunning()) {
+      Serial.print("  RUNNING");
+    } else {
+      Serial.print("  PAUSED ");
+    }
+    Serial.print("  state=");
+    Serial.print(s->rampState());
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
+    Serial.print("  max/us=");
+    Serial.print(s->max_micros);
+#endif
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+    Serial.print("  checksum=");
+    Serial.print(s->checksum);
+#endif
+}
+
 void loop() {
   bool cmd_ok = false;
-  bool queue_ok = false;
 
   if (Serial.available()) {
     char ch = Serial.read();
@@ -100,66 +122,12 @@ void loop() {
     }
   }
 
-  if (queue_ok) {
-    long motor = 0;
-    FastAccelStepper *stepper = motor == 1 ? stepper1 : stepper2;
-    // NOT NEEDED IN RAW ACCESS: stepper->setSpeed(16384);
-    // NOT NEEDED IN RAW ACCESS: stepper->setAcceleration(100.0);
-    Serial.println(stepper->addQueueEntry(5L * 16384, 120, true));
-    Serial.println(stepper->addQueueEntry(4L * 16384, 120, true));
-    Serial.println(stepper->addQueueEntry(3L * 16384, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 16384, 120, true));
-    Serial.println(stepper->addQueueEntry(6L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(5L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(4L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(3L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-    Serial.println(stepper->addQueueEntry(2L * 4096, 120, true));
-  }
-
   if (!stopped) {
     Serial.print("Stepper 1: ");
-    Serial.print(stepper1->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
-    Serial.print(stepper1->getCurrentPosition());
-    if (stepper1->isRunning()) {
-      Serial.print("  RUNNING");
-    } else {
-      Serial.print("  PAUSED ");
-    }
-    Serial.print("  state=");
-    Serial.print(stepper1->rampState());
-#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-    Serial.print("  max/us=");
-    Serial.print(stepper1->max_micros);
-#endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    Serial.print("  checksum=");
-    Serial.print(stepper1->checksum);
-#endif
+    info(stepper1);
 
     Serial.print("  Stepper 2: ");
-    Serial.print(stepper2->isrSpeedControlEnabled() ? " AUTO " : " MANU ");
-    Serial.print(stepper2->getCurrentPosition());
-    if (stepper2->isRunning()) {
-      Serial.print("  RUNNING");
-    } else {
-      Serial.print("  PAUSED ");
-    }
-    Serial.print("  state=");
-    Serial.print(stepper2->rampState());
-#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-    Serial.print("  max/us=");
-    Serial.print(stepper2->max_micros);
-#endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    Serial.print("  checksum=");
-    Serial.print(stepper2->checksum);
-#endif
+    info(stepper2);
 
     Serial.print("  TCCR1A=");
     Serial.print(TCCR1A);
