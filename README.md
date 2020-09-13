@@ -177,8 +177,14 @@ The low level command queue for each stepper allows direct speed control - when 
        1.) let stepper slowly increase speed to v1
        2.) before v1 is reached, increase accel and call stopMove()
        => result is, that the stepper first increases speed before ramping down
-* move/moveTo should ignore requests for opposite direction of a running motor => as long as change direction is not supported
-* Change in direction requires motor stop ! => not convenient and the raw queue actually supports it.
+* Change in direction requires motor stop ! => it's a feature
+* Strategy should be clarified. Under this topic belongs:
+	* TODO: Introduce command queue of speed/accel commands - one per stepper.
+	* Change in direction requires motor stop ! => it's a feature
+  Currently any move/moveTo - while running - adjusts the ongoing move/moveTo's values.
+  With a command queue, this would lead to additional commands to be executed after the running one.
+  Update of new values for acceleration/speed would require another API function, because move/moveTo would enqueue a new command.
+  The question is, if this complexity in the driver is a good idea or better left to the application.
 
 ## Not planned for now
 

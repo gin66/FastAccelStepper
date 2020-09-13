@@ -92,10 +92,14 @@ class FastAccelStepper {
   //
   void setAcceleration(uint32_t step_s_s);
 
-  // start/move the stepper for (move) steps
+  // start/move the stepper for (move) steps or to an absolute position.
+  //
+  // If the stepper is already running, then the current running move will be
+  // updated together with any updated values of acceleration/speed. The move is
+  // relative to the target position of any ongoing move ! If the new
+  // move/moveTo for an ongoing command would reverse the direction, then the
+  // command is silently ignored.
   void move(int32_t move);
-
-  // start/move the stepper to the absolute position
   void moveTo(int32_t position);
 
   // stop the running stepper as fast as possible with deceleration

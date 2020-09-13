@@ -607,22 +607,38 @@ void FastAccelStepper::_update_from_speed_acceleration() {
   _ramp_steps =
       upm_to_u32(divide(_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
 }
-void FastAccelStepper::move(int32_t move) {
-  _target_pos = getPositionAfterCommandsCompleted() + move;
+void FastAccelStepper::moveTo(int32_t position) {
+  int32_t curr_pos = getPositionAfterCommandsCompleted();
+  if (!isrSpeedControlEnabled()) {
+    _target_pos = curr_pos;
+  }
+  int32_t move;
+  move = position - curr_pos;
+  if (move == 0) {
+    return;
+  }
+  if ((_target_pos >= curr_pos) && (move < 0)) {
+    return;
+  }
+  if ((_target_pos <= curr_pos) && (move > 0)) {
+    return;
+  }
+  _target_pos = position;
   _calculate_move(move);
 }
-void FastAccelStepper::moveTo(int32_t position) {
-  int32_t move;
-  _target_pos = position;
-  move = position - getPositionAfterCommandsCompleted();
-  _calculate_move(move);
+void FastAccelStepper::move(int32_t move) {
+  if (!isrSpeedControlEnabled()) {
+    _target_pos = getPositionAfterCommandsCompleted();
+  }
+  moveTo(_target_pos + move);
 }
 void FastAccelStepper::stopMove() {
   if (isRunning() && isrSpeedControlEnabled()) {
-    if (_target_pos > getPositionAfterCommandsCompleted()) {
-      move(_performed_ramp_up_steps);
+    int32_t curr_pos = getPositionAfterCommandsCompleted();
+    if (_target_pos > curr_pos) {
+      moveTo(curr_pos + _performed_ramp_up_steps);
     } else {
-      move(-_performed_ramp_up_steps);
+      moveTo(curr_pos - _performed_ramp_up_steps);
     }
   }
 }
