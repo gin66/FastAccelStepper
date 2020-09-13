@@ -186,6 +186,7 @@ The low level command queue for each stepper allows direct speed control - when 
   With a command queue, this would lead to additional commands to be executed after the running one.
   Update of new values for acceleration/speed would require another API function, because move/moveTo would enqueue a new command.
   The question is, if this complexity in the driver is a good idea or better left to the application.
+* The revisions 0.4.x and 0.5.x are not usable for AVR in case channel B is needed => upgrade to 0.6
 
 ## Not planned for now
 
