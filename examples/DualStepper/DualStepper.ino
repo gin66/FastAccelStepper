@@ -111,39 +111,41 @@ void loop() {
 
   if (Serial.available()) {
     char ch = Serial.read();
-    in_buffer[in_ptr++] = toupper(ch);
-    in_buffer[in_ptr] = 0;
     if (in_ptr == 255) {
       in_ptr = 0;
-    } else if (ch == '\n') {
+    } else if ((ch == ' ') || (ch == '\n')) {
       int32_t val;
-      if (strcmp(in_buffer, "M1\n") == 0) {
+      if (strcmp(in_buffer, "M1") == 0) {
         Serial.println("Select stepper 1");
         selected = stepper1;
-      } else if (strcmp(in_buffer, "M2\n") == 0) {
+      } else if (strcmp(in_buffer, "M2") == 0) {
         Serial.println("Select stepper 2");
         selected = stepper2;
-      } else if (sscanf(in_buffer, "A %ld\n", &val) == 1) {
+      } else if (sscanf(in_buffer, "A%ld", &val) == 1) {
         Serial.print("Set acceleration to ");
         Serial.println(val);
         selected->setAcceleration(val);
-      } else if (sscanf(in_buffer, "V %ld\n", &val) == 1) {
+      } else if (sscanf(in_buffer, "V%ld", &val) == 1) {
         Serial.print("Set speed (us) to ");
         Serial.println(val);
         selected->setSpeed(val);
-      } else if (sscanf(in_buffer, "R %ld\n", &val) == 1) {
+      } else if (sscanf(in_buffer, "R%ld", &val) == 1) {
         Serial.print("Move steps ");
         Serial.println(val);
         selected->move(val);
-      } else if (sscanf(in_buffer, "T %ld\n", &val) == 1) {
+      } else if (sscanf(in_buffer, "P%ld", &val) == 1) {
         Serial.print("Move to position ");
         Serial.println(val);
         selected->moveTo(val);
-      } else if (strcmp(in_buffer, "S\n") == 0) {
+      } else if (strcmp(in_buffer, "S") == 0) {
         Serial.print("Stop");
         selected->stopMove();
       }
       in_ptr = 0;
+    }
+    else {
+      in_buffer[in_ptr++] = toupper(ch);
+      in_buffer[in_ptr] = 0;
     }
   }
 
@@ -154,25 +156,19 @@ void loop() {
     Serial.print("  Stepper 2: ");
     info(stepper2);
 
-    Serial.print("  TCCR1A=");
-    Serial.print(TCCR1A);
-    Serial.print("  TCCR1B=");
-    Serial.print(TCCR1B);
-    Serial.print("  TIMSK1=");
-    Serial.print(TIMSK1);
-    Serial.println("");
+    Serial.println();
     stopped = !(stepper1->isRunning() || stepper2->isRunning());
     if (stopped) {
-      Serial.println("Enter command:");
+      Serial.println("Enter command separated by space or newline:");
       Serial.println("     M1/M2         ... to select stepper");
       Serial.println(
-          "     A <accel>     ... Set selected stepper's acceleration");
+          "     A<accel>     ... Set selected stepper's acceleration");
       Serial.println("     V <speed>     ... Set selected stepper's speed");
       Serial.println(
-          "     T <position>  ... Move selected stepper to position (absolute "
+          "     P<position>  ... Move selected stepper to position (absolute "
           "+/-)");
       Serial.println(
-          "     R <steps>     ... Move selected stepper to steps (+/-)");
+          "     R<steps>     ... Move selected stepper to steps (+/-)");
       Serial.println(
           "     S             ... Stop selected stepper with deceleration");
     }
