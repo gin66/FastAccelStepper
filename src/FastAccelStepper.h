@@ -212,11 +212,6 @@ class FastAccelStepperEngine {
   // If no stepper resources available or pin is wrong, then NULL is returned
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 
-#if defined(ARDUINO_ARCH_AVR)
-#define stepperA() stepperConnectToPin(9)
-#define stepperB() stepperConnectToPin(10)
-#endif
-
   // unstable API functions
   //
   // If this is called, then the periodic task will let the associated LED
