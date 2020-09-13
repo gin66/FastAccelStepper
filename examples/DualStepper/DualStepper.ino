@@ -64,6 +64,8 @@ void info(FastAccelStepper *s) {
     Serial.print(s->getCurrentPosition());
     Serial.print(" QueueEnd=");
     Serial.print(s->getPositionAfterCommandsCompleted());
+    Serial.print(" Target=");
+    Serial.print(s->targetPos());
     if (s->isRunning()) {
       Serial.print("  RUNNING");
     } else {
