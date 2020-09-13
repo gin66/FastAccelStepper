@@ -11,7 +11,7 @@
 #define LED 13
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper1 = engine.stepperA();
+FastAccelStepper *stepper1 = NULL;
 
 void setup() {
   Serial.begin(115200);
@@ -27,6 +27,7 @@ void setup() {
   engine.init();
   engine.setDebugLed(LED);
 
+  stepper1 = engine.stepperConnectToPin(stepPinStepper1);
   stepper1->setDirectionPin(dirPinStepper1);
   stepper1->setEnablePin(enablePinStepper1);
   stepper1->setAutoEnable(true);
