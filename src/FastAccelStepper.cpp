@@ -170,10 +170,9 @@ void FastAccelStepper::addQueueStepperStop() {
   fas_queue[_queue_num].addQueueStepperStop();
 }
 //*************************************************************************************************
-int FastAccelStepper::addQueueEntry(uint32_t start_delta_ticks, uint8_t steps,
+int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
-  return fas_queue[_queue_num].addQueueEntry(start_delta_ticks, steps,
-                                             dir_high);
+  return fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
 }
 
 //*************************************************************************************************

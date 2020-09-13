@@ -106,7 +106,7 @@ bool up = true;
 
 void loop() {
   // Issue command with parameters via addQueueEntry:
-  //          time delta:            dt  [*0.25us/Step]
+  //          time delta:            dt  [*1/TICKS_PER_S s]
   //          steps:                 2
   //          direction pin:         high
   uint8_t steps = min(max(100000L/dt,1), 127);
@@ -179,10 +179,10 @@ The low level command queue for each stepper allows direct speed control - when 
        => result is, that the stepper first increases speed before ramping down
 * move/moveTo should ignore requests for opposite direction of a running motor
 * move should use the target position as reference and not the position at queue end
+* Change in direction requires motor stop ! => not convenient
 
 ## Not planned for now
 
-* Change in direction requires motor stop ! => it's a feature
 * Using constant acceleration leads to force jumps at start and max speed => smooth this out => will not happen
 * Extend command queue entry to perform delay only without step (steps=0) to reduce the 1.0 steps/s
 
