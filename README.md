@@ -177,9 +177,8 @@ The low level command queue for each stepper allows direct speed control - when 
        1.) let stepper slowly increase speed to v1
        2.) before v1 is reached, increase accel and call stopMove()
        => result is, that the stepper first increases speed before ramping down
-* move/moveTo should ignore requests for opposite direction of a running motor
-* move should use the target position as reference and not the position at queue end
-* Change in direction requires motor stop ! => not convenient
+* move/moveTo should ignore requests for opposite direction of a running motor => as long as change direction is not supported
+* Change in direction requires motor stop ! => not convenient and the raw queue actually supports it.
 
 ## Not planned for now
 
