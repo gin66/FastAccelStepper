@@ -3,14 +3,12 @@
 
 #if defined(ARDUINO_ARCH_AVR)
 
-#define Stepper_Toggle(X) \
-  TCCR1##X = (TCCR1##X | _BV(COM1##X##0)) & ~_BV(COM1##X##1)
-#define Stepper_Zero(X) \
-  TCCR1##X = (TCCR1##X | _BV(COM1##X##1)) & ~_BV(COM1##X##0)
+#define Stepper_Toggle(X) TCCR1A = (TCCR1A | _BV(COM1##X##0)) & ~_BV(COM1##X##1)
+#define Stepper_Zero(X) TCCR1A = (TCCR1A | _BV(COM1##X##1)) & ~_BV(COM1##X##0)
 #define Stepper_Disconnect(X) \
-  TCCR1##X = (TCCR1##X & ~(_BV(COM1##X##1) | _BV(COM1##X##0)))
+  TCCR1A = (TCCR1A & ~(_BV(COM1##X##1) | _BV(COM1##X##0)))
 #define Stepper_IsToggling(X) \
-  ((TCCR1##X & (_BV(COM1##X##0) | _BV(COM1##X##1))) == _BV(COM1##X##0))
+  ((TCCR1A & (_BV(COM1##X##0) | _BV(COM1##X##1))) == _BV(COM1##X##0))
 
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
