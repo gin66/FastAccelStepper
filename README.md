@@ -12,9 +12,10 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
       On esp32 is the high time fixed to 20us.
 * Direction Signal (optional)
 	- This can be any port pin.
+    - Position counting up on direction pin high or low, as per optional parameter to setDirectionPin(). Default is high.
 * Enable Signal (optional)
 	- This can be any port pin.
-    - Stepper shall be enabled on LOW
+    - Stepper will be enabled on pin high or low, as per optional parameter to setEnablePin(). Default is low.
 
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
@@ -45,7 +46,7 @@ The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
 
-For the API definition please consult the FastAccelStepper.h header file.
+For the API definition please consult the ![FastAccelStepper.h](https://github.com/FastAccelStepper/blob/master/src/FastAccelStepper.h) header file.
 
 The module defines the global variable fas_queue. Do not use or redefine this variable.
 
