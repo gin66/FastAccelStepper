@@ -68,6 +68,7 @@ class StepperQueue {
   uint8_t autoEnablePinLowActive;
   uint8_t autoEnablePinHighActive;
   uint8_t dirPin;
+  bool dirHighCountsUp;
   bool isRunning;
 #if defined(ARDUINO_ARCH_ESP32)
   const struct mapping_s* mapping;
@@ -81,8 +82,7 @@ class StepperQueue {
   uint16_t period;
 #endif
 
-  bool dir_high_at_queue_end;  // direction high corresponds to position
-                               // counting upwards
+  bool dir_at_queue_end;
   int32_t pos_at_queue_end;    // in steps
   int32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
 
@@ -93,7 +93,7 @@ class StepperQueue {
   bool isQueueEmpty() { return (read_ptr == next_write_ptr); }
   bool isStopped() { return ticks_at_queue_end == 0; }
   void addQueueStepperStop() { ticks_at_queue_end = 0; }
-  int addQueueEntry(uint32_t ticks, uint8_t steps, bool dir_high) {
+  int addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
     int32_t c_sum = 0;
     if (steps >= 128) {
       return AQE_STEPS_ERROR;
@@ -119,13 +119,14 @@ class StepperQueue {
 
     uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
     if (next_wp != rp) {
-      pos_at_queue_end += dir_high ? steps : -steps;
+      pos_at_queue_end += (dir == dirHighCountsUp) ? steps : -steps;
       ticks_at_queue_end = ticks;
       steps <<= 1;
       e->period = period;
       e->n_periods = n_periods;
-      e->steps = (dir_high != dir_high_at_queue_end) ? steps | 0x01 : steps;
-      dir_high_at_queue_end = dir_high;
+	  // check for dir pin value change
+      e->steps = (dir != dir_at_queue_end) ? steps | 0x01 : steps;
+      dir_at_queue_end = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
       {
         unsigned char* x = (unsigned char*)e;
@@ -164,7 +165,8 @@ class StepperQueue {
     autoEnablePinHighActive = PIN_UNDEFINED;
     read_ptr = 0;
     next_write_ptr = 0;
-    dir_high_at_queue_end = true;
+    dir_at_queue_end = true;
+	dirHighCountsUp = true;
     pos_at_queue_end = 0;
     ticks_at_queue_end = 0;
     isRunning = false;

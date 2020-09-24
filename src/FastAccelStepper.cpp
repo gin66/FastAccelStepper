@@ -187,8 +187,7 @@ void FastAccelStepper::addQueueStepperStop() {
   fas_queue[_queue_num].addQueueStepperStop();
 }
 //*************************************************************************************************
-int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
-                                    bool dir_high) {
+int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps, bool dir_high) {
   return fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
 }
 
@@ -476,7 +475,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     curr_ticks = next_ticks;
   }
 
-  bool dir = _target_pos > getPositionAfterCommandsCompleted();
+  bool dir = (_target_pos > getPositionAfterCommandsCompleted()) == _dirHighCountsUp;
 
 #ifdef TEST
   if (command_cnt > 1) {
@@ -586,11 +585,13 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   fas_queue[_queue_num].init(_queue_num, step_pin);
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
-void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
+void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp) {
   _dirPin = dirPin;
+  _dirHighCountsUp = dirHighCountsUp;
   digitalWrite(dirPin, HIGH);
   pinMode(dirPin, OUTPUT);
   fas_queue[_queue_num].dirPin = dirPin;
+  fas_queue[_queue_num].dirHighCountsUp = dirHighCountsUp;
 }
 void FastAccelStepper::setEnablePin(uint8_t enablePin,
                                     bool low_active_enables_stepper) {
@@ -706,20 +707,20 @@ int32_t FastAccelStepper::getCurrentPosition() {
   struct StepperQueue* q = &fas_queue[_queue_num];
   noInterrupts();
   int32_t pos = q->pos_at_queue_end;
-  bool dir = q->dir_high_at_queue_end;
+  bool countUp = (q->dir_at_queue_end == q->dirHighCountsUp);
   uint8_t wp = q->next_write_ptr;
   uint8_t rp = q->read_ptr;
   interrupts();
   while (rp != wp) {
     wp = (wp + QUEUE_LEN - 1) & QUEUE_LEN_MASK;
     uint8_t steps_dir = q->entry[wp].steps;
-    if (dir) {
+    if (countUp) {
       pos -= steps_dir >> 1;
     } else {
       pos += steps_dir >> 1;
     }
     if (steps_dir & 1) {
-      dir = !dir;
+      countUp = !countUp;
     }
   }
   return pos;

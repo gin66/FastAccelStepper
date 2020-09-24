@@ -42,7 +42,7 @@ class FastAccelStepper {
   uint8_t getStepPin();
 
   // if direction pin is connected, call this function
-  void setDirectionPin(uint8_t dirPin);
+  void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true);
 
   // if enable pin is connected, then use this function.
   //
@@ -175,6 +175,7 @@ class FastAccelStepper {
   uint8_t _rampState;  // updated by isr_fill_queue
   uint8_t _stepPin;
   uint8_t _dirPin;
+  bool _dirHighCountsUp;
   uint8_t _autoEnablePinLowActive;
   uint8_t _autoEnablePinHighActive;
   uint8_t _enablePinLowActive;
