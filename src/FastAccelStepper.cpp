@@ -575,6 +575,7 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   _autoEnablePinHighActive = PIN_UNDEFINED;
   _min_travel_ticks = 0;
   _stepPin = step_pin;
+  _dirHighCountsUp = true;
 
 #if defined(ARDUINO_ARCH_AVR)
   _queue_num = step_pin == stepPinStepperA ? 0 : 1;
