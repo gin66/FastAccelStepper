@@ -116,8 +116,11 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     mcpwm->timer[timer].mode.start = 1;           // stop at TEP
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     q->isRunning = false;
-    if (q->autoEnablePin != 255) {
-      digitalWrite(q->autoEnablePin, HIGH);
+    if (q->autoEnablePinLowActive != PIN_UNDEFINED) {
+      digitalWrite(q->autoEnablePinLowActive, HIGH);
+    }
+    if (q->autoEnablePinHighActive != PIN_UNDEFINED) {
+      digitalWrite(q->autoEnablePinHighActive, LOW);
     }
   }
 }
@@ -263,8 +266,11 @@ bool StepperQueue::startQueue(struct queue_entry *e) {
 
   next_command(this, e);
 
-  if (autoEnablePin != 255) {
-    digitalWrite(autoEnablePin, LOW);
+  if (autoEnablePinLowActive != PIN_UNDEFINED) {
+    digitalWrite(autoEnablePinLowActive, LOW);
+  }
+  if (autoEnablePinHighActive != PIN_UNDEFINED) {
+    digitalWrite(autoEnablePinHighActive, HIGH);
   }
   return true;
 }

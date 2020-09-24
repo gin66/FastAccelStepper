@@ -10,7 +10,7 @@
 // Here are the global variables to interface with the interrupts
 
 // To realize the 1 Hz debug led
-static uint8_t fas_ledPin = 255;  // 255 if led blinking off
+static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 #if defined(ARDUINO_ARCH_AVR)
 #define DEBUG_LED_HALF_PERIOD 144
@@ -149,7 +149,7 @@ void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
 //*************************************************************************************************
 void FastAccelStepperEngine::manageSteppers() {
 #ifndef TEST
-  if (fas_ledPin < 255) {
+  if (fas_ledPin != PIN_UNDEFINED) {
     fas_debug_led_cnt++;
     if (fas_debug_led_cnt == DEBUG_LED_HALF_PERIOD) {
       digitalWrite(fas_ledPin, HIGH);
@@ -218,7 +218,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   if (move == 0) {
     return;
   }
-  if ((move < 0) && (_dirPin == 255)) {
+  if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return;
   }
   if (_min_step_us == 0) {
@@ -572,7 +572,8 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   _isr_speed_control_enabled = false;
   _rampState = RAMP_STATE_IDLE;
   _stepper_num = num;
-  _auto_enablePin = 255;
+  _autoEnablePinLowActive = PIN_UNDEFINED;
+  _autoEnablePinHighActive = PIN_UNDEFINED;
   _min_travel_ticks = 0;
   _stepPin = step_pin;
 
@@ -591,18 +592,34 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin) {
   pinMode(dirPin, OUTPUT);
   fas_queue[_queue_num].dirPin = dirPin;
 }
-void FastAccelStepper::setEnablePin(uint8_t enablePin) {
-  _enablePin = enablePin;
-  digitalWrite(enablePin, HIGH);
-  pinMode(enablePin, OUTPUT);
+void FastAccelStepper::setEnablePin(uint8_t enablePin,
+                                    bool low_active_enables_stepper) {
+  if (low_active_enables_stepper) {
+    _enablePinLowActive = enablePin;
+    digitalWrite(enablePin, HIGH);
+    pinMode(enablePin, OUTPUT);
+    if (_enablePinHighActive == enablePin) {
+      _enablePinHighActive = PIN_UNDEFINED;
+    }
+  } else {
+    _enablePinHighActive = enablePin;
+    digitalWrite(enablePin, LOW);
+    pinMode(enablePin, OUTPUT);
+    if (_enablePinLowActive == enablePin) {
+      _enablePinLowActive = PIN_UNDEFINED;
+    }
+  }
 }
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
   if (auto_enable) {
-    _auto_enablePin = _enablePin;
+    _autoEnablePinLowActive = _enablePinLowActive;
+    _autoEnablePinHighActive = _enablePinHighActive;
   } else {
-    _auto_enablePin = 255;
+    _autoEnablePinLowActive = PIN_UNDEFINED;
+    _autoEnablePinHighActive = PIN_UNDEFINED;
   }
-  fas_queue[_queue_num].autoEnablePin = _auto_enablePin;
+  fas_queue[_queue_num].autoEnablePinLowActive = _autoEnablePinLowActive;
+  fas_queue[_queue_num].autoEnablePinHighActive = _autoEnablePinHighActive;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
@@ -660,13 +677,19 @@ void FastAccelStepper::stopMove() {
   }
 }
 void FastAccelStepper::disableOutputs() {
-  if (_enablePin != 255) {
-    digitalWrite(_enablePin, HIGH);
+  if (_enablePinLowActive != PIN_UNDEFINED) {
+    digitalWrite(_enablePinLowActive, HIGH);
+  }
+  if (_enablePinHighActive != PIN_UNDEFINED) {
+    digitalWrite(_enablePinHighActive, LOW);
   }
 }
 void FastAccelStepper::enableOutputs() {
-  if (_enablePin != 255) {
-    digitalWrite(_enablePin, LOW);
+  if (_enablePinLowActive != PIN_UNDEFINED) {
+    digitalWrite(_enablePinLowActive, LOW);
+  }
+  if (_enablePinHighActive != PIN_UNDEFINED) {
+    digitalWrite(_enablePinHighActive, HIGH);
   }
 }
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {

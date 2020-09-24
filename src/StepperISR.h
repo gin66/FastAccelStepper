@@ -5,6 +5,8 @@
 
 #include "FastAccelStepper.h"
 
+#define PIN_UNDEFINED 255
+
 #if defined(ARDUINO_ARCH_AVR)
 #define stepPinStepperA 9  /* OC1A */
 #define stepPinStepperB 10 /* OC1B */
@@ -63,7 +65,8 @@ class StepperQueue {
   struct queue_entry entry[QUEUE_LEN];
   uint8_t read_ptr;  // ISR stops if readptr == next_writeptr
   uint8_t next_write_ptr;
-  uint8_t autoEnablePin;
+  uint8_t autoEnablePinLowActive;
+  uint8_t autoEnablePinHighActive;
   uint8_t dirPin;
   bool isRunning;
 #if defined(ARDUINO_ARCH_ESP32)
@@ -157,7 +160,8 @@ class StepperQueue {
   bool startQueue(struct queue_entry* e);
   void _initVars() {
     dirPin = 255;
-    autoEnablePin = 255;
+    autoEnablePinLowActive = 255;
+    autoEnablePinHighActive = 255;
     read_ptr = 0;
     next_write_ptr = 0;
     dir_high_at_queue_end = true;

@@ -142,8 +142,7 @@ void loop() {
         selected->stopMove();
       }
       in_ptr = 0;
-    }
-    else {
+    } else {
       in_buffer[in_ptr++] = toupper(ch);
       in_buffer[in_ptr] = 0;
     }

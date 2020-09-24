@@ -44,8 +44,14 @@ class FastAccelStepper {
   // if direction pin is connected, call this function
   void setDirectionPin(uint8_t dirPin);
 
-  // if enable pin is connected, then use this function
-  void setEnablePin(uint8_t enablePin);
+  // if enable pin is connected, then use this function.
+  //
+  // In case there are two enable pins: one low and one high active, then
+  // these calls are valid and both pins will be operated:
+  //	setEnablePin(pin1, true);
+  //	setEnablePin(pin2, false);
+  // If pin1 and pin2 are same, then the last call will be used.
+  void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
 
   // using enableOutputs/disableOutputs the stepper can be enabled
   void enableOutputs();
@@ -162,31 +168,24 @@ class FastAccelStepper {
 #endif
 
  private:
-  uint8_t _rampState;  // updated by isr_fill_queue
-  bool _isr_speed_control_enabled;
-  int32_t _target_pos;
-  uint8_t _stepPin;
-  uint8_t _dirPin;
-  uint8_t _auto_enablePin;
-  uint8_t _enablePin;
-
-  uint32_t _min_step_us;  // updated by setSpeed
-  uint32_t _accel;        // updated by setAcceleration
-
   void _calculate_move(int32_t steps);
   void _update_from_speed_acceleration();
 
-  // stepper_num's meaning depends on processor type:
-  //		AVR:	0 => OC1B
-  //		    	1 => OC1A
-  //		ESP32:	0 => MCPWM0 Timer 0
-  //				1 => MCPWM0 Timer 1
-  //				2 => MCPWM0 Timer 2
-  //				3 => MCPWM1 Timer 0
-  //				4 => MCPWM1 Timer 1
-  //				5 => MCPWM1 Timer 2
+  bool _isr_speed_control_enabled;
+  uint8_t _rampState;  // updated by isr_fill_queue
+  uint8_t _stepPin;
+  uint8_t _dirPin;
+  uint8_t _autoEnablePinLowActive;
+  uint8_t _autoEnablePinHighActive;
+  uint8_t _enablePinLowActive;
+  uint8_t _enablePinHighActive;
   uint8_t _stepper_num;
   uint8_t _queue_num;
+
+  int32_t _target_pos;
+
+  uint32_t _min_step_us;  // updated by setSpeed
+  uint32_t _accel;        // updated by setAcceleration
 
   uint32_t _min_travel_ticks;  // in ticks, means 0.25us
   uint32_t _ramp_steps;        // ramp steps from 0 to max speed
