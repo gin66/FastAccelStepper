@@ -59,7 +59,7 @@ Using the high level interface with ramp up/down:
 
 #define dirPinStepperA    5
 #define enablePinStepperA 6
-//#define stepPinStepperA   9  // OC1A
+#define stepPinStepperA   9  // OC1A
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepperA = NULL;
@@ -88,6 +88,7 @@ Using the low level interface to stepper command queue:
 
 #define dirPinStepperA    5
 #define enablePinStepperA 6
+#define stepPinStepperA   9  // OC1A
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper1 = NULL;
