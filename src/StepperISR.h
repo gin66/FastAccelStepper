@@ -159,9 +159,9 @@ class StepperQueue {
  private:
   bool startQueue(struct queue_entry* e);
   void _initVars() {
-    dirPin = 255;
-    autoEnablePinLowActive = 255;
-    autoEnablePinHighActive = 255;
+    dirPin = PIN_UNDEFINED;
+    autoEnablePinLowActive = PIN_UNDEFINED;
+    autoEnablePinHighActive = PIN_UNDEFINED;
     read_ptr = 0;
     next_write_ptr = 0;
     dir_high_at_queue_end = true;
