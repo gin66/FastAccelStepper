@@ -186,16 +186,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
 
   mcpwm_gpio_init(mcpwm_unit, mapping->pwm_output_pin, step_pin);
-  switch (timer) {
-    case 0:
-      break;
-    case 1:
-      mcpwm_gpio_init(mcpwm_unit, MCPWM1A, step_pin);
-      break;
-    case 2:
-      mcpwm_gpio_init(mcpwm_unit, MCPWM2A, step_pin);
-      break;
-  }
+  
   if (timer == 0) {
     // Init mcwpm module for use
     periph_module_enable(mcpwm_unit == MCPWM_UNIT_0 ? PERIPH_PWM0_MODULE
