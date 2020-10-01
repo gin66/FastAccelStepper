@@ -1,5 +1,7 @@
 *.swp
 *.o
+.pio
+pio_dirs
 examples/*/*.h
 examples/*/*.cpp
 tests/test_[0-9][0-9]
@@ -9,4 +11,3 @@ tests/PoorManFloat.cpp
 tests/PoorManFloat.h
 tests/StepperISR*.cpp
 tests/StepperISR.h
-
