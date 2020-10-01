@@ -10,7 +10,9 @@ then
 fi
 
 # install platformio, if needed
-which pio || (
+which pio
+if [ $? -ne 0 ]
+then
 	# Install PlatformIO CLI
 	export PATH=$PATH:~/.platformio/penv/bin
 	curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o get-platformio.py
@@ -18,7 +20,7 @@ which pio || (
 
 	pio platform install "atmelavr"
 	pio platform install "espressif32"
-)
+fi
 
 rm -fR pio_dirs
 
