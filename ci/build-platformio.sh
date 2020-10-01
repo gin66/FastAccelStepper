@@ -10,7 +10,7 @@ then
 fi
 
 # install platformio, if needed
-if [ `which pio` == "" ]
+if [ "`which pio`" == "" ]
 then
 	# Install PlatformIO CLI
 	export PATH=$PATH:~/.platformio/penv/bin
