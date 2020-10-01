@@ -10,8 +10,7 @@ then
 fi
 
 # install platformio, if needed
-if [ "`which pio`" == "" ]
-then
+which pio || (
 	# Install PlatformIO CLI
 	export PATH=$PATH:~/.platformio/penv/bin
 	curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o get-platformio.py
@@ -19,7 +18,7 @@ then
 
 	pio platform install "atmelavr"
 	pio platform install "espressif32"
-fi
+)
 
 rm -fR pio_dirs
 
@@ -38,5 +37,9 @@ done
 
 for i in pio_dirs/*
 do
-	(cd $i;pio run -e avr -e esp32)
+	echo avr: $i
+	(cd $i;pio run -s -e avr)
+
+	echo esp32: $i
+	(cd $i;pio run -s -e esp32)
 done

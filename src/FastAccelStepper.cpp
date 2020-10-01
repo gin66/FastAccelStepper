@@ -232,7 +232,6 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   uint32_t curr_ticks = fas_queue[_queue_num].ticks_at_queue_end;
   uint32_t performed_ramp_up_steps;
   uint32_t deceleration_start;
-  uint32_t upm_sq_min_travel;
   uint32_t ramp_steps = _ramp_steps;
   if ((curr_ticks == 0) || isQueueEmpty()) {
     // motor is not running
@@ -251,7 +250,6 @@ void FastAccelStepper::_calculate_move(int32_t move) {
     performed_ramp_up_steps = ramp_steps;
     deceleration_start = ramp_steps;
   } else {
-    uint32_t on_ramp_steps;
     // motor is running
     //
     // Calculate on which step on the speed ramp the current speed is related to
@@ -317,7 +315,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   uint32_t runtime_us = micros();
 #endif
 
-  int32_t ticks_at_queue_end = fas_queue[_queue_num].ticks_at_queue_end;
+  uint32_t ticks_at_queue_end = fas_queue[_queue_num].ticks_at_queue_end;
 
   // check state for acceleration/deceleration or deceleration to stop
   uint32_t remaining_steps =
@@ -430,6 +428,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
 #endif
+	default:
+	  return; // TODO: how to treat this error case ?
   }
 
   // CLIPPING: avoid increase
@@ -492,7 +492,6 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   }
 #endif
 
-  uint32_t sum_dt = 0;
   for (uint16_t c = 1; c < command_cnt; c++) {
     int8_t res = addQueueEntry(curr_ticks, steps_per_command, dir);
 #ifdef TEST
@@ -505,6 +504,12 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         remaining_steps, change_per_command, res,
         fas_queue[_queue_num].ticks_at_queue_end);
 #endif
+  if (res != 0) {  // Emergency stop on internal error
+    addQueueStepperStop();
+    _rampState = RAMP_STATE_IDLE;
+    _isr_speed_control_enabled = false;
+	return;
+  }
     steps -= steps_per_command;
     curr_ticks += change_per_command;
   }
@@ -522,6 +527,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     addQueueStepperStop();
     _rampState = RAMP_STATE_IDLE;
     _isr_speed_control_enabled = false;
+	return;
   }
   if (total_steps == abs(remaining_steps)) {
     addQueueStepperStop();

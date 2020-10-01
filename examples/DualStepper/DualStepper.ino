@@ -107,14 +107,12 @@ void info(FastAccelStepper *s) {
 }
 
 void loop() {
-  bool cmd_ok = false;
-
   if (Serial.available()) {
     char ch = Serial.read();
     if (in_ptr == 255) {
       in_ptr = 0;
     } else if ((ch == ' ') || (ch == '\n')) {
-      int32_t val;
+      long val;
       if (strcmp(in_buffer, "M1") == 0) {
         Serial.println("Select stepper 1");
         selected = stepper1;

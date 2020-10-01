@@ -44,7 +44,6 @@
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 struct mapping_s {
-  mcpwm_dev_t* mcpwm_dev;
   mcpwm_unit_t mcpwm_unit;
   uint8_t timer;
   mcpwm_io_signals_t pwm_output_pin;
@@ -84,7 +83,7 @@ class StepperQueue {
 
   bool dir_at_queue_end;
   int32_t pos_at_queue_end;    // in steps
-  int32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
+  uint32_t ticks_at_queue_end; // in timer ticks, 0 on stopped stepper
 
   void init(uint8_t queue_num, uint8_t step_pin);
   bool isQueueFull() {
@@ -94,7 +93,6 @@ class StepperQueue {
   bool isStopped() { return ticks_at_queue_end == 0; }
   void addQueueStepperStop() { ticks_at_queue_end = 0; }
   int addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
-    int32_t c_sum = 0;
     if (steps >= 128) {
       return AQE_STEPS_ERROR;
     }
@@ -129,6 +127,7 @@ class StepperQueue {
       dir_at_queue_end = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
       {
+        int32_t checksum = 0;
         unsigned char* x = (unsigned char*)e;
         for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
           if (checksum & 0x80) {
