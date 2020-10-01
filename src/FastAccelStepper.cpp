@@ -429,7 +429,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
              next_ticks, planning_steps, d_ticks_new);
 #endif
 	default:
-	  return; // TODO: how to treat this error case ?
+	  // TODO: how to treat this (error) case ?
+	  next_ticks = curr_ticks;
   }
 
   // CLIPPING: avoid increase

@@ -3,6 +3,8 @@
 ![C/C++ CI](https://github.com/gin66/FastAccelStepper/workflows/C/C++%20CI/badge.svg)
 ![C/C++ CI](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg)
 
+CURRENT VERSION NEED TO BE CHECKED, BECAUSE SEVERAL TESTS HAD TO BE DISABLED. USE ONLY THE LATEST RELEASE
+
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (Atmega 328) and esp32.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
