@@ -18,7 +18,7 @@ then
 	python3 get-platformio.py
 
 	pio platform install "atmelavr"
-	pio platform install "esp32dev"
+	pio platform install "espressif32"
 fi
 
 rm -fR pio_dirs
