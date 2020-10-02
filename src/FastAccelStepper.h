@@ -1,6 +1,8 @@
 #ifndef FASTACCELSTEPPER_H
 #define FASTACCELSTEPPER_H
-#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || defined(TEST)
+#if !(defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || defined(TEST))
+#error “This library only supports boards with an AVR or ESP32 processor.”
+#endif
 #ifndef TEST
 #include <Arduino.h>
 #else
@@ -199,6 +201,8 @@ class FastAccelStepper {
   uint32_t _deceleration_start;  // in steps
   upm_float _upm_inv_accel2;
 
+  // the speed is linked on both ramp slopes to this variable as per
+  //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t _performed_ramp_up_steps;
 };
 
@@ -231,7 +235,4 @@ class FastAccelStepperEngine {
 
   bool _isValidStepPin(uint8_t step_pin);
 };
-#else
-#error “This library only supports boards with an AVR or ESP32 processor.”
-#endif
 #endif

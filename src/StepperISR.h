@@ -21,14 +21,15 @@
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define QUEUE_LEN 16
-#endif
-#if defined(ARDUINO_ARCH_AVR)
+#elif defined(ARDUINO_ARCH_AVR)
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define QUEUE_LEN 16
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32)
+#define NUM_QUEUES 6
+#define QUEUE_LEN 32
+#else
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 #endif
