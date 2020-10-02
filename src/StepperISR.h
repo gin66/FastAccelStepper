@@ -1,4 +1,4 @@
-#ifndef TEST
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR)
 #include <Arduino.h>
 #endif
 #include <stdint.h>
@@ -80,6 +80,9 @@ class StepperQueue {
   uint8_t skip;
   uint16_t period;
 #endif
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  uint8_t checksum;
+#endif
 
   bool dir_at_queue_end;
   int32_t pos_at_queue_end;    // in steps
@@ -127,7 +130,7 @@ class StepperQueue {
       dir_at_queue_end = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
       {
-        int32_t checksum = 0;
+		// checksum is in the struct and will updated here
         unsigned char* x = (unsigned char*)e;
         for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
           if (checksum & 0x80) {
@@ -169,6 +172,9 @@ class StepperQueue {
     pos_at_queue_end = 0;
     ticks_at_queue_end = 0;
     isRunning = false;
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  checksum = 0;
+#endif
   }
 };
 

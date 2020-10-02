@@ -102,7 +102,7 @@ void info(FastAccelStepper *s) {
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   Serial.print("  checksum=");
-  Serial.print(s->checksum);
+  Serial.print(s->checksum());
 #endif
 }
 

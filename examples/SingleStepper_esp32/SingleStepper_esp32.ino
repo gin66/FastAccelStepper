@@ -147,7 +147,7 @@ void loop() {
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
       Serial.print("  checksum=");
-      Serial.print(stepper->checksum);
+      Serial.print(stepper->checksum());
 #endif
       Serial.println();
 

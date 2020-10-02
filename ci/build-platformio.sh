@@ -34,11 +34,12 @@ do
 	cd ../../..
 done
 
+set -e
 for i in pio_dirs/*
 do
-	echo avr: $i
-	(cd $i;pio run -s -e avr)
-
-	echo esp32: $i
-	(cd $i;pio run -s -e esp32)
+	for p in avr esp32 esp32_debug
+	do
+		echo avr: $i
+		(cd $i;pio run -s -e $p)
+	done
 done

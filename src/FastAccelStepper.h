@@ -14,8 +14,12 @@
 
 #include "PoorManFloat.h"
 
+#ifndef TEST_MEASURE_ISR_SINGLE_FILL
 #define TEST_MEASURE_ISR_SINGLE_FILL 0
+#endif
+#ifndef TEST_CREATE_QUEUE_CHECKSUM
 #define TEST_CREATE_QUEUE_CHECKSUM 0
+#endif
 
 #if defined(TEST)
 #define MAX_STEPPER 2
@@ -164,7 +168,7 @@ class FastAccelStepper {
   uint32_t max_micros;
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  uint8_t checksum;
+  uint32_t checksum();
 #endif
 
  private:

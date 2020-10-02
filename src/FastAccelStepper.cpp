@@ -211,9 +211,6 @@ int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps, bool di
 //
 //*************************************************************************************************
 void FastAccelStepper::_calculate_move(int32_t move) {
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  checksum = 0;
-#endif
   if (move == 0) {
     return;
   }
@@ -570,10 +567,6 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   // For run time measurement
   max_micros = 0;
 #endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  checksum = 0;
-#endif
-
   _target_pos = 0;
   _isr_speed_control_enabled = false;
   _rampState = RAMP_STATE_IDLE;
@@ -752,3 +745,8 @@ bool FastAccelStepper::isrSpeedControlEnabled() {
 bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
 int32_t FastAccelStepper::targetPos() { return _target_pos; }
 uint8_t FastAccelStepper::rampState() { return _rampState; }
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  uint32_t FastAccelStepper::checksum() {
+	return fas_queue[_queue_num].checksum;
+  }
+#endif
