@@ -164,12 +164,7 @@ The low level command queue for each stepper allows direct speed control - when 
 
 ## TODO
 
-* API stabilization
-* Better API documentation
-* Simplify the examples, avoid the loop for serial readin.
-* Introduce command queue of speed/accel commands - one per stepper.
-* Calculation on pc and on arduino do not create same commands. Queue checksum differ (recheck) !
-* Support different values for acceleration and deceleration.
+See ![project](https://github.com/gin66/FastAccelStepper/projects/1)
 
 ## ISSUES
 
@@ -189,7 +184,7 @@ The low level command queue for each stepper allows direct speed control - when 
   With a command queue, this would lead to additional commands to be executed after the running one.
   Update of new values for acceleration/speed would require another API function, because move/moveTo would enqueue a new command.
   The question is, if this complexity in the driver is a good idea or better left to the application.
-* The revisions 0.4.x and 0.5.x are not usable for AVR in case channel B is needed => upgrade to 0.6
+* The revision 0.5.x is not usable for AVR in case channel B is needed => upgrade to 0.6
 
 ## Not planned for now
 

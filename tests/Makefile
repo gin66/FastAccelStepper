@@ -33,4 +33,4 @@ fmt:
 	clang-format --style=Google -i ../src/* test_*.cpp stubs.h ../examples/*/*.ino
 
 clean:
-	rm *.o test_[0-9][0-9]
+	rm *.o test_[0-9][0-9] *.gnuplot
