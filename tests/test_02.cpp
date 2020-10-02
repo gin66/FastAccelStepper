@@ -136,12 +136,11 @@ void basic_test_with_empty_queue() {
   test(rc.min_dt == normalize_speed(160000), "max speed not reached");
 }
 
-void test_with_pars(const char *name,
-		            int32_t steps, uint32_t travel_dt, uint16_t accel,
-                    bool reach_max_speed, float min_time, float max_time,
-                    float allowed_ramp_time_delta) {
-  printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", name, steps,
-         travel_dt, accel, reach_max_speed ? "CW" : "CCW");
+void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
+                    uint16_t accel, bool reach_max_speed, float min_time,
+                    float max_time, float allowed_ramp_time_delta) {
+  printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", name,
+         steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
   s.init(0, 0);
@@ -158,7 +157,7 @@ void test_with_pars(const char *name,
   assert(!s.isQueueEmpty());
   float old_planned_time_in_buffer = 0;
   char fname[100];
-  sprintf(fname,"test_02_%s.gnuplot",name);
+  sprintf(fname, "test_02_%s.gnuplot", name);
   FILE *gp_file = fopen(fname, "w");
   fprintf(gp_file, "$data <<EOF\n");
   for (int i = 0; i < steps; i++) {
@@ -178,7 +177,7 @@ void test_with_pars(const char *name,
     while (!s.isQueueEmpty()) {
       rc.check_section(&fas_queue_A.entry[fas_queue[0].read_ptr]);
       fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
-      fprintf(gp_file, "%d %d\n",rc.total_ticks, rc.last_dt);
+      fprintf(gp_file, "%d %d\n", rc.total_ticks, rc.last_dt);
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
@@ -221,7 +220,7 @@ void test_with_pars(const char *name,
   }
   printf(" %f\n", 1.0 * rc.total_ticks / 16000000.0);
   // turned off
-  //test(abs(up_time - down_time) <
+  // test(abs(up_time - down_time) <
   //         0.5 * (up_time + down_time) * allowed_ramp_time_delta,
   //     "assymmetric ramp");
   test(s.isStopped(), "is not stopped");
@@ -242,15 +241,17 @@ int main() {
   // ramp time 0.02s, 4 steps
   test_with_pars("f3", 1600, 5000, 10000, true, 7.9, 8.1, 0.2);
   // ramp time 0.2s, 20 steps
-  test_with_pars("f4", 1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1    -0.1,
+  test_with_pars("f4", 1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1 - 0.1,
                  2 * 0.2 + 7.8 + 0.1, 0.2);
   // ramp time 1s, 5000 steps
-  test_with_pars("f5", 15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.17, 2 * 1.0 + 0.5 + 0.1, 0.2);
+  test_with_pars("f5", 15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.17,
+                 2 * 1.0 + 0.5 + 0.1, 0.2);
   // ramp time 0.02s, 4 steps
   test_with_pars("f6", 100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.1,
                  2 * 0.02 + 0.48 + 0.1, 0.2);
   // ramp time 2s, 20000 steps => only ramp 0.22s
-  test_with_pars("f7", 500, 50, 10000, false, 2 * 0.22 - 0.1, 2 * 0.22 + 0.11, 0.2);
+  test_with_pars("f7", 500, 50, 10000, false, 2 * 0.22 - 0.1, 2 * 0.22 + 0.11,
+                 0.2);
   // ramp time 4s, 8000 steps
   test_with_pars("f8", 128000, 250, 1000, true, 2 * 2.0 + 30.0 - 0.1,
                  2 * 2.0 + 30.0 + 0.1 + 1.9, 0.2);
@@ -264,7 +265,8 @@ int main() {
   test_with_pars("f11", 16002, 250, 1000, true, 2 * 2.0 + 0.0 - 0.1,
                  2 * 2.0 + 0.0 + 0.1 + 4.0, 0.2);
   // ramp time 50s => 2s
-  test_with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1, 0.2);
+  test_with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1,
+                 0.2);
 
   // ramp time 50s, thus with 500s max speed not reached. 250steps need 10s
   test_with_pars("f13", 500, 4000, 5, false, 20.0 - 0.6, 20.0 + 0.2, 0.2);
@@ -279,6 +281,6 @@ int main() {
   test_with_pars("f17", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
 
   // ramp time  625s, 7812500 steps
-  //test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
+  // test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
   printf("TEST_02 PASSED\n");
 }

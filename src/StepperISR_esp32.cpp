@@ -73,7 +73,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
 void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0:&MCPWM1;
+  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
   mcpwm->timer[timer].period.period = e->period;
   uint8_t steps = e->steps;
@@ -107,7 +107,7 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     // no more commands: stop timer at period end
     const struct mapping_s *mapping = q->mapping;
     mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-    mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0:&MCPWM1;
+    mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
     uint8_t timer = mapping->timer;
     mcpwm->timer[timer].mode.start = 1;           // stop at TEP
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
@@ -154,7 +154,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   isRunning = false;
 
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0:&MCPWM1;
+  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
   uint8_t timer = mapping->timer;
 
@@ -182,7 +182,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
 
   mcpwm_gpio_init(mcpwm_unit, mapping->pwm_output_pin, step_pin);
-  
+
   if (timer == 0) {
     // Init mcwpm module for use
     periph_module_enable(mcpwm_unit == MCPWM_UNIT_0 ? PERIPH_PWM0_MODULE
@@ -236,7 +236,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 
 bool StepperQueue::startQueue(struct queue_entry *e) {
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0:&MCPWM1;
+  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 
   // timer should be either at TEP or at zero

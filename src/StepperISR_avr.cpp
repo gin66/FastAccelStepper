@@ -38,70 +38,70 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   }
 }
 
-#define AVR_STEPPER_ISR(CHANNEL, queue, ocr, foc)                              \
-  ISR(TIMER1_COMP##CHANNEL##_vect) {                                           \
-    if (queue.skip) {                                                          \
-      if ((--queue.skip) == 0) {                                               \
-        Stepper_Toggle(CHANNEL);                                               \
-      }                                                                        \
-      ocr += queue.period;                                                     \
-      return;                                                                  \
-    }                                                                          \
-    uint8_t rp = queue.read_ptr;                                               \
-    if (Stepper_IsToggling(CHANNEL)) {                                         \
-      TCCR1C = _BV(foc); /* clear bit */                                       \
-      struct queue_entry* e = &queue.entry[rp];                                \
-      if ((e->steps -= 2) > 1) {                                               \
-        /* perform another step with this queue entry */                       \
-        ocr += queue.period;                                                   \
-        if ((queue.skip =                                                       \
-                e->n_periods - 1)) { /* assign to skip and test for not zero */ \
-          Stepper_Zero(CHANNEL);                                               \
-        }                                                                      \
-        return;                                                                \
-      }                                                                        \
-      rp = (rp + 1) & QUEUE_LEN_MASK;                                          \
-      queue.read_ptr = rp;                                                     \
-      if (rp == queue.next_write_ptr) {                                        \
-        /* queue is empty => set to disconnect */                              \
-        Stepper_Disconnect(CHANNEL);                                           \
-        queue.isRunning = false;                                               \
-        if (queue.autoEnablePinLowActive != PIN_UNDEFINED) {                   \
-          digitalWrite(queue.autoEnablePinLowActive, HIGH);                    \
-        }                                                                      \
-        if (queue.autoEnablePinHighActive != PIN_UNDEFINED) {                  \
-          digitalWrite(queue.autoEnablePinHighActive, LOW);                    \
-        }                                                                      \
-        /* Next Interrupt takes place at next timer cycle => ~4ms */           \
-        return;                                                                \
-      }                                                                        \
-    } else {                                                                   \
-      /* If reach here, then stepper is idle and waiting for a command */      \
-      if (rp == queue.next_write_ptr) {                                        \
-        /* Next Interrupt takes place at next timer cycle => ~4ms */           \
-        return;                                                                \
-      }                                                                        \
-    }                                                                          \
-    /* command in queue */                                                     \
-    struct queue_entry* e = &queue.entry[rp];                                  \
-    ocr += (queue.period = e->period);                                         \
-    if ((queue.skip =                                                           \
-            e->n_periods - 1)) { /* assign to skip and test for not zero */     \
-      Stepper_Zero(CHANNEL);                                                   \
-    } else {                                                                   \
-      Stepper_Toggle(CHANNEL);                                                 \
-    }                                                                          \
-    uint8_t steps = e->steps;                                                  \
-    if ((steps & 0x01) != 0) {                                                 \
-      digitalWrite(queue.dirPin,                                               \
-                   digitalRead(queue.dirPin) == HIGH ? LOW : HIGH);            \
-    }                                                                          \
-    if (queue.autoEnablePinLowActive != PIN_UNDEFINED) {                       \
-      digitalWrite(queue.autoEnablePinLowActive, LOW);                         \
-    }                                                                          \
-    if (queue.autoEnablePinHighActive != PIN_UNDEFINED) {                      \
-      digitalWrite(queue.autoEnablePinHighActive, HIGH);                       \
-    }                                                                          \
+#define AVR_STEPPER_ISR(CHANNEL, queue, ocr, foc)                            \
+  ISR(TIMER1_COMP##CHANNEL##_vect) {                                         \
+    if (queue.skip) {                                                        \
+      if ((--queue.skip) == 0) {                                             \
+        Stepper_Toggle(CHANNEL);                                             \
+      }                                                                      \
+      ocr += queue.period;                                                   \
+      return;                                                                \
+    }                                                                        \
+    uint8_t rp = queue.read_ptr;                                             \
+    if (Stepper_IsToggling(CHANNEL)) {                                       \
+      TCCR1C = _BV(foc); /* clear bit */                                     \
+      struct queue_entry* e = &queue.entry[rp];                              \
+      if ((e->steps -= 2) > 1) {                                             \
+        /* perform another step with this queue entry */                     \
+        ocr += queue.period;                                                 \
+        if ((queue.skip = e->n_periods -                                     \
+                          1)) { /* assign to skip and test for not zero */   \
+          Stepper_Zero(CHANNEL);                                             \
+        }                                                                    \
+        return;                                                              \
+      }                                                                      \
+      rp = (rp + 1) & QUEUE_LEN_MASK;                                        \
+      queue.read_ptr = rp;                                                   \
+      if (rp == queue.next_write_ptr) {                                      \
+        /* queue is empty => set to disconnect */                            \
+        Stepper_Disconnect(CHANNEL);                                         \
+        queue.isRunning = false;                                             \
+        if (queue.autoEnablePinLowActive != PIN_UNDEFINED) {                 \
+          digitalWrite(queue.autoEnablePinLowActive, HIGH);                  \
+        }                                                                    \
+        if (queue.autoEnablePinHighActive != PIN_UNDEFINED) {                \
+          digitalWrite(queue.autoEnablePinHighActive, LOW);                  \
+        }                                                                    \
+        /* Next Interrupt takes place at next timer cycle => ~4ms */         \
+        return;                                                              \
+      }                                                                      \
+    } else {                                                                 \
+      /* If reach here, then stepper is idle and waiting for a command */    \
+      if (rp == queue.next_write_ptr) {                                      \
+        /* Next Interrupt takes place at next timer cycle => ~4ms */         \
+        return;                                                              \
+      }                                                                      \
+    }                                                                        \
+    /* command in queue */                                                   \
+    struct queue_entry* e = &queue.entry[rp];                                \
+    ocr += (queue.period = e->period);                                       \
+    if ((queue.skip =                                                        \
+             e->n_periods - 1)) { /* assign to skip and test for not zero */ \
+      Stepper_Zero(CHANNEL);                                                 \
+    } else {                                                                 \
+      Stepper_Toggle(CHANNEL);                                               \
+    }                                                                        \
+    uint8_t steps = e->steps;                                                \
+    if ((steps & 0x01) != 0) {                                               \
+      digitalWrite(queue.dirPin,                                             \
+                   digitalRead(queue.dirPin) == HIGH ? LOW : HIGH);          \
+    }                                                                        \
+    if (queue.autoEnablePinLowActive != PIN_UNDEFINED) {                     \
+      digitalWrite(queue.autoEnablePinLowActive, LOW);                       \
+    }                                                                        \
+    if (queue.autoEnablePinHighActive != PIN_UNDEFINED) {                    \
+      digitalWrite(queue.autoEnablePinHighActive, HIGH);                     \
+    }                                                                        \
   }
 AVR_STEPPER_ISR(A, fas_queue_A, OCR1A, FOC1A)
 AVR_STEPPER_ISR(B, fas_queue_B, OCR1B, FOC1B)

@@ -85,8 +85,8 @@ class StepperQueue {
 #endif
 
   bool dir_at_queue_end;
-  int32_t pos_at_queue_end;    // in steps
-  uint32_t ticks_at_queue_end; // in timer ticks, 0 on stopped stepper
+  int32_t pos_at_queue_end;     // in steps
+  uint32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
 
   void init(uint8_t queue_num, uint8_t step_pin);
   bool isQueueFull() {
@@ -125,12 +125,12 @@ class StepperQueue {
       steps <<= 1;
       e->period = period;
       e->n_periods = n_periods;
-	  // check for dir pin value change
+      // check for dir pin value change
       e->steps = (dir != dir_at_queue_end) ? steps | 0x01 : steps;
       dir_at_queue_end = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
       {
-		// checksum is in the struct and will updated here
+        // checksum is in the struct and will updated here
         unsigned char* x = (unsigned char*)e;
         for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
           if (checksum & 0x80) {
@@ -168,12 +168,12 @@ class StepperQueue {
     read_ptr = 0;
     next_write_ptr = 0;
     dir_at_queue_end = true;
-	dirHighCountsUp = true;
+    dirHighCountsUp = true;
     pos_at_queue_end = 0;
     ticks_at_queue_end = 0;
     isRunning = false;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  checksum = 0;
+    checksum = 0;
 #endif
   }
 };

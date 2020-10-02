@@ -187,7 +187,8 @@ void FastAccelStepper::addQueueStepperStop() {
   fas_queue[_queue_num].addQueueStepperStop();
 }
 //*************************************************************************************************
-int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps, bool dir_high) {
+int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
+                                    bool dir_high) {
   return fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
 }
 
@@ -426,9 +427,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
              next_ticks, planning_steps, d_ticks_new);
 #endif
       break;
-	default:
-	  // TODO: how to treat this (error) case ?
-	  next_ticks = curr_ticks;
+    default:
+      // TODO: how to treat this (error) case ?
+      next_ticks = curr_ticks;
   }
 
   // CLIPPING: avoid increase
@@ -474,7 +475,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     curr_ticks = next_ticks;
   }
 
-  bool dir = (_target_pos > getPositionAfterCommandsCompleted()) == _dirHighCountsUp;
+  bool dir =
+      (_target_pos > getPositionAfterCommandsCompleted()) == _dirHighCountsUp;
 
 #ifdef TEST
   if (command_cnt > 1) {
@@ -503,16 +505,16 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         remaining_steps, change_per_command, res,
         fas_queue[_queue_num].ticks_at_queue_end);
 #endif
-  if (res != 0) {
-	  if (res == AQE_FULL) {
-		  return;
-	  }
-	  // Emergency stop on internal error
-    addQueueStepperStop();
-    _rampState = RAMP_STATE_IDLE;
-    _isr_speed_control_enabled = false;
-	return;
-  }
+    if (res != 0) {
+      if (res == AQE_FULL) {
+        return;
+      }
+      // Emergency stop on internal error
+      addQueueStepperStop();
+      _rampState = RAMP_STATE_IDLE;
+      _isr_speed_control_enabled = false;
+      return;
+    }
     steps -= steps_per_command;
     curr_ticks += change_per_command;
   }
@@ -527,14 +529,14 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       fas_queue[_queue_num].ticks_at_queue_end);
 #endif
   if (res != 0) {
-	  if (res == AQE_FULL) {
-		  return;
-	  }
-	  // Emergency stop on internal error
+    if (res == AQE_FULL) {
+      return;
+    }
+    // Emergency stop on internal error
     addQueueStepperStop();
     _rampState = RAMP_STATE_IDLE;
     _isr_speed_control_enabled = false;
-	return;
+    return;
   }
   if (total_steps == abs(remaining_steps)) {
     addQueueStepperStop();
@@ -755,7 +757,5 @@ bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
 int32_t FastAccelStepper::targetPos() { return _target_pos; }
 uint8_t FastAccelStepper::rampState() { return _rampState; }
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  uint32_t FastAccelStepper::checksum() {
-	return fas_queue[_queue_num].checksum;
-  }
+uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }
 #endif
