@@ -425,6 +425,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       printf("decelerate ticks => %d  during %d ticks (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
 #endif
+      break;
 	default:
 	  // TODO: how to treat this (error) case ?
 	  next_ticks = curr_ticks;
@@ -502,7 +503,11 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         remaining_steps, change_per_command, res,
         fas_queue[_queue_num].ticks_at_queue_end);
 #endif
-  if (res != 0) {  // Emergency stop on internal error
+  if (res != 0) {
+	  if (res == AQE_FULL) {
+		  return;
+	  }
+	  // Emergency stop on internal error
     addQueueStepperStop();
     _rampState = RAMP_STATE_IDLE;
     _isr_speed_control_enabled = false;
@@ -521,7 +526,11 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       steps, curr_ticks, _target_pos, remaining_steps, change_per_command, res,
       fas_queue[_queue_num].ticks_at_queue_end);
 #endif
-  if (res != 0) {  // Emergency stop on internal error
+  if (res != 0) {
+	  if (res == AQE_FULL) {
+		  return;
+	  }
+	  // Emergency stop on internal error
     addQueueStepperStop();
     _rampState = RAMP_STATE_IDLE;
     _isr_speed_control_enabled = false;

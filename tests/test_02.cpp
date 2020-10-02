@@ -35,6 +35,7 @@ class RampChecker {
   bool first;
   uint32_t accelerate_till;
   uint32_t coast_till;
+  uint32_t pos;
 };
 
 RampChecker::RampChecker() {
@@ -46,6 +47,7 @@ RampChecker::RampChecker() {
   decrease_ok = false;
   coast_till = 0;
   accelerate_till = 0;
+  pos = 0;
 }
 void RampChecker::check_section(struct queue_entry *e) {
   uint8_t steps = e->steps;
@@ -54,6 +56,7 @@ void RampChecker::check_section(struct queue_entry *e) {
   }
   steps >>= 1;
   assert(steps >= 1);
+  pos += steps;
   uint32_t start_dt = e->period * e->n_periods;
 
   min_dt = min(min_dt, start_dt);
@@ -133,10 +136,11 @@ void basic_test_with_empty_queue() {
   test(rc.min_dt == normalize_speed(160000), "max speed not reached");
 }
 
-void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
+void test_with_pars(const char *name,
+		            int32_t steps, uint32_t travel_dt, uint16_t accel,
                     bool reach_max_speed, float min_time, float max_time,
                     float allowed_ramp_time_delta) {
-  printf("Test test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", steps,
+  printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", name, steps,
          travel_dt, accel, reach_max_speed ? "CW" : "CCW");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
@@ -153,6 +157,10 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
   s.isr_fill_queue();
   assert(!s.isQueueEmpty());
   float old_planned_time_in_buffer = 0;
+  char fname[100];
+  sprintf(fname,"test_02_%s.gnuplot",name);
+  FILE *gp_file = fopen(fname, "w");
+  fprintf(gp_file, "$data <<EOF\n");
   for (int i = 0; i < steps; i++) {
     if (true) {
       printf(
@@ -170,6 +178,7 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
     while (!s.isQueueEmpty()) {
       rc.check_section(&fas_queue_A.entry[fas_queue[0].read_ptr]);
       fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
+      fprintf(gp_file, "%d %d\n",rc.total_ticks, rc.last_dt);
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
@@ -178,6 +187,10 @@ void test_with_pars(int32_t steps, uint32_t travel_dt, uint16_t accel,
     assert((i == 0) || (old_planned_time_in_buffer > 0.005));
     old_planned_time_in_buffer = planned_time;
   }
+  fprintf(gp_file, "EOF\n");
+  fprintf(gp_file, "plot $data using 1:2\n");
+  fprintf(gp_file, "pause -1\n");
+  fclose(gp_file);
   test(!s.isrSpeedControlEnabled(), "too many commands created");
   printf("Total time  %f < %f < %f ?\n", min_time, rc.total_ticks / 16000000.0,
          max_time);
@@ -221,51 +234,51 @@ int main() {
   basic_test_with_empty_queue();
   //             steps  ticks_us  accel    maxspeed  min/max_total_time
   // jumps in speed in real on esp32
-  test_with_pars(1000, 4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2, 0.5);
+  test_with_pars("f1", 1000, 4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2, 0.5);
 
   // ramp time 2s, 400 steps TODO
-  test_with_pars(10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,
+  test_with_pars("f2", 10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,
                  2 * 2.0 + 46.0 + 2.0, 0.2);
   // ramp time 0.02s, 4 steps
-  test_with_pars(1600, 5000, 10000, true, 7.9, 8.1, 0.2);
+  test_with_pars("f3", 1600, 5000, 10000, true, 7.9, 8.1, 0.2);
   // ramp time 0.2s, 20 steps
-  test_with_pars(1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1    -0.1,
+  test_with_pars("f4", 1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1    -0.1,
                  2 * 0.2 + 7.8 + 0.1, 0.2);
   // ramp time 1s, 5000 steps
-//  test_with_pars(15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.17, 2 * 1.0 + 0.5 + 0.1, 0.2);
+  test_with_pars("f5", 15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.17, 2 * 1.0 + 0.5 + 0.1, 0.2);
   // ramp time 0.02s, 4 steps
-  test_with_pars(100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.1,
+  test_with_pars("f6", 100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.1,
                  2 * 0.02 + 0.48 + 0.1, 0.2);
   // ramp time 2s, 20000 steps => only ramp 0.22s
-//  test_with_pars(500, 50, 10000, false, 2 * 0.22 - 0.1, 2 * 0.22 + 0.11, 0.2);
+  test_with_pars("f7", 500, 50, 10000, false, 2 * 0.22 - 0.1, 2 * 0.22 + 0.11, 0.2);
   // ramp time 4s, 8000 steps
-  test_with_pars(128000, 250, 1000, true, 2 * 2.0 + 30.0 - 0.1,
+  test_with_pars("f8", 128000, 250, 1000, true, 2 * 2.0 + 30.0 - 0.1,
                  2 * 2.0 + 30.0 + 0.1 + 1.9, 0.2);
   // ramp time 4s, 8000 steps
-  test_with_pars(72000, 250, 1000, true, 2 * 2.0 + 15.0 - 0.1,
+  test_with_pars("f9", 72000, 250, 1000, true, 2 * 2.0 + 15.0 - 0.1,
                  2 * 2.0 + 15.0 + 0.1 + 2 * 1.7, 0.2);
   // ramp time 4s, 8000 steps
-  test_with_pars(44000, 250, 1000, true, 2 * 2.0 + 7.5 - 0.1,
+  test_with_pars("f10", 44000, 250, 1000, true, 2 * 2.0 + 7.5 - 0.1,
                  2 * 2.0 + 7.5 + 0.1 + 2 * 1.7, 0.2);
   // ramp time 4s, 8000 steps
-  test_with_pars(16002, 250, 1000, true, 2 * 2.0 + 0.0 - 0.1,
+  test_with_pars("f11", 16002, 250, 1000, true, 2 * 2.0 + 0.0 - 0.1,
                  2 * 2.0 + 0.0 + 0.1 + 4.0, 0.2);
   // ramp time 50s => 2s
-//  test_with_pars(1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1, 0.2);
+  test_with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1, 0.2);
 
   // ramp time 50s, thus with 500s max speed not reached. 250steps need 10s
-//  test_with_pars(500, 4000, 5, false, 20.0 - 0.6, 20.0 + 0.2, 0.2);
+  test_with_pars("f13", 500, 4000, 5, false, 20.0 - 0.6, 20.0 + 0.2, 0.2);
   // ramp time 50s, thus with 1000s max speed not reached. 1000steps need 20s
-//  test_with_pars(2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2, 0.2);
+  test_with_pars("f14", 2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2, 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 1s
-//  test_with_pars(12500, 4000, 5, true, 100.0 - 0.7, 100.0 + 0.2, 0.2);
+  test_with_pars("f15", 12500, 4000, 5, true, 100.0 - 0.7, 100.0 + 0.2, 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 16s
-//  test_with_pars(16500, 4000, 5, true, 116.0 - 0.7, 116.0 + 0.2, 0.2);
+  test_with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.7, 116.0 + 0.2, 0.2);
 
   // jumps in speed in real => WORKS NOW
-//  test_with_pars(256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
+  test_with_pars("f17", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
 
   // ramp time  625s, 7812500 steps
-  // test_with_pars(2000000, 40, 40, false, 2*223.0, 2*223.0);
+  //test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
   printf("TEST_02 PASSED\n");
 }
