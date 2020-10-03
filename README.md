@@ -1,7 +1,7 @@
 # FastAccelStepper 
  
-![C/C++ CI](https://github.com/gin66/FastAccelStepper/workflows/C/C++%20CI/badge.svg)
-![C/C++ CI](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg)
+![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg)
+![Build examples](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg)
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (Atmega 328) and esp32.
 
