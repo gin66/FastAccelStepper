@@ -14,8 +14,9 @@ static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 #if defined(ARDUINO_ARCH_AVR)
 #define DEBUG_LED_HALF_PERIOD 144
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32)
+#define DEBUG_LED_HALF_PERIOD 50
+#else
 #define DEBUG_LED_HALF_PERIOD 50
 #endif
 
@@ -94,12 +95,10 @@ void FastAccelStepperEngine::init() {
 bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
 #if defined(ARDUINO_ARCH_AVR)
   return ((step_pin == stepPinStepperA) || (step_pin == stepPinStepperB));
-#endif
-#if defined(TEST)
-  return true;
-#endif
-#if defined(ESP32)
+#elif defined(ARDUINO_ARCH_ESP32)
   return true;  // for now
+#else
+  return true;
 #endif
 }
 //*************************************************************************************************
@@ -126,7 +125,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     fas_stepper_num = 1;
   }
 #endif
-#if defined(ESP32)
+#if defined(ARDUINO_ARCH_ESP32)
   if (_next_stepper_num >= MAX_STEPPER) {
     return NULL;
   }
@@ -135,10 +134,14 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   uint8_t stepper_num = _next_stepper_num;
   _next_stepper_num++;
 
+#if defined(ARDUINO_ARCH_AVR) || defined(ESP32) || defined(TEST)
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
   s->init(fas_stepper_num, step_pin);
   return s;
+#else
+  return NULL;
+#endif
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {

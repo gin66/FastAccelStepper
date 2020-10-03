@@ -1,16 +1,13 @@
 #ifndef FASTACCELSTEPPER_H
 #define FASTACCELSTEPPER_H
-#if !(defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || defined(TEST))
-#error “This library only supports boards with an AVR or ESP32 processor.”
-#endif
-#ifndef TEST
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR)
 #include <Arduino.h>
 #else
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "stubs.h"
+#include "../tests/stubs.h"
 #endif
 #include <stdint.h>
 
@@ -26,12 +23,13 @@
 #if defined(TEST)
 #define MAX_STEPPER 2
 #define TICKS_PER_S 16000000L
-#endif
-#if defined(ARDUINO_ARCH_AVR)
+#elif defined(ARDUINO_ARCH_AVR)
 #define MAX_STEPPER 2
 #define TICKS_PER_S F_CPU
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32)
+#define MAX_STEPPER 6
+#define TICKS_PER_S 16000000L
+#else
 #define MAX_STEPPER 6
 #define TICKS_PER_S 16000000L
 #endif
