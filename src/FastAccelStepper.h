@@ -37,6 +37,8 @@
 #define MIN_DELTA_TICKS (F_CPU / 50000)
 #define ABSOLUTE_MAX_TICKS (255L * 65535)
 
+#define PIN_UNDEFINED 255
+
 class FastAccelStepper {
  public:
   // This should be only called by FastAccelStepperEngine !

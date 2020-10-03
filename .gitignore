@@ -11,3 +11,4 @@ tests/PoorManFloat.cpp
 tests/PoorManFloat.h
 tests/StepperISR*.cpp
 tests/StepperISR.h
+tests/*.gnuplot

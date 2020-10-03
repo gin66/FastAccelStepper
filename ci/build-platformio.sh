@@ -39,7 +39,7 @@ for i in pio_dirs/*
 do
 	for p in avr esp32 esp32_debug
 	do
-		echo avr: $i
+		echo $p: $i
 		(cd $i;pio run -s -e $p)
 	done
 done

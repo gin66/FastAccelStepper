@@ -5,8 +5,6 @@
 
 #include "FastAccelStepper.h"
 
-#define PIN_UNDEFINED 255
-
 #if defined(ARDUINO_ARCH_AVR)
 #define stepPinStepperA 9  /* OC1A */
 #define stepPinStepperB 10 /* OC1B */
