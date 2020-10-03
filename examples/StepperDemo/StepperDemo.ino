@@ -49,7 +49,6 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 };
 #endif
 
-// Prepare for up to 6 steppers
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper[MAX_STEPPER];
 
