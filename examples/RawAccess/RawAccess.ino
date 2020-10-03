@@ -1,97 +1,68 @@
 #include "FastAccelStepper.h"
 
-#define dirPinStepper1 5
-#define enablePinStepper1 6
-#define stepPinStepper1 9 /* OC1A */
+#define enablePinStepper 21
+#define dirPinStepper 22
 
-#define dirPinStepper2 7
-#define enablePinStepper2 8
-#define stepPinStepper2 10 /* OC1B */
-
-#define LED 13
+// for avr: either use pin 9 or 10 aka OC1A or OC1B
+#define stepPinStepper 23
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper1 = NULL;
-FastAccelStepper *stepper2 = NULL;
+FastAccelStepper *stepper;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Demo Raw Access");
-
-  // Check stepper motor+driver is operational
-  // This is not done via FastAccelStepper-Library for test purpose only
-  pinMode(stepPinStepper1, OUTPUT);
-  pinMode(dirPinStepper1, OUTPUT);
-  pinMode(enablePinStepper1, OUTPUT);
-  digitalWrite(enablePinStepper1, LOW);
-  digitalWrite(dirPinStepper1, LOW);
-  for (uint16_t i = 0; i < 3200; i++) {
-    digitalWrite(stepPinStepper1, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(stepPinStepper1, LOW);
-    delayMicroseconds(190);
-  }
-  digitalWrite(dirPinStepper1, HIGH);
-  for (uint16_t i = 0; i < 3200; i++) {
-    digitalWrite(stepPinStepper1, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(stepPinStepper1, LOW);
-    delayMicroseconds(190);
-  }
-  digitalWrite(enablePinStepper1, HIGH);
-
-  pinMode(stepPinStepper2, OUTPUT);
-  pinMode(dirPinStepper2, OUTPUT);
-  pinMode(enablePinStepper2, OUTPUT);
-  digitalWrite(enablePinStepper2, LOW);
-  digitalWrite(dirPinStepper2, LOW);
-  for (uint16_t i = 0; i < 3200; i++) {
-    digitalWrite(stepPinStepper2, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(stepPinStepper2, LOW);
-    delayMicroseconds(190);
-  }
-  digitalWrite(dirPinStepper2, HIGH);
-  for (uint16_t i = 0; i < 3200; i++) {
-    digitalWrite(stepPinStepper2, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(stepPinStepper2, LOW);
-    delayMicroseconds(190);
-  }
-  digitalWrite(enablePinStepper2, HIGH);
-  // Done
+  Serial.println("Demo RawAccess");
 
   engine.init();
-  engine.setDebugLed(LED);
-  stepper1 = engine.stepperConnectToPin(stepPinStepper1);
-  stepper2 = engine.stepperConnectToPin(stepPinStepper2);
 
-  stepper1->setDirectionPin(dirPinStepper1);
-  stepper2->setDirectionPin(dirPinStepper2);
+  stepper = engine.stepperConnectToPin(stepPinStepper);
 
-  stepper1->setEnablePin(enablePinStepper1);
-  stepper2->setEnablePin(enablePinStepper2);
-
-  stepper1->setAutoEnable(true);
-  stepper2->setAutoEnable(true);
+  if (stepper) {
+    stepper->setDirectionPin(dirPinStepper);
+    stepper->setEnablePin(enablePinStepper);
+    stepper->setAutoEnable(true);
+  }
 }
 
-uint32_t dt = ABSOLUTE_MAX_TICKS;
-bool up = true;
+// This loop drives the stepper up to 80000 microsteps/s.
+// For a NEMA-17 with 200 steps/revolution and 16 microsteps, this means 25
+// revolutions/s
+
+bool direction = false;
+
+#define MAX_SPEED 80000 /* steps/s */
 
 void loop() {
-  uint8_t steps = min(max(100000L / dt, 1), 127);
-  if (stepper1->addQueueEntry(dt, steps, true) == AQE_OK) {
-    if (up) {
-      dt -= dt / 100;
-      if (dt < TICKS_PER_S / 40000) {  // 40000 steps/s
-        up = false;
+  if(!stepper) {
+return;
+}
+#define COMMAND_CNT (MAX_SPEED / 100)
+  Serial.println("Start");
+  for (uint16_t i = 1; i < 2 * COMMAND_CNT; i++) {
+    uint8_t steps = 100;
+    uint32_t steps_per_s = min(i, 2 * COMMAND_CNT - i) * 100;
+    uint32_t ticks = TICKS_PER_S / steps_per_s;
+    while (true) {
+      int rc = stepper->addQueueEntry(ticks, steps, direction);
+      // Serial.println(rc);
+      if (rc == AQE_OK) {
+        break;
       }
-    } else {
-      dt += 1;
-      if (dt == ABSOLUTE_MAX_TICKS) {
-        up = true;
-      }
+      // adding a delay(1) causes problems
+      delayMicroseconds(1000);
     }
   }
+
+  Serial.println("no more commands to be created");
+  while (!stepper->isQueueEmpty()) {
+  }
+  Serial.println("queue is empty");
+
+  while (stepper->isRunning()) {
+  }
+
+  Serial.println("stepper has stopped");
+
+  delay(10000);
+  direction = !direction;
 }

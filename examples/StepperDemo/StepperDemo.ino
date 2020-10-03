@@ -101,7 +101,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Demo DualStepper");
+  Serial.println("Demo Stepper");
 
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
