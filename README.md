@@ -47,11 +47,11 @@ The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
 
-For the API definition please consult the ![FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h) header file.
+For the API definition please consult the header file ![FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h).
+Please check the examples for application and how to use the low level interface.
 
 The module defines the global variable fas_queue. Do not use or redefine this variable.
 
-### AVR
 
 Using the high level interface with ramp up/down:
 
@@ -60,7 +60,7 @@ Using the high level interface with ramp up/down:
 
 #define dirPinStepperA    5
 #define enablePinStepperA 6
-#define stepPinStepperA   9  // OC1A
+#define stepPinStepperA   9  // OC1A in case of AVR
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepperA = NULL;
@@ -68,73 +68,20 @@ FastAccelStepper *stepperA = NULL;
 void setup() {
    engine.init();
    stepperA = engine.stepperConnectToPin(stepPinStepperA);
+   if (stepperA) {
+      stepperA->setDirectionPin(dirPinStepperA);
+      stepperA->setEnablePin(enablePinStepperA);
+      stepperA->setAutoEnable(true);
 
-   stepperA->setDirectionPin(dirPinStepperA);
-   stepperA->setEnablePin(enablePinStepperA);
-   stepperA->setAutoEnable(true);
-
-   stepperA->setSpeed(1000);       // the parameter is us/step !!!
-   stepperA->setAcceleration(100);
-   stepperA->move(1000);
+      stepperA->setSpeed(1000);       // the parameter is us/step !!!
+      stepperA->setAcceleration(100);
+      stepperA->move(1000);
+   }
 }
 
 void loop() {
 }
 ```
-
-Using the low level interface to stepper command queue:
-
-```
-#include "FastAccelStepper.h"
-
-#define dirPinStepperA    5
-#define enablePinStepperA 6
-#define stepPinStepperA   9  // OC1A
-
-FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper1 = NULL;
-FastAccelStepper *stepper2 = NULL;
-
-void setup() {
-   engine.init();
-   stepperA = engine.stepperConnectToPin(stepPinStepperA);
-
-   stepperA->setDirectionPin(dirPinStepperA);
-
-   stepperA->setEnablePin(enablePinStepperA);
-   stepperA->setAutoEnable(true);
-}
-
-uint32_t dt = ABSOLUTE_MAX_TICKS;
-bool up = true;
-
-void loop() {
-  // Issue command with parameters via addQueueEntry:
-  //          time delta:            dt  [*1/TICKS_PER_S s]
-  //          steps:                 2
-  //          direction pin:         high
-  uint8_t steps = min(max(100000L/dt,1), 127);
-  if (stepperA->addQueueEntry(dt, steps, true) == AQE_OK) {
-     if (up) {
-        dt -= dt / 100;
-        if (dt < F_CPU/40000) { // 40000 steps/s
-            up = false;
-        }
-     }
-     else {
-        dt += 1;
-        if (dt == ABSOLUTE_MAX_TICKS) {
-	        up = true;
-        }
-     }
-  }
-}
-```
-
-### ESP32
-
-Check the examples: SingleStepper_esp32 and RawAccess_esp32.
-RawAccess_esp32 drives the stepper up to 80000 steps/s.
 
 ## Behind the curtains
 
