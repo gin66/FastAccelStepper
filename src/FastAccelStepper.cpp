@@ -496,7 +496,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   }
 #endif
 
-  for (uint16_t c = 1; c < command_cnt; c++) {
+  for (uint16_t c = 0; c < command_cnt; c++) {
     int8_t res = addQueueEntry(curr_ticks, steps_per_command, dir);
 #ifdef TEST
     printf(
@@ -520,26 +520,6 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     }
     steps -= steps_per_command;
     curr_ticks += change_per_command;
-  }
-  int8_t res = addQueueEntry(curr_ticks, steps, dir);
-#ifdef TEST
-  printf(
-      "add command Steps = %d start_ticks = %d  Target "
-      "pos = %d "
-      "Remaining steps = %d  tick_change=%d"
-      " => res=%d   ticks_at_queue_end = %d\n",
-      steps, curr_ticks, _target_pos, remaining_steps, change_per_command, res,
-      fas_queue[_queue_num].ticks_at_queue_end);
-#endif
-  if (res != 0) {
-    if (res == AQE_FULL) {
-      return;
-    }
-    // Emergency stop on internal error
-    addQueueStepperStop();
-    _rampState = RAMP_STATE_IDLE;
-    _isr_speed_control_enabled = false;
-    return;
   }
   if (total_steps == abs(remaining_steps)) {
     addQueueStepperStop();

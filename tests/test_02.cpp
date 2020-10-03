@@ -177,7 +177,8 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
     while (!s.isQueueEmpty()) {
       rc.check_section(&fas_queue_A.entry[fas_queue[0].read_ptr]);
       fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
-      fprintf(gp_file, "%.6f %d\n", rc.total_ticks/1000000.0, 1000000/rc.last_dt);
+      fprintf(gp_file, "%.6f %d\n", rc.total_ticks / 1000000.0,
+              1000000 / rc.last_dt);
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
