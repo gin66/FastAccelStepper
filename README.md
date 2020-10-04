@@ -47,7 +47,7 @@ The library is in use with A4988, but other driver ICs could work, too.
 
 ## Usage
 
-For the API definition please consult the header file ![FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h).
+For the API definition please consult the header file [FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h).
 Please check the examples for application and how to use the low level interface.
 
 The module defines the global variable fas_queue. Do not use or redefine this variable.
