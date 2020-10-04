@@ -6,6 +6,9 @@ struct stepper_config_s {
   uint8_t enable_high_active;
   uint8_t direction;
   bool direction_high_count_up;
+  bool auto_enable;
+  uint32_t on_delay_us;
+  uint16_t off_delay_ms;
 };
 
 #if defined(ARDUINO_ARCH_AVR)
@@ -19,7 +22,10 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 6,
       enable_high_active : PIN_UNDEFINED,
       direction : 5,
-      direction_high_count_up : true
+      direction_high_count_up : true,
+      auto_enable: true,
+      on_delay_us: 500000,
+      off_delay_ms: 5000
     },
     {
       // stepper 2 shall be connected to OC1B
@@ -27,7 +33,10 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 8,
       enable_high_active : PIN_UNDEFINED,
       direction : 7,
-      direction_high_count_up : true
+      direction_high_count_up : true,
+      auto_enable: true,
+      on_delay_us: 5000,
+      off_delay_ms: 10
     }};
 #elif defined(ARDUINO_ARCH_ESP32)
 // Example hardware configuration for esp32 board.
@@ -39,7 +48,10 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 21,
       enable_high_active : PIN_UNDEFINED,
       direction : 22,
-      direction_high_count_up : true
+      direction_high_count_up : true,
+      auto_enable: true,
+      on_delay_us: 5000,
+      off_delay_ms: 10
     },
     {step : 255},  // unused stepper slot
     {step : 255},  // unused stepper slot
@@ -113,14 +125,17 @@ void setup() {
 
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper *s = NULL;
-    if (stepper_config[i].step != PIN_UNDEFINED) {
-      s = engine.stepperConnectToPin(stepper_config[i].step);
+    const struct stepper_config_s *config = &stepper_config[i];
+    if (config->step != PIN_UNDEFINED) {
+      s = engine.stepperConnectToPin(config->step);
       if (s) {
-        s->setDirectionPin(stepper_config[i].direction,
-                           stepper_config[i].direction_high_count_up);
-        s->setEnablePin(stepper_config[i].enable_low_active, true);
-        s->setEnablePin(stepper_config[i].enable_high_active, false);
-        s->setAutoEnable(true);
+        s->setDirectionPin(config->direction,
+                           config->direction_high_count_up);
+        s->setEnablePin(config->enable_low_active, true);
+        s->setEnablePin(config->enable_high_active, false);
+        s->setAutoEnable(config->auto_enable);
+        s->setDelayToEnable(config->on_delay_us);
+        s->setDelayToDisable(config->off_delay_ms);
       }
     }
     stepper[i] = s;

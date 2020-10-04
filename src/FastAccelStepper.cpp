@@ -195,8 +195,7 @@ void FastAccelStepper::addQueueStepperStop() {
 int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
   noInterrupts();
-  uint16_t delay_counter = _off_delay_count;
-  _off_delay_count = 0;
+  uint16_t delay_counter = _auto_disable_delay_counter;
   interrupts();
   enableOutputs();
   int res = fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
@@ -204,7 +203,7 @@ int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
     delay_counter = _off_delay_count;
   }
   noInterrupts();
-  _off_delay_count = delay_counter;
+  _auto_disable_delay_counter = delay_counter;
   interrupts();
   return res;
 }
