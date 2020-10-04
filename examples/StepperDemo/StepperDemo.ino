@@ -175,20 +175,40 @@ void info(FastAccelStepper *s) {
   Serial.print(" ");
 }
 
+const static char usage_str[] PROGMEM =
+    "Enter commands separated by space or newline:\n"
+    "     M1/M2/..  ... to select stepper\n"
+    "     A<accel>  ... Set selected stepper's acceleration\n"
+    "     V<speed>  ... Set selected stepper's speed\n"
+
+    "     P<pos>    ... Move selected stepper to position (can be "
+    "negative)\n"
+
+    "     R<n>      ... Move selected stepper by n steps (can be "
+    "negative)\n"
+    "     E<us>     ... Set selected stepper's delay from enable to steps\n"
+    "     D<ms>     ... Set selected stepper's delay from steps to disable\n"
+    "     N         ... Turn selected stepper output on (disable auto enable)\n"
+    "     F         ... Turn selected stepper output off (disable auto "
+    "enable)\n"
+    "     O         ... Put selected stepper into auto enable mode\n"
+    "     S         ... Stop selected stepper with deceleration\n"
+    "\n";
+
 void usage() {
-  Serial.println("Enter commands separated by space or newline:");
-  Serial.println("     M1/M2/..  ... to select stepper");
-  Serial.println("     A<accel>  ... Set selected stepper's acceleration");
-  Serial.println("     V<speed>  ... Set selected stepper's speed");
-  Serial.println(
-      "     P<pos>    ... Move selected stepper to position (can be "
-      "negative)");
-  Serial.println(
-      "     R<n>      ... Move selected stepper by n steps (can be "
-      "negative)");
-  Serial.println("     E<us>     ... Set selected stepper's delay from enable to steps");
-  Serial.println("     D<ms>     ... Set selected stepper's delay from steps to disable");
-  Serial.println("     S         ... Stop selected stepper with deceleration");
+#if defined(ARDUINO_ARCH_AVR)
+  char ch;
+  PGM_P s = usage_str;
+  for(;;) {
+    ch = pgm_read_byte(s++);
+    if (ch == 0) {
+      break;
+    }
+    Serial.print(ch);
+  }
+#elif defined(ARDUINO_ARCH_ESP32)
+  Serial.print(usage_str);
+#endif
 }
 
 void output_info() {
@@ -253,6 +273,17 @@ void loop() {
           Serial.print("Set disable time to ");
           Serial.println(val);
           selected->setDelayToDisable(val);
+        } else if (strcmp(in_buffer, "N") == 0) {
+          Serial.print("Output driver on");
+          selected->setAutoEnable(false);
+          selected->enableOutputs();
+        } else if (strcmp(in_buffer, "F") == 0) {
+          Serial.print("Output driver off");
+          selected->setAutoEnable(false);
+          selected->disableOutputs();
+        } else if (strcmp(in_buffer, "O") == 0) {
+          Serial.print("Output driver off");
+          selected->setAutoEnable(true);
         } else if (strcmp(in_buffer, "S") == 0) {
           Serial.print("Stop");
           selected->stopMove();
