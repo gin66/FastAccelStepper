@@ -23,9 +23,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_high_active : PIN_UNDEFINED,
       direction : 5,
       direction_high_count_up : true,
-      auto_enable: true,
-      on_delay_us: 500000,
-      off_delay_ms: 5000
+      auto_enable : true,
+      on_delay_us : 500000,
+      off_delay_ms : 5000
     },
     {
       // stepper 2 shall be connected to OC1B
@@ -34,9 +34,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_high_active : PIN_UNDEFINED,
       direction : 7,
       direction_high_count_up : true,
-      auto_enable: true,
-      on_delay_us: 5000,
-      off_delay_ms: 10
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
     }};
 #elif defined(ARDUINO_ARCH_ESP32)
 // Example hardware configuration for esp32 board.
@@ -49,9 +49,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_high_active : PIN_UNDEFINED,
       direction : 22,
       direction_high_count_up : true,
-      auto_enable: true,
-      on_delay_us: 5000,
-      off_delay_ms: 10
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
     },
     {step : 255},  // unused stepper slot
     {step : 255},  // unused stepper slot
@@ -129,8 +129,7 @@ void setup() {
     if (config->step != PIN_UNDEFINED) {
       s = engine.stepperConnectToPin(config->step);
       if (s) {
-        s->setDirectionPin(config->direction,
-                           config->direction_high_count_up);
+        s->setDirectionPin(config->direction, config->direction_high_count_up);
         s->setEnablePin(config->enable_low_active, true);
         s->setEnablePin(config->enable_high_active, false);
         s->setAutoEnable(config->auto_enable);

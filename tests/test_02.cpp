@@ -92,10 +92,10 @@ void RampChecker::check_section(struct queue_entry *e) {
 }
 
 void init_queue() {
-  fas_queue[0].read_ptr = 0;
-  fas_queue[1].read_ptr = 0;
-  fas_queue[0].next_write_ptr = 0;
-  fas_queue[1].next_write_ptr = 0;
+  fas_queue[0].read_idx = 0;
+  fas_queue[1].read_idx = 0;
+  fas_queue[0].next_write_idx = 0;
+  fas_queue[1].next_write_idx = 0;
 }
 
 void basic_test_with_empty_queue() {
@@ -118,7 +118,7 @@ void basic_test_with_empty_queue() {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
           "pos = %d  QueueEmpty=%s\n",
-          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.targetPos(),
+          i, fas_queue[0].read_idx, fas_queue[0].next_write_idx, s.targetPos(),
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
@@ -127,8 +127,9 @@ void basic_test_with_empty_queue() {
     }
     s.manage();
     while (!s.isQueueEmpty()) {
-      rc.check_section(&fas_queue_A.entry[fas_queue[0].read_ptr]);
-      fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
+      rc.check_section(
+          &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+      fas_queue[0].read_idx++;
     }
   }
   test(!s.isrSpeedControlEnabled(), "too many commands created");
@@ -165,7 +166,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
           "pos = %d  QueueEmpty=%s\n",
-          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.targetPos(),
+          i, fas_queue[0].read_idx, fas_queue[0].next_write_idx, s.targetPos(),
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
@@ -175,8 +176,9 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
     s.manage();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
-      rc.check_section(&fas_queue_A.entry[fas_queue[0].read_ptr]);
-      fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
+      rc.check_section(
+          &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+      fas_queue[0].read_idx++;
       fprintf(gp_file, "%.6f %d\n", rc.total_ticks / 1000000.0,
               1000000 / rc.last_dt);
     }

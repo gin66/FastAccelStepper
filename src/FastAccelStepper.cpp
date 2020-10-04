@@ -753,12 +753,12 @@ int32_t FastAccelStepper::getCurrentPosition() {
   noInterrupts();
   int32_t pos = q->pos_at_queue_end;
   bool countUp = (q->dir_at_queue_end == q->dirHighCountsUp);
-  uint8_t wp = q->next_write_ptr;
-  uint8_t rp = q->read_ptr;
+  uint8_t wp = q->next_write_idx;
+  uint8_t rp = q->read_idx;
   interrupts();
   while (rp != wp) {
-    wp = (wp + QUEUE_LEN - 1) & QUEUE_LEN_MASK;
-    uint8_t steps_dir = q->entry[wp].steps;
+    wp--;
+    uint8_t steps_dir = q->entry[wp & QUEUE_LEN_MASK].steps;
     if (countUp) {
       pos -= steps_dir >> 1;
     } else {

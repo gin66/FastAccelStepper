@@ -61,8 +61,8 @@ struct queue_entry {
 class StepperQueue {
  public:
   struct queue_entry entry[QUEUE_LEN];
-  uint8_t read_ptr;  // ISR stops if readptr == next_writeptr
-  uint8_t next_write_ptr;
+  uint8_t read_idx;  // ISR stops if readptr == next_writeptr
+  uint8_t next_write_idx;
   uint32_t on_delay_ticks;
   uint8_t dirPin;
   bool dirHighCountsUp;
@@ -87,12 +87,22 @@ class StepperQueue {
   uint32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
 
   void init(uint8_t queue_num, uint8_t step_pin);
-  bool isQueueFull() {
-    return (((next_write_ptr + 1) & QUEUE_LEN_MASK) == read_ptr);
+  inline bool isQueueFull() {
+    noInterrupts();
+    uint8_t rp = read_idx;
+    uint8_t wp = next_write_idx;
+    interrupts();
+    rp += QUEUE_LEN;
+    return (wp == rp);
   }
-  bool isQueueEmpty() { return (read_ptr == next_write_ptr); }
-  bool isStopped() { return ticks_at_queue_end == 0; }
-  void addQueueStepperStop() { ticks_at_queue_end = 0; }
+  inline bool isQueueEmpty() {
+    noInterrupts();
+    bool res = (next_write_idx == read_idx);
+    interrupts();
+    return res;
+  }
+  inline bool isStopped() { return ticks_at_queue_end == 0; }
+  inline void addQueueStepperStop() { ticks_at_queue_end = 0; }
   int addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
     if (steps >= 128) {
       return AQE_STEPS_ERROR;
@@ -118,6 +128,9 @@ class StepperQueue {
 
  private:
   int _addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
+    if (isQueueFull()) {
+      return AQE_FULL;
+    }
     uint16_t period;
     uint8_t n_periods;
     if (ticks > 65535) {
@@ -129,57 +142,51 @@ class StepperQueue {
       n_periods = 1;
     }
 
-    uint8_t wp = next_write_ptr;
-    uint8_t rp = read_ptr;
-    struct queue_entry* e = &entry[wp];
-
-    uint8_t next_wp = (wp + 1) & QUEUE_LEN_MASK;
-    if (next_wp != rp) {
-      pos_at_queue_end += (dir == dirHighCountsUp) ? steps : -steps;
-      ticks_at_queue_end = ticks;
-      steps <<= 1;
-      e->period = period;
-      e->n_periods = n_periods;
-      // check for dir pin value change
-      e->steps = (dir != dir_at_queue_end) ? steps | 0x01 : steps;
-      dir_at_queue_end = dir;
+    uint8_t wp = next_write_idx;
+    struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
+    pos_at_queue_end += (dir == dirHighCountsUp) ? steps : -steps;
+    ticks_at_queue_end = ticks;
+    steps <<= 1;
+    e->period = period;
+    e->n_periods = n_periods;
+    // check for dir pin value change
+    e->steps = (dir != dir_at_queue_end) ? steps | 0x01 : steps;
+    dir_at_queue_end = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-      {
-        // checksum is in the struct and will updated here
-        unsigned char* x = (unsigned char*)e;
-        for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
-          if (checksum & 0x80) {
-            checksum <<= 1;
-            checksum ^= 0xde;
-          } else {
-            checksum <<= 1;
-          }
-          checksum ^= *x++;
+    {
+      // checksum is in the struct and will updated here
+      unsigned char* x = (unsigned char*)e;
+      for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
+        if (checksum & 0x80) {
+          checksum <<= 1;
+          checksum ^= 0xde;
+        } else {
+          checksum <<= 1;
         }
+        checksum ^= *x++;
       }
-#endif
-      noInterrupts();
-      if (isRunning) {
-        next_write_ptr = next_wp;
-        interrupts();
-      } else {
-        interrupts();
-        if (!startQueue(e)) {
-          next_write_ptr = next_wp;
-        }
-      }
-
-      return AQE_OK;
     }
-    return AQE_FULL;
+#endif
+    wp++;
+    noInterrupts();
+    if (isRunning) {
+      next_write_idx = wp;
+      interrupts();
+    } else {
+      interrupts();
+      if (!startQueue(e)) {
+        next_write_idx = wp;
+      }
+    }
+    return AQE_OK;
   }
 
   bool startQueue(struct queue_entry* e);
   void _initVars() {
     dirPin = PIN_UNDEFINED;
     on_delay_ticks = 0;
-    read_ptr = 0;
-    next_write_ptr = 0;
+    read_idx = 0;
+    next_write_idx = 0;
     dir_at_queue_end = true;
     dirHighCountsUp = true;
     pos_at_queue_end = 0;

@@ -16,10 +16,10 @@ unsigned short OCR1B;
 StepperQueue fas_queue[NUM_QUEUES];
 
 void init_queue() {
-  fas_queue[0].read_ptr = 0;
-  fas_queue[0].next_write_ptr = 0;
-  fas_queue[1].read_ptr = 0;
-  fas_queue[1].next_write_ptr = 0;
+  fas_queue[0].read_idx = 0;
+  fas_queue[0].next_write_idx = 0;
+  fas_queue[1].read_idx = 0;
+  fas_queue[1].next_write_idx = 0;
 }
 
 void basic_test() {
@@ -40,18 +40,18 @@ void queue_full() {
   assert(0 == s.getCurrentPosition());
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
-  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr,
-         fas_queue[0].next_write_ptr);
-  for (int i = 0; i < QUEUE_LEN - 2; i++) {
+  printf("Queue read/write = %d/%d\n", fas_queue[0].read_idx,
+         fas_queue[0].next_write_idx);
+  for (int i = 0; i < QUEUE_LEN - 1; i++) {
     s.addQueueEntry(10000, 100, true);
     assert(!s.isQueueEmpty());
     assert(!s.isQueueFull());
-    printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr,
-           fas_queue[0].next_write_ptr);
+    printf("Queue read/write = %d/%d\n", fas_queue[0].read_idx,
+           fas_queue[0].next_write_idx);
   }
   s.addQueueEntry(10000, 100, true);
-  printf("Queue read/write = %d/%d\n", fas_queue[0].read_ptr,
-         fas_queue[0].next_write_ptr);
+  printf("Queue read/write = %d/%d\n", fas_queue[0].read_idx,
+         fas_queue[0].next_write_idx);
   assert(!s.isQueueEmpty());
   assert(s.isQueueFull());
   puts("...done");

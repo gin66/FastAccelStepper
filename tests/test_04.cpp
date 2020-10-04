@@ -91,10 +91,10 @@ void RampChecker::check_section(struct queue_entry *e) {
 }
 
 void init_queue() {
-  fas_queue[0].read_ptr = 0;
-  fas_queue[1].read_ptr = 0;
-  fas_queue[0].next_write_ptr = 0;
-  fas_queue[1].next_write_ptr = 0;
+  fas_queue[0].read_idx = 0;
+  fas_queue[1].read_idx = 0;
+  fas_queue[0].next_write_idx = 0;
+  fas_queue[1].next_write_idx = 0;
 }
 
 int main() {
@@ -120,7 +120,7 @@ int main() {
   for (int i = 0; i < steps; i++) {
     if (!speed_increased && (s.getCurrentPosition() >= 5000)) {
       puts("Change speed");
-      s.manage();  // ensure queue is no empty
+      s.manage();  // ensure queue is not empty
       speed_increased = true;
       s.setSpeed(300);
       s.move(steps);
@@ -129,7 +129,7 @@ int main() {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
           "pos = %d  QueueEmpty=%s\n",
-          i, fas_queue[0].read_ptr, fas_queue[0].next_write_ptr, s.targetPos(),
+          i, fas_queue[0].read_idx, fas_queue[0].next_write_idx, s.targetPos(),
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
@@ -139,8 +139,9 @@ int main() {
     s.manage();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
-      rc.check_section(&fas_queue[0].entry[fas_queue[0].read_ptr]);
-      fas_queue[0].read_ptr = (fas_queue[0].read_ptr + 1) & QUEUE_LEN_MASK;
+      rc.check_section(
+          &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+      fas_queue[0].read_idx++;
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
