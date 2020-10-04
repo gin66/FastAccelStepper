@@ -41,7 +41,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 #elif defined(ARDUINO_ARCH_ESP32)
 // Example hardware configuration for esp32 board.
 // Please adapt to your configuration
-const uint8_t led_pin = 13;  // 2
+const uint8_t led_pin = 2;
 const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     {
       step : 23,
