@@ -194,7 +194,7 @@ void FastAccelStepper::addQueueStepperStop() {
 //*************************************************************************************************
 int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
-  uint16_t delay_counter;
+  uint16_t delay_counter = 0;
   if (_autoEnable) {
     noInterrupts();
     delay_counter = _auto_disable_delay_counter;
