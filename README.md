@@ -26,7 +26,7 @@ FastAccelStepper offers the following features:
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
-* Auto enable mode: stepper motor is enabled before movement and disabled afterwards
+* Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 
