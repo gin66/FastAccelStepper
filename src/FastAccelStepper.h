@@ -59,14 +59,14 @@ class FastAccelStepper {
   // If pin1 and pin2 are same, then the last call will be used.
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
 
-  // using enableOutputs/disableOutputs the stepper can be enabled
+  // using enableOutputs/disableOutputs the stepper can be enabled and disabled
   void enableOutputs();
   void disableOutputs();
 
   // In auto enable mode, the stepper is enabled before stepping and disabled
   // afterwards. The delay from stepper enabled till first step and from
   // last step to stepper disabled can be separately adjusted.
-  // The delay from enable to first step is done in ticks and as such limited to
+  // The delay from enable to first step is done in ticks and as such is limited to
   // ABSOLUTE_MAX_TICKS, which translates approximately to 1s (for esp32 and avr
   // at 16 MHz). The delay till disable is done in period interrupt/task with 4
   // or 10 ms repetition rate and as such is with several ms jitter.

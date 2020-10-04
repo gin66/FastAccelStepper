@@ -179,13 +179,15 @@ void usage() {
   Serial.println("Enter commands separated by space or newline:");
   Serial.println("     M1/M2/..  ... to select stepper");
   Serial.println("     A<accel>  ... Set selected stepper's acceleration");
-  Serial.println("     V <speed> ... Set selected stepper's speed");
+  Serial.println("     V<speed>  ... Set selected stepper's speed");
   Serial.println(
       "     P<pos>    ... Move selected stepper to position (can be "
       "negative)");
   Serial.println(
       "     R<n>      ... Move selected stepper by n steps (can be "
       "negative)");
+  Serial.println("     E<us>     ... Set selected stepper's delay from enable to steps");
+  Serial.println("     D<ms>     ... Set selected stepper's delay from steps to disable");
   Serial.println("     S         ... Stop selected stepper with deceleration");
 }
 
@@ -243,6 +245,14 @@ void loop() {
           Serial.print("Move to position ");
           Serial.println(val);
           selected->moveTo(val);
+        } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
+          Serial.print("Set enable time to ");
+          Serial.println(val);
+          selected->setDelayToEnable(val);
+        } else if (sscanf(in_buffer, "D%ld", &val) == 1) {
+          Serial.print("Set disable time to ");
+          Serial.println(val);
+          selected->setDelayToDisable(val);
         } else if (strcmp(in_buffer, "S") == 0) {
           Serial.print("Stop");
           selected->stopMove();
