@@ -67,7 +67,7 @@ class FastAccelStepper {
   // afterwards. The delay from stepper enabled till first step and from
   // last step to stepper disabled can be separately adjusted.
   // The delay till disable is done in period interrupt/task with 4 or 10 ms repetition rate
-  // and as such as several ms jitter.
+  // and as such is with several ms jitter.
   void setAutoEnable(bool auto_enable);
   int setDelayToEnable(uint32_t delay_us);
   void setDelayToDisable(uint16_t delay_ms);
