@@ -85,7 +85,7 @@ void loop() {
 Few comments to auto enable/disable:
 
 * If the motor is operated with micro stepping, then the disable/enable will cause the stepper to jump to/from the closest full step position.
-* Some drivers need time to e.g. stabilize voltages until stepping should start. For this the start on delay has been added. See !(issue #5)[https://github.com/gin66/FastAccelStepper/issues/5].
+* Some drivers need time to e.g. stabilize voltages until stepping should start. For this the start on delay has been added. See ![issue #5](https://github.com/gin66/FastAccelStepper/issues/5).
 * The turn off delay is realized in the cyclic task for esp32 or cyclic interrupt for avr. The esp32 task uses 10ms delay, while the avr repeats every ~4 ms at 16 MHz. Thus the turn off delay is a multiple (n>=2) of those period times and actual turning off takes place approx [(n-1)..n] * 10/4 ms after the last step.
 
 
