@@ -50,7 +50,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     uint8_t rp = queue.read_idx;                                             \
     if (Stepper_IsToggling(CHANNEL)) {                                       \
       TCCR1C = _BV(foc); /* clear bit */                                     \
-      struct queue_entry* e = &queue.entry[rp];                              \
+      struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];             \
       if ((e->steps -= 2) > 1) {                                             \
         /* perform another step with this queue entry */                     \
         ocr += queue.period;                                                 \
