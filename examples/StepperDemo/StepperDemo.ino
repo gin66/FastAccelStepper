@@ -139,11 +139,13 @@ void setup() {
     }
     stepper[i] = s;
   }
+
+  usage();
 }
 
 uint8_t in_ptr = 0;
 char in_buffer[256];
-bool stopped = false;
+bool stopped = true;
 uint32_t last_time = 0;
 FastAccelStepper *selected = NULL;
 
@@ -171,6 +173,32 @@ void info(FastAccelStepper *s) {
   Serial.print(s->checksum());
 #endif
   Serial.print(" ");
+}
+
+void usage() {
+  Serial.println("Enter commands separated by space or newline:");
+  Serial.println("     M1/M2/..  ... to select stepper");
+  Serial.println("     A<accel>  ... Set selected stepper's acceleration");
+  Serial.println("     V <speed> ... Set selected stepper's speed");
+  Serial.println(
+      "     P<pos>    ... Move selected stepper to position (can be "
+      "negative)");
+  Serial.println(
+      "     R<n>      ... Move selected stepper by n steps (can be "
+      "negative)");
+  Serial.println("     S         ... Stop selected stepper with deceleration");
+}
+
+void output_info() {
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    if (stepper[i]) {
+      Serial.print("M");
+      Serial.print(i + 1);
+      Serial.print(": ");
+      info(stepper[i]);
+    }
+  }
+  Serial.println();
 }
 
 void loop() {
@@ -233,34 +261,16 @@ void loop() {
       running |= stepper[i]->isRunning();
     }
   }
-  if (running || (stopped == running)) {
+  if (running) {
     uint32_t now = millis();
     if (now - last_time >= 100) {
-      for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-        if (stepper[i]) {
-          Serial.print("M");
-          Serial.print(i + 1);
-          Serial.print(": ");
-          info(stepper[i]);
-        }
-      }
-      Serial.println();
+      output_info();
       last_time = now;
     }
   }
-  if (stopped == running) {
-    Serial.println("Enter commands separated by space or newline:");
-    Serial.println("     M1/M2/..  ... to select stepper");
-    Serial.println("     A<accel>  ... Set selected stepper's acceleration");
-    Serial.println("     V <speed> ... Set selected stepper's speed");
-    Serial.println(
-        "     P<pos>    ... Move selected stepper to position (can be "
-        "negative)");
-    Serial.println(
-        "     R<n>      ... Move selected stepper by n steps (can be "
-        "negative)");
-    Serial.println(
-        "     S         ... Stop selected stepper with deceleration");
-    stopped = !running;
+  if (!stopped && !running) {
+    output_info();
+    usage();
   }
+  stopped = !running;
 }

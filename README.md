@@ -10,12 +10,12 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
 	- avr: This must be connected for stepper A to Pin 9 and for Stepper B to Pin 10.
 	- esp32: This can be any output capable port pin.
 	- Step should be done on transition Low to High. High time will be only a few us.
-      On esp32 is the high time fixed to 10us.
+      On esp32 the high time is fixed to 10us.
 * Direction Signal (optional)
-	- This can be any port pin.
+	- This can be any output capable port pin.
     - Position counting up on direction pin high or low, as per optional parameter to setDirectionPin(). Default is high.
 * Enable Signal (optional)
-	- This can be any port pin.
+	- This can be any output capable port pin.
     - Stepper will be enabled on pin high or low, as per optional parameter to setEnablePin(). Default is low.
 
 FastAccelStepper offers the following features:
@@ -52,7 +52,6 @@ Please check the examples for application and how to use the low level interface
 
 The module defines the global variable fas_queue. Do not use or redefine this variable.
 
-
 Using the high level interface with ramp up/down:
 
 ```
@@ -82,6 +81,13 @@ void setup() {
 void loop() {
 }
 ```
+
+Few comments to auto enable/disable:
+
+* If the motor is operated with micro stepping, then the disable/enable will cause the stepper to jump to/from the closest full step position.
+* Some drivers need time to e.g. stabilize voltages until stepping should start. For this the start on delay has been added. See !(issue #5)[https://github.com/gin66/FastAccelStepper/issues/5].
+* The turn off delay is realized in the cyclic task for esp32 or cyclic interrupt for avr. The esp32 task uses 10ms delay, while the avr repeats every ~4 ms at 16 MHz. Thus the turn off delay is a multiple (n>=2) of those period times and actual turning off takes place approx [(n-1)..n] * 10/4 ms after the last step.
+
 
 ## Behind the curtains
 
