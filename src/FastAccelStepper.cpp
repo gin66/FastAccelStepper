@@ -53,9 +53,11 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
 //
 //*************************************************************************************************
 #if defined(ARDUINO_ARCH_ESP32)
+#define TASK_DELAY_MS 10
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
-  const TickType_t delay = 10 / portTICK_PERIOD_MS;  // block for 10ms
+  const TickType_t delay =
+      TASK_DELAY_MS / portTICK_PERIOD_MS;  // block for 10ms
   while (true) {
     engine->manageSteppers();
     vTaskDelay(delay);
@@ -166,7 +168,7 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-      s->isr_fill_queue();
+      s->manage();
     }
   }
 }
@@ -192,7 +194,19 @@ void FastAccelStepper::addQueueStepperStop() {
 //*************************************************************************************************
 int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
-  return fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
+  noInterrupts();
+  uint16_t delay_counter = _off_delay_count;
+  _off_delay_count = 0;
+  interrupts();
+  enableOutputs();
+  int res = fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
+  if (res == AQE_OK) {
+    delay_counter = _off_delay_count;
+  }
+  noInterrupts();
+  _off_delay_count = delay_counter;
+  interrupts();
+  return res;
 }
 
 //*************************************************************************************************
@@ -327,6 +341,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     planning_steps = 1;
     _rampState = RAMP_STATE_ACCELERATE;
   } else {
+    // TODO:explain the 16000
     planning_steps = max(16000 / ticks_at_queue_end, 1);
     if (remaining_steps <= _deceleration_start) {
       _rampState = RAMP_STATE_DECELERATE_TO_STOP;
@@ -556,6 +571,17 @@ ISR(TIMER1_OVF_vect) {
 }
 #endif
 
+void FastAccelStepper::check_for_auto_disable() {
+  if (_auto_disable_delay_counter > 0) {
+    if (!isRunning()) {
+      _auto_disable_delay_counter--;
+      if (_auto_disable_delay_counter == 0) {
+        disableOutputs();
+      }
+    }
+  }
+}
+
 void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
@@ -567,6 +593,8 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   _stepper_num = num;
   _autoEnablePinLowActive = PIN_UNDEFINED;
   _autoEnablePinHighActive = PIN_UNDEFINED;
+  _off_delay_count = 1;  // ensure to call disableOutputs()
+  _auto_disable_delay_counter = 0;
   _min_travel_ticks = 0;
   _stepPin = step_pin;
   _dirHighCountsUp = true;
@@ -614,8 +642,31 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
     _autoEnablePinLowActive = PIN_UNDEFINED;
     _autoEnablePinHighActive = PIN_UNDEFINED;
   }
-  fas_queue[_queue_num].autoEnablePinLowActive = _autoEnablePinLowActive;
-  fas_queue[_queue_num].autoEnablePinHighActive = _autoEnablePinHighActive;
+}
+int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
+  uint32_t delay_ticks = delay_us * (TICKS_PER_S / 1000L) / 1000L;
+  if (delay_us < 1000) {
+    return DELAY_TOO_LOW;
+  }
+  if (delay_ticks > ABSOLUTE_MAX_TICKS) {
+    return DELAY_TOO_HIGH;
+  }
+  fas_queue[_queue_num].on_delay_ticks = delay_ticks;
+  return DELAY_OK;
+}
+void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
+  uint16_t delay_count = 0;
+#if defined(ARDUINO_ARCH_ESP32)
+  delay_count = delay_ms / TASK_DELAY_MS;
+#endif
+#if defined(ARDUINO_ARCH_AVR)
+  delay_count = delay_ms / (65536000 / TICKS_PER_S);
+#endif
+  if ((delay_ms > 0) && (delay_count < 2)) {
+    // ensure minimum time
+    delay_count = 2;
+  }
+  _off_delay_count = delay_count;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {

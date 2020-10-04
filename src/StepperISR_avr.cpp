@@ -66,12 +66,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         /* queue is empty => set to disconnect */                            \
         Stepper_Disconnect(CHANNEL);                                         \
         queue.isRunning = false;                                             \
-        if (queue.autoEnablePinLowActive != PIN_UNDEFINED) {                 \
-          digitalWrite(queue.autoEnablePinLowActive, HIGH);                  \
-        }                                                                    \
-        if (queue.autoEnablePinHighActive != PIN_UNDEFINED) {                \
-          digitalWrite(queue.autoEnablePinHighActive, LOW);                  \
-        }                                                                    \
         /* Next Interrupt takes place at next timer cycle => ~4ms */         \
         return;                                                              \
       }                                                                      \
@@ -95,12 +89,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     if ((steps & 0x01) != 0) {                                               \
       digitalWrite(queue.dirPin,                                             \
                    digitalRead(queue.dirPin) == HIGH ? LOW : HIGH);          \
-    }                                                                        \
-    if (queue.autoEnablePinLowActive != PIN_UNDEFINED) {                     \
-      digitalWrite(queue.autoEnablePinLowActive, LOW);                       \
-    }                                                                        \
-    if (queue.autoEnablePinHighActive != PIN_UNDEFINED) {                    \
-      digitalWrite(queue.autoEnablePinHighActive, HIGH);                     \
     }                                                                        \
   }
 AVR_STEPPER_ISR(A, fas_queue_A, OCR1A, FOC1A)

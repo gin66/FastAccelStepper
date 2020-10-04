@@ -63,9 +63,17 @@ class FastAccelStepper {
   void enableOutputs();
   void disableOutputs();
 
-  // in auto enable mode, the stepper is enabled before stepping and disabled
-  // afterwards
+  // In auto enable mode, the stepper is enabled before stepping and disabled
+  // afterwards. The delay from stepper enabled till first step and from
+  // last step to stepper disabled can be separately adjusted.
+  // The delay till disable is done in period interrupt/task with 4 or 10 ms repetition rate
+  // and as such as several ms jitter.
   void setAutoEnable(bool auto_enable);
+  int setDelayToEnable(uint32_t delay_us);
+  void setDelayToDisable(uint16_t delay_ms);
+#define DELAY_OK 0
+#define DELAY_TOO_LOW -1
+#define DELAY_TOO_HIGH -2
 
   // Retrieve the current position of the stepper - either in standstill or
   // while moving
@@ -163,8 +171,10 @@ class FastAccelStepper {
 
   // This variable/these functions should NEVER be modified/called by the
   // application
-  inline void isr_fill_queue();
-  inline void isr_single_fill_queue();
+  inline void manage() {
+    isr_fill_queue();
+    check_for_auto_disable();
+  }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
@@ -204,6 +214,12 @@ class FastAccelStepper {
   // the speed is linked on both ramp slopes to this variable as per
   //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t _performed_ramp_up_steps;
+
+  uint16_t _off_delay_count;
+  uint16_t _auto_disable_delay_counter;
+  void isr_fill_queue();
+  void isr_single_fill_queue();
+  void check_for_auto_disable();
 };
 
 class FastAccelStepperEngine {

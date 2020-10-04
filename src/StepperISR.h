@@ -63,8 +63,7 @@ class StepperQueue {
   struct queue_entry entry[QUEUE_LEN];
   uint8_t read_ptr;  // ISR stops if readptr == next_writeptr
   uint8_t next_write_ptr;
-  uint8_t autoEnablePinLowActive;
-  uint8_t autoEnablePinHighActive;
+  uint32_t on_delay_ticks;
   uint8_t dirPin;
   bool dirHighCountsUp;
   bool isRunning;
@@ -98,10 +97,27 @@ class StepperQueue {
     if (steps >= 128) {
       return AQE_STEPS_ERROR;
     }
+    if (steps == 0) {
+      return AQE_STEPS_ERROR;
+    }
     if (ticks > ABSOLUTE_MAX_TICKS) {
       return AQE_TOO_HIGH;
     }
 
+    if (!isRunning) {
+      if (on_delay_ticks > 0) {
+        int res = _addQueueEntry(on_delay_ticks, 1, dir);
+        if ((res != AQE_OK) || (steps == 1)) {
+          return res;
+        }
+        steps -= 1;
+      }
+    }
+    return _addQueueEntry(ticks, steps, dir);
+  }
+
+ private:
+  int _addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
     uint16_t period;
     uint8_t n_periods;
     if (ticks > 65535) {
@@ -158,12 +174,10 @@ class StepperQueue {
     return AQE_FULL;
   }
 
- private:
   bool startQueue(struct queue_entry* e);
   void _initVars() {
     dirPin = PIN_UNDEFINED;
-    autoEnablePinLowActive = PIN_UNDEFINED;
-    autoEnablePinHighActive = PIN_UNDEFINED;
+    on_delay_ticks = 0;
     read_ptr = 0;
     next_write_ptr = 0;
     dir_at_queue_end = true;
