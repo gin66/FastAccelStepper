@@ -110,17 +110,17 @@ int main() {
   assert(s.isQueueEmpty());
   s.setSpeed(400);
   s.setAcceleration(1000);
-  s.isr_fill_queue();
+  s.manage();
   assert(s.isQueueEmpty());
   s.move(steps);
-  s.isr_fill_queue();
+  s.manage();
   assert(!s.isQueueEmpty());
   float old_planned_time_in_buffer = 0;
   int speed_increased = false;
   for (int i = 0; i < steps; i++) {
     if (!speed_increased && (s.getCurrentPosition() >= 5000)) {
       puts("Change speed");
-      s.isr_fill_queue();  // ensure queue is no empty
+      s.manage();  // ensure queue is no empty
       speed_increased = true;
       s.setSpeed(300);
       s.move(steps);
@@ -136,7 +136,7 @@ int main() {
     if (!s.isrSpeedControlEnabled()) {
       break;
     }
-    s.isr_fill_queue();
+    s.manage();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
       rc.check_section(&fas_queue[0].entry[fas_queue[0].read_ptr]);
