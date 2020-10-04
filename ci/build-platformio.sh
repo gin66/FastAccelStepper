@@ -30,7 +30,7 @@ do
 	cd src
 	ln -s ../../../src/*.cpp .
 	ln -s ../../../src/*.h .
-	ln -s ../../../examples/$i/* .
+	ln -s ../../../examples/$i/*.ino .
 	cd ../../..
 done
 

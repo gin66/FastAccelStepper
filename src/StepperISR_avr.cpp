@@ -47,7 +47,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       ocr += queue.period;                                                   \
       return;                                                                \
     }                                                                        \
-    uint8_t rp = queue.read_ptr;                                             \
+    uint8_t rp = queue.read_idx;                                             \
     if (Stepper_IsToggling(CHANNEL)) {                                       \
       TCCR1C = _BV(foc); /* clear bit */                                     \
       struct queue_entry* e = &queue.entry[rp];                              \
@@ -60,9 +60,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         }                                                                    \
         return;                                                              \
       }                                                                      \
-      rp = (rp + 1) & QUEUE_LEN_MASK;                                        \
-      queue.read_ptr = rp;                                                   \
-      if (rp == queue.next_write_ptr) {                                      \
+      rp++;                                                                  \
+      queue.read_idx = rp;                                                   \
+      if (rp == queue.next_write_idx) {                                      \
         /* queue is empty => set to disconnect */                            \
         Stepper_Disconnect(CHANNEL);                                         \
         queue.isRunning = false;                                             \
@@ -71,13 +71,13 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       }                                                                      \
     } else {                                                                 \
       /* If reach here, then stepper is idle and waiting for a command */    \
-      if (rp == queue.next_write_ptr) {                                      \
+      if (rp == queue.next_write_idx) {                                      \
         /* Next Interrupt takes place at next timer cycle => ~4ms */         \
         return;                                                              \
       }                                                                      \
     }                                                                        \
     /* command in queue */                                                   \
-    struct queue_entry* e = &queue.entry[rp];                                \
+    struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];               \
     ocr += (queue.period = e->period);                                       \
     if ((queue.skip =                                                        \
              e->n_periods - 1)) { /* assign to skip and test for not zero */ \

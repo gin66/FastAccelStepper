@@ -97,11 +97,11 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
 
 static void IRAM_ATTR pcnt_isr_service(void *arg) {
   StepperQueue *q = (StepperQueue *)arg;
-  uint8_t rp = q->read_ptr;
-  if (rp != q->next_write_ptr) {
-    struct queue_entry *e = &q->entry[rp];
-    rp = (rp + 1) & QUEUE_LEN_MASK;
-    q->read_ptr = rp;
+  uint8_t rp = q->read_idx;
+  if (rp != q->next_write_idx) {
+    struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
+    rp++;
+    q->read_idx = rp;
     next_command(q, e);
   } else {
     // no more commands: stop timer at period end
