@@ -194,17 +194,23 @@ void FastAccelStepper::addQueueStepperStop() {
 //*************************************************************************************************
 int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
-  noInterrupts();
-  uint16_t delay_counter = _auto_disable_delay_counter;
-  interrupts();
-  enableOutputs();
-  int res = fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
-  if (res == AQE_OK) {
-    delay_counter = _off_delay_count;
+  uint16_t delay_counter;
+  if (_autoEnable) {
+    noInterrupts();
+    delay_counter = _auto_disable_delay_counter;
+    interrupts();
+    enableOutputs();
   }
-  noInterrupts();
-  _auto_disable_delay_counter = delay_counter;
-  interrupts();
+  int res = fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
+  if (_autoEnable) {
+    if (res == AQE_OK) {
+      delay_counter = _off_delay_count;
+    }
+    noInterrupts();
+    _auto_disable_delay_counter = delay_counter;
+    interrupts();
+  }
+
   return res;
 }
 
@@ -590,8 +596,7 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   _isr_speed_control_enabled = false;
   _rampState = RAMP_STATE_IDLE;
   _stepper_num = num;
-  _autoEnablePinLowActive = PIN_UNDEFINED;
-  _autoEnablePinHighActive = PIN_UNDEFINED;
+  _autoEnable = false;
   _off_delay_count = 1;  // ensure to call disableOutputs()
   _auto_disable_delay_counter = 0;
   _min_travel_ticks = 0;
@@ -634,13 +639,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
   }
 }
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
-  if (auto_enable) {
-    _autoEnablePinLowActive = _enablePinLowActive;
-    _autoEnablePinHighActive = _enablePinHighActive;
-  } else {
-    _autoEnablePinLowActive = PIN_UNDEFINED;
-    _autoEnablePinHighActive = PIN_UNDEFINED;
-  }
+  _autoEnable = auto_enable;
 }
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = delay_us * (TICKS_PER_S / 1000L) / 1000L;

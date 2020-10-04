@@ -199,7 +199,7 @@ void usage() {
 #if defined(ARDUINO_ARCH_AVR)
   char ch;
   PGM_P s = usage_str;
-  for(;;) {
+  for (;;) {
     ch = pgm_read_byte(s++);
     if (ch == 0) {
       break;
