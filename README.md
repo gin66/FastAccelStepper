@@ -117,7 +117,7 @@ The low level command queue for each stepper allows direct speed control - when 
 
 ## TODO
 
-See ![project](https://github.com/gin66/FastAccelStepper/projects/1)
+See [project](https://github.com/gin66/FastAccelStepper/projects/1)
 
 ## ISSUES
 
