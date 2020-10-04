@@ -595,7 +595,6 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   _target_pos = 0;
   _isr_speed_control_enabled = false;
   _rampState = RAMP_STATE_IDLE;
-  _stepper_num = num;
   _autoEnable = false;
   _off_delay_count = 1;  // ensure to call disableOutputs()
   _auto_disable_delay_counter = 0;

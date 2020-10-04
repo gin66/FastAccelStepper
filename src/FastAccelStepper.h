@@ -197,7 +197,6 @@ class FastAccelStepper {
   bool _autoEnable;
   uint8_t _enablePinLowActive;
   uint8_t _enablePinHighActive;
-  uint8_t _stepper_num;
   uint8_t _queue_num;
 
   int32_t _target_pos;
