@@ -234,7 +234,7 @@ void loop() {
       running |= stepper[i]->isRunning();
     }
   }
-  if (running) {
+  if (running || (stopped == running)) {
     uint32_t now = millis();
     if (now - last_time >= 100) {
       for (uint8_t i = 0; i < MAX_STEPPER; i++) {
