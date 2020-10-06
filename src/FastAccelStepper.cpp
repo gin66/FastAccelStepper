@@ -336,6 +336,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 #endif
 
   uint32_t ticks_at_queue_end = fas_queue[_queue_num].ticks_at_queue_end;
+  if (ticks_at_queue_end == 0) {
+    ticks_at_queue_end = 0xffffffff;
+  }
 
   // check state for acceleration/deceleration or deceleration to stop
   uint32_t remaining_steps =

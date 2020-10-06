@@ -15,6 +15,10 @@ unsigned short OCR1B;
 
 StepperQueue fas_queue[NUM_QUEUES];
 
+void inject_fill_interrupt(int mark) {}
+void noInterrupts() {}
+void interrupts() {}
+
 void init_queue() {
   fas_queue[0].read_idx = 0;
   fas_queue[0].next_write_idx = 0;

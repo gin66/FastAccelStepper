@@ -4,10 +4,11 @@
 #define PROGMEM
 #define pgm_read_byte_near(x) (*(x))
 
-#define noInterrupts() \
-  {}
-#define interrupts() \
-  {}
+// For inducing interrupts while testing
+void noInterrupts();
+void interrupts();
+void inject_fill_interrupt(int mark);
+
 #define _BV(x) 0
 #define ISR(x) void x()
 #define inline

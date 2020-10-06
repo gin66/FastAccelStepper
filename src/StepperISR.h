@@ -126,7 +126,6 @@ class StepperQueue {
     return _addQueueEntry(ticks, steps, dir);
   }
 
- private:
   int _addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
     if (isQueueFull()) {
       return AQE_FULL;

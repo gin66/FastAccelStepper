@@ -15,6 +15,10 @@ unsigned short OCR1B;
 
 StepperQueue fas_queue[NUM_QUEUES];
 
+void inject_fill_interrupt(int mark) {}
+void noInterrupts() {}
+void interrupts() {}
+
 uint32_t normalize_speed(uint32_t ticks) {
   uint32_t d = (ticks >> 16) + 1;
   uint32_t period = ticks / d;
