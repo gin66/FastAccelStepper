@@ -222,12 +222,12 @@ int main() {
   enable_stepper_manage_on_interrupts = false;
   enable_stepper_manage_on_noInterrupts = true;
   enable_inject_on_mark = -1;
-//  do_test();
+  do_test();
 
   enable_stepper_manage_on_interrupts = true;
   enable_stepper_manage_on_noInterrupts = false;
   enable_inject_on_mark = -1;
-//  do_test();
+  do_test();
 
   printf("TEST_05 PASSED\n");
 }
