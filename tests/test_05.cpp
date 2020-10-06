@@ -168,10 +168,10 @@ void do_test() {
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-    if (!s.isrSpeedControlEnabled()) {
+	in_manage = true;
+    if (!s.isrSpeedControlEnabled() && s.isQueueEmpty()) {
       break;
     }
-	in_manage = true;
     s.manage();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
