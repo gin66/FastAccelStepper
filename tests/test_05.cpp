@@ -82,6 +82,7 @@ void RampChecker::check_section(struct queue_entry *e) {
   uint32_t end_dt = start_dt;
 
   min_dt = min(min_dt, min(start_dt, end_dt));
+  assert(min_dt > 0);
   float accel = 0;
   if (!first) {
     accel = (16000000.0 / end_dt - 16000000.0 / last_dt) /
@@ -185,6 +186,7 @@ void do_test() {
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif
+  assert(rc.total_steps == 4000);
 
   printf("TEST_05 Part PASSED\n");
 }
@@ -200,8 +202,14 @@ int main() {
   enable_inject_on_mark = 0;
   do_test();
 
-  enable_stepper_manage_on_interrupts = true;
+  enable_stepper_manage_on_interrupts = false;
   enable_stepper_manage_on_noInterrupts = true;
+  enable_inject_on_mark = -1;
+//  do_test();
+
+  enable_stepper_manage_on_interrupts = true;
+  enable_stepper_manage_on_noInterrupts = false;
+  enable_inject_on_mark = -1;
 //  do_test();
 
   printf("TEST_05 PASSED\n");
