@@ -371,9 +371,11 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   // Forward planning of minimum 10ms or more on slow speed.
 
 #ifdef TEST
-  printf("pos@queue_end=%d remaining=%u deceleration_start=%u planning steps=%d   ",
-		getPositionAfterCommandsCompleted(),
-         remaining_steps, _deceleration_start, planning_steps);
+  printf(
+      "pos@queue_end=%d remaining=%u deceleration_start=%u planning steps=%d  "
+      " ",
+      getPositionAfterCommandsCompleted(), remaining_steps, _deceleration_start,
+      planning_steps);
   switch (_rampState) {
     case RAMP_STATE_COAST:
       printf("COAST");
@@ -464,7 +466,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
       // TODO: how to treat this (error) case ?
       next_ticks = curr_ticks;
 #ifdef TEST
-	  assert(false);
+      assert(false);
 #endif
   }
 

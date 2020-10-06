@@ -17,30 +17,30 @@ FastAccelStepper *stepper;
 StepperQueue fas_queue[NUM_QUEUES];
 
 int enable_inject_on_mark = -1;
-bool enable_stepper_manage_on_interrupts=false;
-bool enable_stepper_manage_on_noInterrupts=false;
+bool enable_stepper_manage_on_interrupts = false;
+bool enable_stepper_manage_on_noInterrupts = false;
 bool in_manage = false;
 
 void inject_fill_interrupt(int mark) {
-	if ((mark == enable_inject_on_mark) && !in_manage) {
-		in_manage = true;
-		stepper->manage();
-		in_manage = false;
-	}
+  if ((mark == enable_inject_on_mark) && !in_manage) {
+    in_manage = true;
+    stepper->manage();
+    in_manage = false;
+  }
 }
 void noInterrupts() {
-	if (enable_stepper_manage_on_noInterrupts && !in_manage) {
-		in_manage = true;
-		stepper->manage();
-		in_manage = false;
-	}
+  if (enable_stepper_manage_on_noInterrupts && !in_manage) {
+    in_manage = true;
+    stepper->manage();
+    in_manage = false;
+  }
 }
 void interrupts() {
-	if (enable_stepper_manage_on_interrupts && !in_manage) {
-		in_manage = true;
-		stepper->manage();
-		in_manage = false;
-	}
+  if (enable_stepper_manage_on_interrupts && !in_manage) {
+    in_manage = true;
+    stepper->manage();
+    in_manage = false;
+  }
 }
 
 class RampChecker {
@@ -89,11 +89,12 @@ void RampChecker::check_section(struct queue_entry *e) {
             (1.0 / 16000000.0 * 0.5 * (start_dt + end_dt));
   }
   printf(
-      "process command in ramp checker @%.6fs - %d steps: steps = %d last = %d start = %d "
+      "process command in ramp checker @%.6fs - %d steps: steps = %d last = %d "
+      "start = %d "
       " end = %d  min_dt "
       "= %d   accel=%.6f\n",
-      total_ticks / 16000000.0, total_steps, steps, last_dt, start_dt, end_dt, min_dt,
-      accel);
+      total_ticks / 16000000.0, total_steps, steps, last_dt, start_dt, end_dt,
+      min_dt, accel);
 
   total_steps += steps;
   total_ticks += steps * start_dt;
@@ -168,7 +169,7 @@ void do_test() {
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-	in_manage = true;
+    in_manage = true;
     if (!s.isrSpeedControlEnabled() && s.isQueueEmpty()) {
       break;
     }
@@ -179,7 +180,7 @@ void do_test() {
           &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
     }
-	in_manage = false;
+    in_manage = false;
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
     printf("%d: planned time in buffer: %.6fs\n", i, planned_time);

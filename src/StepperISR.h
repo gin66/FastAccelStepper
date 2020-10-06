@@ -103,7 +103,7 @@ class StepperQueue {
     noInterrupts();
     bool res = (next_write_idx == read_idx);
     interrupts();
-  inject_fill_interrupt(0);
+    inject_fill_interrupt(0);
     return res;
   }
   inline bool isStopped() { return ticks_at_queue_end == 0; }
