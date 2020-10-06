@@ -2,9 +2,16 @@
 
 #include "StepperISR.h"
 
+#ifdef TEST
+#include <assert.h>
+#else
+#define assert(x)
+#endif
+
 // This define in order to not shoot myself.
 #ifndef TEST
 #define printf DO_NOT_USE_PRINTF
+#define inject_fill_interrupt(x)
 #endif
 
 // Here are the global variables to interface with the interrupts
@@ -194,6 +201,7 @@ void FastAccelStepper::addQueueStepperStop() {
 //*************************************************************************************************
 int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
+  inject_fill_interrupt(0);
   uint16_t delay_counter = 0;
   if (_autoEnable) {
     noInterrupts();
@@ -365,7 +373,8 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   // Forward planning of minimum 10ms or more on slow speed.
 
 #ifdef TEST
-  printf("remaining=%u deceleration_start=%u planning steps=%d   ",
+  printf("pos@queue_end=%d remaining=%u deceleration_start=%u planning steps=%d   ",
+		getPositionAfterCommandsCompleted(),
          remaining_steps, _deceleration_start, planning_steps);
   switch (_rampState) {
     case RAMP_STATE_COAST:
@@ -384,7 +393,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
   printf("\n");
 #endif
 
-  uint32_t curr_ticks = fas_queue[_queue_num].ticks_at_queue_end;
+  uint32_t curr_ticks = ticks_at_queue_end;
 #ifdef TEST
   float v2;
 #endif
@@ -456,6 +465,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     default:
       // TODO: how to treat this (error) case ?
       next_ticks = curr_ticks;
+	  assert(false);
   }
 
   // CLIPPING: avoid increase
@@ -517,6 +527,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         "and start with %u ticks\n",
         command_cnt, steps, curr_ticks);
   }
+  assert(curr_ticks > 0);
 #endif
 
   for (uint16_t c = 0; c < command_cnt; c++) {
@@ -607,8 +618,9 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
 
 #if defined(ARDUINO_ARCH_AVR)
   _queue_num = step_pin == stepPinStepperA ? 0 : 1;
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32)
+  _queue_num = num;
+#else
   _queue_num = num;
 #endif
   fas_queue[_queue_num].init(_queue_num, step_pin);
