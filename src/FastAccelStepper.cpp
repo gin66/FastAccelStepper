@@ -201,7 +201,6 @@ void FastAccelStepper::addQueueStepperStop() {
 //*************************************************************************************************
 int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
-  inject_fill_interrupt(0);
   uint16_t delay_counter = 0;
   if (_autoEnable) {
     noInterrupts();
@@ -242,6 +241,7 @@ int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
 //
 //*************************************************************************************************
 void FastAccelStepper::_calculate_move(int32_t move) {
+  inject_fill_interrupt(1);
   if (move == 0) {
     return;
   }
@@ -301,6 +301,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   _performed_ramp_up_steps = performed_ramp_up_steps;
   _isr_speed_control_enabled = true;
   interrupts();
+  inject_fill_interrupt(2);
 
 #ifdef TEST
   printf(

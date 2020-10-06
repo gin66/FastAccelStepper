@@ -143,10 +143,14 @@ void do_test() {
   assert(s.isQueueEmpty());
   s.setSpeed(400);
   s.setAcceleration(10000);
+  in_manage = true;
   s.manage();
+  in_manage = false;
   assert(s.isQueueEmpty());
   s.moveTo(3000);
+  in_manage = true;
   s.manage();
+  in_manage = false;
   assert(!s.isQueueEmpty());
 
   float old_planned_time_in_buffer = 0;
@@ -167,6 +171,7 @@ void do_test() {
     if (!s.isrSpeedControlEnabled()) {
       break;
     }
+	in_manage = true;
     s.manage();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
@@ -174,6 +179,7 @@ void do_test() {
           &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
     }
+	in_manage = false;
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
     printf("%d: planned time in buffer: %.6fs\n", i, planned_time);
@@ -186,6 +192,7 @@ void do_test() {
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif
+  printf("Total steps = %d\n", rc.total_steps);
   assert(rc.total_steps == 4000);
 
   printf("TEST_05 Part PASSED\n");
@@ -200,6 +207,16 @@ int main() {
   enable_stepper_manage_on_interrupts = false;
   enable_stepper_manage_on_noInterrupts = false;
   enable_inject_on_mark = 0;
+  do_test();
+
+  enable_stepper_manage_on_interrupts = false;
+  enable_stepper_manage_on_noInterrupts = false;
+  enable_inject_on_mark = 1;
+  do_test();
+
+  enable_stepper_manage_on_interrupts = false;
+  enable_stepper_manage_on_noInterrupts = false;
+  enable_inject_on_mark = 2;
   do_test();
 
   enable_stepper_manage_on_interrupts = false;
