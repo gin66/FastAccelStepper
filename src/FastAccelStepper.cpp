@@ -4,14 +4,11 @@
 
 #ifdef TEST
 #include <assert.h>
-#else
-#define assert(x)
 #endif
 
 // This define in order to not shoot myself.
 #ifndef TEST
 #define printf DO_NOT_USE_PRINTF
-#define inject_fill_interrupt(x)
 #endif
 
 // Here are the global variables to interface with the interrupts
@@ -466,7 +463,9 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     default:
       // TODO: how to treat this (error) case ?
       next_ticks = curr_ticks;
+#ifdef TEST
 	  assert(false);
+#endif
   }
 
   // CLIPPING: avoid increase

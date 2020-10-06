@@ -35,6 +35,10 @@
 // These variables control the stepper timing behaviour
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
+#ifndef TEST
+#define inject_fill_interrupt(x)
+#endif
+
 #if defined(ARDUINO_ARCH_ESP32)
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
