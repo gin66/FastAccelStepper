@@ -53,11 +53,11 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-    {step : 255},  // unused stepper slot
-    {step : 255},  // unused stepper slot
-    {step : 255},  // unused stepper slot
-    {step : 255},  // unused stepper slot
-    {step : 255},  // unused stepper slot
+    {step : PIN_UNDEFINED},  // unused stepper slot
+    {step : PIN_UNDEFINED},  // unused stepper slot
+    {step : PIN_UNDEFINED},  // unused stepper slot
+    {step : PIN_UNDEFINED},  // unused stepper slot
+    {step : PIN_UNDEFINED},  // unused stepper slot
 };
 #endif
 

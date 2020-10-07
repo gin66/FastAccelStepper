@@ -1,14 +1,16 @@
+- StepperDemo: ramp state is written as plain text
+
 0.7.1:
 - StepperDemo extended with commands to 
 		return status code from move/moveTo
-		toggle motor info (v) to suppress info while steppers are running
+		toggle motor info (I) to suppress info while steppers are running
 		output usage (?)
-		output motor info (I)
+		output motor info with usage
 		test direct drive of stepper by port manipulation bypassing the library (T)
 - move/moveTo return error codes
 
 0.7.0: Changes towards 0.6.15
-- Fix possible floatpoint exception (divide by zero), which could happen rarely in isr_single_fill_queue
+- Fix possible floating point exception (divide by zero), which could happen rarely in isr_single_fill_queue
 - Remove deprecated functions:
 	addQueueStepperStop()
     isStopped()
