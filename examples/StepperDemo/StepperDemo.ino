@@ -268,7 +268,7 @@ void loop() {
         selected = 4;
       } else if ((strcmp(in_buffer, "M6") == 0) && stepper[5]) {
         Serial.println("Select stepper 6");
-        selected = stepper[5];
+        selected = 5;
       } else if (selected >= 0) {
         FastAccelStepper *stepper_selected = stepper[selected];
         if (sscanf(in_buffer, "A%ld", &val) == 1) {
