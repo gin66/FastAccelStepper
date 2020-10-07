@@ -146,6 +146,7 @@ void setup() {
 uint8_t in_ptr = 0;
 char in_buffer[256];
 bool stopped = true;
+bool verbose = true;
 uint32_t last_time = 0;
 FastAccelStepper *selected = NULL;
 
@@ -193,6 +194,8 @@ const static char usage_str[] PROGMEM =
     "enable)\n"
     "     O         ... Put selected stepper into auto enable mode\n"
     "     S         ... Stop selected stepper with deceleration\n"
+    "     I         ... Toggle motor info, while any motor is running\n"
+    "     ?         ... Print this usage\n"
     "\n";
 
 void usage() {
@@ -209,6 +212,21 @@ void usage() {
 #elif defined(ARDUINO_ARCH_ESP32)
   Serial.print(usage_str);
 #endif
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    if (stepper[i]) {
+      if (&stepper[i] == selected) {
+        Serial.print(">> ");
+      }
+      else {
+        Serial.print("   ");
+      }
+      Serial.print("M");
+      Serial.print(i + 1);
+      Serial.print(": ");
+      info(stepper[i]);
+      Serial.println();
+    }
+  }
 }
 
 void output_info() {
@@ -260,11 +278,15 @@ void loop() {
         } else if (sscanf(in_buffer, "R%ld", &val) == 1) {
           Serial.print("Move steps ");
           Serial.println(val);
-          selected->move(val);
+          int res = selected->move(val);
+          Serial.print("returncode=");
+          Serial.println(res);
         } else if (sscanf(in_buffer, "P%ld", &val) == 1) {
           Serial.print("Move to position ");
           Serial.println(val);
-          selected->moveTo(val);
+          int res = selected->moveTo(val);
+          Serial.print("returncode=");
+          Serial.println(res);
         } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
           Serial.print("Set enable time to ");
           Serial.println(val);
@@ -274,19 +296,24 @@ void loop() {
           Serial.println(val);
           selected->setDelayToDisable(val);
         } else if (strcmp(in_buffer, "N") == 0) {
-          Serial.print("Output driver on");
+          Serial.println("Output driver on");
           selected->setAutoEnable(false);
           selected->enableOutputs();
         } else if (strcmp(in_buffer, "F") == 0) {
-          Serial.print("Output driver off");
+          Serial.println("Output driver off");
           selected->setAutoEnable(false);
           selected->disableOutputs();
         } else if (strcmp(in_buffer, "O") == 0) {
-          Serial.print("Output driver off");
+          Serial.println("Output driver off");
           selected->setAutoEnable(true);
         } else if (strcmp(in_buffer, "S") == 0) {
-          Serial.print("Stop");
+          Serial.println("Stop");
           selected->stopMove();
+        } else if (strcmp(in_buffer, "I") == 0) {
+          Serial.println("Toggle motor info");
+          verbose = !verbose;
+        } else if (strcmp(in_buffer, "?") == 0) {
+          usage();
         }
       }
       in_ptr = 0;
@@ -305,7 +332,9 @@ void loop() {
   if (running) {
     uint32_t now = millis();
     if (now - last_time >= 100) {
-      output_info();
+      if (verbose) {
+		  output_info();
+      }
       last_time = now;
     }
   }

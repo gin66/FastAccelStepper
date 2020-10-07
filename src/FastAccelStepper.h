@@ -121,8 +121,15 @@ class FastAccelStepper {
   // relative to the target position of any ongoing move ! If the new
   // move/moveTo for an ongoing command would reverse the direction, then the
   // command is silently ignored.
-  void move(int32_t move);
-  void moveTo(int32_t position);
+  int move(int32_t move);
+  int moveTo(int32_t position);
+#define MOVE_OK 0
+#define MOVE_ZERO 1	// Already on target position
+#define MOVE_ERR_OVERFLOW -1 // relative move has caused an overflow
+#define MOVE_ERR_NO_DIRECTION_PIN -2 // negative direction requested, but no direction pin defined
+#define MOVE_ERR_SPEED_IS_UNDEFINED -3
+#define MOVE_ERR_ACCELERATION_IS_UNDEFINED -4
+#define MOVE_ERR_DIRECTION -5  // Change in direction is not supported
 
   // stop the running stepper as fast as possible with deceleration
   void stopMove();
@@ -182,7 +189,7 @@ class FastAccelStepper {
 #endif
 
  private:
-  void _calculate_move(int32_t steps);
+  int _calculate_move(int32_t steps);
 
   bool _isr_speed_control_enabled;
   uint8_t _rampState;  // updated by isr_fill_queue

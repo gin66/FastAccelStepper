@@ -1,3 +1,7 @@
+0.7.1:
+- StepperDemo extended with commands to toggle motor info, return status from move, output usage, output motor info
+- move/moveTo return error codes
+
 0.7.0: Changes towards 0.6.15
 - Fix possible floatpoint exception (divide by zero), which could happen rarely in isr_single_fill_queue
 - Remove deprecated functions:

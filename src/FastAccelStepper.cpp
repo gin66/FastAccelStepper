@@ -231,19 +231,19 @@ int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
 //	    v = sqrt(2 * s * a)
 //
 //*************************************************************************************************
-void FastAccelStepper::_calculate_move(int32_t move) {
+int FastAccelStepper::_calculate_move(int32_t move) {
   inject_fill_interrupt(1);
   if (move == 0) {
-    return;
+    return MOVE_ZERO;
   }
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
-    return;
+    return MOVE_ERR_NO_DIRECTION_PIN;
   }
   if (_min_step_us == 0) {
-    return;
+    return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
   if (_accel == 0) {
-    return;
+    return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
   }
   _min_travel_ticks = _min_step_us * (TICKS_PER_S / 1000L) / 1000L;
 
@@ -319,6 +319,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
       deceleration_start);
   Serial.println(buf);
 #endif
+  return MOVE_OK;
 }
 
 inline void FastAccelStepper::isr_fill_queue() {
@@ -700,7 +701,7 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
   }
   _accel = accel;
 }
-void FastAccelStepper::moveTo(int32_t position) {
+int FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos = getPositionAfterCommandsCompleted();
   if (!isrSpeedControlEnabled()) {
     _target_pos = curr_pos;
@@ -708,22 +709,36 @@ void FastAccelStepper::moveTo(int32_t position) {
   int32_t move;
   move = position - curr_pos;
   if (move == 0) {
-    return;
+    return MOVE_ZERO;
   }
   if ((_target_pos > curr_pos) && (move < 0)) {
-    return;
+    return MOVE_ERR_DIRECTION;
   }
   if ((_target_pos < curr_pos) && (move > 0)) {
-    return;
+    return MOVE_ERR_DIRECTION;
   }
   _target_pos = position;
-  _calculate_move(move);
+  return _calculate_move(move);
 }
-void FastAccelStepper::move(int32_t move) {
+int FastAccelStepper::move(int32_t move) {
   if (!isrSpeedControlEnabled()) {
     _target_pos = getPositionAfterCommandsCompleted();
   }
-  moveTo(_target_pos + move);
+  int32_t new_pos = _target_pos + move;
+  if (move > 0) {
+	  if (new_pos < _target_pos) {
+		  return MOVE_ERR_OVERFLOW;
+	  }
+  }
+  else if (move < 0) {
+	  if (new_pos > _target_pos) {
+		  return MOVE_ERR_OVERFLOW;
+	  }
+  }
+  else {
+	  return MOVE_ZERO;
+  }
+  return moveTo(new_pos);
 }
 void FastAccelStepper::stopMove() {
   if (isRunning() && isrSpeedControlEnabled()) {
