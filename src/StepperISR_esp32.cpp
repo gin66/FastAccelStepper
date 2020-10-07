@@ -112,6 +112,7 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     mcpwm->timer[timer].mode.start = 1;           // stop at TEP
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     q->isRunning = false;
+	q->ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
   }
 }
 

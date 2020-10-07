@@ -189,7 +189,6 @@ void do_test() {
   }
   test(!s.isrSpeedControlEnabled(), "too many commands created");
   printf("Total time  %f\n", rc.total_ticks / 16000000.0);
-  test(s.isStopped(), "is not stopped");
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif

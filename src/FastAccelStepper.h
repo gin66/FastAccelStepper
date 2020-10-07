@@ -155,10 +155,6 @@ class FastAccelStepper {
   // completed. This has immediate effect to getCurrentPosition().
   void setPositionAfterCommandsCompleted(int32_t new_pos);
 
-  // to be deprecated
-  void addQueueStepperStop();
-  bool isStopped();
-
   // This function provides info, in which state the high level stepper control
   // is operating
 #define RAMP_STATE_IDLE 0

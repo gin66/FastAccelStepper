@@ -190,12 +190,6 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-bool FastAccelStepper::isStopped() { return fas_queue[_queue_num].isStopped(); }
-//*************************************************************************************************
-void FastAccelStepper::addQueueStepperStop() {
-  fas_queue[_queue_num].addQueueStepperStop();
-}
-//*************************************************************************************************
 int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
   uint16_t delay_counter = 0;
@@ -258,7 +252,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   uint32_t performed_ramp_up_steps;
   uint32_t deceleration_start;
   uint32_t ramp_steps = _ramp_steps;
-  if ((curr_ticks == 0) || isQueueEmpty()) {
+  if ((curr_ticks == TICKS_FOR_STOPPED_MOTOR) || isQueueEmpty()) {
     // motor is not running
     //
     // ramp starts with s = 0.
@@ -326,7 +320,10 @@ inline void FastAccelStepper::isr_fill_queue() {
     return;
   }
   if (_min_travel_ticks == 0) {
-    return;
+#ifdef TEST
+	  assert(false);
+#endif
+  	  return;
   }
 
   // preconditions are fulfilled, so create the command(s)
@@ -343,7 +340,7 @@ inline void FastAccelStepper::isr_single_fill_queue() {
 
   uint32_t ticks_at_queue_end = fas_queue[_queue_num].ticks_at_queue_end;
   if (ticks_at_queue_end == 0) {
-    ticks_at_queue_end = 0xffffffff;
+    ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
   }
 
   // check state for acceleration/deceleration or deceleration to stop
@@ -549,7 +546,6 @@ inline void FastAccelStepper::isr_single_fill_queue() {
         return;
       }
       // Emergency stop on internal error
-      addQueueStepperStop();
       _rampState = RAMP_STATE_IDLE;
       _isr_speed_control_enabled = false;
       return;
@@ -558,7 +554,6 @@ inline void FastAccelStepper::isr_single_fill_queue() {
     curr_ticks += change_per_command;
   }
   if (total_steps == abs(remaining_steps)) {
-    addQueueStepperStop();
     _rampState = RAMP_STATE_IDLE;
     _isr_speed_control_enabled = false;
 #ifdef TEST

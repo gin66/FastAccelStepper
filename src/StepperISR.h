@@ -39,6 +39,8 @@
 #define inject_fill_interrupt(x)
 #endif
 
+#define TICKS_FOR_STOPPED_MOTOR 0xffffffff
+
 #if defined(ARDUINO_ARCH_ESP32)
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
@@ -106,8 +108,6 @@ class StepperQueue {
     inject_fill_interrupt(0);
     return res;
   }
-  inline bool isStopped() { return ticks_at_queue_end == 0; }
-  inline void addQueueStepperStop() { ticks_at_queue_end = 0; }
   int addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
     if (steps >= 128) {
       return AQE_STEPS_ERROR;
@@ -194,7 +194,7 @@ class StepperQueue {
     dir_at_queue_end = true;
     dirHighCountsUp = true;
     pos_at_queue_end = 0;
-    ticks_at_queue_end = 0;
+    ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
     isRunning = false;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     checksum = 0;
