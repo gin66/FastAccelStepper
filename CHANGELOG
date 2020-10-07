@@ -1,0 +1,6 @@
+0.7.0: Changes towards 0.6.15
+- Fix possible floatpoint exception (divide by zero), which could happen rarely in isr_single_fill_queue
+- Remove deprecated functions:
+	addQueueStepperStop()
+    isStopped()
+- internal: remove obsolete _stepper_num variable
