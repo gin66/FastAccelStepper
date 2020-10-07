@@ -116,7 +116,8 @@ void setup() {
 
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
-  test_direct_drive(&stepper_config[0]);
+  // Alternatively use e.g. M1 T by serial command
+  // test_direct_drive(&stepper_config[0]);
 
   engine.init();
   if (led_pin != PIN_UNDEFINED) {
@@ -148,7 +149,7 @@ char in_buffer[256];
 bool stopped = true;
 bool verbose = true;
 uint32_t last_time = 0;
-FastAccelStepper *selected = NULL;
+int selected = -1;
 
 void info(FastAccelStepper *s) {
   Serial.print(s->isrSpeedControlEnabled() ? "AUTO" : "MANU");
@@ -195,6 +196,7 @@ const static char usage_str[] PROGMEM =
     "     O         ... Put selected stepper into auto enable mode\n"
     "     S         ... Stop selected stepper with deceleration\n"
     "     I         ... Toggle motor info, while any motor is running\n"
+    "     T         ... Test selected motor with direct port access\n"
     "     ?         ... Print this usage\n"
     "\n";
 
@@ -214,7 +216,7 @@ void usage() {
 #endif
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (stepper[i]) {
-      if (&stepper[i] == selected) {
+      if (i == selected) {
         Serial.print(">> ");
       }
       else {
@@ -248,78 +250,83 @@ void loop() {
       in_ptr = 0;
     } else if ((ch == ' ') || (ch == '\n')) {
       long val;
+      in_buffer[in_ptr] = 0;
       if ((strcmp(in_buffer, "M1") == 0) && stepper[0]) {
         Serial.println("Select stepper 1");
-        selected = stepper[0];
+        selected = 0;
       } else if ((strcmp(in_buffer, "M2") == 0) && stepper[1]) {
         Serial.println("Select stepper 2");
-        selected = stepper[1];
+        selected = 1;
       } else if ((strcmp(in_buffer, "M3") == 0) && stepper[2]) {
         Serial.println("Select stepper 3");
-        selected = stepper[2];
+        selected = 2;
       } else if ((strcmp(in_buffer, "M4") == 0) && stepper[3]) {
         Serial.println("Select stepper 4");
-        selected = stepper[3];
+        selected = 3;
       } else if ((strcmp(in_buffer, "M5") == 0) && stepper[4]) {
         Serial.println("Select stepper 5");
-        selected = stepper[4];
+        selected = 4;
       } else if ((strcmp(in_buffer, "M6") == 0) && stepper[5]) {
         Serial.println("Select stepper 6");
         selected = stepper[5];
-      } else if (selected) {
+      } else if (selected >= 0) {
+        FastAccelStepper *stepper_selected = stepper[selected];
         if (sscanf(in_buffer, "A%ld", &val) == 1) {
           Serial.print("Set acceleration to ");
           Serial.println(val);
-          selected->setAcceleration(val);
+          stepper_selected->setAcceleration(val);
         } else if (sscanf(in_buffer, "V%ld", &val) == 1) {
           Serial.print("Set speed (us) to ");
           Serial.println(val);
-          selected->setSpeed(val);
+          stepper_selected->setSpeed(val);
         } else if (sscanf(in_buffer, "R%ld", &val) == 1) {
           Serial.print("Move steps ");
           Serial.println(val);
-          int res = selected->move(val);
+          int res = stepper_selected->move(val);
           Serial.print("returncode=");
           Serial.println(res);
         } else if (sscanf(in_buffer, "P%ld", &val) == 1) {
           Serial.print("Move to position ");
           Serial.println(val);
-          int res = selected->moveTo(val);
+          int res = stepper_selected->moveTo(val);
           Serial.print("returncode=");
           Serial.println(res);
         } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
           Serial.print("Set enable time to ");
           Serial.println(val);
-          selected->setDelayToEnable(val);
+          stepper_selected->setDelayToEnable(val);
         } else if (sscanf(in_buffer, "D%ld", &val) == 1) {
           Serial.print("Set disable time to ");
           Serial.println(val);
-          selected->setDelayToDisable(val);
+          stepper_selected->setDelayToDisable(val);
         } else if (strcmp(in_buffer, "N") == 0) {
           Serial.println("Output driver on");
-          selected->setAutoEnable(false);
-          selected->enableOutputs();
+          stepper_selected->setAutoEnable(false);
+          stepper_selected->enableOutputs();
         } else if (strcmp(in_buffer, "F") == 0) {
           Serial.println("Output driver off");
-          selected->setAutoEnable(false);
-          selected->disableOutputs();
+          stepper_selected->setAutoEnable(false);
+          stepper_selected->disableOutputs();
         } else if (strcmp(in_buffer, "O") == 0) {
           Serial.println("Output driver off");
-          selected->setAutoEnable(true);
+          stepper_selected->setAutoEnable(true);
         } else if (strcmp(in_buffer, "S") == 0) {
           Serial.println("Stop");
-          selected->stopMove();
+          stepper_selected->stopMove();
         } else if (strcmp(in_buffer, "I") == 0) {
           Serial.println("Toggle motor info");
           verbose = !verbose;
         } else if (strcmp(in_buffer, "?") == 0) {
           usage();
+        } else if (strcmp(in_buffer, "T") == 0) {
+          if (!stepper_selected->isRunning()) {
+             test_direct_drive(&stepper_config[selected]);
+          }
         }
       }
       in_ptr = 0;
     } else {
       in_buffer[in_ptr++] = toupper(ch);
-      in_buffer[in_ptr] = 0;
     }
   }
 
