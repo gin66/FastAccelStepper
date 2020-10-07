@@ -165,6 +165,23 @@ void info(FastAccelStepper *s) {
     Serial.print(" STOP ");
   }
   Serial.print(" state=");
+  switch(s->rampState()) {
+    case RAMP_STATE_IDLE:
+      Serial.print("IDLE ");
+      break;
+    case RAMP_STATE_ACCELERATE:
+      Serial.print("ACC  ");
+      break;
+    case RAMP_STATE_DECELERATE_TO_STOP:
+      Serial.print("DEC ");
+      break;
+    case RAMP_STATE_DECELERATE:
+      Serial.print("RED  "); //Reduce
+      break;
+    case RAMP_STATE_COAST:
+      Serial.print("COAST ");
+      break;
+  }
   Serial.print(s->rampState());
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   Serial.print(" max/us=");
