@@ -315,6 +315,9 @@ void FastAccelStepper::_calculate_move(int32_t move) {
 
 inline void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
+  if (!_isr_speed_control_enabled) {
+	  return;
+  }
   if (_target_pos == getPositionAfterCommandsCompleted()) {
     _isr_speed_control_enabled = false;
     return;
