@@ -1,5 +1,10 @@
 0.7.1:
-- StepperDemo extended with commands to toggle motor info, return status from move, output usage, output motor info
+- StepperDemo extended with commands to 
+		return status code from move/moveTo
+		toggle motor info (v) to suppress info while steppers are running
+		output usage (?)
+		output motor info (I)
+		test direct drive of stepper by port manipulation bypassing the library (T)
 - move/moveTo return error codes
 
 0.7.0: Changes towards 0.6.15
