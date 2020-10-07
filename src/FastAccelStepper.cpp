@@ -245,7 +245,14 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   if (_accel == 0) {
     return;
   }
-  _update_from_speed_acceleration();
+  _min_travel_ticks = _min_step_us * (TICKS_PER_S / 1000L) / 1000L;
+
+  uint32_t tmp = TICKS_PER_S / 2;
+  upm_float upm_inv_accel = upm_from(tmp / _accel);
+  upm_float isr_upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
+  _ramp_steps =
+      upm_to_u32(divide(isr_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
+
   uint32_t steps = abs(move);
 
   uint32_t curr_ticks = fas_queue[_queue_num].ticks_at_queue_end;
@@ -273,7 +280,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
     //
     // Calculate on which step on the speed ramp the current speed is related to
     performed_ramp_up_steps =
-        upm_to_u32(divide(_upm_inv_accel2, square(upm_from(curr_ticks))));
+        upm_to_u32(divide(isr_upm_inv_accel2, square(upm_from(curr_ticks))));
     if (curr_ticks >= _min_travel_ticks) {
       // possibly can speed up
       // Full ramp up/down needs 2*ramp_steps
@@ -288,6 +295,7 @@ void FastAccelStepper::_calculate_move(int32_t move) {
   }
 
   noInterrupts();
+  _upm_inv_accel2 = isr_upm_inv_accel2;
   _deceleration_start = deceleration_start;
   _performed_ramp_up_steps = performed_ramp_up_steps;
   _isr_speed_control_enabled = true;
@@ -691,14 +699,6 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
     return;
   }
   _accel = accel;
-}
-void FastAccelStepper::_update_from_speed_acceleration() {
-  _min_travel_ticks = _min_step_us * (TICKS_PER_S / 1000L) / 1000L;
-  uint32_t tmp = TICKS_PER_S / 2;
-  upm_float upm_inv_accel = upm_from(tmp / _accel);
-  _upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
-  _ramp_steps =
-      upm_to_u32(divide(_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
 }
 void FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos = getPositionAfterCommandsCompleted();

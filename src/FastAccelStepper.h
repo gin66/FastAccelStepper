@@ -183,7 +183,6 @@ class FastAccelStepper {
 
  private:
   void _calculate_move(int32_t steps);
-  void _update_from_speed_acceleration();
 
   bool _isr_speed_control_enabled;
   uint8_t _rampState;  // updated by isr_fill_queue
