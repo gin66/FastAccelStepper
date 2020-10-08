@@ -202,4 +202,4 @@ class StepperQueue {
   }
 };
 
-extern struct StepperQueue fas_queue[NUM_QUEUES];
+extern StepperQueue fas_queue[NUM_QUEUES];

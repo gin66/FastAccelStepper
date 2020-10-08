@@ -12,6 +12,7 @@
 #include <stdint.h>
 
 #include "PoorManFloat.h"
+#include "RampGenerator.h"
 
 #ifndef TEST_MEASURE_ISR_SINGLE_FILL
 #define TEST_MEASURE_ISR_SINGLE_FILL 0
@@ -188,9 +189,11 @@ class FastAccelStepper {
   uint32_t checksum();
 #endif
 
+
  private:
   int _calculate_move(int32_t steps);
 
+  RampGenerator rg;
   bool _isr_speed_control_enabled;
   uint8_t _rampState;  // updated by isr_fill_queue
   uint8_t _stepPin;
