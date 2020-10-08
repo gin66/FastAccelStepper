@@ -161,20 +161,14 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   total_steps = min(total_steps, abs(remaining_steps));
   uint16_t steps = total_steps;
 
-  // Calculate change per step
-  int32_t total_change = (int32_t)next_ticks - (int32_t)curr_ticks;
-
-  // Number of commands
+  // Number of commands, if cannot be done in 1
   uint8_t command_cnt = steps / 128 + 1;
 
   // Steps per command
   uint16_t steps_per_command = (steps + command_cnt - 1) / command_cnt;
-
   if (steps_per_command * command_cnt > steps) {
     steps_per_command -= 1;
   }
-
-  int32_t change_per_command = total_change / command_cnt;
 
   if (rw->ramp_state == RAMP_STATE_ACCELERATE) {
     rw->performed_ramp_up_steps += steps;
@@ -182,32 +176,13 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   if (rw->ramp_state == RAMP_STATE_DECELERATE) {
     rw->performed_ramp_up_steps -= steps;
   }
-  // Apply change to curr_ticks
-  if (command_cnt > 1) {
-    curr_ticks += change_per_command / 2;
-  } else {
-    curr_ticks = next_ticks;
-  }
-
   bool countUp = (ro->target_pos > position_at_queue_end);
 
 #ifdef TEST
-  if (command_cnt > 1) {
-    printf(
-        "Issue %d commands for %d steps with %d steps/command for total "
-        "change %d and %d change/command and start with %u ticks\n",
-        command_cnt, steps, steps_per_command, total_change, change_per_command,
-        curr_ticks);
-  } else {
-    printf(
-        "Issue %d command for %d steps "
-        "and start with %u ticks\n",
-        command_cnt, steps, curr_ticks);
-  }
-  assert(curr_ticks > 0);
+  assert(next_ticks > 0);
 #endif
 
-  command->ticks = curr_ticks;
+  command->ticks = next_ticks;
   command->steps = steps_per_command;
   command->count_up = countUp;
 
@@ -220,11 +195,10 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
 
 #ifdef TEST
     printf(
-        "add command Steps = %d start_ticks = %d  Target "
-        "pos = %d "
-        "Remaining steps = %d  tick_change=%d\n",
-        steps_per_command, curr_ticks, ro->target_pos,
-        remaining_steps, change_per_command);
+        "add command Steps = %d ticks = %d  Target pos = %d "
+        "Remaining steps = %d\n",
+        steps_per_command, next_ticks, ro->target_pos,
+        remaining_steps);
 #endif
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
