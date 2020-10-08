@@ -14,7 +14,6 @@ class RampGenerator {
 	} _ro;
 	struct ramp_rw_s {
 		uint8_t ramp_state;
-		bool speed_control_enabled;
 		uint32_t performed_ramp_up_steps;
 	} _rw;
     void single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,FastAccelStepper *stepper, uint32_t ticks_at_queue_end,

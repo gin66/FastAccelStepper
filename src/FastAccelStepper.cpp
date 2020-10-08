@@ -346,11 +346,10 @@ void FastAccelStepper::isr_fill_queue() {
   rg._ro.dirHighCountsUp = _dirHighCountsUp;
   while (!isQueueFull() && _isr_speed_control_enabled) {
     rg._rw.ramp_state = _rampState;
-    rg._rw.speed_control_enabled = _isr_speed_control_enabled;
     rg._rw.performed_ramp_up_steps = _performed_ramp_up_steps;
     rg.single_fill_queue(&rg._ro, &rg._rw, this, fas_queue[_queue_num].ticks_at_queue_end, getPositionAfterCommandsCompleted());
     _rampState = rg._rw.ramp_state;
-    _isr_speed_control_enabled = rg._rw.speed_control_enabled;
+    _isr_speed_control_enabled = rg._rw.ramp_state != RAMP_STATE_IDLE;
     _performed_ramp_up_steps = rg._rw.performed_ramp_up_steps;
   }
 }

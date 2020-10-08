@@ -207,7 +207,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   assert(curr_ticks > 0);
 #endif
 
-  for (uint16_t c = 0; c < command_cnt; c++) {
+  for (uint16_t c = 0; c < 1 /*command_cnt*/; c++) {
     int8_t res = stepper->addQueueEntry(curr_ticks, steps_per_command, dir);
 #ifdef TEST
     printf(
@@ -224,7 +224,6 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
       }
       // Emergency stop on internal error
       rw->ramp_state = RAMP_STATE_IDLE;
-      rw->speed_control_enabled = false;
       return;
     }
     steps -= steps_per_command;
@@ -232,7 +231,6 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   }
   if (total_steps == abs(remaining_steps)) {
     rw->ramp_state = RAMP_STATE_IDLE;
-    rw->speed_control_enabled = false;
 #ifdef TEST
     puts("Stepper stop");
 #endif
