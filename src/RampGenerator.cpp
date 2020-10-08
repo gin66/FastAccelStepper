@@ -13,7 +13,7 @@
 #define printf DO_NOT_USE_PRINTF
 #endif
 
-void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,FastAccelStepper *stepper, uint32_t ticks_at_queue_end, int32_t position_at_queue_end) {
+void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,uint32_t ticks_at_queue_end, int32_t position_at_queue_end, struct ramp_command_s *command) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   uint32_t runtime_us = micros();
@@ -189,7 +189,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
     curr_ticks = next_ticks;
   }
 
-  bool dir = (ro->target_pos > position_at_queue_end) == ro->dirHighCountsUp;
+  bool countUp = (ro->target_pos > position_at_queue_end);
 
 #ifdef TEST
   if (command_cnt > 1) {
@@ -207,29 +207,11 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   assert(curr_ticks > 0);
 #endif
 
-  for (uint16_t c = 0; c < 1 /*command_cnt*/; c++) {
-    int8_t res = stepper->addQueueEntry(curr_ticks, steps_per_command, dir);
-#ifdef TEST
-    printf(
-        "add command %d Steps = %d start_ticks = %d  Target "
-        "pos = %d "
-        "Remaining steps = %d  tick_change=%d"
-        " => res=%d",
-        (command_cnt + 1 - c), steps_per_command, curr_ticks, ro->target_pos,
-        remaining_steps, change_per_command, res);
-#endif
-    if (res != 0) {
-      if (res == AQE_FULL) {
-        return;
-      }
-      // Emergency stop on internal error
-      rw->ramp_state = RAMP_STATE_IDLE;
-      return;
-    }
-    steps -= steps_per_command;
-    curr_ticks += change_per_command;
-  }
-  if (total_steps == abs(remaining_steps)) {
+  command->ticks = curr_ticks;
+  command->steps = steps_per_command;
+  command->count_up = countUp;
+
+  if (steps_per_command == abs(remaining_steps)) {
     rw->ramp_state = RAMP_STATE_IDLE;
 #ifdef TEST
     puts("Stepper stop");
@@ -237,7 +219,12 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   }
 
 #ifdef TEST
-  puts("");
+    printf(
+        "add command Steps = %d start_ticks = %d  Target "
+        "pos = %d "
+        "Remaining steps = %d  tick_change=%d\n",
+        steps_per_command, curr_ticks, ro->target_pos,
+        remaining_steps, change_per_command);
 #endif
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
