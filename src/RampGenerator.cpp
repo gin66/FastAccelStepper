@@ -150,25 +150,16 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   next_ticks = min(next_ticks, ABSOLUTE_MAX_TICKS);
 
   // Number of steps to execute with limitation to min 1 and max remaining steps
-  uint16_t total_steps = planning_steps;
+  uint16_t steps = planning_steps;
 #ifdef TEST
   printf(
-      "total_steps for the command = %d  with planning_steps = %u and "
+      "steps for the command = %d  with planning_steps = %u and "
       "next_ticks = %u\n",
-      total_steps, planning_steps, next_ticks);
+      steps, planning_steps, next_ticks);
 #endif
-  total_steps = max(total_steps, 1);
-  total_steps = min(total_steps, abs(remaining_steps));
-  uint16_t steps = total_steps;
-
-  // Number of commands, if cannot be done in 1
-  uint8_t command_cnt = steps / 128 + 1;
-
-  // Steps per command
-  uint16_t steps_per_command = (steps + command_cnt - 1) / command_cnt;
-  if (steps_per_command * command_cnt > steps) {
-    steps_per_command -= 1;
-  }
+  steps = max(steps, 1);
+  steps = min(steps, abs(remaining_steps));
+  steps = min(127, steps);
 
   if (rw->ramp_state == RAMP_STATE_ACCELERATE) {
     rw->performed_ramp_up_steps += steps;
@@ -183,10 +174,10 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
 #endif
 
   command->ticks = next_ticks;
-  command->steps = steps_per_command;
+  command->steps = steps;
   command->count_up = countUp;
 
-  if (steps_per_command == abs(remaining_steps)) {
+  if (steps == abs(remaining_steps)) {
     rw->ramp_state = RAMP_STATE_IDLE;
 #ifdef TEST
     puts("Stepper stop");
@@ -197,7 +188,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
     printf(
         "add command Steps = %d ticks = %d  Target pos = %d "
         "Remaining steps = %d\n",
-        steps_per_command, next_ticks, ro->target_pos,
+        steps, next_ticks, ro->target_pos,
         remaining_steps);
 #endif
 
