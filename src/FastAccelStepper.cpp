@@ -235,19 +235,16 @@ int FastAccelStepper::_calculate_move(int32_t move) {
   int res = rg.calculate_move(move, &rg._config,
                               fas_queue[_queue_num].ticks_at_queue_end,
                               isQueueEmpty());
-  if (res == MOVE_OK) {
-    _isr_speed_control_enabled = true;
-  }
+  inject_fill_interrupt(2);
   return res;
 }
 
 void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
-  if (!_isr_speed_control_enabled) {
+  if (!isrSpeedControlEnabled()) {
     return;
   }
   if (rg.targetPosition() == getPositionAfterCommandsCompleted()) {
-    _isr_speed_control_enabled = false;
     return;
   }
   if (rg._config.min_travel_ticks == 0) {
@@ -259,7 +256,7 @@ void FastAccelStepper::isr_fill_queue() {
 
   // preconditions are fulfilled, so create the command(s)
   struct ramp_command_s cmd;
-  while (!isQueueFull() && _isr_speed_control_enabled) {
+  while (!isQueueFull() && isrSpeedControlEnabled()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   uint32_t runtime_us = micros();
@@ -272,7 +269,6 @@ void FastAccelStepper::isr_fill_queue() {
     addQueueEntry(cmd.ticks, cmd.steps,
                   cmd.count_up == _dirHighCountsUp);  // TDO: error treatment
 
-    _isr_speed_control_enabled = rg._rw.ramp_state != RAMP_STATE_IDLE;
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   runtime_us = micros() - runtime_us;
@@ -313,7 +309,6 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   // For run time measurement
   max_micros = 0;
 #endif
-  _isr_speed_control_enabled = false;
   _autoEnable = false;
   _off_delay_count = 1;  // ensure to call disableOutputs()
   _auto_disable_delay_counter = 0;

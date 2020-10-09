@@ -42,7 +42,7 @@ void RampGenerator::init() {
   _rw.ramp_state = RAMP_STATE_IDLE;
 #ifdef F_CPU
 #if (F_CPU != 16000000)
-  _config.upm_timer_freq = upm_from((uint32_t)F_CPU);
+  upm_timer_freq = upm_from((uint32_t)F_CPU);
 #endif
 #endif
 }
@@ -71,8 +71,6 @@ int RampGenerator::calculate_move(int32_t move,
     return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
   }
 
-  uint32_t steps = abs(move);
-
   uint32_t performed_ramp_up_steps = upm_to_u32(
         divide(config->upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
 
@@ -81,14 +79,14 @@ int RampGenerator::calculate_move(int32_t move,
   _ro.min_travel_ticks = config->min_travel_ticks;
   _ro.upm_inv_accel2 = config->upm_inv_accel2;
   _rw.performed_ramp_up_steps = performed_ramp_up_steps;
+  _rw.ramp_state = RAMP_STATE_ACCELERATE;
   interrupts();
-  inject_fill_interrupt(2);
 
 #ifdef TEST
   printf(
       "Ramp data: steps to move = %d  curr_ticks = %u travel_ticks = %u "
       "Ramp steps = %u Performed ramp steps = %u\n",
-      steps, ticks_at_queue_end, config->min_travel_ticks, config->ramp_steps,
+      move, ticks_at_queue_end, config->min_travel_ticks, config->ramp_steps,
       performed_ramp_up_steps);
 #endif
 #ifdef DEBUG
@@ -97,7 +95,7 @@ int RampGenerator::calculate_move(int32_t move,
       buf,
       "Ramp data: steps to move = %ld  curr_ticks = %lu travel_ticks = %lu "
       "Ramp steps = %lu Performed ramp steps = %lu\n",
-      steps, ticks_at_queue_end, _min_travel_ticks, config->ramp_steps, performed_ramp_up_steps);
+      move, ticks_at_queue_end, _min_travel_ticks, config->ramp_steps, performed_ramp_up_steps);
   Serial.println(buf);
 #endif
   return MOVE_OK;

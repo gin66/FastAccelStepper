@@ -174,7 +174,7 @@ class FastAccelStepper {
   inline uint8_t rampState() { return rg.rampState(); }
 
   // returns true, if the ramp generation is active
-  inline bool isrSpeedControlEnabled() { return _isr_speed_control_enabled; };
+  inline bool isrSpeedControlEnabled() { return rg.rampState() != RAMP_STATE_IDLE; };
 
   // This variable/these functions should NEVER be modified/called by the
   // application
@@ -194,7 +194,6 @@ class FastAccelStepper {
   int _calculate_move(int32_t steps);
 
   RampGenerator rg;
-  bool _isr_speed_control_enabled;
   uint8_t _stepPin;
   uint8_t _dirPin;
   bool _dirHighCountsUp;

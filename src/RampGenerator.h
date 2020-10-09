@@ -12,7 +12,7 @@ struct ramp_command_s {
 #if (F_CPU == 16000000)
 #define UPM_TICKS_PER_S ((upm_float)0x97f4)
 #else
-#define UPM_TICKS_PER_S _config.upm_timer_freq
+#define UPM_TICKS_PER_S upm_timer_freq
 #endif
 
 class RampGenerator {
@@ -23,9 +23,6 @@ class RampGenerator {
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
 	uint32_t ramp_steps;
-#if (F_CPU != 16000000)
-    upm_float upm_timer_freq;
-#endif
   } _config;
   // The ro variables are those, which are only read from single_fill_queue.
   // Reading ro variables is safe.
@@ -59,6 +56,9 @@ class RampGenerator {
                          int32_t position_at_queue_end,
                          struct ramp_command_s *command);
 private:
+#if (F_CPU != 16000000)
+    upm_float upm_timer_freq;
+#endif
   void update_ramp_steps();
 };
 #endif
