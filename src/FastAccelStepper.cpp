@@ -224,20 +224,6 @@ int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
 //	    v = sqrt(2 * s * a)
 //
 //*************************************************************************************************
-int FastAccelStepper::_calculate_move(int32_t move) {
-  if (move == 0) {
-    return MOVE_ZERO;
-  }
-  if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
-    return MOVE_ERR_NO_DIRECTION_PIN;
-  }
-  inject_fill_interrupt(1);
-  int res = rg.calculate_move(move, &rg._config,
-                              fas_queue[_queue_num].ticks_at_queue_end,
-                              isQueueEmpty());
-  inject_fill_interrupt(2);
-  return res;
-}
 
 void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
@@ -393,29 +379,40 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
   rg.setAcceleration(accel);
 }
 int FastAccelStepper::moveTo(int32_t position) {
-  int32_t curr_pos = rg.targetPosition();
-  // int32_t curr_pos = getPositionAfterCommandsCompleted();
-  // if (!isrSpeedControlEnabled()) {
-  //  rg._ro.target_pos = curr_pos;
-  //}
+  int32_t curr_pos;
+  if (isrSpeedControlEnabled()) {
+	curr_pos = rg.targetPosition();
+  }
+  else {
+    curr_pos = getPositionAfterCommandsCompleted();
+  }
   int32_t move;
   move = position - curr_pos;
-  if (move == 0) {
-    return MOVE_ZERO;
-  }
   if ((rg.targetPosition() > curr_pos) && (move < 0)) {
     return MOVE_ERR_DIRECTION;
   }
   if ((rg.targetPosition() < curr_pos) && (move > 0)) {
     return MOVE_ERR_DIRECTION;
   }
-  return _calculate_move(move);
+  inject_fill_interrupt(1);
+  int res = rg.calculate_moveTo(position, &rg._config,
+                              fas_queue[_queue_num].ticks_at_queue_end,
+                              isQueueEmpty());
+  inject_fill_interrupt(2);
+  return res;
 }
 int FastAccelStepper::move(int32_t move) {
-  if (!isrSpeedControlEnabled()) {
-    rg._ro.target_pos = getPositionAfterCommandsCompleted();
+  int32_t curr_pos;
+  if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
+    return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  int32_t new_pos = rg.targetPosition() + move;
+  if (isrSpeedControlEnabled()) {
+	curr_pos = rg.targetPosition();
+  }
+  else {
+    curr_pos = getPositionAfterCommandsCompleted();
+  }
+  int32_t new_pos = curr_pos + move;
   if (move > 0) {
     if (new_pos < rg.targetPosition()) {
       return MOVE_ERR_OVERFLOW;
@@ -424,8 +421,6 @@ int FastAccelStepper::move(int32_t move) {
     if (new_pos > rg.targetPosition()) {
       return MOVE_ERR_OVERFLOW;
     }
-  } else {
-    return MOVE_ZERO;
   }
   return moveTo(new_pos);
 }

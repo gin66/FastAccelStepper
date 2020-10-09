@@ -49,7 +49,7 @@ class RampGenerator {
   }
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
-  int calculate_move(int32_t move, const struct ramp_config_s *config,
+  int calculate_moveTo(int32_t target_pos, const struct ramp_config_s *config,
                      uint32_t ticks_at_queue_end, bool queue_empty);
   void single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
                          uint32_t ticks_at_queue_end,

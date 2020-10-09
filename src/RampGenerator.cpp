@@ -60,7 +60,7 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
-int RampGenerator::calculate_move(int32_t move,
+int RampGenerator::calculate_moveTo(int32_t target_pos,
                                   const struct ramp_config_s *config,
                                   uint32_t ticks_at_queue_end,
                                   bool queue_empty) {
@@ -75,27 +75,29 @@ int RampGenerator::calculate_move(int32_t move,
         divide(config->upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
 
   noInterrupts();
-  _ro.target_pos += move;
+  _ro.target_pos = target_pos;
   _ro.min_travel_ticks = config->min_travel_ticks;
   _ro.upm_inv_accel2 = config->upm_inv_accel2;
   _rw.performed_ramp_up_steps = performed_ramp_up_steps;
-  _rw.ramp_state = RAMP_STATE_ACCELERATE;
+  if (_rw.ramp_state == RAMP_STATE_IDLE) {
+	  _rw.ramp_state = RAMP_STATE_ACCELERATE;
+  }
   interrupts();
 
 #ifdef TEST
   printf(
-      "Ramp data: steps to move = %d  curr_ticks = %u travel_ticks = %u "
+      "Ramp data: go to %d  curr_ticks = %u travel_ticks = %u "
       "Ramp steps = %u Performed ramp steps = %u\n",
-      move, ticks_at_queue_end, config->min_travel_ticks, config->ramp_steps,
+      target_pos, ticks_at_queue_end, config->min_travel_ticks, config->ramp_steps,
       performed_ramp_up_steps);
 #endif
 #ifdef DEBUG
   char buf[256];
   sprintf(
       buf,
-      "Ramp data: steps to move = %ld  curr_ticks = %lu travel_ticks = %lu "
+      "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu "
       "Ramp steps = %lu Performed ramp steps = %lu\n",
-      move, ticks_at_queue_end, _min_travel_ticks, config->ramp_steps, performed_ramp_up_steps);
+      target_pos, ticks_at_queue_end, _min_travel_ticks, config->ramp_steps, performed_ramp_up_steps);
   Serial.println(buf);
 #endif
   return MOVE_OK;

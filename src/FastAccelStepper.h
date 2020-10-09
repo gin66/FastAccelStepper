@@ -125,7 +125,6 @@ class FastAccelStepper {
   int move(int32_t move);
   int moveTo(int32_t position);
 #define MOVE_OK 0
-#define MOVE_ZERO 1           // Already on target position
 #define MOVE_ERR_OVERFLOW -1  // relative move has caused an overflow
 #define MOVE_ERR_NO_DIRECTION_PIN \
   -2  // negative direction requested, but no direction pin defined
@@ -191,8 +190,6 @@ class FastAccelStepper {
 #endif
 
  private:
-  int _calculate_move(int32_t steps);
-
   RampGenerator rg;
   uint8_t _stepPin;
   uint8_t _dirPin;
