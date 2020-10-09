@@ -1,6 +1,6 @@
 
-CFLAGS=-DTEST -Werror -g 
-CXXFLAGS=-DTEST -Werror -g
+CFLAGS=-DTEST -Werror -g
+CXXFLAGS=-DTEST -Werror -g -DF_CPU=16000000
 LDLIBS=-lm
 
 test: test_01 test_02 test_03 test_04 test_05

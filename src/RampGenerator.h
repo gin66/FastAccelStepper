@@ -9,6 +9,12 @@ struct ramp_command_s {
   bool count_up;
 };
 
+#if (F_CPU == 16000000)
+#define UPM_TICKS_PER_S ((upm_float)0x97f4)
+#else
+#define UPM_TICKS_PER_S _config.upm_timer_freq
+#endif
+
 class RampGenerator {
  public:
   // The following variables are configuration input to
@@ -16,6 +22,9 @@ class RampGenerator {
   struct ramp_config_s {
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
+#if (F_CPU != 16000000)
+    upm_float upm_timer_freq;
+#endif
   } _config;
   // The ro variables are those, which are only read from single_fill_queue.
   // Reading ro variables is safe.

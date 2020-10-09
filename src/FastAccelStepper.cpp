@@ -260,6 +260,11 @@ void FastAccelStepper::isr_fill_queue() {
   // preconditions are fulfilled, so create the command(s)
   struct ramp_command_s cmd;
   while (!isQueueFull() && _isr_speed_control_enabled) {
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
+  // For run time measurement
+  uint32_t runtime_us = micros();
+#endif
+
     rg.single_fill_queue(&rg._ro, &rg._rw,
                          fas_queue[_queue_num].ticks_at_queue_end,
                          getPositionAfterCommandsCompleted(), &cmd);
@@ -268,6 +273,11 @@ void FastAccelStepper::isr_fill_queue() {
                   cmd.count_up == _dirHighCountsUp);  // TDO: error treatment
 
     _isr_speed_control_enabled = rg._rw.ramp_state != RAMP_STATE_IDLE;
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
+  // For run time measurement
+  runtime_us = micros() - runtime_us;
+  max_micros = max(max_micros, runtime_us);
+#endif
   }
 }
 

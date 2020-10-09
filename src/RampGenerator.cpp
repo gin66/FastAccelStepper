@@ -34,18 +34,17 @@
 //	    v = sqrt(2 * s * a)
 //
 //*************************************************************************************************
-#if (TICKS_PER_S == 16000000)
-#define UPM_TICKS_PER_S ((upm_float)0x97f4)
-#else
-upm_float upm_timer_freq;
-#define UPM_TICKS_PER_S upm_timer_freq
-#endif
 
 void RampGenerator::init() {
   _config.min_travel_ticks = 0;
   _config.upm_inv_accel2 = 0;
   _ro.target_pos = 0;
   _rw.ramp_state = RAMP_STATE_IDLE;
+#ifdef F_CPU
+#if (F_CPU != 16000000)
+  _config.upm_timer_freq = upm_from((uint32_t)F_CPU);
+#endif
+#endif
 }
 void RampGenerator::setSpeed(uint32_t min_step_us) {
   _config.min_travel_ticks = min_step_us * (TICKS_PER_S / 1000L) / 1000L;
@@ -144,11 +143,6 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
                                       uint32_t ticks_at_queue_end,
                                       int32_t position_at_queue_end,
                                       struct ramp_command_s *command) {
-#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-  // For run time measurement
-  uint32_t runtime_us = micros();
-#endif
-
   if (ticks_at_queue_end == 0) {
     ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
   }
@@ -320,11 +314,5 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
       "add command Steps = %d ticks = %d  Target pos = %d "
       "Remaining steps = %d\n",
       steps, next_ticks, ro->target_pos, remaining_steps);
-#endif
-
-#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-  // For run time measurement
-  runtime_us = micros() - runtime_us;
-  max_micros = max(max_micros, runtime_us);
 #endif
 }
