@@ -23,13 +23,6 @@ static uint16_t fas_debug_led_cnt = 0;
 #define DEBUG_LED_HALF_PERIOD 50
 #endif
 
-#if (TICKS_PER_S == 16000000)
-#define UPM_TICKS_PER_S ((upm_float)0x97f4)
-#else
-upm_float upm_timer_freq;
-#define UPM_TICKS_PER_S upm_timer_freq
-#endif
-
 #if defined(ARDUINO_ARCH_AVR)
 // this is needed to give the background task isr access to engine
 static FastAccelStepperEngine* fas_engine = NULL;
@@ -231,94 +224,21 @@ int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
 //
 //*************************************************************************************************
 int FastAccelStepper::_calculate_move(int32_t move) {
-  inject_fill_interrupt(1);
   if (move == 0) {
     return MOVE_ZERO;
   }
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  if (_min_step_us == 0) {
-    return MOVE_ERR_SPEED_IS_UNDEFINED;
+  inject_fill_interrupt(1);
+  int res = rg.calculate_move(move, &rg._config,
+			fas_queue[_queue_num].ticks_at_queue_end,
+			isQueueEmpty()
+		  );
+  if (res == MOVE_OK) {
+    _isr_speed_control_enabled = true;
   }
-  if (_accel == 0) {
-    return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
-  }
-  _min_travel_ticks = _min_step_us * (TICKS_PER_S / 1000L) / 1000L;
-
-  uint32_t tmp = TICKS_PER_S / 2;
-  upm_float upm_inv_accel = upm_from(tmp / _accel);
-  upm_float isr_upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
-  _ramp_steps =
-      upm_to_u32(divide(isr_upm_inv_accel2, square(upm_from(_min_travel_ticks))));
-
-  uint32_t steps = abs(move);
-
-  uint32_t curr_ticks = fas_queue[_queue_num].ticks_at_queue_end;
-  uint32_t performed_ramp_up_steps;
-  uint32_t deceleration_start;
-  uint32_t ramp_steps = _ramp_steps;
-  if ((curr_ticks == TICKS_FOR_STOPPED_MOTOR) || isQueueEmpty()) {
-    // motor is not running
-    //
-    // ramp starts with s = 0.
-    //
-    performed_ramp_up_steps = 0;
-
-    // If the maximum speed cannot be reached due to too less steps,
-    // then in the single_fill_queue routine the deceleration will be
-    // started after move/2 steps.
-    deceleration_start = min(ramp_steps, steps / 2);
-  } else if (curr_ticks == _min_travel_ticks) {
-    // motor is running already at coast speed
-    //
-    performed_ramp_up_steps = ramp_steps;
-    deceleration_start = ramp_steps;
-  } else {
-    // motor is running
-    //
-    // Calculate on which step on the speed ramp the current speed is related to
-    performed_ramp_up_steps =
-        upm_to_u32(divide(isr_upm_inv_accel2, square(upm_from(curr_ticks))));
-    if (curr_ticks >= _min_travel_ticks) {
-      // possibly can speed up
-      // Full ramp up/down needs 2*ramp_steps
-      // => full ramp is possible, if move+performed_ramp_up_steps >
-      // 2*ramp_steps
-      deceleration_start =
-          min(ramp_steps, (move + performed_ramp_up_steps) / 2);
-    } else if (curr_ticks < _min_travel_ticks) {
-      // speed too high, so need to reduce to _min_travel_ticks speed
-      deceleration_start = ramp_steps;
-    }
-  }
-
-  noInterrupts();
-  _upm_inv_accel2 = isr_upm_inv_accel2;
-  _deceleration_start = deceleration_start;
-  _performed_ramp_up_steps = performed_ramp_up_steps;
-  _isr_speed_control_enabled = true;
-  interrupts();
-  inject_fill_interrupt(2);
-
-#ifdef TEST
-  printf(
-      "Ramp data: steps to move = %d  curr_ticks = %d travel_ticks = %d "
-      "Ramp steps = %d Performed ramp steps = %d deceleration start = %u\n",
-      steps, curr_ticks, _min_travel_ticks, ramp_steps, performed_ramp_up_steps,
-      deceleration_start);
-#endif
-#ifdef DEBUG
-  char buf[256];
-  sprintf(
-      buf,
-      "Ramp data: steps to move = %ld  curr_ticks = %ld travel_ticks = %ld "
-      "Ramp steps = %ld Performed ramp steps = %ld deceleration start = %lu\n",
-      steps, curr_ticks, _min_travel_ticks, ramp_steps, performed_ramp_up_steps,
-      deceleration_start);
-  Serial.println(buf);
-#endif
-  return MOVE_OK;
+  return res;
 }
 
 void FastAccelStepper::isr_fill_queue() {
@@ -326,11 +246,11 @@ void FastAccelStepper::isr_fill_queue() {
   if (!_isr_speed_control_enabled) {
 	  return;
   }
-  if (_target_pos == getPositionAfterCommandsCompleted()) {
+  if (rg._ro.target_pos == getPositionAfterCommandsCompleted()) {
     _isr_speed_control_enabled = false;
     return;
   }
-  if (_min_travel_ticks == 0) {
+  if (rg._config.min_travel_ticks == 0) {
 #ifdef TEST
 	  assert(false);
 #endif
@@ -338,11 +258,6 @@ void FastAccelStepper::isr_fill_queue() {
   }
 
   // preconditions are fulfilled, so create the command(s)
-
-  rg._ro.target_pos = _target_pos;
-  rg._ro.deceleration_start = _deceleration_start;
-  rg._ro.min_travel_ticks = _min_travel_ticks;
-  rg._ro.upm_inv_accel2 = _upm_inv_accel2;
   struct ramp_command_s cmd;
   while (!isQueueFull() && _isr_speed_control_enabled) {
     rg._rw.ramp_state = _rampState;
@@ -389,15 +304,14 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   // For run time measurement
   max_micros = 0;
 #endif
-  _target_pos = 0;
   _isr_speed_control_enabled = false;
   _rampState = RAMP_STATE_IDLE;
   _autoEnable = false;
   _off_delay_count = 1;  // ensure to call disableOutputs()
   _auto_disable_delay_counter = 0;
-  _min_travel_ticks = 0;
   _stepPin = step_pin;
   _dirHighCountsUp = true;
+  rg.init();
 
 #if defined(ARDUINO_ARCH_AVR)
   _queue_num = step_pin == stepPinStepperA ? 0 : 1;
@@ -467,45 +381,45 @@ void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
     return;
   }
-  _min_step_us = min_step_us;
+  rg.setSpeed(min_step_us);
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
   if (accel == 0) {
     return;
   }
-  _accel = accel;
+  rg.setAcceleration(accel);
 }
 int FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos = getPositionAfterCommandsCompleted();
   if (!isrSpeedControlEnabled()) {
-    _target_pos = curr_pos;
+    rg._ro.target_pos = curr_pos;
   }
   int32_t move;
   move = position - curr_pos;
   if (move == 0) {
     return MOVE_ZERO;
   }
-  if ((_target_pos > curr_pos) && (move < 0)) {
+  if ((rg._ro.target_pos > curr_pos) && (move < 0)) {
     return MOVE_ERR_DIRECTION;
   }
-  if ((_target_pos < curr_pos) && (move > 0)) {
+  if ((rg._ro.target_pos < curr_pos) && (move > 0)) {
     return MOVE_ERR_DIRECTION;
   }
-  _target_pos = position;
+  rg._ro.target_pos = position;
   return _calculate_move(move);
 }
 int FastAccelStepper::move(int32_t move) {
   if (!isrSpeedControlEnabled()) {
-    _target_pos = getPositionAfterCommandsCompleted();
+    rg._ro.target_pos = getPositionAfterCommandsCompleted();
   }
-  int32_t new_pos = _target_pos + move;
+  int32_t new_pos = rg._ro.target_pos + move;
   if (move > 0) {
-	  if (new_pos < _target_pos) {
+	  if (new_pos < rg._ro.target_pos) {
 		  return MOVE_ERR_OVERFLOW;
 	  }
   }
   else if (move < 0) {
-	  if (new_pos > _target_pos) {
+	  if (new_pos > rg._ro.target_pos) {
 		  return MOVE_ERR_OVERFLOW;
 	  }
   }
@@ -517,7 +431,7 @@ int FastAccelStepper::move(int32_t move) {
 void FastAccelStepper::stopMove() {
   if (isRunning() && isrSpeedControlEnabled()) {
     int32_t curr_pos = getPositionAfterCommandsCompleted();
-    if (_target_pos > curr_pos) {
+    if (rg._ro.target_pos > curr_pos) {
       moveTo(curr_pos + _performed_ramp_up_steps);
     } else {
       moveTo(curr_pos - _performed_ramp_up_steps);
@@ -547,7 +461,7 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   noInterrupts();
   int32_t delta = new_pos - fas_queue[_queue_num].pos_at_queue_end;
   fas_queue[_queue_num].pos_at_queue_end = new_pos;
-  _target_pos += delta;
+  rg._ro.target_pos += delta;
   interrupts();
 }
 int32_t FastAccelStepper::getCurrentPosition() {
@@ -576,7 +490,7 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   noInterrupts();
   fas_queue[_queue_num].pos_at_queue_end += delta;
-  _target_pos += delta;
+  rg._ro.target_pos += delta;
   interrupts();
 }
 bool FastAccelStepper::isQueueFull() {
@@ -589,7 +503,7 @@ bool FastAccelStepper::isrSpeedControlEnabled() {
   return _isr_speed_control_enabled;
 };
 bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
-int32_t FastAccelStepper::targetPos() { return _target_pos; }
+int32_t FastAccelStepper::targetPos() { return rg._ro.target_pos; }
 uint8_t FastAccelStepper::rampState() { return _rampState; }
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
 uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }

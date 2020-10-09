@@ -9,6 +9,8 @@ tests/FastAccelStepper.cpp
 tests/FastAccelStepper.h
 tests/PoorManFloat.cpp
 tests/PoorManFloat.h
+tests/RampGenerator.cpp
+tests/RampGenerator.h
 tests/StepperISR*.cpp
 tests/StepperISR.h
 tests/*.gnuplot

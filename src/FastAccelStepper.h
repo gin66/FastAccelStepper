@@ -204,14 +204,6 @@ class FastAccelStepper {
   uint8_t _enablePinHighActive;
   uint8_t _queue_num;
 
-  int32_t _target_pos;
-
-  uint32_t _min_step_us;  // updated by setSpeed
-  uint32_t _accel;        // updated by setAcceleration
-
-  uint32_t _min_travel_ticks;  // in ticks, means 0.25us
-  uint32_t _ramp_steps;        // ramp steps from 0 to max speed
-
   // used in interrupt routine isr_update_move
   uint32_t _deceleration_start;  // in steps
   upm_float _upm_inv_accel2;
