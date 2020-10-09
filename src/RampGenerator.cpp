@@ -73,47 +73,11 @@ int RampGenerator::calculate_move(int32_t move,
 
   uint32_t steps = abs(move);
 
-  uint32_t curr_ticks = ticks_at_queue_end;
-  uint32_t performed_ramp_up_steps;
-  uint32_t deceleration_start;
-  if ((curr_ticks == TICKS_FOR_STOPPED_MOTOR) || queue_empty) {
-    // motor is not running
-    //
-    // ramp starts with s = 0.
-    //
-    performed_ramp_up_steps = 0;
-
-    // If the maximum speed cannot be reached due to too less steps,
-    // then in the single_fill_queue routine the deceleration will be
-    // started after move/2 steps.
-    deceleration_start = min(config->ramp_steps, steps / 2);
-  } else if (curr_ticks == config->min_travel_ticks) {
-    // motor is running already at coast speed
-    //
-    performed_ramp_up_steps = config->ramp_steps;
-    deceleration_start = config->ramp_steps;
-  } else {
-    // motor is running
-    //
-    // Calculate on which step on the speed ramp the current speed is related to
-    performed_ramp_up_steps = upm_to_u32(
-        divide(config->upm_inv_accel2, square(upm_from(curr_ticks))));
-    if (curr_ticks >= config->min_travel_ticks) {
-      // possibly can speed up
-      // Full ramp up/down needs 2*ramp_steps
-      // => full ramp is possible, if move+performed_ramp_up_steps >
-      // 2*ramp_steps
-      deceleration_start =
-          min(config->ramp_steps, (move + performed_ramp_up_steps) / 2);
-    } else if (curr_ticks < config->min_travel_ticks) {
-      // speed too high, so need to reduce to _min_travel_ticks speed
-      deceleration_start = config->ramp_steps;
-    }
-  }
+  uint32_t performed_ramp_up_steps = upm_to_u32(
+        divide(config->upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
 
   noInterrupts();
   _ro.target_pos += move;
-  _ro.deceleration_start = deceleration_start;
   _ro.min_travel_ticks = config->min_travel_ticks;
   _ro.upm_inv_accel2 = config->upm_inv_accel2;
   _rw.performed_ramp_up_steps = performed_ramp_up_steps;
@@ -123,18 +87,17 @@ int RampGenerator::calculate_move(int32_t move,
 #ifdef TEST
   printf(
       "Ramp data: steps to move = %d  curr_ticks = %u travel_ticks = %u "
-      "Ramp steps = %u Performed ramp steps = %u deceleration start = %u\n",
-      steps, curr_ticks, config->min_travel_ticks, config->ramp_steps,
-      performed_ramp_up_steps, deceleration_start);
+      "Ramp steps = %u Performed ramp steps = %u\n",
+      steps, ticks_at_queue_end, config->min_travel_ticks, config->ramp_steps,
+      performed_ramp_up_steps);
 #endif
 #ifdef DEBUG
   char buf[256];
   sprintf(
       buf,
       "Ramp data: steps to move = %ld  curr_ticks = %lu travel_ticks = %lu "
-      "Ramp steps = %lu Performed ramp steps = %lu deceleration start = %lu\n",
-      steps, curr_ticks, _min_travel_ticks, config->ramp_steps, performed_ramp_up_steps,
-      deceleration_start);
+      "Ramp steps = %lu Performed ramp steps = %lu\n",
+      steps, ticks_at_queue_end, _min_travel_ticks, config->ramp_steps, performed_ramp_up_steps);
   Serial.println(buf);
 #endif
   return MOVE_OK;
@@ -161,7 +124,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
   } else {
     // TODO:explain the 16000
     planning_steps = max(16000 / ticks_at_queue_end, 1);
-    if (remaining_steps <= ro->deceleration_start) {
+    if (remaining_steps <= rw->performed_ramp_up_steps) {
       rw->ramp_state = RAMP_STATE_DECELERATE_TO_STOP;
     } else if (ro->min_travel_ticks < ticks_at_queue_end) {
       rw->ramp_state = RAMP_STATE_ACCELERATE;
@@ -176,9 +139,9 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
 
 #ifdef TEST
   printf(
-      "pos@queue_end=%d remaining=%u deceleration_start=%u planning steps=%d  "
+      "pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d  "
       " ",
-      position_at_queue_end, remaining_steps, ro->deceleration_start,
+      position_at_queue_end, remaining_steps, rw->performed_ramp_up_steps,
       planning_steps);
   switch (rw->ramp_state) {
     case RAMP_STATE_COAST:
@@ -209,7 +172,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
       next_ticks = ro->min_travel_ticks;
       // do not overshoot ramp down start
       planning_steps =
-          min(planning_steps, remaining_steps - ro->deceleration_start);
+          min(planning_steps, remaining_steps - rw->performed_ramp_up_steps);
       break;
     case RAMP_STATE_ACCELERATE:
       upm_rem_steps = upm_from(rw->performed_ramp_up_steps + planning_steps);

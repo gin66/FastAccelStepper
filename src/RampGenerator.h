@@ -33,7 +33,6 @@ class RampGenerator {
   // together (!) with relevant rw variables, if needed
   struct ramp_ro_s {
     int32_t target_pos;
-    uint32_t deceleration_start;
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
   } _ro;
