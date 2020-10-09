@@ -424,10 +424,7 @@ int FastAccelStepper::move(int32_t move) {
   return moveTo(new_pos);
 }
 void FastAccelStepper::stopMove() {
-  if (isRunning() && isrSpeedControlEnabled()) {
-    int32_t curr_pos = getPositionAfterCommandsCompleted();
-	rg.initiate_stop(curr_pos);
-  }
+  rg.initiate_stop();
 }
 void FastAccelStepper::disableOutputs() {
   if (_enablePinLowActive != PIN_UNDEFINED) {

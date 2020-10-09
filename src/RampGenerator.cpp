@@ -60,18 +60,6 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
-void RampGenerator::initiate_stop(int32_t position_at_queue_end) {
-	// adjust target position
-	if (_ro.target_pos > position_at_queue_end) {
-		_ro.target_pos = position_at_queue_end + _rw.performed_ramp_up_steps;
-	}
-	if (_ro.target_pos < position_at_queue_end) {
-		_ro.target_pos = position_at_queue_end - _rw.performed_ramp_up_steps;
-	}
-    else {
-		// what about this case ?
-	}	
-}
 int RampGenerator::calculate_moveTo(int32_t target_pos,
                                   const struct ramp_config_s *config,
                                   uint32_t ticks_at_queue_end) {
@@ -89,6 +77,7 @@ int RampGenerator::calculate_moveTo(int32_t target_pos,
   _ro.target_pos = target_pos;
   _ro.min_travel_ticks = config->min_travel_ticks;
   _ro.upm_inv_accel2 = config->upm_inv_accel2;
+  _ro.force_stop = false;
   _rw.performed_ramp_up_steps = performed_ramp_up_steps;
   if (_rw.ramp_state == RAMP_STATE_IDLE) {
 	  _rw.ramp_state = RAMP_STATE_ACCELERATE;
@@ -127,15 +116,14 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
 
   // check state for acceleration/deceleration or deceleration to stop
   uint32_t remaining_steps = abs(ro->target_pos - position_at_queue_end);
-  uint32_t planning_steps;
+  uint32_t planning_steps = max(16000 / ticks_at_queue_end, 1);
   uint32_t next_ticks;
-  if (rw->ramp_state ==
-      RAMP_STATE_IDLE) {  // motor is stopped. Set to max value
-    planning_steps = 1;
-    rw->ramp_state = RAMP_STATE_ACCELERATE;
-  } else {
+  if (ro->force_stop) {
+	  remaining_steps = rw->performed_ramp_up_steps;
+	  rw->ramp_state = RAMP_STATE_DECELERATE_TO_STOP;
+  }
+  else {
     // TODO:explain the 16000
-    planning_steps = max(16000 / ticks_at_queue_end, 1);
     if (remaining_steps <= rw->performed_ramp_up_steps) {
       rw->ramp_state = RAMP_STATE_DECELERATE_TO_STOP;
     } else if (ro->min_travel_ticks < ticks_at_queue_end) {
@@ -267,7 +255,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
   if (rw->ramp_state == RAMP_STATE_ACCELERATE) {
     rw->performed_ramp_up_steps += steps;
   }
-  if (rw->ramp_state == RAMP_STATE_DECELERATE) {
+  if ((rw->ramp_state == RAMP_STATE_DECELERATE) || (rw->ramp_state == RAMP_STATE_DECELERATE_TO_STOP)) {
     rw->performed_ramp_up_steps -= steps;
   }
   bool countUp = (ro->target_pos > position_at_queue_end);

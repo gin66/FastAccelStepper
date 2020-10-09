@@ -32,6 +32,7 @@ class RampGenerator {
     int32_t target_pos;
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
+	bool force_stop;
   } _ro;
   struct ramp_rw_s {
     uint8_t ramp_state;
@@ -49,7 +50,9 @@ class RampGenerator {
   }
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
-  void initiate_stop(int32_t position_at_queue_end);
+  void initiate_stop() {
+	  _ro.force_stop = true;
+  }
   int calculate_moveTo(int32_t target_pos, const struct ramp_config_s *config,
                      uint32_t ticks_at_queue_end);
   void single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
