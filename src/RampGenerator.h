@@ -11,10 +11,16 @@ struct ramp_command_s {
 
 class RampGenerator {
  public:
+  // The following variables are configuration input to
+  // calculate_move, only
   struct ramp_config_s {
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
   } _config;
+  // The ro variables are those, which are only read from single_fill_queue.
+  // Reading ro variables is safe.
+  // Writing has to be protected with noInterrupts/interrupts-calls and
+  // together (!) with relevant rw variables, if needed
   struct ramp_ro_s {
     int32_t target_pos;
     uint32_t deceleration_start;
@@ -28,6 +34,13 @@ class RampGenerator {
     uint32_t performed_ramp_up_steps;
   } _rw;
   void init();
+  inline uint8_t rampState() {
+	  // reading one byte is atomic
+	  return _rw.ramp_state;
+  }
+  inline int32_t targetPosition() {
+	  return _ro.target_pos;
+  }
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
   int calculate_move(int32_t move, const struct ramp_config_s *config,

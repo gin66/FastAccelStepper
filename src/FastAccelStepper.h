@@ -137,7 +137,7 @@ class FastAccelStepper {
   void stopMove();
 
   // get the target position for the current move
-  int32_t targetPos();
+  inline int32_t targetPos() { return rg.targetPosition(); }
 
   // Low level acccess via command queue
   // stepper queue management (low level access)
@@ -171,10 +171,10 @@ class FastAccelStepper {
 #define RAMP_STATE_DECELERATE_TO_STOP 2
 #define RAMP_STATE_DECELERATE 3
 #define RAMP_STATE_COAST 4
-  uint8_t rampState();
+  inline uint8_t rampState() { return rg.rampState(); }
 
   // returns true, if the ramp generation is active
-  bool isrSpeedControlEnabled();
+  inline bool isrSpeedControlEnabled() { return _isr_speed_control_enabled; };
 
   // This variable/these functions should NEVER be modified/called by the
   // application

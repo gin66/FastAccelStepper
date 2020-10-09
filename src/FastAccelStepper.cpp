@@ -246,7 +246,7 @@ void FastAccelStepper::isr_fill_queue() {
   if (!_isr_speed_control_enabled) {
     return;
   }
-  if (rg._ro.target_pos == getPositionAfterCommandsCompleted()) {
+  if (rg.targetPosition() == getPositionAfterCommandsCompleted()) {
     _isr_speed_control_enabled = false;
     return;
   }
@@ -388,7 +388,7 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
   rg.setAcceleration(accel);
 }
 int FastAccelStepper::moveTo(int32_t position) {
-  int32_t curr_pos = rg._ro.target_pos;
+  int32_t curr_pos = rg.targetPosition();
   // int32_t curr_pos = getPositionAfterCommandsCompleted();
   // if (!isrSpeedControlEnabled()) {
   //  rg._ro.target_pos = curr_pos;
@@ -398,10 +398,10 @@ int FastAccelStepper::moveTo(int32_t position) {
   if (move == 0) {
     return MOVE_ZERO;
   }
-  if ((rg._ro.target_pos > curr_pos) && (move < 0)) {
+  if ((rg.targetPosition() > curr_pos) && (move < 0)) {
     return MOVE_ERR_DIRECTION;
   }
-  if ((rg._ro.target_pos < curr_pos) && (move > 0)) {
+  if ((rg.targetPosition() < curr_pos) && (move > 0)) {
     return MOVE_ERR_DIRECTION;
   }
   return _calculate_move(move);
@@ -410,13 +410,13 @@ int FastAccelStepper::move(int32_t move) {
   if (!isrSpeedControlEnabled()) {
     rg._ro.target_pos = getPositionAfterCommandsCompleted();
   }
-  int32_t new_pos = rg._ro.target_pos + move;
+  int32_t new_pos = rg.targetPosition() + move;
   if (move > 0) {
-    if (new_pos < rg._ro.target_pos) {
+    if (new_pos < rg.targetPosition()) {
       return MOVE_ERR_OVERFLOW;
     }
   } else if (move < 0) {
-    if (new_pos > rg._ro.target_pos) {
+    if (new_pos > rg.targetPosition()) {
       return MOVE_ERR_OVERFLOW;
     }
   } else {
@@ -427,7 +427,7 @@ int FastAccelStepper::move(int32_t move) {
 void FastAccelStepper::stopMove() {
   if (isRunning() && isrSpeedControlEnabled()) {
     int32_t curr_pos = getPositionAfterCommandsCompleted();
-    if (rg._ro.target_pos > curr_pos) {
+    if (rg.targetPosition() > curr_pos) {
       moveTo(curr_pos + rg._rw.performed_ramp_up_steps);
     } else {
       moveTo(curr_pos - rg._rw.performed_ramp_up_steps);
@@ -495,12 +495,7 @@ bool FastAccelStepper::isQueueFull() {
 bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
-bool FastAccelStepper::isrSpeedControlEnabled() {
-  return _isr_speed_control_enabled;
-};
 bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
-int32_t FastAccelStepper::targetPos() { return rg._ro.target_pos; }
-uint8_t FastAccelStepper::rampState() { return rg._rw.ramp_state; }
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
 uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }
 #endif
