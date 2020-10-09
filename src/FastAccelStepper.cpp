@@ -260,8 +260,6 @@ void FastAccelStepper::isr_fill_queue() {
   // preconditions are fulfilled, so create the command(s)
   struct ramp_command_s cmd;
   while (!isQueueFull() && _isr_speed_control_enabled) {
-    rg._rw.ramp_state = _rampState;
-    rg._rw.performed_ramp_up_steps = _performed_ramp_up_steps;
     rg.single_fill_queue(&rg._ro, &rg._rw,
                          fas_queue[_queue_num].ticks_at_queue_end,
                          getPositionAfterCommandsCompleted(), &cmd);
@@ -269,9 +267,7 @@ void FastAccelStepper::isr_fill_queue() {
     addQueueEntry(cmd.ticks, cmd.steps,
                   cmd.count_up == _dirHighCountsUp);  // TDO: error treatment
 
-    _rampState = rg._rw.ramp_state;
     _isr_speed_control_enabled = rg._rw.ramp_state != RAMP_STATE_IDLE;
-    _performed_ramp_up_steps = rg._rw.performed_ramp_up_steps;
   }
 }
 
@@ -308,7 +304,6 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   max_micros = 0;
 #endif
   _isr_speed_control_enabled = false;
-  _rampState = RAMP_STATE_IDLE;
   _autoEnable = false;
   _off_delay_count = 1;  // ensure to call disableOutputs()
   _auto_disable_delay_counter = 0;
@@ -433,9 +428,9 @@ void FastAccelStepper::stopMove() {
   if (isRunning() && isrSpeedControlEnabled()) {
     int32_t curr_pos = getPositionAfterCommandsCompleted();
     if (rg._ro.target_pos > curr_pos) {
-      moveTo(curr_pos + _performed_ramp_up_steps);
+      moveTo(curr_pos + rg._rw.performed_ramp_up_steps);
     } else {
-      moveTo(curr_pos - _performed_ramp_up_steps);
+      moveTo(curr_pos - rg._rw.performed_ramp_up_steps);
     }
   }
 }
@@ -457,13 +452,6 @@ void FastAccelStepper::enableOutputs() {
 }
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return fas_queue[_queue_num].pos_at_queue_end;
-}
-void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
-  noInterrupts();
-  int32_t delta = new_pos - fas_queue[_queue_num].pos_at_queue_end;
-  fas_queue[_queue_num].pos_at_queue_end = new_pos;
-  rg._ro.target_pos += delta;
-  interrupts();
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   struct StepperQueue* q = &fas_queue[_queue_num];
@@ -494,6 +482,13 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   rg._ro.target_pos += delta;
   interrupts();
 }
+void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
+  noInterrupts();
+  int32_t delta = new_pos - fas_queue[_queue_num].pos_at_queue_end;
+  fas_queue[_queue_num].pos_at_queue_end = new_pos;
+  rg._ro.target_pos += delta;
+  interrupts();
+}
 bool FastAccelStepper::isQueueFull() {
   return fas_queue[_queue_num].isQueueFull();
 }
@@ -505,7 +500,7 @@ bool FastAccelStepper::isrSpeedControlEnabled() {
 };
 bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
 int32_t FastAccelStepper::targetPos() { return rg._ro.target_pos; }
-uint8_t FastAccelStepper::rampState() { return _rampState; }
+uint8_t FastAccelStepper::rampState() { return rg._rw.ramp_state; }
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
 uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }
 #endif

@@ -23,6 +23,8 @@ class RampGenerator {
   } _ro;
   struct ramp_rw_s {
     uint8_t ramp_state;
+    // the speed is linked on both ramp slopes to this variable as per
+    //       s = v²/2a   =>   v = sqrt(2*a*s)
     uint32_t performed_ramp_up_steps;
   } _rw;
   void init();

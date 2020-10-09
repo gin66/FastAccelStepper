@@ -195,7 +195,6 @@ class FastAccelStepper {
 
   RampGenerator rg;
   bool _isr_speed_control_enabled;
-  uint8_t _rampState;  // updated by isr_fill_queue
   uint8_t _stepPin;
   uint8_t _dirPin;
   bool _dirHighCountsUp;
@@ -204,9 +203,6 @@ class FastAccelStepper {
   uint8_t _enablePinHighActive;
   uint8_t _queue_num;
 
-  // the speed is linked on both ramp slopes to this variable as per
-  //       s = v²/2a   =>   v = sqrt(2*a*s)
-  uint32_t _performed_ramp_up_steps;
 
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
