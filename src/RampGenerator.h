@@ -22,6 +22,7 @@ class RampGenerator {
   struct ramp_config_s {
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
+	uint32_t ramp_steps;
 #if (F_CPU != 16000000)
     upm_float upm_timer_freq;
 #endif
@@ -58,5 +59,7 @@ class RampGenerator {
                          uint32_t ticks_at_queue_end,
                          int32_t position_at_queue_end,
                          struct ramp_command_s *command);
+private:
+  void update_ramp_steps();
 };
 #endif

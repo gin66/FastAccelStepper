@@ -46,13 +46,19 @@ void RampGenerator::init() {
 #endif
 #endif
 }
+void RampGenerator::update_ramp_steps() {
+  _config.ramp_steps = upm_to_u32(divide(
+      _config.upm_inv_accel2, square(upm_from(_config.min_travel_ticks))));
+}
 void RampGenerator::setSpeed(uint32_t min_step_us) {
   _config.min_travel_ticks = min_step_us * (TICKS_PER_S / 1000L) / 1000L;
+  update_ramp_steps();
 }
 void RampGenerator::setAcceleration(uint32_t accel) {
   uint32_t tmp = TICKS_PER_S / 2;
   upm_float upm_inv_accel = upm_from(tmp / accel);
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
+  update_ramp_steps();
 }
 int RampGenerator::calculate_move(int32_t move,
                                   const struct ramp_config_s *config,
@@ -61,12 +67,9 @@ int RampGenerator::calculate_move(int32_t move,
   if (config->min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
-  // if (_accel == 0) {
-  //  return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
-  //}
-
-  uint32_t ramp_steps = upm_to_u32(divide(
-      config->upm_inv_accel2, square(upm_from(config->min_travel_ticks))));
+  if (config->upm_inv_accel2 == 0) {
+    return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
+  }
 
   uint32_t steps = abs(move);
 
@@ -83,12 +86,12 @@ int RampGenerator::calculate_move(int32_t move,
     // If the maximum speed cannot be reached due to too less steps,
     // then in the single_fill_queue routine the deceleration will be
     // started after move/2 steps.
-    deceleration_start = min(ramp_steps, steps / 2);
+    deceleration_start = min(config->ramp_steps, steps / 2);
   } else if (curr_ticks == config->min_travel_ticks) {
     // motor is running already at coast speed
     //
-    performed_ramp_up_steps = ramp_steps;
-    deceleration_start = ramp_steps;
+    performed_ramp_up_steps = config->ramp_steps;
+    deceleration_start = config->ramp_steps;
   } else {
     // motor is running
     //
@@ -101,10 +104,10 @@ int RampGenerator::calculate_move(int32_t move,
       // => full ramp is possible, if move+performed_ramp_up_steps >
       // 2*ramp_steps
       deceleration_start =
-          min(ramp_steps, (move + performed_ramp_up_steps) / 2);
+          min(config->ramp_steps, (move + performed_ramp_up_steps) / 2);
     } else if (curr_ticks < config->min_travel_ticks) {
       // speed too high, so need to reduce to _min_travel_ticks speed
-      deceleration_start = ramp_steps;
+      deceleration_start = config->ramp_steps;
     }
   }
 
@@ -121,7 +124,7 @@ int RampGenerator::calculate_move(int32_t move,
   printf(
       "Ramp data: steps to move = %d  curr_ticks = %u travel_ticks = %u "
       "Ramp steps = %u Performed ramp steps = %u deceleration start = %u\n",
-      steps, curr_ticks, config->min_travel_ticks, ramp_steps,
+      steps, curr_ticks, config->min_travel_ticks, config->ramp_steps,
       performed_ramp_up_steps, deceleration_start);
 #endif
 #ifdef DEBUG
@@ -130,7 +133,7 @@ int RampGenerator::calculate_move(int32_t move,
       buf,
       "Ramp data: steps to move = %ld  curr_ticks = %lu travel_ticks = %lu "
       "Ramp steps = %lu Performed ramp steps = %lu deceleration start = %lu\n",
-      steps, curr_ticks, _min_travel_ticks, ramp_steps, performed_ramp_up_steps,
+      steps, curr_ticks, _min_travel_ticks, config->ramp_steps, performed_ramp_up_steps,
       deceleration_start);
   Serial.println(buf);
 #endif
