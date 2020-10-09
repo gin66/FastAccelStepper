@@ -396,8 +396,7 @@ int FastAccelStepper::moveTo(int32_t position) {
   }
   inject_fill_interrupt(1);
   int res = rg.calculate_moveTo(position, &rg._config,
-                              fas_queue[_queue_num].ticks_at_queue_end,
-                              isQueueEmpty());
+                              fas_queue[_queue_num].ticks_at_queue_end);
   inject_fill_interrupt(2);
   return res;
 }
@@ -427,11 +426,7 @@ int FastAccelStepper::move(int32_t move) {
 void FastAccelStepper::stopMove() {
   if (isRunning() && isrSpeedControlEnabled()) {
     int32_t curr_pos = getPositionAfterCommandsCompleted();
-    if (rg.targetPosition() > curr_pos) {
-      moveTo(curr_pos + rg._rw.performed_ramp_up_steps);
-    } else {
-      moveTo(curr_pos - rg._rw.performed_ramp_up_steps);
-    }
+	rg.initiate_stop(curr_pos);
   }
 }
 void FastAccelStepper::disableOutputs() {

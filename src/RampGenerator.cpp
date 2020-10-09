@@ -60,10 +60,21 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
+void RampGenerator::initiate_stop(int32_t position_at_queue_end) {
+	// adjust target position
+	if (_ro.target_pos > position_at_queue_end) {
+		_ro.target_pos = position_at_queue_end + _rw.performed_ramp_up_steps;
+	}
+	if (_ro.target_pos < position_at_queue_end) {
+		_ro.target_pos = position_at_queue_end - _rw.performed_ramp_up_steps;
+	}
+    else {
+		// what about this case ?
+	}	
+}
 int RampGenerator::calculate_moveTo(int32_t target_pos,
                                   const struct ramp_config_s *config,
-                                  uint32_t ticks_at_queue_end,
-                                  bool queue_empty) {
+                                  uint32_t ticks_at_queue_end) {
   if (config->min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
@@ -109,6 +120,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
                                       uint32_t ticks_at_queue_end,
                                       int32_t position_at_queue_end,
                                       struct ramp_command_s *command) {
+  // This should never be true
   if (ticks_at_queue_end == 0) {
     ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
   }
