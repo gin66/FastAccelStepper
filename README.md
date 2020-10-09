@@ -119,6 +119,22 @@ The low level command queue for each stepper allows direct speed control - when 
 
 See [project](https://github.com/gin66/FastAccelStepper/projects/1)
 
+## PLATFORMIO
+
+If you prefer platformio and you are running Linux, then platformio version of the examples are created by executing
+
+```
+ci/build-platformio.sh
+```
+
+This will create a directory pio_dirs, which contains all examples. Can be executed by e.g.
+
+```
+cd pio_dirs/StepperDemo
+pio run -e avr --target upload --upload-port /dev/ttyUSB0
+```
+
+
 ## ISSUES
 
 * Speed changes at very low speed with high acceleration values are not always performed
