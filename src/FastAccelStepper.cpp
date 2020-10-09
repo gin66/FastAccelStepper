@@ -390,10 +390,11 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
   rg.setAcceleration(accel);
 }
 int FastAccelStepper::moveTo(int32_t position) {
-  int32_t curr_pos = getPositionAfterCommandsCompleted();
-  if (!isrSpeedControlEnabled()) {
-    rg._ro.target_pos = curr_pos;
-  }
+  int32_t curr_pos = rg._ro.target_pos;
+  //int32_t curr_pos = getPositionAfterCommandsCompleted();
+  //if (!isrSpeedControlEnabled()) {
+  //  rg._ro.target_pos = curr_pos;
+  //}
   int32_t move;
   move = position - curr_pos;
   if (move == 0) {
@@ -405,7 +406,6 @@ int FastAccelStepper::moveTo(int32_t position) {
   if ((rg._ro.target_pos < curr_pos) && (move > 0)) {
     return MOVE_ERR_DIRECTION;
   }
-  rg._ro.target_pos = position;
   return _calculate_move(move);
 }
 int FastAccelStepper::move(int32_t move) {

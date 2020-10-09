@@ -108,7 +108,7 @@ int RampGenerator::calculate_move(int32_t move, const struct ramp_config_s *conf
   }
 
   noInterrupts();
-  //_ro.target_pos += move;
+  _ro.target_pos += move;
   _ro.deceleration_start = deceleration_start;
   _ro.min_travel_ticks = config->min_travel_ticks;
   _ro.upm_inv_accel2 = config->upm_inv_accel2;
