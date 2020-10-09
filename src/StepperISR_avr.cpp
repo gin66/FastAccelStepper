@@ -66,7 +66,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         /* queue is empty => set to disconnect */                            \
         Stepper_Disconnect(CHANNEL);                                         \
         queue.isRunning = false;                                             \
-		queue.ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;                  \
+        queue.ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;                  \
         /* Next Interrupt takes place at next timer cycle => ~4ms */         \
         return;                                                              \
       }                                                                      \

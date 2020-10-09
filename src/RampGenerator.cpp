@@ -1,8 +1,9 @@
+#include "RampGenerator.h"
+
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
-#include "RampGenerator.h"
 
 #ifdef TEST
 #include <assert.h>
@@ -40,10 +41,10 @@ upm_float upm_timer_freq;
 #endif
 
 void RampGenerator::init() {
-	_config.min_travel_ticks = 0;
-	_config.upm_inv_accel2 = 0;
-	_ro.target_pos = 0;
-	_rw.ramp_state = RAMP_STATE_IDLE;
+  _config.min_travel_ticks = 0;
+  _config.upm_inv_accel2 = 0;
+  _ro.target_pos = 0;
+  _rw.ramp_state = RAMP_STATE_IDLE;
 }
 void RampGenerator::setSpeed(uint32_t min_step_us) {
   _config.min_travel_ticks = min_step_us * (TICKS_PER_S / 1000L) / 1000L;
@@ -53,19 +54,19 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   upm_float upm_inv_accel = upm_from(tmp / accel);
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
 }
-int RampGenerator::calculate_move(int32_t move, const struct ramp_config_s *config, 
-		uint32_t ticks_at_queue_end,
-		bool queue_empty
-		) {
+int RampGenerator::calculate_move(int32_t move,
+                                  const struct ramp_config_s *config,
+                                  uint32_t ticks_at_queue_end,
+                                  bool queue_empty) {
   if (config->min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
-  //if (_accel == 0) {
+  // if (_accel == 0) {
   //  return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
   //}
 
-  uint32_t ramp_steps =
-      upm_to_u32(divide(config->upm_inv_accel2, square(upm_from(config->min_travel_ticks))));
+  uint32_t ramp_steps = upm_to_u32(divide(
+      config->upm_inv_accel2, square(upm_from(config->min_travel_ticks))));
 
   uint32_t steps = abs(move);
 
@@ -92,8 +93,8 @@ int RampGenerator::calculate_move(int32_t move, const struct ramp_config_s *conf
     // motor is running
     //
     // Calculate on which step on the speed ramp the current speed is related to
-    performed_ramp_up_steps =
-        upm_to_u32(divide(config->upm_inv_accel2, square(upm_from(curr_ticks))));
+    performed_ramp_up_steps = upm_to_u32(
+        divide(config->upm_inv_accel2, square(upm_from(curr_ticks))));
     if (curr_ticks >= config->min_travel_ticks) {
       // possibly can speed up
       // Full ramp up/down needs 2*ramp_steps
@@ -120,8 +121,8 @@ int RampGenerator::calculate_move(int32_t move, const struct ramp_config_s *conf
   printf(
       "Ramp data: steps to move = %d  curr_ticks = %u travel_ticks = %u "
       "Ramp steps = %u Performed ramp steps = %u deceleration start = %u\n",
-      steps, curr_ticks, config->min_travel_ticks, ramp_steps, performed_ramp_up_steps,
-      deceleration_start);
+      steps, curr_ticks, config->min_travel_ticks, ramp_steps,
+      performed_ramp_up_steps, deceleration_start);
 #endif
 #ifdef DEBUG
   char buf[256];
@@ -137,7 +138,11 @@ int RampGenerator::calculate_move(int32_t move, const struct ramp_config_s *conf
 }
 
 //*************************************************************************************************
-void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,uint32_t ticks_at_queue_end, int32_t position_at_queue_end, struct ramp_command_s *command) {
+void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
+                                      struct ramp_rw_s *rw,
+                                      uint32_t ticks_at_queue_end,
+                                      int32_t position_at_queue_end,
+                                      struct ramp_command_s *command) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   uint32_t runtime_us = micros();
@@ -151,7 +156,8 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   uint32_t remaining_steps = abs(ro->target_pos - position_at_queue_end);
   uint32_t planning_steps;
   uint32_t next_ticks;
-  if (rw->ramp_state == RAMP_STATE_IDLE) {  // motor is stopped. Set to max value
+  if (rw->ramp_state ==
+      RAMP_STATE_IDLE) {  // motor is stopped. Set to max value
     planning_steps = 1;
     rw->ramp_state = RAMP_STATE_ACCELERATE;
   } else {
@@ -309,11 +315,10 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw
   }
 
 #ifdef TEST
-    printf(
-        "add command Steps = %d ticks = %d  Target pos = %d "
-        "Remaining steps = %d\n",
-        steps, next_ticks, ro->target_pos,
-        remaining_steps);
+  printf(
+      "add command Steps = %d ticks = %d  Target pos = %d "
+      "Remaining steps = %d\n",
+      steps, next_ticks, ro->target_pos, remaining_steps);
 #endif
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)

@@ -125,9 +125,10 @@ class FastAccelStepper {
   int move(int32_t move);
   int moveTo(int32_t position);
 #define MOVE_OK 0
-#define MOVE_ZERO 1	// Already on target position
-#define MOVE_ERR_OVERFLOW -1 // relative move has caused an overflow
-#define MOVE_ERR_NO_DIRECTION_PIN -2 // negative direction requested, but no direction pin defined
+#define MOVE_ZERO 1           // Already on target position
+#define MOVE_ERR_OVERFLOW -1  // relative move has caused an overflow
+#define MOVE_ERR_NO_DIRECTION_PIN \
+  -2  // negative direction requested, but no direction pin defined
 #define MOVE_ERR_SPEED_IS_UNDEFINED -3
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -4
 #define MOVE_ERR_DIRECTION -5  // Change in direction is not supported
@@ -188,7 +189,6 @@ class FastAccelStepper {
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint32_t checksum();
 #endif
-
 
  private:
   int _calculate_move(int32_t steps);

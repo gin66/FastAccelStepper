@@ -165,7 +165,7 @@ void info(FastAccelStepper *s) {
     Serial.print(" STOP ");
   }
   Serial.print(" state=");
-  switch(s->rampState()) {
+  switch (s->rampState()) {
     case RAMP_STATE_IDLE:
       Serial.print("IDLE ");
       break;
@@ -176,7 +176,7 @@ void info(FastAccelStepper *s) {
       Serial.print("DEC ");
       break;
     case RAMP_STATE_DECELERATE:
-      Serial.print("RED  "); //Reduce
+      Serial.print("RED  ");  // Reduce
       break;
     case RAMP_STATE_COAST:
       Serial.print("COAST ");
@@ -235,8 +235,7 @@ void usage() {
     if (stepper[i]) {
       if (i == selected) {
         Serial.print(">> ");
-      }
-      else {
+      } else {
         Serial.print("   ");
       }
       Serial.print("M");
@@ -337,7 +336,7 @@ void loop() {
           usage();
         } else if (strcmp(in_buffer, "T") == 0) {
           if (!stepper_selected->isRunning()) {
-             test_direct_drive(&stepper_config[selected]);
+            test_direct_drive(&stepper_config[selected]);
           }
         }
       }
@@ -357,7 +356,7 @@ void loop() {
     uint32_t now = millis();
     if (now - last_time >= 100) {
       if (verbose) {
-		  output_info();
+        output_info();
       }
       last_time = now;
     }

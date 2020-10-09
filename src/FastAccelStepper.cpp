@@ -1,5 +1,6 @@
-#include "StepperISR.h"
 #include "FastAccelStepper.h"
+
+#include "StepperISR.h"
 
 #ifdef TEST
 #include <assert.h>
@@ -232,9 +233,8 @@ int FastAccelStepper::_calculate_move(int32_t move) {
   }
   inject_fill_interrupt(1);
   int res = rg.calculate_move(move, &rg._config,
-			fas_queue[_queue_num].ticks_at_queue_end,
-			isQueueEmpty()
-		  );
+                              fas_queue[_queue_num].ticks_at_queue_end,
+                              isQueueEmpty());
   if (res == MOVE_OK) {
     _isr_speed_control_enabled = true;
   }
@@ -244,7 +244,7 @@ int FastAccelStepper::_calculate_move(int32_t move) {
 void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
   if (!_isr_speed_control_enabled) {
-	  return;
+    return;
   }
   if (rg._ro.target_pos == getPositionAfterCommandsCompleted()) {
     _isr_speed_control_enabled = false;
@@ -252,9 +252,9 @@ void FastAccelStepper::isr_fill_queue() {
   }
   if (rg._config.min_travel_ticks == 0) {
 #ifdef TEST
-	  assert(false);
+    assert(false);
 #endif
-  	  return;
+    return;
   }
 
   // preconditions are fulfilled, so create the command(s)
@@ -262,9 +262,12 @@ void FastAccelStepper::isr_fill_queue() {
   while (!isQueueFull() && _isr_speed_control_enabled) {
     rg._rw.ramp_state = _rampState;
     rg._rw.performed_ramp_up_steps = _performed_ramp_up_steps;
-    rg.single_fill_queue(&rg._ro, &rg._rw, fas_queue[_queue_num].ticks_at_queue_end, getPositionAfterCommandsCompleted(), &cmd);
+    rg.single_fill_queue(&rg._ro, &rg._rw,
+                         fas_queue[_queue_num].ticks_at_queue_end,
+                         getPositionAfterCommandsCompleted(), &cmd);
 
-	addQueueEntry(cmd.ticks, cmd.steps, cmd.count_up == _dirHighCountsUp); // TDO: error treatment
+    addQueueEntry(cmd.ticks, cmd.steps,
+                  cmd.count_up == _dirHighCountsUp);  // TDO: error treatment
 
     _rampState = rg._rw.ramp_state;
     _isr_speed_control_enabled = rg._rw.ramp_state != RAMP_STATE_IDLE;
@@ -391,8 +394,8 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
 }
 int FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos = rg._ro.target_pos;
-  //int32_t curr_pos = getPositionAfterCommandsCompleted();
-  //if (!isrSpeedControlEnabled()) {
+  // int32_t curr_pos = getPositionAfterCommandsCompleted();
+  // if (!isrSpeedControlEnabled()) {
   //  rg._ro.target_pos = curr_pos;
   //}
   int32_t move;
@@ -414,17 +417,15 @@ int FastAccelStepper::move(int32_t move) {
   }
   int32_t new_pos = rg._ro.target_pos + move;
   if (move > 0) {
-	  if (new_pos < rg._ro.target_pos) {
-		  return MOVE_ERR_OVERFLOW;
-	  }
-  }
-  else if (move < 0) {
-	  if (new_pos > rg._ro.target_pos) {
-		  return MOVE_ERR_OVERFLOW;
-	  }
-  }
-  else {
-	  return MOVE_ZERO;
+    if (new_pos < rg._ro.target_pos) {
+      return MOVE_ERR_OVERFLOW;
+    }
+  } else if (move < 0) {
+    if (new_pos > rg._ro.target_pos) {
+      return MOVE_ERR_OVERFLOW;
+    }
+  } else {
+    return MOVE_ZERO;
   }
   return moveTo(new_pos);
 }
