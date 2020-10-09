@@ -204,10 +204,6 @@ class FastAccelStepper {
   uint8_t _enablePinHighActive;
   uint8_t _queue_num;
 
-  // used in interrupt routine isr_update_move
-  uint32_t _deceleration_start;  // in steps
-  upm_float _upm_inv_accel2;
-
   // the speed is linked on both ramp slopes to this variable as per
   //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t _performed_ramp_up_steps;
