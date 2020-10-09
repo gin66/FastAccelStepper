@@ -1,4 +1,3 @@
-#include "RampGenerator.h"
 
 #include <stdint.h>
 
@@ -8,6 +7,8 @@
 #ifdef TEST
 #include <assert.h>
 #endif
+
+#include "RampGenerator.h"
 
 // This define in order to not shoot myself.
 #ifndef TEST
