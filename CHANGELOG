@@ -1,4 +1,9 @@
+0.8.0:
+- Change direction with running motor is possible !!!
+- stopMove() can be called from interrupt routine
+- Refactor ramp generation code into RampGenerator.h/cpp
 - StepperDemo: ramp state is written as plain text
+- Mention platformio in README
 
 0.7.1:
 - StepperDemo extended with commands to 

@@ -30,6 +30,17 @@ FastAccelStepper offers the following features:
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 
+General behaviour:
+* The desired end position to move to is set by calls to moveTo() and move()
+* The desired end position is in case of moveTo() as absolute value given#
+* For move() the delta is added to the latest desired end position
+* The stepper tries to reach the given desired end position as fast as possible with adherence to acceleration/deceleration
+* If the stepper is e.g. running towards position 1000 and moveTo(0) is called at position 500, then the stepper will 
+	1. decelerate, which means it will overshoot position 500 
+    2. stop and accelerate towards 0
+    3. eventually coast for a while and then decelerate
+    4. stop
+
 ### AVR
 
 * allows up to roughly 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
@@ -138,21 +149,8 @@ pio run -e avr --target upload --upload-port /dev/ttyUSB0
 ## ISSUES
 
 * Speed changes at very low speed with high acceleration values are not always performed
-	==> Implementation changed. Need to verify, if issue is closed
 * Queue is filled too much, which cause slow response to speed/acceleration changes
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
-* Following will lead to interesting behavior:
-       1.) let stepper slowly increase speed to v1
-       2.) before v1 is reached, increase accel and call stopMove()
-       => result is, that the stepper first increases speed before ramping down
-* Change in direction requires motor stop ! => it's a feature
-* Strategy should be clarified. Under this topic belongs:
-	* TODO: Introduce command queue of speed/accel commands - one per stepper.
-	* Change in direction requires motor stop ! => it's a feature
-  Currently any move/moveTo - while running - adjusts the ongoing move/moveTo's values.
-  With a command queue, this would lead to additional commands to be executed after the running one.
-  Update of new values for acceleration/speed would require another API function, because move/moveTo would enqueue a new command.
-  The question is, if this complexity in the driver is a good idea or better left to the application.
 * The revision 0.5.x is not usable for AVR in case channel B is needed => upgrade to 0.6
 
 ## Not planned for now
