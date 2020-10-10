@@ -32,7 +32,7 @@ FastAccelStepper offers the following features:
 
 General behaviour:
 * The desired end position to move to is set by calls to moveTo() and move()
-* The desired end position is in case of moveTo() as absolute value given#
+* The desired end position is in case of moveTo() given as absolute position
 * For move() the delta is added to the latest desired end position
 * The stepper tries to reach the given desired end position as fast as possible with adherence to acceleration/deceleration
 * If the stepper is e.g. running towards position 1000 and moveTo(0) is called at position 500, then the stepper will 
@@ -68,24 +68,24 @@ Using the high level interface with ramp up/down:
 ```
 #include "FastAccelStepper.h"
 
-#define dirPinStepperA    5
-#define enablePinStepperA 6
-#define stepPinStepperA   9  // OC1A in case of AVR
+#define dirPinStepper    5
+#define enablePinStepper 6
+#define stepPinStepper   9  // OC1A in case of AVR
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepperA = NULL;
+FastAccelStepper *stepper = NULL;
 
 void setup() {
    engine.init();
-   stepperA = engine.stepperConnectToPin(stepPinStepperA);
-   if (stepperA) {
-      stepperA->setDirectionPin(dirPinStepperA);
-      stepperA->setEnablePin(enablePinStepperA);
-      stepperA->setAutoEnable(true);
+   stepper = engine.stepperConnectToPin(stepPinStepper);
+   if (stepper) {
+      stepper->setDirectionPin(dirPinStepper);
+      stepper->setEnablePin(enablePinStepper);
+      stepper->setAutoEnable(true);
 
-      stepperA->setSpeed(1000);       // the parameter is us/step !!!
-      stepperA->setAcceleration(100);
-      stepperA->move(1000);
+      stepper->setSpeed(1000);       // the parameter is us/step !!!
+      stepper->setAcceleration(100);
+      stepper->move(1000);
    }
 }
 
@@ -120,7 +120,7 @@ The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-
 
 ### BOTH
 
-The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
+The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v² = 2 * a * s. The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 
 The compare interrupt routines use two staged tick counters. One byte (n_periods) + one word (period). The max tick counter value is 254*65535. At 16 MHz this comes down to 1.04s. Thus the lower speed limit is approx 1 step per second.
 
@@ -151,7 +151,6 @@ pio run -e avr --target upload --upload-port /dev/ttyUSB0
 * Speed changes at very low speed with high acceleration values are not always performed
 * Queue is filled too much, which cause slow response to speed/acceleration changes
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
-* The revision 0.5.x is not usable for AVR in case channel B is needed => upgrade to 0.6
 
 ## Not planned for now
 
