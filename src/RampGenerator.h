@@ -53,8 +53,12 @@ class RampGenerator {
   void initiate_stop() {
 	  _ro.force_stop = true;
   }
+  bool is_stopping() {
+	  return _ro.force_stop;
+  }
   int calculate_moveTo(int32_t target_pos, const struct ramp_config_s *config,
-                     uint32_t ticks_at_queue_end);
+                     uint32_t ticks_at_queue_end,
+					 int32_t position_at_queue_end);
   void single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
                          uint32_t ticks_at_queue_end,
                          int32_t position_at_queue_end,

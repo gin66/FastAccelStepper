@@ -384,19 +384,16 @@ int FastAccelStepper::moveTo(int32_t position) {
 	curr_pos = rg.targetPosition();
   }
   else {
+	if (rg.is_stopping()) {
+		return MOVE_ERR_STOP_ONGOING;
+	}
     curr_pos = getPositionAfterCommandsCompleted();
   }
   int32_t move;
   move = position - curr_pos;
-  if ((rg.targetPosition() > curr_pos) && (move < 0)) {
-    return MOVE_ERR_DIRECTION;
-  }
-  if ((rg.targetPosition() < curr_pos) && (move > 0)) {
-    return MOVE_ERR_DIRECTION;
-  }
   inject_fill_interrupt(1);
   int res = rg.calculate_moveTo(position, &rg._config,
-                              fas_queue[_queue_num].ticks_at_queue_end);
+                              fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
   inject_fill_interrupt(2);
   return res;
 }

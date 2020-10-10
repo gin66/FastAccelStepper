@@ -130,9 +130,11 @@ class FastAccelStepper {
   -2  // negative direction requested, but no direction pin defined
 #define MOVE_ERR_SPEED_IS_UNDEFINED -3
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -4
-#define MOVE_ERR_DIRECTION -5  // Change in direction is not supported
+#define MOVE_ERR_STOP_ONGOING -5
 
   // stop the running stepper as fast as possible with deceleration
+  // This only sets a flag and can be called from an interrupt !
+  // Another move/moveTo must wait, till the motor has stopped
   void stopMove();
 
   // get the target position for the current move
@@ -170,6 +172,10 @@ class FastAccelStepper {
 #define RAMP_STATE_DECELERATE_TO_STOP 2
 #define RAMP_STATE_DECELERATE 3
 #define RAMP_STATE_COAST 4
+#define RAMP_STATE_MASK 0x0f
+#define RAMP_MOVE_UP 0x80
+#define RAMP_MOVE_DOWN 0x40
+#define RAMP_MOVE_MASK 0xc0
   inline uint8_t rampState() { return rg.rampState(); }
 
   // returns true, if the ramp generation is active
