@@ -22,7 +22,7 @@ class RampGenerator {
   struct ramp_config_s {
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
-	uint32_t ramp_steps;
+    uint32_t ramp_steps;
   } _config;
   // The ro variables are those, which are only read from single_fill_queue.
   // Reading ro variables is safe.
@@ -32,7 +32,7 @@ class RampGenerator {
     int32_t target_pos;
     uint32_t min_travel_ticks;
     upm_float upm_inv_accel2;
-	bool force_stop;
+    bool force_stop;
   } _ro;
   struct ramp_rw_s {
     uint8_t ramp_state;
@@ -42,30 +42,25 @@ class RampGenerator {
   } _rw;
   void init();
   inline uint8_t rampState() {
-	  // reading one byte is atomic
-	  return _rw.ramp_state;
+    // reading one byte is atomic
+    return _rw.ramp_state;
   }
-  inline int32_t targetPosition() {
-	  return _ro.target_pos;
-  }
+  inline int32_t targetPosition() { return _ro.target_pos; }
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
-  void initiate_stop() {
-	  _ro.force_stop = true;
-  }
-  bool is_stopping() {
-	  return _ro.force_stop;
-  }
+  void initiate_stop() { _ro.force_stop = true; }
+  bool is_stopping() { return _ro.force_stop; }
   int calculate_moveTo(int32_t target_pos, const struct ramp_config_s *config,
-                     uint32_t ticks_at_queue_end,
-					 int32_t position_at_queue_end);
+                       uint32_t ticks_at_queue_end,
+                       int32_t position_at_queue_end);
   void single_fill_queue(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
                          uint32_t ticks_at_queue_end,
                          int32_t position_at_queue_end,
                          struct ramp_command_s *command);
-private:
+
+ private:
 #if (F_CPU != 16000000)
-    upm_float upm_timer_freq;
+  upm_float upm_timer_freq;
 #endif
   void update_ramp_steps();
 };

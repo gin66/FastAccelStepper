@@ -244,8 +244,8 @@ void FastAccelStepper::isr_fill_queue() {
   struct ramp_command_s cmd;
   while (!isQueueFull() && isrSpeedControlEnabled()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-  // For run time measurement
-  uint32_t runtime_us = micros();
+    // For run time measurement
+    uint32_t runtime_us = micros();
 #endif
 
     rg.single_fill_queue(&rg._ro, &rg._rw,
@@ -256,9 +256,9 @@ void FastAccelStepper::isr_fill_queue() {
                   cmd.count_up == _dirHighCountsUp);  // TDO: error treatment
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-  // For run time measurement
-  runtime_us = micros() - runtime_us;
-  max_micros = max(max_micros, runtime_us);
+    // For run time measurement
+    runtime_us = micros() - runtime_us;
+    max_micros = max(max_micros, runtime_us);
 #endif
   }
 }
@@ -381,17 +381,17 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
 int FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos;
   if (isrSpeedControlEnabled()) {
-	if (rg.is_stopping()) {
-		return MOVE_ERR_STOP_ONGOING;
-	}
-	curr_pos = rg.targetPosition();
-  }
-  else {
+    if (rg.is_stopping()) {
+      return MOVE_ERR_STOP_ONGOING;
+    }
+    curr_pos = rg.targetPosition();
+  } else {
     curr_pos = getPositionAfterCommandsCompleted();
   }
   inject_fill_interrupt(1);
-  int res = rg.calculate_moveTo(position, &rg._config,
-                              fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
+  int res =
+      rg.calculate_moveTo(position, &rg._config,
+                          fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
   inject_fill_interrupt(2);
   return res;
 }
@@ -401,9 +401,8 @@ int FastAccelStepper::move(int32_t move) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
   if (isrSpeedControlEnabled()) {
-	curr_pos = rg.targetPosition();
-  }
-  else {
+    curr_pos = rg.targetPosition();
+  } else {
     curr_pos = getPositionAfterCommandsCompleted();
   }
   int32_t new_pos = curr_pos + move;
@@ -418,9 +417,7 @@ int FastAccelStepper::move(int32_t move) {
   }
   return moveTo(new_pos);
 }
-void FastAccelStepper::stopMove() {
-  rg.initiate_stop();
-}
+void FastAccelStepper::stopMove() { rg.initiate_stop(); }
 void FastAccelStepper::disableOutputs() {
   if (_enablePinLowActive != PIN_UNDEFINED) {
     digitalWrite(_enablePinLowActive, HIGH);

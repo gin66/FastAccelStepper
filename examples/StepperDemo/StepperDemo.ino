@@ -166,18 +166,18 @@ void info(FastAccelStepper *s) {
   }
   Serial.print(" state=");
   switch (s->rampState() & RAMP_MOVE_MASK) {
-	  case RAMP_MOVE_UP:
-		  Serial.print("+");
-		  break;
-	  case RAMP_MOVE_DOWN:
-		  Serial.print("-");
-		  break;
-	  case 0:
-		  Serial.print("=");
-		  break;
-	  default:
-		  Serial.print("ERR");
-		  break;
+    case RAMP_MOVE_UP:
+      Serial.print("+");
+      break;
+    case RAMP_MOVE_DOWN:
+      Serial.print("-");
+      break;
+    case 0:
+      Serial.print("=");
+      break;
+    default:
+      Serial.print("ERR");
+      break;
   }
   switch (s->rampState() & RAMP_STATE_MASK) {
     case RAMP_STATE_IDLE:
