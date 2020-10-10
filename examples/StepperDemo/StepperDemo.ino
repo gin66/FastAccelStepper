@@ -165,7 +165,21 @@ void info(FastAccelStepper *s) {
     Serial.print(" STOP ");
   }
   Serial.print(" state=");
-  switch (s->rampState()) {
+  switch (s->rampState() & RAMP_MOVE_MASK) {
+	  case RAMP_MOVE_UP:
+		  Serial.print("+");
+		  break;
+	  case RAMP_MOVE_DOWN:
+		  Serial.print("-");
+		  break;
+	  case 0:
+		  Serial.print("=");
+		  break;
+	  default:
+		  Serial.print("ERR");
+		  break;
+  }
+  switch (s->rampState() & RAMP_STATE_MASK) {
     case RAMP_STATE_IDLE:
       Serial.print("IDLE ");
       break;
@@ -181,8 +195,9 @@ void info(FastAccelStepper *s) {
     case RAMP_STATE_COAST:
       Serial.print("COAST ");
       break;
+    default:
+      Serial.print(s->rampState());
   }
-  Serial.print(s->rampState());
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   Serial.print(" max/us=");
   Serial.print(s->max_micros);

@@ -78,7 +78,7 @@ int RampGenerator::calculate_moveTo(int32_t target_pos,
   if (target_pos > position_at_queue_end) {
 	  start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_UP;
   }
-  else if (target_pos > position_at_queue_end) {
+  else if (target_pos < position_at_queue_end) {
 	  start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_DOWN;
   }
   else {

@@ -381,16 +381,14 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
 int FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos;
   if (isrSpeedControlEnabled()) {
-	curr_pos = rg.targetPosition();
-  }
-  else {
 	if (rg.is_stopping()) {
 		return MOVE_ERR_STOP_ONGOING;
 	}
+	curr_pos = rg.targetPosition();
+  }
+  else {
     curr_pos = getPositionAfterCommandsCompleted();
   }
-  int32_t move;
-  move = position - curr_pos;
   inject_fill_interrupt(1);
   int res = rg.calculate_moveTo(position, &rg._config,
                               fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
