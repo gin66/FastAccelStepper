@@ -19,12 +19,6 @@ void inject_fill_interrupt(int mark) {}
 void noInterrupts() {}
 void interrupts() {}
 
-uint32_t normalize_speed(uint32_t ticks) {
-  uint32_t d = (ticks >> 16) + 1;
-  uint32_t period = ticks / d;
-  return period * d;
-}
-
 class RampChecker {
  public:
   RampChecker();
@@ -61,7 +55,9 @@ void RampChecker::check_section(struct queue_entry *e) {
   steps >>= 1;
   assert(steps >= 1);
   pos += steps;
-  uint32_t start_dt = e->period * e->n_periods;
+  uint32_t start_dt = PERIOD_TICKS;
+  start_dt *= e->n_periods;
+  start_dt += e->period;
 
   min_dt = min(min_dt, start_dt);
   float accel = 0;
@@ -138,7 +134,7 @@ void basic_test_with_empty_queue() {
   }
   test(!s.isrSpeedControlEnabled(), "too many commands created");
   printf("%d\n", rc.min_dt);
-  test(rc.min_dt == normalize_speed(160000), "max speed not reached");
+  test(rc.min_dt == 160000, "max speed not reached");
 }
 
 void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,

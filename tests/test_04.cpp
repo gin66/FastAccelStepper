@@ -52,7 +52,9 @@ void RampChecker::check_section(struct queue_entry *e) {
   }
   steps >>= 1;
   assert(steps >= 1);
-  uint32_t start_dt = e->period * e->n_periods;
+  uint32_t start_dt = PERIOD_TICKS;
+  start_dt *= e->n_periods;
+  start_dt += e->period;
   uint32_t end_dt = start_dt;
 
   min_dt = min(min_dt, min(start_dt, end_dt));

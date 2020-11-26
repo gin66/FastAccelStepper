@@ -122,7 +122,7 @@ The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 
-The compare interrupt routines use two staged tick counters. One byte (n_periods) + one word (period). The max tick counter value is 254*65535. At 16 MHz this comes down to 1.04s. Thus the lower speed limit is approx 1 step per second.
+The compare interrupt routines use two staged tick counters. One byte (n_periods) + one word (period). The max tick counter value is ABSOLUTE_MAX_TICKS. At 16 MHz this comes down to approx 1s. Thus the lower speed limit is approx 1 step per second.
 
 The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed (beware of any Serial.print in your hot path).
 

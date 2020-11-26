@@ -20,6 +20,8 @@ FastAccelStepper.o: FastAccelStepper.cpp FastAccelStepper.h PoorManFloat.h Stepp
 
 PoorManFloat.o: PoorManFloat.cpp PoorManFloat.h
 
+StepperISR_test.o: StepperISR_test.cpp StepperISR.h
+
 test_%.o: test_%.cpp stubs.h
 
 FastAccelStepper.cpp: symlinks

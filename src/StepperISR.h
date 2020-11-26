@@ -143,22 +143,23 @@ class StepperQueue {
     // division is approximated, because PERIOD_TICKS is close to 65536. Perform
     // first "division by 65536", which serves too identifying the need of
     // adding fixed delays.
-    uint8_t n_periods = ticks >> 16;
+    uint32_t period_ticks = ticks;
+    uint8_t n_periods = period_ticks >> 16;
     if (n_periods > 0) {
       // In this case, PERIOD_TICKS delays need to be inserted
       // Based on division by 65536, n_periods is off by 0..6 in case F_CPU =
       // 16MHz
       uint32_t fixed_ticks = PERIOD_TICKS;
       fixed_ticks *= n_periods;
-      ticks -= fixed_ticks;
+      period_ticks -= fixed_ticks;
       // Consequently a loop is acceptable compared to 32bit/16bit division and
       // remainder operations.
-      while (ticks > 65535) {
+      while (period_ticks > 65535) {
         n_periods += 1;
-        ticks -= PERIOD_TICKS;
+        period_ticks -= PERIOD_TICKS;
       }
     }
-    uint16_t period = ticks;
+    uint16_t period = period_ticks;
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
