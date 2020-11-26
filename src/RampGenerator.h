@@ -1,6 +1,20 @@
 #ifndef RAMP_GENERATOR_H
 #define RAMP_GENERATOR_H
 
+#if defined(TEST)
+#define MAX_STEPPER 2
+#define TICKS_PER_S 16000000L
+#elif defined(ARDUINO_ARCH_AVR)
+#define MAX_STEPPER 2
+#define TICKS_PER_S F_CPU
+#elif defined(ARDUINO_ARCH_ESP32)
+#define MAX_STEPPER 6
+#define TICKS_PER_S 16000000L
+#else
+#define MAX_STEPPER 6
+#define TICKS_PER_S 16000000L
+#endif
+
 class FastAccelStepper;
 
 struct ramp_command_s {
@@ -9,7 +23,7 @@ struct ramp_command_s {
   bool count_up;
 };
 
-#if (F_CPU == 16000000)
+#if (TICKS_PER_S == 16000000)
 #define UPM_TICKS_PER_S ((upm_float)0x97f4)
 #else
 #define UPM_TICKS_PER_S upm_timer_freq
@@ -59,7 +73,7 @@ class RampGenerator {
                          struct ramp_command_s *command);
 
  private:
-#if (F_CPU != 16000000)
+#if (TICKS_PER_S != 16000000)
   upm_float upm_timer_freq;
 #endif
   void update_ramp_steps();

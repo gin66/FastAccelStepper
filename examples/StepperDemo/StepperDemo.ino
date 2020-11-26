@@ -41,19 +41,28 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 #elif defined(ARDUINO_ARCH_ESP32)
 // Example hardware configuration for esp32 board.
 // Please adapt to your configuration
-const uint8_t led_pin = 2;
+const uint8_t led_pin = 21;
 const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     {
-      step : 23,
-      enable_low_active : 21,
+      step : 33,
+      enable_low_active : 25,
       enable_high_active : PIN_UNDEFINED,
-      direction : 22,
+      direction : 32,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-    {step : PIN_UNDEFINED},  // unused stepper slot
+    {
+      step : 26,
+      enable_low_active : 12,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 27,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
     {step : PIN_UNDEFINED},  // unused stepper slot
     {step : PIN_UNDEFINED},  // unused stepper slot
     {step : PIN_UNDEFINED},  // unused stepper slot
@@ -113,6 +122,10 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
 void setup() {
   Serial.begin(115200);
   Serial.println("Demo Stepper");
+  Serial.print("    F_CPU=");
+  Serial.println(F_CPU);
+  Serial.print("    TICKS_PER_S=");
+  Serial.println(TICKS_PER_S);
 
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
@@ -157,6 +170,9 @@ void info(FastAccelStepper *s) {
   Serial.print(s->getCurrentPosition());
   Serial.print(" QueueEnd=");
   Serial.print(s->getPositionAfterCommandsCompleted());
+  Serial.print("/");
+  Serial.print(s->getPeriodAfterCommandsCompleted());
+  Serial.print("µs");
   Serial.print(" Target=");
   Serial.print(s->targetPos());
   if (s->isRunning()) {
@@ -164,7 +180,7 @@ void info(FastAccelStepper *s) {
   } else {
     Serial.print(" STOP ");
   }
-  Serial.print(" state=");
+  Serial.print(" ");
   switch (s->rampState() & RAMP_MOVE_MASK) {
     case RAMP_MOVE_UP:
       Serial.print("+");

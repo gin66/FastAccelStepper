@@ -21,27 +21,13 @@
 #define TEST_CREATE_QUEUE_CHECKSUM 0
 #endif
 
-#if defined(TEST)
-#define MAX_STEPPER 2
-#define TICKS_PER_S 16000000L
-#elif defined(ARDUINO_ARCH_AVR)
-#define MAX_STEPPER 2
-#define TICKS_PER_S F_CPU
-#elif defined(ARDUINO_ARCH_ESP32)
-#define MAX_STEPPER 6
-#define TICKS_PER_S 16000000L
-#else
-#define MAX_STEPPER 6
-#define TICKS_PER_S 16000000L
-#endif
-
 #if !defined(ARDUINO_ARCH_ESP32) && !defined(ARDUINO_ARCH_AVR)
 #ifndef F_CPU
 #define F_CPU 16000000L
 #endif
 #endif
 
-#define MIN_DELTA_TICKS (F_CPU / 50000)
+#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #define MIN_REMAINING_PERIOD_TICKS (2 * MIN_DELTA_TICKS)
 #define PERIOD_TICKS (65535 - MIN_REMAINING_PERIOD_TICKS)
 #define ABSOLUTE_MAX_TICKS (255L * PERIOD_TICKS)
@@ -168,6 +154,10 @@ class FastAccelStepper {
   // Get the future position of the stepper after all commands in queue are
   // completed
   int32_t getPositionAfterCommandsCompleted();
+
+  // Get the future speed of the stepper after all commands in queue are
+  // completed. This is in µs. Returns 0 for stopped motor
+  uint32_t getPeriodAfterCommandsCompleted();
 
   // Set the future position of the stepper after all commands in queue are
   // completed. This has immediate effect to getCurrentPosition().

@@ -40,10 +40,8 @@ void RampGenerator::init() {
   _config.upm_inv_accel2 = 0;
   _ro.target_pos = 0;
   _rw.ramp_state = RAMP_STATE_IDLE;
-#ifdef F_CPU
-#if (F_CPU != 16000000)
-  upm_timer_freq = upm_from((uint32_t)F_CPU);
-#endif
+#if (TICKS_PER_S != 16000000)
+  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
 }
 void RampGenerator::update_ramp_steps() {
@@ -55,8 +53,7 @@ void RampGenerator::setSpeed(uint32_t min_step_us) {
   update_ramp_steps();
 }
 void RampGenerator::setAcceleration(uint32_t accel) {
-  uint32_t tmp = TICKS_PER_S / 2;
-  upm_float upm_inv_accel = upm_from(tmp / accel);
+  upm_float upm_inv_accel = divide(UPM_TICKS_PER_S,upm_from(2*accel));
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
@@ -153,24 +150,11 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
     next_state |= move_state;
   }
 
-  switch (rw->ramp_state & RAMP_STATE_MASK) {
-    case RAMP_STATE_COAST:
-      break;
-    case RAMP_STATE_ACCELERATE:
-      break;
-    case RAMP_STATE_DECELERATE:
-      break;
-    case RAMP_STATE_DECELERATE_TO_STOP:
-      break;
-  }
-
-  // TODO:explain the 16000
-  uint32_t planning_steps = max(16000 / ticks_at_queue_end, 1);
+  // Forward planning of 1ms or more on slow speed.
+  uint32_t planning_steps = max((TICKS_PER_S/1000) / ticks_at_queue_end, 1);
   uint32_t next_ticks;
 
   rw->ramp_state = next_state;
-
-  // Forward planning of minimum 10ms or more on slow speed.
 
 #ifdef TEST
   printf("pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d  ",

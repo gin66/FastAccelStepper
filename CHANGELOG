@@ -1,6 +1,9 @@
 0.8.1:
 - Fix issue #8: Long step times are less accurate than short ones
   => All time delta between steps are cycle accurate
+- Add getPeriodAfterCommandsCompleted() to API
+- Fix bug due to AutoEnable at ramp start (can find at low speeds)
+- StepperDemo outputs: F_CPU/TICKS_PER_S and stepper period at queue end
 
 0.8.0:
 - Change direction with running motor is possible !!!

@@ -124,6 +124,7 @@ class StepperQueue {
       if (on_delay_ticks > 0) {
         int res = _addQueueEntry(on_delay_ticks, 1, dir);
         if ((res != AQE_OK) || (steps == 1)) {
+          ticks_at_queue_end = ticks; // if steps == 1, wrong value in ticks_at_queue_end
           return res;
         }
         steps -= 1;

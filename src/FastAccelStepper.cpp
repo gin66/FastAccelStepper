@@ -247,7 +247,6 @@ void FastAccelStepper::isr_fill_queue() {
     // For run time measurement
     uint32_t runtime_us = micros();
 #endif
-
     rg.single_fill_queue(&rg._ro, &rg._rw,
                          fas_queue[_queue_num].ticks_at_queue_end,
                          getPositionAfterCommandsCompleted(), &cmd);
@@ -436,6 +435,13 @@ void FastAccelStepper::enableOutputs() {
 }
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return fas_queue[_queue_num].pos_at_queue_end;
+}
+uint32_t FastAccelStepper::getPeriodAfterCommandsCompleted() {
+  uint32_t ticks = fas_queue[_queue_num].ticks_at_queue_end;
+  if (ticks == TICKS_FOR_STOPPED_MOTOR) {
+	  return 0;
+  }
+  return ticks / (TICKS_PER_S/1000L) * 1000;
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   struct StepperQueue* q = &fas_queue[_queue_num];

@@ -138,7 +138,7 @@ void basic_test_with_empty_queue() {
 }
 
 void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
-                    uint16_t accel, bool reach_max_speed, float min_time,
+                    uint32_t accel, bool reach_max_speed, float min_time,
                     float max_time, float allowed_ramp_time_delta) {
   printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n", name,
          steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
@@ -179,8 +179,8 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
       rc.check_section(
           &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
-      fprintf(gp_file, "%.6f %d\n", rc.total_ticks / 1000000.0,
-              1000000 / rc.last_dt);
+      fprintf(gp_file, "%.6f %.2f\n", rc.total_ticks / 1000000.0,
+              16000000.0 / rc.last_dt);
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
@@ -284,5 +284,8 @@ int main() {
 
   // ramp time  625s, 7812500 steps
   // test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
+  
+  // slow ramp time
+  test_with_pars("f19", 1000, 10, 1, false, 62.0, 63.0, 1.0);
   printf("TEST_02 PASSED\n");
 }
