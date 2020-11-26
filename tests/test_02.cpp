@@ -193,6 +193,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
   fprintf(gp_file, "plot $data using 1:2 with linespoints\n");
   fprintf(gp_file, "pause -1\n");
   fclose(gp_file);
+  printf("TEST=%s\n", name);
   test(!s.isrSpeedControlEnabled(), "too many commands created");
   printf("Total time  %f < %f < %f ?\n", min_time, rc.total_ticks / 16000000.0,
          max_time);
@@ -275,7 +276,7 @@ int main() {
   // ramp time 50s, thus with 1000s max speed not reached. 1000steps need 20s
   test_with_pars("f14", 2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2, 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 1s
-  test_with_pars("f15", 12500, 4000, 5, true, 100.0 - 0.7, 100.0 + 0.2, 0.2);
+  test_with_pars("f15", 12600, 4000, 5, true, 100.0 - 0.7, 100.0 + 0.2, 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 16s
   test_with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.7, 116.0 + 0.2, 0.2);
 
