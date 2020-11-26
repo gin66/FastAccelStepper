@@ -441,7 +441,7 @@ uint32_t FastAccelStepper::getPeriodAfterCommandsCompleted() {
   if (ticks == TICKS_FOR_STOPPED_MOTOR) {
 	  return 0;
   }
-  return ticks / (TICKS_PER_S/1000L) * 1000;
+  return ticks / (TICKS_PER_S/1000000L);
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   struct StepperQueue* q = &fas_queue[_queue_num];
