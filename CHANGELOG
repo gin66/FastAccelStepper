@@ -1,3 +1,7 @@
+0.8.1:
+- Fix issue #8: Long step times are less accurate than short ones
+  => All time delta between steps are cycle accurate
+
 0.8.0:
 - Change direction with running motor is possible !!!
 - stopMove() can be called from interrupt routine

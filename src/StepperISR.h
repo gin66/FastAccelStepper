@@ -61,8 +61,8 @@ struct mapping_s {
 
 struct queue_entry {
   uint8_t steps;  // coding is bit7..1 is nr of steps and bit 0 is direction
-  uint8_t n_periods;
-  uint16_t period;
+  uint8_t n_periods; // number of PERIOD_TICKS delays
+  uint16_t period;   // remaining period time in addition to n_periods*PERIOD_TICKS delays
 };
 class StepperQueue {
  public:
@@ -82,8 +82,8 @@ class StepperQueue {
 #if defined(ARDUINO_ARCH_AVR)
   // This is used in the timer compare unit as extension of the 16 timer
   uint8_t skip;
-  uint16_t period;
 #endif
+  uint16_t period;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint8_t checksum;
 #endif
@@ -135,16 +135,26 @@ class StepperQueue {
     if (isQueueFull()) {
       return AQE_FULL;
     }
-    uint16_t period;
-    uint8_t n_periods;
-    if (ticks > 65535) {
-      n_periods = ticks >> 16;
-      n_periods += 1;
-      period = ticks / n_periods;
-    } else {
-      period = ticks;
-      n_periods = 1;
+	// For ticks > 65536, there will be several fixed delays with PERIOD_TICKS inserted.
+	// The formula behind is:
+	//		ticks = n_periods * PERIOD_TICKS + period
+	// In order to avoid division/remainder operation (on avr actually), the division is
+	// approximated, because PERIOD_TICKS is close to 65536. 
+	// Perform first "division by 65536", which serves too identifying the need of adding fixed delays.
+	uint8_t n_periods = ticks >> 16;
+    if (n_periods > 0) {
+	  // In this case, PERIOD_TICKS delays need to be inserted
+	  // Based on division by 65536, n_periods is off by 0..6 in case F_CPU = 16MHz
+	  uint32_t fixed_ticks = PERIOD_TICKS;
+	  fixed_ticks *= n_periods;
+	  ticks -= fixed_ticks;
+	  // Consequently a loop is acceptable compared to 32bit/16bit division and remainder operations.
+	  while (ticks > 65535) {
+	     n_periods += 1;
+		 ticks -= PERIOD_TICKS;
+	  }
     }
+    uint16_t period = ticks;
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];

@@ -75,20 +75,24 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
-  mcpwm->timer[timer].period.period = e->period;
   uint8_t steps = e->steps;
-  PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // update only on zero
+  PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // is updated only on zero
   if ((steps & 0x01) != 0) {
     uint8_t dirPin = queue->dirPin;
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
   }
   uint8_t n_periods = e->n_periods;
-  if (n_periods == 1) {
+  uint16_t period = e->period;
+  queue->period = period;
+  if (n_periods == 0) {
+    mcpwm->timer[timer].period.period = period;
     mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
     mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
   } else {
+    mcpwm->timer[timer].period.period = PERIOD_TICKS;
     queue->current_n_periods = n_periods;
-    queue->current_period = 1;  // mcpwm is already running in period 1
+    // period = 0..n_period-1 is PERIOD_TICKS, period = n_period is queue.period
+    queue->current_period = 0;
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     mcpwm->int_clr.val = mapping->timer_tez_int_clr;
     mcpwm->int_ena.val |= mapping->timer_tez_int_ena;
@@ -116,17 +120,25 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
   }
 }
 
+// MCPWM_SERVICE is only used to add PERIOD_TICKS delays before toggle step pin
 #define MCPWM_SERVICE(mcpwm, TIMER, pcnt)                            \
   if (mcpwm.int_st.timer##TIMER##_tez_int_st != 0) {                 \
     mcpwm.int_clr.timer##TIMER##_tez_int_clr = 1;                    \
-    uint8_t cp = fas_queue[pcnt].current_period + 1;                 \
+    uint8_t cp = fas_queue[pcnt].current_period;                     \
+	uint16_t period;                                                 \
+    /* period = 0..n_period-1 is PERIOD_TICKS */                     \
+	/* period = n_period is queue.period */                          \
     if (fas_queue[pcnt].current_n_periods == cp) {                   \
       mcpwm.channel[TIMER].generator[0].utez = 2; /* high at zero */ \
-      fas_queue[pcnt].current_period = 0;                            \
+      period = fas_queue[pcnt].period;                               \
+      cp = 0;                                                        \
     } else {                                                         \
+	  period = PERIOD_TICKS;                                         \
       mcpwm.channel[TIMER].generator[0].utez = 1; /* low at zero */  \
-      fas_queue[pcnt].current_period = cp;                           \
+      cp++;                                                          \
     }                                                                \
+    fas_queue[pcnt].current_period = cp;                             \
+    mcpwm.timer[TIMER].period.period = period;                       \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {

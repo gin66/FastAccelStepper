@@ -44,7 +44,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       if ((--queue.skip) == 0) {                                             \
         Stepper_Toggle(CHANNEL);                                             \
       }                                                                      \
-      ocr += queue.period;                                                   \
+      ocr += PERIOD_TICKS;                                                   \
       return;                                                                \
     }                                                                        \
     uint8_t rp = queue.read_idx;                                             \
@@ -54,8 +54,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       if ((e->steps -= 2) > 1) {                                             \
         /* perform another step with this queue entry */                     \
         ocr += queue.period;                                                 \
-        if ((queue.skip = e->n_periods -                                     \
-                          1)) { /* assign to skip and test for not zero */   \
+        if (0 != (queue.skip = e->n_periods)) {                              \
+          /* assign to skip and test for not zero */                         \
           Stepper_Zero(CHANNEL);                                             \
         }                                                                    \
         return;                                                              \
@@ -80,8 +80,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     /* command in queue */                                                   \
     struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];               \
     ocr += (queue.period = e->period);                                       \
-    if ((queue.skip =                                                        \
-             e->n_periods - 1)) { /* assign to skip and test for not zero */ \
+    if (0 != (queue.skip = e->n_periods)) {                                  \
+      /* assign to skip and test for not zero */                             \
       Stepper_Zero(CHANNEL);                                                 \
     } else {                                                                 \
       Stepper_Toggle(CHANNEL);                                               \
