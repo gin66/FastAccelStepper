@@ -76,7 +76,8 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
-  PCNT.conf_unit[timer].conf2.cnt_h_lim = steps >> 1;  // is updated only on zero
+  PCNT.conf_unit[timer].conf2.cnt_h_lim =
+      steps >> 1;  // is updated only on zero
   if ((steps & 0x01) != 0) {
     uint8_t dirPin = queue->dirPin;
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
@@ -125,15 +126,15 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
   if (mcpwm.int_st.timer##TIMER##_tez_int_st != 0) {                 \
     mcpwm.int_clr.timer##TIMER##_tez_int_clr = 1;                    \
     uint8_t cp = fas_queue[pcnt].current_period;                     \
-	uint16_t period;                                                 \
+    uint16_t period;                                                 \
     /* period = 0..n_period-1 is PERIOD_TICKS */                     \
-	/* period = n_period is queue.period */                          \
+    /* period = n_period is queue.period */                          \
     if (fas_queue[pcnt].current_n_periods == cp) {                   \
       mcpwm.channel[TIMER].generator[0].utez = 2; /* high at zero */ \
       period = fas_queue[pcnt].period;                               \
       cp = 0;                                                        \
     } else {                                                         \
-	  period = PERIOD_TICKS;                                         \
+      period = PERIOD_TICKS;                                         \
       mcpwm.channel[TIMER].generator[0].utez = 1; /* low at zero */  \
       cp++;                                                          \
     }                                                                \

@@ -60,9 +60,10 @@ struct mapping_s {
 #endif
 
 struct queue_entry {
-  uint8_t steps;  // coding is bit7..1 is nr of steps and bit 0 is direction
-  uint8_t n_periods; // number of PERIOD_TICKS delays
-  uint16_t period;   // remaining period time in addition to n_periods*PERIOD_TICKS delays
+  uint8_t steps;      // coding is bit7..1 is nr of steps and bit 0 is direction
+  uint8_t n_periods;  // number of PERIOD_TICKS delays
+  uint16_t period;    // remaining period time in addition to
+                      // n_periods*PERIOD_TICKS delays
 };
 class StepperQueue {
  public:
@@ -135,24 +136,27 @@ class StepperQueue {
     if (isQueueFull()) {
       return AQE_FULL;
     }
-	// For ticks > 65536, there will be several fixed delays with PERIOD_TICKS inserted.
-	// The formula behind is:
-	//		ticks = n_periods * PERIOD_TICKS + period
-	// In order to avoid division/remainder operation (on avr actually), the division is
-	// approximated, because PERIOD_TICKS is close to 65536. 
-	// Perform first "division by 65536", which serves too identifying the need of adding fixed delays.
-	uint8_t n_periods = ticks >> 16;
+    // For ticks > 65536, there will be several fixed delays with PERIOD_TICKS
+    // inserted. The formula behind is:
+    //		ticks = n_periods * PERIOD_TICKS + period
+    // In order to avoid division/remainder operation (on avr actually), the
+    // division is approximated, because PERIOD_TICKS is close to 65536. Perform
+    // first "division by 65536", which serves too identifying the need of
+    // adding fixed delays.
+    uint8_t n_periods = ticks >> 16;
     if (n_periods > 0) {
-	  // In this case, PERIOD_TICKS delays need to be inserted
-	  // Based on division by 65536, n_periods is off by 0..6 in case F_CPU = 16MHz
-	  uint32_t fixed_ticks = PERIOD_TICKS;
-	  fixed_ticks *= n_periods;
-	  ticks -= fixed_ticks;
-	  // Consequently a loop is acceptable compared to 32bit/16bit division and remainder operations.
-	  while (ticks > 65535) {
-	     n_periods += 1;
-		 ticks -= PERIOD_TICKS;
-	  }
+      // In this case, PERIOD_TICKS delays need to be inserted
+      // Based on division by 65536, n_periods is off by 0..6 in case F_CPU =
+      // 16MHz
+      uint32_t fixed_ticks = PERIOD_TICKS;
+      fixed_ticks *= n_periods;
+      ticks -= fixed_ticks;
+      // Consequently a loop is acceptable compared to 32bit/16bit division and
+      // remainder operations.
+      while (ticks > 65535) {
+        n_periods += 1;
+        ticks -= PERIOD_TICKS;
+      }
     }
     uint16_t period = ticks;
 
