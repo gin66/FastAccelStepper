@@ -488,15 +488,25 @@ bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
 bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
-void FastAccelStepper::forwardStep() {
+void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
     addQueueEntry(MIN_DELTA_TICKS, 1, _dirHighCountsUp);
+    if (blocking) {
+      while (isRunning()) {
+        // busy wait
+      }
+    }
   }
 }
-void FastAccelStepper::backwardStep() {
+void FastAccelStepper::backwardStep(bool blocking) {
   if (!isRunning()) {
     if (_dirPin != PIN_UNDEFINED) {
       addQueueEntry(MIN_DELTA_TICKS, 1, !_dirHighCountsUp);
+      if (blocking) {
+        while (isRunning()) {
+          // busy wait
+        }
+      }
     }
   }
 }

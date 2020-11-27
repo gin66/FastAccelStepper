@@ -73,7 +73,7 @@ class StepperQueue {
   uint32_t on_delay_ticks;
   uint8_t dirPin;
   bool dirHighCountsUp;
-  bool isRunning;
+  volatile bool isRunning;
 #if defined(ARDUINO_ARCH_ESP32)
   const struct mapping_s* mapping;
   // These two variables are for the mcpwm interrupt

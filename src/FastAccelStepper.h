@@ -130,8 +130,9 @@ class FastAccelStepper {
   // If stepper is moving, this is a no-op.
   // backwardStep() is a no-op, if no direction pin defined
   // It will immediately let the stepper perform one single step.
-  void forwardStep();
-  void backwardStep();
+  // If blocking = true, then the routine will wait till isRunning() is false
+  void forwardStep(bool blocking = false);
+  void backwardStep(bool blocking = false);
 
   // stop the running stepper as fast as possible with deceleration
   // This only sets a flag and can be called from an interrupt !

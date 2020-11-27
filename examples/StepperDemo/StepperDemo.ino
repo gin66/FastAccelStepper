@@ -373,11 +373,13 @@ void loop() {
           }
         } else if (strcmp(in_buffer, "+") == 0) {
           if (!stepper_selected->isRunning()) {
-            stepper_selected->forwardStep();
+            stepper_selected->forwardStep(true);
+            Serial.println("Stepped forward");
           }
         } else if (strcmp(in_buffer, "-") == 0) {
           if (!stepper_selected->isRunning()) {
-            stepper_selected->backwardStep();
+            stepper_selected->backwardStep(true);
+            Serial.println("Stepped backward");
           }
         }
       }
