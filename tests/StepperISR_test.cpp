@@ -8,7 +8,6 @@
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 	_initVars();
 }
-bool StepperQueue::startQueue(struct queue_entry *e) {
+void StepperQueue::startQueue() {
 	isRunning = true;
-	return false;
 }
