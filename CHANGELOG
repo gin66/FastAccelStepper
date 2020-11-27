@@ -1,6 +1,7 @@
 pre 0.8.3:
 - AVR: timer compare interrupts are only enabled, if stepper is running.
 - AVR: on arrival of a command, the queue is started with few µs delay
+- Implement backwardStep() and forwardStep()
 
 0.8.2:
 - Solved issue: Queue is filled too much, which cause slow response to speed/acceleration changes

@@ -260,8 +260,8 @@ void StepperQueue::startQueue() {
   while (mcpwm->timer[timer].status.value >= TIMER_H_L_TRANSITION) {
   }
 
-  // my interrupt cannot be called in this state, so modifying read_idx without interrupts
-  // disabled is ok
+  // my interrupt cannot be called in this state, so modifying read_idx without
+  // interrupts disabled is ok
   uint8_t rp = q->read_idx++;
   struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
   next_command(this, e);

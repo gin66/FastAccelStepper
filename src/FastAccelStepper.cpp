@@ -488,6 +488,18 @@ bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
 bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning; }
+void FastAccelStepper::forwardStep() {
+  if (!isRunning()) {
+    addQueueEntry(MIN_DELTA_TICKS, 1, _dirHighCountsUp);
+  }
+}
+void FastAccelStepper::backwardStep() {
+  if (!isRunning()) {
+    if (_dirPin != PIN_UNDEFINED) {
+      addQueueEntry(MIN_DELTA_TICKS, 1, !_dirHighCountsUp);
+    }
+  }
+}
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
 uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }
 #endif

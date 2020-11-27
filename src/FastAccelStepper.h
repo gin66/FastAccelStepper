@@ -126,6 +126,13 @@ class FastAccelStepper {
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -4
 #define MOVE_ERR_STOP_ONGOING -5
 
+  // forwardStep()/backwardstep() can be called, while stepper is not moving
+  // If stepper is moving, this is a no-op.
+  // backwardStep() is a no-op, if no direction pin defined
+  // It will immediately let the stepper perform one single step.
+  void forwardStep();
+  void backwardStep();
+
   // stop the running stepper as fast as possible with deceleration
   // This only sets a flag and can be called from an interrupt !
   // Another move/moveTo must wait, till the motor has stopped

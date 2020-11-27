@@ -244,6 +244,8 @@ const static char usage_str[] PROGMEM =
     "     O         ... Put selected stepper into auto enable mode\n"
     "     S         ... Stop selected stepper with deceleration\n"
     "     I         ... Toggle motor info, while any motor is running\n"
+    "     +         ... Perform one step forward of the selected motor\n"
+    "     -         ... Perform one step backward of the selected motor\n"
     "     T         ... Test selected motor with direct port access\n"
     "     ?         ... Print this usage\n"
     "\n";
@@ -368,6 +370,14 @@ void loop() {
         } else if (strcmp(in_buffer, "T") == 0) {
           if (!stepper_selected->isRunning()) {
             test_direct_drive(&stepper_config[selected]);
+          }
+        } else if (strcmp(in_buffer, "+") == 0) {
+          if (!stepper_selected->isRunning()) {
+            stepper_selected->forwardStep();
+          }
+        } else if (strcmp(in_buffer, "-") == 0) {
+          if (!stepper_selected->isRunning()) {
+            stepper_selected->backwardStep();
           }
         }
       }
