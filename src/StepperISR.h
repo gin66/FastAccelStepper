@@ -231,6 +231,11 @@ class StepperQueue {
     return false;
   }
 
+  // startQueue is called, if motor is not running.
+  // The parameter provided, is the first queue entry.
+  // If - while queue is started - the first queue entry is consumed,
+  // then that entry need not to be put into the command queue (return value = false).
+  // In case return value is true, then the first queue entry is consumed.
   bool startQueue(struct queue_entry* e);
   void _initVars() {
     dirPin = PIN_UNDEFINED;
