@@ -262,8 +262,7 @@ void StepperQueue::startQueue() {
 
   // my interrupt cannot be called in this state, so modifying read_idx without
   // interrupts disabled is ok
-  uint8_t rp = q->read_idx++;
-  struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
+  struct queue_entry *e = &entry[read_idx++ & QUEUE_LEN_MASK];
   next_command(this, e);
 }
 #endif
