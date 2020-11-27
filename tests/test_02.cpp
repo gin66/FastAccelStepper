@@ -24,7 +24,7 @@ class RampChecker {
   RampChecker();
   void check_section(struct queue_entry *e);
 
-  uint32_t total_ticks;
+  uint64_t total_ticks;
   uint32_t last_dt;
   uint32_t min_dt;
   bool increase_ok;
@@ -179,8 +179,8 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
       rc.check_section(
           &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
-      fprintf(gp_file, "%.6f %.2f\n", rc.total_ticks / 1000000.0,
-              16000000.0 / rc.last_dt);
+      fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
+              16000000.0 / rc.last_dt, rc.last_dt);
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
@@ -288,5 +288,11 @@ int main() {
   
   // slow ramp time
   test_with_pars("f19", 1000, 10, 1, false, 62.0, 63.0, 1.0);
+
+  // name, steps, travel_dt, accel, reach_max_speed, min_time, max_time, allowed_ramp_time_delta
+  // slow ramp time
+//  test_with_pars("f20", 50000, 270000, 10, true, 62.0, 63.0, 1.0);
+  test_with_pars("f20", 20, 270000, 1, true, 62.0, 63.0, 1.0);
+
   printf("TEST_02 PASSED\n");
 }

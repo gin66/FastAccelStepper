@@ -172,7 +172,7 @@ void info(FastAccelStepper *s) {
   Serial.print(s->getPositionAfterCommandsCompleted());
   Serial.print("/");
   Serial.print(s->getPeriodAfterCommandsCompleted());
-  Serial.print("µs");
+  Serial.print("us");
   Serial.print(" Target=");
   Serial.print(s->targetPos());
   if (s->isRunning()) {
