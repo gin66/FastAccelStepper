@@ -226,7 +226,7 @@ void info(FastAccelStepper *s) {
 }
 
 const static char usage_str[] PROGMEM =
-    "Enter commands separated by space or newline:\n"
+    "Enter commands separated by space, carriage return or newline:\n"
     "     M1/M2/..  ... to select stepper\n"
     "     A<accel>  ... Set selected stepper's acceleration\n"
     "     V<speed>  ... Set selected stepper's speed\n"
@@ -295,7 +295,7 @@ void loop() {
     char ch = Serial.read();
     if (in_ptr == 255) {
       in_ptr = 0;
-    } else if ((ch == ' ') || (ch == '\n')) {
+    } else if ((ch == ' ') || (ch == '\n') || (ch == '\r'))) {
       long val;
       in_buffer[in_ptr] = 0;
       if ((strcmp(in_buffer, "M1") == 0) && stepper[0]) {
