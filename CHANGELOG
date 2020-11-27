@@ -1,3 +1,7 @@
+0.8.2:
+- Solved issue: Queue is filled too much, which cause slow response to speed/acceleration changes
+  => Queue is filled to max ~10ms into the future.
+
 0.8.1:
 - Fix issue #8: Long step times are less accurate than short ones
   => All time delta between steps are cycle accurate

@@ -242,13 +242,15 @@ void FastAccelStepper::isr_fill_queue() {
 
   // preconditions are fulfilled, so create the command(s)
   struct ramp_command_s cmd;
-  while (!isQueueFull() && isrSpeedControlEnabled()) {
+  StepperQueue *q = &fas_queue[_queue_num];
+  // Plan ahead for max. 10 ms. Currently hard coded
+  while (!isQueueFull() && isrSpeedControlEnabled() && !q->hasTicksInQueue(TICKS_PER_S/100)) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     uint32_t runtime_us = micros();
 #endif
     rg.single_fill_queue(&rg._ro, &rg._rw,
-                         fas_queue[_queue_num].ticks_at_queue_end,
+                         q->ticks_at_queue_end,
                          getPositionAfterCommandsCompleted(), &cmd);
 
     addQueueEntry(cmd.ticks, cmd.steps,

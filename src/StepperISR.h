@@ -200,6 +200,35 @@ class StepperQueue {
     }
     return AQE_OK;
   }
+  bool hasTicksInQueue(uint32_t min_ticks) {
+    noInterrupts();
+    uint8_t rp = read_idx;
+    uint8_t wp = next_write_idx;
+    interrupts();
+	if (wp == rp) {
+		return 0;
+	}
+	rp++; // ignore currently processed entry
+	while (wp != rp) {
+        struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+		uint8_t steps = e->steps >> 1;
+		uint32_t tmp = e->period;
+		tmp *= steps;
+		if (tmp >= min_ticks) {
+			return true;
+		}
+		min_ticks -= tmp;
+		tmp = e->n_periods;
+		tmp *= steps;
+		tmp *= PERIOD_TICKS;
+		if (tmp >= min_ticks) {
+			return true;
+		}
+		min_ticks -= tmp;
+		rp++;
+	}
+	return false;
+  }
 
   bool startQueue(struct queue_entry* e);
   void _initVars() {
