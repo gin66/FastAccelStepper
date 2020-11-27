@@ -295,7 +295,7 @@ void loop() {
     char ch = Serial.read();
     if (in_ptr == 255) {
       in_ptr = 0;
-    } else if ((ch == ' ') || (ch == '\n') || (ch == '\r'))) {
+    } else if ((ch == ' ') || (ch == '\n') || (ch == '\r')) {
       long val;
       in_buffer[in_ptr] = 0;
       if ((strcmp(in_buffer, "M1") == 0) && stepper[0]) {
