@@ -81,6 +81,7 @@ class StepperQueue {
   uint8_t current_n_periods;
 #endif
 #if defined(ARDUINO_ARCH_AVR)
+  bool isChannelA;
   // This is used in the timer compare unit as extension of the 16 timer
   uint8_t skip;
 #endif
@@ -190,14 +191,11 @@ class StepperQueue {
 #endif
     wp++;
     noInterrupts();
-    if (isRunning) {
-      next_write_idx = wp;
-      interrupts();
-    } else {
-      interrupts();
-      if (!startQueue(e)) {
-        next_write_idx = wp;
-      }
+    next_write_idx = wp;
+    bool run = isRunning;
+    interrupts();
+    if (!run) {
+      startQueue();
     }
     return AQE_OK;
   }
@@ -232,11 +230,7 @@ class StepperQueue {
   }
 
   // startQueue is called, if motor is not running.
-  // The parameter provided, is the first queue entry.
-  // If - while queue is started - the first queue entry is consumed,
-  // then that entry need not to be put into the command queue (return value = false).
-  // In case return value is true, then the first queue entry is consumed.
-  bool startQueue(struct queue_entry* e);
+  void startQueue();
   void _initVars() {
     dirPin = PIN_UNDEFINED;
     on_delay_ticks = 0;

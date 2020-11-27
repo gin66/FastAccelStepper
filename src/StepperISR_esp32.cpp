@@ -242,7 +242,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 //		- 	without next command: set mcpwm to stop mode on reaching
 // period
 
-bool StepperQueue::startQueue(struct queue_entry *e) {
+void StepperQueue::startQueue() {
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
@@ -260,7 +260,10 @@ bool StepperQueue::startQueue(struct queue_entry *e) {
   while (mcpwm->timer[timer].status.value >= TIMER_H_L_TRANSITION) {
   }
 
+  // my interrupt cannot be called in this state, so modifying read_idx without interrupts
+  // disabled is ok
+  uint8_t rp = q->read_idx++;
+  struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
   next_command(this, e);
-  return true;
 }
 #endif
