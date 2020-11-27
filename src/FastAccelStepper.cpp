@@ -242,15 +242,15 @@ void FastAccelStepper::isr_fill_queue() {
 
   // preconditions are fulfilled, so create the command(s)
   struct ramp_command_s cmd;
-  StepperQueue *q = &fas_queue[_queue_num];
+  StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 10 ms. Currently hard coded
-  while (!isQueueFull() && isrSpeedControlEnabled() && !q->hasTicksInQueue(TICKS_PER_S/100)) {
+  while (!isQueueFull() && isrSpeedControlEnabled() &&
+         !q->hasTicksInQueue(TICKS_PER_S / 100)) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     uint32_t runtime_us = micros();
 #endif
-    rg.single_fill_queue(&rg._ro, &rg._rw,
-                         q->ticks_at_queue_end,
+    rg.single_fill_queue(&rg._ro, &rg._rw, q->ticks_at_queue_end,
                          getPositionAfterCommandsCompleted(), &cmd);
 
     addQueueEntry(cmd.ticks, cmd.steps,
@@ -441,9 +441,9 @@ int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
 uint32_t FastAccelStepper::getPeriodAfterCommandsCompleted() {
   uint32_t ticks = fas_queue[_queue_num].ticks_at_queue_end;
   if (ticks == TICKS_FOR_STOPPED_MOTOR) {
-	  return 0;
+    return 0;
   }
-  return ticks / (TICKS_PER_S/1000000L);
+  return ticks / (TICKS_PER_S / 1000000L);
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   struct StepperQueue* q = &fas_queue[_queue_num];

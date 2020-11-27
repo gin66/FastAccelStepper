@@ -53,7 +53,7 @@ void RampGenerator::setSpeed(uint32_t min_step_us) {
   update_ramp_steps();
 }
 void RampGenerator::setAcceleration(uint32_t accel) {
-  upm_float upm_inv_accel = divide(UPM_TICKS_PER_S,upm_from(2*accel));
+  upm_float upm_inv_accel = divide(UPM_TICKS_PER_S, upm_from(2 * accel));
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
@@ -151,7 +151,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
   }
 
   // Forward planning of 1ms or more on slow speed.
-  uint32_t planning_steps = max((TICKS_PER_S/1000) / ticks_at_queue_end, 1);
+  uint32_t planning_steps = max((TICKS_PER_S / 1000) / ticks_at_queue_end, 1);
   uint32_t next_ticks;
 
   rw->ramp_state = next_state;

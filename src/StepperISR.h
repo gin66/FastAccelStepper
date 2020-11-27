@@ -124,7 +124,8 @@ class StepperQueue {
       if (on_delay_ticks > 0) {
         int res = _addQueueEntry(on_delay_ticks, 1, dir);
         if ((res != AQE_OK) || (steps == 1)) {
-          ticks_at_queue_end = ticks; // if steps == 1, wrong value in ticks_at_queue_end
+          ticks_at_queue_end =
+              ticks;  // if steps == 1, wrong value in ticks_at_queue_end
           return res;
         }
         steps -= 1;
@@ -205,29 +206,29 @@ class StepperQueue {
     uint8_t rp = read_idx;
     uint8_t wp = next_write_idx;
     interrupts();
-	if (wp == rp) {
-		return 0;
-	}
-	rp++; // ignore currently processed entry
-	while (wp != rp) {
-        struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
-		uint8_t steps = e->steps >> 1;
-		uint32_t tmp = e->period;
-		tmp *= steps;
-		if (tmp >= min_ticks) {
-			return true;
-		}
-		min_ticks -= tmp;
-		tmp = e->n_periods;
-		tmp *= steps;
-		tmp *= PERIOD_TICKS;
-		if (tmp >= min_ticks) {
-			return true;
-		}
-		min_ticks -= tmp;
-		rp++;
-	}
-	return false;
+    if (wp == rp) {
+      return 0;
+    }
+    rp++;  // ignore currently processed entry
+    while (wp != rp) {
+      struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+      uint8_t steps = e->steps >> 1;
+      uint32_t tmp = e->period;
+      tmp *= steps;
+      if (tmp >= min_ticks) {
+        return true;
+      }
+      min_ticks -= tmp;
+      tmp = e->n_periods;
+      tmp *= steps;
+      tmp *= PERIOD_TICKS;
+      if (tmp >= min_ticks) {
+        return true;
+      }
+      min_ticks -= tmp;
+      rp++;
+    }
+    return false;
   }
 
   bool startQueue(struct queue_entry* e);

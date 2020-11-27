@@ -285,15 +285,15 @@ int main() {
 
   // ramp time  625s, 7812500 steps
   // test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
-  
+
   // slow ramp time
   test_with_pars("f19", 1000, 10, 1, false, 62.0, 63.0, 1.0);
 
-  // name, steps, travel_dt, accel, reach_max_speed, min_time, max_time, allowed_ramp_time_delta
-  // slow ramp time
-  // Those are anomalies (see github issue #8) on avr, but not on PC
-//  test_with_pars("f20", 50000, 270000, 10, true, 62.0, 63.0, 1.0);
-//  test_with_pars("f20", 20, 270000, 1, true, 62.0, 63.0, 1.0);
+  // name, steps, travel_dt, accel, reach_max_speed, min_time, max_time,
+  // allowed_ramp_time_delta slow ramp time Those are anomalies (see github
+  // issue #8) on avr, but not on PC
+  //  test_with_pars("f20", 50000, 270000, 10, true, 62.0, 63.0, 1.0);
+  //  test_with_pars("f20", 20, 270000, 1, true, 62.0, 63.0, 1.0);
 
   printf("TEST_02 PASSED\n");
 }
