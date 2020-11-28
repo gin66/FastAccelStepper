@@ -122,7 +122,7 @@ void basic_test_with_empty_queue() {
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-    if (!s.isrSpeedControlEnabled()) {
+    if (!s.isRampGeneratorActive()) {
       break;
     }
     s.manage();
@@ -132,7 +132,7 @@ void basic_test_with_empty_queue() {
       fas_queue[0].read_idx++;
     }
   }
-  test(!s.isrSpeedControlEnabled(), "too many commands created");
+  test(!s.isRampGeneratorActive(), "too many commands created");
   printf("%d\n", rc.min_dt);
   test(rc.min_dt == 160000, "max speed not reached");
 }
@@ -170,7 +170,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-    if (!s.isrSpeedControlEnabled()) {
+    if (!s.isRampGeneratorActive()) {
       break;
     }
     s.manage();
@@ -194,7 +194,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
   fprintf(gp_file, "pause -1\n");
   fclose(gp_file);
   printf("TEST=%s\n", name);
-  test(!s.isrSpeedControlEnabled(), "too many commands created");
+  test(!s.isRampGeneratorActive(), "too many commands created");
   printf("Total time  %f < %f < %f ?\n", min_time, rc.total_ticks / 16000000.0,
          max_time);
   test(rc.total_ticks / 16000000.0 > min_time, "ramp too fast");

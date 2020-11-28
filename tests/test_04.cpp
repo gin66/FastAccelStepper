@@ -139,7 +139,7 @@ int main() {
           s.getPositionAfterCommandsCompleted(),
           s.isQueueEmpty() ? "yes" : "no");
     }
-    if (!s.isrSpeedControlEnabled()) {
+    if (!s.isRampGeneratorActive()) {
       break;
     }
     s.manage();
@@ -156,7 +156,7 @@ int main() {
     assert((i == 0) || (old_planned_time_in_buffer > 0.005));
     old_planned_time_in_buffer = planned_time;
   }
-  test(!s.isrSpeedControlEnabled(), "too many commands created");
+  test(!s.isRampGeneratorActive(), "too many commands created");
   printf("Total time  %f\n", rc.total_ticks / 16000000.0);
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);

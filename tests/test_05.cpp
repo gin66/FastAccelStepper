@@ -172,7 +172,7 @@ void do_test() {
           s.isQueueEmpty() ? "yes" : "no");
     }
     in_manage = true;
-    if (!s.isrSpeedControlEnabled() && s.isQueueEmpty()) {
+    if (!s.isRampGeneratorActive() && s.isQueueEmpty()) {
       break;
     }
     s.manage();
@@ -189,7 +189,7 @@ void do_test() {
     // This must be ensured, so that the stepper does not run out of commands
     old_planned_time_in_buffer = planned_time;
   }
-  test(!s.isrSpeedControlEnabled(), "too many commands created");
+  test(!s.isRampGeneratorActive(), "too many commands created");
   printf("Total time  %f\n", rc.total_ticks / 16000000.0);
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
