@@ -139,6 +139,10 @@ class FastAccelStepper {
   // Another move/moveTo must wait, till the motor has stopped
   void stopMove();
 
+  // stop the running stepper immediately and set new_pos as new position
+  // This can be called from an interrupt !
+  void forceStopAndNewPosition(uint32_t new_pos);
+
   // get the target position for the current move
   inline int32_t targetPos() { return rg.targetPosition(); }
 

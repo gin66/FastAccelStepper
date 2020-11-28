@@ -106,4 +106,26 @@ void StepperQueue::startQueue() {
     interrupts();
   }
 }
+void StepperQueue::forceStop() {
+  if (isChannelA) {
+    /* disable compare interrupt */
+    TIMSK1 &= ~_BV(OCIE1A);
+    /* set to disconnect */
+    Stepper_Disconnect(A);
+    /* force compare to ensure disconnect */
+    TCCR1C = _BV(FOC1A);
+  } else {
+    /* disable compare interrupt */
+    TIMSK1 &= ~_BV(OCIE1B);
+    /* set to disconnect */
+    Stepper_Disconnect(B);
+    /* force compare to ensure disconnect */
+    TCCR1C = _BV(FOC1B);
+  }
+  isRunning = false;
+  ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
+
+  // empty the queue
+  read_idx = next_write_idx;
+}
 #endif

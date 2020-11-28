@@ -243,6 +243,7 @@ const static char usage_str[] PROGMEM =
     "enable)\n"
     "     O         ... Put selected stepper into auto enable mode\n"
     "     S         ... Stop selected stepper with deceleration\n"
+    "     X         ... Immediately stop motor and set zero position\n"
     "     I         ... Toggle motor info, while any motor is running\n"
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
@@ -362,6 +363,9 @@ void loop() {
         } else if (strcmp(in_buffer, "S") == 0) {
           Serial.println("Stop");
           stepper_selected->stopMove();
+        } else if (strcmp(in_buffer, "X") == 0) {
+          Serial.println("Immediate Stop");
+          stepper_selected->forceStopAndNewPosition(0);
         } else if (strcmp(in_buffer, "I") == 0) {
           Serial.println("Toggle motor info");
           verbose = !verbose;

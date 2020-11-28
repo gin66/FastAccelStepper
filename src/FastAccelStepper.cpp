@@ -419,6 +419,18 @@ int FastAccelStepper::move(int32_t move) {
   return moveTo(new_pos);
 }
 void FastAccelStepper::stopMove() { rg.initiate_stop(); }
+void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
+  StepperQueue* q = &fas_queue[_queue_num];
+
+  // first stop ramp generator
+  rg.abort();
+
+  // stop the stepper interrupt and empty the queue
+  q->forceStop();
+
+  // set the new position
+  q->pos_at_queue_end = new_pos;
+}
 void FastAccelStepper::disableOutputs() {
   if (_enablePinLowActive != PIN_UNDEFINED) {
     digitalWrite(_enablePinLowActive, HIGH);

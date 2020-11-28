@@ -231,6 +231,7 @@ class StepperQueue {
 
   // startQueue is called, if motor is not running.
   void startQueue();
+  void forceStop();
   void _initVars() {
     dirPin = PIN_UNDEFINED;
     on_delay_ticks = 0;

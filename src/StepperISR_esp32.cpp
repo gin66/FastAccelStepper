@@ -265,4 +265,13 @@ void StepperQueue::startQueue() {
   struct queue_entry *e = &entry[read_idx++ & QUEUE_LEN_MASK];
   next_command(this, e);
 }
+void StepperQueue::forceStop() {
+  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
+  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  uint8_t timer = mapping->timer;
+  mcpwm->timer[timer].mode.start = 1;           // stop at TEP
+  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+  isRunning = false;
+  ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
+}
 #endif
