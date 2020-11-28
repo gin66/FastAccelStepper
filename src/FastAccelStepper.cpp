@@ -408,11 +408,11 @@ int FastAccelStepper::move(int32_t move) {
   }
   int32_t new_pos = curr_pos + move;
   if (move > 0) {
-    if (new_pos < rg.targetPosition()) {
+    if (new_pos < curr_pos) {
       return MOVE_ERR_OVERFLOW;
     }
   } else if (move < 0) {
-    if (new_pos > rg.targetPosition()) {
+    if (new_pos > curr_pos) {
       return MOVE_ERR_OVERFLOW;
     }
   }
