@@ -236,6 +236,8 @@ const static char usage_str[] PROGMEM =
 
     "     R<n>      ... Move selected stepper by n steps (can be "
     "negative)\n"
+    "     @<pos>    ... Set selected stepper to position (can be "
+    "negative)\n"
     "     E<us>     ... Set selected stepper's delay from enable to steps\n"
     "     D<ms>     ... Set selected stepper's delay from steps to disable\n"
     "     N         ... Turn selected stepper output on (disable auto enable)\n"
@@ -341,6 +343,10 @@ void loop() {
           int res = stepper_selected->moveTo(val);
           Serial.print("returncode=");
           Serial.println(res);
+        } else if (sscanf(in_buffer, "@%ld", &val) == 1) {
+          Serial.print("Set position ");
+          Serial.println(val);
+          stepper_selected->setCurrentPosition(val);
         } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
           Serial.print("Set enable time to ");
           Serial.println(val);

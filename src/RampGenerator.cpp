@@ -48,18 +48,24 @@ void RampGenerator::update_ramp_steps() {
       _config.upm_inv_accel2, square(upm_from(_config.min_travel_ticks))));
 }
 void RampGenerator::setSpeed(uint32_t min_step_us) {
+  if (min_step_us == 0) {
+    return;
+  }
   _config.min_travel_ticks = US_TO_TICKS(min_step_us);
   update_ramp_steps();
 }
 void RampGenerator::setAcceleration(uint32_t accel) {
+  if (accel == 0) {
+    return;
+  }
   upm_float upm_inv_accel = divide(UPM_TICKS_PER_S, upm_from(2 * accel));
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
 int RampGenerator::calculateMoveTo(int32_t target_pos,
-                                    const struct ramp_config_s *config,
-                                    uint32_t ticks_at_queue_end,
-                                    int32_t position_at_queue_end) {
+                                   const struct ramp_config_s *config,
+                                   uint32_t ticks_at_queue_end,
+                                   int32_t position_at_queue_end) {
   if (config->min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
@@ -71,9 +77,11 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
       divide(config->upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
 
   uint8_t start_state;
-  if (target_pos > position_at_queue_end) {
+  int32_t delta =
+      target_pos - position_at_queue_end;  // This can overflow, which is legal
+  if (delta > 0) {
     start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_UP;
-  } else if (target_pos < position_at_queue_end) {
+  } else if (delta < 0) {
     start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_DOWN;
   } else {
     start_state = RAMP_STATE_IDLE;
@@ -111,12 +119,12 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
 
 //*************************************************************************************************
 bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
-                                      struct ramp_rw_s *rw,
-                                      uint32_t ticks_at_queue_end,
-                                      int32_t position_at_queue_end,
-                                      struct ramp_command_s *command) {
+                                   struct ramp_rw_s *rw,
+                                   uint32_t ticks_at_queue_end,
+                                   int32_t position_at_queue_end,
+                                   struct ramp_command_s *command) {
   if (rw->ramp_state == RAMP_STATE_IDLE) {
-	  return false;
+    return false;
   }
 
   // This should never be true
@@ -125,10 +133,13 @@ bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
   }
 
   // check state for acceleration/deceleration or deceleration to stop
-  bool need_count_up = ro->target_pos > position_at_queue_end;
-  uint32_t remaining_steps = abs(ro->target_pos - position_at_queue_end);
-  if (remaining_steps == 0) { // This case should actually never happen
-	  return false;
+  int32_t delta = ro->target_pos -
+                  position_at_queue_end;  // this can overflow, which is legal
+  bool need_count_up = delta > 0;
+  uint32_t remaining_steps = abs(delta);
+  if (remaining_steps == 0) {  // This case should actually never happen
+    rw->ramp_state = RAMP_STATE_IDLE;
+    return false;
   }
   uint8_t next_state = rw->ramp_state;
   uint8_t move_state = next_state & RAMP_MOVE_MASK;
@@ -329,4 +340,6 @@ bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
   return true;
 }
 void RampGenerator::abort() { _rw.ramp_state = RAMP_STATE_IDLE; }
-bool RampGenerator::isRampGeneratorActive() { return _rw.ramp_state != RAMP_STATE_IDLE; }
+bool RampGenerator::isRampGeneratorActive() {
+  return _rw.ramp_state != RAMP_STATE_IDLE;
+}

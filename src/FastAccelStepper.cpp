@@ -184,7 +184,7 @@ void FastAccelStepperEngine::manageSteppers() {
 
 //*************************************************************************************************
 int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
-                                    bool dir_high) {
+                                       bool dir_high) {
   uint16_t delay_counter = 0;
   if (_autoEnable) {
     noInterrupts();
@@ -227,7 +227,7 @@ int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
 
 void FastAccelStepper::isr_fill_queue() {
   // Check preconditions to be allowed to fill the queue
-  if (!isrSpeedControlEnabled()) {
+  if (!rg.isRampGeneratorActive()) {
     return;
   }
   if (rg.targetPosition() == getPositionAfterCommandsCompleted()) {
@@ -249,29 +249,29 @@ void FastAccelStepper::isr_fill_queue() {
     // For run time measurement
     uint32_t runtime_us = micros();
 #endif
-	int8_t res = AQE_OK;
-    bool have_command = rg.getNextCommand(&rg._ro, &rg._rw, q->ticks_at_queue_end,
-                         getPositionAfterCommandsCompleted(), &cmd);
+    int8_t res = AQE_OK;
+    bool have_command =
+        rg.getNextCommand(&rg._ro, &rg._rw, q->ticks_at_queue_end,
+                          getPositionAfterCommandsCompleted(), &cmd);
     if (have_command) {
-		res = addQueueEntry(cmd.ticks, cmd.steps,
-					  cmd.count_up == _dirHighCountsUp);
-	}
+      res =
+          addQueueEntry(cmd.ticks, cmd.steps, cmd.count_up == _dirHighCountsUp);
+    }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     runtime_us = micros() - runtime_us;
     max_micros = max(max_micros, runtime_us);
 #endif
-	if (!have_command) {
-		break;
-	}
-	if (res == AQE_FULL) {
-		break;
-	}
-	else if (res != AQE_OK) {
-		// TODO: How to deal with these error ?
-		rg.abort();
-	}
+    if (!have_command) {
+      break;
+    }
+    if (res == AQE_FULL) {
+      break;
+    } else if (res != AQE_OK) {
+      // TODO: How to deal with these error ?
+      rg.abort();
+    }
   }
 }
 
@@ -379,20 +379,14 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   _off_delay_count = delay_count;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
-  if (min_step_us == 0) {
-    return;
-  }
   rg.setSpeed(min_step_us);
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
-  if (accel == 0) {
-    return;
-  }
   rg.setAcceleration(accel);
 }
 int FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos;
-  if (isrSpeedControlEnabled()) {
+  if (rg.isRampGeneratorActive()) {
     if (rg.isStopping()) {
       return MOVE_ERR_STOP_ONGOING;
     }
@@ -403,7 +397,7 @@ int FastAccelStepper::moveTo(int32_t position) {
   inject_fill_interrupt(1);
   int res =
       rg.calculateMoveTo(position, &rg._config,
-                          fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
+                         fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
   inject_fill_interrupt(2);
   return res;
 }
@@ -412,21 +406,12 @@ int FastAccelStepper::move(int32_t move) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  if (isrSpeedControlEnabled()) {
+  if (rg.isRampGeneratorActive()) {
     curr_pos = rg.targetPosition();
   } else {
     curr_pos = getPositionAfterCommandsCompleted();
   }
   int32_t new_pos = curr_pos + move;
-  if (move > 0) {
-    if (new_pos < curr_pos) {
-      return MOVE_ERR_OVERFLOW;
-    }
-  } else if (move < 0) {
-    if (new_pos > curr_pos) {
-      return MOVE_ERR_OVERFLOW;
-    }
-  }
   return moveTo(new_pos);
 }
 void FastAccelStepper::stopMove() { rg.initiate_stop(); }

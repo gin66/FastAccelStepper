@@ -71,7 +71,7 @@ class RampGenerator {
   }
   inline int32_t targetPosition() { return _ro.target_pos; }
   void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
-	  _ro.target_pos += delta;
+    _ro.target_pos += delta;
   }
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
@@ -81,12 +81,12 @@ class RampGenerator {
   void abort();
 
   int calculateMoveTo(int32_t target_pos, const struct ramp_config_s *config,
-                       uint32_t ticks_at_queue_end,
-                       int32_t position_at_queue_end);
+                      uint32_t ticks_at_queue_end,
+                      int32_t position_at_queue_end);
   bool getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
-                         uint32_t ticks_at_queue_end,
-                         int32_t position_at_queue_end,
-                         struct ramp_command_s *command);
+                      uint32_t ticks_at_queue_end,
+                      int32_t position_at_queue_end,
+                      struct ramp_command_s *command);
 
  private:
 #if (TICKS_PER_S != 16000000L)
