@@ -88,6 +88,7 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
   }
 
   noInterrupts();
+  _rw.keep_running = false;
   _ro.target_pos = target_pos;
   _ro.min_travel_ticks = config->min_travel_ticks;
   _ro.upm_inv_accel2 = config->upm_inv_accel2;
@@ -132,25 +133,34 @@ bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
     ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
   }
 
-  // check state for acceleration/deceleration or deceleration to stop
-  int32_t delta = ro->target_pos -
-                  position_at_queue_end;  // this can overflow, which is legal
-  bool need_count_up = delta > 0;
-  uint32_t remaining_steps = abs(delta);
-  if (remaining_steps == 0) {  // This case should actually never happen
-    rw->ramp_state = RAMP_STATE_IDLE;
-    return false;
-  }
   uint8_t next_state = rw->ramp_state;
   uint8_t move_state = next_state & RAMP_MOVE_MASK;
-  bool countUp = (move_state == RAMP_MOVE_UP);
+  bool count_up = (move_state == RAMP_MOVE_UP);
+
+  // check state for acceleration/deceleration or deceleration to stop
+  uint32_t remaining_steps;
+  bool need_count_up;
+  if (rw->keep_running) {
+    need_count_up = count_up;
+    remaining_steps = 0xfffffff;
+  } else {
+    int32_t delta = ro->target_pos -
+                    position_at_queue_end;  // this can overflow, which is legal
+    if (delta == 0) {  // This case should actually never happen
+      rw->ramp_state = RAMP_STATE_IDLE;
+      return false;
+    }
+    need_count_up = delta > 0;
+    remaining_steps = abs(delta);
+  }
 
   if (ro->force_stop) {
     next_state = RAMP_STATE_DECELERATE_TO_STOP | move_state;
     remaining_steps = rw->performed_ramp_up_steps;
+    rw->keep_running = false;
   }
   // Detect change in direction and if so, initiate deceleration to stop
-  else if (countUp != need_count_up) {
+  else if (count_up != need_count_up) {
     next_state = RAMP_STATE_DECELERATE_TO_STOP | move_state;
     remaining_steps = rw->performed_ramp_up_steps;
   } else {
@@ -315,10 +325,10 @@ bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
 
   command->ticks = next_ticks;
   command->steps = steps;
-  command->count_up = countUp;
+  command->count_up = count_up;
 
   if (steps == abs(remaining_steps)) {
-    if (countUp != need_count_up) {
+    if (count_up != need_count_up) {
       rw->ramp_state = RAMP_STATE_ACCELERATE | (move_state ^ RAMP_MOVE_MASK);
 #ifdef TEST
       puts("Stepper reverse");

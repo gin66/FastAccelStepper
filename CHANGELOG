@@ -1,11 +1,15 @@
 pre 0.9.0:
 - implement forceStopAndNewPosition()
-- StepperDemo extended to cause forceStopAndNewPosition by press X
+- StepperDemo extended:
+	- cause forceStopAndNewPosition by press X
+    - set position with press @
+    - keep motor running with press K
 - addQueueEntry() returns now an int8_t instead of an int
 - move and moveTo goes to the closest position (+/-2147483647).
   This means continues move(1000) will let the stepper turn in same direction,
   while the position wraps around: 0,1,...,2147483647,-2147483648,-2147483647,...,-1,0,1,...
-- StepperDemo extended to set position with press @
+- add keepRunning() to let the motor continuously run in same direction.
+
 
 0.8.3:
 - AVR: timer compare interrupts are only enabled, if stepper is running.

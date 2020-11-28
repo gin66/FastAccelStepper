@@ -230,9 +230,6 @@ void FastAccelStepper::isr_fill_queue() {
   if (!rg.isRampGeneratorActive()) {
     return;
   }
-  if (rg.targetPosition() == getPositionAfterCommandsCompleted()) {
-    return;
-  }
   if (rg._config.min_travel_ticks == 0) {
 #ifdef TEST
     assert(false);
@@ -384,7 +381,7 @@ void FastAccelStepper::setSpeed(uint32_t min_step_us) {
 void FastAccelStepper::setAcceleration(uint32_t accel) {
   rg.setAcceleration(accel);
 }
-int FastAccelStepper::moveTo(int32_t position) {
+int8_t FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos;
   if (rg.isRampGeneratorActive()) {
     if (rg.isStopping()) {
@@ -401,7 +398,7 @@ int FastAccelStepper::moveTo(int32_t position) {
   inject_fill_interrupt(2);
   return res;
 }
-int FastAccelStepper::move(int32_t move) {
+int8_t FastAccelStepper::move(int32_t move) {
   int32_t curr_pos;
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
@@ -414,6 +411,7 @@ int FastAccelStepper::move(int32_t move) {
   int32_t new_pos = curr_pos + move;
   return moveTo(new_pos);
 }
+void FastAccelStepper::keepRunning() { rg.setKeepRunning(); }
 void FastAccelStepper::stopMove() { rg.initiate_stop(); }
 void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];

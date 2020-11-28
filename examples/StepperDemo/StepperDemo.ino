@@ -173,8 +173,12 @@ void info(FastAccelStepper *s) {
   Serial.print("/");
   Serial.print(s->getPeriodAfterCommandsCompleted());
   Serial.print("us");
-  Serial.print(" Target=");
-  Serial.print(s->targetPos());
+  if (s->isRunningContinuously()) {
+    Serial.print(" nonstop");
+  } else {
+    Serial.print(" Target=");
+    Serial.print(s->targetPos());
+  }
   if (s->isRunning()) {
     Serial.print(" RUN ");
   } else {
@@ -236,6 +240,7 @@ const static char usage_str[] PROGMEM =
 
     "     R<n>      ... Move selected stepper by n steps (can be "
     "negative)\n"
+    "     K         ... Keep selected stepper running in current direction\n"
     "     @<pos>    ... Set selected stepper to position (can be "
     "negative)\n"
     "     E<us>     ... Set selected stepper's delay from enable to steps\n"
@@ -369,6 +374,9 @@ void loop() {
         } else if (strcmp(in_buffer, "S") == 0) {
           Serial.println("Stop");
           stepper_selected->stopMove();
+        } else if (strcmp(in_buffer, "K") == 0) {
+          Serial.println("Keep running");
+          stepper_selected->keepRunning();
         } else if (strcmp(in_buffer, "X") == 0) {
           Serial.println("Immediate Stop");
           stepper_selected->forceStopAndNewPosition(0);

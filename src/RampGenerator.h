@@ -59,6 +59,7 @@ class RampGenerator {
     bool force_stop;
   } _ro;
   struct ramp_rw_s {
+    bool keep_running;
     uint8_t ramp_state;
     // the speed is linked on both ramp slopes to this variable as per
     //       s = v²/2a   =>   v = sqrt(2*a*s)
@@ -79,7 +80,8 @@ class RampGenerator {
   bool isStopping() { return _ro.force_stop; }
   bool isRampGeneratorActive();
   void abort();
-
+  void setKeepRunning() { _rw.keep_running = true; }
+  bool isRunningContinuously() { return _rw.keep_running; }
   int calculateMoveTo(int32_t target_pos, const struct ramp_config_s *config,
                       uint32_t ticks_at_queue_end,
                       int32_t position_at_queue_end);

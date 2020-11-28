@@ -116,14 +116,22 @@ class FastAccelStepper {
   // relative to the target position of any ongoing move ! If the new
   // move/moveTo for an ongoing command would reverse the direction, then the
   // command is silently ignored.
-  int move(int32_t move);
-  int moveTo(int32_t position);
+  int8_t move(int32_t move);
+  int8_t moveTo(int32_t position);
 #define MOVE_OK 0
 #define MOVE_ERR_NO_DIRECTION_PIN \
   -1 /* negative direction requested, but no direction pin defined */
 #define MOVE_ERR_SPEED_IS_UNDEFINED -2
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
 #define MOVE_ERR_STOP_ONGOING -4
+
+  // This command flags the stepper to keep run continuously into current
+  // direction. It can be stopped by stopMove.
+  // Be aware, if the motor is currently decelerating towards reversed
+  // direction, then keepRunning() will speed up again and not finish direction
+  // reversal first.
+  void keepRunning();
+  bool isRunningContinuously() { return rg.isRunningContinuously(); }
 
   // forwardStep()/backwardstep() can be called, while stepper is not moving
   // If stepper is moving, this is a no-op.
