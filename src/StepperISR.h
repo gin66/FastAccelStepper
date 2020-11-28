@@ -150,13 +150,21 @@ class StepperQueue {
     uint8_t n_periods = period_ticks >> 16;
     if (n_periods > 0) {
       // In this case, PERIOD_TICKS delays need to be inserted
-      // Based on division by 65536, n_periods is off by 0..6 in case F_CPU =
+      // Based on division by 65536, n_periods is off by 0..11 in case F_CPU =
       // 16MHz
       uint32_t fixed_ticks = PERIOD_TICKS;
       fixed_ticks *= n_periods;
       period_ticks -= fixed_ticks;
       // Consequently a loop is acceptable compared to 32bit/16bit division and
       // remainder operations.
+      while (period_ticks > 4*65535) {
+        n_periods += 4;
+        period_ticks -= 4*PERIOD_TICKS;
+      }
+      while (period_ticks > 2*65535) {
+        n_periods += 2;
+        period_ticks -= 2*PERIOD_TICKS;
+      }
       while (period_ticks > 65535) {
         n_periods += 1;
         period_ticks -= PERIOD_TICKS;

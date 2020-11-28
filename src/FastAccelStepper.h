@@ -28,9 +28,12 @@
 #endif
 
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
-#define MIN_REMAINING_PERIOD_TICKS (2 * MIN_DELTA_TICKS)
-#define PERIOD_TICKS (65535 - MIN_REMAINING_PERIOD_TICKS)
-#define ABSOLUTE_MAX_TICKS (255L * PERIOD_TICKS)
+// this fixed value ensures max tick count of 255*62489 + 65535 = 16000230 ticks.
+// With 16MHz frequency, the maximum time between two steps is 1s.
+// This ensures too - that in case of esp32 - two interrupts do not occur within 190us
+// for one stepper.
+#define PERIOD_TICKS 62489
+#define ABSOLUTE_MAX_TICKS (255L * PERIOD_TICKS + 65535)
 
 #define PIN_UNDEFINED 255
 
