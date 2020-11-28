@@ -150,7 +150,7 @@ class FastAccelStepper {
   // stepper queue management (low level access)
   //	delta_ticks is multiplied by (1/TICKS_PER_S) s
   //	steps must be less than 128 aka 7 bits
-  int addQueueEntry(uint32_t delta_ticks, uint8_t steps, bool dir_high);
+  int8_t addQueueEntry(uint32_t delta_ticks, uint8_t steps, bool dir_high);
 
   // Return codes for addQueueEntry
 #define AQE_OK 0

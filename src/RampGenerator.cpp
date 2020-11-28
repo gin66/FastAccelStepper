@@ -56,7 +56,7 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
-int RampGenerator::calculate_moveTo(int32_t target_pos,
+int RampGenerator::calculateMoveTo(int32_t target_pos,
                                     const struct ramp_config_s *config,
                                     uint32_t ticks_at_queue_end,
                                     int32_t position_at_queue_end) {
@@ -110,11 +110,15 @@ int RampGenerator::calculate_moveTo(int32_t target_pos,
 }
 
 //*************************************************************************************************
-void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
+bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
                                       struct ramp_rw_s *rw,
                                       uint32_t ticks_at_queue_end,
                                       int32_t position_at_queue_end,
                                       struct ramp_command_s *command) {
+  if (rw->ramp_state == RAMP_STATE_IDLE) {
+	  return false;
+  }
+
   // This should never be true
   if (ticks_at_queue_end == 0) {
     ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
@@ -123,6 +127,9 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
   // check state for acceleration/deceleration or deceleration to stop
   bool need_count_up = ro->target_pos > position_at_queue_end;
   uint32_t remaining_steps = abs(ro->target_pos - position_at_queue_end);
+  if (remaining_steps == 0) { // This case should actually never happen
+	  return false;
+  }
   uint8_t next_state = rw->ramp_state;
   uint8_t move_state = next_state & RAMP_MOVE_MASK;
   bool countUp = (move_state == RAMP_MOVE_UP);
@@ -319,6 +326,7 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
       "Remaining steps = %d\n",
       steps, next_ticks, ro->target_pos, remaining_steps);
 #endif
+  return true;
 }
 void RampGenerator::abort() { _rw.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() { return _rw.ramp_state != RAMP_STATE_IDLE; }

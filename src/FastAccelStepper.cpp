@@ -183,7 +183,7 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-int FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
+int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                     bool dir_high) {
   uint16_t delay_counter = 0;
   if (_autoEnable) {
@@ -244,23 +244,34 @@ void FastAccelStepper::isr_fill_queue() {
   struct ramp_command_s cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 10 ms. Currently hard coded
-  while (!isQueueFull() && isrSpeedControlEnabled() &&
-         !q->hasTicksInQueue(TICKS_PER_S / 100)) {
+  while (!isQueueFull() && !q->hasTicksInQueue(TICKS_PER_S / 100)) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     uint32_t runtime_us = micros();
 #endif
-    rg.single_fill_queue(&rg._ro, &rg._rw, q->ticks_at_queue_end,
+	int8_t res = AQE_OK;
+    bool have_command = rg.getNextCommand(&rg._ro, &rg._rw, q->ticks_at_queue_end,
                          getPositionAfterCommandsCompleted(), &cmd);
-
-    addQueueEntry(cmd.ticks, cmd.steps,
-                  cmd.count_up == _dirHighCountsUp);  // TDO: error treatment
+    if (have_command) {
+		res = addQueueEntry(cmd.ticks, cmd.steps,
+					  cmd.count_up == _dirHighCountsUp);
+	}
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     runtime_us = micros() - runtime_us;
     max_micros = max(max_micros, runtime_us);
 #endif
+	if (!have_command) {
+		break;
+	}
+	if (res == AQE_FULL) {
+		break;
+	}
+	else if (res != AQE_OK) {
+		// TODO: How to deal with these error ?
+		rg.abort();
+	}
   }
 }
 
@@ -391,7 +402,7 @@ int FastAccelStepper::moveTo(int32_t position) {
   }
   inject_fill_interrupt(1);
   int res =
-      rg.calculate_moveTo(position, &rg._config,
+      rg.calculateMoveTo(position, &rg._config,
                           fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
   inject_fill_interrupt(2);
   return res;
@@ -483,14 +494,14 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   noInterrupts();
   fas_queue[_queue_num].pos_at_queue_end += delta;
-  rg._ro.target_pos += delta;
+  rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
   interrupts();
 }
 void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   noInterrupts();
   int32_t delta = new_pos - fas_queue[_queue_num].pos_at_queue_end;
   fas_queue[_queue_num].pos_at_queue_end = new_pos;
-  rg._ro.target_pos += delta;
+  rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
   interrupts();
 }
 bool FastAccelStepper::isQueueFull() {

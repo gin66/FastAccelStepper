@@ -1,6 +1,7 @@
-pre 0.8.4:
+pre 0.9.0:
 - implement forceStopAndNewPosition()
 - StepperDemo extended to cause forceStopAndNewPosition by press X
+- addQueueEntry() returns now an int8_t instead of an int
 
 0.8.3:
 - AVR: timer compare interrupts are only enabled, if stepper is running.
