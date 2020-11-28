@@ -148,7 +148,6 @@ pio run -e avr --target upload --upload-port /dev/ttyUSB0
 
 ## ISSUES
 
-* Speed changes at very low speed with high acceleration values are not always performed
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
 
 ## Not planned for now

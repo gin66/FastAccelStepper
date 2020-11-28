@@ -23,11 +23,20 @@ struct ramp_command_s {
   bool count_up;
 };
 
-#if (TICKS_PER_S == 16000000)
+#if (TICKS_PER_S == 16000000L)
 #define UPM_TICKS_PER_S ((upm_float)0x97f4)
+#define US_TO_TICKS(u32) (u32*16)
+#define TICKS_TO_US(u32) (u32/16)
 #else
 #define UPM_TICKS_PER_S upm_timer_freq
+
+// This overflows for approx. 1s at 40 MHz, only
+#define US_TO_TICKS(u32) ((uint32_t)((((uint32_t)((u32)*(TICKS_PER_S/10000L)))/100L)))
+
+// This calculation needs more work
+#define TICKS_TO_US(u32) ((uint32_t)((((uint32_t)((u32)/(TICKS_PER_S/1000000L)))/1L)))
 #endif
+
 
 class RampGenerator {
  public:
@@ -73,7 +82,7 @@ class RampGenerator {
                          struct ramp_command_s *command);
 
  private:
-#if (TICKS_PER_S != 16000000)
+#if (TICKS_PER_S != 16000000L)
   upm_float upm_timer_freq;
 #endif
   void update_ramp_steps();

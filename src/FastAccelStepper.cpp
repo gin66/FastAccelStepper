@@ -63,7 +63,7 @@ void StepperTask(void* parameter) {
 #endif
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
-#if (TICKS_PER_S != 16000000)
+#if (TICKS_PER_S != 16000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
 #if defined(ARDUINO_ARCH_AVR)
@@ -343,7 +343,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
   _autoEnable = auto_enable;
 }
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
-  uint32_t delay_ticks = delay_us * (TICKS_PER_S / 1000L) / 1000L;
+  uint32_t delay_ticks = US_TO_TICKS(delay_us);
   if (delay_us < 1000) {
     return DELAY_TOO_LOW;
   }
@@ -443,7 +443,7 @@ uint32_t FastAccelStepper::getPeriodAfterCommandsCompleted() {
   if (ticks == TICKS_FOR_STOPPED_MOTOR) {
     return 0;
   }
-  return ticks / (TICKS_PER_S / 1000000L);
+  return TICKS_TO_US(ticks);
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   struct StepperQueue* q = &fas_queue[_queue_num];

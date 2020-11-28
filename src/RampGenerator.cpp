@@ -40,7 +40,7 @@ void RampGenerator::init() {
   _config.upm_inv_accel2 = 0;
   _ro.target_pos = 0;
   _rw.ramp_state = RAMP_STATE_IDLE;
-#if (TICKS_PER_S != 16000000)
+#if (TICKS_PER_S != 16000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
 }
@@ -49,7 +49,7 @@ void RampGenerator::update_ramp_steps() {
       _config.upm_inv_accel2, square(upm_from(_config.min_travel_ticks))));
 }
 void RampGenerator::setSpeed(uint32_t min_step_us) {
-  _config.min_travel_ticks = min_step_us * (TICKS_PER_S / 1000L) / 1000L;
+  _config.min_travel_ticks = US_TO_TICKS(min_step_us);
   update_ramp_steps();
 }
 void RampGenerator::setAcceleration(uint32_t accel) {
