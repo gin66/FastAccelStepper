@@ -165,7 +165,7 @@ uint32_t last_time = 0;
 int selected = -1;
 
 void info(FastAccelStepper *s) {
-  Serial.print(s->isrSpeedControlEnabled() ? "AUTO" : "MANU");
+  Serial.print(s->isRampGeneratorActive() ? "AUTO" : "MANU");
   Serial.print(" Curr=");
   Serial.print(s->getCurrentPosition());
   Serial.print(" QueueEnd=");

@@ -1,4 +1,4 @@
-pre 0.9.0:
+0.9.0:
 - implement forceStopAndNewPosition()
 - StepperDemo extended:
 	- cause forceStopAndNewPosition by press X
@@ -9,7 +9,7 @@ pre 0.9.0:
   This means continues move(1000) will let the stepper turn in same direction,
   while the position wraps around: 0,1,...,2147483647,-2147483648,-2147483647,...,-1,0,1,...
 - add keepRunning() to let the motor continuously run in same direction.
-
+- rename isrSpeedControlEnabled() to isRampGeneratorActive()
 
 0.8.3:
 - AVR: timer compare interrupts are only enabled, if stepper is running.

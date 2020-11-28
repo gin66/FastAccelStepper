@@ -143,7 +143,8 @@ class FastAccelStepper {
 
   // stop the running stepper as fast as possible with deceleration
   // This only sets a flag and can be called from an interrupt !
-  // Another move/moveTo must wait, till the motor has stopped
+  // Another move/moveTo must wait, till the motor has stopped.
+  // Similarly keepRunning() is ignored, too.
   void stopMove();
 
   // stop the running stepper immediately and set new_pos as new position
@@ -196,7 +197,7 @@ class FastAccelStepper {
   inline uint8_t rampState() { return rg.rampState(); }
 
   // returns true, if the ramp generation is active
-  inline bool isrSpeedControlEnabled() { return rg.isRampGeneratorActive(); }
+  inline bool isRampGeneratorActive() { return rg.isRampGeneratorActive(); }
 
   // This variable/these functions should NEVER be modified/called by the
   // application
