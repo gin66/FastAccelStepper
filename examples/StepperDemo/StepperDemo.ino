@@ -355,7 +355,9 @@ void loop() {
         } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
           Serial.print("Set enable time to ");
           Serial.println(val);
-          stepper_selected->setDelayToEnable(val);
+          int res = stepper_selected->setDelayToEnable(val);
+          Serial.print("returncode=");
+          Serial.println(res);
         } else if (sscanf(in_buffer, "D%ld", &val) == 1) {
           Serial.print("Set disable time to ");
           Serial.println(val);
