@@ -382,7 +382,7 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
 int FastAccelStepper::moveTo(int32_t position) {
   int32_t curr_pos;
   if (isrSpeedControlEnabled()) {
-    if (rg.is_stopping()) {
+    if (rg.isStopping()) {
       return MOVE_ERR_STOP_ONGOING;
     }
     curr_pos = rg.targetPosition();

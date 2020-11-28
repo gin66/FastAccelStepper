@@ -73,7 +73,8 @@ class RampGenerator {
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
   void initiate_stop() { _ro.force_stop = true; }
-  bool is_stopping() { return _ro.force_stop; }
+  bool isStopping() { return _ro.force_stop; }
+  bool isRampGeneratorActive();
   void abort();
 
   int calculate_moveTo(int32_t target_pos, const struct ramp_config_s *config,

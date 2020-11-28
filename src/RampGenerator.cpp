@@ -321,3 +321,4 @@ void RampGenerator::single_fill_queue(const struct ramp_ro_s *ro,
 #endif
 }
 void RampGenerator::abort() { _rw.ramp_state = RAMP_STATE_IDLE; }
+bool RampGenerator::isRampGeneratorActive() { return _rw.ramp_state != RAMP_STATE_IDLE; }
