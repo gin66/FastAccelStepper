@@ -185,21 +185,45 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
                                        bool dir_high) {
-  uint16_t delay_counter = 0;
+  if (steps >= 128) {
+    return AQE_STEPS_ERROR;
+  }
+  if (steps == 0) {
+    return AQE_STEPS_ERROR;
+  }
+  if (delta_ticks > ABSOLUTE_MAX_TICKS) {
+    return AQE_TOO_HIGH;
+  }
+
+  StepperQueue* q = &fas_queue[_queue_num];
+  int res = AQE_OK;
   if (_autoEnable) {
     noInterrupts();
-    delay_counter = _auto_disable_delay_counter;
+    uint16_t delay_counter = _auto_disable_delay_counter;
     interrupts();
-    enableOutputs();
+    if (delay_counter == 0) {
+      // outputs are disabled
+      enableOutputs();
+      // if on delay is defined, perform first step accordingly
+      if (_on_delay_ticks > 0) {
+        res = q->addQueueEntry(_on_delay_ticks, 1, dir_high);
+        if (res == AQE_OK) {
+          // if steps == 1, wrong value in ticks_at_queue_end
+          q->ticks_at_queue_end = delta_ticks;
+        }
+        steps -= 1;
+      }
+    }
   }
-  int res = fas_queue[_queue_num].addQueueEntry(delta_ticks, steps, dir_high);
+  if (steps > 0) {
+    res = q->addQueueEntry(delta_ticks, steps, dir_high);
+  }
   if (_autoEnable) {
     if (res == AQE_OK) {
-      delay_counter = _off_delay_count;
+      noInterrupts();
+      _auto_disable_delay_counter = _off_delay_count;
+      interrupts();
     }
-    noInterrupts();
-    _auto_disable_delay_counter = delay_counter;
-    interrupts();
   }
 
   return res;
@@ -305,6 +329,7 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   max_micros = 0;
 #endif
   _autoEnable = false;
+  _on_delay_ticks = 0;
   _off_delay_count = 1;  // ensure to call disableOutputs()
   _auto_disable_delay_counter = 0;
   _stepPin = step_pin;
@@ -358,7 +383,7 @@ int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   if (delay_ticks > ABSOLUTE_MAX_TICKS) {
     return DELAY_TOO_HIGH;
   }
-  fas_queue[_queue_num].on_delay_ticks = delay_ticks;
+  _on_delay_ticks = delay_ticks;
   return DELAY_OK;
 }
 void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {

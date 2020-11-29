@@ -232,6 +232,7 @@ class FastAccelStepper {
   uint8_t _enablePinHighActive;
   uint8_t _queue_num;
 
+  uint32_t _on_delay_ticks;
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
   void isr_fill_queue();
