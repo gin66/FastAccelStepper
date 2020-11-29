@@ -180,7 +180,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pcnt_unit_config(&cfg);
 
   pcnt_counter_clear(pcnt_unit);
-  pcnt_counter_reupm_sume(pcnt_unit);
+  pcnt_counter_resume(pcnt_unit);
   pcnt_event_enable(pcnt_unit, PCNT_EVT_H_LIM);
   if (queue_num == 0) {
     // isr_service_install apparently enables the interrupt
