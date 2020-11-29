@@ -394,6 +394,10 @@ int8_t FastAccelStepper::move(int32_t move) {
 }
 void FastAccelStepper::keepRunning() { rg.setKeepRunning(); }
 void FastAccelStepper::stopMove() { rg.initiate_stop(); }
+void FastAccelStepper::applySpeedAcceleration() {
+  uint32_t ticks = fas_queue[_queue_num].ticks_at_queue_end;
+  rg.applySpeedAcceleration(ticks);
+}
 void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];
 

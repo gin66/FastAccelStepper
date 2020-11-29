@@ -116,10 +116,7 @@ class FastAccelStepper {
 
   // This function applies new values for speed/acceleration.
   // This is convenient especially, if we stepper is set to continuous running.
-  void applySpeedAcceleration() {
-    uint32_t ticks = fas_queue[_queue_num].ticks_at_queue_end;
-    rg.applySpeedAcceleration(ticks);
-  }
+  void applySpeedAcceleration();
 
   // start/move the stepper for (move) steps or to an absolute position.
   //
