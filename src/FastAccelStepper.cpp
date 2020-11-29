@@ -215,6 +215,7 @@ int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
 // Basis of the calculation is the relation between steps and time via
 // acceleration a:
 //
+//
 //		s = 1/2 * a * t²
 //
 // With v = a * t for the acceleration case, then v can be deducted:
@@ -248,7 +249,7 @@ void FastAccelStepper::isr_fill_queue() {
 #endif
     int8_t res = AQE_OK;
     bool have_command =
-        rg.getNextCommand(&rg._ro, &rg._rw, q->ticks_at_queue_end,
+        rg.getNextCommand(q->ticks_at_queue_end,
                           getPositionAfterCommandsCompleted(), &cmd);
     if (have_command) {
       res =

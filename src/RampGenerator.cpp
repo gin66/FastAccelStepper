@@ -119,8 +119,8 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
 }
 
 //*************************************************************************************************
-bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
-                                   struct ramp_rw_s *rw,
+static bool _getNextCommand(const struct RampGenerator::ramp_ro_s *ro,
+                                   struct RampGenerator::ramp_rw_s *rw,
                                    uint32_t ticks_at_queue_end,
                                    int32_t position_at_queue_end,
                                    struct ramp_command_s *command) {
@@ -348,6 +348,11 @@ bool RampGenerator::getNextCommand(const struct ramp_ro_s *ro,
       steps, next_ticks, ro->target_pos, remaining_steps);
 #endif
   return true;
+}
+bool RampGenerator::getNextCommand(uint32_t ticks_at_queue_end,
+                                   int32_t position_at_queue_end,
+                                   struct ramp_command_s *command) {
+	return _getNextCommand(&_ro, &_rw, ticks_at_queue_end, position_at_queue_end, command);
 }
 void RampGenerator::abort() { _rw.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() {

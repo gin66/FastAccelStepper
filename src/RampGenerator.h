@@ -85,8 +85,7 @@ class RampGenerator {
   int calculateMoveTo(int32_t target_pos, const struct ramp_config_s *config,
                       uint32_t ticks_at_queue_end,
                       int32_t position_at_queue_end);
-  bool getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
-                      uint32_t ticks_at_queue_end,
+  bool getNextCommand(uint32_t ticks_at_queue_end,
                       int32_t position_at_queue_end,
                       struct ramp_command_s *command);
 
