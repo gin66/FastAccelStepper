@@ -1,3 +1,8 @@
+0.9.4:
+- Fix possible race condition in check_for_auto_disable()
+- StepperDemo extended:
+	- blocking wait for stepper stop by press W (dangerous: can deadlock)
+
 0.9.3:
 - Fix auto on delay: Delay way always replied, even if the output is still enabled
 

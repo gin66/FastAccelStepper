@@ -253,6 +253,8 @@ const static char usage_str[] PROGMEM =
     "     S         ... Stop selected stepper with deceleration\n"
     "     X         ... Immediately stop motor and set zero position\n"
     "     I         ... Toggle motor info, while any motor is running\n"
+    "     W         ... Blocking wait until selected motor is stopped (will "
+    "deadlock if the motor will never stop)\n"
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
     "     T         ... Test selected motor with direct port access\n"
@@ -386,6 +388,16 @@ void loop() {
         } else if (strcmp(in_buffer, "U") == 0) {
           Serial.println("Update speed/acceleration");
           stepper_selected->applySpeedAcceleration();
+        } else if (strcmp(in_buffer, "W") == 0) {
+          Serial.println("Blocking wait for running stepper to stop");
+          // Wait stepper is really running
+          while (!stepper_selected->isRunning()) {
+            // do nothing
+          }
+          // Wait for stepper stop
+          while (stepper_selected->isRunning()) {
+            // do nothing
+          }
         } else if (strcmp(in_buffer, "I") == 0) {
           Serial.println("Toggle motor info");
           verbose = !verbose;

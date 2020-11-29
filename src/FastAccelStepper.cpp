@@ -207,7 +207,7 @@ int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
         res = q->addQueueEntry(_on_delay_ticks, 1, dir_high);
-        if (res == AQE_OK) {
+        if ((res == AQE_OK) && (steps == 1)) {
           // if steps == 1, wrong value in ticks_at_queue_end
           q->ticks_at_queue_end = delta_ticks;
         }
@@ -313,6 +313,7 @@ ISR(TIMER1_OVF_vect) {
 #endif
 
 void FastAccelStepper::check_for_auto_disable() {
+  noInterrupts();
   if (_auto_disable_delay_counter > 0) {
     if (!isRunning()) {
       _auto_disable_delay_counter--;
@@ -321,6 +322,7 @@ void FastAccelStepper::check_for_auto_disable() {
       }
     }
   }
+  interrupts();
 }
 
 void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
@@ -330,7 +332,7 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
 #endif
   _autoEnable = false;
   _on_delay_ticks = 0;
-  _off_delay_count = 1;  // ensure to call disableOutputs()
+  _off_delay_count = 0;
   _auto_disable_delay_counter = 0;
   _stepPin = step_pin;
   _dirHighCountsUp = true;
