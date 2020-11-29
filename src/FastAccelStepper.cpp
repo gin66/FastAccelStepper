@@ -383,34 +383,15 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
   rg.setAcceleration(accel);
 }
 int8_t FastAccelStepper::moveTo(int32_t position) {
-  int32_t curr_pos;
-  if (rg.isRampGeneratorActive()) {
-    if (rg.isStopping()) {
-      return MOVE_ERR_STOP_ONGOING;
-    }
-    curr_pos = rg.targetPosition();
-  } else {
-    curr_pos = getPositionAfterCommandsCompleted();
-  }
-  inject_fill_interrupt(1);
-  int res =
-      rg.calculateMoveTo(position, &rg._config,
-                         fas_queue[_queue_num].ticks_at_queue_end, curr_pos);
-  inject_fill_interrupt(2);
-  return res;
+  uint32_t ticks = fas_queue[_queue_num].ticks_at_queue_end;
+  return rg.moveTo(position, getPositionAfterCommandsCompleted(), ticks);
 }
 int8_t FastAccelStepper::move(int32_t move) {
-  int32_t curr_pos;
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  if (rg.isRampGeneratorActive()) {
-    curr_pos = rg.targetPosition();
-  } else {
-    curr_pos = getPositionAfterCommandsCompleted();
-  }
-  int32_t new_pos = curr_pos + move;
-  return moveTo(new_pos);
+  uint32_t ticks = fas_queue[_queue_num].ticks_at_queue_end;
+  return rg.move(move, getPositionAfterCommandsCompleted(), ticks);
 }
 void FastAccelStepper::keepRunning() { rg.setKeepRunning(); }
 void FastAccelStepper::stopMove() { rg.initiate_stop(); }
