@@ -76,8 +76,8 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
       divide(_config.upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
 
   uint8_t start_state;
-  int32_t delta =
-      target_pos - position_at_queue_end;  // This can overflow, which is legal
+  // This can overflow, which is legal
+  int32_t delta = target_pos - position_at_queue_end;
   if (delta > 0) {
     start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_UP;
   } else if (delta < 0) {
@@ -117,7 +117,8 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
   return MOVE_OK;
 }
 
-int8_t RampGenerator::moveTo(int32_t position, int32_t pos_at_queue_end, uint32_t ticks_at_queue_end) {
+int8_t RampGenerator::moveTo(int32_t position, int32_t pos_at_queue_end,
+                             uint32_t ticks_at_queue_end) {
   int32_t curr_pos;
   if (isStopping()) {
     return MOVE_ERR_STOP_ONGOING;
@@ -128,12 +129,12 @@ int8_t RampGenerator::moveTo(int32_t position, int32_t pos_at_queue_end, uint32_
     curr_pos = pos_at_queue_end;
   }
   inject_fill_interrupt(1);
-  int res =
-      calculateMoveTo(position, curr_pos, ticks_at_queue_end);
+  int res = calculateMoveTo(position, curr_pos, ticks_at_queue_end);
   inject_fill_interrupt(2);
   return res;
 }
-int8_t RampGenerator::move(int32_t move, int32_t pos_at_queue_end, uint32_t ticks_at_queue_end) {
+int8_t RampGenerator::move(int32_t move, int32_t pos_at_queue_end,
+                           uint32_t ticks_at_queue_end) {
   int32_t curr_pos;
   if (isRampGeneratorActive() && !_rw.keep_running) {
     curr_pos = _ro.target_pos;
@@ -145,11 +146,10 @@ int8_t RampGenerator::move(int32_t move, int32_t pos_at_queue_end, uint32_t tick
 }
 
 //*************************************************************************************************
-static bool _getNextCommand(const struct ramp_ro_s *ro,
-                                   struct ramp_rw_s *rw,
-                                   uint32_t ticks_at_queue_end,
-                                   int32_t position_at_queue_end,
-                                   struct ramp_command_s *command) {
+static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
+                            uint32_t ticks_at_queue_end,
+                            int32_t position_at_queue_end,
+                            struct ramp_command_s *command) {
   if (rw->ramp_state == RAMP_STATE_IDLE) {
     return false;
   }
@@ -378,7 +378,8 @@ static bool _getNextCommand(const struct ramp_ro_s *ro,
 bool RampGenerator::getNextCommand(uint32_t ticks_at_queue_end,
                                    int32_t position_at_queue_end,
                                    struct ramp_command_s *command) {
-	return _getNextCommand(&_ro, &_rw, ticks_at_queue_end, position_at_queue_end, command);
+  return _getNextCommand(&_ro, &_rw, ticks_at_queue_end, position_at_queue_end,
+                         command);
 }
 void RampGenerator::abort() { _rw.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() {

@@ -248,9 +248,8 @@ void FastAccelStepper::isr_fill_queue() {
     uint32_t runtime_us = micros();
 #endif
     int8_t res = AQE_OK;
-    bool have_command =
-        rg.getNextCommand(q->ticks_at_queue_end,
-                          getPositionAfterCommandsCompleted(), &cmd);
+    bool have_command = rg.getNextCommand(
+        q->ticks_at_queue_end, getPositionAfterCommandsCompleted(), &cmd);
     if (have_command) {
       res =
           addQueueEntry(cmd.ticks, cmd.steps, cmd.count_up == _dirHighCountsUp);

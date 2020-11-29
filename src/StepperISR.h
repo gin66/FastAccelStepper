@@ -157,13 +157,13 @@ class StepperQueue {
       period_ticks -= fixed_ticks;
       // Consequently a loop is acceptable compared to 32bit/16bit division and
       // remainder operations.
-      while (period_ticks > 4*65535) {
+      while (period_ticks > 4 * 65535) {
         n_periods += 4;
-        period_ticks -= 4*PERIOD_TICKS;
+        period_ticks -= 4 * PERIOD_TICKS;
       }
-      while (period_ticks > 2*65535) {
+      while (period_ticks > 2 * 65535) {
         n_periods += 2;
-        period_ticks -= 2*PERIOD_TICKS;
+        period_ticks -= 2 * PERIOD_TICKS;
       }
       while (period_ticks > 65535) {
         n_periods += 1;
