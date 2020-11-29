@@ -86,7 +86,7 @@ class RampGenerator {
   int8_t move(int32_t move, int32_t position_at_queue_end, uint32_t ticks_at_queue_end);
   int8_t moveTo(int32_t position, int32_t position_at_queue_end, uint32_t ticks_at_queue_end);
   void initiate_stop() { _ro.force_stop = true; }
-  bool isStopping() { return _ro.force_stop; }
+  bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
   void abort();
   void setKeepRunning() { _rw.keep_running = true; }

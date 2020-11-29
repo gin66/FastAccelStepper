@@ -119,11 +119,11 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
 
 int8_t RampGenerator::moveTo(int32_t position, int32_t pos_at_queue_end, uint32_t ticks_at_queue_end) {
   int32_t curr_pos;
-  if (isRampGeneratorActive()) {
-    if (isStopping()) {
-      return MOVE_ERR_STOP_ONGOING;
-    }
-    curr_pos = targetPosition();
+  if (isStopping()) {
+    return MOVE_ERR_STOP_ONGOING;
+  }
+  if (isRampGeneratorActive() && !_rw.keep_running) {
+    curr_pos = _ro.target_pos;
   } else {
     curr_pos = pos_at_queue_end;
   }
@@ -135,8 +135,8 @@ int8_t RampGenerator::moveTo(int32_t position, int32_t pos_at_queue_end, uint32_
 }
 int8_t RampGenerator::move(int32_t move, int32_t pos_at_queue_end, uint32_t ticks_at_queue_end) {
   int32_t curr_pos;
-  if (isRampGeneratorActive()) {
-    curr_pos = targetPosition();
+  if (isRampGeneratorActive() && !_rw.keep_running) {
+    curr_pos = _ro.target_pos;
   } else {
     curr_pos = pos_at_queue_end;
   }
