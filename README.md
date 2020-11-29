@@ -20,7 +20,7 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
 
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
-* 2-pin operation for e.g. axis control (even though use for X/Y-coordinated movement is not recommendend)
+* 2-pin operation for e.g. axis control (even though use for X/Y-coordinated movement is not recommended)
 * 3-pin operation to reduce power dissipation of driver/stepper
 * Lower limit of ~1 steps/s @ 16MHz
 * fully interrupt driven - no periodic task to be called
