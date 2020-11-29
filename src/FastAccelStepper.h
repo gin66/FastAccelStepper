@@ -27,7 +27,18 @@
 #endif
 #endif
 
+#if defined(ARDUINO_ARCH_ESP32)
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#elif defined(ARDUINO_ARCH_AVR)
+// AVR:
+// tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
+// the main task is freezing (StepperDemo).
+// Thus the limitation set here is set to 25kSteps/s as stated in the README.
+#define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
+#else
+#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#endif
+
 // this fixed value ensures max tick count of 255*62489 + 65535 = 16000230
 // ticks. With 16MHz frequency, the maximum time between two steps is 1s. This
 // ensures too - that in case of esp32 - two interrupts do not occur within

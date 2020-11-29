@@ -1,3 +1,6 @@
+pre-0.9.6:
+- setSpeed() silently imposes lower limit for period
+
 0.9.5:
 - Fix sudden CPU reset on high interrupt load for avr variant. Issue #12
 

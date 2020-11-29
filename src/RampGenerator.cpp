@@ -51,7 +51,11 @@ void RampGenerator::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
     return;
   }
-  _config.min_travel_ticks = US_TO_TICKS(min_step_us);
+  uint32_t min_travel_ticks = US_TO_TICKS(min_step_us);
+  if (min_travel_ticks < MIN_DELTA_TICKS) {
+    return;
+  }
+  _config.min_travel_ticks = min_travel_ticks;
   update_ramp_steps();
 }
 void RampGenerator::setAcceleration(uint32_t accel) {
