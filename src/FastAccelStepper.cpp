@@ -307,6 +307,9 @@ ISR(TIMER1_OVF_vect) {
   // manage steppers
   fas_engine->manageSteppers();
 
+  // disable interrupts for exist ISR routine
+  noInterrupts();
+
   // enable OVF interrupt again
   TIMSK1 |= _BV(TOIE1);
 }
