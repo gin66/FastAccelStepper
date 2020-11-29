@@ -43,13 +43,13 @@ General behaviour:
     4. stop
 * The stepper position is a 32bit integer variable, which wraps around for continuous movement.
   Example:
-	  Assume counting up turns stepper clockwise, and counting down, anti-clockwise.
-      Current position is -2.000.000.000, move to 2.000.000.000.
-      Apparently the position has to count up, and count should run clockwise.
-      Implementation is done via difference of 32bit signed numbers, which can overflow (being legal).
-      The calculation is then:
+	- Assume counting up turns stepper clockwise, and counting down, anti-clockwise.
+    - Current position is -2.000.000.000, move to 2.000.000.000.
+    - Apparently the position has to count up, and count should run clockwise.
+    - Implementation is done via difference of 32bit signed numbers, which can overflow (being legal).
+    - The calculation is then:
 			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
-						4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
+	- But 4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
 
 ### AVR
 
