@@ -20,7 +20,7 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
 
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
-* 2-pin operation for e.g. axis control
+* 2-pin operation for e.g. axis control (even though use for X/Y-coordinated movement is not recommendend)
 * 3-pin operation to reduce power dissipation of driver/stepper
 * Lower limit of ~1 steps/s @ 16MHz
 * fully interrupt driven - no periodic task to be called
@@ -41,6 +41,15 @@ General behaviour:
     2. stop and accelerate towards 0
     3. eventually coast for a while and then decelerate
     4. stop
+* The stepper position is a 32bit integer variable, which wraps around for continuous movement.
+  Example:
+	  Assume counting up turns stepper clockwise, and counting down, anti-clockwise.
+      Current position is -2.000.000.000, move to 2.000.000.000.
+      Apparently the position has to count up, and count should run clockwise.
+      Implementation is done via difference of 32bit signed numbers, which can overflow (being legal).
+      The calculation is then:
+			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
+						4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
 
 ### AVR
 
