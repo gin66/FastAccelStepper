@@ -64,8 +64,8 @@ void RampGenerator::setAcceleration(uint32_t accel) {
 }
 void RampGenerator::_applySpeedAcceleration(uint32_t ticks_at_queue_end,
                                             int32_t target_pos) {
-  uint32_t performed_ramp_up_steps = upm_to_u32(
-      upm_divide(_config.upm_inv_accel2, upm_square(upm_from(ticks_at_queue_end))));
+  uint32_t performed_ramp_up_steps = upm_to_u32(upm_divide(
+      _config.upm_inv_accel2, upm_square(upm_from(ticks_at_queue_end))));
 
   noInterrupts();
   _ro.min_travel_ticks = _config.min_travel_ticks;

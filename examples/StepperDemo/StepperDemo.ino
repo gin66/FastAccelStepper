@@ -234,6 +234,8 @@ const static char usage_str[] PROGMEM =
     "     M1/M2/..  ... to select stepper\n"
     "     A<accel>  ... Set selected stepper's acceleration\n"
     "     V<speed>  ... Set selected stepper's speed\n"
+    "     U         ... Update selected stepper's speed/acceleration while "
+    "running\n"
     "     P<pos>    ... Move selected stepper to position (can be "
     "negative)\n"
 
@@ -381,6 +383,9 @@ void loop() {
         } else if (strcmp(in_buffer, "X") == 0) {
           Serial.println("Immediate Stop");
           stepper_selected->forceStopAndNewPosition(0);
+        } else if (strcmp(in_buffer, "U") == 0) {
+          Serial.println("Update speed/acceleration");
+          stepper_selected->applySpeedAcceleration();
         } else if (strcmp(in_buffer, "I") == 0) {
           Serial.println("Toggle motor info");
           verbose = !verbose;

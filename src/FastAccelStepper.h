@@ -99,7 +99,8 @@ class FastAccelStepper {
   //      t = 0.2 s/steps = 200000 us/step
   //      setSpeed(200000);
   //
-  // New value will be used after call to move/moveTo/stopMove e.g. move(0)
+  // New value will be used after call to
+  // move/moveTo/stopMove/applySpeedAcceleration
   //
   void setSpeed(uint32_t min_step_us);
 
@@ -108,9 +109,17 @@ class FastAccelStepper {
   //  If for example the speed should ramp up from 0 to 10000 steps/s within
   //  10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
   //
-  // New value will be used after call to move/moveTo/stopMove e.g. move(0)
+  // New value will be used after call to
+  // move/moveTo/stopMove/applySpeedAcceleration
   //
   void setAcceleration(uint32_t step_s_s);
+
+  // This function applies new values for speed/acceleration.
+  // This is convenient especially, if we stepper is set to continuous running.
+  void applySpeedAcceleration() {
+    uint32_t ticks = fas_queue[_queue_num].ticks_at_queue_end;
+    rg.applySpeedAcceleration(ticks);
+  }
 
   // start/move the stepper for (move) steps or to an absolute position.
   //
