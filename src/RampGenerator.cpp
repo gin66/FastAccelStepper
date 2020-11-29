@@ -62,6 +62,21 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
+void RampGenerator::_applySpeedAcceleration(uint32_t ticks_at_queue_end,
+                                            int32_t target_pos) {
+  uint32_t performed_ramp_up_steps = upm_to_u32(
+      divide(_config.upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
+
+  noInterrupts();
+  _ro.min_travel_ticks = _config.min_travel_ticks;
+  _ro.upm_inv_accel2 = _config.upm_inv_accel2;
+  _rw.performed_ramp_up_steps = performed_ramp_up_steps;
+  _ro.target_pos = target_pos;
+  interrupts();
+}
+void RampGenerator::applySpeedAcceleration(uint32_t ticks_at_queue_end) {
+  _applySpeedAcceleration(ticks_at_queue_end, _ro.target_pos);
+}
 int RampGenerator::calculateMoveTo(int32_t target_pos,
                                    int32_t position_at_queue_end,
                                    uint32_t ticks_at_queue_end) {
@@ -72,38 +87,33 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
     return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
   }
 
-  uint32_t performed_ramp_up_steps = upm_to_u32(
-      divide(_config.upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
+  _applySpeedAcceleration(ticks_at_queue_end, target_pos);
 
-  uint8_t start_state;
-  // This can overflow, which is legal
-  int32_t delta = target_pos - position_at_queue_end;
-  if (delta > 0) {
-    start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_UP;
-  } else if (delta < 0) {
-    start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_DOWN;
-  } else {
-    start_state = RAMP_STATE_IDLE;
-  }
-
-  noInterrupts();
-  _rw.keep_running = false;
-  _ro.target_pos = target_pos;
-  _ro.min_travel_ticks = _config.min_travel_ticks;
-  _ro.upm_inv_accel2 = _config.upm_inv_accel2;
-  _ro.force_stop = false;
-  _rw.performed_ramp_up_steps = performed_ramp_up_steps;
   if (_rw.ramp_state == RAMP_STATE_IDLE) {
+    uint8_t start_state;
+    // This can overflow, which is legal
+    int32_t delta = target_pos - position_at_queue_end;
+    if (delta > 0) {
+      start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_UP;
+    } else if (delta < 0) {
+      start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_DOWN;
+    } else {
+      return MOVE_OK;
+    }
+
+    noInterrupts();
+    _rw.keep_running = false;
+    _ro.force_stop = false;
     _rw.ramp_state = start_state;
+    interrupts();
   }
-  interrupts();
 
 #ifdef TEST
   printf(
       "Ramp data: go to %d  curr_ticks = %u travel_ticks = %u "
       "Ramp steps = %u Performed ramp steps = %u\n",
       target_pos, ticks_at_queue_end, _config.min_travel_ticks,
-      _config.ramp_steps, performed_ramp_up_steps);
+      _config.ramp_steps, _rw.performed_ramp_up_steps);
 #endif
 #ifdef DEBUG
   char buf[256];
@@ -111,7 +121,7 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
           "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu "
           "Ramp steps = %lu Performed ramp steps = %lu\n",
           target_pos, ticks_at_queue_end, _min_travel_ticks, _config.ramp_steps,
-          performed_ramp_up_steps);
+          _rw.performed_ramp_up_steps);
   Serial.println(buf);
 #endif
   return MOVE_OK;

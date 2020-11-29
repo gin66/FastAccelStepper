@@ -84,6 +84,12 @@ class RampGenerator {
   }
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
+
+ private:
+  void _applySpeedAcceleration(uint32_t ticks_at_queue_end, int32_t target_pos);
+
+ public:
+  void applySpeedAcceleration(uint32_t ticks_at_queue_end);
   int8_t move(int32_t move, int32_t position_at_queue_end,
               uint32_t ticks_at_queue_end);
   int8_t moveTo(int32_t position, int32_t position_at_queue_end,

@@ -234,7 +234,6 @@ const static char usage_str[] PROGMEM =
     "     M1/M2/..  ... to select stepper\n"
     "     A<accel>  ... Set selected stepper's acceleration\n"
     "     V<speed>  ... Set selected stepper's speed\n"
-
     "     P<pos>    ... Move selected stepper to position (can be "
     "negative)\n"
 

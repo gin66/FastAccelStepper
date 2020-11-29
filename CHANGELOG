@@ -1,3 +1,7 @@
+pre 0.9.2:
+- prepare RampGenerator for function applySpeedAcceleration()
+- fix possible bug in move/moveTo while keepRunning is set
+
 0.9.1:
 - reduce interrupt load on esp32
 
