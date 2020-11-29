@@ -44,8 +44,8 @@ void RampGenerator::init() {
 #endif
 }
 void RampGenerator::update_ramp_steps() {
-  _config.ramp_steps = upm_to_u32(divide(
-      _config.upm_inv_accel2, square(upm_from(_config.min_travel_ticks))));
+  _config.ramp_steps = upm_to_u32(upm_divide(
+      _config.upm_inv_accel2, upm_square(upm_from(_config.min_travel_ticks))));
 }
 void RampGenerator::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
@@ -58,14 +58,14 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   if (accel == 0) {
     return;
   }
-  upm_float upm_inv_accel = divide(UPM_TICKS_PER_S, upm_from(2 * accel));
-  _config.upm_inv_accel2 = multiply(UPM_TICKS_PER_S, upm_inv_accel);
+  upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
+  _config.upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
   update_ramp_steps();
 }
 void RampGenerator::_applySpeedAcceleration(uint32_t ticks_at_queue_end,
                                             int32_t target_pos) {
   uint32_t performed_ramp_up_steps = upm_to_u32(
-      divide(_config.upm_inv_accel2, square(upm_from(ticks_at_queue_end))));
+      upm_divide(_config.upm_inv_accel2, upm_square(upm_from(ticks_at_queue_end))));
 
   noInterrupts();
   _ro.min_travel_ticks = _config.min_travel_ticks;
@@ -267,7 +267,7 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
       break;
     case RAMP_STATE_ACCELERATE:
       upm_rem_steps = upm_from(rw->performed_ramp_up_steps + planning_steps);
-      upm_d_ticks_new = sqrt(divide(ro->upm_inv_accel2, upm_rem_steps));
+      upm_d_ticks_new = upm_sqrt(upm_divide(ro->upm_inv_accel2, upm_rem_steps));
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
@@ -288,7 +288,7 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
       break;
     case RAMP_STATE_DECELERATE:
       upm_rem_steps = upm_from(rw->performed_ramp_up_steps + planning_steps);
-      upm_d_ticks_new = sqrt(divide(ro->upm_inv_accel2, upm_rem_steps));
+      upm_d_ticks_new = upm_sqrt(upm_divide(ro->upm_inv_accel2, upm_rem_steps));
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
@@ -306,7 +306,7 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
       break;
     case RAMP_STATE_DECELERATE_TO_STOP:
       upm_rem_steps = upm_from(remaining_steps - planning_steps);
-      upm_d_ticks_new = sqrt(divide(ro->upm_inv_accel2, upm_rem_steps));
+      upm_d_ticks_new = upm_sqrt(upm_divide(ro->upm_inv_accel2, upm_rem_steps));
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 

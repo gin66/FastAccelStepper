@@ -151,7 +151,7 @@ upm_float upm_from(uint32_t x) {
     return upm_from(w) + 0x1000;
   }
 }
-upm_float multiply(upm_float x, upm_float y) {
+upm_float upm_multiply(upm_float x, upm_float y) {
   uint16_t mant_x = x & 255;
   uint16_t mant_y = y & 255;
   uint16_t xy = mant_x * mant_y;
@@ -173,7 +173,7 @@ upm_float multiply(upm_float x, upm_float y) {
   //  ab += ((x & 0xff00) - 0x4000) + ((y & 0xff00) - 0x4000);
   return (((uint16_t)exponent) << 8) | mant;
 }
-upm_float square(upm_float x) {
+upm_float upm_square(upm_float x) {
   uint16_t a = x & 0x00ff;
   uint16_t aa = a * a;
   if (aa & 0x8000) {
@@ -186,7 +186,7 @@ upm_float square(upm_float x) {
   return aa;
 }
 #ifdef LOG_DIVIDE
-upm_float divide(upm_float x, upm_float y) {
+upm_float upm_divide(upm_float x, upm_float y) {
   uint8_t exp_x = x >> 8;
   uint8_t exp_y = y >> 8;
   uint8_t mant_x = x & 255;
@@ -214,7 +214,7 @@ upm_float divide(upm_float x, upm_float y) {
   return res;
 }
 #else
-upm_float divide(upm_float x, upm_float y) {
+upm_float upm_divide(upm_float x, upm_float y) {
   if (x < y) {
     return 0;
   }
@@ -280,7 +280,7 @@ uint32_t upm_to_u32(upm_float x) {
   }
   return res;
 }
-upm_float abs_diff(upm_float x, upm_float y) {
+upm_float upm_abs_diff(upm_float x, upm_float y) {
   uint8_t exp_x = x >> 8;
   uint8_t exp_y = y >> 8;
   uint8_t mantissa;
@@ -309,7 +309,7 @@ upm_float abs_diff(upm_float x, upm_float y) {
   res |= mantissa;
   return res;
 }
-upm_float sum(upm_float x, upm_float y) {
+upm_float upm_sum(upm_float x, upm_float y) {
   uint8_t exp_x = x >> 8;
   uint8_t exp_y = y >> 8;
   uint16_t mantissa;
@@ -338,9 +338,9 @@ upm_float sum(upm_float x, upm_float y) {
   res |= (mantissa & 0x00ff);
   return res;
 }
-upm_float shl(upm_float x, uint8_t n) { return x + (((uint16_t)n) << 8); }
-upm_float shr(upm_float x, uint8_t n) { return x - (((uint16_t)n) << 8); }
-upm_float sqrt(upm_float x) {
+upm_float upm_shl(upm_float x, uint8_t n) { return x + (((uint16_t)n) << 8); }
+upm_float upm_shr(upm_float x, uint8_t n) { return x - (((uint16_t)n) << 8); }
+upm_float upm_sqrt(upm_float x) {
   uint8_t mantissa = x & 0x00ff;
   uint8_t exponent = x >> 8;
   if ((exponent & 0x01) == 0) {
