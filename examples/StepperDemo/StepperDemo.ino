@@ -390,7 +390,7 @@ void loop() {
           stepper_selected->applySpeedAcceleration();
         } else if (strcmp(in_buffer, "W") == 0) {
           Serial.println("Blocking wait for running stepper to stop");
-          if (!stepper->isKeepRunning()) {
+          if (!stepper_selected->isRunningContinuously()) {
             // Wait for stepper stop
             while (stepper_selected->isRunning()) {
               // do nothing

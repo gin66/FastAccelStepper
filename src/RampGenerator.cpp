@@ -130,14 +130,8 @@ int RampGenerator::calculateMoveTo(int32_t target_pos, const struct queue_end_s 
 }
 
 int8_t RampGenerator::moveTo(int32_t position, const struct queue_end_s *queue_end) {
-  int32_t curr_pos;
   if (isStopping()) {
     return MOVE_ERR_STOP_ONGOING;
-  }
-  if (isRampGeneratorActive() && !_rw.keep_running) {
-    curr_pos = _ro.target_pos;
-  } else {
-    curr_pos = queue_end->pos;
   }
   inject_fill_interrupt(1);
   int res = calculateMoveTo(position, queue_end);

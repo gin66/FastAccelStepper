@@ -69,7 +69,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       /* force compare to ensure disconnect */                      \
       TCCR1C = _BV(FOC1##CHANNEL);                                  \
       queue.isRunning = false;                                      \
-      queue.ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;           \
+      queue.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;              \
       return;                                                       \
     }                                                               \
     /* command in queue */                                          \
@@ -123,7 +123,7 @@ void StepperQueue::forceStop() {
     TCCR1C = _BV(FOC1B);
   }
   isRunning = false;
-  ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
+  queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 
   // empty the queue
   read_idx = next_write_idx;
