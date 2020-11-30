@@ -86,10 +86,8 @@ class RampGenerator {
 
  public:
   void applySpeedAcceleration(uint32_t ticks_at_queue_end);
-  int8_t move(int32_t move, int32_t position_at_queue_end,
-              uint32_t ticks_at_queue_end);
-  int8_t moveTo(int32_t position, int32_t position_at_queue_end,
-                uint32_t ticks_at_queue_end);
+  int8_t move(int32_t move, const struct queue_end_s *queue);
+  int8_t moveTo(int32_t position, const struct queue_end_s *queue);
   void initiate_stop() { _ro.force_stop = true; }
   bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
@@ -101,8 +99,7 @@ class RampGenerator {
   void commandEnqueued(struct stepper_command_s *command);
 
  private:
-  int calculateMoveTo(int32_t target_pos, int32_t position_at_queue_end,
-                      uint32_t ticks_at_queue_end);
+  int calculateMoveTo(int32_t target_pos, const struct queue_end_s *queue_end);
 
  private:
 #if (TICKS_PER_S != 16000000L)

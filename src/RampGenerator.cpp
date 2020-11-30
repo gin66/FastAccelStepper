@@ -81,9 +81,7 @@ void RampGenerator::_applySpeedAcceleration(uint32_t ticks_at_queue_end,
 void RampGenerator::applySpeedAcceleration(uint32_t ticks_at_queue_end) {
   _applySpeedAcceleration(ticks_at_queue_end, _ro.target_pos);
 }
-int RampGenerator::calculateMoveTo(int32_t target_pos,
-                                   int32_t position_at_queue_end,
-                                   uint32_t ticks_at_queue_end) {
+int RampGenerator::calculateMoveTo(int32_t target_pos, const struct queue_end_s *queue_end) {
   if (_config.min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
@@ -91,12 +89,12 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
     return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
   }
 
-  _applySpeedAcceleration(ticks_at_queue_end, target_pos);
+  _applySpeedAcceleration(queue_end->ticks, target_pos);
 
   if (_rw.ramp_state == RAMP_STATE_IDLE) {
     uint8_t start_state;
     // This can overflow, which is legal
-    int32_t delta = target_pos - position_at_queue_end;
+    int32_t delta = target_pos - queue_end->pos;
     if (delta > 0) {
       start_state = RAMP_STATE_ACCELERATE | RAMP_MOVE_UP;
     } else if (delta < 0) {
@@ -116,7 +114,7 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
   printf(
       "Ramp data: go to %d  curr_ticks = %u travel_ticks = %u "
       "Ramp steps = %u Performed ramp steps = %u\n",
-      target_pos, ticks_at_queue_end, _config.min_travel_ticks,
+      target_pos, queue_end->ticks, _config.min_travel_ticks,
       _config.ramp_steps, _rw.performed_ramp_up_steps);
 #endif
 #ifdef DEBUG
@@ -124,15 +122,14 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
   sprintf(buf,
           "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu "
           "Ramp steps = %lu Performed ramp steps = %lu\n",
-          target_pos, ticks_at_queue_end, _min_travel_ticks, _config.ramp_steps,
+          target_pos, queue_end->ticks, _min_travel_ticks, _config.ramp_steps,
           _rw.performed_ramp_up_steps);
   Serial.println(buf);
 #endif
   return MOVE_OK;
 }
 
-int8_t RampGenerator::moveTo(int32_t position, int32_t pos_at_queue_end,
-                             uint32_t ticks_at_queue_end) {
+int8_t RampGenerator::moveTo(int32_t position, const struct queue_end_s *queue_end) {
   int32_t curr_pos;
   if (isStopping()) {
     return MOVE_ERR_STOP_ONGOING;
@@ -140,23 +137,22 @@ int8_t RampGenerator::moveTo(int32_t position, int32_t pos_at_queue_end,
   if (isRampGeneratorActive() && !_rw.keep_running) {
     curr_pos = _ro.target_pos;
   } else {
-    curr_pos = pos_at_queue_end;
+    curr_pos = queue_end->pos;
   }
   inject_fill_interrupt(1);
-  int res = calculateMoveTo(position, curr_pos, ticks_at_queue_end);
+  int res = calculateMoveTo(position, queue_end);
   inject_fill_interrupt(2);
   return res;
 }
-int8_t RampGenerator::move(int32_t move, int32_t pos_at_queue_end,
-                           uint32_t ticks_at_queue_end) {
+int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   int32_t curr_pos;
   if (isRampGeneratorActive() && !_rw.keep_running) {
     curr_pos = _ro.target_pos;
   } else {
-    curr_pos = pos_at_queue_end;
+    curr_pos = queue_end->pos;
   }
   int32_t new_pos = curr_pos + move;
-  return moveTo(new_pos, pos_at_queue_end, ticks_at_queue_end);
+  return moveTo(new_pos, queue_end);
 }
 
 //*************************************************************************************************

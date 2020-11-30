@@ -412,15 +412,13 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
   rg.setAcceleration(accel);
 }
 int8_t FastAccelStepper::moveTo(int32_t position) {
-  uint32_t ticks = fas_queue[_queue_num].queue_end.ticks;
-  return rg.moveTo(position, getPositionAfterCommandsCompleted(), ticks);
+  return rg.moveTo(position, &fas_queue[_queue_num].queue_end);
 }
 int8_t FastAccelStepper::move(int32_t move) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  uint32_t ticks = fas_queue[_queue_num].queue_end.ticks;
-  return rg.move(move, getPositionAfterCommandsCompleted(), ticks);
+  return rg.move(move, &fas_queue[_queue_num].queue_end);
 }
 void FastAccelStepper::keepRunning() { rg.setKeepRunning(); }
 void FastAccelStepper::stopMove() { rg.initiate_stop(); }
