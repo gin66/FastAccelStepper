@@ -104,7 +104,7 @@ int RampGenerator::calculateMoveTo(int32_t target_pos, const struct queue_end_s 
     }
 
     noInterrupts();
-    _rw.keep_running = false;
+    _ro.keep_running = false;
     _ro.force_stop = false;
     _rw.ramp_state = start_state;
     interrupts();
@@ -140,7 +140,7 @@ int8_t RampGenerator::moveTo(int32_t position, const struct queue_end_s *queue_e
 }
 int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   int32_t curr_pos;
-  if (isRampGeneratorActive() && !_rw.keep_running) {
+  if (isRampGeneratorActive() && !_ro.keep_running) {
     curr_pos = _ro.target_pos;
   } else {
     curr_pos = queue_end->pos;
@@ -164,7 +164,7 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
   // check state for acceleration/deceleration or deceleration to stop
   uint32_t remaining_steps;
   bool need_count_up;
-  if (rw->keep_running) {
+  if (ro->keep_running) {
     need_count_up = count_up;
     remaining_steps = 0xfffffff;
   } else {
@@ -181,7 +181,6 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
   if (ro->force_stop) {
     next_state = RAMP_STATE_DECELERATE_TO_STOP | move_state;
     remaining_steps = rw->performed_ramp_up_steps;
-    rw->keep_running = false;
   }
   // Detect change in direction and if so, initiate deceleration to stop
   else if (count_up != need_count_up) {

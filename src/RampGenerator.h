@@ -45,9 +45,9 @@ struct ramp_ro_s {
   uint32_t min_travel_ticks;
   upm_float upm_inv_accel2;
   bool force_stop;
+  bool keep_running;
 };
 struct ramp_rw_s {
-  bool keep_running;
   uint8_t ramp_state;
   // the speed is linked on both ramp slopes to this variable as per
   //       s = v²/2a   =>   v = sqrt(2*a*s)
@@ -92,8 +92,8 @@ class RampGenerator {
   bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
   void abort();
-  void setKeepRunning() { _rw.keep_running = true; }
-  bool isRunningContinuously() { return _rw.keep_running; }
+  void setKeepRunning() { _ro.keep_running = true; }
+  bool isRunningContinuously() { return _ro.keep_running; }
   bool getNextCommand(const struct queue_end_s *queue_end,
                       struct stepper_command_s *command);
   void commandEnqueued(struct stepper_command_s *command);
