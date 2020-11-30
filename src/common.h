@@ -8,4 +8,9 @@ struct stepper_command_s {
   bool count_up;
 };
 
+struct queue_end_s {
+  int32_t pos;     // in steps
+  uint32_t ticks;  // in timer ticks, 0 on stopped stepper
+  bool dir;
+};
 #endif

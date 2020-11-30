@@ -88,10 +88,8 @@ class StepperQueue {
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint8_t checksum;
 #endif
-
-  bool dir_at_queue_end;
-  int32_t pos_at_queue_end;     // in steps
-  uint32_t ticks_at_queue_end;  // in timer ticks, 0 on stopped stepper
+ 
+  struct queue_end_s queue_end;
 
   void init(uint8_t queue_num, uint8_t step_pin);
   inline bool isQueueFull() {
@@ -148,14 +146,14 @@ class StepperQueue {
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-    pos_at_queue_end += (dir == dirHighCountsUp) ? steps : -steps;
-    ticks_at_queue_end = ticks;
+    queue_end.pos += (dir == dirHighCountsUp) ? steps : -steps;
+    queue_end.ticks = ticks;
     steps <<= 1;
     e->period = period;
     e->n_periods = n_periods;
     // check for dir pin value change
-    e->steps = (dir != dir_at_queue_end) ? steps | 0x01 : steps;
-    dir_at_queue_end = dir;
+    e->steps = (dir != queue_end.dir) ? steps | 0x01 : steps;
+    queue_end.dir = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     {
       // checksum is in the struct and will updated here
@@ -218,10 +216,10 @@ class StepperQueue {
     dirPin = PIN_UNDEFINED;
     read_idx = 0;
     next_write_idx = 0;
-    dir_at_queue_end = true;
+    queue_end.dir = true;
+    queue_end.pos = 0;
+    queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
     dirHighCountsUp = true;
-    pos_at_queue_end = 0;
-    ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
     isRunning = false;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     checksum = 0;
