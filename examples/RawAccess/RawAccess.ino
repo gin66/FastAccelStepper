@@ -45,7 +45,6 @@ void loop() {
     while (true) {
       struct stepper_command_s cmd = {.ticks = ticks,
                                       .steps = steps,
-                                      .state = 0,  // PROBLEM
                                       .count_up = direction};
       int rc = stepper->addQueueEntry(&cmd);
       // Serial.println(rc);

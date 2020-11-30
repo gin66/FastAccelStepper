@@ -46,7 +46,6 @@ const uint8_t cos_tab[32] = {0,   2,   9,   21,  37,  56,  79,  103,
 void loop() {
   struct stepper_command_s cmd = {.ticks = dt,
                                   .steps = steps,
-                                  .state = 0,  // PROBLEM
                                   .count_up = true};
 
   while (stepper1->addQueueEntry(&cmd) == AQE_OK) {

@@ -34,7 +34,6 @@ void basic_test() {
   assert(s.isQueueEmpty());
   struct stepper_command_s cmd = {.ticks = 100000,
                                   .steps = 100,
-                                  .state = 0,  // PROBLEM
                                   .count_up = true};
   s.addQueueEntry(&cmd);
   assert(!s.isQueueEmpty());
@@ -52,7 +51,6 @@ void queue_full() {
          fas_queue[0].next_write_idx);
   struct stepper_command_s cmd = {.ticks = 100000,
                                   .steps = 100,
-                                  .state = 0,  // PROBLEM
                                   .count_up = true};
   for (int i = 0; i < QUEUE_LEN - 1; i++) {
     s.addQueueEntry(&cmd);
@@ -82,7 +80,6 @@ void queue_out_of_range() {
 
   struct stepper_command_s cmd1 = {.ticks = ABSOLUTE_MAX_TICKS + 1,
                                    .steps = 100,
-                                   .state = 0,  // PROBLEM
                                    .count_up = true};
   res = s.addQueueEntry(&cmd1);
   test(res == AQE_TOO_HIGH, "Too high provided should trigger error");
@@ -90,7 +87,6 @@ void queue_out_of_range() {
 
   struct stepper_command_s cmd2 = {.ticks = 65535,
                                    .steps = 128,
-                                   .state = 0,  // PROBLEM
                                    .count_up = true};
 
   res = s.addQueueEntry(&cmd2);
@@ -99,7 +95,6 @@ void queue_out_of_range() {
 
   struct stepper_command_s cmd3 = {.ticks = ABSOLUTE_MAX_TICKS,
                                    .steps = 100,
-                                   .state = 0,  // PROBLEM
                                    .count_up = true};
   res = s.addQueueEntry(&cmd3);
   test(res == AQE_OK, "In range should be accepted");
@@ -113,7 +108,6 @@ void end_pos_test() {
   assert(0 == s.getPositionAfterCommandsCompleted());
   struct stepper_command_s cmd = {.ticks = 65535,
                                   .steps = 1,
-                                  .state = 0,  // PROBLEM
                                   .count_up = true};
 
   s.addQueueEntry(&cmd);

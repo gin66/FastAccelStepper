@@ -208,7 +208,6 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
       if (_on_delay_ticks > 0) {
         struct stepper_command_s start_cmd = {.ticks = _on_delay_ticks,
                                               .steps = 1,
-                                              .state = cmd->state,
                                               .count_up = cmd->count_up};
         res = q->addQueueEntry(&start_cmd);
         if ((res == AQE_OK) && (cmd->steps == 1)) {
@@ -522,7 +521,6 @@ void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
     struct stepper_command_s cmd = {.ticks = MIN_DELTA_TICKS,
                                     .steps = 1,
-                                    .state = 0,  // PROBLEM
                                     .count_up = true};
     addQueueEntry(&cmd);
     if (blocking) {
@@ -537,7 +535,6 @@ void FastAccelStepper::backwardStep(bool blocking) {
     if (_dirPin != PIN_UNDEFINED) {
       struct stepper_command_s cmd = {.ticks = MIN_DELTA_TICKS,
                                       .steps = 1,
-                                      .state = 0,  // PROBLEM
                                       .count_up = false};
       addQueueEntry(&cmd);
       if (blocking) {
