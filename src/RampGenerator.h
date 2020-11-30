@@ -15,13 +15,9 @@
 #define TICKS_PER_S 16000000L
 #endif
 
-class FastAccelStepper;
+#include "common.h"
 
-struct ramp_command_s {
-  uint32_t ticks;
-  uint8_t steps;
-  bool count_up;
-};
+class FastAccelStepper;
 
 #if (TICKS_PER_S == 16000000L)
 #define UPM_TICKS_PER_S ((upm_float)0x97f4)
@@ -102,7 +98,8 @@ class RampGenerator {
   bool isRunningContinuously() { return _rw.keep_running; }
   bool getNextCommand(uint32_t ticks_at_queue_end,
                       int32_t position_at_queue_end,
-                      struct ramp_command_s *command);
+                      struct stepper_command_s *command);
+  void commandEnqueued(struct stepper_command_s *command);
 
  private:
   int calculateMoveTo(int32_t target_pos, int32_t position_at_queue_end,

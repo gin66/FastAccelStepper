@@ -163,7 +163,7 @@ int8_t RampGenerator::move(int32_t move, int32_t pos_at_queue_end,
 static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
                             uint32_t ticks_at_queue_end,
                             int32_t position_at_queue_end,
-                            struct ramp_command_s *command) {
+                            struct stepper_command_s *command) {
   if (rw->ramp_state == RAMP_STATE_IDLE) {
     return false;
   }
@@ -347,39 +347,20 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
   steps = min(steps, abs(remaining_steps));
   steps = min(127, steps);
 
-  switch (next_state & RAMP_STATE_MASK) {
-    case RAMP_STATE_COAST:
-      break;
-    case RAMP_STATE_ACCELERATE:
-      rw->performed_ramp_up_steps += steps;
-      break;
-    case RAMP_STATE_DECELERATE:
-    case RAMP_STATE_DECELERATE_TO_STOP:
-      rw->performed_ramp_up_steps -= steps;
-      break;
-  }
-
 #ifdef TEST
   assert(next_ticks > 0);
 #endif
 
+  if (steps == abs(remaining_steps)) {
+    if (count_up == need_count_up) {
+		next_state = RAMP_STATE_IDLE;
+    }
+  }
+
   command->ticks = next_ticks;
   command->steps = steps;
   command->count_up = count_up;
-
-  if (steps == abs(remaining_steps)) {
-    if (count_up != need_count_up) {
-      rw->ramp_state = RAMP_STATE_ACCELERATE | (move_state ^ RAMP_MOVE_MASK);
-#ifdef TEST
-      puts("Stepper reverse");
-#endif
-    } else {
-      rw->ramp_state = RAMP_STATE_IDLE;
-#ifdef TEST
-      puts("Stepper stop");
-#endif
-    }
-  }
+  command->state = next_state;
 
 #ifdef TEST
   printf(
@@ -389,9 +370,25 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
 #endif
   return true;
 }
+void RampGenerator::commandEnqueued(struct stepper_command_s *command) {
+  noInterrupts();
+  switch (command->state & RAMP_STATE_MASK) {
+    case RAMP_STATE_COAST:
+      break;
+    case RAMP_STATE_ACCELERATE:
+      _rw.performed_ramp_up_steps += command->steps;
+      break;
+    case RAMP_STATE_DECELERATE:
+    case RAMP_STATE_DECELERATE_TO_STOP:
+      _rw.performed_ramp_up_steps -= command->steps;
+      break;
+  }
+  _rw.ramp_state = command->state;
+  interrupts();
+}
 bool RampGenerator::getNextCommand(uint32_t ticks_at_queue_end,
                                    int32_t position_at_queue_end,
-                                   struct ramp_command_s *command) {
+                                   struct stepper_command_s *command) {
   return _getNextCommand(&_ro, &_rw, ticks_at_queue_end, position_at_queue_end,
                          command);
 }

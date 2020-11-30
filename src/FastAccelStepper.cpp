@@ -263,7 +263,7 @@ void FastAccelStepper::isr_fill_queue() {
   }
 
   // preconditions are fulfilled, so create the command(s)
-  struct ramp_command_s cmd;
+  struct stepper_command_s cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 10 ms. Currently hard coded
   while (!isQueueFull() && !q->hasTicksInQueue(TICKS_PER_S / 100)) {
@@ -277,6 +277,7 @@ void FastAccelStepper::isr_fill_queue() {
     if (have_command) {
       res =
           addQueueEntry(cmd.ticks, cmd.steps, cmd.count_up == _dirHighCountsUp);
+	  rg.commandEnqueued(&cmd);
     }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
