@@ -204,9 +204,6 @@ void info(FastAccelStepper *s) {
     case RAMP_STATE_REVERSE:
       Serial.print("REV   ");
       break;
-    case RAMP_STATE_FINISH:
-      Serial.print("FIN   ");
-      break;
     default:
       Serial.print(s->rampState());
   }

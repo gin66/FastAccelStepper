@@ -158,10 +158,6 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
 	command->steps = 0;
     return RAMP_STATE_IDLE;
   }
-  if (rw->ramp_state == RAMP_STATE_FINISH) {
-	command->steps = 0;
-    return RAMP_STATE_IDLE;
-  }
 
   bool count_up = queue_end->count_up;
 
@@ -243,9 +239,6 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
       break;
     case RAMP_STATE_REVERSE:
       printf("REVERSE");
-      break;
-    case RAMP_STATE_FINISH:
-      printf("FINISH");
       break;
   }
   printf("\n");
@@ -347,7 +340,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
 
   if (steps == abs(remaining_steps)) {
     if (count_up == need_count_up) {
-      next_state = RAMP_STATE_FINISH;
+      next_state = RAMP_STATE_IDLE;
     }
   }
 
@@ -386,5 +379,5 @@ uint8_t RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 }
 void RampGenerator::stopRamp() { _rw.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() {
-  return (_rw.ramp_state != RAMP_STATE_IDLE) && (_rw.ramp_state != RAMP_STATE_FINISH);
+  return (_rw.ramp_state != RAMP_STATE_IDLE);
 }

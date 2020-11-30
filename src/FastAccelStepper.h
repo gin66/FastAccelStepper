@@ -209,7 +209,6 @@ class FastAccelStepper {
 #define RAMP_STATE_DECELERATE 3
 #define RAMP_STATE_COAST 4
 #define RAMP_STATE_REVERSE 5
-#define RAMP_STATE_FINISH 6
 #define RAMP_STATE_MASK 0x0f
   inline uint8_t rampState() { return rg.rampState(); }
 
