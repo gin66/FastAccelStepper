@@ -208,6 +208,7 @@ class FastAccelStepper {
 #define RAMP_STATE_DECELERATE_TO_STOP 2
 #define RAMP_STATE_DECELERATE 3
 #define RAMP_STATE_COAST 4
+#define RAMP_STATE_FINISH 5
 #define RAMP_STATE_MASK 0x0f
 #define RAMP_MOVE_UP 0x80
 #define RAMP_MOVE_DOWN 0x40

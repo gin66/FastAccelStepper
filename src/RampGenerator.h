@@ -91,12 +91,13 @@ class RampGenerator {
   void initiate_stop() { _ro.force_stop = true; }
   bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
+  void setState(uint8_t state) { _rw.ramp_state = state; }
   void stopRamp();
   void setKeepRunning() { _ro.keep_running = true; }
   bool isRunningContinuously() { return _ro.keep_running; }
-  bool getNextCommand(const struct queue_end_s *queue_end,
-                      struct stepper_command_s *command);
-  void commandEnqueued(struct stepper_command_s *command);
+  uint8_t getNextCommand(const struct queue_end_s *queue_end,
+                         struct stepper_command_s *command);
+  void commandEnqueued(struct stepper_command_s *command, uint8_t state);
 
  private:
   int calculateMoveTo(int32_t target_pos, const struct queue_end_s *queue_end);
