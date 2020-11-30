@@ -355,7 +355,8 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
 #endif
   return next_state;
 }
-void RampGenerator::commandEnqueued(struct stepper_command_s *command, uint8_t state) {
+void RampGenerator::commandEnqueued(struct stepper_command_s *command,
+                                    uint8_t state) {
   noInterrupts();
   switch (state & RAMP_STATE_MASK) {
     case RAMP_STATE_COAST:

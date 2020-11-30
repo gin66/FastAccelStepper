@@ -43,9 +43,8 @@ void loop() {
     uint32_t steps_per_s = min(i, 2 * COMMAND_CNT - i) * 100;
     uint32_t ticks = TICKS_PER_S / steps_per_s;
     while (true) {
-      struct stepper_command_s cmd = {.ticks = ticks,
-                                      .steps = steps,
-                                      .count_up = direction};
+      struct stepper_command_s cmd = {
+          .ticks = ticks, .steps = steps, .count_up = direction};
       int rc = stepper->addQueueEntry(&cmd);
       // Serial.println(rc);
       if (rc == AQE_OK) {
