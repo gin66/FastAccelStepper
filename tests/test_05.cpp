@@ -150,7 +150,9 @@ void do_test() {
   s.manage();
   in_manage = false;
   assert(s.isQueueEmpty());
+  assert(!s.isRunning());
   s.moveTo(3000);
+  assert(s.isRunning());
   in_manage = true;
   s.manage();
   in_manage = false;

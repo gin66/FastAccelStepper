@@ -86,12 +86,12 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   queue->period = period;
   if (n_periods == 0) {
     mcpwm->timer[timer].period.period = period;
-    mcpwm->channel[timer].cmpr_value[0].cmpr_val = period>>1;
+    mcpwm->channel[timer].cmpr_value[0].cmpr_val = period >> 1;
     mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
     mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
   } else {
     mcpwm->timer[timer].period.period = PERIOD_TICKS;
-    mcpwm->channel[timer].cmpr_value[0].cmpr_val = PERIOD_TICKS>>1;
+    mcpwm->channel[timer].cmpr_value[0].cmpr_val = PERIOD_TICKS >> 1;
     queue->current_n_periods = n_periods;
     // period = 0..n_period-1 is PERIOD_TICKS, period = n_period is queue.period
     queue->current_period = 0;

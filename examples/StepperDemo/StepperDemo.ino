@@ -390,13 +390,11 @@ void loop() {
           stepper_selected->applySpeedAcceleration();
         } else if (strcmp(in_buffer, "W") == 0) {
           Serial.println("Blocking wait for running stepper to stop");
-          // Wait stepper is really running
-          while (!stepper_selected->isRunning()) {
-            // do nothing
-          }
-          // Wait for stepper stop
-          while (stepper_selected->isRunning()) {
-            // do nothing
+          if (!stepper->isKeepRunning()) {
+            // Wait for stepper stop
+            while (stepper_selected->isRunning()) {
+              // do nothing
+            }
           }
         } else if (strcmp(in_buffer, "I") == 0) {
           Serial.println("Toggle motor info");
