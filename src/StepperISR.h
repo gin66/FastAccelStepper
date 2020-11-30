@@ -154,6 +154,7 @@ class StepperQueue {
     e->period = period;
     e->n_periods = n_periods;
     // check for dir pin value change
+	queue_end.count_up = cmd->count_up;
     bool dir = (cmd->count_up == dirHighCountsUp);
     e->steps = (dir != queue_end.dir) ? steps | 0x01 : steps;
     queue_end.dir = dir;
@@ -220,6 +221,7 @@ class StepperQueue {
     read_idx = 0;
     next_write_idx = 0;
     queue_end.dir = true;
+    queue_end.count_up = true;
     queue_end.pos = 0;
     queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
     dirHighCountsUp = true;

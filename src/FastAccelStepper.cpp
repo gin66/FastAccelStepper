@@ -276,14 +276,14 @@ void FastAccelStepper::isr_fill_queue() {
 #endif
     int8_t res = AQE_OK;
     uint8_t next_state = rg.getNextCommand(&q->queue_end, &cmd);
-    if (next_state != RAMP_STATE_IDLE) {
+    if (cmd.steps != 0) {
       res = addQueueEntry(&cmd);
       if (res == AQE_OK) {
         rg.commandEnqueued(&cmd, next_state);
         rg.setState(next_state);
       }
     } else {
-      rg.setState(next_state);
+      rg.setState(RAMP_STATE_IDLE);
     }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
@@ -291,7 +291,7 @@ void FastAccelStepper::isr_fill_queue() {
     runtime_us = micros() - runtime_us;
     max_micros = max(max_micros, runtime_us);
 #endif
-    if (next_state == RAMP_STATE_IDLE) {
+    if (cmd.steps == 0) {
       break;
     }
     if (res == AQE_FULL) {

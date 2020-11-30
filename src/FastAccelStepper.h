@@ -208,11 +208,9 @@ class FastAccelStepper {
 #define RAMP_STATE_DECELERATE_TO_STOP 2
 #define RAMP_STATE_DECELERATE 3
 #define RAMP_STATE_COAST 4
-#define RAMP_STATE_FINISH 5
+#define RAMP_STATE_REVERSE 5
+#define RAMP_STATE_FINISH 6
 #define RAMP_STATE_MASK 0x0f
-#define RAMP_MOVE_UP 0x80
-#define RAMP_MOVE_DOWN 0x40
-#define RAMP_MOVE_MASK 0xc0
   inline uint8_t rampState() { return rg.rampState(); }
 
   // returns true, if the ramp generation is active
