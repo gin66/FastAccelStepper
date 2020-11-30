@@ -279,7 +279,7 @@ void FastAccelStepper::isr_fill_queue() {
       rg.commandEnqueued(&cmd);
     }
 	else {
-		rg.abort();
+		rg.stopRamp();
 	}
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
@@ -294,7 +294,7 @@ void FastAccelStepper::isr_fill_queue() {
       break;
     } else if (res != AQE_OK) {
       // TODO: How to deal with these error ?
-      rg.abort();
+      rg.stopRamp();
     }
   }
 }
@@ -433,7 +433,7 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];
 
   // first stop ramp generator
-  rg.abort();
+  rg.stopRamp();
 
   // stop the stepper interrupt and empty the queue
   q->forceStop();

@@ -91,7 +91,7 @@ class RampGenerator {
   void initiate_stop() { _ro.force_stop = true; }
   bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
-  void abort();
+  void stopRamp();
   void setKeepRunning() { _ro.keep_running = true; }
   bool isRunningContinuously() { return _ro.keep_running; }
   bool getNextCommand(const struct queue_end_s *queue_end,

@@ -171,7 +171,6 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, const struct ramp_rw_s *
     int32_t delta =
         ro->target_pos - queue_end->pos;  // this can overflow, which is legal
     if (delta == 0) {  // This case should actually never happen
-      //rw->ramp_state = RAMP_STATE_IDLE;
       return false;
     }
     need_count_up = delta > 0;
@@ -371,7 +370,7 @@ bool RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
                                    struct stepper_command_s *command) {
   return _getNextCommand(&_ro, &_rw, queue_end, command);
 }
-void RampGenerator::abort() { _rw.ramp_state = RAMP_STATE_IDLE; }
+void RampGenerator::stopRamp() { _rw.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() {
   return _rw.ramp_state != RAMP_STATE_IDLE;
 }
