@@ -161,6 +161,7 @@ uint8_t in_ptr = 0;
 char in_buffer[256];
 bool stopped = true;
 bool verbose = true;
+bool usage_info = true;
 uint32_t last_time = 0;
 int selected = -1;
 
@@ -247,6 +248,7 @@ const static char usage_str[] PROGMEM =
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
     "     T         ... Test selected motor with direct port access\n"
+    "     Q         ... Toggle print usage on motor stop\n"
     "     ?         ... Print this usage\n"
     "\n";
 
@@ -388,6 +390,9 @@ void loop() {
         } else if (strcmp(in_buffer, "I") == 0) {
           Serial.println("Toggle motor info");
           verbose = !verbose;
+        } else if (strcmp(in_buffer, "Q") == 0) {
+          Serial.println("Toggle usage info");
+          usage_info = !usage_info;
         } else if (strcmp(in_buffer, "?") == 0) {
           usage();
         } else if (strcmp(in_buffer, "T") == 0) {
@@ -429,7 +434,9 @@ void loop() {
   }
   if (!stopped && !running) {
     output_info();
-    usage();
+    if (usage_info) {
+      usage();
+    }
   }
   stopped = !running;
 }

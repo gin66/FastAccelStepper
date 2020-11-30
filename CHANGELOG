@@ -3,6 +3,10 @@ pre-0.10.0:
 - esp32: step pulse length is for high speed with 50% duty cycle and for low speed fixed at 2ms
 - addQueueEntry() receives a stepper_command_s struct
 - esp32: Task priority of ramp generator task has been set to max Priority.
+- StepperDemo extended:
+	- Q: Quiet the usage info, which takes time to be transmitted.
+      Try this NEMA-17 without load:
+			M1 A1000000 V20 P1000 W P0 W P500 W P-500 W P0
 
 0.9.5:
 - Fix sudden CPU reset on high interrupt load for avr variant. Issue #12
