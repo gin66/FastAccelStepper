@@ -204,8 +204,6 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
   uint32_t planning_steps = max((TICKS_PER_S / 1000) / queue_end->ticks, 1);
   uint32_t next_ticks;
 
-  rw->ramp_state = next_state;
-
 #ifdef TEST
   printf("pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d  ",
          queue_end->pos, remaining_steps, rw->performed_ramp_up_steps,
