@@ -71,6 +71,17 @@ void RampGenerator::_applySpeedAcceleration(uint32_t ticks_at_queue_end,
   uint32_t performed_ramp_up_steps = upm_to_u32(upm_divide(
       _config.upm_inv_accel2, upm_square(upm_from(ticks_at_queue_end))));
 
+  // The below values are read in various places of getNextCommand().
+  // The mechanism to ensure no inconstitencites to different mechanisms are at work
+  // - avr
+  //   The getNextCommand() is called from an interrupt context. Even the priorities are
+  //   reenabled in that context, the application - invoking move/moveTo/... - is not
+  //   invoked, before getNextCommand() is completed
+  // - esp32
+  //   Here the interleaved access from getNextCommand() and move/moveTo/... are
+  //   guaranteed, by setting the priority of the getNextCommand() calling cyclic Task
+  //   to the maximum allowed level.
+
   noInterrupts();
   _ro.min_travel_ticks = _config.min_travel_ticks;
   _ro.upm_inv_accel2 = _config.upm_inv_accel2;
