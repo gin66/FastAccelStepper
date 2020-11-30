@@ -155,7 +155,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
                                const struct queue_end_s *queue_end,
                                struct stepper_command_s *command) {
   if (rw->ramp_state == RAMP_STATE_IDLE) {
-	command->steps = 0;
+    command->steps = 0;
     return RAMP_STATE_IDLE;
   }
 
@@ -172,7 +172,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
     int32_t delta =
         ro->target_pos - queue_end->pos;  // this can overflow, which is legal
     if (delta == 0) {  // This case should actually never happen
-	command->steps = 0;
+      command->steps = 0;
       return RAMP_STATE_IDLE;
     }
     need_count_up = delta > 0;
@@ -180,7 +180,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
   }
 
   if (queue_end->ticks == TICKS_FOR_STOPPED_MOTOR) {
-	  count_up = need_count_up;
+    count_up = need_count_up;
   }
 
   if (ro->force_stop) {
@@ -190,14 +190,13 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
   // Detect change in direction and if so, initiate deceleration to stop
   else if (count_up != need_count_up) {
     next_state = RAMP_STATE_REVERSE;
-	uint32_t prus = rw->performed_ramp_up_steps;
-	if (prus != 0) {
-		remaining_steps = prus;
-	}
-	else {
-	  count_up = need_count_up;
+    uint32_t prus = rw->performed_ramp_up_steps;
+    if (prus != 0) {
+      remaining_steps = prus;
+    } else {
+      count_up = need_count_up;
       next_state = RAMP_STATE_ACCELERATE;
-	}
+    }
   } else {
     // If come here, then direction is same as current movement
     if (remaining_steps <= rw->performed_ramp_up_steps) {
@@ -219,10 +218,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
          queue_end->pos, remaining_steps, rw->performed_ramp_up_steps,
          planning_steps);
   if (count_up) {
-      printf("+");
-  }
-  else {
-      printf("-");
+    printf("+");
+  } else {
+    printf("-");
   }
   switch (next_state) {
     case RAMP_STATE_COAST:

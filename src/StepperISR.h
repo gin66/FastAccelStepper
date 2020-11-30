@@ -154,7 +154,7 @@ class StepperQueue {
     e->period = period;
     e->n_periods = n_periods;
     // check for dir pin value change
-	queue_end.count_up = cmd->count_up;
+    queue_end.count_up = cmd->count_up;
     bool dir = (cmd->count_up == dirHighCountsUp);
     e->steps = (dir != queue_end.dir) ? steps | 0x01 : steps;
     queue_end.dir = dir;
