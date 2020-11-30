@@ -86,7 +86,7 @@ void FastAccelStepperEngine::init() {
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #define STACK_SIZE 1000
-#define PRIORITY 1
+#define PRIORITY configMAX_PRIORITIES
   xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
 #endif
 }

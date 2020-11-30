@@ -53,14 +53,14 @@ General behaviour:
 
 ### AVR
 
-* allows up to roughly 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
+* allows up to 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
 * supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
 * Steppers' command queue depth: 16
 
 ### ESP32
 
-* allows up to roughly 50000 generated steps per second
+* allows up 200000 generated steps per second
 * supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
