@@ -278,6 +278,9 @@ void FastAccelStepper::isr_fill_queue() {
           addQueueEntry(cmd.ticks, cmd.steps, cmd.count_up == _dirHighCountsUp);
       rg.commandEnqueued(&cmd);
     }
+	else {
+		rg.abort();
+	}
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement

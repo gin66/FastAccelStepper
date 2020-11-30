@@ -150,7 +150,7 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
 }
 
 //*************************************************************************************************
-static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
+static bool _getNextCommand(const struct ramp_ro_s *ro, const struct ramp_rw_s *rw,
                             const struct queue_end_s *queue_end,
                             struct stepper_command_s *command) {
   if (rw->ramp_state == RAMP_STATE_IDLE) {
@@ -171,7 +171,7 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
     int32_t delta =
         ro->target_pos - queue_end->pos;  // this can overflow, which is legal
     if (delta == 0) {  // This case should actually never happen
-      rw->ramp_state = RAMP_STATE_IDLE;
+      //rw->ramp_state = RAMP_STATE_IDLE;
       return false;
     }
     need_count_up = delta > 0;
