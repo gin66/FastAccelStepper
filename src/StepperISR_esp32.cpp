@@ -3,8 +3,7 @@
 
 #if defined(ARDUINO_ARCH_ESP32)
 
-// H-Period of Step signal is 10 us
-#define TIMER_H_L_TRANSITION 160
+#define DEFAULT_TIMER_H_L_TRANSITION 160
 
 // cannot be updated while timer is running => fix it to 0
 #define TIMER_PRESCALER 0
@@ -87,10 +86,12 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   queue->period = period;
   if (n_periods == 0) {
     mcpwm->timer[timer].period.period = period;
+    mcpwm->channel[timer].cmpr_value[0].cmpr_val = period>>1;
     mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
     mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
   } else {
     mcpwm->timer[timer].period.period = PERIOD_TICKS;
+    mcpwm->channel[timer].cmpr_value[0].cmpr_val = PERIOD_TICKS>>1;
     queue->current_n_periods = n_periods;
     // period = 0..n_period-1 is PERIOD_TICKS, period = n_period is queue.period
     queue->current_period = 0;
@@ -213,7 +214,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->timer[timer].mode.val = 0;  // freeze
   mcpwm->timer[timer].sync.val = 0;  // no sync
   mcpwm->channel[timer].cmpr_cfg.a_upmethod = 0;
-  mcpwm->channel[timer].cmpr_value[0].cmpr_val = TIMER_H_L_TRANSITION;
+  mcpwm->channel[timer].cmpr_value[0].cmpr_val = DEFAULT_TIMER_H_L_TRANSITION;
   mcpwm->channel[timer].generator[0].val = 0;
   mcpwm->channel[timer].generator[1].val = 0;
   // mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
@@ -257,7 +258,7 @@ void StepperQueue::startQueue() {
   mcpwm->timer[timer].mode.val = 10;  // free run incrementing
 
   // busy wait period for timer zero
-  while (mcpwm->timer[timer].status.value >= TIMER_H_L_TRANSITION) {
+  while (mcpwm->timer[timer].status.value <= DEFAULT_TIMER_H_L_TRANSITION) {
   }
 
   // my interrupt cannot be called in this state, so modifying read_idx without
