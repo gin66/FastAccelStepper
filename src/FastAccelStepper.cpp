@@ -272,8 +272,7 @@ void FastAccelStepper::isr_fill_queue() {
     uint32_t runtime_us = micros();
 #endif
     int8_t res = AQE_OK;
-    bool have_command = rg.getNextCommand(
-        q->queue_end.ticks, getPositionAfterCommandsCompleted(), &cmd);
+    bool have_command = rg.getNextCommand(&q->queue_end, &cmd);
     if (have_command) {
       res =
           addQueueEntry(cmd.ticks, cmd.steps, cmd.count_up == _dirHighCountsUp);
@@ -509,7 +508,9 @@ bool FastAccelStepper::isQueueFull() {
 bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
-bool FastAccelStepper::isRunning() { return fas_queue[_queue_num].isRunning || rg.isRampGeneratorActive(); }
+bool FastAccelStepper::isRunning() {
+  return fas_queue[_queue_num].isRunning || rg.isRampGeneratorActive();
+}
 void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
     addQueueEntry(MIN_DELTA_TICKS, 1, _dirHighCountsUp);

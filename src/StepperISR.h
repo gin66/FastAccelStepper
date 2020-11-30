@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
+#include "common.h"
 
 #if defined(ARDUINO_ARCH_AVR)
 #define stepPinStepperA 9  /* OC1A */
@@ -88,7 +89,7 @@ class StepperQueue {
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint8_t checksum;
 #endif
- 
+
   struct queue_end_s queue_end;
 
   void init(uint8_t queue_num, uint8_t step_pin);

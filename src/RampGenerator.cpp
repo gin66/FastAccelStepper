@@ -161,16 +161,10 @@ int8_t RampGenerator::move(int32_t move, int32_t pos_at_queue_end,
 
 //*************************************************************************************************
 static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
-                            uint32_t ticks_at_queue_end,
-                            int32_t position_at_queue_end,
+                            const struct queue_end_s *queue_end,
                             struct stepper_command_s *command) {
   if (rw->ramp_state == RAMP_STATE_IDLE) {
     return false;
-  }
-
-  // This should never be true
-  if (ticks_at_queue_end == 0) {
-    ticks_at_queue_end = TICKS_FOR_STOPPED_MOTOR;
   }
 
   uint8_t next_state = rw->ramp_state;
@@ -184,8 +178,8 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
     need_count_up = count_up;
     remaining_steps = 0xfffffff;
   } else {
-    int32_t delta = ro->target_pos -
-                    position_at_queue_end;  // this can overflow, which is legal
+    int32_t delta =
+        ro->target_pos - queue_end->pos;  // this can overflow, which is legal
     if (delta == 0) {  // This case should actually never happen
       rw->ramp_state = RAMP_STATE_IDLE;
       return false;
@@ -207,9 +201,9 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
     // If come here, then direction is same as current movement
     if (remaining_steps <= rw->performed_ramp_up_steps) {
       next_state = RAMP_STATE_DECELERATE_TO_STOP;
-    } else if (ro->min_travel_ticks < ticks_at_queue_end) {
+    } else if (ro->min_travel_ticks < queue_end->ticks) {
       next_state = RAMP_STATE_ACCELERATE;
-    } else if (ro->min_travel_ticks > ticks_at_queue_end) {
+    } else if (ro->min_travel_ticks > queue_end->ticks) {
       next_state = RAMP_STATE_DECELERATE;
     } else {
       next_state = RAMP_STATE_COAST;
@@ -218,14 +212,14 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
   }
 
   // Forward planning of 1ms or more on slow speed.
-  uint32_t planning_steps = max((TICKS_PER_S / 1000) / ticks_at_queue_end, 1);
+  uint32_t planning_steps = max((TICKS_PER_S / 1000) / queue_end->ticks, 1);
   uint32_t next_ticks;
 
   rw->ramp_state = next_state;
 
 #ifdef TEST
   printf("pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d  ",
-         position_at_queue_end, remaining_steps, rw->performed_ramp_up_steps,
+         queue_end->pos, remaining_steps, rw->performed_ramp_up_steps,
          planning_steps);
   switch (next_state & RAMP_MOVE_MASK) {
     case RAMP_MOVE_UP:
@@ -258,7 +252,7 @@ static bool _getNextCommand(const struct ramp_ro_s *ro, struct ramp_rw_s *rw,
   printf("\n");
 #endif
 
-  uint32_t curr_ticks = ticks_at_queue_end;
+  uint32_t curr_ticks = queue_end->ticks;
   switch (next_state & RAMP_STATE_MASK) {
     uint32_t d_ticks_new;
     uint32_t upm_rem_steps;
@@ -386,11 +380,9 @@ void RampGenerator::commandEnqueued(struct stepper_command_s *command) {
   _rw.ramp_state = command->state;
   interrupts();
 }
-bool RampGenerator::getNextCommand(uint32_t ticks_at_queue_end,
-                                   int32_t position_at_queue_end,
+bool RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
                                    struct stepper_command_s *command) {
-  return _getNextCommand(&_ro, &_rw, ticks_at_queue_end, position_at_queue_end,
-                         command);
+  return _getNextCommand(&_ro, &_rw, queue_end, command);
 }
 void RampGenerator::abort() { _rw.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() {
