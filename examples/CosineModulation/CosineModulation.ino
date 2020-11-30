@@ -44,7 +44,12 @@ const uint8_t cos_tab[32] = {0,   2,   9,   21,  37,  56,  79,  103,
                              128, 103, 79,  56,  37,  21,  9,   2};
 
 void loop() {
-  while (stepper1->addQueueEntry(dt, steps, true) == AQE_OK) {
+  struct stepper_command_s cmd = {.ticks = dt,
+                                  .steps = steps,
+                                  .state = 0,  // PROBLEM
+                                  .count_up = true};
+
+  while (stepper1->addQueueEntry(&cmd) == AQE_OK) {
     if (!run_cos) {
       dt -= dt / 100;
       if (dt < TICKS_PER_S / 30000) {  // steps/s

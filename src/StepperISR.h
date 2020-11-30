@@ -108,7 +108,7 @@ class StepperQueue {
     inject_fill_interrupt(0);
     return res;
   }
-  int addQueueEntry(struct stepper_command_s *cmd) {
+  int addQueueEntry(struct stepper_command_s* cmd) {
     if (isQueueFull()) {
       return AQE_FULL;
     }
@@ -147,7 +147,7 @@ class StepperQueue {
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-	uint8_t steps = cmd->steps;
+    uint8_t steps = cmd->steps;
     queue_end.pos += cmd->count_up ? steps : -steps;
     queue_end.ticks = cmd->ticks;
     steps <<= 1;

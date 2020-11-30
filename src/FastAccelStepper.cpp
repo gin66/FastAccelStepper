@@ -183,7 +183,7 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s *cmd) {
+int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
   if (cmd->steps >= 128) {
     return AQE_STEPS_ERROR;
   }
@@ -206,18 +206,16 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s *cmd) {
       enableOutputs();
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
-        struct stepper_command_s start_cmd = {
-			.ticks = _on_delay_ticks,
-			.steps = 1,
-			.state = cmd->state,
-			.count_up = cmd->count_up
-		};
+        struct stepper_command_s start_cmd = {.ticks = _on_delay_ticks,
+                                              .steps = 1,
+                                              .state = cmd->state,
+                                              .count_up = cmd->count_up};
         res = q->addQueueEntry(&start_cmd);
         if ((res == AQE_OK) && (cmd->steps == 1)) {
           // if steps == 1, wrong value in queue_end.ticks
           q->queue_end.ticks = cmd->ticks;
         }
-         cmd->steps -= 1;
+        cmd->steps -= 1;
       }
     }
   }
@@ -283,10 +281,9 @@ void FastAccelStepper::isr_fill_queue() {
     if (have_command) {
       res = addQueueEntry(&cmd);
       rg.commandEnqueued(&cmd);
+    } else {
+      rg.stopRamp();
     }
-	else {
-		rg.stopRamp();
-	}
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
@@ -520,12 +517,10 @@ bool FastAccelStepper::isRunning() {
 }
 void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
-        struct stepper_command_s cmd = {
-			.ticks = MIN_DELTA_TICKS,
-			.steps = 1,
-			.state = 0, // PROBLEM
-			.count_up = true
-		};
+    struct stepper_command_s cmd = {.ticks = MIN_DELTA_TICKS,
+                                    .steps = 1,
+                                    .state = 0,  // PROBLEM
+                                    .count_up = true};
     addQueueEntry(&cmd);
     if (blocking) {
       while (isRunning()) {
@@ -537,13 +532,11 @@ void FastAccelStepper::forwardStep(bool blocking) {
 void FastAccelStepper::backwardStep(bool blocking) {
   if (!isRunning()) {
     if (_dirPin != PIN_UNDEFINED) {
-        struct stepper_command_s cmd = {
-			.ticks = MIN_DELTA_TICKS,
-			.steps = 1,
-			.state = 0, // PROBLEM
-			.count_up = false
-		};
-    addQueueEntry(&cmd);
+      struct stepper_command_s cmd = {.ticks = MIN_DELTA_TICKS,
+                                      .steps = 1,
+                                      .state = 0,  // PROBLEM
+                                      .count_up = false};
+      addQueueEntry(&cmd);
       if (blocking) {
         while (isRunning()) {
           // busy wait

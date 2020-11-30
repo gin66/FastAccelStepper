@@ -81,7 +81,8 @@ void RampGenerator::_applySpeedAcceleration(uint32_t ticks_at_queue_end,
 void RampGenerator::applySpeedAcceleration(uint32_t ticks_at_queue_end) {
   _applySpeedAcceleration(ticks_at_queue_end, _ro.target_pos);
 }
-int RampGenerator::calculateMoveTo(int32_t target_pos, const struct queue_end_s *queue_end) {
+int RampGenerator::calculateMoveTo(int32_t target_pos,
+                                   const struct queue_end_s *queue_end) {
   if (_config.min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
@@ -129,7 +130,8 @@ int RampGenerator::calculateMoveTo(int32_t target_pos, const struct queue_end_s 
   return MOVE_OK;
 }
 
-int8_t RampGenerator::moveTo(int32_t position, const struct queue_end_s *queue_end) {
+int8_t RampGenerator::moveTo(int32_t position,
+                             const struct queue_end_s *queue_end) {
   if (isStopping()) {
     return MOVE_ERR_STOP_ONGOING;
   }
@@ -150,7 +152,8 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
 }
 
 //*************************************************************************************************
-static bool _getNextCommand(const struct ramp_ro_s *ro, const struct ramp_rw_s *rw,
+static bool _getNextCommand(const struct ramp_ro_s *ro,
+                            const struct ramp_rw_s *rw,
                             const struct queue_end_s *queue_end,
                             struct stepper_command_s *command) {
   if (rw->ramp_state == RAMP_STATE_IDLE) {

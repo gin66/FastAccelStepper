@@ -32,12 +32,10 @@ void basic_test() {
   assert(0 == s.getCurrentPosition());
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
-        struct stepper_command_s cmd = {
-			.ticks = 100000,
-			.steps = 100,
-			.state = 0, // PROBLEM
-			.count_up = true
-		};
+  struct stepper_command_s cmd = {.ticks = 100000,
+                                  .steps = 100,
+                                  .state = 0,  // PROBLEM
+                                  .count_up = true};
   s.addQueueEntry(&cmd);
   assert(!s.isQueueEmpty());
 }
@@ -52,12 +50,10 @@ void queue_full() {
   assert(s.isQueueEmpty());
   printf("Queue read/write = %d/%d\n", fas_queue[0].read_idx,
          fas_queue[0].next_write_idx);
-        struct stepper_command_s cmd = {
-			.ticks = 100000,
-			.steps = 100,
-			.state = 0, // PROBLEM
-			.count_up = true
-		};
+  struct stepper_command_s cmd = {.ticks = 100000,
+                                  .steps = 100,
+                                  .state = 0,  // PROBLEM
+                                  .count_up = true};
   for (int i = 0; i < QUEUE_LEN - 1; i++) {
     s.addQueueEntry(&cmd);
     assert(!s.isQueueEmpty());
@@ -65,7 +61,7 @@ void queue_full() {
     printf("Queue read/write = %d/%d\n", fas_queue[0].read_idx,
            fas_queue[0].next_write_idx);
   }
-    s.addQueueEntry(&cmd);
+  s.addQueueEntry(&cmd);
   printf("Queue read/write = %d/%d\n", fas_queue[0].read_idx,
          fas_queue[0].next_write_idx);
   assert(!s.isQueueEmpty());
@@ -84,33 +80,27 @@ void queue_out_of_range() {
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
 
-        struct stepper_command_s cmd1 = {
-			.ticks = ABSOLUTE_MAX_TICKS+1,
-			.steps = 100,
-			.state = 0, // PROBLEM
-			.count_up = true
-		};
+  struct stepper_command_s cmd1 = {.ticks = ABSOLUTE_MAX_TICKS + 1,
+                                   .steps = 100,
+                                   .state = 0,  // PROBLEM
+                                   .count_up = true};
   res = s.addQueueEntry(&cmd1);
   test(res == AQE_TOO_HIGH, "Too high provided should trigger error");
   assert(s.isQueueEmpty());
 
-        struct stepper_command_s cmd2 = {
-			.ticks = 65535,
-			.steps = 128,
-			.state = 0, // PROBLEM
-			.count_up = true
-		};
+  struct stepper_command_s cmd2 = {.ticks = 65535,
+                                   .steps = 128,
+                                   .state = 0,  // PROBLEM
+                                   .count_up = true};
 
   res = s.addQueueEntry(&cmd2);
   test(res == AQE_STEPS_ERROR, "Too high step count should trigger an error");
   assert(s.isQueueEmpty());
 
-        struct stepper_command_s cmd3 = {
-			.ticks = ABSOLUTE_MAX_TICKS,
-			.steps = 100,
-			.state = 0, // PROBLEM
-			.count_up = true
-		};
+  struct stepper_command_s cmd3 = {.ticks = ABSOLUTE_MAX_TICKS,
+                                   .steps = 100,
+                                   .state = 0,  // PROBLEM
+                                   .count_up = true};
   res = s.addQueueEntry(&cmd3);
   test(res == AQE_OK, "In range should be accepted");
   assert(!s.isQueueEmpty());
@@ -121,12 +111,10 @@ void end_pos_test() {
   FastAccelStepper s = FastAccelStepper();
   s.init(0, 0);
   assert(0 == s.getPositionAfterCommandsCompleted());
-        struct stepper_command_s cmd = {
-			.ticks = 65535,
-			.steps = 1,
-			.state = 0, // PROBLEM
-			.count_up = true
-		};
+  struct stepper_command_s cmd = {.ticks = 65535,
+                                  .steps = 1,
+                                  .state = 0,  // PROBLEM
+                                  .count_up = true};
 
   s.addQueueEntry(&cmd);
   assert(1 == s.getPositionAfterCommandsCompleted());
