@@ -108,7 +108,7 @@ class StepperQueue {
     inject_fill_interrupt(0);
     return res;
   }
-  int addQueueEntry(uint32_t ticks, uint8_t steps, bool dir) {
+  int addQueueEntry(struct stepper_command_s *cmd) {
     if (isQueueFull()) {
       return AQE_FULL;
     }
@@ -119,7 +119,7 @@ class StepperQueue {
     // division is approximated, because PERIOD_TICKS is close to 65536. Perform
     // first "division by 65536", which serves too identifying the need of
     // adding fixed delays.
-    uint32_t period_ticks = ticks;
+    uint32_t period_ticks = cmd->ticks;
     uint8_t n_periods = period_ticks >> 16;
     if (n_periods > 0) {
       // In this case, PERIOD_TICKS delays need to be inserted
@@ -147,12 +147,14 @@ class StepperQueue {
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-    queue_end.pos += (dir == dirHighCountsUp) ? steps : -steps;
-    queue_end.ticks = ticks;
+	uint8_t steps = cmd->steps;
+    queue_end.pos += cmd->count_up ? steps : -steps;
+    queue_end.ticks = cmd->ticks;
     steps <<= 1;
     e->period = period;
     e->n_periods = n_periods;
     // check for dir pin value change
+    bool dir = (cmd->count_up == dirHighCountsUp);
     e->steps = (dir != queue_end.dir) ? steps | 0x01 : steps;
     queue_end.dir = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)

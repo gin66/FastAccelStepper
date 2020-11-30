@@ -1,6 +1,7 @@
-pre-0.9.6:
+pre-0.10.0:
 - setSpeed() silently imposes lower limit for period
 - esp32: step pulse length is for high speed with 50% duty cycle and for low speed fixed at 2ms
+- addQueueEntry() receives a stepper_command_s struct
 
 0.9.5:
 - Fix sudden CPU reset on high interrupt load for avr variant. Issue #12

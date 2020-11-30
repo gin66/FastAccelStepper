@@ -183,20 +183,20 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
-                                       bool dir_high) {
-  if (steps >= 128) {
+int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s *cmd) {
+  if (cmd->steps >= 128) {
     return AQE_STEPS_ERROR;
   }
-  if (steps == 0) {
+  if (cmd->steps == 0) {
     return AQE_STEPS_ERROR;
   }
-  if (delta_ticks > ABSOLUTE_MAX_TICKS) {
+  if (cmd->ticks > ABSOLUTE_MAX_TICKS) {
     return AQE_TOO_HIGH;
   }
 
   StepperQueue* q = &fas_queue[_queue_num];
   int res = AQE_OK;
+  uint8_t orig_steps = cmd->steps;
   if (_autoEnable) {
     noInterrupts();
     uint16_t delay_counter = _auto_disable_delay_counter;
@@ -206,18 +206,25 @@ int8_t FastAccelStepper::addQueueEntry(uint32_t delta_ticks, uint8_t steps,
       enableOutputs();
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
-        res = q->addQueueEntry(_on_delay_ticks, 1, dir_high);
-        if ((res == AQE_OK) && (steps == 1)) {
+        struct stepper_command_s start_cmd = {
+			.ticks = _on_delay_ticks,
+			.steps = 1,
+			.state = cmd->state,
+			.count_up = cmd->count_up
+		};
+        res = q->addQueueEntry(&start_cmd);
+        if ((res == AQE_OK) && (cmd->steps == 1)) {
           // if steps == 1, wrong value in queue_end.ticks
-          q->queue_end.ticks = delta_ticks;
+          q->queue_end.ticks = cmd->ticks;
         }
-        steps -= 1;
+         cmd->steps -= 1;
       }
     }
   }
-  if (steps > 0) {
-    res = q->addQueueEntry(delta_ticks, steps, dir_high);
+  if (cmd->steps > 0) {
+    res = q->addQueueEntry(cmd);
   }
+  cmd->steps = orig_steps;  // restore original steps value
   if (_autoEnable) {
     if (res == AQE_OK) {
       noInterrupts();
@@ -274,8 +281,7 @@ void FastAccelStepper::isr_fill_queue() {
     int8_t res = AQE_OK;
     bool have_command = rg.getNextCommand(&q->queue_end, &cmd);
     if (have_command) {
-      res =
-          addQueueEntry(cmd.ticks, cmd.steps, cmd.count_up == _dirHighCountsUp);
+      res = addQueueEntry(&cmd);
       rg.commandEnqueued(&cmd);
     }
 	else {
@@ -514,7 +520,13 @@ bool FastAccelStepper::isRunning() {
 }
 void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
-    addQueueEntry(MIN_DELTA_TICKS, 1, _dirHighCountsUp);
+        struct stepper_command_s cmd = {
+			.ticks = MIN_DELTA_TICKS,
+			.steps = 1,
+			.state = 0, // PROBLEM
+			.count_up = true
+		};
+    addQueueEntry(&cmd);
     if (blocking) {
       while (isRunning()) {
         // busy wait
@@ -525,7 +537,13 @@ void FastAccelStepper::forwardStep(bool blocking) {
 void FastAccelStepper::backwardStep(bool blocking) {
   if (!isRunning()) {
     if (_dirPin != PIN_UNDEFINED) {
-      addQueueEntry(MIN_DELTA_TICKS, 1, !_dirHighCountsUp);
+        struct stepper_command_s cmd = {
+			.ticks = MIN_DELTA_TICKS,
+			.steps = 1,
+			.state = 0, // PROBLEM
+			.count_up = false
+		};
+    addQueueEntry(&cmd);
       if (blocking) {
         while (isRunning()) {
           // busy wait
