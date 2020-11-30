@@ -269,7 +269,7 @@ void FastAccelStepper::isr_fill_queue() {
   struct stepper_command_s cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 10 ms. Currently hard coded
-  while (!isQueueFull() && !q->hasTicksInQueue(TICKS_PER_S / 100)) {
+  while (!isQueueFull() && !q->hasTicksInQueue(TICKS_PER_S / 100) && rg.isRampGeneratorActive()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     uint32_t runtime_us = micros();

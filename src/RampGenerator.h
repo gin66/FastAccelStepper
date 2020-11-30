@@ -48,10 +48,12 @@ struct ramp_ro_s {
   bool keep_running;
 };
 struct ramp_rw_s {
-  uint8_t ramp_state;
   // the speed is linked on both ramp slopes to this variable as per
   //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t performed_ramp_up_steps;
+};
+struct ramp_wo_s {
+  uint8_t ramp_state;
 };
 
 class RampGenerator {
@@ -67,11 +69,12 @@ class RampGenerator {
  private:
   struct ramp_ro_s _ro;
   struct ramp_rw_s _rw;
+  struct ramp_wo_s _wo;
 
  public:
   inline uint8_t rampState() {
     // reading one byte is atomic
-    return _rw.ramp_state;
+    return _wo.ramp_state;
   }
   void init();
   inline int32_t targetPosition() { return _ro.target_pos; }
@@ -91,7 +94,7 @@ class RampGenerator {
   void initiate_stop() { _ro.force_stop = true; }
   bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
-  void setState(uint8_t state) { _rw.ramp_state = state; }
+  void setState(uint8_t state) { _wo.ramp_state = state; }
   void stopRamp();
   void setKeepRunning() { _ro.keep_running = true; }
   bool isRunningContinuously() { return _ro.keep_running; }

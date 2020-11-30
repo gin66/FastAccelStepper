@@ -38,7 +38,7 @@ void RampGenerator::init() {
   _config.min_travel_ticks = 0;
   _config.upm_inv_accel2 = 0;
   _ro.target_pos = 0;
-  _rw.ramp_state = RAMP_STATE_IDLE;
+  _wo.ramp_state = RAMP_STATE_IDLE;
 #if (TICKS_PER_S != 16000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
@@ -92,7 +92,7 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
 
   _applySpeedAcceleration(queue_end->ticks, target_pos);
 
-  if (_rw.ramp_state == RAMP_STATE_IDLE) {
+  if (_wo.ramp_state == RAMP_STATE_IDLE) {
     uint8_t start_state;
     // This can overflow, which is legal
     int32_t delta = target_pos - queue_end->pos;
@@ -105,7 +105,7 @@ int RampGenerator::calculateMoveTo(int32_t target_pos,
     noInterrupts();
     _ro.keep_running = false;
     _ro.force_stop = false;
-    _rw.ramp_state = start_state;
+    _wo.ramp_state = start_state;
     interrupts();
   }
 
@@ -154,11 +154,6 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ro,
                                const struct ramp_rw_s *rw,
                                const struct queue_end_s *queue_end,
                                struct stepper_command_s *command) {
-  if (rw->ramp_state == RAMP_STATE_IDLE) {
-    command->steps = 0;
-    return RAMP_STATE_IDLE;
-  }
-
   bool count_up = queue_end->count_up;
 
   // check state for acceleration/deceleration or deceleration to stop
@@ -375,7 +370,7 @@ uint8_t RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
                                       struct stepper_command_s *command) {
   return _getNextCommand(&_ro, &_rw, queue_end, command);
 }
-void RampGenerator::stopRamp() { _rw.ramp_state = RAMP_STATE_IDLE; }
+void RampGenerator::stopRamp() { _wo.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() {
-  return (_rw.ramp_state != RAMP_STATE_IDLE);
+  return (_wo.ramp_state != RAMP_STATE_IDLE);
 }
