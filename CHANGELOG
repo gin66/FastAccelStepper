@@ -1,4 +1,9 @@
+0.11.1:
+- AVR works again
+- Limit auto enable on delay to approx. 16ms due to further bugs
+
 0.11.0:
+- BROKEN ON AVR
 - Slowest speed is TICKS_PER_S/0xffffffff, which is ~268s between steps
 - ABS_MAX_TICKS renamed to ABS_MAX_AQE_TICKS. Only applicable to raw commands
 - Done: Extend command queue entry to perform delay only without step (steps=0) to reduce the 1.0 steps/s
