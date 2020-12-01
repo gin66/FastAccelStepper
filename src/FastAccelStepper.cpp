@@ -204,19 +204,18 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
       enableOutputs();
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
-		uint32_t delay = _on_delay_ticks;
+        uint32_t delay = _on_delay_ticks;
         while (delay > 0) {
-		  uint32_t ticks = delay>>1;
-		  if (ticks > 65535) {
-			  ticks = 65535;
-		  }
-		  else if (ticks < 32768) {
-			  ticks = delay;
-		  }
+          uint32_t ticks = delay >> 1;
+          if (ticks > 65535) {
+            ticks = 65535;
+          } else if (ticks < 32768) {
+            ticks = delay;
+          }
           struct stepper_command_s start_cmd = {
               .ticks = ticks, .steps = 0, .count_up = cmd->count_up};
           res = q->addQueueEntry(&start_cmd);
-		  delay -= ticks;
+          delay -= ticks;
         }
         if (res != AQE_OK) {
           return res;

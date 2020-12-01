@@ -63,7 +63,7 @@ struct mapping_s {
 struct queue_entry {
   uint8_t steps_dir;  // coding is bit7..1 is nr of steps and bit 0 is direction
   uint8_t unused;
-  uint16_t period;    // TODO: rename
+  uint16_t period;  // TODO: rename
 };
 class StepperQueue {
  public:
@@ -108,9 +108,9 @@ class StepperQueue {
       return AQE_FULL;
     }
     uint32_t period_ticks = cmd->ticks;
-	if (period_ticks > 65535) {
-		return AQE_TOO_HIGH;
-	}
+    if (period_ticks > 65535) {
+      return AQE_TOO_HIGH;
+    }
     uint16_t period = period_ticks;
 
     uint8_t wp = next_write_idx;

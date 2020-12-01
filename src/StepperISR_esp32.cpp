@@ -83,14 +83,13 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   }
   uint16_t period = e->period;
   queue->period = period;
-    mcpwm->timer[timer].period.period = period;
-    mcpwm->channel[timer].cmpr_value[0].cmpr_val = period >> 1;
+  mcpwm->timer[timer].period.period = period;
+  mcpwm->channel[timer].cmpr_value[0].cmpr_val = period >> 1;
   if ((steps_dir & 0xfe) == 0) {
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     mcpwm->int_clr.val |= mapping->timer_tez_int_clr;
     mcpwm->int_ena.val |= mapping->timer_tez_int_ena;
-  }
-  else {
+  } else {
     mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
     mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
   }
@@ -119,11 +118,11 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 }
 
 // MCPWM_SERVICE is only used in case of pause
-#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)                            \
-  if (mcpwm.int_st.timer##TIMER##_tez_int_st != 0) {                 \
-    mcpwm.int_clr.timer##TIMER##_tez_int_clr = 1;                    \
-    StepperQueue *q = &fas_queue[pcnt];                              \
-        pcnt_isr_service(q);                                         \
+#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)            \
+  if (mcpwm.int_st.timer##TIMER##_tez_int_st != 0) { \
+    mcpwm.int_clr.timer##TIMER##_tez_int_clr = 1;    \
+    StepperQueue *q = &fas_queue[pcnt];              \
+    pcnt_isr_service(q);                             \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {

@@ -72,9 +72,10 @@ class FastAccelStepper {
   // afterwards. The delay from stepper enabled till first step and from
   // last step to stepper disabled can be separately adjusted.
   // The delay from enable to first step is done in ticks and as such is limited
-  // to ABSOLUTE_MAX_AQE_TICKS, which translates approximately to 120ms for esp32
-  // and 60ms for avr at 16 MHz). The delay till disable is done in period interrupt/task
-  // with 4 or 10 ms repetition rate and as such is with several ms jitter.
+  // to ABSOLUTE_MAX_AQE_TICKS, which translates approximately to 120ms for
+  // esp32 and 60ms for avr at 16 MHz). The delay till disable is done in period
+  // interrupt/task with 4 or 10 ms repetition rate and as such is with several
+  // ms jitter.
   void setAutoEnable(bool auto_enable);
   int setDelayToEnable(uint32_t delay_us);
   void setDelayToDisable(uint16_t delay_ms);

@@ -326,7 +326,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
 
   if (next_ticks > 65535) {
-	steps = 1;
+    steps = 1;
     // insert a pause
     if (queue_end->ticks_from_last_step < next_ticks) {
       next_ticks -= queue_end->ticks_from_last_step;
