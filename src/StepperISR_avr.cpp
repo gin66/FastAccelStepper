@@ -38,7 +38,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 
 #define AVR_STEPPER_ISR(CHANNEL, queue, ocr, foc)                             \
   ISR(TIMER1_COMP##CHANNEL##_vect) {                                          \
-    uint8_t rp = queue.read_idx;                                              \
     if (queue.skip) {                                                         \
       if ((--queue.skip) == 0) {                                              \
         Stepper_Toggle(CHANNEL);                                              \
@@ -46,9 +45,10 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       ocr += PERIOD_TICKS;                                                    \
       return;                                                                 \
     }                                                                         \
-    struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];                \
+    uint8_t rp = queue.read_idx;                                              \
     if (Stepper_IsToggling(CHANNEL)) {                                        \
       TCCR1C = _BV(foc); /* clear bit */                                      \
+      struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];              \
       if ((e->steps_dir -= 2) > 1) {                                          \
         /* perform another steps_dir with this queue entry */                 \
         ocr += queue.period;                                                  \
@@ -73,7 +73,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       return;                                                                 \
     }                                                                         \
     /* command in queue */                                                    \
-    e = &queue.entry[rp & QUEUE_LEN_MASK];                                    \
+    struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];                \
     ocr += (queue.period = e->period);                                        \
     /* assign to skip and test for not zero */                                \
     if ((0 != (queue.skip = e->n_periods)) || ((e->steps_dir & 0xfe) == 0)) { \
