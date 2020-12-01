@@ -155,14 +155,13 @@ cd pio_dirs/StepperDemo
 pio run -e avr --target upload --upload-port /dev/ttyUSB0
 ```
 
+## CHANGELOG
+
+See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 
 ## ISSUES
 
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
-
-## Not planned for now
-
-* Using constant acceleration leads to force jumps at start and max speed => smooth this out => will not happen
 
 ## Lessons Learned
 
