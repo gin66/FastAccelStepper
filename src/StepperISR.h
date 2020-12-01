@@ -149,8 +149,17 @@ class StepperQueue {
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
     uint8_t steps = cmd->steps;
     queue_end.pos += cmd->count_up ? steps : -steps;
-    queue_end.ticks = cmd->ticks;
     steps <<= 1;
+    if (steps == 0) {
+      // This is a pause
+      uint32_t tfls = queue_end.ticks_from_last_step;
+      if (tfls <= 0xffff0000) {
+        queue_end.ticks_from_last_step = tfls + cmd->ticks;
+      }
+    } else {
+      queue_end.ticks_from_last_step = 0;
+      queue_end.ticks = cmd->ticks;
+    }
     e->period = period;
     e->n_periods = n_periods;
     // check for dir pin value change
@@ -224,6 +233,7 @@ class StepperQueue {
     queue_end.count_up = true;
     queue_end.pos = 0;
     queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
+    queue_end.ticks_from_last_step = 0xffffffff;
     dirHighCountsUp = true;
     isRunning = false;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
