@@ -47,11 +47,12 @@ struct ramp_ro_s {
   bool keep_running;
 };
 struct ramp_rw_s {
-  // if change_cnt does not match config.change_cnt, then performed_ramp_up_steps to be recalculated
-  uint8_t change_cnt;
   // the speed is linked on both ramp slopes to this variable as per
   //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t performed_ramp_up_steps;
+  // if change_cnt does not match config.change_cnt, then
+  // performed_ramp_up_steps to be recalculated
+  uint8_t change_cnt;
 };
 struct ramp_wo_s {
   uint8_t ramp_state;
@@ -62,8 +63,9 @@ class RampGenerator {
   // This latest configuration for acceleration/speed calculate_move, only
   struct ramp_config_s _config;
 
-  // The ro variables are those, which are only read from getNextCommand().
-  // Reading ro variables is safe.
+  // The ro variables are those, which are only read from _getNextCommand().
+  // The rw variables are only read and written by _getNextCommand() and
+  // commandEnqueued() Reading ro variables is safe in application
   struct ramp_ro_s _ro;
   struct ramp_rw_s _rw;
   struct ramp_wo_s _wo;
@@ -75,34 +77,30 @@ class RampGenerator {
   }
   void init();
   inline int32_t targetPosition() { return _ro.target_pos; }
-  void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
+  inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
     _ro.target_pos += delta;
   }
   void setSpeed(uint32_t min_step_us);
   void setAcceleration(uint32_t accel);
-  bool hasValidConfig() {
-	  return ((_config.min_travel_ticks != 0) && (_config.upm_inv_accel2 != 0));
+  inline bool hasValidConfig() {
+    return ((_config.min_travel_ticks != 0) && (_config.upm_inv_accel2 != 0));
   }
-
- public:
   void applySpeedAcceleration();
   int8_t move(int32_t move, const struct queue_end_s *queue);
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);
-  void initiate_stop() { _ro.force_stop = true; }
-  bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
+  inline void initiate_stop() { _ro.force_stop = true; }
+  inline bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
-  void setState(uint8_t state) { _wo.ramp_state = state; }
+  inline void setState(uint8_t state) { _wo.ramp_state = state; }
   void stopRamp();
-  void setKeepRunning() { _ro.keep_running = true; }
-  bool isRunningContinuously() { return _ro.keep_running; }
+  inline void setKeepRunning() { _ro.keep_running = true; }
+  inline bool isRunningContinuously() { return _ro.keep_running; }
   uint8_t getNextCommand(const struct queue_end_s *queue_end,
                          struct stepper_command_s *command);
   void commandEnqueued(struct stepper_command_s *command, uint8_t state);
 
  private:
   int _startMove(int32_t target_pos, const struct queue_end_s *queue_end);
-
- private:
 #if (TICKS_PER_S != 16000000L)
   upm_float upm_timer_freq;
 #endif
