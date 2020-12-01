@@ -1,6 +1,8 @@
-pre 0.11.2:
+0.11.2:
 - auto enable on delay implemented by filling the queue with pause
   This allows approx. 60/120 ms delay for avr/esp32
+- esp32: two motors in parallel could lead to uncontrolled running steppers.
+         Reason was the wrong registration of the shared interrupt service routine
 
 0.11.1:
 - AVR works again
