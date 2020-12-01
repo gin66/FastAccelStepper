@@ -33,6 +33,7 @@ class RampChecker {
   bool first;
   uint32_t accelerate_till;
   uint32_t coast_till;
+  uint32_t ticks_since_last_step = 0xffffffff;
 };
 
 RampChecker::RampChecker() {
@@ -51,10 +52,19 @@ void RampChecker::check_section(struct queue_entry *e) {
     assert((steps_dir & 1) == 0);
   }
   uint8_t steps = steps_dir >> 1;
-  assert(steps >= 1);
+  if (steps == 0) {
+	  // Just a pause
+	  ticks_since_last_step += e->period;
+	  total_ticks += e->period;
+	  printf("process pause %d\n", e->period);
+	  return;
+  }
   uint32_t start_dt = PERIOD_TICKS;
   start_dt *= e->n_periods;
   start_dt += e->period;
+  total_ticks += steps * start_dt;
+  start_dt += ticks_since_last_step;
+  ticks_since_last_step = 0;
   uint32_t end_dt = start_dt;
 
   min_dt = min(min_dt, min(start_dt, end_dt));
@@ -70,7 +80,6 @@ void RampChecker::check_section(struct queue_entry *e) {
       total_ticks / 16000000.0, steps, last_dt, start_dt, end_dt, min_dt,
       accel);
 
-  total_ticks += steps * start_dt;
   assert(steps * start_dt >= 0);
 
   if (last_dt > start_dt) {

@@ -157,8 +157,14 @@ class StepperQueue {
         queue_end.ticks_from_last_step = tfls + cmd->ticks;
       }
     } else {
+      uint32_t tfls = queue_end.ticks_from_last_step;
+      if (tfls <= 0xffff0000) {
+        queue_end.ticks = tfls + cmd->ticks;
+      }
+	  else {
+        queue_end.ticks = cmd->ticks;
+	  }
       queue_end.ticks_from_last_step = 0;
-      queue_end.ticks = cmd->ticks;
     }
     e->period = period;
     e->n_periods = n_periods;
