@@ -43,7 +43,6 @@
 // ticks. With 16MHz frequency, the maximum time between two steps is 1s. This
 // ensures too - that in case of esp32 - two interrupts do not occur within
 // 190us for one stepper.
-#define PERIOD_TICKS 62489
 #define ABSOLUTE_MAX_AQE_TICKS ((uint32_t)((QUEUE_LEN-1) * 65535L))
 #define MAX_DELTA_TICKS 0xffffffff
 

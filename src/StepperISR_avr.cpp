@@ -15,7 +15,6 @@ StepperQueue fas_queue[NUM_QUEUES];
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _initVars();
-  skip = 0;
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
   if (step_pin == stepPinStepperA) {
@@ -38,13 +37,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 
 #define AVR_STEPPER_ISR(CHANNEL, queue, ocr, foc)                   \
   ISR(TIMER1_COMP##CHANNEL##_vect) {                                \
-    if (queue.skip) {                                               \
-      if ((--queue.skip) == 0) {                                    \
-        Stepper_Toggle(CHANNEL);                                    \
-      }                                                             \
-      ocr += PERIOD_TICKS;                                          \
-      return;                                                       \
-    }                                                               \
     uint8_t rp = queue.read_idx;                                    \
     if (Stepper_IsToggling(CHANNEL)) {                              \
       TCCR1C = _BV(foc); /* clear bit */                            \
@@ -52,10 +44,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       if ((e->steps_dir -= 2) > 1) {                                \
         /* perform another steps_dir with this queue entry */       \
         ocr += queue.period;                                        \
-        /* assign to skip and test for not zero */                  \
-        if (0 != (queue.skip = e->n_periods)) {                     \
-          Stepper_Zero(CHANNEL);                                    \
-        }                                                           \
         return;                                                     \
       }                                                             \
       rp++;                                                         \
@@ -76,18 +64,16 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];      \
     ocr += (queue.period = e->period);                              \
     /* assign to skip and test for not zero */                      \
-    if (0 != (queue.skip = e->n_periods)) {                         \
-      Stepper_Zero(CHANNEL);                                        \
-    } else if ((e->steps_dir & 0xfe) == 0) {                        \
+    if ((e->steps_dir & 0xfe) == 0) {                        \
       Stepper_Zero(CHANNEL);                                        \
       queue.read_idx++;                                             \
     } else {                                                        \
       Stepper_Toggle(CHANNEL);                                      \
-    }                                                               \
     uint8_t steps_dir = e->steps_dir;                               \
     if ((steps_dir & 0x01) != 0) {                                  \
       digitalWrite(queue.dirPin,                                    \
                    digitalRead(queue.dirPin) == HIGH ? LOW : HIGH); \
+    }                                                               \
     }                                                               \
   }
 AVR_STEPPER_ISR(A, fas_queue_A, OCR1A, FOC1A)

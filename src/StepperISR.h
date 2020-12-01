@@ -62,9 +62,8 @@ struct mapping_s {
 
 struct queue_entry {
   uint8_t steps_dir;  // coding is bit7..1 is nr of steps and bit 0 is direction
-  uint8_t n_periods;  // number of PERIOD_TICKS delays
-  uint16_t period;    // remaining period time in addition to
-                      // n_periods*PERIOD_TICKS delays
+  uint8_t unused;
+  uint16_t period;    // TODO: rename
 };
 class StepperQueue {
  public:
@@ -76,14 +75,10 @@ class StepperQueue {
   volatile bool isRunning;
 #if defined(ARDUINO_ARCH_ESP32)
   const struct mapping_s* mapping;
-  // These two variables are for the mcpwm interrupt
-  uint8_t current_period;
-  uint8_t current_n_periods;
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   bool isChannelA;
   // This is used in the timer compare unit as extension of the 16 timer
-  uint8_t skip;
 #endif
   uint16_t period;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
@@ -112,37 +107,10 @@ class StepperQueue {
     if (isQueueFull()) {
       return AQE_FULL;
     }
-    // For ticks > 65536, there will be several fixed delays with PERIOD_TICKS
-    // inserted. The formula behind is:
-    //		ticks = n_periods * PERIOD_TICKS + period
-    // In order to avoid division/remainder operation (on avr actually), the
-    // division is approximated, because PERIOD_TICKS is close to 65536. Perform
-    // first "division by 65536", which serves too identifying the need of
-    // adding fixed delays.
     uint32_t period_ticks = cmd->ticks;
-    uint8_t n_periods = period_ticks >> 16;
-    if (n_periods > 0) {
-      // In this case, PERIOD_TICKS delays need to be inserted
-      // Based on division by 65536, n_periods is off by 0..11 in case F_CPU =
-      // 16MHz
-      uint32_t fixed_ticks = PERIOD_TICKS;
-      fixed_ticks *= n_periods;
-      period_ticks -= fixed_ticks;
-      // Consequently a loop is acceptable compared to 32bit/16bit division and
-      // remainder operations.
-      while (period_ticks > 4 * 65535) {
-        n_periods += 4;
-        period_ticks -= 4 * PERIOD_TICKS;
-      }
-      while (period_ticks > 2 * 65535) {
-        n_periods += 2;
-        period_ticks -= 2 * PERIOD_TICKS;
-      }
-      while (period_ticks > 65535) {
-        n_periods += 1;
-        period_ticks -= PERIOD_TICKS;
-      }
-    }
+	if (period_ticks > 65535) {
+		return AQE_TOO_HIGH;
+	}
     uint16_t period = period_ticks;
 
     uint8_t wp = next_write_idx;
@@ -166,7 +134,6 @@ class StepperQueue {
       queue_end.ticks_from_last_step = 0;
     }
     e->period = period;
-    e->n_periods = n_periods;
     // check for dir pin value change
     queue_end.count_up = cmd->count_up;
     bool dir = (cmd->count_up == dirHighCountsUp);
@@ -211,13 +178,6 @@ class StepperQueue {
       uint8_t steps = e->steps_dir >> 1;
       uint32_t tmp = e->period;
       tmp *= steps;
-      if (tmp >= min_ticks) {
-        return true;
-      }
-      min_ticks -= tmp;
-      tmp = e->n_periods;
-      tmp *= steps;
-      tmp *= PERIOD_TICKS;
       if (tmp >= min_ticks) {
         return true;
       }

@@ -81,23 +81,18 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
     uint8_t dirPin = queue->dirPin;
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
   }
-  uint8_t n_periods = e->n_periods;
   uint16_t period = e->period;
   queue->period = period;
-  if ((n_periods == 0) && (steps > 0)) {
     mcpwm->timer[timer].period.period = period;
     mcpwm->channel[timer].cmpr_value[0].cmpr_val = period >> 1;
+  if ((steps_dir & 0xfe) == 0) {
+    mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+    mcpwm->int_clr.val |= mapping->timer_tez_int_clr;
+    mcpwm->int_ena.val |= mapping->timer_tez_int_ena;
+  }
+  else {
     mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
     mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
-  } else {
-    mcpwm->timer[timer].period.period = PERIOD_TICKS;
-    mcpwm->channel[timer].cmpr_value[0].cmpr_val = PERIOD_TICKS >> 1;
-    queue->current_n_periods = n_periods;
-    // period = 0..n_period-1 is PERIOD_TICKS, period = n_period is queue.period
-    queue->current_period = 0;
-    mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
-    mcpwm->int_clr.val = mapping->timer_tez_int_clr;
-    mcpwm->int_ena.val |= mapping->timer_tez_int_ena;
   }
 }
 
@@ -114,6 +109,7 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     const struct mapping_s *mapping = q->mapping;
     mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
     mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+    mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
     uint8_t timer = mapping->timer;
     mcpwm->timer[timer].mode.start = 1;           // stop at TEP
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
@@ -122,32 +118,12 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
   }
 }
 
-// MCPWM_SERVICE is only used to add PERIOD_TICKS delays before toggle step pin
+// MCPWM_SERVICE is only used in case of pause
 #define MCPWM_SERVICE(mcpwm, TIMER, pcnt)                            \
   if (mcpwm.int_st.timer##TIMER##_tez_int_st != 0) {                 \
     mcpwm.int_clr.timer##TIMER##_tez_int_clr = 1;                    \
     StepperQueue *q = &fas_queue[pcnt];                              \
-    uint8_t cp = q->current_period;                                  \
-    uint16_t period;                                                 \
-    /* period = 0..n_period-1 is PERIOD_TICKS */                     \
-    /* period = n_period is queue.period */                          \
-    if (q->current_n_periods == cp) {                                \
-      uint8_t rp = q->read_idx;                                      \
-      struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];        \
-      if ((e->steps_dir & 0xfe) == 0) {                              \
         pcnt_isr_service(q);                                         \
-        return;                                                      \
-      }                                                              \
-      mcpwm.channel[TIMER].generator[0].utez = 2; /* high at zero */ \
-      period = q->period;                                            \
-      cp = 0;                                                        \
-    } else {                                                         \
-      period = PERIOD_TICKS;                                         \
-      mcpwm.channel[TIMER].generator[0].utez = 1; /* low at zero */  \
-      cp++;                                                          \
-    }                                                                \
-    q->current_period = cp;                                          \
-    mcpwm.timer[TIMER].period.period = period;                       \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
