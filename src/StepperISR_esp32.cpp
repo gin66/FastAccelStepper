@@ -169,7 +169,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   if (queue_num == 0) {
     // isr_service_install apparently enables the interrupt
     PCNT.int_clr.val = PCNT.int_st.val;
-    pcnt_isr_service_install(ESP_INTR_FLAG_EDGE | ESP_INTR_FLAG_IRAM);
+    pcnt_isr_service_install(ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM);
   }
   pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
 
