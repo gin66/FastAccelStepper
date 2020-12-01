@@ -76,8 +76,11 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];                \
     ocr += (queue.period = e->period);                                        \
     /* assign to skip and test for not zero */                                \
-    if ((0 != (queue.skip = e->n_periods)) || ((e->steps_dir & 0xfe) == 0)) { \
+    if (0 != (queue.skip = e->n_periods)) { \
       Stepper_Zero(CHANNEL);                                                  \
+    } else if ((e->steps_dir & 0xfe) == 0) { \
+      Stepper_Zero(CHANNEL);                                                  \
+      queue.read_idx++;                                                  \
     } else {                                                                  \
       Stepper_Toggle(CHANNEL);                                                \
     }                                                                         \
