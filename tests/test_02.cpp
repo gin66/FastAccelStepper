@@ -55,11 +55,11 @@ void RampChecker::check_section(struct queue_entry *e) {
   }
   uint8_t steps = steps_dir >> 1;
   if (steps == 0) {
-	  // Just a pause
-	  ticks_since_last_step += e->period;
-	  total_ticks += e->period;
-	  printf("process pause %d\n", e->period);
-	  return;
+    // Just a pause
+    ticks_since_last_step += e->period;
+    total_ticks += e->period;
+    printf("process pause %d\n", e->period);
+    return;
   }
   pos += steps;
   uint32_t start_dt = PERIOD_TICKS;
@@ -193,7 +193,8 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
-    printf("planned time in buffer: %.6fs (old=%.6fs)\n", planned_time, old_planned_time_in_buffer);
+    printf("planned time in buffer: %.6fs (old=%.6fs)\n", planned_time,
+           old_planned_time_in_buffer);
     // This must be ensured, so that the stepper does not run out of commands
     assert((i == 0) || (old_planned_time_in_buffer > 0.005));
     old_planned_time_in_buffer = planned_time;
@@ -292,7 +293,7 @@ int main() {
   test_with_pars("f17", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
 
   // ramp time  625s, 7812500 steps
-  //test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
+  // test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
 
   // slow ramp time
   test_with_pars("f19", 1000, 10, 1, false, 62.0, 63.0, 1.0);

@@ -135,7 +135,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
                                struct ramp_rw_s *rw,
                                const struct queue_end_s *queue_end,
                                struct stepper_command_s *command) {
-	uint32_t qe_ticks = queue_end->ticks;
+  uint32_t qe_ticks = queue_end->ticks;
   if (ramp->config.change_cnt != rw->change_cnt) {
     uint32_t performed_ramp_up_steps = upm_to_u32(upm_divide(
         ramp->config.upm_inv_accel2, upm_square(upm_from(qe_ticks))));
@@ -158,7 +158,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
     int32_t delta =
         ramp->target_pos - queue_end->pos;  // this can overflow, which is legal
     if (delta == 0) {  // This case should actually never happen
-	  command->ticks = 0;
+      command->ticks = 0;
       return RAMP_STATE_IDLE;
     }
     need_count_up = delta > 0;
@@ -200,9 +200,11 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   uint32_t next_ticks;
 
 #ifdef TEST
-  printf("pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d queue_end.ticks=%u ",
-         queue_end->pos, remaining_steps, rw->performed_ramp_up_steps,
-         planning_steps, qe_ticks);
+  printf(
+      "pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d "
+      "queue_end.ticks=%u ",
+      queue_end->pos, remaining_steps, rw->performed_ramp_up_steps,
+      planning_steps, qe_ticks);
   if (count_up) {
     printf("+");
   } else {
@@ -306,7 +308,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
   }
 
-  next_ticks = min(next_ticks, ABSOLUTE_MAX_TICKS);
+  //  next_ticks = min(next_ticks, ABSOLUTE_MAX_TICKS);
 
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t steps = planning_steps;
@@ -324,20 +326,19 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   assert(next_ticks > 0);
 #endif
 
-  if ((steps == 1) &&(next_ticks > 65535)) {
-      // insert a pause
-	  if (queue_end->ticks_from_last_step < next_ticks) {
-		  next_ticks -= queue_end->ticks_from_last_step;
-		  if (next_ticks > 65535) {
-			  // insert a pause
-			  next_ticks >>= 1;
-			  next_ticks = min(next_ticks, 65535);
-			  steps = 0;
-		  }
-	  }
-	  else {
-		  //next_ticks = MIN_DELTA_TICKS;
-	  }
+  if ((steps == 1) && (next_ticks > 65535)) {
+    // insert a pause
+    if (queue_end->ticks_from_last_step < next_ticks) {
+      next_ticks -= queue_end->ticks_from_last_step;
+      if (next_ticks > 65535) {
+        // insert a pause
+        next_ticks >>= 1;
+        next_ticks = min(next_ticks, 65535);
+        steps = 0;
+      }
+    } else {
+      // next_ticks = MIN_DELTA_TICKS;
+    }
   }
 
   if (steps == abs(remaining_steps)) {

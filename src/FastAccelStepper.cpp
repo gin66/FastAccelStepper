@@ -187,7 +187,7 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
   if (cmd->steps >= 128) {
     return AQE_STEPS_ERROR;
   }
-  if (cmd->ticks > ABSOLUTE_MAX_TICKS) {
+  if (cmd->ticks > ABSOLUTE_MAX_AQE_TICKS) {
     return AQE_TOO_HIGH;
   }
 
@@ -390,7 +390,7 @@ int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   if (delay_us < 1000) {
     return DELAY_TOO_LOW;
   }
-  if (delay_ticks > ABSOLUTE_MAX_TICKS) {
+  if (delay_ticks > MAX_DELTA_TICKS) {
     return DELAY_TOO_HIGH;
   }
   _on_delay_ticks = delay_ticks;
