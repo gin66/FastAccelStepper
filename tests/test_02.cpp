@@ -287,7 +287,7 @@ int main() {
   // ramp time 50s, thus with 500steps max speed not reached. 250steps need 10s
   //  test_with_pars("f13", 500, 4000, 5, false, 20.0 - 0.6, 20.0 + 0.2, 0.2);
   ////  test_with_pars("f14", 2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2,
-  ///0.2);
+  /// 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 1s
   test_with_pars("f15", 12600, 4000, 5, true, 100.0 - 0.7, 100.0 + 0.2, 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 16s
