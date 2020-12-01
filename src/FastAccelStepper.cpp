@@ -204,14 +204,19 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
       enableOutputs();
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
-        if (_on_delay_ticks > 65535) {
+		uint32_t delay = _on_delay_ticks;
+        while (delay > 0) {
+		  uint32_t ticks = delay>>1;
+		  if (ticks > 65535) {
+			  ticks = 65535;
+		  }
+		  else if (ticks < 32768) {
+			  ticks = delay;
+		  }
           struct stepper_command_s start_cmd = {
-              .ticks = 65535, .steps = 0, .count_up = cmd->count_up};
+              .ticks = ticks, .steps = 0, .count_up = cmd->count_up};
           res = q->addQueueEntry(&start_cmd);
-        } else {
-          struct stepper_command_s start_cmd = {
-              .ticks = _on_delay_ticks, .steps = 0, .count_up = cmd->count_up};
-          res = q->addQueueEntry(&start_cmd);
+		  delay -= ticks;
         }
         if (res != AQE_OK) {
           return res;
@@ -388,10 +393,10 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
 }
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = US_TO_TICKS(delay_us);
-  if (delay_us < 1000) {
+  if (delay_ticks < MIN_DELTA_TICKS) {
     return DELAY_TOO_LOW;
   }
-  if (delay_ticks > MAX_DELTA_TICKS) {
+  if (delay_ticks > ABSOLUTE_MAX_AQE_TICKS) {
     return DELAY_TOO_HIGH;
   }
   _on_delay_ticks = delay_ticks;
