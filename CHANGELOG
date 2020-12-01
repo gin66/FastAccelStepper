@@ -1,3 +1,6 @@
+0.11.3:
+- ABSOLUTE_MAX_AQE_TICKS is now 65535
+
 0.11.2:
 - auto enable on delay implemented by filling the queue with pause
   This allows approx. 60/120 ms delay for avr/esp32

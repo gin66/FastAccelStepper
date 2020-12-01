@@ -33,7 +33,7 @@ void basic_test() {
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
   struct stepper_command_s cmd = {
-      .ticks = 100000, .steps = 100, .count_up = true};
+      .ticks = 10000, .steps = 100, .count_up = true};
   s.addQueueEntry(&cmd);
   assert(!s.isQueueEmpty());
 }
@@ -49,7 +49,7 @@ void queue_full() {
   printf("Queue read/write = %d/%d\n", fas_queue[0].read_idx,
          fas_queue[0].next_write_idx);
   struct stepper_command_s cmd = {
-      .ticks = 100000, .steps = 100, .count_up = true};
+      .ticks = 10000, .steps = 100, .count_up = true};
   for (int i = 0; i < QUEUE_LEN - 1; i++) {
     s.addQueueEntry(&cmd);
     assert(!s.isQueueEmpty());

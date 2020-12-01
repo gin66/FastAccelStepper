@@ -62,9 +62,7 @@ void RampChecker::check_section(struct queue_entry *e) {
     return;
   }
   pos += steps;
-  uint32_t start_dt = PERIOD_TICKS;
-  start_dt *= e->n_periods;
-  start_dt += e->period;
+  uint32_t start_dt = e->period;
   total_ticks += steps * start_dt;
   if (ticks_since_last_step < 0xffff0000) {
   start_dt += ticks_since_last_step;

@@ -39,11 +39,7 @@
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #endif
 
-// this fixed value ensures max tick count of 255*62489 + 65535 = 16000230
-// ticks. With 16MHz frequency, the maximum time between two steps is 1s. This
-// ensures too - that in case of esp32 - two interrupts do not occur within
-// 190us for one stepper.
-#define ABSOLUTE_MAX_AQE_TICKS ((uint32_t)((QUEUE_LEN-1) * 65535L))
+#define ABSOLUTE_MAX_AQE_TICKS 65535
 #define MAX_DELTA_TICKS 0xffffffff
 
 #define PIN_UNDEFINED 255
