@@ -161,7 +161,7 @@ class StepperQueue {
       if (tfls <= 0xffff0000) {
         queue_end.ticks = tfls + cmd->ticks;
       } else {
-        queue_end.ticks = cmd->ticks;
+        queue_end.ticks = tfls;
       }
       queue_end.ticks_from_last_step = 0;
     }

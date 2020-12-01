@@ -44,7 +44,7 @@
 // ensures too - that in case of esp32 - two interrupts do not occur within
 // 190us for one stepper.
 #define PERIOD_TICKS 62489
-#define ABSOLUTE_MAX_AQE_TICKS (255L * PERIOD_TICKS + 65535)
+#define ABSOLUTE_MAX_AQE_TICKS ((uint32_t)((QUEUE_LEN-1) * 65535L))
 #define MAX_DELTA_TICKS 0xffffffff
 
 #define PIN_UNDEFINED 255
@@ -77,8 +77,8 @@ class FastAccelStepper {
   // afterwards. The delay from stepper enabled till first step and from
   // last step to stepper disabled can be separately adjusted.
   // The delay from enable to first step is done in ticks and as such is limited
-  // to ABSOLUTE_MAX_ABS_TICKS, which translates approximately to 1s (for esp32
-  // and avr at 16 MHz). The delay till disable is done in period interrupt/task
+  // to ABSOLUTE_MAX_AQE_TICKS, which translates approximately to 120ms for esp32
+  // and 60ms for avr at 16 MHz). The delay till disable is done in period interrupt/task
   // with 4 or 10 ms repetition rate and as such is with several ms jitter.
   void setAutoEnable(bool auto_enable);
   int setDelayToEnable(uint32_t delay_us);

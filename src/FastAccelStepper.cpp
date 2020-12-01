@@ -190,7 +190,9 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
   if (cmd->ticks > ABSOLUTE_MAX_AQE_TICKS) {
     return AQE_TOO_HIGH;
   }
-
+  if (cmd->ticks < MIN_DELTA_TICKS) {
+    return AQE_TOO_LOW;
+  }
   StepperQueue* q = &fas_queue[_queue_num];
   int res = AQE_OK;
   if (_autoEnable) {
@@ -261,7 +263,6 @@ void FastAccelStepper::isr_fill_queue() {
 #endif
     return;
   }
-
   // preconditions are fulfilled, so create the command(s)
   struct stepper_command_s cmd;
   StepperQueue* q = &fas_queue[_queue_num];

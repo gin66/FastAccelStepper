@@ -308,10 +308,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
   }
 
-  //  next_ticks = min(next_ticks, ABSOLUTE_MAX_TICKS);
-
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t steps = planning_steps;
+
 #ifdef TEST
   printf(
       "steps for the command = %d  with planning_steps = %u and "
@@ -326,7 +325,8 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   assert(next_ticks > 0);
 #endif
 
-  if ((steps == 1) && (next_ticks > 65535)) {
+  if (next_ticks > 65535) {
+	steps = 1;
     // insert a pause
     if (queue_end->ticks_from_last_step < next_ticks) {
       next_ticks -= queue_end->ticks_from_last_step;
@@ -337,7 +337,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
         steps = 0;
       }
     } else {
-      // next_ticks = MIN_DELTA_TICKS;
+      next_ticks = 32768;
     }
   }
 
