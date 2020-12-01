@@ -53,11 +53,11 @@ void RampChecker::check_section(struct queue_entry *e) {
   }
   uint8_t steps = steps_dir >> 1;
   if (steps == 0) {
-	  // Just a pause
-	  ticks_since_last_step += e->period;
-	  total_ticks += e->period;
-	  printf("process pause %d\n", e->period);
-	  return;
+    // Just a pause
+    ticks_since_last_step += e->period;
+    total_ticks += e->period;
+    printf("process pause %d\n", e->period);
+    return;
   }
   uint32_t start_dt = PERIOD_TICKS;
   start_dt *= e->n_periods;

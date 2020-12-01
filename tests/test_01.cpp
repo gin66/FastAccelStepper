@@ -77,7 +77,7 @@ void queue_out_of_range() {
   assert(s.isQueueEmpty());
 
   struct stepper_command_s cmd1 = {
-      .ticks = ABSOLUTE_MAX_TICKS + 1, .steps = 100, .count_up = true};
+      .ticks = ABSOLUTE_MAX_AQE_TICKS + 1, .steps = 100, .count_up = true};
   res = s.addQueueEntry(&cmd1);
   test(res == AQE_TOO_HIGH, "Too high provided should trigger error");
   assert(s.isQueueEmpty());
@@ -90,7 +90,7 @@ void queue_out_of_range() {
   assert(s.isQueueEmpty());
 
   struct stepper_command_s cmd3 = {
-      .ticks = ABSOLUTE_MAX_TICKS, .steps = 100, .count_up = true};
+      .ticks = ABSOLUTE_MAX_AQE_TICKS, .steps = 100, .count_up = true};
   res = s.addQueueEntry(&cmd3);
   test(res == AQE_OK, "In range should be accepted");
   assert(!s.isQueueEmpty());

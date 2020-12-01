@@ -22,7 +22,7 @@ FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
 * 2-pin operation for e.g. axis control (even though use for X/Y-coordinated movement is not recommended)
 * 3-pin operation to reduce power dissipation of driver/stepper
-* Lower limit of ~1 steps/s @ 16MHz
+* Lower limit of 260s per step @ 16MHz aka one step every four minute
 * fully interrupt driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * Allow the motor to continuously run in the current direction until stopMove() is called.
@@ -163,7 +163,6 @@ pio run -e avr --target upload --upload-port /dev/ttyUSB0
 ## Not planned for now
 
 * Using constant acceleration leads to force jumps at start and max speed => smooth this out => will not happen
-* Extend command queue entry to perform delay only without step (steps=0) to reduce the 1.0 steps/s
 
 ## Lessons Learned
 

@@ -1,3 +1,8 @@
+pre 0.11.0:
+- Slowest speed is TICKS_PER_S/0xffffffff, which is ~268s between steps
+- ABS_MAX_TICKS renamed to ABS_MAX_AQE_TICKS. Only applicable to raw commands
+- Done: Extend command queue entry to perform delay only without step (steps=0) to reduce the 1.0 steps/s
+
 0.10.0:
 - setSpeed() silently imposes lower limit for period
 - esp32: step pulse length is for high speed with 50% duty cycle and for low speed fixed at 2ms

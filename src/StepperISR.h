@@ -160,10 +160,9 @@ class StepperQueue {
       uint32_t tfls = queue_end.ticks_from_last_step;
       if (tfls <= 0xffff0000) {
         queue_end.ticks = tfls + cmd->ticks;
-      }
-	  else {
+      } else {
         queue_end.ticks = cmd->ticks;
-	  }
+      }
       queue_end.ticks_from_last_step = 0;
     }
     e->period = period;
