@@ -479,7 +479,7 @@ int32_t FastAccelStepper::getCurrentPosition() {
   interrupts();
   while (rp != wp) {
     wp--;
-    uint8_t steps_dir = q->entry[wp & QUEUE_LEN_MASK].steps;
+    uint8_t steps_dir = q->entry[wp & QUEUE_LEN_MASK].steps_dir;
     if (countUp) {
       pos -= steps_dir >> 1;
     } else {

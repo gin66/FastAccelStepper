@@ -46,11 +46,11 @@ RampChecker::RampChecker() {
   accelerate_till = 0;
 }
 void RampChecker::check_section(struct queue_entry *e) {
-  uint8_t steps = e->steps;
+  uint8_t steps_dir = e->steps_dir;
   if (!first) {
-    assert((steps & 1) == 0);
+    assert((steps_dir & 1) == 0);
   }
-  steps >>= 1;
+  uint8_t steps = steps_dir >> 1;
   assert(steps >= 1);
   uint32_t start_dt = PERIOD_TICKS;
   start_dt *= e->n_periods;

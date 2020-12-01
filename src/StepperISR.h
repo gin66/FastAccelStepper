@@ -61,7 +61,7 @@ struct mapping_s {
 #endif
 
 struct queue_entry {
-  uint8_t steps;      // coding is bit7..1 is nr of steps and bit 0 is direction
+  uint8_t steps_dir;  // coding is bit7..1 is nr of steps and bit 0 is direction
   uint8_t n_periods;  // number of PERIOD_TICKS delays
   uint16_t period;    // remaining period time in addition to
                       // n_periods*PERIOD_TICKS delays
@@ -156,7 +156,7 @@ class StepperQueue {
     // check for dir pin value change
     queue_end.count_up = cmd->count_up;
     bool dir = (cmd->count_up == dirHighCountsUp);
-    e->steps = (dir != queue_end.dir) ? steps | 0x01 : steps;
+    e->steps_dir = (dir != queue_end.dir) ? steps | 0x01 : steps;
     queue_end.dir = dir;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     {
@@ -194,7 +194,7 @@ class StepperQueue {
     rp++;  // ignore currently processed entry
     while (wp != rp) {
       struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
-      uint8_t steps = e->steps >> 1;
+      uint8_t steps = e->steps_dir >> 1;
       uint32_t tmp = e->period;
       tmp *= steps;
       if (tmp >= min_ticks) {
