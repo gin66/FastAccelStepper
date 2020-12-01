@@ -187,16 +187,12 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
   if (cmd->steps >= 128) {
     return AQE_STEPS_ERROR;
   }
-  if (cmd->steps == 0) {
-    return AQE_STEPS_ERROR;
-  }
   if (cmd->ticks > ABSOLUTE_MAX_TICKS) {
     return AQE_TOO_HIGH;
   }
 
   StepperQueue* q = &fas_queue[_queue_num];
   int res = AQE_OK;
-  uint8_t orig_steps = cmd->steps;
   if (_autoEnable) {
     noInterrupts();
     uint16_t delay_counter = _auto_disable_delay_counter;
@@ -207,20 +203,15 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
         struct stepper_command_s start_cmd = {
-            .ticks = _on_delay_ticks, .steps = 1, .count_up = cmd->count_up};
+            .ticks = _on_delay_ticks, .steps = 0, .count_up = cmd->count_up};
         res = q->addQueueEntry(&start_cmd);
-        if ((res == AQE_OK) && (cmd->steps == 1)) {
-          // if steps == 1, wrong value in queue_end.ticks
-          q->queue_end.ticks = cmd->ticks;
+        if (res != AQE_OK) {
+          return res;
         }
-        cmd->steps -= 1;
       }
     }
   }
-  if (cmd->steps > 0) {
-    res = q->addQueueEntry(cmd);
-  }
-  cmd->steps = orig_steps;  // restore original steps value
+  res = q->addQueueEntry(cmd);
   if (_autoEnable) {
     if (res == AQE_OK) {
       noInterrupts();
