@@ -34,6 +34,7 @@ class RampChecker {
   uint32_t accelerate_till;
   uint32_t coast_till;
   uint32_t pos;
+  uint32_t ticks_since_last_step = 0xffffffff;
 };
 
 RampChecker::RampChecker() {
@@ -53,12 +54,21 @@ void RampChecker::check_section(struct queue_entry *e) {
     assert((steps_dir & 1) == 0);
   }
   uint8_t steps = steps_dir >> 1;
-  assert(steps >= 1);
+  if (steps == 0) {
+	  // Just a pause
+	  ticks_since_last_step += e->period;
+	  total_ticks += e->period;
+	  printf("process pause %d\n", e->period);
+	  return;
+  }
   pos += steps;
   uint32_t start_dt = PERIOD_TICKS;
   start_dt *= e->n_periods;
   start_dt += e->period;
+  total_ticks += steps * start_dt;
+  start_dt += ticks_since_last_step;
 
+  ticks_since_last_step = 0;
   min_dt = min(min_dt, start_dt);
   float accel = 0;
   if (!first) {
@@ -71,7 +81,6 @@ void RampChecker::check_section(struct queue_entry *e) {
       "= %d   accel=%.6f\n",
       total_ticks / 16000000.0, steps, last_dt, start_dt, min_dt, accel);
 
-  total_ticks += steps * start_dt;
   assert(steps * start_dt >= 0);
 
   if (last_dt > start_dt) {
@@ -133,7 +142,7 @@ void basic_test_with_empty_queue() {
     }
   }
   test(!s.isRampGeneratorActive(), "too many commands created");
-  printf("%d\n", rc.min_dt);
+  printf("min_dt=%u\n", rc.min_dt);
   test(rc.min_dt == 160000, "max speed not reached");
 }
 
@@ -184,7 +193,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
     }
     uint32_t to_dt = rc.total_ticks;
     float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
-    printf("planned time in buffer: %.6fs\n", planned_time);
+    printf("planned time in buffer: %.6fs (old=%.6fs)\n", planned_time, old_planned_time_in_buffer);
     // This must be ensured, so that the stepper does not run out of commands
     assert((i == 0) || (old_planned_time_in_buffer > 0.005));
     old_planned_time_in_buffer = planned_time;
@@ -271,9 +280,8 @@ int main() {
   test_with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1,
                  0.2);
 
-  // ramp time 50s, thus with 500s max speed not reached. 250steps need 10s
+  // ramp time 50s, thus with 500steps max speed not reached. 250steps need 10s
   test_with_pars("f13", 500, 4000, 5, false, 20.0 - 0.6, 20.0 + 0.2, 0.2);
-  // ramp time 50s, thus with 1000s max speed not reached. 1000steps need 20s
   test_with_pars("f14", 2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2, 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 1s
   test_with_pars("f15", 12600, 4000, 5, true, 100.0 - 0.7, 100.0 + 0.2, 0.2);
@@ -284,7 +292,7 @@ int main() {
   test_with_pars("f17", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
 
   // ramp time  625s, 7812500 steps
-  // test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
+  //test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
 
   // slow ramp time
   test_with_pars("f19", 1000, 10, 1, false, 62.0, 63.0, 1.0);

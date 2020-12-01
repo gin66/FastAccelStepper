@@ -268,7 +268,7 @@ void FastAccelStepper::isr_fill_queue() {
 #endif
     int8_t res = AQE_OK;
     uint8_t next_state = rg.getNextCommand(&q->queue_end, &cmd);
-    if (cmd.steps != 0) {
+    if (cmd.ticks != 0) {
       res = addQueueEntry(&cmd);
       if (res == AQE_OK) {
         rg.commandEnqueued(&cmd, next_state);
@@ -283,7 +283,7 @@ void FastAccelStepper::isr_fill_queue() {
     runtime_us = micros() - runtime_us;
     max_micros = max(max_micros, runtime_us);
 #endif
-    if (cmd.steps == 0) {
+    if (cmd.ticks == 0) {
       break;
     }
     if (res == AQE_FULL) {
