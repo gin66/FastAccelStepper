@@ -1,3 +1,7 @@
+pre 0.12.0:
+- reduce data type for command queue entries' ticks value from uint32_t to uint16_t
+   => remove ABS_MAX_AQE_TICKS
+
 0.11.3:
 - ABSOLUTE_MAX_AQE_TICKS is now 65535
 

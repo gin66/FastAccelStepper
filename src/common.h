@@ -5,7 +5,7 @@
 //	steps must be less than 128 aka 7 bits
 //	If steps is 0, then a pause is generated
 struct stepper_command_s {
-  uint32_t ticks;
+  uint16_t ticks;
   uint8_t steps;
   bool count_up;
 };

@@ -39,8 +39,8 @@
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #endif
 
-#define ABSOLUTE_MAX_AQE_TICKS 65535
 #define MAX_DELTA_TICKS 0xffffffff
+#define MAX_ON_DELAY_TICKS ((uint32_t)(65535*(QUEUE_LEN-1)))
 
 #define PIN_UNDEFINED 255
 
