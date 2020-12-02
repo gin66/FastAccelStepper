@@ -10,11 +10,19 @@ test: test_01 test_02 test_03 test_04 test_05
 	./test_04
 	./test_05
 
-test_01: test_01.cpp stubs.h FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
-test_02: test_02.cpp stubs.h FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
-test_03: test_03.cpp stubs.h PoorManFloat.o
-test_04: test_04.cpp stubs.h FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
-test_05: test_05.cpp stubs.h FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
+LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h RampGenerator.h
+
+test_01: test_01.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
+test_02: test_02.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
+test_03: test_03.o PoorManFloat.o
+test_04: test_04.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
+test_05: test_05.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
+
+test_01.o: test_01.cpp $(LIB_H) RampChecker.h stubs.h
+test_02.o: test_02.cpp $(LIB_H) RampChecker.h stubs.h
+test_03.o: test_03.cpp PoorManFloat.h stubs.h
+test_04.o: test_04.cpp $(LIB_H) RampChecker.h stubs.h
+test_05.o: test_05.cpp $(LIB_H) RampChecker.h stubs.h
 
 FastAccelStepper.o: FastAccelStepper.cpp FastAccelStepper.h PoorManFloat.h StepperISR.h stubs.h RampGenerator.h common.h
 

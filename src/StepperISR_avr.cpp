@@ -43,9 +43,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     if (Stepper_IsToggling(CHANNEL)) {                                  \
       TCCR1C = _BV(foc); /* clear bit */                                \
       struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];        \
-      if ((e->steps_dir -= 2) > 1) {                                    \
+      if (e->steps-- > 0) {                                             \
         /* perform another steps_dir with this queue entry */           \
-        ocr += queue.period;                                            \
+        ocr += queue.ticks;                                             \
         return;                                                         \
       }                                                                 \
       rp++;                                                             \
@@ -67,14 +67,13 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     }                                                                   \
     /* command in queue */                                              \
     struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];          \
-    ocr += (queue.period = e->period);                                  \
+    ocr += (queue.ticks = e->ticks);                                    \
     /* assign to skip and test for not zero */                          \
-    if ((e->steps_dir & 0xfe) == 0) {                                   \
+    if (e->steps == 0) {                                                \
       Stepper_Zero(CHANNEL);                                            \
     } else {                                                            \
       Stepper_Toggle(CHANNEL);                                          \
-      uint8_t steps_dir = e->steps_dir;                                 \
-      if ((steps_dir & 0x01) != 0) {                                    \
+      if (e->toggle_dir) {                                              \
         uint8_t dirPin = queue.dirPin;                                  \
         digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH); \
       }                                                                 \

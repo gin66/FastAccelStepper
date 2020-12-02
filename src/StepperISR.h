@@ -61,9 +61,9 @@ struct mapping_s {
 #endif
 
 struct queue_entry {
-  uint8_t steps_dir;  // coding is bit7..1 is nr of steps and bit 0 is direction
-  uint8_t unused;
-  uint16_t period;  // TODO: rename
+  uint8_t steps;  // if 0,  then the command only adds a delay
+  bool toggle_dir;
+  uint16_t ticks;
 };
 class StepperQueue {
  public:
@@ -80,7 +80,7 @@ class StepperQueue {
   bool isChannelA;
   // This is used in the timer compare unit as extension of the 16 timer
 #endif
-  uint16_t period;
+  uint16_t ticks;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint8_t checksum;
 #endif
@@ -117,7 +117,6 @@ class StepperQueue {
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
     uint8_t steps = cmd->steps;
     queue_end.pos += cmd->count_up ? steps : -steps;
-    steps <<= 1;
     if (steps == 0) {
       // This is a pause
       uint32_t tfls = queue_end.ticks_from_last_step;
@@ -133,12 +132,12 @@ class StepperQueue {
       }
       queue_end.ticks_from_last_step = 0;
     }
-    e->period = period;
-    // check for dir pin value change
-    queue_end.count_up = cmd->count_up;
     bool dir = (cmd->count_up == dirHighCountsUp);
-    e->steps_dir = (dir != queue_end.dir) ? steps | 0x01 : steps;
+    e->steps = steps;
+    e->toggle_dir = (dir != queue_end.dir) ? true : false;
+    e->ticks = period;
     queue_end.dir = dir;
+    queue_end.count_up = cmd->count_up;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     {
       // checksum is in the struct and will updated here
@@ -175,8 +174,8 @@ class StepperQueue {
     rp++;  // ignore currently processed entry
     while (wp != rp) {
       struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
-      uint8_t steps = e->steps_dir >> 1;
-      uint32_t tmp = e->period;
+      uint32_t tmp = e->ticks;
+      uint8_t steps = max(e->steps, 1);
       tmp *= steps;
       if (tmp >= min_ticks) {
         return true;

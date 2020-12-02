@@ -204,7 +204,7 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
         uint32_t delay = _on_delay_ticks;
         while (delay > 0) {
           uint32_t ticks = delay >> 1;
-		  uint16_t ticks_u16 = ticks;
+          uint16_t ticks_u16 = ticks;
           if (ticks > 65535) {
             ticks_u16 = 65535;
           } else if (ticks < 32768) {
@@ -479,13 +479,13 @@ int32_t FastAccelStepper::getCurrentPosition() {
   interrupts();
   while (rp != wp) {
     wp--;
-    uint8_t steps_dir = q->entry[wp & QUEUE_LEN_MASK].steps_dir;
+    struct queue_entry* e = &q->entry[wp & QUEUE_LEN_MASK];
     if (countUp) {
-      pos -= steps_dir >> 1;
+      pos -= e->steps;
     } else {
-      pos += steps_dir >> 1;
+      pos += e->steps;
     }
-    if (steps_dir & 1) {
+    if (e->toggle_dir) {
       countUp = !countUp;
     }
   }

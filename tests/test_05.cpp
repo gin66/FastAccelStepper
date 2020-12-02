@@ -43,99 +43,7 @@ void interrupts() {
   }
 }
 
-class RampChecker {
- public:
-  RampChecker();
-  void check_section(struct queue_entry *e);
-
-  uint32_t total_ticks;
-  uint32_t last_dt;
-  uint32_t min_dt;
-  bool increase_ok;
-  bool flat_ok;
-  bool decrease_ok;
-  bool first;
-  uint32_t accelerate_till;
-  uint32_t coast_till;
-  uint32_t total_steps;
-  uint32_t ticks_since_last_step = 0xffffffff;
-};
-
-RampChecker::RampChecker() {
-  total_ticks = 0;
-  last_dt = ~0;
-  min_dt = ~0;
-  first = true;
-  increase_ok = true;
-  decrease_ok = false;
-  coast_till = 0;
-  accelerate_till = 0;
-  total_steps = 0;
-}
-void RampChecker::check_section(struct queue_entry *e) {
-  uint8_t steps_dir = e->steps_dir;
-  if (!first) {
-    assert((steps_dir & 1) == 0);
-  }
-  uint8_t steps = steps_dir >> 1;
-  if (steps == 0) {
-    // Just a pause
-    ticks_since_last_step += e->period;
-    total_ticks += e->period;
-    printf("process pause %d\n", e->period);
-    return;
-  }
-  uint32_t start_dt = e->period;
-  total_ticks += steps * start_dt;
-  if (ticks_since_last_step < 0xffff0000) {
-    start_dt += ticks_since_last_step;
-  } else {
-    start_dt = ticks_since_last_step;
-  }
-
-  ticks_since_last_step = 0;
-  uint32_t end_dt = start_dt;
-
-  min_dt = min(min_dt, min(start_dt, end_dt));
-  assert(min_dt > 0);
-  float accel = 0;
-  if (!first) {
-    accel = (16000000.0 / end_dt - 16000000.0 / last_dt) /
-            (1.0 / 16000000.0 * 0.5 * (start_dt + end_dt));
-  }
-  printf(
-      "process command in ramp checker @%.6fs - %d steps: steps = %d last = %d "
-      "start = %d "
-      " end = %d  min_dt "
-      "= %d   accel=%.6f\n",
-      total_ticks / 16000000.0, total_steps, steps, last_dt, start_dt, end_dt,
-      min_dt, accel);
-
-  total_steps += steps;
-  assert(steps * start_dt >= 0);
-
-  if (last_dt > start_dt) {
-    assert(increase_ok);
-    accelerate_till = total_ticks;
-    decrease_ok = true;
-  } else if (last_dt < start_dt) {
-    if (increase_ok) {
-      coast_till = total_ticks;
-    }
-    assert(decrease_ok);
-    increase_ok = false;
-  }
-  if (start_dt > end_dt) {
-    assert(increase_ok);
-  } else if (start_dt < end_dt) {
-    assert(decrease_ok);
-    increase_ok = false;
-  }
-
-  last_dt = end_dt;
-
-  first = false;
-}
+#include "RampChecker.h"
 
 void init_queue() {
   fas_queue[0]._initVars();
@@ -208,8 +116,8 @@ void do_test() {
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif
-  printf("Total steps = %d\n", rc.total_steps);
-  assert(rc.total_steps == 4000);
+  printf("Total steps = %d\n", rc.pos);
+  assert(rc.pos == 4000);
 
   printf("TEST_05 Part PASSED\n");
 }

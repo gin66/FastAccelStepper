@@ -40,7 +40,8 @@ void loop() {
   Serial.println("Start");
   for (uint16_t i = 1; i < 2 * COMMAND_CNT; i++) {
     uint8_t steps = 100;
-    uint32_t steps_per_s = max(min(i, 2 * COMMAND_CNT - i), TICKS_PER_S/65536+1) * 100;
+    uint32_t steps_per_s =
+        max(min(i, 2 * COMMAND_CNT - i), TICKS_PER_S / 65536 + 1) * 100;
     uint16_t ticks = TICKS_PER_S / steps_per_s;
     while (true) {
       struct stepper_command_s cmd = {

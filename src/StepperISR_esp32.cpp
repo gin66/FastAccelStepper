@@ -74,18 +74,17 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
-  uint8_t steps_dir = e->steps_dir;
-  uint8_t steps = steps_dir >> 1;
+  uint8_t steps = e->steps;
   PCNT.conf_unit[timer].conf2.cnt_h_lim = steps;  // is updated only on zero
-  if ((steps_dir & 0x01) != 0) {
+  if (e->toggle_dir) {
     uint8_t dirPin = queue->dirPin;
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
   }
-  uint16_t period = e->period;
-  queue->period = period;
-  mcpwm->timer[timer].period.period = period;
-  mcpwm->channel[timer].cmpr_value[0].cmpr_val = period >> 1;
-  if ((steps_dir & 0xfe) == 0) {
+  uint16_t ticks = e->ticks;
+  queue->ticks = ticks;
+  mcpwm->timer[timer].period.period = ticks;
+  mcpwm->channel[timer].cmpr_value[0].cmpr_val = ticks >> 1;
+  if (steps == 0) {
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     mcpwm->int_clr.val |= mapping->timer_tez_int_clr;
     mcpwm->int_ena.val |= mapping->timer_tez_int_ena;
