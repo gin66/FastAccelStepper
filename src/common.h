@@ -2,7 +2,6 @@
 #define COMMON_H
 
 //	ticks is multiplied by (1/TICKS_PER_S) in s
-//	steps must be less than 128 aka 7 bits
 //	If steps is 0, then a pause is generated
 struct stepper_command_s {
   uint16_t ticks;

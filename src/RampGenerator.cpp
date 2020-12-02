@@ -319,7 +319,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
   steps = max(steps, 1);
   steps = min(steps, abs(remaining_steps));
-  steps = min(127, steps);
+  steps = min(255, steps);
 
 #ifdef TEST
   assert(next_ticks > 0);
