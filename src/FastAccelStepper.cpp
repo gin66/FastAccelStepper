@@ -177,13 +177,15 @@ void FastAccelStepperEngine::manageSteppers() {
         for (uint8_t j = 0; j < _next_stepper_num; j++) {
           if (i != j) {
             FastAccelStepper* other = _stepper[j];
-            if (!other->agreeWithAutoDisable(s->getEnablePinHighActive())) {
-              agree = false;
-              break;
-            }
-            if (!other->agreeWithAutoDisable(s->getEnablePinLowActive())) {
-              agree = false;
-              break;
+            if (other) {
+              if (!other->agreeWithAutoDisable(s->getEnablePinHighActive())) {
+                agree = false;
+                break;
+              }
+              if (!other->agreeWithAutoDisable(s->getEnablePinLowActive())) {
+                agree = false;
+                break;
+              }
             }
           }
         }
