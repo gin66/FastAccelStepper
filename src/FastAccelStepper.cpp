@@ -173,24 +173,24 @@ void FastAccelStepperEngine::manageSteppers() {
     FastAccelStepper* s = _stepper[i];
     if (s) {
       if (s->needAutoDisable()) {
-		  bool agree = true;
-		  for (uint8_t j = 0; j < _next_stepper_num; j++) {
-			  if (i != j) {
-				FastAccelStepper* other = _stepper[i];
-				if (!other->agreeWithAutoDisable(s->getEnablePinHighActive())) {
-					agree = false;
-					break;
-				}
-				if (!other->agreeWithAutoDisable(s->getEnablePinLowActive())) {
-					agree = false;
-					break;
-				}
-			  }
-		  }
-		  if (agree) {
-			  s->disableOutputs();
-		  }
-	  }
+        bool agree = true;
+        for (uint8_t j = 0; j < _next_stepper_num; j++) {
+          if (i != j) {
+            FastAccelStepper* other = _stepper[j];
+            if (!other->agreeWithAutoDisable(s->getEnablePinHighActive())) {
+              agree = false;
+              break;
+            }
+            if (!other->agreeWithAutoDisable(s->getEnablePinLowActive())) {
+              agree = false;
+              break;
+            }
+          }
+        }
+        if (agree) {
+          s->disableOutputs();
+        }
+      }
     }
   }
 }
@@ -355,7 +355,7 @@ bool FastAccelStepper::needAutoDisable() {
     if (!isRunning()) {
       _auto_disable_delay_counter--;
       if (_auto_disable_delay_counter == 0) {
-		need_disable = true;
+        need_disable = true;
       }
     }
   }
@@ -364,17 +364,17 @@ bool FastAccelStepper::needAutoDisable() {
 }
 
 bool FastAccelStepper::agreeWithAutoDisable(uint8_t pin) {
-	bool agree = true;
-	if (pin != PIN_UNDEFINED) {
-		if ((pin == _enablePinHighActive) || (pin == _enablePinLowActive)) {
-  noInterrupts();
-  if (_auto_disable_delay_counter > 0) {
-	  agree = false;
+  bool agree = true;
+  if (pin != PIN_UNDEFINED) {
+    if ((pin == _enablePinHighActive) || (pin == _enablePinLowActive)) {
+      noInterrupts();
+      if (_auto_disable_delay_counter > 0) {
+        agree = false;
+      }
+      interrupts();
+    }
   }
-  interrupts();
-		}
-	}
-	return agree;
+  return agree;
 }
 
 void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
@@ -429,7 +429,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
   _autoEnable = auto_enable;
   if (auto_enable && (_on_delay_ticks == 0)) {
-	  _on_delay_ticks = 1;
+    _on_delay_ticks = 1;
   }
 }
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
