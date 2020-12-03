@@ -325,7 +325,7 @@ void loop() {
       } else if ((strcmp(in_buffer, "M6") == 0) && stepper[5]) {
         Serial.println("Select stepper 6");
         selected = 5;
-	 }
+      }
 #if defined(ARDUINO_ARCH_ESP32)
       else if (strcmp(in_buffer, "r") == 0) {
         Serial.println("ESP restart");
@@ -408,7 +408,7 @@ void loop() {
         } else if (strcmp(in_buffer, "?") == 0) {
           usage();
         }
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_AVR)
         else if (strcmp(in_buffer, "T") == 0) {
           if (!stepper_selected->isRunning()) {
             Serial.println("Test direct drive");

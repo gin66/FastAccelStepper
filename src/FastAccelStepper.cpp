@@ -171,11 +171,11 @@ void FastAccelStepperEngine::manageSteppers() {
   // Check for auto disable
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
-	uint8_t high_active_pin = s->getEnablePinHighActive();
-	uint8_t low_active_pin = s->getEnablePinLowActive();
+    uint8_t high_active_pin = s->getEnablePinHighActive();
+    uint8_t low_active_pin = s->getEnablePinLowActive();
     if (s) {
       if (s->needAutoDisable()) {
-		noInterrupts();
+        noInterrupts();
         bool agree = true;
         for (uint8_t j = 0; j < _next_stepper_num; j++) {
           if (i != j) {
@@ -202,7 +202,7 @@ void FastAccelStepperEngine::manageSteppers() {
             }
           }
         }
-		interrupts();
+        interrupts();
       }
     }
   }
@@ -364,7 +364,7 @@ ISR(TIMER1_OVF_vect) {
 bool FastAccelStepper::needAutoDisable() {
   bool need_disable = false;
   // FastAccelStepperEngine will call with interrupts disabled
-  //noInterrupts();
+  // noInterrupts();
   if (_auto_disable_delay_counter > 0) {
     if (!isRunning()) {
       _auto_disable_delay_counter--;
@@ -373,7 +373,7 @@ bool FastAccelStepper::needAutoDisable() {
       }
     }
   }
-  //interrupts();
+  // interrupts();
   return need_disable;
 }
 
