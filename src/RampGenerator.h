@@ -45,6 +45,7 @@ struct ramp_ro_s {
   int32_t target_pos;
   bool force_stop;
   bool keep_running;
+  bool keep_running_count_up;
 };
 struct ramp_rw_s {
   // the speed is linked on both ramp slopes to this variable as per
@@ -88,6 +89,7 @@ class RampGenerator {
   void applySpeedAcceleration();
   int8_t move(int32_t move, const struct queue_end_s *queue);
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);
+  int8_t startRun(bool countUp);
   inline void initiate_stop() { _ro.force_stop = true; }
   inline bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
@@ -100,7 +102,7 @@ class RampGenerator {
   void commandEnqueued(struct stepper_command_s *command, uint8_t state);
 
  private:
-  int _startMove(int32_t target_pos, const struct queue_end_s *queue_end);
+  int8_t _startMove(int32_t target_pos, const struct queue_end_s *queue_end);
 #if (TICKS_PER_S != 16000000L)
   upm_float upm_timer_freq;
 #endif

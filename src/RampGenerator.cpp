@@ -68,7 +68,34 @@ void RampGenerator::applySpeedAcceleration() {
   _ro.config = _config;
   interrupts();
 }
-int RampGenerator::_startMove(int32_t target_pos,
+int8_t RampGenerator::startRun(bool countUp) {
+  if (_config.min_travel_ticks == 0) {
+    return MOVE_ERR_SPEED_IS_UNDEFINED;
+  }
+  if (_config.upm_inv_accel2 == 0) {
+    return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
+  }
+
+  struct ramp_ro_s new_ramp = {.config = _config,
+                               .target_pos = 0,
+                               .force_stop = false,
+                               .keep_running = true,
+							   .keep_running_count_up = countUp};
+
+  if (_wo.ramp_state == RAMP_STATE_IDLE) {
+    noInterrupts();
+    _ro = new_ramp;
+    _wo.ramp_state = RAMP_STATE_ACCELERATE;
+    interrupts();
+  } else {
+    noInterrupts();
+    _ro = new_ramp;
+    interrupts();
+  }
+  return MOVE_OK;
+}
+
+int8_t RampGenerator::_startMove(int32_t target_pos,
                               const struct queue_end_s *queue_end) {
   if (_config.min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
@@ -80,7 +107,8 @@ int RampGenerator::_startMove(int32_t target_pos,
   struct ramp_ro_s new_ramp = {.config = _config,
                                .target_pos = target_pos,
                                .force_stop = false,
-                               .keep_running = false};
+                               .keep_running = false,
+							   .keep_running_count_up = true};
 
   if (_wo.ramp_state == RAMP_STATE_IDLE) {
     if (target_pos == queue_end->pos) {
@@ -152,7 +180,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   uint32_t remaining_steps;
   bool need_count_up;
   if (ramp->keep_running) {
-    need_count_up = count_up;
+    need_count_up = ramp->keep_running_count_up;
     remaining_steps = 0xfffffff;
   } else {
     int32_t delta =

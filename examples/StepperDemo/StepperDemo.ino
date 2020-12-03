@@ -231,6 +231,8 @@ const static char usage_str[] PROGMEM =
 
     "     R<n>      ... Move selected stepper by n steps (can be "
     "negative)\n"
+    "     f         ... Run forward (counting up)\n"
+    "     b         ... Run backward (counting down)\n"
     "     K         ... Keep selected stepper running in current direction\n"
     "     @<pos>    ... Set selected stepper to position (can be "
     "negative)\n"
@@ -385,6 +387,16 @@ void loop() {
         } else if (strcmp(in_buffer, "K") == 0) {
           Serial.println("Keep running");
           stepper_selected->keepRunning();
+        } else if (strcmp(in_buffer, "f") == 0) {
+          Serial.println("run forward");
+          int res = stepper_selected->runForward();
+          Serial.print("returncode=");
+          Serial.println(res);
+        } else if (strcmp(in_buffer, "b") == 0) {
+          Serial.println("run backward");
+          int res = stepper_selected->runBackward();
+          Serial.print("returncode=");
+          Serial.println(res);
         } else if (strcmp(in_buffer, "X") == 0) {
           Serial.println("Immediate Stop");
           stepper_selected->forceStopAndNewPosition(0);

@@ -152,6 +152,11 @@ class FastAccelStepper {
   void keepRunning();
   bool isRunningContinuously() { return rg.isRunningContinuously(); }
 
+  // This command just let the motor run continuously in one direction.
+  // If the motor is running in the opposite direction, it will reverse
+  int8_t runForward() { return rg.startRun(true); }
+  int8_t runBackward() { return rg.startRun(false); }
+
   // forwardStep()/backwardstep() can be called, while stepper is not moving
   // If stepper is moving, this is a no-op.
   // backwardStep() is a no-op, if no direction pin defined
