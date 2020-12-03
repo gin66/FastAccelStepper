@@ -323,7 +323,14 @@ void loop() {
       } else if ((strcmp(in_buffer, "M6") == 0) && stepper[5]) {
         Serial.println("Select stepper 6");
         selected = 5;
-      } else if (selected >= 0) {
+	 }
+#if defined(ARDUINO_ARCH_ESP32)
+      else if (strcmp(in_buffer, "r") == 0) {
+        Serial.println("ESP restart");
+        ESP.restart();
+      }
+#endif
+      else if (selected >= 0) {
         FastAccelStepper *stepper_selected = stepper[selected];
         if (sscanf(in_buffer, "A%ld", &val) == 1) {
           Serial.print("Set acceleration to ");
@@ -409,14 +416,9 @@ void loop() {
           }
         }
       }
-#if defined(ARDUINO_ARCH_ESP32)
-      else if (strcmp(in_buffer, "r") == 0) {
-        ESP.restart();
-      }
-#endif
       in_ptr = 0;
     } else {
-      in_buffer[in_ptr++] = toupper(ch);
+      in_buffer[in_ptr++] = ch;
     }
   }
 
