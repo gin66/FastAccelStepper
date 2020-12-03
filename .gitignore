@@ -13,4 +13,5 @@ tests/RampGenerator.cpp
 tests/RampGenerator.h
 tests/StepperISR*.cpp
 tests/StepperISR.h
+tests/common.h
 tests/*.gnuplot

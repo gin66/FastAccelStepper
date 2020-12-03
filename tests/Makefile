@@ -20,7 +20,7 @@ test_05: test_05.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGener
 
 test_01.o: test_01.cpp $(LIB_H) RampChecker.h stubs.h
 test_02.o: test_02.cpp $(LIB_H) RampChecker.h stubs.h
-test_03.o: test_03.cpp PoorManFloat.h stubs.h
+test_03.o: test_03.cpp PoorManFloat.h stubs.h test_03.h
 test_04.o: test_04.cpp $(LIB_H) RampChecker.h stubs.h
 test_05.o: test_05.cpp $(LIB_H) RampChecker.h stubs.h
 
