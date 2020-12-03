@@ -224,7 +224,8 @@ class FastAccelStepper {
   // These should not be called by the application
   void fill_queue();
   bool needAutoDisable();
-  bool agreeWithAutoDisable(uint8_t pin);
+  bool agreeWithAutoDisable();
+  bool usesAutoEnablePin(uint8_t pin);
 
  private:
   RampGenerator rg;

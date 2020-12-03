@@ -21,8 +21,8 @@ unsigned int error_cnt = 0;
 
 #include "test_03.h"
 
-int main() { 
-	if (perform_test()) {
-		xprintf("TEST_03 PASSED\n");
-	}
+int main() {
+  if (perform_test()) {
+    xprintf("TEST_03 PASSED\n");
+  }
 }

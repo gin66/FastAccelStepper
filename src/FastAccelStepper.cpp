@@ -171,27 +171,38 @@ void FastAccelStepperEngine::manageSteppers() {
   // Check for auto disable
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
+	uint8_t high_active_pin = s->getEnablePinHighActive();
+	uint8_t low_active_pin = s->getEnablePinLowActive();
     if (s) {
       if (s->needAutoDisable()) {
+		noInterrupts();
         bool agree = true;
         for (uint8_t j = 0; j < _next_stepper_num; j++) {
           if (i != j) {
             FastAccelStepper* other = _stepper[j];
             if (other) {
-              if (!other->agreeWithAutoDisable(s->getEnablePinHighActive())) {
-                agree = false;
-                break;
-              }
-              if (!other->agreeWithAutoDisable(s->getEnablePinLowActive())) {
-                agree = false;
-                break;
+              if (other->usesAutoEnablePin(high_active_pin) ||
+                  other->usesAutoEnablePin(low_active_pin)) {
+                if (!other->agreeWithAutoDisable()) {
+                  agree = false;
+                  break;
+                }
               }
             }
           }
         }
         if (agree) {
-          s->disableOutputs();
+          for (uint8_t j = 0; j < _next_stepper_num; j++) {
+            FastAccelStepper* other = _stepper[j];
+            if (other) {
+              if (other->usesAutoEnablePin(high_active_pin) ||
+                  other->usesAutoEnablePin(low_active_pin)) {
+                other->disableOutputs();
+              }
+            }
+          }
         }
+		interrupts();
       }
     }
   }
@@ -263,9 +274,9 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
 //*************************************************************************************************
 // fill_queue generates commands to the stepper for executing a ramp
 //
-// Plan is to fill the queue with commmands with approx. 10 ms ahead (or more).
-// For low speeds, this results in single stepping
-// For high speeds (40kSteps/s) approx. 400 Steps to be created using 3 commands
+// Plan is to fill the queue with commmands with approx. 10 ms ahead (or
+// more). For low speeds, this results in single stepping For high speeds
+// (40kSteps/s) approx. 400 Steps to be created using 3 commands
 //
 // Basis of the calculation is the relation between steps and time via
 // acceleration a:
@@ -352,7 +363,8 @@ ISR(TIMER1_OVF_vect) {
 
 bool FastAccelStepper::needAutoDisable() {
   bool need_disable = false;
-  noInterrupts();
+  // FastAccelStepperEngine will call with interrupts disabled
+  //noInterrupts();
   if (_auto_disable_delay_counter > 0) {
     if (!isRunning()) {
       _auto_disable_delay_counter--;
@@ -361,21 +373,26 @@ bool FastAccelStepper::needAutoDisable() {
       }
     }
   }
-  interrupts();
+  //interrupts();
   return need_disable;
 }
 
-bool FastAccelStepper::agreeWithAutoDisable(uint8_t pin) {
-  bool agree = true;
+bool FastAccelStepper::usesAutoEnablePin(uint8_t pin) {
   if (pin != PIN_UNDEFINED) {
     if ((pin == _enablePinHighActive) || (pin == _enablePinLowActive)) {
-      noInterrupts();
-      if (_auto_disable_delay_counter > 0) {
-        agree = false;
-      }
-      interrupts();
+      return true;
     }
   }
+  return false;
+}
+
+bool FastAccelStepper::agreeWithAutoDisable() {
+  bool agree = true;
+  noInterrupts();
+  if (_auto_disable_delay_counter > 0) {
+    agree = false;
+  }
+  interrupts();
   return agree;
 }
 
