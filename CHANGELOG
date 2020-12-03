@@ -4,6 +4,7 @@ pre 0.12.0:
 - each command in queue can now emit up to 255 steps
 - StepperDemo extended:
 	- r: Call ESP.restart() to check for issue #6
+- AutoEnable-Pin can be shared by steppers
 
 0.11.3:
 - ABSOLUTE_MAX_AQE_TICKS is now 65535

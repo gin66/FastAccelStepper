@@ -50,14 +50,13 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
 //
 //*************************************************************************************************
 #if defined(ARDUINO_ARCH_ESP32)
-#define TASK_DELAY_MS 10
+#define TASK_DELAY_10MS 10
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
-  const TickType_t delay =
-      TASK_DELAY_MS / portTICK_PERIOD_MS;  // block for 10ms
+  const TickType_t delay_10ms = TASK_DELAY_10MS / portTICK_PERIOD_MS;
   while (true) {
     engine->manageSteppers();
-    vTaskDelay(delay);
+    vTaskDelay(delay_10ms);
   }
 }
 #endif
@@ -165,7 +164,33 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-      s->manage();
+      s->fill_queue();
+    }
+  }
+
+  // Check for auto disable
+  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+    FastAccelStepper* s = _stepper[i];
+    if (s) {
+      if (s->needAutoDisable()) {
+		  bool agree = true;
+		  for (uint8_t j = 0; j < _next_stepper_num; j++) {
+			  if (i != j) {
+				FastAccelStepper* other = _stepper[i];
+				if (!other->agreeWithAutoDisable(s->getEnablePinHighActive())) {
+					agree = false;
+					break;
+				}
+				if (!other->agreeWithAutoDisable(s->getEnablePinLowActive())) {
+					agree = false;
+					break;
+				}
+			  }
+		  }
+		  if (agree) {
+			  s->disableOutputs();
+		  }
+	  }
     }
   }
 }
@@ -254,7 +279,7 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
 //
 //*************************************************************************************************
 
-void FastAccelStepper::isr_fill_queue() {
+void FastAccelStepper::fill_queue() {
   // Check preconditions to be allowed to fill the queue
   if (!rg.isRampGeneratorActive()) {
     return;
@@ -323,17 +348,33 @@ ISR(TIMER1_OVF_vect) {
 }
 #endif
 
-void FastAccelStepper::check_for_auto_disable() {
+bool FastAccelStepper::needAutoDisable() {
+  bool need_disable = false;
   noInterrupts();
   if (_auto_disable_delay_counter > 0) {
     if (!isRunning()) {
       _auto_disable_delay_counter--;
       if (_auto_disable_delay_counter == 0) {
-        disableOutputs();
+		need_disable = true;
       }
     }
   }
   interrupts();
+  return need_disable;
+}
+
+bool FastAccelStepper::agreeWithAutoDisable(uint8_t pin) {
+	bool agree = true;
+	if (pin != PIN_UNDEFINED) {
+		if ((pin == _enablePinHighActive) || (pin == _enablePinLowActive)) {
+  noInterrupts();
+  if (_auto_disable_delay_counter > 0) {
+	  agree = false;
+  }
+  interrupts();
+		}
+	}
+	return agree;
 }
 
 void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
@@ -387,6 +428,9 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
 }
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
   _autoEnable = auto_enable;
+  if (auto_enable && (_on_delay_ticks == 0)) {
+	  _on_delay_ticks = 1;
+  }
 }
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = US_TO_TICKS(delay_us);
@@ -402,7 +446,7 @@ int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
 void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   uint16_t delay_count = 0;
 #if defined(ARDUINO_ARCH_ESP32)
-  delay_count = delay_ms / TASK_DELAY_MS;
+  delay_count = delay_ms / TASK_DELAY_10MS;
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   delay_count = delay_ms / (65536000 / TICKS_PER_S);

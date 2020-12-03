@@ -108,6 +108,16 @@ Few comments to auto enable/disable:
 * If the motor is operated with micro stepping, then the disable/enable will cause the stepper to jump to/from the closest full step position.
 * Some drivers need time to e.g. stabilize voltages until stepping should start. For this the start on delay has been added. See [issue #5](https://github.com/gin66/FastAccelStepper/issues/5).
 * The turn off delay is realized in the cyclic task for esp32 or cyclic interrupt for avr. The esp32 task uses 10ms delay, while the avr repeats every ~4 ms at 16 MHz. Thus the turn off delay is a multiple (n>=2) of those period times and actual turning off takes place approx [(n-1)..n] * (10 or 4) ms after the last step.
+* More than one stepper can be connected to one auto enable pin. Behaviour is like this:
+	1. If stepper #1 needs enable, then it will enable it with its defined on delay time.
+    2. If stepper #2 connected to same enable pin, starts after stepper one. It still will wait its defined on delay time and set the enable pin.
+       The stepper #2 is not aware, that another stepper (stepper #1) has enabled stepper #2 already.
+    3. If e.g. stepper #1 stops, then the delay off counter is started.
+    4. When stepper #1's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to disable stepper #1's disable request.
+       If stepper #2 is still running, then stepper #2 will not agree and the output will stay enabled.
+    5. The library does not consider the case, that Low/High Active enables may be mixed.
+       This means stepper #1 uses the enable pin as High Active and stepper #2 the same pin as Low Active.
+       => This situation will not be identified and will lead to unexpected behaviour
 
 
 ## Behind the curtains

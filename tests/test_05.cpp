@@ -24,21 +24,21 @@ bool in_manage = false;
 void inject_fill_interrupt(int mark) {
   if ((mark == enable_inject_on_mark) && !in_manage) {
     in_manage = true;
-    stepper->manage();
+    stepper->fill_queue();
     in_manage = false;
   }
 }
 void noInterrupts() {
   if (enable_stepper_manage_on_noInterrupts && !in_manage) {
     in_manage = true;
-    stepper->manage();
+    stepper->fill_queue();
     in_manage = false;
   }
 }
 void interrupts() {
   if (enable_stepper_manage_on_interrupts && !in_manage) {
     in_manage = true;
-    stepper->manage();
+    stepper->fill_queue();
     in_manage = false;
   }
 }
@@ -67,14 +67,14 @@ void do_test() {
   s.setSpeed(400);
   s.setAcceleration(10000);
   in_manage = true;
-  s.manage();
+  s.fill_queue();
   in_manage = false;
   assert(s.isQueueEmpty());
   assert(!s.isRunning());
   s.moveTo(3000);
   assert(s.isRunning());
   in_manage = true;
-  s.manage();
+  s.fill_queue();
   in_manage = false;
   assert(!s.isQueueEmpty());
 
@@ -97,7 +97,7 @@ void do_test() {
     if (!s.isRampGeneratorActive() && s.isQueueEmpty()) {
       break;
     }
-    s.manage();
+    s.fill_queue();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
       rc.check_section(

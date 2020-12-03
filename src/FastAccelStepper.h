@@ -63,6 +63,8 @@ class FastAccelStepper {
   //	setEnablePin(pin2, false);
   // If pin1 and pin2 are same, then the last call will be used.
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
+  uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
+  uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
   void enableOutputs();
@@ -212,19 +214,17 @@ class FastAccelStepper {
   // returns true, if the ramp generation is active
   inline bool isRampGeneratorActive() { return rg.isRampGeneratorActive(); }
 
-  // This variable/these functions should NEVER be modified/called by the
-  // application
-  inline void manage() {
-    isr_fill_queue();
-    check_for_auto_disable();
-  }
-
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint32_t checksum();
 #endif
+
+  // These should not be called by the application
+  void fill_queue();
+  bool needAutoDisable();
+  bool agreeWithAutoDisable(uint8_t pin);
 
  private:
   RampGenerator rg;
@@ -239,9 +239,6 @@ class FastAccelStepper {
   uint32_t _on_delay_ticks;
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
-  void isr_fill_queue();
-  void isr_single_fill_queue();
-  void check_for_auto_disable();
 };
 
 class FastAccelStepperEngine {

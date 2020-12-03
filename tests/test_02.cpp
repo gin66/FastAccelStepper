@@ -38,10 +38,10 @@ void basic_test_with_empty_queue() {
   assert(s.isQueueEmpty());
   s.setSpeed(10000);
   s.setAcceleration(100);
-  s.manage();
+  s.fill_queue();
   assert(s.isQueueEmpty());
   s.move(1000);
-  s.manage();
+  s.fill_queue();
   assert(!s.isQueueEmpty());
   for (int i = 0; i < 1000; i++) {
     if (false) {
@@ -55,7 +55,7 @@ void basic_test_with_empty_queue() {
     if (!s.isRampGeneratorActive()) {
       break;
     }
-    s.manage();
+    s.fill_queue();
     while (!s.isQueueEmpty()) {
       rc.check_section(
           &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
@@ -81,10 +81,10 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
   assert(s.isQueueEmpty());
   s.setSpeed(travel_dt);
   s.setAcceleration(accel);
-  s.manage();
+  s.fill_queue();
   assert(s.isQueueEmpty());
   s.move(steps);
-  s.manage();
+  s.fill_queue();
   assert(!s.isQueueEmpty());
   float old_planned_time_in_buffer = 0;
   char fname[100];
@@ -103,7 +103,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
     if (!s.isRampGeneratorActive()) {
       break;
     }
-    s.manage();
+    s.fill_queue();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
       rc.check_section(
