@@ -119,9 +119,9 @@ Few comments to auto enable/disable:
     6. When stepper #2's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to disable stepper #2's disable request.
        Stepper #1 agrees, because it is no running. So the engine will call Stepper #2's _AND_ Stepper #1's disableOutputs().
 
-The library does not consider the case, that Low/High Active enable may be mixed.
-This means stepper #1 uses the enable pin as High Active and stepper #2 the same pin as Low Active.
-=> This situation will not be identified and will lead to unexpected behaviour
+  The library does not consider the case, that Low/High Active enable may be mixed.
+  This means stepper #1 uses the enable pin as High Active and stepper #2 the same pin as Low Active.
+  => This situation will not be identified and will lead to unexpected behaviour
 
 ## Behind the curtains
 
