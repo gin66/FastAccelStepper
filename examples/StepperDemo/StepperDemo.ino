@@ -247,7 +247,9 @@ const static char usage_str[] PROGMEM =
     "deadlock if the motor will never stop)\n"
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
+#if defined(ARDUINO_ARCH_ESP32)
     "     T         ... Test selected motor with direct port access\n"
+#endif
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
 #endif
@@ -405,11 +407,16 @@ void loop() {
           usage_info = !usage_info;
         } else if (strcmp(in_buffer, "?") == 0) {
           usage();
-        } else if (strcmp(in_buffer, "T") == 0) {
+        }
+#if defined(ARDUINO_ARCH_ESP32)
+        else if (strcmp(in_buffer, "T") == 0) {
           if (!stepper_selected->isRunning()) {
+            Serial.println("Test direct drive");
             test_direct_drive(&stepper_config[selected]);
           }
-        } else if (strcmp(in_buffer, "+") == 0) {
+        }
+#endif
+        else if (strcmp(in_buffer, "+") == 0) {
           if (!stepper_selected->isRunning()) {
             stepper_selected->forwardStep(true);
             Serial.println("Stepped forward");

@@ -2,8 +2,9 @@ pre 0.12.0:
 - reduce data type for command queue entries' ticks value from uint32_t to uint16_t
    => remove ABS_MAX_AQE_TICKS
 - each command in queue can now emit up to 255 steps
-- StepperDemo extended:
+- StepperDemo modification:
 	- r: Call ESP.restart() to check for issue #6
+    - Disable direct drive for esp32
 - AutoEnable-Pin can be shared by steppers
 
 0.11.3:
