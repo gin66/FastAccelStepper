@@ -251,7 +251,7 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
           struct stepper_command_s start_cmd = {
               .ticks = ticks_u16, .steps = 0, .count_up = cmd->count_up};
           res = q->addQueueEntry(&start_cmd);
-          delay -= ticks;
+          delay -= ticks_u16;
         }
         if (res != AQE_OK) {
           return res;
