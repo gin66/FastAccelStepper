@@ -248,6 +248,9 @@ const static char usage_str[] PROGMEM =
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
     "     T         ... Test selected motor with direct port access\n"
+#if defined(ARDUINO_ARCH_ESP32)
+    "     r         ... Call ESP.restart()\n"
+#endif
     "     Q         ... Toggle print usage on motor stop\n"
     "     ?         ... Print this usage\n"
     "\n";
@@ -404,13 +407,13 @@ void loop() {
             stepper_selected->forwardStep(true);
             Serial.println("Stepped forward");
           }
-        } else if (strcmp(in_buffer, "-") == 0) {
-          if (!stepper_selected->isRunning()) {
-            stepper_selected->backwardStep(true);
-            Serial.println("Stepped backward");
-          }
         }
       }
+#if defined(ARDUINO_ARCH_ESP32)
+      else if (strcmp(in_buffer, "r") == 0) {
+        ESP.restart();
+      }
+#endif
       in_ptr = 0;
     } else {
       in_buffer[in_ptr++] = toupper(ch);
