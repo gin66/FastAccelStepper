@@ -113,10 +113,10 @@ Few comments to auto enable/disable:
     2. If stepper #2, which is connected to same enable pin, starts after stepper one, then it still will wait its defined on delay time and set the enable pin, again (no-op).
        The stepper #2 is not aware, that another stepper (stepper #1) has enabled the outputs already.
     3. If e.g. stepper #1 stops, then stepper #1's delay off counter is started.
-    4. When stepper #1's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to disable stepper #1's disable request.
+    4. When stepper #1's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to stepper #1's disable request.
        If stepper #2 is still running, then stepper #2 will not agree and the output will stay enabled.
     5. When stepper #2 stops, then stepper #2's delay off counter is started.
-    6. When stepper #2's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to disable stepper #2's disable request.
+    6. When stepper #2's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to stepper #2's disable request.
        Stepper #1 agrees, because it is not running. So the engine will call Stepper #2's _AND_ Stepper #1's disableOutputs().
 
   The library does not consider the case, that Low/High Active enable may be mixed.
