@@ -1,5 +1,7 @@
 #include "FastAccelStepper.h"
 
+#define VERSION "post-46e1937"
+
 struct stepper_config_s {
   uint8_t step;
   uint8_t enable_low_active;
@@ -121,7 +123,8 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Demo Stepper");
+  Serial.print("StepperDemo Version ");
+  Serial.println(VERSION);
   Serial.print("    F_CPU=");
   Serial.println(F_CPU);
   Serial.print("    TICKS_PER_S=");

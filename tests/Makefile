@@ -45,8 +45,12 @@ RampGenerator.cpp: symlinks
 symlinks:
 	ln -sf ../src/* .
 
+VERSION=$(shell git rev-parse --short HEAD)
+
 fmt:
 	clang-format --style=Google -i ../src/* test_*.cpp stubs.h ../examples/*/*.ino
+	echo $(VERSION)
+	sed -i -e 's/#define VERSION.*$$/#define VERSION "post-$(VERSION)"/' ../examples/StepperDemo/StepperDemo.ino
 
 clean:
 	rm *.o test_[0-9][0-9] *.gnuplot

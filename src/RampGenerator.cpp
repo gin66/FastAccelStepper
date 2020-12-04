@@ -80,7 +80,7 @@ int8_t RampGenerator::startRun(bool countUp) {
                                .target_pos = 0,
                                .force_stop = false,
                                .keep_running = true,
-							   .keep_running_count_up = countUp};
+                               .keep_running_count_up = countUp};
 
   if (_wo.ramp_state == RAMP_STATE_IDLE) {
     noInterrupts();
@@ -96,7 +96,7 @@ int8_t RampGenerator::startRun(bool countUp) {
 }
 
 int8_t RampGenerator::_startMove(int32_t target_pos,
-                              const struct queue_end_s *queue_end) {
+                                 const struct queue_end_s *queue_end) {
   if (_config.min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
@@ -108,7 +108,7 @@ int8_t RampGenerator::_startMove(int32_t target_pos,
                                .target_pos = target_pos,
                                .force_stop = false,
                                .keep_running = false,
-							   .keep_running_count_up = true};
+                               .keep_running_count_up = true};
 
   if (_wo.ramp_state == RAMP_STATE_IDLE) {
     if (target_pos == queue_end->pos) {
