@@ -171,9 +171,9 @@ void FastAccelStepperEngine::manageSteppers() {
   // Check for auto disable
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
-    uint8_t high_active_pin = s->getEnablePinHighActive();
-    uint8_t low_active_pin = s->getEnablePinLowActive();
     if (s) {
+      uint8_t high_active_pin = s->getEnablePinHighActive();
+      uint8_t low_active_pin = s->getEnablePinLowActive();
       if (s->needAutoDisable()) {
         noInterrupts();
         bool agree = true;
