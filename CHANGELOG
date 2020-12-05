@@ -2,6 +2,7 @@ pre 0.12.2:
 - StepperDemo modification:
     - Enable direct drive feature in StepperDemo for esp32
     - While direct driving, check if the signals can be applied
+    - Add test mode (enter with t). Here can select stepper, a test sequence and run it
 
 0.12.1:
 - implement runForward()/runBackward()

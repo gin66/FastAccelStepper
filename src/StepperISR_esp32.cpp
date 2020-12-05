@@ -114,7 +114,8 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     q->isRunning = false;
     q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
     // Disconnect
-	//   do not use disconnect(), because then IRAM_ATTR would be needed on that routine
+    //   do not use disconnect(), because then IRAM_ATTR would be needed on that
+    //   routine
     gpio_matrix_out(q->_step_pin, 0x100, false, false);
   }
 }

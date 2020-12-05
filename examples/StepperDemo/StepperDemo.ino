@@ -1,6 +1,7 @@
 #include "FastAccelStepper.h"
+#include "test_seq.h"
 
-#define VERSION "post-c9d0c2d"
+#define VERSION "post-e74a8c2"
 
 struct stepper_config_s {
   uint8_t step;
@@ -74,6 +75,14 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper[MAX_STEPPER];
+
+bool test_mode = false;
+bool test_ongoing = false;
+struct test_seq_s test_seq[MAX_STEPPER] = {
+#if defined(ARDUINO_ARCH_ESP32)
+    {.test = NULL}, {.test = NULL}, {.test = NULL}, {.test = NULL},
+#endif
+    {.test = NULL}, {.test = NULL}};
 
 void test_direct_drive(const struct stepper_config_s *stepper) {
   // Check stepper motor+driver is operational
@@ -296,24 +305,22 @@ const static char usage_str[] PROGMEM =
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
 #endif
+    "     t         ... Enter test mode\n"
     "     Q         ... Toggle print usage on motor stop\n"
     "     ?         ... Print this usage\n"
     "\n";
 
-void usage() {
-#if defined(ARDUINO_ARCH_AVR)
-  char ch;
-  PGM_P s = usage_str;
-  for (;;) {
-    ch = pgm_read_byte(s++);
-    if (ch == 0) {
-      break;
-    }
-    Serial.print(ch);
-  }
-#elif defined(ARDUINO_ARCH_ESP32)
-  Serial.print(usage_str);
+const static char test_usage_str[] PROGMEM =
+    "Enter commands separated by space, carriage return or newline:\n"
+    "     M1/M2/..  ... to select stepper\n"
+    "     R         ... start all selected tests\n"
+    "     01        ... select test sequence 01 for selected stepper\n"
+#if defined(ARDUINO_ARCH_ESP32)
+    "     r         ... Call ESP.restart()\n"
 #endif
+    "\n";
+
+void stepper_info() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (stepper[i]) {
       if (i == selected) {
@@ -328,6 +335,32 @@ void usage() {
       Serial.println();
     }
   }
+}
+
+void usage() {
+#if defined(ARDUINO_ARCH_AVR)
+  char ch;
+  PGM_P s;
+  if (!test_mode) {
+    s = usage_str;
+  } else {
+    s = test_usage_str;
+  }
+  for (;;) {
+    ch = pgm_read_byte(s++);
+    if (ch == 0) {
+      break;
+    }
+    Serial.print(ch);
+  }
+#elif defined(ARDUINO_ARCH_ESP32)
+  if (!test_mode) {
+    Serial.print(usage_str);
+  } else {
+    Serial.print(test_usage_str);
+  }
+#endif
+  stepper_info();
 }
 
 void output_info() {
@@ -375,100 +408,119 @@ void loop() {
         ESP.restart();
       }
 #endif
-      else if (selected >= 0) {
+      else if (strcmp(in_buffer, "I") == 0) {
+        Serial.println("Toggle motor info");
+        verbose = !verbose;
+      } else if (strcmp(in_buffer, "Q") == 0) {
+        Serial.println("Toggle usage info");
+        usage_info = !usage_info;
+      } else if (strcmp(in_buffer, "?") == 0) {
+        usage();
+      } else if (strcmp(in_buffer, "t") == 0) {
+        Serial.println("Enter test mode");
+        test_mode = true;
+        usage();
+      } else if (selected >= 0) {
         FastAccelStepper *stepper_selected = stepper[selected];
-        if (sscanf(in_buffer, "A%ld", &val) == 1) {
-          Serial.print("Set acceleration to ");
-          Serial.println(val);
-          stepper_selected->setAcceleration(val);
-        } else if (sscanf(in_buffer, "V%ld", &val) == 1) {
-          Serial.print("Set speed (us) to ");
-          Serial.println(val);
-          stepper_selected->setSpeed(val);
-        } else if (sscanf(in_buffer, "R%ld", &val) == 1) {
-          Serial.print("Move steps ");
-          Serial.println(val);
-          int res = stepper_selected->move(val);
-          Serial.print("returncode=");
-          Serial.println(res);
-        } else if (sscanf(in_buffer, "P%ld", &val) == 1) {
-          Serial.print("Move to position ");
-          Serial.println(val);
-          int res = stepper_selected->moveTo(val);
-          Serial.print("returncode=");
-          Serial.println(res);
-        } else if (sscanf(in_buffer, "@%ld", &val) == 1) {
-          Serial.print("Set position ");
-          Serial.println(val);
-          stepper_selected->setCurrentPosition(val);
-        } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
-          Serial.print("Set enable time to ");
-          Serial.println(val);
-          int res = stepper_selected->setDelayToEnable(val);
-          Serial.print("returncode=");
-          Serial.println(res);
-        } else if (sscanf(in_buffer, "D%ld", &val) == 1) {
-          Serial.print("Set disable time to ");
-          Serial.println(val);
-          stepper_selected->setDelayToDisable(val);
-        } else if (strcmp(in_buffer, "N") == 0) {
-          Serial.println("Output driver on");
-          stepper_selected->setAutoEnable(false);
-          stepper_selected->enableOutputs();
-        } else if (strcmp(in_buffer, "F") == 0) {
-          Serial.println("Output driver off");
-          stepper_selected->setAutoEnable(false);
-          stepper_selected->disableOutputs();
-        } else if (strcmp(in_buffer, "O") == 0) {
-          Serial.println("Output driver off");
-          stepper_selected->setAutoEnable(true);
-        } else if (strcmp(in_buffer, "S") == 0) {
-          Serial.println("Stop");
-          stepper_selected->stopMove();
-        } else if (strcmp(in_buffer, "K") == 0) {
-          Serial.println("Keep running");
-          stepper_selected->keepRunning();
-        } else if (strcmp(in_buffer, "f") == 0) {
-          Serial.println("run forward");
-          int res = stepper_selected->runForward();
-          Serial.print("returncode=");
-          Serial.println(res);
-        } else if (strcmp(in_buffer, "b") == 0) {
-          Serial.println("run backward");
-          int res = stepper_selected->runBackward();
-          Serial.print("returncode=");
-          Serial.println(res);
-        } else if (strcmp(in_buffer, "X") == 0) {
-          Serial.println("Immediate Stop");
-          stepper_selected->forceStopAndNewPosition(0);
-        } else if (strcmp(in_buffer, "U") == 0) {
-          Serial.println("Update speed/acceleration");
-          stepper_selected->applySpeedAcceleration();
-        } else if (strcmp(in_buffer, "W") == 0) {
-          Serial.println("Blocking wait for running stepper to stop");
-          if (!stepper_selected->isRunningContinuously()) {
-            // Wait for stepper stop
-            while (stepper_selected->isRunning()) {
-              // do nothing
+        if (!test_mode) {
+          if (sscanf(in_buffer, "A%ld", &val) == 1) {
+            Serial.print("Set acceleration to ");
+            Serial.println(val);
+            stepper_selected->setAcceleration(val);
+          } else if (sscanf(in_buffer, "V%ld", &val) == 1) {
+            Serial.print("Set speed (us) to ");
+            Serial.println(val);
+            stepper_selected->setSpeed(val);
+          } else if (sscanf(in_buffer, "R%ld", &val) == 1) {
+            Serial.print("Move steps ");
+            Serial.println(val);
+            int res = stepper_selected->move(val);
+            Serial.print("returncode=");
+            Serial.println(res);
+          } else if (sscanf(in_buffer, "P%ld", &val) == 1) {
+            Serial.print("Move to position ");
+            Serial.println(val);
+            int res = stepper_selected->moveTo(val);
+            Serial.print("returncode=");
+            Serial.println(res);
+          } else if (sscanf(in_buffer, "@%ld", &val) == 1) {
+            Serial.print("Set position ");
+            Serial.println(val);
+            stepper_selected->setCurrentPosition(val);
+          } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
+            Serial.print("Set enable time to ");
+            Serial.println(val);
+            int res = stepper_selected->setDelayToEnable(val);
+            Serial.print("returncode=");
+            Serial.println(res);
+          } else if (sscanf(in_buffer, "D%ld", &val) == 1) {
+            Serial.print("Set disable time to ");
+            Serial.println(val);
+            stepper_selected->setDelayToDisable(val);
+          } else if (strcmp(in_buffer, "N") == 0) {
+            Serial.println("Output driver on");
+            stepper_selected->setAutoEnable(false);
+            stepper_selected->enableOutputs();
+          } else if (strcmp(in_buffer, "F") == 0) {
+            Serial.println("Output driver off");
+            stepper_selected->setAutoEnable(false);
+            stepper_selected->disableOutputs();
+          } else if (strcmp(in_buffer, "O") == 0) {
+            Serial.println("Output driver off");
+            stepper_selected->setAutoEnable(true);
+          } else if (strcmp(in_buffer, "S") == 0) {
+            Serial.println("Stop");
+            stepper_selected->stopMove();
+          } else if (strcmp(in_buffer, "K") == 0) {
+            Serial.println("Keep running");
+            stepper_selected->keepRunning();
+          } else if (strcmp(in_buffer, "f") == 0) {
+            Serial.println("run forward");
+            int res = stepper_selected->runForward();
+            Serial.print("returncode=");
+            Serial.println(res);
+          } else if (strcmp(in_buffer, "b") == 0) {
+            Serial.println("run backward");
+            int res = stepper_selected->runBackward();
+            Serial.print("returncode=");
+            Serial.println(res);
+          } else if (strcmp(in_buffer, "X") == 0) {
+            Serial.println("Immediate Stop");
+            stepper_selected->forceStopAndNewPosition(0);
+          } else if (strcmp(in_buffer, "U") == 0) {
+            Serial.println("Update speed/acceleration");
+            stepper_selected->applySpeedAcceleration();
+          } else if (strcmp(in_buffer, "W") == 0) {
+            Serial.println("Blocking wait for running stepper to stop");
+            if (!stepper_selected->isRunningContinuously()) {
+              // Wait for stepper stop
+              while (stepper_selected->isRunning()) {
+                // do nothing
+              }
+            }
+          } else if (strcmp(in_buffer, "T") == 0) {
+            if (!stepper_selected->isRunning()) {
+              Serial.println("Test direct drive");
+              test_direct_drive(&stepper_config[selected]);
+            }
+          } else if (strcmp(in_buffer, "+") == 0) {
+            if (!stepper_selected->isRunning()) {
+              stepper_selected->forwardStep(true);
+              Serial.println("Stepped forward");
             }
           }
-        } else if (strcmp(in_buffer, "I") == 0) {
-          Serial.println("Toggle motor info");
-          verbose = !verbose;
-        } else if (strcmp(in_buffer, "Q") == 0) {
-          Serial.println("Toggle usage info");
-          usage_info = !usage_info;
-        } else if (strcmp(in_buffer, "?") == 0) {
-          usage();
-        } else if (strcmp(in_buffer, "T") == 0) {
-          if (!stepper_selected->isRunning()) {
-            Serial.println("Test direct drive");
-            test_direct_drive(&stepper_config[selected]);
-          }
-        } else if (strcmp(in_buffer, "+") == 0) {
-          if (!stepper_selected->isRunning()) {
-            stepper_selected->forwardStep(true);
-            Serial.println("Stepped forward");
+        } else {
+          if (strcmp(in_buffer, "R") == 0) {
+            Serial.println("Run tests");
+            test_ongoing = true;
+          } else if (strcmp(in_buffer, "01") == 0) {
+            Serial.println("Select test_seq_01");
+            test_seq[selected].test = test_seq_01;
+            test_seq[selected].state = 0;
+          } else if (strcmp(in_buffer, "02") == 0) {
+            Serial.println("Select test_seq_02");
+            test_seq[selected].test = test_seq_01;
+            test_seq[selected].state = 0;
           }
         }
       }
@@ -478,26 +530,42 @@ void loop() {
     }
   }
 
-  bool running = false;
-  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    if (stepper[i]) {
-      running |= stepper[i]->isRunning();
-    }
-  }
-  if (running) {
-    uint32_t now = millis();
-    if (now - last_time >= 100) {
-      if (verbose) {
-        output_info();
+  if (test_mode) {
+    if (test_ongoing) {
+      bool finished = true;
+      uint32_t ms = millis();
+      for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+        if (test_seq[i].test != NULL) {
+          finished &= test_seq[i].test(stepper[i], &test_seq[i], ms);
+        }
       }
-      last_time = now;
+      if (finished) {
+        test_ongoing = false;
+        Serial.println("finished");
+      }
     }
-  }
-  if (!stopped && !running) {
-    output_info();
-    if (usage_info) {
-      usage();
+  } else {
+    bool running = false;
+    for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+      if (stepper[i]) {
+        running |= stepper[i]->isRunning();
+      }
     }
+    if (running) {
+      uint32_t now = millis();
+      if (now - last_time >= 100) {
+        if (verbose) {
+          output_info();
+        }
+        last_time = now;
+      }
+    }
+    if (!stopped && !running) {
+      output_info();
+      if (usage_info) {
+        usage();
+      }
+    }
+    stopped = !running;
   }
-  stopped = !running;
 }

@@ -30,7 +30,8 @@ do
 	cd src
 	ln -s ../../../src/*.cpp .
 	ln -s ../../../src/*.h .
-	ln -s ../../../examples/$i/*.ino .
+	FILES=`cd ../../../examples/$i;find . -type f`
+	for f in $FILES;do ln -s ../../../examples/$i/$f .;done
 	cd ../../..
 done
 
