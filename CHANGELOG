@@ -1,4 +1,4 @@
-pre 0.12.2:
+0.12.2:
 - StepperDemo modification:
     - Enable direct drive feature in StepperDemo for esp32
     - While direct driving, check if the signals can be applied
