@@ -147,8 +147,8 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
   if (enableLow != PIN_UNDEFINED) {
     digitalWrite(enableLow, HIGH);
     delayMicroseconds(10);
-    if (digitalRead(enableLow) != LOW) {
-      Serial.println("Cannot set enable low pin to LOW");
+    if (digitalRead(enableLow) != HIGH) {
+      Serial.println("Cannot set enable low pin to HIGH");
     }
   }
   if (enableHigh != PIN_UNDEFINED) {
