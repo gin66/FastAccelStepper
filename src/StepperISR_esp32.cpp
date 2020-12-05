@@ -19,6 +19,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM0A,
       pcnt_unit : PCNT_UNIT_0,
       input_sig_index : PCNT_SIG_CH0_IN0_IDX,
+      ctrl_sig_index : PCNT_CTRL_CH0_IN0_IDX,
       timer_tez_int_clr : MCPWM_TIMER0_TEZ_INT_CLR,
       timer_tez_int_ena : MCPWM_TIMER0_TEZ_INT_ENA
     },
@@ -28,6 +29,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM1A,
       pcnt_unit : PCNT_UNIT_1,
       input_sig_index : PCNT_SIG_CH0_IN1_IDX,
+      ctrl_sig_index : PCNT_CTRL_CH0_IN1_IDX,
       timer_tez_int_clr : MCPWM_TIMER1_TEZ_INT_CLR,
       timer_tez_int_ena : MCPWM_TIMER1_TEZ_INT_ENA
     },
@@ -37,6 +39,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM2A,
       pcnt_unit : PCNT_UNIT_2,
       input_sig_index : PCNT_SIG_CH0_IN2_IDX,
+      ctrl_sig_index : PCNT_CTRL_CH0_IN2_IDX,
       timer_tez_int_clr : MCPWM_TIMER2_TEZ_INT_CLR,
       timer_tez_int_ena : MCPWM_TIMER2_TEZ_INT_ENA
     },
@@ -46,6 +49,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM0A,
       pcnt_unit : PCNT_UNIT_3,
       input_sig_index : PCNT_SIG_CH0_IN3_IDX,
+      ctrl_sig_index : PCNT_CTRL_CH0_IN3_IDX,
       timer_tez_int_clr : MCPWM_TIMER0_TEZ_INT_CLR,
       timer_tez_int_ena : MCPWM_TIMER0_TEZ_INT_ENA
     },
@@ -55,6 +59,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM1A,
       pcnt_unit : PCNT_UNIT_4,
       input_sig_index : PCNT_SIG_CH0_IN4_IDX,
+      ctrl_sig_index : PCNT_CTRL_CH0_IN4_IDX,
       timer_tez_int_clr : MCPWM_TIMER1_TEZ_INT_CLR,
       timer_tez_int_ena : MCPWM_TIMER1_TEZ_INT_ENA
     },
@@ -64,6 +69,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM2A,
       pcnt_unit : PCNT_UNIT_5,
       input_sig_index : PCNT_SIG_CH0_IN5_IDX,
+      ctrl_sig_index : PCNT_CTRL_CH0_IN5_IDX,
       timer_tez_int_clr : MCPWM_TIMER2_TEZ_INT_CLR,
       timer_tez_int_ena : MCPWM_TIMER2_TEZ_INT_ENA
     },

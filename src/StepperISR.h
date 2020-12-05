@@ -55,7 +55,8 @@ struct mapping_s {
   uint8_t timer;
   mcpwm_io_signals_t pwm_output_pin;
   pcnt_unit_t pcnt_unit;
-  int input_sig_index;
+  uint8_t input_sig_index;
+  uint8_t ctrl_sig_index;
   uint32_t timer_tez_int_clr;
   uint32_t timer_tez_int_ena;
 };
