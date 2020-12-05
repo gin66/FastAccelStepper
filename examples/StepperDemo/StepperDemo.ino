@@ -252,7 +252,7 @@ const static char usage_str[] PROGMEM =
     "deadlock if the motor will never stop)\n"
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_AVR)
     "     T         ... Test selected motor with direct port access\n"
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
