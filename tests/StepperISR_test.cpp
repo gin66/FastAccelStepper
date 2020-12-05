@@ -13,3 +13,7 @@ void StepperQueue::startQueue() {
 }
 void StepperQueue::forceStop() {
 }
+void StepperQueue::connect() {
+}
+void StepperQueue::disconnect() {
+}

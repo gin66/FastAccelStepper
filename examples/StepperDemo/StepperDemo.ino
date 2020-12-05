@@ -1,7 +1,7 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
-#define VERSION "post-394ce65"
+#define VERSION "post-678ee20"
 
 struct stepper_config_s {
   uint8_t step;
@@ -84,7 +84,8 @@ struct test_seq_s test_seq[MAX_STEPPER] = {
 #endif
     {.test = NULL}, {.test = NULL}};
 
-void test_direct_drive(FastAccelStepper *_stepper, const struct stepper_config_s *stepper) {
+void test_direct_drive(FastAccelStepper *_stepper,
+                       const struct stepper_config_s *stepper) {
   // Check stepper motor+driver is operational
   // This is not done via FastAccelStepper-Library for test purpose only
   uint8_t step = stepper->step;

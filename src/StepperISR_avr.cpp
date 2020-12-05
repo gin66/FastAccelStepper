@@ -120,8 +120,6 @@ void StepperQueue::forceStop() {
   // empty the queue
   read_idx = next_write_idx;
 }
-void StepperQueue::connect() {
-}
-void StepperQueue::disconnect() {
-}
+void StepperQueue::connect() {}
+void StepperQueue::disconnect() {}
 #endif
