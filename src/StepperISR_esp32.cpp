@@ -113,10 +113,6 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     q->isRunning = false;
     q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
-    // Disconnect
-    //   do not use disconnect(), because then IRAM_ATTR would be needed on that
-    //   routine
-    gpio_matrix_out(q->_step_pin, 0x100, false, false);
   }
 }
 
@@ -209,7 +205,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->channel[timer].carrier_cfg.val = 0;  // carrier disabled
 
   // at last link mcpwm to output pin and back into pcnt input
-  // This will be done in startQueue()
+  connect();
 }
 
 void StepperQueue::connect() {
@@ -247,8 +243,6 @@ void StepperQueue::startQueue() {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 
-  connect();
-
   // timer should be either at TEP or at zero
   mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
   mcpwm->timer[timer].period.upmethod = 0;      // 0 = immediate update, 1 = TEZ
@@ -275,6 +269,5 @@ void StepperQueue::forceStop() {
   mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
   isRunning = false;
   queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
-  disconnect();
 }
 #endif

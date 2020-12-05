@@ -84,7 +84,7 @@ struct test_seq_s test_seq[MAX_STEPPER] = {
 #endif
     {.test = NULL}, {.test = NULL}};
 
-void test_direct_drive(const struct stepper_config_s *stepper) {
+void test_direct_drive(FastAccelStepper *_stepper, const struct stepper_config_s *stepper) {
   // Check stepper motor+driver is operational
   // This is not done via FastAccelStepper-Library for test purpose only
   uint8_t step = stepper->step;
@@ -92,6 +92,8 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
   uint8_t enableHigh = stepper->enable_high_active;
   uint8_t direction = stepper->direction;
   bool direction_high_count_up = stepper->direction_high_count_up;
+
+  _stepper->detachFromPin();
 
   pinMode(step, OUTPUT);
 
@@ -167,6 +169,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
       Serial.println("Cannot set enable high pin to LOW");
     }
   }
+  _stepper->reAttachToPin();
   // Done
 }
 
@@ -503,7 +506,7 @@ void loop() {
           } else if (strcmp(in_buffer, "T") == 0) {
             if (!stepper_selected->isRunning()) {
               Serial.println("Test direct drive");
-              test_direct_drive(&stepper_config[selected]);
+              test_direct_drive(stepper_selected, &stepper_config[selected]);
             }
           } else if (strcmp(in_buffer, "+") == 0) {
             if (!stepper_selected->isRunning()) {

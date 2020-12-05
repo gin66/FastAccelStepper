@@ -603,6 +603,12 @@ void FastAccelStepper::backwardStep(bool blocking) {
     }
   }
 }
+void FastAccelStepper::detachFromPin() {
+  fas_queue[_queue_num].disconnect();
+}
+void FastAccelStepper::reAttachToPin() {
+  fas_queue[_queue_num].connect();
+}
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
 uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }
 #endif

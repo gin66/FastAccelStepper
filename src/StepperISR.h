@@ -207,9 +207,9 @@ class StepperQueue {
   }
 #if defined(ARDUINO_ARCH_ESP32)
   uint8_t _step_pin;
+#endif
   void connect();
   void disconnect();
-#endif
 };
 
 extern StepperQueue fas_queue[NUM_QUEUES];

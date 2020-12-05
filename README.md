@@ -175,7 +175,6 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 ## ISSUES
 
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
-* StepperDemo: Test sequence 02/03/04 indicates existing problem in esp32 code
 
 ## Lessons Learned
 

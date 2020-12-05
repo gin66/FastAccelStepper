@@ -231,6 +231,8 @@ class FastAccelStepper {
   bool needAutoDisable();
   bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
+  void detachFromPin();
+  void reAttachToPin();
 
  private:
   RampGenerator rg;
