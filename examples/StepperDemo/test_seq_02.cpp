@@ -4,33 +4,36 @@
 
 bool test_seq_02(FastAccelStepper *stepper, struct test_seq_s *seq, uint32_t time_ms) {
 	int32_t steps = seq->u32_1;
-	switch (seq->state & 15) {
+	switch (seq->state) {
 		case 0: // INIT
 			stepper->setSpeed(30);
-			stepper->setAcceleration(1000000);
+			stepper->setAcceleration(1000);
 			seq->u32_1 = 1;
 			seq->state++;
 			break;
 		case 1:
-		case 5:
 			// Turn 
 			stepper->move(steps);
-			seq->state = 2;
+			seq->state++;
 			break;
 		case 3:
 			// Turn back
 			stepper->move(-steps);
-			seq->u32_1 += 5;
 			seq->state++;
 			break;
 		case 2:
 		case 4:
 			if (!stepper->isRunning()) {
-				if (seq->u32_1 >= 3200) {
+			    seq->state++;
+			}
+			break;
+		case 5:
+				if (seq->u32_1 >= 6400) {
 				return true; // finished
 				}
-			}
-			seq->state++;
+			seq->u32_1++;
+			seq->u32_1 += seq->u32_1 >> 2;
+			seq->state = 1;
 			break;
 	}
 	return false;

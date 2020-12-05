@@ -1,7 +1,7 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
-#define VERSION "post-e74a8c2"
+#define VERSION "post-394ce65"
 
 struct stepper_config_s {
   uint8_t step;
@@ -315,6 +315,8 @@ const static char test_usage_str[] PROGMEM =
     "     M1/M2/..  ... to select stepper\n"
     "     R         ... start all selected tests\n"
     "     01        ... select test sequence 01 for selected stepper\n"
+    "     :\n"
+    "     04        ... select test sequence 04 for selected stepper\n"
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
 #endif
@@ -521,6 +523,14 @@ void loop() {
             Serial.println("Select test_seq_02");
             test_seq[selected].test = test_seq_02;
             test_seq[selected].state = 0;
+          } else if (strcmp(in_buffer, "03") == 0) {
+            Serial.println("Select test_seq_03");
+            test_seq[selected].test = test_seq_03;
+            test_seq[selected].state = 0;
+          } else if (strcmp(in_buffer, "04") == 0) {
+            Serial.println("Select test_seq_04");
+            test_seq[selected].test = test_seq_04;
+            test_seq[selected].state = 0;
           }
         }
       }
@@ -542,6 +552,7 @@ void loop() {
       if (finished) {
         test_ongoing = false;
         Serial.println("finished");
+        stepper_info();
       }
     }
   } else {
