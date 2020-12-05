@@ -519,7 +519,7 @@ void loop() {
             test_seq[selected].state = 0;
           } else if (strcmp(in_buffer, "02") == 0) {
             Serial.println("Select test_seq_02");
-            test_seq[selected].test = test_seq_01;
+            test_seq[selected].test = test_seq_02;
             test_seq[selected].state = 0;
           }
         }
