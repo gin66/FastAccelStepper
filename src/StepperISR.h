@@ -43,6 +43,7 @@
 #define TICKS_FOR_STOPPED_MOTOR 0xffffffff
 
 #if defined(ARDUINO_ARCH_ESP32)
+#include <driver/gpio.h>
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
 #include <soc/mcpwm_reg.h>
@@ -204,6 +205,11 @@ class StepperQueue {
     checksum = 0;
 #endif
   }
+#if defined(ARDUINO_ARCH_ESP32)
+  uint8_t _step_pin;
+  void connect();
+  void disconnect();
+#endif
 };
 
 extern StepperQueue fas_queue[NUM_QUEUES];

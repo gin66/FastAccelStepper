@@ -1,6 +1,7 @@
 pre 0.12.2:
 - StepperDemo modification:
-    - Write in usage about direct drive for avr, and not esp32
+    - Enable direct drive feature in StepperDemo for esp32
+    - While direct driving, check if the signals can be applied
 
 0.12.1:
 - implement runForward()/runBackward()

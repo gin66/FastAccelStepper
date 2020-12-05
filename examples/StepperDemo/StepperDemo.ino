@@ -1,6 +1,6 @@
 #include "FastAccelStepper.h"
 
-#define VERSION "post-46e1937"
+#define VERSION "post-c9d0c2d"
 
 struct stepper_config_s {
   uint8_t step;
@@ -85,38 +85,78 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
   bool direction_high_count_up = stepper->direction_high_count_up;
 
   pinMode(step, OUTPUT);
+
   if (enableLow != PIN_UNDEFINED) {
     digitalWrite(enableLow, LOW);
     pinMode(enableLow, OUTPUT);
+    delayMicroseconds(10);
+    if (digitalRead(enableLow) != LOW) {
+      Serial.println("Cannot set enable low pin to LOW");
+    }
   }
   if (enableHigh != PIN_UNDEFINED) {
     digitalWrite(enableHigh, HIGH);
     pinMode(enableHigh, OUTPUT);
+    delayMicroseconds(10);
+    if (digitalRead(enableHigh) != HIGH) {
+      Serial.println("Cannot set enable high pin to HIGH");
+    }
   }
   if (direction != PIN_UNDEFINED) {
     digitalWrite(direction, direction_high_count_up);
     pinMode(direction, OUTPUT);
+    delayMicroseconds(10);
+    if (digitalRead(direction) != direction_high_count_up) {
+      Serial.print("Cannot set direction pin to ");
+      Serial.println(direction_high_count_up ? "HIGH" : "LOW");
+    }
   }
   for (uint16_t i = 0; i < 3200; i++) {
     digitalWrite(step, HIGH);
     delayMicroseconds(10);
+    if (digitalRead(step) != HIGH) {
+      Serial.println("Cannot set step output to HIGH");
+    }
     digitalWrite(step, LOW);
     delayMicroseconds(190);
+    if (digitalRead(step) != LOW) {
+      Serial.println("Cannot set step output to LOW");
+    }
   }
   if (direction != PIN_UNDEFINED) {
     digitalWrite(direction, !direction_high_count_up);
+    delayMicroseconds(10);
+    delayMicroseconds(10);
+    if (digitalRead(direction) != !direction_high_count_up) {
+      Serial.print("Cannot set direction pin to ");
+      Serial.println(!direction_high_count_up ? "HIGH" : "LOW");
+    }
   }
   for (uint16_t i = 0; i < 3200; i++) {
     digitalWrite(step, HIGH);
     delayMicroseconds(10);
+    if (digitalRead(step) != HIGH) {
+      Serial.println("Cannot set step output to HIGH");
+    }
     digitalWrite(step, LOW);
     delayMicroseconds(190);
+    if (digitalRead(step) != LOW) {
+      Serial.println("Cannot set step output to LOW");
+    }
   }
   if (enableLow != PIN_UNDEFINED) {
     digitalWrite(enableLow, HIGH);
+    delayMicroseconds(10);
+    if (digitalRead(enableLow) != LOW) {
+      Serial.println("Cannot set enable low pin to LOW");
+    }
   }
   if (enableHigh != PIN_UNDEFINED) {
     digitalWrite(enableHigh, LOW);
+    delayMicroseconds(10);
+    if (digitalRead(enableHigh) != LOW) {
+      Serial.println("Cannot set enable high pin to LOW");
+    }
   }
   // Done
 }
@@ -252,9 +292,7 @@ const static char usage_str[] PROGMEM =
     "deadlock if the motor will never stop)\n"
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
-#if defined(ARDUINO_ARCH_AVR)
     "     T         ... Test selected motor with direct port access\n"
-#endif
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
 #endif
@@ -422,16 +460,12 @@ void loop() {
           usage_info = !usage_info;
         } else if (strcmp(in_buffer, "?") == 0) {
           usage();
-        }
-#if defined(ARDUINO_ARCH_AVR)
-        else if (strcmp(in_buffer, "T") == 0) {
+        } else if (strcmp(in_buffer, "T") == 0) {
           if (!stepper_selected->isRunning()) {
             Serial.println("Test direct drive");
             test_direct_drive(&stepper_config[selected]);
           }
-        }
-#endif
-        else if (strcmp(in_buffer, "+") == 0) {
+        } else if (strcmp(in_buffer, "+") == 0) {
           if (!stepper_selected->isRunning()) {
             stepper_selected->forwardStep(true);
             Serial.println("Stepped forward");

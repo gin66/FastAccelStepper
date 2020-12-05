@@ -113,6 +113,9 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
     q->isRunning = false;
     q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
+    // Disconnect
+	//   do not use disconnect(), because then IRAM_ATTR would be needed on that routine
+    gpio_matrix_out(q->_step_pin, 0x100, false, false);
   }
 }
 
@@ -137,6 +140,7 @@ static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _initVars();
+  _step_pin = step_pin;
 
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
@@ -149,8 +153,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   uint8_t timer = mapping->timer;
 
   pcnt_config_t cfg;
-  cfg.pulse_gpio_num = step_pin;
-  cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
+  // if step_pin is not set here (or 0x30), then it does not work
+  cfg.pulse_gpio_num = step_pin;          // static 0 is 0x30, static 1 is 0x38
+  cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;  // static 0 is 0x30, static 1 is 0x38
   cfg.lctrl_mode = PCNT_MODE_KEEP;
   cfg.hctrl_mode = PCNT_MODE_KEEP;
   cfg.pos_mode = PCNT_COUNT_INC;
@@ -170,8 +175,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     pcnt_isr_service_install(ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM);
   }
   pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void *)this);
-
-  mcpwm_gpio_init(mcpwm_unit, mapping->pwm_output_pin, step_pin);
 
   if (timer == 0) {
     // Init mcwpm module for use
@@ -204,9 +207,23 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->channel[timer].db_cfg.val = 0;
   mcpwm->channel[timer].carrier_cfg.val = 0;  // carrier disabled
 
-  // at last link the output to pcnt input
-  int input_sig_index = mapping->input_sig_index;
-  gpio_iomux_in(step_pin, input_sig_index);
+  // at last link mcpwm to output pin and back into pcnt input
+  // This will be done in startQueue()
+}
+
+void StepperQueue::connect() {
+  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
+  mcpwm_gpio_init(mcpwm_unit, mapping->pwm_output_pin, _step_pin);
+  // Doesn't work with gpio_matrix_in
+  //  gpio_matrix_in(step_pin, mapping->input_sig_index, false);
+  gpio_iomux_in(_step_pin, mapping->input_sig_index);
+}
+
+void StepperQueue::disconnect() {
+  // sig_index = 0x100 => cancel output
+  gpio_matrix_out(_step_pin, 0x100, false, false);
+  // untested alternative:
+  //	gpio_reset_pin((gpio_num_t)q->step_pin);
 }
 
 // Mechanism is like this, starting from stopped motor:
@@ -228,6 +245,8 @@ void StepperQueue::startQueue() {
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
+
+  connect();
 
   // timer should be either at TEP or at zero
   mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
@@ -255,5 +274,6 @@ void StepperQueue::forceStop() {
   mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
   isRunning = false;
   queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
+  disconnect();
 }
 #endif
