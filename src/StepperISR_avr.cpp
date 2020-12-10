@@ -20,22 +20,21 @@
 // T is the timer module number 0,1,2,3...
 // X is the Channel name A or B
 #define Stepper_Toggle(T, X) \
-  TCCR##T##A = (TCCR##T##A | _BV(COM##T####X##0)) & ~_BV(COM##T####X##1)
+  TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
 #define Stepper_Zero(T, X) \
-  TCCR##T##A = (TCCR##T##A | _BV(COM##T####X##1)) & ~_BV(COM##T####X##0)
+  TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##1)) & ~_BV(COM##T##X##0)
 #define Stepper_Disconnect(T, X) \
-  TCCR##T##A = (TCCR##T##A & ~(_BV(COM##T####X##1) | _BV(COM##T####X##0)))
-#define Stepper_IsToggling(T, X)                                 \
-  ((TCCR##T##A & (_BV(COM##T####X##0) | _BV(COM##T####X##1))) == \
-   _BV(COM##T####X##0))
+  TCCR##T##A = (TCCR##T##A & ~(_BV(COM##T##X##1) | _BV(COM##T##X##0)))
+#define Stepper_IsToggling(T, X) \
+  ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == _BV(COM##T##X##0))
 #define Stepper_IsDisconnected(T, X) \
-  ((TCCR##T##A & (_BV(COM##T####X##0) | _BV(COM##T####X##1))) == 0)
+  ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
 
 #define ForceCompare(T, X) TCCR##T##C = _BV(FOC##T##X)
-#define DisableCompareInterrupt(T, X) TIMSK##T &= ~_BV(OCIE##T####X)
-#define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE##T####X)
-#define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF##T####X)
-#define SetTimerCompareRelative(T, X, D) OCR##T####X = TCNT##T + D
+#define DisableCompareInterrupt(T, X) TIMSK##T &= ~_BV(OCIE##T##X)
+#define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE##T##X)
+#define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF##T##X)
+#define SetTimerCompareRelative(T, X, D) OCR##T##X = TCNT##T + D
 
 #define ConfigureTimer(T)                                                 \
   {                                                                       \
