@@ -92,11 +92,11 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
   if (step_pin == stepPinStepperA) {
-    isChannelA = true;
+    channel = channelA;
     AVR_INIT(TIMER_MODULE, A)
   }
   if (step_pin == stepPinStepperB) {
-    isChannelA = false;
+    channel = channelB;
     AVR_INIT(TIMER_MODULE, B)
   }
 }
@@ -183,10 +183,13 @@ AVR_CYCLIC_ISR_GEN(TIMER_MODULE)
 
 void StepperQueue::startQueue() {
   isRunning = true;
-  if (isChannelA) {
-    AVR_START_QUEUE(TIMER_MODULE, A)
-  } else {
-    AVR_START_QUEUE(TIMER_MODULE, B)
+  switch (channel) {
+    case channelA:
+      AVR_START_QUEUE(TIMER_MODULE, A)
+      break;
+    case channelB:
+      AVR_START_QUEUE(TIMER_MODULE, B)
+      break;
   }
 }
 
@@ -200,10 +203,13 @@ void StepperQueue::startQueue() {
     ForceCompare(T, CHANNEL);                \
   }
 void StepperQueue::forceStop() {
-  if (isChannelA) {
-    FORCE_STOP(TIMER_MODULE, A)
-  } else {
-    FORCE_STOP(TIMER_MODULE, B)
+  switch (channel) {
+    case channelA:
+      FORCE_STOP(TIMER_MODULE, A)
+      break;
+    case channelB:
+      FORCE_STOP(TIMER_MODULE, B)
+      break;
   }
   isRunning = false;
   queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;

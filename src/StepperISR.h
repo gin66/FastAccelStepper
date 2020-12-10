@@ -73,7 +73,7 @@ class StepperQueue {
   const struct mapping_s* mapping;
 #endif
 #if defined(ARDUINO_ARCH_AVR)
-  bool isChannelA;
+  enum { channelA, channelB } channel;
   // This is used in the timer compare unit as extension of the 16 timer
 #endif
   uint16_t ticks;
