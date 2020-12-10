@@ -241,14 +241,14 @@ void StepperQueue::connect() {}
 void StepperQueue::disconnect() {}
 bool StepperQueue::isValidStepPin(uint8_t step_pin) {
   if (step_pin == stepPinStepperA) {
-	  return true;
+    return true;
   }
   if (step_pin == stepPinStepperB) {
-	  return true;
+    return true;
   }
 #ifdef stepPinStepperC
   if (step_pin == stepPinStepperC) {
-	  return true;
+    return true;
   }
 #endif
   return false;
@@ -256,14 +256,14 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
   if (step_pin == stepPinStepperA) {
-	  return 0;
+    return 0;
   }
   if (step_pin == stepPinStepperB) {
-	  return 1;
+    return 1;
   }
 #ifdef stepPinStepperC
   if (step_pin == stepPinStepperC) {
-	  return 2;
+    return 2;
   }
 #endif
   return -1;

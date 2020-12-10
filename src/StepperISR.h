@@ -8,7 +8,7 @@
 
 // Here are the global variables to interface with the interrupts
 #if __has_include("fas_config.h")
-# include "fas_config.h"
+#include "fas_config.h"
 #endif
 
 // CURRENT QUEUE IMPLEMENTATION WASTES ONE UNUSED ENTRY => BUG/TODO

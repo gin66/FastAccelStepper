@@ -1,3 +1,7 @@
+0.13.1:
+- try a mechanism to include application defined config file
+- StepperDemo: for avr move messages into program code to reduce RAM usage
+
 0.13.0:
 - Support ATmega2560 for three steppers linked to timer 4 (currently hardcoded)
 
