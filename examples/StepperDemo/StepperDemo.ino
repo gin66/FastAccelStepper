@@ -412,7 +412,7 @@ void output_msg(int8_t i) {
     }
   }
 #elif defined(ARDUINO_ARCH_ESP32)
-  char *p = messages;
+  const char *p = messages;
   while (i >= 0) {
     if (i == 0) {
       Serial.print(*p);
