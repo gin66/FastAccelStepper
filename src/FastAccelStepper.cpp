@@ -17,7 +17,7 @@
 static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 #if defined(ARDUINO_ARCH_AVR)
-#define DEBUG_LED_HALF_PERIOD (TICKS_PER_S/65536/2)
+#define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
 #elif defined(ARDUINO_ARCH_ESP32)
 #define DEBUG_LED_HALF_PERIOD 50
 #else
