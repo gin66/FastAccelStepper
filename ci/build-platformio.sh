@@ -51,7 +51,7 @@ cd ../../..
 set -e
 for i in pio_dirs/*
 do
-	for p in avr esp32 esp32_debug
+	for p in avr atmega2560 esp32 esp32_debug
 	do
 		echo $p: $i
 		(cd $i;pio run -s -e $p)
