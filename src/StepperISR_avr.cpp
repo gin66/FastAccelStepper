@@ -13,7 +13,6 @@
 // The ATmega328P has one 16 bit timer: Timer 1
 // The ATmega2560 has four 16 bit timers: Timer 1, 3, 4 and 5
 
-
 #if defined(ARDUINO_ARCH_AVR)
 // T is the timer module number 0,1,2,3...
 // X is the Channel name A or B
@@ -34,13 +33,16 @@
 #define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF##T####X)
 #define SetTimerCompareRelative(T, X, D) OCR##T####X = TCNT##T + D
 
-#define ConfigureTimer(T) { \
-  /* Set WGM13:0 to all zero => Normal mode */ \
-  TCCR##T##A &= ~(_BV(WGM##T##1) | _BV(WGM##T##0)); \
-  TCCR##T##B &= ~(_BV(WGM##T##3) | _BV(WGM##T##2)); \
-  /* Set prescaler to 1 */ \
-  TCCR##T##B = (TCCR##T##B & ~(_BV(CS##T##2) | _BV(CS##T##1) | _BV(CS##T##0))) | _BV(CS##T##0); \
-}
+#define ConfigureTimer(T)                                                 \
+  {                                                                       \
+    /* Set WGM13:0 to all zero => Normal mode */                          \
+    TCCR##T##A &= ~(_BV(WGM##T##1) | _BV(WGM##T##0));                     \
+    TCCR##T##B &= ~(_BV(WGM##T##3) | _BV(WGM##T##2));                     \
+    /* Set prescaler to 1 */                                              \
+    TCCR##T##B =                                                          \
+        (TCCR##T##B & ~(_BV(CS##T##2) | _BV(CS##T##1) | _BV(CS##T##0))) | \
+        _BV(CS##T##0);                                                    \
+  }
 #define EnableOverflowInterrupt(T) TIMSK##T |= _BV(TOIE##T)
 #define DisableOverflowInterrupt(T) TIMSK##T &= ~_BV(TOIE##T)
 
@@ -53,7 +55,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pinMode(step_pin, OUTPUT);
   if (step_pin == stepPinStepperA) {
     isChannelA = true;
-	// Disconnect stepper on next compare event
+    // Disconnect stepper on next compare event
     Stepper_Disconnect(1, A);
     // disable compare A interrupt
     DisableCompareInterrupt(1, A);
@@ -62,7 +64,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   }
   if (step_pin == stepPinStepperB) {
     isChannelA = false;
-	// Disconnect stepper on next compare event
+    // Disconnect stepper on next compare event
     Stepper_Disconnect(1, B);
     // disable compare B interrupt
     DisableCompareInterrupt(1, B);
@@ -71,7 +73,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   }
 }
 
-#define AVR_STEPPER_ISR(T,CHANNEL, queue, ocr, foc)                   \
+#define AVR_STEPPER_ISR(T, CHANNEL, queue, ocr, foc)                  \
   ISR(TIMER##T##_COMP##CHANNEL##_vect) {                              \
     uint8_t rp = queue.read_idx;                                      \
     if (Stepper_IsToggling(T, CHANNEL)) {                             \
@@ -118,22 +120,23 @@ AVR_STEPPER_ISR(1, A, fas_queue_A, OCR1A, FOC1A)
 AVR_STEPPER_ISR(1, B, fas_queue_B, OCR1B, FOC1B)
 
 // this is for cyclic task
-#define AVR_STEPPER_ISR(T) ISR(TIMER##T##_OVF_vect) {\
-  /* disable OVF interrupt to avoid nesting */\
-  DisableCompareInterrupt(T);\
-\
-  /* enable interrupts for nesting */\
-  interrupts();\
-\
-  /* manage steppers */\
-  fas_engine->manageSteppers();\
-\
-  /* disable interrupts for exist ISR routine */\
-  noInterrupts();\
-\
-  /* enable OVF interrupt again */\
-  EnableOverflowInterrupt(T);\
-}
+#define AVR_STEPPER_ISR(T)                         \
+  ISR(TIMER##T##_OVF_vect) {                       \
+    /* disable OVF interrupt to avoid nesting */   \
+    DisableCompareInterrupt(T);                    \
+                                                   \
+    /* enable interrupts for nesting */            \
+    interrupts();                                  \
+                                                   \
+    /* manage steppers */                          \
+    fas_engine->manageSteppers();                  \
+                                                   \
+    /* disable interrupts for exist ISR routine */ \
+    noInterrupts();                                \
+                                                   \
+    /* enable OVF interrupt again */               \
+    EnableOverflowInterrupt(T);                    \
+  }
 AVR_CYCLIC_ISR(1)
 
 void StepperQueue::startQueue() {
