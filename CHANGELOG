@@ -1,4 +1,4 @@
-pre 0.13.0:
+0.13.0:
 - Support ATmega2560 for three steppers linked to timer 4 (currently hardcoded)
 
 0.12.2:
