@@ -1,3 +1,6 @@
+pre 0.13.0:
+- Support ATmega2560 for three steppers linked to timer 4 (currently hardcoded)
+
 0.12.2:
 - StepperDemo modification:
     - Enable direct drive feature in StepperDemo for esp32

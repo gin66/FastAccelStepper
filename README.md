@@ -3,11 +3,12 @@
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg)
 ![Build examples](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg)
 
-This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (Atmega 328) and esp32.
+This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560) and esp32.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
-	- avr: This must be connected for stepper A to Pin 9 and for Stepper B to Pin 10.
+	- avr atmega328: only Pin 9 and Pin 10.
+	- avr atmega2560: only Pin 15, 16 and 17
 	- esp32: This can be any output capable port pin.
 	- Step should be done on transition Low to High. High time will be only a few us.
       On esp32 the high time is for slow speed fixed to ~2ms and high speed to 50% duty cycle
@@ -51,12 +52,20 @@ General behaviour:
 			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
 	- But 4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
 
-### AVR
+### AVR ATMega 328
 
 * allows up to 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
 * supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
 * Steppers' command queue depth: 16
+
+### AVR ATMega 2560
+
+* allows up to 25000 generated steps per second in dual stepper operation (depends on worst ISR routine in the system)
+* supports up to three stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
+* Steppers' command queue depth: 16
+* This device has four 16 bit timers, so extension up to 12 steppers should be possible (not implemented)
 
 ### ESP32
 
@@ -125,7 +134,7 @@ Few comments to auto enable/disable:
 
 ## Behind the curtains
 
-### AVR
+### AVR ATmega328
 
 The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This timer overflow interrupt is used for adjusting the speed. 
 
@@ -135,9 +144,13 @@ After stepper movement is completed, the timer compare unit is disconnected from
 
 Measurement of the acceleration/deacceleration aka timer overflow interrupt yields: one calculation round needs around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
 
+### AVR ATmega2560
+
+Similar to ATmega328,but instead of timer 1, timer 4 is used.
+
 ### ESP32
 
-This stepper driver use mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six. In addition, the pulse counter module is used starting from unit_0 to unit_5. This driver uses the pcnt_isr_service, so unallocated modules can still be used by the application.
+This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six. In addition, the pulse counter module is used starting from unit_0 to unit_5. This driver uses the pcnt_isr_service, so unallocated modules can still be used by the application.
 
 The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-modification.
 

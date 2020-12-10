@@ -16,10 +16,20 @@
 #define fas_queue_B fas_queue[1]
 #define QUEUE_LEN 16
 #elif defined(ARDUINO_ARCH_AVR)
+#if defined(__AVR_ATmega328P__)
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define QUEUE_LEN 16
+#elif defined(__AVR_ATmega2560__)
+#define NUM_QUEUES 3
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define fas_queue_C fas_queue[2]
+#define QUEUE_LEN 16
+#else
+#error "Unsupported derivate"
+#endif
 #elif defined(ARDUINO_ARCH_ESP32)
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
@@ -73,7 +83,7 @@ class StepperQueue {
   const struct mapping_s* mapping;
 #endif
 #if defined(ARDUINO_ARCH_AVR)
-  enum { channelA, channelB } channel;
+  enum { channelA, channelB, channelC } channel;
   // This is used in the timer compare unit as extension of the 16 timer
 #endif
   uint16_t ticks;

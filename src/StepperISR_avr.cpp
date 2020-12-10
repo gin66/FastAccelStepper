@@ -37,6 +37,7 @@
 #define TIMER_MODULE 4
 #define stepPinStepperA stepPinStepper4A
 #define stepPinStepperB stepPinStepper4B
+#define stepPinStepperC stepPinStepper4C
 #endif
 
 // T is the timer module number 0,1,2,3...
@@ -99,6 +100,12 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     channel = channelB;
     AVR_INIT(TIMER_MODULE, B)
   }
+#ifdef stepPinStepperC
+  if (step_pin == stepPinStepperC) {
+    channel = channelC;
+    AVR_INIT(TIMER_MODULE, C)
+  }
+#endif
 }
 
 #define AVR_STEPPER_ISR(T, CHANNEL)                                            \
@@ -147,6 +154,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 #define AVR_STEPPER_ISR_GEN(T, CHANNEL) AVR_STEPPER_ISR(T, CHANNEL)
 AVR_STEPPER_ISR_GEN(TIMER_MODULE, A)
 AVR_STEPPER_ISR_GEN(TIMER_MODULE, B)
+#ifdef stepPinStepperC
+AVR_STEPPER_ISR_GEN(TIMER_MODULE, C)
+#endif
 
 // this is for cyclic task
 #define AVR_CYCLIC_ISR(T)                          \
@@ -190,6 +200,11 @@ void StepperQueue::startQueue() {
     case channelB:
       AVR_START_QUEUE(TIMER_MODULE, B)
       break;
+#ifdef stepPinStepperC
+    case channelC:
+      AVR_START_QUEUE(TIMER_MODULE, C)
+      break;
+#endif
   }
 }
 
@@ -210,6 +225,11 @@ void StepperQueue::forceStop() {
     case channelB:
       FORCE_STOP(TIMER_MODULE, B)
       break;
+#ifdef stepPinStepperC
+    case channelC:
+      FORCE_STOP(TIMER_MODULE, C)
+      break;
+#endif
   }
   isRunning = false;
   queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
@@ -220,14 +240,32 @@ void StepperQueue::forceStop() {
 void StepperQueue::connect() {}
 void StepperQueue::disconnect() {}
 bool StepperQueue::isValidStepPin(uint8_t step_pin) {
-  return ((step_pin == stepPinStepperA) || (step_pin == stepPinStepperB));
+  if (step_pin == stepPinStepperA) {
+	  return true;
+  }
+  if (step_pin == stepPinStepperB) {
+	  return true;
+  }
+#ifdef stepPinStepperC
+  if (step_pin == stepPinStepperC) {
+	  return true;
+  }
+#endif
+  return false;
 }
 
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
   if (step_pin == stepPinStepperA) {
-    return 0;
-  } else {
-    return 1;
+	  return 0;
   }
+  if (step_pin == stepPinStepperB) {
+	  return 1;
+  }
+#ifdef stepPinStepperC
+  if (step_pin == stepPinStepperC) {
+	  return 2;
+  }
+#endif
+  return -1;
 }
 #endif
