@@ -44,6 +44,8 @@
 
 #define PIN_UNDEFINED 255
 
+class FastAccelStepperEngine;
+
 class FastAccelStepper {
  public:
   // This should be only called by FastAccelStepperEngine !
@@ -278,4 +280,6 @@ class FastAccelStepperEngine {
 
   bool _isValidStepPin(uint8_t step_pin);
 };
+
+extern FastAccelStepperEngine* fas_engine;
 #endif

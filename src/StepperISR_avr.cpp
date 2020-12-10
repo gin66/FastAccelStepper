@@ -33,6 +33,15 @@
 #define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE1##X)
 #define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF1##X)
 #define SetTimerCompareRelative(T, X, D) OCR##T####X = TCNT##T + D
+
+#define ConfigureTimer(T) { \
+  /* Set WGM13:0 to all zero => Normal mode */ \
+  TCCR##T##A &= ~(_BV(WGM##T##1) | _BV(WGM##T##0)); \
+  TCCR##T##B &= ~(_BV(WGM##T##3) | _BV(WGM##T##2)); \
+  /* Set prescaler to 1 */ \
+  TCCR##T##B = (TCCR##T##B & ~(_BV(CS##T##2) | _BV(CS##T##1) | _BV(CS##T##0))) | _BV(CS##T##0); \
+}
+
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
@@ -110,17 +119,19 @@ void StepperQueue::startQueue() {
   isRunning = true;
   if (isChannelA) {
     noInterrupts();
-    TIFR1 = _BV(OCF1A);
+    // Initialize timer for correct time base
+    ConfigureTimer(1);
     // clear interrupt flag
     ClearInterruptFlag(1, A);
     // enable compare A interrupt
     EnableCompareInterrupt(1, A);
-    OCR1A = TCNT1 + 40;
     // definite start point
     SetTimerCompareRelative(1, A, 40);
     interrupts();
   } else {
     noInterrupts();
+    // Initialize timer for correct time base
+    ConfigureTimer(1);
     // clear interrupt flag
     ClearInterruptFlag(1, B);
     // enable compare B interrupt
@@ -154,4 +165,21 @@ void StepperQueue::forceStop() {
 }
 void StepperQueue::connect() {}
 void StepperQueue::disconnect() {}
+
+ISR(TIMER1_OVF_vect) {
+  // disable OVF interrupt to avoid nesting
+  TIMSK1 &= ~_BV(TOIE1);
+
+  // enable interrupts for nesting
+  interrupts();
+
+  // manage steppers
+  fas_engine->manageSteppers();
+
+  // disable interrupts for exist ISR routine
+  noInterrupts();
+
+  // enable OVF interrupt again
+  TIMSK1 |= _BV(TOIE1);
+}
 #endif

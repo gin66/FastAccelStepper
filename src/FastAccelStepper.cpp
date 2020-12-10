@@ -26,7 +26,7 @@ static uint16_t fas_debug_led_cnt = 0;
 
 #if defined(ARDUINO_ARCH_AVR)
 // this is needed to give the background task isr access to engine
-static FastAccelStepperEngine* fas_engine = NULL;
+FastAccelStepperEngine* fas_engine = NULL;
 
 // dynamic allocation seems to not work so well on avr
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
@@ -68,20 +68,8 @@ void FastAccelStepperEngine::init() {
 #if defined(ARDUINO_ARCH_AVR)
   fas_engine = this;
 
-  // Initialize timer for stepper background task and correct time base
-  noInterrupts();
-
-  // Set WGM13:0 to all zero => Normal mode
-  TCCR1A &= ~(_BV(WGM11) | _BV(WGM10));
-  TCCR1B &= ~(_BV(WGM13) | _BV(WGM12));
-
-  // Set prescaler to 1
-  TCCR1B = (TCCR1B & ~(_BV(CS12) | _BV(CS11) | _BV(CS10))) | _BV(CS10);
-
   // enable OVF interrupt
   TIMSK1 |= _BV(TOIE1);
-
-  interrupts();
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #define STACK_SIZE 1000
@@ -341,25 +329,6 @@ void FastAccelStepper::fill_queue() {
     }
   }
 }
-
-#if defined(ARDUINO_ARCH_AVR)
-ISR(TIMER1_OVF_vect) {
-  // disable OVF interrupt to avoid nesting
-  TIMSK1 &= ~_BV(TOIE1);
-
-  // enable interrupts for nesting
-  interrupts();
-
-  // manage steppers
-  fas_engine->manageSteppers();
-
-  // disable interrupts for exist ISR routine
-  noInterrupts();
-
-  // enable OVF interrupt again
-  TIMSK1 |= _BV(TOIE1);
-}
-#endif
 
 bool FastAccelStepper::needAutoDisable() {
   bool need_disable = false;
