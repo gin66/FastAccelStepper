@@ -17,3 +17,5 @@ void StepperQueue::connect() {
 }
 void StepperQueue::disconnect() {
 }
+bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
+int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
