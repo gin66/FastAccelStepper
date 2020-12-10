@@ -176,6 +176,8 @@ AVR_CYCLIC_ISR_GEN(TIMER_MODULE)
     EnableCompareInterrupt(T, CHANNEL);          \
     /* definite start point */                   \
     SetTimerCompareRelative(T, CHANNEL, 40);     \
+    /* ensure cyclic interrupt is running */     \
+    EnableOverflowInterrupt(T);                  \
     interrupts();                                \
   }
 
