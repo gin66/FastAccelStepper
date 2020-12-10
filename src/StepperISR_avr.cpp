@@ -82,6 +82,10 @@ StepperQueue fas_queue[NUM_QUEUES];
     DisableCompareInterrupt(T, CHANNEL);           \
     /* force compare to ensure disconnect */       \
     ForceCompare(T, CHANNEL);                      \
+    /* Initialize timer for correct time base */\
+    ConfigureTimer(T);                           \
+    /* ensure cyclic interrupt is running */     \
+    EnableOverflowInterrupt(T);                 \
   }
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _initVars();
@@ -168,16 +172,12 @@ AVR_CYCLIC_ISR_GEN(TIMER_MODULE)
 #define AVR_START_QUEUE(T, CHANNEL)              \
   {                                              \
     noInterrupts();                              \
-    /* Initialize timer for correct time base */ \
-    ConfigureTimer(T);                           \
     /* clear interrupt flag */                   \
     ClearInterruptFlag(T, CHANNEL);              \
     /* enable compare A interrupt */             \
     EnableCompareInterrupt(T, CHANNEL);          \
     /* definite start point */                   \
     SetTimerCompareRelative(T, CHANNEL, 40);     \
-    /* ensure cyclic interrupt is running */     \
-    EnableOverflowInterrupt(T);                  \
     interrupts();                                \
   }
 
