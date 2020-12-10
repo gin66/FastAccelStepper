@@ -10,8 +10,11 @@
 #endif
 #endif
 
-#if defined(ARDUINO_ARCH_AVR)
+// The ATmega328P has one 16 bit timer: Timer 1
+// The ATmega2560 has four 16 bit timers: Timer 1, 3, 4 and 5
 
+
+#if defined(ARDUINO_ARCH_AVR)
 // T is the timer module number 0,1,2,3...
 // X is the Channel name A or B
 #define Stepper_Toggle(T, X) \
@@ -39,32 +42,30 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pinMode(step_pin, OUTPUT);
   if (step_pin == stepPinStepperA) {
     isChannelA = true;
-    noInterrupts();
+	// Disconnect stepper on next compare event
     Stepper_Disconnect(1, A);
-    // force compare to ensure disconnect
-    ForceCompare(1, A);
     // disable compare A interrupt
     DisableCompareInterrupt(1, A);
-    interrupts();
+    // force compare to ensure disconnect
+    ForceCompare(1, A);
   }
   if (step_pin == stepPinStepperB) {
     isChannelA = false;
-    noInterrupts();
+	// Disconnect stepper on next compare event
     Stepper_Disconnect(1, B);
-    // force compare to ensure disconnect
-    ForceCompare(1, B);
     // disable compare B interrupt
     DisableCompareInterrupt(1, B);
-    interrupts();
+    // force compare to ensure disconnect
+    ForceCompare(1, B);
   }
 }
 
-#define AVR_STEPPER_ISR(CHANNEL, queue, ocr, foc)                     \
-  ISR(TIMER1_COMP##CHANNEL##_vect) {                                  \
+#define AVR_STEPPER_ISR(T,CHANNEL, queue, ocr, foc)                   \
+  ISR(TIMER##T##_COMP##CHANNEL##_vect) {                              \
     uint8_t rp = queue.read_idx;                                      \
-    if (Stepper_IsToggling(1, CHANNEL)) {                             \
+    if (Stepper_IsToggling(T, CHANNEL)) {                             \
       /* Clear output bit by another toggle */                        \
-      ForceCompare(1, CHANNEL);                                       \
+      ForceCompare(T, CHANNEL);                                       \
       struct queue_entry* e = &queue.entry[rp & QUEUE_LEN_MASK];      \
       if (e->steps-- > 0) {                                           \
         /* perform another steps_dir with this queue entry */         \
@@ -73,17 +74,17 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       }                                                               \
       rp++;                                                           \
       queue.read_idx = rp;                                            \
-    } else if (!Stepper_IsDisconnected(1, CHANNEL)) {                 \
+    } else if (!Stepper_IsDisconnected(T, CHANNEL)) {                 \
       rp++;                                                           \
       queue.read_idx = rp;                                            \
     }                                                                 \
     if (rp == queue.next_write_idx) {                                 \
       /* queue is empty => set to disconnect */                       \
-      Stepper_Disconnect(1, CHANNEL);                                 \
+      Stepper_Disconnect(T, CHANNEL);                                 \
       /* disable compare interrupt */                                 \
-      DisableCompareInterrupt(1, CHANNEL);                            \
+      DisableCompareInterrupt(T, CHANNEL);                            \
       /* force compare to ensure disconnect */                        \
-      ForceCompare(1, CHANNEL);                                       \
+      ForceCompare(T, CHANNEL);                                       \
       queue.isRunning = false;                                        \
       queue.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;                \
       return;                                                         \
@@ -93,17 +94,17 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     ocr += (queue.ticks = e->ticks);                                  \
     /* assign to skip and test for not zero */                        \
     if (e->steps == 0) {                                              \
-      Stepper_Zero(1, CHANNEL);                                       \
+      Stepper_Zero(T, CHANNEL);                                       \
     } else {                                                          \
-      Stepper_Toggle(1, CHANNEL);                                     \
+      Stepper_Toggle(T, CHANNEL);                                     \
     }                                                                 \
     if (e->toggle_dir) {                                              \
       uint8_t dirPin = queue.dirPin;                                  \
       digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH); \
     }                                                                 \
   }
-AVR_STEPPER_ISR(A, fas_queue_A, OCR1A, FOC1A)
-AVR_STEPPER_ISR(B, fas_queue_B, OCR1B, FOC1B)
+AVR_STEPPER_ISR(1, A, fas_queue_A, OCR1A, FOC1A)
+AVR_STEPPER_ISR(1, B, fas_queue_B, OCR1B, FOC1B)
 
 void StepperQueue::startQueue() {
   isRunning = true;
