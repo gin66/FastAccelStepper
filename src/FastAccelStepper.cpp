@@ -67,9 +67,6 @@ void FastAccelStepperEngine::init() {
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   fas_engine = this;
-
-  // enable OVF interrupt
-  TIMSK1 |= _BV(TOIE1);
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #define STACK_SIZE 1000
