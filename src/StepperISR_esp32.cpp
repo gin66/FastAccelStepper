@@ -270,4 +270,6 @@ void StepperQueue::forceStop() {
   isRunning = false;
   queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 }
+bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
+int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 #endif

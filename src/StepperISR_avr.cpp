@@ -11,10 +11,32 @@
 
 // The ATmega328P has one 16 bit timer: Timer 1
 // The ATmega2560 has four 16 bit timers: Timer 1, 3, 4 and 5
+#if defined(ARDUINO_AVR_NANO)
+#define stepPinStepper1A 9  /* OC1A */
+#define stepPinStepper1B 10 /* OC1B */
+#elif defined(ARDUINO_AVR_ATmega2560)
+#define stepPinStepper1A 24 /* OC1A */
+#define stepPinStepper1B 25 /* OC1B */
+#define stepPinStepper1C 26 /* OC1B */
+#define stepPinStepper3A 5  /* OC3A */
+#define stepPinStepper3B 6  /* OC3B */
+#define stepPinStepper3C 7  /* OC3C */
+#define stepPinStepper4A 15 /* OC4A */
+#define stepPinStepper4B 16 /* OC4B */
+#define stepPinStepper4C 17 /* OC4C */
+#define stepPinStepper5A 38 /* OC5A */
+#define stepPinStepper5B 39 /* OC5B */
+#define stepPinStepper5C 40 /* OC5C */
+#endif
+
 #if defined(__AVR_ATmega328P__)
 #define TIMER_MODULE 1
+#define stepPinStepperA stepPinStepper1A
+#define stepPinStepperB stepPinStepper1B
 #elif defined(__AVR_ATmega2560__)
 #define TIMER_MODULE 4
+#define stepPinStepperA stepPinStepper4A
+#define stepPinStepperB stepPinStepper4B
 #endif
 
 // T is the timer module number 0,1,2,3...
@@ -189,5 +211,15 @@ void StepperQueue::forceStop() {
 }
 void StepperQueue::connect() {}
 void StepperQueue::disconnect() {}
+bool StepperQueue::isValidStepPin(uint8_t step_pin) {
+  return ((step_pin == stepPinStepperA) || (step_pin == stepPinStepperB));
+}
 
+int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
+  if (step_pin == stepPinStepperA) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
 #endif

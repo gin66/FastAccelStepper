@@ -76,13 +76,8 @@ void FastAccelStepperEngine::init() {
 }
 //*************************************************************************************************
 bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
-#if defined(ARDUINO_ARCH_AVR)
-  return ((step_pin == stepPinStepperA) || (step_pin == stepPinStepperB));
-#elif defined(ARDUINO_ARCH_ESP32)
-  return true;  // for now
-#else
-  return true;
-#endif
+  // ask just first queue entry....
+  return StepperQueue::isValidStepPin(step_pin);
 }
 //*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
@@ -99,21 +94,13 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (!_isValidStepPin(step_pin)) {
     return NULL;
   }
-  uint8_t fas_stepper_num = 0;
-#if defined(ARDUINO_ARCH_AVR)
-  // The stepper connection is hardcoded for AVR
-  if (step_pin == stepPinStepperA) {
-    fas_stepper_num = 0;
-  } else {
-    fas_stepper_num = 1;
+  int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
+  if (fas_stepper_num < 0) {  // flexible, so just choose next
+    if (_next_stepper_num >= MAX_STEPPER) {
+      return NULL;
+    }
+    fas_stepper_num = _next_stepper_num;
   }
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
-  if (_next_stepper_num >= MAX_STEPPER) {
-    return NULL;
-  }
-  fas_stepper_num = _next_stepper_num;
-#endif
   uint8_t stepper_num = _next_stepper_num;
   _next_stepper_num++;
 
@@ -375,13 +362,7 @@ void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
   _dirHighCountsUp = true;
   rg.init();
 
-#if defined(ARDUINO_ARCH_AVR)
-  _queue_num = step_pin == stepPinStepperA ? 0 : 1;
-#elif defined(ARDUINO_ARCH_ESP32)
   _queue_num = num;
-#else
-  _queue_num = num;
-#endif
   fas_queue[_queue_num].init(_queue_num, step_pin);
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
