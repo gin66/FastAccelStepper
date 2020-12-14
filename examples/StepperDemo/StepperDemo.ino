@@ -1,7 +1,7 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
-#define VERSION "post-2f951b4"
+#define VERSION "post-91c987b"
 
 struct stepper_config_s {
   uint8_t step;
@@ -46,27 +46,36 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 // Please adapt to your configuration
 const uint8_t led_pin = PIN_UNDEFINED;
 const struct stepper_config_s stepper_config[MAX_STEPPER] = {
-// Test-HW
-// Position 01 linked to atmega nano
-// 2: Enable Left Pin 13 GPIO13   , DIR Right Pin 7 GPIO18,    Step Right Pin 13 GPIO15
-// 3: Enable Left Pin 12 GPIO12   , DIR Right Pin 6 GPIO19,    Step Right Pin 12 GPIO2  blue LED
-// 4: Enable Left Pin 11 GPIO14   , DIR Right Pin 5 GPIO21,    Step Right Pin 11 GPIO4
-// 5: Enable Left Pin 10 GPIO27   , DIR Right Pin 4 GPIO3 RX0, Step Right Pin 10 GPIO16 RX2
-// 6: Enable Left Pin 9  GPIO26 A9, DIR Right Pin 3 GPIO1 TX0, Step Right Pin 9  GPIO17 TX2
-// 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right Pin 8  GPIO5
-//                          ALL Enable: Right Pin 1 GPIO23
-//Left Pin 15: +5V
-    { // position 01.234567 => 2
+    // Test-HW
+    // Position 01 linked to atmega nano
+    // 2: Enable Left Pin 13 GPIO13   , DIR Right Pin 7 GPIO18,    Step Right
+    // Pin 13 GPIO15
+    // 3: Enable Left Pin 12 GPIO12   , DIR Right Pin 6 GPIO19,    Step Right
+    // Pin 12 GPIO2  blue LED
+    // 4: Enable Left Pin 11 GPIO14   , DIR Right Pin 5 GPIO21,    Step Right
+    // Pin 11 GPIO4
+    // 5: Enable Left Pin 10 GPIO27   , DIR Right Pin 4 GPIO3 RX0, Step Right
+    // Pin 10 GPIO16 RX2
+    // 6: Enable Left Pin 9  GPIO26 A9, DIR Right Pin 3 GPIO1 TX0, Step Right
+    // Pin 9  GPIO17 TX2
+    // 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right
+    // Pin 8  GPIO5
+    //                          ALL Enable: Right Pin 1 GPIO23
+    // Left Pin 15: +5V
+    {
+      // position 01.234567 => 2
       step : 17,
       enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
-      direction : 18, // was GPIO 1 in conflict with TXD, via wire to Dir of next stepper
+      direction : 18,  // was GPIO 1 in conflict with TXD, via wire to Dir of
+                       // next stepper
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 50,
       off_delay_ms : 1000
     },
-    { // position 01.234567 => 3
+    {
+      // position 01.234567 => 3
       step : 15,
       enable_low_active : 13,
       enable_high_active : PIN_UNDEFINED,
@@ -76,7 +85,8 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 500,
       off_delay_ms : 1000
     },
-    { // position 01.234567 => 4, step is linked to blue LED
+    {
+      // position 01.234567 => 4, step is linked to blue LED
       step : 2,
       enable_low_active : 12,
       enable_high_active : PIN_UNDEFINED,
@@ -86,7 +96,8 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 500,
       off_delay_ms : 1000
     },
-    { // position 01.234567 => 5
+    {
+      // position 01.234567 => 5
       step : 5,
       enable_low_active : 25,
       enable_high_active : PIN_UNDEFINED,
@@ -96,17 +107,20 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-    { // position 01.234567 => 6
+    {
+      // position 01.234567 => 6
       step : 16,
       enable_low_active : 27,
       enable_high_active : PIN_UNDEFINED,
-      direction : 21, // was GPIO 3 in conflict with RXD, via wire to GPIO21 (Dir next stepper)
+      direction : 21,  // was GPIO 3 in conflict with RXD, via wire to GPIO21
+                       // (Dir next stepper)
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-    { // position 01.234567 => 7
+    {
+      // position 01.234567 => 7
       step : 4,
       enable_low_active : 14,
       enable_high_active : PIN_UNDEFINED,
@@ -115,8 +129,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
-};
+    }};
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -269,56 +282,57 @@ int selected = -1;
 
 void info(FastAccelStepper *s) {
   if (s->isRunning()) {
-  Serial.print(s->isRampGeneratorActive() ? "AUTO" : "MANU");
-  Serial.print(" Curr=");
-  Serial.print(s->getCurrentPosition());
-  Serial.print(" QueueEnd=");
-  Serial.print(s->getPositionAfterCommandsCompleted());
-  Serial.print("/");
-  Serial.print(s->getPeriodAfterCommandsCompleted());
-  Serial.print("us");
-  if (s->isRunningContinuously()) {
-    Serial.print(" nonstop");
-  } else {
-    Serial.print(" Target=");
-    Serial.print(s->targetPos());
-  }
-  Serial.print(" ");
-  switch (s->rampState() & RAMP_STATE_MASK) {
-    case RAMP_STATE_IDLE:
-      Serial.print("IDLE ");
-      break;
-    case RAMP_STATE_ACCELERATE:
-      Serial.print("ACC  ");
-      break;
-    case RAMP_STATE_DECELERATE_TO_STOP:
-      Serial.print("DEC ");
-      break;
-    case RAMP_STATE_DECELERATE:
-      Serial.print("RED  ");  // Reduce
-      break;
-    case RAMP_STATE_COAST:
-      Serial.print("COAST ");
-      break;
-    case RAMP_STATE_REVERSE:
-      Serial.print("REV   ");
-      break;
-    default:
-      Serial.print(s->rampState());
-  }
+    Serial.print("Curr=");
+    Serial.print(s->getCurrentPosition());
+    Serial.print(" QueueEnd=");
+    Serial.print(s->getPositionAfterCommandsCompleted());
+    Serial.print("/");
+    Serial.print(s->getPeriodAfterCommandsCompleted());
+    Serial.print("us");
+    if (s->isRunningContinuously()) {
+      Serial.print(" nonstop");
+    } else {
+      Serial.print(" Target=");
+      Serial.print(s->targetPos());
+    }
+    if (s->isRampGeneratorActive()) {
+      switch (s->rampState() & RAMP_STATE_MASK) {
+        case RAMP_STATE_IDLE:
+          Serial.print(" IDLE ");
+          break;
+        case RAMP_STATE_ACCELERATE:
+          Serial.print(" ACC  ");
+          break;
+        case RAMP_STATE_DECELERATE_TO_STOP:
+          Serial.print(" DEC  ");
+          break;
+        case RAMP_STATE_DECELERATE:
+          Serial.print(" RED  ");  // Reduce
+          break;
+        case RAMP_STATE_COAST:
+          Serial.print(" COAST");
+          break;
+        case RAMP_STATE_REVERSE:
+          Serial.print(" REV  ");
+          break;
+        default:
+          Serial.print(s->rampState());
+      }
+    } else {
+      Serial.print(" MANU");
+    }
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-  Serial.print(" max/us=");
-  Serial.print(s->max_micros);
+    Serial.print(" max/us=");
+    Serial.print(s->max_micros);
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  Serial.print(" checksum=");
-  Serial.print(s->checksum());
+    Serial.print(" checksum=");
+    Serial.print(s->checksum());
 #endif
-}
-else {
-  Serial.print("STOP@");
-  Serial.print(s->getPositionAfterCommandsCompleted());
-}
+  } else {
+    Serial.print("@");
+    Serial.print(s->getPositionAfterCommandsCompleted());
+  }
   Serial.print(" ");
 }
 
@@ -450,8 +464,7 @@ void output_msg(int8_t i) {
     ch = pgm_read_byte(p++);
     if (ch == '|') {
       i--;
-    }
-    else if (i == 0) {
+    } else if (i == 0) {
       Serial.print(ch);
     }
   }
@@ -461,8 +474,7 @@ void output_msg(int8_t i) {
     ch = *p++;
     if (ch == '|') {
       i--;
-    }
-    else if (i == 0) {
+    } else if (i == 0) {
       Serial.print(ch);
     }
   }
