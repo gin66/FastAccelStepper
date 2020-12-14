@@ -1,3 +1,6 @@
+ongoing:
+- StepperDemo: Compact output for stopped motor
+
 0.13.1:
 - try a mechanism to include application defined config file
 - StepperDemo: for avr move messages into program code to reduce RAM usage

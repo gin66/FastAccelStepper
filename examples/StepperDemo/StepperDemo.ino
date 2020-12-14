@@ -268,6 +268,7 @@ uint32_t last_time = 0;
 int selected = -1;
 
 void info(FastAccelStepper *s) {
+  if (s->isRunning()) {
   Serial.print(s->isRampGeneratorActive() ? "AUTO" : "MANU");
   Serial.print(" Curr=");
   Serial.print(s->getCurrentPosition());
@@ -281,11 +282,6 @@ void info(FastAccelStepper *s) {
   } else {
     Serial.print(" Target=");
     Serial.print(s->targetPos());
-  }
-  if (s->isRunning()) {
-    Serial.print(" RUN ");
-  } else {
-    Serial.print(" STOP ");
   }
   Serial.print(" ");
   switch (s->rampState() & RAMP_STATE_MASK) {
@@ -318,6 +314,11 @@ void info(FastAccelStepper *s) {
   Serial.print(" checksum=");
   Serial.print(s->checksum());
 #endif
+}
+else {
+  Serial.print("STOP@");
+  Serial.print(s->getPositionAfterCommandsCompleted());
+}
   Serial.print(" ");
 }
 
