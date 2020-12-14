@@ -103,13 +103,14 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
     next_command(q, e);
   } else {
     // no more commands: stop timer at period end
+	// Same as forceStop()
     const struct mapping_s *mapping = q->mapping;
     mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
     mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
-    mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
     uint8_t timer = mapping->timer;
     mcpwm->timer[timer].mode.start = 1;           // stop at TEP
     mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+    mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
     q->isRunning = false;
     q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
   }
@@ -271,6 +272,7 @@ void StepperQueue::forceStop() {
   uint8_t timer = mapping->timer;
   mcpwm->timer[timer].mode.start = 1;           // stop at TEP
   mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+  mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
   isRunning = false;
   queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 }
