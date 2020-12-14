@@ -94,8 +94,7 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   }
 }
 
-static void IRAM_ATTR pcnt_isr_service(void *arg) {
-  StepperQueue *q = (StepperQueue *)arg;
+static void IRAM_ATTR what_is_next(StepperQueue *q) {
   uint8_t rp = q->read_idx;
   if (rp != q->next_write_idx) {
     struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
@@ -116,12 +115,17 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
   }
 }
 
+static void IRAM_ATTR pcnt_isr_service(void *arg) {
+  StepperQueue *q = (StepperQueue *)arg;
+  what_is_next(q);
+}
+
 // MCPWM_SERVICE is only used in case of pause
 #define MCPWM_SERVICE(mcpwm, TIMER, pcnt)            \
   if (mcpwm.int_st.timer##TIMER##_tez_int_st != 0) { \
     mcpwm.int_clr.timer##TIMER##_tez_int_clr = 1;    \
     StepperQueue *q = &fas_queue[pcnt];              \
-    pcnt_isr_service(q);                             \
+    what_is_next(q);                                 \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
