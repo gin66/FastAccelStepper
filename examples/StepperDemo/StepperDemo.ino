@@ -56,15 +56,15 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 // 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right Pin 8  GPIO5
 //                          ALL Enable: Right Pin 1 GPIO23
 //Left Pin 15: +5V
-    { // position 01.234567 => 2,  direction in conflict with TXD
+    { // position 01.234567 => 2
       step : 17,
       enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
-      direction : 1,
+      direction : 18, // was GPIO 1 in conflict with TXD, via wire to Dir of next stepper
       direction_high_count_up : true,
       auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
+      on_delay_us : 50,
+      off_delay_ms : 1000
     },
     { // position 01.234567 => 3
       step : 15,
@@ -73,8 +73,8 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       direction : 18,
       direction_high_count_up : true,
       auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
+      on_delay_us : 500,
+      off_delay_ms : 1000
     },
     { // position 01.234567 => 4, step is linked to blue LED
       step : 2,
@@ -83,8 +83,8 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       direction : 19,
       direction_high_count_up : true,
       auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
+      on_delay_us : 500,
+      off_delay_ms : 1000
     },
     { // position 01.234567 => 5
       step : 5,
@@ -96,11 +96,11 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-    { // position 01.234567 => 6, direction in conflict with RXD
+    { // position 01.234567 => 6
       step : 16,
       enable_low_active : 27,
       enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED, //3,
+      direction : 21, // was GPIO 3 in conflict with RXD, via wire to GPIO21 (Dir next stepper)
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
