@@ -181,7 +181,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     mcpwm_isr_register(
         mcpwm_unit,
         mcpwm_unit == MCPWM_UNIT_0 ? mcpwm0_isr_service : mcpwm1_isr_service,
-        NULL, ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_EDGE, NULL);
+        NULL, ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED, NULL);
 
     mcpwm->clk_cfg.prescale = 10 - 1;  // 160 MHz/10  => 16 MHz
 
