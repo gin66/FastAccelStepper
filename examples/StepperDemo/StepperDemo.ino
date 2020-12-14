@@ -44,32 +44,78 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 #elif defined(ARDUINO_ARCH_ESP32)
 // Example hardware configuration for esp32 board.
 // Please adapt to your configuration
-const uint8_t led_pin = 21;
+const uint8_t led_pin = PIN_UNDEFINED;
 const struct stepper_config_s stepper_config[MAX_STEPPER] = {
-    {
-      step : 33,
-      enable_low_active : 25,
+// Test-HW
+// Position 01 linked to atmega nano
+// 2: Enable Left Pin 13 GPIO13   , DIR Right Pin 7 GPIO18,    Step Right Pin 13 GPIO15
+// 3: Enable Left Pin 12 GPIO12   , DIR Right Pin 6 GPIO19,    Step Right Pin 12 GPIO2  blue LED
+// 4: Enable Left Pin 11 GPIO14   , DIR Right Pin 5 GPIO21,    Step Right Pin 11 GPIO4
+// 5: Enable Left Pin 10 GPIO27   , DIR Right Pin 4 GPIO3 RX0, Step Right Pin 10 GPIO16 RX2
+// 6: Enable Left Pin 9  GPIO26 A9, DIR Right Pin 3 GPIO1 TX0, Step Right Pin 9  GPIO17 TX2
+// 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right Pin 8  GPIO5
+//                          ALL Enable: Right Pin 1 GPIO23
+//Left Pin 15: +5V
+    { // position 01.234567 => 2,  direction in conflict with TXD
+      step : 17,
+      enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
-      direction : 32,
+      direction : 1,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-    {
-      step : 26,
+    { // position 01.234567 => 3
+      step : 15,
+      enable_low_active : 13,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    { // position 01.234567 => 4, step is linked to blue LED
+      step : 2,
       enable_low_active : 12,
       enable_high_active : PIN_UNDEFINED,
-      direction : 27,
+      direction : 19,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-    {step : PIN_UNDEFINED},  // unused stepper slot
-    {step : PIN_UNDEFINED},  // unused stepper slot
-    {step : PIN_UNDEFINED},  // unused stepper slot
-    {step : PIN_UNDEFINED},  // unused stepper slot
+    { // position 01.234567 => 5
+      step : 5,
+      enable_low_active : 25,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 22,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    { // position 01.234567 => 6, direction in conflict with RXD
+      step : 16,
+      enable_low_active : 27,
+      enable_high_active : PIN_UNDEFINED,
+      direction : PIN_UNDEFINED, //3,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    { // position 01.234567 => 7
+      step : 4,
+      enable_low_active : 14,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 21,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }
 };
 #endif
 
@@ -396,31 +442,27 @@ const static char messages[] PROGMEM =
     "Stepped backward\n|";
 
 void output_msg(int8_t i) {
-#if defined(ARDUINO_ARCH_AVR)
   char ch;
+#if defined(ARDUINO_ARCH_AVR)
   PGM_P p = messages;
   while (i >= 0) {
-    if (i == 0) {
-      ch = pgm_read_byte(p);
-      Serial.print(ch);
-    }
-    p++;
-    ch = pgm_read_byte(p);
+    ch = pgm_read_byte(p++);
     if (ch == '|') {
       i--;
-      p++;
+    }
+    else if (i == 0) {
+      Serial.print(ch);
     }
   }
 #elif defined(ARDUINO_ARCH_ESP32)
   const char *p = messages;
   while (i >= 0) {
-    if (i == 0) {
-      Serial.print(*p);
-    }
-    p++;
-    if (*p == '|') {
+    ch = *p++;
+    if (ch == '|') {
       i--;
-      p++;
+    }
+    else if (i == 0) {
+      Serial.print(ch);
     }
   }
 #endif
