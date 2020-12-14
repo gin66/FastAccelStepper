@@ -282,19 +282,19 @@ int selected = -1;
 
 void info(FastAccelStepper *s) {
   if (s->isRunning()) {
-    Serial.print("Curr=");
+    Serial.print("@");
     Serial.print(s->getCurrentPosition());
+    if (s->isRunningContinuously()) {
+      Serial.print(" nonstop");
+    } else {
+      Serial.print(" => ");
+      Serial.print(s->targetPos());
+    }
     Serial.print(" QueueEnd=");
     Serial.print(s->getPositionAfterCommandsCompleted());
     Serial.print("/");
     Serial.print(s->getPeriodAfterCommandsCompleted());
     Serial.print("us");
-    if (s->isRunningContinuously()) {
-      Serial.print(" nonstop");
-    } else {
-      Serial.print(" Target=");
-      Serial.print(s->targetPos());
-    }
     if (s->isRampGeneratorActive()) {
       switch (s->rampState() & RAMP_STATE_MASK) {
         case RAMP_STATE_IDLE:
