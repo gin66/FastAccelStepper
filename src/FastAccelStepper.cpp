@@ -236,7 +236,9 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
     interrupts();
     if (delay_counter == 0) {
       // outputs are disabled
-      enableOutputs();
+	  if (!enableOutputs()) {
+		  return AQE_WAIT_FOR_ENABLE_PIN_ACTIVE;
+	  }
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
         uint32_t delay = _on_delay_ticks;
@@ -334,7 +336,7 @@ void FastAccelStepper::fill_queue() {
     if (cmd.ticks == 0) {
       break;
     }
-    if ((res == AQE_FULL) || (res == AQE_DIR_PIN_IS_BUSY)) {
+    if ((res == AQE_FULL) || (res == AQE_DIR_PIN_IS_BUSY) || (res == AQE_WAIT_FOR_ENABLE_PIN_ACTIVE)) {
       break;
     } else if (res != AQE_OK) {
       // TODO: How to deal with these error ?
@@ -494,13 +496,14 @@ void FastAccelStepper::disableOutputs() {
     digitalWrite(_enablePinHighActive, LOW);
   }
 }
-void FastAccelStepper::enableOutputs() {
+bool FastAccelStepper::enableOutputs() {
   if (_enablePinLowActive != PIN_UNDEFINED) {
     digitalWrite(_enablePinLowActive, LOW);
   }
   if (_enablePinHighActive != PIN_UNDEFINED) {
     digitalWrite(_enablePinHighActive, HIGH);
   }
+  return true;
 }
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return fas_queue[_queue_num].queue_end.pos;

@@ -70,7 +70,7 @@ class FastAccelStepper {
   uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
-  void enableOutputs();
+  bool enableOutputs();  // returns true, if enabled
   void disableOutputs();
 
   // In auto enable mode, the stepper is enabled before stepping and disabled
@@ -195,6 +195,7 @@ class FastAccelStepper {
 #define AQE_TOO_LOW -3
 #define AQE_STEPS_ERROR -4
 #define AQE_DIR_PIN_IS_BUSY -5
+#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE -6
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();

@@ -1,5 +1,7 @@
 pre 0.14.0:
 - Direction pins can be shared by several steppers
+- enableOutputs() returns bool to indicate, output was enabled
+  => prepare for external enable output control
 
 0.13.4:
 - Automated github test identified a compile error introduced in 0.13.3
