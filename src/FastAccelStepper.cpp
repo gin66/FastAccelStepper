@@ -412,7 +412,7 @@ int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
 void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   uint16_t delay_count = 0;
 #if defined(ARDUINO_ARCH_ESP32)
-  delay_count = delay_ms / TASK_DELAY_10MS;
+  delay_count = delay_ms / TASK_DELAY_4MS;
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   delay_count = delay_ms / (65536000 / TICKS_PER_S);

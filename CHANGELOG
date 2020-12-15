@@ -1,3 +1,6 @@
+0.13.4:
+- Automated github test identified a compile error introduced in 0.13.3
+
 0.13.3:
 - esp32: Cyclic rate increased from 10ms to 4ms.
 	With a planning ahead time of 10ms, there was the risk
