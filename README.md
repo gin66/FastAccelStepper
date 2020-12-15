@@ -8,7 +8,8 @@ This is an high speed alternative for the [AccelStepper library](http://www.airs
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
 	- avr atmega328: only Pin 9 and Pin 10.
-	- avr atmega2560: only Pin 15, 16 and 17
+	- avr atmega2560: only Pin 15, 16 and 17.
+      On platformio, this can be changed to other triples: 24/25/26, 5/6/7 or 38/39/40 with FAS_TIMER_MODULE setting.
 	- esp32: This can be any output capable port pin.
 	- Step should be done on transition Low to High. High time will be only a few us.
       On esp32 the high time is for slow speed fixed to ~2ms and high speed to 50% duty cycle
@@ -154,7 +155,7 @@ Measurement of the acceleration/deacceleration aka timer overflow interrupt yiel
 
 ### AVR ATmega2560
 
-Similar to ATmega328,but instead of timer 1, timer 4 is used.
+Similar to ATmega328, but instead of timer 1, timer 4 is used.
 
 For users of platformio, the used timer can be changed to either 1, 3, 4 or 5. For e.g. timer module 3 add to platformio.ini under build_flags:
 ```
