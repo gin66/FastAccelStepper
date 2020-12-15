@@ -1,3 +1,8 @@
+0.13.3:
+- esp32: Cyclic rate increased from 10ms to 4ms.
+	With a planning ahead time of 10ms, there was the risk
+	of running out of commands as identified in issue #18
+
 0.13.2:
 - StepperDemo: Compact output for stopped motor
 - Fixed a bug, where stepper 4-6 misconfigured stepper 1-3 pcnt.
