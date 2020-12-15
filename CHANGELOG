@@ -1,4 +1,4 @@
-pre 0.14.0:
+0.14.0:
 - Direction pins can be shared by several steppers
 - enableOutputs() returns bool to indicate, output was enabled
 - Possibility to supply external enable output control
