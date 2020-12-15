@@ -30,14 +30,37 @@
 #endif
 
 #if defined(__AVR_ATmega328P__)
-#define TIMER_MODULE 1
+#define FAS_TIMER_MODULE 1
+#elif defined(__AVR_ATmega2560__)
+#ifndef FAS_TIMER_MODULE
+#define FAS_TIMER_MODULE 4
+#endif
+#endif
+
+#if (FAS_TIMER_MODULE == 1)
 #define stepPinStepperA stepPinStepper1A
 #define stepPinStepperB stepPinStepper1B
-#elif defined(__AVR_ATmega2560__)
-#define TIMER_MODULE 4
+#if defined(__AVR_ATmega2560__)
+#define stepPinStepperC stepPinStepper1C
+#endif
+#elif (FAS_TIMER_MODULE == 3)
+#define stepPinStepperA stepPinStepper3A
+#define stepPinStepperB stepPinStepper3B
+#if defined(__AVR_ATmega2560__)
+#define stepPinStepperC stepPinStepper3C
+#endif
+#elif (FAS_TIMER_MODULE == 4)
 #define stepPinStepperA stepPinStepper4A
 #define stepPinStepperB stepPinStepper4B
+#if defined(__AVR_ATmega2560__)
 #define stepPinStepperC stepPinStepper4C
+#endif
+#elif (FAS_TIMER_MODULE == 5)
+#define stepPinStepperA stepPinStepper5A
+#define stepPinStepperB stepPinStepper5B
+#if defined(__AVR_ATmega2560__)
+#define stepPinStepperC stepPinStepper5C
+#endif
 #endif
 
 // T is the timer module number 0,1,2,3...
@@ -94,16 +117,16 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   pinMode(step_pin, OUTPUT);
   if (step_pin == stepPinStepperA) {
     channel = channelA;
-    AVR_INIT(TIMER_MODULE, A)
+    AVR_INIT(FAS_TIMER_MODULE, A)
   }
   if (step_pin == stepPinStepperB) {
     channel = channelB;
-    AVR_INIT(TIMER_MODULE, B)
+    AVR_INIT(FAS_TIMER_MODULE, B)
   }
 #ifdef stepPinStepperC
   if (step_pin == stepPinStepperC) {
     channel = channelC;
-    AVR_INIT(TIMER_MODULE, C)
+    AVR_INIT(FAS_TIMER_MODULE, C)
   }
 #endif
 }
@@ -152,10 +175,10 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     }                                                                          \
   }
 #define AVR_STEPPER_ISR_GEN(T, CHANNEL) AVR_STEPPER_ISR(T, CHANNEL)
-AVR_STEPPER_ISR_GEN(TIMER_MODULE, A)
-AVR_STEPPER_ISR_GEN(TIMER_MODULE, B)
+AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, A)
+AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, B)
 #ifdef stepPinStepperC
-AVR_STEPPER_ISR_GEN(TIMER_MODULE, C)
+AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, C)
 #endif
 
 // this is for cyclic task
@@ -177,7 +200,7 @@ AVR_STEPPER_ISR_GEN(TIMER_MODULE, C)
     EnableOverflowInterrupt(T);                    \
   }
 #define AVR_CYCLIC_ISR_GEN(T) AVR_CYCLIC_ISR(T)
-AVR_CYCLIC_ISR_GEN(TIMER_MODULE)
+AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
 
 #define AVR_START_QUEUE(T, CHANNEL)          \
   {                                          \
@@ -195,14 +218,14 @@ void StepperQueue::startQueue() {
   isRunning = true;
   switch (channel) {
     case channelA:
-      AVR_START_QUEUE(TIMER_MODULE, A)
+      AVR_START_QUEUE(FAS_TIMER_MODULE, A)
       break;
     case channelB:
-      AVR_START_QUEUE(TIMER_MODULE, B)
+      AVR_START_QUEUE(FAS_TIMER_MODULE, B)
       break;
 #ifdef stepPinStepperC
     case channelC:
-      AVR_START_QUEUE(TIMER_MODULE, C)
+      AVR_START_QUEUE(FAS_TIMER_MODULE, C)
       break;
 #endif
   }
@@ -220,14 +243,14 @@ void StepperQueue::startQueue() {
 void StepperQueue::forceStop() {
   switch (channel) {
     case channelA:
-      FORCE_STOP(TIMER_MODULE, A)
+      FORCE_STOP(FAS_TIMER_MODULE, A)
       break;
     case channelB:
-      FORCE_STOP(TIMER_MODULE, B)
+      FORCE_STOP(FAS_TIMER_MODULE, B)
       break;
 #ifdef stepPinStepperC
     case channelC:
-      FORCE_STOP(TIMER_MODULE, C)
+      FORCE_STOP(FAS_TIMER_MODULE, C)
       break;
 #endif
   }

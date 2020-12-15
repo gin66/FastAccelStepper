@@ -3,6 +3,7 @@ pre 0.14.0:
 - enableOutputs() returns bool to indicate, output was enabled
 - Possibility to supply external enable output control
 - AddQueueEntry() return values changed: >0 => retry again, <0 => error
+- ATmega2560: Allow to change the used timer module with preprocesser variable FAS_TIMER_MODULE
 
 0.13.4:
 - Automated github test identified a compile error introduced in 0.13.3

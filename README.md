@@ -156,6 +156,16 @@ Measurement of the acceleration/deacceleration aka timer overflow interrupt yiel
 
 Similar to ATmega328,but instead of timer 1, timer 4 is used.
 
+For users of platformio, the used timer can be changed to either 1, 3, 4 or 5. For e.g. timer module 3 add to platformio.ini under build_flags:
+```
+build_flags = -DFAS_TIMER_MODULE=3
+```
+
+or better:
+```
+build_flags = -Werror -Wall -DFAS_TIMER_MODULE=3
+```
+
 ### ESP32
 
 This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six. In addition, the pulse counter module is used starting from unit_0 to unit_5. This driver uses the pcnt_isr_service, so unallocated modules can still be used by the application.
