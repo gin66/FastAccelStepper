@@ -22,6 +22,8 @@ static uint16_t fas_debug_led_cnt = 0;
 #define DEBUG_LED_HALF_PERIOD 50
 #else
 #define DEBUG_LED_HALF_PERIOD 50
+#define LOW 0
+#define HIGH 1
 #endif
 
 #if defined(ARDUINO_ARCH_AVR)
@@ -396,6 +398,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _stepPin = step_pin;
   _dirHighCountsUp = true;
   _rg.init();
+  _externalEnableCall = NULL;
 
   _queue_num = num;
   fas_queue[_queue_num].init(_queue_num, step_pin);
@@ -426,6 +429,14 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
       _enablePinLowActive = PIN_UNDEFINED;
     }
   }
+  if ((_enablePinHighActive == PIN_UNDEFINED) &&
+      (_enablePinHighActive == PIN_UNDEFINED)) {
+    _externalEnableCall = NULL;
+  }
+}
+void FastAccelStepper::setExternalEnableCall(bool (*func)(uint8_t enablePin,
+                                                          uint8_t value)) {
+  _externalEnableCall = func;
 }
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
   _autoEnable = auto_enable;
@@ -491,21 +502,40 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   q->queue_end.pos = new_pos;
 }
 void FastAccelStepper::disableOutputs() {
-  if (_enablePinLowActive != PIN_UNDEFINED) {
-    digitalWrite(_enablePinLowActive, HIGH);
-  }
-  if (_enablePinHighActive != PIN_UNDEFINED) {
-    digitalWrite(_enablePinHighActive, LOW);
+  if (_externalEnableCall == NULL) {
+    if (_enablePinLowActive != PIN_UNDEFINED) {
+      digitalWrite(_enablePinLowActive, HIGH);
+    }
+    if (_enablePinHighActive != PIN_UNDEFINED) {
+      digitalWrite(_enablePinHighActive, LOW);
+    }
+  } else {
+    if (_enablePinLowActive != PIN_UNDEFINED) {
+      _externalEnableCall(_enablePinLowActive, HIGH);
+    }
+    if (_enablePinHighActive != PIN_UNDEFINED) {
+      _externalEnableCall(_enablePinHighActive, LOW);
+    }
   }
 }
 bool FastAccelStepper::enableOutputs() {
-  if (_enablePinLowActive != PIN_UNDEFINED) {
-    digitalWrite(_enablePinLowActive, LOW);
+  bool enabled = true;
+  if (_externalEnableCall == NULL) {
+    if (_enablePinLowActive != PIN_UNDEFINED) {
+      digitalWrite(_enablePinLowActive, LOW);
+    }
+    if (_enablePinHighActive != PIN_UNDEFINED) {
+      digitalWrite(_enablePinHighActive, HIGH);
+    }
+  } else {
+    if (_enablePinLowActive != PIN_UNDEFINED) {
+      enabled &= (_externalEnableCall(_enablePinLowActive, LOW) == LOW);
+    }
+    if (_enablePinHighActive != PIN_UNDEFINED) {
+      enabled &= (_externalEnableCall(_enablePinHighActive, HIGH) == HIGH);
+    }
   }
-  if (_enablePinHighActive != PIN_UNDEFINED) {
-    digitalWrite(_enablePinHighActive, HIGH);
-  }
-  return true;
+  return enabled;
 }
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return fas_queue[_queue_num].queue_end.pos;

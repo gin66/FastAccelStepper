@@ -80,7 +80,8 @@ void queue_out_of_range() {
       .ticks = 65535, .steps = 128, .count_up = true};
 
   res = s.addQueueEntry(&cmd2);
-  test(res == AQE_ERROR_STEPS_VALUE, "Too high step count should trigger an error");
+  test(res == AQE_ERROR_STEPS_VALUE,
+       "Too high step count should trigger an error");
   assert(s.isQueueEmpty());
 }
 

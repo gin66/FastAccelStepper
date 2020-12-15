@@ -68,7 +68,21 @@ class FastAccelStepper {
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
   uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
   uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
-  void setExternalEnableCall(bool (*func)(uint8_t enablePin));
+
+  // If the enable pins are e.g. connected via external HW (shift registers),
+  // then an external callback function can be supplied.
+  // This will be called for defined low active and high active enable pin via
+  // setEnablePin(). If both pins are defined, the function will be called
+  // twice. The supplied value is either LOW or HIGH. The return value shall be
+  // the status of the pin (either LOW or HIGH).
+  //
+  // In auto enable mode, this function is called from cyclic task/interrupt
+  // with 4ms rate, which creates the command to put into the command queue.
+  // Thus the supplied function should take much less time than 4ms.
+  // Otherwise there is risk, that other running stepper run out of commands in the queue.
+  // If this takes longer, then the function should be offloaded and return the
+  // status, after the enable/disable function has been successfully completed.
+  void setExternalEnableCall(bool (*func)(uint8_t enablePin, uint8_t value));
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
   bool enableOutputs();  // returns true, if enabled
@@ -246,6 +260,7 @@ class FastAccelStepper {
 
  private:
   FastAccelStepperEngine* _engine;
+  bool (*_externalEnableCall)(uint8_t enablePin, uint8_t value);
   RampGenerator _rg;
   uint8_t _stepPin;
   uint8_t _dirPin;
