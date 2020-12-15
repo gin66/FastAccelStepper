@@ -31,7 +31,7 @@ void init_queue() {
 int main() {
   init_queue();
   FastAccelStepper s = FastAccelStepper();
-  s.init(0, 0);
+  s.init(NULL, 0, 0);
   RampChecker rc = RampChecker();
   assert(0 == s.getCurrentPosition());
 

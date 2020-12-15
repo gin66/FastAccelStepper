@@ -98,21 +98,16 @@ class StepperQueue {
   struct queue_end_s queue_end;
 
   void init(uint8_t queue_num, uint8_t step_pin);
-  inline bool isQueueFull() {
+  inline uint8_t queueEntries() {
     noInterrupts();
     uint8_t rp = read_idx;
     uint8_t wp = next_write_idx;
     interrupts();
-    rp += QUEUE_LEN;
-    return (wp == rp);
-  }
-  inline bool isQueueEmpty() {
-    noInterrupts();
-    bool res = (next_write_idx == read_idx);
-    interrupts();
     inject_fill_interrupt(0);
-    return res;
+    return (uint8_t)(wp - rp);
   }
+  inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
+  inline bool isQueueEmpty() { return queueEntries() == 0; }
   int addQueueEntry(struct stepper_command_s* cmd) {
     if (isQueueFull()) {
       return AQE_FULL;
@@ -143,6 +138,10 @@ class StepperQueue {
       queue_end.ticks_from_last_step = 0;
     }
     bool dir = (cmd->count_up == dirHighCountsUp);
+    if (isQueueEmpty()) {
+      // set the dirPin here. Necessary with shared direction pins
+      digitalWrite(dirPin, dir);
+    }
     e->steps = steps;
     e->toggle_dir = (dir != queue_end.dir) ? true : false;
     e->ticks = period;

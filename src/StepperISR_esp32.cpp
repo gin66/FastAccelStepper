@@ -75,7 +75,8 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
-  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = steps;  // is updated only on zero
+  // is updated only on zero
+  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = steps;
   if (e->toggle_dir) {
     uint8_t dirPin = queue->dirPin;
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
@@ -103,7 +104,7 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
     next_command(q, e);
   } else {
     // no more commands: stop timer at period end
-	// Same as forceStop() => perhaps combine
+    // Same as forceStop() => perhaps combine
     const struct mapping_s *mapping = q->mapping;
     mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
     mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;

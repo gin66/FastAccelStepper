@@ -80,6 +80,23 @@ bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
   return StepperQueue::isValidStepPin(step_pin);
 }
 //*************************************************************************************************
+bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
+                                          uint8_t except_stepper) {
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    if (i != except_stepper) {
+      FastAccelStepper* s = _stepper[i];
+      if (s) {
+        if (s->getDirectionPin() == dir_pin) {
+          if (s->isMotorRunning()) {
+            return true;
+          }
+        }
+      }
+    }
+  }
+  return false;
+}
+//*************************************************************************************************
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
   // Check if already connected
@@ -107,7 +124,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 #if defined(ARDUINO_ARCH_AVR) || defined(ESP32) || defined(TEST)
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
-  s->init(fas_stepper_num, step_pin);
+  s->init(this, fas_stepper_num, step_pin);
   return s;
 #else
   return NULL;
@@ -200,6 +217,17 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
   if (cmd->ticks < MIN_DELTA_TICKS) {
     return AQE_TOO_LOW;
   }
+
+  if (_dirPin != PIN_UNDEFINED) {
+    if (!isMotorRunning()) {
+      if (_engine != NULL) {
+        if (_engine->isDirPinBusy(_dirPin, _queue_num)) {
+          return AQE_DIR_PIN_IS_BUSY;
+        }
+      }
+    }
+  }
+
   StepperQueue* q = &fas_queue[_queue_num];
   int res = AQE_OK;
   if (_autoEnable) {
@@ -266,10 +294,10 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
 
 void FastAccelStepper::fill_queue() {
   // Check preconditions to be allowed to fill the queue
-  if (!rg.isRampGeneratorActive()) {
+  if (!_rg.isRampGeneratorActive()) {
     return;
   }
-  if (!rg.hasValidConfig()) {
+  if (!_rg.hasValidConfig()) {
 #ifdef TEST
     assert(false);
 #endif
@@ -279,22 +307,23 @@ void FastAccelStepper::fill_queue() {
   struct stepper_command_s cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 10 ms. Currently hard coded
-  while (!isQueueFull() && !q->hasTicksInQueue(TICKS_PER_S / 100) &&
-         rg.isRampGeneratorActive()) {
+  while (!isQueueFull() &&
+         (!q->hasTicksInQueue(TICKS_PER_S / 100) || q->queueEntries() <= 1) &&
+         _rg.isRampGeneratorActive()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     uint32_t runtime_us = micros();
 #endif
     int8_t res = AQE_OK;
-    uint8_t next_state = rg.getNextCommand(&q->queue_end, &cmd);
+    uint8_t next_state = _rg.getNextCommand(&q->queue_end, &cmd);
     if (cmd.ticks != 0) {
       res = addQueueEntry(&cmd);
       if (res == AQE_OK) {
-        rg.commandEnqueued(&cmd, next_state);
-        rg.setState(next_state);
+        _rg.commandEnqueued(&cmd, next_state);
+        _rg.setState(next_state);
       }
     } else {
-      rg.setState(RAMP_STATE_IDLE);
+      _rg.setState(RAMP_STATE_IDLE);
     }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
@@ -305,11 +334,11 @@ void FastAccelStepper::fill_queue() {
     if (cmd.ticks == 0) {
       break;
     }
-    if (res == AQE_FULL) {
+    if ((res == AQE_FULL) || (res == AQE_DIR_PIN_IS_BUSY)) {
       break;
     } else if (res != AQE_OK) {
       // TODO: How to deal with these error ?
-      rg.stopRamp();
+      _rg.stopRamp();
     }
   }
 }
@@ -349,18 +378,20 @@ bool FastAccelStepper::agreeWithAutoDisable() {
   return agree;
 }
 
-void FastAccelStepper::init(uint8_t num, uint8_t step_pin) {
+void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
+                            uint8_t step_pin) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
   max_micros = 0;
 #endif
+  _engine = engine;
   _autoEnable = false;
   _on_delay_ticks = 0;
   _off_delay_count = 0;
   _auto_disable_delay_counter = 0;
   _stepPin = step_pin;
   _dirHighCountsUp = true;
-  rg.init();
+  _rg.init();
 
   _queue_num = num;
   fas_queue[_queue_num].init(_queue_num, step_pin);
@@ -424,28 +455,30 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   _off_delay_count = delay_count;
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
-  rg.setSpeed(min_step_us);
+  _rg.setSpeed(min_step_us);
 }
 void FastAccelStepper::setAcceleration(uint32_t accel) {
-  rg.setAcceleration(accel);
+  _rg.setAcceleration(accel);
 }
 int8_t FastAccelStepper::moveTo(int32_t position) {
-  return rg.moveTo(position, &fas_queue[_queue_num].queue_end);
+  return _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
 }
 int8_t FastAccelStepper::move(int32_t move) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  return rg.move(move, &fas_queue[_queue_num].queue_end);
+  return _rg.move(move, &fas_queue[_queue_num].queue_end);
 }
-void FastAccelStepper::keepRunning() { rg.setKeepRunning(); }
-void FastAccelStepper::stopMove() { rg.initiate_stop(); }
-void FastAccelStepper::applySpeedAcceleration() { rg.applySpeedAcceleration(); }
+void FastAccelStepper::keepRunning() { _rg.setKeepRunning(); }
+void FastAccelStepper::stopMove() { _rg.initiate_stop(); }
+void FastAccelStepper::applySpeedAcceleration() {
+  _rg.applySpeedAcceleration();
+}
 void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];
 
   // first stop ramp generator
-  rg.stopRamp();
+  _rg.stopRamp();
 
   // stop the stepper interrupt and empty the queue
   q->forceStop();
@@ -505,14 +538,14 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   noInterrupts();
   fas_queue[_queue_num].queue_end.pos += delta;
-  rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
+  _rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
   interrupts();
 }
 void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   noInterrupts();
   int32_t delta = new_pos - fas_queue[_queue_num].queue_end.pos;
   fas_queue[_queue_num].queue_end.pos = new_pos;
-  rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
+  _rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
   interrupts();
 }
 bool FastAccelStepper::isQueueFull() {
@@ -521,8 +554,11 @@ bool FastAccelStepper::isQueueFull() {
 bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
+bool FastAccelStepper::isMotorRunning() {
+  return fas_queue[_queue_num].isRunning;
+}
 bool FastAccelStepper::isRunning() {
-  return fas_queue[_queue_num].isRunning || rg.isRampGeneratorActive();
+  return fas_queue[_queue_num].isRunning || _rg.isRampGeneratorActive();
 }
 void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
