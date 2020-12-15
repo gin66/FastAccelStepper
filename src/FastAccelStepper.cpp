@@ -212,10 +212,10 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
   if (cmd->steps >= 128) {
-    return AQE_STEPS_ERROR;
+    return AQE_ERROR_STEPS_VALUE;
   }
   if (cmd->ticks < MIN_DELTA_TICKS) {
-    return AQE_TOO_LOW;
+    return AQE_ERROR_TICKS_TOO_LOW;
   }
 
   if (_dirPin != PIN_UNDEFINED) {
@@ -336,7 +336,7 @@ void FastAccelStepper::fill_queue() {
     if (cmd.ticks == 0) {
       break;
     }
-    if (res == AQE_OK) {
+    if (res != AQE_OK) {
       if (res > 0) {
         // try later again
         break;

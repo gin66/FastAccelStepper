@@ -110,11 +110,11 @@ class StepperQueue {
   inline bool isQueueEmpty() { return queueEntries() == 0; }
   int addQueueEntry(struct stepper_command_s* cmd) {
     if (isQueueFull()) {
-      return AQE_FULL;
+      return AQE_QUEUE_FULL;
     }
     uint32_t period_ticks = cmd->ticks;
     if (period_ticks > 65535) {
-      return AQE_TOO_HIGH;
+      return AQE_ERROR_TICKS_TOO_HIGH;
     }
     uint16_t period = period_ticks;
 

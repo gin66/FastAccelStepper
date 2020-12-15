@@ -68,6 +68,7 @@ class FastAccelStepper {
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
   uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
   uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
+  void setExternalEnableCall(bool (*func)(uint8_t enablePin));
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
   bool enableOutputs();  // returns true, if enabled
@@ -191,12 +192,12 @@ class FastAccelStepper {
   // Return codes for addQueueEntry
   //    positive values mean, that caller should retry later
 #define AQE_OK 0
-#define AQE_FULL 1
+#define AQE_QUEUE_FULL 1
 #define AQE_DIR_PIN_IS_BUSY 2
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
-#define AQE_ERROR_TOO_HIGH -1
-#define AQE_ERROR_TOO_LOW -2
-#define AQE_ERROR_STEPS_ERROR -3
+#define AQE_ERROR_TICKS_TOO_HIGH -1
+#define AQE_ERROR_TICKS_TOO_LOW -2
+#define AQE_ERROR_STEPS_VALUE -3
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();
