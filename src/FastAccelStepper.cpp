@@ -236,9 +236,9 @@ int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
     interrupts();
     if (delay_counter == 0) {
       // outputs are disabled
-	  if (!enableOutputs()) {
-		  return AQE_WAIT_FOR_ENABLE_PIN_ACTIVE;
-	  }
+      if (!enableOutputs()) {
+        return AQE_WAIT_FOR_ENABLE_PIN_ACTIVE;
+      }
       // if on delay is defined, perform first step accordingly
       if (_on_delay_ticks > 0) {
         uint32_t delay = _on_delay_ticks;
@@ -336,11 +336,13 @@ void FastAccelStepper::fill_queue() {
     if (cmd.ticks == 0) {
       break;
     }
-    if ((res == AQE_FULL) || (res == AQE_DIR_PIN_IS_BUSY) || (res == AQE_WAIT_FOR_ENABLE_PIN_ACTIVE)) {
-      break;
-    } else if (res != AQE_OK) {
-      // TODO: How to deal with these error ?
-      _rg.stopRamp();
+    if (res == AQE_OK) {
+      if (res > 0) {
+        // try later again
+        break;
+      } else {
+        _rg.stopRamp();
+      }
     }
   }
 }

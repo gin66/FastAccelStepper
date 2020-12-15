@@ -189,13 +189,14 @@ class FastAccelStepper {
   int8_t addQueueEntry(struct stepper_command_s* cmd);
 
   // Return codes for addQueueEntry
+  //    positive values mean, that caller should retry later
 #define AQE_OK 0
-#define AQE_FULL -1
-#define AQE_TOO_HIGH -2
-#define AQE_TOO_LOW -3
-#define AQE_STEPS_ERROR -4
-#define AQE_DIR_PIN_IS_BUSY -5
-#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE -6
+#define AQE_FULL 1
+#define AQE_DIR_PIN_IS_BUSY 2
+#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
+#define AQE_ERROR_TOO_HIGH -1
+#define AQE_ERROR_TOO_LOW -2
+#define AQE_ERROR_STEPS_ERROR -3
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();
