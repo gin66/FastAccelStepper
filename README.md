@@ -29,6 +29,8 @@ FastAccelStepper offers the following features:
 * Allow the motor to continuously run in the current direction until stopMove() is called.
 * speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
+* Enable pins can be shared between motors
+* Direction pins can be shared between motors
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 
@@ -51,6 +53,11 @@ General behaviour:
     - The calculation is then:
 			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
 	- But 4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
+
+Comments to pin sharing:
+* Enable pin sharing: the common pin will be enabled for as long as one motor is running + delay off.
+  Every motor will adhere to its auto enable delay, even if other motors already have enabled the pin.
+* Direction pin sharing: The direction pin will be exclusively driven by one motor. If one motor is operating, another motor will wait until the direction pin comes available
 
 ### AVR ATMega 328
 

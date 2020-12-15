@@ -42,7 +42,7 @@ void queue_full() {
   puts("queue_full...");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
-  s.init(0, 0);
+  s.init(NULL, 0, 0);
   assert(0 == s.getCurrentPosition());
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
@@ -70,7 +70,7 @@ void queue_out_of_range() {
 
   init_queue();
   FastAccelStepper s = FastAccelStepper();
-  s.init(0, 0);
+  s.init(NULL, 0, 0);
   assert(s.isQueueEmpty());
   assert(0 == s.getCurrentPosition());
   assert(s.isQueueEmpty());
@@ -87,7 +87,7 @@ void queue_out_of_range() {
 void end_pos_test() {
   init_queue();
   FastAccelStepper s = FastAccelStepper();
-  s.init(0, 0);
+  s.init(NULL, 0, 0);
   assert(0 == s.getPositionAfterCommandsCompleted());
   struct stepper_command_s cmd = {.ticks = 65535, .steps = 1, .count_up = true};
 

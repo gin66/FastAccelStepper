@@ -49,13 +49,14 @@ class FastAccelStepperEngine;
 class FastAccelStepper {
  public:
   // This should be only called by FastAccelStepperEngine !
-  void init(uint8_t num, uint8_t step_pin);
+  void init(FastAccelStepperEngine* engine, uint8_t num, uint8_t step_pin);
 
   // step pin is defined at creation. Here can retrieve the pin
   uint8_t getStepPin();
 
   // if direction pin is connected, call this function
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true);
+  uint8_t getDirectionPin() { return _dirPin; }
 
   // if enable pin is connected, then use this function.
   //
@@ -100,8 +101,11 @@ class FastAccelStepper {
   //               => recommend to use only in standstill
   void setCurrentPosition(int32_t new_pos);
 
-  // is true while the stepper is running
+  // is true while the stepper is running or ramp generation is active
   bool isRunning();
+
+  // is true while the stepper is running
+  bool isMotorRunning();
 
   // For stepper movement control by FastAccelStepper
   //
@@ -152,12 +156,12 @@ class FastAccelStepper {
   // direction, then keepRunning() will speed up again and not finish direction
   // reversal first.
   void keepRunning();
-  bool isRunningContinuously() { return rg.isRunningContinuously(); }
+  bool isRunningContinuously() { return _rg.isRunningContinuously(); }
 
   // This command just let the motor run continuously in one direction.
   // If the motor is running in the opposite direction, it will reverse
-  int8_t runForward() { return rg.startRun(true); }
-  int8_t runBackward() { return rg.startRun(false); }
+  int8_t runForward() { return _rg.startRun(true); }
+  int8_t runBackward() { return _rg.startRun(false); }
 
   // forwardStep()/backwardstep() can be called, while stepper is not moving
   // If stepper is moving, this is a no-op.
@@ -178,7 +182,7 @@ class FastAccelStepper {
   void forceStopAndNewPosition(uint32_t new_pos);
 
   // get the target position for the current move
-  inline int32_t targetPos() { return rg.targetPosition(); }
+  inline int32_t targetPos() { return _rg.targetPosition(); }
 
   // Low level acccess via command queue
   // stepper queue management (low level access)
@@ -190,6 +194,7 @@ class FastAccelStepper {
 #define AQE_TOO_HIGH -2
 #define AQE_TOO_LOW -3
 #define AQE_STEPS_ERROR -4
+#define AQE_DIR_PIN_IS_BUSY -5
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();
@@ -216,10 +221,10 @@ class FastAccelStepper {
 #define RAMP_STATE_COAST 4
 #define RAMP_STATE_REVERSE 5
 #define RAMP_STATE_MASK 0x0f
-  inline uint8_t rampState() { return rg.rampState(); }
+  inline uint8_t rampState() { return _rg.rampState(); }
 
   // returns true, if the ramp generation is active
-  inline bool isRampGeneratorActive() { return rg.isRampGeneratorActive(); }
+  inline bool isRampGeneratorActive() { return _rg.isRampGeneratorActive(); }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
@@ -237,7 +242,8 @@ class FastAccelStepper {
   void reAttachToPin();
 
  private:
-  RampGenerator rg;
+  FastAccelStepperEngine* _engine;
+  RampGenerator _rg;
   uint8_t _stepPin;
   uint8_t _dirPin;
   bool _dirHighCountsUp;
@@ -273,6 +279,7 @@ class FastAccelStepperEngine {
 
   // This should be only called from ISR or stepper task
   void manageSteppers();
+  bool isDirPinBusy(uint8_t dirPin, uint8_t except_stepper);
 
  private:
   uint8_t _next_stepper_num;

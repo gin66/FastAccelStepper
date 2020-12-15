@@ -53,7 +53,7 @@ void init_queue() {
 void do_test() {
   init_queue();
   FastAccelStepper s = FastAccelStepper();
-  s.init(0, 0);
+  s.init(NULL, 0, 0);
   stepper = &s;
 
   RampChecker rc = RampChecker();
