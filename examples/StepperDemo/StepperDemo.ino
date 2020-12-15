@@ -1,7 +1,7 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
-#define VERSION "post-d7b8543"
+#define VERSION "post-d5213fc"
 
 struct stepper_config_s {
   uint8_t step;
