@@ -1,4 +1,4 @@
-pre 0.15.0:
+0.15.0:
 - For the commands in the queue, the minimum time in ticks to execute
   a command is limited to 10*MIN_DELTA_TICKS. For esp32 this relates to
   the time between interrupts of one channel
