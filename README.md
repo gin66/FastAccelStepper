@@ -42,7 +42,7 @@ General behaviour:
 * For move() the delta is added to the latest desired end position
 * The stepper tries to reach the given desired end position as fast as possible with adherence to acceleration/deceleration
 * If the stepper is e.g. running towards position 1000 and moveTo(0) is called at position 500, then the stepper will 
-	1. decelerate, which means it will overshoot position 500 
+    1. decelerate, which means it will overshoot position 500 
     2. stop and accelerate towards 0
     3. eventually coast for a while and then decelerate
     4. stop
@@ -56,18 +56,20 @@ General behaviour:
 			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
 	- But 4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
 	  Means the position will count:
-			-2.000.000.000
-			-2.000.000.001
-			-2.000.000.002
-				:	:
-			-2.147.483.647
-			-2.147.483.648
-			 2.147.483.647
-			 2.147.483.646
-			 2.147.483.645
-				:	:
-			 2.000.000.000
-
+	  ```
+		-2.000.000.000
+		-2.000.000.001
+		-2.000.000.002
+			:
+		-2.147.483.647
+		-2.147.483.648
+		 2.147.483.647
+		 2.147.483.646
+		 2.147.483.645
+			:
+		 2.000.000.000
+	```
+	
 Comments to pin sharing:
 * Enable pin sharing: the common pin will be enabled for as long as one motor is running + delay off.
   Every motor will adhere to its auto enable delay, even if other motors already have enabled the pin.
