@@ -1,7 +1,7 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
-#define VERSION "post-5a9583d"
+#define VERSION "post-fd62010"
 
 struct stepper_config_s {
   uint8_t step;
@@ -702,7 +702,8 @@ void loop() {
       uint32_t ms = millis();
       for (uint8_t i = 0; i < MAX_STEPPER; i++) {
         if (test_seq[i].test != NULL) {
-          finished &= test_seq[i].test(stepper[i], &test_seq[i], ms);
+          bool res = test_seq[i].test(stepper[i], &test_seq[i], ms);
+          finished &= res;
         }
       }
       if (finished) {

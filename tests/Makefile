@@ -48,7 +48,7 @@ symlinks:
 VERSION=$(shell git rev-parse --short HEAD)
 
 fmt:
-	clang-format --style=Google -i ../src/* test_*.cpp stubs.h ../examples/*/*.ino
+	clang-format --style=Google -i ../src/* test_*.cpp stubs.h ../examples/*/*.ino ../examples/*/test_seq*
 	echo $(VERSION)
 	sed -i -e 's/#define VERSION.*$$/#define VERSION "post-$(VERSION)"/' ../examples/StepperDemo/StepperDemo.ino
 

@@ -21,9 +21,9 @@
 #define stepPinStepper3A 5  /* OC3A */
 #define stepPinStepper3B 2  /* OC3B */
 #define stepPinStepper3C 3  /* OC3C */
-#define stepPinStepper4A 6 /* OC4A */
-#define stepPinStepper4B 7 /* OC4B */
-#define stepPinStepper4C 8 /* OC4C */
+#define stepPinStepper4A 6  /* OC4A */
+#define stepPinStepper4B 7  /* OC4B */
+#define stepPinStepper4C 8  /* OC4C */
 #define stepPinStepper5A 46 /* OC5A */
 #define stepPinStepper5B 45 /* OC5B */
 #define stepPinStepper5C 44 /* OC5C */
