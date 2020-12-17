@@ -446,9 +446,15 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
 }
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = US_TO_TICKS(delay_us);
+#if defined(ARDUINO_ARCH_AVR)
   if (delay_ticks < MIN_DELTA_TICKS) {
     return DELAY_TOO_LOW;
   }
+#else
+  if (delay_ticks < 10 * MIN_DELTA_TICKS) {  // SEE addQueueEntry for reference
+    return DELAY_TOO_LOW;
+  }
+#endif
   if (delay_ticks > MAX_ON_DELAY_TICKS) {
     return DELAY_TOO_HIGH;
   }

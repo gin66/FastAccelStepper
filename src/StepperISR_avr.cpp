@@ -131,48 +131,47 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 #endif
 }
 
-#define AVR_STEPPER_ISR(T, CHANNEL)                                            \
-  ISR(TIMER##T##_COMP##CHANNEL##_vect) {                                       \
-    uint8_t rp = fas_queue_##CHANNEL.read_idx;                                 \
-    if (Stepper_IsToggling(T, CHANNEL)) {                                      \
-      /* Clear output bit by another toggle */                                 \
-      ForceCompare(T, CHANNEL);                                                \
-      struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK]; \
-      if (e->steps-- > 0) {                                                    \
-        /* perform another steps_dir with this queue entry */                  \
-        OCR##T##CHANNEL += fas_queue_##CHANNEL.ticks;                          \
-        return;                                                                \
-      }                                                                        \
-      rp++;                                                                    \
-      fas_queue_##CHANNEL.read_idx = rp;                                       \
-    } else if (!Stepper_IsDisconnected(T, CHANNEL)) {                          \
-      rp++;                                                                    \
-      fas_queue_##CHANNEL.read_idx = rp;                                       \
-    }                                                                          \
-    if (rp == fas_queue_##CHANNEL.next_write_idx) {                            \
-      /* queue is empty => set to disconnect */                                \
-      Stepper_Disconnect(T, CHANNEL);                                          \
-      /* disable compare interrupt */                                          \
-      DisableCompareInterrupt(T, CHANNEL);                                     \
-      /* force compare to ensure disconnect */                                 \
-      ForceCompare(T, CHANNEL);                                                \
-      fas_queue_##CHANNEL.isRunning = false;                                   \
-      fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;           \
-      return;                                                                  \
-    }                                                                          \
-    /* command in queue */                                                     \
-    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];   \
-    OCR##T##CHANNEL += (fas_queue_##CHANNEL.ticks = e->ticks);                 \
-    /* assign to skip and test for not zero */                                 \
-    if (e->steps == 0) {                                                       \
-      Stepper_Zero(T, CHANNEL);                                                \
-    } else {                                                                   \
-      Stepper_Toggle(T, CHANNEL);                                              \
-    }                                                                          \
-    if (e->toggle_dir) {                                                       \
-      uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                             \
-      digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);          \
-    }                                                                          \
+#define AVR_STEPPER_ISR(T, CHANNEL)                                          \
+  ISR(TIMER##T##_COMP##CHANNEL##_vect) {                                     \
+    uint8_t rp = fas_queue_##CHANNEL.read_idx;                               \
+    if (rp == fas_queue_##CHANNEL.next_write_idx) {                          \
+      /* queue is empty => set to disconnect */                              \
+      Stepper_Disconnect(T, CHANNEL);                                        \
+      /* disable compare interrupt */                                        \
+      DisableCompareInterrupt(T, CHANNEL);                                   \
+      /* force compare to ensure disconnect */                               \
+      ForceCompare(T, CHANNEL);                                              \
+      fas_queue_##CHANNEL.isRunning = false;                                 \
+      fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;         \
+      return;                                                                \
+    }                                                                        \
+    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK]; \
+    OCR##T##CHANNEL += e->ticks;                                             \
+    if (Stepper_IsToggling(T, CHANNEL)) {                                    \
+      /* Clear output bit by another toggle */                               \
+      ForceCompare(T, CHANNEL);                                              \
+      if (e->steps-- > 1) {                                                  \
+        /* perform another step with this queue entry */                     \
+        return;                                                              \
+      }                                                                      \
+    }                                                                        \
+    rp++;                                                                    \
+    fas_queue_##CHANNEL.read_idx = rp;                                       \
+    if (rp != fas_queue_##CHANNEL.next_write_idx) {                          \
+      /* command in queue */                                                 \
+      e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];                   \
+      if (e->steps == 0) {                                                   \
+        Stepper_Zero(T, CHANNEL);                                            \
+      } else {                                                               \
+        Stepper_Toggle(T, CHANNEL);                                          \
+      }                                                                      \
+      if (e->toggle_dir) {                                                   \
+        uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                         \
+        digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);      \
+      }                                                                      \
+    } else {                                                                 \
+      Stepper_Zero(T, CHANNEL);                                              \
+    }                                                                        \
   }
 #define AVR_STEPPER_ISR_GEN(T, CHANNEL) AVR_STEPPER_ISR(T, CHANNEL)
 AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, A)
@@ -202,16 +201,30 @@ AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, C)
 #define AVR_CYCLIC_ISR_GEN(T) AVR_CYCLIC_ISR(T)
 AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
 
-#define AVR_START_QUEUE(T, CHANNEL)          \
-  {                                          \
-    noInterrupts();                          \
-    /* clear interrupt flag */               \
-    ClearInterruptFlag(T, CHANNEL);          \
-    /* enable compare A interrupt */         \
-    EnableCompareInterrupt(T, CHANNEL);      \
-    /* definite start point */               \
-    SetTimerCompareRelative(T, CHANNEL, 40); \
-    interrupts();                            \
+#define AVR_START_QUEUE(T, CHANNEL)                                          \
+  {                                                                          \
+    /* force compare to ensure zero */                                       \
+    Stepper_Zero(T, CHANNEL);                                                \
+    ForceCompare(T, CHANNEL);                                                \
+    /* enter critical section */                                             \
+    noInterrupts();                                                          \
+    /* ensure no compare event */                                            \
+    SetTimerCompareRelative(T, CHANNEL, 32768);                              \
+    /* set toggle mode, if steps to be generated */                          \
+    uint8_t rp = fas_queue_##CHANNEL.read_idx;                               \
+    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK]; \
+    if (e->steps > 0) {                                                      \
+      Stepper_Toggle(T, CHANNEL);                                            \
+    } else {                                                                 \
+      Stepper_Zero(T, CHANNEL);                                              \
+    }                                                                        \
+    /* clear interrupt flag */                                               \
+    ClearInterruptFlag(T, CHANNEL);                                          \
+    /* enable compare interrupt */                                           \
+    EnableCompareInterrupt(T, CHANNEL);                                      \
+    /* definite start point */                                               \
+    SetTimerCompareRelative(T, CHANNEL, 10);                                 \
+    interrupts();                                                            \
   }
 
 void StepperQueue::startQueue() {
