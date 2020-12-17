@@ -13,3 +13,4 @@ bool test_seq_01(FastAccelStepper *stepper, struct test_seq_s *seq, uint32_t tim
 bool test_seq_02(FastAccelStepper *stepper, struct test_seq_s *seq, uint32_t time_ms);
 bool test_seq_03(FastAccelStepper *stepper, struct test_seq_s *seq, uint32_t time_ms);
 bool test_seq_04(FastAccelStepper *stepper, struct test_seq_s *seq, uint32_t time_ms);
+bool test_seq_05(FastAccelStepper *stepper, struct test_seq_s *seq, uint32_t time_ms);

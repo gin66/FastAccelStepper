@@ -24,10 +24,10 @@ Timer   0 1 2 3 4 ... ticks-1 ticks ticks-1 ... 1 0 1 2 3
 CMPA      X                                         X
 TEP                             X
 STEP    0 0 0 0 0       0       0     0         0 ...
-PWMint    |---|
+PWMint                          |---|
 PCNTint
 
-Only PWM interrupt is triggered on time == 1.
+Only PWM interrupt is triggered on time == (ticker).
 
 
 For steps = 1: ===========================================================================

@@ -381,7 +381,7 @@ const static char test_usage_str[] PROGMEM =
     "     R         ... start all selected tests\n"
     "     01        ... select test sequence 01 for selected stepper\n"
     "     :\n"
-    "     04        ... select test sequence 04 for selected stepper\n"
+    "     05        ... select test sequence 05 for selected stepper\n"
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
 #endif
@@ -682,6 +682,10 @@ void loop() {
           } else if (strcmp(in_buffer, "04") == 0) {
             Serial.println("Select test_seq_04");
             test_seq[selected].test = test_seq_04;
+            test_seq[selected].state = 0;
+          } else if (strcmp(in_buffer, "05") == 0) {
+            Serial.println("Select test_seq_05");
+            test_seq[selected].test = test_seq_05;
             test_seq[selected].state = 0;
           }
         }
