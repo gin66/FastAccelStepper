@@ -48,10 +48,10 @@ For steps = 2 ==================================================================
 Timer   0 1 2 3 4 ... ticks ... 1 0 1 2 3...ticks ... 1 0
 CMPA      X                         X            
 TEP                     X                    X
-STEP    0 1 1 1 1       0       0 1 1 1 1... 0        0 0...
-PCNT    0 1 1 1 1       1       1 2 2 2 2...
+STEP    0 1 1 1 1       0       0 0 1 1 1... 0        0 0...
+PCNT    0 1 1 1 1       1       1 1 2 2 2...
 PWMint
-PCNTint                           |---|
+PCNTint                             |---|
 
 PCNT interrupt is triggered on time == 1 and counter value 2.
 
