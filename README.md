@@ -55,6 +55,18 @@ General behaviour:
     - The calculation is then:
 			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
 	- But 4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
+	  Means the position will count:
+			-2.000.000.000
+			-2.000.000.001
+			-2.000.000.002
+				:	:
+			-2.147.483.647
+			-2.147.483.648
+			 2.147.483.647
+			 2.147.483.646
+			 2.147.483.645
+				:	:
+			 2.000.000.000
 
 Comments to pin sharing:
 * Enable pin sharing: the common pin will be enabled for as long as one motor is running + delay off.
