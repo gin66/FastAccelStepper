@@ -75,8 +75,6 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
-  // is updated only on zero
-  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = steps;
   if (e->toggle_dir) {
     uint8_t dirPin = queue->dirPin;
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
@@ -84,36 +82,40 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   uint16_t ticks = e->ticks;
   queue->ticks = ticks;
   mcpwm->timer[timer].period.period = ticks;
-  mcpwm->channel[timer].cmpr_value[0].cmpr_val = ticks >> 1;
   if (steps == 0) {
-    mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
+    // is updated only on zero
+    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
+    mcpwm->channel[timer].generator[0].utea = 1;  // timer value = 1: output low
     mcpwm->int_clr.val |= mapping->timer_tez_int_clr;
     mcpwm->int_ena.val |= mapping->timer_tez_int_ena;
   } else {
-    mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
+    // is updated only on zero
+    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 10; //steps;
+    mcpwm->channel[timer].generator[0].utea = 2;  // timer value = 1: output high
     mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
   }
+}
+
+static void IRAM_ATTR init_stop(StepperQueue *q) {
+    const struct mapping_s *mapping = q->mapping;
+    mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
+    mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+    uint8_t timer = mapping->timer;
+    mcpwm->timer[timer].mode.start = 0;           // 0: stop at TEZ
+    mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
+    q->isRunning = false;
+    q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 }
 
 static void IRAM_ATTR what_is_next(StepperQueue *q) {
   uint8_t rp = q->read_idx;
   if (rp != q->next_write_idx) {
     struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
-    rp++;
-    q->read_idx = rp;
+    q->read_idx = rp+1;
     next_command(q, e);
   } else {
     // no more commands: stop timer at period end
-    // Same as forceStop() => perhaps combine
-    const struct mapping_s *mapping = q->mapping;
-    mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-    mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
-    uint8_t timer = mapping->timer;
-    mcpwm->timer[timer].mode.start = 1;           // stop at TEP
-    mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
-    mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
-    q->isRunning = false;
-    q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
+    init_stop(q);	
   }
 }
 
@@ -189,7 +191,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         mcpwm_unit == MCPWM_UNIT_0 ? mcpwm0_isr_service : mcpwm1_isr_service,
         NULL, ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED, NULL);
 
-    mcpwm->clk_cfg.prescale = 10 - 1;  // 160 MHz/10  => 16 MHz
+    mcpwm->clk_cfg.prescale = 5 - 1;  // 160 MHz/5 = 32 MHz => 16 MHz in up/down-mode
 
     mcpwm->timer_sel.operator0_sel = 0;  // timer 0 is input for operator 0
     mcpwm->timer_sel.operator1_sel = 1;  // timer 1 is input for operator 1
@@ -197,17 +199,21 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   }
   mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
   mcpwm->timer[timer].period.prescale = TIMER_PRESCALER;
-  mcpwm->timer[timer].period.period = 400;
-  mcpwm->timer[timer].mode.val = 0;  // freeze
-  mcpwm->timer[timer].sync.val = 0;  // no sync
-  mcpwm->channel[timer].cmpr_cfg.a_upmethod = 0;
-  mcpwm->channel[timer].cmpr_value[0].cmpr_val = DEFAULT_TIMER_H_L_TRANSITION;
-  mcpwm->channel[timer].generator[0].val = 0;
-  mcpwm->channel[timer].generator[1].val = 0;
-  // mcpwm->channel[timer].generator[0].utez = 2;  // high at zero
-  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
-  mcpwm->channel[timer].generator[0].utea = 1;  // low at compare A match
-  mcpwm->channel[timer].db_cfg.val = 0;
+  mcpwm->timer[timer].period.period = 400; // Random value
+  mcpwm->timer[timer].mode.mode = 0;  // 0=freeze
+
+  // this sequence should reset the timer to 0
+  mcpwm->timer[timer].sync.timer_phase = 0;  // prepare value of 0
+  mcpwm->timer[timer].sync.in_en = 1;  // enable sync
+  mcpwm->timer[timer].sync.sync_sw ^= 1;  // force a sync
+  mcpwm->timer[timer].sync.in_en = 0;  // disable sync
+
+  mcpwm->channel[timer].cmpr_cfg.a_upmethod = 0; // 0 = immediate update
+  mcpwm->channel[timer].cmpr_value[0].cmpr_val = 1; // set compare value A
+  mcpwm->channel[timer].generator[0].val = 0; // clear all trigger actions
+  mcpwm->channel[timer].generator[1].val = 0; // clear all trigger actions
+  mcpwm->channel[timer].generator[0].dtep = 1;  // low at period
+  mcpwm->channel[timer].db_cfg.val = 0; // edge delay disabled
   mcpwm->channel[timer].carrier_cfg.val = 0;  // carrier disabled
 
   // at last link mcpwm to output pin and back into pcnt input
@@ -245,37 +251,23 @@ void StepperQueue::disconnect() {
 // period
 
 void StepperQueue::startQueue() {
-  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
-  uint8_t timer = mapping->timer;
-
-  // timer should be either at TEP or at zero
-  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
-  mcpwm->timer[timer].period.upmethod = 0;      // 0 = immediate update, 1 = TEZ
-  // period will be overwritten later in next_command
-  mcpwm->timer[timer].period.period = 65535;
   isRunning = true;
-
-  mcpwm->timer[timer].mode.val = 10;  // free run incrementing
-
-  // busy wait period for timer zero
-  while (mcpwm->timer[timer].status.value <= DEFAULT_TIMER_H_L_TRANSITION) {
-  }
 
   // my interrupt cannot be called in this state, so modifying read_idx without
   // interrupts disabled is ok
   struct queue_entry *e = &entry[read_idx++ & QUEUE_LEN_MASK];
   next_command(this, e);
-}
-void StepperQueue::forceStop() {
+
+  // timer should be either at zero or running towards zero from previous command
+  // Anyway, set to run continuous
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
-  mcpwm->timer[timer].mode.start = 1;           // stop at TEP
-  mcpwm->channel[timer].generator[0].utez = 1;  // low at zero
-  mcpwm->int_ena.val &= ~mapping->timer_tez_int_ena;
-  isRunning = false;
-  queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
+  mcpwm->timer[timer].mode.mode = 3;  // 3=up/down counting
+  mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
+}
+void StepperQueue::forceStop() {
+  init_stop(this);
 }
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
