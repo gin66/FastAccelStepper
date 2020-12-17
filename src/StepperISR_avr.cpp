@@ -14,7 +14,7 @@
 #if defined(ARDUINO_AVR_NANO)
 #define stepPinStepper1A 9  /* OC1A */
 #define stepPinStepper1B 10 /* OC1B */
-#elif defined(ARDUINO_AVR_ATmega2560)
+#elif defined(ARDUINO_AVR_MEGA2560)
 #define stepPinStepper1A 11 /* OC1A */
 #define stepPinStepper1B 12 /* OC1B */
 #define stepPinStepper1C 13 /* OC1B */
