@@ -210,9 +210,8 @@ class FastAccelStepper {
 #define AQE_QUEUE_FULL 1
 #define AQE_DIR_PIN_IS_BUSY 2
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
-#define AQE_ERROR_TICKS_TOO_HIGH -1
-#define AQE_ERROR_TICKS_TOO_LOW -2
-#define AQE_ERROR_STEPS_VALUE -3
+#define AQE_ERROR_TICKS_TOO_LOW -1
+#define AQE_ERROR_STEPS_VALUE -2
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();
