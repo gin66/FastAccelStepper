@@ -1,3 +1,11 @@
+pre 0.15.0:
+- For the commands in the queue, the minimum time in ticks to execute
+  a command is limited to 10*MIN_DELTA_TICKS. For esp32 this relates to
+  the time between interrupts of one channel
+- AQE_ERROR_TICKS_TOO_HIGH removed, because it is already limited by the data type uint16_t
+- esp32: Change from mcpwm up count mode to up-down count mode
+- avr: adjust implementation to esp32: pulse at start of ticks period of a command
+
 0.14.0:
 - Direction pins can be shared by several steppers
 - enableOutputs() returns bool to indicate, output was enabled

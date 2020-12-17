@@ -90,7 +90,6 @@ class StepperQueue {
 #if defined(ARDUINO_ARCH_AVR)
   enum channels channel;
 #endif
-  uint16_t ticks;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint8_t checksum;
 #endif
@@ -112,15 +111,20 @@ class StepperQueue {
     if (isQueueFull()) {
       return AQE_QUEUE_FULL;
     }
-    uint32_t period_ticks = cmd->ticks;
-    if (period_ticks > 65535) {
-      return AQE_ERROR_TICKS_TOO_HIGH;
+    uint16_t period = cmd->ticks;
+    uint8_t steps = cmd->steps;
+#if defined(ARDUINO_ARCH_ESP32)
+    uint32_t command_rate_ticks = period;
+    if (steps > 1) {
+      command_rate_ticks *= steps;
     }
-    uint16_t period = period_ticks;
+    if (command_rate_ticks < 10 * MIN_DELTA_TICKS) {  // MAGIC CONSTANT
+      return AQE_ERROR_TICKS_TOO_LOW;
+    }
+#endif
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-    uint8_t steps = cmd->steps;
     queue_end.pos += cmd->count_up ? steps : -steps;
     if (steps == 0) {
       // This is a pause

@@ -79,10 +79,10 @@ class FastAccelStepper {
   // In auto enable mode, this function is called from cyclic task/interrupt
   // with 4ms rate, which creates the commands to put into the command queue.
   // Thus the supplied function should take much less time than 4ms.
-  // Otherwise there is risk, that other running steppers are running out of commands in
-  // the queue. If this takes longer, then the function should be offloaded and
-  // return the new status, after the enable/disable function has been successfully
-  // completed.
+  // Otherwise there is risk, that other running steppers are running out of
+  // commands in the queue. If this takes longer, then the function should be
+  // offloaded and return the new status, after the enable/disable function has
+  // been successfully completed.
   void setExternalEnableCall(bool (*func)(uint8_t enablePin, uint8_t value));
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
@@ -210,9 +210,8 @@ class FastAccelStepper {
 #define AQE_QUEUE_FULL 1
 #define AQE_DIR_PIN_IS_BUSY 2
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
-#define AQE_ERROR_TICKS_TOO_HIGH -1
-#define AQE_ERROR_TICKS_TOO_LOW -2
-#define AQE_ERROR_STEPS_VALUE -3
+#define AQE_ERROR_TICKS_TOO_LOW -1
+#define AQE_ERROR_STEPS_VALUE -2
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();
