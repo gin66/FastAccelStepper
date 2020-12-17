@@ -5,7 +5,7 @@ The mcpwm generates the timing of the pulses.
 The pcnt module counts fast pulses.
 
 The io-matrix of esp32 is configured, that the mcpwm generated
-pulses a routed out to the GPIO pad and those pulses are
+pulses are routed to the GPIO pad and those pulses are
 fed back into the pulse counter.
 
 If the command queue contains a command with 0 steps aka pause,
@@ -54,8 +54,6 @@ PWMint
 PCNTint                           |---|
 
 PCNT interrupt is triggered on time == 1 and counter value 2.
-On time == 1, the step output is triggered high and transition to 0 on (ticks)
-
 
 Consequently: The ticks wait time is AFTER the pulse and started from L->H transition.
 Thus the pulse of the following command starts after this command's period
