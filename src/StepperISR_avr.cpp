@@ -137,10 +137,10 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     if (rp == fas_queue_##CHANNEL.next_write_idx) {                          \
       /* queue is empty => set to disconnect */                              \
       Stepper_Disconnect(T, CHANNEL);                                        \
-      /* disable compare interrupt */                                        \
-      DisableCompareInterrupt(T, CHANNEL);                                   \
       /* force compare to ensure disconnect */                               \
       ForceCompare(T, CHANNEL);                                              \
+      /* disable compare interrupt */                                        \
+      DisableCompareInterrupt(T, CHANNEL);                                   \
       fas_queue_##CHANNEL.isRunning = false;                                 \
       fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;         \
       return;                                                                \
@@ -217,6 +217,10 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
       Stepper_Toggle(T, CHANNEL);                                            \
     } else {                                                                 \
       Stepper_Zero(T, CHANNEL);                                              \
+    }                                                                        \
+    if (e->toggle_dir) {                                                     \
+      uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                           \
+      digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);        \
     }                                                                        \
     /* clear interrupt flag */                                               \
     ClearInterruptFlag(T, CHANNEL);                                          \
