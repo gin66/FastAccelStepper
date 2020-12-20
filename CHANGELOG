@@ -1,3 +1,6 @@
+0.15.2:
+- Assume for now, that atmega328 and ATmega2560 uses always same pins for OC1A and OC1B
+
 0.15.1:
 - Remove the check for specific avr board. This assumes, that all avr boards
   uses Pin 9 and Pin 10 for OC1A and OC1B respectively

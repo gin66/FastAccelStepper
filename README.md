@@ -187,7 +187,7 @@ This stepper driver uses mcpwm modules of the esp32: for the first three stepper
 
 The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-modification.
 
-### BOTH
+### ALL
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 

@@ -8,10 +8,10 @@
 
 // The ATmega328P has one 16 bit timer: Timer 1
 // The ATmega2560 has four 16 bit timers: Timer 1, 3, 4 and 5
-#if defined(ARDUINO_AVR_NANO)
+#if defined(__AVR_ATmega328P__)
 #define stepPinStepper1A 9  /* OC1A */
 #define stepPinStepper1B 10 /* OC1B */
-#elif defined(ARDUINO_AVR_MEGA2560)
+#elif defined(__AVR_ATmega2560__)
 #define stepPinStepper1A 11 /* OC1A */
 #define stepPinStepper1B 12 /* OC1B */
 #define stepPinStepper1C 13 /* OC1B */
