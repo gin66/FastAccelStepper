@@ -1,3 +1,7 @@
+0.15.1:
+- Remove the check for specific avr board. This assumes, that all avr boards
+  uses Pin 9 and Pin 10 for OC1A and OC1B respectively
+
 0.15.0:
 - For the commands in the queue, the minimum time in ticks to execute
   a command is limited to 10*MIN_DELTA_TICKS. For esp32 this relates to

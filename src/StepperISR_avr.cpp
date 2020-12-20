@@ -2,9 +2,6 @@
 #include "StepperISR.h"
 
 #if defined(ARDUINO_ARCH_AVR)
-#if !(defined(ARDUINO_AVR_NANO) || defined(ARDUINO_AVR_MEGA2560))
-#error "Unsupported board"
-#endif
 #if !(defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__))
 #error "Unsupported AVR derivate"
 #endif
