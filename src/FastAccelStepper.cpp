@@ -163,9 +163,10 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-      uint8_t high_active_pin = s->getEnablePinHighActive();
-      uint8_t low_active_pin = s->getEnablePinLowActive();
       if (s->needAutoDisable()) {
+        uint8_t high_active_pin = s->getEnablePinHighActive();
+        uint8_t low_active_pin = s->getEnablePinLowActive();
+
         noInterrupts();
         bool agree = true;
         for (uint8_t j = 0; j < _next_stepper_num; j++) {
@@ -174,7 +175,7 @@ void FastAccelStepperEngine::manageSteppers() {
             if (other) {
               if (other->usesAutoEnablePin(high_active_pin) ||
                   other->usesAutoEnablePin(low_active_pin)) {
-                if (!other->agreeWithAutoDisable()) {
+                if (!other->needAutoDisable()) {
                   agree = false;
                   break;
                 }
@@ -184,11 +185,13 @@ void FastAccelStepperEngine::manageSteppers() {
         }
         if (agree) {
           for (uint8_t j = 0; j < _next_stepper_num; j++) {
-            FastAccelStepper* other = _stepper[j];
-            if (other) {
-              if (other->usesAutoEnablePin(high_active_pin) ||
-                  other->usesAutoEnablePin(low_active_pin)) {
-                other->disableOutputs();
+            FastAccelStepper* current = _stepper[j];
+            if (current) {
+              if (current->usesAutoEnablePin(high_active_pin) ||
+                  current->usesAutoEnablePin(low_active_pin)) {
+				// if successful, then the _auto_disable_delay_counter is zero
+				// Otherwise in next loop will be checked for auto disable again
+                current->disableOutputs();
               }
             }
           }
@@ -196,6 +199,17 @@ void FastAccelStepperEngine::manageSteppers() {
         interrupts();
       }
     }
+  }
+
+  // Update the auto disable counters
+  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+    FastAccelStepper* s = _stepper[i];
+    if (s) {
+      if (s->needAutoDisable()) {
+		// update the counters down to 1
+		s->updateAutoDisable();
+	  }
+	}
   }
 }
 
@@ -349,16 +363,24 @@ void FastAccelStepper::fill_queue() {
   }
 }
 
+void FastAccelStepper::updateAutoDisable() {
+  // FastAccelStepperEngine will call with interrupts disabled
+  // noInterrupts();
+  if (_auto_disable_delay_counter > 1) {
+    if (!isRunning()) {
+      _auto_disable_delay_counter--;
+    }
+  }
+  // interrupts();
+}
+
 bool FastAccelStepper::needAutoDisable() {
   bool need_disable = false;
   // FastAccelStepperEngine will call with interrupts disabled
   // noInterrupts();
-  if (_auto_disable_delay_counter > 0) {
+  if (_auto_disable_delay_counter == 1) {
     if (!isRunning()) {
-      _auto_disable_delay_counter--;
-      if (_auto_disable_delay_counter == 0) {
-        need_disable = true;
-      }
+      need_disable = true;
     }
   }
   // interrupts();
@@ -372,16 +394,6 @@ bool FastAccelStepper::usesAutoEnablePin(uint8_t pin) {
     }
   }
   return false;
-}
-
-bool FastAccelStepper::agreeWithAutoDisable() {
-  bool agree = true;
-  noInterrupts();
-  if (_auto_disable_delay_counter > 0) {
-    agree = false;
-  }
-  interrupts();
-  return agree;
 }
 
 void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
@@ -507,7 +519,8 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   // set the new position
   q->queue_end.pos = new_pos;
 }
-void FastAccelStepper::disableOutputs() {
+bool FastAccelStepper::disableOutputs() {
+  bool disabled = true;
   if (_externalEnableCall == NULL) {
     if (_enablePinLowActive != PIN_UNDEFINED) {
       digitalWrite(_enablePinLowActive, HIGH);
@@ -517,12 +530,16 @@ void FastAccelStepper::disableOutputs() {
     }
   } else {
     if (_enablePinLowActive != PIN_UNDEFINED) {
-      _externalEnableCall(_enablePinLowActive, HIGH);
+      disabled &= (_externalEnableCall(_enablePinLowActive, HIGH) == HIGH);
     }
     if (_enablePinHighActive != PIN_UNDEFINED) {
-      _externalEnableCall(_enablePinHighActive, LOW);
+      disabled &= (_externalEnableCall(_enablePinHighActive, LOW) == LOW);
     }
   }
+  if (disabled) {
+	_auto_disable_delay_counter = 0;
+  }
+  return disabled;
 }
 bool FastAccelStepper::enableOutputs() {
   bool enabled = true;

@@ -1,3 +1,7 @@
+pre-0.16.0:
+- disableOutputs() returns boolean success value
+- The external enable output routine will be called regularly in case of disable, too
+
 0.15.2:
 - Assume for now, that atmega328 and ATmega2560 uses always same pins for OC1A and OC1B
 

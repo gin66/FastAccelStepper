@@ -87,7 +87,7 @@ class FastAccelStepper {
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
   bool enableOutputs();  // returns true, if enabled
-  void disableOutputs();
+  bool disableOutputs(); // returns true, if disabled
 
   // In auto enable mode, the stepper is enabled before stepping and disabled
   // afterwards. The delay from stepper enabled till first step and from
@@ -252,8 +252,8 @@ class FastAccelStepper {
 
   // These should not be called by the application
   void fill_queue();
+  void updateAutoDisable();
   bool needAutoDisable();
-  bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
   void detachFromPin();
   void reAttachToPin();
