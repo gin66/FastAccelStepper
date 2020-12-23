@@ -189,8 +189,8 @@ void FastAccelStepperEngine::manageSteppers() {
             if (current) {
               if (current->usesAutoEnablePin(high_active_pin) ||
                   current->usesAutoEnablePin(low_active_pin)) {
-				// if successful, then the _auto_disable_delay_counter is zero
-				// Otherwise in next loop will be checked for auto disable again
+                // if successful, then the _auto_disable_delay_counter is zero
+                // Otherwise in next loop will be checked for auto disable again
                 current->disableOutputs();
               }
             }
@@ -205,11 +205,11 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-        noInterrupts();
-		// update the counters down to 1
-		s->updateAutoDisable();
-        interrupts();
-	}
+      noInterrupts();
+      // update the counters down to 1
+      s->updateAutoDisable();
+      interrupts();
+    }
   }
 }
 
@@ -551,7 +551,7 @@ bool FastAccelStepper::disableOutputs() {
     }
   }
   if (disabled) {
-	_auto_disable_delay_counter = 0;
+    _auto_disable_delay_counter = 0;
   }
   return disabled;
 }

@@ -86,8 +86,8 @@ class FastAccelStepper {
   void setExternalEnableCall(bool (*func)(uint8_t enablePin, uint8_t value));
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
-  bool enableOutputs();  // returns true, if enabled
-  bool disableOutputs(); // returns true, if disabled
+  bool enableOutputs();   // returns true, if enabled
+  bool disableOutputs();  // returns true, if disabled
 
   // In auto enable mode, the stepper is enabled before stepping and disabled
   // afterwards. The delay from stepper enabled till first step and from
