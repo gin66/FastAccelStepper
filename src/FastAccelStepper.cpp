@@ -175,7 +175,7 @@ void FastAccelStepperEngine::manageSteppers() {
             if (other) {
               if (other->usesAutoEnablePin(high_active_pin) ||
                   other->usesAutoEnablePin(low_active_pin)) {
-                if (!other->needAutoDisable()) {
+                if (!other->agreeWithAutoDisable()) {
                   agree = false;
                   break;
                 }
@@ -205,10 +205,10 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-      if (s->needAutoDisable()) {
+        noInterrupts();
 		// update the counters down to 1
 		s->updateAutoDisable();
-	  }
+        interrupts();
 	}
   }
 }
@@ -372,6 +372,20 @@ void FastAccelStepper::updateAutoDisable() {
     }
   }
   // interrupts();
+}
+
+bool FastAccelStepper::agreeWithAutoDisable() {
+  bool agree = true;
+  // FastAccelStepperEngine will call with interrupts disabled
+  // noInterrupts();
+  if (isRunning()) {
+    agree = false;
+  }
+  if (_auto_disable_delay_counter > 1) {
+    agree = false;
+  }
+  // interrupts();
+  return agree;
 }
 
 bool FastAccelStepper::needAutoDisable() {

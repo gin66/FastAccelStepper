@@ -254,6 +254,7 @@ class FastAccelStepper {
   void fill_queue();
   void updateAutoDisable();
   bool needAutoDisable();
+  bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
   void detachFromPin();
   void reAttachToPin();
