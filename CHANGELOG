@@ -1,6 +1,9 @@
-pre-0.16.0:
+0.16.0:
 - disableOutputs() returns boolean success value
 - The external enable output routine will be called regularly in case of disable, too
+- esp32: fixed loss of pauses in command queue due to pcnt/mcpwm timer interaction.
+   This caused V4100 being faster than V4000, even so it should be slower
+- ramp generator: fix for high accelerations to have stop command effective
 
 0.15.2:
 - Assume for now, that atmega328 and ATmega2560 uses always same pins for OC1A and OC1B
