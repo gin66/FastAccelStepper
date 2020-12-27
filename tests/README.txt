@@ -16,3 +16,6 @@ Tests;
 - test_05
   check for move/moveTo while ramp is processing
   Introduce concept of interrupt generation during noInterrupts call
+
+- test_06
+  check for stop during move

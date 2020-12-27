@@ -19,8 +19,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM0A,
       pcnt_unit : PCNT_UNIT_0,
       input_sig_index : PCNT_SIG_CH0_IN0_IDX,
-      timer_tep_int_clr : MCPWM_TIMER0_TEP_INT_CLR,
-      timer_tep_int_ena : MCPWM_TIMER0_TEP_INT_ENA
+      cmpr_tea_int_clr : MCPWM_OP0_TEA_INT_CLR,
+      cmpr_tea_int_ena : MCPWM_OP0_TEA_INT_ENA
     },
     {
       mcpwm_unit : MCPWM_UNIT_0,
@@ -28,8 +28,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM1A,
       pcnt_unit : PCNT_UNIT_1,
       input_sig_index : PCNT_SIG_CH0_IN1_IDX,
-      timer_tep_int_clr : MCPWM_TIMER1_TEP_INT_CLR,
-      timer_tep_int_ena : MCPWM_TIMER1_TEP_INT_ENA
+      cmpr_tea_int_clr : MCPWM_OP1_TEA_INT_CLR,
+      cmpr_tea_int_ena : MCPWM_OP1_TEA_INT_ENA
     },
     {
       mcpwm_unit : MCPWM_UNIT_0,
@@ -37,8 +37,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM2A,
       pcnt_unit : PCNT_UNIT_2,
       input_sig_index : PCNT_SIG_CH0_IN2_IDX,
-      timer_tep_int_clr : MCPWM_TIMER2_TEP_INT_CLR,
-      timer_tep_int_ena : MCPWM_TIMER2_TEP_INT_ENA
+      cmpr_tea_int_clr : MCPWM_OP2_TEA_INT_CLR,
+      cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA
     },
     {
       mcpwm_unit : MCPWM_UNIT_1,
@@ -46,8 +46,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM0A,
       pcnt_unit : PCNT_UNIT_3,
       input_sig_index : PCNT_SIG_CH0_IN3_IDX,
-      timer_tep_int_clr : MCPWM_TIMER0_TEP_INT_CLR,
-      timer_tep_int_ena : MCPWM_TIMER0_TEP_INT_ENA
+      cmpr_tea_int_clr : MCPWM_OP0_TEA_INT_CLR,
+      cmpr_tea_int_ena : MCPWM_OP0_TEA_INT_ENA
     },
     {
       mcpwm_unit : MCPWM_UNIT_1,
@@ -55,8 +55,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM1A,
       pcnt_unit : PCNT_UNIT_4,
       input_sig_index : PCNT_SIG_CH0_IN4_IDX,
-      timer_tep_int_clr : MCPWM_TIMER1_TEP_INT_CLR,
-      timer_tep_int_ena : MCPWM_TIMER1_TEP_INT_ENA
+      cmpr_tea_int_clr : MCPWM_OP1_TEA_INT_CLR,
+      cmpr_tea_int_ena : MCPWM_OP1_TEA_INT_ENA
     },
     {
       mcpwm_unit : MCPWM_UNIT_1,
@@ -64,8 +64,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pwm_output_pin : MCPWM2A,
       pcnt_unit : PCNT_UNIT_5,
       input_sig_index : PCNT_SIG_CH0_IN5_IDX,
-      timer_tep_int_clr : MCPWM_TIMER2_TEP_INT_CLR,
-      timer_tep_int_ena : MCPWM_TIMER2_TEP_INT_ENA
+      cmpr_tea_int_clr : MCPWM_OP2_TEA_INT_CLR,
+      cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA
     },
 };
 
@@ -73,6 +73,7 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
@@ -80,19 +81,32 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
   }
   uint16_t ticks = e->ticks;
+  // period value shall be taken over for _next_ period
+  mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
   mcpwm->timer[timer].period.period = ticks;
   if (steps == 0) {
-    // is updated only on zero
-    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
-    mcpwm->channel[timer].generator[0].utea = 1;  // timer value = 1: output low
-    mcpwm->int_clr.val |= mapping->timer_tep_int_clr;
-    mcpwm->int_ena.val |= mapping->timer_tep_int_ena;
+    // is updated only on zero for next cycle
+	// any value should do, as this should not be used
+    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 255;
+	// timer value = 1 - upcounting: output low
+    mcpwm->channel[timer].generator[0].utea = 1;
+    mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
+    mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
-    // is updated only on zero
-    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = steps;
-    mcpwm->channel[timer].generator[0].utea =
-        2;  // timer value = 1: output high
-    mcpwm->int_ena.val &= ~mapping->timer_tep_int_ena;
+	if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim == 255) {
+		// coming from a pause, need to force new value taken over
+        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
+
+        // ensure zero event for pcnt to take over new value for h limit
+        pcnt_counter_clear(pcnt_unit);
+	}
+	else {
+        // is updated only on zero for next cycle
+        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
+	}
+	// timer value = 1 - upcounting: output high
+    mcpwm->channel[timer].generator[0].utea = 2;
+    mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
   }
 }
 
@@ -102,7 +116,7 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
   mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
-  mcpwm->int_ena.val &= ~mapping->timer_tep_int_ena;
+  mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
   q->isRunning = false;
   q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 }
@@ -125,11 +139,11 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 }
 
 // MCPWM_SERVICE is only used in case of pause
-#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)            \
-  if (mcpwm.int_st.timer##TIMER##_tep_int_st != 0) { \
-    mcpwm.int_clr.timer##TIMER##_tep_int_clr = 1;    \
-    StepperQueue *q = &fas_queue[pcnt];              \
-    what_is_next(q);                                 \
+#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)             \
+  if (mcpwm.int_st.cmpr##TIMER##_tea_int_st != 0) {  \
+    /*mcpwm.int_clr.cmpr##TIMER##_tea_int_clr = 1;*/ \
+    StepperQueue *q = &fas_queue[pcnt];               \
+    what_is_next(q);                                  \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
@@ -198,7 +212,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     mcpwm->timer_sel.operator1_sel = 1;  // timer 1 is input for operator 1
     mcpwm->timer_sel.operator2_sel = 2;  // timer 2 is input for operator 2
   }
-  mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
+  mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
   mcpwm->timer[timer].period.prescale = TIMER_PRESCALER;
   mcpwm->timer[timer].period.period = 400;  // Random value
   mcpwm->timer[timer].mode.mode = 0;        // 0=freeze
@@ -217,7 +231,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->channel[timer].db_cfg.val = 0;         // edge delay disabled
   mcpwm->channel[timer].carrier_cfg.val = 0;    // carrier disabled
 
-  // at last link mcpwm to output pin and back into pcnt input
+  // at last, link mcpwm to output pin and back into pcnt input
   connect();
 }
 
@@ -241,11 +255,11 @@ void StepperQueue::disconnect() {
 // *	init counter
 // *	init mcpwm
 // *	start mcpwm
-// *	-- mcpwm counter counts every L->H-transition at mcpwm.timer = 0
+// *	-- pcnt counter counts every L->H-transition at mcpwm.timer = 1
 // *	-- if counter reaches planned steps, then counter is reset and
 // *	interrupt is created
 //
-// *	pcnt interrupt: available time is from mcpwm.timer = 0+x to period
+// *	pcnt interrupt: available time is from mcpwm.timer = 1+x to period
 //		-	read next commmand: store period in counter shadow and
 // steps in pcnt
 //		- 	without next command: set mcpwm to stop mode on reaching
@@ -259,8 +273,12 @@ void StepperQueue::startQueue() {
   struct queue_entry *e = &entry[read_idx++ & QUEUE_LEN_MASK];
   next_command(this, e);
 
+  // ensure zero event for pcnt to take over new value for h limit
+  pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
+  pcnt_counter_clear(pcnt_unit);
+
   // timer should be either at zero or running towards zero from previous
-  // command Anyway, set to run continuous
+  // command. Anyway, set to run continuous
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;

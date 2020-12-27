@@ -66,8 +66,8 @@ struct mapping_s {
   mcpwm_io_signals_t pwm_output_pin;
   pcnt_unit_t pcnt_unit;
   uint8_t input_sig_index;
-  uint32_t timer_tep_int_clr;
-  uint32_t timer_tep_int_ena;
+  uint32_t cmpr_tea_int_clr;
+  uint32_t cmpr_tea_int_ena;
 };
 #endif
 

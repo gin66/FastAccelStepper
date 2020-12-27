@@ -21,13 +21,13 @@ Timing:
 For steps = 0: ===========================================================================
 
 Timer   0 1 2 3 4 ... ticks-1 ticks ticks-1 ... 1 0 1 2 3
-CMPA      X                                         X
+TEA       X                                     X   X
 TEP                             X
 STEP    0 0 0 0 0       0       0     0         0 ...
-PWMint                          |---|
+PWMint    |---|                                (|-----|) in case of another pause
 PCNTint
 
-Only PWM interrupt is triggered on time == (ticker).
+Only PWM interrupt is triggered on time == 1. On down counting, a second event is generated two clock cycles later: too fast for two interrupts.
 
 
 For steps = 1: ===========================================================================
@@ -36,7 +36,7 @@ Timer   0 1 2 3 4 ... ticks-1 ticks ticks-1 ... 1 0 1 2 3
 CMPA      X                                         X
 TEP                             X
 STEP    0 1 1 1 1       1       0     0         0.....
-PCNT    0 1 1 1 1   ............................
+PCNT    0 1 1 1 1   ............................  
 PWMint
 PCNTint   |---|
 
@@ -54,6 +54,8 @@ PWMint
 PCNTint                             |---|
 
 PCNT interrupt is triggered on time == 1 and counter value 2.
+
+Important: mcpwm update method at TEZ
 
 Consequently: The ticks wait time is AFTER the pulse and started from L->H transition.
 Thus the pulse of the following command starts after this command's period
