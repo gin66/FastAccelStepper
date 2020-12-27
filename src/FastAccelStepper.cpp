@@ -419,7 +419,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _engine = engine;
   _autoEnable = false;
   _on_delay_ticks = 0;
-  _off_delay_count = 0;
+  _off_delay_count = 1;
   _auto_disable_delay_counter = 0;
   _stepPin = step_pin;
   _dirHighCountsUp = true;
@@ -466,21 +466,24 @@ void FastAccelStepper::setExternalEnableCall(bool (*func)(uint8_t enablePin,
 }
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
   _autoEnable = auto_enable;
-  if (auto_enable && (_on_delay_ticks == 0)) {
-    _on_delay_ticks = 1;
+  if (auto_enable && (_off_delay_count == 0)) {
+    _off_delay_count = 1;
   }
 }
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = US_TO_TICKS(delay_us);
+  if (delay_ticks > 0) {
 #if defined(ARDUINO_ARCH_AVR)
-  if (delay_ticks < MIN_DELTA_TICKS) {
-    return DELAY_TOO_LOW;
-  }
+    if (delay_ticks < MIN_DELTA_TICKS) {
+      return DELAY_TOO_LOW;
+    }
 #else
-  if (delay_ticks < 10 * MIN_DELTA_TICKS) {  // SEE addQueueEntry for reference
-    return DELAY_TOO_LOW;
-  }
+    if (delay_ticks <
+        10 * MIN_DELTA_TICKS) {  // SEE addQueueEntry for reference
+      return DELAY_TOO_LOW;
+    }
 #endif
+  }
   if (delay_ticks > MAX_ON_DELAY_TICKS) {
     return DELAY_TOO_HIGH;
   }
@@ -499,7 +502,7 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
     // ensure minimum time
     delay_count = 2;
   }
-  _off_delay_count = delay_count;
+  _off_delay_count = max(delay_count, 1);
 }
 void FastAccelStepper::setSpeed(uint32_t min_step_us) {
   _rg.setSpeed(min_step_us);

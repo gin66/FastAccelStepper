@@ -276,8 +276,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
-	  d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
+      // if acceleration is very high, then d_ticks_new can be lower than
+      // min_travel_ticks
+      d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
 
       // avoid overshoot
       next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
@@ -301,8 +302,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
-	  d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
+      // if acceleration is very high, then d_ticks_new can be lower than
+      // min_travel_ticks
+      d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
 
       // avoid undershoot
       next_ticks = min(d_ticks_new, ramp->config.min_travel_ticks);
@@ -323,12 +325,12 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
-	  // in this case can immediately stop
-	  if (d_ticks_new < ramp->config.min_travel_ticks) {
-         command->ticks = 0;
-         return RAMP_STATE_IDLE;
-	  }	
+      // if acceleration is very high, then d_ticks_new can be lower than
+      // min_travel_ticks in this case can immediately stop
+      if (d_ticks_new < ramp->config.min_travel_ticks) {
+        command->ticks = 0;
+        return RAMP_STATE_IDLE;
+      }
 
       // avoid undershoot
       next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
@@ -347,11 +349,11 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
-	  // in this case can immediately reverse
-	  if (d_ticks_new < ramp->config.min_travel_ticks) {
-		  count_up = need_count_up;
-	  }	
+      // if acceleration is very high, then d_ticks_new can be lower than
+      // min_travel_ticks in this case can immediately reverse
+      if (d_ticks_new < ramp->config.min_travel_ticks) {
+        count_up = need_count_up;
+      }
 
       // avoid undershoot
       next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
@@ -435,12 +437,11 @@ void RampGenerator::commandEnqueued(struct stepper_command_s *command,
     case RAMP_STATE_DECELERATE:
     case RAMP_STATE_DECELERATE_TO_STOP:
       uint32_t prus = _rw.performed_ramp_up_steps;
-	  if (prus < command->steps) {
-		  prus = 0;
-	  }
-	  else {
-		  prus -= command->steps;
-	  }
+      if (prus < command->steps) {
+        prus = 0;
+      } else {
+        prus -= command->steps;
+      }
       _rw.performed_ramp_up_steps = prus;
       break;
   }

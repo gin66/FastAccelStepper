@@ -86,25 +86,24 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   mcpwm->timer[timer].period.period = ticks;
   if (steps == 0) {
     // is updated only on zero for next cycle
-	// any value should do, as this should not be used
+    // any value should do, as this should not be used
     PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 255;
-	// timer value = 1 - upcounting: output low
+    // timer value = 1 - upcounting: output low
     mcpwm->channel[timer].generator[0].utea = 1;
     mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
-	if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim == 255) {
-		// coming from a pause, need to force new value taken over
-        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
+    if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim == 255) {
+      // coming from a pause, need to force new value taken over
+      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
 
-        // ensure zero event for pcnt to take over new value for h limit
-        pcnt_counter_clear(pcnt_unit);
-	}
-	else {
-        // is updated only on zero for next cycle
-        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
-	}
-	// timer value = 1 - upcounting: output high
+      // ensure zero event for pcnt to take over new value for h limit
+      pcnt_counter_clear(pcnt_unit);
+    } else {
+      // is updated only on zero for next cycle
+      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
+    }
+    // timer value = 1 - upcounting: output high
     mcpwm->channel[timer].generator[0].utea = 2;
     mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
   }
@@ -139,11 +138,11 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 }
 
 // MCPWM_SERVICE is only used in case of pause
-#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)             \
+#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)            \
   if (mcpwm.int_st.cmpr##TIMER##_tea_int_st != 0) {  \
     /*mcpwm.int_clr.cmpr##TIMER##_tea_int_clr = 1;*/ \
-    StepperQueue *q = &fas_queue[pcnt];               \
-    what_is_next(q);                                  \
+    StepperQueue *q = &fas_queue[pcnt];              \
+    what_is_next(q);                                 \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {

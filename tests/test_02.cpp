@@ -229,6 +229,6 @@ int main() {
   // no ramp time, just constant run time
   test_with_pars("f21", 15000, 4000, 100000, true, 50.9, 60.1, 0.1);
   test_with_pars("f22", 14634, 4100, 100000, true, 50.9, 60.1, 0.1);
- 
+
   printf("TEST_02 PASSED\n");
 }

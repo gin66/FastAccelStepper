@@ -104,7 +104,7 @@ Please check the examples for application and how to use the low level interface
 
 The module defines the global variable fas_queue. Do not use or redefine this variable.
 
-Using the high level interface with ramp up/down:
+Using the high level interface with ramp up/down as in [UsageExample.ino](https://github.com/gin66/FastAccelStepper/blob/master/examples/UsageExample/UsageExample.ino).
 
 ```
 #include "FastAccelStepper.h"
