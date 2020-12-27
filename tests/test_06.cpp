@@ -55,16 +55,16 @@ int main() {
   int stop_initiated = false;
   for (int i = 0; i < steps; i++) {
     if (!speed_changed && (s.getCurrentPosition() >= 1000)) {
-      puts("Change speed");
+      puts("Change speed to 4300us");
       s.fill_queue();  // ensure queue is not empty
       speed_changed = true;
       s.setSpeed(4300);
       s.applySpeedAcceleration();
     }
-    if (!speed_changed && (s.getCurrentPosition() >= 2000)) {
-      puts("Change speed");
+    if (!stop_initiated && (s.getCurrentPosition() >= 2000)) {
+      puts("Init stop");
       s.fill_queue();  // ensure queue is not empty
-      speed_changed = true;
+      stop_initiated = true;
       s.stopMove();
     }
     if (true) {
@@ -99,5 +99,5 @@ int main() {
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif
 
-  printf("TEST_04 PASSED\n");
+  printf("TEST_06 PASSED\n");
 }

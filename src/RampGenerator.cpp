@@ -230,9 +230,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #ifdef TEST
   printf(
       "pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d "
-      "queue_end.ticks=%u ",
+      "queue_end.ticks=%u travel_ticks=%u ",
       queue_end->pos, remaining_steps, rw->performed_ramp_up_steps,
-      planning_steps, qe_ticks);
+      planning_steps, qe_ticks, ramp->config.min_travel_ticks);
   if (count_up) {
     printf("+");
   } else {
@@ -276,6 +276,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
+	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
+	  d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
+
       // avoid overshoot
       next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
       if (rw->performed_ramp_up_steps == 0) {
@@ -298,6 +301,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
+	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
+	  d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
+
       // avoid undershoot
       next_ticks = min(d_ticks_new, ramp->config.min_travel_ticks);
 
@@ -311,12 +317,41 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
       break;
     case RAMP_STATE_DECELERATE_TO_STOP:
+      upm_rem_steps = upm_from(remaining_steps - planning_steps);
+      upm_d_ticks_new =
+          upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
+
+      d_ticks_new = upm_to_u32(upm_d_ticks_new);
+
+	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
+	  // in this case can immediately stop
+	  if (d_ticks_new < ramp->config.min_travel_ticks) {
+         command->ticks = 0;
+         return RAMP_STATE_IDLE;
+	  }	
+
+      // avoid undershoot
+      next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
+
+      // CLIPPING: avoid reduction
+      next_ticks = max(next_ticks, curr_ticks);
+#ifdef TEST
+      printf("decelerate ticks => %d  during %d steps (d_ticks_new = %u)\n",
+             next_ticks, planning_steps, d_ticks_new);
+#endif
+      break;
     case RAMP_STATE_REVERSE:
       upm_rem_steps = upm_from(remaining_steps - planning_steps);
       upm_d_ticks_new =
           upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
+
+	  // if acceleration is very high, then d_ticks_new can be lower than min_travel_ticks
+	  // in this case can immediately reverse
+	  if (d_ticks_new < ramp->config.min_travel_ticks) {
+		  count_up = need_count_up;
+	  }	
 
       // avoid undershoot
       next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
@@ -399,7 +434,14 @@ void RampGenerator::commandEnqueued(struct stepper_command_s *command,
     case RAMP_STATE_REVERSE:
     case RAMP_STATE_DECELERATE:
     case RAMP_STATE_DECELERATE_TO_STOP:
-      _rw.performed_ramp_up_steps -= command->steps;
+      uint32_t prus = _rw.performed_ramp_up_steps;
+	  if (prus < command->steps) {
+		  prus = 0;
+	  }
+	  else {
+		  prus -= command->steps;
+	  }
+      _rw.performed_ramp_up_steps = prus;
       break;
   }
   interrupts();
