@@ -21,7 +21,7 @@ void setup() {
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
 
-	// If auto enable/disable need delays, just add (one or both):
+    // If auto enable/disable need delays, just add (one or both):
     // stepper->setDelayToEnable(50);
     // stepper->setDelayToDisable(1000);
 

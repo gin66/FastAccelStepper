@@ -1,10 +1,9 @@
 #include "FastAccelStepper.h"
 
-#define enablePinStepper 12
-#define dirPinStepper 27
-
 // for avr: either use pin 9 or 10 aka OC1A or OC1B
-#define stepPinStepper 26
+#define stepPinStepper 17
+#define enablePinStepper 26
+#define dirPinStepper 18
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper;
@@ -25,14 +24,14 @@ void setup() {
   }
 }
 
-// This loop should use the new pause only command to generate steps every 2 s
+// This loop should use the new pause only command to generate steps every 0.1 s
 
 void loop() {
   // in case the stepper has not gotten initialized
   if (!stepper) {
     return;
   }
-  // every loop will create one step and then pause 2s = 500 * 2ms
+  // every loop will create one step and then pause 0.1 s = 25 * 4ms
   const struct stepper_command_s cmd_step = {
       .ticks = 64000, .steps = 1, .count_up = true};  // one step with pause 4ms
   const struct stepper_command_s cmd_pause = {
@@ -51,8 +50,8 @@ void loop() {
     delayMicroseconds(1000);
   }
 
-  // this creates 499*4ms pauses
-  for (uint16_t i = 0; i < 499; i++) {
+  // this creates 24*4ms pauses
+  for (uint16_t i = 0; i < 24; i++) {
     // This loop repeats a command, in case the queue is full
     while (true) {
       int rc = stepper->addQueueEntry(&cmd_pause);

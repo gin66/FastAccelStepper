@@ -1,6 +1,7 @@
-pre-0.16.2:
+0.16.2:
 - Add comments to example RawAccessWithPause (renamed from RawAccessWithDelay)
 - addQueueEntry() expects now a const pointer instead of just a pointer
+- Rework RawAccess example and test on hw
 
 0.16.1:
 - Usage example in readme has not worked due to a bug in the auto enable/disable variable setting.

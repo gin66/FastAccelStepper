@@ -1,10 +1,9 @@
 #include "FastAccelStepper.h"
 
-#define enablePinStepper 21
-#define dirPinStepper 22
-
 // for avr: either use pin 9 or 10 aka OC1A or OC1B
-#define stepPinStepper 23
+#define stepPinStepper 17
+#define enablePinStepper 26
+#define dirPinStepper 18
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper;
@@ -20,39 +19,66 @@ void setup() {
   if (stepper) {
     stepper->setDirectionPin(dirPinStepper);
     stepper->setEnablePin(enablePinStepper);
-    stepper->setAutoEnable(true);
+    stepper->setAutoEnable(false);
+    stepper->enableOutputs();
   }
 }
 
-// This loop drives the stepper up to 80000 microsteps/s.
-// For a NEMA-17 with 200 steps/revolution and 16 microsteps, this means 25
-// revolutions/s
+// This loop drives the stepper up to 50000 microsteps/s.
+// For a NEMA-17 with 200 steps/revolution and 16 microsteps driver setting,
+// this means 15.6 revolutions/s
 
 bool direction = false;
-
-#define MAX_SPEED 80000 /* steps/s */
 
 void loop() {
   if (!stepper) {
     return;
   }
-#define COMMAND_CNT (MAX_SPEED / 100)
+#define STEPS 500
   Serial.println("Start");
-  for (uint16_t i = 1; i < 2 * COMMAND_CNT; i++) {
-    uint8_t steps = 100;
-    uint32_t steps_per_s =
-        max(min(i, 2 * COMMAND_CNT - i), TICKS_PER_S / 65536 + 1) * 100;
-    uint16_t ticks = TICKS_PER_S / steps_per_s;
+  for (uint32_t step = 1; step < STEPS; step++) {
+    // Ticks at start/end: 10ms
+    // @step = STEPS/2: it is 10ms/STEPS for STEPS=500 => 20us
+    uint32_t k = max(step, STEPS - step);
+    uint32_t ticks = TICKS_PER_S / 100 / (STEPS - k);
+    uint16_t curr_ticks;
+    uint8_t steps;
+    if (ticks > 65535) {
+      curr_ticks = 32768;
+      steps = 1;
+    } else {
+      steps = 65535 / ticks;
+      curr_ticks = ticks;
+    }
+    ticks -= curr_ticks;
+    struct stepper_command_s cmd = {
+        .ticks = curr_ticks, .steps = steps, .count_up = direction};
     while (true) {
-      struct stepper_command_s cmd = {
-          .ticks = ticks, .steps = steps, .count_up = direction};
       int rc = stepper->addQueueEntry(&cmd);
-      // Serial.println(rc);
       if (rc == AQE_OK) {
         break;
       }
       // adding a delay(1) causes problems
       delayMicroseconds(1000);
+    }
+    while (ticks > 0) {
+      uint16_t curr_ticks;
+      if (ticks > 65535) {
+        curr_ticks = 32768;
+      } else {
+        curr_ticks = ticks;
+      }
+      ticks -= curr_ticks;
+      struct stepper_command_s cmd = {
+          .ticks = curr_ticks, .steps = 0, .count_up = direction};
+      while (true) {
+        int rc = stepper->addQueueEntry(&cmd);
+        if (rc == AQE_OK) {
+          break;
+        }
+        // adding a delay(1) causes problems
+        delayMicroseconds(1000);
+      }
     }
   }
 
@@ -66,6 +92,6 @@ void loop() {
 
   Serial.println("stepper has stopped");
 
-  delay(10000);
+  delay(1000);
   direction = !direction;
 }
