@@ -107,7 +107,7 @@ class StepperQueue {
   }
   inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
   inline bool isQueueEmpty() { return queueEntries() == 0; }
-  int addQueueEntry(struct stepper_command_s* cmd) {
+  int addQueueEntry(const struct stepper_command_s* cmd) {
     if (isQueueFull()) {
       return AQE_QUEUE_FULL;
     }

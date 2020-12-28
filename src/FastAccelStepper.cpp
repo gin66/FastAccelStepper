@@ -226,7 +226,7 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-int8_t FastAccelStepper::addQueueEntry(struct stepper_command_s* cmd) {
+int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd) {
   if (cmd->steps >= 128) {
     return AQE_ERROR_STEPS_VALUE;
   }

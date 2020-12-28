@@ -202,7 +202,7 @@ class FastAccelStepper {
 
   // Low level acccess via command queue
   // stepper queue management (low level access)
-  int8_t addQueueEntry(struct stepper_command_s* cmd);
+  int8_t addQueueEntry(const struct stepper_command_s* cmd);
 
   // Return codes for addQueueEntry
   //    positive values mean, that caller should retry later
