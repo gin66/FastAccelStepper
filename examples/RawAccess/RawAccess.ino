@@ -19,8 +19,7 @@ void setup() {
   if (stepper) {
     stepper->setDirectionPin(dirPinStepper);
     stepper->setEnablePin(enablePinStepper);
-    stepper->setAutoEnable(false);
-    stepper->enableOutputs();
+    stepper->setAutoEnable(true);
   }
 }
 
