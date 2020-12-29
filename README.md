@@ -195,6 +195,10 @@ The compare interrupt routines use 16bit tick counters, which translates to appr
 
 The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed (beware of any Serial.print in your hot path).
 
+## Usage for multi-axis applications
+
+For coordinated movement of two or more axis, the current ramp generation will not provide good results. The planning of steps needs to take into consideration max.speed/acceleration of all steppers and eventually the net speed/acceleration of the resulting movement together with its restrictions. Nice example of multi-axis forward planning can be found within the (marlin-project)[https://github.com/MarlinFirmware/Marlin/tree/2.0.x/Marlin/src/module]. If this kind of multi-dimensional planning is used, then FastAccelStepper is a good solution to execute the raw commands (without ramp generation). Only missing feature for this is a synchronized start of several steppers. With the tick-exact execution of commands, the synchronization will not be lost as long as the command queues are not running out of commands.
+
 ## TODO
 
 See [project](https://github.com/gin66/FastAccelStepper/projects/1)
