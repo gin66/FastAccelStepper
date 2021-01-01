@@ -3,6 +3,7 @@
 *.py
 .pio
 pio_dirs
+PCB/
 examples/*/*.h
 examples/*/*.cpp
 !examples/*/test_*.cpp
