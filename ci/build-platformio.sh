@@ -28,8 +28,6 @@ do
 	cd pio_dirs/$i
 	ln -s ../../ci/platformio.ini .
 	cd src
-	ln -s ../../../src/*.cpp .
-	ln -s ../../../src/*.h .
 	FILES=`cd ../../../examples/$i;find . -type f`
 	for f in $FILES;do ln -s ../../../examples/$i/$f .;done
 	cd ../../..
@@ -41,8 +39,6 @@ mkdir pio_dirs/PMF_test/src
 cd pio_dirs/PMF_test
 ln -s ../../ci/platformio.ini .
 cd src
-ln -s ../../../src/*.cpp .
-ln -s ../../../src/*.h .
 #sed  -e 's/%d/%ld/g' <../../../tests/test_03.h >test_03.h
 ln -s ../../../tests/test_03.h .
 ln -s ../../../tests/PMF_test.ino PMF_test.ino
