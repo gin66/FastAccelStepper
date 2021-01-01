@@ -133,9 +133,9 @@ void test_speed_decrease() {
       break;
     }
     s.fill_queue();
-	if (s.rampState() == RAMP_STATE_DECELERATE) {
-	  count_state_dec++;
-	}
+    if (s.rampState() == RAMP_STATE_DECELERATE) {
+      count_state_dec++;
+    }
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
       rc.check_section(

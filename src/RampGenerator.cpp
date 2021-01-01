@@ -296,21 +296,18 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
       break;
     case RAMP_STATE_DECELERATE:
-      upm_rem_steps = upm_from(rw->performed_ramp_up_steps + planning_steps);
-      upm_d_ticks_new =
-          upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
-
-      d_ticks_new = upm_to_u32(upm_d_ticks_new);
-
-      // if acceleration is very high, then d_ticks_new can be lower than
-      // min_travel_ticks
-      d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
-
-      // avoid undershoot
-      next_ticks = min(d_ticks_new, ramp->config.min_travel_ticks);
+      planning_steps = min(planning_steps, rw->performed_ramp_up_steps);
+      if (planning_steps == 0) {
+        d_ticks_new = ramp->config.min_travel_ticks;
+      } else {
+        upm_rem_steps = upm_from(rw->performed_ramp_up_steps - planning_steps);
+        upm_d_ticks_new =
+            upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
+        d_ticks_new = upm_to_u32(upm_d_ticks_new);
+      }
 
       // CLIPPING: avoid reduction
-      next_ticks = max(next_ticks, curr_ticks);
+      next_ticks = max(d_ticks_new, curr_ticks);
 
 #ifdef TEST
       printf("decelerate ticks => %d  during %d steps (d_ticks_new = %u)",
@@ -332,11 +329,8 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
         return RAMP_STATE_IDLE;
       }
 
-      // avoid undershoot
-      next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
-
       // CLIPPING: avoid reduction
-      next_ticks = max(next_ticks, curr_ticks);
+      next_ticks = max(d_ticks_new, curr_ticks);
 #ifdef TEST
       printf("decelerate ticks => %d  during %d steps (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
@@ -353,13 +347,11 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
       // min_travel_ticks in this case can immediately reverse
       if (d_ticks_new < ramp->config.min_travel_ticks) {
         count_up = need_count_up;
+        d_ticks_new = ramp->config.min_travel_ticks;
       }
 
-      // avoid undershoot
-      next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
-
       // CLIPPING: avoid reduction
-      next_ticks = max(next_ticks, curr_ticks);
+      next_ticks = max(d_ticks_new, curr_ticks);
 #ifdef TEST
       printf("decelerate ticks => %d  during %d steps (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
