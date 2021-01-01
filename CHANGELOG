@@ -1,3 +1,7 @@
+pre-0.16.4:
+- Example code for platformio (built with ci/build-platformio.sh) references the library code
+  via platformio.ini option and not via symbolic links.
+
 0.16.3:
 - Add another test case for speed reduction, while running (see issue #23)
   This has identified a bug in the ramp generator impacting esp32/avr. This bug is now fixed.
