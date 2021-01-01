@@ -1,7 +1,4 @@
 #include <stdint.h>
-#ifdef TEST
-#include "stubs.h"
-#endif
 #if defined(ARDUINO_ARCH_AVR)
 #include <avr/pgmspace.h>
 #else
