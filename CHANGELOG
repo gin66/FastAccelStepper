@@ -1,6 +1,6 @@
 0.16.3:
-- Add another test case for speed reduction, while running. This has identified
-  a bug in the ramp generator impacting esp32/avr. This bug is now fixed.
+- Add another test case for speed reduction, while running (see issue #23)
+  This has identified a bug in the ramp generator impacting esp32/avr. This bug is now fixed.
 
 0.16.2:
 - Add comments to example RawAccessWithPause (renamed from RawAccessWithDelay)
