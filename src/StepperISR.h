@@ -11,8 +11,6 @@
 #include "fas_config.h"
 #endif
 
-// CURRENT QUEUE IMPLEMENTATION WASTES ONE UNUSED ENTRY => BUG/TODO
-
 #if defined(TEST)
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
