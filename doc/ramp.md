@@ -57,16 +57,26 @@ a = -------------
 
 Calculation example: Stepper motor should perform 32000 steps in 10s.
 
-The required acceleration and (minimum) speed for different acceleration times are calculated as this:
+The required acceleration and speed for different acceleration times are calculated as this:
 ```
 Ta = 1s => a = 32000/9  steps/s² = 3556 steps/s²
            v = a*Ta = 3556 steps/s => 281us/step
 Ta = 2s => a = 32000/16 steps/s² = 2000 steps/s²
            v = a*Ta = 4000 steps/s => 250us/step
-Ta = 3s => a = 32000/21 steps/s² = 15248 steps/s²
+Ta = 3s => a = 32000/21 steps/s² = 1524 steps/s²
            v = a*Ta = 4571 steps/s => 218us/step
 Ta = 4s => a = 32000/24 steps/s² = 1333 steps/s²
            v = a*Ta = 5333 steps/s => 188us/step
 Ta = 5s => a = 32000/25 steps/s² = 1280 steps/s²
            v = a*Ta = 6400 steps/s => 156us/step
 ```
+
+As commands for the StepperDemo:
+```
+	M1 A3556 V281 R32000
+	M1 A2000 V250 R32000
+	M1 A1524 V218 R32000
+	M1 A1333 V188 R32000
+	M1 A1280 V156 R32000
+```
+
