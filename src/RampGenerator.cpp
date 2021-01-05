@@ -214,7 +214,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   } else {
     // If come here, then direction is same as current movement
     if (remaining_steps <= rw->performed_ramp_up_steps) {
-      next_state = RAMP_STATE_DECELERATE_TO_STOP;
+      next_state = RAMP_STATE_DECELERATE;
     } else if (ramp->config.min_travel_ticks < qe_ticks) {
       next_state = RAMP_STATE_ACCELERATE;
     } else if (ramp->config.min_travel_ticks > qe_ticks) {
