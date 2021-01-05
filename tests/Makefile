@@ -3,13 +3,14 @@ CFLAGS=-DTEST -Werror -g -I../src
 CXXFLAGS=-DTEST -Werror -g -DF_CPU=16000000 -I../src
 LDLIBS=-lm
 
-test: test_01 test_02 test_03 test_04 test_05 test_06
+test: test_01 test_02 test_03 test_04 test_05 test_06 test_07
 	./test_01
 	./test_02
 	./test_03
 	./test_04
 	./test_05
 	./test_06
+	./test_07
 
 LIB_H=../src/FastAccelStepper.h ../src/PoorManFloat.h ../src/StepperISR.h ../src/RampGenerator.h
 
@@ -19,6 +20,7 @@ test_03: test_03.o PoorManFloat.o
 test_04: test_04.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
 test_05: test_05.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
 test_06: test_06.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
+test_07: test_07.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
 
 test_01.o: test_01.cpp $(LIB_H) RampChecker.h stubs.h
 test_02.o: test_02.cpp $(LIB_H) RampChecker.h stubs.h
