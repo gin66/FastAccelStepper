@@ -1,6 +1,11 @@
-pre-0.16.4:
+0.16.4:
 - Example code for platformio (built with ci/build-platformio.sh) references the library code
   via platformio.ini option and not via symbolic links.
+- StepperDemo test mode extended:
+	- x: Allows to exit test mode
+    - I: Allows to toggle motor info while test sequence is running
+    - New test sequence 06 due to issue #24
+- Fix for issue #24: unplanned stop due to speed changes during ramp down
 
 0.16.3:
 - Add another test case for speed reduction, while running (see issue #23)
