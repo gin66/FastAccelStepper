@@ -105,8 +105,12 @@ int main() {
 
   printf("mid point @ %ld => total = %ld, total ticks = %ld\n", mid_point_ticks,
          2 * mid_point_ticks, rc.total_ticks);
-  test(mid_point_ticks * 2 > rc.total_ticks + 1000, "ramp is not symmetric");
-  test(mid_point_ticks * 2 < rc.total_ticks - 1000, "ramp is not symmetric");
+#define ALLOWED_ASYMMETRY TICKS_PER_S / 16
+  printf("%ld\n", ALLOWED_ASYMMETRY);
+  test(mid_point_ticks * 2 < rc.total_ticks + ALLOWED_ASYMMETRY,
+       "ramp is not symmetric 1");
+  test(mid_point_ticks * 2 > rc.total_ticks - ALLOWED_ASYMMETRY,
+       "ramp is not symmetric 2");
 
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);

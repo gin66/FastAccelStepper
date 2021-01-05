@@ -28,6 +28,7 @@ test_03.o: test_03.cpp ../src/PoorManFloat.h stubs.h test_03.h
 test_04.o: test_04.cpp $(LIB_H) RampChecker.h stubs.h
 test_05.o: test_05.cpp $(LIB_H) RampChecker.h stubs.h
 test_06.o: test_06.cpp $(LIB_H) RampChecker.h stubs.h
+test_07.o: test_07.cpp $(LIB_H) RampChecker.h stubs.h
 
 FastAccelStepper.o: ../src/FastAccelStepper.cpp ../src/FastAccelStepper.h ../src/PoorManFloat.h ../src/StepperISR.h stubs.h ../src/RampGenerator.h ../src/common.h
 	$(COMPILE.cpp) $< -o $@
