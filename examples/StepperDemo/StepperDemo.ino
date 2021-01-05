@@ -384,6 +384,7 @@ const static char test_usage_str[] PROGMEM =
     "     06        ... select test sequence 06 for selected stepper\n"
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
+    "     x         ... Exit test mode\n"
 #endif
     "\n";
 
@@ -664,7 +665,11 @@ void loop() {
             }
           }
         } else {
-          if (strcmp(in_buffer, "R") == 0) {
+          if (strcmp(in_buffer, "x") == 0) {
+            Serial.println("Exit to main menu");
+            test_ongoing = false;
+			test_mode = false;
+          } else if (strcmp(in_buffer, "R") == 0) {
             Serial.println("Run tests");
             test_ongoing = true;
           } else if (strcmp(in_buffer, "01") == 0) {
