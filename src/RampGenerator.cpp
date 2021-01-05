@@ -295,6 +295,8 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
     case RAMP_STATE_DECELERATE:
       planning_steps = min(planning_steps, rw->performed_ramp_up_steps);
       if (planning_steps == 0) {
+        // This seems not to be correct and planning_steps == 0 should not
+        // happen
         d_ticks_new = ramp->config.min_travel_ticks;
       } else {
         upm_rem_steps = upm_from(rw->performed_ramp_up_steps - planning_steps);

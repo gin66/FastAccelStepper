@@ -29,7 +29,7 @@
 
 #if defined(ARDUINO_ARCH_ESP32)
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
-#define MIN_CMD_TIME (10*MIN_DELTA_TICKS)
+#define MIN_CMD_TIME (10 * MIN_DELTA_TICKS)
 #elif defined(ARDUINO_ARCH_AVR)
 // AVR:
 // tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
