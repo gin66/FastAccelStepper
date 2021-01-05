@@ -53,7 +53,6 @@ void RampGenerator::setSpeed(uint32_t min_step_us) {
     min_travel_ticks = MIN_DELTA_TICKS;  // set to lower limit
   }
   _config.min_travel_ticks = min_travel_ticks;
-  _config.change_cnt++;
 }
 void RampGenerator::setAcceleration(uint32_t accel) {
   if (accel == 0) {
@@ -167,10 +166,8 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   if (ramp->config.change_cnt != rw->change_cnt) {
     uint32_t performed_ramp_up_steps = upm_to_u32(upm_divide(
         ramp->config.upm_inv_accel2, upm_square(upm_from(qe_ticks))));
-    noInterrupts();
     rw->change_cnt = ramp->config.change_cnt;
     rw->performed_ramp_up_steps = performed_ramp_up_steps;
-    interrupts();
   }
 
   bool count_up = queue_end->count_up;
