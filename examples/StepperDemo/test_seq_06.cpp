@@ -21,24 +21,24 @@ bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
       break;
     case 1:
       if (time_ms - seq->u32_1 >= 100) {
-          stepper->setSpeed(SPEED_2_US);
-          stepper->applySpeedAcceleration();
-		  seq->u32_1 = time_ms;
-	      seq->state++;
+        stepper->setSpeed(SPEED_2_US);
+        stepper->applySpeedAcceleration();
+        seq->u32_1 = time_ms;
+        seq->state++;
       }
       break;
     case 2:
       if (time_ms - seq->u32_1 >= 100) {
-          stepper->setSpeed(SPEED_1_US);
-          stepper->applySpeedAcceleration();
-		  seq->u32_1 = time_ms;
-	      seq->state--;
+        stepper->setSpeed(SPEED_1_US);
+        stepper->applySpeedAcceleration();
+        seq->u32_1 = time_ms;
+        seq->state--;
       }
-	  if (!stepper->isRunning()) {
-		seq->state = 3;
-	  }
+      if (!stepper->isRunning()) {
+        seq->state = 3;
+      }
       break;
-    case 3: // Return to start position
+    case 3:  // Return to start position
       stepper->setSpeed(SPEED_HOME_US);
       stepper->move(-32000);
       seq->state++;

@@ -1,7 +1,7 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
-#define VERSION "post-9002f7a"
+#define VERSION "post-f02df7b"
 
 struct stepper_config_s {
   uint8_t step;
@@ -379,6 +379,7 @@ const static char test_usage_str[] PROGMEM =
     "Enter commands separated by space, carriage return or newline:\n"
     "     M1/M2/..  ... to select stepper\n"
     "     R         ... start all selected tests\n"
+    "     I         ... Toggle motor info, while test sequence is running\n"
     "     01        ... select test sequence 01 for selected stepper\n"
     "     :\n"
     "     06        ... select test sequence 06 for selected stepper\n"
@@ -668,10 +669,13 @@ void loop() {
           if (strcmp(in_buffer, "x") == 0) {
             Serial.println("Exit to main menu");
             test_ongoing = false;
-			test_mode = false;
+            test_mode = false;
           } else if (strcmp(in_buffer, "R") == 0) {
             Serial.println("Run tests");
             test_ongoing = true;
+          } else if (strcmp(in_buffer, "I") == 0) {
+            output_msg(MSG_TOGGLE_MOTOR_INFO);
+            verbose = !verbose;
           } else if (strcmp(in_buffer, "01") == 0) {
             Serial.println("Select test_seq_01");
             test_seq[selected].test = test_seq_01;
@@ -705,10 +709,10 @@ void loop() {
     }
   }
 
+  uint32_t ms = millis();
   if (test_mode) {
     if (test_ongoing) {
       bool finished = true;
-      uint32_t ms = millis();
       for (uint8_t i = 0; i < MAX_STEPPER; i++) {
         if (test_seq[i].test != NULL) {
           bool res = test_seq[i].test(stepper[i], &test_seq[i], ms);
@@ -719,6 +723,14 @@ void loop() {
         test_ongoing = false;
         Serial.println("finished");
         stepper_info();
+      } else {
+        uint32_t now = millis();
+        if (now - last_time >= 100) {
+          if (verbose) {
+            output_info();
+          }
+          last_time = now;
+        }
       }
     }
   } else {
@@ -729,12 +741,11 @@ void loop() {
       }
     }
     if (running) {
-      uint32_t now = millis();
-      if (now - last_time >= 100) {
+      if (ms - last_time >= 100) {
         if (verbose) {
           output_info();
         }
-        last_time = now;
+        last_time = ms;
       }
     }
     if (!stopped && !running) {
