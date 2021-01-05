@@ -473,16 +473,9 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
 int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = US_TO_TICKS(delay_us);
   if (delay_ticks > 0) {
-#if defined(ARDUINO_ARCH_AVR)
-    if (delay_ticks < MIN_DELTA_TICKS) {
+    if (delay_ticks < MIN_CMD_TIME) {
       return DELAY_TOO_LOW;
     }
-#else
-    if (delay_ticks <
-        10 * MIN_DELTA_TICKS) {  // SEE addQueueEntry for reference
-      return DELAY_TOO_LOW;
-    }
-#endif
   }
   if (delay_ticks > MAX_ON_DELAY_TICKS) {
     return DELAY_TOO_HIGH;
@@ -638,7 +631,7 @@ bool FastAccelStepper::isRunning() {
 void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
     struct stepper_command_s cmd = {
-        .ticks = MIN_DELTA_TICKS, .steps = 1, .count_up = true};
+        .ticks = MIN_CMD_TIME, .steps = 1, .count_up = true};
     addQueueEntry(&cmd);
     if (blocking) {
       while (isRunning()) {
@@ -651,7 +644,7 @@ void FastAccelStepper::backwardStep(bool blocking) {
   if (!isRunning()) {
     if (_dirPin != PIN_UNDEFINED) {
       struct stepper_command_s cmd = {
-          .ticks = MIN_DELTA_TICKS, .steps = 1, .count_up = false};
+          .ticks = MIN_CMD_TIME, .steps = 1, .count_up = false};
       addQueueEntry(&cmd);
       if (blocking) {
         while (isRunning()) {

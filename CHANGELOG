@@ -1,3 +1,6 @@
+pre-0.16.5:
+- esp32: forwardStep()/backwardStep() works again
+
 0.16.4:
 - Example code for platformio (built with ci/build-platformio.sh) references the library code
   via platformio.ini option and not via symbolic links.

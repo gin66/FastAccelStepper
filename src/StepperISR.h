@@ -116,7 +116,7 @@ class StepperQueue {
     if (steps > 1) {
       command_rate_ticks *= steps;
     }
-    if (command_rate_ticks < 10 * MIN_DELTA_TICKS) {  // MAGIC CONSTANT
+    if (command_rate_ticks < MIN_CMD_TIME) {  // MAGIC CONSTANT
       return AQE_ERROR_TICKS_TOO_LOW;
     }
 #endif
