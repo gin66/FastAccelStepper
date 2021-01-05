@@ -48,18 +48,18 @@ int main() {
   s.fill_queue();
   assert(!s.isQueueEmpty());
   float old_planned_time_in_buffer = 0;
-#define T100MS (TICKS_PER_S/10)
+#define T100MS (TICKS_PER_S / 10)
   uint64_t next_speed_change = T100MS;
+  uint64_t mid_point_ticks = 0;
 
   char fname[100];
   sprintf(fname, "test_07.gnuplot");
   FILE *gp_file = fopen(fname, "w");
   fprintf(gp_file, "$data <<EOF\n");
-  for (int i = 0; i < 10*steps; i++) {
+  for (int i = 0; i < 10 * steps; i++) {
     if (rc.total_ticks > next_speed_change) {
-	  next_speed_change = rc.total_ticks + T100MS;
-	  speed_us = 190 - speed_us;
-      s.fill_queue();  // ensure queue is not empty
+      next_speed_change = rc.total_ticks + T100MS;
+      speed_us = 190 - speed_us;
       s.setSpeed(speed_us);
       s.applySpeedAcceleration();
     }
@@ -77,8 +77,11 @@ int main() {
     s.fill_queue();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
-	  rc.increase_ok = true;
-	  rc.decrease_ok = true;
+      if ((mid_point_ticks == 0) && (rc.pos >= steps / 2)) {
+        mid_point_ticks = rc.total_ticks;
+      }
+      rc.increase_ok = true;
+      rc.decrease_ok = true;
       rc.check_section(
           &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
@@ -97,9 +100,14 @@ int main() {
   fprintf(gp_file, "pause -1\n");
   fclose(gp_file);
   test(!s.isRampGeneratorActive(), "too many commands created");
-  printf("getCurrentPosition() = %d, steps = %d\n", s.getCurrentPosition(), steps);
   test(s.getCurrentPosition() == steps, "has not reached target position");
   printf("Total time  %f\n", rc.total_ticks / 16000000.0);
+
+  printf("mid point @ %ld => total = %ld, total ticks = %ld\n", mid_point_ticks,
+         2 * mid_point_ticks, rc.total_ticks);
+  test(mid_point_ticks * 2 > rc.total_ticks + 1000, "ramp is not symmetric");
+  test(mid_point_ticks * 2 < rc.total_ticks - 1000, "ramp is not symmetric");
+
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif
