@@ -116,7 +116,6 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   uint8_t timer = mapping->timer;
   mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
   mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
-  q->isRunning = false;
   q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 }
 
@@ -163,7 +162,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
   mapping = &queue2mapping[queue_num];
-  isRunning = false;
 
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -264,8 +262,27 @@ void StepperQueue::disconnect() {
 //		- 	without next command: set mcpwm to stop mode on reaching
 // period
 
+bool StepperQueue::isRunning() {
+  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
+  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  uint8_t timer = mapping->timer;
+  if(mcpwm->timer[timer].status.value > 1) {
+	  return true;
+  }
+  return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
+}
+
 void StepperQueue::startQueue() {
-  isRunning = true;
+  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
+  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  uint8_t timer = mapping->timer;
+  if(mcpwm->timer[timer].status.value > 1) {
+	// Here the timer is running, so let the timer trigger next_command()
+	// Timer value equals 1, if the timer is stopped.
+    mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
+    mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
+	return;
+  }
 
   // my interrupt cannot be called in this state, so modifying read_idx without
   // interrupts disabled is ok
@@ -278,9 +295,6 @@ void StepperQueue::startQueue() {
 
   // timer should be either at zero or running towards zero from previous
   // command. Anyway, set to run continuous
-  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
-  uint8_t timer = mapping->timer;
   mcpwm->timer[timer].mode.mode = 3;   // 3=up/down counting
   mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
 }

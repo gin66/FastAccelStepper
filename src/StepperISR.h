@@ -81,11 +81,15 @@ class StepperQueue {
   uint8_t next_write_idx;
   uint8_t dirPin;
   bool dirHighCountsUp;
-  volatile bool isRunning;
 #if defined(ARDUINO_ARCH_ESP32)
+  bool isRunning();
   const struct mapping_s* mapping;
 #endif
 #if defined(ARDUINO_ARCH_AVR)
+  volatile bool _isRunning;
+  bool isRunning() {
+		return _isRunning;
+  }
   enum channels channel;
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
@@ -167,7 +171,7 @@ class StepperQueue {
     wp++;
     noInterrupts();
     next_write_idx = wp;
-    bool run = isRunning;
+    bool run = isRunning();
     interrupts();
     if (!run) {
       startQueue();
@@ -210,7 +214,9 @@ class StepperQueue {
     queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
     queue_end.ticks_from_last_step = 0xffffffff;
     dirHighCountsUp = true;
-    isRunning = false;
+#if defined(ARDUINO_ARCH_AVR)
+    _isRunning = false;
+#endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     checksum = 0;
 #endif

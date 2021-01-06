@@ -623,10 +623,10 @@ bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
 }
 bool FastAccelStepper::isMotorRunning() {
-  return fas_queue[_queue_num].isRunning;
+  return fas_queue[_queue_num].isRunning();
 }
 bool FastAccelStepper::isRunning() {
-  return fas_queue[_queue_num].isRunning || _rg.isRampGeneratorActive();
+  return fas_queue[_queue_num].isRunning() || _rg.isRampGeneratorActive();
 }
 void FastAccelStepper::forwardStep(bool blocking) {
   if (!isRunning()) {
