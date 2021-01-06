@@ -35,7 +35,7 @@
 //*************************************************************************************************
 
 void RampGenerator::init() {
-  _config.change_cnt = 0;
+  _config.accel_change_cnt = 0;
   _config.min_travel_ticks = 0;
   _config.upm_inv_accel2 = 0;
   _ro.target_pos = 0;
@@ -60,7 +60,7 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   }
   upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
   _config.upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
-  _config.change_cnt++;
+  _config.accel_change_cnt++;
 }
 void RampGenerator::applySpeedAcceleration() {
   noInterrupts();
@@ -154,10 +154,10 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
                                const struct queue_end_s *queue_end,
                                struct stepper_command_s *command) {
   uint32_t qe_ticks = queue_end->ticks;
-  if (ramp->config.change_cnt != rw->change_cnt) {
+  if (ramp->config.accel_change_cnt != rw->accel_change_cnt) {
     uint32_t performed_ramp_up_steps = upm_to_u32(upm_divide(
         ramp->config.upm_inv_accel2, upm_square(upm_from(qe_ticks))));
-    rw->change_cnt = ramp->config.change_cnt;
+    rw->accel_change_cnt = ramp->config.accel_change_cnt;
     rw->performed_ramp_up_steps = performed_ramp_up_steps;
   }
 

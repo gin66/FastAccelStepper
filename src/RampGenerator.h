@@ -38,7 +38,7 @@ class FastAccelStepper;
 struct ramp_config_s {
   uint32_t min_travel_ticks;
   upm_float upm_inv_accel2;
-  uint8_t change_cnt;
+  uint8_t accel_change_cnt;
 };
 struct ramp_ro_s {
   struct ramp_config_s config;
@@ -51,9 +51,9 @@ struct ramp_rw_s {
   // the speed is linked on both ramp slopes to this variable as per
   //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t performed_ramp_up_steps;
-  // if change_cnt does not match config.change_cnt, then
+  // if accel_change_cnt does not match config.accel_change_cnt, then
   // performed_ramp_up_steps to be recalculated
-  uint8_t change_cnt;
+  uint8_t accel_change_cnt;
 };
 struct ramp_wo_s {
   uint8_t ramp_state;
