@@ -19,3 +19,6 @@ Tests;
 
 - test_06
   check for stop during move
+
+- test_07
+  test case with varying speed
