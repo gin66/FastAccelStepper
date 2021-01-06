@@ -81,16 +81,12 @@ int8_t RampGenerator::startRun(bool countUp) {
                                .keep_running = true,
                                .keep_running_count_up = countUp};
 
+  noInterrupts();
   if (_wo.ramp_state == RAMP_STATE_IDLE) {
-    noInterrupts();
-    _ro = new_ramp;
     _wo.ramp_state = RAMP_STATE_ACCELERATE;
-    interrupts();
-  } else {
-    noInterrupts();
-    _ro = new_ramp;
-    interrupts();
   }
+  _ro = new_ramp;
+  interrupts();
   return MOVE_OK;
 }
 
@@ -109,19 +105,14 @@ int8_t RampGenerator::_startMove(int32_t target_pos,
                                .keep_running = false,
                                .keep_running_count_up = true};
 
+  noInterrupts();
   if (_wo.ramp_state == RAMP_STATE_IDLE) {
-    if (target_pos == queue_end->pos) {
-      return MOVE_OK;
+    if (target_pos != queue_end->pos) {
+      _wo.ramp_state = RAMP_STATE_ACCELERATE;
     }
-    noInterrupts();
-    _ro = new_ramp;
-    _wo.ramp_state = RAMP_STATE_ACCELERATE;
-    interrupts();
-  } else {
-    noInterrupts();
-    _ro = new_ramp;
-    interrupts();
   }
+  _ro = new_ramp;
+  interrupts();
 
 #ifdef TEST
   printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
