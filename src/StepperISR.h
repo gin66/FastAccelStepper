@@ -180,7 +180,7 @@ class StepperQueue {
     uint8_t wp = next_write_idx;
     interrupts();
     if (wp == rp) {
-      return 0;
+      return false;
     }
     rp++;  // ignore currently processed entry
     while (wp != rp) {
