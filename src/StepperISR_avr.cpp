@@ -229,6 +229,9 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   }
 
 void StepperQueue::startQueue() {
+  if (isRunning) {
+	  return;
+  }
   isRunning = true;
   switch (channel) {
     case channelA:

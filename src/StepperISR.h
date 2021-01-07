@@ -82,6 +82,7 @@ class StepperQueue {
   uint8_t dirPin;
   bool dirHighCountsUp;
 #if defined(ARDUINO_ARCH_ESP32)
+  volatile bool _hasISRactive;
   bool isRunning();
   const struct mapping_s* mapping;
 #endif
@@ -168,14 +169,8 @@ class StepperQueue {
       }
     }
 #endif
-    wp++;
-    noInterrupts();
-    next_write_idx = wp;
-    bool run = isRunning();
-    interrupts();
-    if (!run) {
-      startQueue();
-    }
+    next_write_idx = wp + 1;
+    startQueue();
     return AQE_OK;
   }
   bool hasTicksInQueue(uint32_t min_ticks) {
@@ -201,7 +196,7 @@ class StepperQueue {
     return false;
   }
 
-  // startQueue is called, if motor is not running.
+  // startQueue is always called
   void startQueue();
   void forceStop();
   void _initVars() {
@@ -216,6 +211,9 @@ class StepperQueue {
     dirHighCountsUp = true;
 #if defined(ARDUINO_ARCH_AVR)
     _isRunning = false;
+#endif
+#if defined(ARDUINO_ARCH_ESP32)
+	_hasISRactive = false;
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     checksum = 0;

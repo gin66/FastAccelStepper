@@ -266,13 +266,9 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       // if acceleration is very high, then d_ticks_new can be lower than
       // min_travel_ticks
-      d_ticks_new = max(d_ticks_new, ramp->config.min_travel_ticks);
-
-      // avoid overshoot
       next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
-      if (rw->performed_ramp_up_steps == 0) {
-        curr_ticks = d_ticks_new;
-      } else {
+
+	  if (curr_ticks != TICKS_FOR_STOPPED_MOTOR) {
         // CLIPPING: avoid increase
         next_ticks = min(next_ticks, curr_ticks);
       }
@@ -296,8 +292,14 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
         d_ticks_new = upm_to_u32(upm_d_ticks_new);
       }
 
-      // CLIPPING: avoid reduction
-      next_ticks = max(d_ticks_new, curr_ticks);
+	  next_ticks = d_ticks_new;
+
+      // CLIPPING: avoid reduction unless curr_ticks indicates stopped motor
+	  // Issue #25: root cause is, that curr_ticks can be TICKS_FOR_STOPPED_MOTOR
+	  // for the case, that queue is emptied before the next command is issued 
+	  if (curr_ticks != TICKS_FOR_STOPPED_MOTOR) {
+		  next_ticks = max(next_ticks, curr_ticks);
+	  }
 
 #ifdef TEST
       printf("decelerate ticks => %d  during %d steps (d_ticks_new = %u)",
@@ -340,8 +342,12 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
         d_ticks_new = ramp->config.min_travel_ticks;
       }
 
+	  next_ticks = d_ticks_new;
+
       // CLIPPING: avoid reduction
-      next_ticks = max(d_ticks_new, curr_ticks);
+	  if (curr_ticks != TICKS_FOR_STOPPED_MOTOR) {
+		next_ticks = max(d_ticks_new, curr_ticks);
+	  }
 #ifdef TEST
       printf("decelerate ticks => %d  during %d steps (d_ticks_new = %u)\n",
              next_ticks, planning_steps, d_ticks_new);
