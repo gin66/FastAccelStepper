@@ -185,7 +185,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
 
-  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 255; // mark as coming from a pause
+  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim =
+      255;  // mark as coming from a pause
   pcnt_counter_clear(pcnt_unit);
   pcnt_counter_resume(pcnt_unit);
   pcnt_event_enable(pcnt_unit, PCNT_EVT_H_LIM);
@@ -206,7 +207,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         mcpwm_unit == MCPWM_UNIT_0 ? mcpwm0_isr_service : mcpwm1_isr_service,
         NULL, ESP_INTR_FLAG_IRAM | ESP_INTR_FLAG_SHARED, NULL);
 
-	// 160 MHz/5 = 32 MHz => 16 MHz in up/down-mode
+    // 160 MHz/5 = 32 MHz => 16 MHz in up/down-mode
     mcpwm->clk_cfg.prescale = 5 - 1;
 
     mcpwm->timer_sel.operator0_sel = 0;  // timer 0 is input for operator 0
@@ -216,8 +217,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
   mcpwm->timer[timer].period.prescale = TIMER_PRESCALER;
   mcpwm->timer[timer].period.period = 400;  // Random value
-  mcpwm->timer[timer].mode.mode = 3;   // 3=up/down counting
-  mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
+  mcpwm->timer[timer].mode.mode = 3;        // 3=up/down counting
+  mcpwm->timer[timer].mode.start = 0;       // 0: stop at TEZ
 
   // this sequence should reset the timer to 0
   mcpwm->timer[timer].sync.timer_phase = 0;  // prepare value of 0
@@ -269,33 +270,33 @@ void StepperQueue::disconnect() {
 
 bool StepperQueue::isRunning() {
   if (_hasISRactive) {
-	return true;
+    return true;
   }
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
-  if(mcpwm->timer[timer].status.value > 1) {
-	  return true;
+  if (mcpwm->timer[timer].status.value > 1) {
+    return true;
   }
   return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
 }
 
 void StepperQueue::startQueue() {
   if (_hasISRactive) {
-	return;
+    return;
   }
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 
   mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
-  if(mcpwm->timer[timer].status.value > 1) {
-	// Here the timer is running, so let the tae interrupt trigger next_command()
-	// Timer value equals 1, if the timer is stopped.
+  if (mcpwm->timer[timer].status.value > 1) {
+    // Here the timer is running, so let the tae interrupt trigger
+    // next_command() Timer value equals 1, if the timer is stopped.
     _hasISRactive = true;
     mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
-	return;
+    return;
   }
 
   _hasISRactive = true;

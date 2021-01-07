@@ -3,9 +3,18 @@
 // Exclusively for test purposes !
 
 // for avr: either use pin 9 or 10 aka OC1A or OC1B
-#define stepPinStepper 17
-#define enablePinStepper 26
-#define dirPinStepper 18
+
+// platformio does not manage cpp directives well
+// #define are always executed
+#if defined(ARDUINO_ARCH_AVR)
+const uint8_t stepPinStepper = 9;
+const uint8_t enablePinStepper = 6;
+const uint8_t dirPinStepper = 5;
+#elif defined(ARDUINO_ARCH_ESP32)
+const uint8_t stepPinStepper = 17;
+const uint8_t enablePinStepper = 26;
+const uint8_t dirPinStepper = 18;
+#endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper;
@@ -23,31 +32,36 @@ void setup() {
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
 
-  Serial.println("Start");
-  uint32_t start = micros();
-  uint32_t cnt = 0;
-  for (uint32_t delay = 0; delay < 20000; delay+=100) {
-	// just issue a step with 1ms pause
-    struct stepper_command_s cmd = {
-        .ticks = 16000, .steps = 1, .count_up = true};
-    int rc = stepper->addQueueEntry(&cmd);
-    if (rc != AQE_OK) {
-      Serial.print("Queue error:");
-      Serial.println(rc);
+    Serial.println("Start");
+    uint32_t start = micros();
+    uint32_t cnt = 0;
+    for (uint32_t delay = 0; delay < 20000; delay += 100) {
+      // just issue a step with 1ms pause
+      struct stepper_command_s cmd = {
+          .ticks = 16000, .steps = 1, .count_up = true};
+      int rc = stepper->addQueueEntry(&cmd);
+      if (rc != AQE_OK) {
+        Serial.print("Queue error:");
+        Serial.println(rc);
+      } else {
+        cnt++;
+        while (stepper->isRunning()) {
+        }
+      }
+      uint32_t x = micros() + delay;
+      while (micros() < x) {
+      }
+      start += delay;
     }
-    else {
-		cnt++;
-		while (stepper->isRunning()) {
-		}
-    }
-    delayMicroseconds(delay);
-    start += delay;
+    uint32_t end = micros();
+    Serial.println(start);
+    Serial.println(end);
+    Serial.println("Done. ");
+    Serial.print(cnt);
+    Serial.print(" Stepper commands executed within us=");
+    Serial.print((end - start) / cnt);
+    Serial.println(". Expected ~1000");
   }
-  Serial.print("Done. Stepper commands executed within us=");
-  Serial.print((micros()-start)/cnt);
-  Serial.println(". Expected ~1000");
-}
 }
 
-void loop() {
-}
+void loop() {}

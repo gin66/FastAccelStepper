@@ -85,13 +85,13 @@ class StepperQueue {
   volatile bool _hasISRactive;
   bool isRunning();
   const struct mapping_s* mapping;
-#endif
-#if defined(ARDUINO_ARCH_AVR)
+#elif defined(ARDUINO_ARCH_AVR)
   volatile bool _isRunning;
-  bool isRunning() {
-		return _isRunning;
-  }
+  bool isRunning() { return _isRunning; }
   enum channels channel;
+#else
+  volatile bool _isRunning;
+  bool isRunning() { return _isRunning; }
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   uint8_t checksum;
@@ -211,9 +211,10 @@ class StepperQueue {
     dirHighCountsUp = true;
 #if defined(ARDUINO_ARCH_AVR)
     _isRunning = false;
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
-	_hasISRactive = false;
+#elif defined(ARDUINO_ARCH_ESP32)
+    _hasISRactive = false;
+#else
+    _isRunning = false;
 #endif
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     checksum = 0;

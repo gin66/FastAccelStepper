@@ -11,7 +11,6 @@ test: test_01 test_02 test_03 test_04 test_05 test_06 test_07
 	./test_05
 	./test_06
 	./test_07
-	./test_08
 
 LIB_H=../src/FastAccelStepper.h ../src/PoorManFloat.h ../src/StepperISR.h ../src/RampGenerator.h
 
@@ -22,7 +21,6 @@ test_04: test_04.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGener
 test_05: test_05.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
 test_06: test_06.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
 test_07: test_07.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
-test_08: test_08.o FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o
 
 test_01.o: test_01.cpp $(LIB_H) RampChecker.h stubs.h
 test_02.o: test_02.cpp $(LIB_H) RampChecker.h stubs.h
@@ -31,7 +29,6 @@ test_04.o: test_04.cpp $(LIB_H) RampChecker.h stubs.h
 test_05.o: test_05.cpp $(LIB_H) RampChecker.h stubs.h
 test_06.o: test_06.cpp $(LIB_H) RampChecker.h stubs.h
 test_07.o: test_07.cpp $(LIB_H) RampChecker.h stubs.h
-test_08.o: test_08.cpp $(LIB_H) RampChecker.h stubs.h
 
 FastAccelStepper.o: ../src/FastAccelStepper.cpp ../src/FastAccelStepper.h ../src/PoorManFloat.h ../src/StepperISR.h stubs.h ../src/RampGenerator.h ../src/common.h
 	$(COMPILE.cpp) $< -o $@

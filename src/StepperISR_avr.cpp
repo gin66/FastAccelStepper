@@ -138,7 +138,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       ForceCompare(T, CHANNEL);                                              \
       /* disable compare interrupt */                                        \
       DisableCompareInterrupt(T, CHANNEL);                                   \
-      fas_queue_##CHANNEL.isRunning = false;                                 \
+      fas_queue_##CHANNEL._isRunning = false;                                \
       fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;         \
       return;                                                                \
     }                                                                        \
@@ -229,10 +229,10 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   }
 
 void StepperQueue::startQueue() {
-  if (isRunning) {
-	  return;
+  if (_isRunning) {
+    return;
   }
-  isRunning = true;
+  _isRunning = true;
   switch (channel) {
     case channelA:
       AVR_START_QUEUE(FAS_TIMER_MODULE, A)
@@ -271,7 +271,7 @@ void StepperQueue::forceStop() {
       break;
 #endif
   }
-  isRunning = false;
+  _isRunning = false;
   queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 
   // empty the queue

@@ -9,7 +9,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 	_initVars();
 }
 void StepperQueue::startQueue() {
-	isRunning = true;
+	_isRunning = true;
 }
 void StepperQueue::forceStop() {
 }
