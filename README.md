@@ -108,10 +108,15 @@ Using the high level interface with ramp up/down as in [UsageExample.ino](https:
 
 ```
 #include "FastAccelStepper.h"
+#include "AVRStepperPins.h" // Only required for AVR controllers
 
 #define dirPinStepper    5
 #define enablePinStepper 6
-#define stepPinStepper   9  // OC1A in case of AVR
+
+// If using an AVR device use the definitons provided in AVRStepperPins
+#define stepPinStepper   stepPinStepper1A
+// Else, if using an esp32 device pin selection is much easier!
+#define stepPinStepper   9
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
@@ -179,6 +184,17 @@ build_flags = -DFAS_TIMER_MODULE=3
 or better:
 ```
 build_flags = -Werror -Wall -DFAS_TIMER_MODULE=3
+```
+
+For arduino users, the same can be done by defining the flag *before* including the `FastAccelStepperEngine.h` header.
+e.g.
+```
+sketch.ino
+----------
+#include <Arduino.h>
+#define FAS_TIMER_MODULE 3
+#include <FastAccelStepper.h>
+/* blah blah blah... */
 ```
 
 ### ESP32
