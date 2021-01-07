@@ -2,11 +2,13 @@
 #include "StepperISR.h"
 #include "AVRStepperPins.h"
 
+#if defined(ARDUINO_ARCH_AVR)
 #if defined(__AVR_ATmega328P__)
 #define FAS_TIMER_MODULE 1
 #elif defined(__AVR_ATmega2560__)
 #ifndef FAS_TIMER_MODULE
 #define FAS_TIMER_MODULE 4
+#endif
 #endif
 
 #if (FAS_TIMER_MODULE == 1)
@@ -283,4 +285,3 @@ int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
 #endif
   return -1;
 }
-#endif

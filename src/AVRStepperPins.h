@@ -14,6 +14,7 @@
 #if !(defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__))
 #error "Unsupported AVR derivate"
 #endif
+#endif
 
 // The ATmega328P has one 16 bit timer: Timer 1
 // The ATmega2560 has four 16 bit timers: Timer 1, 3, 4 and 5
@@ -35,4 +36,4 @@
 #define stepPinStepper5C 44 /* OC5C */
 #endif
 
-#endif //AVRSTEPPERPINS_H_YFXPAB9M
+#endif // AVRSTEPPERPINS_H_YFXPAB9M
