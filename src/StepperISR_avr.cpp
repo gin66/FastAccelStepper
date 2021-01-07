@@ -8,7 +8,6 @@
 #ifndef FAS_TIMER_MODULE
 #define FAS_TIMER_MODULE 4
 #endif
-#endif
 
 #if (FAS_TIMER_MODULE == 1)
 #define stepPinStepperA stepPinStepper1A
