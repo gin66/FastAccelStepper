@@ -1,5 +1,7 @@
-pre-0.16.5:
+0.16.5:
 - esp32: forwardStep()/backwardStep() works again
+- Fix for issue #25: RampGenerator was irritated, if interrupt has processed command too fast.
+- Rework definition of isRunning() for esp32 to make it more like avr
 
 0.16.4:
 - Example code for platformio (built with ci/build-platformio.sh) references the library code
