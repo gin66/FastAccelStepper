@@ -1,6 +1,6 @@
 
 TESTS=$(wildcard test_*)
-TESTS_SD=$(wildcard test_sd_*)
+TESTS_SD=$(wildcard test_*sd_*)
 
 TEST_FILES=$(addsuffix /.tested,$(TESTS))
 SD_SRC_DIRS=$(addsuffix /src/.dir,$(TESTS_SD))
