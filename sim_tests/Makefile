@@ -8,13 +8,15 @@ SRC=$(wildcard ../src/*)
 
 test: $(TEST_FILES)
 
-%/.tested:	$(SRC) run_avr %/expect.txt
+%/.tested:	links $(SRC) run_avr %/expect.txt
 	make -C $(dir $@) -f ../Makefile.test
 
 links: $(SRC_DIRS)
 
 %/src/.dir:
-	(cd $(dir $@);mkdir -p src;cd src;ln -sf ../../../examples/StepperDemo/* .)
+	mkdir -p $(dir $@)
+	cd $(dir $@)
+	ln -sf ../../../examples/StepperDemo/* 
 
 run_avr: run_avr.c
 	sudo apt install -y libsimavr-dev libelf-dev
