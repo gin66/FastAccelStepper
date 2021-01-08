@@ -2,6 +2,7 @@
  
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg)
 ![Build examples](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg)
+![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg)
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560) and esp32.
 
