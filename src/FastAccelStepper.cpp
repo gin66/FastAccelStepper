@@ -442,7 +442,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
                                     bool low_active_enables_stepper) {
   if (low_active_enables_stepper) {
     _enablePinLowActive = enablePin;
-	if (enablePin == PIN_UNDEFINED) {
+	if (enablePin != PIN_UNDEFINED) {
 		digitalWrite(enablePin, HIGH);
 		pinMode(enablePin, OUTPUT);
 		if (_enablePinHighActive == enablePin) {
@@ -450,7 +450,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
 		}
 	}
   } else {
-	if (enablePin == PIN_UNDEFINED) {
+	if (enablePin != PIN_UNDEFINED) {
 		_enablePinHighActive = enablePin;
 		digitalWrite(enablePin, LOW);
 		pinMode(enablePin, OUTPUT);
