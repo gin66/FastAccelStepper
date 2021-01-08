@@ -147,6 +147,7 @@ class StepperQueue {
     if (isQueueEmpty()) {
       // set the dirPin here. Necessary with shared direction pins
       digitalWrite(dirPin, dir);
+	  queue_end.dir = dir;
     }
     e->steps = steps;
     e->toggle_dir = (dir != queue_end.dir) ? true : false;

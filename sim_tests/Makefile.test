@@ -4,8 +4,12 @@ SRC=$(wildcard ../../src/*) $(wildcard src/*)
 TRACES=-at OCF1A=trace@0x36/0x02
 TRACES+=-at OCR1AL=trace@0x88/0xff
 TRACES+=-at OCR1AH=trace@0x89/0xff
-TRACES+=-at StepA=trace@0x25/0x02
-TRACES+=-at FOC1A=trace@0x82/0x80
+TRACES+=-at StepA=trace@0x25/0x02 # Pin 9  PPB1
+TRACES+=-at StepB=trace@0x25/0x04 # Pin 10 PB2
+TRACES+=-at DirA=trace@0x2b/0x20  # Pin 5  PD5
+TRACES+=-at DirB=trace@0x2b/0x80  # Pin 7  PD7
+TRACES+=-at EnableA=trace@0x2b/0x40  # Pin 6  PD6
+TRACES+=-at EnableB=trace@0x25/0x01  # Pin 8  PB0
 
 FIRMWARE=".pio/build/avr/firmware.elf"
 DEVICE="atmega328p"

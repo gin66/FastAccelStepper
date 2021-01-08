@@ -1,3 +1,6 @@
+pre-0.16.7:
+- Avoid unnecessary direction pin toggle on direction change after motor stop
+
 0.16.6:
 - bugfix in setEnablePin(): if called with PIN_UNDEFINED, that value was used with pinMode and digitalWrite()
 - Use simavr to perform regression test for avr on HW-simulation

@@ -1,1 +1,9 @@
-L->H= 64000 H->L= 64001
+    DirA:        1*L->H,        1*H->L
+    DirB:        1*L->H,        0*H->L
+ EnableA:        1*L->H,        1*H->L
+ EnableB:        1*L->H,        0*H->L
+   OCF1A:        1*L->H,        1*H->L
+   StepA:    64000*L->H,    64000*H->L
+   StepB:        0*L->H,        0*H->L
+Position[A]=0
+
