@@ -13,5 +13,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: install platformio
+      run:
+	    curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o get-platformio.py
+	    python3 get-platformio.py
+
+    	pio platform install "atmelavr"
+	    pio platform install "espressif32"
     - name: make
       run: make -C sim_tests
