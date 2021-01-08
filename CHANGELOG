@@ -1,4 +1,4 @@
-pre-0.16.6:
+0.16.6:
 - bugfix in setEnablePin(): if called with PIN_UNDEFINED, that value was used with pinMode and digitalWrite()
 - Use simavr to perform regression test for avr on HW-simulation
 - Reworked the avr ISR code to avoid steps being lost, if the command queue is running out of commands and a new command comes in with steps to be generated
