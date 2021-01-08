@@ -73,11 +73,16 @@
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
 
-#define ForceCompare(T, X) TCCR##T##C = _BV(FOC##T##X)
+#ifdef SIMAVR_FOC_WORKAROUND
+#define ForceCompare(T, X) uint16_t x=OCR##T##X;OCR##T##X=TCNT##T+4;while((TIFR##T & _BV(OCF##T##X)) == 0){};OCR##T##X=x;ClearInterruptFlag(T,X)
+#else
+#define ForceCompare(T, X) TCCR##T##C = _BV(FOC##T##X
+#endif
 #define DisableCompareInterrupt(T, X) TIMSK##T &= ~_BV(OCIE##T##X)
 #define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE##T##X)
 #define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF##T##X)
 #define SetTimerCompareRelative(T, X, D) OCR##T##X = TCNT##T + D
+
 
 #define ConfigureTimer(T)                                                 \
   {                                                                       \

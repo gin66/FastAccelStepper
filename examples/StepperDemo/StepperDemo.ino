@@ -1,6 +1,8 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
+#include <avr/sleep.h>
+
 #define VERSION "post-f329743"
 
 struct stepper_config_s {
@@ -383,6 +385,9 @@ const static char test_usage_str[] PROGMEM =
     "     01        ... select test sequence 01 for selected stepper\n"
     "     :\n"
     "     06        ... select test sequence 06 for selected stepper\n"
+#ifdef SIM_TEST_INPUT
+    "     W         ... Blocking wait until test is finished\n"
+#endif
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
     "     x         ... Exit test mode\n"
@@ -521,9 +526,30 @@ void output_info() {
   Serial.println();
 }
 
+#ifdef SIM_TEST_INPUT
+const char *input = SIM_TEST_INPUT;
+#else
+const char *input = NULL;
+#endif
+
 void loop() {
-  if (Serial.available()) {
-    char ch = Serial.read();
+  char ch = 0;
+  if (input == NULL) {
+    if (Serial.available()) {
+      ch = Serial.read();
+    }
+  }
+  else {
+    ch = *input++;
+    if (ch == 0) {
+      input = NULL;
+	  delay(1000);
+	  noInterrupts();
+	  sleep_cpu();
+    }
+  }
+
+  if (ch != 0) {
     if (in_ptr == 255) {
       in_ptr = 0;
     } else if ((ch == ' ') || (ch == '\n') || (ch == '\r')) {
@@ -676,7 +702,15 @@ void loop() {
           } else if (strcmp(in_buffer, "I") == 0) {
             output_msg(MSG_TOGGLE_MOTOR_INFO);
             verbose = !verbose;
-          } else if (strcmp(in_buffer, "01") == 0) {
+          } 
+#ifdef SIM_TEST_INPUT
+          else if (strcmp(in_buffer, "W") == 0) {
+            if (test_ongoing) {
+				input-=2; // go back in input buffer to "W "
+            }
+          }
+#endif
+		  else if (strcmp(in_buffer, "01") == 0) {
             Serial.println("Select test_seq_01");
             test_seq[selected].test = test_seq_01;
             test_seq[selected].state = 0;
