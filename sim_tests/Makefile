@@ -15,8 +15,7 @@ links: $(SRC_DIRS)
 
 %/src/.dir:
 	mkdir -p $(dir $@)
-	cd $(dir $@)
-	ln -sf ../../../examples/StepperDemo/* .
+	cd $(dir $@); ln -sf ../../../examples/StepperDemo/* .
 
 run_avr: run_avr.c
 	sudo apt install -y libsimavr-dev libelf-dev
