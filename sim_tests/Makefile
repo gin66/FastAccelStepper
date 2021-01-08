@@ -8,7 +8,7 @@ SRC=$(wildcard ../src/*)
 
 test: $(TEST_FILES)
 
-%/.tested:	$(SRC) run_avr %/expect.txt
+%/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini
 	make -C $(dir $@) -f ../Makefile.test
 
 links: $(SRC_DIRS)

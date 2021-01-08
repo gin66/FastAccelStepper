@@ -18,7 +18,7 @@ test: .tested
 	cat result.txt
 	cmp result.txt expect.txt && touch .tested
 
-x.vcd:	$(SRC) ../run_avr 
+x.vcd:	$(SRC) ../run_avr platformio.ini
 	~/.platformio/penv/bin/pio run -e avr
 	../run_avr $(FIRMWARE) -m $(DEVICE) -o x.vcd $(TRACES)
 
