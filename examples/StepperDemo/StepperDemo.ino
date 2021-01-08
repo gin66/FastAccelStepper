@@ -545,9 +545,11 @@ void loop() {
     ch = *input++;
     if (ch == 0) {
       input = NULL;
+#ifdef SIM_TEST_INPUT
 	  delay(1000);
 	  noInterrupts();
 	  sleep_cpu();
+#endif
     }
   }
 
