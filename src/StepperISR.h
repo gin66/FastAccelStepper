@@ -86,6 +86,7 @@ class StepperQueue {
   bool isRunning();
   const struct mapping_s* mapping;
 #elif defined(ARDUINO_ARCH_AVR)
+  volatile bool _prepareForStop;
   volatile bool _isRunning;
   bool isRunning() { return _isRunning; }
   enum channels channel;
@@ -116,15 +117,13 @@ class StepperQueue {
     }
     uint16_t period = cmd->ticks;
     uint8_t steps = cmd->steps;
-#if defined(ARDUINO_ARCH_ESP32)
     uint32_t command_rate_ticks = period;
     if (steps > 1) {
       command_rate_ticks *= steps;
     }
-    if (command_rate_ticks < MIN_CMD_TIME) {  // MAGIC CONSTANT
+    if (command_rate_ticks < MIN_CMD_TIME) {
       return AQE_ERROR_TICKS_TOO_LOW;
     }
-#endif
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
@@ -211,6 +210,7 @@ class StepperQueue {
     dirHighCountsUp = true;
 #if defined(ARDUINO_ARCH_AVR)
     _isRunning = false;
+	_prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
 #else
