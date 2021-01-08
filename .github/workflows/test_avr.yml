@@ -20,6 +20,6 @@ jobs:
     - name: install platform atmelavr
       run: pio platform install "atmelavr"
     - name: install platform espressif32
-	  run: pio platform install "espressif32"
+      run: pio platform install "espressif32"
     - name: make
       run: make -C sim_tests
