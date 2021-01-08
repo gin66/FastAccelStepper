@@ -18,8 +18,8 @@ jobs:
     - name: install getplatformio
       run: python3 get-platformio.py
     - name: install platform atmelavr
-      run: pio platform install "atmelavr"
+      run:  ~/.platformio/penv/bin/pio platform install "atmelavr"
     - name: install platform espressif32
-      run: pio platform install "espressif32"
+      run: ~/.platformio/penv/bin/pio platform install "espressif32"
     - name: make
       run: make -C sim_tests
