@@ -210,7 +210,7 @@ class StepperQueue {
     dirHighCountsUp = true;
 #if defined(ARDUINO_ARCH_AVR)
     _isRunning = false;
-	_prepareForStop = false;
+    _prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
 #else

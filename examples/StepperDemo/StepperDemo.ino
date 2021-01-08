@@ -5,7 +5,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-f329743"
+#define VERSION "post-cd614ce"
 
 struct stepper_config_s {
   uint8_t step;
@@ -540,15 +540,14 @@ void loop() {
     if (Serial.available()) {
       ch = Serial.read();
     }
-  }
-  else {
+  } else {
     ch = *input++;
     if (ch == 0) {
       input = NULL;
 #ifdef SIM_TEST_INPUT
-	  delay(1000);
-	  noInterrupts();
-	  sleep_cpu();
+      delay(1000);
+      noInterrupts();
+      sleep_cpu();
 #endif
     }
   }
@@ -706,15 +705,15 @@ void loop() {
           } else if (strcmp(in_buffer, "I") == 0) {
             output_msg(MSG_TOGGLE_MOTOR_INFO);
             verbose = !verbose;
-          } 
+          }
 #ifdef SIM_TEST_INPUT
           else if (strcmp(in_buffer, "W") == 0) {
             if (test_ongoing) {
-				input-=2; // go back in input buffer to "W "
+              input -= 2;  // go back in input buffer to "W "
             }
           }
 #endif
-		  else if (strcmp(in_buffer, "01") == 0) {
+          else if (strcmp(in_buffer, "01") == 0) {
             Serial.println("Select test_seq_01");
             test_seq[selected].test = test_seq_01;
             test_seq[selected].state = 0;

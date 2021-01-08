@@ -41,7 +41,8 @@ void setup() {
     uint32_t cnt = 0;
     for (uint32_t delay = 0; delay < 20000; delay += 100) {
       // just issue a step with 1ms pause
-      struct stepper_command_s cmd = { .ticks = 16000, .steps = 2, .count_up = true};
+      struct stepper_command_s cmd = {
+          .ticks = 16000, .steps = 2, .count_up = true};
       int rc = stepper->addQueueEntry(&cmd);
       if (rc != AQE_OK) {
         Serial.print("Queue error:");
