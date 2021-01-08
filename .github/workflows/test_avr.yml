@@ -21,5 +21,7 @@ jobs:
       run:  ~/.platformio/penv/bin/pio platform install "atmelavr"
     - name: install platform espressif32
       run: ~/.platformio/penv/bin/pio platform install "espressif32"
+    - name: make links
+      run: make -C sim_tests links
     - name: make
       run: make -C sim_tests
