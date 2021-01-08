@@ -1,8 +1,9 @@
 
 TESTS=$(wildcard test_*)
+TESTS_SD=$(wildcard test_sd_*)
 
 TEST_FILES=$(addsuffix /.tested,$(TESTS))
-SRC_DIRS=$(addsuffix /src/.dir,$(TESTS))
+SD_SRC_DIRS=$(addsuffix /src/.dir,$(TESTS_SD))
 
 SRC=$(wildcard ../src/*)
 
@@ -11,7 +12,7 @@ test: $(TEST_FILES)
 %/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini
 	make -C $(dir $@) -f ../Makefile.test
 
-links: $(SRC_DIRS)
+links: $(SD_SRC_DIRS)
 
 %/src/.dir:
 	mkdir -p $(dir $@)
@@ -23,3 +24,5 @@ run_avr: run_avr.c
 
 clean:
 	rm -fR */.pio */.tested */x.vcd */result.txt
+	find . -type l -delete
+	find . -type d -empty -delete
