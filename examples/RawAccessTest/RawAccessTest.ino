@@ -1,6 +1,8 @@
 #include "FastAccelStepper.h"
 
+#ifdef SIM_TEST_INPUT
 #include <avr/sleep.h>
+#endif
 
 // Exclusively for test purposes !
 
@@ -67,6 +69,8 @@ void setup() {
 
 void loop() {
   delay(1000);
+#ifdef SIM_TEST_INPUT
   noInterrupts();
   sleep_cpu();
+#endif
 }

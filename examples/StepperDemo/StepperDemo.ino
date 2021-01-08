@@ -1,7 +1,9 @@
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
+#ifdef SIM_TEST_INPUT
 #include <avr/sleep.h>
+#endif
 
 #define VERSION "post-f329743"
 
