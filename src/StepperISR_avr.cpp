@@ -10,6 +10,7 @@
 #define FAS_TIMER_MODULE 4
 #endif
 #endif
+#endif
 
 #if (FAS_TIMER_MODULE == 1)
 #define stepPinStepperA stepPinStepper1A
@@ -38,7 +39,7 @@
 #endif
 
 // T is the timer module number 0,1,2,3...
-// X is the Channel name A or B
+// X is the Channel name A or B or C
 #define Stepper_Toggle(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
 #define Stepper_Zero(T, X) \
