@@ -1,3 +1,8 @@
+#
+# In order to execute the test for one directory use:
+#
+# 	make -C test_sd_01b_328p -f ../Makefile.test
+
 SRC=$(wildcard ../../src/*) $(wildcard src/*)
 
 # platformio should contain only one env section.

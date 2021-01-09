@@ -4,37 +4,7 @@
 
 #if defined(ARDUINO_ARCH_AVR)
 #if defined(__AVR_ATmega328P__)
-#define FAS_TIMER_MODULE 1
 #elif defined(__AVR_ATmega2560__)
-#ifndef FAS_TIMER_MODULE
-#define FAS_TIMER_MODULE 4
-#endif
-#endif
-
-#if (FAS_TIMER_MODULE == 1)
-#define stepPinStepperA stepPinStepper1A
-#define stepPinStepperB stepPinStepper1B
-#if defined(__AVR_ATmega2560__)
-#define stepPinStepperC stepPinStepper1C
-#endif
-#elif (FAS_TIMER_MODULE == 3)
-#define stepPinStepperA stepPinStepper3A
-#define stepPinStepperB stepPinStepper3B
-#if defined(__AVR_ATmega2560__)
-#define stepPinStepperC stepPinStepper3C
-#endif
-#elif (FAS_TIMER_MODULE == 4)
-#define stepPinStepperA stepPinStepper4A
-#define stepPinStepperB stepPinStepper4B
-#if defined(__AVR_ATmega2560__)
-#define stepPinStepperC stepPinStepper4C
-#endif
-#elif (FAS_TIMER_MODULE == 5)
-#define stepPinStepperA stepPinStepper5A
-#define stepPinStepperB stepPinStepper5B
-#if defined(__AVR_ATmega2560__)
-#define stepPinStepperC stepPinStepper5C
-#endif
 #endif
 
 // T is the timer module number 0,1,2,3...

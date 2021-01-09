@@ -1,0 +1,11 @@
+    DirA:        1*L->H,        0*H->L
+    DirB:        1*L->H,        0*H->L
+    DirC:        1*L->H,        0*H->L
+ EnableA:        1*L->H,        1*H->L
+ EnableB:        1*L->H,        0*H->L
+ EnableC:        1*L->H,        0*H->L
+   StepA:     3200*L->H,     3200*H->L
+   StepB:        0*L->H,        0*H->L
+   StepC:        0*L->H,        0*H->L
+Position[A]=3200
+

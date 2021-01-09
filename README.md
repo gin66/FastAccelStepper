@@ -116,7 +116,10 @@ Using the high level interface with ramp up/down as in [UsageExample.ino](https:
 #define stepPinStepper   9
 
 // If using an AVR device use the definitons provided in AVRStepperPins
-// #define stepPinStepper   stepPinStepper1A
+//    stepPinStepper1A
+//
+// or even shorter (for 2560 the correct pin on the chosen timer is selected):
+//    stepPinStepperA
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
