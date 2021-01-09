@@ -1,11 +1,12 @@
 #include "FastAccelStepper.h"
+#include "AVRStepperPins.h"
 #include "test_seq.h"
 
 #ifdef SIM_TEST_INPUT
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-3d7da8b"
+#define VERSION "post-cd614ce"
 
 struct stepper_config_s {
   uint8_t step;
@@ -26,7 +27,7 @@ const uint8_t led_pin = 13;  // turn off with PIN_UNDEFINED
 const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     {
       // stepper 1 shall be connected to OC1A
-      step : 9,
+      step : stepPinStepper1A,
       enable_low_active : 6,
       enable_high_active : PIN_UNDEFINED,
       direction : 5,
@@ -37,7 +38,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     },
     {
       // stepper 2 shall be connected to OC1B
-      step : 10,
+      step : stepPinStepper1B,
       enable_low_active : 8,
       enable_high_active : PIN_UNDEFINED,
       direction : 7,
