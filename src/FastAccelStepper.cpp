@@ -227,9 +227,6 @@ void FastAccelStepperEngine::manageSteppers() {
 
 //*************************************************************************************************
 int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd) {
-  if (cmd->steps >= 128) {
-    return AQE_ERROR_STEPS_VALUE;
-  }
   if (cmd->ticks < MIN_DELTA_TICKS) {
     return AQE_ERROR_TICKS_TOO_LOW;
   }
