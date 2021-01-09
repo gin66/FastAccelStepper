@@ -1,3 +1,6 @@
+0.16.8:
+- Fix for issue #30: for dirPin undefined, digitalWrite/pinMode was called
+
 0.16.7:
 - Avoid unnecessary direction pin toggle on direction change after motor stop
 - Fix MAX_STEPPER for atmega2560
