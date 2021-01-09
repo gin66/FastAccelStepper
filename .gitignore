@@ -2,6 +2,9 @@
 *.o
 *.py
 .pio
+.dir
+.tested
+run_avr
 pio_dirs
 PCB/
 examples/*/*.h
@@ -18,3 +21,5 @@ tests/StepperISR*.cpp
 tests/StepperISR.h
 tests/common.h
 tests/*.gnuplot
+sim_tests/*/result.txt
+sim_tests/*/x.vcd

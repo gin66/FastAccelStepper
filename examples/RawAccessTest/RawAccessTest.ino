@@ -1,5 +1,9 @@
 #include "FastAccelStepper.h"
 
+#ifdef SIM_TEST_INPUT
+#include <avr/sleep.h>
+#endif
+
 // Exclusively for test purposes !
 
 // for avr: either use pin 9 or 10 aka OC1A or OC1B
@@ -33,12 +37,12 @@ void setup() {
     stepper->setAutoEnable(true);
 
     Serial.println("Start");
-    uint32_t start = micros();
+    uint32_t _start = micros();
     uint32_t cnt = 0;
     for (uint32_t delay = 0; delay < 20000; delay += 100) {
       // just issue a step with 1ms pause
       struct stepper_command_s cmd = {
-          .ticks = 16000, .steps = 1, .count_up = true};
+          .ticks = 16000, .steps = 2, .count_up = true};
       int rc = stepper->addQueueEntry(&cmd);
       if (rc != AQE_OK) {
         Serial.print("Queue error:");
@@ -51,17 +55,23 @@ void setup() {
       uint32_t x = micros() + delay;
       while (micros() < x) {
       }
-      start += delay;
+      _start += delay;
     }
-    uint32_t end = micros();
-    Serial.println(start);
-    Serial.println(end);
+    uint32_t _end = micros();
+    Serial.println(_start);
+    Serial.println(_end);
     Serial.println("Done. ");
     Serial.print(cnt);
     Serial.print(" Stepper commands executed within us=");
-    Serial.print((end - start) / cnt);
+    Serial.print((_end - _start) / cnt);
     Serial.println(". Expected ~1000");
   }
 }
 
-void loop() {}
+void loop() {
+  delay(1000);
+#ifdef SIM_TEST_INPUT
+  noInterrupts();
+  sleep_cpu();
+#endif
+}
