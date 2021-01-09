@@ -1,25 +1,60 @@
 
 SRC=$(wildcard ../../src/*) $(wildcard src/*)
 
-TRACES=-at OCF1A=trace@0x36/0x02
-TRACES+=-at OCR1AL=trace@0x88/0xff
-TRACES+=-at OCR1AH=trace@0x89/0xff
-TRACES+=-at StepA=trace@0x25/0x02 # Pin 9  PPB1
-TRACES+=-at StepB=trace@0x25/0x04 # Pin 10 PB2
-TRACES+=-at DirA=trace@0x2b/0x20  # Pin 5  PD5
-TRACES+=-at DirB=trace@0x2b/0x80  # Pin 7  PD7
+DEVICE=atmega328p
+DUT=atmega328p
+
+TRACES=
+#
+ifeq ($(DUT),atmega2560_timer1)
+TRACES+=-at StepA=trace@0x025/0x20 #OC1A PB5 11 ATMega2560
+TRACES+=-at StepB=trace@0x025/0x40 #OC1B PB6 12 ATMega2560
+TRACES+=-at StepC=trace@0x025/0x80 #OC1C PB7 13 ATMega2560
+#
+else ifeq ($(DUT),atmega2560_timer3)
+TRACES+=-at StepA=trace@0x02e/0x08 #OC3A PE3 5 ATMega2560
+TRACES+=-at StepB=trace@0x02e/0x10 #OC3B PE4 2 ATMega2560
+TRACES+=-at StepC=trace@0x02e/0x20 #OC3C PE5 3 ATMega2560
+#
+else ifeq ($(DUT),atmega2560_timer4)
+TRACES+=-at StepA=trace@0x102/0x08 #OC4A PH3 6 ATMega2560
+TRACES+=-at StepB=trace@0x102/0x10 #OC4B PH4 7 ATMega2560
+TRACES+=-at StepC=trace@0x102/0x20 #OC4C PH5 8 ATMega2560
+#
+else ifeq ($(DUT),atmega2560_timer5)
+TRACES+=-at StepA=trace@0x10b/0x08 #OC5A PL3 46 ATMega2560
+TRACES+=-at StepB=trace@0x10b/0x10 #OC5B PL4 45 ATMega2560
+TRACES+=-at StepC=trace@0x10b/0x20 #OC5C PL5 44 ATMega2560
+
+else ifeq ($(DUT),atmega328p)
+TRACES+=-at StepA=trace@0x25/0x02  #OC1A PB1 9  ATMega328p
+TRACES+=-at StepB=trace@0x25/0x04  #OC1B PB2 10 ATMega328p
+
+endif
+
+ifeq ($(DEVICE),atmega2560)
+TRACES+=-at DirA=trace@0x2b/0x01     # Pin 21 PD0
+TRACES+=-at DirB=trace@0x2b/0x02     # Pin 20 PD1
+TRACES+=-at EnableA=trace@0x2b/0x04  # Pin 19 PD2
+TRACES+=-at EnableB=trace@0x2b/0x08  # Pin 18 PD3
+TRACES+=-at DirC=trace@0x10b/0x80    # Pin 42 PL7
+TRACES+=-at EnableC=trace@0x10b/0x40 # Pin 43 PL6
+
+else ifeq ($(DEVICE),atmega328p)
+TRACES+=-at DirA=trace@0x2b/0x20     # Pin 5  PD5
+TRACES+=-at DirB=trace@0x2b/0x80     # Pin 7  PD7
 TRACES+=-at EnableA=trace@0x2b/0x40  # Pin 6  PD6
 TRACES+=-at EnableB=trace@0x25/0x01  # Pin 8  PB0
 
+endif 
+
 FIRMWARE=".pio/build/avr/firmware.elf"
-DEVICE="atmega328p"
 
 test: .tested
 
 .tested:	x.vcd expect.txt
 	gawk -f ../eval.awk x.vcd
 	cat expect.txt
-	cat result.txt
 	cmp result.txt expect.txt && touch .tested
 
 x.vcd:	$(SRC) ../run_avr platformio.ini

@@ -8,9 +8,9 @@ This is an high speed alternative for the [AccelStepper library](http://www.airs
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
-	- avr atmega328: only Pin 9 and Pin 10.
+	- avr atmega328p: only Pin 9 and Pin 10.
 	- avr atmega2560: only Pin 6, 7 and 8.
-      On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 6 with FAS_TIMER_MODULE setting.
+      On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 5 with FAS_TIMER_MODULE setting.
 	- esp32: This can be any output capable port pin.
 	- Step should be done on transition Low to High. High time will be only a few us.
       On esp32 the high time is for slow speed fixed to ~2ms and high speed to 50% duty cycle
