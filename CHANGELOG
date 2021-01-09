@@ -1,3 +1,6 @@
+pre-0.16.9:
+- avr: stepper definition support via AVRStepperPins.h
+
 0.16.8:
 - Fix for issue #30: for dirPin undefined, digitalWrite/pinMode was called
 
