@@ -7,5 +7,5 @@
    StepA:        0*L->H,        0*H->L
    StepB:        0*L->H,        0*H->L
    StepC:     3200*L->H,     3200*H->L
-Position[A]=3200
+Position[C]=3200
 
