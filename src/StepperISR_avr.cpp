@@ -10,7 +10,6 @@
 #define FAS_TIMER_MODULE 4
 #endif
 #endif
-#endif
 
 #if (FAS_TIMER_MODULE == 1)
 #define stepPinStepperA stepPinStepper1A
@@ -318,3 +317,4 @@ int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
 #endif
   return -1;
 }
+#endif
