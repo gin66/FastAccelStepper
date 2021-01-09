@@ -144,17 +144,16 @@ class StepperQueue {
       queue_end.ticks_from_last_step = 0;
     }
     bool dir = (cmd->count_up == dirHighCountsUp);
-	bool toggle_dir = false;
-	if (dirPin != PIN_UNDEFINED) {
-		if (isQueueEmpty()) {
-		  // set the dirPin here. Necessary with shared direction pins
-		  digitalWrite(dirPin, dir);
-		  queue_end.dir = dir;
-		}
-		else {
-	  	  toggle_dir = (dir != queue_end.dir) ? true : false;
-		}
-	}
+    bool toggle_dir = false;
+    if (dirPin != PIN_UNDEFINED) {
+      if (isQueueEmpty()) {
+        // set the dirPin here. Necessary with shared direction pins
+        digitalWrite(dirPin, dir);
+        queue_end.dir = dir;
+      } else {
+        toggle_dir = (dir != queue_end.dir) ? true : false;
+      }
+    }
     e->steps = steps;
     e->toggle_dir = toggle_dir;
     e->ticks = period;
