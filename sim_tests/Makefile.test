@@ -47,9 +47,9 @@ endif
 ifeq ($(DEVICE),atmega2560)
 TRACES+=-at DirA=trace@0x2b/0x01     # Pin 21 PD0
 TRACES+=-at DirB=trace@0x2b/0x02     # Pin 20 PD1
+TRACES+=-at DirC=trace@0x10b/0x80    # Pin 42 PL7
 TRACES+=-at EnableA=trace@0x2b/0x04  # Pin 19 PD2
 TRACES+=-at EnableB=trace@0x2b/0x08  # Pin 18 PD3
-TRACES+=-at DirC=trace@0x10b/0x80    # Pin 42 PL7
 TRACES+=-at EnableC=trace@0x10b/0x40 # Pin 43 PL6
 
 else ifeq ($(DEVICE),atmega328p)

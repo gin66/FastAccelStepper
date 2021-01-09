@@ -1,5 +1,7 @@
 pre-0.16.7:
 - Avoid unnecessary direction pin toggle on direction change after motor stop
+- Fix MAX_STEPPER for atmega2560
+- Extend simavr tests for atmega2560
 
 0.16.6:
 - bugfix in setEnablePin(): if called with PIN_UNDEFINED, that value was used with pinMode and digitalWrite()

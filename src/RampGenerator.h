@@ -5,7 +5,11 @@
 #define MAX_STEPPER 2
 #define TICKS_PER_S 16000000L
 #elif defined(ARDUINO_ARCH_AVR)
+#if defined(__AVR_ATmega328P__)
 #define MAX_STEPPER 2
+#elif defined(__AVR_ATmega2560__)
+#define MAX_STEPPER 3
+#endif
 #define TICKS_PER_S F_CPU
 #elif defined(ARDUINO_ARCH_ESP32)
 #define MAX_STEPPER 6

@@ -19,6 +19,7 @@ struct stepper_config_s {
 };
 
 #if defined(ARDUINO_ARCH_AVR)
+#if defined(__AVR_ATmega328P__)
 // Example hardware configuration for Arduino Nano
 // Please adapt to your configuration
 const uint8_t led_pin = 13;  // turn off with PIN_UNDEFINED
@@ -45,6 +46,45 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     }};
+#elif defined(__AVR_ATmega2560__)
+// Example hardware configuration for Arduino ATmega2560
+// Please adapt to your configuration
+const uint8_t led_pin = PIN_UNDEFINED;  // turn off with PIN_UNDEFINED
+const struct stepper_config_s stepper_config[MAX_STEPPER] = {
+    {
+      // stepper 1 shall be connected to OC4A
+      step : 6,
+      enable_low_active : 19,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 21,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 500000,
+      off_delay_ms : 5000
+    },
+    {
+      // stepper 2 shall be connected to OC4B
+      step : 7,
+      enable_low_active : 18,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 20,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    {
+      // stepper 3 shall be connected to OC4C
+      step : 8,
+      enable_low_active : 43,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 42,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }};
+#endif
 #elif defined(ARDUINO_ARCH_ESP32)
 // Example hardware configuration for esp32 board.
 // Please adapt to your configuration
