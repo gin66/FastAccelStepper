@@ -190,6 +190,10 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
             exitStepperISR();                                                \
             return;                                                          \
           }                                                                  \
+      /* Here the output compare is in Toggle mode */                        \
+      AVR_STEPPER_ISR_NEXT(T, CHANNEL, false)                                \
+            exitStepperISR();                                                \
+            return;                                                          \
         }                                                                    \
       }                                                                      \
       /* Here the output compare is in Zero mode */                          \
