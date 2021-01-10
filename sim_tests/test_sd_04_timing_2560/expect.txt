@@ -1,19 +1,17 @@
     DirA:        1*L->H,        0*H->L
     DirB:        1*L->H,        0*H->L
     DirC:        1*L->H,        0*H->L
- EnableA:        1*L->H,        1*H->L
- EnableB:        1*L->H,        1*H->L
- EnableC:        1*L->H,        1*H->L
- FillISR:      495*L->H,      495*H->L
-   StepA:      500*L->H,      499*H->L
-   StepB:      501*L->H,      501*H->L
-   StepC:      501*L->H,      500*H->L
- StepISR:        0*L->H,        0*H->L
-Position[A]=500
+ EnableA:        2*L->H,        1*H->L
+ EnableB:        2*L->H,        1*H->L
+ EnableC:        2*L->H,        1*H->L
+   StepA:    64000*L->H,    64000*H->L
+   StepB:    64000*L->H,    64000*H->L
+   StepC:    64000*L->H,    64000*H->L
+Position[A]=64000
 
-Position[B]=501
+Position[B]=64000
 
-Position[C]=501
+Position[C]=64000
 
-Max_time in FillISR=3806 us
+Max_time in FillISR=10933 us
 

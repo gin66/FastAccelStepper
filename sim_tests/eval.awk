@@ -97,7 +97,9 @@ END {
 		s = to_sym[name]
 		info = sprintf("%8s: %8d*L->H, %8d*H->L",name,cnt_l_h[s],cnt_h_l[s])
 		print(info)
-		print(info) >"result.txt"
+		if (name !~ /ISR/) {
+		    print(info) >"result.txt"
+	    }
 	}
 	channels["A"]=1
 	channels["B"]=1

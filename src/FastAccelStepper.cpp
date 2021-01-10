@@ -431,7 +431,7 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp) {
   _dirPin = dirPin;
   _dirHighCountsUp = dirHighCountsUp;
   if (_dirPin != PIN_UNDEFINED) {
-    digitalWrite(dirPin, dirHighCountsUp ? HIGH:LOW);
+    digitalWrite(dirPin, dirHighCountsUp ? HIGH : LOW);
     pinMode(dirPin, OUTPUT);
   }
   fas_queue[_queue_num].dirPin = dirPin;
