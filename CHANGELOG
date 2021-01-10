@@ -1,7 +1,13 @@
-pre-0.16.9:
+0.17.0:
 - avr: stepper definition support via AVRStepperPins.h
 - 2560: all timers and channels are checked with one test
 - addQueueEntry(): remove test for steps >= 128
+- new function moveByAcceleration() to control stepper speed by positive and
+  negative acceleration values.
+- stopMove() will not run to stop, if any move command is called afterwards.
+  The error code MOVE_ERR_STOP_ONGOING has been removed.
+- StepperDemo extended:
+	- a: Allows to control the stepper speed by positive/negative acceleration values
 
 0.16.8:
 - Fix for issue #30: for dirPin undefined, digitalWrite/pinMode was called

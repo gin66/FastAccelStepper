@@ -35,6 +35,7 @@
 //*************************************************************************************************
 
 void RampGenerator::init() {
+  speed_in_us = 0;
   _config.accel_change_cnt = 0;
   _config.min_travel_ticks = 0;
   _config.upm_inv_accel2 = 0;
@@ -48,6 +49,7 @@ void RampGenerator::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
     return;
   }
+  speed_in_us = min_step_us;
   uint32_t min_travel_ticks = US_TO_TICKS(min_step_us);
   if (min_travel_ticks < MIN_DELTA_TICKS) {
     min_travel_ticks = MIN_DELTA_TICKS;  // set to lower limit
@@ -129,9 +131,6 @@ int8_t RampGenerator::_startMove(int32_t target_pos,
 
 int8_t RampGenerator::moveTo(int32_t position,
                              const struct queue_end_s *queue_end) {
-  if (isStopping()) {
-    return MOVE_ERR_STOP_ONGOING;
-  }
   inject_fill_interrupt(1);
   int res = _startMove(position, queue_end);
   inject_fill_interrupt(2);

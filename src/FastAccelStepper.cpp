@@ -520,6 +520,26 @@ void FastAccelStepper::stopMove() { _rg.initiate_stop(); }
 void FastAccelStepper::applySpeedAcceleration() {
   _rg.applySpeedAcceleration();
 }
+void FastAccelStepper::moveByAcceleration(int32_t acceleration,
+                                          bool allow_reverse) {
+  if (acceleration > 0) {
+    setAcceleration(acceleration);
+    runForward();
+  } else if (acceleration < 0) {
+    setAcceleration(-acceleration);
+    if (allow_reverse) {
+      runBackward();
+    } else {
+      stopMove();
+    }
+  } else {
+    uint32_t max_speed = _rg.speed_in_us;
+    setSpeed(getPeriodAfterCommandsCompleted());
+    setAcceleration(1);
+    applySpeedAcceleration();
+    setSpeed(max_speed);
+  }
+}
 void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];
 

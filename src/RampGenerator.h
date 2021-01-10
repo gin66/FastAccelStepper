@@ -76,6 +76,7 @@ class RampGenerator {
   struct ramp_wo_s _wo;
 
  public:
+  uint32_t speed_in_us;
   inline uint8_t rampState() {
     // reading one byte is atomic
     return _wo.ramp_state;

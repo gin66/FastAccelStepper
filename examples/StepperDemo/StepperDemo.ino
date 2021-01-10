@@ -1,12 +1,12 @@
-#include "FastAccelStepper.h"
 #include "AVRStepperPins.h"
+#include "FastAccelStepper.h"
 #include "test_seq.h"
 
 #ifdef SIM_TEST_INPUT
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-cd614ce"
+#define VERSION "post-501cfe3"
 
 struct stepper_config_s {
   uint8_t step;
@@ -382,8 +382,9 @@ void info(FastAccelStepper *s) {
 const static char usage_str[] PROGMEM =
     "Enter commands separated by space, carriage return or newline:\n"
     "     M1/M2/..  ... to select stepper\n"
-    "     A<accel>  ... Set selected stepper's acceleration\n"
     "     V<speed>  ... Set selected stepper's speed\n"
+    "     A<accel>  ... Set selected stepper's acceleration\n"
+    "     a<accel>  ... Acceleration control with +/-acceleration values\n"
     "     U         ... Update selected stepper's speed/acceleration while "
     "running\n"
     "     P<pos>    ... Move selected stepper to position (can be "
@@ -643,14 +644,18 @@ void loop() {
       } else if (selected >= 0) {
         FastAccelStepper *stepper_selected = stepper[selected];
         if (!test_mode) {
-          if (sscanf(in_buffer, "A%ld", &val) == 1) {
+          if (sscanf(in_buffer, "A%lu", &val) == 1) {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
             stepper_selected->setAcceleration(val);
-          } else if (sscanf(in_buffer, "V%ld", &val) == 1) {
+          } else if (sscanf(in_buffer, "V%lu", &val) == 1) {
             output_msg(MSG_SET_SPEED_TO);
             Serial.println(val);
             stepper_selected->setSpeed(val);
+          } else if (sscanf(in_buffer, "a%ld", &val) == 1) {
+            output_msg(MSG_SET_ACCELERATION_TO);
+            Serial.println(val);
+            stepper_selected->moveByAcceleration(val);
           } else if (sscanf(in_buffer, "R%ld", &val) == 1) {
             output_msg(MSG_MOVE_STEPS);
             Serial.println(val);

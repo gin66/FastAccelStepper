@@ -66,4 +66,4 @@
 #endif
 #endif
 
-#endif // AVRSTEPPERPINS_H_YFXPAB9M
+#endif  // AVRSTEPPERPINS_H_YFXPAB9M

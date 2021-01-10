@@ -1,6 +1,6 @@
+#include "AVRStepperPins.h"
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
-#include "AVRStepperPins.h"
 
 #if defined(ARDUINO_ARCH_AVR)
 #if defined(__AVR_ATmega328P__)

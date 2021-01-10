@@ -167,7 +167,6 @@ class FastAccelStepper {
   -1 /* negative direction requested, but no direction pin defined */
 #define MOVE_ERR_SPEED_IS_UNDEFINED -2
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
-#define MOVE_ERR_STOP_ONGOING -4
 
   // This command flags the stepper to keep run continuously into current
   // direction. It can be stopped by stopMove.
@@ -190,10 +189,19 @@ class FastAccelStepper {
   void forwardStep(bool blocking = false);
   void backwardStep(bool blocking = false);
 
+  // moveByAcceleration() can be called, if only the speed of the stepper
+  // is of interest and that speed to be controlled by acceleration.
+  // The maximum speed (in both directions) to be set by setSpeed() before.
+  // The behaviour will be:
+  //	acceleration > 0  => accelerate towards positive maximum speed
+  //	acceleration = 0  => keep current speed
+  //	acceleration < 0
+  //		=> accelerate towards negative maximum speed if allow_reverse
+  //		=> decelerate towards motor stop if allow_reverse = false
+  void moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
+
   // stop the running stepper as fast as possible with deceleration
   // This only sets a flag and can be called from an interrupt !
-  // Another move/moveTo must wait, till the motor has stopped.
-  // Similarly keepRunning() is ignored, too.
   void stopMove();
 
   // stop the running stepper immediately and set new_pos as new position
