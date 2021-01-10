@@ -16,7 +16,9 @@ SRC=$(wildcard ../../src/*) $(wildcard src/*)
 
 DUT=$(shell gawk '/env:/{print(substr($$1,6,length($$1)-6))}' platformio.ini)
 
-TRACES=
+TRACES=-at StepISR=trace@0x25/0x08     # PB3
+TRACES+=-at FillISR=trace@0x25/0x10     # PB4
+
 #
 ifeq ($(DUT),atmega2560_timer1)
 DEVICE=atmega2560

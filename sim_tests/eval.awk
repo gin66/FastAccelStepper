@@ -17,6 +17,7 @@ dump_all == 1{print}
 	transition_h_l[$4] = 0
 	cnt_l_h[$4] = 0
 	cnt_h_l[$4] = 0
+	max_time_h[$4] = 0
 	state[$4] = "X"
 }
 
@@ -24,7 +25,7 @@ dump_all == 1{print}
 
 /^1.$/ {
 	s = substr($1,2)
-	print(sym[s] "=1")
+	printf("%s=1  ", sym[s])
 	if (state[s] == 0) {
 		# transition L->H
 		cnt_l_h[s]++
@@ -52,15 +53,16 @@ dump_all == 1{print}
 				}
 				printf("position=%d ",position[channel])
 			}
-			printf("period=%.1fus high time=%.1fus\n",
+		    printf("period=%.1fus high time=%.1fus",
 				  period_lh_lh[s]/ref,time_h[s]/ref)
 		}
 	}
+	printf("\n")
 	state[s] = 1
 }
 /^0.$/ {
 	s = substr($1,2)
-	print(sym[s] "=0")
+	printf("%s=0  ", sym[s])
 	if (state[s] == 1) {
 		# transition H->L
 		cnt_h_l[s]++
@@ -73,7 +75,18 @@ dump_all == 1{print}
 		if (last > 0) {
 			time_h[s] = time - last
 		}
+		if (sym[s] ~ /FillISR/) {
+			printf("period=%.1fus ", period_lh_lh[s]/ref)
+		}
+		if (sym[s] ~ /ISR/) {
+			h_time = time_h[s]/ref
+			printf("high time=%.1fus", h_time)
+			if (h_time > max_time_h[s]) {
+				max_time_h[s] = h_time
+			}
+		}
 	}
+	printf("\n")
 	state[s] = 0
 }
 
@@ -92,6 +105,16 @@ END {
 	for (ch in channels) {
 		if (ch in position) {
 			info = sprintf("Position[%s]=%d\n",ch,position[ch])
+			print(info)
+			print(info) >"result.txt"
+		}
+	}
+
+	for (i = 1;i <= n;i++) {
+		name = names[i]
+		s = to_sym[name]
+		if (max_time_h[s] > 0) {
+			info = sprintf("Max_time in %s=%d us\n",name,max_time_h[s])
 			print(info)
 			print(info) >"result.txt"
 		}

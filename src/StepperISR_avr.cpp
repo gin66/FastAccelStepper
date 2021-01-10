@@ -1,11 +1,7 @@
+#if defined(ARDUINO_ARCH_AVR)
 #include "AVRStepperPins.h"
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
-
-#if defined(ARDUINO_ARCH_AVR)
-#if defined(__AVR_ATmega328P__)
-#elif defined(__AVR_ATmega2560__)
-#endif
 
 // T is the timer module number 0,1,2,3...
 // X is the Channel name A or B
@@ -19,6 +15,20 @@
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == _BV(COM##T##X##0))
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
+
+#ifdef SIMAVR_TIME_MEASUREMENT
+#define prepareISRtimeMeasurement() DDRB |= 0x18
+#define enterStepperISR() PORTB |= 0x08
+#define exitStepperISR() PORTB ^= 0x08
+#define enterFillQueueISR() PORTB |= 0x10
+#define exitFillQueueISR() PORTB ^= 0x10
+#else
+#define prepareISRtimeMeasurement() {}
+#define enterStepperISR() {}
+#define exitStepperISR() {}
+#define enterFillQueueISR() {}
+#define exitFillQueueISR() {}
+#endif
 
 #ifdef SIMAVR_FOC_WORKAROUND
 #define ForceCompare(T, X)                  \
@@ -66,6 +76,7 @@ StepperQueue fas_queue[NUM_QUEUES];
     EnableOverflowInterrupt(T);                    \
   }
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+  prepareISRtimeMeasurement();
   _initVars();
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
@@ -93,6 +104,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 
 #define AVR_STEPPER_ISR(T, CHANNEL)                                           \
   ISR(TIMER##T##_COMP##CHANNEL##_vect) {                                      \
+	enterStepperISR();                                                        \
     uint8_t rp = fas_queue_##CHANNEL.read_idx;                                \
     if (rp == fas_queue_##CHANNEL.next_write_idx) {                           \
       /* queue is empty => set to disconnect */                               \
@@ -104,6 +116,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       fas_queue_##CHANNEL._isRunning = false;                                 \
       fas_queue_##CHANNEL._prepareForStop = false;                            \
       fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;          \
+	  exitStepperISR();                                                       \
       return;                                                                 \
     }                                                                         \
     struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];  \
@@ -123,6 +136,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       ForceCompare(T, CHANNEL);                                               \
       if (e->steps-- > 1) {                                                   \
         /* perform another step with this queue entry */                      \
+	    exitStepperISR();                                                     \
         return;                                                               \
       }                                                                       \
     }                                                                         \
@@ -144,6 +158,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       Stepper_Zero(T, CHANNEL);                                               \
       fas_queue_##CHANNEL._prepareForStop = true;                             \
     }                                                                         \
+	exitStepperISR();                                                         \
   }
 #define AVR_STEPPER_ISR_GEN(T, CHANNEL) AVR_STEPPER_ISR(T, CHANNEL)
 AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, A)
@@ -155,6 +170,8 @@ AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, C)
 // this is for cyclic task
 #define AVR_CYCLIC_ISR(T)                          \
   ISR(TIMER##T##_OVF_vect) {                       \
+	enterFillQueueISR();                           \
+                                                   \
     /* disable OVF interrupt to avoid nesting */   \
     DisableOverflowInterrupt(T);                   \
                                                    \
@@ -169,6 +186,8 @@ AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, C)
                                                    \
     /* enable OVF interrupt again */               \
     EnableOverflowInterrupt(T);                    \
+                                                   \
+	exitFillQueueISR();                            \
   }
 #define AVR_CYCLIC_ISR_GEN(T) AVR_CYCLIC_ISR(T)
 AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
