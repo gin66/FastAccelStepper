@@ -22,6 +22,12 @@
 #define exitStepperISR() PORTB ^= 0x08
 #define enterFillQueueISR() PORTB |= 0x10
 #define exitFillQueueISR() PORTB ^= 0x10
+#elif defined(SIMAVR_TIME_MEASUREMENT_QUEUE)
+#define prepareISRtimeMeasurement() DDRB |= 0x10
+#define enterStepperISR() {}
+#define exitStepperISR() {}
+#define enterFillQueueISR() PORTB |= 0x10
+#define exitFillQueueISR() PORTB ^= 0x10
 #else
 #define prepareISRtimeMeasurement() {}
 #define enterStepperISR() {}
