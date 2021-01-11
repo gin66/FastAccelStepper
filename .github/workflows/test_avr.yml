@@ -19,6 +19,8 @@ jobs:
       run: python3 get-platformio.py
     - name: install platform atmelavr
       run:  ~/.platformio/penv/bin/pio platform install "atmelavr"
+    - name: install lib elf
+      run:  sudo apt install libelf-dev
     - name: make links
       run: make -C sim_tests links
     - name: make
