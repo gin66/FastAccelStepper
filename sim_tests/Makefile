@@ -22,7 +22,7 @@ run_avr: simavr/simavr/run_avr
 	ln -s simavr/simavr/run_avr .
 
 simavr/simavr/run_avr:
-	git clone git@github.com:gin66/simavr.git
+	git clone https://github.com/gin66/simavr.git
 	make -C simavr build-simavr
 
 clean:
