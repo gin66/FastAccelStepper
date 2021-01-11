@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-5109fe3"
+#define VERSION "post-e080d87"
 
 struct stepper_config_s {
   uint8_t step;
@@ -715,6 +715,11 @@ void loop() {
             output_msg(MSG_UPDATE_SPEED_ACCELERATION);
             stepper_selected->applySpeedAcceleration();
           } else if (strcmp(in_buffer, "W") == 0) {
+#ifdef SIM_TEST_INPUT
+			if (stepper_selected->isRunning()) {
+			  input -= 2;
+            }
+#else
             output_msg(MSG_BLOCKING_WAIT);
             if (!stepper_selected->isRunningContinuously()) {
               // Wait for stepper stop
@@ -722,6 +727,7 @@ void loop() {
                 // do nothing
               }
             }
+#endif
           } else if (strcmp(in_buffer, "T") == 0) {
             if (!stepper_selected->isRunning()) {
               output_msg(MSG_TEST_DIRECT_DRIVE);

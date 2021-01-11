@@ -7,9 +7,6 @@
 #include "common.h"
 
 // Here are the global variables to interface with the interrupts
-#if __has_include("fas_config.h")
-#include "fas_config.h"
-#endif
 
 #if defined(TEST)
 #define NUM_QUEUES 2
@@ -111,12 +108,14 @@ class StepperQueue {
   }
   inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
   inline bool isQueueEmpty() { return queueEntries() == 0; }
+
   int addQueueEntry(const struct stepper_command_s* cmd) {
     if (isQueueFull()) {
       return AQE_QUEUE_FULL;
     }
     uint16_t period = cmd->ticks;
     uint8_t steps = cmd->steps;
+
     uint32_t command_rate_ticks = period;
     if (steps > 1) {
       command_rate_ticks *= steps;
@@ -127,7 +126,6 @@ class StepperQueue {
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-    queue_end.pos += cmd->count_up ? steps : -steps;
     if (steps == 0) {
       // This is a pause
       uint32_t tfls = queue_end.ticks_from_last_step;
@@ -135,6 +133,7 @@ class StepperQueue {
         queue_end.ticks_from_last_step = tfls + cmd->ticks;
       }
     } else {
+      queue_end.pos += cmd->count_up ? steps : -steps;
       uint32_t tfls = queue_end.ticks_from_last_step;
       if (tfls <= 0xffff0000) {
         queue_end.ticks = tfls + cmd->ticks;
@@ -174,8 +173,7 @@ class StepperQueue {
       }
     }
 #endif
-    next_write_idx = wp + 1;
-    startQueue();
+    commandAddedToQueue();
     return AQE_OK;
   }
   bool hasTicksInQueue(uint32_t min_ticks) {
@@ -202,7 +200,7 @@ class StepperQueue {
   }
 
   // startQueue is always called
-  void startQueue();
+  void commandAddedToQueue();
   void forceStop();
   void _initVars() {
     dirPin = PIN_UNDEFINED;

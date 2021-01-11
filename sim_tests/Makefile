@@ -18,9 +18,12 @@ links: $(SD_SRC_DIRS)
 	mkdir -p $(dir $@)
 	cd $(dir $@); ln -sf ../../../examples/StepperDemo/* .
 
-run_avr: run_avr.c
-	sudo apt install -y libsimavr-dev libelf-dev
-	gcc run_avr.c -static -I /usr/include/simavr -lsimavr -lelf -lz -o run_avr
+run_avr: simavr/simavr/run_avr
+	ln -s simavr/simavr/run_avr .
+
+simavr/simavr/run_avr:
+	git clone git@github.com:gin66/simavr.git
+	make -C simavr build-simavr
 
 clean:
 	rm -fR */.pio */.tested */x.vcd */result.txt

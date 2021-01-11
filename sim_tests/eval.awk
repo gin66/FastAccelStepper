@@ -78,12 +78,10 @@ dump_all == 1{print}
 		if (sym[s] ~ /FillISR/) {
 			printf("period=%.1fus ", period_lh_lh[s]/ref)
 		}
-		if (sym[s] ~ /ISR/) {
-			h_time = time_h[s]/ref
-			printf("high time=%.1fus", h_time)
-			if (h_time > max_time_h[s]) {
-				max_time_h[s] = h_time
-			}
+		h_time = time_h[s]/ref
+		printf("high time=%.1fus", h_time)
+		if (h_time > max_time_h[s]) {
+			max_time_h[s] = h_time
 		}
 	}
 	printf("\n")
@@ -96,6 +94,9 @@ END {
 		name = names[i]
 		s = to_sym[name]
 		info = sprintf("%8s: %8d*L->H, %8d*H->L",name,cnt_l_h[s],cnt_h_l[s])
+		if (name ~ /Step/) {
+			info = sprintf("%s, Max High=%dus", info, max_time_h[s])
+		}
 		print(info)
 		if (name !~ /ISR/) {
 		    print(info) >"result.txt"

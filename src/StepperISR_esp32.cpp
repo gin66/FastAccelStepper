@@ -281,7 +281,8 @@ bool StepperQueue::isRunning() {
   return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
 }
 
-void StepperQueue::startQueue() {
+void StepperQueue::commandAddedToQueue() {
+  next_write_idx++;
   if (_hasISRactive) {
     return;
   }

@@ -8,7 +8,7 @@ Position[A]=1000
 
 Position[B]=1000
 
-Max_time in FillISR=3729 us
+Max_time in FillISR=3697 us
 
-Max_time in StepISR=9 us
+Max_time in StepISR=8 us
 

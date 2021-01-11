@@ -5,14 +5,17 @@
 
 // T is the timer module number 0,1,2,3...
 // X is the Channel name A or B
-#define Stepper_Toggle(T, X) \
-  TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
 #define Stepper_Zero(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##1)) & ~_BV(COM##T##X##0)
+#define Stepper_Toggle(T, X) \
+  TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
+#define Stepper_One(T, X) \
+  TCCR##T##A |= _BV(COM##T##X##1) | _BV(COM##T##X##0)
 #define Stepper_Disconnect(T, X) \
-  TCCR##T##A = (TCCR##T##A & ~(_BV(COM##T##X##1) | _BV(COM##T##X##0)))
-#define Stepper_IsToggling(T, X) \
-  ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == _BV(COM##T##X##0))
+  TCCR##T##A &= ~(_BV(COM##T##X##1) | _BV(COM##T##X##0))
+#define Stepper_IsOne(T, X)                                  \
+  ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == \
+   (_BV(COM##T##X##0) | _BV(COM##T##X##1)))
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
 
@@ -43,19 +46,7 @@
   {}
 #endif
 
-#ifdef SIMAVR_FOC_WORKAROUND
-#define ForceCompare(T, X)                    \
-  {                                           \
-    uint16_t x = OCR##T##X;                   \
-    OCR##T##X = TCNT##T + 8;                  \
-    while ((TIFR##T & _BV(OCF##T##X)) == 0) { \
-    };                                        \
-    OCR##T##X = x;                            \
-  }                                           \
-  ClearInterruptFlag(T, X); 
-#else
 #define ForceCompare(T, X) TCCR##T##C = _BV(FOC##T##X)
-#endif
 #define DisableCompareInterrupt(T, X) TIMSK##T &= ~_BV(OCIE##T##X)
 #define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE##T##X)
 #define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF##T##X)
@@ -116,91 +107,80 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 // wait time has still to be executed for the next command, if any.
 //
 // If reaching here without further commands, then the queue is done
-#define AVR_STEPPER_ISR_NEXT(T, CHANNEL, FOC_STATE_ZERO)              \
-  rp++;                                                               \
-  fas_queue_##CHANNEL.read_idx = rp;                                  \
-  if (rp != fas_queue_##CHANNEL.next_write_idx) {                     \
-    /* command in queue */                                            \
-    e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];              \
-    if (e->steps == 0) {                                              \
-      if (!FOC_STATE_ZERO) {                                          \
-        Stepper_Zero(T, CHANNEL);                                     \
-      }                                                               \
-    } else {                                                          \
-      if (FOC_STATE_ZERO) {                                           \
-        Stepper_Toggle(T, CHANNEL);                                   \
-      }                                                               \
-    }                                                                 \
-    if (e->toggle_dir) {                                              \
-      uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                    \
-      digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH); \
-    }                                                                 \
-  } else {                                                            \
-    if (!FOC_STATE_ZERO) {                                            \
-      Stepper_Zero(T, CHANNEL);                                       \
-    }                                                                 \
-    fas_queue_##CHANNEL._prepareForStop = true;                       \
+#define AVR_STEPPER_ISR(T, CHANNEL)                                           \
+  ISR(TIMER##T##_COMP##CHANNEL##_vect) {                                      \
+    enterStepperISR();                                                        \
+    uint8_t rp = fas_queue_##CHANNEL.read_idx;                                \
+    if (rp == fas_queue_##CHANNEL.next_write_idx) {                           \
+      /* queue is empty => set to disconnect */                               \
+      Stepper_Disconnect(T, CHANNEL);                                         \
+      /* force compare to ensure disconnect */                                \
+      ForceCompare(T, CHANNEL);                                               \
+      /* disable compare interrupt */                                         \
+      DisableCompareInterrupt(T, CHANNEL);                                    \
+      fas_queue_##CHANNEL._isRunning = false;                                 \
+      fas_queue_##CHANNEL._prepareForStop = false;                            \
+      fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;          \
+      exitStepperISR();                                                       \
+      return;                                                                 \
+    }                                                                         \
+    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];  \
+    /* There is a risk, that this new compare time is delayed by one cycle */ \
+    OCR##T##CHANNEL += e->ticks;                                              \
+    if (Stepper_IsOne(T, CHANNEL)) {                                          \
+      /* Clear output bit by another compare event */                         \
+      Stepper_Zero(T, CHANNEL);                                               \
+      ForceCompare(T, CHANNEL);                                               \
+      ClearInterruptFlag(T, CHANNEL);                                               \
+      if (e->steps-- > 1) {                                                   \
+        /* perform another step with this queue entry */                      \
+        Stepper_One(T, CHANNEL);                                              \
+        exitStepperISR();                                                     \
+        return;                                                               \
+      }                                                                       \
+    } else {                                                                  \
+      if (fas_queue_##CHANNEL._prepareForStop) {                              \
+        /* new command received after running out of commands */              \
+        /* if this new command requires a step, then this step would be lost  \
+         */                                                                   \
+        fas_queue_##CHANNEL._prepareForStop = false;                          \
+        if (e->steps > 0) {                                                   \
+          /* That's the problem, so generate a step */                        \
+          Stepper_One(T, CHANNEL);                                            \
+          ForceCompare(T, CHANNEL);                                           \
+          /* Use a high time of 3us */                                        \
+          delayMicroseconds(3);                                               \
+          /* Clear output bit by another toggle */                            \
+          Stepper_Zero(T, CHANNEL);                                           \
+          ForceCompare(T, CHANNEL);                                           \
+      ClearInterruptFlag(T, CHANNEL);                                               \
+          if (e->steps-- > 1) {                                               \
+            /* perform another step with this queue entry */                  \
+            Stepper_One(T, CHANNEL);                                          \
+            exitStepperISR();                                                 \
+            return;                                                           \
+          }                                                                   \
+        }                                                                     \
+      }                                                                       \
+    }                                                                         \
+    rp++;                                                                     \
+    fas_queue_##CHANNEL.read_idx = rp;                                        \
+    if (rp != fas_queue_##CHANNEL.next_write_idx) {                           \
+      /* command in queue */                                                  \
+      e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];                    \
+      if (e->steps != 0) {                                                    \
+        Stepper_One(T, CHANNEL);                                              \
+      }                                                                       \
+      if (e->toggle_dir) {                                                    \
+        uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                          \
+        digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);       \
+      }                                                                       \
+    } else {                                                                  \
+      fas_queue_##CHANNEL._prepareForStop = true;                             \
+    }                                                                         \
+    exitStepperISR();                                                         \
   }
 
-#define AVR_STEPPER_ISR(T, CHANNEL)                                          \
-  ISR(TIMER##T##_COMP##CHANNEL##_vect) {                                     \
-    enterStepperISR();                                                       \
-    uint8_t rp = fas_queue_##CHANNEL.read_idx;                               \
-    if (rp == fas_queue_##CHANNEL.next_write_idx) {                          \
-      /* queue is empty => set to disconnect */                              \
-      Stepper_Disconnect(T, CHANNEL);                                        \
-      /* force compare to ensure disconnect */                               \
-      ForceCompare(T, CHANNEL);                                              \
-      /* disable compare interrupt */                                        \
-      DisableCompareInterrupt(T, CHANNEL);                                   \
-      fas_queue_##CHANNEL._isRunning = false;                                \
-      fas_queue_##CHANNEL._prepareForStop = false;                           \
-      fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;         \
-      exitStepperISR();                                                      \
-      return;                                                                \
-    }                                                                        \
-    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK]; \
-    OCR##T##CHANNEL += e->ticks;                                             \
-    if (Stepper_IsToggling(T, CHANNEL)) {                                    \
-      /* Clear output bit by another toggle */                               \
-      ForceCompare(T, CHANNEL);                                              \
-      if (e->steps-- > 1) {                                                  \
-        /* perform another step with this queue entry */                     \
-        exitStepperISR();                                                    \
-        return;                                                              \
-      }                                                                      \
-      /* Here the output compare is in Toggle mode */                        \
-      AVR_STEPPER_ISR_NEXT(T, CHANNEL, false)                                \
-    } else {                                                                 \
-      if (fas_queue_##CHANNEL._prepareForStop) {                             \
-        /* new command received after running out of commands */             \
-        /* if this new command requires a step, then this step would be lost \
-         */                                                                  \
-        fas_queue_##CHANNEL._prepareForStop = false;                         \
-        if (e->steps > 0) {                                                  \
-          /* That's the problem, so generate a step */                       \
-          Stepper_Toggle(T, CHANNEL);                                        \
-          ForceCompare(T, CHANNEL);                                          \
-          /* Use a high time of 3us */                                       \
-          delayMicroseconds(3);                                              \
-          /* Clear output bit by another toggle */                           \
-          ForceCompare(T, CHANNEL);                                          \
-          if (e->steps-- > 1) {                                              \
-            /* perform another step with this queue entry */                 \
-            exitStepperISR();                                                \
-            return;                                                          \
-          }                                                                  \
-      /* Here the output compare is in Toggle mode */                        \
-      AVR_STEPPER_ISR_NEXT(T, CHANNEL, false)                                \
-            exitStepperISR();                                                \
-            return;                                                          \
-        }                                                                    \
-      }                                                                      \
-      /* Here the output compare is in Zero mode */                          \
-      AVR_STEPPER_ISR_NEXT(T, CHANNEL, true)                                 \
-    }                                                                        \
-    exitStepperISR();                                                        \
-  }
 #define AVR_STEPPER_ISR_GEN(T, CHANNEL) AVR_STEPPER_ISR(T, CHANNEL)
 AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, A)
 AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, B)
@@ -246,9 +226,7 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
     uint8_t rp = fas_queue_##CHANNEL.read_idx;                               \
     struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK]; \
     if (e->steps > 0) {                                                      \
-      Stepper_Toggle(T, CHANNEL);                                            \
-    } else {                                                                 \
-      Stepper_Zero(T, CHANNEL);                                              \
+      Stepper_One(T, CHANNEL);                                               \
     }                                                                        \
     if (e->toggle_dir) {                                                     \
       uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                           \
@@ -263,13 +241,16 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
     interrupts();                                                            \
   }
 
-void StepperQueue::startQueue() {
+
+void StepperQueue::commandAddedToQueue() {
+  noInterrupts();
+  next_write_idx++;
   if (_isRunning) {
+    interrupts();
     return;
   }
-  if (isQueueEmpty()) {
-    return;
-  }
+  interrupts();
+
   _isRunning = true;
   _prepareForStop = false;
   switch (channel) {

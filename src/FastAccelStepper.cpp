@@ -167,7 +167,7 @@ void FastAccelStepperEngine::manageSteppers() {
         uint8_t high_active_pin = s->getEnablePinHighActive();
         uint8_t low_active_pin = s->getEnablePinLowActive();
 
-        noInterrupts();
+        //noInterrupts();
         bool agree = true;
         for (uint8_t j = 0; j < _next_stepper_num; j++) {
           if (i != j) {
@@ -196,7 +196,7 @@ void FastAccelStepperEngine::manageSteppers() {
             }
           }
         }
-        interrupts();
+        //interrupts();
       }
     }
   }
@@ -205,10 +205,10 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-      noInterrupts();
+      //noInterrupts();
       // update the counters down to 1
       s->updateAutoDisable();
-      interrupts();
+      //interrupts();
     }
   }
 }
