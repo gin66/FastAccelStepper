@@ -69,7 +69,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
     },
 };
 
-void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
+void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -88,25 +88,36 @@ void IRAM_ATTR next_command(StepperQueue *queue, struct queue_entry *e) {
   if (steps == 0) {
     // is updated only on zero for next cycle
     // any value should do, as this should not be used
-    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 255;
+    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 256;
     // timer value = 1 - upcounting: output low
     mcpwm->channel[timer].generator[0].utea = 1;
     mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
-    if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim == 255) {
-      // coming from a pause, need to force new value taken over
-      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
+    if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim == 256) {
+		// coming from a pause
+	  if (steps == 1) {
+		// steps = 1 will still output two pulses below
+		// => treat this as special case 
+		PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
+		// timer value = 1 - upcounting: output low
+		mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
+		mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
+	  } else {
+		  // coming from a pause, need to force new value taken over
+		  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
 
-      // ensure zero event for pcnt to take over new value for h limit
-      pcnt_counter_clear(pcnt_unit);
+		  // ensure zero event for pcnt to take over new value for h limit
+		  pcnt_counter_clear(pcnt_unit);
+          mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
+	  }
     } else {
       // is updated only on zero for next cycle
       PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
+      mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
     }
     // timer value = 1 - upcounting: output high
     mcpwm->channel[timer].generator[0].utea = 2;
-    mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
   }
 }
 
@@ -116,8 +127,10 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
   mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
+  // timer value = 1 - upcounting: output low
+  mcpwm->channel[timer].generator[0].utea = 1;
   mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
-  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 255;
+  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 256;
   q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
   q->_hasISRactive = false;
 }
@@ -126,8 +139,8 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
   uint8_t rp = q->read_idx;
   if (rp != q->next_write_idx) {
     struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
-    q->read_idx = rp + 1;
     next_command(q, e);
+    q->read_idx = rp + 1;
   } else {
     // no more commands: stop timer at period end
     init_stop(q);
@@ -162,8 +175,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
 
-  digitalWrite(step_pin, LOW);
-  pinMode(step_pin, OUTPUT);
   mapping = &queue2mapping[queue_num];
 
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
@@ -185,8 +196,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
 
-  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim =
-      255;  // mark as coming from a pause
+  // mark as coming from a pause
+  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 256;
   pcnt_counter_clear(pcnt_unit);
   pcnt_counter_resume(pcnt_unit);
   pcnt_event_enable(pcnt_unit, PCNT_EVT_H_LIM);
@@ -233,6 +244,12 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->channel[timer].generator[0].dtep = 1;  // low at period
   mcpwm->channel[timer].db_cfg.val = 0;         // edge delay disabled
   mcpwm->channel[timer].carrier_cfg.val = 0;    // carrier disabled
+
+  //mcpwm->channel[timer].gen_force.a_nciforce_mode = 1;// force low high
+  ////mcpwm->channel[timer].gen_force.a_nciforce = 1;// force output low before connect
+
+  digitalWrite(step_pin, LOW);
+  pinMode(step_pin, OUTPUT);
 
   // at last, link mcpwm to output pin and back into pcnt input
   connect();

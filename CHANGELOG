@@ -1,3 +1,6 @@
+pre-0.17.1:
+- esp32: Fixed one/two spurious step pulses after reset mainly (issue #29)
+
 0.17.0:
 - avr: stepper definition support via AVRStepperPins.h
 - 2560: all timers and channels are checked with one test
