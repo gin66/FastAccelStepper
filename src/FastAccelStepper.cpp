@@ -167,7 +167,7 @@ void FastAccelStepperEngine::manageSteppers() {
         uint8_t high_active_pin = s->getEnablePinHighActive();
         uint8_t low_active_pin = s->getEnablePinLowActive();
 
-        //noInterrupts(); // TODO
+        // noInterrupts(); // TODO
         bool agree = true;
         for (uint8_t j = 0; j < _next_stepper_num; j++) {
           if (i != j) {
@@ -196,7 +196,7 @@ void FastAccelStepperEngine::manageSteppers() {
             }
           }
         }
-        //interrupts();
+        // interrupts();
       }
     }
   }

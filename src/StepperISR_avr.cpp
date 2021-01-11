@@ -9,8 +9,7 @@
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##1)) & ~_BV(COM##T##X##0)
 #define Stepper_Toggle(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
-#define Stepper_One(T, X) \
-  TCCR##T##A |= _BV(COM##T##X##1) | _BV(COM##T##X##0)
+#define Stepper_One(T, X) TCCR##T##A |= _BV(COM##T##X##1) | _BV(COM##T##X##0)
 #define Stepper_Disconnect(T, X) \
   TCCR##T##A &= ~(_BV(COM##T##X##1) | _BV(COM##T##X##0))
 #define Stepper_IsOne(T, X)                                  \
@@ -131,7 +130,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       /* Clear output bit by another compare event */                         \
       Stepper_Zero(T, CHANNEL);                                               \
       ForceCompare(T, CHANNEL);                                               \
-      ClearInterruptFlag(T, CHANNEL);                                               \
+      ClearInterruptFlag(T, CHANNEL);                                         \
       if (e->steps-- > 1) {                                                   \
         /* perform another step with this queue entry */                      \
         Stepper_One(T, CHANNEL);                                              \
@@ -153,7 +152,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
           /* Clear output bit by another toggle */                            \
           Stepper_Zero(T, CHANNEL);                                           \
           ForceCompare(T, CHANNEL);                                           \
-      ClearInterruptFlag(T, CHANNEL);                                               \
+          ClearInterruptFlag(T, CHANNEL);                                     \
           if (e->steps-- > 1) {                                               \
             /* perform another step with this queue entry */                  \
             Stepper_One(T, CHANNEL);                                          \
@@ -240,7 +239,6 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
     SetTimerCompareRelative(T, CHANNEL, 10);                                 \
     interrupts();                                                            \
   }
-
 
 void StepperQueue::commandAddedToQueue() {
   noInterrupts();

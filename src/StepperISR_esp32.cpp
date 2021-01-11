@@ -95,22 +95,22 @@ void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
     if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim == 256) {
-		// coming from a pause
-	  if (steps == 1) {
-		// steps = 1 will still output two pulses below
-		// => treat this as special case 
-		PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
-		// timer value = 1 - upcounting: output low
-		mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
-		mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
-	  } else {
-		  // coming from a pause, need to force new value taken over
-		  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
+      // coming from a pause
+      if (steps == 1) {
+        // steps = 1 will still output two pulses below
+        // => treat this as special case
+        PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
+        // timer value = 1 - upcounting: output low
+        mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
+        mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
+      } else {
+        // coming from a pause, need to force new value taken over
+        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
 
-		  // ensure zero event for pcnt to take over new value for h limit
-		  pcnt_counter_clear(pcnt_unit);
-          mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
-	  }
+        // ensure zero event for pcnt to take over new value for h limit
+        pcnt_counter_clear(pcnt_unit);
+        mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
+      }
     } else {
       // is updated only on zero for next cycle
       PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
@@ -244,9 +244,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->channel[timer].generator[0].dtep = 1;  // low at period
   mcpwm->channel[timer].db_cfg.val = 0;         // edge delay disabled
   mcpwm->channel[timer].carrier_cfg.val = 0;    // carrier disabled
-
-  //mcpwm->channel[timer].gen_force.a_nciforce_mode = 1;// force low high
-  ////mcpwm->channel[timer].gen_force.a_nciforce = 1;// force output low before connect
 
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
