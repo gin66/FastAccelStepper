@@ -4,9 +4,9 @@
  EnableA:        2*L->H,        1*H->L
  EnableB:        2*L->H,        1*H->L
  EnableC:        2*L->H,        1*H->L
-   StepA:    64000*L->H,    64000*H->L, Max High=27us
-   StepB:    64000*L->H,    64000*H->L, Max High=30us
-   StepC:    64000*L->H,    64000*H->L, Max High=32us
+   StepA:    64000*L->H,    64000*H->L, Max High=30us
+   StepB:    64000*L->H,    64000*H->L, Max High=39us
+   StepC:    64000*L->H,    64000*H->L, Max High=35us
 Position[A]=64000
 
 Position[B]=64000
@@ -19,11 +19,11 @@ Max_time in EnableB=184576 us
 
 Max_time in EnableC=197799 us
 
-Max_time in FillISR=18751 us
+Max_time in FillISR=18985 us
 
-Max_time in StepA=27 us
+Max_time in StepA=30 us
 
-Max_time in StepB=30 us
+Max_time in StepB=39 us
 
-Max_time in StepC=32 us
+Max_time in StepC=35 us
 

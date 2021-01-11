@@ -12,7 +12,7 @@ Max_time in EnableA=172137 us
 
 Max_time in EnableB=185617 us
 
-Max_time in FillISR=3872 us
+Max_time in FillISR=3697 us
 
 Max_time in StepA=16 us
 
