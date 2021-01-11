@@ -34,7 +34,8 @@ void basic_test() {
   assert(s.isQueueEmpty());
   struct stepper_command_s cmd = {
       .ticks = 10000, .steps = 100, .count_up = true};
-  s.addQueueEntry(&cmd);
+  int res = s.addQueueEntry(&cmd);
+  assert(res == AQE_OK);
   assert(!s.isQueueEmpty());
 }
 

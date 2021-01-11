@@ -8,8 +8,9 @@
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 	_initVars();
 }
-void StepperQueue::startQueue() {
+void StepperQueue::commandAddedToQueue() {
 	_isRunning = true;
+	next_write_idx++;
 }
 void StepperQueue::forceStop() {
 }
