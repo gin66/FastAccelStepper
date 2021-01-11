@@ -1,5 +1,12 @@
-pre-0.17.1:
+0.17.1:
 - esp32: Fixed one/two spurious step pulses after reset mainly (issue #29)
+- avr: reworked ISR for more reliable operation (correct steps). (issue #31)
+  Remaining risk (primarily three steppers in parallel in 2560) can cause
+  an CPU overload and stepper stopping/not running smooth
+- Fix issue #32
+- Remove interrupts/noInterrupts protection for shared auto enable function.
+  => Thus there is a small time window during auto disable, that a new command issued
+     may loose steps. This will be addressed in a subsequent release
 
 0.17.0:
 - avr: stepper definition support via AVRStepperPins.h
