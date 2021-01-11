@@ -4,8 +4,12 @@
  EnableA:        1*L->H,        0*H->L
  EnableB:        2*L->H,        1*H->L
  EnableC:        1*L->H,        0*H->L
-   StepA:        0*L->H,        0*H->L
-   StepB:     3200*L->H,     3200*H->L
-   StepC:        0*L->H,        0*H->L
+   StepA:        0*L->H,        0*H->L, Max High=0us
+   StepB:     3200*L->H,     3200*H->L, Max High=13us
+   StepC:        0*L->H,        0*H->L, Max High=0us
 Position[B]=3200
+
+Max_time in EnableB=331826 us
+
+Max_time in StepB=13 us
 
