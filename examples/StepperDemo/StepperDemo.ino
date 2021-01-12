@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-0f6508d"
+#define VERSION "post-2aca9bd"
 
 struct stepper_config_s {
   uint8_t step;
@@ -388,7 +388,7 @@ void setup() {
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
   // Alternatively use e.g. M1 T by serial command
-  //test_direct_drive(&stepper_config[0]);
+  // test_direct_drive(&stepper_config[0]);
 
   engine.init();
   if (led_pin != PIN_UNDEFINED) {
@@ -609,14 +609,18 @@ void loop() {
       ch = Serial.read();
     }
   } else {
-    ch = *input++;
+    ch = *input;
     if (ch == 0) {
-      input = NULL;
+      if (read_ptr == write_ptr) {
+        input = NULL;
 #ifdef SIM_TEST_INPUT
-      delay(1000);
-      noInterrupts();
-      sleep_cpu();
+        delay(1000);
+        noInterrupts();
+        sleep_cpu();
 #endif
+      }
+    } else {
+      input++;
     }
   }
 
@@ -715,13 +719,13 @@ void loop() {
             output_msg(MSG_SET_POSITION);
             Serial.println(val);
             stepper_selected->setCurrentPosition(val);
-          } else if (sscanf(out_buffer, "E%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "E%lu", &val) == 1) {
             output_msg(MSG_SET_ENABLE_TIME);
             Serial.println(val);
             int res = stepper_selected->setDelayToEnable(val);
             output_msg(MSG_RETURN_CODE);
             Serial.println(res);
-          } else if (sscanf(out_buffer, "D%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "D%lu", &val) == 1) {
             output_msg(MSG_SET_DISABLE_TIME);
             Serial.println(val);
             stepper_selected->setDelayToDisable(val);
@@ -772,18 +776,17 @@ void loop() {
               }
             }
 #endif
-          } else if (sscanf(out_buffer, "w%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "w%lu", &val) == 1) {
             Serial.print(val);
             output_msg(MSG_WAIT_MS);
             pause_ms = val;
             pause_start = millis();
-            stepper_selected->setDelayToDisable(val);
           } else if (strcmp(out_buffer, "T") == 0) {
             if (!stepper_selected->isRunning()) {
               output_msg(MSG_TEST_DIRECT_DRIVE);
-  stepper_selected->detachFromPin();
+              stepper_selected->detachFromPin();
               test_direct_drive(&stepper_config[selected]);
-  stepper_selected->reAttachToPin();
+              stepper_selected->reAttachToPin();
             }
           } else if (strcmp(out_buffer, "+") == 0) {
             if (!stepper_selected->isRunning()) {

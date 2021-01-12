@@ -99,23 +99,20 @@ void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
       if (steps == 1) {
         // steps = 1 will still output two pulses below
         // => treat this as special case
-  PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 0;
-        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 0;
-        PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
+        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 0;
+        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 1;
         pcnt_counter_clear(pcnt_unit);
-  PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
+        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
 
         // timer value = 1 - upcounting: output low
         mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
         mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
       } else {
         // coming from a pause, need to force new value taken over
-  PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 0;
-        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 0;
+        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 0;
         PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
         pcnt_counter_clear(pcnt_unit);
-  PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
-
+        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
 
         // ensure zero event for pcnt to take over new value for h limit
         pcnt_counter_clear(pcnt_unit);

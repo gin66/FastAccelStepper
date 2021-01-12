@@ -172,10 +172,11 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   } else {
     int32_t delta =
         ramp->target_pos - queue_end->pos;  // this can overflow, which is legal
-    if (delta == 0) {  // This case should actually never happen
+    if (delta == 0) {
       command->ticks = 0;
       return RAMP_STATE_IDLE;
     }
+
     need_count_up = delta > 0;
     remaining_steps = abs(delta);
   }
@@ -209,6 +210,10 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
     } else {
       next_state = RAMP_STATE_COAST;
     }
+  }
+  if (remaining_steps == 0) {
+    command->ticks = 0;
+    return RAMP_STATE_IDLE;
   }
   // Forward planning of 1ms or more on slow speed.
   uint32_t planning_steps = max((TICKS_PER_S / 1000) / qe_ticks, 1);
@@ -314,13 +319,6 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-      // if acceleration is very high, then d_ticks_new can be lower than
-      // min_travel_ticks in this case can immediately stop
-      if (d_ticks_new < ramp->config.min_travel_ticks) {
-        command->ticks = 0;
-        return RAMP_STATE_IDLE;
-      }
-
       // CLIPPING: avoid reduction
       next_ticks = max(d_ticks_new, curr_ticks);
 #ifdef TEST
@@ -370,8 +368,8 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
       "next_ticks = %u\n",
       steps, planning_steps, next_ticks);
 #endif
-  steps = max(steps, 1);
   steps = min(steps, abs(remaining_steps));
+  steps = max(steps, 1);
   steps = min(255, steps);
 
 #ifdef TEST
