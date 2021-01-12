@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-9dced38"
+#define VERSION "post-0f6508d"
 
 struct stepper_config_s {
   uint8_t step;
@@ -186,8 +186,112 @@ struct test_seq_s test_seq[MAX_STEPPER] = {
 #endif
     {.test = NULL}, {.test = NULL}};
 
-void test_direct_drive(FastAccelStepper *_stepper,
-                       const struct stepper_config_s *stepper) {
+const static char messages[] PROGMEM =
+#define MSG_SELECT_STEPPER 0
+    "Select stepper |"
+#define MSG_TOGGLE_MOTOR_INFO 1
+    "Toggle motor info\n|"
+#define MSG_TOGGLE_USAGE_INFO 2
+    "Toggle usage info\n|"
+#define MSG_ENTER_TEST_MODE 3
+    "Enter test mode\n|"
+#define MSG_SET_ACCELERATION_TO 4
+    "Set acceleration to |"
+#define MSG_SET_SPEED_TO 5
+    "Set speed (us) to |"
+#define MSG_MOVE_STEPS 6
+    "Move steps |"
+#define MSG_MOVE_TO_POSITION 7
+    "Move to position |"
+#define MSG_RETURN_CODE 8
+    "returncode = |"
+#define MSG_SET_POSITION 9
+    "set position |"
+#define MSG_SET_ENABLE_TIME 10
+    "set enable time to |"
+#define MSG_SET_DISABLE_TIME 11
+    "set disable time to |"
+#define MSG_OUTPUT_DRIVER_ON 12
+    "Output driver on\n|"
+#define MSG_OUTPUT_DRIVER_OFF 13
+    "Output driver off\n|"
+#define MSG_OUTPUT_DRIVER_AUTO 14
+    "Output driver automatic mode\n|"
+#define MSG_STOP 15
+    "Stop\n|"
+#define MSG_KEEP_RUNNING 16
+    "Keep running\n|"
+#define MSG_RUN_FORWARD 17
+    "Run forward\n|"
+#define MSG_RUN_BACKWARD 18
+    "Run backward\n|"
+#define MSG_IMMEDIATE_STOP 19
+    "Immediate Stop\n|"
+#define MSG_UPDATE_SPEED_ACCELERATION 20
+    "Update speed/acceleration\n|"
+#define MSG_BLOCKING_WAIT 21
+    "Blocking wait for running stepper to stop\n|"
+#define MSG_TEST_DIRECT_DRIVE 22
+    "Test direct drive\n|"
+#define MSG_STEPPED_FORWARD 23
+    "Stepped forward\n|"
+#define MSG_STEPPED_BACKWARD 24
+    "Stepped backward\n|"
+#define MSG_WAIT_MS 25
+    " ms wait\n|"
+#define MSG_SELECT_TEST_SEQUENCE 26
+    "Select test_seq: |"
+#define MSG_EXIT_TO_MAIN_MENU 27
+    "Exit to main menu\n|"
+#define MSG_RUN_TESTS 28
+    "Run tests\n|"
+#define MSG_WAIT_COMPLETE 29
+    "Wait complete\n|"
+#define MSG_FAILED_STATUS 30
+    "Failed status from test\n|"
+#define MSG_ENABLE_LOW_PIN_IS_NOT_LOW 31
+    "Cannot set enable low pin to LOW\n|"
+#define MSG_ENABLE_LOW_PIN_IS_NOT_HIGH 32
+    "Cannot set enable low pin to HIGH\n|"
+#define MSG_ENABLE_HIGH_PIN_IS_NOT_LOW 33
+    "Cannot set enable high pin to LOW\n|"
+#define MSG_ENABLE_HIGH_PIN_IS_NOT_HIGH 34
+    "Cannot set enable high pin to HIGH\n|"
+#define MSG_STEP_PIN_IS_NOT_LOW 35
+    "Cannot set step pin to LOW\n|"
+#define MSG_STEP_PIN_IS_NOT_HIGH 36
+    "Cannot set step pin to HIGH\n|"
+#define MSG_CANNOT_SET_DIRECTION_PIN 37
+    "Cannot set direction pin to |"
+#define MSG_STEPPER_VERSION 38
+    "StepperDemo Version " VERSION "\n|";
+
+void output_msg(int8_t i) {
+  char ch;
+#if defined(ARDUINO_ARCH_AVR)
+  PGM_P p = messages;
+  while (i >= 0) {
+    ch = pgm_read_byte(p++);
+    if (ch == '|') {
+      i--;
+    } else if (i == 0) {
+      Serial.print(ch);
+    }
+  }
+#elif defined(ARDUINO_ARCH_ESP32)
+  const char *p = messages;
+  while (i >= 0) {
+    ch = *p++;
+    if (ch == '|') {
+      i--;
+    } else if (i == 0) {
+      Serial.print(ch);
+    }
+  }
+#endif
+}
+
+void test_direct_drive(const struct stepper_config_s *stepper) {
   // Check stepper motor+driver is operational
   // This is not done via FastAccelStepper-Library for test purpose only
   uint8_t step = stepper->step;
@@ -196,8 +300,6 @@ void test_direct_drive(FastAccelStepper *_stepper,
   uint8_t direction = stepper->direction;
   bool direction_high_count_up = stepper->direction_high_count_up;
 
-  _stepper->detachFromPin();
-
   pinMode(step, OUTPUT);
 
   if (enableLow != PIN_UNDEFINED) {
@@ -205,7 +307,7 @@ void test_direct_drive(FastAccelStepper *_stepper,
     pinMode(enableLow, OUTPUT);
     delayMicroseconds(10);
     if (digitalRead(enableLow) != LOW) {
-      Serial.println("Cannot set enable low pin to LOW");
+      output_msg(MSG_ENABLE_LOW_PIN_IS_NOT_LOW);
     }
   }
   if (enableHigh != PIN_UNDEFINED) {
@@ -213,7 +315,7 @@ void test_direct_drive(FastAccelStepper *_stepper,
     pinMode(enableHigh, OUTPUT);
     delayMicroseconds(10);
     if (digitalRead(enableHigh) != HIGH) {
-      Serial.println("Cannot set enable high pin to HIGH");
+      output_msg(MSG_ENABLE_HIGH_PIN_IS_NOT_HIGH);
     }
   }
   if (direction != PIN_UNDEFINED) {
@@ -221,7 +323,7 @@ void test_direct_drive(FastAccelStepper *_stepper,
     pinMode(direction, OUTPUT);
     delayMicroseconds(10);
     if (digitalRead(direction) != direction_high_count_up) {
-      Serial.print("Cannot set direction pin to ");
+      output_msg(MSG_CANNOT_SET_DIRECTION_PIN);
       Serial.println(direction_high_count_up ? "HIGH" : "LOW");
     }
   }
@@ -229,12 +331,12 @@ void test_direct_drive(FastAccelStepper *_stepper,
     digitalWrite(step, HIGH);
     delayMicroseconds(10);
     if (digitalRead(step) != HIGH) {
-      Serial.println("Cannot set step output to HIGH");
+      output_msg(MSG_STEP_PIN_IS_NOT_HIGH);
     }
     digitalWrite(step, LOW);
     delayMicroseconds(190);
     if (digitalRead(step) != LOW) {
-      Serial.println("Cannot set step output to LOW");
+      output_msg(MSG_STEP_PIN_IS_NOT_LOW);
     }
   }
   if (direction != PIN_UNDEFINED) {
@@ -242,7 +344,7 @@ void test_direct_drive(FastAccelStepper *_stepper,
     delayMicroseconds(10);
     delayMicroseconds(10);
     if (digitalRead(direction) != !direction_high_count_up) {
-      Serial.print("Cannot set direction pin to ");
+      output_msg(MSG_CANNOT_SET_DIRECTION_PIN);
       Serial.println(!direction_high_count_up ? "HIGH" : "LOW");
     }
   }
@@ -250,36 +352,34 @@ void test_direct_drive(FastAccelStepper *_stepper,
     digitalWrite(step, HIGH);
     delayMicroseconds(10);
     if (digitalRead(step) != HIGH) {
-      Serial.println("Cannot set step output to HIGH");
+      output_msg(MSG_STEP_PIN_IS_NOT_HIGH);
     }
     digitalWrite(step, LOW);
     delayMicroseconds(190);
     if (digitalRead(step) != LOW) {
-      Serial.println("Cannot set step output to LOW");
+      output_msg(MSG_STEP_PIN_IS_NOT_LOW);
     }
   }
   if (enableLow != PIN_UNDEFINED) {
     digitalWrite(enableLow, HIGH);
     delayMicroseconds(10);
     if (digitalRead(enableLow) != HIGH) {
-      Serial.println("Cannot set enable low pin to HIGH");
+      output_msg(MSG_ENABLE_LOW_PIN_IS_NOT_HIGH);
     }
   }
   if (enableHigh != PIN_UNDEFINED) {
     digitalWrite(enableHigh, LOW);
     delayMicroseconds(10);
     if (digitalRead(enableHigh) != LOW) {
-      Serial.println("Cannot set enable high pin to LOW");
+      output_msg(MSG_ENABLE_HIGH_PIN_IS_NOT_LOW);
     }
   }
-  _stepper->reAttachToPin();
   // Done
 }
 
 void setup() {
   Serial.begin(115200);
-  Serial.print("StepperDemo Version ");
-  Serial.println(VERSION);
+  output_msg(MSG_STEPPER_VERSION);
   Serial.print("    F_CPU=");
   Serial.println(F_CPU);
   Serial.print("    TICKS_PER_S=");
@@ -288,7 +388,7 @@ void setup() {
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
   // Alternatively use e.g. M1 T by serial command
-  // test_direct_drive(&stepper_config[0]);
+  test_direct_drive(&stepper_config[0]);
 
   engine.init();
   if (led_pin != PIN_UNDEFINED) {
@@ -315,13 +415,23 @@ void setup() {
   usage();
 }
 
-uint8_t in_ptr = 0;
-char in_buffer[256];
+#ifdef SIM_TEST_INPUT
+const char *input = SIM_TEST_INPUT;
+#else
+const char *input = NULL;
+#endif
+uint8_t write_ptr = 0;
+uint8_t read_ptr = 0;
+char in_buffer[256];  // This allows to let in/out_ptr wrap around
+uint8_t out_ptr = 0;
+char out_buffer[256];
 bool stopped = true;
 bool verbose = true;
 bool usage_info = true;
 uint32_t last_time = 0;
 int selected = -1;
+uint32_t pause_ms = 0;
+uint32_t pause_start = 0;
 
 void info(FastAccelStepper *s) {
   if (s->isRunning()) {
@@ -408,6 +518,7 @@ const static char usage_str[] PROGMEM =
     "     I         ... Toggle motor info, while any motor is running\n"
     "     W         ... Blocking wait until selected motor is stopped (will "
     "deadlock if the motor will never stop)\n"
+    "     w<ms>     ... Wait time in ms\n"
     "     +         ... Perform one step forward of the selected motor\n"
     "     -         ... Perform one step backward of the selected motor\n"
     "     T         ... Test selected motor with direct port access\n"
@@ -453,83 +564,6 @@ void stepper_info() {
   }
 }
 
-const static char messages[] PROGMEM =
-#define MSG_SELECT_STEPPER 0
-    "Select stepper |"
-#define MSG_TOGGLE_MOTOR_INFO 1
-    "Toggle motor info\n|"
-#define MSG_TOGGLE_USAGE_INFO 2
-    "Toggle usage info\n|"
-#define MSG_ENTER_TEST_MODE 3
-    "Enter test mode\n|"
-#define MSG_SET_ACCELERATION_TO 4
-    "Set acceleration to |"
-#define MSG_SET_SPEED_TO 5
-    "Set speed (us) to |"
-#define MSG_MOVE_STEPS 6
-    "Move steps |"
-#define MSG_MOVE_TO_POSITION 7
-    "Move to position |"
-#define MSG_RETURN_CODE 8
-    "returncode = |"
-#define MSG_SET_POSITION 9
-    "set position |"
-#define MSG_SET_ENABLE_TIME 10
-    "set enable time to |"
-#define MSG_SET_DISABLE_TIME 11
-    "set disable time to |"
-#define MSG_OUTPUT_DRIVER_ON 12
-    "Output driver on\n|"
-#define MSG_OUTPUT_DRIVER_OFF 13
-    "Output driver off\n|"
-#define MSG_OUTPUT_DRIVER_AUTO 14
-    "Output driver automatic mode\n|"
-#define MSG_STOP 15
-    "Stop\n|"
-#define MSG_KEEP_RUNNING 16
-    "Keep running\n|"
-#define MSG_RUN_FORWARD 17
-    "Run forward\n|"
-#define MSG_RUN_BACKWARD 18
-    "Run backward\n|"
-#define MSG_IMMEDIATE_STOP 19
-    "Immediate Stop\n|"
-#define MSG_UPDATE_SPEED_ACCELERATION 20
-    "Update speed/acceleration\n|"
-#define MSG_BLOCKING_WAIT 21
-    "Blocking wait for running stepper to stop\n|"
-#define MSG_TEST_DIRECT_DRIVE 22
-    "Test direct drive\n|"
-#define MSG_STEPPED_FORWARD 23
-    "Stepped forward\n|"
-#define MSG_STEPPED_BACKWARD 24
-    "Stepped backward\n|";
-
-void output_msg(int8_t i) {
-  char ch;
-#if defined(ARDUINO_ARCH_AVR)
-  PGM_P p = messages;
-  while (i >= 0) {
-    ch = pgm_read_byte(p++);
-    if (ch == '|') {
-      i--;
-    } else if (i == 0) {
-      Serial.print(ch);
-    }
-  }
-#elif defined(ARDUINO_ARCH_ESP32)
-  const char *p = messages;
-  while (i >= 0) {
-    ch = *p++;
-    if (ch == '|') {
-      i--;
-    } else if (i == 0) {
-      Serial.print(ch);
-    }
-  }
-#endif
-}
-
 void usage() {
 #if defined(ARDUINO_ARCH_AVR)
   char ch;
@@ -568,12 +602,6 @@ void output_info() {
   Serial.println();
 }
 
-#ifdef SIM_TEST_INPUT
-const char *input = SIM_TEST_INPUT;
-#else
-const char *input = NULL;
-#endif
-
 void loop() {
   char ch = 0;
   if (input == NULL) {
@@ -593,128 +621,144 @@ void loop() {
   }
 
   if (ch != 0) {
-    if (in_ptr == 255) {
-      in_ptr = 0;
+    if ((uint8_t)(write_ptr + 1) == read_ptr) {
+      read_ptr++;
+    }
+    in_buffer[write_ptr++] = ch;
+  }
+  if (pause_ms > 0) {
+    if ((uint32_t)(millis() - pause_start) >= pause_ms) {
+      pause_ms = 0;
+      output_msg(MSG_WAIT_COMPLETE);
+    }
+  } else if (read_ptr != write_ptr) {
+    ch = in_buffer[read_ptr++];
+    if ((ch != ' ') && (ch != '\n') && (ch != '\r')) {
+      if (out_ptr == 255) {
+        out_ptr = 0;
+      }
+      out_buffer[out_ptr++] = ch;
     } else if ((ch == ' ') || (ch == '\n') || (ch == '\r')) {
       long val;
-      in_buffer[in_ptr] = 0;
-      if ((strcmp(in_buffer, "M1") == 0) && stepper[0]) {
+      out_buffer[out_ptr] = 0;
+      if ((strcmp(out_buffer, "M1") == 0) && stepper[0]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(1);
         selected = 0;
-      } else if ((strcmp(in_buffer, "M2") == 0) && stepper[1]) {
+      } else if ((strcmp(out_buffer, "M2") == 0) && stepper[1]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(2);
         selected = 1;
-      } else if ((strcmp(in_buffer, "M3") == 0) && stepper[2]) {
+      } else if ((strcmp(out_buffer, "M3") == 0) && stepper[2]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(3);
         selected = 2;
-      } else if ((strcmp(in_buffer, "M4") == 0) && stepper[3]) {
+      } else if ((strcmp(out_buffer, "M4") == 0) && stepper[3]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(4);
         selected = 3;
-      } else if ((strcmp(in_buffer, "M5") == 0) && stepper[4]) {
+      } else if ((strcmp(out_buffer, "M5") == 0) && stepper[4]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(5);
         selected = 4;
-      } else if ((strcmp(in_buffer, "M6") == 0) && stepper[5]) {
+      } else if ((strcmp(out_buffer, "M6") == 0) && stepper[5]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(6);
         selected = 5;
       }
 #if defined(ARDUINO_ARCH_ESP32)
-      else if (strcmp(in_buffer, "r") == 0) {
+      else if (strcmp(out_buffer, "r") == 0) {
         Serial.println("ESP restart");
         ESP.restart();
       }
 #endif
-      else if (strcmp(in_buffer, "I") == 0) {
+      else if (strcmp(out_buffer, "I") == 0) {
         output_msg(MSG_TOGGLE_MOTOR_INFO);
         verbose = !verbose;
-      } else if (strcmp(in_buffer, "Q") == 0) {
+      } else if (strcmp(out_buffer, "Q") == 0) {
         output_msg(MSG_TOGGLE_USAGE_INFO);
         usage_info = !usage_info;
-      } else if (strcmp(in_buffer, "?") == 0) {
+      } else if (strcmp(out_buffer, "?") == 0) {
         usage();
-      } else if (strcmp(in_buffer, "t") == 0) {
+      } else if (strcmp(out_buffer, "t") == 0) {
         output_msg(MSG_ENTER_TEST_MODE);
         test_mode = true;
         usage();
       } else if (selected >= 0) {
         FastAccelStepper *stepper_selected = stepper[selected];
         if (!test_mode) {
-          if (sscanf(in_buffer, "A%lu", &val) == 1) {
+          if (sscanf(out_buffer, "A%lu", &val) == 1) {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
             stepper_selected->setAcceleration(val);
-          } else if (sscanf(in_buffer, "V%lu", &val) == 1) {
+          } else if (sscanf(out_buffer, "V%lu", &val) == 1) {
             output_msg(MSG_SET_SPEED_TO);
             Serial.println(val);
             stepper_selected->setSpeed(val);
-          } else if (sscanf(in_buffer, "a%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "a%ld", &val) == 1) {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
             stepper_selected->moveByAcceleration(val);
-          } else if (sscanf(in_buffer, "R%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "R%ld", &val) == 1) {
             output_msg(MSG_MOVE_STEPS);
             Serial.println(val);
             int res = stepper_selected->move(val);
             output_msg(MSG_RETURN_CODE);
             Serial.println(res);
-          } else if (sscanf(in_buffer, "P%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "P%ld", &val) == 1) {
             output_msg(MSG_MOVE_TO_POSITION);
             Serial.println(val);
             int res = stepper_selected->moveTo(val);
             output_msg(MSG_RETURN_CODE);
             Serial.println(res);
-          } else if (sscanf(in_buffer, "@%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "@%ld", &val) == 1) {
             output_msg(MSG_SET_POSITION);
             Serial.println(val);
             stepper_selected->setCurrentPosition(val);
-          } else if (sscanf(in_buffer, "E%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "E%ld", &val) == 1) {
             output_msg(MSG_SET_ENABLE_TIME);
             Serial.println(val);
             int res = stepper_selected->setDelayToEnable(val);
             output_msg(MSG_RETURN_CODE);
             Serial.println(res);
-          } else if (sscanf(in_buffer, "D%ld", &val) == 1) {
+          } else if (sscanf(out_buffer, "D%ld", &val) == 1) {
+            output_msg(MSG_SET_DISABLE_TIME);
             Serial.println(val);
             stepper_selected->setDelayToDisable(val);
-          } else if (strcmp(in_buffer, "N") == 0) {
+          } else if (strcmp(out_buffer, "N") == 0) {
             output_msg(MSG_OUTPUT_DRIVER_ON);
             stepper_selected->setAutoEnable(false);
             stepper_selected->enableOutputs();
-          } else if (strcmp(in_buffer, "F") == 0) {
+          } else if (strcmp(out_buffer, "F") == 0) {
             output_msg(MSG_OUTPUT_DRIVER_OFF);
             stepper_selected->setAutoEnable(false);
             stepper_selected->disableOutputs();
-          } else if (strcmp(in_buffer, "O") == 0) {
+          } else if (strcmp(out_buffer, "O") == 0) {
             output_msg(MSG_OUTPUT_DRIVER_AUTO);
             stepper_selected->setAutoEnable(true);
-          } else if (strcmp(in_buffer, "S") == 0) {
+          } else if (strcmp(out_buffer, "S") == 0) {
             output_msg(MSG_STOP);
             stepper_selected->stopMove();
-          } else if (strcmp(in_buffer, "K") == 0) {
+          } else if (strcmp(out_buffer, "K") == 0) {
             output_msg(MSG_KEEP_RUNNING);
             stepper_selected->keepRunning();
-          } else if (strcmp(in_buffer, "f") == 0) {
+          } else if (strcmp(out_buffer, "f") == 0) {
             output_msg(MSG_RUN_FORWARD);
             int res = stepper_selected->runForward();
             output_msg(MSG_RETURN_CODE);
             Serial.println(res);
-          } else if (strcmp(in_buffer, "b") == 0) {
+          } else if (strcmp(out_buffer, "b") == 0) {
             output_msg(MSG_RUN_BACKWARD);
             int res = stepper_selected->runBackward();
             output_msg(MSG_RETURN_CODE);
             Serial.println(res);
-          } else if (strcmp(in_buffer, "X") == 0) {
+          } else if (strcmp(out_buffer, "X") == 0) {
             output_msg(MSG_IMMEDIATE_STOP);
             stepper_selected->forceStopAndNewPosition(0);
-          } else if (strcmp(in_buffer, "U") == 0) {
+          } else if (strcmp(out_buffer, "U") == 0) {
             output_msg(MSG_UPDATE_SPEED_ACCELERATION);
             stepper_selected->applySpeedAcceleration();
-          } else if (strcmp(in_buffer, "W") == 0) {
+          } else if (strcmp(out_buffer, "W") == 0) {
 #ifdef SIM_TEST_INPUT
             if (stepper_selected->isRunning()) {
               input -= 2;
@@ -728,71 +772,88 @@ void loop() {
               }
             }
 #endif
-          } else if (strcmp(in_buffer, "T") == 0) {
+          } else if (sscanf(out_buffer, "w%ld", &val) == 1) {
+            Serial.print(val);
+            output_msg(MSG_WAIT_MS);
+            pause_ms = val;
+            pause_start = millis();
+            stepper_selected->setDelayToDisable(val);
+          } else if (strcmp(out_buffer, "T") == 0) {
             if (!stepper_selected->isRunning()) {
               output_msg(MSG_TEST_DIRECT_DRIVE);
-              test_direct_drive(stepper_selected, &stepper_config[selected]);
+  stepper_selected->detachFromPin();
+              test_direct_drive(&stepper_config[selected]);
+  stepper_selected->reAttachToPin();
             }
-          } else if (strcmp(in_buffer, "+") == 0) {
+          } else if (strcmp(out_buffer, "+") == 0) {
             if (!stepper_selected->isRunning()) {
               stepper_selected->forwardStep(true);
               output_msg(MSG_STEPPED_FORWARD);
             }
-          } else if (strcmp(in_buffer, "-") == 0) {
+          } else if (strcmp(out_buffer, "-") == 0) {
             if (!stepper_selected->isRunning()) {
               stepper_selected->backwardStep(true);
               output_msg(MSG_STEPPED_BACKWARD);
             }
           }
         } else {
-          if (strcmp(in_buffer, "x") == 0) {
-            Serial.println("Exit to main menu");
+          if (strcmp(out_buffer, "x") == 0) {
+            output_msg(MSG_EXIT_TO_MAIN_MENU);
             test_ongoing = false;
             test_mode = false;
-          } else if (strcmp(in_buffer, "R") == 0) {
-            Serial.println("Run tests");
+          } else if (strcmp(out_buffer, "R") == 0) {
+            output_msg(MSG_RUN_TESTS);
             test_ongoing = true;
-          } else if (strcmp(in_buffer, "I") == 0) {
+          } else if (strcmp(out_buffer, "I") == 0) {
             output_msg(MSG_TOGGLE_MOTOR_INFO);
             verbose = !verbose;
           }
 #ifdef SIM_TEST_INPUT
-          else if (strcmp(in_buffer, "W") == 0) {
+          else if (strcmp(out_buffer, "W") == 0) {
             if (test_ongoing) {
               input -= 2;  // go back in input buffer to "W "
             }
           }
 #endif
-          else if (strcmp(in_buffer, "01") == 0) {
-            Serial.println("Select test_seq_01");
+          else if (strcmp(out_buffer, "01") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
             test_seq[selected].test = test_seq_01;
             test_seq[selected].state = 0;
-          } else if (strcmp(in_buffer, "02") == 0) {
-            Serial.println("Select test_seq_02");
+          } else if (strcmp(out_buffer, "02") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
             test_seq[selected].test = test_seq_02;
             test_seq[selected].state = 0;
-          } else if (strcmp(in_buffer, "03") == 0) {
-            Serial.println("Select test_seq_03");
+          } else if (strcmp(out_buffer, "03") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
             test_seq[selected].test = test_seq_03;
             test_seq[selected].state = 0;
-          } else if (strcmp(in_buffer, "04") == 0) {
-            Serial.println("Select test_seq_04");
+          } else if (strcmp(out_buffer, "04") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
             test_seq[selected].test = test_seq_04;
             test_seq[selected].state = 0;
-          } else if (strcmp(in_buffer, "05") == 0) {
-            Serial.println("Select test_seq_05");
+          } else if (strcmp(out_buffer, "05") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
             test_seq[selected].test = test_seq_05;
             test_seq[selected].state = 0;
-          } else if (strcmp(in_buffer, "06") == 0) {
-            Serial.println("Select test_seq_06");
+          } else if (strcmp(out_buffer, "06") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
             test_seq[selected].test = test_seq_06;
+            test_seq[selected].state = 0;
+          } else if (strcmp(out_buffer, "07") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
+            test_seq[selected].test = test_seq_07;
             test_seq[selected].state = 0;
           }
         }
       }
-      in_ptr = 0;
-    } else {
-      in_buffer[in_ptr++] = ch;
+      out_ptr = 0;
     }
   }
 
@@ -801,8 +862,12 @@ void loop() {
     if (test_ongoing) {
       bool finished = true;
       for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-        if (test_seq[i].test != NULL) {
-          bool res = test_seq[i].test(stepper[i], &test_seq[i], ms);
+        struct test_seq_s *s = &test_seq[i];
+        if ((s->test != NULL) && (s->state != TEST_STATE_ERROR)) {
+          bool res = s->test(stepper[i], &test_seq[i], ms);
+          if (res) {
+            s->test = NULL;
+          }
           finished &= res;
         }
       }
@@ -810,6 +875,14 @@ void loop() {
         test_ongoing = false;
         Serial.println("finished");
         stepper_info();
+        for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+          struct test_seq_s *s = &test_seq[i];
+          s->test = NULL;
+          if (s->state == TEST_STATE_ERROR) {
+            output_msg(MSG_FAILED_STATUS);
+            Serial.println(i);
+          }
+        }
       } else {
         uint32_t now = millis();
         if (now - last_time >= 100) {

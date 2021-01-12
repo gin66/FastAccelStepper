@@ -1,3 +1,10 @@
+pre-0.17.2:
+- StepperDemo extended:
+	- w<ms>: Option to wait in input processing for some ms
+	- test sequence 07 added, which fails on esp32
+	- avr: free RAM by usage of output_msg()
+    - tests can return failure, which is displayed at test end
+
 0.17.1:
 - esp32: Fixed one/two spurious step pulses after reset mainly (issue #29)
 - avr: reworked ISR for more reliable operation (correct steps). (issue #31)
