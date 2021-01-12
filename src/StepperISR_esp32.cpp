@@ -88,31 +88,27 @@ void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
   if (steps == 0) {
     // is updated only on zero for next cycle
     // any value should do, as this should not be used
-    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 255;
+    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
     // timer value = 1 - upcounting: output low
     mcpwm->channel[timer].generator[0].utea = 1;
     mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
-    if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim == 256) {
+    if (queue->_wasNotRunning) {
       // coming from a stopped queue
       if (steps == 1) {
         // steps = 1 will still output two pulses below
         // => treat this as special case
-        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 0;
         PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 1;
         pcnt_counter_clear(pcnt_unit);
-        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
 
         // timer value = 1 - upcounting: output low
         mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
         mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
       } else {
         // coming from a stopped queue, need to force new value taken over
-        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 0;
         PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
         pcnt_counter_clear(pcnt_unit);
-        PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
 
         // ensure zero event for pcnt to take over new value for h limit
         pcnt_counter_clear(pcnt_unit);
@@ -126,6 +122,7 @@ void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
     // timer value = 1 - upcounting: output high
     mcpwm->channel[timer].generator[0].utea = 2;
   }
+  queue->_wasNotRunning = false;
 }
 
 static void IRAM_ATTR init_stop(StepperQueue *q) {
@@ -137,9 +134,10 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   // timer value = 1 - upcounting: output low
   mcpwm->channel[timer].generator[0].utea = 1;
   mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
-  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 256;
+  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
   q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
   q->_hasISRactive = false;
+  q->_wasNotRunning = true;
 }
 
 static void IRAM_ATTR what_is_next(StepperQueue *q) {
@@ -203,11 +201,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
 
-  // mark as coming from a pause
-  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 256;
-  PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 0;
+  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 1;
   PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
-
   PCNT.conf_unit[pcnt_unit].conf0.thr_l_lim_en = 0;
 
   pcnt_counter_clear(pcnt_unit);
@@ -326,6 +321,7 @@ void StepperQueue::commandAddedToQueue() {
     return;
   }
 
+  _wasNotRunning = true;
   _hasISRactive = true;
 
   // my interrupt cannot be called in this state, so modifying read_idx without

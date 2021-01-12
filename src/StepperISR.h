@@ -80,6 +80,7 @@ class StepperQueue {
   bool dirHighCountsUp;
 #if defined(ARDUINO_ARCH_ESP32)
   volatile bool _hasISRactive;
+  volatile bool _wasNotRunning;
   bool isRunning();
   const struct mapping_s* mapping;
 #elif defined(ARDUINO_ARCH_AVR)
@@ -220,6 +221,7 @@ class StepperQueue {
     _prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
+	_wasNotRunning = true;
 #else
     _isRunning = false;
 #endif

@@ -6,7 +6,7 @@
    StepB:        0*L->H,        0*H->L, Max High=0us
 Position[A]=3200
 
-Max_time in EnableA=331890 us
+Max_time in EnableA=335987 us
 
 Max_time in StepA=11 us
 
