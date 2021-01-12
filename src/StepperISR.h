@@ -115,6 +115,9 @@ class StepperQueue {
     }
     uint16_t period = cmd->ticks;
     uint8_t steps = cmd->steps;
+	// Serial.print(period);
+	// Serial.print(" ");
+	// Serial.println(steps);
 
     uint32_t command_rate_ticks = period;
     if (steps > 1) {

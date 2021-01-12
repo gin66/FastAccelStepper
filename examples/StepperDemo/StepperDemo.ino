@@ -388,7 +388,7 @@ void setup() {
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
   // Alternatively use e.g. M1 T by serial command
-  test_direct_drive(&stepper_config[0]);
+  //test_direct_drive(&stepper_config[0]);
 
   engine.init();
   if (led_pin != PIN_UNDEFINED) {

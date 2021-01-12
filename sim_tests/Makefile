@@ -21,9 +21,11 @@ links: $(SD_SRC_DIRS)
 run_avr: simavr/simavr/run_avr
 	ln -s simavr/simavr/run_avr .
 
-simavr/simavr/run_avr:
-	git clone https://github.com/gin66/simavr.git
+simavr/simavr/run_avr: simavr/simavr/sim/run_avr.c
 	make -C simavr build-simavr
+
+simavr/simavr/sim/run_avr.c:
+	git clone https://github.com/gin66/simavr.git
 
 clean:
 	rm -fR */.pio */.tested */x.vcd */result.txt
