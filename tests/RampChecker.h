@@ -10,7 +10,7 @@ class RampChecker {
   uint32_t accelerate_till;
   uint32_t coast_till;
   uint32_t pos;
-  uint32_t ticks_since_last_step = 0xffffffff;
+  uint32_t ticks_since_last_step = 0;
 
 RampChecker() {
   total_ticks = 0;
@@ -30,50 +30,50 @@ void check_section(struct queue_entry *e) {
   }
   if (steps == 0) {
     // Just a pause
-    ticks_since_last_step += e->ticks;
+    if (ticks_since_last_step <= 0xffff0000) {
+       ticks_since_last_step += e->ticks;
+	}
     total_ticks += e->ticks;
-    printf("process pause %d\n", e->ticks);
+    printf("process pause %d => %u\n", e->ticks, ticks_since_last_step);
     return;
   }
   pos += steps;
-  uint32_t start_dt = e->ticks;
-  total_ticks += steps * start_dt;
-  if (ticks_since_last_step < 0xffff0000) {
-    start_dt += ticks_since_last_step;
-  } else {
-    start_dt = ticks_since_last_step;
-  }
-
-  ticks_since_last_step = 0;
-  min_dt = min(min_dt, start_dt);
-  float accel = 0;
+  uint32_t curr_dt = ticks_since_last_step;
+  total_ticks += steps * e->ticks;
   if (!first) {
-    accel = (16000000.0 / start_dt - 16000000.0 / last_dt) /
-            (1.0 / 16000000.0 * start_dt);
+	  min_dt = min(min_dt, curr_dt);
+  }
+  float accel = 0;
+  if (last_dt != ~0) {
+    accel = (16000000.0 / curr_dt - 16000000.0 / last_dt) /
+            (1.0 / 16000000.0 * curr_dt);
   }
   printf(
-      "process command in ramp checker @%.6fs: steps = %d last = %d start = %d "
+      "process command in ramp checker @%.6fs: steps = %d last = %u current = %u "
       " min_dt "
       "= %d   accel=%.6f inc=%s dec=%s\n",
-      total_ticks / 16000000.0, steps, last_dt, start_dt, min_dt, accel,
+      total_ticks / 16000000.0, steps, last_dt, curr_dt, min_dt, accel,
       increase_ok ? "ALLOW" : "NO", decrease_ok ? "ALLOW" : "NO");
 
-  assert(steps * start_dt >= 0);
+  assert(steps * curr_dt >= 0);
 
-  if (last_dt > start_dt) {
+  if (last_dt > curr_dt) {
     assert(increase_ok);
     accelerate_till = total_ticks;
     decrease_ok = true;
-  } else if (last_dt < start_dt) {
+  } else if (last_dt < curr_dt) {
     if (increase_ok) {
-      coast_till = total_ticks;
+      coast_till = total_ticks-curr_dt;
     }
     assert(decrease_ok);
     increase_ok = false;
   }
 
-  last_dt = start_dt;
+  if (!first) {
+	  last_dt = curr_dt;
+  }
 
+  ticks_since_last_step = e->ticks;
   first = false;
 }
 };

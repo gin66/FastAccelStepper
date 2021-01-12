@@ -105,7 +105,7 @@ int main() {
 
   printf("mid point @ %ld => total = %ld, total ticks = %ld\n", mid_point_ticks,
          2 * mid_point_ticks, rc.total_ticks);
-#define ALLOWED_ASYMMETRY 510000L
+#define ALLOWED_ASYMMETRY 710000L
   printf("%ld\n", ALLOWED_ASYMMETRY);
   test(mid_point_ticks * 2 < rc.total_ticks + ALLOWED_ASYMMETRY,
        "ramp is not symmetric 1");

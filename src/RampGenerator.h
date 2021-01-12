@@ -50,7 +50,9 @@ struct ramp_ro_s {
   bool force_stop;
   bool keep_running;
   bool keep_running_count_up;
+  uint8_t ramp_state;
 };
+
 struct ramp_rw_s {
   // the speed is linked on both ramp slopes to this variable as per
   //       s = v²/2a   =>   v = sqrt(2*a*s)
@@ -58,9 +60,9 @@ struct ramp_rw_s {
   // if accel_change_cnt does not match config.accel_change_cnt, then
   // performed_ramp_up_steps to be recalculated
   uint8_t accel_change_cnt;
-};
-struct ramp_wo_s {
-  uint8_t ramp_state;
+  // Are the ticks stored of the last previous step, if pulse time requires
+  // more than one command
+  uint32_t pause_ticks_left;
 };
 
 class RampGenerator {
@@ -73,13 +75,12 @@ class RampGenerator {
   // commandEnqueued() Reading ro variables is safe in application
   struct ramp_ro_s _ro;
   struct ramp_rw_s _rw;
-  struct ramp_wo_s _wo;
 
  public:
   uint32_t speed_in_us;
   inline uint8_t rampState() {
     // reading one byte is atomic
-    return _wo.ramp_state;
+    return _ro.ramp_state;
   }
   void init();
   inline int32_t targetPosition() { return _ro.target_pos; }
@@ -98,7 +99,8 @@ class RampGenerator {
   inline void initiate_stop() { _ro.force_stop = true; }
   inline bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
-  inline void setState(uint8_t state) { _wo.ramp_state = state; }
+  inline void setState(uint8_t state) { _ro.ramp_state = state; }
+
   void stopRamp();
   inline void setKeepRunning() { _ro.keep_running = true; }
   inline bool isRunningContinuously() { return _ro.keep_running; }

@@ -91,7 +91,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
   sprintf(fname, "test_02_%s.gnuplot", name);
   FILE *gp_file = fopen(fname, "w");
   fprintf(gp_file, "$data <<EOF\n");
-  for (int i = 0; i < steps; i++) {
+  for (int i = 0; i < steps*40; i++) {
     if (true) {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
@@ -145,6 +145,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
     printf(" %f", 1.0 * rc.accelerate_till / 16000000.0);
     printf(" %f", 1.0 * (rc.coast_till - rc.accelerate_till) / 16000000.0);
     printf(" %f", 1.0 * (rc.total_ticks - rc.coast_till) / 16000000.0);
+    printf(" %f\n", 1.0 * rc.total_ticks / 16000000.0);
     assert(rc.total_ticks > rc.coast_till);
   } else {
     printf("Ramp time up/down/total =");
@@ -152,8 +153,8 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
     down_time = (1.0 * rc.total_ticks - 1.0 * rc.accelerate_till) / 16000000.0;
     printf(" %f", 1.0 * rc.accelerate_till / 16000000.0);
     printf(" %f", 1.0 * (rc.total_ticks - rc.accelerate_till) / 16000000.0);
+    printf(" %f\n", 1.0 * rc.total_ticks / 16000000.0);
   }
-  printf(" %f\n", 1.0 * rc.total_ticks / 16000000.0);
   // turned off
   // test(abs(up_time - down_time) <
   //         0.5 * (up_time + down_time) * allowed_ramp_time_delta,
@@ -203,13 +204,13 @@ int main() {
                  0.2);
 
   // ramp time 50s, thus with 500steps max speed not reached. 250steps need 10s
-  //  test_with_pars("f13", 500, 4000, 5, false, 20.0 - 0.6, 20.0 + 0.2, 0.2);
+  test_with_pars("f13", 500, 4000, 5, false, 20.0 - 1.0, 20.0 + 0.2, 0.2);
   ////  test_with_pars("f14", 2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2,
   /// 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 1s
   test_with_pars("f15", 12600, 4000, 5, true, 100.0 - 0.7, 100.0 + 0.2, 0.2);
   // ramp time 50s with 6250 steps => 4000 steps at max speed using 16s
-  test_with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.7, 116.0 + 0.2, 0.2);
+  test_with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.8, 116.0 + 0.2, 0.2);
 
   // jumps in speed in real => WORKS NOW
   test_with_pars("f17", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
@@ -218,13 +219,13 @@ int main() {
   // test_with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
 
   // slow ramp time
-  //  test_with_pars("f19", 1000, 10, 1, false, 62.0, 63.0, 1.0);
+  test_with_pars("f19", 1000, 10, 1, false, 61.0, 63.0, 1.0);
 
   // name, steps, travel_dt, accel, reach_max_speed, min_time, max_time,
   // allowed_ramp_time_delta slow ramp time Those are anomalies (see github
   // issue #8) on avr, but not on PC
   //  test_with_pars("f20", 50000, 270000, 10, true, 62.0, 63.0, 1.0);
-  //  test_with_pars("f20", 20, 270000, 1, true, 62.0, 63.0, 1.0);
+  test_with_pars("f20", 10, 1000000, 1, true, 9.0, 10.0, 1.0);
 
   // no ramp time, just constant run time
   test_with_pars("f21", 15000, 4000, 100000, true, 50.9, 60.1, 0.1);
