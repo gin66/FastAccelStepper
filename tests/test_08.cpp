@@ -28,7 +28,7 @@ void init_queue() {
   fas_queue[1].next_write_idx = 0;
 }
 
-void test_ramp(uint32_t steps) {
+void test_ramp(uint32_t accel, uint32_t steps) {
   init_queue();
   FastAccelStepper s = FastAccelStepper();
   s.init(NULL, 0, 0);
@@ -40,7 +40,7 @@ void test_ramp(uint32_t steps) {
   uint32_t speed_us = 40;
   assert(s.isQueueEmpty());
   s.setSpeed(speed_us);
-  s.setAcceleration(100000);
+  s.setAcceleration(accel);
   s.fill_queue();
   assert(s.isQueueEmpty());
   s.move(steps);
@@ -93,10 +93,13 @@ void test_ramp(uint32_t steps) {
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif
-
 }
 int main() {
-  test_ramp(400);
+  test_ramp(100000, 400);
+  test_ramp(100000, 600);
+  for (uint32_t i = 0; i < 30; i++) {
+    test_ramp(1000000, 1000 + i);
+  }
   printf("TEST_08 PASSED\n");
   return 0;
 }

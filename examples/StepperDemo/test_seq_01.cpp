@@ -16,7 +16,7 @@ bool test_seq_01(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 5:
       if (time_ms - seq->u32_1 >= 1000) {
         seq->state++;
-        if ((seq->state >> 4) == 60/3) {
+        if ((seq->state >> 4) == 60 / 3) {
           seq->state = 7;
         }
       }
@@ -35,11 +35,11 @@ bool test_seq_01(FastAccelStepper *stepper, struct test_seq_s *seq,
       seq->state = (seq->state & 0xfff0) + 17;
       break;
     case 7:
-          stepper->setSpeed(1000);
-          stepper->setAcceleration(10000);
-          stepper->move(-3200);
+      stepper->setSpeed(1000);
+      stepper->setAcceleration(10000);
+      stepper->move(-3200);
       seq->state++;
-		  break;
+      break;
     case 8:
       if (!stepper->isRunning()) {
         return true;  // finished

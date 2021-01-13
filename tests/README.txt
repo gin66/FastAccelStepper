@@ -25,3 +25,6 @@ Tests;
 
 - test_08
   ramp to max speed with step wise increased length
+
+- test_09
+  simple test case for V30 A1000000 R53 W R53
