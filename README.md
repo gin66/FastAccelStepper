@@ -245,6 +245,7 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
 * avr: three steppers at high speed does not work due too interrupt load
+* Very high acceleration value e.g. 10.000.000 and high speed may not be executed, if the high speed in us is smaller than MIN_CMD_TIME (in ticks)
 
 ## Lessons Learned
 

@@ -335,7 +335,10 @@ void StepperQueue::commandAddedToQueue() {
   mcpwm->timer[timer].mode.mode = 3;   // 3=up/down counting
   mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
 }
-void StepperQueue::forceStop() { init_stop(this); read_idx = next_write_idx; }
+void StepperQueue::forceStop() {
+  init_stop(this);
+  read_idx = next_write_idx;
+}
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 #endif

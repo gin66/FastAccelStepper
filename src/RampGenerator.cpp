@@ -434,13 +434,6 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
-      // if acceleration is very high, then d_ticks_new can be lower than
-      // min_travel_ticks in this case can immediately reverse
-      //if (d_ticks_new < ramp->config.min_travel_ticks) {
-      //  count_up = need_count_up;
-      //  d_ticks_new = ramp->config.min_travel_ticks;
-      //}
-
       next_ticks = d_ticks_new;
 
       // CLIPPING: avoid reduction

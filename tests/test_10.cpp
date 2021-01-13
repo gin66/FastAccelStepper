@@ -50,17 +50,17 @@ void test_reduce_acceleration() {
   float old_planned_time_in_buffer = 0;
   int accel_decreased = false;
   uint32_t count_state_dec = 0;
-  for (int i = 0; i < steps*10; i++) {
+  for (int i = 0; i < steps * 10; i++) {
     if (!accel_decreased && (s.getCurrentPosition() >= 35000)) {
       puts("Change acceleration");
       accel_decreased = true;
-	  s.moveByAcceleration(-1000);
+      s.moveByAcceleration(-1000);
       s.fill_queue();  // ensure queue is not empty
     }
     if (accel_decreased && (s.getCurrentPosition() >= 37000)) {
-	  test(s.rampState() != RAMP_STATE_COAST,"Coasting is wrong state here");
-	  break;
-	}
+      test(s.rampState() != RAMP_STATE_COAST, "Coasting is wrong state here");
+      break;
+    }
     if (true) {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
