@@ -85,7 +85,7 @@ void queue_out_of_range() {
   assert(s.isQueueEmpty());
 
   struct stepper_command_s cmd3 = {
-      .ticks = MIN_CMD_TIME - 1, .steps = 1, .count_up = true};
+      .ticks = MIN_CMD_TICKS - 1, .steps = 1, .count_up = true};
 
   res = s.addQueueEntry(&cmd3);
   test(res == AQE_ERROR_TICKS_TOO_LOW,

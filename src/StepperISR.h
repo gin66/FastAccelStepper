@@ -124,7 +124,7 @@ class StepperQueue {
     if (steps > 1) {
       command_rate_ticks *= steps;
     }
-    if (command_rate_ticks < MIN_CMD_TIME) {
+    if (command_rate_ticks < MIN_CMD_TICKS) {
       return AQE_ERROR_TICKS_TOO_LOW;
     }
 

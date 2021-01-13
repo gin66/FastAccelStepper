@@ -254,7 +254,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       remaining_steps = performed_ramp_up_steps;
     } else if (ramp->config.min_travel_ticks < rw->curr_ticks) {
       this_state = RAMP_STATE_ACCELERATE;
-      if (rw->curr_ticks < 2 * MIN_CMD_TIME) {
+      if (rw->curr_ticks < 2 * MIN_CMD_TICKS) {
         // special consideration needed, that invalid commands are not generated
         //
         // possible coast steps is divided by 4: 1 part acc, 2 part coast, 1
@@ -263,7 +263,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
             (remaining_steps - performed_ramp_up_steps) >> 2;
         // curr_ticks is not necessarily correct due to speed increase
         uint32_t coast_time = possible_coast_steps * rw->curr_ticks;
-        if (coast_time < 2 * MIN_CMD_TIME) {
+        if (coast_time < 2 * MIN_CMD_TICKS) {
           this_state = RAMP_STATE_COAST;
 #ifdef TEST
           printf("low speed coast %d %d\n", possible_coast_steps,
@@ -275,8 +275,10 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
         }
       }
       if (remaining_steps - performed_ramp_up_steps < 2 * planning_steps) {
-        this_state = RAMP_STATE_COAST;
-        planning_steps = remaining_steps - performed_ramp_up_steps;
+        if (curr_ticks != TICKS_FOR_STOPPED_MOTOR) {
+          this_state = RAMP_STATE_COAST;
+          planning_steps = remaining_steps - performed_ramp_up_steps;
+        }
       }
     } else if (ramp->config.min_travel_ticks > rw->curr_ticks) {
       this_state = RAMP_STATE_DECELERATE;
