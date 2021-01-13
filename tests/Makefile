@@ -3,7 +3,7 @@ CFLAGS=-DTEST -Werror -g -I../src
 CXXFLAGS=-DTEST -Werror -g -DF_CPU=16000000 -I../src
 LDLIBS=-lm
 
-TESTS=$(wildcard test_??)
+TESTS=$(basename $(wildcard test_??.cpp))
 
 test: $(TESTS)
 	$(addsuffix &&,$(addprefix ./,$(TESTS))) echo "All tests passed"

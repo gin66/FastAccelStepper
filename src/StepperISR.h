@@ -221,7 +221,7 @@ class StepperQueue {
     _prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
-	_wasNotRunning = true;
+    _wasNotRunning = true;
 #else
     _isRunning = false;
 #endif

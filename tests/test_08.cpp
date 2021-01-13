@@ -28,7 +28,7 @@ void init_queue() {
   fas_queue[1].next_write_idx = 0;
 }
 
-int main() {
+void test_ramp(uint32_t steps) {
   init_queue();
   FastAccelStepper s = FastAccelStepper();
   s.init(NULL, 0, 0);
@@ -37,32 +37,22 @@ int main() {
 
   // Reproduce test sequence 06
 
-  uint32_t speed_us = 100;
-  int32_t steps = 32000;
+  uint32_t speed_us = 40;
   assert(s.isQueueEmpty());
   s.setSpeed(speed_us);
-  s.setAcceleration(10000);
+  s.setAcceleration(100000);
   s.fill_queue();
   assert(s.isQueueEmpty());
   s.move(steps);
   s.fill_queue();
   assert(!s.isQueueEmpty());
   float old_planned_time_in_buffer = 0;
-#define T100MS (TICKS_PER_S / 10)
-  uint64_t next_speed_change = T100MS;
-  uint64_t mid_point_ticks = 0;
 
   char fname[100];
   sprintf(fname, "test_07.gnuplot");
   FILE *gp_file = fopen(fname, "w");
   fprintf(gp_file, "$data <<EOF\n");
-  for (int i = 0; i < 10 * steps; i++) {
-    if (rc.total_ticks > next_speed_change) {
-      next_speed_change = rc.total_ticks + T100MS;
-      speed_us = 190 - speed_us;
-      s.setSpeed(speed_us);
-      s.applySpeedAcceleration();
-    }
+  for (int i = 0; i < 100 * steps; i++) {
     if (true) {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
@@ -77,9 +67,6 @@ int main() {
     s.fill_queue();
     uint32_t from_dt = rc.total_ticks;
     while (!s.isQueueEmpty()) {
-      if ((mid_point_ticks == 0) && (rc.pos >= steps / 2)) {
-        mid_point_ticks = rc.total_ticks;
-      }
       rc.increase_ok = true;
       rc.decrease_ok = true;
       rc.check_section(
@@ -103,18 +90,13 @@ int main() {
   test(s.getCurrentPosition() == steps, "has not reached target position");
   printf("Total time  %f\n", rc.total_ticks / 16000000.0);
 
-  printf("mid point @ %ld => total = %ld, total ticks = %ld\n", mid_point_ticks,
-         2 * mid_point_ticks, rc.total_ticks);
-#define ALLOWED_ASYMMETRY 1000000L
-  printf("%ld\n", ALLOWED_ASYMMETRY);
-  test(mid_point_ticks * 2 < rc.total_ticks + ALLOWED_ASYMMETRY,
-       "ramp is not symmetric 1");
-  test(mid_point_ticks * 2 > rc.total_ticks - ALLOWED_ASYMMETRY,
-       "ramp is not symmetric 2");
-
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
   printf("CHECKSUM for %d/%d/%d: %d\n", steps, travel_dt, accel, s.checksum);
 #endif
 
-  printf("TEST_07 PASSED\n");
+}
+int main() {
+  test_ramp(400);
+  printf("TEST_08 PASSED\n");
+  return 0;
 }

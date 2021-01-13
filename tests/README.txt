@@ -22,3 +22,6 @@ Tests;
 
 - test_07
   test case with varying speed
+
+- test_08
+  ramp to max speed with step wise increased length

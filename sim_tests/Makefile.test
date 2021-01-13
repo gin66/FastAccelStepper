@@ -71,11 +71,15 @@ FIRMWARE=".pio/build/$(DUT)/firmware.elf"
 
 test: .tested
 
-.tested:	x.vcd expect.txt
+.tested:	result.txt expect.txt ../judge.awk
+	echo DUT=$(DUT)
+	rm -f .tested
+	gawk -f ../judge.awk -v PWD=$(PWD) result.txt expect.txt
+	test -f .tested
+
+result.txt: x.vcd
 	gawk -f ../eval.awk x.vcd
 	cat expect.txt
-	echo DUT=$(DUT)
-	cmp result.txt expect.txt && touch .tested
 
 x.vcd:	$(SRC) ../run_avr platformio.ini
 	~/.platformio/penv/bin/pio run -e $(DUT)

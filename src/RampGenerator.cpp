@@ -43,7 +43,8 @@ void RampGenerator::init() {
   _rw.pause_ticks_left = 0;
   _rw.performed_ramp_up_steps = 0;
   _rw.accel_change_cnt = 0xff;
-  _ro.ramp_state = RAMP_STATE_IDLE;
+  _rw.ramp_state = RAMP_STATE_IDLE;
+  _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
 #if (TICKS_PER_S != 16000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
@@ -65,7 +66,7 @@ void RampGenerator::setAcceleration(uint32_t accel) {
   }
   upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
   _config.upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
-  _config.accel_change_cnt = _rw.accel_change_cnt+1;
+  _config.accel_change_cnt = _rw.accel_change_cnt + 1;
 }
 void RampGenerator::applySpeedAcceleration() {
   noInterrupts();
@@ -87,8 +88,8 @@ int8_t RampGenerator::startRun(bool countUp) {
                                .keep_running_count_up = countUp};
 
   noInterrupts();
-  if (_ro.ramp_state == RAMP_STATE_IDLE) {
-    _ro.ramp_state = RAMP_STATE_ACCELERATE;
+  if (_rw.ramp_state == RAMP_STATE_IDLE) {
+    _rw.ramp_state = RAMP_STATE_ACCELERATE;
   }
   _ro = new_ramp;
   interrupts();
@@ -108,24 +109,23 @@ int8_t RampGenerator::_startMove(int32_t target_pos,
                                .target_pos = target_pos,
                                .force_stop = false,
                                .keep_running = false,
-                               .keep_running_count_up = true,
-							   .ramp_state = RAMP_STATE_ACCELERATE};
+                               .keep_running_count_up = true};
 
   noInterrupts();
-  if (_ro.ramp_state != RAMP_STATE_IDLE) {
-     new_ramp.ramp_state = _ro.ramp_state;
+  if (_rw.ramp_state == RAMP_STATE_IDLE) {
+    _rw.ramp_state = RAMP_STATE_ACCELERATE;
   }
   _ro = new_ramp;
   interrupts();
 
 #ifdef TEST
   printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
-         queue_end->ticks, _config.min_travel_ticks);
+         _rw.curr_ticks, _config.min_travel_ticks);
 #endif
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu\n",
-          target_pos, queue_end->ticks, _min_travel_ticks);
+          target_pos, _rw.curr_ticks, _min_travel_ticks);
   Serial.println(buf);
 #endif
   return MOVE_OK;
@@ -150,100 +150,156 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
 }
 
 //*************************************************************************************************
-static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
-                               struct ramp_rw_s *rw,
-                               const struct queue_end_s *queue_end,
-                               struct stepper_command_s *command) {
+static void _getNextCommand(const struct ramp_ro_s *ramp,
+                            const struct ramp_rw_s *rw,
+                            const struct queue_end_s *queue_end,
+                            NextCommand *command) {
+  // If there is a pause from last step, then just output a pause
   if (rw->pause_ticks_left > 0) {
-	  uint32_t ticks = rw->pause_ticks_left;
+    uint32_t ticks = rw->pause_ticks_left;
     if (ticks > 65535) {
-       ticks >>= 1;
-       ticks = min(ticks, 65535);
-     }
-     command->ticks = ticks;
-     command->steps = 0;
-     command->count_up = queue_end->count_up;
-	return ramp->ramp_state;
+      ticks >>= 1;
+      ticks = min(ticks, 65535);
+    }
+    command->command.ticks = ticks;
+    command->command.steps = 0;
+    command->command.count_up = queue_end->count_up;
+    command->rw.ramp_state = rw->ramp_state;
+    command->rw.accel_change_cnt = rw->accel_change_cnt;
+    command->rw.performed_ramp_up_steps = rw->performed_ramp_up_steps;
+    command->rw.pause_ticks_left = rw->pause_ticks_left - ticks;
+	command->rw.curr_ticks = rw->curr_ticks;
+#ifdef TEST
+    printf(
+        "add command pause ticks = %d  remaining pause = %d  Target pos = %d\n",
+        ticks, command->rw.pause_ticks_left, ramp->target_pos);
+#endif
+    return;
   }
-  uint32_t qe_ticks = queue_end->ticks;
-  if (ramp->config.accel_change_cnt != rw->accel_change_cnt) {
-    uint32_t performed_ramp_up_steps = upm_to_u32(upm_divide(
-        ramp->config.upm_inv_accel2, upm_square(upm_from(qe_ticks))));
-    rw->accel_change_cnt = ramp->config.accel_change_cnt;
-    rw->performed_ramp_up_steps = performed_ramp_up_steps;
+
+  // If the acceleration has changed, recalculate the ramp up/down steps,
+  // which is the equivalent to the current speed.
+  // Even if the accelration value is constant, the calculated value
+  // can deviated due to precision or clipping effect
+  uint8_t accel_change_cnt = ramp->config.accel_change_cnt;
+  uint32_t performed_ramp_up_steps;
+  if (accel_change_cnt != rw->accel_change_cnt) {
+    performed_ramp_up_steps = upm_to_u32(upm_divide(
+        ramp->config.upm_inv_accel2, upm_square(upm_from(rw->curr_ticks))));
+  } else {
+    performed_ramp_up_steps = rw->performed_ramp_up_steps;
   }
 
   bool count_up = queue_end->count_up;
 
   // check state for acceleration/deceleration or deceleration to stop
-  uint8_t next_state;
+  uint8_t this_state;
   uint32_t remaining_steps;
   bool need_count_up;
   if (ramp->keep_running) {
     need_count_up = ramp->keep_running_count_up;
     remaining_steps = 0xfffffff;
   } else {
-    int32_t delta =
-        ramp->target_pos - queue_end->pos;  // this can overflow, which is legal
-    if (delta == 0) {
-      command->ticks = 0;
-      return RAMP_STATE_IDLE;
-    }
+    // this can overflow, which is legal
+    int32_t delta = ramp->target_pos - queue_end->pos;
 
-    need_count_up = delta > 0;
+    if (delta == 0) {
+	  // this case can happen on overshoot. So reverse current direction
+      need_count_up = !count_up;
+    } else {
+      need_count_up = delta > 0;
+    }
     remaining_steps = abs(delta);
   }
 
-  if (queue_end->ticks == TICKS_FOR_STOPPED_MOTOR) {
+  // If not moving, then use requested direction
+  if (performed_ramp_up_steps == 0) {
     count_up = need_count_up;
   }
 
-  if (ramp->force_stop) {
-    next_state = RAMP_STATE_DECELERATE_TO_STOP;
-    remaining_steps = rw->performed_ramp_up_steps;
+  if ((remaining_steps == 0) && (performed_ramp_up_steps <= 1)) {
+    command->command.ticks = 0;
+    command->rw.pause_ticks_left = 0;
+    command->rw.ramp_state = RAMP_STATE_IDLE;
+	command->rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+#ifdef TEST
+    puts("ramp complete");
+#endif
+    return;
   }
-  // Detect change in direction and if so, initiate deceleration to stop
+
+  // In case of force stop just run down the ramp
+  uint32_t coast_speed = rw->curr_ticks;
+  if (ramp->force_stop) {
+    this_state = RAMP_STATE_DECELERATE_TO_STOP;
+    remaining_steps = performed_ramp_up_steps;
+  }
   else if (count_up != need_count_up) {
-    next_state = RAMP_STATE_REVERSE;
-    uint32_t prus = rw->performed_ramp_up_steps;
-    if (prus != 0) {
-      remaining_steps = prus;
-    } else {
-      count_up = need_count_up;
-      next_state = RAMP_STATE_ACCELERATE;
-    }
+    // On direcction change, do reversing
+    this_state = RAMP_STATE_REVERSE;
+    remaining_steps = performed_ramp_up_steps;
   } else {
     // If come here, then direction is same as current movement
-    if (remaining_steps <= rw->performed_ramp_up_steps) {
-      next_state = RAMP_STATE_DECELERATE;
-    } else if (ramp->config.min_travel_ticks < qe_ticks) {
-      next_state = RAMP_STATE_ACCELERATE;
-    } else if (ramp->config.min_travel_ticks > qe_ticks) {
-      next_state = RAMP_STATE_DECELERATE;
+    if (remaining_steps == performed_ramp_up_steps) {
+      this_state = RAMP_STATE_DECELERATE;
+	  remaining_steps = performed_ramp_up_steps;
+	} else if (remaining_steps < performed_ramp_up_steps) {
+	  // We will overshoot
+      this_state = RAMP_STATE_REVERSE;
+	  remaining_steps = performed_ramp_up_steps;
+    } else if (ramp->config.min_travel_ticks < rw->curr_ticks) {
+      this_state = RAMP_STATE_ACCELERATE;
+	  if (rw->curr_ticks < 2*MIN_CMD_TIME) {
+		  // special consideration needed, that invalid commands are not generated
+		  //
+		  // possible coast steps is divided by 4: 1 part acc, 2 part coast, 1 part dec
+		  uint32_t possible_coast_steps = (remaining_steps - performed_ramp_up_steps)>>2;
+		  // curr_ticks is not necessarily correct due to speed increase
+		  uint32_t coast_time = possible_coast_steps * rw->curr_ticks;
+		  if (coast_time < 2*MIN_CMD_TIME) {
+			 this_state = RAMP_STATE_COAST;
+		  }
+	  }
+    } else if (ramp->config.min_travel_ticks > rw->curr_ticks) {
+      this_state = RAMP_STATE_DECELERATE;
     } else {
-      next_state = RAMP_STATE_COAST;
+      this_state = RAMP_STATE_COAST;
+	  coast_speed = ramp->config.min_travel_ticks;
     }
   }
-  if (remaining_steps == 0) {
-    command->ticks = 0;
-    return RAMP_STATE_IDLE;
+  if (remaining_steps == 0) {  // This implies performed_ramp_up_steps == 0
+    command->command.ticks = 0;
+    command->rw.pause_ticks_left = 0;
+    command->rw.ramp_state = RAMP_STATE_IDLE;
+	command->rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+#ifdef TEST
+    puts("ramp complete");
+#endif
+    return;
   }
+
+  // Guarantee here:
+  //	remaining_steps > 0
+  //	remaining_steps >= performed_ramp_up_steps
+  //	performed_ramp_up_steps can be 0
+
   // Forward planning of 1ms or more on slow speed.
-  uint32_t planning_steps = max((TICKS_PER_S / 1000) / qe_ticks, 1);
+  uint32_t curr_ticks = rw->curr_ticks;
+  uint32_t planning_steps = max((TICKS_PER_S / 1000) / curr_ticks, 1);
   uint32_t next_ticks;
 
 #ifdef TEST
   printf(
       "pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d "
       "queue_end.ticks=%u travel_ticks=%u ",
-      queue_end->pos, remaining_steps, rw->performed_ramp_up_steps,
-      planning_steps, qe_ticks, ramp->config.min_travel_ticks);
+      queue_end->pos, remaining_steps, performed_ramp_up_steps, planning_steps,
+      rw->curr_ticks, ramp->config.min_travel_ticks);
   if (count_up) {
     printf("+");
   } else {
     printf("-");
   }
-  switch (next_state) {
+  switch (this_state) {
     case RAMP_STATE_COAST:
       printf("COAST");
       break;
@@ -263,19 +319,34 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   printf("\n");
 #endif
 
-  uint32_t curr_ticks = qe_ticks;
-  switch (next_state) {
+  // Guarantee here:
+  //	remaining_steps > 0
+  //	remaining_steps >= performed_ramp_up_steps
+  //	remaining_steps >  performed_ramp_up_steps, in COAST
+  //	performed_ramp_up_steps can be 0
+  //	planning_steps >= 1
+
+  // TODO:
+  // In case of high speed, need to stop acceleration, if the steps in high speed too low
+  // otherwise esp32 can reject a command !
+  // During COAST need to make sure the steps are not 1
+
+  switch (this_state) {
     uint32_t d_ticks_new;
     uint32_t upm_rem_steps;
     upm_float upm_d_ticks_new;
     case RAMP_STATE_COAST:
-      next_ticks = ramp->config.min_travel_ticks;
+      next_ticks = coast_speed;
       // do not overshoot ramp down start
       planning_steps =
-          min(planning_steps, remaining_steps - rw->performed_ramp_up_steps);
+          min(planning_steps, remaining_steps - performed_ramp_up_steps);
       break;
     case RAMP_STATE_ACCELERATE:
-      upm_rem_steps = upm_from(rw->performed_ramp_up_steps + planning_steps);
+      // do not overshoot ramp down start
+      planning_steps =
+          min(planning_steps, (remaining_steps - performed_ramp_up_steps)>>1);
+
+      upm_rem_steps = upm_from(performed_ramp_up_steps + planning_steps);
       upm_d_ticks_new =
           upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
 
@@ -293,21 +364,21 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #ifdef TEST
       printf("accelerate ticks => %d  during %d steps (d_ticks_new = %u)",
              next_ticks, planning_steps, d_ticks_new);
-      printf("... %u+%u steps\n", rw->performed_ramp_up_steps, planning_steps);
+      printf("... %u+%u steps\n", performed_ramp_up_steps, planning_steps);
 #endif
       break;
     case RAMP_STATE_DECELERATE:
-      planning_steps = min(planning_steps, rw->performed_ramp_up_steps);
-      if (planning_steps == 0) {
-        // This seems not to be correct and planning_steps == 0 should not
-        // happen
-        d_ticks_new = ramp->config.min_travel_ticks;
-      } else {
-        upm_rem_steps = upm_from(rw->performed_ramp_up_steps - planning_steps);
-        upm_d_ticks_new =
+
+	  if (performed_ramp_up_steps > planning_steps) {
+		  upm_rem_steps = upm_from(performed_ramp_up_steps - planning_steps);
+		  upm_d_ticks_new =
             upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
-        d_ticks_new = upm_to_u32(upm_d_ticks_new);
-      }
+		  d_ticks_new = upm_to_u32(upm_d_ticks_new);
+	  }
+	  else {
+		  planning_steps = max(1, performed_ramp_up_steps);
+		  d_ticks_new = curr_ticks;
+	  } 
 
       next_ticks = d_ticks_new;
 
@@ -322,7 +393,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
 #ifdef TEST
       printf("decelerate ticks => %d  during %d steps (d_ticks_new = %u)",
              next_ticks, planning_steps, d_ticks_new);
-      printf("... %u+%u steps\n", rw->performed_ramp_up_steps, planning_steps);
+      printf("... %u+%u steps\n", performed_ramp_up_steps, planning_steps);
 #endif
       break;
     case RAMP_STATE_DECELERATE_TO_STOP:
@@ -381,7 +452,7 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
       "next_ticks = %u\n",
       steps, planning_steps, next_ticks);
 #endif
-  steps = min(steps, abs(remaining_steps));
+  steps = min(steps, abs(remaining_steps)); // This could be problematic
   steps = max(steps, 1);
   steps = min(255, steps);
 
@@ -389,24 +460,50 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
   assert(next_ticks > 0);
 #endif
 
+  uint32_t pause_ticks_left;
   if (next_ticks > 65535) {
     steps = 1;
-    uint32_t pause = next_ticks;
-	next_ticks >>= 1;
+    pause_ticks_left = next_ticks;
+    next_ticks >>= 1;
     next_ticks = min(next_ticks, 65535);
-	pause -= next_ticks;
-	rw->pause_ticks_left = pause;
-  }
-
-  if (steps == abs(remaining_steps)) {
-    if (count_up == need_count_up) {
-      next_state = RAMP_STATE_IDLE;
+    pause_ticks_left -= next_ticks;
+  } else {
+    pause_ticks_left = 0;
+    if (steps == remaining_steps) {
+      if (count_up == need_count_up) {
+		if (performed_ramp_up_steps == steps) {
+           this_state = RAMP_STATE_IDLE;
+		}
+      }
     }
   }
 
-  command->ticks = next_ticks;
-  command->steps = steps;
-  command->count_up = count_up;
+  switch (this_state & RAMP_STATE_MASK) {
+    case RAMP_STATE_COAST:
+      break;
+    case RAMP_STATE_ACCELERATE:
+      performed_ramp_up_steps += steps;
+      break;
+    case RAMP_STATE_REVERSE:
+    case RAMP_STATE_DECELERATE:
+    case RAMP_STATE_DECELERATE_TO_STOP:
+      if (performed_ramp_up_steps < steps) {
+        performed_ramp_up_steps = 0; // TODO: should be obsolete
+      } else {
+        performed_ramp_up_steps -= steps;
+      }
+      break;
+  }
+
+  command->command.ticks = next_ticks;
+  command->command.steps = steps;
+  command->command.count_up = count_up;
+
+  command->rw.ramp_state = this_state;
+  command->rw.accel_change_cnt = accel_change_cnt;
+  command->rw.performed_ramp_up_steps = performed_ramp_up_steps;
+  command->rw.pause_ticks_left = pause_ticks_left;
+  command->rw.curr_ticks = pause_ticks_left + next_ticks;
 
 #ifdef TEST
   printf(
@@ -414,43 +511,15 @@ static uint8_t _getNextCommand(const struct ramp_ro_s *ramp,
       "Remaining steps = %d\n",
       steps, next_ticks, ramp->target_pos, remaining_steps);
 #endif
-  return next_state;
 }
-void RampGenerator::commandEnqueued(struct stepper_command_s *command,
-                                    uint8_t state) {
-  if (command->steps == 0) {
-	  uint32_t ticks = _rw.pause_ticks_left;
-	if (ticks > 0) {
-		if (ticks <= command->ticks) {
-			ticks = 0;
-		}
-		else {
-			ticks -= command->ticks;
-		}
-		_rw.pause_ticks_left = ticks;
-	}
-  }
-  else switch (state & RAMP_STATE_MASK) {
-    case RAMP_STATE_COAST:
-      break;
-    case RAMP_STATE_ACCELERATE:
-      _rw.performed_ramp_up_steps += command->steps;
-      break;
-    case RAMP_STATE_REVERSE:
-    case RAMP_STATE_DECELERATE:
-    case RAMP_STATE_DECELERATE_TO_STOP:
-      uint32_t prus = _rw.performed_ramp_up_steps;
-      if (prus < command->steps) {
-        prus = 0;
-      } else {
-        prus -= command->steps;
-      }
-      _rw.performed_ramp_up_steps = prus;
-      break;
-  }
+void RampGenerator::afterCommandEnqueued(NextCommand *command) {
+#ifdef TEST
+  puts("after Command Enqueued");
+#endif
+  _rw = command->rw;
 }
-uint8_t RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
-                                      struct stepper_command_s *command) {
+void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
+                                   NextCommand *command) {
   noInterrupts();
   // copy consistent ramp state
   struct ramp_ro_s ramp = _ro;
@@ -458,7 +527,7 @@ uint8_t RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 
   return _getNextCommand(&ramp, &_rw, queue_end, command);
 }
-void RampGenerator::stopRamp() { _ro.ramp_state = RAMP_STATE_IDLE; }
+void RampGenerator::stopRamp() { _rw.ramp_state = RAMP_STATE_IDLE; }
 bool RampGenerator::isRampGeneratorActive() {
-  return (_ro.ramp_state != RAMP_STATE_IDLE);
+  return (_rw.ramp_state != RAMP_STATE_IDLE);
 }

@@ -29,18 +29,17 @@
 
 #if defined(ARDUINO_ARCH_ESP32)
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
-#define MIN_CMD_TIME (10 * MIN_DELTA_TICKS)
 #elif defined(ARDUINO_ARCH_AVR)
 // AVR:
 // tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
 // the main task is freezing (StepperDemo).
 // Thus the limitation set here is set to 25kSteps/s as stated in the README.
 #define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
-#define MIN_CMD_TIME MIN_DELTA_TICKS
 #else
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
-#define MIN_CMD_TIME MIN_DELTA_TICKS
 #endif
+
+#define MIN_CMD_TIME (10 * MIN_DELTA_TICKS)
 
 #define MAX_DELTA_TICKS 0xffffffff
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))

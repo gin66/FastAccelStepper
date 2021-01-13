@@ -4,6 +4,13 @@ pre-0.17.2:
 	- test sequence 07 added, which fails on esp32
 	- avr: free RAM by usage of output_msg()
     - tests can return failure, which is displayed at test end
+- Rework RampGenerator: pauses are now after the step and not before. This removes
+  some irregularity between steps.
+- Rework esp32 interrupt code. Works, but the PCNT module is hard to control
+- Fix issue #29 and a slow start of a ramp (identified by #29)
+- RampGenerator: Support coasting at lower speed for a couple of steps
+  to limit interrupt rate for esp32 (or even rejected commands)
+- More tests
 
 0.17.1:
 - esp32: Fixed one/two spurious step pulses after reset mainly (issue #29)

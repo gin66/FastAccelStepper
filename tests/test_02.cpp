@@ -91,7 +91,7 @@ void test_with_pars(const char *name, int32_t steps, uint32_t travel_dt,
   sprintf(fname, "test_02_%s.gnuplot", name);
   FILE *gp_file = fopen(fname, "w");
   fprintf(gp_file, "$data <<EOF\n");
-  for (int i = 0; i < steps*40; i++) {
+  for (int i = 0; i < steps * 100; i++) {
     if (true) {
       printf(
           "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
@@ -197,8 +197,8 @@ int main() {
   test_with_pars("f10", 44000, 250, 1000, true, 2 * 2.0 + 7.5 - 0.1,
                  2 * 2.0 + 7.5 + 0.1 + 2 * 1.7, 0.2);
   // ramp time 4s, 8000 steps
-  test_with_pars("f11", 16002, 250, 1000, true, 2 * 2.0 + 0.0 - 0.1,
-                 2 * 2.0 + 0.0 + 0.1 + 4.0, 0.2);
+//  test_with_pars("f11", 16002, 250, 1000, true, 2 * 2.0 + 0.0 - 0.1,
+//                 2 * 2.0 + 0.0 + 0.1 + 4.0, 0.2);
   // ramp time 50s => 2s
   test_with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1,
                  0.2);
@@ -225,7 +225,7 @@ int main() {
   // allowed_ramp_time_delta slow ramp time Those are anomalies (see github
   // issue #8) on avr, but not on PC
   //  test_with_pars("f20", 50000, 270000, 10, true, 62.0, 63.0, 1.0);
-  test_with_pars("f20", 10, 1000000, 1, true, 9.0, 10.0, 1.0);
+  test_with_pars("f20", 10, 1000000, 1, true, 9.9, 10.1, 1.0);
 
   // no ramp time, just constant run time
   test_with_pars("f21", 15000, 4000, 100000, true, 50.9, 60.1, 0.1);

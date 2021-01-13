@@ -319,7 +319,7 @@ void FastAccelStepper::fill_queue() {
     return;
   }
   // preconditions are fulfilled, so create the command(s)
-  struct stepper_command_s cmd;
+  NextCommand cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 20 ms. Currently hard coded
   while (!isQueueFull() &&
@@ -330,15 +330,12 @@ void FastAccelStepper::fill_queue() {
     uint32_t runtime_us = micros();
 #endif
     int8_t res = AQE_OK;
-    uint8_t next_state = _rg.getNextCommand(&q->queue_end, &cmd);
-    if (cmd.ticks != 0) {
-      res = addQueueEntry(&cmd);
-      if (res == AQE_OK) {
-        _rg.commandEnqueued(&cmd, next_state);
-        _rg.setState(next_state);
-      }
-    } else {
-      _rg.setState(RAMP_STATE_IDLE);
+    _rg.getNextCommand(&q->queue_end, &cmd);
+    if (cmd.command.ticks != 0) {
+      res = addQueueEntry(&cmd.command);
+    }
+    if (res == AQE_OK) {
+      _rg.afterCommandEnqueued(&cmd);
     }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
@@ -346,7 +343,7 @@ void FastAccelStepper::fill_queue() {
     runtime_us = micros() - runtime_us;
     max_micros = max(max_micros, runtime_us);
 #endif
-    if (cmd.ticks == 0) {
+    if (cmd.command.ticks == 0) {
       break;
     }
     if (res != AQE_OK) {
@@ -354,6 +351,9 @@ void FastAccelStepper::fill_queue() {
         // try later again
         break;
       } else {
+#ifdef TEST
+		printf("ERROR: Abort ramp due to queue error (%d)\n", res);
+#endif
         _rg.stopRamp();
       }
     }

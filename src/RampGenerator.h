@@ -50,19 +50,27 @@ struct ramp_ro_s {
   bool force_stop;
   bool keep_running;
   bool keep_running_count_up;
-  uint8_t ramp_state;
 };
 
 struct ramp_rw_s {
-  // the speed is linked on both ramp slopes to this variable as per
-  //       s = v²/2a   =>   v = sqrt(2*a*s)
-  uint32_t performed_ramp_up_steps;
+  uint8_t ramp_state;
   // if accel_change_cnt does not match config.accel_change_cnt, then
   // performed_ramp_up_steps to be recalculated
   uint8_t accel_change_cnt;
+  // the speed is linked on both ramp slopes to this variable as per
+  //       s = v²/2a   =>   v = sqrt(2*a*s)
+  uint32_t performed_ramp_up_steps;
   // Are the ticks stored of the last previous step, if pulse time requires
   // more than one command
   uint32_t pause_ticks_left;
+  // Current ticks for ongoing step
+  uint32_t curr_ticks;
+};
+
+class NextCommand {
+ public:
+  struct stepper_command_s command;
+  struct ramp_rw_s rw;
 };
 
 class RampGenerator {
@@ -80,7 +88,7 @@ class RampGenerator {
   uint32_t speed_in_us;
   inline uint8_t rampState() {
     // reading one byte is atomic
-    return _ro.ramp_state;
+    return _rw.ramp_state;
   }
   void init();
   inline int32_t targetPosition() { return _ro.target_pos; }
@@ -99,14 +107,13 @@ class RampGenerator {
   inline void initiate_stop() { _ro.force_stop = true; }
   inline bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
   bool isRampGeneratorActive();
-  inline void setState(uint8_t state) { _ro.ramp_state = state; }
 
   void stopRamp();
   inline void setKeepRunning() { _ro.keep_running = true; }
   inline bool isRunningContinuously() { return _ro.keep_running; }
-  uint8_t getNextCommand(const struct queue_end_s *queue_end,
-                         struct stepper_command_s *command);
-  void commandEnqueued(struct stepper_command_s *command, uint8_t state);
+  void getNextCommand(const struct queue_end_s *queue_end,
+                      NextCommand *cmd_out);
+  void afterCommandEnqueued(NextCommand *cmd_in);
 
  private:
   int8_t _startMove(int32_t target_pos, const struct queue_end_s *queue_end);
