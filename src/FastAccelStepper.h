@@ -134,8 +134,9 @@ class FastAccelStepper {
   //      setSpeed(200000);
   //
   // New value will be used after call to
-  // move/moveTo/stopMove/applySpeedAcceleration
-  //
+  // move/moveTo/runForward/runBackward/applySpeedAcceleration
+  // 
+  // note: no update on stopMove()
   void setSpeed(uint32_t min_step_us);
 
   //  set Acceleration expects as parameter the change of speed

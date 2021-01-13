@@ -28,3 +28,6 @@ Tests;
 
 - test_09
   simple test case for V30 A1000000 R53 W R53
+
+- test_10
+  test case for V30 a17164 w2000 a-1000

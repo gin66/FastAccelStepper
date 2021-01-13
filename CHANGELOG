@@ -11,6 +11,9 @@ pre-0.17.2:
 - RampGenerator: Support coasting at lower speed for a couple of steps
   to limit interrupt rate for esp32 (or even rejected commands)
 - More tests
+- esp32: forceStopAndNewPosition() has not emptied the queue
+- fixed: In reversing at max speed an abrupt stop could be initiated
+- update FastAccelStepper.h: stopMove() does not make new acceleration value valid
 
 0.17.1:
 - esp32: Fixed one/two spurious step pulses after reset mainly (issue #29)

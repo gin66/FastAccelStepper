@@ -114,6 +114,8 @@ int8_t RampGenerator::_startMove(int32_t target_pos,
   noInterrupts();
   if (_rw.ramp_state == RAMP_STATE_IDLE) {
     _rw.ramp_state = RAMP_STATE_ACCELERATE;
+    _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+    _rw.performed_ramp_up_steps = 0;
   }
   _ro = new_ramp;
   interrupts();
@@ -304,7 +306,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 #ifdef TEST
   printf(
       "pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d "
-      "queue_end.ticks=%u travel_ticks=%u ",
+      "last_ticks=%u travel_ticks=%u ",
       queue_end->pos, remaining_steps, performed_ramp_up_steps, planning_steps,
       rw->curr_ticks, ramp->config.min_travel_ticks);
   if (count_up) {
@@ -434,10 +436,10 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 
       // if acceleration is very high, then d_ticks_new can be lower than
       // min_travel_ticks in this case can immediately reverse
-      if (d_ticks_new < ramp->config.min_travel_ticks) {
-        count_up = need_count_up;
-        d_ticks_new = ramp->config.min_travel_ticks;
-      }
+      //if (d_ticks_new < ramp->config.min_travel_ticks) {
+      //  count_up = need_count_up;
+      //  d_ticks_new = ramp->config.min_travel_ticks;
+      //}
 
       next_ticks = d_ticks_new;
 
@@ -542,7 +544,12 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 
   return _getNextCommand(&ramp, &_rw, queue_end, command);
 }
-void RampGenerator::stopRamp() { _rw.ramp_state = RAMP_STATE_IDLE; }
+void RampGenerator::stopRamp() {
+  // Should be safe on avr and on esp32 due to task prio
+  _rw.ramp_state = RAMP_STATE_IDLE;
+  _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+  _rw.performed_ramp_up_steps = 0;
+}
 bool RampGenerator::isRampGeneratorActive() {
   return (_rw.ramp_state != RAMP_STATE_IDLE);
 }

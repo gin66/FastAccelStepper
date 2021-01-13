@@ -94,6 +94,6 @@ void test_ramp(uint32_t steps) {
 }
 int main() {
   test_ramp(53);
-  printf("TEST_08 PASSED\n");
+  printf("TEST_09 PASSED\n");
   return 0;
 }
