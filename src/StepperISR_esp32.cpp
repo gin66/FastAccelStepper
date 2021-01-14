@@ -8,7 +8,7 @@
 // cannot be updated while timer is running => fix it to 0
 #define TIMER_PRESCALER 0
 
-#define TEST_PROBE 18
+//#define TEST_PROBE 18
 
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
