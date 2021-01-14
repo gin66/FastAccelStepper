@@ -1,3 +1,7 @@
+0.18.1:
+- moveByAcceleration() returns int8_t result code
+- setDelayToEnable() returns an int8_t instead of int
+
 0.18.0:
 - StepperDemo extended:
 	- w<ms>: Option to wait in input processing for some ms

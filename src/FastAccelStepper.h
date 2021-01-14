@@ -86,7 +86,7 @@ class FastAccelStepper {
   // interrupt/task with 4 or 10 ms repetition rate and as such is with several
   // ms jitter.
   void setAutoEnable(bool auto_enable);
-  int setDelayToEnable(uint32_t delay_us);
+  int8_t setDelayToEnable(uint32_t delay_us);
   void setDelayToDisable(uint16_t delay_ms);
 #define DELAY_OK 0
 #define DELAY_TOO_LOW -1
@@ -120,7 +120,7 @@ class FastAccelStepper {
   //      setSpeed(200000);
   //
   // New value will be used after call to
-  // move/moveTo/runForward/runBackward/applySpeedAcceleration
+  // move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
   //
   // note: no update on stopMove()
   void setSpeed(uint32_t min_step_us);
@@ -164,6 +164,7 @@ class FastAccelStepper {
 
   // This command just let the motor run continuously in one direction.
   // If the motor is running in the opposite direction, it will reverse
+  // return value as with move/moveTo
   int8_t runForward() { return _rg.startRun(true); }
   int8_t runBackward() { return _rg.startRun(false); }
 
@@ -184,7 +185,8 @@ class FastAccelStepper {
   //	acceleration < 0
   //		=> accelerate towards negative maximum speed if allow_reverse
   //		=> decelerate towards motor stop if allow_reverse = false
-  void moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
+  // return value as with move/moveTo
+  int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
 
   // stop the running stepper as fast as possible with deceleration
   // This only sets a flag and can be called from an interrupt !

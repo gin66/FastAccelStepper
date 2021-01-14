@@ -476,7 +476,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
     _off_delay_count = 1;
   }
 }
-int FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
+int8_t FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = US_TO_TICKS(delay_us);
   if (delay_ticks > 0) {
     if (delay_ticks < MIN_CMD_TICKS) {
@@ -523,15 +523,16 @@ void FastAccelStepper::stopMove() { _rg.initiate_stop(); }
 void FastAccelStepper::applySpeedAcceleration() {
   _rg.applySpeedAcceleration();
 }
-void FastAccelStepper::moveByAcceleration(int32_t acceleration,
+int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
                                           bool allow_reverse) {
+  int8_t res = MOVE_OK;
   if (acceleration > 0) {
     setAcceleration(acceleration);
-    runForward();
+    res = runForward();
   } else if (acceleration < 0) {
     setAcceleration(-acceleration);
     if (allow_reverse) {
-      runBackward();
+      res = runBackward();
     } else {
       stopMove();
     }
@@ -542,6 +543,7 @@ void FastAccelStepper::moveByAcceleration(int32_t acceleration,
     applySpeedAcceleration();
     setSpeed(max_speed);
   }
+  return res;
 }
 void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];

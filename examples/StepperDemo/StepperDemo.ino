@@ -694,7 +694,9 @@ void loop() {
           } else if (sscanf(out_buffer, "a%ld", &val) == 1) {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
-            stepper_selected->moveByAcceleration(val);
+            int res = stepper_selected->moveByAcceleration(val);
+            output_msg(MSG_RETURN_CODE);
+            Serial.println(res);
           } else if (sscanf(out_buffer, "R%ld", &val) == 1) {
             output_msg(MSG_MOVE_STEPS);
             Serial.println(val);
