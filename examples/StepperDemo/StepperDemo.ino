@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-ca7ac52"
+#define VERSION "post-b68ad40"
 
 struct stepper_config_s {
   uint8_t step;
@@ -474,15 +474,6 @@ void info(FastAccelStepper *s) {
     } else {
       Serial.print(" MANU");
     }
-#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-    Serial.print(" max/us=");
-    Serial.print(s->max_micros);
-#endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    Serial.print(" checksum=");
-    Serial.print(s->checksum());
-#endif
-  } else {
     Serial.print("@");
     Serial.print(s->getPositionAfterCommandsCompleted());
   }

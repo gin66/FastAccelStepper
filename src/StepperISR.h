@@ -63,6 +63,7 @@ struct mapping_s {
   uint8_t input_sig_index;
   uint32_t cmpr_tea_int_clr;
   uint32_t cmpr_tea_int_ena;
+  uint32_t cmpr_tea_int_raw;
 };
 #endif
 
@@ -80,7 +81,6 @@ class StepperQueue {
   bool dirHighCountsUp;
 #if defined(ARDUINO_ARCH_ESP32)
   volatile bool _hasISRactive;
-  volatile bool _wasNotRunning;
   bool isRunning();
   const struct mapping_s* mapping;
 #elif defined(ARDUINO_ARCH_AVR)
@@ -221,7 +221,6 @@ class StepperQueue {
     _prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
-    _wasNotRunning = true;
 #else
     _isRunning = false;
 #endif

@@ -8,6 +8,8 @@
 // cannot be updated while timer is running => fix it to 0
 #define TIMER_PRESCALER 0
 
+//#define TEST_PROBE 18
+
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
@@ -20,7 +22,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pcnt_unit : PCNT_UNIT_0,
       input_sig_index : PCNT_SIG_CH0_IN0_IDX,
       cmpr_tea_int_clr : MCPWM_OP0_TEA_INT_CLR,
-      cmpr_tea_int_ena : MCPWM_OP0_TEA_INT_ENA
+      cmpr_tea_int_ena : MCPWM_OP0_TEA_INT_ENA,
+      cmpr_tea_int_raw : MCPWM_OP0_TEA_INT_RAW
     },
     {
       mcpwm_unit : MCPWM_UNIT_0,
@@ -29,7 +32,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pcnt_unit : PCNT_UNIT_1,
       input_sig_index : PCNT_SIG_CH0_IN1_IDX,
       cmpr_tea_int_clr : MCPWM_OP1_TEA_INT_CLR,
-      cmpr_tea_int_ena : MCPWM_OP1_TEA_INT_ENA
+      cmpr_tea_int_ena : MCPWM_OP1_TEA_INT_ENA,
+      cmpr_tea_int_raw : MCPWM_OP1_TEA_INT_RAW
     },
     {
       mcpwm_unit : MCPWM_UNIT_0,
@@ -38,7 +42,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pcnt_unit : PCNT_UNIT_2,
       input_sig_index : PCNT_SIG_CH0_IN2_IDX,
       cmpr_tea_int_clr : MCPWM_OP2_TEA_INT_CLR,
-      cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA
+      cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA,
+      cmpr_tea_int_raw : MCPWM_OP2_TEA_INT_RAW
     },
     {
       mcpwm_unit : MCPWM_UNIT_1,
@@ -47,7 +52,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pcnt_unit : PCNT_UNIT_3,
       input_sig_index : PCNT_SIG_CH0_IN3_IDX,
       cmpr_tea_int_clr : MCPWM_OP0_TEA_INT_CLR,
-      cmpr_tea_int_ena : MCPWM_OP0_TEA_INT_ENA
+      cmpr_tea_int_ena : MCPWM_OP0_TEA_INT_ENA,
+      cmpr_tea_int_raw : MCPWM_OP0_TEA_INT_RAW
     },
     {
       mcpwm_unit : MCPWM_UNIT_1,
@@ -56,7 +62,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pcnt_unit : PCNT_UNIT_4,
       input_sig_index : PCNT_SIG_CH0_IN4_IDX,
       cmpr_tea_int_clr : MCPWM_OP1_TEA_INT_CLR,
-      cmpr_tea_int_ena : MCPWM_OP1_TEA_INT_ENA
+      cmpr_tea_int_ena : MCPWM_OP1_TEA_INT_ENA,
+      cmpr_tea_int_raw : MCPWM_OP1_TEA_INT_RAW
     },
     {
       mcpwm_unit : MCPWM_UNIT_1,
@@ -65,7 +72,8 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
       pcnt_unit : PCNT_UNIT_5,
       input_sig_index : PCNT_SIG_CH0_IN5_IDX,
       cmpr_tea_int_clr : MCPWM_OP2_TEA_INT_CLR,
-      cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA
+      cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA,
+      cmpr_tea_int_raw : MCPWM_OP2_TEA_INT_RAW
     },
 };
 
@@ -86,58 +94,78 @@ void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
   // prepare update method for next invocation
   mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
   if (steps == 0) {
-    // is updated only on zero for next cycle
-    // any value should do, as this should not be used
-    PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
     // timer value = 1 - upcounting: output low
     mcpwm->channel[timer].generator[0].utea = 1;
     mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
-    if (queue->_wasNotRunning) {
-      // coming from a stopped queue
-      if (steps == 1) {
-        // steps = 1 will still output two pulses below
-        // => treat this as special case
-        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 1;
-        pcnt_counter_clear(pcnt_unit);
-
-        // timer value = 1 - upcounting: output low
-        mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
-        mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
-      } else {
-        // coming from a stopped queue, need to force new value taken over
-        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
-        pcnt_counter_clear(pcnt_unit);
-
-        // ensure zero event for pcnt to take over new value for h limit
-        pcnt_counter_clear(pcnt_unit);
-        mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
-      }
-    } else {
-      // is updated only on zero for next cycle
-      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = steps;
-      mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
+    // For fast pulses, eventually the ISR is late. So take the current pulse
+    // count into consideration.
+    //
+    // Automatic update for next pulse cnt on pulse counter zero does not work.
+    // For example the sequence:
+    //		5 pulses
+    //		1 pause		==> here would need to know, that 3 has to be
+    // stored 		3 pulses
+    //
+    // Read counter
+    uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
+    // Clear flag for l-->h transition
+    mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
+    // Read counter again
+    uint16_t val2 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
+    // If no pulse arrives between val1 and val2:
+    //		val2 == val1
+    // If pulse arrives between val1 and int_clr:
+    //		mcpwm status is cleared and val2 == val1+1
+    // If pulse arrives between int_clr and val2:
+    //		mcpwm status is set and val2 == val1+1
+    // => mcwpm status info is not reliable, so clear again
+    if (val1 != val2) {
+      // Clear flag again. No pulse can be expected between val2 and here
+      mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
     }
+
+    // is updated only on zero
+    PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2;
+    // force take over
+    pcnt_counter_clear(pcnt_unit);
+    // Check, if pulse has come in
+    if ((mcpwm->int_raw.val & mapping->cmpr_tea_int_raw) != 0) {
+      // Need to adjust one down
+      // Here the border case = 1 is ignored, because the command rate is
+      // limited
+      //
+      // Check if the pulse has been counted or not
+      if (PCNT.cnt_unit[pcnt_unit].cnt_val == val2) {
+        // pulse hasn't been counted, so adjust the limit
+        // is updated only on zero
+        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2 - 1;
+        // force take over
+        pcnt_counter_clear(pcnt_unit);
+      }
+    }
+    // disable mcpwm interrupt
+    mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
     // timer value = 1 - upcounting: output high
     mcpwm->channel[timer].generator[0].utea = 2;
   }
-  queue->_wasNotRunning = false;
 }
 
 static void IRAM_ATTR init_stop(StepperQueue *q) {
+  // init stop is normally called after the first command,
+  // because the second command is entered too late
+  // and after the last command aka running out of commands.
   const struct mapping_s *mapping = q->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
   mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
   // timer value = 1 - upcounting: output low
-  mcpwm->channel[timer].generator[0].utea = 1;
   mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
-  PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
+  // PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
   q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
   q->_hasISRactive = false;
-  q->_wasNotRunning = true;
 }
 
 static void IRAM_ATTR what_is_next(StepperQueue *q) {
@@ -153,6 +181,9 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
 }
 
 static void IRAM_ATTR pcnt_isr_service(void *arg) {
+#ifdef TEST_PROBE
+  digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
+#endif
   StepperQueue *q = (StepperQueue *)arg;
   what_is_next(q);
 }
@@ -160,12 +191,15 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 // MCPWM_SERVICE is only used in case of pause
 #define MCPWM_SERVICE(mcpwm, TIMER, pcnt)            \
   if (mcpwm.int_st.cmpr##TIMER##_tea_int_st != 0) {  \
+    /*managed in next_command()                   */ \
     /*mcpwm.int_clr.cmpr##TIMER##_tea_int_clr = 1;*/ \
     StepperQueue *q = &fas_queue[pcnt];              \
     what_is_next(q);                                 \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
+  // For whatever reason, this interrupt is constantly called even with int_st =
+  // 0 while the timer is running
   MCPWM_SERVICE(MCPWM0, 0, 0);
   MCPWM_SERVICE(MCPWM0, 1, 1);
   MCPWM_SERVICE(MCPWM0, 2, 2);
@@ -177,6 +211,10 @@ static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
 }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+#ifdef TEST_PROBE
+  pinMode(TEST_PROBE, OUTPUT);
+#endif
+
   _initVars();
   _step_pin = step_pin;
 
@@ -321,7 +359,6 @@ void StepperQueue::commandAddedToQueue() {
     return;
   }
 
-  _wasNotRunning = true;
   _hasISRactive = true;
 
   // my interrupt cannot be called in this state, so modifying read_idx without

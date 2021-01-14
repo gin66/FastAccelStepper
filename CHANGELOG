@@ -1,4 +1,4 @@
-pre-0.17.2:
+pre-0.18.0:
 - StepperDemo extended:
 	- w<ms>: Option to wait in input processing for some ms
 	- test sequence 07 added, which fails on esp32
@@ -6,7 +6,7 @@ pre-0.17.2:
     - tests can return failure, which is displayed at test end
 - Rework RampGenerator: pauses are now after the step and not before. This removes
   some irregularity between steps.
-- Rework esp32 interrupt code. Works, but the PCNT module is hard to control
+- Rework esp32 interrupt code.
 - Fix issue #29 and a slow start of a ramp (identified by #29)
 - RampGenerator: Support coasting at lower speed for a couple of steps
   to limit interrupt rate for esp32 (or even rejected commands)
@@ -14,6 +14,7 @@ pre-0.17.2:
 - esp32: forceStopAndNewPosition() has not emptied the queue
 - fixed: In reversing at max speed an abrupt stop could be initiated
 - update FastAccelStepper.h: stopMove() does not make new acceleration value valid
+- protect non application fields, which are for test purposes
 
 0.17.1:
 - esp32: Fixed one/two spurious step pulses after reset mainly (issue #29)

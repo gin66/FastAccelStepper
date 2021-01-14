@@ -206,6 +206,8 @@ This stepper driver uses mcpwm modules of the esp32: for the first three stepper
 
 The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-modification.
 
+A note to MIN_CMD_TICKS: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
+
 ### ALL
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
@@ -245,7 +247,9 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
 * avr: three steppers at high speed does not work due too interrupt load
-* Very high acceleration value e.g. 10.000.000 and high speed may not be executed, if the high speed in us is smaller than MIN_CMD_TICKS. This corresponds to 2500 steps/s for avr and 5000 steps/s.
+* Very high acceleration value e.g. 10.000.000 and high speed may be silently not executed, if the high speed in us is smaller than MIN_CMD_TICKS. This corresponds to 2500 steps/s for avr and 5000 steps/s.
+* StepperDemo test case 07 yields quite a deviation between esp32 and avr timing for identical ramp
+* There is an issue with the esp32 mcpwm: as soon as the mcpwm timer is running on every cycle an interrupt is serviced - even though no interrupt is enabled. If several steppers are running at high step rate, the interrupt load for this nonsense interrupt could be quite high for the CPU. Need further investigation, but till now haven't found the root cause.
 
 
 ## Lessons Learned

@@ -14,19 +14,6 @@
 #include "PoorManFloat.h"
 #include "RampGenerator.h"
 
-#ifndef TEST_MEASURE_ISR_SINGLE_FILL
-#define TEST_MEASURE_ISR_SINGLE_FILL 0
-#endif
-#ifndef TEST_CREATE_QUEUE_CHECKSUM
-#define TEST_CREATE_QUEUE_CHECKSUM 0
-#endif
-
-#if !defined(ARDUINO_ARCH_ESP32) && !defined(ARDUINO_ARCH_AVR)
-#ifndef F_CPU
-#define F_CPU 16000000L
-#endif
-#endif
-
 #if defined(ARDUINO_ARCH_ESP32)
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
 #elif defined(ARDUINO_ARCH_AVR)
@@ -41,7 +28,6 @@
 
 #define MIN_CMD_TICKS (10 * MIN_DELTA_TICKS)
 
-#define MAX_DELTA_TICKS 0xffffffff
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
 
 #define PIN_UNDEFINED 255
@@ -253,23 +239,18 @@ class FastAccelStepper {
   // returns true, if the ramp generation is active
   inline bool isRampGeneratorActive() { return _rg.isRampGeneratorActive(); }
 
-#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-  uint32_t max_micros;
-#endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  uint32_t checksum();
-#endif
+  // This functions allow to detach and reAttach a step pin for other use.
+  // Pretty low level, use with care or not at all
+  void detachFromPin();
+  void reAttachToPin();
 
-  // These should not be called by the application
+ private:
   void fill_queue();
   void updateAutoDisable();
   bool needAutoDisable();
   bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
-  void detachFromPin();
-  void reAttachToPin();
 
- private:
   FastAccelStepperEngine* _engine;
   bool (*_externalEnableCall)(uint8_t enablePin, uint8_t value);
   RampGenerator _rg;
@@ -284,6 +265,16 @@ class FastAccelStepper {
   uint32_t _on_delay_ticks;
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
+
+#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
+  uint32_t max_micros;
+#endif
+#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
+  uint32_t checksum();
+#endif
+
+  friend class FastAccelStepperEngine;
+  friend class FastAccelStepperTest;
 };
 
 class FastAccelStepperEngine {
@@ -294,27 +285,31 @@ class FastAccelStepperEngine {
   // ESP32:
   // The first three steppers use mcpwm0, the next three steppers use mcpwm1
   //
-  // AVR:
+  // Atmega328p:
   // Only the pins connected to OC1A and OC1B are allowed
+  //
+  // Atmega2560:
+  // Only the pins connected to OC4A, OC4B and OC4C are allowed.
   //
   // If no stepper resources available or pin is wrong, then NULL is returned
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 
-  // unstable API functions
-  //
   // If this is called, then the periodic task will let the associated LED
   // blink with 1 Hz
   void setDebugLed(uint8_t ledPin);
 
   // This should be only called from ISR or stepper task
   void manageSteppers();
-  bool isDirPinBusy(uint8_t dirPin, uint8_t except_stepper);
 
  private:
+  bool isDirPinBusy(uint8_t dirPin, uint8_t except_stepper);
+
   uint8_t _next_stepper_num;
   FastAccelStepper* _stepper[MAX_STEPPER];
 
   bool _isValidStepPin(uint8_t step_pin);
+
+  friend class FastAccelStepper;
 };
 
 extern FastAccelStepperEngine* fas_engine;
