@@ -8,7 +8,7 @@
 // cannot be updated while timer is running => fix it to 0
 #define TIMER_PRESCALER 0
 
-//#define TEST_PROBE 18
+#define TEST_PROBE 18
 
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
@@ -77,7 +77,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
     },
 };
 
-void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
+void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -89,10 +89,12 @@ void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
     digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);
   }
   uint16_t ticks = e->ticks;
-  // period value shall be taken over for _next_ period
+  if (mcpwm->timer[timer].status.value <= 1) {
+    mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
+  } else {
+    mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
+  }
   mcpwm->timer[timer].period.period = ticks;
-  // prepare update method for next invocation
-  mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
   if (steps == 0) {
     // timer value = 1 - upcounting: output low
     mcpwm->channel[timer].generator[0].utea = 1;
@@ -105,8 +107,8 @@ void IRAM_ATTR next_command(StepperQueue *queue, const struct queue_entry *e) {
     // Automatic update for next pulse cnt on pulse counter zero does not work.
     // For example the sequence:
     //		5 pulses
-    //		1 pause		==> here would need to know, that 3 has to be
-    // stored 		3 pulses
+    //		1 pause		==> here need to store 3, but not available yet
+    //		3 pulses
     //
     // Read counter
     uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
@@ -172,7 +174,7 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
   uint8_t rp = q->read_idx;
   if (rp != q->next_write_idx) {
     struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
-    next_command(q, e);
+    apply_command(q, e);
     q->read_idx = rp + 1;
   } else {
     // no more commands: stop timer at period end
@@ -181,20 +183,17 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
 }
 
 static void IRAM_ATTR pcnt_isr_service(void *arg) {
-#ifdef TEST_PROBE
-  digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
-#endif
   StepperQueue *q = (StepperQueue *)arg;
   what_is_next(q);
 }
 
 // MCPWM_SERVICE is only used in case of pause
-#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)            \
-  if (mcpwm.int_st.cmpr##TIMER##_tea_int_st != 0) {  \
-    /*managed in next_command()                   */ \
-    /*mcpwm.int_clr.cmpr##TIMER##_tea_int_clr = 1;*/ \
-    StepperQueue *q = &fas_queue[pcnt];              \
-    what_is_next(q);                                 \
+#define MCPWM_SERVICE(mcpwm, TIMER, pcnt)             \
+  if (mcpwm.int_st.cmpr##TIMER##_tea_int_st != 0) {   \
+    /*managed in apply_command()                   */ \
+    /*mcpwm.int_clr.cmpr##TIMER##_tea_int_clr = 1;*/  \
+    StepperQueue *q = &fas_queue[pcnt];               \
+    what_is_next(q);                                  \
   }
 
 static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
@@ -341,6 +340,12 @@ bool StepperQueue::isRunning() {
 }
 
 void StepperQueue::commandAddedToQueue() {
+  {
+#ifdef TEST_PROBE
+    // The time used by this command can have an impact
+    digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
+#endif
+  }
   next_write_idx++;
   if (_hasISRactive) {
     return;
@@ -349,27 +354,9 @@ void StepperQueue::commandAddedToQueue() {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 
-  mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
-  if (mcpwm->timer[timer].status.value > 1) {
-    // Here the timer is running, so let the tae interrupt trigger
-    // next_command() Timer value equals 1, if the timer is stopped.
-    _hasISRactive = true;
-    mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
-    mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
-    return;
-  }
-
   _hasISRactive = true;
-
-  // my interrupt cannot be called in this state, so modifying read_idx without
-  // interrupts disabled is ok
-  mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
   struct queue_entry *e = &entry[read_idx++ & QUEUE_LEN_MASK];
-  next_command(this, e);
-
-  // timer should be either at zero or running towards zero from previous
-  // command. Anyway, set to run continuous
-  mcpwm->timer[timer].mode.mode = 3;   // 3=up/down counting
+  apply_command(this, e);
   mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
 }
 void StepperQueue::forceStop() {

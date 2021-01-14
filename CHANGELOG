@@ -1,4 +1,4 @@
-pre-0.18.0:
+0.18.0:
 - StepperDemo extended:
 	- w<ms>: Option to wait in input processing for some ms
 	- test sequence 07 added, which fails on esp32
