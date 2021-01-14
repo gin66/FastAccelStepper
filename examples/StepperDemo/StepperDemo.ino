@@ -474,6 +474,7 @@ void info(FastAccelStepper *s) {
     } else {
       Serial.print(" MANU");
     }
+  } else {
     Serial.print("@");
     Serial.print(s->getPositionAfterCommandsCompleted());
   }
