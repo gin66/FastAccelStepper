@@ -230,8 +230,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;  // static 0 is 0x30, static 1 is 0x38
   cfg.lctrl_mode = PCNT_MODE_KEEP;
   cfg.hctrl_mode = PCNT_MODE_KEEP;
-  cfg.pos_mode = PCNT_COUNT_INC;
-  cfg.neg_mode = PCNT_COUNT_DIS;
+  cfg.pos_mode = PCNT_COUNT_INC;    // increment on rising edge
+  cfg.neg_mode = PCNT_COUNT_DIS;	// ignore falling edge
   cfg.counter_h_lim = 1;
   cfg.counter_l_lim = 0;
   cfg.unit = pcnt_unit;

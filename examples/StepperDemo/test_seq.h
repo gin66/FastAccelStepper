@@ -24,3 +24,5 @@ bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms);
 bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms);
+bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
+                 uint32_t time_ms);
