@@ -1,3 +1,10 @@
+0.18.2:
+- extend addQueueEntry() with a start flag. This allows to first fill the queue
+  and then start the queue. If several motor are started one after the other
+  (with interrupts disabled), a nearly synchronous start is possible.
+  Which is required for coordinated axis movement
+- make use of this in enqueueing commands from ramp generator
+
 0.18.1:
 - moveByAcceleration() returns int8_t result code
 - setDelayToEnable() returns an int8_t instead of int

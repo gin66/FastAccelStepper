@@ -69,12 +69,14 @@ endif
 
 FIRMWARE=".pio/build/$(DUT)/firmware.elf"
 
+DIR=$(shell /bin/pwd)
+
 test: .tested
 
 .tested:	result.txt expect.txt ../judge.awk
 	echo DUT=$(DUT)
 	rm -f .tested
-	gawk -f ../judge.awk -v PWD=$(PWD) result.txt expect.txt
+	gawk -f ../judge.awk -v DIR=$(DIR) result.txt expect.txt
 	test -f .tested
 
 result.txt: x.vcd

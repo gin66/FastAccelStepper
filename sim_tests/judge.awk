@@ -1,7 +1,7 @@
 BEGIN {
 	ok = 1
 	timing = 0
-	if (PWD ~ /timing/) {
+	if (DIR ~ /timing/) {
 		timing = 1
 	}
 }

@@ -212,58 +212,102 @@ AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, C)
 #define AVR_CYCLIC_ISR_GEN(T) AVR_CYCLIC_ISR(T)
 AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
 
-#define AVR_START_QUEUE(T, CHANNEL)                                          \
-  {                                                                          \
-    /* force compare to ensure zero */                                       \
-    Stepper_Zero(T, CHANNEL);                                                \
-    ForceCompare(T, CHANNEL);                                                \
-    /* enter critical section */                                             \
-    noInterrupts();                                                          \
-    /* ensure no compare event */                                            \
-    SetTimerCompareRelative(T, CHANNEL, 32768);                              \
-    /* set toggle mode, if steps to be generated */                          \
-    uint8_t rp = fas_queue_##CHANNEL.read_idx;                               \
-    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK]; \
-    if (e->steps > 0) {                                                      \
-      Stepper_One(T, CHANNEL);                                               \
-    }                                                                        \
-    if (e->toggle_dir) {                                                     \
-      uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                           \
-      digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);        \
-    }                                                                        \
-    /* clear interrupt flag */                                               \
-    ClearInterruptFlag(T, CHANNEL);                                          \
-    /* enable compare interrupt */                                           \
-    EnableCompareInterrupt(T, CHANNEL);                                      \
-    /* definite start point */                                               \
-    SetTimerCompareRelative(T, CHANNEL, 10);                                 \
-    interrupts();                                                            \
+#define GET_ENTRY_PTR(T, CHANNEL)    \
+  rp = fas_queue_##CHANNEL.read_idx; \
+  e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];
+
+#define PREPARE_DIRECTION_PIN(CHANNEL)                              \
+  if (e->toggle_dir) {                                              \
+    uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                    \
+    digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH); \
   }
 
-void StepperQueue::commandAddedToQueue() {
+#define AVR_START_QUEUE(T, CHANNEL)              \
+  _isRunning = true;                             \
+  _prepareForStop = false;                       \
+  /* ensure no compare event */                  \
+  SetTimerCompareRelative(T, CHANNEL, 32768);    \
+  /* set output one, if steps to be generated */ \
+  if (e->steps > 0) {                            \
+    Stepper_One(T, CHANNEL);                     \
+  }                                              \
+  /* clear interrupt flag */                     \
+  ClearInterruptFlag(T, CHANNEL);                \
+  /* enable compare interrupt */                 \
+  EnableCompareInterrupt(T, CHANNEL);            \
+  /* start */                                    \
+  SetTimerCompareRelative(T, CHANNEL, 10);
+
+void StepperQueue::commandAddedToQueue(bool start) {
+  // Check if this is the first command and advance write pointer
   noInterrupts();
-  next_write_idx++;
+  bool first = (next_write_idx++ == read_idx);
   if (_isRunning) {
     interrupts();
     return;
   }
   interrupts();
 
-  _isRunning = true;
-  _prepareForStop = false;
+  // If it is not the first command in the queue, then just return
+  // Otherwise just prepare, what is possible for start (set direction pin)
+  if (!first & !start) {
+    return;
+  }
+
+  uint8_t rp;
+  struct queue_entry* e;
+
   switch (channel) {
     case channelA:
+      GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
+      PREPARE_DIRECTION_PIN(A)
+      if (start) {
+        AVR_START_QUEUE(FAS_TIMER_MODULE, A)
+      }
+      break;
+    case channelB:
+      GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
+      PREPARE_DIRECTION_PIN(B)
+      if (start) {
+        AVR_START_QUEUE(FAS_TIMER_MODULE, B)
+      }
+      break;
+#ifdef stepPinStepperC
+    case channelC:
+      GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
+      PREPARE_DIRECTION_PIN(C)
+      if (start) {
+        AVR_START_QUEUE(FAS_TIMER_MODULE, C)
+      }
+      break;
+#endif
+  }
+}
+
+int8_t StepperQueue::startPreparedQueue() {
+  if (next_write_idx == read_idx) {
+    return AQE_ERROR_EMPTY_QUEUE_TO_START;
+  }
+
+  uint8_t rp;
+  struct queue_entry* e;
+  switch (channel) {
+    case channelA:
+      GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
       AVR_START_QUEUE(FAS_TIMER_MODULE, A)
       break;
     case channelB:
+      GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
       AVR_START_QUEUE(FAS_TIMER_MODULE, B)
       break;
 #ifdef stepPinStepperC
     case channelC:
+      GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
       AVR_START_QUEUE(FAS_TIMER_MODULE, C)
       break;
 #endif
   }
+  return AQE_OK;
 }
 
 #define FORCE_STOP(T, CHANNEL)               \

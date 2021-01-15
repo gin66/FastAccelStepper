@@ -110,7 +110,13 @@ class StepperQueue {
   inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
   inline bool isQueueEmpty() { return queueEntries() == 0; }
 
-  int addQueueEntry(const struct stepper_command_s* cmd) {
+  int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start) {
+    if (cmd == NULL) {
+      if (start) {
+        return startPreparedQueue();
+      }
+      return AQE_OK;
+    }
     if (isQueueFull()) {
       return AQE_QUEUE_FULL;
     }
@@ -177,8 +183,30 @@ class StepperQueue {
       }
     }
 #endif
-    commandAddedToQueue();
+    commandAddedToQueue(start);
     return AQE_OK;
+  }
+  uint32_t ticksInQueue() {
+    noInterrupts();
+    uint8_t rp = read_idx;
+    uint8_t wp = next_write_idx;
+    interrupts();
+    if (wp == rp) {
+      return 0;
+    }
+	uint32_t ticks = 0;
+    rp++;  // ignore currently processed entry
+    while (wp != rp) {
+      struct queue_entry* e = &entry[rp++ & QUEUE_LEN_MASK];
+	  ticks += e->ticks;
+	  uint8_t steps = e->steps;
+	  if (steps > 1) {
+		  uint32_t tmp = e->ticks;
+		  tmp *= steps - 1;
+		  ticks += tmp;
+	  }
+    }
+    return ticks;
   }
   bool hasTicksInQueue(uint32_t min_ticks) {
     noInterrupts();
@@ -204,7 +232,8 @@ class StepperQueue {
   }
 
   // startQueue is always called
-  void commandAddedToQueue();
+  void commandAddedToQueue(bool start);
+  int8_t startPreparedQueue();
   void forceStop();
   void _initVars() {
     dirPin = PIN_UNDEFINED;

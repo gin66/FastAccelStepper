@@ -226,7 +226,12 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd) {
+int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
+                                       bool start) {
+  StepperQueue* q = &fas_queue[_queue_num];
+  if (cmd == NULL) {
+	  return q->addQueueEntry(NULL, start);
+  }
   if (cmd->ticks < MIN_DELTA_TICKS) {
     return AQE_ERROR_TICKS_TOO_LOW;
   }
@@ -241,7 +246,6 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd) {
     }
   }
 
-  StepperQueue* q = &fas_queue[_queue_num];
   int res = AQE_OK;
   if (_autoEnable) {
     noInterrupts();
@@ -265,7 +269,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd) {
           }
           struct stepper_command_s start_cmd = {
               .ticks = ticks_u16, .steps = 0, .count_up = cmd->count_up};
-          res = q->addQueueEntry(&start_cmd);
+          res = q->addQueueEntry(&start_cmd, start);
           delay -= ticks_u16;
         }
         if (res != AQE_OK) {
@@ -274,7 +278,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd) {
       }
     }
   }
-  res = q->addQueueEntry(cmd);
+  res = q->addQueueEntry(cmd, start);
   if (_autoEnable) {
     if (res == AQE_OK) {
       noInterrupts();
@@ -322,8 +326,11 @@ void FastAccelStepper::fill_queue() {
   NextCommand cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 20 ms. Currently hard coded
+  bool delayed_start = false; //!q->isRunning();
+  bool need_delayed_start  = false;
+  uint32_t ticksPrepared = q->ticksInQueue();
   while (!isQueueFull() &&
-         (!q->hasTicksInQueue(TICKS_PER_S / 50) || q->queueEntries() <= 1) &&
+         ((ticksPrepared < TICKS_PER_S / 50) || q->queueEntries() <= 1) &&
          _rg.isRampGeneratorActive()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
@@ -332,10 +339,14 @@ void FastAccelStepper::fill_queue() {
     int8_t res = AQE_OK;
     _rg.getNextCommand(&q->queue_end, &cmd);
     if (cmd.command.ticks != 0) {
-      res = addQueueEntry(&cmd.command);
+      res = addQueueEntry(&cmd.command,!delayed_start);
     }
     if (res == AQE_OK) {
       _rg.afterCommandEnqueued(&cmd);
+	  need_delayed_start = delayed_start;
+	  uint32_t tmp = cmd.command.ticks;
+	  tmp *= max(cmd.command.steps,1);
+	  ticksPrepared += tmp;
     }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
@@ -351,15 +362,18 @@ void FastAccelStepper::fill_queue() {
         // try later again
         break;
       } else {
-//		  Serial.println("ERROR: Abort ramp due to queue error");
 #ifdef TEST
         printf("ERROR: Abort ramp due to queue error (%d)\n", res);
         printf("steps=%d ticks=%d limit=%ld state=%d\n", cmd.command.steps,
                cmd.command.ticks, MIN_CMD_TICKS, cmd.rw.ramp_state);
 #endif
         _rg.stopRamp();
+		delayed_start = false;
       }
     }
+  }
+  if (need_delayed_start) {
+	  addQueueEntry(NULL, true);
   }
 }
 
@@ -524,7 +538,7 @@ void FastAccelStepper::applySpeedAcceleration() {
   _rg.applySpeedAcceleration();
 }
 int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
-                                          bool allow_reverse) {
+                                            bool allow_reverse) {
   int8_t res = MOVE_OK;
   if (acceleration > 0) {
     setAcceleration(acceleration);

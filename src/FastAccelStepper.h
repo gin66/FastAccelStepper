@@ -199,9 +199,21 @@ class FastAccelStepper {
   // get the target position for the current move
   inline int32_t targetPos() { return _rg.targetPosition(); }
 
-  // Low level acccess via command queue
   // stepper queue management (low level access)
-  int8_t addQueueEntry(const struct stepper_command_s* cmd);
+  //
+  // If the queue is already running, then the start parameter is obsolote.
+  // But the queue may run out of commands while executing addQueueEntry,
+  // so it is better to set start=true to automatically restart/continue
+  // a running queue.
+  //
+  // If the queue is not running, then the start parameter defines starting it
+  // or not. The latter case is of interest to first fill the queue and then
+  // start it.
+  //
+  // The call addQueueEntry(NULL, true) just starts the queue. This is intended
+  // to achieve a near synchronous start of several steppers. Consequently it
+  // should be called with interrupts disabled and return very fast.
+  int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start = true);
 
   // Return codes for addQueueEntry
   //    positive values mean, that caller should retry later
@@ -210,6 +222,7 @@ class FastAccelStepper {
 #define AQE_DIR_PIN_IS_BUSY 2
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
 #define AQE_ERROR_TICKS_TOO_LOW -1
+#define AQE_ERROR_EMPTY_QUEUE_TO_START -2
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();
