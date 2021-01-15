@@ -230,7 +230,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
                                        bool start) {
   StepperQueue* q = &fas_queue[_queue_num];
   if (cmd == NULL) {
-	  return q->addQueueEntry(NULL, start);
+    return q->addQueueEntry(NULL, start);
   }
   if (cmd->ticks < MIN_DELTA_TICKS) {
     return AQE_ERROR_TICKS_TOO_LOW;
@@ -326,8 +326,8 @@ void FastAccelStepper::fill_queue() {
   NextCommand cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 20 ms. Currently hard coded
-  bool delayed_start = false; //!q->isRunning();
-  bool need_delayed_start  = false;
+  bool delayed_start = false;  //! q->isRunning();
+  bool need_delayed_start = false;
   uint32_t ticksPrepared = q->ticksInQueue();
   while (!isQueueFull() &&
          ((ticksPrepared < TICKS_PER_S / 50) || q->queueEntries() <= 1) &&
@@ -339,14 +339,14 @@ void FastAccelStepper::fill_queue() {
     int8_t res = AQE_OK;
     _rg.getNextCommand(&q->queue_end, &cmd);
     if (cmd.command.ticks != 0) {
-      res = addQueueEntry(&cmd.command,!delayed_start);
+      res = addQueueEntry(&cmd.command, !delayed_start);
     }
     if (res == AQE_OK) {
       _rg.afterCommandEnqueued(&cmd);
-	  need_delayed_start = delayed_start;
-	  uint32_t tmp = cmd.command.ticks;
-	  tmp *= max(cmd.command.steps,1);
-	  ticksPrepared += tmp;
+      need_delayed_start = delayed_start;
+      uint32_t tmp = cmd.command.ticks;
+      tmp *= max(cmd.command.steps, 1);
+      ticksPrepared += tmp;
     }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
@@ -368,12 +368,12 @@ void FastAccelStepper::fill_queue() {
                cmd.command.ticks, MIN_CMD_TICKS, cmd.rw.ramp_state);
 #endif
         _rg.stopRamp();
-		delayed_start = false;
+        delayed_start = false;
       }
     }
   }
   if (need_delayed_start) {
-	  addQueueEntry(NULL, true);
+    addQueueEntry(NULL, true);
   }
 }
 
@@ -698,6 +698,20 @@ void FastAccelStepper::backwardStep(bool blocking) {
 }
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
+#if defined(ARDUINO_ARCH_ESP32)
+void FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit) {
+  if (pcnt_unit < 8) {
+    _esp32_attachToPulseCounter(pcnt_unit, this);
+  }
+}
+uint16_t FastAccelStepper::readPulseCounter() {
+  if (_attached_pulse_cnt_unit >= 0) {
+    return _esp32_readPulseCounter(_attached_pulse_cnt_unit);
+  }
+  return 0;
+}
+#endif
+
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
 uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }
 #endif

@@ -230,8 +230,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;  // static 0 is 0x30, static 1 is 0x38
   cfg.lctrl_mode = PCNT_MODE_KEEP;
   cfg.hctrl_mode = PCNT_MODE_KEEP;
-  cfg.pos_mode = PCNT_COUNT_INC;    // increment on rising edge
-  cfg.neg_mode = PCNT_COUNT_DIS;	// ignore falling edge
+  cfg.pos_mode = PCNT_COUNT_INC;  // increment on rising edge
+  cfg.neg_mode = PCNT_COUNT_DIS;  // ignore falling edge
   cfg.counter_h_lim = 1;
   cfg.counter_l_lim = 0;
   cfg.unit = pcnt_unit;
@@ -386,4 +386,47 @@ void StepperQueue::forceStop() {
 }
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
+
+void _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
+  pcnt_config_t cfg;
+  uint8_t dir_pin = stepper->getDirectionPin();
+  cfg.pulse_gpio_num = stepper->getStepPin();
+  if (dir_pin == PIN_UNDEFINED) {
+    cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
+  } else {
+    cfg.ctrl_gpio_num = dir_pin;
+  }
+  if (stepper->directionPinHighCountsUp()) {
+    cfg.lctrl_mode = PCNT_MODE_REVERSE;
+    cfg.hctrl_mode = PCNT_MODE_KEEP;
+  } else {
+    cfg.lctrl_mode = PCNT_MODE_KEEP;
+    cfg.hctrl_mode = PCNT_MODE_REVERSE;
+  }
+  cfg.pos_mode = PCNT_COUNT_INC;  // increment on rising edge
+  cfg.neg_mode = PCNT_COUNT_DIS;  // ignore falling edge
+  cfg.counter_h_lim = 16384;
+  cfg.counter_l_lim = -16384;
+  cfg.unit = (pcnt_unit_t)pcnt_unit;
+  cfg.channel = PCNT_CHANNEL_0;
+  pcnt_unit_config(&cfg);
+
+  PCNT.conf_unit[cfg.unit].conf0.thr_h_lim_en = 0;
+  PCNT.conf_unit[cfg.unit].conf0.thr_l_lim_en = 0;
+
+  pcnt_counter_clear(cfg.unit);
+  pcnt_counter_resume(cfg.unit);
+
+  stepper->detachFromPin();
+  stepper->reAttachToPin();
+  gpio_iomux_in(stepper->getStepPin(), PCNT_SIG_CH0_IN7_IDX);
+  if (dir_pin != PIN_UNDEFINED) {
+    gpio_matrix_out(stepper->getDirectionPin(), 0x100, false, false);
+    gpio_iomux_in(stepper->getDirectionPin(), PCNT_CTRL_CH0_IN7_IDX);
+    pinMode(stepper->getDirectionPin(), OUTPUT);
+  }
+}
+int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
+  return PCNT.cnt_unit[pcnt_unit].cnt_val;
+}
 #endif

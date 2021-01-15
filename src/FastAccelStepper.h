@@ -45,6 +45,7 @@ class FastAccelStepper {
   // if direction pin is connected, call this function
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true);
   uint8_t getDirectionPin() { return _dirPin; }
+  bool directionPinHighCountsUp() { return _dirHighCountsUp; }
 
   // if enable pin is connected, then use this function.
   //
@@ -254,10 +255,15 @@ class FastAccelStepper {
   // returns true, if the ramp generation is active
   inline bool isRampGeneratorActive() { return _rg.isRampGeneratorActive(); }
 
-  // This functions allow to detach and reAttach a step pin for other use.
+  // These functions allow to detach and reAttach a step pin for other use.
   // Pretty low level, use with care or not at all
   void detachFromPin();
   void reAttachToPin();
+
+#if defined(ARDUINO_ARCH_ESP32)
+  void attachToPulseCounter(uint8_t pcnt_unit);
+  uint16_t readPulseCounter();
+#endif
 
  private:
   void fill_queue();
@@ -281,6 +287,9 @@ class FastAccelStepper {
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
 
+#if defined(ARDUINO_ARCH_ESP32)
+  int16_t _attached_pulse_cnt_unit;
+#endif
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
 #endif

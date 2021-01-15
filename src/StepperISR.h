@@ -65,6 +65,9 @@ struct mapping_s {
   uint32_t cmpr_tea_int_ena;
   uint32_t cmpr_tea_int_raw;
 };
+
+void _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper);
+int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
 #endif
 
 struct queue_entry {
@@ -194,17 +197,17 @@ class StepperQueue {
     if (wp == rp) {
       return 0;
     }
-	uint32_t ticks = 0;
+    uint32_t ticks = 0;
     rp++;  // ignore currently processed entry
     while (wp != rp) {
       struct queue_entry* e = &entry[rp++ & QUEUE_LEN_MASK];
-	  ticks += e->ticks;
-	  uint8_t steps = e->steps;
-	  if (steps > 1) {
-		  uint32_t tmp = e->ticks;
-		  tmp *= steps - 1;
-		  ticks += tmp;
-	  }
+      ticks += e->ticks;
+      uint8_t steps = e->steps;
+      if (steps > 1) {
+        uint32_t tmp = e->ticks;
+        tmp *= steps - 1;
+        ticks += tmp;
+      }
     }
     return ticks;
   }
