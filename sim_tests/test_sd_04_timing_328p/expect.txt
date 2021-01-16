@@ -3,7 +3,7 @@
  EnableA:        1*L->H,        1*H->L
  EnableB:        1*L->H,        1*H->L
    StepA:     1000*L->H,     1000*H->L, Max High=16us
-   StepB:     1000*L->H,     1000*H->L, Max High=16us
+   StepB:     1000*L->H,     1000*H->L, Max High=20us
 Position[A]=1000
 
 Position[B]=1000
@@ -16,7 +16,7 @@ Max_time in FillISR=3524 us
 
 Max_time in StepA=16 us
 
-Max_time in StepB=16 us
+Max_time in StepB=20 us
 
 Max_time in StepISR=8 us
 
