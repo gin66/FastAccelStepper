@@ -705,13 +705,13 @@ void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
 bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit) {
   if (pcnt_unit < 8) {
     if (_esp32_attachToPulseCounter(pcnt_unit, this)) {
-		_attached_pulse_cnt_unit = pcnt_unit;
-		return true;
-	}
+      _attached_pulse_cnt_unit = pcnt_unit;
+      return true;
+    }
   }
   return false;
 }
-uint16_t FastAccelStepper::readPulseCounter() {
+int16_t FastAccelStepper::readPulseCounter() {
   if (_attached_pulse_cnt_unit >= 0) {
     return _esp32_readPulseCounter(_attached_pulse_cnt_unit);
   }

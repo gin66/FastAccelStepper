@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-d6679bd"
+#define VERSION "post-c651c61"
 
 struct stepper_config_s {
   uint8_t step;
@@ -264,7 +264,12 @@ const static char messages[] PROGMEM =
 #define MSG_CANNOT_SET_DIRECTION_PIN 37
     "Cannot set direction pin to |"
 #define MSG_STEPPER_VERSION 38
-    "StepperDemo Version " VERSION "\n|";
+    "StepperDemo Version " VERSION
+    "\n|"
+#define MSG_ATTACH_PULSE_COUNTER 39
+    "Attach pulse counter |"
+#define MSG_ERROR_ATTACH_PULSE_COUNTER 40
+    "ERROR attaching pulse counter\n|";
 
 void output_msg(int8_t i) {
   char ch;
@@ -434,9 +439,16 @@ uint32_t pause_ms = 0;
 uint32_t pause_start = 0;
 
 void info(FastAccelStepper *s) {
+  Serial.print('@');
+  Serial.print(s->getCurrentPosition());
+#if defined(ARDUINO_ARCH_ESP32)
+  if (s->pulseCounterAttached()) {
+    Serial.print(" [");
+    Serial.print(s->readPulseCounter());
+    Serial.print(']');
+  }
+#endif
   if (s->isRunning()) {
-    Serial.print("@");
-    Serial.print(s->getCurrentPosition());
     if (s->isRunningContinuously()) {
       Serial.print(" nonstop");
     } else {
@@ -445,7 +457,7 @@ void info(FastAccelStepper *s) {
     }
     Serial.print(" QueueEnd=");
     Serial.print(s->getPositionAfterCommandsCompleted());
-    Serial.print("/");
+    Serial.print('/');
     Serial.print(s->getPeriodAfterCommandsCompleted());
     Serial.print("us");
     if (s->isRampGeneratorActive()) {
@@ -474,11 +486,8 @@ void info(FastAccelStepper *s) {
     } else {
       Serial.print(" MANU");
     }
-  } else {
-    Serial.print("@");
-    Serial.print(s->getPositionAfterCommandsCompleted());
   }
-  Serial.print(" ");
+  Serial.print(' ');
 }
 
 const static char usage_str[] PROGMEM =
@@ -516,6 +525,7 @@ const static char usage_str[] PROGMEM =
     "     T         ... Test selected motor with direct port access\n"
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
+    "     p<n>      ... Attach pulse counter n<=7\n"
 #endif
     "     t         ... Enter test mode\n"
     "     Q         ... Toggle print usage on motor stop\n"
@@ -547,7 +557,7 @@ void stepper_info() {
       } else {
         Serial.print("   ");
       }
-      Serial.print("M");
+      Serial.print('M');
       Serial.print(i + 1);
       Serial.print(": ");
       info(stepper[i]);
@@ -585,7 +595,7 @@ void usage() {
 void output_info() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (stepper[i]) {
-      Serial.print("M");
+      Serial.print('M');
       Serial.print(i + 1);
       Serial.print(": ");
       info(stepper[i]);
@@ -793,6 +803,15 @@ void loop() {
               output_msg(MSG_STEPPED_BACKWARD);
             }
           }
+#if defined(ARDUINO_ARCH_ESP32)
+          else if (sscanf(out_buffer, "p%lu", &val) == 1) {
+            output_msg(MSG_ATTACH_PULSE_COUNTER);
+            Serial.println(val);
+            if (!stepper_selected->attachToPulseCounter(val)) {
+               output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
+		    }
+          }
+#endif
         } else {
           if (strcmp(out_buffer, "x") == 0) {
             output_msg(MSG_EXIT_TO_MAIN_MENU);

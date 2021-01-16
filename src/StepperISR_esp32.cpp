@@ -387,27 +387,14 @@ void StepperQueue::forceStop() {
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 
-
-uint32_t sig_idx[8] = {
-	PCNT_SIG_CH0_IN0_IDX,
-	PCNT_SIG_CH0_IN1_IDX,
-	PCNT_SIG_CH0_IN2_IDX,
-	PCNT_SIG_CH0_IN3_IDX,
-	PCNT_SIG_CH0_IN4_IDX,
-	PCNT_SIG_CH0_IN5_IDX,
-	PCNT_SIG_CH0_IN6_IDX,
-	PCNT_SIG_CH0_IN7_IDX
-};
-uint32_t ctrl_idx[8] = {
-	PCNT_CTRL_CH0_IN0_IDX,
-	PCNT_CTRL_CH0_IN1_IDX,
-	PCNT_CTRL_CH0_IN2_IDX,
-	PCNT_CTRL_CH0_IN3_IDX,
-	PCNT_CTRL_CH0_IN4_IDX,
-	PCNT_CTRL_CH0_IN5_IDX,
-	PCNT_CTRL_CH0_IN6_IDX,
-	PCNT_CTRL_CH0_IN7_IDX
-};
+uint32_t sig_idx[8] = {PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,
+                       PCNT_SIG_CH0_IN2_IDX, PCNT_SIG_CH0_IN3_IDX,
+                       PCNT_SIG_CH0_IN4_IDX, PCNT_SIG_CH0_IN5_IDX,
+                       PCNT_SIG_CH0_IN6_IDX, PCNT_SIG_CH0_IN7_IDX};
+uint32_t ctrl_idx[8] = {PCNT_CTRL_CH0_IN0_IDX, PCNT_CTRL_CH0_IN1_IDX,
+                        PCNT_CTRL_CH0_IN2_IDX, PCNT_CTRL_CH0_IN3_IDX,
+                        PCNT_CTRL_CH0_IN4_IDX, PCNT_CTRL_CH0_IN5_IDX,
+                        PCNT_CTRL_CH0_IN6_IDX, PCNT_CTRL_CH0_IN7_IDX};
 
 bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
   // TODO: Check if free pulse counter

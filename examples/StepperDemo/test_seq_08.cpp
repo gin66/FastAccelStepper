@@ -21,10 +21,10 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 0:  // INIT
       srand(135);
       if (!stepper->attachToPulseCounter(7)) {
-		  Serial.println("Error attaching to pulse counter");
-          seq->state = TEST_STATE_ERROR;
-          return true;
-	  }
+        Serial.println("Error attaching to pulse counter");
+        seq->state = TEST_STATE_ERROR;
+        return true;
+      }
       seq->u32_1 = time_ms;
       seq->state++;
       break;

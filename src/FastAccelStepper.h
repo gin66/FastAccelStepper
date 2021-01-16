@@ -261,8 +261,23 @@ class FastAccelStepper {
   void reAttachToPin();
 
 #if defined(ARDUINO_ARCH_ESP32)
+  // These two functions are only available on esp32.
+  // The first can attach any of the eight pulse counters to this stepper.
+  // The second then will read the current pulse counter value
+  //
+  // The user is responsible to not use a pulse counter, which is occupied by a
+  // stepper and by this render the stepper or even blow up the uC.
+  //
+  // Pulse counter 6 and 7 are not used by the stepper library and are judged as
+  // available. If only five steppers are defined, then 5 gets available. If
+  // four steppers are defined, then 4 is usable,too.
+  //
+  // The function are intended for testing, because the library should always
+  // output the correct amount of pulses. Possible application usage would be an
+  // immediate and interrupt friendly version for getCurrentPosition()
   bool attachToPulseCounter(uint8_t pcnt_unit);
-  uint16_t readPulseCounter();
+  int16_t readPulseCounter();
+  bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
 #endif
 
  private:
