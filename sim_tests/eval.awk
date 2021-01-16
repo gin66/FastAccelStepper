@@ -119,7 +119,7 @@ END {
 		name = names[i]
 		s = to_sym[name]
 		if (max_time_h[s] > 0) {
-			info = sprintf("Max_time in %s=%d us\n",name,max_time_h[s])
+			info = sprintf("Time in %s  max=%d us, total=%d us\n",name,max_time_h[s], sum_time_h[s])
 			print(info)
 			print(info) >"result.txt"
 		}
