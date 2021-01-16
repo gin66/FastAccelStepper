@@ -442,6 +442,9 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 
   _queue_num = num;
   fas_queue[_queue_num].init(_queue_num, step_pin);
+#if defined(ARDUINO_ARCH_ESP32)
+  _attached_pulse_cnt_unit = -1;
+#endif
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp) {
@@ -699,10 +702,14 @@ void FastAccelStepper::backwardStep(bool blocking) {
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
 #if defined(ARDUINO_ARCH_ESP32)
-void FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit) {
-  if (pcnt_unit < 8) {
-    _esp32_attachToPulseCounter(pcnt_unit, this);
+bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit) {
+  if ((pcnt_unit < 8) && (pcnt_unit >= _next_stepper_num)) {
+    if (_esp32_attachToPulseCounter(pcnt_unit, this)) {
+		_attached_pulse_cnt_unit = pcnt_unit;
+		return true
+	}
   }
+  return false;
 }
 uint16_t FastAccelStepper::readPulseCounter() {
   if (_attached_pulse_cnt_unit >= 0) {

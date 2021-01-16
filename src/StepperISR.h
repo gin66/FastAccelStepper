@@ -66,7 +66,7 @@ struct mapping_s {
   uint32_t cmpr_tea_int_raw;
 };
 
-void _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper);
+bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper);
 int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
 #endif
 

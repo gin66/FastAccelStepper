@@ -387,7 +387,14 @@ void StepperQueue::forceStop() {
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 
-void _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
+
+
+bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
+	// TODO: Check if free pulse counter
+  if (pcnt_unit < 7) { // 7 is still hard coded here
+	  return false;
+  }
+
   pcnt_config_t cfg;
   uint8_t dir_pin = stepper->getDirectionPin();
   cfg.pulse_gpio_num = stepper->getStepPin();
@@ -407,7 +414,7 @@ void _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
   cfg.neg_mode = PCNT_COUNT_DIS;  // ignore falling edge
   cfg.counter_h_lim = 16384;
   cfg.counter_l_lim = -16384;
-  cfg.unit = (pcnt_unit_t)pcnt_unit;
+  cfg.unit = PCNT_UNIT_7;
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
 
@@ -425,8 +432,9 @@ void _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
     gpio_iomux_in(stepper->getDirectionPin(), PCNT_CTRL_CH0_IN7_IDX);
     pinMode(stepper->getDirectionPin(), OUTPUT);
   }
+  return true;
 }
 int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
-  return PCNT.cnt_unit[pcnt_unit].cnt_val;
+  return PCNT.cnt_unit[PCNT_UNIT_7].cnt_val;
 }
 #endif

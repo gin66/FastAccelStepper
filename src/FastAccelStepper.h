@@ -261,7 +261,7 @@ class FastAccelStepper {
   void reAttachToPin();
 
 #if defined(ARDUINO_ARCH_ESP32)
-  void attachToPulseCounter(uint8_t pcnt_unit);
+  bool attachToPulseCounter(uint8_t pcnt_unit);
   uint16_t readPulseCounter();
 #endif
 
