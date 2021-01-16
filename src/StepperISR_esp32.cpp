@@ -78,12 +78,20 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
 };
 
 void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
-                                        const struct queue_entry *e) {
-  const struct mapping_s *mapping = queue->mapping;
-  pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
-  // is updated only on zero
-//  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = e->steps;
+                                        const struct queue_entry *e_curr,
+                                        const struct queue_entry *e_next) {
+  uint8_t curr_steps = e_curr->steps;
+  if (curr_steps > 0) {
+    uint8_t next_steps = e_next->steps;
+    if ((next_steps > 0) && (curr_steps != next_steps)) {
+      const struct mapping_s *mapping = queue->mapping;
+      pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
+      // is updated only on zero
+      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = next_steps;
+    }
+  }
 }
+
 void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
@@ -115,7 +123,7 @@ void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
       // work. For example the sequence:
       //		5 pulses
       //		1 pause		==> here need to store 3, but not
-      //available yet 		3 pulses
+      // available yet 		3 pulses
       //
       // Read counter
       uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
@@ -178,14 +186,14 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
 static void IRAM_ATTR what_is_next(StepperQueue *q) {
   uint8_t rp = q->read_idx;
   if (rp != q->next_write_idx) {
-    struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
-    apply_command(q, e);
+    struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+    apply_command(q, e_curr);
     rp++;
+    if (rp != q->next_write_idx) {
+      struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
+      prepare_for_next_command(q, e_curr, e_next);
+    }
     q->read_idx = rp;
-    //if (rp != q->next_write_idx) {
-    //  struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
-    //  prepare_for_next_command(q, e);
-    //}
   } else {
     // no more commands: stop timer at period end
     init_stop(q);
@@ -373,8 +381,9 @@ void StepperQueue::commandAddedToQueue(bool start) {
   uint8_t timer = mapping->timer;
 
   _hasISRactive = true;
-  struct queue_entry *e = &entry[read_idx++ & QUEUE_LEN_MASK];
+  struct queue_entry *e = &entry[read_idx & QUEUE_LEN_MASK];
   apply_command(this, e);
+  read_idx++;
 
   if (start) {
     mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
