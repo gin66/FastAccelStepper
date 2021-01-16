@@ -5,11 +5,11 @@
  EnableB:        2*L->H,        1*H->L
  EnableC:        1*L->H,        0*H->L
    StepA:        0*L->H,        0*H->L, Max High=0us Total High=0us
-   StepB:     3200*L->H,     3200*H->L, Max High=12us Total High=16490us
+   StepB:     3200*L->H,     3200*H->L, Max High=12us Total High=16682us
    StepC:        0*L->H,        0*H->L, Max High=0us Total High=0us
 Position[B]=3200
 
 Time in EnableB  max=340014 us, total=340014 us
 
-Time in StepB  max=12 us, total=16490 us
+Time in StepB  max=12 us, total=16682 us
 

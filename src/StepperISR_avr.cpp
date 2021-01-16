@@ -135,7 +135,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];  \
     /* There is a risk, that this new compare time is delayed by one cycle */ \
     OCR##T##CHANNEL += e->ticks;                                              \
-    if (Stepper_IsOneIfOutput(T, CHANNEL)) {                                  \
+    if (Stepper_IsOne(T, CHANNEL)) {    /* was IfOutput and fails then  */    \
       /* Clear output bit by another compare event */                         \
       Stepper_OneToZero(T, CHANNEL);                                          \
       ForceCompare(T, CHANNEL);                                               \
