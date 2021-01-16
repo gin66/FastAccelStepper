@@ -243,15 +243,20 @@ pio run -e avr --target upload --upload-port /dev/ttyUSB0
 
 The library is tested with different kind of tests:
 * PC only, which reside in tests/.
+
   These tests focussing primarily the ramp generator and part of the API
 * simavr based for avr
-  The simavr is an excellent simulator for avr microcontrollers. This allows to check the avr implementation thoroughly and even count the number of steps generated. Tested code is mainly the StepperDemo, which gets fed in a line of commands to execute.
-  These tests focus on avr and help to check the whole library code and helps for esp32
+
+  The simavr is an excellent simulator for avr microcontrollers. This allows to check the avr implementation thoroughly and even count the number of steps generated. Tested code is mainly the StepperDemo, which gets fed in a line of commands to execute. These tests are focused on avr, but help to check the whole library code, used by esp32, too.
 * esp32 tests with another pulse counter attached
+
   The FastAccelStepper-API supports to attach another free pulse counter to a stepper's step and dir pins. This counter counts in the range of -16383 to 16383 with wrap around to 0. The test condition is, that the library's view of the position should match the independently counted one. These tests are still evolving
+
 * Test for pulse generation using examples/Pulses
+
   This has been intensively used to debug the esp32 ISR code
 * manual tests using StepperDemo
+
   These are unstructured tests with listening to the motor and observing the behavior
 
 ## CHANGELOG
@@ -265,6 +270,7 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 * Very high acceleration value e.g. 10.000.000 and high speed may be silently not executed, if the high speed in us is smaller than MIN_CMD_TICKS. This corresponds to 2500 steps/s for avr and 5000 steps/s.
 * StepperDemo test case 07 yields quite a deviation between esp32 and avr timing for identical ramp
 * There is an issue with the esp32 mcpwm: as soon as the mcpwm timer is running on every cycle an interrupt is serviced - even though no interrupt is enabled. If several steppers are running at high step rate, the interrupt load for this nonsense interrupt could be quite high for the CPU. Need further investigation, but till now haven't found the root cause.
+* As per issue #34, at high speed the esp32 may deviate from its position. Until this is fixed, the remedy could be to attach a free pulse counter to the high speed stepper and fix the position post mortem. Any reliable test case for reproduction is appreciated.
 
 
 ## Lessons Learned
