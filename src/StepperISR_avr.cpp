@@ -226,8 +226,7 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
 
 #define PREPARE_DIRECTION_PIN(CHANNEL)                              \
   if (e->toggle_dir) {                                              \
-    uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                    \
-    digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH); \
+	*fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask;  \
   }
 
 #define AVR_START_QUEUE(T, CHANNEL)              \
