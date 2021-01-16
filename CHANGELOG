@@ -1,7 +1,10 @@
+pre-0.18.5A
+- replace 16bit division with upm_float division
+
 0.18.4:
 - avr: Step ISR code optimization e.g. get rid of digitalRead/Write
 - esp32: get rid of digitalRead/Write, too
-- avr: replave 32bit division with 16bit => much better timing
+- replave 32bit division with 16bit => much better timing on avr
 
 0.18.3:
 - esp32: extend API to attach free pulse counter for debugging

@@ -231,11 +231,13 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   }
 
   // Forward planning of 1ms or more on slow speed.
+#define UPM_CONST_1000 ((upm_float)35322)
   uint32_t curr_ticks = rw->curr_ticks;
-  // TICKS_PER_S/1000 is 16000 normally and fit in a 16bit
-  uint16_t planning_steps = TICKS_PER_S / 1000;
+  uint16_t planning_steps;
   if (curr_ticks < TICKS_PER_S/2000) {
-	  planning_steps /= (uint16_t)curr_ticks;
+      upm_float upm_ps = upm_divide(UPM_TICKS_PER_S, upm_from(curr_ticks));
+      upm_ps = upm_divide(upm_ps, UPM_CONST_1000);
+	  planning_steps = upm_to_u16(upm_ps);
   }
   else {
 	  planning_steps = 1;
