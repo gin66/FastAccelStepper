@@ -32,37 +32,52 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
       if (!stepper->isRunning()) {
         int16_t pcnt = stepper->readPulseCounter();
         int32_t spos = stepper->getPositionAfterCommandsCompleted();
-        if (pcnt != spos) {
+        if ((pcnt & 0x3fff) != (spos&0x3fff)) {
           sprintf(buf, "stepper pos=%d  real pos=%d", spos, pcnt);
           Serial.println(buf);
 
           seq->state = TEST_STATE_ERROR;
           return true;
         }
-#define VMIN 20
-#define VMAX 10000
-        uint32_t speed = rand() % (VMAX * 4);
+#define VMIN 10 
+#define VMAX 16384
+        uint16_t speed = rand() % (VMAX * 4);
         speed = speed >> ((speed % 4) + 2);
         speed = speed + VMIN;
 
 #define AMIN 10
-#define AMAX 1000000
+#define AMAX (4*65536)
         uint32_t accel = rand() % (AMAX * 4);
         accel = accel >> ((accel % 4) + 2);
         accel = accel + AMIN;
 
-        int32_t pos = rand() % 32766;
-        if (pos & 1) {
-          pos = -(pos >> 1);
-        } else {
-          pos = (pos >> 1);
-        }
+		// s = a * tr² + v * tc  with t = 2*tr+tc
+		//
+		// v = a * tr => tr = v/a
+		//
+		// s = v²/a + v * (t-2*tr)
+		//
+		//   = v²/a + v * (t-2*v/a)
+		//
+		//   = v²/a + v * t - 2*v²/a
+		//
+		//   = v * t - v²/a
+		//
+		//   = v * (t - v/a)
+		//
+		//   = t/tv - 1/(tv²*a)
+		//
+		// With t = 1s
+        int32_t move = 1000000/speed;
+		if (move & 2) {
+			move = -move;
+		}
 
-        sprintf(buf, "speed=%d accel=%d pos=%d", speed, accel, pos);
+        sprintf(buf, "speed=%d accel=%d move=%d", speed, accel, move);
         Serial.println(buf);
         stepper->setSpeed(speed);
         stepper->setAcceleration(accel);
-        stepper->moveTo(pos);
+        stepper->move(move);
         seq->u32_1 = time_ms;
       }
       break;

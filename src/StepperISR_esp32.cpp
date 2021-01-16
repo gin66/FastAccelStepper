@@ -435,9 +435,6 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
   PCNT.conf_unit[cfg.unit].conf0.thr_h_lim_en = 0;
   PCNT.conf_unit[cfg.unit].conf0.thr_l_lim_en = 0;
 
-  pcnt_counter_clear(cfg.unit);
-  pcnt_counter_resume(cfg.unit);
-
   stepper->detachFromPin();
   stepper->reAttachToPin();
   gpio_iomux_in(stepper->getStepPin(), sig_idx[pcnt_unit]);
@@ -446,6 +443,9 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
     gpio_iomux_in(stepper->getDirectionPin(), ctrl_idx[pcnt_unit]);
     pinMode(stepper->getDirectionPin(), OUTPUT);
   }
+
+  pcnt_counter_clear(cfg.unit);
+  pcnt_counter_resume(cfg.unit);
   return true;
 }
 int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
