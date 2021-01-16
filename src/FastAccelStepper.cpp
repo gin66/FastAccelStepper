@@ -706,7 +706,7 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit) {
   if (pcnt_unit < 8) {
     if (_esp32_attachToPulseCounter(pcnt_unit, this)) {
 		_attached_pulse_cnt_unit = pcnt_unit;
-		return true
+		return true;
 	}
   }
   return false;
