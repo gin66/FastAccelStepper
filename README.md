@@ -30,7 +30,7 @@ FastAccelStepper offers the following features:
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * Allows the motor to continuously run in the current direction until stopMove() is called.
 * speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
-* Constant acceleration control: In this mode the motor can be controled by aceilleration values and with acceleration=0 will keep current speed
+* Constant acceleration control: In this mode the motor can be controled by acceleration values and with acceleration=0 will keep current speed
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
 * Enable pins can be shared between motors
 * Direction pins can be shared between motors
