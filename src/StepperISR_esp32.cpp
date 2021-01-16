@@ -82,7 +82,7 @@ void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
   const struct mapping_s *mapping = queue->mapping;
   pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
   // is updated only on zero
-  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = e->steps;
+//  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = e->steps;
 }
 void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
@@ -182,10 +182,10 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
     apply_command(q, e);
     rp++;
     q->read_idx = rp;
-    if (rp != q->next_write_idx) {
-      struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
-      prepare_for_next_command(q, e);
-    }
+    //if (rp != q->next_write_idx) {
+    //  struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
+    //  prepare_for_next_command(q, e);
+    //}
   } else {
     // no more commands: stop timer at period end
     init_stop(q);

@@ -1,3 +1,6 @@
+0.18.9:
+- Fixed esp32 high speed step loss: partial reverted this fix for now
+
 0.18.8:
 - New API-function: isStopping()
 - Fixed esp32 high speed step loss
