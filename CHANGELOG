@@ -1,3 +1,8 @@
+pre-0.18.3:
+- esp32: extend API to attach free pulse counter for debugging
+- StepperDemo extended for esp32:
+	- p<n>: Attach pulse counter n to the selected stepper
+
 0.18.2:
 - extend addQueueEntry() with a start flag. This allows to first fill the queue
   and then start the queue. If several motor are started one after the other
