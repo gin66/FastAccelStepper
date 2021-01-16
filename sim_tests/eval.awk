@@ -18,6 +18,7 @@ dump_all == 1{print}
 	cnt_l_h[$4] = 0
 	cnt_h_l[$4] = 0
 	max_time_h[$4] = 0
+	sum_time_h[$4] = 0
 	state[$4] = "X"
 }
 
@@ -80,6 +81,7 @@ dump_all == 1{print}
 		}
 		h_time = time_h[s]/ref
 		printf("high time=%.1fus", h_time)
+		sum_time_h[s] += h_time
 		if (h_time > max_time_h[s]) {
 			max_time_h[s] = h_time
 		}
@@ -95,7 +97,7 @@ END {
 		s = to_sym[name]
 		info = sprintf("%8s: %8d*L->H, %8d*H->L",name,cnt_l_h[s],cnt_h_l[s])
 		if (name ~ /Step/) {
-			info = sprintf("%s, Max High=%dus", info, max_time_h[s])
+			info = sprintf("%s, Max High=%dus Total High=%dus", info, max_time_h[s], sum_time_h[s])
 		}
 		print(info)
 		if (name !~ /ISR/) {
