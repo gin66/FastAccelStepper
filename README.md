@@ -242,20 +242,20 @@ pio run -e avr --target upload --upload-port /dev/ttyUSB0
 ## TEST STRATEGY
 
 The library is tested with different kind of tests:
-* PC only, which reside in tests/.
+* PC only (sub folder ./tests/)
 
   These tests focussing primarily the ramp generator and part of the API
-* simavr based for avr
+* simavr based for avr (sub folder ./sim_tests)
 
   The simavr is an excellent simulator for avr microcontrollers. This allows to check the avr implementation thoroughly and even count the number of steps generated. Tested code is mainly the StepperDemo, which gets fed in a line of commands to execute. These tests are focused on avr, but help to check the whole library code, used by esp32, too.
-* esp32 tests with another pulse counter attached
+* esp32 tests with another pulse counter attached (e.g. test_seq_08 in StepperDemo)
 
   The FastAccelStepper-API supports to attach another free pulse counter to a stepper's step and dir pins. This counter counts in the range of -16383 to 16383 with wrap around to 0. The test condition is, that the library's view of the position should match the independently counted one. These tests are still evolving
 
 * Test for pulse generation using examples/Pulses
 
   This has been intensively used to debug the esp32 ISR code
-* manual tests using StepperDemo
+* manual tests using examples/StepperDemo
 
   These are unstructured tests with listening to the motor and observing the behavior
 
