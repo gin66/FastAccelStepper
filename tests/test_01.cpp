@@ -100,7 +100,7 @@ void end_pos_test() {
   assert(0 == s.getPositionAfterCommandsCompleted());
   struct stepper_command_s cmd = {.ticks = 65535, .steps = 1, .count_up = true};
 
-  s.addQueueEntry(&cmd);
+  assert(AQE_OK == s.addQueueEntry(&cmd));
   assert(1 == s.getPositionAfterCommandsCompleted());
 }
 

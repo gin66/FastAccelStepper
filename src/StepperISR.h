@@ -143,22 +143,7 @@ class StepperQueue {
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-    if (steps == 0) {
-      // This is a pause
-      uint32_t tfls = queue_end.ticks_from_last_step;
-      if (tfls <= 0xffff0000) {
-        queue_end.ticks_from_last_step = tfls + cmd->ticks;
-      }
-    } else {
-      queue_end.pos += cmd->count_up ? steps : -steps;
-      uint32_t tfls = queue_end.ticks_from_last_step;
-      if (tfls <= 0xffff0000) {
-        queue_end.ticks = tfls + cmd->ticks;
-      } else {
-        queue_end.ticks = tfls;
-      }
-      queue_end.ticks_from_last_step = 0;
-    }
+	queue_end.pos += cmd->count_up ? steps : -steps;
     bool dir = (cmd->count_up == dirHighCountsUp);
     bool toggle_dir = false;
     if (dirPin != PIN_UNDEFINED) {
@@ -172,7 +157,7 @@ class StepperQueue {
     }
     e->steps = steps;
     e->toggle_dir = toggle_dir;
-    e->ticks = period;
+	e->ticks = period;
     queue_end.dir = dir;
     queue_end.count_up = cmd->count_up;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
@@ -249,8 +234,6 @@ class StepperQueue {
     queue_end.dir = true;
     queue_end.count_up = true;
     queue_end.pos = 0;
-    queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
-    queue_end.ticks_from_last_step = 0xffffffff;
     dirHighCountsUp = true;
 #if defined(ARDUINO_ARCH_AVR)
     _isRunning = false;

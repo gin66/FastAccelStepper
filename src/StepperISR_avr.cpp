@@ -128,7 +128,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       DisableCompareInterrupt(T, CHANNEL);                                    \
       fas_queue_##CHANNEL._isRunning = false;                                 \
       fas_queue_##CHANNEL._prepareForStop = false;                            \
-      fas_queue_##CHANNEL.queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;          \
       exitStepperISR();                                                       \
       return;                                                                 \
     }                                                                         \
@@ -343,7 +342,6 @@ void StepperQueue::forceStop() {
 #endif
   }
   _isRunning = false;
-  queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
 
   // empty the queue
   read_idx = next_write_idx;

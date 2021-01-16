@@ -618,11 +618,10 @@ int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return fas_queue[_queue_num].queue_end.pos;
 }
 uint32_t FastAccelStepper::getPeriodAfterCommandsCompleted() {
-  uint32_t ticks = fas_queue[_queue_num].queue_end.ticks;
-  if (ticks == TICKS_FOR_STOPPED_MOTOR) {
-    return 0;
+  if (_rg.isRampGeneratorActive()) {
+	  return _rg.getCurrentPeriodInUs();
   }
-  return TICKS_TO_US(ticks);
+  return 0;
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   struct StepperQueue* q = &fas_queue[_queue_num];

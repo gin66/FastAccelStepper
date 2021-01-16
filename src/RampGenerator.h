@@ -114,6 +114,12 @@ class RampGenerator {
   void getNextCommand(const struct queue_end_s *queue_end,
                       NextCommand *cmd_out);
   void afterCommandEnqueued(NextCommand *cmd_in);
+  uint32_t getCurrentPeriodInUs() {
+	  noInterrupts();
+	  uint32_t ticks = _rw.curr_ticks;
+	  interrupts();
+	  return TICKS_TO_US(ticks);
+  }
 
  private:
   int8_t _startMove(int32_t target_pos, const struct queue_end_s *queue_end);

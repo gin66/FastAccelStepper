@@ -179,7 +179,6 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   // timer value = 1 - upcounting: output low
   mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
   // PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
-  q->queue_end.ticks = TICKS_FOR_STOPPED_MOTOR;
   q->_hasISRactive = false;
 }
 
