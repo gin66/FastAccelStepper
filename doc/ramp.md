@@ -1,3 +1,7 @@
+# Ramp generator
+
+# Introduction
+
 The ramp generator increases the speed linearly with the acceleration.
 If e.g. a=1000 steps/s², then after 1s the speed is 1000 steps/s.
 
@@ -55,7 +59,7 @@ a = -------------
     Ta * (T - Ta)
 ```
 
-Calculation example: Stepper motor should perform 32000 steps in 10s.
+## Calculation example: Stepper motor should perform 32000 steps in 10s.
 
 The required acceleration and speed for different acceleration times are calculated as this:
 ```
