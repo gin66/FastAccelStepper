@@ -1,5 +1,6 @@
-pre-0.18.8:
+0.18.8:
 - New API-function: isStopping()
+- Fixed esp32 high speed step loss
 
 0.18.7
 - Fix compile error on esp32

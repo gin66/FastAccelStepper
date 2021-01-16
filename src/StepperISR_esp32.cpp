@@ -77,6 +77,13 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
     },
 };
 
+void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
+                                        const struct queue_entry *e) {
+  const struct mapping_s *mapping = queue->mapping;
+  pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
+  // is updated only on zero
+  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = e->steps;
+}
 void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
@@ -88,8 +95,8 @@ void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
     *queue->_dirPinPort ^= queue->_dirPinMask;
   }
   uint16_t ticks = e->ticks;
-  if (mcpwm->timer[timer].status.value <= 1) {
-    mcpwm->timer[timer].period.upmethod = 0;  // 0 = immediate update, 1 = TEZ
+  if (mcpwm->timer[timer].status.value <= 1) {  // mcpwm Timer is stopped ?
+    mcpwm->timer[timer].period.upmethod = 0;    // 0 = immediate update, 1 = TEZ
   } else {
     mcpwm->timer[timer].period.upmethod = 1;  // 0 = immediate update, 1 = TEZ
   }
@@ -100,50 +107,49 @@ void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
     mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
-    // For fast pulses, eventually the ISR is late. So take the current pulse
-    // count into consideration.
-    //
-    // Automatic update for next pulse cnt on pulse counter zero does not work.
-    // For example the sequence:
-    //		5 pulses
-    //		1 pause		==> here need to store 3, but not available yet
-    //		3 pulses
-    //
-    // Read counter
-    uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
-    // Clear flag for l-->h transition
-    mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
-    // Read counter again
-    uint16_t val2 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
-    // If no pulse arrives between val1 and val2:
-    //		val2 == val1
-    // If pulse arrives between val1 and int_clr:
-    //		mcpwm status is cleared and val2 == val1+1
-    // If pulse arrives between int_clr and val2:
-    //		mcpwm status is set and val2 == val1+1
-    // => mcwpm status info is not reliable, so clear again
-    if (val1 != val2) {
-      // Clear flag again. No pulse can be expected between val2 and here
-      mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
-    }
-
-    // is updated only on zero
-    PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2;
-    // force take over
-    pcnt_counter_clear(pcnt_unit);
-    // Check, if pulse has come in
-    if ((mcpwm->int_raw.val & mapping->cmpr_tea_int_raw) != 0) {
-      // Need to adjust one down
-      // Here the border case = 1 is ignored, because the command rate is
-      // limited
+    if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim != steps) {
+      // For fast pulses, eventually the ISR is late. So take the current pulse
+      // count into consideration.
       //
-      // Check if the pulse has been counted or not
-      if (PCNT.cnt_unit[pcnt_unit].cnt_val == val2) {
-        // pulse hasn't been counted, so adjust the limit
-        // is updated only on zero
-        PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2 - 1;
-        // force take over
-        pcnt_counter_clear(pcnt_unit);
+      // Automatic update for next pulse cnt on pulse counter zero does not
+      // work. For example the sequence:
+      //		5 pulses
+      //		1 pause		==> here need to store 3, but not
+      //available yet 		3 pulses
+      //
+      // Read counter
+      uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
+      // Clear flag for l-->h transition
+      mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
+      // Read counter again
+      uint16_t val2 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
+      // If no pulse arrives between val1 and val2:
+      //		val2 == val1
+      // If pulse arrives between val1 and int_clr:
+      //		mcpwm status is cleared and val2 == val1+1
+      // If pulse arrives between int_clr and val2:
+      //		mcpwm status is set and val2 == val1+1
+      // => mcwpm status info is not reliable, so clear again
+      if (val1 != val2) {
+        // Clear flag again. No pulse can be expected between val2 and here
+        mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
+      }
+
+      // is updated only on zero
+      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2;
+      // force take over
+      pcnt_counter_clear(pcnt_unit);
+      // Check, if pulse has come in
+      if ((mcpwm->int_raw.val & mapping->cmpr_tea_int_raw) != 0) {
+        // Pulse has come in
+        // Check if the pulse has been counted or not
+        if (PCNT.cnt_unit[pcnt_unit].cnt_val == 0) {
+          // pulse hasn't been counted, so adjust the limit
+          // is updated only on zero
+          PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2 - 1;
+          // force take over
+          pcnt_counter_clear(pcnt_unit);
+        }
       }
     }
     // disable mcpwm interrupt
@@ -174,7 +180,12 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
   if (rp != q->next_write_idx) {
     struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
     apply_command(q, e);
-    q->read_idx = rp + 1;
+    rp++;
+    q->read_idx = rp;
+    if (rp != q->next_write_idx) {
+      struct queue_entry *e = &q->entry[rp & QUEUE_LEN_MASK];
+      prepare_for_next_command(q, e);
+    }
   } else {
     // no more commands: stop timer at period end
     init_stop(q);
