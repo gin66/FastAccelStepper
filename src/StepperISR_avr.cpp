@@ -25,7 +25,7 @@
    (_BV(COM##T##X##0) | _BV(COM##T##X##1)))
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
-#define Stepper_IsOneIfOutput(T, X) ((TCCR##T##A & _BV(COM##T##X##1)) != 0)
+#define Stepper_IsOneIfOutput(T, X) ((TCCR##T##A & _BV(COM##T##X##0)) != 0)
 
 #ifdef SIMAVR_TIME_MEASUREMENT
 #define prepareISRtimeMeasurement() DDRB |= 0x18
