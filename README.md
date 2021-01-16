@@ -26,18 +26,18 @@ FastAccelStepper offers the following features:
 * 2-pin operation for e.g. axis control
 * 3-pin operation to reduce power dissipation of driver/stepper
 * Lower limit of 260s per step @ 16MHz aka one step every four minute
-* fully interrupt/task driven - no periodic task to be called
+* fully interrupt/task driven - no periodic function to be called from application loop
 * supports acceleration and deceleration with per stepper max speed/acceleration
-* Allow the motor to continuously run in the current direction until stopMove() is called.
+* Allows the motor to continuously run in the current direction until stopMove() is called.
 * speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
-* Constant acceleration mode: In this mode the motor can be called by aceleration values and with acceleration=0 will keep current speed
+* Constant acceleration control: In this mode the motor can be controled by aceilleration values and with acceleration=0 will keep current speed
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
 * Enable pins can be shared between motors
 * Direction pins can be shared between motors
 * External callback function can be used to drive the enable pins (e.g. connected to shift register)
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
-* Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axes applications.
+* Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
 
 General behaviour:
 * The desired end position to move to is set by calls to moveTo() and move()
