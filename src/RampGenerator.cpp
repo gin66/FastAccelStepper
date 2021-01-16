@@ -235,13 +235,12 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   // Forward planning of 2ms or more on slow speed.
   uint32_t curr_ticks = rw->curr_ticks;
   uint16_t planning_steps;
-  if (curr_ticks < TICKS_PER_S/1000) {
-      upm_float upm_ps = upm_divide(UPM_TICKS_PER_S, upm_from(curr_ticks));
-      upm_ps = upm_divide(upm_ps, UPM_CONST_500);
-	  planning_steps = upm_to_u16(upm_ps);
-  }
-  else {
-	  planning_steps = 1;
+  if (curr_ticks < TICKS_PER_S / 1000) {
+    upm_float upm_ps = upm_divide(UPM_TICKS_PER_S, upm_from(curr_ticks));
+    upm_ps = upm_divide(upm_ps, UPM_CONST_500);
+    planning_steps = upm_to_u16(upm_ps);
+  } else {
+    planning_steps = 1;
   }
 
   // In case of force stop just run down the ramp

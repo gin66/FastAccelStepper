@@ -192,6 +192,7 @@ class FastAccelStepper {
   // stop the running stepper as fast as possible with deceleration
   // This only sets a flag and can be called from an interrupt !
   void stopMove();
+  bool isStopping() { return _rg.isStopping(); }
 
   // stop the running stepper immediately and set new_pos as new position
   // This can be called from an interrupt !

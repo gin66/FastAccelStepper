@@ -1,3 +1,6 @@
+pre-0.18.8:
+- New API-function: isStopping()
+
 0.18.7
 - Fix compile error on esp32
 

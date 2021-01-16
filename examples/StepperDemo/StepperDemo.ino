@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-a3af1fb"
+#define VERSION "post-ec95adf"
 
 struct stepper_config_s {
   uint8_t step;
@@ -773,11 +773,13 @@ void loop() {
             }
 #else
             output_msg(MSG_BLOCKING_WAIT);
-            if (!stepper_selected->isRunningContinuously()) {
+            if (!stepper_selected->isRunningContinuously() ||
+                stepper_selected->isStopping()) {
               // Wait for stepper stop
               while (stepper_selected->isRunning()) {
                 // do nothing
               }
+              Serial.println("STOPPED");
             }
 #endif
           } else if (sscanf(out_buffer, "w%lu", &val) == 1) {
