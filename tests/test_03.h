@@ -325,5 +325,13 @@ bool perform_test() {
   back = upm_to_u32(x);
   xprintf("upm_square(%x)=0x%x (%ld)\n", x1, x, back);
   test(back == 40894464, "upm_square");
+
+  x1 = upm_from((uint32_t)500);
+  test(x1 == UPM_CONST_500, "const 500");
+  x1 = upm_from((uint32_t)1000);
+  test(x1 == UPM_CONST_1000, "const 1000");
+  x1 = upm_from((uint32_t)2000);
+  test(x1 == UPM_CONST_2000, "const 2000");
+
   return (error_cnt == 0);
 }

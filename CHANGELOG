@@ -1,5 +1,7 @@
-pre-0.18.5A
+0.18.5
 - replace 16bit division with upm_float division
+- ramp generator packs per command steps for 2 ms or more. 
+  Before this was 1ms. This change makes huge difference on Atmega2560
 
 0.18.4:
 - avr: Step ISR code optimization e.g. get rid of digitalRead/Write
