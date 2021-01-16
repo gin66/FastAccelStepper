@@ -85,7 +85,7 @@ void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
-	*queue->dirPinPort ^= queue->dirPinMask;
+    *queue->dirPinPort ^= queue->dirPinMask;
   }
   uint16_t ticks = e->ticks;
   if (mcpwm->timer[timer].status.value <= 1) {

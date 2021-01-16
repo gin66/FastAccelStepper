@@ -49,7 +49,7 @@ test_%.o: test_%.cpp stubs.h
 VERSION=$(shell git rev-parse --short HEAD)
 
 fmt:
-	clang-format --style=Google -i ../src/* test_*.cpp stubs.h ../examples/*/*.ino ../examples/*/test_seq*
+	clang-format --style=Google -i ../src/* *.ino *.cpp *.h ../examples/*/*.ino ../examples/*/test_seq*
 	echo $(VERSION)
 	sed -i -e 's/#define VERSION.*$$/#define VERSION "post-$(VERSION)"/' ../examples/StepperDemo/StepperDemo.ino
 

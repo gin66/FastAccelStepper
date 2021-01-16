@@ -135,7 +135,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];  \
     /* There is a risk, that this new compare time is delayed by one cycle */ \
     OCR##T##CHANNEL += e->ticks;                                              \
-    if (Stepper_IsOne(T, CHANNEL)) {    /* was IfOutput and fails then  */    \
+    if (Stepper_IsOneIfOutput(T, CHANNEL)) {                                  \
       /* Clear output bit by another compare event */                         \
       Stepper_OneToZero(T, CHANNEL);                                          \
       ForceCompare(T, CHANNEL);                                               \
@@ -180,7 +180,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         Stepper_One(T, CHANNEL);                                              \
       }                                                                       \
       if (e->toggle_dir) {                                                    \
-		*fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask;  \
+        *fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask;  \
       }                                                                       \
     } else {                                                                  \
       fas_queue_##CHANNEL._prepareForStop = true;                             \
@@ -224,9 +224,9 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   rp = fas_queue_##CHANNEL.read_idx; \
   e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];
 
-#define PREPARE_DIRECTION_PIN(CHANNEL)                              \
-  if (e->toggle_dir) {                                              \
-	*fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask;  \
+#define PREPARE_DIRECTION_PIN(CHANNEL)                                   \
+  if (e->toggle_dir) {                                                   \
+    *fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask; \
   }
 
 #define AVR_START_QUEUE(T, CHANNEL)              \
@@ -237,6 +237,8 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   /* set output one, if steps to be generated */ \
   if (e->steps > 0) {                            \
     Stepper_One(T, CHANNEL);                     \
+  } else {                                       \
+    Stepper_Zero(T, CHANNEL);                    \
   }                                              \
   /* clear interrupt flag */                     \
   ClearInterruptFlag(T, CHANNEL);                \
