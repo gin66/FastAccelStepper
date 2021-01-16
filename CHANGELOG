@@ -1,3 +1,8 @@
+0.18.6
+- Running forward/backward could start with previous speed in
+  opposite direction due to two missing initialization, which are
+  present for move/moveTo
+
 0.18.5
 - replace 16bit division with upm_float division
 - ramp generator packs per command steps for 2 ms or more. 

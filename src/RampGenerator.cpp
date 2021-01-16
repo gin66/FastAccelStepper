@@ -90,6 +90,8 @@ int8_t RampGenerator::startRun(bool countUp) {
   noInterrupts();
   if (_rw.ramp_state == RAMP_STATE_IDLE) {
     _rw.ramp_state = RAMP_STATE_ACCELERATE;
+    _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+    _rw.performed_ramp_up_steps = 0;
   }
   _ro = new_ramp;
   interrupts();
