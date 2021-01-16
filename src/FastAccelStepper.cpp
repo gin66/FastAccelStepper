@@ -703,7 +703,7 @@ void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
 #if defined(ARDUINO_ARCH_ESP32)
 bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit) {
-  if ((pcnt_unit < 8) && (pcnt_unit >= _next_stepper_num)) {
+  if (pcnt_unit < 8) {
     if (_esp32_attachToPulseCounter(pcnt_unit, this)) {
 		_attached_pulse_cnt_unit = pcnt_unit;
 		return true
