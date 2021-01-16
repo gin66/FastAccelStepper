@@ -23,19 +23,21 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
 
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
-* 2-pin operation for e.g. axis control (even though use for X/Y-coordinated movement is not recommended)
+* 2-pin operation for e.g. axis control
 * 3-pin operation to reduce power dissipation of driver/stepper
 * Lower limit of 260s per step @ 16MHz aka one step every four minute
-* fully interrupt driven - no periodic task to be called
+* fully interrupt/task driven - no periodic task to be called
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * Allow the motor to continuously run in the current direction until stopMove() is called.
 * speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
+* Constant acceleration mode: In this mode the motor can be called by aceleration values and with acceleration=0 will keep current speed
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
 * Enable pins can be shared between motors
 * Direction pins can be shared between motors
 * External callback function can be used to drive the enable pins (e.g. connected to shift register)
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
+* Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axes applications.
 
 General behaviour:
 * The desired end position to move to is set by calls to moveTo() and move()
@@ -218,7 +220,7 @@ The low level command queue for each stepper allows direct speed control - when 
 
 ## Usage for multi-axis applications
 
-For coordinated movement of two or more axis, the current ramp generation will not provide good results. The planning of steps needs to take into consideration max.speed/acceleration of all steppers and eventually the net speed/acceleration of the resulting movement together with its restrictions. Nice example of multi-axis forward planning can be found within the [marlin-project](https://github.com/MarlinFirmware/Marlin/tree/2.0.x/Marlin/src/module). If this kind of multi-dimensional planning is used, then FastAccelStepper is a good solution to execute the raw commands (without ramp generation). Only missing feature for this is a synchronized start of several steppers. With the tick-exact execution of commands, the synchronization will not be lost as long as the command queues are not running out of commands.
+For coordinated movement of two or more axis, the current ramp generation will not provide good results. The planning of steps needs to take into consideration max.speed/acceleration of all steppers and eventually the net speed/acceleration of the resulting movement together with its restrictions. Nice example of multi-axis forward planning can be found within the [marlin-project](https://github.com/MarlinFirmware/Marlin/tree/2.0.x/Marlin/src/module). If this kind of multi-dimensional planning is used, then FastAccelStepper is a good solution to execute the raw commands (without ramp generation) with near-synchronous start of involved steppers. With the tick-exact execution of commands, the synchronization will not be lost as long as the command queues are not running out of commands.
 
 ## TODO
 
