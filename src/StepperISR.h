@@ -80,13 +80,15 @@ class StepperQueue {
   struct queue_entry entry[QUEUE_LEN];
   uint8_t read_idx;  // ISR stops if readptr == next_writeptr
   uint8_t next_write_idx;
-  uint8_t dirPin;
   bool dirHighCountsUp;
+  uint8_t dirPin;
 #if defined(ARDUINO_ARCH_ESP32)
   volatile bool _hasISRactive;
   bool isRunning();
   const struct mapping_s* mapping;
 #elif defined(ARDUINO_ARCH_AVR)
+  volatile uint8_t *_dirPinPort;
+  uint8_t _dirPinMask;
   volatile bool _prepareForStop;
   volatile bool _isRunning;
   bool isRunning() { return _isRunning; }
@@ -265,6 +267,16 @@ class StepperQueue {
 #endif
   void connect();
   void disconnect();
+  void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
+	  dirPin = dir_pin;
+	  dirHighCountsUp = _dirHighCountsUp;
+#if defined(ARDUINO_ARCH_AVR)
+	  if (dir_pin != PIN_UNDEFINED) {
+		  _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
+		  _dirPinMask = digitalPinToBitMask(dir_pin);
+	  }
+#endif
+  }
   static bool isValidStepPin(uint8_t step_pin);
   static int8_t queueNumForStepPin(uint8_t step_pin);
 };

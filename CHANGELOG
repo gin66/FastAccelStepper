@@ -1,4 +1,7 @@
-pre-0.18.3:
+pre-0.18.4:
+- avr: Step ISR code optimization e.g. get rid of digitalRead/Write
+
+0.18.3:
 - esp32: extend API to attach free pulse counter for debugging
 - StepperDemo extended for esp32:
 	- p<n>: Attach pulse counter n to the selected stepper

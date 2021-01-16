@@ -180,8 +180,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         Stepper_One(T, CHANNEL);                                              \
       }                                                                       \
       if (e->toggle_dir) {                                                    \
-        uint8_t dirPin = fas_queue_##CHANNEL.dirPin;                          \
-        digitalWrite(dirPin, digitalRead(dirPin) == HIGH ? LOW : HIGH);       \
+		*fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask;  \
       }                                                                       \
     } else {                                                                  \
       fas_queue_##CHANNEL._prepareForStop = true;                             \
