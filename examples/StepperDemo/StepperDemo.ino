@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-c651c61"
+#define VERSION "post-cce48b0"
 
 struct stepper_config_s {
   uint8_t step;
@@ -808,8 +808,8 @@ void loop() {
             output_msg(MSG_ATTACH_PULSE_COUNTER);
             Serial.println(val);
             if (!stepper_selected->attachToPulseCounter(val)) {
-               output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
-		    }
+              output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
+            }
           }
 #endif
         } else {

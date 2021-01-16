@@ -5,6 +5,14 @@
 
 // T is the timer module number 0,1,2,3...
 // X is the Channel name A or B
+//
+//               BV1 Bv0
+// Output one  is 1   1
+// Output zero is 1   0
+// Toggle      is 0   1
+// Disconnect  is 0   0
+//
+#define Stepper_OneToZero(T, X) TCCR##T##A = TCCR##T##A & ~_BV(COM##T##X##0)
 #define Stepper_Zero(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##1)) & ~_BV(COM##T##X##0)
 #define Stepper_Toggle(T, X) \
@@ -17,6 +25,7 @@
    (_BV(COM##T##X##0) | _BV(COM##T##X##1)))
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
+#define Stepper_IsOneIfOutput(T, X) ((TCCR##T##A & _BV(COM##T##X##1)) != 0)
 
 #ifdef SIMAVR_TIME_MEASUREMENT
 #define prepareISRtimeMeasurement() DDRB |= 0x18
@@ -126,9 +135,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];  \
     /* There is a risk, that this new compare time is delayed by one cycle */ \
     OCR##T##CHANNEL += e->ticks;                                              \
-    if (Stepper_IsOne(T, CHANNEL)) {                                          \
+    if (Stepper_IsOneIfOutput(T, CHANNEL)) {                                  \
       /* Clear output bit by another compare event */                         \
-      Stepper_Zero(T, CHANNEL);                                               \
+      Stepper_OneToZero(T, CHANNEL);                                          \
       ForceCompare(T, CHANNEL);                                               \
       ClearInterruptFlag(T, CHANNEL);                                         \
       if (e->steps-- > 1) {                                                   \
@@ -150,7 +159,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
           /* Use a high time of 3us */                                        \
           delayMicroseconds(3);                                               \
           /* Clear output bit by another toggle */                            \
-          Stepper_Zero(T, CHANNEL);                                           \
+          Stepper_OneToZero(T, CHANNEL);                                      \
           ForceCompare(T, CHANNEL);                                           \
           ClearInterruptFlag(T, CHANNEL);                                     \
           if (e->steps-- > 1) {                                               \
