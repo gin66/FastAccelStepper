@@ -539,7 +539,7 @@ const static char test_usage_str[] PROGMEM =
     "     I         ... Toggle motor info, while test sequence is running\n"
     "     01        ... select test sequence 01 for selected stepper\n"
     "     :\n"
-    "     08        ... select test sequence 08 for selected stepper\n"
+    "     09        ... select test sequence 09 for selected stepper\n"
 #ifdef SIM_TEST_INPUT
     "     W         ... Blocking wait until test is finished\n"
 #endif
@@ -872,6 +872,11 @@ void loop() {
             output_msg(MSG_SELECT_TEST_SEQUENCE);
             Serial.println(out_buffer);
             test_seq[selected].test = test_seq_08;
+            test_seq[selected].state = 0;
+          } else if (strcmp(out_buffer, "09") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
+            test_seq[selected].test = test_seq_09;
             test_seq[selected].state = 0;
           }
         }

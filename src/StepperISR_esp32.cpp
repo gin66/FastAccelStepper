@@ -379,6 +379,12 @@ void StepperQueue::commandAddedToQueue(bool start) {
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 
+  // apply_command() assumes the pcnt counter to contain executed steps
+  // and deduct this from the new command. For a starting motor
+  // need to make sure, that the counter is 0. (issue #33)
+  pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
+  pcnt_counter_clear(pcnt_unit);
+
   _hasISRactive = true;
   struct queue_entry *e = &entry[read_idx & QUEUE_LEN_MASK];
   apply_command(this, e);
@@ -457,6 +463,9 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
   return true;
 }
 int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
+  //Serial.println(' ');
+  //Serial.println(PCNT.cnt_unit[PCNT_UNIT_0].cnt_val);
+  //Serial.println(PCNT.conf_unit[PCNT_UNIT_0].conf2.cnt_h_lim);
   return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].cnt_val;
 }
 #endif
