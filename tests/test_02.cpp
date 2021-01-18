@@ -73,7 +73,8 @@ class FastAccelStepperTest {
                  uint32_t accel, bool reach_max_speed, float min_time,
                  float max_time, float allowed_ramp_time_delta,
                  bool call_moveTo_repeatedly = false,
-                 bool call_setAccelertion_repeatedly = false) {
+                 bool call_setAccelertion_repeatedly = false,
+				 bool alternatingAccelerationValue = false) {
     printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n",
            name, steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
     init_queue();
@@ -100,7 +101,11 @@ class FastAccelStepperTest {
         s.moveTo(steps);
       }
       if (call_setAccelertion_repeatedly) {
-        s.setAcceleration(accel);
+		if (alternatingAccelerationValue) {
+			s.setAcceleration(accel+(i&1)*100);
+		} else {
+			s.setAcceleration(accel);
+		}
       }
       if (true) {
         printf(
@@ -249,7 +254,7 @@ int main() {
   test.with_pars("f23", 1, 100, 1000, false, 0.02, 0.04, 0.1);
 
   // try to identify issue #40
-  test.with_pars("f24", 5000, 200,	9999, true, 1.48, 1.5, 0.1, true, true);
+  test.with_pars("f24", 5000, 200,	9999, true, 1.48, 1.5, 0.1, true, true, true);
 
   printf("TEST_02 PASSED\n");
   return 0;
