@@ -102,7 +102,7 @@ class RampGenerator {
   }
   void applySpeedAcceleration();
   int8_t move(int32_t move, const struct queue_end_s *queue);
-  int8_t moveTo(int32_t position, const struct queue_end_s *queue);
+  int8_t moveTo(int32_t position);
   int8_t startRun(bool countUp);
   inline void initiate_stop() { _ro.force_stop = true; }
   inline bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
@@ -115,14 +115,14 @@ class RampGenerator {
                       NextCommand *cmd_out);
   void afterCommandEnqueued(NextCommand *cmd_in);
   uint32_t getCurrentPeriodInUs() {
-	  noInterrupts();
-	  uint32_t ticks = _rw.curr_ticks;
-	  interrupts();
-	  return TICKS_TO_US(ticks);
+    noInterrupts();
+    uint32_t ticks = _rw.curr_ticks;
+    interrupts();
+    return TICKS_TO_US(ticks);
   }
 
  private:
-  int8_t _startMove(int32_t target_pos, const struct queue_end_s *queue_end);
+  int8_t _startMove(int32_t target_pos);
 #if (TICKS_PER_S != 16000000L)
   upm_float upm_timer_freq;
 #endif

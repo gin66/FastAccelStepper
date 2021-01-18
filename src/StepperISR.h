@@ -143,7 +143,7 @@ class StepperQueue {
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-	queue_end.pos += cmd->count_up ? steps : -steps;
+    queue_end.pos += cmd->count_up ? steps : -steps;
     bool dir = (cmd->count_up == dirHighCountsUp);
     bool toggle_dir = false;
     if (dirPin != PIN_UNDEFINED) {
@@ -157,7 +157,7 @@ class StepperQueue {
     }
     e->steps = steps;
     e->toggle_dir = toggle_dir;
-	e->ticks = period;
+    e->ticks = period;
     queue_end.dir = dir;
     queue_end.count_up = cmd->count_up;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)

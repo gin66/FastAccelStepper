@@ -526,7 +526,7 @@ void FastAccelStepper::setAcceleration(uint32_t accel) {
   _rg.setAcceleration(accel);
 }
 int8_t FastAccelStepper::moveTo(int32_t position) {
-  return _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
+  return _rg.moveTo(position);
 }
 int8_t FastAccelStepper::move(int32_t move) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
@@ -619,7 +619,7 @@ int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
 }
 uint32_t FastAccelStepper::getPeriodAfterCommandsCompleted() {
   if (_rg.isRampGeneratorActive()) {
-	  return _rg.getCurrentPeriodInUs();
+    return _rg.getCurrentPeriodInUs();
   }
   return 0;
 }

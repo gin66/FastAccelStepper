@@ -237,7 +237,8 @@ class FastAccelStepper {
   // Get the future speed of the stepper after all commands in queue are
   // completed. This is in µs. Returns 0 for stopped motor
   //
-  // This value comes from the ramp generator and is not valid for raw command queue
+  // This value comes from the ramp generator and is not valid for raw command
+  // queue
   // ==> Will be renamed in future release
   uint32_t getPeriodAfterCommandsCompleted();
 

@@ -98,8 +98,7 @@ int8_t RampGenerator::startRun(bool countUp) {
   return MOVE_OK;
 }
 
-int8_t RampGenerator::_startMove(int32_t target_pos,
-                                 const struct queue_end_s *queue_end) {
+int8_t RampGenerator::_startMove(int32_t target_pos) {
   if (_config.min_travel_ticks == 0) {
     return MOVE_ERR_SPEED_IS_UNDEFINED;
   }
@@ -114,7 +113,8 @@ int8_t RampGenerator::_startMove(int32_t target_pos,
                                .keep_running_count_up = true};
 
   noInterrupts();
-  if (_rw.ramp_state == RAMP_STATE_IDLE) {
+  if ((_rw.ramp_state == RAMP_STATE_IDLE) && (_ro.target_pos != target_pos)) {
+    // Only start the ramp generator, if the target position is different
     _rw.ramp_state = RAMP_STATE_ACCELERATE;
     _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
     _rw.performed_ramp_up_steps = 0;
@@ -135,10 +135,9 @@ int8_t RampGenerator::_startMove(int32_t target_pos,
   return MOVE_OK;
 }
 
-int8_t RampGenerator::moveTo(int32_t position,
-                             const struct queue_end_s *queue_end) {
+int8_t RampGenerator::moveTo(int32_t position) {
   inject_fill_interrupt(1);
-  int res = _startMove(position, queue_end);
+  int res = _startMove(position);
   inject_fill_interrupt(2);
   return res;
 }
@@ -150,7 +149,7 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
     curr_pos = queue_end->pos;
   }
   int32_t new_pos = curr_pos + move;
-  return moveTo(new_pos, queue_end);
+  return moveTo(new_pos);
 }
 
 //*************************************************************************************************

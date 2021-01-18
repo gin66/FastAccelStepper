@@ -36,18 +36,18 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         uint32_t accel = rand() % (AMAX * 4);
         accel = accel >> ((accel % 4) + 2);
         accel = accel + AMIN;
-        sprintf(buf, "speed=%u accel=%u", (unsigned int)speed, (unsigned int)accel);
+        sprintf(buf, "speed=%u accel=%u", (unsigned int)speed,
+                (unsigned int)accel);
         Serial.println(buf);
         stepper->setSpeed(speed);
         stepper->setAcceleration(accel);
-		if (rand() & 1) {
-			stepper->runForward();
-		}
-		else {
-			stepper->runBackward();
-		}
+        if (rand() & 1) {
+          stepper->runForward();
+        } else {
+          stepper->runBackward();
+        }
         seq->u32_1 = time_ms;
-		seq->state++;
+        seq->state++;
       }
       break;
     case 2:
@@ -55,32 +55,32 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
 #if defined(ARDUINO_ARCH_ESP32)
         seq->s16_1 = stepper->readPulseCounter();
 #endif
-		  stepper->forceStopAndNewPosition(0);
+        stepper->forceStopAndNewPosition(0);
         seq->u32_1 = time_ms;
-		seq->state++;
-	  }
+        seq->state++;
+      }
       break;
     case 3:
       if (!stepper->isRunning()) {
 #if defined(ARDUINO_ARCH_ESP32)
-		int16_t old = seq->s16_1;
+        int16_t old = seq->s16_1;
         seq->s16_1 = stepper->readPulseCounter();
-		Serial.print("Steps needed for stop=");
-		Serial.println(old - seq->s16_1);
+        Serial.print("Steps needed for stop=");
+        Serial.println(old - seq->s16_1);
 #endif
-		seq->state++;
-	  }
+        seq->state++;
+      }
       break;
     case 4:
       if (time_ms - seq->u32_1 >= 100) {
 #if defined(ARDUINO_ARCH_ESP32)
         if (seq->s16_1 != stepper->readPulseCounter()) {
-			Serial.println("Step AFTER stop");
-		}
+          Serial.println("Step AFTER stop");
+        }
 #endif
         seq->u32_1 = time_ms;
-		seq->state = 1;
-	  }
+        seq->state = 1;
+      }
       break;
   }
   return false;

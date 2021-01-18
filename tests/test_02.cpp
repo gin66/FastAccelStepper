@@ -71,7 +71,8 @@ class FastAccelStepperTest {
 
   void with_pars(const char *name, int32_t steps, uint32_t travel_dt,
                  uint32_t accel, bool reach_max_speed, float min_time,
-                 float max_time, float allowed_ramp_time_delta) {
+                 float max_time, float allowed_ramp_time_delta,
+                 bool set_moveTo_repeatedly = false) {
     printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n",
            name, steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
     init_queue();
@@ -94,6 +95,9 @@ class FastAccelStepperTest {
     FILE *gp_file = fopen(fname, "w");
     fprintf(gp_file, "$data <<EOF\n");
     for (int i = 0; i < steps * 100; i++) {
+      if (set_moveTo_repeatedly) {
+        s.moveTo(steps);
+      }
       if (true) {
         printf(
             "Loop %d: Queue read/write = %d/%d    Target pos = %d, Queue End "
@@ -174,7 +178,8 @@ int main() {
   test.with_empty_queue();
   //             steps  ticks_us  accel    maxspeed  min/max_total_time
   // jumps in speed in real on esp32
-  test.with_pars("f1", 1000, 4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2, 0.5);
+  test.with_pars("f1", 1000, 4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2, 0.5,
+                 true);
 
   // ramp time 2s, 400 steps TODO
   test.with_pars("f2", 10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,

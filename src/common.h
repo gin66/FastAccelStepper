@@ -10,7 +10,7 @@ struct stepper_command_s {
 };
 
 struct queue_end_s {
-  int32_t pos;     // in steps
+  int32_t pos;  // in steps
   bool count_up;
   bool dir;
 };

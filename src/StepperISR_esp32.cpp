@@ -463,9 +463,9 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper) {
   return true;
 }
 int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
-  //Serial.println(' ');
-  //Serial.println(PCNT.cnt_unit[PCNT_UNIT_0].cnt_val);
-  //Serial.println(PCNT.conf_unit[PCNT_UNIT_0].conf2.cnt_h_lim);
+  // Serial.println(' ');
+  // Serial.println(PCNT.cnt_unit[PCNT_UNIT_0].cnt_val);
+  // Serial.println(PCNT.conf_unit[PCNT_UNIT_0].conf2.cnt_h_lim);
   return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].cnt_val;
 }
 #endif

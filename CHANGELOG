@@ -1,3 +1,6 @@
+pre-0.18.12:
+- moveTo() has started ramp generator, even if on target position
+
 0.18.11:
 - Remove obsolete queue_end variables ticks and ticks_from_last_step
 - Fix for issue #33: pulse counter needed to be cleared at motor start
