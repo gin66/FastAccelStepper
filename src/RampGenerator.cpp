@@ -65,8 +65,11 @@ void RampGenerator::setAcceleration(uint32_t accel) {
     return;
   }
   upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
-  _config.upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
-  _config.accel_change_cnt = _rw.accel_change_cnt + 1;
+  upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
+  if (_config.upm_inv_accel2 != upm_inv_accel2) {
+    _config.upm_inv_accel2 = upm_inv_accel2;
+    _config.accel_change_cnt = _rw.accel_change_cnt + 1;
+  }
 }
 void RampGenerator::applySpeedAcceleration() {
   noInterrupts();

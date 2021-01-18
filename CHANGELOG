@@ -1,5 +1,6 @@
 pre-0.18.12:
 - moveTo() has started ramp generator, even if on target position
+- avoid recalculation of ramp on setAcceleration, if unchanged value
 
 0.18.11:
 - Remove obsolete queue_end variables ticks and ticks_from_last_step
