@@ -1,3 +1,6 @@
+pre-0.18.13:
+- Add fix for issue #41: High acceleration and high speed
+
 0.18.12:
 - Issue #40 fixed:
 	- moveTo() has started ramp generator, even if on target position

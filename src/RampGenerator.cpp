@@ -385,11 +385,28 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 
       // if acceleration is very high, then d_ticks_new can be lower than
       // min_travel_ticks
-      next_ticks = max(d_ticks_new, ramp->config.min_travel_ticks);
+      if (d_ticks_new < ramp->config.min_travel_ticks) {
+        next_ticks = ramp->config.min_travel_ticks;
+      } else {
+        next_ticks = d_ticks_new;
+      }
 
       if (curr_ticks != TICKS_FOR_STOPPED_MOTOR) {
         // CLIPPING: avoid increase
         next_ticks = min(next_ticks, curr_ticks);
+      }
+
+      // if acceleration is very high, then planning_steps may be too less
+      {
+        uint32_t cmd_ticks = next_ticks * planning_steps;
+        if (cmd_ticks < MIN_CMD_TICKS) {
+          // planning_steps = MIN_CMD_TICKS / next_ticks;
+
+          planning_steps = upm_to_u32(upm_divide(
+              upm_from((uint32_t)(MIN_CMD_TICKS * 8 /
+                                  7)),  // upm calculation is not exact
+              upm_from(next_ticks)));
+        }
       }
 
 #ifdef TEST
