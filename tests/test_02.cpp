@@ -248,6 +248,9 @@ int main() {
 
   test.with_pars("f23", 1, 100, 1000, false, 0.02, 0.04, 0.1);
 
+  // try to identify issue #40
+  test.with_pars("f24", 5000, 200,	9999, true, 1.48, 1.5, 0.1, true, true);
+
   printf("TEST_02 PASSED\n");
   return 0;
 }
