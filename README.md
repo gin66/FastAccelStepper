@@ -281,8 +281,8 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 
 Found on youtube:
 
-[Testing on NEMA-17](https://www.youtube.com/watch?v=yUTXTRjAOak)
-[Neck mechanism](https://www.youtube.com/watch?v=rY7NDBnz7Cw)
+* [Testing on NEMA-17](https://www.youtube.com/watch?v=yUTXTRjAOak)
+* [Neck mechanism](https://www.youtube.com/watch?v=rY7NDBnz7Cw)
 
 ## Thanks
 
