@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-01fb3b4"
+#define VERSION "post-4118a8c"
 
 struct stepper_config_s {
   uint8_t step;
@@ -279,8 +279,7 @@ const static char messages[] PROGMEM =
 #define MSG_ERROR_MOVE_ERR_NO_DIRECTION_PIN__MINUS_1 44
     "ERROR no direction Pin => impossible move\n|"
 #define MSG_MOVE_OK 45
-    "OK\n|"
-;
+    "OK\n|";
 
 void output_msg(int8_t i) {
   char ch;
@@ -497,14 +496,13 @@ void info(FastAccelStepper *s, bool long_info) {
     } else {
       Serial.print(" MANU");
     }
-  }
-  else {
+  } else {
     if (long_info) {
-		Serial.print(" Acceleration [steps/s^2]=");
-		Serial.print(s->getAcceleration());
-		Serial.print(" Speed [us/step]=");
-		Serial.print(s->getSpeedInUs());
-	}
+      Serial.print(" Acceleration [steps/s^2]=");
+      Serial.print(s->getAcceleration());
+      Serial.print(" Speed [us/step]=");
+      Serial.print(s->getSpeedInUs());
+    }
   }
   Serial.print(' ');
 }
@@ -612,17 +610,21 @@ void usage() {
 }
 
 void output_info(bool only_running) {
+  bool need_ln = false;
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (stepper[i]) {
       if (!only_running || stepper[i]->isRunning()) {
-		  Serial.print('M');
-		  Serial.print(i + 1);
-		  Serial.print(": ");
-		  info(stepper[i], false);
-		}
+        need_ln = true;
+        Serial.print('M');
+        Serial.print(i + 1);
+        Serial.print(": ");
+        info(stepper[i], false);
+      }
     }
   }
-  Serial.println();
+  if (need_ln) {
+    Serial.println();
+  }
 }
 
 void loop() {
@@ -718,31 +720,31 @@ void loop() {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
             int8_t res = stepper_selected->setAcceleration(val);
-			if (res < 0) {
-				output_msg(MSG_ERROR_INVALID_VALUE);
-			}
+            if (res < 0) {
+              output_msg(MSG_ERROR_INVALID_VALUE);
+            }
           } else if (sscanf(out_buffer, "V%lu", &val) == 1) {
             output_msg(MSG_SET_SPEED_TO);
             Serial.println(val);
             int8_t res = stepper_selected->setSpeed(val);
-			if (res < 0) {
-				output_msg(MSG_ERROR_INVALID_VALUE);
-			}
+            if (res < 0) {
+              output_msg(MSG_ERROR_INVALID_VALUE);
+            }
           } else if (sscanf(out_buffer, "a%ld", &val) == 1) {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
             int8_t res = stepper_selected->moveByAcceleration(val);
-            output_msg(MSG_MOVE_OK+res);
+            output_msg(MSG_MOVE_OK + res);
           } else if (sscanf(out_buffer, "R%ld", &val) == 1) {
             output_msg(MSG_MOVE_STEPS);
             Serial.println(val);
             int8_t res = stepper_selected->move(val);
-            output_msg(MSG_MOVE_OK+res);
+            output_msg(MSG_MOVE_OK + res);
           } else if (sscanf(out_buffer, "P%ld", &val) == 1) {
             output_msg(MSG_MOVE_TO_POSITION);
             Serial.println(val);
             int8_t res = stepper_selected->moveTo(val);
-            output_msg(MSG_MOVE_OK+res);
+            output_msg(MSG_MOVE_OK + res);
           } else if (sscanf(out_buffer, "@%ld", &val) == 1) {
             output_msg(MSG_SET_POSITION);
             Serial.println(val);
