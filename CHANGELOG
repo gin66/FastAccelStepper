@@ -1,6 +1,7 @@
-pre-0.8.14:
+pre-0.9.0:
 - avoid overflow in setSpeed for super slow speed
 - setSpeed and setAcceleration return status code
+- moveByAcceleration(): check if direction pin is defined for reverse
 
 0.18.13:
 - Add fix for issue #41: High acceleration and high speed
