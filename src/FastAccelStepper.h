@@ -116,15 +116,17 @@ class FastAccelStepper {
   //
   // setSpeed expects as parameter the minimum time between two steps.
   // If for example 5 steps/s shall be the maximum speed of the stepper,
-  // then this call will be
-  //      t = 0.2 s/steps = 200000 us/step
+  // then t = 0.2 s/steps = 200000 us/step, so call
   //      setSpeed(200000);
   //
   // New value will be used after call to
   // move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
   //
   // note: no update on stopMove()
-  void setSpeed(uint32_t min_step_us);
+  //
+  // Returns 0 on success, or -1 on invalid value
+  // Invalid is <MIN_DELTA_TICKS in us or >~250 Mio.
+  int8_t setSpeed(uint32_t min_step_us);
 
   //  set Acceleration expects as parameter the change of speed
   //  as step/s².
@@ -134,7 +136,8 @@ class FastAccelStepper {
   // New value will be used after call to
   // move/moveTo/stopMove/applySpeedAcceleration
   //
-  void setAcceleration(uint32_t step_s_s);
+  // Returns 0 on success, or -1 on invalid value (=0)
+  int8_t setAcceleration(uint32_t step_s_s);
 
   // This function applies new values for speed/acceleration.
   // This is convenient especially, if we stepper is set to continuous running.

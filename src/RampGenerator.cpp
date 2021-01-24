@@ -49,20 +49,24 @@ void RampGenerator::init() {
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
 }
-void RampGenerator::setSpeed(uint32_t min_step_us) {
+int8_t RampGenerator::setSpeed(uint32_t min_step_us) {
   if (min_step_us == 0) {
-    return;
+    return -1;
   }
-  speed_in_us = min_step_us;
+  if (min_step_us > TICKS_TO_US(0xffffffff)) {
+	return -1;
+  }
   uint32_t min_travel_ticks = US_TO_TICKS(min_step_us);
   if (min_travel_ticks < MIN_DELTA_TICKS) {
-    min_travel_ticks = MIN_DELTA_TICKS;  // set to lower limit
+	return -1;
   }
+  speed_in_us = min_step_us;
   _config.min_travel_ticks = min_travel_ticks;
+  return 0;
 }
-void RampGenerator::setAcceleration(uint32_t accel) {
+int8_t RampGenerator::setAcceleration(uint32_t accel) {
   if (accel == 0) {
-    return;
+    return -1;
   }
   upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
   upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
@@ -70,6 +74,7 @@ void RampGenerator::setAcceleration(uint32_t accel) {
     _config.upm_inv_accel2 = upm_inv_accel2;
     _config.accel_change_cnt = _rw.accel_change_cnt + 1;
   }
+  return 0;
 }
 void RampGenerator::applySpeedAcceleration() {
   noInterrupts();

@@ -95,8 +95,8 @@ class RampGenerator {
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
     _ro.target_pos += delta;
   }
-  void setSpeed(uint32_t min_step_us);
-  void setAcceleration(uint32_t accel);
+  int8_t setSpeed(uint32_t min_step_us);
+  int8_t setAcceleration(uint32_t accel);
   inline bool hasValidConfig() {
     return ((_config.min_travel_ticks != 0) && (_config.upm_inv_accel2 != 0));
   }
