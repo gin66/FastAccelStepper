@@ -239,7 +239,7 @@ int main() {
   // test.with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
 
   // slow ramp time
-  test.with_pars("f19", 1000, 10, 1, false, 61.0, 63.0, 1.0);
+  test.with_pars("f19", 1000, 40, 1, false, 61.0, 63.0, 1.0);
 
   // name, steps, travel_dt, accel, reach_max_speed, min_time, max_time,
   // allowed_ramp_time_delta slow ramp time Those are anomalies (see github
