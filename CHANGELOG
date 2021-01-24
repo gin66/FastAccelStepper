@@ -1,7 +1,13 @@
-pre-0.9.0:
+pre-0.19.0:
 - avoid overflow in setSpeed for super slow speed
 - setSpeed and setAcceleration return status code
 - moveByAcceleration(): check if direction pin is defined for reverse
+- add getter functions: getSpeedInUS(), getAcceleration()
+- StepperDemo extended:
+	- move/moveTo/moveByAcceleration => verbose error code
+	- setSpeed/setAcceleration =>x report invalid data error
+	- motor info with speed/acceleration
+
 
 0.18.13:
 - Add fix for issue #41: High acceleration and high speed

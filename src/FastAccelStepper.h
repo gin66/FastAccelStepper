@@ -127,6 +127,8 @@ class FastAccelStepper {
   // Returns 0 on success, or -1 on invalid value
   // Invalid is <MIN_DELTA_TICKS in us or >~250 Mio.
   int8_t setSpeed(uint32_t min_step_us);
+  // retrieve current speed
+  uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
 
   //  set Acceleration expects as parameter the change of speed
   //  as step/s².
@@ -138,6 +140,7 @@ class FastAccelStepper {
   //
   // Returns 0 on success, or -1 on invalid value (=0)
   int8_t setAcceleration(uint32_t step_s_s);
+  uint32_t getAcceleration() { return _rg.getAcceleration(); }
 
   // This function applies new values for speed/acceleration.
   // This is convenient especially, if the stepper is set to continuous running.

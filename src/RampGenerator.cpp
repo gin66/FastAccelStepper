@@ -68,6 +68,7 @@ int8_t RampGenerator::setAcceleration(uint32_t accel) {
   if (accel == 0) {
     return -1;
   }
+  acceleration = accel;
   upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
   upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
   if (_config.upm_inv_accel2 != upm_inv_accel2) {

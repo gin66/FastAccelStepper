@@ -269,7 +269,18 @@ const static char messages[] PROGMEM =
 #define MSG_ATTACH_PULSE_COUNTER 39
     "Attach pulse counter |"
 #define MSG_ERROR_ATTACH_PULSE_COUNTER 40
-    "ERROR attaching pulse counter\n|";
+    "ERROR attaching pulse counter\n|"
+#define MSG_ERROR_INVALID_VALUE 41
+    "ERROR invalid value\n|"
+#define MSG_ERROR_MOVE_ERR_ACCELERATION_IS_UNDEFINED__MINUS_3 42
+    "ERROR acceleration is not defined\n|"
+#define MSG_ERROR_MOVE_ERR_SPEED_IS_UNDEFINED__MINUS_2 43
+    "ERROR speed is not defined\n|"
+#define MSG_ERROR_MOVE_ERR_NO_DIRECTION_PIN__MINUS_1 44
+    "ERROR no direction Pin => impossible move\n|"
+#define MSG_MOVE_OK 45
+    "OK\n|"
+;
 
 void output_msg(int8_t i) {
   char ch;
@@ -487,6 +498,12 @@ void info(FastAccelStepper *s) {
       Serial.print(" MANU");
     }
   }
+  else {
+    Serial.print(" Acceleration [steps/s^2]=");
+    Serial.print(s->getAcceleration());
+    Serial.print(" Speed [us/step]=");
+    Serial.print(s->getSpeedInUs());
+  }
   Serial.print(' ');
 }
 
@@ -696,29 +713,32 @@ void loop() {
           if (sscanf(out_buffer, "A%lu", &val) == 1) {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
-            stepper_selected->setAcceleration(val);
+            int8_t res = stepper_selected->setAcceleration(val);
+			if (res < 0) {
+				output_msg(MSG_ERROR_INVALID_VALUE);
+			}
           } else if (sscanf(out_buffer, "V%lu", &val) == 1) {
             output_msg(MSG_SET_SPEED_TO);
             Serial.println(val);
-            stepper_selected->setSpeed(val);
+            int8_t res = stepper_selected->setSpeed(val);
+			if (res < 0) {
+				output_msg(MSG_ERROR_INVALID_VALUE);
+			}
           } else if (sscanf(out_buffer, "a%ld", &val) == 1) {
             output_msg(MSG_SET_ACCELERATION_TO);
             Serial.println(val);
-            int res = stepper_selected->moveByAcceleration(val);
-            output_msg(MSG_RETURN_CODE);
-            Serial.println(res);
+            int8_t res = stepper_selected->moveByAcceleration(val);
+            output_msg(MSG_MOVE_OK+res);
           } else if (sscanf(out_buffer, "R%ld", &val) == 1) {
             output_msg(MSG_MOVE_STEPS);
             Serial.println(val);
-            int res = stepper_selected->move(val);
-            output_msg(MSG_RETURN_CODE);
-            Serial.println(res);
+            int8_t res = stepper_selected->move(val);
+            output_msg(MSG_MOVE_OK+res);
           } else if (sscanf(out_buffer, "P%ld", &val) == 1) {
             output_msg(MSG_MOVE_TO_POSITION);
             Serial.println(val);
-            int res = stepper_selected->moveTo(val);
-            output_msg(MSG_RETURN_CODE);
-            Serial.println(res);
+            int8_t res = stepper_selected->moveTo(val);
+            output_msg(MSG_MOVE_OK+res);
           } else if (sscanf(out_buffer, "@%ld", &val) == 1) {
             output_msg(MSG_SET_POSITION);
             Serial.println(val);

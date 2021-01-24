@@ -86,6 +86,7 @@ class RampGenerator {
 
  public:
   uint32_t speed_in_us;
+  uint32_t acceleration;
   inline uint8_t rampState() {
     // reading one byte is atomic
     return _rw.ramp_state;
@@ -96,7 +97,9 @@ class RampGenerator {
     _ro.target_pos += delta;
   }
   int8_t setSpeed(uint32_t min_step_us);
+  uint32_t getSpeedInUs() { return speed_in_us; }
   int8_t setAcceleration(uint32_t accel);
+  uint32_t getAcceleration() { return acceleration; }
   inline bool hasValidConfig() {
     return ((_config.min_travel_ticks != 0) && (_config.upm_inv_accel2 != 0));
   }
