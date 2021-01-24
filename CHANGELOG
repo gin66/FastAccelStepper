@@ -7,6 +7,7 @@ pre-0.19.0:
 	- move/moveTo/moveByAcceleration => verbose error code
 	- setSpeed/setAcceleration =>x report invalid data error
 	- motor info with speed/acceleration
+	- less verbose: if any motor is running, only info for running motor
 
 
 0.18.13:

@@ -449,7 +449,7 @@ int selected = -1;
 uint32_t pause_ms = 0;
 uint32_t pause_start = 0;
 
-void info(FastAccelStepper *s) {
+void info(FastAccelStepper *s, bool long_info) {
   Serial.print('@');
   Serial.print(s->getCurrentPosition());
 #if defined(ARDUINO_ARCH_ESP32)
@@ -499,10 +499,12 @@ void info(FastAccelStepper *s) {
     }
   }
   else {
-    Serial.print(" Acceleration [steps/s^2]=");
-    Serial.print(s->getAcceleration());
-    Serial.print(" Speed [us/step]=");
-    Serial.print(s->getSpeedInUs());
+    if (long_info) {
+		Serial.print(" Acceleration [steps/s^2]=");
+		Serial.print(s->getAcceleration());
+		Serial.print(" Speed [us/step]=");
+		Serial.print(s->getSpeedInUs());
+	}
   }
   Serial.print(' ');
 }
@@ -577,7 +579,7 @@ void stepper_info() {
       Serial.print('M');
       Serial.print(i + 1);
       Serial.print(": ");
-      info(stepper[i]);
+      info(stepper[i], true);
       Serial.println();
     }
   }
@@ -609,13 +611,15 @@ void usage() {
   stepper_info();
 }
 
-void output_info() {
+void output_info(bool only_running) {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (stepper[i]) {
-      Serial.print('M');
-      Serial.print(i + 1);
-      Serial.print(": ");
-      info(stepper[i]);
+      if (!only_running || stepper[i]->isRunning()) {
+		  Serial.print('M');
+		  Serial.print(i + 1);
+		  Serial.print(": ");
+		  info(stepper[i], false);
+		}
     }
   }
   Serial.println();
@@ -935,7 +939,7 @@ void loop() {
         uint32_t now = millis();
         if (now - last_time >= 100) {
           if (verbose) {
-            output_info();
+            output_info(true);
           }
           last_time = now;
         }
@@ -951,13 +955,13 @@ void loop() {
     if (running) {
       if (ms - last_time >= 100) {
         if (verbose) {
-          output_info();
+          output_info(true);
         }
         last_time = ms;
       }
     }
     if (!stopped && !running) {
-      output_info();
+      output_info(true);
       if (usage_info) {
         usage();
       }
