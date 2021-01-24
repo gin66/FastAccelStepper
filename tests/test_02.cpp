@@ -190,16 +190,16 @@ int main() {
   test.with_pars("f1", 1000, 4300, 10000, true, 4.5 - 0.2, 4.5 + 0.2, 0.5, true,
                  true);
 
-  // ramp time 2s, 400 steps TODO
-  test.with_pars("f2", 10000, 5000, 100, true, 2 * 2.0 + 46.0 - 1.0,
-                 2 * 2.0 + 46.0 + 2.0, 0.2);
-  // ramp time 0.02s, 4 steps
-  test.with_pars("f3", 1600, 5000, 10000, true, 7.9, 8.1, 0.2);
-  // ramp time 0.2s, 20 steps
-  test.with_pars("f4", 1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1 - 0.1,
+  // ramp 2*2s, 2*200 steps, coasting: 9600steps, 48s
+  test.with_pars("f2", 10000, 5000, 100, true, 2 * 2.0 + 48.0 - 0.2,
+                 2 * 2.0 + 48.0 + 0.2, 0.2);
+  // ramp 2*0.02s, 2*2 steps, coasting: 1596 steps, 7.98s
+  test.with_pars("f3", 1600, 5000, 10000, true, 7.94, 8.02, 0.2);
+  // ramp 2*0.2s, 2*20 steps, coasting: 1560 steps, 7.8s
+  test.with_pars("f4", 1600, 5000, 1000, true, 2 * 0.2 + 7.8 - 0.1,
                  2 * 0.2 + 7.8 + 0.1, 0.2);
-  // ramp time 1s, 5000 steps
-  test.with_pars("f5", 15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.17,
+  // ramp 2*1s, 5000 steps, coasting: 5000steps, 0.5s
+  test.with_pars("f5", 15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.1,
                  2 * 1.0 + 0.5 + 0.1, 0.2);
   // ramp time 0.02s, 4 steps
   test.with_pars("f6", 100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.1,
