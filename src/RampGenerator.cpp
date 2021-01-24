@@ -54,11 +54,11 @@ int8_t RampGenerator::setSpeed(uint32_t min_step_us) {
     return -1;
   }
   if (min_step_us > TICKS_TO_US(0xffffffff)) {
-	return -1;
+    return -1;
   }
   uint32_t min_travel_ticks = US_TO_TICKS(min_step_us);
   if (min_travel_ticks < MIN_DELTA_TICKS) {
-	return -1;
+    return -1;
   }
   speed_in_us = min_step_us;
   _config.min_travel_ticks = min_travel_ticks;

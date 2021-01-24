@@ -223,22 +223,30 @@ int main() {
   test.with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1,
                  0.2);
 
-  // The following five ramps are too fast. 
+  // The following five ramps are too fast.
   // The first step should come after ~0.6s and
   // the second after 0.89s. Implementation issues first step immediately
-  // with pause to 2nd step of 0.6s (from design, not checked).
-  // So the first steps are issued within 0.6 instead of 0.89s.
+  // with pause to 2nd step of 0.36s (actually 0.315s).
+  // So the first steps are issued within 0.36s instead of 0.89s.
+  //
+  // The implementation issues in addition the last two steps with 0.315s pause
+  float rd = 0.57;  // rd  means ramp deviation
   //
   // ramp 2*50s, thus with 500steps max speed not reached. 250steps need 10s
-  test.with_pars("f13", 500, 4000, 5, false, 20.0 - 0.7, 20.0 + 0.1, 0.2);
-  test.with_pars("f14", 2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2,
-   0.2);
+  test.with_pars("f13", 500, 4000, 5, false, 20.0 - rd - 0.1, 20.0 - rd + 0.1,
+                 0.2);
+  test.with_pars("f14", 2000, 4000, 5, false, 40.0 - rd - 0.1, 40.0 - rd + 0.1,
+                 0.2);
   // ramp 2*50s with 2*6250 steps => 100 steps at max speed using 0.4s
-  test.with_pars("f15", 12600, 4000, 5, true, 100.0 +0* 0.4-0.1, 100.0 +0.4+ 0.1, 0.2);
+  test.with_pars("f15", 12600, 4000, 5, true, 100.0 + 0.4 - rd - 0.1,
+                 100.0 + 0.4 - rd + 0.1, 0.2);
   // ramp 2*50s with 2*6250 steps => 4000 steps at max speed using 16s
-  test.with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.1 -0.4, 116.0 + 0.1, 0.2);
+  test.with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.1 - rd,
+                 116.0 + 0.1 - rd, 0.2);
   // slow ramp: 2*50steps, 2*10s
-  test.with_pars("f17", 100, 40, 1, false, 20.0-0.1-1.4, 20.0+0.1-1.4, 1.0);
+  rd = 1.4;
+  test.with_pars("f17", 100, 40, 1, false, 20.0 - 0.1 - rd, 20.0 + 0.1 - rd,
+                 1.0);
 
   // jumps in speed in real => WORKS NOW
   test.with_pars("f18", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
@@ -249,7 +257,7 @@ int main() {
   // name, steps, travel_dt, accel, reach_max_speed, min_time, max_time,
   // allowed_ramp_time_delta slow ramp time Those are anomalies (see github
   // issue #8) on avr, but not on PC
-  //test.with_pars("f20", 50000, 270000, 10, true, 62.0, 63.0, 1.0);
+  // test.with_pars("f20", 50000, 270000, 10, true, 62.0, 63.0, 1.0);
   test.with_pars("f20", 10, 1000000, 1, true, 9.9, 10.1, 1.0);
 
   // no ramp time, just constant run time
