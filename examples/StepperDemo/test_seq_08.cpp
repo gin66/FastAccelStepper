@@ -39,7 +39,7 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
           seq->state = TEST_STATE_ERROR;
           return true;
         }
-#define VMIN 10
+#define VMIN 40
 #define VMAX 16384
         uint16_t speed = rand() % (VMAX * 4);
         speed = speed >> ((speed % 4) + 2);
