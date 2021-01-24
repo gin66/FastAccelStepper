@@ -223,27 +223,28 @@ int main() {
   test.with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1,
                  0.2);
 
+  // The following five ramps are too fast. 
+  // The first step should come after ~0.6s and
+  // the second after 0.89s. Implementation issues first step immediately
+  // with pause to 2nd step of 0.6s (from design, not checked).
+  // So the first steps are issued within 0.6 instead of 0.89s.
+  //
   // ramp 2*50s, thus with 500steps max speed not reached. 250steps need 10s
-  // TODO: these two are too fast
-  test.with_pars("f13", 500, 4000, 5, false, 20.0 - 1.1, 20.0 + 0.1, 0.2);
+  test.with_pars("f13", 500, 4000, 5, false, 20.0 - 0.7, 20.0 + 0.1, 0.2);
   test.with_pars("f14", 2000, 4000, 5, false, 40.0 - 0.6, 40.0 + 0.2,
    0.2);
   // ramp 2*50s with 2*6250 steps => 100 steps at max speed using 0.4s
-  // TODO: this is too fast
   test.with_pars("f15", 12600, 4000, 5, true, 100.0 +0* 0.4-0.1, 100.0 +0.4+ 0.1, 0.2);
   // ramp 2*50s with 2*6250 steps => 4000 steps at max speed using 16s
-  // TODO: this is too fast
-	  test.with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.1 -0.4, 116.0 + 0.1, 0.2);
+  test.with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.1 -0.4, 116.0 + 0.1, 0.2);
+  // slow ramp: 2*50steps, 2*10s
+  test.with_pars("f17", 100, 40, 1, false, 20.0-0.1-1.4, 20.0+0.1-1.4, 1.0);
 
   // jumps in speed in real => WORKS NOW
-  test.with_pars("f17", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
+  test.with_pars("f18", 256000, 40, 5000, true, 15.2 - 0.1, 15.2 + 0.2, 0.2);
 
   // ramp time  625s, 7812500 steps
-  // test.with_pars("f18", 2000000, 40, 40, false, 2*223.0, 2*223.0);
-
-  // slow ramp: 2*50steps, 2*10s
-  // TODO: too fast
-  test.with_pars("f19", 100, 40, 1, false, 20.0-0.1-1.4, 20.0+0.1-1.4, 1.0);
+  // test.with_pars("f19", 2000000, 40, 40, false, 2*223.0, 2*223.0);
 
   // name, steps, travel_dt, accel, reach_max_speed, min_time, max_time,
   // allowed_ramp_time_delta slow ramp time Those are anomalies (see github
