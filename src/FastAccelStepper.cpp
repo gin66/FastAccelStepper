@@ -520,10 +520,10 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   _off_delay_count = max(delay_count, 1);
 }
 int8_t FastAccelStepper::setSpeed(uint32_t min_step_us) {
-  _rg.setSpeed(min_step_us);
+  return _rg.setSpeed(min_step_us);
 }
 int8_t FastAccelStepper::setAcceleration(uint32_t accel) {
-  _rg.setAcceleration(accel);
+  return _rg.setAcceleration(accel);
 }
 int8_t FastAccelStepper::moveTo(int32_t position) {
   return _rg.moveTo(position);
