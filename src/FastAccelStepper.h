@@ -140,7 +140,7 @@ class FastAccelStepper {
   int8_t setAcceleration(uint32_t step_s_s);
 
   // This function applies new values for speed/acceleration.
-  // This is convenient especially, if we stepper is set to continuous running.
+  // This is convenient especially, if the stepper is set to continuous running.
   void applySpeedAcceleration();
 
   // start/move the stepper for (move) steps or to an absolute position.
