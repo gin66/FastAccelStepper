@@ -201,9 +201,9 @@ int main() {
   // ramp 2*1s, 5000 steps, coasting: 5000steps, 0.5s
   test.with_pars("f5", 15000, 100, 10000, true, 2 * 1.0 + 0.5 - 0.1,
                  2 * 1.0 + 0.5 + 0.1, 0.2);
-  // ramp time 0.02s, 4 steps
-  test.with_pars("f6", 100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.1,
-                 2 * 0.02 + 0.48 + 0.1, 0.2);
+  // ramp 2*0.02s, 2*2 steps, coasting: 96steps, 0.48
+  test.with_pars("f6", 100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.02,
+                 2 * 0.02 + 0.48 + 0.02, 0.2);
   // ramp time 2s, 20000 steps => only ramp 0.22s
   test.with_pars("f7", 500, 50, 10000, false, 2 * 0.22 - 0.1, 2 * 0.22 + 0.11,
                  0.2);
