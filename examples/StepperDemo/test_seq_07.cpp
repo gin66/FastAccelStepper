@@ -18,7 +18,7 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
       if (stepper->rampState() == RAMP_STATE_COAST) {
         int32_t dt = time_ms - seq->u32_1;
         Serial.println(dt);
-        if (abs(dt - 955) > 145) {  // avr ~820, esp32 ~1085
+        if (abs(dt - 811) > 10) {
           seq->state = TEST_STATE_ERROR;
           return true;
         }
@@ -45,9 +45,10 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
       if (!stepper->isRunning()) {
         int32_t dt = time_ms - seq->u32_1;
         Serial.println(dt);
-        if (abs(dt - 1390) > 90) {  // avr ~1480, esp32 ~1308
+        if (abs(dt - 1485) > 10) {
           seq->state = TEST_STATE_ERROR;
         }
+		Serial.println(stepper->getPositionAfterCommandsCompleted());
         if (stepper->getPositionAfterCommandsCompleted() != 0) {
           seq->state = TEST_STATE_ERROR;
         }
