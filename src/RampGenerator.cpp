@@ -144,7 +144,8 @@ int8_t RampGenerator::_startMove(int32_t target_pos, int32_t curr_target_pos) {
   return MOVE_OK;
 }
 
-int8_t RampGenerator::moveTo(int32_t position, const struct queue_end_s *queue_end) {
+int8_t RampGenerator::moveTo(int32_t position,
+                             const struct queue_end_s *queue_end) {
   int32_t curr_pos;
   if (isRampGeneratorActive() && !_ro.keep_running) {
     curr_pos = _ro.target_pos;

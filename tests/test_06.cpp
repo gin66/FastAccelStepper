@@ -103,7 +103,7 @@ class FastAccelStepperTest {
   }
 
   void do_test2(uint32_t stop_at_position) {
-	printf("do_test2 with stop at %d\n", stop_at_position);
+    printf("do_test2 with stop at %d\n", stop_at_position);
     init_queue();
     FastAccelStepper s = FastAccelStepper();
     s.init(NULL, 0, 0);
@@ -154,19 +154,19 @@ class FastAccelStepperTest {
       // This must be ensured, so that the stepper does not run out of commands
       assert((i == 0) || (old_planned_time_in_buffer > 0.005));
       if (!s.isRampGeneratorActive()) {
-		if (restarted) {
-			break;
-		}
-		puts("Continue move to end position");
-		rc.next_ramp();
-		restarted = true;
+        if (restarted) {
+          break;
+        }
+        puts("Continue move to end position");
+        rc.next_ramp();
+        restarted = true;
         s.moveTo(9999);
       }
       old_planned_time_in_buffer = planned_time;
     }
-	printf("do_test2 with stop at %d\n", stop_at_position);
+    printf("do_test2 with stop at %d\n", stop_at_position);
     test(!s.isRampGeneratorActive(), "too many commands created");
-	printf("getCurrentPosition() = %d\n", s.getCurrentPosition());
+    printf("getCurrentPosition() = %d\n", s.getCurrentPosition());
     test(s.getCurrentPosition() == 9999, "has not reached end position");
     printf("Total time  %f\n", rc.total_ticks / 16000000.0);
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)

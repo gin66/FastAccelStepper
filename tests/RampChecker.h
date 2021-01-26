@@ -24,7 +24,7 @@ class RampChecker {
   RampChecker() {
     total_ticks = 0;
     pos = 0;
-	next_ramp();
+    next_ramp();
   }
   void check_section(struct queue_entry *e) {
     uint8_t steps = e->steps;

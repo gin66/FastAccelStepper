@@ -48,7 +48,7 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
         if (abs(dt - 1485) > 10) {
           seq->state = TEST_STATE_ERROR;
         }
-		Serial.println(stepper->getPositionAfterCommandsCompleted());
+        Serial.println(stepper->getPositionAfterCommandsCompleted());
         if (stepper->getPositionAfterCommandsCompleted() != 0) {
           seq->state = TEST_STATE_ERROR;
         }
