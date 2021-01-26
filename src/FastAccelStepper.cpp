@@ -526,7 +526,7 @@ int8_t FastAccelStepper::setAcceleration(uint32_t accel) {
   return _rg.setAcceleration(accel);
 }
 int8_t FastAccelStepper::moveTo(int32_t position) {
-  return _rg.moveTo(position);
+  return _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
 }
 int8_t FastAccelStepper::move(int32_t move) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {

@@ -12,16 +12,19 @@ class RampChecker {
   uint32_t pos;
   uint32_t ticks_since_last_step = 0;
 
-  RampChecker() {
-    total_ticks = 0;
+  void next_ramp() {
+    increase_ok = true;
+    decrease_ok = false;
     last_dt = ~0;
     min_dt = ~0;
     first = true;
-    increase_ok = true;
-    decrease_ok = false;
     coast_till = 0;
     accelerate_till = 0;
+  }
+  RampChecker() {
+    total_ticks = 0;
     pos = 0;
+	next_ramp();
   }
   void check_section(struct queue_entry *e) {
     uint8_t steps = e->steps;
