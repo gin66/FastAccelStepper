@@ -726,7 +726,7 @@ void loop() {
           } else if (sscanf(out_buffer, "V%lu", &val) == 1) {
             output_msg(MSG_SET_SPEED_TO);
             Serial.println(val);
-            int8_t res = stepper_selected->setSpeed(val);
+            int8_t res = stepper_selected->setSpeedInUs(val);
             if (res < 0) {
               output_msg(MSG_ERROR_INVALID_VALUE);
             }

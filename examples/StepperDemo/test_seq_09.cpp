@@ -39,7 +39,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         sprintf(buf, "speed=%u accel=%u", (unsigned int)speed,
                 (unsigned int)accel);
         Serial.println(buf);
-        stepper->setSpeed(speed);
+        stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         if (rand() & 1) {
           stepper->runForward();

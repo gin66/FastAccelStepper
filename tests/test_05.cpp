@@ -43,7 +43,7 @@ class FastAccelStepperTest {
     // Increase speed to 400, then further to 300
     // Identified bug was a fast jump to 300 without acceleration
     assert(s.isQueueEmpty());
-    s.setSpeed(400);
+    s.setSpeedInUs(400);
     s.setAcceleration(10000);
     in_manage = true;
     s.fill_queue();

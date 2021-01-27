@@ -41,7 +41,7 @@ class FastAccelStepperTest {
 
     uint32_t speed_us = 40;
     assert(s.isQueueEmpty());
-    s.setSpeed(speed_us);
+    s.setSpeedInUs(speed_us);
     s.setAcceleration(accel);
     s.fill_queue();
     assert(s.isQueueEmpty());

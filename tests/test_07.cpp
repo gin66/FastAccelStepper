@@ -42,7 +42,7 @@ class FastAccelStepperTest {
     uint32_t speed_us = 100;
     int32_t steps = 32000;
     assert(s.isQueueEmpty());
-    s.setSpeed(speed_us);
+    s.setSpeedInUs(speed_us);
     s.setAcceleration(10000);
     s.fill_queue();
     assert(s.isQueueEmpty());
@@ -62,7 +62,7 @@ class FastAccelStepperTest {
       if (rc.total_ticks > next_speed_change) {
         next_speed_change = rc.total_ticks + T100MS;
         speed_us = 190 - speed_us;
-        s.setSpeed(speed_us);
+        s.setSpeedInUs(speed_us);
         s.applySpeedAcceleration();
       }
       if (true) {

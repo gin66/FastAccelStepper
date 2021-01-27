@@ -112,12 +112,12 @@ class FastAccelStepper {
   // is true while the stepper is running
   bool isMotorRunning();
 
-  // For stepper movement control by FastAccelStepper
+  // For stepper movement control by FastAccelStepper's ramp generator
   //
-  // setSpeed expects as parameter the minimum time between two steps.
+  // setSpeedInUs expects as parameter the minimum time between two steps.
   // If for example 5 steps/s shall be the maximum speed of the stepper,
   // then t = 0.2 s/steps = 200000 us/step, so call
-  //      setSpeed(200000);
+  //      setSpeedInUs(200000);
   //
   // New value will be used after call to
   // move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
@@ -126,9 +126,29 @@ class FastAccelStepper {
   //
   // Returns 0 on success, or -1 on invalid value
   // Invalid is <MIN_DELTA_TICKS in us or >~250 Mio.
-  int8_t setSpeed(uint32_t min_step_us);
+  int8_t setSpeedInUs(uint32_t min_step_us);
   // retrieve current speed
   uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
+
+  // setSpeedInHz() allows to set the stepper speed as step frequency in Hertz.
+  // This means steps/s.
+  int8_t setSpeedInHz(uint32_t speed_hz) {
+	  if (speed_hz == 0) {
+		  return -1;
+	  }
+	  return setSpeedInUs(1000000L/speed_hz);
+  }
+  
+  // setSpeedInMilliHz() allows to set the stepper speed as step frequency in milliHertz.
+  // This means steps/1000 s. This is required for very slow speeds.
+  //
+  //
+  int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
+	  if (speed_mhz == 0) {
+		  return -1;
+	  }
+	  return setSpeedInUs(1000000000L/speed_mhz);
+  }
 
   //  set Acceleration expects as parameter the change of speed
   //  as step/s².
@@ -185,7 +205,7 @@ class FastAccelStepper {
 
   // moveByAcceleration() can be called, if only the speed of the stepper
   // is of interest and that speed to be controlled by acceleration.
-  // The maximum speed (in both directions) to be set by setSpeed() before.
+  // The maximum speed (in both directions) to be set by setSpeedInUs() before.
   // The behaviour will be:
   //	acceleration > 0  => accelerate towards positive maximum speed
   //	acceleration = 0  => keep current speed

@@ -25,7 +25,7 @@ void setup() {
     // stepper->setDelayToEnable(50);
     // stepper->setDelayToDisable(1000);
 
-    stepper->setSpeed(1000);  // the parameter is us/step !!!
+    stepper->setSpeedInUs(1000);  // the parameter is us/step !!!
     stepper->setAcceleration(100);
     stepper->move(1000);
   }

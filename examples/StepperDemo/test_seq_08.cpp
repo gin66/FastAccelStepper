@@ -75,7 +75,7 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
 
         sprintf(buf, "speed=%d accel=%d move=%d", speed, accel, move);
         Serial.println(buf);
-        stepper->setSpeed(speed);
+        stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         stepper->move(move);
         seq->u32_1 = time_ms;

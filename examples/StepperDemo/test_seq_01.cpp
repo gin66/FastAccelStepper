@@ -6,7 +6,7 @@ bool test_seq_01(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
   switch (seq->state & 15) {
     case 0:  // INIT
-      stepper->setSpeed(40);
+      stepper->setSpeedInUs(40);
       stepper->setAcceleration(1000000);
       seq->u32_1 = time_ms;
       seq->state++;
@@ -35,7 +35,7 @@ bool test_seq_01(FastAccelStepper *stepper, struct test_seq_s *seq,
       seq->state = (seq->state & 0xfff0) + 17;
       break;
     case 7:
-      stepper->setSpeed(1000);
+      stepper->setSpeedInUs(1000);
       stepper->setAcceleration(10000);
       stepper->move(-3200);
       seq->state++;

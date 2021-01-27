@@ -49,7 +49,7 @@ void RampGenerator::init() {
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
 }
-int8_t RampGenerator::setSpeed(uint32_t min_step_us) {
+int8_t RampGenerator::setSpeedInUs(uint32_t min_step_us) {
   if (min_step_us == 0) {
     return -1;
   }

@@ -26,7 +26,7 @@ void setup() {
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
 
-    stepper->setSpeed(1000);  // the parameter is us/step !!!
+    stepper->setSpeedInUs(1000);  // the parameter is us/step !!!
     stepper->setAcceleration(10000);
     // stepper->move(7000);
     stepper->runForward();

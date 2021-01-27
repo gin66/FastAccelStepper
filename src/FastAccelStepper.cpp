@@ -519,8 +519,8 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   }
   _off_delay_count = max(delay_count, 1);
 }
-int8_t FastAccelStepper::setSpeed(uint32_t min_step_us) {
-  return _rg.setSpeed(min_step_us);
+int8_t FastAccelStepper::setSpeedInUs(uint32_t min_step_us) {
+  return _rg.setSpeedInUs(min_step_us);
 }
 int8_t FastAccelStepper::setAcceleration(uint32_t accel) {
   return _rg.setAcceleration(accel);
@@ -554,10 +554,10 @@ int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
     }
   } else {
     uint32_t max_speed = _rg.speed_in_us;
-    setSpeed(getPeriodAfterCommandsCompleted());
+    setSpeedInUs(getPeriodAfterCommandsCompleted());
     setAcceleration(1);
     applySpeedAcceleration();
-    setSpeed(max_speed);
+    setSpeedInUs(max_speed);
   }
   return res;
 }

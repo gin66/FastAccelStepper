@@ -45,7 +45,7 @@ class FastAccelStepperTest {
     //	S
 
     assert(s.isQueueEmpty());
-    s.setSpeed(4000);
+    s.setSpeedInUs(4000);
     s.setAcceleration(100000);
     s.fill_queue();
     assert(s.isQueueEmpty());
@@ -60,7 +60,7 @@ class FastAccelStepperTest {
         puts("Change speed to 4300us");
         s.fill_queue();  // ensure queue is not empty
         speed_changed = true;
-        s.setSpeed(4300);
+        s.setSpeedInUs(4300);
         s.applySpeedAcceleration();
       }
       if (!stop_initiated && (s.getCurrentPosition() >= 2000)) {
@@ -116,7 +116,7 @@ class FastAccelStepperTest {
     //	M1 N A100 V100 P9999 w100 S W P9999
 
     assert(s.isQueueEmpty());
-    s.setSpeed(100);
+    s.setSpeedInUs(100);
     s.setAcceleration(100);
     s.fill_queue();
     assert(s.isQueueEmpty());

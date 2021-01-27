@@ -43,7 +43,7 @@ class FastAccelStepperTest {
     // Increase speed to 400, then further to 300
     // Identified bug was a fast jump to 300 without acceleration
     assert(s.isQueueEmpty());
-    s.setSpeed(400);
+    s.setSpeedInUs(400);
     s.setAcceleration(1000);
     s.fill_queue();
     assert(s.isQueueEmpty());
@@ -57,7 +57,7 @@ class FastAccelStepperTest {
         puts("Change speed");
         s.fill_queue();  // ensure queue is not empty
         speed_increased = true;
-        s.setSpeed(300);
+        s.setSpeedInUs(300);
         s.move(steps);
       }
       if (true) {
@@ -105,7 +105,7 @@ class FastAccelStepperTest {
     // Increase speed to 400, then further to 300
     // Identified bug was a fast jump to 300 without acceleration
     assert(s.isQueueEmpty());
-    s.setSpeed(400);
+    s.setSpeedInUs(400);
     s.setAcceleration(1000);
     s.fill_queue();
     assert(s.isQueueEmpty());
@@ -120,7 +120,7 @@ class FastAccelStepperTest {
         puts("Change speed");
         s.fill_queue();  // ensure queue is not empty
         speed_decreased = true;
-        s.setSpeed(500);
+        s.setSpeedInUs(500);
         s.move(steps);
       }
       if (true) {

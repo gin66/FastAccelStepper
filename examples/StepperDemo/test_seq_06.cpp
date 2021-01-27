@@ -13,7 +13,7 @@ bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
   switch (seq->state) {
     case 0:  // INIT
-      stepper->setSpeed(SPEED_1_US);
+      stepper->setSpeedInUs(SPEED_1_US);
       stepper->setAcceleration(10000);
       stepper->move(32000);
       seq->u32_1 = time_ms;
@@ -21,7 +21,7 @@ bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
       break;
     case 1:
       if (time_ms - seq->u32_1 >= 100) {
-        stepper->setSpeed(SPEED_2_US);
+        stepper->setSpeedInUs(SPEED_2_US);
         stepper->applySpeedAcceleration();
         seq->u32_1 = time_ms;
         seq->state++;
@@ -29,7 +29,7 @@ bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
       break;
     case 2:
       if (time_ms - seq->u32_1 >= 100) {
-        stepper->setSpeed(SPEED_1_US);
+        stepper->setSpeedInUs(SPEED_1_US);
         stepper->applySpeedAcceleration();
         seq->u32_1 = time_ms;
         seq->state--;
@@ -39,7 +39,7 @@ bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
       }
       break;
     case 3:  // Return to start position
-      stepper->setSpeed(SPEED_HOME_US);
+      stepper->setSpeedInUs(SPEED_HOME_US);
       stepper->move(-32000);
       seq->state++;
       break;
