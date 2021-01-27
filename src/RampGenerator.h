@@ -24,7 +24,8 @@
 class FastAccelStepper;
 
 #if (TICKS_PER_S == 16000000L)
-#define UPM_TICKS_PER_S ((upm_float)0x97f4)
+#define UPM_TICKS_PER_S UPM_CONST_16E6
+#define UPM_ACCEL_FACTOR UPM_CONST_128E12
 #define US_TO_TICKS(u32) (u32 * 16)
 #define TICKS_TO_US(u32) (u32 / 16)
 #else

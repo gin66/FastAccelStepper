@@ -5,7 +5,8 @@
 #endif
 
 typedef uint16_t upm_float;
-
+#define UPM_CONST_128E12 ((upm_float)0xaee8)
+#define UPM_CONST_16E6 ((upm_float)0x97f4)
 #define UPM_CONST_500 ((upm_float)0x88fa)
 #define UPM_CONST_1000 ((upm_float)0x89fa)
 #define UPM_CONST_2000 ((upm_float)0x8afa)

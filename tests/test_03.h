@@ -332,6 +332,13 @@ bool perform_test() {
   test(x1 == UPM_CONST_1000, "const 1000");
   x1 = upm_from((uint32_t)2000);
   test(x1 == UPM_CONST_2000, "const 2000");
+  x1 = upm_from((uint32_t)16000000);
+  test(x1 == UPM_CONST_16E6, "const 16E6");
+  x1 = upm_from((uint32_t)128000000);
+  x1 = upm_multiply(x1, UPM_CONST_1000);
+  x1 = upm_multiply(x1, UPM_CONST_1000);
+  xprintf("const 128e12=0x%x\n", x1);
+  test(x1 == UPM_CONST_128E12, "const 128E12");
 
   return (error_cnt == 0);
 }
