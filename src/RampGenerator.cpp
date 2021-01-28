@@ -270,7 +270,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     this_state = RAMP_STATE_DECELERATE_TO_STOP;
     remaining_steps = performed_ramp_up_steps;
   } else if (count_up != need_count_up) {
-    // On direcction change, do reversing
+    // On direction change, do reversing
     this_state = RAMP_STATE_REVERSE;
     remaining_steps = performed_ramp_up_steps;
   } else {
