@@ -444,8 +444,8 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 #ifdef TEST
       assert((performed_ramp_up_steps == 0) && (steps == 1));
 #endif
-      performed_ramp_up_steps =
-          0;  // based on above assumption actually obsolete
+      // based on above assumption actually obsolete
+      performed_ramp_up_steps = 0;
     } else {
       performed_ramp_up_steps -= steps;
     }
