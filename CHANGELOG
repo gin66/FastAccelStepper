@@ -1,6 +1,7 @@
 pre 0.20.0:
 - rename setSpeed to setSpeedInUs
 - add setSpeedInHz() and setSpeedInMilliHz()
+- RampGenerator code reworked and simplified
 
 0.19.0:
 - avoid overflow in setSpeed for super slow speed

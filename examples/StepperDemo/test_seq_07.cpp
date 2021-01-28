@@ -45,7 +45,7 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
       if (!stepper->isRunning()) {
         int32_t dt = time_ms - seq->u32_1;
         Serial.println(dt);
-        if (abs(dt - 1485) > 10) {
+        if (abs(dt - 1495) > 30) {
           seq->state = TEST_STATE_ERROR;
         }
         Serial.println(stepper->getPositionAfterCommandsCompleted());

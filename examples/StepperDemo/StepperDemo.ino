@@ -471,7 +471,7 @@ void info(FastAccelStepper *s, bool long_info) {
     Serial.print(s->getPeriodAfterCommandsCompleted());
     Serial.print("us");
     if (s->isRampGeneratorActive()) {
-      switch (s->rampState() & RAMP_STATE_MASK) {
+      switch (s->rampState()) {
         case RAMP_STATE_IDLE:
           Serial.print(" IDLE ");
           break;
