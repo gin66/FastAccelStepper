@@ -230,7 +230,7 @@ int main() {
   // So the first steps are issued within 0.36s instead of 0.89s.
   //
   // The implementation issues in addition the last two steps with 0.315s pause
-  float rd = 0.57;  // rd  means ramp deviation
+  float rd = 0.38;  // rd  means ramp deviation
   //
   // ramp 2*50s, thus with 500steps max speed not reached. 250steps need 10s
   test.with_pars("f13", 500, 4000, 5, false, 20.0 - rd - 0.1, 20.0 - rd + 0.1,
@@ -244,7 +244,7 @@ int main() {
   test.with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.1 - rd,
                  116.0 + 0.1 - rd, 0.2);
   // slow ramp: 2*50steps, 2*10s
-  rd = 1.4;
+  rd = 1.2;
   test.with_pars("f17", 100, 40, 1, false, 20.0 - 0.1 - rd, 20.0 + 0.1 - rd,
                  1.0);
 

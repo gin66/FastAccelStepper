@@ -133,21 +133,21 @@ class FastAccelStepper {
   // setSpeedInHz() allows to set the stepper speed as step frequency in Hertz.
   // This means steps/s.
   int8_t setSpeedInHz(uint32_t speed_hz) {
-	  if (speed_hz == 0) {
-		  return -1;
-	  }
-	  return setSpeedInUs(1000000L/speed_hz);
+    if (speed_hz == 0) {
+      return -1;
+    }
+    return setSpeedInUs(1000000L / speed_hz);
   }
-  
-  // setSpeedInMilliHz() allows to set the stepper speed as step frequency in milliHertz.
-  // This means steps/1000 s. This is required for very slow speeds.
+
+  // setSpeedInMilliHz() allows to set the stepper speed as step frequency in
+  // milliHertz. This means steps/1000 s. This is required for very slow speeds.
   //
   //
   int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
-	  if (speed_mhz == 0) {
-		  return -1;
-	  }
-	  return setSpeedInUs(1000000000L/speed_mhz);
+    if (speed_mhz == 0) {
+      return -1;
+    }
+    return setSpeedInUs(1000000000L / speed_mhz);
   }
 
   //  set Acceleration expects as parameter the change of speed
@@ -275,12 +275,13 @@ class FastAccelStepper {
   // This function provides info, in which state the high level stepper control
   // is operating
 #define RAMP_STATE_IDLE 0
-#define RAMP_STATE_ACCELERATE 1
-#define RAMP_STATE_DECELERATE_TO_STOP 2
-#define RAMP_STATE_DECELERATE 3
-#define RAMP_STATE_COAST 4
-#define RAMP_STATE_REVERSE 5
-#define RAMP_STATE_MASK 0x0f
+#define RAMP_STATE_COAST 1
+#define RAMP_STATE_ACCELERATE 2
+#define RAMP_STATE_DECELERATE_TO_STOP 4
+#define RAMP_STATE_DECELERATE 12
+#define RAMP_STATE_REVERSE 20
+#define RAMP_STATE_ACCELERATING_FLAG 2
+#define RAMP_STATE_DECELERATING_FLAG 4
   inline uint8_t rampState() { return _rg.rampState(); }
 
   // returns true, if the ramp generation is active
