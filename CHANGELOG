@@ -1,3 +1,7 @@
+pre-0.20.1:
+- few minor speed ups
+- RampGenerator uses now the delayed start feature of the queue
+
 0.20.0:
 - rename setSpeed to setSpeedInUs
 - add setSpeedInHz() and setSpeedInMilliHz()
