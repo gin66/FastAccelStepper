@@ -27,3 +27,4 @@ upm_float upm_shl(upm_float x, uint8_t n);
 upm_float upm_shr(upm_float x, uint8_t n);
 upm_float upm_square(upm_float x);
 upm_float upm_sqrt(upm_float x);
+upm_float upm_sqrt_after_divide(upm_float x, upm_float y);

@@ -7,7 +7,8 @@
 #endif
 #include "PoorManFloat.h"
 
-#define LOG_DIVIDE
+#define UPM_FROM_PARTS(mantissa, exponent) \
+  ((((uint16_t)exponent) << 8) | ((uint8_t)(mantissa)))
 
 // representation is:
 //
@@ -33,7 +34,6 @@ const PROGMEM uint8_t isqrt_tab[256] = {
     234, 235, 235, 236, 236, 237, 237, 238, 238, 239, 239, 240, 241, 241, 242,
     242, 243, 243, 244, 244, 245, 245, 246, 246, 247, 247, 248, 248, 249, 249,
     250, 250, 251, 251, 252, 252, 253, 253, 254, 254, 255, 255};
-#ifdef LOG_DIVIDE
 const PROGMEM uint8_t log_adjust[192] = {
     0,   3,   6,   8,   11,  14,  17,  19,  22,  24,  27,  29,  32,  34,  36,
     39,  41,  43,  46,  48,  50,  52,  55,  57,  59,  61,  63,  65,  67,  69,
@@ -67,7 +67,6 @@ const PROGMEM uint8_t exp_mul_64[256] = {
     217, 218, 219, 220, 221, 223, 224, 225, 226, 228, 229, 230, 231, 233, 234,
     235, 236, 238, 239, 240, 242, 243, 244, 246, 247, 248, 250, 251, 252, 254,
     255};
-#endif
 
 upm_float upm_from(uint8_t x) {
   uint16_t res;
@@ -168,7 +167,7 @@ upm_float upm_multiply(upm_float x, upm_float y) {
   //    ab >>= 7;
   //  }
   //  ab += ((x & 0xff00) - 0x4000) + ((y & 0xff00) - 0x4000);
-  return (((uint16_t)exponent) << 8) | mant;
+  return UPM_FROM_PARTS(mant, exponent);
 }
 upm_float upm_square(upm_float x) {
   uint16_t a = x & 0x00ff;
@@ -182,65 +181,34 @@ upm_float upm_square(upm_float x) {
   aa += ((x & 0xff00) - 0x4000) << 1;
   return aa;
 }
-#ifdef LOG_DIVIDE
+#define UPM_DIVIDE(x, y, mant_res, exp_res)                       \
+  {                                                               \
+    uint8_t exp_x = x >> 8;                                       \
+    uint8_t exp_y = y >> 8;                                       \
+    uint8_t mant_x = x & 255;                                     \
+    uint8_t mant_y = y & 255;                                     \
+                                                                  \
+    if (mant_x < mant_y) {                                        \
+      mant_y >>= 1;                                               \
+      exp_y += 1;                                                 \
+    }                                                             \
+    uint8_t log_x = pgm_read_byte_near(&log_adjust[mant_x - 64]); \
+    uint8_t log_y = pgm_read_byte_near(&log_adjust[mant_y - 64]); \
+    uint8_t log_x_y = log_x - log_y;                              \
+    mant_res = pgm_read_byte_near(&exp_mul_64[log_x_y]);          \
+    /* 6 for table_64 factor. 7 for shift of upm_float */         \
+    exp_res = exp_x - exp_y + 128 - 6 + 7;                        \
+                                                                  \
+    if (mant_res < 128) {                                         \
+      mant_res <<= 1;                                             \
+      exp_res -= 1;                                               \
+    }                                                             \
+  }
 upm_float upm_divide(upm_float x, upm_float y) {
-  uint8_t exp_x = x >> 8;
-  uint8_t exp_y = y >> 8;
-  uint8_t mant_x = x & 255;
-  uint8_t mant_y = y & 255;
-
-  if (mant_x < mant_y) {
-    mant_y >>= 1;
-    exp_y += 1;
-  }
-  uint8_t log_x = pgm_read_byte_near(&log_adjust[mant_x - 64]);
-  uint8_t log_y = pgm_read_byte_near(&log_adjust[mant_y - 64]);
-  uint8_t log_x_y = log_x - log_y;
-  uint8_t mant_res = pgm_read_byte_near(&exp_mul_64[log_x_y]);
-  uint8_t exp_res = exp_x - exp_y + 128 - 6 +
-                    7;  // 6 for table_64 factor. 7 for shift of upm_float
-
-  if (mant_res < 128) {
-    mant_res <<= 1;
-    exp_res -= 1;
-  }
-
-  uint16_t res = exp_res;
-  res <<= 8;
-  res |= mant_res;
-  return res;
+  uint8_t mant_res, exp_res;
+  UPM_DIVIDE(x, y, mant_res, exp_res);
+  return UPM_FROM_PARTS(mant_res, exp_res);
 }
-#else
-upm_float upm_divide(upm_float x, upm_float y) {
-  if (x < y) {
-    return 0;
-  }
-  uint8_t a = x & 255;
-  uint8_t b = y & 255;
-
-  uint8_t exponent = (x >> 8) - (y >> 8);
-  uint8_t mantissa = 0;
-  uint8_t mask = 0x80;
-  while (mask) {
-    if (a >= b) {
-      a -= b;
-      mantissa |= mask;
-    }
-    if (a == 0) {
-      break;
-    }
-    a <<= 1;
-    mask >>= 1;
-  }
-  if ((mantissa & 0x80) == 0) {
-    exponent -= 1;
-  }
-  uint16_t res = exponent + 128;
-  res <<= 8;
-  res |= mantissa;
-  return res;
-}
-#endif
 uint16_t upm_to_u16(upm_float x) {
   uint8_t exponent = x >> 8;
   if (exponent > 15 + 128) {
@@ -301,10 +269,7 @@ upm_float upm_abs_diff(upm_float x, upm_float y) {
     mantissa <<= 1;
     exponent--;
   }
-  uint16_t res = exponent;
-  res <<= 8;
-  res |= mantissa;
-  return res;
+  return UPM_FROM_PARTS(mantissa, exponent);
 }
 upm_float upm_sum(upm_float x, upm_float y) {
   uint8_t exp_x = x >> 8;
@@ -330,31 +295,37 @@ upm_float upm_sum(upm_float x, upm_float y) {
     mantissa >>= 1;
     exponent++;
   }
-  uint16_t res = exponent;
-  res <<= 8;
-  res |= (mantissa & 0x00ff);
-  return res;
+  return UPM_FROM_PARTS(mantissa, exponent);
 }
 upm_float upm_shl(upm_float x, uint8_t n) { return x + (((uint16_t)n) << 8); }
 upm_float upm_shr(upm_float x, uint8_t n) { return x - (((uint16_t)n) << 8); }
+#define UPM_SQRT(mantissa, exponent)                                   \
+  {                                                                    \
+    if ((exponent & 0x01) == 0) {                                      \
+      exponent += 1;                                                   \
+      mantissa >>= 1;                                                  \
+    }                                                                  \
+    mantissa -= 64;                                                    \
+    mantissa = pgm_read_byte_near(&isqrt_tab[mantissa]);               \
+    if (exponent >= 128) {                                             \
+      exponent -= 128;                                                 \
+      exponent >>= 1;                                                  \
+      exponent += 128;                                                 \
+    } else {                                                           \
+      exponent = 129 - exponent; /* this difference to 128 is needed*/ \
+      exponent >>= 1;                                                  \
+      exponent = 128 - exponent;                                       \
+    }                                                                  \
+  }
 upm_float upm_sqrt(upm_float x) {
   uint8_t mantissa = x & 0x00ff;
   uint8_t exponent = x >> 8;
-  if ((exponent & 0x01) == 0) {
-    exponent += 1;
-    mantissa >>= 1;
-  }
-  mantissa -= 64;
-  uint8_t sqrt_mantissa = pgm_read_byte_near(&isqrt_tab[mantissa]);
-  if (exponent >= 128) {
-    exponent -= 128;
-    exponent >>= 1;
-    exponent += 128;
-  } else {
-    exponent = 129 - exponent;  // this difference to 128 is needed
-    exponent >>= 1;
-    exponent = 128 - exponent;
-  }
-  uint16_t res = ((uint16_t)exponent) << 8;
-  return res | sqrt_mantissa;
+  UPM_SQRT(mantissa, exponent);
+  return UPM_FROM_PARTS(mantissa, exponent);
+}
+upm_float upm_sqrt_after_divide(upm_float x, upm_float y) {
+  uint8_t mantissa, exponent;
+  UPM_DIVIDE(x, y, mantissa, exponent);
+  UPM_SQRT(mantissa, exponent);
+  return UPM_FROM_PARTS(mantissa, exponent);
 }

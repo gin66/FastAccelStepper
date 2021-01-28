@@ -258,7 +258,8 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   // Forward planning of 2ms or more on slow speed.
   uint16_t planning_steps;
   if (curr_ticks < TICKS_PER_S / 1000) {
-    upm_float upm_ps = upm_divide(UPM_TICKS_PER_S_DIV_500, upm_from(curr_ticks));
+    upm_float upm_ps =
+        upm_divide(UPM_TICKS_PER_S_DIV_500, upm_from(curr_ticks));
     planning_steps = upm_to_u16(upm_ps);
   } else {
     planning_steps = 1;
@@ -361,7 +362,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 
       upm_rem_steps = upm_from(performed_ramp_up_steps + planning_steps);
       upm_d_ticks_new =
-          upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
+          upm_sqrt_after_divide(ramp->config.upm_inv_accel2, upm_rem_steps);
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
 
@@ -386,7 +387,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       upm_rem_steps = upm_from(performed_ramp_up_steps - planning_steps);
       upm_d_ticks_new =
-          upm_sqrt(upm_divide(ramp->config.upm_inv_accel2, upm_rem_steps));
+          upm_sqrt_after_divide(ramp->config.upm_inv_accel2, upm_rem_steps);
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
     } else {
