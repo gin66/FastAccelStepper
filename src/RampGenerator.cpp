@@ -440,10 +440,12 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     performed_ramp_up_steps += steps;
   } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
     if (performed_ramp_up_steps < steps) {
-      performed_ramp_up_steps = 0;
+      // This can occur with performed_ramp_up_steps = 0 and steps = 1
 #ifdef TEST
-      // assert(0!=0);
+      assert((performed_ramp_up_steps == 0) && (steps == 1));
 #endif
+      performed_ramp_up_steps =
+          0;  // based on above assumption actually obsolete
     } else {
       performed_ramp_up_steps -= steps;
     }
