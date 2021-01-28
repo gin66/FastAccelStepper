@@ -344,9 +344,13 @@ void FastAccelStepper::fill_queue() {
     if (res == AQE_OK) {
       _rg.afterCommandEnqueued(&cmd);
       need_delayed_start = delayed_start;
-      uint32_t tmp = cmd.command.ticks;
-      tmp *= max(cmd.command.steps, 1);
-      ticksPrepared += tmp;
+      if (cmd.command.steps <= 1) {
+        ticksPrepared += cmd.command.ticks;
+      } else {
+        uint32_t tmp = cmd.command.ticks;
+        tmp *= cmd.command.steps;
+        ticksPrepared += tmp;
+      }
     }
 
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
