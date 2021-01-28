@@ -10,6 +10,7 @@ typedef uint16_t upm_float;
 #define UPM_CONST_500 ((upm_float)0x88fa)
 #define UPM_CONST_1000 ((upm_float)0x89fa)
 #define UPM_CONST_2000 ((upm_float)0x8afa)
+#define UPM_CONST_32000 ((upm_float)0x8efa)
 
 upm_float upm_from(uint8_t x);
 upm_float upm_from(uint16_t x);

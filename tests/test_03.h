@@ -332,6 +332,8 @@ bool perform_test() {
   test(x1 == UPM_CONST_1000, "const 1000");
   x1 = upm_from((uint32_t)2000);
   test(x1 == UPM_CONST_2000, "const 2000");
+  x1 = upm_from((uint32_t)32000);
+  test(x1 == UPM_CONST_32000, "const 32000");
   x1 = upm_from((uint32_t)16000000);
   test(x1 == UPM_CONST_16E6, "const 16E6");
   x1 = upm_from((uint32_t)128000000);

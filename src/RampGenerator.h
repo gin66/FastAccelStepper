@@ -25,11 +25,13 @@ class FastAccelStepper;
 
 #if (TICKS_PER_S == 16000000L)
 #define UPM_TICKS_PER_S UPM_CONST_16E6
+#define UPM_TICKS_PER_S_DIV_500 UPM_CONST_32000
 #define UPM_ACCEL_FACTOR UPM_CONST_128E12
 #define US_TO_TICKS(u32) (u32 * 16)
 #define TICKS_TO_US(u32) (u32 / 16)
 #else
 #define UPM_TICKS_PER_S upm_timer_freq
+#define UPM_TICKS_PER_S_DIV_500 upm_timer_freq_div_500
 
 // This overflows for approx. 1s at 40 MHz, only
 #define US_TO_TICKS(u32) \
@@ -129,6 +131,7 @@ class RampGenerator {
   int8_t _startMove(int32_t target_pos, int32_t current_target_pos);
 #if (TICKS_PER_S != 16000000L)
   upm_float upm_timer_freq;
+  upm_float upm_timer_freq_div_500;
 #endif
 };
 #endif

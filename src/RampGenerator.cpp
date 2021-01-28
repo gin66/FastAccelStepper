@@ -47,6 +47,7 @@ void RampGenerator::init() {
   _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
 #if (TICKS_PER_S != 16000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
+  upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);
 #endif
 }
 int8_t RampGenerator::setSpeedInUs(uint32_t min_step_us) {
@@ -257,8 +258,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   // Forward planning of 2ms or more on slow speed.
   uint16_t planning_steps;
   if (curr_ticks < TICKS_PER_S / 1000) {
-    upm_float upm_ps = upm_divide(UPM_TICKS_PER_S, upm_from(curr_ticks));
-    upm_ps = upm_divide(upm_ps, UPM_CONST_500);
+    upm_float upm_ps = upm_divide(UPM_TICKS_PER_S_DIV_500, upm_from(curr_ticks));
     planning_steps = upm_to_u16(upm_ps);
   } else {
     planning_steps = 1;
