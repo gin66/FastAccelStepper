@@ -274,7 +274,7 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 ## Lessons Learned
 
 * Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
-* In one setup, operating A4988 without microsteps has led to erratic behaviour at some specific low speed (erratic means step forward/backward, while DIR is kept low). No issue with 16 microstep
+* In one setup, operating A4988 without microsteps has led to erratic behaviour at some specific low speed (erratic means step forward/backward, while DIR is kept low). No issue with 16 microstep. These two youtube videos show similar behavior: [hard disc stepper](https://youtu.be/DsYgw3GFHZo) and [axes movement](https://youtu.be/Nw18B81Ylhk)
 * The pulse counters in esp32 have several comparators to trigger interrupts. What the documentation does not mention: All those reference values are only forwarded to the actual comparator on pulse counter reset. Thus the pulse counters cannot be used as lower 16bit of the position, unfortunately.
 
 ## 3rd party videos in action
