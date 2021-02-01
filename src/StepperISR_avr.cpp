@@ -145,28 +145,26 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         exitStepperISR();                                                     \
         return;                                                               \
       }                                                                       \
-    } else {                                                                  \
-      if (fas_queue_##CHANNEL._prepareForStop) {                              \
-        /* new command received after running out of commands */              \
-        /* if this new command requires a step, then this step would be lost  \
-         */                                                                   \
-        fas_queue_##CHANNEL._prepareForStop = false;                          \
-        if (e->steps > 0) {                                                   \
-          /* That's the problem, so generate a step */                        \
+    } else if (fas_queue_##CHANNEL._prepareForStop) {                         \
+      /* new command received after running out of commands */                \
+      /* if this new command requires a step, then this step would be lost    \
+       */                                                                     \
+      fas_queue_##CHANNEL._prepareForStop = false;                            \
+      if (e->steps > 0) {                                                     \
+        /* That's the problem, so generate a step */                          \
+        Stepper_One(T, CHANNEL);                                              \
+        ForceCompare(T, CHANNEL);                                             \
+        /* Use a high time of 3us */                                          \
+        delayMicroseconds(3);                                                 \
+        /* Clear output bit by another toggle */                              \
+        Stepper_OneToZero(T, CHANNEL);                                        \
+        ForceCompare(T, CHANNEL);                                             \
+        ClearInterruptFlag(T, CHANNEL);                                       \
+        if (e->steps-- > 1) {                                                 \
+          /* perform another step with this queue entry */                    \
           Stepper_One(T, CHANNEL);                                            \
-          ForceCompare(T, CHANNEL);                                           \
-          /* Use a high time of 3us */                                        \
-          delayMicroseconds(3);                                               \
-          /* Clear output bit by another toggle */                            \
-          Stepper_OneToZero(T, CHANNEL);                                      \
-          ForceCompare(T, CHANNEL);                                           \
-          ClearInterruptFlag(T, CHANNEL);                                     \
-          if (e->steps-- > 1) {                                               \
-            /* perform another step with this queue entry */                  \
-            Stepper_One(T, CHANNEL);                                          \
-            exitStepperISR();                                                 \
-            return;                                                           \
-          }                                                                   \
+          exitStepperISR();                                                   \
+          return;                                                             \
         }                                                                     \
       }                                                                       \
     }                                                                         \

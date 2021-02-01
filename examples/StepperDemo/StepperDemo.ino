@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-648e1d3"
+#define VERSION "post-9a08132"
 
 struct stepper_config_s {
   uint8_t step;
@@ -279,7 +279,15 @@ const static char messages[] PROGMEM =
 #define MSG_ERROR_MOVE_ERR_NO_DIRECTION_PIN__MINUS_1 44
     "ERROR no direction Pin => impossible move\n|"
 #define MSG_MOVE_OK 45
-    "OK\n|";
+    "OK\n|"
+#define MSG_STRAY_DIGITAL_READ_TOGGLE 46
+    "Toggle erroneous digitalRead() to step pin\n|"
+#define MSG_STRAY_DIGITAL_READ_ENABLED 47
+    "ERRONEOUS digitalRead() TO STEP PIN IS ON !!!\n|"
+#define MSG_LONG_INTERRUPT_BLOCK_TOGGLE 48
+    "Toggle erroneous 100 µs ISR block\n|"
+#define MSG_LONG_INTERRUPT_BLOCK_ENABLED 49
+    "ERRONEOUS 100 µs ISR BLOCK IS ON\n|";
 
 void output_msg(int8_t i) {
   char ch;
@@ -447,6 +455,10 @@ uint32_t last_time = 0;
 int selected = -1;
 uint32_t pause_ms = 0;
 uint32_t pause_start = 0;
+#if defined(ARDUINO_ARCH_AVR)
+bool simulate_digitalRead_error = false;
+#endif
+bool simulate_blocked_ISR = false;
 
 void info(FastAccelStepper *s, bool long_info) {
   Serial.print('@');
@@ -546,6 +558,10 @@ const static char usage_str[] PROGMEM =
 #endif
     "     t         ... Enter test mode\n"
     "     Q         ... Toggle print usage on motor stop\n"
+#if defined(ARDUINO_ARCH_AVR)
+    "     r         ... Toggle erroneous digitalRead() of stepper pin\n"
+#endif
+    "     e         ... Toggle erroneous long 100us interrupt block\n"
     "     ?         ... Print this usage\n"
     "\n";
 
@@ -581,6 +597,14 @@ void stepper_info() {
       Serial.println();
     }
   }
+  if (simulate_blocked_ISR) {
+    output_msg(MSG_LONG_INTERRUPT_BLOCK_ENABLED);
+  }
+#if defined(ARDUINO_ARCH_AVR)
+  if (simulate_digitalRead_error) {
+    output_msg(MSG_STRAY_DIGITAL_READ_ENABLED);
+  }
+#endif
 }
 
 void usage() {
@@ -701,7 +725,16 @@ void loop() {
         ESP.restart();
       }
 #endif
-      else if (strcmp(out_buffer, "I") == 0) {
+#if defined(ARDUINO_ARCH_AVR)
+      else if (strcmp(out_buffer, "r") == 0) {
+        output_msg(MSG_STRAY_DIGITAL_READ_TOGGLE);
+        simulate_digitalRead_error ^= true;
+      }
+#endif
+      else if (strcmp(out_buffer, "e") == 0) {
+        output_msg(MSG_LONG_INTERRUPT_BLOCK_TOGGLE);
+        simulate_blocked_ISR ^= true;
+      } else if (strcmp(out_buffer, "I") == 0) {
         output_msg(MSG_TOGGLE_MOTOR_INFO);
         verbose = !verbose;
       } else if (strcmp(out_buffer, "Q") == 0) {
@@ -912,6 +945,24 @@ void loop() {
   }
 
   uint32_t ms = millis();
+
+#if defined(ARDUINO_ARCH_AVR)
+  if (simulate_digitalRead_error) {
+    digitalRead(stepPinStepperA);
+    digitalRead(stepPinStepperB);
+#ifdef stepPinStepperC
+    digitalRead(stepPinStepperC);
+#endif
+  }
+#endif
+  if (simulate_blocked_ISR) {
+    if ((ms & 0xff) < 0x40) {
+      noInterrupts();
+      delayMicroseconds(100);
+      interrupts();
+    }
+  }
+
   if (test_mode) {
     if (test_ongoing) {
       bool finished = true;

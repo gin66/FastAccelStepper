@@ -271,6 +271,15 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 * esp32: getCurrentPosition() does not take into account the current pulses, because the pulse counter is not read
 * There is an issue with the esp32 mcpwm: as soon as the mcpwm timer is running on every cycle an interrupt is serviced - even though no interrupt is enabled. If several steppers are running at high step rate, the interrupt load for this nonsense interrupt could be quite high for the CPU. Need further investigation, but till now haven't found the root cause.
 
+## Error investigation
+
+In case the stepper does not run smoothly, then StepperDemo contains command to simulate this kind of error. For avr the commands are `r` and `e`. For esp32 only `e` can be used. `r` toggles erroneous digitalRead() of the stepper pin.
+The commands do this:
+- `r`: The digitalRead() of arduino is a fancy implementation, which checks if the pin is connected to a timer to generate PWM and if yes, turns this off (actually IMHO a broken implementation: only 1 of the needed 2 bits are cleared). As FastAccelStepper controls the step pin, the digitalRead can cause a missed step, sporadically. 
+- `e`: This blocks repeatedly interrupts for ~100us during 64ms out of 256ms. 
+
+This allows to compare an erroneous behavior with non-smooth running stepper in the application.
+
 ## Lessons Learned
 
 * Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
@@ -284,6 +293,6 @@ Found on youtube:
 * [Testing on NEMA-17](https://www.youtube.com/watch?v=yUTXTRjAOak)
 * [Neck mechanism](https://www.youtube.com/watch?v=rY7NDBnz7Cw)
 
-## Thanks
+## Contribution
 
 - Thanks ixil for pull request (https://github.com/gin66/FastAccelStepper/pull/19) for ATmega2560
