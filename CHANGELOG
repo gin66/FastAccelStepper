@@ -1,6 +1,9 @@
+pre-0,20,2:
+This change scheduled for 0.20.1 has failed in sim_tests. Need to be checked again why
+- RampGenerator uses now the delayed start feature of the queue
+
 0.20.1:
 - few minor speed ups
-- RampGenerator uses now the delayed start feature of the queue
 - StepperDemo extended:
 	- avr only: command 'r' toggles erroneous digitalRead() to stepperpin
 	- command 'e' toggles interrupt block of ~100us

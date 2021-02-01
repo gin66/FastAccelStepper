@@ -6,7 +6,7 @@
    StepB:        0*L->H,        0*H->L, Max High=0us Total High=0us
 Position[A]=1
 
-Time in EnableA  max=172146 us, total=172146 us
+Time in EnableA  max=192595 us, total=192595 us
 
 Time in StepA  max=4 us, total=4 us
 
