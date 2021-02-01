@@ -1,4 +1,4 @@
-pre-0.20.1:
+0.20.1:
 - few minor speed ups
 - RampGenerator uses now the delayed start feature of the queue
 - StepperDemo extended:
