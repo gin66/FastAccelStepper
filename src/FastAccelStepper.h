@@ -156,7 +156,9 @@ class FastAccelStepper {
   //  10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
   //
   // New value will be used after call to
-  // move/moveTo/stopMove/applySpeedAcceleration
+  // move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
+  //
+  // note: no update on stopMove()
   //
   // Returns 0 on success, or -1 on invalid value (=0)
   int8_t setAcceleration(uint32_t step_s_s);
