@@ -273,10 +273,9 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 
 ## Error investigation
 
-In case the stepper does not run smoothly, then StepperDemo contains command to simulate this kind of error. For avr the commands are `r` and `e`. For esp32 only `e` can be used. `r` toggles erroneous digitalRead() of the stepper pin.
-The commands do this:
-- `r`: The digitalRead() of arduino is a fancy implementation, which checks if the pin is connected to a timer to generate PWM and if yes, turns this off (actually IMHO a broken implementation: only 1 of the needed 2 bits are cleared). As FastAccelStepper controls the step pin, the digitalRead can cause a missed step, sporadically. 
-- `e`: This blocks repeatedly interrupts for ~100us during 64ms out of 256ms. 
+In case the stepper does not run smoothly, then StepperDemo contains commands to simulate this kind of error. For avr the commands are `r` and `e`. For esp32 only `e` can be used.
+- `r`: The digitalRead() of arduino is a fancy implementation, which checks, if the pin being read is connected to a timer to generate PWM and if yes, turns this off (actually IMHO a broken implementation: only 1 of the needed 2 bits are cleared). As FastAccelStepper controls the step pin, the digitalRead can cause missed steps, sporadically. The implementation in StepperDemo reads the pins in the main loop(), thus the problem comes quite reliable.
+- `e`: This blocks repeatedly interrupts for ~100us during 64ms out of 256ms. On AVR to see this problem popping up, the stepper rate has to be <~106 us (avr, one stepper running). >~106us it runs quite smooth. The 106us = 100us block + ~6us ISR runtime. For ESP32 still need to test, will later share the result in an update
 
 This allows to compare an erroneous behavior with non-smooth running stepper in the application.
 
