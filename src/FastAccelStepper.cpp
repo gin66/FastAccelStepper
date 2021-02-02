@@ -482,7 +482,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
     }
   }
   if ((_enablePinHighActive == PIN_UNDEFINED) &&
-      (_enablePinHighActive == PIN_UNDEFINED)) {
+      (_enablePinLowActive == PIN_UNDEFINED)) {
     _externalEnableCall = NULL;
   }
 }

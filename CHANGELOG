@@ -1,6 +1,9 @@
-pre-0,20,2:
+pre-0.20.x:
 This change scheduled for 0.20.1 has failed in sim_tests. Need to be checked again why
 - RampGenerator uses now the delayed start feature of the queue
+
+pre-0.20.2:
+- Fix for issue #45: if enablePinHighActive has been set to PIN_UNDEFINED, the eternalEnableCall was cleared even in enablePinLowActive still in use.
 
 0.20.1:
 - few minor speed ups
