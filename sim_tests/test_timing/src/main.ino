@@ -27,7 +27,7 @@ void loop() {
     //x = calculate_ticks_v3(steps, acceleration_f);
     //x = calculate_ticks_v4(steps, acceleration_i);
     //x = calculate_ticks_v5(steps, acceleration_i);
-    x = calculate_ticks_v6(steps, acceleration_i);
+    x = calculate_ticks_v7(0x1234000, 1000);
     digitalWrite(stepPinStepperA, LOW);
 
     digitalWrite(stepPinStepperB, HIGH);

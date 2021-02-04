@@ -97,7 +97,7 @@ uint32_t calculate_ticks_v6(uint32_t steps, upm_float pre_calc) {
 //      f_[i+1] = n_[i+1]² * s = {                         with same condition as before
 //						          (n_i  + mask_i)² * s
 //
-// For the lower case the calculation contines:
+// For the lower case the calculation continues:
 //		
 //		= n_i² * s + 2 * n_i * mask_i * s + mask_i² * s
 //
@@ -120,12 +120,34 @@ uint32_t calculate_ticks_v6(uint32_t steps, upm_float pre_calc) {
 //				= (mask_i >> 1)² * s
 //				= h_i >> 2
 //
-uint32_t calculate_ticks_v7(uint32_t steps, upm_float const_a) {
+// Actually this is a dead end, because below routines already needs 35us,
+// while several variables below ought to be 32bit
+uint32_t calculate_ticks_v7(uint32_t steps, upm_float precalc) {
 	
 	// initial values for i = 0
-	uint16_t mask_i = 0x8000;
+	uint16_t mask_i = 0x800;
 	uint16_t n_i = 0;
 	uint16_t f_i = 0;
 	uint16_t g_i = 0;
-	uint32_t h_i = s;
+	uint16_t h_i = steps;
+	uint16_t const_a = precalc;
+
+	while (mask_i) {
+		uint16_t f_x = f_i + g_i + h_i;
+		//Serial.println(f_x);
+		if (f_x < const_a) {
+			n_i += mask_i;
+			f_i = f_x;
+			g_i >>= 1;
+			g_i += h_i;
+			h_i >>= 2;
+			mask_i >>= 1;
+		}
+		else {
+			g_i >>= 1;
+			h_i >>= 2;
+			mask_i >>= 1;
+		}
+	}
+	return n_i;
 }
