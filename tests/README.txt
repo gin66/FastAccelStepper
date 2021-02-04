@@ -6,9 +6,8 @@ Tests;
 - test_02
   checks ramp timing
 
-- test_03
+- pmf_test
   checks PoorManFloat implementation
-  This file can be compiled for the target and be executed on the target
 
 - test_04
   one test case with speed change during ramp

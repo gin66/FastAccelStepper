@@ -1,0 +1,131 @@
+#include <math.h>
+
+#include "RampCalculator.h"
+#include "StepperISR.h"
+// This module has only one purpose:
+//
+// -  To calculate for a given step the corresponding speed.
+//
+// With constant acceleration the relation between the steps s. acceleration a,
+// time t and speed v will fulfill this equation during acceleration and deceleration:
+//
+//		s = 0.5 * a * t² = 0.5 * v² / a
+//
+// Acceleration is just counting up the steps and deceleration counting down towards 0.
+//
+// From this equation the actual speed v at a given step can be calculated by:
+//
+//		v = sqrt(2*s*a)
+//
+// For the pwm, the speed needs to be translated into time ticks T = n * timeticks = 1/v:
+//
+//		n * timeticks = 1 / sqrt(2*s*a)
+//
+// If the µC would be fast, then the solution would be in floating point:
+uint32_t calculate_ticks_v1(uint32_t steps, float acceleration) {
+	 float n = TICKS_PER_S / sqrt(2.0 * steps * acceleration);
+	 return n;
+}
+// Just this takes approx 92-4 = 88 us. Which is pretty slow.
+//
+// Little optimization improves to 87-4 = 83 us 
+uint32_t calculate_ticks_v2(uint32_t steps, float acceleration) {
+	 float n = TICKS_PER_S / sqrt(2 * steps * acceleration);
+	 return n;
+}
+//
+// Precalculate TICKS_PER_S / sqrt(2 * acceleration)
+// results in 80-4 = 76us
+uint32_t calculate_ticks_v3(uint32_t steps, float pre_calc) {
+	 float n = pre_calc / sqrt(steps);
+	 return n;
+}
+//
+// Using upm_float improves to 22-4 = 18us, but less precision
+uint32_t calculate_ticks_v4(uint32_t steps, uint32_t acceleration) {
+	upm_float upm_a = upm_from(acceleration);
+	upm_float upm_s = upm_from(steps);
+    upm_float upm_res = upm_divide(UPM_TICKS_PER_S, upm_sqrt(upm_multiply(upm_s,upm_a)));
+	uint32_t res = upm_to_u32(upm_res);
+	return res;
+}
+//
+// Precalculating the acceleration related constant improves further to 12-4 = 8us
+uint32_t calculate_ticks_v5(uint32_t steps, upm_float pre_calc) {
+	upm_float upm_s = upm_from(steps);
+    upm_float upm_res = upm_divide(pre_calc, upm_sqrt(upm_s));
+	uint32_t res = upm_to_u32(upm_res);
+	return res;
+}
+//
+// using the combined function yields actually no measureable improvement
+uint32_t calculate_ticks_v6(uint32_t steps, upm_float pre_calc) {
+	upm_float upm_s = upm_from(steps);
+    upm_float upm_res = upm_sqrt_after_divide(pre_calc, upm_s);
+	uint32_t res = upm_to_u32(upm_res);
+	return res;
+}
+//
+// In order to increase the precision to more than 8 bits and avoid
+// the penalty of slow float operations different approach will be used.
+//
+// in order to avoid division+sqrt operation, the following equation will be
+// rearranged:
+//
+//		n * timeticks = 1 / sqrt(2*s*a)
+//
+// into:
+//
+//		n² * s = 1 / sqrt(2*a) / timeticks²
+//
+// with the right part being constant for a given acceleration a
+//
+//		n² * s = const(a)
+//
+// This can be solved iteratively
+//
+//      n_0 = 0
+//	                n_i
+//      n_[i+1] = {		         	with n_i² * s <= const(a) < (n_i + mask_i)² * s
+//                  n_i + mask_i
+//
+//      mask_[i+1] = mask_i >> 1
+//
+// In order to avoid the square calculation in each step several temporary values need
+// to be calculated
+//                                n_i² * s = f_i
+//      f_[i+1] = n_[i+1]² * s = {                         with same condition as before
+//						          (n_i  + mask_i)² * s
+//
+// For the lower case the calculation contines:
+//		
+//		= n_i² * s + 2 * n_i * mask_i * s + mask_i² * s
+//
+//		= f_i + g_i + h_i
+//
+// With g_i and h_i defined like this:
+//
+//		g_0 = 0
+//
+//		g_[i+1] = 2 * n_[i+1] * mask_[i+1] * s
+//
+//					2 * n_i * (mask_i >> 1) * s = g_i >> 1
+//				= {
+//				    2 * (n_i + mask_i) * (mask_i >> 1) * s = (g_i >> 1) + (mask_i² * s)
+//                                                         = (g_i >> 1) + h_i
+//
+//		h_0 = mask_0 ² * s
+//
+//		h_[i+1] = mask_[i+1]² * s
+//				= (mask_i >> 1)² * s
+//				= h_i >> 2
+//
+uint32_t calculate_ticks_v7(uint32_t steps, upm_float const_a) {
+	
+	// initial values for i = 0
+	uint16_t mask_i = 0x8000;
+	uint16_t n_i = 0;
+	uint16_t f_i = 0;
+	uint16_t g_i = 0;
+	uint32_t h_i = s;
+}

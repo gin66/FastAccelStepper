@@ -21,6 +21,7 @@ tests/StepperISR*.cpp
 tests/StepperISR.h
 tests/common.h
 tests/*.gnuplot
+tests/pmf_test
 sim_tests/*/result.txt
 sim_tests/*/x.vcd
 sim_tests/test*sd*/src
