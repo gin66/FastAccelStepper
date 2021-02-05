@@ -44,7 +44,7 @@ bool test_seq_10(FastAccelStepper *stepper, struct test_seq_s *seq,
           if (seq->s16_1 >= 0) {
             seq->s16_1++;
           }
-          if (seq->s16_1 == 15) {
+          if (seq->s16_1 == 25) {
             seq->state = 4;
             stepper->setAcceleration(1000);
             stepper->applySpeedAcceleration();
