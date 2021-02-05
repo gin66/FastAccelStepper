@@ -366,6 +366,15 @@ void FastAccelStepper::fill_queue() {
         // try later again
         break;
       } else {
+#ifdef SIM_TEST_INPUT
+		Serial.println("Abort ramp due to queue error");
+		Serial.print("Steps=");
+		Serial.print(cmd.command.steps);
+		Serial.print(" ticks=");
+		Serial.print(cmd.command.ticks);
+		Serial.print(" min_cmd_ticks=");
+		Serial.println(MIN_CMD_TICKS);
+#endif
 #ifdef TEST
         printf("ERROR: Abort ramp due to queue error (%d)\n", res);
         printf("steps=%d ticks=%d limit=%ld state=%d\n", cmd.command.steps,
