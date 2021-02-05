@@ -6,6 +6,7 @@ struct test_seq_s {
   uint16_t state;
   uint32_t u32_1;
   int16_t s16_1;
+  int16_t s16_2;
 };
 
 // a test_seq should return true, if finished.
@@ -28,4 +29,6 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
 bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms);
 bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
+                 uint32_t time_ms);
+bool test_seq_10(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms);

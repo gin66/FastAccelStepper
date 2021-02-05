@@ -1,12 +1,5 @@
 #include "test_seq.h"
 
-#if defined(ARDUINO_ARCH_ESP32)
-#include <driver/gpio.h>
-#include <driver/pcnt.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
-#endif
-
 bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
   char buf[100];

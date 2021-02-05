@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-cf1d237"
+#define VERSION "post-5de0716"
 
 struct stepper_config_s {
   uint8_t step;
@@ -572,7 +572,7 @@ const static char test_usage_str[] PROGMEM =
     "     I         ... Toggle motor info, while test sequence is running\n"
     "     01        ... select test sequence 01 for selected stepper\n"
     "     :\n"
-    "     09        ... select test sequence 09 for selected stepper\n"
+    "     10        ... select test sequence 10 for selected stepper\n"
 #ifdef SIM_TEST_INPUT
     "     W         ... Blocking wait until test is finished\n"
 #endif
@@ -936,6 +936,11 @@ void loop() {
             output_msg(MSG_SELECT_TEST_SEQUENCE);
             Serial.println(out_buffer);
             test_seq[selected].test = test_seq_09;
+            test_seq[selected].state = 0;
+          } else if (strcmp(out_buffer, "10") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
+            test_seq[selected].test = test_seq_10;
             test_seq[selected].state = 0;
           }
         }

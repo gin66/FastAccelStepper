@@ -1,11 +1,6 @@
 #include "test_seq.h"
 
 #if defined(ARDUINO_ARCH_ESP32)
-#include <driver/gpio.h>
-#include <driver/pcnt.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
-
 struct command_s {
   uint32_t accel;
   uint32_t speed;
