@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-8eb7dcb"
+#define VERSION "post-cf1d237"
 
 struct stepper_config_s {
   uint8_t step;

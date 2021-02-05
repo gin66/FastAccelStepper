@@ -212,6 +212,10 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     } else {
       performed_ramp_up_steps = upm_to_u32(upm_divide(
           ramp->config.upm_inv_accel2, upm_square(upm_from(curr_ticks))));
+#ifdef TEST
+      printf("Recalculate performed_ramp_up_steps to %d\n",
+             performed_ramp_up_steps);
+#endif
     }
   } else {
     performed_ramp_up_steps = rw->performed_ramp_up_steps;
@@ -385,11 +389,31 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
         }
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
-      upm_rem_steps = upm_from(performed_ramp_up_steps - planning_steps);
+#ifdef TEST
+      printf("prus=%d planning_steps=%d remaining_steps=%d force_stop=%d\n",
+             performed_ramp_up_steps, planning_steps, remaining_steps,
+             ramp->force_stop);
+#endif
+      if (performed_ramp_up_steps <= planning_steps) {
+        upm_rem_steps = upm_from(planning_steps);
+      } else {
+        upm_rem_steps = upm_from(performed_ramp_up_steps - planning_steps);
+      }
       upm_d_ticks_new =
           upm_sqrt_after_divide(ramp->config.upm_inv_accel2, upm_rem_steps);
 
       d_ticks_new = upm_to_u32(upm_d_ticks_new);
+
+      {
+        uint32_t cmd_ticks = d_ticks_new * planning_steps;
+        if (cmd_ticks < MIN_CMD_TICKS) {
+          // planning_steps = MIN_CMD_TICKS / next_ticks;
+          planning_steps = upm_to_u32(upm_divide(
+              upm_from((uint32_t)(MIN_CMD_TICKS * 8 /
+                                  7)),  // upm calculation is not exact
+              upm_from(d_ticks_new)));
+        }
+      }
     } else {
       d_ticks_new = coast_speed;
       // do not overshoot ramp down start

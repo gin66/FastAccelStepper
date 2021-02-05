@@ -326,7 +326,7 @@ void FastAccelStepper::fill_queue() {
   NextCommand cmd;
   StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 20 ms. Currently hard coded
-  bool delayed_start = false;//!q->isRunning();
+  bool delayed_start = false;  //! q->isRunning();
   bool need_delayed_start = false;
   uint32_t ticksPrepared = q->ticksInQueue();
   while (!isQueueFull() &&
@@ -367,13 +367,13 @@ void FastAccelStepper::fill_queue() {
         break;
       } else {
 #ifdef SIM_TEST_INPUT
-		Serial.println("Abort ramp due to queue error");
-		Serial.print("Steps=");
-		Serial.print(cmd.command.steps);
-		Serial.print(" ticks=");
-		Serial.print(cmd.command.ticks);
-		Serial.print(" min_cmd_ticks=");
-		Serial.println(MIN_CMD_TICKS);
+        Serial.println("Abort ramp due to queue error");
+        Serial.print("Steps=");
+        Serial.print(cmd.command.steps);
+        Serial.print(" ticks=");
+        Serial.print(cmd.command.ticks);
+        Serial.print(" min_cmd_ticks=");
+        Serial.println(MIN_CMD_TICKS);
 #endif
 #ifdef TEST
         printf("ERROR: Abort ramp due to queue error (%d)\n", res);

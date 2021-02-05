@@ -143,16 +143,20 @@ class FastAccelStepperTest {
       }
       s.fill_queue();
       uint32_t from_dt = rc.total_ticks;
-      while (!s.isQueueEmpty()) {
-        rc.check_section(
-            &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
-        fas_queue[0].read_idx++;
+      if (!s.isQueueEmpty()) {
+        while (!s.isQueueEmpty()) {
+          rc.check_section(
+              &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+          fas_queue[0].read_idx++;
+        }
+        uint32_t to_dt = rc.total_ticks;
+        float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
+        printf("planned time in buffer: %.6fs\n", planned_time);
+        // This must be ensured, so that the stepper does not run out of
+        // commands
+        assert((i == 0) || (old_planned_time_in_buffer > 0.005));
+        old_planned_time_in_buffer = planned_time;
       }
-      uint32_t to_dt = rc.total_ticks;
-      float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
-      printf("planned time in buffer: %.6fs\n", planned_time);
-      // This must be ensured, so that the stepper does not run out of commands
-      assert((i == 0) || (old_planned_time_in_buffer > 0.005));
       if (!s.isRampGeneratorActive()) {
         if (restarted) {
           break;
@@ -162,7 +166,6 @@ class FastAccelStepperTest {
         restarted = true;
         s.moveTo(9999);
       }
-      old_planned_time_in_buffer = planned_time;
     }
     printf("do_test2 with stop at %d\n", stop_at_position);
     test(!s.isRampGeneratorActive(), "too many commands created");
