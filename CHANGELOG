@@ -5,6 +5,7 @@ This change scheduled for 0.20.1 has failed in sim_tests. Need to be checked aga
 pre-0.20.3:
 - StepperDemo extended with test sequence 10 for issue #44
 - avr: Avoid ClearInterruptFlag() in ISR, which is needed by simavr due to implementation bug
+- eliminate need for FOC workaround by updated simavr
 
 0.20.2:
 - Fix for issue #45: if enablePinHighActive has been set to PIN_UNDEFINED,

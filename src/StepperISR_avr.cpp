@@ -59,12 +59,6 @@
 #define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE##T##X)
 #define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF##T##X)
 #define SetTimerCompareRelative(T, X, D) OCR##T##X = TCNT##T + D
-#ifdef SIMAVR_FOC_WORKAROUND
-#define ClearInterruptFlag_FOCworkaround(T, X) ClearInterruptFlag(T, X)
-#else
-#define ClearInterruptFlag_FOCworkaround(T, X) \
-  {}
-#endif
 
 #define ConfigureTimer(T)                                                 \
   {                                                                       \
@@ -146,7 +140,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       /* Clear output bit by another compare event */                         \
       Stepper_OneToZero(T, CHANNEL);                                          \
       ForceCompare(T, CHANNEL);                                               \
-      ClearInterruptFlag_FOCworkaround(T, CHANNEL);                           \
       if (e->steps-- > 1) {                                                   \
         /* perform another step with this queue entry */                      \
         Stepper_One(T, CHANNEL);                                              \
@@ -167,7 +160,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         /* Clear output bit by another toggle */                              \
         Stepper_OneToZero(T, CHANNEL);                                        \
         ForceCompare(T, CHANNEL);                                             \
-        ClearInterruptFlag_FOCworkaround(T, CHANNEL);                         \
         if (e->steps-- > 1) {                                                 \
           /* perform another step with this queue entry */                    \
           Stepper_One(T, CHANNEL);                                            \
