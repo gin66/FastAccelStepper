@@ -1,5 +1,4 @@
-pre-0.21.x:
-This change scheduled for 0.20.1 has failed in sim_tests. Need to be checked again why
+pre-0.21.1:
 - RampGenerator uses now the delayed start feature of the queue
 
 0.21.0:
