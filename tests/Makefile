@@ -9,28 +9,33 @@ test: $(TESTS) pmf_test
 	./pmf_test
 	$(addsuffix &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
 
-LIB_H=../src/FastAccelStepper.h ../src/PoorManFloat.h ../src/StepperISR.h ../src/RampGenerator.h 
-LIB_O=FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o 
+LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h RampGenerator.h RampCalculator.h common.h
+LIB_O=FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o  RampCalculator.o
+
+SRC_LIB_H=$(addprefix ../src/,$(LIB_H))
 
 test_%: test_%.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
 
-test_%.o: test_%.cpp $(LIB_H) RampChecker.h stubs.h
+test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h stubs.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
 pmf_test: pmf_test.o PoorManFloat.o
 pmf_test.o: pmf_test.cpp ../src/PoorManFloat.h stubs.h test_03.h
 
-FastAccelStepper.o: ../src/FastAccelStepper.cpp ../src/FastAccelStepper.h ../src/PoorManFloat.h ../src/StepperISR.h stubs.h ../src/RampGenerator.h ../src/common.h
+FastAccelStepper.o: ../src/FastAccelStepper.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 PoorManFloat.o: ../src/PoorManFloat.cpp ../src/PoorManFloat.h
 	$(COMPILE.cpp) $< -o $@
 
-RampGenerator.o: ../src/RampGenerator.cpp ../src/RampGenerator.h ../src/common.h
+RampGenerator.o: ../src/RampGenerator.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
-StepperISR_test.o: StepperISR_test.cpp ../src/StepperISR.h ../src/common.h ../src/FastAccelStepper.h ../src/StepperISR.h
+RampCalculator.o: ../src/RampCalculator.cpp $(SRC_LIB_H)
+	$(COMPILE.cpp) $< -o $@
+
+StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 
 VERSION=$(shell git rev-parse --short HEAD)
 
