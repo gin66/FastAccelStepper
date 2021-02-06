@@ -2,6 +2,8 @@
 
 #include "RampCalculator.h"
 #include "StepperISR.h"
+
+#ifdef TEST_TIMING
 // This module has only one purpose:
 //
 // -  To calculate for a given step the corresponding speed.
@@ -122,7 +124,7 @@ uint32_t calculate_ticks_v6(uint32_t steps, upm_float pre_calc) {
 //
 // Actually this is a dead end, because below routines already needs 35us,
 // while several variables below ought to be 32bit
-uint32_t calculate_ticks_v7(uint32_t steps, upm_float precalc) {
+uint32_t calculate_ticks_v7(uint32_t steps, upm_float pre_calc) {
 	
 	// initial values for i = 0
 	uint16_t mask_i = 0x800;
@@ -130,7 +132,7 @@ uint32_t calculate_ticks_v7(uint32_t steps, upm_float precalc) {
 	uint16_t f_i = 0;
 	uint16_t g_i = 0;
 	uint16_t h_i = steps;
-	uint16_t const_a = precalc;
+	uint16_t const_a = pre_calc;
 
 	while (mask_i) {
 		uint16_t f_x = f_i + g_i + h_i;
@@ -150,4 +152,74 @@ uint32_t calculate_ticks_v7(uint32_t steps, upm_float precalc) {
 		}
 	}
 	return n_i;
+}
+//
+// New approach is to calculate the draft result and then increase the resolution by another operation.
+//
+// Starting again with:
+//
+//		n * timeticks = 1 / sqrt(2*s*a)
+//
+// solved for n and timeticks replaced with 1/f
+//
+//		n = 1 / sqrt(s) * f / sqrt(2 * a)
+//
+// The second part should be the precalculated A
+//
+//	    A = f / sqrt(2 * a)
+//
+// Thus
+//		n = 1 / sqrt(s) * A
+//
+// Now we define
+//
+//		s = s_r + e = s_r * (1 + e/s_r)
+//
+// When calculate n, actually calculated with rounding/truncation from 8 bit operation:
+//
+//		n_r = 1 / sqrt(s_r) * A
+//
+// The error from the rounding/truncation can be fixed by:
+//		
+//     n = n_r * 1/sqrt(1+e/s_r) ~ n_r * (1 - 0.5 * e/s_r) = n_r - n_r * e/s_r/2
+//
+// How to get e and s_r ?
+//
+// If calculating sqrt(s), the result squared is s_r
+//
+//    s_r = (sqrt(s))²
+//
+// And so:
+//
+//	  e = s - s_r
+//
+// Below implementation may be buggy, but takes 38-4 = 34 us. Which is quite promising
+#endif
+uint32_t calculate_ticks_v8(uint32_t steps, upm_float pre_calc) {
+	upm_float upm_steps = upm_from(steps);
+	upm_float upm_sqrt_steps = upm_sqrt(upm_steps);
+    upm_float upm_res = upm_divide(pre_calc, upm_sqrt_steps);
+	uint32_t res = upm_to_u32(upm_res);
+
+    // now improving the result
+	uint16_t sqrt_steps = upm_to_u16(upm_sqrt_steps);
+	uint32_t steps_r = sqrt_steps;
+    steps_r	*= sqrt_steps;
+	if (steps > steps_r) {
+		uint32_t e = steps - steps_r;
+		upm_float upm_e = upm_from(e >> 1);
+		upm_float upm_corr = upm_divide(upm_e, upm_steps); // steps instead of steps_r
+		upm_float upm_val = upm_multiply(upm_corr, upm_res);
+		uint32_t val = upm_to_u32(upm_val);
+		res -= val;
+	}
+	else if (steps < steps_r) {
+		uint32_t e = steps_r - steps;
+		upm_float upm_e = upm_from(e >> 1);
+		upm_float upm_corr = upm_divide(upm_e, upm_steps); // steps instead of steps_r
+		upm_float upm_val = upm_multiply(upm_corr, upm_res);
+		uint32_t val = upm_to_u32(upm_val);
+		res += val;
+	}
+	return res;
 }

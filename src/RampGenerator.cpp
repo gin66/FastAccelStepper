@@ -8,6 +8,7 @@
 #endif
 
 #include "RampGenerator.h"
+#include "RampCalculator.h"
 
 // This define in order to not shoot myself.
 #ifndef TEST
@@ -76,6 +77,7 @@ int8_t RampGenerator::setAcceleration(uint32_t accel) {
   upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
   upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
 #endif
+  upm_inv_accel2 = upm_sqrt(upm_inv_accel2);
   if (_config.upm_inv_accel2 != upm_inv_accel2) {
     _config.upm_inv_accel2 = upm_inv_accel2;
     _config.accel_change_cnt = _rw.accel_change_cnt + 1;
@@ -364,11 +366,8 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       planning_steps =
           min(planning_steps, (remaining_steps - performed_ramp_up_steps) >> 1);
 
-      upm_rem_steps = upm_from(performed_ramp_up_steps + planning_steps);
-      upm_d_ticks_new =
-          upm_sqrt_after_divide(ramp->config.upm_inv_accel2, upm_rem_steps);
-
-      d_ticks_new = upm_to_u32(upm_d_ticks_new);
+	  uint32_t rs = performed_ramp_up_steps + planning_steps;
+      d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_inv_accel2);
 
       // if acceleration is very high, then d_ticks_new can be lower than
       // min_travel_ticks
@@ -394,15 +393,13 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
              performed_ramp_up_steps, planning_steps, remaining_steps,
              ramp->force_stop);
 #endif
+	  uint32_t rs;
       if (performed_ramp_up_steps <= planning_steps) {
-        upm_rem_steps = upm_from(planning_steps);
+        rs = planning_steps;
       } else {
-        upm_rem_steps = upm_from(performed_ramp_up_steps - planning_steps);
+        rs = performed_ramp_up_steps - planning_steps;
       }
-      upm_d_ticks_new =
-          upm_sqrt_after_divide(ramp->config.upm_inv_accel2, upm_rem_steps);
-
-      d_ticks_new = upm_to_u32(upm_d_ticks_new);
+      d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_inv_accel2);
 
       {
         uint32_t cmd_ticks = d_ticks_new * planning_steps;

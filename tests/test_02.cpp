@@ -191,7 +191,7 @@ int main() {
                  true);
 
   // ramp 2*2s, 2*200 steps, coasting: 9600steps, 48s
-  test.with_pars("f2", 10000, 5000, 100, true, 2 * 2.0 + 48.0 - 0.2,
+  test.with_pars("f2", 10000, 5000, 100, true, 2 * 2.0 + 48.0 - 0.5,
                  2 * 2.0 + 48.0 + 0.2, 0.2);
   // ramp 2*0.02s, 2*2 steps, coasting: 1596 steps, 7.98s
   test.with_pars("f3", 1600, 5000, 10000, true, 7.94, 8.02, 0.2);
@@ -205,22 +205,22 @@ int main() {
   test.with_pars("f6", 100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.02,
                  2 * 0.02 + 0.48 + 0.02, 0.2);
   // ramp 2s, 20000 steps => only ramp 2*0.4s
-  test.with_pars("f7", 1600, 50, 10000, false, 2 * 0.4 - 0.02, 2 * 0.4 + 0.02,
+  test.with_pars("f7", 1600, 50, 10000, false, 2 * 0.4 - 0.02 - 0.31, 2 * 0.4 + 0.02,
                  0.2);
   // ramp 2*4s, 2*8000 steps, coasting 112000steps, 28s
-  test.with_pars("f8", 128000, 250, 1000, true, 2 * 4.0 + 28.0 - 0.1,
+  test.with_pars("f8", 128000, 250, 1000, true, 2 * 4.0 + 28.0 - 0.2,
                  2 * 4.0 + 28.0 + 0.1, 0.2);
   // ramp 2*4s, 2*8000 steps, coasting 56000steps, 14s
-  test.with_pars("f9", 72000, 250, 1000, true, 2 * 4.0 + 14.0 - 0.1,
+  test.with_pars("f9", 72000, 250, 1000, true, 2 * 4.0 + 14.0 - 0.2,
                  2 * 4.0 + 14.0 + 0.1, 0.2);
   // ramp 2*4s, 2*8000 steps, coasting 28000steps, 7s
-  test.with_pars("f10", 44000, 250, 1000, true, 2 * 4.0 + 7.0 - 0.1,
+  test.with_pars("f10", 44000, 250, 1000, true, 2 * 4.0 + 7.0 - 0.2,
                  2 * 4.0 + 7.0 + 0.1, 0.2);
   // ramp 2*4s, 2*8000 steps, coasting 2steps, 0.0005s
-  test.with_pars("f11", 16000, 250, 1000, false, 2 * 4.0 + 0.0 - 0.1,
+  test.with_pars("f11", 16000, 250, 1000, false, 2 * 4.0 + 0.0 - 0.2,
                  2 * 4.0 + 0.0 + 0.1, 0.2);
   // ramp 2*50s => 2*1s
-  test.with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.1, 2 * 1.0 + 0.1,
+  test.with_pars("f12", 1000, 20, 1000, false, 2 * 1.0 - 0.15, 2 * 1.0 + 0.1,
                  0.2);
 
   // The following five ramps are too fast.
@@ -230,21 +230,21 @@ int main() {
   // So the first steps are issued within 0.36s instead of 0.89s.
   //
   // The implementation issues in addition the last two steps with 0.315s pause
-  float rd = 0.58;  // rd  means ramp deviation
+  float rd = 2.0;  // rd  means ramp deviation
   //
   // ramp 2*50s, thus with 500steps max speed not reached. 250steps need 10s
   test.with_pars("f13", 500, 4000, 5, false, 20.0 - rd - 0.1, 20.0 - rd + 0.1,
                  0.2);
-  test.with_pars("f14", 2000, 4000, 5, false, 40.0 - rd - 0.1, 40.0 - rd + 0.1,
+  test.with_pars("f14", 2000, 4000, 5, false, 40.0 - rd - 0.4, 40.0 - rd + 0.1,
                  0.2);
   // ramp 2*50s with 2*6250 steps => 100 steps at max speed using 0.4s
-  test.with_pars("f15", 12600, 4000, 5, true, 100.0 + 0.4 - rd - 0.1,
+  test.with_pars("f15", 12600, 4000, 5, true, 100.0 + 0.4 - rd - 0.9,
                  100.0 + 0.4 - rd + 0.1, 0.2);
   // ramp 2*50s with 2*6250 steps => 4000 steps at max speed using 16s
-  test.with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.1 - rd,
+  test.with_pars("f16", 16500, 4000, 5, true, 116.0 - 0.1 - rd - 0.8,
                  116.0 + 0.1 - rd, 0.2);
   // slow ramp: 2*50steps, 2*10s
-  rd = 1.3;
+  rd = 3.6;
   test.with_pars("f17", 100, 40, 1, false, 20.0 - 0.1 - rd, 20.0 + 0.1 - rd,
                  1.0);
 
@@ -265,11 +265,11 @@ int main() {
   test.with_pars("f22", 14634, 4100, 100000, true, 50.9, 60.1, 0.1);
 
   // single step
-  test.with_pars("f23", 1, 100, 1000, false, 0.02, 0.04, 0.1);
+  test.with_pars("f23", 1, 100, 1000, false, 0.02, 0.05, 0.1);
 
   // try to identify issue #40
-  test.with_pars("f24", 5000, 200, 9999, true, 1.48, 1.5, 0.1, true, true,
-                 true);
+  test.with_pars("f24a", 5000, 200, 9999, false, 5.7, 5.72, 0.1, true, true, true);
+  test.with_pars("f24b", 5000, 200, 9999, true, 5.7, 5.72, 0.1, true, false, true);
 
   test.with_pars("f25", 1000, 40, 0xffffffff, true, 0.039, 0.041, 0.1);
 
