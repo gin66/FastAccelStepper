@@ -385,9 +385,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
           // planning_steps = MIN_CMD_TICKS / next_ticks;
 
           planning_steps = upm_to_u32(upm_divide(
-              upm_from((uint32_t)(MIN_CMD_TICKS * 8 /
-                                  7)),  // upm calculation is not exact
-              upm_from(d_ticks_new)));
+              upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
         }
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
@@ -404,9 +402,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
         if (cmd_ticks < MIN_CMD_TICKS) {
           // planning_steps = MIN_CMD_TICKS / next_ticks;
           planning_steps = upm_to_u32(upm_divide(
-              upm_from((uint32_t)(MIN_CMD_TICKS * 8 /
-                                  7)),  // upm calculation is not exact
-              upm_from(d_ticks_new)));
+              upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
         }
       }
     } else {

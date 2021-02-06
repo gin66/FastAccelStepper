@@ -27,6 +27,7 @@
 #endif
 
 #define MIN_CMD_TICKS (10 * MIN_DELTA_TICKS)
+#define REF_CMD_TICKS (15 * MIN_DELTA_TICKS)
 
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
 

@@ -121,7 +121,8 @@ uint32_t calculate_ticks_v6(uint32_t steps, upm_float pre_calc) {
 //
 //					2 * n_i * (mask_i >> 1) * s = g_i >> 1
 //				= {
-//				    2 * (n_i + mask_i) * (mask_i >> 1) * s = (g_i
+//				    2 * (n_i + mask_i) * (mask_i >> 1) * s =
+//(g_i
 //>> 1) + (mask_i² * s)
 //                                                         = (g_i >> 1) + h_i
 //
