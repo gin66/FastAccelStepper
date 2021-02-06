@@ -277,7 +277,12 @@ In case the stepper does not run smoothly, then StepperDemo contains commands to
 - `r`: The digitalRead() of arduino is a fancy implementation, which checks, if the pin being read is connected to a timer to generate PWM and if yes, turns this off (actually IMHO a broken implementation: only 1 of the needed 2 bits are cleared, and the activation by force compare is missing). As FastAccelStepper controls the step pin, the digitalRead can disturb the step pin (even though I have expected step loss, only difference in noise can be heard). The error simulation in StepperDemo reads the pins in the main loop(), thus the symptom occurs quite reliably.
 - `e`: This blocks repeatedly interrupts for ~100us during 64ms out of 256ms. On AVR to see this problem popping up, the stepper rate has to be <~106 us (avr, one stepper running). >~106us it runs quite smoothly. The 106us = 100us block + ~6us ISR runtime. For ESP32 this has no effect.
 
-For avr: cause of long interrupt being blocked can be long section of codes between `noInterrupts()/interrupts()` in the application (or used libraries). Or long interrupt service routines in the application (or used libraries). Especially in interrupt service routines, the `digitalRead()/digitalWrite()` must be avoided. Alternative solution is described e.g. here: [blog](https://masteringarduino.blogspot.com/2013/10/fastest-and-smallest-digitalread-and.html), or [digitalWriteFast](https://github.com/NicksonYap/digitalWriteFast), or [fast versions](https://forum.arduino.cc/index.php?topic=46896.0).
+For avr: cause of long interrupt being blocked can be e.g.:
+- long section of codes between `noInterrupts()/interrupts()` in the application (or used libraries)
+- long interrupt service routines in the application (or used libraries).
+- port interrupts connected to noisy/bouncy switches causing bursts of interrupts
+
+Especially in interrupt service routines, the `digitalRead()/digitalWrite()` must be avoided. Alternative solution is described e.g. here: [blog](https://masteringarduino.blogspot.com/2013/10/fastest-and-smallest-digitalread-and.html), or [digitalWriteFast](https://github.com/NicksonYap/digitalWriteFast), or [fast versions](https://forum.arduino.cc/index.php?topic=46896.0).
 
 This feature of StepperDemo allows to compare non-smooth running stepper in an application with these error types.
 
