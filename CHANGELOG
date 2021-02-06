@@ -1,8 +1,8 @@
-pre-0.20.x:
+pre-0.21.x:
 This change scheduled for 0.20.1 has failed in sim_tests. Need to be checked again why
 - RampGenerator uses now the delayed start feature of the queue
 
-pre-0.20.3:
+pre-0.21.0:
 - StepperDemo extended with test sequence 10 for issue #44
 - avr: Avoid ClearInterruptFlag() in ISR, which is needed by simavr due to implementation bug
 - eliminate need for FOC workaround by updated simavr
@@ -10,6 +10,10 @@ pre-0.20.3:
   Cost is slower execution of ramp generation.
 - Fix a minor bug, that while deleration to a slower set speed, the deceleration could overshoot,
   which requires short acceleration
+- StepperDemo extended:
+	- command u to put selected stepper into unidirectional mode (need reset to restore)
+- Fix for issue #47: Restart in unidirectional mode and position count down
+- addQueueEntry returns AQE_ERROR_NO_DIR_PIN_TO_TOGGLE, if command defines count down and direction pin is undefined
 
 0.20.2:
 - Fix for issue #45: if enablePinHighActive has been set to PIN_UNDEFINED,

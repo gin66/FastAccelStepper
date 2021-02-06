@@ -254,6 +254,7 @@ class FastAccelStepper {
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
 #define AQE_ERROR_TICKS_TOO_LOW -1
 #define AQE_ERROR_EMPTY_QUEUE_TO_START -2
+#define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE -3
 
   // check function s for command queue being empty or full
   bool isQueueEmpty();

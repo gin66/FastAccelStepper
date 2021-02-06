@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-9a8df9a"
+#define VERSION "post-1ddf9e8"
 
 struct stepper_config_s {
   uint8_t step;
@@ -287,7 +287,9 @@ const static char messages[] PROGMEM =
 #define MSG_LONG_INTERRUPT_BLOCK_TOGGLE 48
     "Toggle erroneous 100 µs ISR block\n|"
 #define MSG_LONG_INTERRUPT_BLOCK_ENABLED 49
-    "ERRONEOUS 100 µs ISR BLOCK IS ON\n|";
+    "ERRONEOUS 100 µs ISR BLOCK IS ON\n|"
+#define MSG_SET_UNIDIRECTIONAL_STEPPER 50
+    "Set unidirectional stepper\n|";
 
 void output_msg(int8_t i) {
   char ch;
@@ -557,11 +559,12 @@ const static char usage_str[] PROGMEM =
     "     p<n>      ... Attach pulse counter n<=7\n"
 #endif
     "     t         ... Enter test mode\n"
-    "     Q         ... Toggle print usage on motor stop\n"
+    "     u         ... Unidirectional mode (need reset to restore)\n"
 #if defined(ARDUINO_ARCH_AVR)
     "     r         ... Toggle erroneous digitalRead() of stepper pin\n"
 #endif
     "     e         ... Toggle erroneous long 100us interrupt block\n"
+    "     Q         ... Toggle print usage on motor stop\n"
     "     ?         ... Print this usage\n"
     "\n";
 
@@ -825,6 +828,9 @@ void loop() {
           } else if (strcmp(out_buffer, "U") == 0) {
             output_msg(MSG_UPDATE_SPEED_ACCELERATION);
             stepper_selected->applySpeedAcceleration();
+          } else if (strcmp(out_buffer, "u") == 0) {
+            output_msg(MSG_SET_UNIDIRECTIONAL_STEPPER);
+            stepper_selected->setDirectionPin(PIN_UNDEFINED);
           } else if (strcmp(out_buffer, "W") == 0) {
 #ifdef SIM_TEST_INPUT
             if (stepper_selected->isRunning()) {

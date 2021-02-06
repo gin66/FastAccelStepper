@@ -244,6 +244,10 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
         }
       }
     }
+  } else {
+    if (!cmd->count_up) {
+      return AQE_ERROR_NO_DIR_PIN_TO_TOGGLE;
+    }
   }
 
   int res = AQE_OK;
