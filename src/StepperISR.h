@@ -1,5 +1,7 @@
 #if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR)
 #include <Arduino.h>
+#else
+#include <assert.h>
 #endif
 #include <stdint.h>
 

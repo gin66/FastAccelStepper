@@ -6,6 +6,10 @@ pre-0.20.3:
 - StepperDemo extended with test sequence 10 for issue #44
 - avr: Avoid ClearInterruptFlag() in ISR, which is needed by simavr due to implementation bug
 - eliminate need for FOC workaround by updated simavr
+- Better resolution of calculate ramp speed to reduce steps of constant speed while accelerating or decelerating.
+  Cost is slower execution of ramp generation.
+- Fix a minor bug, that while deleration to a slower set speed, the deceleration could overshoot,
+  which requires short acceleration
 
 0.20.2:
 - Fix for issue #45: if enablePinHighActive has been set to PIN_UNDEFINED,

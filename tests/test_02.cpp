@@ -74,13 +74,16 @@ class FastAccelStepperTest {
                  float max_time, float allowed_ramp_time_delta,
                  bool call_moveTo_repeatedly = false,
                  bool call_setAccelertion_repeatedly = false,
-                 bool alternatingAccelerationValue = false) {
+                 bool alternatingAccelerationValue = false,
+                 bool reversing_allowed = false) {
     printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n",
            name, steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
     init_queue();
     FastAccelStepper s = FastAccelStepper();
     s.init(NULL, 0, 0);
+    s.setDirectionPin(0);
     RampChecker rc = RampChecker();
+    rc.reversing_allowed = reversing_allowed;
     assert(0 == s.getCurrentPosition());
 
     assert(s.isQueueEmpty());
@@ -205,8 +208,8 @@ int main() {
   test.with_pars("f6", 100, 5000, 10000, true, 2 * 0.02 + 0.48 - 0.02,
                  2 * 0.02 + 0.48 + 0.02, 0.2);
   // ramp 2s, 20000 steps => only ramp 2*0.4s
-  test.with_pars("f7", 1600, 50, 10000, false, 2 * 0.4 - 0.02 - 0.31, 2 * 0.4 + 0.02,
-                 0.2);
+  test.with_pars("f7", 1600, 50, 10000, false, 2 * 0.4 - 0.02 - 0.31,
+                 2 * 0.4 + 0.02, 0.2);
   // ramp 2*4s, 2*8000 steps, coasting 112000steps, 28s
   test.with_pars("f8", 128000, 250, 1000, true, 2 * 4.0 + 28.0 - 0.2,
                  2 * 4.0 + 28.0 + 0.1, 0.2);
@@ -268,8 +271,14 @@ int main() {
   test.with_pars("f23", 1, 100, 1000, false, 0.02, 0.05, 0.1);
 
   // try to identify issue #40
-  test.with_pars("f24a", 5000, 200, 9999, false, 5.7, 5.72, 0.1, true, true, true);
-  test.with_pars("f24b", 5000, 200, 9999, true, 5.7, 5.72, 0.1, true, false, true);
+  test.with_pars("f24a", 5000, 200, 9999, true, 1.57, 1.59, 0.1, true, true,
+                 true, true);
+  test.with_pars("f24b", 5000, 200, 9999, true, 1.44, 1.46, 0.1, false, false,
+                 false);
+  test.with_pars("f24c", 5000, 200, 9999, true, 1.44, 1.46, 0.1, false, false,
+                 true);
+  test.with_pars("f24d", 5000, 200, 9999, true, 1.44, 1.46, 0.1, true, false,
+                 true);
 
   test.with_pars("f25", 1000, 40, 0xffffffff, true, 0.039, 0.041, 0.1);
 

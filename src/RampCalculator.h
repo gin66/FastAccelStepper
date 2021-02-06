@@ -1,4 +1,5 @@
 #include <stdint.h>
+
 #include "PoorManFloat.h"
 
 #ifdef TEST_TIMING

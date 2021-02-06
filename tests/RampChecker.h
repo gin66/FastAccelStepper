@@ -7,6 +7,8 @@ class RampChecker {
   bool flat_ok;
   bool decrease_ok;
   bool first;
+  bool dir_high;
+  bool reversing_allowed;
   uint32_t accelerate_till;
   uint32_t coast_till;
   uint32_t pos;
@@ -18,8 +20,10 @@ class RampChecker {
     last_dt = ~0;
     min_dt = ~0;
     first = true;
+    dir_high = true;
     coast_till = 0;
     accelerate_till = 0;
+    reversing_allowed = false;
   }
   RampChecker() {
     total_ticks = 0;
@@ -28,9 +32,6 @@ class RampChecker {
   }
   void check_section(struct queue_entry *e) {
     uint8_t steps = e->steps;
-    if (!first) {
-      assert(!e->toggle_dir);
-    }
     if (steps == 0) {
       // Just a pause
       if (ticks_since_last_step <= 0xffff0000) {
@@ -40,7 +41,18 @@ class RampChecker {
       printf("process pause %d => %u\n", e->ticks, ticks_since_last_step);
       return;
     }
-    pos += steps;
+    if (e->toggle_dir) {
+      assert(reversing_allowed);
+      dir_high = !dir_high;
+      increase_ok = true;
+      last_dt = ~0;
+      decrease_ok = false;
+    }
+    if (dir_high) {
+      pos += steps;
+    } else {
+      pos -= steps;
+    }
     uint32_t curr_dt = ticks_since_last_step;
     total_ticks += steps * e->ticks;
     if (!first) {

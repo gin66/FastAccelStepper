@@ -45,6 +45,7 @@ class FastAccelStepper;
 struct ramp_config_s {
   uint32_t min_travel_ticks;
   upm_float upm_inv_accel2;
+  upm_float upm_sqrt_inv_accel;
   uint8_t accel_change_cnt;
 };
 struct ramp_ro_s {
@@ -78,7 +79,7 @@ class NextCommand {
 
 class RampGenerator {
  private:
-  // This latest configuration for acceleration/speed calculate_move, only
+  // Latest configuration for acceleration/speed calculate_move, only
   struct ramp_config_s _config;
 
   // The ro variables are those, which are only read from _getNextCommand().
