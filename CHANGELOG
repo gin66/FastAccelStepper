@@ -1,5 +1,6 @@
-pre-0.21.1:
+0.21.1:
 - RampGenerator uses now the delayed start feature of the queue
+- Fix invalid command generated due to upm calculation tolerance at higher speed
 
 0.21.0:
 - StepperDemo extended with test sequence 10 for issue #44
