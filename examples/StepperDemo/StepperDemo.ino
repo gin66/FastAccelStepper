@@ -197,8 +197,8 @@ const static char messages[] PROGMEM =
     "Enter test mode\n|"
 #define MSG_SET_ACCELERATION_TO 4
     "Set acceleration to |"
-#define MSG_SET_SPEED_TO 5
-    "Set speed (us) to |"
+#define MSG_SET_SPEED_TO_US 5
+    "Set speed (us/step) to |"
 #define MSG_MOVE_STEPS 6
     "Move steps |"
 #define MSG_MOVE_TO_POSITION 7
@@ -291,7 +291,9 @@ const static char messages[] PROGMEM =
 #define MSG_SET_UNIDIRECTIONAL_STEPPER 50
     "Set unidirectional stepper\n|"
 #define MSG_CLEAR_PULSE_COUNTER 51
-    "Clear pulse counter\n|";
+    "Clear pulse counter\n|"
+#define MSG_SET_SPEED_TO_HZ 52
+    "Set speed (steps/s) to |";
 
 void output_msg(int8_t i) {
   char ch;
@@ -527,6 +529,7 @@ const static char usage_str[] PROGMEM =
     "Enter commands separated by space, carriage return or newline:\n"
     "     M1/M2/..  ... to select stepper\n"
     "     V<speed>  ... Set selected stepper's speed in us/step\n"
+    "     H<speed>  ... Set selected stepper's speed in steps/s\n"
     "     A<accel>  ... Set selected stepper's acceleration\n"
     "     a<accel>  ... Acceleration control with +/-acceleration values\n"
     "     U         ... Update selected stepper's speed/acceleration while "
@@ -767,9 +770,16 @@ void loop() {
               output_msg(MSG_ERROR_INVALID_VALUE);
             }
           } else if (sscanf(out_buffer, "V%lu", &val) == 1) {
-            output_msg(MSG_SET_SPEED_TO);
+            output_msg(MSG_SET_SPEED_TO_US);
             Serial.println(val);
             int8_t res = stepper_selected->setSpeedInUs(val);
+            if (res < 0) {
+              output_msg(MSG_ERROR_INVALID_VALUE);
+            }
+          } else if (sscanf(out_buffer, "H%lu", &val) == 1) {
+            output_msg(MSG_SET_SPEED_TO_HZ);
+            Serial.println(val);
+            int8_t res = stepper_selected->setSpeedInHz(val);
             if (res < 0) {
               output_msg(MSG_ERROR_INVALID_VALUE);
             }

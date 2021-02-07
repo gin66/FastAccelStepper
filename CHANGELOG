@@ -1,7 +1,11 @@
 pre-0.21.2:
 - Two new API functions: setSpeedInTicks() and getSpeedInTicks()
 - setSpeedInHz() and setSpeedInMilliHz() uses higher resolution than us
-- esp32: the spare pulse counter attached to a stepper can now be configured and cleared.
+- esp32: the spare pulse counter attached to a stepper can now be configured and cleared.A
+- StepperDemo extended:
+	- esp32 only: Add command p<n>,<l>,<h> to configure limits for attached pulse counter
+	- esp32 only: Add command pc to clear an attachedPulseCounter
+	- H<speed>: Set the speed in Steps/s
 
 0.21.1:
 - RampGenerator uses now the delayed start feature of the queue
