@@ -289,7 +289,9 @@ const static char messages[] PROGMEM =
 #define MSG_LONG_INTERRUPT_BLOCK_ENABLED 49
     "ERRONEOUS 100 µs ISR BLOCK IS ON\n|"
 #define MSG_SET_UNIDIRECTIONAL_STEPPER 50
-    "Set unidirectional stepper\n|";
+    "Set unidirectional stepper\n|"
+#define MSG_CLEAR_PULSE_COUNTER 51
+    "Clear pulse counter\n|";
 
 void output_msg(int8_t i) {
   char ch;
@@ -557,6 +559,8 @@ const static char usage_str[] PROGMEM =
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
     "     p<n>      ... Attach pulse counter n<=7\n"
+    "     p<n>,l,h  ... Attach pulse counter n<=7 with low and high limits\n"
+    "     pc        ... Clear pulse counter\n"
 #endif
     "     t         ... Enter test mode\n"
     "     u         ... Unidirectional mode (need reset to restore)\n"
@@ -696,6 +700,9 @@ void loop() {
       out_buffer[out_ptr++] = ch;
     } else if ((ch == ' ') || (ch == '\n') || (ch == '\r')) {
       long val;
+#if defined(ARDUINO_ARCH_ESP32)
+      long val2, val3;
+#endif
       out_buffer[out_ptr] = 0;
       if ((strcmp(out_buffer, "M1") == 0) && stepper[0]) {
         output_msg(MSG_SELECT_STEPPER);
@@ -871,12 +878,23 @@ void loop() {
             }
           }
 #if defined(ARDUINO_ARCH_ESP32)
+          else if (sscanf(out_buffer, "p%lu,%ld,%ld", &val, &val2, &val3) == 3) {
+            output_msg(MSG_ATTACH_PULSE_COUNTER);
+            Serial.println(val);
+            if (!stepper_selected->attachToPulseCounter(val, val2, val3)) {
+              output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
+            }
+          }
           else if (sscanf(out_buffer, "p%lu", &val) == 1) {
             output_msg(MSG_ATTACH_PULSE_COUNTER);
             Serial.println(val);
             if (!stepper_selected->attachToPulseCounter(val)) {
               output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
             }
+          }
+          else if (strcmp(out_buffer, "pc") == 0) {
+            output_msg(MSG_CLEAR_PULSE_COUNTER);
+            stepper_selected->clearPulseCounter();
           }
 #endif
         } else {

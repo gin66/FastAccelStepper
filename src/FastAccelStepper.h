@@ -301,11 +301,28 @@ class FastAccelStepper {
   // available. If only five steppers are defined, then 5 gets available. If
   // four steppers are defined, then 4 is usable,too.
   //
-  // The function are intended for testing, because the library should always
+  // These functions are intended primarily for testing, because the library should always
   // output the correct amount of pulses. Possible application usage would be an
   // immediate and interrupt friendly version for getCurrentPosition()
-  bool attachToPulseCounter(uint8_t pcnt_unit);
+  //
+  // The pulse counter counts up towards high_value.
+  // If the high_value is reached, then the pulse counter is reset to 0.
+  // Similarly, if direction pin is configured and set to count down,
+  // then the pulse counter counts towards low_value. When the low value is hit,
+  // the pulse counter is reset to 0.
+  //
+  // If low_value and high_value is set 0 zero, then the pulse counter is just counting
+  // like any int16_t counter: 0...32767,-32768,-32767,...,0 and backwards accordingly
+  //
+  // Possible application:
+  // Assume the stepper, to which the pulse counter attached to, needs 3200 steps/revolution.
+  // If now attachToPulseCounter is called with -3200 and 3200 for the low and high values respectively,
+  // then the momentary angle of the stepper (at exact this moment) can be retrieved just 
+  // by reading the pulse counter. If the value is negative, then just add 3200.
+  //
+  bool attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value = -16384, int16_t high_value = 16384);
   int16_t readPulseCounter();
+  void clearPulseCounter();
   bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
 #endif
 

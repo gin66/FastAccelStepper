@@ -1,6 +1,7 @@
 pre-0.21.2:
 - Two new API functions: setSpeedInTicks() and getSpeedInTicks()
 - setSpeedInHz() and setSpeedInMilliHz() uses higher resolution than us
+- esp32: the spare pulse counter attached to a stepper can now be configured and cleared.
 
 0.21.1:
 - RampGenerator uses now the delayed start feature of the queue

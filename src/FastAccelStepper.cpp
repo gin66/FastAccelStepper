@@ -714,14 +714,19 @@ void FastAccelStepper::backwardStep(bool blocking) {
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
 #if defined(ARDUINO_ARCH_ESP32)
-bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit) {
+bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value, int16_t high_value) {
   if (pcnt_unit < 8) {
-    if (_esp32_attachToPulseCounter(pcnt_unit, this)) {
+    if (_esp32_attachToPulseCounter(pcnt_unit, this, low_value, high_value)) {
       _attached_pulse_cnt_unit = pcnt_unit;
       return true;
     }
   }
   return false;
+}
+void FastAccelStepper::clearPulseCounter() {
+  if (_attached_pulse_cnt_unit >= 0) {
+    _esp32_clearPulseCounter(_attached_pulse_cnt_unit);
+  }
 }
 int16_t FastAccelStepper::readPulseCounter() {
   if (_attached_pulse_cnt_unit >= 0) {
