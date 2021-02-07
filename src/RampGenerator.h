@@ -89,7 +89,7 @@ class RampGenerator {
   struct ramp_rw_s _rw;
 
  public:
-  uint32_t speed_in_us;
+  uint32_t speed_in_ticks;
   uint32_t acceleration;
   inline uint8_t rampState() {
     // reading one byte is atomic
@@ -100,8 +100,22 @@ class RampGenerator {
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
     _ro.target_pos += delta;
   }
+  int8_t setSpeedInTicks(uint32_t min_step_ticks);
   int8_t setSpeedInUs(uint32_t min_step_us);
-  uint32_t getSpeedInUs() { return speed_in_us; }
+  uint32_t getSpeedInUs() { return speed_in_ticks / (TICKS_PER_S/1000000); }
+  uint32_t getSpeedInTicks() { return speed_in_ticks; }
+  int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
+    if (speed_mhz <= (1000LL*TICKS_PER_S / 0xffffffff + 1)) {
+      return -1;
+    }
+    return setSpeedInTicks(250UL * TICKS_PER_S / speed_mhz * 4);
+  }
+  int8_t setSpeedInHz(uint32_t speed_hz) {
+    if (speed_hz == 0) {
+      return -1;
+    }
+    return setSpeedInTicks(TICKS_PER_S / speed_hz);
+  }
   int8_t setAcceleration(uint32_t accel);
   uint32_t getAcceleration() { return acceleration; }
   inline bool hasValidConfig() {

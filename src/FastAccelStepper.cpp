@@ -536,9 +536,6 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   }
   _off_delay_count = max(delay_count, 1);
 }
-int8_t FastAccelStepper::setSpeedInUs(uint32_t min_step_us) {
-  return _rg.setSpeedInUs(min_step_us);
-}
 int8_t FastAccelStepper::setAcceleration(uint32_t accel) {
   return _rg.setAcceleration(accel);
 }
@@ -570,11 +567,11 @@ int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
       stopMove();
     }
   } else {
-    uint32_t max_speed = _rg.speed_in_us;
+    uint32_t max_speed = _rg.getSpeedInTicks();
     setSpeedInUs(getPeriodAfterCommandsCompleted());
     setAcceleration(1);
     applySpeedAcceleration();
-    setSpeedInUs(max_speed);
+    setSpeedInTicks(max_speed);
   }
   return res;
 }

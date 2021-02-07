@@ -36,7 +36,7 @@
 //*************************************************************************************************
 
 void RampGenerator::init() {
-  speed_in_us = 0;
+  speed_in_ticks = 0;
   _config.accel_change_cnt = 0;
   _config.min_travel_ticks = 0;
   _config.upm_inv_accel2 = 0;
@@ -51,20 +51,23 @@ void RampGenerator::init() {
   upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);
 #endif
 }
-int8_t RampGenerator::setSpeedInUs(uint32_t min_step_us) {
-  if (min_step_us == 0) {
+int8_t RampGenerator::setSpeedInTicks(uint32_t min_step_ticks) {
+  if (min_step_ticks < MIN_DELTA_TICKS) {
     return -1;
   }
-  if (min_step_us > TICKS_TO_US(0xffffffff)) {
+  if (min_step_ticks == TICKS_FOR_STOPPED_MOTOR) {
     return -1;
   }
-  uint32_t min_travel_ticks = US_TO_TICKS(min_step_us);
-  if (min_travel_ticks < MIN_DELTA_TICKS) {
-    return -1;
-  }
-  speed_in_us = min_step_us;
-  _config.min_travel_ticks = min_travel_ticks;
+  speed_in_ticks = min_step_ticks;
+  _config.min_travel_ticks = min_step_ticks;
   return 0;
+}
+int8_t RampGenerator::setSpeedInUs(uint32_t min_step_us) {
+  if (min_step_us >= TICKS_TO_US(0xffffffff)) {
+    return -1;
+  }
+  uint32_t min_step_ticks = US_TO_TICKS(min_step_us);
+  return setSpeedInTicks(min_step_ticks);
 }
 int8_t RampGenerator::setAcceleration(uint32_t accel) {
   if (accel == 0) {

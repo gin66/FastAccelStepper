@@ -127,30 +127,22 @@ class FastAccelStepper {
   //
   // Returns 0 on success, or -1 on invalid value
   // Invalid is <MIN_DELTA_TICKS in us or >~250 Mio.
-  int8_t setSpeedInUs(uint32_t min_step_us);
+  int8_t setSpeedInUs(uint32_t min_step_us) { return _rg.setSpeedInUs(min_step_us); }
+  int8_t setSpeedInTicks(uint32_t min_step_us) { return _rg.setSpeedInTicks(min_step_us); }
   // retrieve current set speed (while accelerationn/deceleration: not the
   // actual speed !)
   uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
+  uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
 
   // setSpeedInHz() allows to set the stepper speed as step frequency in Hertz.
   // This means steps/s.
-  int8_t setSpeedInHz(uint32_t speed_hz) {
-    if (speed_hz == 0) {
-      return -1;
-    }
-    return setSpeedInUs(1000000L / speed_hz);
-  }
+  int8_t setSpeedInHz(uint32_t speed_hz) { return _rg.setSpeedInHz(speed_hz); }
 
   // setSpeedInMilliHz() allows to set the stepper speed as step frequency in
   // milliHertz. This means steps/1000 s. This is required for very slow speeds.
   //
   //
-  int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
-    if (speed_mhz == 0) {
-      return -1;
-    }
-    return setSpeedInUs(1000000000L / speed_mhz);
-  }
+  int8_t setSpeedInMilliHz(uint32_t speed_mhz) { return _rg.setSpeedInMilliHz(speed_mhz); }
 
   //  set Acceleration expects as parameter the change of speed
   //  as step/s².

@@ -524,7 +524,7 @@ void info(FastAccelStepper *s, bool long_info) {
 const static char usage_str[] PROGMEM =
     "Enter commands separated by space, carriage return or newline:\n"
     "     M1/M2/..  ... to select stepper\n"
-    "     V<speed>  ... Set selected stepper's speed\n"
+    "     V<speed>  ... Set selected stepper's speed in us/step\n"
     "     A<accel>  ... Set selected stepper's acceleration\n"
     "     a<accel>  ... Acceleration control with +/-acceleration values\n"
     "     U         ... Update selected stepper's speed/acceleration while "
