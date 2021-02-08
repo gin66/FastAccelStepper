@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-f5003a8"
+#define VERSION "post-534b430"
 
 struct stepper_config_s {
   uint8_t step;
@@ -888,21 +888,20 @@ void loop() {
             }
           }
 #if defined(ARDUINO_ARCH_ESP32)
-          else if (sscanf(out_buffer, "p%lu,%ld,%ld", &val, &val2, &val3) == 3) {
+          else if (sscanf(out_buffer, "p%lu,%ld,%ld", &val, &val2, &val3) ==
+                   3) {
             output_msg(MSG_ATTACH_PULSE_COUNTER);
             Serial.println(val);
             if (!stepper_selected->attachToPulseCounter(val, val2, val3)) {
               output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
             }
-          }
-          else if (sscanf(out_buffer, "p%lu", &val) == 1) {
+          } else if (sscanf(out_buffer, "p%lu", &val) == 1) {
             output_msg(MSG_ATTACH_PULSE_COUNTER);
             Serial.println(val);
             if (!stepper_selected->attachToPulseCounter(val)) {
               output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
             }
-          }
-          else if (strcmp(out_buffer, "pc") == 0) {
+          } else if (strcmp(out_buffer, "pc") == 0) {
             output_msg(MSG_CLEAR_PULSE_COUNTER);
             stepper_selected->clearPulseCounter();
           }

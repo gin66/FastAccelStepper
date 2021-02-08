@@ -383,6 +383,7 @@ void FastAccelStepper::fill_queue() {
         printf("ERROR: Abort ramp due to queue error (%d)\n", res);
         printf("steps=%d ticks=%d limit=%ld state=%d\n", cmd.command.steps,
                cmd.command.ticks, MIN_CMD_TICKS, cmd.rw.ramp_state);
+        assert(false);
 #endif
         _rg.stopRamp();
         delayed_start = false;
@@ -714,7 +715,9 @@ void FastAccelStepper::backwardStep(bool blocking) {
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
 #if defined(ARDUINO_ARCH_ESP32)
-bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value, int16_t high_value) {
+bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
+                                            int16_t low_value,
+                                            int16_t high_value) {
   if (pcnt_unit < 8) {
     if (_esp32_attachToPulseCounter(pcnt_unit, this, low_value, high_value)) {
       _attached_pulse_cnt_unit = pcnt_unit;

@@ -212,6 +212,8 @@ uint32_t calculate_ticks_v8(uint32_t steps, upm_float pre_calc) {
   upm_float upm_res = upm_divide(pre_calc, upm_sqrt_steps);
   uint32_t res = upm_to_u32(upm_res);
 
+//#define ENABLED
+#ifdef ENABLED
   // now improving the result
   uint16_t sqrt_steps = upm_to_u16(upm_sqrt_steps);
   uint32_t steps_r = sqrt_steps;
@@ -233,5 +235,6 @@ uint32_t calculate_ticks_v8(uint32_t steps, upm_float pre_calc) {
     uint32_t val = upm_to_u32(upm_val);
     res += val;
   }
+#endif
   return res;
 }

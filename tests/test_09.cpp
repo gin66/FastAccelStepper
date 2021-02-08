@@ -46,7 +46,7 @@ class FastAccelStepperTest {
     float old_planned_time_in_buffer = 0;
 
     char fname[100];
-    sprintf(fname, "test_07.gnuplot");
+    sprintf(fname, "test_09.gnuplot");
     FILE *gp_file = fopen(fname, "w");
     fprintf(gp_file, "$data <<EOF\n");
     for (int j = 0; j < 2; j++) {

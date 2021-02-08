@@ -11,6 +11,7 @@ class RampChecker {
   bool reversing_allowed;
   uint32_t accelerate_till;
   uint32_t coast_till;
+  uint32_t time_coasting;
   uint32_t pos;
   uint32_t ticks_since_last_step = 0;
 
@@ -22,6 +23,7 @@ class RampChecker {
     first = true;
     dir_high = true;
     coast_till = 0;
+    time_coasting = 0;
     accelerate_till = 0;
     reversing_allowed = false;
   }
@@ -71,7 +73,7 @@ class RampChecker {
         total_ticks / 16000000.0, steps, last_dt, curr_dt, min_dt, accel,
         increase_ok ? "ALLOW" : "NO", decrease_ok ? "ALLOW" : "NO");
 
-    assert(steps * curr_dt >= 0);
+    assert(first || (steps * curr_dt > 0));
 
     if (last_dt > curr_dt) {
       assert(increase_ok);
@@ -83,6 +85,8 @@ class RampChecker {
       }
       assert(decrease_ok);
       increase_ok = false;
+    } else {
+      time_coasting += steps * curr_dt;
     }
 
     if (!first) {

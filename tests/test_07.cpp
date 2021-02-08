@@ -62,6 +62,7 @@ class FastAccelStepperTest {
       if (rc.total_ticks > next_speed_change) {
         next_speed_change = rc.total_ticks + T100MS;
         speed_us = 190 - speed_us;
+        printf("Change speed to %d\n", speed_us);
         s.setSpeedInUs(speed_us);
         s.applySpeedAcceleration();
       }
@@ -104,6 +105,9 @@ class FastAccelStepperTest {
     test(!s.isRampGeneratorActive(), "too many commands created");
     test(s.getCurrentPosition() == steps, "has not reached target position");
     printf("Total time  %f\n", rc.total_ticks / 16000000.0);
+
+    printf("Time coasting = %d\n", rc.time_coasting);
+    test(rc.time_coasting < 46000000, "too much coasting");
 
     printf("mid point @ %ld => total = %ld, total ticks = %ld\n",
            mid_point_ticks, 2 * mid_point_ticks, rc.total_ticks);

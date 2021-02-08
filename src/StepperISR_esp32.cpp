@@ -420,7 +420,8 @@ uint32_t ctrl_idx[8] = {PCNT_CTRL_CH0_IN0_IDX, PCNT_CTRL_CH0_IN1_IDX,
                         PCNT_CTRL_CH0_IN4_IDX, PCNT_CTRL_CH0_IN5_IDX,
                         PCNT_CTRL_CH0_IN6_IDX, PCNT_CTRL_CH0_IN7_IDX};
 
-bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper, int16_t low_value, int16_t high_value) {
+bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
+                                 int16_t low_value, int16_t high_value) {
   // TODO: Check if free pulse counter
 
   pcnt_config_t cfg;

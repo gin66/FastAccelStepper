@@ -374,6 +374,9 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 
       uint32_t rs = performed_ramp_up_steps + planning_steps;
       d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
+#ifdef TEST
+      printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
+#endif
 
       // if acceleration is very high, then d_ticks_new can be lower than
       // min_travel_ticks
@@ -387,8 +390,13 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
         if (cmd_ticks < MIN_CMD_TICKS) {
           // planning_steps = MIN_CMD_TICKS / next_ticks;
 
-          planning_steps = upm_to_u32(upm_divide(
+          uint32_t new_planning_steps = upm_to_u32(upm_divide(
               upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
+#ifdef TEST
+          printf("Increase planning steps %d => %d\n", planning_steps,
+                 new_planning_steps);
+#endif
+          planning_steps = new_planning_steps;
         }
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
@@ -399,13 +407,21 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
         rs = performed_ramp_up_steps - planning_steps;
       }
       d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
+#ifdef TEST
+      printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
+#endif
 
       {
         uint32_t cmd_ticks = d_ticks_new * planning_steps;
         if (cmd_ticks < MIN_CMD_TICKS) {
           // planning_steps = MIN_CMD_TICKS / next_ticks;
-          planning_steps = upm_to_u32(upm_divide(
+          uint32_t new_planning_steps = upm_to_u32(upm_divide(
               upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
+#ifdef TEST
+          printf("Increase planning steps %d => %d\n", planning_steps,
+                 new_planning_steps);
+#endif
+          planning_steps = new_planning_steps;
         }
       }
     } else {
@@ -414,6 +430,25 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       coast_steps = remaining_steps - performed_ramp_up_steps;
       if (coast_steps < planning_steps * 2) {
         planning_steps = coast_steps;
+      }
+#ifdef TEST
+      printf("planning steps=%d remaining steps=%d coast steps=%d\n",
+             planning_steps, remaining_steps, coast_steps);
+#endif
+      {
+        // coast_steps can be too slow, if the acceleration just has changed
+        uint32_t cmd_ticks = d_ticks_new * planning_steps;
+        if (cmd_ticks < MIN_CMD_TICKS) {
+          // planning_steps = MIN_CMD_TICKS / next_ticks;
+
+          uint32_t new_planning_steps = upm_to_u32(upm_divide(
+              upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
+#ifdef TEST
+          printf("Increase planning steps %d => %d\n", planning_steps,
+                 new_planning_steps);
+#endif
+          planning_steps = new_planning_steps;
+        }
       }
     }
   }
@@ -429,15 +464,27 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       // TICKS_FOR_STOPPED_MOTOR for the case, that queue is emptied before
       // the next command is issued
       next_ticks = max(next_ticks, curr_ticks);
-      if (this_state == RAMP_STATE_DECELERATE) {
-        next_ticks = max(next_ticks, ramp->config.min_travel_ticks);
-      }
+      //      if (this_state != RAMP_STATE_DECELERATE) {
+      //        next_ticks = max(next_ticks, ramp->config.min_travel_ticks);
+      //      }
     }
   }
 #ifdef TEST
   assert(next_ticks > 0);
 #endif
+#ifdef TEST
+  if (next_ticks != d_ticks_new) {
+    printf(
+        "Clipping result d_ticks_new=%d => next_ticks=%d  with curr_ticks=%d  "
+        "state=%d\n",
+        d_ticks_new, next_ticks, curr_ticks, this_state);
+  }
+#endif
 
+#ifdef TEST
+  printf("planning steps=%d remaining steps=%d\n", planning_steps,
+         remaining_steps);
+#endif
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t steps = planning_steps;
   steps = min(steps, abs(remaining_steps));  // This could be problematic
@@ -525,7 +572,11 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 }
 void RampGenerator::afterCommandEnqueued(NextCommand *command) {
 #ifdef TEST
-  puts("after Command Enqueued");
+  printf(
+      "after Command Enqueued: performed ramp up steps = %d, pause left = %d, "
+      "curr_ticks = %d\n",
+      command->rw.performed_ramp_up_steps, command->rw.pause_ticks_left,
+      command->rw.curr_ticks);
 #endif
   _rw = command->rw;
 }

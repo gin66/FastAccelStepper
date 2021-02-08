@@ -127,8 +127,12 @@ class FastAccelStepper {
   //
   // Returns 0 on success, or -1 on invalid value
   // Invalid is <MIN_DELTA_TICKS in us or >~250 Mio.
-  int8_t setSpeedInUs(uint32_t min_step_us) { return _rg.setSpeedInUs(min_step_us); }
-  int8_t setSpeedInTicks(uint32_t min_step_us) { return _rg.setSpeedInTicks(min_step_us); }
+  int8_t setSpeedInUs(uint32_t min_step_us) {
+    return _rg.setSpeedInUs(min_step_us);
+  }
+  int8_t setSpeedInTicks(uint32_t min_step_us) {
+    return _rg.setSpeedInTicks(min_step_us);
+  }
   // retrieve current set speed (while accelerationn/deceleration: not the
   // actual speed !)
   uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
@@ -142,7 +146,9 @@ class FastAccelStepper {
   // milliHertz. This means steps/1000 s. This is required for very slow speeds.
   //
   //
-  int8_t setSpeedInMilliHz(uint32_t speed_mhz) { return _rg.setSpeedInMilliHz(speed_mhz); }
+  int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
+    return _rg.setSpeedInMilliHz(speed_mhz);
+  }
 
   //  set Acceleration expects as parameter the change of speed
   //  as step/s².
@@ -275,8 +281,8 @@ class FastAccelStepper {
 #define RAMP_STATE_COAST 1
 #define RAMP_STATE_ACCELERATE 2
 #define RAMP_STATE_DECELERATE_TO_STOP 4
-#define RAMP_STATE_DECELERATE 12
-#define RAMP_STATE_REVERSE 20
+#define RAMP_STATE_DECELERATE (4 + 8)
+#define RAMP_STATE_REVERSE (4 + 16)
 #define RAMP_STATE_ACCELERATING_FLAG 2
 #define RAMP_STATE_DECELERATING_FLAG 4
   inline uint8_t rampState() { return _rg.rampState(); }
@@ -301,9 +307,10 @@ class FastAccelStepper {
   // available. If only five steppers are defined, then 5 gets available. If
   // four steppers are defined, then 4 is usable,too.
   //
-  // These functions are intended primarily for testing, because the library should always
-  // output the correct amount of pulses. Possible application usage would be an
-  // immediate and interrupt friendly version for getCurrentPosition()
+  // These functions are intended primarily for testing, because the library
+  // should always output the correct amount of pulses. Possible application
+  // usage would be an immediate and interrupt friendly version for
+  // getCurrentPosition()
   //
   // The pulse counter counts up towards high_value.
   // If the high_value is reached, then the pulse counter is reset to 0.
@@ -311,16 +318,19 @@ class FastAccelStepper {
   // then the pulse counter counts towards low_value. When the low value is hit,
   // the pulse counter is reset to 0.
   //
-  // If low_value and high_value is set 0 zero, then the pulse counter is just counting
-  // like any int16_t counter: 0...32767,-32768,-32767,...,0 and backwards accordingly
+  // If low_value and high_value is set 0 zero, then the pulse counter is just
+  // counting like any int16_t counter: 0...32767,-32768,-32767,...,0 and
+  // backwards accordingly
   //
   // Possible application:
-  // Assume the stepper, to which the pulse counter attached to, needs 3200 steps/revolution.
-  // If now attachToPulseCounter is called with -3200 and 3200 for the low and high values respectively,
-  // then the momentary angle of the stepper (at exact this moment) can be retrieved just 
-  // by reading the pulse counter. If the value is negative, then just add 3200.
+  // Assume the stepper, to which the pulse counter attached to, needs 3200
+  // steps/revolution. If now attachToPulseCounter is called with -3200 and 3200
+  // for the low and high values respectively, then the momentary angle of the
+  // stepper (at exact this moment) can be retrieved just by reading the pulse
+  // counter. If the value is negative, then just add 3200.
   //
-  bool attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value = -16384, int16_t high_value = 16384);
+  bool attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value = -16384,
+                            int16_t high_value = 16384);
   int16_t readPulseCounter();
   void clearPulseCounter();
   bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
