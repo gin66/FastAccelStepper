@@ -16,7 +16,12 @@ int main() {
 	float err;
 	for (int mode = 0;mode <= 1;mode++) {
 		upm_float upm_pre_calc = upm_from(pre_calc);
-		res = calculate_ticks_v8(steps, upm_pre_calc, mode == 1);
+		if (mode == 0) {
+			res = calculate_ticks_v8(steps, upm_pre_calc);
+		}
+		else {
+			res = calculate_ticks_v9(steps, upm_pre_calc);
+		}
 		correct = upm_to_u32(upm_pre_calc) * 1.0 / sqrt(steps);
 		err = res - correct;
 		printf("%d %f  %f\n",res,correct,err);
