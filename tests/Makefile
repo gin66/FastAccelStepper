@@ -5,7 +5,8 @@ LDLIBS=-lm -lc
 
 TESTS=$(basename $(wildcard test_??.cpp))
 
-test: $(TESTS) pmf_test
+test: $(TESTS) pmf_test rmc_test
+	./rmc_test
 	./pmf_test
 	$(addsuffix &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
 
@@ -22,6 +23,9 @@ test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h stubs.h
 
 pmf_test: pmf_test.o PoorManFloat.o
 pmf_test.o: pmf_test.cpp ../src/PoorManFloat.h stubs.h test_03.h
+
+rmc_test: rmc_test.o PoorManFloat.o RampCalculator.o
+rmc_test.o: rmc_test.cpp ../src/PoorManFloat.h ../src/RampCalculator.h stubs.h test_03.h
 
 FastAccelStepper.o: ../src/FastAccelStepper.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@

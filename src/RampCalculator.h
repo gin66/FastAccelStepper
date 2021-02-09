@@ -11,4 +11,8 @@ uint32_t calculate_ticks_v5(uint32_t steps, upm_float pre_calc);
 uint32_t calculate_ticks_v6(uint32_t steps, upm_float pre_calc);
 uint32_t calculate_ticks_v7(uint32_t steps, upm_float pre_calc);
 #endif
+#ifdef TEST
+uint32_t calculate_ticks_v8(uint32_t steps, upm_float pre_calc, bool enable_correction = false);
+#else
 uint32_t calculate_ticks_v8(uint32_t steps, upm_float pre_calc);
+#endif
