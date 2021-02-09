@@ -187,7 +187,7 @@ uint32_t calculate_ticks_v7(uint32_t steps, upm_float pre_calc) {
 // When calculate n, actually calculated with rounding/truncation from 8 bit
 // operation:
 //
-//		n_r = 1 / sqrt(s_r) * A
+//		n_r = A / sqrt(s_r)
 //
 // The error from the rounding/truncation can be fixed by:
 //
@@ -221,13 +221,13 @@ uint32_t calculate_ticks_v9(uint32_t steps, upm_float pre_calc) {
   upm_float upm_res = upm_divide(pre_calc, upm_sqrt_steps);
   uint32_t res = upm_to_u32(upm_res);
 
-
   // now improving the result
   uint16_t sqrt_steps = upm_to_u16(upm_sqrt_steps);
   uint32_t steps_r = sqrt_steps;
   steps_r *= sqrt_steps;
-printf("%d ->sqrt -> %d ->^2-> %d\n", steps,sqrt_steps, steps_r);
-printf("%d / sqrt(steps) = %d,   %d\n", upm_to_u32(pre_calc), res, upm_to_u32(pre_calc)/sqrt_steps);
+  printf("%d ->sqrt -> %d ->^2-> %d\n", steps, sqrt_steps, steps_r);
+  printf("%d / sqrt(steps) = %d,   %d\n", upm_to_u32(pre_calc), res,
+         upm_to_u32(pre_calc) / sqrt_steps);
 
   if (steps > steps_r) {
     uint32_t e = steps - steps_r;
@@ -236,7 +236,7 @@ printf("%d / sqrt(steps) = %d,   %d\n", upm_to_u32(pre_calc), res, upm_to_u32(pr
         upm_divide(upm_e, upm_steps);  // steps instead of steps_r
     upm_float upm_val = upm_multiply(upm_corr, upm_res);
     uint32_t val = upm_to_u32(upm_val);
-	printf("%d %d\n",e,val);
+    printf("%d %d\n", e, val);
     res -= val;
   } else if (steps < steps_r) {
     uint32_t e = steps_r - steps;
@@ -247,7 +247,7 @@ printf("%d / sqrt(steps) = %d,   %d\n", upm_to_u32(pre_calc), res, upm_to_u32(pr
     uint32_t val = upm_to_u32(upm_val);
     res += val;
   }
-printf("%d / sqrt(steps) = %d\n", upm_to_u32(pre_calc), res);
+  printf("%d / sqrt(steps) = %d\n", upm_to_u32(pre_calc), res);
   return res;
 }
 #endif
