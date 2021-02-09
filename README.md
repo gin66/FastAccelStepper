@@ -297,6 +297,7 @@ This feature of StepperDemo allows to compare non-smooth running stepper in an a
 Found on youtube:
 
 * [Testing on NEMA-17](https://www.youtube.com/watch?v=yUTXTRjAOak)
+* [high speed Closed Loop nema 34 12nm stepper motor, esp32 FastAccelStepper, SBH860H driver](https://www.youtube.com/watch?v=hPxJekex5zM)
 * [Neck mechanism](https://www.youtube.com/watch?v=rY7NDBnz7Cw)
 
 ## Contribution
