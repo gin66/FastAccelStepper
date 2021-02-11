@@ -1,3 +1,6 @@
+0.21.3:
+-  Unidirectional mode: moveByAcceleration() with negative values has used previous acceleration till stop
+
 0.21.2:
 - Two new API functions: setSpeedInTicks() and getSpeedInTicks()
 - setSpeedInHz() and setSpeedInMilliHz() uses higher resolution than us

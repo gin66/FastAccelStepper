@@ -565,6 +565,7 @@ int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
     if (allow_reverse && (_dirPin != PIN_UNDEFINED)) {
       res = runBackward();
     } else {
+      applySpeedAcceleration();
       stopMove();
     }
   } else {

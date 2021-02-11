@@ -445,7 +445,7 @@ void setup() {
 }
 
 #ifdef SIM_TEST_INPUT
-const char *input = SIM_TEST_INPUT;
+const char *input = SIM_TEST_INPUT " "; // final space is too easy forgotten in platformio.ini test
 #else
 const char *input = NULL;
 #endif
@@ -851,7 +851,7 @@ void loop() {
           } else if (strcmp(out_buffer, "W") == 0) {
 #ifdef SIM_TEST_INPUT
             if (stepper_selected->isRunning()) {
-              input -= 2;
+              read_ptr -= 2;
             }
 #else
             output_msg(MSG_BLOCKING_WAIT);
@@ -921,7 +921,7 @@ void loop() {
 #ifdef SIM_TEST_INPUT
           else if (strcmp(out_buffer, "W") == 0) {
             if (test_ongoing) {
-              input -= 2;  // go back in input buffer to "W "
+              read_ptr -= 2;
             }
           }
 #endif
