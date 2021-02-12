@@ -1,44 +1,27 @@
 bool perform_test() {
   upm_float x;
 
-  x = upm_from((uint8_t)1);
-  test(x == 0x8080, "conversion error from uint8_t 1");
-  x = upm_from((uint8_t)2);
-  test(x == 0x8180, "conversion error from uint8_t 2");
-  x = upm_from((uint8_t)3);
-  test(x == 0x81c0, "conversion error from uint8_t 3");
-  x = upm_from((uint8_t)4);
-  xprintf("%x\n", x);
-  test(x == 0x8280, "conversion error from uint8_t 4");
-  x = upm_from((uint8_t)8);
-  test(x == 0x8380, "conversion error from uint8_t 8");
-  x = upm_from((uint8_t)16);
-  test(x == 0x8480, "conversion error from uint8_t 16");
-  x = upm_from((uint8_t)32);
-  test(x == 0x8580, "conversion error from uint8_t 32");
-  x = upm_from((uint8_t)64);
-  test(x == 0x8680, "conversion error from uint8_t 64");
-  x = upm_from((uint8_t)128);
-  test(x == 0x8780, "conversion error from uint8_t 128");
+  for (uint16_t x16 = 1;x16 < 256;x16++) {
+	x = upm_from((uint8_t)x16);
+	uint16_t res_16 = upm_to_u16(x);
+	xprintf("%d => %x => %d\n", x16, x, res_16);
+	test(res_16 == x16, "conversion error from uint8_t and back to uint16_t");
+  }
 
-  x = upm_from((uint16_t)1);
-  test(x == 0x8080, "conversion error from uint16_t 1");
-  x = upm_from((uint16_t)256);
-  test(x == 0x8880, "conversion error from uint16_t 256");
-  x = upm_from((uint16_t)512);
-  test(x == 0x8980, "conversion error from uint16_t 512");
-  x = upm_from((uint16_t)1024);
-  test(x == 0x8a80, "conversion error from uint16_t 1024");
-  x = upm_from((uint16_t)2048);
-  test(x == 0x8b80, "conversion error from uint16_t 2048");
-  x = upm_from((uint16_t)4096);
-  test(x == 0x8c80, "conversion error from uint16_t 4096");
-  x = upm_from((uint16_t)8192);
-  test(x == 0x8d80, "conversion error from uint16_t 8192");
-  x = upm_from((uint16_t)16384);
-  test(x == 0x8e80, "conversion error from uint16_t 16384");
-  x = upm_from((uint16_t)32768);
-  test(x == 0x8f80, "conversion error from uint16_t 32768");
+  uint32_t significant = 0x1ff;
+  for (uint32_t x32 = 1;x32 < 65536;x32++) {
+	if (x32 > significant) {
+		if ((x32 & significant) != significant) {
+			significant <<= 1;
+		}
+	}
+	x = upm_from((uint16_t)x32);
+	uint16_t res_16 = upm_to_u16(x);
+		xprintf("%d => %x => %d  (significant=%x)\n", x32, x, res_16, significant);
+	if (res_16 != (x32 & significant)) {
+	}
+	test(res_16 == (x32 & significant), "conversion error from uint16_t and back to uint16_t");
+  }
 
   x = upm_from((uint32_t)1);
   test(x == 0x8080, "conversion error from uint32_t 1");

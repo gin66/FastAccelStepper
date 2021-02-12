@@ -10,15 +10,17 @@
 #define UPM_FROM_PARTS(mantissa, exponent) \
   ((((uint16_t)exponent) << 8) | ((uint8_t)(mantissa)))
 
-// representation is:
+// new representation is:
 //
-//     76543210:76543210
-//     XXXXXXXX:1XXXXXXX
+//     76543210: 76543210
+//     XXXXXXXX:1XXXXXXXX
 //     exponent mantissa
 //
-// exponent is shifted by 128 in order to allow numbers < 1
+// exponent is added 128 in order to allow numbers < 1
 //
-//  0x8080 => is 1
+//  0x8000 => is 1
+//
+// Negative numbers and zero are not available
 
 const PROGMEM uint8_t isqrt_tab[256] = {
     128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 139, 140, 141,
@@ -73,35 +75,36 @@ upm_float upm_from(uint8_t x) {
   if ((x & 0xf0) == 0) {
     if ((x & 0x0c) == 0) {
       if ((x & 0x02) == 0) {
-        x <<= 7;
+        x <<= 8;
         res = x;
       } else {
-        x <<= 6;
+        x <<= 7;
         res = x | 0x0100;
       }
     } else {
       if ((x & 0x08) == 0) {
-        x <<= 5;
+        x <<= 6;
         res = x | 0x0200;
       } else {
-        x <<= 4;
+        x <<= 5;
         res = x | 0x0300;
       }
     }
   } else {
     if ((x & 0xc0) == 0) {
       if ((x & 0x20) == 0) {
-        x <<= 3;
+        x <<= 4;
         res = x | 0x0400;
       } else {
-        x <<= 2;
+        x <<= 3;
         res = x | 0x0500;
       }
     } else {
       if ((x & 0x80) == 0) {
-        x <<= 1;
+        x <<= 2;
         res = x | 0x0600;
       } else {
+        x <<= 1;
         res = x | 0x0700;
       }
     }
@@ -109,30 +112,56 @@ upm_float upm_from(uint8_t x) {
   return res | 0x8000;
 }
 upm_float upm_from(uint16_t x) {
-  uint8_t exponent;
   if ((x & 0xff00) == 0) {
-    uint8_t b = x & 0xff;
-    return upm_from(b);
+    return upm_from((uint8_t)x);
   }
-  if (x & 0xf000) {
-    exponent = 8 + 4;
-  } else {
-    x <<= 4;
-    exponent = 8 + 0;
+  uint8_t exponent;
+  if ((x & 0xf000) != 0) {
+	  if ((x & 0xc000) != 0) {
+		  if ((x & 0x8000) != 0) {
+			  x <<= 1;
+			  exponent = 0x8f;
+		  }
+		  else {
+			  x <<= 2;
+			  exponent = 0x8e;
+		  }
+	  }
+	  else {
+		  if ((x & 0x2000) != 0) {
+			  x <<= 3;
+			  exponent = 0x8d;
+		  }
+		  else {
+			  x <<= 4;
+			  exponent = 0x8c;
+		  }
+	  }
   }
-  if ((x & 0xc000) == 0) {
-    x <<= 2;
-  } else {
-    exponent += 2;
-  }
-  if ((x & 0x8000) == 0) {
-    x <<= 1;
-  } else {
-    exponent += 1;
+  else {
+	  if ((x & 0x0c00) != 0) {
+		  if ((x & 0x0800) != 0) {
+			  x <<= 5;
+			  exponent = 0x8b;
+		  }
+		  else {
+			  x <<= 6;
+			  exponent = 0x8a;
+		  }
+	  }
+	  else {
+		  if ((x & 0x0200) != 0) {
+			  x <<= 7;
+			  exponent = 0x89;
+		  }
+		  else {
+			  x <<= 8;
+			  exponent = 0x88;
+		  }
+	  }
   }
   x >>= 8;
-  exponent |= 0x80;
-  return x | (exponent << 8);
+  return UPM_FROM_PARTS(x, exponent);
 }
 upm_float upm_from(uint32_t x) {
   if ((x & 0xffff0000) == 0) {
@@ -219,11 +248,11 @@ uint16_t upm_to_u16(upm_float x) {
   }
   exponent -= 128;
   uint8_t mantissa = x & 0x00ff;
-  uint16_t res = mantissa;
+  uint16_t res = mantissa | 0x0100;
   if (exponent < 8) {
-    res >>= (7 - exponent);
+    res >>= (8 - exponent);
   } else {
-    res <<= exponent - 7;
+    res <<= exponent - 8;
   }
   return res;
 }
