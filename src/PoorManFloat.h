@@ -5,12 +5,12 @@
 #endif
 
 typedef uint16_t upm_float;
-#define UPM_CONST_128E12 ((upm_float)0xaee8)
-#define UPM_CONST_16E6 ((upm_float)0x97f4)
-#define UPM_CONST_500 ((upm_float)0x88fa)
-#define UPM_CONST_1000 ((upm_float)0x89fa)
-#define UPM_CONST_2000 ((upm_float)0x8afa)
-#define UPM_CONST_32000 ((upm_float)0x8efa)
+#define UPM_CONST_128E12 ((upm_float)0xaed0)
+#define UPM_CONST_16E6 ((upm_float)0x97e8)
+#define UPM_CONST_500 ((upm_float)0x88f4)
+#define UPM_CONST_1000 ((upm_float)0x89f4)
+#define UPM_CONST_2000 ((upm_float)0x8af4)
+#define UPM_CONST_32000 ((upm_float)0x8ef4)
 
 upm_float upm_from(uint8_t x);
 upm_float upm_from(uint16_t x);
@@ -30,5 +30,3 @@ upm_float upm_rsqrt(upm_float x); // TESTED. Reciprocal sqrt() = 1/sqrt(x)
 
 // OLD
 upm_float upm_divide(upm_float x, upm_float y);
-upm_float upm_sqrt(upm_float x);
-upm_float upm_sqrt_after_divide(upm_float x, upm_float y);
