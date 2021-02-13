@@ -1,3 +1,6 @@
+pre-0.21.4:
+- Issue: avr quite noisy at 180us
+
 0.21.3:
 -  Unidirectional mode: moveByAcceleration() with negative values has used previous acceleration till stop
 

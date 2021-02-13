@@ -208,8 +208,8 @@ uint32_t calculate_ticks_v7(uint32_t steps, upm_float pre_calc) {
 
 uint32_t calculate_ticks_v8(uint32_t steps, upm_float pre_calc) {
   upm_float upm_steps = upm_from(steps);
-  upm_float upm_sqrt_steps = upm_sqrt(upm_steps);
-  upm_float upm_res = upm_divide(pre_calc, upm_sqrt_steps);
+  upm_float upm_rsqrt_steps = upm_rsqrt(upm_steps);
+  upm_float upm_res = upm_multiply(pre_calc, upm_rsqrt_steps);
   uint32_t res = upm_to_u32(upm_res);
   return res;
 }
@@ -217,10 +217,11 @@ uint32_t calculate_ticks_v8(uint32_t steps, upm_float pre_calc) {
 #ifdef TEST
 uint32_t calculate_ticks_v9(uint32_t steps, upm_float pre_calc) {
   upm_float upm_steps = upm_from(steps);
-  upm_float upm_sqrt_steps = upm_sqrt(upm_steps);
-  upm_float upm_res = upm_divide(pre_calc, upm_sqrt_steps);
+  upm_float upm_rsqrt_steps = upm_rsqrt(upm_steps);
+  upm_float upm_res = upm_multiply(pre_calc, upm_rsqrt_steps);
   uint32_t res = upm_to_u32(upm_res);
 
+#ifdef OFF
   // now improving the result
   uint16_t sqrt_steps = upm_to_u16(upm_sqrt_steps);
   uint32_t steps_r = sqrt_steps;
@@ -247,6 +248,7 @@ uint32_t calculate_ticks_v9(uint32_t steps, upm_float pre_calc) {
     uint32_t val = upm_to_u32(upm_val);
     res += val;
   }
+#endif
   printf("%d / sqrt(steps) = %d\n", upm_to_u32(pre_calc), res);
   return res;
 }

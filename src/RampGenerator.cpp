@@ -82,7 +82,10 @@ int8_t RampGenerator::setAcceleration(uint32_t accel) {
 #endif
   if (_config.upm_inv_accel2 != upm_inv_accel2) {
     _config.upm_inv_accel2 = upm_inv_accel2;
-    _config.upm_sqrt_inv_accel = upm_sqrt(upm_inv_accel2);
+
+	// This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
+    _config.upm_sqrt_inv_accel = upm_multiply(upm_rsqrt(upm_from(accel)),
+			UPM_TICKS_PER_S_DIV_SQRT_OF_2);
     _config.accel_change_cnt = _rw.accel_change_cnt + 1;
   }
   return 0;
@@ -215,8 +218,8 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
-      performed_ramp_up_steps = upm_to_u32(upm_divide(
-          ramp->config.upm_inv_accel2, upm_square(upm_from(curr_ticks))));
+      performed_ramp_up_steps = upm_to_u32(upm_multiply(
+          ramp->config.upm_inv_accel2, upm_rsquare(upm_from(curr_ticks))));
 #ifdef TEST
       printf("Recalculate performed_ramp_up_steps to %d from %d ticks\n",
              performed_ramp_up_steps, curr_ticks);

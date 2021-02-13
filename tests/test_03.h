@@ -261,6 +261,10 @@ bool perform_test() {
   x1 = upm_multiply(x1, UPM_CONST_1000);
   xprintf("const 128e12=0x%x\n", x1);
   test(x1 == UPM_CONST_128E12, "const 128E12");
+  x1 = UPM_CONST_16E6;
+  x1 = upm_multiply(x1, upm_rsqrt(upm_from((uint16_t)2)));
+  xprintf("const 16e6/sqrt(2)=0x%x\n", x1);
+  test(x1 == UPM_CONST_16E6_DIV_SQRT_OF_2, "const 16E6/sqrt(2)");
 
   return (error_cnt == 0);
 }
