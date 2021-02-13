@@ -1,3 +1,6 @@
+pre-0.21.5:
+- Internal code clean up/polishing
+
 0.21.4:
 - PoorManFloat changed from 8bit to 9bit mantissa (implicit msb=1)
    => speed steps with acceleration=1 hardly noticeable
