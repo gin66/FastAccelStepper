@@ -19,11 +19,13 @@ upm_float upm_from(uint32_t x);
 uint16_t upm_to_u16(upm_float x);
 uint32_t upm_to_u32(upm_float x);
 
-upm_float upm_multiply(upm_float x, upm_float y); // TESTED
-upm_float upm_divide(upm_float x, upm_float y);
 upm_float upm_shl(upm_float x, uint8_t n);
 upm_float upm_shr(upm_float x, uint8_t n);
-upm_float upm_square(upm_float x); // TESTED
+
+upm_float upm_multiply(upm_float x, upm_float y); // TESTED
+upm_float upm_divide(upm_float x, upm_float y);
+upm_float upm_square(upm_float x); // TESTED = x*x
+upm_float upm_rsquare(upm_float x); // TESTED Reciprocal square = 1/(x*x)
 upm_float upm_sqrt(upm_float x);
 upm_float upm_sqrt_after_divide(upm_float x, upm_float y);
-upm_float upm_rsqrt(upm_float x); // TESTED
+upm_float upm_rsqrt(upm_float x); // TESTED. Reciprocal sqrt() = 1/sqrt(x)
