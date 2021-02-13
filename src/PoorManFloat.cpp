@@ -26,7 +26,7 @@
 //
 // Negative numbers and zero are not available
 //
-// 
+//
 // rsqrt-tables
 // ============
 //
@@ -35,10 +35,10 @@
 // rsqrt_exp_even is used, if the exponent is even.
 // rsqrt_exp_odd is used, if the exponent is odd.
 //
-// For even exponents 1/sqrt(mantissa) translates in the range 1.0 down to 0.7077
-// The mantissa 256 (aka mantissa byte==0) is a special case to be treated separately,
-// that's why this table has only 255 entries
-// The table is generated with this one liner
+// For even exponents 1/sqrt(mantissa) translates in the range 1.0 down to
+// 0.7077 The mantissa 256 (aka mantissa byte==0) is a special case to be
+// treated separately, that's why this table has only 255 entries The table is
+// generated with this one liner
 //		[round(512.0/math.sqrt(i/256))-256 for i in range(257,512)
 const PROGMEM uint8_t rsqrt_exp_even[255] = {
     255, 254, 253, 252, 251, 250, 249, 248, 247, 247, 246, 245, 244, 243, 242,
@@ -58,8 +58,8 @@ const PROGMEM uint8_t rsqrt_exp_even[255] = {
     123, 123, 123, 122, 122, 121, 121, 121, 120, 120, 119, 119, 119, 118, 118,
     117, 117, 117, 116, 116, 115, 115, 115, 114, 114, 114, 113, 113, 112, 112,
     112, 111, 111, 111, 110, 110, 110, 109, 109, 108, 108, 108, 107, 107, 107};
-// 
-// For odd exponents, the exponent is reduced by 1 and the 
+//
+// For odd exponents, the exponent is reduced by 1 and the
 // the mantissa multiplied by 2 and as such represents 2.0 to ~3
 // Consequently 1/sqrt(mantissa) is in range 0.707107 down to ~0.5
 //
@@ -260,7 +260,7 @@ upm_float upm_multiply(upm_float x, upm_float y) {  // TESTED
   uint16_t xy = mant_x * mant_y;
   xy >>= 2;  // result is 0x10000..0x3fc01, so need to shift by 2
   xy += (mant_x + mant_y) << 6;  // add missing 0x100 multiplication
-  xy += 0x4000; // add result of 0x100*0x100
+  xy += 0x4000;                  // add result of 0x100*0x100
 
   uint8_t mant;
   uint8_t exponent = (x >> 8) + (y >> 8) - 0x80;
@@ -320,7 +320,7 @@ uint32_t upm_to_u32(upm_float x) {  // TESTED
   uint32_t res = mantissa | 0x100;
   if (exponent < 8) {
     res >>= (8 - exponent);
-  } else if (exponent > 8){
+  } else if (exponent > 8) {
     res <<= exponent - 8;
   }
   return res;

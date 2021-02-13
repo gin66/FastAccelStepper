@@ -77,7 +77,8 @@ int8_t RampGenerator::setAcceleration(uint32_t accel) {
 #ifdef UPM_ACCEL_FACTOR
   upm_float upm_inv_accel2 = upm_divide(UPM_ACCEL_FACTOR, upm_from(accel));
 #else
-  upm_float upm_inv_accel = upm_divide(UPM_TICKS_PER_S, upm_from(2 * accel));
+  upm_float upm_inv_accel =
+      upm_divide(upm_shr(UPM_TICKS_PER_S, 1), upm_from(accel));
   upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
 #endif
   if (_config.upm_inv_accel2 != upm_inv_accel2) {
@@ -386,22 +387,6 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       if (d_ticks_new < ramp->config.min_travel_ticks) {
         d_ticks_new = ramp->config.min_travel_ticks;
       }
-
-      // if acceleration is very high, then planning_steps may be too less
-      {
-        uint32_t cmd_ticks = d_ticks_new * planning_steps;
-        if (cmd_ticks < MIN_CMD_TICKS) {
-          // planning_steps = MIN_CMD_TICKS / next_ticks;
-
-          uint32_t new_planning_steps = upm_to_u32(upm_divide(
-              upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
-#ifdef TEST
-          printf("Increase planning steps %d => %d\n", planning_steps,
-                 new_planning_steps);
-#endif
-          planning_steps = new_planning_steps;
-        }
-      }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       uint32_t rs;
       if (performed_ramp_up_steps <= planning_steps) {
@@ -413,20 +398,6 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 #ifdef TEST
       printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
 #endif
-
-      {
-        uint32_t cmd_ticks = d_ticks_new * planning_steps;
-        if (cmd_ticks < MIN_CMD_TICKS) {
-          // planning_steps = MIN_CMD_TICKS / next_ticks;
-          uint32_t new_planning_steps = upm_to_u32(upm_divide(
-              upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
-#ifdef TEST
-          printf("Increase planning steps %d => %d\n", planning_steps,
-                 new_planning_steps);
-#endif
-          planning_steps = new_planning_steps;
-        }
-      }
     } else {
       d_ticks_new = coast_speed;
       // do not overshoot ramp down start
@@ -438,21 +409,22 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       printf("planning steps=%d remaining steps=%d coast steps=%d\n",
              planning_steps, remaining_steps, coast_steps);
 #endif
-      {
-        // coast_steps can be too slow, if the acceleration just has changed
-        uint32_t cmd_ticks = d_ticks_new * planning_steps;
-        if (cmd_ticks < MIN_CMD_TICKS) {
-          // planning_steps = MIN_CMD_TICKS / next_ticks;
+    }
+  }
 
-          uint32_t new_planning_steps = upm_to_u32(upm_divide(
-              upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
+  {
+    // coast_steps can be too slow, if the acceleration just has changed
+    uint32_t cmd_ticks = d_ticks_new * planning_steps;
+    if (cmd_ticks < MIN_CMD_TICKS) {
+      // planning_steps = MIN_CMD_TICKS / next_ticks;
+
+      uint32_t new_planning_steps = upm_to_u32(upm_divide(
+          upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
 #ifdef TEST
-          printf("Increase planning steps %d => %d\n", planning_steps,
-                 new_planning_steps);
+      printf("Increase planning steps %d => %d\n", planning_steps,
+             new_planning_steps);
 #endif
-          planning_steps = new_planning_steps;
-        }
-      }
+      planning_steps = new_planning_steps;
     }
   }
 
