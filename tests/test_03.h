@@ -154,6 +154,31 @@ bool perform_test() {
 	  }
   }
 
+  // Check reciprocal 
+  for (int16_t sa = -20;sa <= 20;sa++) {
+	  for (uint32_t a_32 = 1;a_32 <= 0x1ff;a_32++) {
+				x1 = upm_from(a_32);
+				if (sa > 0) {
+					x1 = upm_shl(x1, sa);
+				}
+				else if (sa < 0) {
+					x1 = upm_shr(x1, -sa);
+				}
+				x = upm_reciprocal(x1);
+
+				upm_float xe = upm_multiply(x,x1);
+				// xe should be approximately 1
+				uint32_t res = upm_to_u32(upm_shl(xe,16));
+				int32_t diff = (int32_t)res - 0x10000;
+				if (abs(diff) > 384) {
+					xprintf("a=%d upm(x)=%x  upm(reciprocal(x))=%x upm(reciprocal(x)*x)=%x ", a_32,x1, x, xe);
+					xprintf("shift=%d reciprocal(%d)*%d*0x10000=%x, diff=%d\n", sa,a_32, a_32, res,diff);
+				}
+				test(abs(diff) <= 384, "reciprocal error");
+	  }
+  }
+
+
 
   x1 = upm_from((uint32_t)0x0ffff);
   x2 = upm_from((uint32_t)0x1fffe);
