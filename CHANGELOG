@@ -1,5 +1,7 @@
-pre-0.21.4:
-- Issue: avr quite noisy at 180us
+0.21.4:
+- PoorManFloat changed from 8bit to 9bit mantissa (implicit msb=1)
+   => speed steps with acceleration=1 hardly noticeable
+- PoorManFloat new functions for reciprocal calculations
 
 0.21.3:
 -  Unidirectional mode: moveByAcceleration() with negative values has used previous acceleration till stop
