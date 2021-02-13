@@ -108,6 +108,29 @@ bool perform_test() {
 	  }
   }
 
+  // Check square
+  for (int16_t sa = -20;sa <= 20;sa++) {
+	  for (uint32_t a_32 = 1;a_32 <= 0x1ff;a_32++) {
+				x1 = upm_from(a_32);
+				if (sa > 0) {
+					x1 = upm_shl(x1, sa);
+				}
+				else if (sa < 0) {
+					x1 = upm_shr(x1, -sa);
+				}
+				x = upm_square(x1);
+				upm_float xe = upm_multiply(x1,x1);
+				//uint32_t res = upm_to_u32(upm_shl(xe,16));
+				int32_t diff = (int32_t)x - (int32_t)xe;
+				if (diff > 1) { // square has better precision than multiply
+					xprintf("a=%d upm(x)=%x  upm(square(x))=%x upm(x*x)=%x ", a_32,x1, x, xe);
+					xprintf("shift=%d, diff=%d\n", sa, 0);
+				}
+				test(diff<= 1, "square error");
+	  }
+  }
+
+
   x1 = upm_from((uint32_t)0x0ffff);
   x2 = upm_from((uint32_t)0x1fffe);
   x2 = upm_from((uint32_t)0x10100);
@@ -136,70 +159,6 @@ bool perform_test() {
   x = upm_multiply(x, x);
   xprintf("%x\n", x);
   test(x == 0xafe8, "upm_multiply error from uint32_t 16000000²");
-
-  x1 = upm_from((uint32_t)0xf455);
-  x2 = upm_from((uint32_t)0xf455);
-  x = upm_abs_diff(x1, x2);
-  back = upm_to_u32(x);
-  xprintf("|%x-%x|=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0, "wrong upm_abs_diff");
-
-  x1 = upm_from((uint32_t)0xf455);
-  x2 = upm_from((uint32_t)0xf400);
-  x = upm_abs_diff(x1, x2);
-  back = upm_to_u32(x);
-  xprintf("|%x-%x|=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0, "wrong upm_abs_diff");
-  x = upm_abs_diff(x2, x1);
-  back = upm_to_u32(x);
-  xprintf("|%x-%x|=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0, "wrong upm_abs_diff");
-  x = upm_sum(x1, x2);
-  back = upm_to_u32(x);
-  xprintf("%x+%x=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x1e800, "wrong upm_sum");
-  x = upm_sum(x2, x1);
-  back = upm_to_u32(x);
-  xprintf("%x+%x=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x1e800, "wrong upm_sum");
-
-  x1 = upm_from((uint32_t)0xf455);
-  x2 = upm_from((uint32_t)0xf3ff);
-  x = upm_abs_diff(x1, x2);
-  back = upm_to_u32(x);
-  xprintf("|%x-%x|=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x0100, "wrong upm_abs_diff");
-  x = upm_abs_diff(x2, x1);
-  back = upm_to_u32(x);
-  xprintf("|%x-%x|=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x0100, "wrong upm_abs_diff");
-  x = upm_sum(x1, x2);
-  back = upm_to_u32(x);
-  xprintf("%x+%x=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x1e600, "wrong upm_sum");
-  x = upm_sum(x2, x1);
-  back = upm_to_u32(x);
-  xprintf("%x+%x=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x1e600, "wrong upm_sum");
-
-  x1 = upm_from((uint32_t)0xf4555);
-  x2 = upm_from((uint32_t)0x0f3ff);
-  x = upm_abs_diff(x1, x2);
-  back = upm_to_u32(x);
-  xprintf("|%x-%x|=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0xe5000, "wrong upm_abs_diff");
-  x = upm_abs_diff(x2, x1);
-  back = upm_to_u32(x);
-  xprintf("|%x-%x|=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0xe5000, "wrong upm_abs_diff");
-  x = upm_sum(x1, x2);
-  back = upm_to_u32(x);
-  xprintf("%x+%x=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x102000, "wrong upm_sum");
-  x = upm_sum(x2, x1);
-  back = upm_to_u32(x);
-  xprintf("%x+%x=%x (%ld)\n", x1, x2, x, back);
-  test(back == 0x102000, "wrong upm_sum");
 
   x1 = upm_from((uint32_t)0xf4555);
   x = upm_shl(x1, 4);

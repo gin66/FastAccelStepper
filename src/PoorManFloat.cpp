@@ -45,6 +45,16 @@ const PROGMEM uint8_t rsqrt_exp_odd[256] = {
 106, 106, 105, 104, 103, 103, 102, 101, 101, 100, 99, 99, 98, 97, 97, 96, 95, 95, 94, 94, 93, 92, 92, 91, 90, 90, 89, 89, 88, 87, 87, 86, 86, 85, 84, 84, 83, 83, 82, 82, 81, 80, 80, 79, 79, 78, 78, 77, 76, 76, 75, 75, 74, 74, 73, 73, 72, 72, 71, 71, 70, 70, 69, 69, 68, 68, 67, 67, 66, 66, 65, 65, 64, 64, 63, 63, 62, 62, 61, 61, 60, 60, 59, 59, 58, 58, 57, 57, 57, 56, 56, 55, 55, 54, 54, 53, 53, 53, 52, 52, 51, 51, 50, 50, 50, 49, 49, 48, 48, 47, 47, 47, 46, 46, 45, 45, 45, 44, 44, 43, 43, 43, 42, 42, 41, 41, 41, 40, 40, 39, 39, 39, 38, 38, 38, 37, 37, 36, 36, 36, 35, 35, 35, 34, 34, 34, 33, 33, 32, 32, 32, 31, 31, 31, 30, 30, 30, 29, 29, 29, 28, 28, 28, 27, 27, 27, 26, 26, 26, 25, 25, 25, 24, 24, 24, 23, 23, 23, 22, 22, 22, 21, 21, 21, 20, 20, 20, 19, 19, 19, 19, 18, 18, 18, 17, 17, 17, 16, 16, 16, 16, 15, 15, 15, 14, 14, 14, 13, 13, 13, 13, 12, 12, 12, 11, 11, 11, 11, 10, 10, 10, 9, 9, 9, 9, 8, 8, 8, 8, 7, 7, 7, 6, 6, 6, 6, 5, 5, 5, 5, 4, 4, 4, 4, 3, 3, 3, 3, 2, 2, 2, 2, 1, 1, 1, 1
 };
 
+const PROGMEM uint8_t square_table[256] = {
+	// [round((i/256)*(i/256) * 256)-256 for i in range(256,256+106)]
+	0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 27, 29, 31, 33, 35, 37, 39, 42, 44, 46, 48, 50, 52, 55, 57, 59, 61, 64, 66, 68, 70, 73, 75, 77, 79, 82, 84, 86, 89, 91, 93, 96, 98, 100, 103, 105, 107, 110, 112, 115, 117, 119, 122, 124, 127, 129, 132, 134, 137, 139, 142, 144, 147, 149, 152, 154, 157, 159, 162, 164, 167, 169, 172, 175, 177, 180, 182, 185, 188, 190, 193, 196, 198, 201, 204, 206, 209, 212, 214, 217, 220, 223, 225, 228, 231, 234, 236, 239, 242, 245, 247, 250, 253,
+	// [round((i/256)*(i/256) * 128)-512 for i in range(256+106,256+256)]
+	0, 1, 3, 4, 6, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29, 31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 53, 55, 56, 58, 60, 61, 63, 64, 66, 68, 69, 71, 72, 74, 76, 77, 79, 80, 82, 84, 85, 87, 89, 90, 92, 93, 95, 97, 98, 100, 102, 103, 105, 107, 108, 110, 112, 114, 115, 117, 119, 120, 122, 124, 126, 127, 129, 131, 133, 134, 136, 138, 140, 141, 143, 145, 147, 148, 150, 152, 154, 155, 157, 159, 161, 163, 164, 166, 168, 170, 172, 174, 175, 177, 179, 181, 183, 185, 187, 188, 190, 192, 194, 196, 198, 200, 202, 203, 205, 207, 209, 211, 213, 215, 217, 219, 221, 223, 224, 226, 228, 230, 232, 234, 236, 238, 240, 242, 244, 246, 248, 250, 252, 254
+};
+
+
+
+
 const PROGMEM uint8_t isqrt_tab[256] = {
     128, 129, 130, 131, 132, 133, 134, 135, 136, 137, 138, 139, 139, 140, 141,
     142, 143, 144, 145, 146, 147, 148, 148, 149, 150, 151, 152, 153, 153, 154,
@@ -214,27 +224,22 @@ upm_float upm_multiply(upm_float x, upm_float y) { // TESTED
   } else {
     mant = xy >> 6;
   }
-
-  //  if ((ab & 0x8000) != 0) {
-  //    ab >>= 8;
-  //    ab += 0x0100;
-  //  } else {
-  //    ab >>= 7;
-  //  }
-  //  ab += ((x & 0xff00) - 0x4000) + ((y & 0xff00) - 0x4000);
   return UPM_FROM_PARTS(mant, exponent);
 }
-upm_float upm_square(upm_float x) {
-  uint16_t a = x & 0x00ff;
-  uint16_t aa = a * a;
-  if (aa & 0x8000) {
-    aa >>= 8;
-    aa += 0x0100;
-  } else {
-    aa >>= 7;
+upm_float upm_square(upm_float x) { // TESTED
+  uint8_t mantissa = x & 0x00ff;
+  uint8_t exponent = x >> 8;
+  if (exponent >= 128) {
+	  exponent = (exponent - 64)<<1;
   }
-  aa += ((x & 0xff00) - 0x4000) << 1;
-  return aa;
+  else {
+	  exponent = 128-((128-exponent)<<1);
+  }
+  if (mantissa >= 106) {
+	 exponent++;
+  }
+  mantissa = pgm_read_byte_near(&square_table[mantissa]);
+  return UPM_FROM_PARTS(mantissa, exponent);
 }
 #define UPM_DIVIDE(x, y, mant_res, exp_res)                       \
   {                                                               \
@@ -300,58 +305,6 @@ uint32_t upm_to_u32(upm_float x) { // TESTED
   }
   return res;
 }
-upm_float upm_abs_diff(upm_float x, upm_float y) {
-  uint8_t exp_x = x >> 8;
-  uint8_t exp_y = y >> 8;
-  uint8_t mantissa;
-  uint8_t exponent;
-  if (x > y) {
-    exponent = exp_x;
-    uint8_t m_y = y & 0xff;
-    m_y >>= (exp_x - exp_y);
-    mantissa = x & 0xff;
-    mantissa -= m_y;
-  } else if (x < y) {
-    exponent = exp_y;
-    uint8_t m_x = x & 0xff;
-    m_x >>= (exp_y - exp_x);
-    mantissa = y & 0xff;
-    mantissa -= m_x;
-  } else {
-    return 0;
-  }
-  while ((mantissa & 0x80) == 0) {
-    mantissa <<= 1;
-    exponent--;
-  }
-  return UPM_FROM_PARTS(mantissa, exponent);
-}
-upm_float upm_sum(upm_float x, upm_float y) {
-  uint8_t exp_x = x >> 8;
-  uint8_t exp_y = y >> 8;
-  uint16_t mantissa;
-  uint8_t exponent;
-  if (x > y) {
-    exponent = exp_x;
-    uint8_t m_y = y & 0xff;
-    m_y >>= (exp_x - exp_y);
-    mantissa = x & 0xff;
-    mantissa += m_y;
-  } else if (x < y) {
-    exponent = exp_y;
-    uint8_t m_x = x & 0xff;
-    m_x >>= (exp_y - exp_x);
-    mantissa = y & 0xff;
-    mantissa += m_x;
-  } else {
-    return x + 0x0100;
-  }
-  while (mantissa & 0xff00) {
-    mantissa >>= 1;
-    exponent++;
-  }
-  return UPM_FROM_PARTS(mantissa, exponent);
-}
 upm_float upm_shl(upm_float x, uint8_t n) { return x + (((uint16_t)n) << 8); }
 upm_float upm_shr(upm_float x, uint8_t n) { return x - (((uint16_t)n) << 8); }
 #define UPM_SQRT(mantissa, exponent)                                   \
@@ -384,7 +337,7 @@ upm_float upm_sqrt_after_divide(upm_float x, upm_float y) {
   UPM_SQRT(mantissa, exponent);
   return UPM_FROM_PARTS(mantissa, exponent);
 }
-upm_float upm_rsqrt(upm_float x) {
+upm_float upm_rsqrt(upm_float x) { // TESTED
   uint8_t mantissa = x & 0x00ff;
   uint8_t exponent = x >> 8;
   bool exp_even = (exponent & 1)== 0;
