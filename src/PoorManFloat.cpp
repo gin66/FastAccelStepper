@@ -406,16 +406,15 @@ upm_float upm_reciprocal(upm_float x) { // TESTED
   uint8_t mantissa = x & 0x00ff;
   uint8_t exponent = x >> 8;
   if (exponent >= 128) {
-	  exponent = 128 - (exponent - 128);
+	  exponent = 127 - (exponent - 128);
   }
   else {
-	  exponent = 128 + (128 - exponent);
+	  exponent = 127 + (128 - exponent);
   }
   if (mantissa == 0) {
-	//exponent--;
+	exponent++;
   }
   else {
-	exponent--;
 	mantissa = pgm_read_byte_near(&reciprocal_table[mantissa-1]);
   }
   return UPM_FROM_PARTS(mantissa, exponent);
