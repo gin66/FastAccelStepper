@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-6db7c19"
+#define VERSION "post-5b7d280"
 
 struct stepper_config_s {
   uint8_t step;
@@ -445,7 +445,8 @@ void setup() {
 }
 
 #ifdef SIM_TEST_INPUT
-const char *input = SIM_TEST_INPUT " "; // final space is too easy forgotten in platformio.ini test
+const char *input = SIM_TEST_INPUT
+    " ";  // final space is too easy forgotten in platformio.ini test
 #else
 const char *input = NULL;
 #endif

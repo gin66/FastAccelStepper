@@ -10,11 +10,7 @@
 #include <Arduino.h>
 uint16_t error_cnt = 0;
 char buffer[256];
-#define xprintf(args...)   \
-  {                        \
-    sprintf(buffer, args); \
-    Serial.print(buffer);  \
-  }
+#define xprintf(args...)
 #define test(x, msg)          \
   if (!(x)) {                 \
     error_cnt++;              \

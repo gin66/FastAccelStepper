@@ -83,9 +83,9 @@ int8_t RampGenerator::setAcceleration(uint32_t accel) {
   if (_config.upm_inv_accel2 != upm_inv_accel2) {
     _config.upm_inv_accel2 = upm_inv_accel2;
 
-	// This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
-    _config.upm_sqrt_inv_accel = upm_multiply(upm_rsqrt(upm_from(accel)),
-			UPM_TICKS_PER_S_DIV_SQRT_OF_2);
+    // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
+    _config.upm_sqrt_inv_accel =
+        upm_multiply(upm_rsqrt(upm_from(accel)), UPM_TICKS_PER_S_DIV_SQRT_OF_2);
     _config.accel_change_cnt = _rw.accel_change_cnt + 1;
   }
   return 0;
