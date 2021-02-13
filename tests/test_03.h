@@ -1,3 +1,5 @@
+#include <math.h>
+
 bool perform_test() {
   upm_float x;
 
@@ -80,6 +82,29 @@ bool perform_test() {
 				}
 				test(res == repr_real, "upm_multiply error");
 		  }
+	  }
+  }
+
+  // Check rsqrt
+  for (int16_t sa = -20;sa <= 20;sa++) {
+	  for (uint32_t a_32 = 1;a_32 <= 0x1ff;a_32++) {
+				x1 = upm_from(a_32);
+				if (sa > 0) {
+					x1 = upm_shl(x1, sa);
+				}
+				else if (sa < 0) {
+					x1 = upm_shr(x1, -sa);
+				}
+				x = upm_rsqrt(x1);
+				upm_float xe = upm_multiply(x1,upm_multiply(x,x)); //sqrt not yet tested
+				// xe should be approximately 1
+				uint32_t res = upm_to_u32(upm_shl(xe,16));
+				int32_t diff = (int32_t)res - 0x10000;
+				if (abs(diff) > 384) {
+					xprintf("a=%d upm(x)=%x  upm(rsqrt(x))=%x upm(rsqrt(x)²*x)=%x ", a_32,x1, x, xe);
+					xprintf("shift=%d rsqrt(%d)^2*%d*0x10000=%x, diff=%d\n", sa,a_32, a_32, res,diff);
+				}
+				test(abs(diff) <= 384, "rsqrt error");
 	  }
   }
 
