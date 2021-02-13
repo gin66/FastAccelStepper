@@ -412,8 +412,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     }
   }
 
-  {
-    // coast_steps can be too slow, if the acceleration just has changed
+  if (d_ticks_new < MIN_CMD_TICKS) {
     uint32_t cmd_ticks = d_ticks_new * planning_steps;
     if (cmd_ticks < MIN_CMD_TICKS) {
       // planning_steps = MIN_CMD_TICKS / next_ticks;
