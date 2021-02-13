@@ -6,6 +6,9 @@
 #define pgm_read_byte_near(x) (*(x))
 #endif
 #include "PoorManFloat.h"
+#ifdef TEST
+#include <stdio.h>
+#endif
 
 #define UPM_FROM_PARTS(mantissa, exponent) \
   ((((uint16_t)exponent) << 8) | ((uint8_t)(mantissa)))
@@ -70,7 +73,7 @@ const PROGMEM uint8_t exp_mul_64[256] = {
     235, 236, 238, 239, 240, 242, 243, 244, 246, 247, 248, 250, 251, 252, 254,
     255};
 
-upm_float upm_from(uint8_t x) {
+upm_float upm_from(uint8_t x) { // TESTED
   uint16_t res;
   if ((x & 0xf0) == 0) {
     if ((x & 0x0c) == 0) {
@@ -111,7 +114,7 @@ upm_float upm_from(uint8_t x) {
   }
   return res | 0x8000;
 }
-upm_float upm_from(uint16_t x) {
+upm_float upm_from(uint16_t x) { // TESTED
   if ((x & 0xff00) == 0) {
     return upm_from((uint8_t)x);
   }
@@ -163,10 +166,9 @@ upm_float upm_from(uint16_t x) {
   x >>= 8;
   return UPM_FROM_PARTS(x, exponent);
 }
-upm_float upm_from(uint32_t x) {
+upm_float upm_from(uint32_t x) { // TESTED
   if ((x & 0xffff0000) == 0) {
-    uint16_t w = x & 0xffff;
-    return upm_from(w);
+    return upm_from((uint16_t)x);
   }
   if ((x & 0xff000000) == 0) {
     uint16_t w = x >> 8;
@@ -176,17 +178,21 @@ upm_float upm_from(uint32_t x) {
     return upm_from(w) + 0x1000;
   }
 }
-upm_float upm_multiply(upm_float x, upm_float y) {
+upm_float upm_multiply(upm_float x, upm_float y) { // TESTED
   uint16_t mant_x = x & 255;
   uint16_t mant_y = y & 255;
   uint16_t xy = mant_x * mant_y;
+  xy >>= 2; // result is 0x10000..0x3fc01, so need to shift by 2
+  xy += (mant_x + mant_y)<<6; // add missing 0x100 multiplication
+  xy += 0x4000;
+
   uint8_t mant;
   uint8_t exponent = (x >> 8) + (y >> 8) - 0x80;
   if ((xy & 0x8000) != 0) {
-    mant = xy >> 8;
+    mant = xy >> 7;
     exponent += 1;
   } else {
-    mant = xy >> 7;
+    mant = xy >> 6;
   }
 
   //  if ((ab & 0x8000) != 0) {
@@ -238,7 +244,7 @@ upm_float upm_divide(upm_float x, upm_float y) {
   UPM_DIVIDE(x, y, mant_res, exp_res);
   return UPM_FROM_PARTS(mant_res, exp_res);
 }
-uint16_t upm_to_u16(upm_float x) {
+uint16_t upm_to_u16(upm_float x) { // TESTED
   uint8_t exponent = x >> 8;
   if (exponent > 15 + 128) {
     return 0xffff;
@@ -256,7 +262,7 @@ uint16_t upm_to_u16(upm_float x) {
   }
   return res;
 }
-uint32_t upm_to_u32(upm_float x) {
+uint32_t upm_to_u32(upm_float x) { // TESTED
   uint8_t exponent = x >> 8;
   if (exponent > 31 + 128) {
     return 0xffffffff;
@@ -266,11 +272,11 @@ uint32_t upm_to_u32(upm_float x) {
   }
   exponent -= 128;
   uint8_t mantissa = x & 0x00ff;
-  uint32_t res = mantissa;
+  uint32_t res = mantissa | 0x100;
   if (exponent < 8) {
-    res >>= (7 - exponent);
+    res >>= (8 - exponent);
   } else {
-    res <<= exponent - 7;
+    res <<= exponent - 8;
   }
   return res;
 }

@@ -1,100 +1,93 @@
 bool perform_test() {
   upm_float x;
 
-  for (uint16_t x16 = 1;x16 < 256;x16++) {
-	x = upm_from((uint8_t)x16);
+  for (uint8_t x8 = 255;x8 > 0;x8--) {
+	x = upm_from((uint8_t)x8);
 	uint16_t res_16 = upm_to_u16(x);
-	xprintf("%d => %x => %d\n", x16, x, res_16);
-	test(res_16 == x16, "conversion error from uint8_t and back to uint16_t");
+	if (res_16 != x8) {
+		xprintf("%u => %x => %u\n", x8, x, res_16);
+	}
+	test(res_16 == x8, "conversion error from uint8_t and back to uint16_t");
   }
 
-  uint32_t significant = 0x1ff;
-  for (uint32_t x32 = 1;x32 < 65536;x32++) {
-	if (x32 > significant) {
-		if ((x32 & significant) != significant) {
-			significant <<= 1;
+  uint16_t significant_16 =0xff80;
+  uint16_t trigger_16 = 0x8000;
+  for (uint16_t x16 = 0xffff;x16 > 0 ;x16--) {
+	if ((x16 & trigger_16) == 0) {
+		significant_16 >>= 1;
+		trigger_16 >>= 1;
+	}
+	x = upm_from((uint16_t)x16);
+	uint16_t res_16 = upm_to_u16(x);
+	if (res_16 != (x16 & significant_16)) {
+		xprintf("%x => %x => %x  (significant=%x)\n", x16, x, res_16, significant_16);
+	}
+	test(res_16 == (x16 & significant_16), "conversion error from uint16_t and back to uint16_t");
+  }
+
+  uint32_t significant_32 =0xff800000;
+  uint32_t trigger_32 = 0x80000000;
+  uint32_t delta_32 = 0x00400000;
+  for (uint32_t x32 = 0xffffffff;x32 > 0 ;x32 -= delta_32) {
+	if ((x32 & trigger_32) == 0) {
+		significant_32 >>= 1;
+		trigger_32 >>= 1;
+		delta_32 >>= 1;
+		if (delta_32 == 0) {
+			delta_32 = 1;
 		}
 	}
-	x = upm_from((uint16_t)x32);
-	uint16_t res_16 = upm_to_u16(x);
-		xprintf("%d => %x => %d  (significant=%x)\n", x32, x, res_16, significant);
-	if (res_16 != (x32 & significant)) {
+	x = upm_from((uint32_t)x32);
+	uint32_t res_32 = upm_to_u32(x);
+	if (res_32 != (x32 & significant_32)) {
+		xprintf("%x => %x => %x  (significant=%x)\n", x32, x, res_32, significant_32);
 	}
-	test(res_16 == (x32 & significant), "conversion error from uint16_t and back to uint16_t");
+	test(res_32 == (x32 & significant_32), "conversion error from uint32_t and back to uint32_t");
   }
 
-  x = upm_from((uint32_t)1);
-  test(x == 0x8080, "conversion error from uint32_t 1");
-  x = upm_from((uint32_t)3);
-  xprintf("%x\n", x);
-  test(x == 0x81c0, "conversion error from uint32_t 3");
-  x = upm_from((uint32_t)5);
-  test(x == 0x82a0, "conversion error from uint32_t 5");
-  x = upm_from((uint32_t)65536);
-  test(x == 0x9080, "conversion error from uint32_t 65536");
-  x = upm_from((uint32_t)131072);
-  test(x == 0x9180, "conversion error from uint32_t 131072");
-  x = upm_from((uint32_t)262144);
-  test(x == 0x9280, "conversion error from uint32_t 262144");
-  x = upm_from((uint32_t)524288);
-  test(x == 0x9380, "conversion error from uint32_t 524288");
-  x = upm_from((uint32_t)1048576);
-  test(x == 0x9480, "conversion error from uint32_t 1048576");
-  x = upm_from((uint32_t)2097152);
-  test(x == 0x9580, "conversion error from uint32_t 2097152");
-  x = upm_from((uint32_t)4194304);
-  test(x == 0x9680, "conversion error from uint32_t 4194304");
-  x = upm_from((uint32_t)8388608);
-  test(x == 0x9780, "conversion error from uint32_t 8388608");
-  x = upm_from((uint32_t)16777216);
-  test(x == 0x9880, "conversion error from uint32_t 16777216");
-  x = upm_from((uint32_t)33554432);
-  test(x == 0x9980, "conversion error from uint32_t 33554432");
-  x = upm_from((uint32_t)67108864);
-  test(x == 0x9a80, "conversion error from uint32_t 67108864");
-  x = upm_from((uint32_t)134217728);
-  test(x == 0x9b80, "conversion error from uint32_t 134217728");
-  x = upm_from((uint32_t)268435456);
-  test(x == 0x9c80, "conversion error from uint32_t 268435456");
-  x = upm_from((uint32_t)536870912);
-  test(x == 0x9d80, "conversion error from uint32_t 536870912");
-  x = upm_from((uint32_t)1073741824);
-  test(x == 0x9e80, "conversion error from uint32_t 1073741824");
-  x = upm_from((uint32_t)2147483648);
-  test(x == 0x9f80, "conversion error from uint32_t 2147483648");
+  x = upm_from((uint32_t)0x10000);
+  test(upm_to_u16(x) == 0xffff, "wrong overflow 16bit");
+  x = upm_from((uint32_t)0x80000000);
+  x = upm_shl(x , 1);
+  test(upm_to_u32(x) == 0xffffffff, "wrong overflow 32bit");
 
+  // Check multiply
   upm_float x1, x2, x3;
-  x1 = upm_from((uint32_t)3);
-  x2 = upm_from((uint32_t)5);
-  x3 = upm_from((uint32_t)15);
-  x = upm_multiply(x1, x2);
-  xprintf("%x*%x=%x\n", x1, x2, x);
-  test(x == x3, "upm_multiply error 3*5");
-  test(x == 0x83f0, "upm_multiply error 3*5");
-
-  for (uint64_t i = 1; i < (1LL << 16); i *= 5) {
-    x = upm_from((uint16_t)i);
-    uint16_t back = upm_to_u16(x);
-
-    test(i >= back, "conversion error to/back");
-    test((i & back) == back, "conversion error to/back");
+  for (int16_t sa = -40;sa <= 40;sa++) {
+	  for (uint32_t a_32 = 1;a_32 <= 0x1ff;a_32++) {
+		  for (uint32_t b_32 = 1;b_32 <= 0x1ff;b_32++) {
+				x1 = upm_from(a_32);
+				x2 = upm_from(b_32);
+				if (sa > 0) {
+					x1 = upm_shl(x1, sa);
+				}
+				else if (sa < 0) {
+					x1 = upm_shr(x1, -sa);
+				}
+				x = upm_multiply(x1, x2);
+				if (sa > 0) {
+					x = upm_shr(x, sa);
+				}
+				else if (sa < 0) {
+					x = upm_shl(x, -sa);
+				}
+				uint32_t res = upm_to_u32(x);
+				uint32_t real_res = a_32*b_32;
+				uint32_t repr_real = upm_to_u32(upm_from(real_res));
+				int32_t diff = (int32_t)res - (int32_t)repr_real;
+				if (res != repr_real) {
+					xprintf("%d*%d=%d ~ %d =?= %d, diff=%d\n", a_32, b_32, a_32*b_32, repr_real, res,diff);
+				}
+				test(res == repr_real, "upm_multiply error");
+		  }
+	  }
   }
 
-  for (uint64_t i = 1; i < (1LL << 32); i *= 3) {
-    x = upm_from((uint32_t)i);
-    uint32_t back = upm_to_u32(x);
-
-    test(i >= back, "conversion error to/back");
-    test((i & back) == back, "conversion error to/back");
-  }
-
-  // Check overflows
   x1 = upm_from((uint32_t)0x0ffff);
   x2 = upm_from((uint32_t)0x1fffe);
+  x2 = upm_from((uint32_t)0x10100);
   x = upm_multiply(x1, x2);
   unsigned long back = upm_to_u32(x);
-  xprintf("%x*%x=%x (back=%ld)\n", x1, x2, x, back);
-  test(x == 0xa0fe, "upm_multiply error");
   test(back == 0xffffffff, "overflow not catched");
 
   x1 = upm_from((uint32_t)0x5555);
