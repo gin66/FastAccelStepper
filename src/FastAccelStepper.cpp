@@ -570,8 +570,8 @@ int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
     }
   } else {
     uint32_t max_speed = _rg.getSpeedInTicks();
-    setSpeedInUs(getPeriodAfterCommandsCompleted());
-    setAcceleration(1);
+    setSpeedInTicks(getPeriodInTicksAfterCommandsCompleted());
+    setAcceleration(1); // ensure increase, so the speed is kept
     applySpeedAcceleration();
     setSpeedInTicks(max_speed);
   }
@@ -633,7 +633,13 @@ bool FastAccelStepper::enableOutputs() {
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
   return fas_queue[_queue_num].queue_end.pos;
 }
-uint32_t FastAccelStepper::getPeriodAfterCommandsCompleted() {
+uint32_t FastAccelStepper::getPeriodInTicksAfterCommandsCompleted() {
+  if (_rg.isRampGeneratorActive()) {
+    return _rg.getCurrentPeriodInTicks();
+  }
+  return 0;
+}
+uint32_t FastAccelStepper::getPeriodInUsAfterCommandsCompleted() {
   if (_rg.isRampGeneratorActive()) {
     return _rg.getCurrentPeriodInUs();
   }

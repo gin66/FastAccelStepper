@@ -487,8 +487,10 @@ void info(FastAccelStepper *s, bool long_info) {
     Serial.print(" QueueEnd=");
     Serial.print(s->getPositionAfterCommandsCompleted());
     Serial.print('/');
-    Serial.print(s->getPeriodAfterCommandsCompleted());
-    Serial.print("us");
+    Serial.print(s->getPeriodInUsAfterCommandsCompleted());
+    Serial.print("us/");
+    Serial.print(s->getPeriodInTicksAfterCommandsCompleted());
+    Serial.print("ticks");
     if (s->isRampGeneratorActive()) {
       switch (s->rampState()) {
         case RAMP_STATE_IDLE:

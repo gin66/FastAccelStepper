@@ -14,7 +14,7 @@ bool test_seq_10(FastAccelStepper *stepper, struct test_seq_s *seq,
       seq->state++;
       break;
     case 1:
-      if (stepper->getPeriodAfterCommandsCompleted() == 64) {
+      if (stepper->getPeriodInUsAfterCommandsCompleted() == 64) {
         stepper->setAcceleration(100000000);
         seq->s16_1 = 0;
         seq->s16_2 = 0;

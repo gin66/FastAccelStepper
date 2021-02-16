@@ -133,8 +133,8 @@ class FastAccelStepper {
   int8_t setSpeedInTicks(uint32_t min_step_us) {
     return _rg.setSpeedInTicks(min_step_us);
   }
-  // retrieve current set speed (while accelerationn/deceleration: not the
-  // actual speed !)
+  // retrieve current set speed (while acceleration/deceleration:
+  // NOT the actual speed !)
   uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
   uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
 
@@ -269,7 +269,8 @@ class FastAccelStepper {
   // This value comes from the ramp generator and is not valid for raw command
   // queue
   // ==> Will be renamed in future release
-  uint32_t getPeriodAfterCommandsCompleted();
+  uint32_t getPeriodInUsAfterCommandsCompleted();
+  uint32_t getPeriodInTicksAfterCommandsCompleted();
 
   // Set the future position of the stepper after all commands in queue are
   // completed. This has immediate effect to getCurrentPosition().

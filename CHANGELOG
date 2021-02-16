@@ -1,5 +1,8 @@
-pre-0.21.5:
+0.22.0:
 - Internal code clean up/polishing
+- replace getPeriodAfterCommandsCompleted() by
+	getPeriodInUsAfterCommandsCompleted() and getPeriodInTicksAfterCommandsCompleted()
+- StepperDemo outputs for a running motor the period in us and in ticks
 
 0.21.4:
 - PoorManFloat changed from 8bit to 9bit mantissa (implicit msb=1)
