@@ -192,7 +192,7 @@ or better:
 build_flags = -Werror -Wall -DFAS_TIMER_MODULE=3
 ```
 
-For arduino users, the same can be done by defining the flag *before* including the `FastAccelStepperEngine.h` header (as per info ixil).
+For arduino users, the same can be done by defining the flag *before* including the `FastAccelStepperEngine.h` header (as per info ixil), but apparently to issue #50, this approach does not work for everyone:
 e.g.
 ```
 sketch.ino
