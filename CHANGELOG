@@ -1,3 +1,7 @@
+pre-0.22.1:
+- disableOutputs() will return false, if called on a running motor with
+  autoEnable set to true
+
 0.22.0:
 - Internal code clean up/polishing
 - replace getPeriodAfterCommandsCompleted() by

@@ -590,6 +590,9 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   q->queue_end.pos = new_pos;
 }
 bool FastAccelStepper::disableOutputs() {
+  if (isRunning() && _autoEnable) {
+	return false;
+  }
   bool disabled = true;
   if (_externalEnableCall == NULL) {
     if (_enablePinLowActive != PIN_UNDEFINED) {

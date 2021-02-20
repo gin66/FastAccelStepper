@@ -76,6 +76,7 @@ class FastAccelStepper {
   void setExternalEnableCall(bool (*func)(uint8_t enablePin, uint8_t value));
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
+  // For a running motor with autoEnable set, disableOutputs() will return false
   bool enableOutputs();   // returns true, if enabled
   bool disableOutputs();  // returns true, if disabled
 
