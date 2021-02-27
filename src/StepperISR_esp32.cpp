@@ -92,6 +92,8 @@ void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
   }
 }
 
+#define isr_pcnt_counter_clear(pcnt_unit) REG_SET_BIT(PCNT_CTRL_REG, (1 << (2*pcnt_unit)))
+
 void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
@@ -146,7 +148,7 @@ void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
       // is updated only on zero
       PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2;
       // force take over
-      pcnt_counter_clear(pcnt_unit);
+      isr_pcnt_counter_clear(pcnt_unit);
       // Check, if pulse has come in
       if ((mcpwm->int_raw.val & mapping->cmpr_tea_int_raw) != 0) {
         // Pulse has come in
@@ -156,7 +158,7 @@ void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
           // is updated only on zero
           PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2 - 1;
           // force take over
-          pcnt_counter_clear(pcnt_unit);
+          isr_pcnt_counter_clear(pcnt_unit);
         }
       }
     }

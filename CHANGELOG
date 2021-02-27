@@ -1,6 +1,7 @@
 pre-0.22.1:
 - disableOutputs() will return false, if called on a running motor with
   autoEnable set to true
+- esp32: replace pcnt_counter_clear() by preprocessor-directive in relation to issue #55
 
 0.22.0:
 - Internal code clean up/polishing
