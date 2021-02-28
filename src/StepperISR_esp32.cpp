@@ -14,7 +14,7 @@
 StepperQueue fas_queue[NUM_QUEUES];
 
 // Here the associated mapping from queue to mcpwm/pcnt units
-static const struct mapping_s queue2mapping[NUM_QUEUES] = {
+static struct mapping_s queue2mapping[NUM_QUEUES] = {
     {
       mcpwm_unit : MCPWM_UNIT_0,
       timer : 0,
@@ -77,7 +77,7 @@ static const struct mapping_s queue2mapping[NUM_QUEUES] = {
     },
 };
 
-void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
+static void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
                                         const struct queue_entry *e_curr,
                                         const struct queue_entry *e_next) {
   uint8_t curr_steps = e_curr->steps;
@@ -94,7 +94,7 @@ void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
 
 #define isr_pcnt_counter_clear(pcnt_unit) REG_SET_BIT(PCNT_CTRL_REG, (1 << (2*pcnt_unit)))
 
-void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
+static void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
