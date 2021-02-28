@@ -1,3 +1,6 @@
+ifndef SILENCE
+	SILENCE=0
+endif
 
 TESTS=$(wildcard test_*)
 TESTS_SD=$(wildcard test_*sd_*)
@@ -10,7 +13,7 @@ SRC=$(wildcard ../src/*)
 test: $(TEST_FILES)
 
 %/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini
-	make -C $(dir $@) -f ../Makefile.test
+	make SILENCE=$(SILENCE)  -C $(dir $@) -f ../Makefile.test
 
 links: $(SD_SRC_DIRS)
 

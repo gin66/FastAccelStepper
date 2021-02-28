@@ -26,7 +26,7 @@ dump_all == 1{print}
 
 /^1.$/ {
 	s = substr($1,2)
-	printf("%s=1  ", sym[s])
+	if(!SILENCE) printf("%s=1  ", sym[s])
 	if (state[s] == 0) {
 		# transition L->H
 		cnt_l_h[s]++
@@ -42,7 +42,7 @@ dump_all == 1{print}
 
 		if (sym[s] ~ /Step/) {
 			channel = substr(sym[s],5)
-			printf("%s: ", channel)
+			if(!SILENCE) printf("%s: ", channel)
 			dir = "Dir" channel
 			if (dir in to_sym) {
 				dir_sym = to_sym[dir]
@@ -52,18 +52,18 @@ dump_all == 1{print}
 				else {
 					position[channel]++
 				}
-				printf("position=%d ",position[channel])
+				if(!SILENCE) printf("position=%d ",position[channel])
 			}
-		    printf("period=%.1fus high time=%.1fus",
+		    if(!SILENCE) printf("period=%.1fus high time=%.1fus",
 				  period_lh_lh[s]/ref,time_h[s]/ref)
 		}
 	}
-	printf("\n")
+	if(!SILENCE) printf("\n")
 	state[s] = 1
 }
 /^0.$/ {
 	s = substr($1,2)
-	printf("%s=0  ", sym[s])
+	if(!SILENCE) printf("%s=0  ", sym[s])
 	if (state[s] == 1) {
 		# transition H->L
 		cnt_h_l[s]++
@@ -77,16 +77,16 @@ dump_all == 1{print}
 			time_h[s] = time - last
 		}
 		if (sym[s] ~ /FillISR/) {
-			printf("period=%.1fus ", period_lh_lh[s]/ref)
+			if(!SILENCE) printf("period=%.1fus ", period_lh_lh[s]/ref)
 		}
 		h_time = time_h[s]/ref
-		printf("high time=%.1fus", h_time)
+		if(!SILENCE) printf("high time=%.1fus", h_time)
 		sum_time_h[s] += h_time
 		if (h_time > max_time_h[s]) {
 			max_time_h[s] = h_time
 		}
 	}
-	printf("\n")
+	if(!SILENCE) printf("\n")
 	state[s] = 0
 }
 
@@ -99,7 +99,7 @@ END {
 		if (name ~ /Step/) {
 			info = sprintf("%s, Max High=%dus Total High=%dus", info, max_time_h[s], sum_time_h[s])
 		}
-		print(info)
+		if(!SILENCE) print(info)
 		if (name !~ /ISR/) {
 		    print(info) >"result.txt"
 	    }
@@ -110,7 +110,7 @@ END {
 	for (ch in channels) {
 		if (ch in position) {
 			info = sprintf("Position[%s]=%d\n",ch,position[ch])
-			print(info)
+			if(!SILENCE) print(info)
 			print(info) >"result.txt"
 		}
 	}
@@ -120,7 +120,7 @@ END {
 		s = to_sym[name]
 		if (max_time_h[s] > 0) {
 			info = sprintf("Time in %s  max=%d us, total=%d us\n",name,max_time_h[s], sum_time_h[s])
-			print(info)
+			if(!SILENCE) print(info)
 			print(info) >"result.txt"
 		}
 	}

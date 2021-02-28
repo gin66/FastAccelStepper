@@ -71,6 +71,10 @@ FIRMWARE=".pio/build/$(DUT)/firmware.elf"
 
 DIR=$(shell /bin/pwd)
 
+ifndef SILENCE
+	SILENCE=0
+endif
+
 test: .tested
 
 .tested:	result.txt expect.txt ../judge.awk
@@ -80,7 +84,7 @@ test: .tested
 	test -f .tested
 
 result.txt: x.vcd
-	gawk -f ../eval.awk x.vcd
+	gawk -v SILENCE=$(SILENCE) -f ../eval.awk x.vcd
 	cat expect.txt
 
 x.vcd:	$(SRC) ../run_avr platformio.ini
