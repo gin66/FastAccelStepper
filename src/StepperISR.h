@@ -198,7 +198,7 @@ class StepperQueue {
 #if defined(ARDUINO_ARCH_ESP32)
     // pulse counter should go max up to 255 with perhaps few pulses overrun, so
     // this conversion is safe
-    int16_t cp = (int16_t)_getCurrentPulseCounter();
+    int16_t rem_p = (int16_t)_getRemainingPulses();
 #endif
     interrupts();
 #if defined(ARDUINO_ARCH_ESP32)
@@ -210,12 +210,12 @@ class StepperQueue {
       if (e->countUp) {
         pos -= e->steps;
 #if defined(ARDUINO_ARCH_ESP32)
-        adjust = cp;
+        adjust = e->toggle_dir ? rem_p : -rem_p;
 #endif
       } else {
         pos += e->steps;
 #if defined(ARDUINO_ARCH_ESP32)
-        adjust = -cp;
+        adjust = e->toggle_dir ? -rem_p : rem_p;
 #endif
       }
     }
@@ -311,7 +311,7 @@ class StepperQueue {
   }
 #if defined(ARDUINO_ARCH_ESP32)
   uint8_t _step_pin;
-  uint16_t _getCurrentPulseCounter();
+  uint16_t _getRemainingPulses();
 #endif
   void connect();
   void disconnect();

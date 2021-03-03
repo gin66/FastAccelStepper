@@ -95,7 +95,7 @@ prepare_for_next_command(StepperQueue *queue, const struct queue_entry *e_curr,
   }
 }
 
-#define isr_pcnt_counter_clear(pcnt_unit) \
+#define isr_pcnt_counter_clear(pcnt_unit)             \
   REG_SET_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit))); \
   REG_CLR_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit)))
 
@@ -418,8 +418,10 @@ void StepperQueue::forceStop() {
 }
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
-uint16_t StepperQueue::_getCurrentPulseCounter() {
-  return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
+uint16_t StepperQueue::_getRemainingPulses() {
+  pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
+  return PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim -
+         PCNT.cnt_unit[pcnt_unit].cnt_val;
 }
 
 uint32_t sig_idx[8] = {PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,

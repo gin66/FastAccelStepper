@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-dab693c"
+#define VERSION "post-1ea5dc6"
 
 struct stepper_config_s {
   uint8_t step;
@@ -469,13 +469,27 @@ bool simulate_blocked_ISR = false;
 
 void info(FastAccelStepper *s, bool long_info) {
   Serial.print('@');
-  Serial.print(s->getCurrentPosition());
 #if defined(ARDUINO_ARCH_ESP32)
   if (s->pulseCounterAttached()) {
+    int16_t pcnt_pos_1 = s->readPulseCounter();
+    int32_t pos = s->getCurrentPosition();
+    int16_t pcnt_pos_2 = s->readPulseCounter();
+    Serial.print(pos);
     Serial.print(" [");
-    Serial.print(s->readPulseCounter());
+    Serial.print(pcnt_pos_1);
     Serial.print(']');
+    if (pcnt_pos_1 != pcnt_pos_2) {
+      Serial.print(" [");
+      Serial.print(pcnt_pos_2);
+      Serial.print(']');
+    }
+  } else {
+    int32_t pos = s->getCurrentPosition();
+    Serial.print(pos);
   }
+#else
+  int32_t pos = s->getCurrentPosition();
+  Serial.print(pos);
 #endif
   if (s->isRunning()) {
     if (s->isRunningContinuously()) {
