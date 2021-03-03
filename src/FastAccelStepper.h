@@ -158,9 +158,17 @@ class FastAccelStepper {
   //
   // note: no update on stopMove()
   //
-  // Returns 0 on success, or -1 on invalid value (=0)
-  int8_t setAcceleration(uint32_t step_s_s);
+  // Returns 0 on success, or -1 on invalid value (<=0)
+  int8_t setAcceleration(int32_t step_s_s) {
+    return _rg.setAcceleration(step_s_s);
+  }
   uint32_t getAcceleration() { return _rg.getAcceleration(); }
+
+  // getCurrentAcceleration() retrieves the actual acceleration.
+  //	= 0 while idle or coasting
+  //	> 0 while speed is changing towards positive values
+  //	< 0 while speed is changeing towards negative values
+  int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
 
   // This function applies new values for speed/acceleration.
   // This is convenient especially, if the stepper is set to continuous running.
@@ -284,6 +292,10 @@ class FastAccelStepper {
 #define RAMP_STATE_REVERSE (4 + 16)
 #define RAMP_STATE_ACCELERATING_FLAG 2
 #define RAMP_STATE_DECELERATING_FLAG 4
+#define RAMP_STATE_MASK (1 + 2 + 4 + 8 + 16)
+#define RAMP_DIRECTION_COUNT_UP 32
+#define RAMP_DIRECTION_COUNT_DOWN 64
+#define RAMP_DIRECTION_MASK (32 + 64)
   inline uint8_t rampState() { return _rg.rampState(); }
 
   // returns true, if the ramp generation is active

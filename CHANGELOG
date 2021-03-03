@@ -1,3 +1,9 @@
+pre-0.23.0:
+- getRampState(): Add two flags for current direction
+- add function: getCurrentAcceleration()
+- setAcceleration(uint32_t) changed to setAcceleration(int32_t). Only positive values allowed.
+  This way getCurrentAcceleration() can return negative values without range problems
+
 0.22.2:
 - esp32: getCurrentPosition() does take current command's pulse count into consideration
 - fix issue #57: counter clear needs a strobe on a bit and not only being set

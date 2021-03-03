@@ -117,8 +117,9 @@ class RampGenerator {
     }
     return setSpeedInTicks(TICKS_PER_S / speed_hz);
   }
-  int8_t setAcceleration(uint32_t accel);
+  int8_t setAcceleration(int32_t accel);
   uint32_t getAcceleration() { return acceleration; }
+  int32_t getCurrentAcceleration();
   inline bool hasValidConfig() {
     return ((_config.min_travel_ticks != 0) && (_config.upm_inv_accel2 != 0));
   }

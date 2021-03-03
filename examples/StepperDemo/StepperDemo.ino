@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-1ea5dc6"
+#define VERSION "post-6a5fabe"
 
 struct stepper_config_s {
   uint8_t step;
@@ -506,7 +506,7 @@ void info(FastAccelStepper *s, bool long_info) {
     Serial.print(s->getPeriodInTicksAfterCommandsCompleted());
     Serial.print("ticks");
     if (s->isRampGeneratorActive()) {
-      switch (s->rampState()) {
+      switch (s->rampState() & RAMP_STATE_MASK) {
         case RAMP_STATE_IDLE:
           Serial.print(" IDLE ");
           break;

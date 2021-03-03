@@ -69,13 +69,13 @@ int8_t RampGenerator::setSpeedInUs(uint32_t min_step_us) {
   uint32_t min_step_ticks = US_TO_TICKS(min_step_us);
   return setSpeedInTicks(min_step_ticks);
 }
-int8_t RampGenerator::setAcceleration(uint32_t accel) {
-  if (accel == 0) {
+int8_t RampGenerator::setAcceleration(int32_t accel) {
+  if (accel <= 0) {
     return -1;
   }
-  acceleration = accel;
+  acceleration = (uint32_t)accel;
 #ifdef UPM_ACCEL_FACTOR
-  upm_float upm_inv_accel2 = upm_divide(UPM_ACCEL_FACTOR, upm_from(accel));
+  upm_float upm_inv_accel2 = upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
 #else
   upm_float upm_inv_accel =
       upm_divide(upm_shr(UPM_TICKS_PER_S, 1), upm_from(accel));
@@ -86,7 +86,7 @@ int8_t RampGenerator::setAcceleration(uint32_t accel) {
 
     // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
     _config.upm_sqrt_inv_accel =
-        upm_multiply(upm_rsqrt(upm_from(accel)), UPM_TICKS_PER_S_DIV_SQRT_OF_2);
+        upm_multiply(upm_rsqrt(upm_from((uint32_t)accel)), UPM_TICKS_PER_S_DIV_SQRT_OF_2);
     _config.accel_change_cnt = _rw.accel_change_cnt + 1;
   }
   return 0;
@@ -494,6 +494,12 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     }
   }
 
+  if (count_up) {
+    this_state |= RAMP_DIRECTION_COUNT_UP;
+  } else {
+    this_state |= RAMP_DIRECTION_COUNT_DOWN;
+  }
+
   command->command.ticks = next_ticks;
   command->command.steps = steps;
   command->command.count_up = count_up;
@@ -510,12 +516,15 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       "last_ticks=%u travel_ticks=%u ",
       queue_end->pos, remaining_steps, performed_ramp_up_steps, planning_steps,
       rw->curr_ticks, ramp->config.min_travel_ticks);
-  if (count_up) {
-    printf("+");
-  } else {
-    printf("-");
+  switch (this_state & RAMP_DIRECTION_MASK) {
+    case RAMP_DIRECTION_COUNT_UP:
+      printf("+");
+      break;
+    case RAMP_DIRECTION_COUNT_DOWN:
+      printf("-");
+      break;
   }
-  switch (this_state) {
+  switch (this_state & RAMP_STATE_MASK) {
     case RAMP_STATE_COAST:
       printf("COAST");
       break;
@@ -571,4 +580,19 @@ void RampGenerator::stopRamp() {
 }
 bool RampGenerator::isRampGeneratorActive() {
   return (_rw.ramp_state != RAMP_STATE_IDLE);
+}
+int32_t RampGenerator::getCurrentAcceleration() {
+  switch (_rw.ramp_state &
+          (RAMP_STATE_ACCELERATING_FLAG | RAMP_STATE_DECELERATING_FLAG |
+           RAMP_DIRECTION_MASK)) {
+    case RAMP_STATE_ACCELERATING_FLAG | RAMP_DIRECTION_COUNT_UP:
+      return acceleration;
+    case RAMP_STATE_DECELERATING_FLAG | RAMP_DIRECTION_COUNT_UP:
+      return -acceleration;
+    case RAMP_STATE_ACCELERATING_FLAG | RAMP_DIRECTION_COUNT_DOWN:
+      return -acceleration;
+    case RAMP_STATE_DECELERATING_FLAG | RAMP_DIRECTION_COUNT_DOWN:
+      return acceleration;
+  }
+  return 0;
 }
