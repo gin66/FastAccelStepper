@@ -96,7 +96,8 @@ prepare_for_next_command(StepperQueue *queue, const struct queue_entry *e_curr,
 }
 
 #define isr_pcnt_counter_clear(pcnt_unit) \
-  REG_SET_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit)))
+  REG_SET_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit))); \
+  REG_CLR_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit)))
 
 static void IRAM_ATTR apply_command(StepperQueue *queue,
                                     const struct queue_entry *e) {
@@ -397,9 +398,9 @@ void StepperQueue::commandAddedToQueue(bool start) {
   apply_command(this, e);
   read_idx++;
 
-//  if (start) {
+  if (start) {
     mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
-//  }
+  }
 }
 int8_t StepperQueue::startPreparedQueue() {
   if (next_write_idx == read_idx) {

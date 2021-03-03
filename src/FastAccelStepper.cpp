@@ -649,7 +649,7 @@ uint32_t FastAccelStepper::getPeriodInUsAfterCommandsCompleted() {
   return 0;
 }
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
-  int32_t delta = new_pos - fas_queue[_queue_num].getCurrentPosition();
+  int32_t delta = new_pos - getCurrentPosition();
   noInterrupts();
   fas_queue[_queue_num].queue_end.pos += delta;
   _rg.advanceTargetPositionWithinInterruptDisabledScope(delta);

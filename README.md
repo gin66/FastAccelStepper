@@ -258,6 +258,11 @@ The library is tested with different kind of tests:
 * Test for pulse generation using examples/Pulses
 
   This has been intensively used to debug the esp32 ISR code
+
+* esp32 hw tests
+
+  These tests live under sub folder ./esp32_hw_tests
+
 * manual tests using examples/StepperDemo
 
   These are unstructured tests with listening to the motor and observing the behavior
