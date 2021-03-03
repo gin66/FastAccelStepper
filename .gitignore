@@ -26,3 +26,4 @@ sim_tests/*/result.txt
 sim_tests/*/x.vcd
 sim_tests/test*sd*/src
 sim_tests/simavr
+esp32_hw_tests/*.log
