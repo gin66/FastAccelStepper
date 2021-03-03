@@ -14,6 +14,9 @@
 StepperQueue fas_queue[NUM_QUEUES];
 
 // Here the associated mapping from queue to mcpwm/pcnt units
+//
+// As the ISR is accessing this table, the mapping cannot be put into flash,
+// even this is actually a constant table
 static struct mapping_s queue2mapping[NUM_QUEUES] = {
     {
       mcpwm_unit : MCPWM_UNIT_0,
@@ -77,9 +80,9 @@ static struct mapping_s queue2mapping[NUM_QUEUES] = {
     },
 };
 
-static void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
-                                        const struct queue_entry *e_curr,
-                                        const struct queue_entry *e_next) {
+static void IRAM_ATTR
+prepare_for_next_command(StepperQueue *queue, const struct queue_entry *e_curr,
+                         const struct queue_entry *e_next) {
   uint8_t curr_steps = e_curr->steps;
   if (curr_steps > 0) {
     uint8_t next_steps = e_next->steps;
@@ -92,9 +95,11 @@ static void IRAM_ATTR prepare_for_next_command(StepperQueue *queue,
   }
 }
 
-#define isr_pcnt_counter_clear(pcnt_unit) REG_SET_BIT(PCNT_CTRL_REG, (1 << (2*pcnt_unit)))
+#define isr_pcnt_counter_clear(pcnt_unit) \
+  REG_SET_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit)))
 
-static void IRAM_ATTR apply_command(StepperQueue *queue, const struct queue_entry *e) {
+static void IRAM_ATTR apply_command(StepperQueue *queue,
+                                    const struct queue_entry *e) {
   const struct mapping_s *mapping = queue->mapping;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -392,9 +397,9 @@ void StepperQueue::commandAddedToQueue(bool start) {
   apply_command(this, e);
   read_idx++;
 
-  if (start) {
+//  if (start) {
     mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
-  }
+//  }
 }
 int8_t StepperQueue::startPreparedQueue() {
   if (next_write_idx == read_idx) {
@@ -412,6 +417,9 @@ void StepperQueue::forceStop() {
 }
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
+uint16_t StepperQueue::_getCurrentPulseCounter() {
+  return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
+}
 
 uint32_t sig_idx[8] = {PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,
                        PCNT_SIG_CH0_IN2_IDX, PCNT_SIG_CH0_IN3_IDX,

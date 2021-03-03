@@ -571,7 +571,7 @@ int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
   } else {
     uint32_t max_speed = _rg.getSpeedInTicks();
     setSpeedInTicks(getPeriodInTicksAfterCommandsCompleted());
-    setAcceleration(1); // ensure increase, so the speed is kept
+    setAcceleration(1);  // ensure increase, so the speed is kept
     applySpeedAcceleration();
     setSpeedInTicks(max_speed);
   }
@@ -591,7 +591,7 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
 }
 bool FastAccelStepper::disableOutputs() {
   if (isRunning() && _autoEnable) {
-	return false;
+    return false;
   }
   bool disabled = true;
   if (_externalEnableCall == NULL) {
@@ -648,30 +648,8 @@ uint32_t FastAccelStepper::getPeriodInUsAfterCommandsCompleted() {
   }
   return 0;
 }
-int32_t FastAccelStepper::getCurrentPosition() {
-  struct StepperQueue* q = &fas_queue[_queue_num];
-  noInterrupts();
-  int32_t pos = q->queue_end.pos;
-  bool countUp = (q->queue_end.dir == q->dirHighCountsUp);
-  uint8_t wp = q->next_write_idx;
-  uint8_t rp = q->read_idx;
-  interrupts();
-  while (rp != wp) {
-    wp--;
-    struct queue_entry* e = &q->entry[wp & QUEUE_LEN_MASK];
-    if (countUp) {
-      pos -= e->steps;
-    } else {
-      pos += e->steps;
-    }
-    if (e->toggle_dir) {
-      countUp = !countUp;
-    }
-  }
-  return pos;
-}
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
-  int32_t delta = new_pos - getCurrentPosition();
+  int32_t delta = new_pos - fas_queue[_queue_num].getCurrentPosition();
   noInterrupts();
   fas_queue[_queue_num].queue_end.pos += delta;
   _rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
@@ -721,6 +699,9 @@ void FastAccelStepper::backwardStep(bool blocking) {
       }
     }
   }
+}
+int32_t FastAccelStepper::getCurrentPosition() {
+  return fas_queue[_queue_num].getCurrentPosition();
 }
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }

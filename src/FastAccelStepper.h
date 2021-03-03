@@ -95,10 +95,7 @@ class FastAccelStepper {
 #define DELAY_TOO_LOW -1
 #define DELAY_TOO_HIGH -2
 
-  // Retrieve the current position of the stepper - either in standstill or
-  // while moving
-  //    for esp32: the position while moving may deviate by the currently
-  //    executed queue command's steps
+  // Retrieve the current position of the stepper
   int32_t getCurrentPosition();
 
   // Set the current position of the stepper - either in standstill or while

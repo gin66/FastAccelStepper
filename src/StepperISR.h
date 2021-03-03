@@ -76,7 +76,9 @@ int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
 
 struct queue_entry {
   uint8_t steps;  // if 0,  then the command only adds a delay
-  bool toggle_dir;
+  uint8_t toggle_dir : 1;
+  uint8_t countUp : 1;
+  uint8_t moreThanOneStep : 1;
   uint16_t ticks;
 };
 class StepperQueue {
@@ -122,6 +124,10 @@ class StepperQueue {
   inline bool isQueueEmpty() { return queueEntries() == 0; }
 
   int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start) {
+    // Just to check if, if the struct has the correct size
+    // if (sizeof(entry) != 6 * QUEUE_LEN) {
+    //  return -1;
+    //}
     if (cmd == NULL) {
       if (start) {
         return startPreparedQueue();
@@ -161,6 +167,8 @@ class StepperQueue {
     }
     e->steps = steps;
     e->toggle_dir = toggle_dir;
+    e->countUp = cmd->count_up ? 1 : 0;
+    e->moreThanOneStep = steps > 1 ? 1 : 0;
     e->ticks = period;
     queue_end.dir = dir;
     queue_end.count_up = cmd->count_up;
@@ -181,6 +189,40 @@ class StepperQueue {
 #endif
     commandAddedToQueue(start);
     return AQE_OK;
+  }
+  int32_t getCurrentPosition() {
+    noInterrupts();
+    int32_t pos = queue_end.pos;
+    uint8_t wp = next_write_idx;
+    uint8_t rp = read_idx;
+#if defined(ARDUINO_ARCH_ESP32)
+    // pulse counter should go max up to 255 with perhaps few pulses overrun, so
+    // this conversion is safe
+    int16_t cp = (int16_t)_getCurrentPulseCounter();
+#endif
+    interrupts();
+#if defined(ARDUINO_ARCH_ESP32)
+    int16_t adjust = 0;
+#endif
+    while (rp != wp) {
+      wp--;
+      struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
+      if (e->countUp) {
+        pos -= e->steps;
+#if defined(ARDUINO_ARCH_ESP32)
+        adjust = cp;
+#endif
+      } else {
+        pos += e->steps;
+#if defined(ARDUINO_ARCH_ESP32)
+        adjust = -cp;
+#endif
+      }
+    }
+#if defined(ARDUINO_ARCH_ESP32)
+    pos += adjust;
+#endif
+    return pos;
   }
   uint32_t ticksInQueue() {
     noInterrupts();
@@ -226,6 +268,22 @@ class StepperQueue {
     }
     return false;
   }
+  uint16_t getActualTicks() {
+    // Retrieve current step rate from the current view.
+    // This is valid only, if the command describes more than one step
+    noInterrupts();
+    uint8_t rp = read_idx;
+    uint8_t wp = next_write_idx;
+    interrupts();
+    if (wp == rp) {
+      return 0;
+    }
+    struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+    if (e->moreThanOneStep) {
+      return 0;
+    }
+    return e->ticks;
+  }
 
   // startQueue is always called
   void commandAddedToQueue(bool start);
@@ -253,6 +311,7 @@ class StepperQueue {
   }
 #if defined(ARDUINO_ARCH_ESP32)
   uint8_t _step_pin;
+  uint16_t _getCurrentPulseCounter();
 #endif
   void connect();
   void disconnect();

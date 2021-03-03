@@ -1,3 +1,6 @@
+pre-0.22.2:
+- esp32: getCurrentPosition() does take current command's pulse count into consideration
+
 0.22.1:
 - disableOutputs() will return false, if called on a running motor with
   autoEnable set to true
