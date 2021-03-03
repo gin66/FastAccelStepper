@@ -548,7 +548,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       "d_ticks_new=%u, pause_left=%u\n",
       steps, next_ticks, ramp->target_pos, remaining_steps, planning_steps,
       d_ticks_new, pause_ticks_left);
-  if (this_state == RAMP_STATE_ACCELERATE) {
+  if ((this_state & RAMP_STATE_MASK) == RAMP_STATE_ACCELERATE) {
     assert(pause_ticks_left + next_ticks >= ramp->config.min_travel_ticks);
   }
 #endif

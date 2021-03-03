@@ -15,7 +15,7 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
       seq->state++;
       break;
     case 1:
-      if (stepper->rampState() == RAMP_STATE_COAST) {
+      if ((stepper->rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST) {
         int32_t dt = time_ms - seq->u32_1;
         Serial.println(dt);
         if (abs(dt - 792) > 15) {  // 779 esp, 805 avr
