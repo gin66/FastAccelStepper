@@ -2,7 +2,7 @@
 DEV="-d /dev/ttyUSB0 -b 115200"
 
 CMD="t M1 07 R "
-PASS="finished"
+PASS="Test passed"
 MAX_RUN_S=10
 
 LOG="$0.log"

@@ -293,7 +293,9 @@ const static char messages[] PROGMEM =
 #define MSG_CLEAR_PULSE_COUNTER 51
     "Clear pulse counter\n|"
 #define MSG_SET_SPEED_TO_HZ 52
-    "Set speed (steps/s) to |";
+    "Set speed (steps/s) to |"
+#define MSG_PASS_STATUS 53
+    "Test passed\n|";
 
 void output_msg(int8_t i) {
   char ch;
@@ -1041,6 +1043,9 @@ void loop() {
           if (s->state == TEST_STATE_ERROR) {
             output_msg(MSG_FAILED_STATUS);
             Serial.println(i);
+          }
+          else {
+            output_msg(MSG_PASS_STATUS);
           }
         }
       } else {
