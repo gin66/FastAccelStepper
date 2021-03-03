@@ -136,6 +136,12 @@ class FastAccelStepper {
   uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
   uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
 
+  // getCurrentSpeed() retrieves the actual speed.
+  //	= 0 while not moving
+  //	> 0 while position counting up
+  //	< 0 while position counting down
+  int32_t getCurrentSpeedInUs();
+
   // setSpeedInHz() allows to set the stepper speed as step frequency in Hertz.
   // This means steps/s.
   int8_t setSpeedInHz(uint32_t speed_hz) { return _rg.setSpeedInHz(speed_hz); }
