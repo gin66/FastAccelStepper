@@ -282,7 +282,7 @@ int main() {
   test.with_pars("f24d", 5000, 200, 9999, true, 1.48 - 0.04 * nc,
                  1.50 - 0.04 * nc, 0.1, true, false, true);
 
-  test.with_pars("f25", 1000, 40, 0xffffffff, true, 0.039, 0.041, 0.1);
+  test.with_pars("f25", 1000, 40, 0x7fffffff, true, 0.039, 0.041, 0.1);
 
   printf("TEST_02 PASSED\n");
   return 0;

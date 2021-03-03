@@ -135,7 +135,7 @@ class FastAccelStepperTest {
         break;
       }
       s.fill_queue();
-      if (s.rampState() == RAMP_STATE_DECELERATE) {
+      if ((s.rampState() & RAMP_STATE_MASK) == RAMP_STATE_DECELERATE) {
         count_state_dec++;
       }
       uint32_t from_dt = rc.total_ticks;
