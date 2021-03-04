@@ -248,7 +248,7 @@ The library is tested with different kind of tests:
 * PC only (sub folder ./tests/pc_based)
 
   These tests focussing primarily the ramp generator and part of the API
-* simavr based for avr (sub folder ./sim_tests)
+* simavr based for avr (sub folder ./tests/simavr_based)
 
   The simavr is an excellent simulator for avr microcontrollers. This allows to check the avr implementation thoroughly: number of steps generated, virtual stepper position and even timing. Tested code is mainly the StepperDemo, which gets fed in a one line sequence of commands to execute. These tests are focused on avr, but help to check the whole library code, used by esp32, too.
 * esp32 tests with another pulse counter attached (e.g. test_seq_08 in StepperDemo)
