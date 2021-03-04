@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../tests/stubs.h"
+#include "../tests/pc_based/stubs.h"
 #endif
 #include <stdint.h>
 

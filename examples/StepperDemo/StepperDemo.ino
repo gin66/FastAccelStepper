@@ -6,7 +6,7 @@
 #include <avr/sleep.h>
 #endif
 
-#define VERSION "post-6a5fabe"
+#define VERSION "post-d75a612"
 
 struct stepper_config_s {
   uint8_t step;
@@ -1043,8 +1043,7 @@ void loop() {
           if (s->state == TEST_STATE_ERROR) {
             output_msg(MSG_FAILED_STATUS);
             Serial.println(i);
-          }
-          else {
+          } else {
             output_msg(MSG_PASS_STATUS);
           }
         }

@@ -245,7 +245,7 @@ pio run -e avr --target upload --upload-port /dev/ttyUSB0
 ## TEST STRATEGY
 
 The library is tested with different kind of tests:
-* PC only (sub folder ./tests/)
+* PC only (sub folder ./tests/pc_based)
 
   These tests focussing primarily the ramp generator and part of the API
 * simavr based for avr (sub folder ./sim_tests)
