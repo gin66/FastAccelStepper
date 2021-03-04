@@ -261,7 +261,7 @@ The library is tested with different kind of tests:
 
 * esp32 hw tests
 
-  These tests live under sub folder ./esp32_hw_tests
+  These tests live under sub folder ./tests/esp32_hw_based
 
 * manual tests using examples/StepperDemo
 

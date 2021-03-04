@@ -14,4 +14,4 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: make
-      run: make -C tests
+      run: make -C tests/pc_based

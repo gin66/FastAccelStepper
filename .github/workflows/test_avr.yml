@@ -22,6 +22,6 @@ jobs:
     - name: install lib elf
       run:  sudo apt install libelf-dev
     - name: make links
-      run: make -C sim_tests links
+      run: make -C tests/simavr_based links
     - name: make
-      run: make SILENCE=1 -C sim_tests
+      run: make SILENCE=1 -C tests/simavr_based
