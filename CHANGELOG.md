@@ -1,4 +1,4 @@
-pre-0.23.0:
+0.23.0:
 - getRampState(): Add two flags for current direction
 - add function: getCurrentAcceleration()
 - setAcceleration(uint32_t) changed to setAcceleration(int32_t). Only positive values allowed.
