@@ -40,8 +40,8 @@ cd pio_dirs/PMF_test
 ln -s ../../ci/platformio.ini .
 cd src
 #sed  -e 's/%d/%ld/g' <../../../tests/test_03.h >test_03.h
-ln -s ../../../tests/test_03.h .
-ln -s ../../../tests/PMF_test.ino PMF_test.ino
+ln -s ../../../tests/pc_based/test_03.h .
+ln -s ../../../tests/pc_based/PMF_test.ino PMF_test.ino
 cd ../../..
 
 set -e
