@@ -3,8 +3,11 @@ pre-0.23.0:
 - add function: getCurrentAcceleration()
 - setAcceleration(uint32_t) changed to setAcceleration(int32_t). Only positive values allowed.
   This way getCurrentAcceleration() can return negative values without range problems
-- add function: getCurrentSpeed()
+- add function: getCurrentSpeedInUs(), getCurrentSpeedInMilliHz(), getSpeedInMilliHz()
 - restructure tests
+- StepperDemo extended:
+	- esp32 only: Add command reset, which causes a watchdog reset
+	- auto switch between speed in milliSteps/s and us/step depending on command H or V
 
 0.22.2:
 - esp32: getCurrentPosition() does take current command's pulse count into consideration

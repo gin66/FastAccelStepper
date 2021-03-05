@@ -280,9 +280,9 @@ class StepperQueue {
     }
     struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
     if (e->moreThanOneStep) {
-      return 0;
+      return e->ticks;
     }
-    return e->ticks;
+    return 0;
   }
 
   // startQueue is always called

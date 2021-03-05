@@ -5,6 +5,9 @@
 #ifdef SIM_TEST_INPUT
 #include <avr/sleep.h>
 #endif
+#if defined(ARDUINO_ARCH_ESP32)
+#include <esp_task_wdt.h>
+#endif
 
 #define VERSION "post-d75a612"
 
@@ -460,6 +463,7 @@ char out_buffer[256];
 bool stopped = true;
 bool verbose = true;
 bool usage_info = true;
+bool speed_in_milli_hz = false;
 uint32_t last_time = 0;
 int selected = -1;
 uint32_t pause_ms = 0;
@@ -502,11 +506,18 @@ void info(FastAccelStepper *s, bool long_info) {
     }
     Serial.print(" QueueEnd=");
     Serial.print(s->getPositionAfterCommandsCompleted());
-    Serial.print('/');
-    Serial.print(s->getPeriodInUsAfterCommandsCompleted());
-    Serial.print("us/");
-    Serial.print(s->getPeriodInTicksAfterCommandsCompleted());
-    Serial.print("ticks");
+    if (speed_in_milli_hz) {
+		Serial.print(" v=");
+		Serial.print(s->getCurrentSpeedInMilliHz());
+		Serial.print("mSteps/s");
+    }
+    else {
+		Serial.print('/');
+		Serial.print(s->getPeriodInUsAfterCommandsCompleted());
+		Serial.print("us/");
+		Serial.print(s->getPeriodInTicksAfterCommandsCompleted());
+		Serial.print("ticks");
+    }
     if (s->isRampGeneratorActive()) {
       switch (s->rampState() & RAMP_STATE_MASK) {
         case RAMP_STATE_IDLE:
@@ -535,10 +546,16 @@ void info(FastAccelStepper *s, bool long_info) {
     }
   } else {
     if (long_info) {
-      Serial.print(" Acceleration [steps/s^2]=");
+      Serial.print(" Acceleration [Steps/s^2]=");
       Serial.print(s->getAcceleration());
-      Serial.print(" Speed [us/step]=");
-      Serial.print(s->getSpeedInUs());
+      if (speed_in_milli_hz) {
+		  Serial.print(" Speed [mStep/s]=");
+		Serial.print(s->getSpeedInMilliHz());
+      }
+      else {
+		  Serial.print(" Speed [us/step]=");
+		  Serial.print(s->getSpeedInUs());
+      }
     }
   }
   Serial.print(' ');
@@ -580,6 +597,7 @@ const static char usage_str[] PROGMEM =
     "     T         ... Test selected motor with direct port access\n"
 #if defined(ARDUINO_ARCH_ESP32)
     "     r         ... Call ESP.restart()\n"
+    "     reset     ... Perform reset\n"
     "     p<n>      ... Attach pulse counter n<=7\n"
     "     p<n>,l,h  ... Attach pulse counter n<=7 with low and high limits\n"
     "     pc        ... Clear pulse counter\n"
@@ -756,6 +774,12 @@ void loop() {
         Serial.println("ESP restart");
         ESP.restart();
       }
+      else if (strcmp(out_buffer, "reset") == 0) {
+        Serial.println("ESP reset");
+		esp_task_wdt_init(1,true);
+		esp_task_wdt_add(NULL);
+		while(true);
+      }
 #endif
 #if defined(ARDUINO_ARCH_AVR)
       else if (strcmp(out_buffer, "r") == 0) {
@@ -789,6 +813,7 @@ void loop() {
               output_msg(MSG_ERROR_INVALID_VALUE);
             }
           } else if (sscanf(out_buffer, "V%lu", &val) == 1) {
+			speed_in_milli_hz = false;
             output_msg(MSG_SET_SPEED_TO_US);
             Serial.println(val);
             int8_t res = stepper_selected->setSpeedInUs(val);
@@ -796,6 +821,7 @@ void loop() {
               output_msg(MSG_ERROR_INVALID_VALUE);
             }
           } else if (sscanf(out_buffer, "H%lu", &val) == 1) {
+			speed_in_milli_hz = true;
             output_msg(MSG_SET_SPEED_TO_HZ);
             Serial.println(val);
             int8_t res = stepper_selected->setSpeedInHz(val);
@@ -1035,17 +1061,20 @@ void loop() {
       }
       if (finished) {
         test_ongoing = false;
+        bool test_failed = false;
         Serial.println("finished");
         stepper_info();
         for (uint8_t i = 0; i < MAX_STEPPER; i++) {
           struct test_seq_s *s = &test_seq[i];
           s->test = NULL;
           if (s->state == TEST_STATE_ERROR) {
-            output_msg(MSG_FAILED_STATUS);
-            Serial.println(i);
-          } else {
-            output_msg(MSG_PASS_STATUS);
+            test_failed = true;
           }
+        }
+        if (test_failed) {
+          output_msg(MSG_FAILED_STATUS);
+        } else {
+          output_msg(MSG_PASS_STATUS);
         }
       } else {
         uint32_t now = millis();

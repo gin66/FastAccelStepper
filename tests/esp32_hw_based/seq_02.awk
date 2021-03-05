@@ -11,6 +11,15 @@ BEGIN {
 		print "FAIL HERE ^^^"
 	}
 }
+/^>> M1:/ {
+	print
+	api = substr($3,2)
+	pcnt = substr($4,2,length($4)-2)
+	if (api != pcnt) {
+		pass = 0
+		print "FAIL HERE ^^^"
+	}
+}
 
 END {
 	if (pass) {

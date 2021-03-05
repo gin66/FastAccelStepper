@@ -659,6 +659,23 @@ int32_t FastAccelStepper::getCurrentSpeedInUs() {
   }
   return 0;
 }
+int32_t FastAccelStepper::getCurrentSpeedInMilliHz() {
+  uint32_t ticks = fas_queue[_queue_num].getActualTicks();
+  if (ticks == 0) {
+    ticks = getPeriodInTicksAfterCommandsCompleted();
+  }
+  int32_t speed_in_milli_hz = 0;
+  if (ticks > 0) {
+	  speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
+  }
+  switch (_rg.rampState() & RAMP_DIRECTION_MASK) {
+    case RAMP_DIRECTION_COUNT_UP:
+      return speed_in_milli_hz;
+    case RAMP_DIRECTION_COUNT_DOWN:
+      return -speed_in_milli_hz;
+  }
+  return 0;
+}
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   noInterrupts();

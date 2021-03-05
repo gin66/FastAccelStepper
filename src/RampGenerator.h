@@ -105,6 +105,12 @@ class RampGenerator {
   int8_t setSpeedInUs(uint32_t min_step_us);
   uint32_t getSpeedInUs() { return speed_in_ticks / (TICKS_PER_S / 1000000); }
   uint32_t getSpeedInTicks() { return speed_in_ticks; }
+  uint32_t getSpeedInMilliHz() { 
+	  if (speed_in_ticks == 0) {
+		  return 0;
+	  }
+	  return ((uint32_t)250 * TICKS_PER_S)/speed_in_ticks * 4;
+  }
   int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
     if (speed_mhz <= (1000LL * TICKS_PER_S / 0xffffffff + 1)) {
       return -1;
