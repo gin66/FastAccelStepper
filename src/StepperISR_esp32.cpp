@@ -81,18 +81,15 @@ static struct mapping_s queue2mapping[NUM_QUEUES] = {
 };
 
 static void IRAM_ATTR
-prepare_for_next_command(StepperQueue *queue, const struct queue_entry *e_curr,
+prepare_for_next_command(StepperQueue *queue,
                          const struct queue_entry *e_next) {
-  uint8_t curr_steps = e_curr->steps;
-  if (curr_steps > 0) {
     uint8_t next_steps = e_next->steps;
-    if ((next_steps > 0) && (curr_steps != next_steps)) {
+    if (next_steps > 0) {
       const struct mapping_s *mapping = queue->mapping;
       pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
       // is updated only on zero
       PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = next_steps;
     }
-  }
 }
 
 #define isr_pcnt_counter_clear(pcnt_unit)             \
@@ -191,20 +188,30 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
 }
 
 static void IRAM_ATTR what_is_next(StepperQueue *q) {
+  bool isPrepared = q->_nextCommandIsPrepared;
+  q->_nextCommandIsPrepared = false;
   uint8_t rp = q->read_idx;
-  if (rp != q->next_write_idx) {
-    struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
-    apply_command(q, e_curr);
-    rp++;
+  if (rp != q->next_write_idx) { 
+	rp++;
+	q->read_idx = rp;
     if (rp != q->next_write_idx) {
-      struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
-      prepare_for_next_command(q, e_curr, e_next);
+      struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+	  if (!isPrepared) {
+		  prepare_for_next_command(q, e_curr);
+		  isr_pcnt_counter_clear(q->mapping->pcnt_unit);
+	  }
+      apply_command(q, e_curr);
+	  rp++;
+      if (rp != q->next_write_idx) {
+        struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
+		q->_nextCommandIsPrepared = true;
+        prepare_for_next_command(q, e_next);
+      }
+      return;
     }
-    q->read_idx = rp;
-  } else {
-    // no more commands: stop timer at period end
-    init_stop(q);
   }
+  // no more commands: stop timer at period end
+  init_stop(q);
 }
 
 static void IRAM_ATTR pcnt_isr_service(void *arg) {
@@ -394,9 +401,9 @@ void StepperQueue::commandAddedToQueue(bool start) {
   pcnt_counter_clear(pcnt_unit);
 
   _hasISRactive = true;
+  _nextCommandIsPrepared = false;
   struct queue_entry *e = &entry[read_idx & QUEUE_LEN_MASK];
   apply_command(this, e);
-  read_idx++;
 
   if (start) {
     mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
@@ -418,10 +425,8 @@ void StepperQueue::forceStop() {
 }
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
-uint16_t StepperQueue::_getRemainingPulses() {
-  pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
-  return PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim -
-         PCNT.cnt_unit[pcnt_unit].cnt_val;
+uint16_t StepperQueue::_getPerformedPulses() {
+  return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
 }
 
 uint32_t sig_idx[8] = {PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,

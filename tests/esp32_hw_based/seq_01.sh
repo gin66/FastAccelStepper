@@ -2,21 +2,31 @@
 
 DEV="-d /dev/ttyUSB0 -b 115200"
 
-CMD="M1 H25000 A10000 f w1000 X R1000 "
-PASS=">> M1: @1000"
+CMD="M1 p7,0,0 H25000 A10000 f w1000 X pc R1000 "
+PASS=">> M1: @1000 \\[1000\\]"
 
-grabserial $DEV -c 'r ' -e 1
+LOG="$0.log"
 
-grabserial $DEV -c "$CMD" -q "$PASS" -e 3 -o seq_01.log
+grabserial $DEV -c 'reset ' -q "M1:" -e 10
+sleep 2
+
+grabserial $DEV -c "$CMD" -q "$PASS" -e 3 -o $LOG
 echo
 
-if [ `grep -c "$PASS" seq_01.log` -eq 1 ]
+#if [ `gawk -f seq_02.awk $LOG | grep -c PASS` -ne 1 ]
+#then
+#	grabserial $DEV -c 'r ' -q StepperDemo -e 1
+#	echo
+#	echo FAIL $0 pulse counter mismatch
+#	exit 1
+#fi
+if [ `grep -c "$PASS" $LOG` -eq 1 ]
 then
 	echo PASS
 else
 	grabserial $DEV -c 'r ' -q StepperDemo -e 1
 	echo
-	echo FAIL
+	echo "FAIL $0 result pattern: $PASS"
 	exit 1
 fi
 

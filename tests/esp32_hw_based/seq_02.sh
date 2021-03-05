@@ -6,18 +6,25 @@ PASS=">> M1: @30000 \\[30000\\]"
 
 LOG="$0.log"
 
-grabserial $DEV -c 'r ' -e 1
+grabserial $DEV -c 'reset ' -q "M1:" -e 10
+sleep 2
 
 grabserial $DEV -c "$CMD" -q "$PASS" -e 3 -o $LOG
 echo
 
-if [ `gawk -f seq_02.awk $LOG | grep -c PASS` -eq 1 ]
+if [ `gawk -f seq_02.awk $LOG | grep -c PASS` -ne 1 ]
+then
+	grabserial $DEV -c 'r ' -q StepperDemo -e 1
+	echo
+	echo FAIL $0 pulse counter mismatch
+	exit 1
+fi
+if [ `grep -c "$PASS" $LOG` -eq 1 ]
 then
 	echo PASS
 else
 	grabserial $DEV -c 'r ' -q StepperDemo -e 1
 	echo
-	echo FAIL
+	echo "FAIL $0 result pattern: $PASS"
 	exit 1
 fi
-

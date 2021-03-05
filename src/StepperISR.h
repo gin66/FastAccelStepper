@@ -92,6 +92,7 @@ class StepperQueue {
   volatile uint32_t* _dirPinPort;
   uint32_t _dirPinMask;
   volatile bool _hasISRactive;
+  bool _nextCommandIsPrepared;
   bool isRunning();
   const struct mapping_s* mapping;
 #elif defined(ARDUINO_ARCH_AVR)
@@ -198,7 +199,7 @@ class StepperQueue {
 #if defined(ARDUINO_ARCH_ESP32)
     // pulse counter should go max up to 255 with perhaps few pulses overrun, so
     // this conversion is safe
-    int16_t rem_p = (int16_t)_getRemainingPulses();
+    int16_t done_p = (int16_t)_getPerformedPulses();
 #endif
     interrupts();
 #if defined(ARDUINO_ARCH_ESP32)
@@ -210,12 +211,12 @@ class StepperQueue {
       if (e->countUp) {
         pos -= e->steps;
 #if defined(ARDUINO_ARCH_ESP32)
-        adjust = e->toggle_dir ? rem_p : -rem_p;
+        adjust = e->toggle_dir ? -done_p : done_p;
 #endif
       } else {
         pos += e->steps;
 #if defined(ARDUINO_ARCH_ESP32)
-        adjust = e->toggle_dir ? -rem_p : rem_p;
+        adjust = e->toggle_dir ? done_p : -done_p;
 #endif
       }
     }
@@ -302,6 +303,7 @@ class StepperQueue {
     _prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
+	_nextCommandIsPrepared = false;
 #else
     _isRunning = false;
 #endif
@@ -311,7 +313,7 @@ class StepperQueue {
   }
 #if defined(ARDUINO_ARCH_ESP32)
   uint8_t _step_pin;
-  uint16_t _getRemainingPulses();
+  uint16_t _getPerformedPulses();
 #endif
   void connect();
   void disconnect();
