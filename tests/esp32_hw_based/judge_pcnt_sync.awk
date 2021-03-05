@@ -6,7 +6,16 @@ BEGIN {
 	print
 	api = substr($2,2)
 	pcnt = substr($3,2,length($3)-2)
+	if (pcnt < 0) {
+		if (api > 0) {
+			while (pcnt < 0) {
+				pcnt += 65536
+			}
+		}
+	}
+	api = api % 65536
 	if ((api-pcnt > 1) || (pcnt-api > 1)) {
+		print api, pcnt
 		pass = 0
 		print "FAIL HERE ^^^"
 	}

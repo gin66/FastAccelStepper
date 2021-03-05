@@ -13,7 +13,7 @@ sleep 2
 grabserial $DEV -c "$CMD" -q "$PASS" -e 3 -o $LOG
 echo
 
-#if [ `gawk -f seq_02.awk $LOG | grep -c PASS` -ne 1 ]
+#if [ `gawk -f judge_pcnt_sync.awk $LOG | grep -c PASS` -ne 1 ]
 #then
 #	grabserial $DEV -c 'r ' -q StepperDemo -e 1
 #	echo
