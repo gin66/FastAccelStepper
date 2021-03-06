@@ -105,23 +105,39 @@ class RampGenerator {
   int8_t setSpeedInUs(uint32_t min_step_us);
   uint32_t getSpeedInUs() { return speed_in_ticks / (TICKS_PER_S / 1000000); }
   uint32_t getSpeedInTicks() { return speed_in_ticks; }
+  uint32_t divForMilliHz(uint32_t f) {
+	  uint32_t base = (uint32_t)250 * TICKS_PER_S;
+	  uint32_t res = base/f;
+	  base -= res * f;
+	  base <<= 2;
+	  res <<= 2;
+	  base += f/2; // add rounding
+	  res += base/f;
+	  return res;
+  }
+  uint32_t divForHz(uint32_t f) {
+	  uint32_t base = TICKS_PER_S;
+	  base += f/2; // add rounding
+	  uint32_t res = base/f;
+	  return res;
+  }
   uint32_t getSpeedInMilliHz() { 
 	  if (speed_in_ticks == 0) {
 		  return 0;
 	  }
-	  return ((uint32_t)250 * TICKS_PER_S)/speed_in_ticks * 4;
+	  return divForMilliHz(speed_in_ticks);
   }
   int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
     if (speed_mhz <= (1000LL * TICKS_PER_S / 0xffffffff + 1)) {
       return -1;
     }
-    return setSpeedInTicks(250UL * TICKS_PER_S / speed_mhz * 4);
+    return setSpeedInTicks(divForMilliHz(speed_mhz));
   }
   int8_t setSpeedInHz(uint32_t speed_hz) {
     if (speed_hz == 0) {
       return -1;
     }
-    return setSpeedInTicks(TICKS_PER_S / speed_hz);
+    return setSpeedInTicks(divForHz(speed_hz));
   }
   int8_t setAcceleration(int32_t accel);
   uint32_t getAcceleration() { return acceleration; }

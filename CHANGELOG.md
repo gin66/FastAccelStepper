@@ -1,5 +1,6 @@
 pre-0.23.1:
 - get actual speed from queue if current and next command has at least one step
+- improve accuracy for setSpeedInHz() and setSpeedInMilliHz() and use rounding in addition (issue #56)
 
 0.23.0:
 - getRampState(): Add two flags for current direction
