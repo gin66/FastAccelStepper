@@ -1,3 +1,6 @@
+pre-0.23.1:
+- get actual speed from queue if current and next command has at least one step
+
 0.23.0:
 - getRampState(): Add two flags for current direction
 - add function: getCurrentAcceleration()

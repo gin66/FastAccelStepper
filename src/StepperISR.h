@@ -79,6 +79,7 @@ struct queue_entry {
   uint8_t toggle_dir : 1;
   uint8_t countUp : 1;
   uint8_t moreThanOneStep : 1;
+  uint8_t hasSteps : 1;
   uint16_t ticks;
 };
 class StepperQueue {
@@ -170,6 +171,7 @@ class StepperQueue {
     e->toggle_dir = toggle_dir;
     e->countUp = cmd->count_up ? 1 : 0;
     e->moreThanOneStep = steps > 1 ? 1 : 0;
+    e->hasSteps = steps > 0 ? 1 : 0;
     e->ticks = period;
     queue_end.dir = dir;
     queue_end.count_up = cmd->count_up;
@@ -280,9 +282,16 @@ class StepperQueue {
       return 0;
     }
     struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
-    if (e->moreThanOneStep) {
-      return e->ticks;
-    }
+	if (e->hasSteps) {
+		if (e->moreThanOneStep) {
+		  return e->ticks;
+		}
+		if (wp != ++rp) {
+			if (entry[rp & QUEUE_LEN_MASK].hasSteps) {
+				return e->ticks;
+			}
+		}
+	}
     return 0;
   }
 
