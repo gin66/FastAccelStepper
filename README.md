@@ -267,6 +267,23 @@ The library is tested with different kind of tests:
 
   These are unstructured tests with listening to the motor and observing the behavior
 
+## TEST SEQUENCES from StepperDemo
+
+Short info, what the test sequences, embedded in StepperDemo in the test mode, do:
+
+- 01 - Run the stepper like a clock for one minute
+- 02 - Run the stepper towards positive position and back to zero repeatedly
+- 03/04 - same like 02, both different speed/acceleration
+- 05 - Perform 800 times a single step and then 800 steps back in one command
+- 06 - Run 32000 steps with speed changes every 100ms in order to reproduce issue #24
+
+All those tests have no internal test passed/failed criteria. Those are used for automated tests with `./tests/simavr_based` and `./tests/esp32_hw_based`. The test pass criteria are: They should run smoothly without hiccups and return to start position.
+
+- 07 - measures timing of several moveByAcceleration(). Should stop at position zero. (should be started from position 0).
+- 08 - is an endless running test to check on esp32, if the generated pulses are successfully counted by a second pulse counter. The moves should be all executed in one second with alternating direction and varying speed/acceleration
+- 09 - is an endless running test with starting a ramp with random speed/acceleration/direction, which after 1s is stopped with forceStopAndNewPosition(). It contains no internal test criteria, but looking at the log, the match of generated and sent pulses can be checked. And the needed steps for a forceStopAndNewPosition() can be derived out of this
+- 10 - runs the stepper forward and every 200 ms changes speed with increasing positive speed deltas and then decreasing negative speed deltas.
+
 ## CHANGELOG
 
 See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
@@ -295,6 +312,7 @@ This feature of StepperDemo allows to compare non-smooth running stepper in an a
 * Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
 * In one setup, operating A4988 without microsteps has led to erratic behaviour at some specific low speed (erratic means step forward/backward, while DIR is kept low). No issue with 16 microstep. These two youtube videos show similar behavior: [hard disc stepper](https://youtu.be/DsYgw3GFHZo) and [axes movement](https://youtu.be/Nw18B81Ylhk)
 * The pulse counters in esp32 have several comparators to trigger interrupts. What the documentation does not mention: All those reference values are only forwarded to the actual comparator on pulse counter reset. Thus the pulse counters cannot be used as lower 16bit of the position, unfortunately.
+* The issue #60 was raised due to wrong position on negative moves with esp32. Apparently the issue was with proper ground and/or power lines to the stepper driver. If similar issue is encountered, please check on this issue
 
 ## 3rd party videos in action
 
