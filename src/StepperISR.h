@@ -282,16 +282,16 @@ class StepperQueue {
       return 0;
     }
     struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
-	if (e->hasSteps) {
-		if (e->moreThanOneStep) {
-		  return e->ticks;
-		}
-		if (wp != ++rp) {
-			if (entry[rp & QUEUE_LEN_MASK].hasSteps) {
-				return e->ticks;
-			}
-		}
-	}
+    if (e->hasSteps) {
+      if (e->moreThanOneStep) {
+        return e->ticks;
+      }
+      if (wp != ++rp) {
+        if (entry[rp & QUEUE_LEN_MASK].hasSteps) {
+          return e->ticks;
+        }
+      }
+    }
     return 0;
   }
 
@@ -312,7 +312,7 @@ class StepperQueue {
     _prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
-	_nextCommandIsPrepared = false;
+    _nextCommandIsPrepared = false;
 #else
     _isRunning = false;
 #endif

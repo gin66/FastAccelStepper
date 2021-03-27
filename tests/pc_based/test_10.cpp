@@ -60,7 +60,8 @@ class FastAccelStepperTest {
         s.fill_queue();  // ensure queue is not empty
       }
       if (accel_decreased && (s.getCurrentPosition() >= 37000)) {
-        test((s.rampState() & RAMP_STATE_MASK) != RAMP_STATE_COAST, "Coasting is wrong state here");
+        test((s.rampState() & RAMP_STATE_MASK) != RAMP_STATE_COAST,
+             "Coasting is wrong state here");
         break;
       }
       if (true) {

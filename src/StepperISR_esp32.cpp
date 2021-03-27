@@ -80,16 +80,15 @@ static struct mapping_s queue2mapping[NUM_QUEUES] = {
     },
 };
 
-static void IRAM_ATTR
-prepare_for_next_command(StepperQueue *queue,
-                         const struct queue_entry *e_next) {
-    uint8_t next_steps = e_next->steps;
-    if (next_steps > 0) {
-      const struct mapping_s *mapping = queue->mapping;
-      pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
-      // is updated only on zero
-      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = next_steps;
-    }
+static void IRAM_ATTR prepare_for_next_command(
+    StepperQueue *queue, const struct queue_entry *e_next) {
+  uint8_t next_steps = e_next->steps;
+  if (next_steps > 0) {
+    const struct mapping_s *mapping = queue->mapping;
+    pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
+    // is updated only on zero
+    PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = next_steps;
+  }
 }
 
 #define isr_pcnt_counter_clear(pcnt_unit)             \
@@ -191,20 +190,20 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
   bool isPrepared = q->_nextCommandIsPrepared;
   q->_nextCommandIsPrepared = false;
   uint8_t rp = q->read_idx;
-  if (rp != q->next_write_idx) { 
-	rp++;
-	q->read_idx = rp;
+  if (rp != q->next_write_idx) {
+    rp++;
+    q->read_idx = rp;
     if (rp != q->next_write_idx) {
       struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
-	  if (!isPrepared) {
-		  prepare_for_next_command(q, e_curr);
-		  isr_pcnt_counter_clear(q->mapping->pcnt_unit);
-	  }
+      if (!isPrepared) {
+        prepare_for_next_command(q, e_curr);
+        isr_pcnt_counter_clear(q->mapping->pcnt_unit);
+      }
       apply_command(q, e_curr);
-	  rp++;
+      rp++;
       if (rp != q->next_write_idx) {
         struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
-		q->_nextCommandIsPrepared = true;
+        q->_nextCommandIsPrepared = true;
         prepare_for_next_command(q, e_next);
       }
       return;

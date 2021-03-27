@@ -23,6 +23,7 @@ BEGIN {
 /^>> M1:/ {
 	print
 	api = substr($3,2)
+	api = api % 65536
 	pcnt = substr($4,2,length($4)-2)
 	if (api != pcnt) {
 		pass = 0

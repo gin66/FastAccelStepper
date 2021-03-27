@@ -1,6 +1,7 @@
-pre-0.23.1:
+0.23.1:
 - get actual speed from queue if current and next command has at least one step
 - improve accuracy for setSpeedInHz() and setSpeedInMilliHz() and use rounding in addition (issue #56)
+- Fix issue #67: If the speed changes are below the minimum speed after one step, then the speed will not change
 
 0.23.0:
 - getRampState(): Add two flags for current direction

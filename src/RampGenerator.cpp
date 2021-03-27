@@ -390,12 +390,16 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       uint32_t rs;
-      if (performed_ramp_up_steps <= planning_steps) {
-        rs = planning_steps;
+      if (performed_ramp_up_steps == 0) {
+        d_ticks_new = ramp->config.min_travel_ticks;
       } else {
-        rs = performed_ramp_up_steps - planning_steps;
+        if (performed_ramp_up_steps <= planning_steps) {
+          rs = planning_steps;
+        } else {
+          rs = performed_ramp_up_steps - planning_steps;
+        }
+        d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
       }
-      d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
 #ifdef TEST
       printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
 #endif

@@ -9,7 +9,7 @@
 #include <esp_task_wdt.h>
 #endif
 
-#define VERSION "post-d75a612"
+#define VERSION "post-fba57d5"
 
 struct stepper_config_s {
   uint8_t step;
@@ -507,16 +507,15 @@ void info(FastAccelStepper *s, bool long_info) {
     Serial.print(" QueueEnd=");
     Serial.print(s->getPositionAfterCommandsCompleted());
     if (speed_in_milli_hz) {
-		Serial.print(" v=");
-		Serial.print(s->getCurrentSpeedInMilliHz());
-		Serial.print("mSteps/s");
-    }
-    else {
-		Serial.print('/');
-		Serial.print(s->getPeriodInUsAfterCommandsCompleted());
-		Serial.print("us/");
-		Serial.print(s->getPeriodInTicksAfterCommandsCompleted());
-		Serial.print("ticks");
+      Serial.print(" v=");
+      Serial.print(s->getCurrentSpeedInMilliHz());
+      Serial.print("mSteps/s");
+    } else {
+      Serial.print('/');
+      Serial.print(s->getPeriodInUsAfterCommandsCompleted());
+      Serial.print("us/");
+      Serial.print(s->getPeriodInTicksAfterCommandsCompleted());
+      Serial.print("ticks");
     }
     if (s->isRampGeneratorActive()) {
       switch (s->rampState() & RAMP_STATE_MASK) {
@@ -549,12 +548,11 @@ void info(FastAccelStepper *s, bool long_info) {
       Serial.print(" Acceleration [Steps/s^2]=");
       Serial.print(s->getAcceleration());
       if (speed_in_milli_hz) {
-		  Serial.print(" Speed [mStep/s]=");
-		Serial.print(s->getSpeedInMilliHz());
-      }
-      else {
-		  Serial.print(" Speed [us/step]=");
-		  Serial.print(s->getSpeedInUs());
+        Serial.print(" Speed [mStep/s]=");
+        Serial.print(s->getSpeedInMilliHz());
+      } else {
+        Serial.print(" Speed [us/step]=");
+        Serial.print(s->getSpeedInUs());
       }
     }
   }
@@ -773,12 +771,12 @@ void loop() {
       else if (strcmp(out_buffer, "r") == 0) {
         Serial.println("ESP restart");
         ESP.restart();
-      }
-      else if (strcmp(out_buffer, "reset") == 0) {
+      } else if (strcmp(out_buffer, "reset") == 0) {
         Serial.println("ESP reset");
-		esp_task_wdt_init(1,true);
-		esp_task_wdt_add(NULL);
-		while(true);
+        esp_task_wdt_init(1, true);
+        esp_task_wdt_add(NULL);
+        while (true)
+          ;
       }
 #endif
 #if defined(ARDUINO_ARCH_AVR)
@@ -813,7 +811,7 @@ void loop() {
               output_msg(MSG_ERROR_INVALID_VALUE);
             }
           } else if (sscanf(out_buffer, "V%lu", &val) == 1) {
-			speed_in_milli_hz = false;
+            speed_in_milli_hz = false;
             output_msg(MSG_SET_SPEED_TO_US);
             Serial.println(val);
             int8_t res = stepper_selected->setSpeedInUs(val);
@@ -821,7 +819,7 @@ void loop() {
               output_msg(MSG_ERROR_INVALID_VALUE);
             }
           } else if (sscanf(out_buffer, "H%lu", &val) == 1) {
-			speed_in_milli_hz = true;
+            speed_in_milli_hz = true;
             output_msg(MSG_SET_SPEED_TO_HZ);
             Serial.println(val);
             int8_t res = stepper_selected->setSpeedInHz(val);
