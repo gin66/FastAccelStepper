@@ -30,3 +30,8 @@ Tests;
 
 - test_10
   test case for V30 a17164 w2000 a-1000
+
+- test 11
+  test case for M1 A1000 V10000 f w300 V100000 U
+  This is stuck in state RED.
+  Revised test: M1 A1000 V10000 P100 w300 V100000 U

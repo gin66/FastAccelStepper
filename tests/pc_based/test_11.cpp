@@ -30,7 +30,7 @@ class FastAccelStepperTest {
     fas_queue[1].next_write_idx = 0;
   }
 
-  void reduce_acceleration() {
+  void reduce_speed() {
     puts("Test test_speed_decrease");
     init_queue();
     FastAccelStepper s = FastAccelStepper();
@@ -38,29 +38,30 @@ class FastAccelStepperTest {
     RampChecker rc = RampChecker();
     assert(0 == s.getCurrentPosition());
 
-    int32_t steps = 100000;
+    int32_t steps = 100;
 
-    // Increase speed to 400, then further to 300
-    // Identified bug was a fast jump to 300 without acceleration
+    // M1 A1000 V10000 P100 w300 V100000 U
     assert(s.isQueueEmpty());
-    s.setSpeedInUs(30);
+    s.setAcceleration(1000);
+    s.setSpeedInUs(10000);
     s.fill_queue();
     assert(s.isQueueEmpty());
-    s.moveByAcceleration(17164);
+    s.moveTo(100);
     s.fill_queue();
     assert(!s.isQueueEmpty());
     float old_planned_time_in_buffer = 0;
-    int accel_decreased = false;
+    int speed_decreased = false;
     uint32_t count_state_dec = 0;
     for (int i = 0; i < steps * 10; i++) {
-      if (!accel_decreased && (s.getCurrentPosition() >= 35000)) {
-        puts("Change acceleration");
-        accel_decreased = true;
-        s.moveByAcceleration(-1000);
+      if (!speed_decreased && (s.getCurrentPosition() >= 35)) {
+        puts("Change speed");
+        speed_decreased = true;
+        s.setSpeedInUs(100000);
+        s.applySpeedAcceleration();
         s.fill_queue();  // ensure queue is not empty
       }
-      if (accel_decreased && (s.getCurrentPosition() >= 37000)) {
-        test((s.rampState() & RAMP_STATE_MASK) != RAMP_STATE_COAST, "Coasting is wrong state here");
+      if (speed_decreased && (s.getCurrentPosition() >= 90)) {
+        test((s.rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST, "Coasting is required state here");
         break;
       }
       if (true) {
@@ -100,7 +101,7 @@ class FastAccelStepperTest {
 
 int main() {
   FastAccelStepperTest test;
-  test.reduce_acceleration();
-  printf("TEST_10 PASSED\n");
+  test.reduce_speed();
+  printf("TEST_11 PASSED\n");
   return 0;
 }
