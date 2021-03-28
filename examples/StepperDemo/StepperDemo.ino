@@ -9,7 +9,7 @@
 #include <esp_task_wdt.h>
 #endif
 
-#define VERSION "post-fba57d5"
+#define VERSION "post-c58d3f7"
 
 struct stepper_config_s {
   uint8_t step;
@@ -1080,7 +1080,7 @@ void loop() {
         } else {
           output_msg(MSG_PASS_STATUS);
         }
-		output_msg(MSG_TEST_COMPLETED);
+        output_msg(MSG_TEST_COMPLETED);
       } else {
         uint32_t now = millis();
         if (now - last_time >= 100) {

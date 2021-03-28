@@ -1,3 +1,8 @@
+0.23.2:
+- StepperDemo extended:
+	- add test sequence 11 for issue #68
+- Fix issue #68: getCurrentPosition() could be off by one command's step amount
+
 0.23.1:
 - get actual speed from queue if current and next command has at least one step
 - improve accuracy for setSpeedInHz() and setSpeedInMilliHz() and use rounding in addition (issue #56)

@@ -257,6 +257,8 @@ class FastAccelStepper {
   // The call addQueueEntry(NULL, true) just starts the queue. This is intended
   // to achieve a near synchronous start of several steppers. Consequently it
   // should be called with interrupts disabled and return very fast.
+  // Actually this is necessary, too, in case the queue is full and not
+  // started.
   int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start = true);
 
   // Return codes for addQueueEntry
