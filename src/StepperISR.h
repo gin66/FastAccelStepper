@@ -81,6 +81,11 @@ struct queue_entry {
   uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
   uint16_t ticks;
+#if defined(ARDUINO_ARCH_AVR)
+  uint16_t end_pos_last16;
+#else
+  uint16_t start_pos_last16;
+#endif
 };
 class StepperQueue {
  public:
@@ -155,7 +160,6 @@ class StepperQueue {
 
     uint8_t wp = next_write_idx;
     struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
-    queue_end.pos += cmd->count_up ? steps : -steps;
     bool dir = (cmd->count_up == dirHighCountsUp);
     bool toggle_dir = false;
     if (dirPin != PIN_UNDEFINED) {
@@ -164,7 +168,7 @@ class StepperQueue {
         digitalWrite(dirPin, dir);
         queue_end.dir = dir;
       } else {
-        toggle_dir = (dir != queue_end.dir) ? true : false;
+        toggle_dir = (dir != queue_end.dir);
       }
     }
     e->steps = steps;
@@ -173,6 +177,13 @@ class StepperQueue {
     e->moreThanOneStep = steps > 1 ? 1 : 0;
     e->hasSteps = steps > 0 ? 1 : 0;
     e->ticks = period;
+#if defined(ARDUINO_ARCH_AVR)
+    queue_end.pos += cmd->count_up ? steps : -steps;
+	e->end_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
+#else
+	e->start_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
+    queue_end.pos += cmd->count_up ? steps : -steps;
+#endif
     queue_end.dir = dir;
     queue_end.count_up = cmd->count_up;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
@@ -193,11 +204,20 @@ class StepperQueue {
     commandAddedToQueue(start);
     return AQE_OK;
   }
+
+
   int32_t getCurrentPosition() {
     noInterrupts();
-    int32_t pos = queue_end.pos;
-    uint8_t wp = next_write_idx;
+    uint32_t pos = (uint32_t)queue_end.pos;
     uint8_t rp = read_idx;
+    bool is_empty = (rp == next_write_idx);
+  struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+#if defined(ARDUINO_ARCH_AVR)
+  uint16_t pos_last16 = e->end_pos_last16;
+#else
+  uint16_t pos_last16 = e->start_pos_last16;
+#endif
+  uint8_t steps = e->steps;
 #if defined(ARDUINO_ARCH_ESP32)
     // pulse counter should go max up to 255 with perhaps few pulses overrun, so
     // this conversion is safe
@@ -205,28 +225,70 @@ class StepperQueue {
 #endif
     interrupts();
 #if defined(ARDUINO_ARCH_ESP32)
-    int16_t adjust = 0;
+	if (done_p == 0) {
+		// fix for possible race condition described in issue #68
+		noInterrupts();
+		rp = read_idx;
+		is_empty = (rp == next_write_idx);
+  e = &entry[rp & QUEUE_LEN_MASK];
+  pos_last16 = e->start_pos_last16;
+  steps = e->steps;
+		done_p = (int16_t)_getPerformedPulses();
+		interrupts();
+	}
 #endif
-    while (rp != wp) {
-      wp--;
-      struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
+	if (!is_empty) {
+    int16_t adjust = 0;
+
+  uint16_t pos16 = pos & 0xffff;
+  uint8_t transition = ((pos16 >> 12) & 0x0c) | (pos_last16 >> 14);
+  switch(transition) {
+	  case 0: // 00 00
+	  case 5: // 01 01
+	  case 10:// 10 10
+	  case 15:// 11 11
+		  break;
+	  case 1: // 00 01
+	  case 6: // 01 10
+	  case 11:// 10 11
+	  case 12:// 11 00
+  	      pos += 0x4000;
+		  break;
+	  case 4: // 01 00
+	  case 9: // 10 01
+	  case 14:// 11 10
+	  case 3: // 00 11
+	      pos -= 0x4000;
+		  break;
+	  case 2: // 00 10
+	  case 7: // 01 11
+	  case 8: // 10 00
+	  case 13:// 11 01
+		  break; // TODO: ERROR
+  }
+  pos = (int32_t)((pos & 0xffff0000) | pos_last16);
+
+  if (steps != 0) {
       if (e->countUp) {
-        pos -= e->steps;
-#if defined(ARDUINO_ARCH_ESP32)
-        adjust = e->toggle_dir ? -done_p : done_p;
+#if defined(ARDUINO_ARCH_AVR)
+	   adjust = -steps;
+#elif defined(ARDUINO_ARCH_ESP32)
+        adjust = done_p;
 #endif
       } else {
-        pos += e->steps;
-#if defined(ARDUINO_ARCH_ESP32)
-        adjust = e->toggle_dir ? done_p : -done_p;
+#if defined(ARDUINO_ARCH_AVR)
+	   adjust = steps;
+#elif defined(ARDUINO_ARCH_ESP32)
+        adjust = -done_p;
 #endif
       }
-    }
-#if defined(ARDUINO_ARCH_ESP32)
-    pos += adjust;
-#endif
+      pos += adjust;
+	}
+	}
     return pos;
   }
+
+
   uint32_t ticksInQueue() {
     noInterrupts();
     uint8_t rp = read_idx;
