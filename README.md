@@ -283,7 +283,7 @@ All those tests have no internal test passed/failed criteria. Those are used for
 - 08 - is an endless running test to check on esp32, if the generated pulses are successfully counted by a second pulse counter. The moves should be all executed in one second with alternating direction and varying speed/acceleration
 - 09 - is an endless running test with starting a ramp with random speed/acceleration/direction, which after 1s is stopped with forceStopAndNewPosition(). It contains no internal test criteria, but looking at the log, the match of generated and sent pulses can be checked. And the needed steps for a forceStopAndNewPosition() can be derived out of this
 - 10 - runs the stepper forward and every 200 ms changes speed with increasing positive speed deltas and then decreasing negative speed deltas.
-- 11 - runs the stepper to position 1000000 and back to 0. This tests, if getCurrentPosition() is counting monotoneous up or down respectively.
+- 11 - runs the stepper to position 1000000 and back to 0. This tests, if getCurrentPosition() is counting monotonously up or down respectively.
 
 ## CHANGELOG
 
