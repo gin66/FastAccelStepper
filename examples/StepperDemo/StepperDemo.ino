@@ -298,7 +298,9 @@ const static char messages[] PROGMEM =
 #define MSG_SET_SPEED_TO_HZ 52
     "Set speed (steps/s) to |"
 #define MSG_PASS_STATUS 53
-    "Test passed\n|";
+    "Test passed\n|"
+#define MSG_TEST_COMPLETED 54
+    "Test completed\n|";
 
 void output_msg(int8_t i) {
   char ch;
@@ -617,7 +619,7 @@ const static char test_usage_str[] PROGMEM =
     "     I         ... Toggle motor info, while test sequence is running\n"
     "     01        ... select test sequence 01 for selected stepper\n"
     "     :\n"
-    "     10        ... select test sequence 10 for selected stepper\n"
+    "     11        ... select test sequence 11 for selected stepper\n"
 #ifdef SIM_TEST_INPUT
     "     W         ... Blocking wait until test is finished\n"
 #endif
@@ -1018,6 +1020,11 @@ void loop() {
             Serial.println(out_buffer);
             test_seq[selected].test = test_seq_10;
             test_seq[selected].state = 0;
+          } else if (strcmp(out_buffer, "11") == 0) {
+            output_msg(MSG_SELECT_TEST_SEQUENCE);
+            Serial.println(out_buffer);
+            test_seq[selected].test = test_seq_11;
+            test_seq[selected].state = 0;
           }
         }
       }
@@ -1060,7 +1067,6 @@ void loop() {
       if (finished) {
         test_ongoing = false;
         bool test_failed = false;
-        Serial.println("finished");
         stepper_info();
         for (uint8_t i = 0; i < MAX_STEPPER; i++) {
           struct test_seq_s *s = &test_seq[i];
@@ -1074,6 +1080,7 @@ void loop() {
         } else {
           output_msg(MSG_PASS_STATUS);
         }
+		output_msg(MSG_TEST_COMPLETED);
       } else {
         uint32_t now = millis();
         if (now - last_time >= 100) {

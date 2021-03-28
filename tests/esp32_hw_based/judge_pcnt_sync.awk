@@ -25,7 +25,11 @@ BEGIN {
 	api = substr($3,2)
 	api = api % 65536
 	pcnt = substr($4,2,length($4)-2)
+	if (pcnt < 0) {
+	    pcnt += 65536
+	}
 	if (api != pcnt) {
+		print api, pcnt
 		pass = 0
 		print "FAIL HERE ^^^"
 	}

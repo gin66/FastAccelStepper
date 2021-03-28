@@ -6,7 +6,7 @@ test:
 	./seq_03.sh
 
 compile:
-	(cd ../../pio_dirs/StepperDemo; pio run -e esp32 -t upload)
+	(cd ../../pio_dirs/StepperDemo;rm -fR .pio; pio run -e esp32 -t upload)
 
 clean:
 	rm seq*.log
