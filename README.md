@@ -3,11 +3,9 @@
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg)
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver)
-
-
-BUILD EXAMPLES is BROKEN, BECAUSE THERE IS A BUG IN THE ESPRESSIF FRAMEWORK !!!
-Introduced by: `framework-arduinoespressif32 @ 3.10006.210326`
 ![Build examples](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg)
+
+ATTENTION: `framework-arduinoespressif32 @ 3.10006.210326` will lead to compile error for esp32 !!!
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560) and esp32.
 
