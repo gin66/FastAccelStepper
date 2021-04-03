@@ -213,6 +213,8 @@ A note to MIN_CMD_TICKS: The current implementation uses one interrupt per comma
 
 Compatibility with ESP32-S2 and ESP32-C3: Not supported due to lack of mcpwm modules. see [reference](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/chip-series-comparison.html) in the related data sheets. ledpwm modules cannot be used for steppers, too.
 
+Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are listed in the datasheet. So there are chances, that this lib works.
+
 ### ALL
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
