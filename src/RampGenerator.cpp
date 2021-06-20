@@ -2,6 +2,7 @@
 
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
+#include "PoorManMinMax.h"
 
 #ifdef TEST
 #include <assert.h>
