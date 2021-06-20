@@ -1,11 +1,9 @@
-# FastAccelStepper 
- 
+# FastAccelStepper
+
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg)
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver)
 ![Build examples](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg)
-
-ATTENTION: `framework-arduinoespressif32 @ 3.10006.210326` will lead to compile error for esp32 !!!
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560) and esp32.
 
@@ -47,8 +45,8 @@ General behaviour:
 * The desired end position is in case of moveTo() given as absolute position
 * For move() the delta is added to the latest desired end position
 * The stepper tries to reach the given desired end position as fast as possible with adherence to acceleration/deceleration
-* If the stepper is e.g. running towards position 1000 and moveTo(0) is called at position 500, then the stepper will 
-    1. decelerate, which means it will overshoot position 500 
+* If the stepper is e.g. running towards position 1000 and moveTo(0) is called at position 500, then the stepper will
+    1. decelerate, which means it will overshoot position 500
     2. stop and accelerate towards 0
     3. eventually coast for a while and then decelerate
     4. stop
@@ -172,7 +170,7 @@ Few comments to auto enable/disable:
 
 ### AVR ATmega328
 
-The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This timer overflow interrupt is used for adjusting the speed. 
+The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This timer overflow interrupt is used for adjusting the speed.
 
 The timer compare unit toggles the step pin from Low to High precisely. The transition High to Low is done in the timer compare interrupt routine, thus the High state is only few us.
 
@@ -211,7 +209,7 @@ This stepper driver uses mcpwm modules of the esp32: for the first three stepper
 
 The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-modification.
 
-A note to MIN_CMD_TICKS: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
+A note to MIN_CMD_TICKS: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause.
 
 Compatibility with ESP32-S2 and ESP32-C3: Not supported due to lack of mcpwm modules. see [reference](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/chip-series-comparison.html) in the related data sheets. ledpwm modules cannot be used for steppers, too.
 
@@ -221,7 +219,7 @@ Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are li
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup. Sufficient exact for this purpose.
 
-The compare interrupt routines use 16bit tick counters, which translates to approx. 4ms. For longer time between pulses, pauses without step output can be added. With this approach the ramp generation supports up to one step per 268s. 
+The compare interrupt routines use 16bit tick counters, which translates to approx. 4ms. For longer time between pulses, pauses without step output can be added. With this approach the ramp generation supports up to one step per 268s.
 
 The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed (beware of any Serial.print in your hot path).
 
