@@ -329,6 +329,7 @@ Found on youtube:
 * [high speed Closed Loop nema 34 12nm stepper motor, esp32 FastAccelStepper, SBH860H driver](https://www.youtube.com/watch?v=hPxJekex5zM)
 * [Neck mechanism](https://www.youtube.com/watch?v=rY7NDBnz7Cw)
 * [Stepper motor at 1500RPM with ESP32 and A4988](https://www.youtube.com/watch?v=sQqezEsiuUU)
+* [DIY 3 AXIS CAMERA SLIDER | MOTORIZED CAMERA SLIDER](https://youtu.be/7TkybpSQULk)
 
 ## Contribution
 
