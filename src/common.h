@@ -21,7 +21,6 @@ struct queue_end_s {
 #elif defined(ARDUINO_ARCH_ESP32)
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
-#endif
 #elif defined(ARDUINO_ARCH_AVR)
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
