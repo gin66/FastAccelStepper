@@ -15,12 +15,18 @@ struct queue_end_s {
   bool dir;
 };
 
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(TEST)
+#define fasEnableInterrupts()
+#define fasDisableInterrupts()
+#elif defined(ARDUINO_ARCH_ESP32)
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
 #endif
-#if defined(ARDUINO_ARCH_AVR)
+#elif defined(ARDUINO_ARCH_AVR)
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
+#else
+#error "Unsupported derivate"
 #endif
-#endif
+
+#endif /* COMMON_H */
