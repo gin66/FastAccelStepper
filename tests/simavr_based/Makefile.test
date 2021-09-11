@@ -88,7 +88,7 @@ result.txt: x.vcd
 	cat expect.txt
 
 x.vcd:	$(SRC) ../run_avr platformio.ini
-	~/.platformio/penv/bin/pio run -e $(DUT)
+	~/.platformio/penv/bin/pio run -e $(DUT) || ~/.local/bin/pio run -e $(DUT)
 	../run_avr $(FIRMWARE) -m $(DEVICE) -o x.vcd $(TRACES)
 
 clean:

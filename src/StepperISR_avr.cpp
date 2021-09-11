@@ -201,13 +201,13 @@ AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, C)
     DisableOverflowInterrupt(T);                   \
                                                    \
     /* enable interrupts for nesting */            \
-    fasEnableInterrupts();                                  \
+    sei();                                         \
                                                    \
     /* manage steppers */                          \
     fas_engine->manageSteppers();                  \
                                                    \
     /* disable interrupts for exist ISR routine */ \
-    fasDisableInterrupts();                                \
+    cli();                                         \
                                                    \
     /* enable OVF interrupt again */               \
     EnableOverflowInterrupt(T);                    \
