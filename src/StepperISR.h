@@ -120,10 +120,10 @@ class StepperQueue {
 
   void init(uint8_t queue_num, uint8_t step_pin);
   inline uint8_t queueEntries() {
-    noInterrupts();
+    fasDisableInterrupts();
     uint8_t rp = read_idx;
     uint8_t wp = next_write_idx;
-    interrupts();
+    fasEnableInterrupts();
     inject_fill_interrupt(0);
     return (uint8_t)(wp - rp);
   }
@@ -206,7 +206,7 @@ class StepperQueue {
   }
 
   int32_t getCurrentPosition() {
-    noInterrupts();
+    fasDisableInterrupts();
     uint32_t pos = (uint32_t)queue_end.pos;
     uint8_t rp = read_idx;
     bool is_empty = (rp == next_write_idx);
@@ -222,18 +222,18 @@ class StepperQueue {
     // this conversion is safe
     int16_t done_p = (int16_t)_getPerformedPulses();
 #endif
-    interrupts();
+    fasEnableInterrupts();
 #if defined(ARDUINO_ARCH_ESP32)
     if (done_p == 0) {
       // fix for possible race condition described in issue #68
-      noInterrupts();
+      fasDisableInterrupts();
       rp = read_idx;
       is_empty = (rp == next_write_idx);
       e = &entry[rp & QUEUE_LEN_MASK];
       pos_last16 = e->start_pos_last16;
       steps = e->steps;
       done_p = (int16_t)_getPerformedPulses();
-      interrupts();
+      fasEnableInterrupts();
     }
 #endif
     if (!is_empty) {
@@ -288,10 +288,10 @@ class StepperQueue {
   }
 
   uint32_t ticksInQueue() {
-    noInterrupts();
+    fasDisableInterrupts();
     uint8_t rp = read_idx;
     uint8_t wp = next_write_idx;
-    interrupts();
+    fasEnableInterrupts();
     if (wp == rp) {
       return 0;
     }
@@ -310,10 +310,10 @@ class StepperQueue {
     return ticks;
   }
   bool hasTicksInQueue(uint32_t min_ticks) {
-    noInterrupts();
+    fasDisableInterrupts();
     uint8_t rp = read_idx;
     uint8_t wp = next_write_idx;
-    interrupts();
+    fasEnableInterrupts();
     if (wp == rp) {
       return false;
     }
@@ -334,10 +334,10 @@ class StepperQueue {
   uint16_t getActualTicks() {
     // Retrieve current step rate from the current view.
     // This is valid only, if the command describes more than one step
-    noInterrupts();
+    fasDisableInterrupts();
     uint8_t rp = read_idx;
     uint8_t wp = next_write_idx;
-    interrupts();
+    fasEnableInterrupts();
     if (wp == rp) {
       return 0;
     }

@@ -201,13 +201,13 @@ AVR_STEPPER_ISR_GEN(FAS_TIMER_MODULE, C)
     DisableOverflowInterrupt(T);                   \
                                                    \
     /* enable interrupts for nesting */            \
-    interrupts();                                  \
+    fasEnableInterrupts();                                  \
                                                    \
     /* manage steppers */                          \
     fas_engine->manageSteppers();                  \
                                                    \
     /* disable interrupts for exist ISR routine */ \
-    noInterrupts();                                \
+    fasDisableInterrupts();                                \
                                                    \
     /* enable OVF interrupt again */               \
     EnableOverflowInterrupt(T);                    \
@@ -246,13 +246,13 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
 
 void StepperQueue::commandAddedToQueue(bool start) {
   // Check if this is the first command and advance write pointer
-  noInterrupts();
+  fasDisableInterrupts();
   bool first = (next_write_idx++ == read_idx);
   if (_isRunning) {
-    interrupts();
+    fasEnableInterrupts();
     return;
   }
-  interrupts();
+  fasEnableInterrupts();
 
   // If it is not the first command in the queue, then just return
   // Otherwise just prepare, what is possible for start (set direction pin)

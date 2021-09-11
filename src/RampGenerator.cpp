@@ -93,9 +93,9 @@ int8_t RampGenerator::setAcceleration(int32_t accel) {
   return 0;
 }
 void RampGenerator::applySpeedAcceleration() {
-  noInterrupts();
+  fasDisableInterrupts();
   _ro.config = _config;
-  interrupts();
+  fasEnableInterrupts();
 }
 int8_t RampGenerator::startRun(bool countUp) {
   if (_config.min_travel_ticks == 0) {
@@ -111,14 +111,14 @@ int8_t RampGenerator::startRun(bool countUp) {
                                .keep_running = true,
                                .keep_running_count_up = countUp};
 
-  noInterrupts();
+  fasDisableInterrupts();
   if (_rw.ramp_state == RAMP_STATE_IDLE) {
     _rw.ramp_state = RAMP_STATE_ACCELERATE;
     _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
     _rw.performed_ramp_up_steps = 0;
   }
   _ro = new_ramp;
-  interrupts();
+  fasEnableInterrupts();
   return MOVE_OK;
 }
 
@@ -136,7 +136,7 @@ int8_t RampGenerator::_startMove(int32_t target_pos, int32_t curr_target_pos) {
                                .keep_running = false,
                                .keep_running_count_up = true};
 
-  noInterrupts();
+  fasDisableInterrupts();
   if ((_rw.ramp_state == RAMP_STATE_IDLE) && (target_pos != curr_target_pos)) {
     // Only start the ramp generator, if the target position is different
     _rw.ramp_state = RAMP_STATE_ACCELERATE;
@@ -144,7 +144,7 @@ int8_t RampGenerator::_startMove(int32_t target_pos, int32_t curr_target_pos) {
     _rw.performed_ramp_up_steps = 0;
   }
   _ro = new_ramp;
-  interrupts();
+  fasEnableInterrupts();
 
 #ifdef TEST
   printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
@@ -570,10 +570,10 @@ void RampGenerator::afterCommandEnqueued(NextCommand *command) {
 }
 void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
                                    NextCommand *command) {
-  noInterrupts();
+  fasDisableInterrupts();
   // copy consistent ramp state
   struct ramp_ro_s ramp = _ro;
-  interrupts();
+  fasEnableInterrupts();
 
   return _getNextCommand(&ramp, &_rw, queue_end, command);
 }

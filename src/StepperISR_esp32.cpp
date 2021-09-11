@@ -375,13 +375,13 @@ void StepperQueue::commandAddedToQueue(bool start) {
   // The time used by this command can have an impact
   digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
 #endif
-  noInterrupts();
+  fasDisableInterrupts();
   bool first = (next_write_idx++ == read_idx);
   if (_hasISRactive) {
-    interrupts();
+    fasEnableInterrupts();
     return;
   }
-  interrupts();
+  fasEnableInterrupts();
 
   // If it is not the first command in the queue, then just return
   // Otherwise just prepare, what is possible for start (set direction pin)

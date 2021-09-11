@@ -167,7 +167,7 @@ void FastAccelStepperEngine::manageSteppers() {
         uint8_t high_active_pin = s->getEnablePinHighActive();
         uint8_t low_active_pin = s->getEnablePinLowActive();
 
-        // noInterrupts(); // TODO
+        // fasDisableInterrupts(); // TODO
         bool agree = true;
         for (uint8_t j = 0; j < _next_stepper_num; j++) {
           if (i != j) {
@@ -196,7 +196,7 @@ void FastAccelStepperEngine::manageSteppers() {
             }
           }
         }
-        // interrupts();
+        // fasEnableInterrupts();
       }
     }
   }
@@ -205,10 +205,10 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-      noInterrupts();
+      fasDisableInterrupts();
       // update the counters down to 1
       s->updateAutoDisable();
-      interrupts();
+      fasEnableInterrupts();
     }
   }
 }
@@ -252,9 +252,9 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
 
   int res = AQE_OK;
   if (_autoEnable) {
-    noInterrupts();
+    fasDisableInterrupts();
     uint16_t delay_counter = _auto_disable_delay_counter;
-    interrupts();
+    fasEnableInterrupts();
     if (delay_counter == 0) {
       // outputs are disabled
       if (!enableOutputs()) {
@@ -285,9 +285,9 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
   res = q->addQueueEntry(cmd, start);
   if (_autoEnable) {
     if (res == AQE_OK) {
-      noInterrupts();
+      fasDisableInterrupts();
       _auto_disable_delay_counter = _off_delay_count;
-      interrupts();
+      fasEnableInterrupts();
     }
   }
 
@@ -397,39 +397,39 @@ void FastAccelStepper::fill_queue() {
 
 void FastAccelStepper::updateAutoDisable() {
   // FastAccelStepperEngine will call with interrupts disabled
-  // noInterrupts();
+  // fasDisableInterrupts();
   if (_auto_disable_delay_counter > 1) {
     if (!isRunning()) {
       _auto_disable_delay_counter--;
     }
   }
-  // interrupts();
+  // fasEnableInterrupts();
 }
 
 bool FastAccelStepper::agreeWithAutoDisable() {
   bool agree = true;
   // FastAccelStepperEngine will call with interrupts disabled
-  // noInterrupts();
+  // fasDisableInterrupts();
   if (isRunning()) {
     agree = false;
   }
   if (_auto_disable_delay_counter > 1) {
     agree = false;
   }
-  // interrupts();
+  // fasEnableInterrupts();
   return agree;
 }
 
 bool FastAccelStepper::needAutoDisable() {
   bool need_disable = false;
   // FastAccelStepperEngine will call with interrupts disabled
-  // noInterrupts();
+  // fasDisableInterrupts();
   if (_auto_disable_delay_counter == 1) {
     if (!isRunning()) {
       need_disable = true;
     }
   }
-  // interrupts();
+  // fasEnableInterrupts();
   return need_disable;
 }
 
@@ -678,17 +678,17 @@ int32_t FastAccelStepper::getCurrentSpeedInMilliHz() {
 }
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
-  noInterrupts();
+  fasDisableInterrupts();
   fas_queue[_queue_num].queue_end.pos += delta;
   _rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
-  interrupts();
+  fasEnableInterrupts();
 }
 void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
-  noInterrupts();
+  fasDisableInterrupts();
   int32_t delta = new_pos - fas_queue[_queue_num].queue_end.pos;
   fas_queue[_queue_num].queue_end.pos = new_pos;
   _rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
-  interrupts();
+  fasEnableInterrupts();
 }
 bool FastAccelStepper::isQueueFull() {
   return fas_queue[_queue_num].isQueueFull();

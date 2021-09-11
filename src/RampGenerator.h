@@ -160,15 +160,15 @@ class RampGenerator {
                       NextCommand *cmd_out);
   void afterCommandEnqueued(NextCommand *cmd_in);
   uint32_t getCurrentPeriodInTicks() {
-    noInterrupts();
+    fasDisableInterrupts();
     uint32_t ticks = _rw.curr_ticks;
-    interrupts();
+    fasEnableInterrupts();
     return ticks;
   }
   uint32_t getCurrentPeriodInUs() {
-    noInterrupts();
+    fasDisableInterrupts();
     uint32_t ticks = _rw.curr_ticks;
-    interrupts();
+    fasEnableInterrupts();
     return TICKS_TO_US(ticks);
   }
 

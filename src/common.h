@@ -14,4 +14,13 @@ struct queue_end_s {
   bool count_up;
   bool dir;
 };
+
+#if defined(ARDUINO_ARCH_ESP32)
+#define fasEnableInterrupts interrupts
+#define fasDisableInterrupts noInterrupts
+#endif
+#if defined(ARDUINO_ARCH_AVR)
+#define fasEnableInterrupts interrupts
+#define fasDisableInterrupts noInterrupts
+#endif
 #endif
