@@ -248,6 +248,12 @@ cd pio_dirs/StepperDemo
 pio run -e avr --target upload --upload-port /dev/ttyUSB0
 ```
 
+## ESP-IDF
+
+A `CMakeLists.txt` is provided to use it as an ESP-IDF component. Tested ESP-IDF component integration on PlatformIO Espressif32 Platform v3.3.0.
+
+For any questions/support please contact [gagank1](https://github.com/gagank1), as I do not use esp-idf
+
 ## TEST STRATEGY
 
 The library is tested with different kind of tests:
@@ -334,3 +340,5 @@ Found on youtube:
 ## Contribution
 
 - Thanks ixil for pull request (https://github.com/gin66/FastAccelStepper/pull/19) for ATmega2560
+- Thanks gagank1 for esp-idf integration by adding CMakeLists.txt (https://github.com/gin66/FastAccelStepper/pull/81)
+

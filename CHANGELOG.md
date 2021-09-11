@@ -1,3 +1,6 @@
+pre-0.23.3:
+- Add CMakeLists.txt for ESP-IDF (https://github.com/gin66/FastAccelStepper/pull/81)
+
 0.23.2:
 - StepperDemo extended:
 	- add test sequence 11 for issue #68
