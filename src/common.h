@@ -22,8 +22,11 @@ struct queue_end_s {
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
 #elif defined(ARDUINO_ARCH_AVR)
-#define fasEnableInterrupts interrupts
-#define fasDisableInterrupts noInterrupts
+#define fasEnableInterrupts() \
+	uint8_t prevSREG = SREG; \
+	cli()
+#define fasDisableInterrupts() \
+	SREG = prevSREG
 #else
 #error "Unsupported derivate"
 #endif
