@@ -1,5 +1,6 @@
 pre-0.23.3:
 - Add CMakeLists.txt for ESP-IDF (https://github.com/gin66/FastAccelStepper/pull/81)
+- avr: use reentrant version for disable/enable interrupts [Issue #75](https://github.com/gin66/FastAccelStepper/issues/75)
 
 0.23.2:
 - StepperDemo extended:
