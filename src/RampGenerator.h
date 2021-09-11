@@ -179,4 +179,7 @@ class RampGenerator {
   upm_float upm_timer_freq_div_500;
 #endif
 };
+
+#define fas_abs(x) ((x) >= 0 ? (x) : (-x))
+
 #endif

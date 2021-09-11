@@ -250,7 +250,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     } else {
       need_count_up = delta > 0;
     }
-    remaining_steps = abs(delta);
+    remaining_steps = fas_abs(delta);
   }
 
   // If not moving, then use requested direction
@@ -466,7 +466,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t steps = planning_steps;
-  steps = min(steps, abs(remaining_steps));  // This could be problematic
+  steps = min(steps, fas_abs(remaining_steps));  // This could be problematic
   steps = max(steps, 1);
   steps = min(255, steps);
 
