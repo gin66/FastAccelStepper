@@ -261,17 +261,32 @@ bool perform_test() {
   test(x1 == UPM_CONST_2000, "const 2000");
   x1 = upm_from((uint32_t)32000);
   test(x1 == UPM_CONST_32000, "const 32000");
+  x1 = upm_from((uint32_t)42000);
+  test(x1 == UPM_CONST_42000, "const 42000");
   x1 = upm_from((uint32_t)16000000);
   test(x1 == UPM_CONST_16E6, "const 16E6");
+  x1 = upm_from((uint32_t)21000000);
+  test(x1 == UPM_CONST_21E6, "const 21E6");
   x1 = upm_from((uint32_t)128000000);
   x1 = upm_multiply(x1, UPM_CONST_1000);
   x1 = upm_multiply(x1, UPM_CONST_1000);
   xprintf("const 128e12=0x%x\n", x1);
   test(x1 == UPM_CONST_128E12, "const 128E12");
+  x1 = upm_from((uint32_t)221000000);
+  x1 = upm_multiply(x1, UPM_CONST_1000);
+  x1 = upm_multiply(x1, UPM_CONST_1000);
+  xprintf("const 2205e11=0x%x\n", x1);
+  xprintf("const 2205e11=0x%x\n", UPM_CONST_2205E11);
+  test(x1 == UPM_CONST_2205E11, "const 2205E11");
   x1 = UPM_CONST_16E6;
   x1 = upm_multiply(x1, upm_rsqrt(upm_from((uint16_t)2)));
   xprintf("const 16e6/sqrt(2)=0x%x\n", x1);
   test(x1 == UPM_CONST_16E6_DIV_SQRT_OF_2, "const 16E6/sqrt(2)");
+  x1 = UPM_CONST_21E6;
+  x1 = upm_multiply(x1, upm_rsqrt(upm_from((uint16_t)2)));
+  xprintf("const 21e6/sqrt(2)=0x%x\n", x1);
+  xprintf("%d\n", upm_to_u32(UPM_CONST_21E6_DIV_SQRT_OF_2));
+  test(x1 == UPM_CONST_21E6_DIV_SQRT_OF_2, "const 21E6/sqrt(2)");
 
   return (error_cnt == 0);
 }
