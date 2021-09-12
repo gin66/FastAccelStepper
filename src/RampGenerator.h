@@ -14,9 +14,9 @@
 #elif defined(ARDUINO_ARCH_ESP32)
 #define MAX_STEPPER 6
 #define TICKS_PER_S 16000000L
-#else
+#elif defined (ARDUINO_ARCH_SAM)
 #define MAX_STEPPER 6
-#define TICKS_PER_S 16000000L
+#define TICKS_PER_S 21000000L
 #endif
 
 #include "common.h"
@@ -30,6 +30,13 @@ class FastAccelStepper;
 #define UPM_ACCEL_FACTOR UPM_CONST_128E12
 #define US_TO_TICKS(u32) (u32 * 16)
 #define TICKS_TO_US(u32) (u32 / 16)
+#elif (TICKS_PER_S == 21000000L)
+#define UPM_TICKS_PER_S UPM_CONST_21E6
+#define UPM_TICKS_PER_S_DIV_500 UPM_CONST_42000
+#define UPM_TICKS_PER_S_DIV_SQRT_OF_2 UPM_CONST_21E6_DIV_SQRT_OF_2
+#define UPM_ACCEL_FACTOR UPM_CONST_2205E11
+#define US_TO_TICKS(u32) (u32 * 21)
+#define TICKS_TO_US(u32) (u32 / 21)
 #else
 #define UPM_TICKS_PER_S upm_timer_freq
 #define UPM_TICKS_PER_S_DIV_500 upm_timer_freq_div_500

@@ -1,6 +1,7 @@
 #ifndef FASTACCELSTEPPER_H
 #define FASTACCELSTEPPER_H
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
+    defined(ARDUINO_ARCH_SAM)
 #include <Arduino.h>
 #else
 #include <math.h>
