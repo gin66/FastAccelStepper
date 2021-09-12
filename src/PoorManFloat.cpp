@@ -40,6 +40,42 @@
 // treated separately, that's why this table has only 255 entries The table is
 // generated with this one liner
 //		[round(512.0/math.sqrt(i/256))-256 for i in range(257,512)
+//
+// I want to expound on the original comment, and include an example to make
+// this less tedious for someone else.  You probably need to go lookup/refresh
+// your memory on floating point formats to make this make sense.  In this
+// format we will use an 8 bit exponent, and 8 bits of the data type as
+// the mantissa, but as the diagram above shows, the first bit will always be 1
+// So lets walk through an example.  For the Due, I needed the PWM clock in
+// this format, so 21,000,000.
+// First off, remember that floating point wants the entire number in the range
+// of the mantissa, so we right shift the value until it is within the range of
+// 256-511.  So for 21,000,000, thats 21000000 >> 16 = 0x140.  Remember that the
+// leading one is hidden.  so the low byte is 0x40.  You'd be wrong to assume
+// the exponent is simply 16.  again, in floating point, we want the mantissa
+// to be treated as less than 1, so we shift past the bits.  This means we want
+// it to look like 0.0x140, or 0.101000000.  Thats what mantissa means.  So, to
+// get the correct value for the exponent, we need the exponent that makes this
+// (as close to) the original value as we can get, that is 20,971,520 or
+// 0001 0100 0000 0000 0000 0000 0000.  So again, we need to shift past our
+// number, all the way to the above, so 0.101000000 << 25 is what we want.  Or
+// 0x19, (remember we had 16 shifts, but 9 bits of mantissa including the
+// hidden bit 16+9=25).  Now, we get a bit tricky.  We know the hidden bit is
+// always there, so we don't include it in our exponent!  Thus, our exponent
+// becomes 0x18 or 24.  So the almost final value is 0x1840, but we forgot
+// about the sign bit.  We need to or 0x80 to the exponent to get the sign bit
+// making for a final value of 0x9840 as seen in PoorManFloat.h.  To reverse
+// this, we take our value of the mantissa enter it in calculator.  We take
+// the exponent and subtract 8 from it.  Enter the mantissa with the added 1
+// into a "programmer calculator", 0x140 and use the LSH operator to do 0x140
+// << 16, and you should get 20,971,520.  There, now there's no need to be
+// afraid of making new constants for the system to use different clock rates!
+// I had to do this for the Due because the PWM clock could be divisions of 2
+// off the main system clock of 84MHz.  I'd need a 5.25 divider to get 16 MHz.
+// Thats not an even number, so even with the arbitrary clock divider, the best
+// I could have managed was 16.8 MHz.  Easier to just use the modulo 4 divider
+// and add the constants.
+
 const PROGMEM uint8_t rsqrt_exp_even[255] = {
     255, 254, 253, 252, 251, 250, 249, 248, 247, 247, 246, 245, 244, 243, 242,
     241, 240, 239, 238, 237, 236, 236, 235, 234, 233, 232, 231, 230, 230, 229,

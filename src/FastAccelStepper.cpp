@@ -34,10 +34,14 @@ FastAccelStepperEngine* fas_engine = NULL;
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
                                              FastAccelStepper()};
 #endif
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined (ARDUINO_ARCH_SAM)
 FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper()};
+#endif
+#if defined (ARDUINO_ARCH_SAM)
+//We also need access to the engine for the timer task, so we will mimic the AVR code here...
+FastAccelStepperEngine* fas_engine=NULL;
 #endif
 #if defined(TEST)
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
@@ -64,10 +68,10 @@ void StepperTask(void* parameter) {
 #endif
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
-#if (TICKS_PER_S != 16000000L)
+#if (TICKS_PER_S != 16000000L)  && (TICKS_PER_S != 21000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) || defined (ARDUINO_ARCH_SAM)
   fas_engine = this;
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
@@ -123,7 +127,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   uint8_t stepper_num = _next_stepper_num;
   _next_stepper_num++;
 
-#if defined(ARDUINO_ARCH_AVR) || defined(ESP32) || defined(TEST)
+#if defined(ARDUINO_ARCH_AVR) || defined(ESP32) || defined(TEST) || defined (ARDUINO_ARCH_SAM)
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
@@ -527,6 +531,9 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   uint16_t delay_count = 0;
 #if defined(ARDUINO_ARCH_ESP32)
   delay_count = delay_ms / TASK_DELAY_4MS;
+#endif
+#if defined (ARDUINO_ARCH_SAM)
+  delay_count = delay_ms / (1000 / TICKS_PER_S);
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   delay_count = delay_ms / (65536000 / TICKS_PER_S);

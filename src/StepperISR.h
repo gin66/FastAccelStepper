@@ -1,4 +1,5 @@
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
+    defined(ARDUINO_ARCH_SAM)
 #include <Arduino.h>
 #else
 #include <assert.h>
@@ -33,6 +34,9 @@ enum channels { channelA, channelB, channelC };
 #error "Unsupported derivate"
 #endif
 #elif defined(ARDUINO_ARCH_ESP32)
+#define NUM_QUEUES 6
+#define QUEUE_LEN 32
+#elif defined(ARDUINO_ARCH_SAM)
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 #else
@@ -73,7 +77,14 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
 void _esp32_clearPulseCounter(uint8_t pcnt_unit);
 int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
 #endif
-
+#if defined(ARDUINO_ARCH_SAM)
+typedef struct _PWMCHANNELMAPPING {
+  uint8_t pin;
+  uint32_t channel;
+  Pio* port;
+  uint32_t channelMask;
+} PWMCHANNELMAPPING;
+#endif
 struct queue_entry {
   uint8_t steps;  // if 0,  then the command only adds a delay
   uint8_t toggle_dir : 1;
@@ -90,8 +101,8 @@ struct queue_entry {
 class StepperQueue {
  public:
   struct queue_entry entry[QUEUE_LEN];
-  uint8_t read_idx;  // ISR stops if readptr == next_writeptr
-  uint8_t next_write_idx;
+  volatile uint8_t read_idx;  // ISR stops if readptr == next_writeptr
+  volatile uint8_t next_write_idx;
   bool dirHighCountsUp;
   uint8_t dirPin;
 #if defined(ARDUINO_ARCH_ESP32)
@@ -108,6 +119,19 @@ class StepperQueue {
   volatile bool _isRunning;
   bool isRunning() { return _isRunning; }
   enum channels channel;
+#elif defined(ARDUINO_ARCH_SAM)
+  volatile uint32_t* _dirPinPort;
+  uint32_t _dirPinMask;
+  volatile bool _hasISRactive;
+  bool isRunning();
+  const PWMCHANNELMAPPING* mapping;
+  bool _connected;
+  volatile bool _skipNextPWMInterrupt;
+  volatile bool _skipNextPIOInterrupt;
+  volatile bool _pauseCommanded;
+  volatile bool _runOnce;
+  volatile uint32_t timePWMInterruptEnabled;
+
 #else
   volatile bool _isRunning;
   bool isRunning() { return _isRunning; }
@@ -166,6 +190,10 @@ class StepperQueue {
       if (isQueueEmpty()) {
         // set the dirPin here. Necessary with shared direction pins
         digitalWrite(dirPin, dir);
+#ifdef ARDUINO_ARCH_SAM
+        delayMicroseconds(30);  // Make sure the driver has enough time to see
+                                // the dir pin change
+#endif
         queue_end.dir = dir;
       } else {
         toggle_dir = (dir != queue_end.dir);
@@ -269,13 +297,13 @@ class StepperQueue {
 
       if (steps != 0) {
         if (e->countUp) {
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
           adjust = -steps;
 #elif defined(ARDUINO_ARCH_ESP32)
           adjust = done_p;
 #endif
         } else {
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
           adjust = steps;
 #elif defined(ARDUINO_ARCH_ESP32)
           adjust = -done_p;
@@ -373,6 +401,17 @@ class StepperQueue {
 #elif defined(ARDUINO_ARCH_ESP32)
     _hasISRactive = false;
     _nextCommandIsPrepared = false;
+#elif defined(ARDUINO_ARCH_SAM)
+    _hasISRactive = false;
+    // we cannot clear the PWM interrupt when switching to a pause, but we'll
+    // get a double interrupt if we do nothing.  So this tells us that on a
+    // transition from a pulse to a pause to skip the next interrupt.
+    _skipNextPWMInterrupt = false;
+    _skipNextPIOInterrupt = false;
+    _pauseCommanded = false;
+    _runOnce = false;
+    timePWMInterruptEnabled = 0;
+
 #else
     _isRunning = false;
 #endif
@@ -384,12 +423,17 @@ class StepperQueue {
   uint8_t _step_pin;
   uint16_t _getPerformedPulses();
 #endif
+#if defined(ARDUINO_ARCH_SAM)
+  uint8_t _step_pin;
+  uint8_t _queue_num;
+#endif
   void connect();
   void disconnect();
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
+    defined(ARDUINO_ARCH_SAM)
     if (dir_pin != PIN_UNDEFINED) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);
