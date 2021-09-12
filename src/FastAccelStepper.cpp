@@ -20,6 +20,8 @@ static uint16_t fas_debug_led_cnt = 0;
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
 #elif defined(ARDUINO_ARCH_ESP32)
 #define DEBUG_LED_HALF_PERIOD 50
+#elif defined(ARDUINO_ARCH_SAM)
+#define DEBUG_LED_HALF_PERIOD 50
 #else
 #define DEBUG_LED_HALF_PERIOD 50
 #define LOW 0
@@ -533,7 +535,7 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   delay_count = delay_ms / TASK_DELAY_4MS;
 #endif
 #if defined (ARDUINO_ARCH_SAM)
-  delay_count = delay_ms / (1000 / TICKS_PER_S);
+  delay_count = delay_ms; // have understood, the cyclic task is run with 1ms timer
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   delay_count = delay_ms / (65536000 / TICKS_PER_S);

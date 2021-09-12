@@ -162,7 +162,7 @@ void PWM_Handler(void) {
   // again or switch to outputting steps).  Pretty easy :)
 
   uint32_t sr = PWM_INTERFACE->PWM_ISR1;
-  uint32_t sr2 = PWM_INTERFACE->PWM_ISR2;
+  //uint32_t sr2 = PWM_INTERFACE->PWM_ISR2;
   uint8_t leading_zeros;
   sr = sr & 0xFF;  // Ignore the faults, they will screw this up, and we
                    // shouldn't be getting faults...
@@ -191,7 +191,7 @@ void PWM_Handler(void) {
     uint32_t timeElapsed = micros() - q->timePWMInterruptEnabled;
     if (t < q->timePWMInterruptEnabled)  // Timer wrapped...
     {
-      timeElapsed == 0xFFFFFFFF - q->timePWMInterruptEnabled;
+      timeElapsed = 0xFFFFFFFF - q->timePWMInterruptEnabled;
       timeElapsed += t;
     }
     if (timeElapsed < 100) {

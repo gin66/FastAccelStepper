@@ -16,6 +16,7 @@ then
 	python3 get-platformio.py
 
 	pio platform install "atmelavr"
+	pio platform install "atmelsam"
 	pio platform install "espressif32@3.1.1"
 fi
 
@@ -47,7 +48,7 @@ cd ../../..
 set -e
 for i in pio_dirs/*
 do
-	for p in avr atmega2560 esp32
+	for p in avr atmega2560 esp32 atmelsam
 	do
 		echo $p: $i
 		(cd $i;pio run -s -e $p)
