@@ -181,24 +181,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 // Please adapt to your configuration
 const uint8_t led_pin = PIN_UNDEFINED;
 const struct stepper_config_s stepper_config[MAX_STEPPER] = {
-    // Test-HW
-    // Position 01 linked to atmega nano
-    // 2: Enable Left Pin 13 GPIO13   , DIR Right Pin 7 GPIO18,    Step Right
-    // Pin 13 GPIO15
-    // 3: Enable Left Pin 12 GPIO12   , DIR Right Pin 6 GPIO19,    Step Right
-    // Pin 12 GPIO2  blue LED
-    // 4: Enable Left Pin 11 GPIO14   , DIR Right Pin 5 GPIO21,    Step Right
-    // Pin 11 GPIO4
-    // 5: Enable Left Pin 10 GPIO27   , DIR Right Pin 4 GPIO3 RX0, Step Right
-    // Pin 10 GPIO16 RX2
-    // 6: Enable Left Pin 9  GPIO26 A9, DIR Right Pin 3 GPIO1 TX0, Step Right
-    // Pin 9  GPIO17 TX2
-    // 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right
-    // Pin 8  GPIO5
-    //                          ALL Enable: Right Pin 1 GPIO23
-    // Left Pin 15: +5V
     {
-      // position 01.234567 => 2
       step : 17,
       enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
@@ -210,7 +193,6 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 1000
     },
     {
-      // position 01.234567 => 3
       step : 15,
       enable_low_active : 13,
       enable_high_active : PIN_UNDEFINED,
@@ -221,7 +203,6 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 1000
     },
     {
-      // position 01.234567 => 4, step is linked to blue LED
       step : 2,
       enable_low_active : 12,
       enable_high_active : PIN_UNDEFINED,
@@ -232,7 +213,6 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 1000
     },
     {
-      // position 01.234567 => 5
       step : 5,
       enable_low_active : 25,
       enable_high_active : PIN_UNDEFINED,
@@ -243,7 +223,6 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     },
     {
-      // position 01.234567 => 6
       step : 16,
       enable_low_active : 27,
       enable_high_active : PIN_UNDEFINED,
@@ -255,7 +234,6 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     },
     {
-      // position 01.234567 => 7
       step : 4,
       enable_low_active : 14,
       enable_high_active : PIN_UNDEFINED,
