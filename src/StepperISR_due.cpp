@@ -1,7 +1,7 @@
 #include "StepperISR.h"
-#ifndef ARDUINO_ARCH_SAM
-#define ARDUINO_ARCH_SAM
-#endif
+//#ifndef ARDUINO_ARCH_SAM
+//#define ARDUINO_ARCH_SAM
+//#endif
 //#define KEEP_SCORE
 #if defined(ARDUINO_ARCH_SAM)
 const bool enabled = false;
@@ -446,6 +446,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mapping = &gChannelMap[queue_num];
   _initVars();
   _step_pin = step_pin;
+  channelsUsed[pinToChannel(step_pin)] = true;
+  numChannels++;
 #if defined(KEEP_SCORE)
   totalPulsesDetected[queue_num] = 0;
   totalSteps[queue_num] = 0;
@@ -617,10 +619,10 @@ void StepperQueue::commandAddedToQueue(bool start) {
     *_dirPinPort ^= _dirPinMask;
     delayMicroseconds(30);
   }
+  noInterrupts();
+  bool first = (next_write_idx++ == read_idx);
+  interrupts();
   if (start) {
-    noInterrupts();
-    bool first = (next_write_idx++ == read_idx);
-    interrupts();
     if (!first) {
       if (e->steps > 0 || e->hasSteps) {
         if (!_hasISRactive) {
@@ -661,7 +663,22 @@ void StepperQueue::commandAddedToQueue(bool start) {
   }
 }
 
-int8_t StepperQueue::startPreparedQueue() { return AQE_OK; }
+int8_t StepperQueue::startPreparedQueue() 
+{ 
+  if (next_write_idx == read_idx) {
+    return AQE_ERROR_EMPTY_QUEUE_TO_START;
+  }
+
+  uint32_t rp=read_idx;
+  struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+  _hasISRactive = true;
+  _runOnce = false;
+  _skipNextPWMInterrupt = false;
+  PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
+  attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask, true);
+
+  return AQE_OK;
+}
 
 void StepperQueue::forceStop() {
   noInterrupts();
@@ -673,8 +690,6 @@ void StepperQueue::forceStop() {
 bool StepperQueue::isValidStepPin(uint8_t step_pin) {
   if (pinToChannel(step_pin) < 0x08) {
     if (!channelsUsed[pinToChannel(step_pin)]) {
-      channelsUsed[pinToChannel(step_pin)] = true;
-      numChannels++;
       return true;
     }
   }
@@ -682,9 +697,7 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 }
 
 bool StepperQueue::isRunning() {
-  if (_hasISRactive) {
-    return true;
-  }
+  return _hasISRactive;
 }
 
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
