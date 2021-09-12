@@ -7,7 +7,7 @@
 
 ATTENTION: `framework-arduinoespressif32 @ 3.10006.210326` will lead to compile error for esp32 !!!
 
-This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560) and esp32.
+This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
@@ -15,6 +15,7 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
 	- avr atmega2560: only Pin 6, 7 and 8.
       On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 5 with FAS_TIMER_MODULE setting.
 	- esp32: This can be any output capable port pin.
+    - atmel sam due: This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6
 	- Step should be done on transition Low to High. High time will be only a few us.
       On esp32 the high time is for slow speed fixed to ~2ms and high speed to 50% duty cycle
 * Direction Signal (optional)
@@ -28,7 +29,7 @@ FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
 * 2-pin operation for e.g. axis control
 * 3-pin operation to reduce power dissipation of driver/stepper
-* Lower limit of 260s per step @ 16MHz aka one step every four minute
+* Lower limit of 260s per step @ 16MHz aka one step every four minute (esp32/avr), 198s for sam due
 * fully interrupt/task driven - no periodic function to be called from application loop
 * supports acceleration and deceleration with per stepper max speed/acceleration
 * Allows the motor to continuously run in the current direction until stopMove() is called.
@@ -101,9 +102,17 @@ Comments to pin sharing:
 * supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
-The library is in use with A4988, but other driver ICs could work, too.
+### Atmel SAM Due
+
+* allows up 50000 generated steps per second
+* supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+
+Tested with max two stepper motors with 50 kHz step rate by clazarowitz
 
 ## Usage
+
+The library is in use with A4988, but other driver ICs could work, too.
 
 For the API definition please consult the header file [FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h).
 Please check the examples for application and how to use the low level interface.
@@ -151,7 +160,7 @@ Few comments to auto enable/disable:
 
 * If the motor is operated with micro stepping, then the disable/enable will cause the stepper to jump to/from the closest full step position.
 * Some drivers need time to e.g. stabilize voltages until stepping should start. For this the start on delay has been added. See [issue #5](https://github.com/gin66/FastAccelStepper/issues/5).
-* The turn off delay is realized in the cyclic task for esp32 or cyclic interrupt for avr. The esp32 task uses 4ms delay, while the avr repeats every ~4 ms at 16 MHz. Thus the turn off delay is a multiple (n>=2) of those period times and actual turning off takes place approx [(n-1)..n] * 4 ms after the last step.
+* The turn off delay is realized in the cyclic task for esp32 or cyclic interrupt for avr. The esp32 task uses 4ms delay, while the avr repeats every ~4 ms at 16 MHz and atmel sam due every 2ms at 21MHz. Thus the turn off delay is a multiple (n>=2) of those period times and actual turning off takes place approx [(n-1)..n] * 4 ms resp. 2ms after the last step.
 * The turn on delay is minimal `MIN_CMD_TICKS`.
 * More than one stepper can be connected to one auto enable pin. Behaviour is like this:
 	1. If stepper #1 needs enable, then it will enable it with its defined on delay time.
@@ -216,6 +225,10 @@ A note to MIN_CMD_TICKS: The current implementation uses one interrupt per comma
 Compatibility with ESP32-S2 and ESP32-C3: Not supported due to lack of mcpwm modules. see [reference](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/chip-series-comparison.html) in the related data sheets. ledpwm modules cannot be used for steppers, too.
 
 Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are listed in the datasheet. So there are chances, that this lib works.
+
+### Atmel SAM Due
+
+This is supported by clazarowitz
 
 ### ALL
 
@@ -341,4 +354,5 @@ Found on youtube:
 
 - Thanks ixil for pull request (https://github.com/gin66/FastAccelStepper/pull/19) for ATmega2560
 - Thanks gagank1 for esp-idf integration by adding CMakeLists.txt (https://github.com/gin66/FastAccelStepper/pull/81)
+- Thanks clazarowitz for the amazing atmel sam due port (https://github.com/gin66/FastAccelStepper/pull/82)
 

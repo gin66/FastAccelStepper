@@ -1,3 +1,6 @@
+0.23.4:
+- Add support for SAM Due (https://github.com/gin66/FastAccelStepper/pull/82)
+
 0.23.3:
 - Add CMakeLists.txt for ESP-IDF (https://github.com/gin66/FastAccelStepper/pull/81)
 - avr: use reentrant version for disable/enable interrupts [Issue #75](https://github.com/gin66/FastAccelStepper/issues/75)

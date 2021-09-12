@@ -23,6 +23,8 @@
 // the main task is freezing (StepperDemo).
 // Thus the limitation set here is set to 25kSteps/s as stated in the README.
 #define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
+#elif defined(ARDUINO_ARCH_SAM)
+#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #else
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #endif

@@ -535,7 +535,7 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   delay_count = delay_ms / TASK_DELAY_4MS;
 #endif
 #if defined (ARDUINO_ARCH_SAM)
-  delay_count = delay_ms; // have understood, the cyclic task is run with 1ms timer
+  delay_count = delay_ms / 2; // have understood, the cyclic task is run with 2ms timer
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   delay_count = delay_ms / (65536000 / TICKS_PER_S);
