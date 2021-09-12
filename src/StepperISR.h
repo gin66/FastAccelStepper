@@ -101,7 +101,7 @@ struct queue_entry {
 class StepperQueue {
  public:
   struct queue_entry entry[QUEUE_LEN];
-  #ifndef ARDUINO_ARCH_SAM
+  #ifdef ARDUINO_ARCH_SAM
   //gin66 thinks this is unnecessary, and I think I see the point and how it 
   //has been constrained to make it unnecessary.  Instinct honed on tons of
   //HPC clusters says do not trust constraints to make it unnecessary....
