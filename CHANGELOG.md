@@ -1,3 +1,7 @@
+0.23.5:
+- Add missing initialization of dir pin to be PIN_UNDEFINED.
+  With two or more steppers without dir pin, the steppers have run only sequential and not in parallel.
+
 0.23.4:
 - Add support for SAM Due (https://github.com/gin66/FastAccelStepper/pull/82)
 

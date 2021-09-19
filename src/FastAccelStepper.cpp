@@ -461,6 +461,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _auto_disable_delay_counter = 0;
   _stepPin = step_pin;
   _dirHighCountsUp = true;
+  _dirPin = PIN_UNDEFINED;
   _rg.init();
   _externalEnableCall = NULL;
 
