@@ -15,18 +15,50 @@
 #include "PoorManFloat.h"
 #include "RampGenerator.h"
 
+//
+// Timing values - Architecture dependent
+//
+// AVR
+// 	TICKS_PER_S			16_000_000
+//	MIN_DELTA_TICKS		640		[1/TICKS_PER_S seconds]
+//	MIN_CMD_TICKS		6400	[1/TICKS_PER_S seconds]
+//	MIN_DIR_DELAY_US	40		[µs]
+//	MAX_DIR_DELAY_US	4095	[µs]
+//
+// ESP32
+// 	TICKS_PER_S			16_000_000
+//	MIN_DELTA_TICKS		80		[1/TICKS_PER_S seconds]
+//	MIN_CMD_TICKS		800		[1/TICKS_PER_S seconds]
+//	MIN_DIR_DELAY_US	50		[µs]
+//	MAX_DIR_DELAY_US	4095	[µs]
+//
+// SAM DUE
+// 	TICKS_PER_S			21_000_000
+//	MIN_DELTA_TICKS		420		[1/TICKS_PER_S seconds]
+//	MIN_CMD_TICKS		4200	[1/TICKS_PER_S seconds]
+//	MIN_DIR_DELAY_US	200		[µs]
+//	MAX_DIR_DELAY_US	3120	[µs]
+
 #if defined(ARDUINO_ARCH_ESP32)
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
+#define MIN_DIR_DELAY_US (MIN_CMD_TICKS * (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #elif defined(ARDUINO_ARCH_AVR)
 // AVR:
 // tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
 // the main task is freezing (StepperDemo).
 // Thus the limitation set here is set to 25kSteps/s as stated in the README.
 #define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
+#define MIN_DIR_DELAY_US (MIN_DELTA_TICKS * (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #elif defined(ARDUINO_ARCH_SAM)
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#define MIN_DIR_DELAY_US (MIN_CMD_TICKS * (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #else
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#define MIN_DIR_DELAY_US (MIN_CMD_TICKS * (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #endif
 
 #define MIN_CMD_TICKS (10 * MIN_DELTA_TICKS)
@@ -46,8 +78,16 @@ class FastAccelStepper {
   // step pin is defined at creation. Here can retrieve the pin
   uint8_t getStepPin();
 
-  // if direction pin is connected, call this function
-  void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true);
+  // if direction pin is connected, call this function.
+  //
+  // For slow driver hardware the first step after any polarity change of the
+  // direction pin can be delayed by the value dir_change_delay_us. The allowed
+  // range is MIN_DIR_DELAY_US and MAX_DIR_DELAY_US. The special value of 0
+  // means, that no delay is added. Values 1 up to MIN_DIR_DELAY_US will be
+  // clamped to MIN_DIR_DELAY_US. Values above MAX_DIR_DELAY_US will be clamped
+  // to MAX_DIR_DELAY_US.
+  void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
+                       uint16_t dir_change_delay_us = 0);
   uint8_t getDirectionPin() { return _dirPin; }
   bool directionPinHighCountsUp() { return _dirHighCountsUp; }
 
@@ -378,6 +418,7 @@ class FastAccelStepper {
   uint8_t _enablePinHighActive;
   uint8_t _queue_num;
 
+  uint16_t _dir_change_delay_ticks;
   uint32_t _on_delay_ticks;
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;

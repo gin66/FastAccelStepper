@@ -36,14 +36,15 @@ FastAccelStepperEngine* fas_engine = NULL;
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
                                              FastAccelStepper()};
 #endif
-#if defined(ARDUINO_ARCH_ESP32) || defined (ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAM)
 FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper()};
 #endif
-#if defined (ARDUINO_ARCH_SAM)
-//We also need access to the engine for the timer task, so we will mimic the AVR code here...
-FastAccelStepperEngine* fas_engine=NULL;
+#if defined(ARDUINO_ARCH_SAM)
+// We also need access to the engine for the timer task, so we will mimic the
+// AVR code here...
+FastAccelStepperEngine* fas_engine = NULL;
 #endif
 #if defined(TEST)
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
@@ -70,10 +71,10 @@ void StepperTask(void* parameter) {
 #endif
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
-#if (TICKS_PER_S != 16000000L)  && (TICKS_PER_S != 21000000L)
+#if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
-#if defined(ARDUINO_ARCH_AVR) || defined (ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
   fas_engine = this;
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
@@ -129,7 +130,8 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   uint8_t stepper_num = _next_stepper_num;
   _next_stepper_num++;
 
-#if defined(ARDUINO_ARCH_AVR) || defined(ESP32) || defined(TEST) || defined (ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_AVR) || defined(ESP32) || defined(TEST) || \
+    defined(ARDUINO_ARCH_SAM)
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
@@ -266,7 +268,8 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
       if (!enableOutputs()) {
         return AQE_WAIT_FOR_ENABLE_PIN_ACTIVE;
       }
-      // if on delay is defined, perform first step accordingly
+      // if on delay is defined, fill queue if required amount of pauses before
+      // the first step
       if (_on_delay_ticks > 0) {
         uint32_t delay = _on_delay_ticks;
         while (delay > 0) {
@@ -285,6 +288,18 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
         if (res != AQE_OK) {
           return res;
         }
+      }
+    }
+  }
+  if (_dir_change_delay_ticks != 0) {
+    if (q->queue_end.count_up != cmd->count_up) {
+      // add pause command to delay dir pin change to first step
+      struct stepper_command_s start_cmd = {.ticks = _dir_change_delay_ticks,
+                                            .steps = 0,
+                                            .count_up = cmd->count_up};
+      res = q->addQueueEntry(&start_cmd, start);
+      if (res != AQE_OK) {
+        return res;
       }
     }
   }
@@ -456,6 +471,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 #endif
   _engine = engine;
   _autoEnable = false;
+  _dir_change_delay_ticks = 0;
   _on_delay_ticks = 0;
   _off_delay_count = 1;
   _auto_disable_delay_counter = 0;
@@ -472,7 +488,8 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 #endif
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
-void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp) {
+void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
+                                       uint16_t dir_change_delay_us) {
   _dirPin = dirPin;
   _dirHighCountsUp = dirHighCountsUp;
   if (_dirPin != PIN_UNDEFINED) {
@@ -480,6 +497,17 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp) {
     pinMode(dirPin, OUTPUT);
   }
   fas_queue[_queue_num].setDirPin(dirPin, dirHighCountsUp);
+  if (dir_change_delay_us != 0) {
+    if (dir_change_delay_us > MAX_DIR_DELAY_US) {
+      dir_change_delay_us = MAX_DIR_DELAY_US;
+    }
+    if (dir_change_delay_us < MIN_DIR_DELAY_US) {
+      dir_change_delay_us = MIN_DIR_DELAY_US;
+    }
+    _dir_change_delay_ticks = US_TO_TICKS(dir_change_delay_us);
+  } else {
+    _dir_change_delay_ticks = 0;
+  }
 }
 void FastAccelStepper::setEnablePin(uint8_t enablePin,
                                     bool low_active_enables_stepper) {
@@ -535,8 +563,9 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
 #if defined(ARDUINO_ARCH_ESP32)
   delay_count = delay_ms / TASK_DELAY_4MS;
 #endif
-#if defined (ARDUINO_ARCH_SAM)
-  delay_count = delay_ms / 2; // have understood, the cyclic task is run with 2ms timer
+#if defined(ARDUINO_ARCH_SAM)
+  delay_count =
+      delay_ms / 2;  // have understood, the cyclic task is run with 2ms timer
 #endif
 #if defined(ARDUINO_ARCH_AVR)
   delay_count = delay_ms / (65536000 / TICKS_PER_S);

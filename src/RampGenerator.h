@@ -14,7 +14,7 @@
 #elif defined(ARDUINO_ARCH_ESP32)
 #define MAX_STEPPER 6
 #define TICKS_PER_S 16000000L
-#elif defined (ARDUINO_ARCH_SAM)
+#elif defined(ARDUINO_ARCH_SAM)
 #define MAX_STEPPER 6
 #define TICKS_PER_S 21000000L
 #endif

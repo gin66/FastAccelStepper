@@ -1,3 +1,9 @@
+pre-0.24.0:
+- Implement configurable delay after direction pin change and first step in new direction
+  [Issue #83](https://github.com/gin66/FastAccelStepper/issues/83).
+  The value is set by the third parameter of setDirectionPin().
+- Add table of timing values in FastAccelStepper.h for the architectures
+
 0.23.5:
 - Add missing initialization of dir pin to be PIN_UNDEFINED.
   With two or more steppers without dir pin, the steppers have run only sequential and not in parallel.

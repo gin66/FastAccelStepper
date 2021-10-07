@@ -9,7 +9,7 @@
 #include <esp_task_wdt.h>
 #endif
 
-#define VERSION "post-c58d3f7"
+#define VERSION "post-9aba324"
 
 struct stepper_config_s {
   uint8_t step;

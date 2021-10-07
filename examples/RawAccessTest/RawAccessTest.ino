@@ -19,7 +19,7 @@ const uint8_t stepPinStepper = 17;
 const uint8_t enablePinStepper = 26;
 const uint8_t dirPinStepper = 18;
 #elif defined(ARDUINO_ARCH_SAM)
-const uint8_t stepPinStepper = 1;   // only defined to satisfy compiler
+const uint8_t stepPinStepper = 1;  // only defined to satisfy compiler
 const uint8_t enablePinStepper = 2;
 const uint8_t dirPinStepper = 3;
 #endif

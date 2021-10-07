@@ -101,16 +101,16 @@ struct queue_entry {
 class StepperQueue {
  public:
   struct queue_entry entry[QUEUE_LEN];
-  #ifdef ARDUINO_ARCH_SAM
-  //gin66 thinks this is unnecessary, and I think I see the point and how it 
-  //has been constrained to make it unnecessary.  Instinct honed on tons of
-  //HPC clusters says do not trust constraints to make it unnecessary....
+#ifdef ARDUINO_ARCH_SAM
+  // gin66 thinks this is unnecessary, and I think I see the point and how it
+  // has been constrained to make it unnecessary.  Instinct honed on tons of
+  // HPC clusters says do not trust constraints to make it unnecessary....
   //
-  //I still believe that if unnecessary, all this should do is force the single
-  //read from the variable at the top of the ISR to be from RAM, not from any
-  //caching.  It should not affect optimization in any way.  I'll test sans 
-  //volatile later, but I feel like that will require a lot of longevity 
-  //testing!  Its one of those sneaky errors that can pop up!
+  // I still believe that if unnecessary, all this should do is force the single
+  // read from the variable at the top of the ISR to be from RAM, not from any
+  // caching.  It should not affect optimization in any way.  I'll test sans
+  // volatile later, but I feel like that will require a lot of longevity
+  // testing!  Its one of those sneaky errors that can pop up!
   volatile uint8_t read_idx;  // ISR stops if readptr == next_writeptr
   volatile uint8_t next_write_idx;
 #else
