@@ -292,7 +292,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
     }
   }
   if (_dir_change_delay_ticks != 0) {
-    if (q->queue_end.count_up != cmd->count_up) {
+    if ((q->queue_end.count_up != cmd->count_up) && (cmd->steps != 0)) {
       // add pause command to delay dir pin change to first step
       struct stepper_command_s start_cmd = {.ticks = _dir_change_delay_ticks,
                                             .steps = 0,

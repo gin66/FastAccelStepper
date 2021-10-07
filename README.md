@@ -38,6 +38,7 @@ FastAccelStepper offers the following features:
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
 * Enable pins can be shared between motors
 * Direction pins can be shared between motors
+* Configurable delay between direction change and following step
 * External callback function can be used to drive the enable pins (e.g. connected to shift register)
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
@@ -241,6 +242,12 @@ The low level command queue for each stepper allows direct speed control - when 
 ## Usage for multi-axis applications
 
 For coordinated movement of two or more axis, the current ramp generation will not provide good results. The planning of steps needs to take into consideration max.speed/acceleration of all steppers and eventually the net speed/acceleration of the resulting movement together with its restrictions. Nice example of multi-axis forward planning can be found within the [marlin-project](https://github.com/MarlinFirmware/Marlin/tree/2.0.x/Marlin/src/module). If this kind of multi-dimensional planning is used, then FastAccelStepper is a good solution to execute the raw commands (without ramp generation) with near-synchronous start of involved steppers. With the tick-exact execution of commands, the synchronization will not be lost as long as the command queues are not running out of commands. And for esp32, second requirement is, that the interrupts can be serviced on time (no pulses issued with previous command's pulse period time)
+
+To keep up the synchronization of two steppers please keep in mind:
+* The stepper queue will on initial start, if configured, add pauses to the command queue to implement enable delay.
+  => Perhaps best to not use enable on delay
+* If the stepper is configured for delays for direction change, then one pause is added to the command queue for each direction change together with a step.
+  => Execute direction change together with a pause or do not configure direction change delay
 
 ## TODO
 
