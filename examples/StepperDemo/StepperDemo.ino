@@ -16,6 +16,7 @@ struct stepper_config_s {
   uint8_t enable_low_active;
   uint8_t enable_high_active;
   uint8_t direction;
+  uint16_t dir_change_delay;
   bool direction_high_count_up;
   bool auto_enable;
   uint32_t on_delay_us;
@@ -34,6 +35,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 6,
       enable_high_active : PIN_UNDEFINED,
       direction : 5,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 500000,
@@ -45,6 +47,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 8,
       enable_high_active : PIN_UNDEFINED,
       direction : 7,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -60,6 +63,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 19,
       enable_high_active : PIN_UNDEFINED,
       direction : 21,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 500000,
@@ -70,6 +74,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 18,
       enable_high_active : PIN_UNDEFINED,
       direction : 20,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -81,6 +86,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 43,
       enable_high_active : PIN_UNDEFINED,
       direction : 42,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -115,6 +121,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_high_active : PIN_UNDEFINED,
       direction : 18,  // was GPIO 1 in conflict with TXD, via wire to Dir of
                        // next stepper
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 50,
@@ -126,6 +133,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 13,
       enable_high_active : PIN_UNDEFINED,
       direction : 18,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 500,
@@ -137,6 +145,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 12,
       enable_high_active : PIN_UNDEFINED,
       direction : 19,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 500,
@@ -148,6 +157,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 25,
       enable_high_active : PIN_UNDEFINED,
       direction : 22,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -160,6 +170,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_high_active : PIN_UNDEFINED,
       direction : 21,  // was GPIO 3 in conflict with RXD, via wire to GPIO21
                        // (Dir next stepper)
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -171,6 +182,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 14,
       enable_high_active : PIN_UNDEFINED,
       direction : 21,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -187,6 +199,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_high_active : PIN_UNDEFINED,
       direction : 18,  // was GPIO 1 in conflict with TXD, via wire to Dir of
                        // next stepper
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 50,
@@ -197,6 +210,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 13,
       enable_high_active : PIN_UNDEFINED,
       direction : 18,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 500,
@@ -207,6 +221,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 12,
       enable_high_active : PIN_UNDEFINED,
       direction : 19,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 500,
@@ -217,6 +232,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 25,
       enable_high_active : PIN_UNDEFINED,
       direction : 22,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -228,6 +244,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_high_active : PIN_UNDEFINED,
       direction : 21,  // was GPIO 3 in conflict with RXD, via wire to GPIO21
                        // (Dir next stepper)
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -238,6 +255,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 14,
       enable_high_active : PIN_UNDEFINED,
       direction : 21,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
@@ -504,7 +522,7 @@ void setup() {
     if (config->step != PIN_UNDEFINED) {
       s = engine.stepperConnectToPin(config->step);
       if (s) {
-        s->setDirectionPin(config->direction, config->direction_high_count_up);
+        s->setDirectionPin(config->direction, config->direction_high_count_up, config->dir_change_delay);
         s->setEnablePin(config->enable_low_active, true);
         s->setEnablePin(config->enable_high_active, false);
         s->setAutoEnable(config->auto_enable);
