@@ -3,7 +3,7 @@ pre-0.24.0:
   [Issue #83](https://github.com/gin66/FastAccelStepper/issues/83).
   The value is set by the third parameter of setDirectionPin().
 - Add table of timing values in FastAccelStepper.h for the architectures
-- StepperDeno extended:
+- StepperDemo extended:
 	- add config mode (press c) for direction pin configuration
 
 

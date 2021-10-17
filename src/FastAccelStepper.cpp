@@ -272,6 +272,11 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
       // the first step
       if (_on_delay_ticks > 0) {
         uint32_t delay = _on_delay_ticks;
+		// this delay sets count_up appropriately. If this is shorter than
+		// dir_change_delay_ticks, then extend accordingly
+		if ((delay < _dir_change_delay_ticks) && (q->queue_end.count_up != cmd->count_up)) {
+			delay = _dir_change_delay_ticks;
+		}
         while (delay > 0) {
           uint32_t ticks = delay >> 1;
           uint16_t ticks_u16 = ticks;
