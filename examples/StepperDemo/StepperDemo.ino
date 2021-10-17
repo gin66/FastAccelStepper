@@ -388,16 +388,18 @@ const static char messages[] PROGMEM =
     "Test completed\n|"
 #define MSG_ENTER_CONFIG_MODE 55
     "Enter config mode\n|"
-#define MSG_SET_DIRECTION_PIN 56
-    "Set direction to pin |"
-#define MSG_NO_DIRECTION_PIN 57
-    "Disable direction pin\n|"
-#define MSG_DIRECTION_PIN_HIGH_COUNT_UP 58
-    "Direction pin high counts up\n|"
-#define MSG_DIRECTION_PIN_HIGH_COUNT_DOWN 59
-    "Direction pin high counts down\n|"
-#define MSG_DIRECTION_PIN_DELAY 60
-    "Direction pin delay in us = |";
+#define MSG_DIRECTION_PIN 56
+    "Direction pin |"
+#define MSG_SET_TO_PIN 57
+    "set to pin |"
+#define MSG_DISABLED 58
+    "disabled\n|"
+#define MSG_HIGH_COUNT_UP 59
+    "high counts up\n|"
+#define MSG_HIGH_COUNT_DOWN 60
+    "high counts down\n|"
+#define MSG_DELAY 61
+    "delay in us = |";
 
 void output_msg(int8_t i) {
   char ch;
@@ -878,9 +880,7 @@ void loop() {
       out_buffer[out_ptr++] = ch;
     } else if ((ch == ' ') || (ch == '\n') || (ch == '\r')) {
       long val;
-#if defined(ARDUINO_ARCH_ESP32)
       long val2, val3;
-#endif
       out_buffer[out_ptr] = 0;
       if ((strcmp(out_buffer, "M1") == 0) && stepper[0]) {
         output_msg(MSG_SELECT_STEPPER);
@@ -894,7 +894,9 @@ void loop() {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(3);
         selected = 2;
-      } else if ((strcmp(out_buffer, "M4") == 0) && stepper[3]) {
+      }
+#if !defined(ARDUINO_ARCH_AVR)
+	  else if ((strcmp(out_buffer, "M4") == 0) && stepper[3]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(4);
         selected = 3;
@@ -907,6 +909,7 @@ void loop() {
         Serial.println(6);
         selected = 5;
       }
+#endif
 #if defined(ARDUINO_ARCH_ESP32)
       else if (strcmp(out_buffer, "r") == 0) {
         Serial.println("ESP restart");
@@ -1181,31 +1184,36 @@ void loop() {
               usage();
             } else if (sscanf(out_buffer, "d%lu,%lu,%lu", &val, &val2, &val3) ==
                        3) {
-              output_msg(MSG_SET_DIRECTION_PIN);
+              output_msg(MSG_DIRECTION_PIN);
+              output_msg(MSG_SET_TO_PIN);
               Serial.println(val);
-              if (val2 == 0) {
-                output_msg(MSG_DIRECTION_PIN_HIGH_COUNT_DOWN);
+              output_msg(MSG_DIRECTION_PIN);
+              if (val2 != 0) {
+                output_msg(MSG_HIGH_COUNT_DOWN);
               } else {
-                output_msg(MSG_DIRECTION_PIN_HIGH_COUNT_UP);
+                output_msg(MSG_HIGH_COUNT_UP);
               }
-              output_msg(MSG_DIRECTION_PIN_DELAY);
+              output_msg(MSG_DELAY);
               Serial.println(val3);
               stepper_selected->setDirectionPin(val, val2, val3);
             } else if (sscanf(out_buffer, "d%lu,%lu", &val, &val2) == 2) {
-              output_msg(MSG_SET_DIRECTION_PIN);
+              output_msg(MSG_DIRECTION_PIN);
+              output_msg(MSG_SET_TO_PIN);
               Serial.println(val);
-              if (val2 == 0) {
-                output_msg(MSG_DIRECTION_PIN_HIGH_COUNT_DOWN);
+              output_msg(MSG_DIRECTION_PIN);
+              if (val2 != 0) {
+                output_msg(MSG_HIGH_COUNT_DOWN);
               } else {
-                output_msg(MSG_DIRECTION_PIN_HIGH_COUNT_UP);
+                output_msg(MSG_HIGH_COUNT_UP);
               }
               stepper_selected->setDirectionPin(val, val2);
             } else if (sscanf(out_buffer, "d%lu", &val) == 1) {
-              output_msg(MSG_SET_DIRECTION_PIN);
+              output_msg(MSG_DIRECTION_PIN);
+              output_msg(MSG_SET_TO_PIN);
               Serial.println(val);
               stepper_selected->setDirectionPin(val);
             } else if (strcmp(out_buffer, "dc") == 0) {
-              output_msg(MSG_NO_DIRECTION_PIN);
+              output_msg(MSG_DISABLED);
               stepper_selected->setDirectionPin(PIN_UNDEFINED);
             }
             break;
