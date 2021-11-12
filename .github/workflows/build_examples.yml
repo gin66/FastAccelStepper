@@ -2,9 +2,9 @@ name: Build examples
 
 on:
   push:
-    branches: [ master, atmega2560 ]
+    branches: [ master, atmega2560, espidf4.4 ]
   pull_request:
-    branches: [ master, atmega2560 ]
+    branches: [ master, atmega2560, espidf4.4 ]
 
 jobs:
   build:
