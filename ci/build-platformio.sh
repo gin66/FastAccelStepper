@@ -17,7 +17,7 @@ then
 
 	pio platform install "atmelavr"
 	pio platform install "atmelsam"
-	pio platform install "espressif32@3.1.1"
+	pio platform install "espressif32"
 fi
 
 rm -fR pio_dirs
