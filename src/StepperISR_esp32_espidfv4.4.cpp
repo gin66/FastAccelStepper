@@ -1,8 +1,8 @@
 
 #include "StepperISR.h"
 
-// In esp-idf v4.4 PERIPH_PWM1_MODULE is not defined anymore. So use this to distinguish between the two versions
-#if defined(ARDUINO_ARCH_ESP32) && !defined(PERIPH_PWM0_MODULE)
+// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use this to distinguish between the two versions
+#if defined(ARDUINO_ARCH_ESP32) && defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
 
 #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
