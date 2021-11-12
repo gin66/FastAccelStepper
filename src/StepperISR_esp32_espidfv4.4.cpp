@@ -2,7 +2,7 @@
 #include "StepperISR.h"
 
 // In esp-idf v4.4 PERIPH_PWM1_MODULE is not defined anymore. So use this to distinguish between the two versions
-#if defined(ARDUINO_ARCH_ESP32) && defined(PERIPH_PWM0_MODULE)
+#if defined(ARDUINO_ARCH_ESP32) && !defined(PERIPH_PWM0_MODULE)
 
 #define DEFAULT_TIMER_H_L_TRANSITION 160
 
