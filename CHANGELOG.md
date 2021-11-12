@@ -5,6 +5,7 @@ pre-0.24.0:
 - Add table of timing values in FastAccelStepper.h for the architectures
 - StepperDemo extended:
 	- add config mode (press c) for direction pin configuration
+- Support changed mpcwpm-definitions in esp-idf v4.4
 
 
 0.23.5:
