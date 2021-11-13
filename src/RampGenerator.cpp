@@ -466,7 +466,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t steps = planning_steps;
-  steps = min(steps, fas_abs(remaining_steps));  // This could be problematic
+  steps = min(steps, remaining_steps);  // This could be problematic
   steps = max(steps, 1);
   steps = min(255, steps);
 

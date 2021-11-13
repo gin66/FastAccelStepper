@@ -324,6 +324,7 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 ## ISSUES
 
 * There is an issue with the esp32 mcpwm: as soon as the mcpwm timer is running, on every cycle an interrupt is serviced - even though no interrupt is enabled. If several steppers are running at high step rate, the interrupt load for this nonsense interrupt could be quite high for the CPU. Need further investigation, but till now haven't found the root cause.
+* Compilation using esp-idf 4.4 will yield a deprecation warning for `mcpwm_isr_register()`. This has been raised as [issue](https://github.com/espressif/esp-idf/issues/7890) at espressif
 
 ## Error investigation
 

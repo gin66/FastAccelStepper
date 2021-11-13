@@ -6,6 +6,7 @@ pre-0.24.0:
 - StepperDemo extended:
 	- add config mode (press c) for direction pin configuration
 - Support changed mpcwpm-definitions in esp-idf v4.4
+- Fix warning identified in this [Issue #98](https://github.com/gin66/FastAccelStepper/issues/98) for fas_abs() usage
 
 
 0.23.5:
