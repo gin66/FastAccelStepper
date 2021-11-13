@@ -8,7 +8,7 @@
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
 [![Build examples for AVR](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml)
 
-ATTENTION: `framework-arduinoespressif32 @ 3.10006.210326` and lateer will lead to compile error for esp32, if using compiler options `-Werror -Wall` !!! The problem can be circumvented by applying `-Wno-error=incompatible-pointer-types`
+ATTENTION: `framework-arduinoespressif32 @ 3.10006.210326` and later will lead to compile error for esp32, if using compiler options `-Werror -Wall` !!! The problem can be circumvented by applying `-Wno-error=incompatible-pointer-types`
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
 
