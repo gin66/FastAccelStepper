@@ -1,4 +1,4 @@
-name: Build examples for AVR
+name: Build examples for Atmega328
 
 on:
   push:
@@ -15,5 +15,5 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
     - name: Build on PlatformIO
-      run: bash ci/build-platformio.sh avr
+      run: bash ci/build-platformio.sh nanoatmega328
 

@@ -6,7 +6,7 @@
 [![Build examples for esp32arduino @ 3.4.0](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml)
 [![Build examples for Atmega2560](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml)
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
-[![Build examples for AVR](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml)
+[![Build examples for Atmega328](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml)
 
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
 
