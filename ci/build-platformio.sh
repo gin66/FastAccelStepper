@@ -1,5 +1,8 @@
 #!/bin/sh
 
+TARGETS=${1:-avr atmega2560 esp32 atmelsam}
+echo "execute for ${TARGETS}"
+
 if [ "$GITHUB_WORKSPACE" != "" ]
 then
 	# Make sure we are inside the github workspace
@@ -15,13 +18,15 @@ then
 	curl -fsSL https://raw.githubusercontent.com/platformio/platformio-core-installer/master/get-platformio.py -o get-platformio.py
 	python3 get-platformio.py
 
-	pio platform install "atmelavr"
-	pio platform install "atmelsam"
-	pio platform install "espressif32"
+	# Use automated install from pio run
+	# pio platform install "atmelavr"
+	# pio platform install "atmelsam"
+	# pio platform install "espressif32"
 fi
 
+# arduino libraries are not allowed to contain symbolic links in the repository.
+# So create the pio_dirs-directory during the github action 
 rm -fR pio_dirs
-
 mkdir pio_dirs
 for i in `ls examples`
 do
@@ -48,7 +53,7 @@ cd ../../..
 set -e
 for i in pio_dirs/*
 do
-	for p in avr atmega2560 esp32 atmelsam
+	for p in ${TARGETS}
 	do
 		echo $p: $i
 		(cd $i;pio run -s -e $p)

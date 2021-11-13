@@ -1,4 +1,4 @@
-name: Build examples
+name: Build examples for Atmel SAM
 
 on:
   push:
@@ -15,5 +15,5 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
     - name: Build on PlatformIO
-      run: bash ci/build-platformio.sh
+      run: bash ci/build-platformio.sh atmelsam
 
