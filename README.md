@@ -8,8 +8,6 @@
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
 [![Build examples for AVR](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml)
 
-ATTENTION: `framework-arduinoespressif32 @ 3.10006.210326` and later will lead to compile error for esp32, if using compiler options `-Werror -Wall` !!! The problem can be circumvented by applying `-Wno-error=incompatible-pointer-types`
-
 This is an high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
@@ -328,6 +326,8 @@ See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
 
 * There is an issue with the esp32 mcpwm: as soon as the mcpwm timer is running, on every cycle an interrupt is serviced - even though no interrupt is enabled. If several steppers are running at high step rate, the interrupt load for this nonsense interrupt could be quite high for the CPU. Need further investigation, but till now haven't found the root cause.
 * Compilation using esp-idf 4.4 will yield a deprecation warning for `mcpwm_isr_register()`. This has been raised as [issue](https://github.com/espressif/esp-idf/issues/7890) at espressif
+* `framework-arduinoespressif32 @ 3.10006.210326` and later will lead to compile error for esp32, if using compiler options `-Werror -Wall` !!! The problem can be circumvented by applying `-Wno-error=incompatible-pointer-types`
+
 
 ## Error investigation
 
