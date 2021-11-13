@@ -360,6 +360,7 @@ Found on youtube:
 * [Neck mechanism](https://www.youtube.com/watch?v=rY7NDBnz7Cw)
 * [Stepper motor at 1500RPM with ESP32 and A4988](https://www.youtube.com/watch?v=sQqezEsiuUU)
 * [DIY 3 AXIS CAMERA SLIDER | MOTORIZED CAMERA SLIDER](https://youtu.be/7TkybpSQULk)
+* [NEMA 17 Servo: Final Accuracy Test & New Speed Record!! - N-Gnoid TV](https://www.youtube.com/watch?v=EHHDuI3xK94)
 
 ## Contribution
 
