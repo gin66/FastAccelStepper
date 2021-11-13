@@ -1,4 +1,4 @@
-name: Build examples
+name: Build examples for Atmega2560
 
 on:
   push:

@@ -1,9 +1,12 @@
 # FastAccelStepper 
  
+![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.23.3)
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.23.3)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.23.3)
-![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.23.3)
-![Build examples](https://github.com/gin66/FastAccelStepper/workflows/Build%20examples/badge.svg?no_cache_0.23.3)
+[![Build examples for esp32arduino @ 3.4.0](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml)
+[![Build examples for Atmega2560](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml)
+[![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
+[![Build examples for AVR](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_avr.yml)
 
 ATTENTION: `framework-arduinoespressif32 @ 3.10006.210326` and lateer will lead to compile error for esp32, if using compiler options `-Werror -Wall` !!! The problem can be circumvented by applying `-Wno-error=incompatible-pointer-types`
 
