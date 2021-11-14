@@ -1,4 +1,4 @@
-pre-0.24.0:
+0.24.0:
 - Implement configurable delay after direction pin change and first step in new direction
   [Issue #83](https://github.com/gin66/FastAccelStepper/issues/83).
   The value is set by the third parameter of setDirectionPin().
