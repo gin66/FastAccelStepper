@@ -276,6 +276,7 @@ void PWM_Handler(void) {
       uint32_t dwSR = port->PIO_ABSR;
       port->PIO_ABSR = (g_APinDescription[mapping->pin].ulPin | dwSR);
       // Remove the pins from under the control of PIO
+      port->PIO_ODR |= g_APinDescription[mapping->pin].ulPin;
       port->PIO_PDR = g_APinDescription[mapping->pin].ulPin;
       port->PIO_IER = g_APinDescription[mapping->pin].ulPin;
       q->_pauseCommanded = false;
@@ -353,7 +354,6 @@ inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask,
       if (e->toggle_dir) {                                                     \
         e->toggle_dir = 0;                                                     \
         *q->_dirPinPort ^= q->_dirPinMask;                                     \
-        delayMicroseconds(20);                                                 \
       }                                                                        \
       /*Check immediatly if we need to turn off the pulse generator.Time is    \
         critical! */                                                           \
@@ -619,7 +619,6 @@ void StepperQueue::commandAddedToQueue(bool start) {
   if (e->toggle_dir) {
     e->toggle_dir = 0;
     *_dirPinPort ^= _dirPinMask;
-    delayMicroseconds(30);
   }
   noInterrupts();
   bool first = (next_write_idx++ == read_idx);
@@ -676,8 +675,18 @@ int8_t StepperQueue::startPreparedQueue() {
   _runOnce = false;
   _skipNextPWMInterrupt = false;
   PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
-  attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask, true);
+  if (!e->hasSteps || e->steps == 0) {
+    _pauseCommanded = true;
+    timePWMInterruptEnabled = micros();
+    uint32_t samPin = g_APinDescription[mapping->pin].ulPin;
+    PWM_INTERFACE->PWM_IER1 = mapping->channelMask;
+    PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
+    PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
 
+  } else {
+    attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
+                        true);
+  }
   return AQE_OK;
 }
 
