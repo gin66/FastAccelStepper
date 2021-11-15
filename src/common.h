@@ -23,6 +23,7 @@ struct queue_end_s {
 #define fasDisableInterrupts noInterrupts
 #elif defined(ESP_PLATFORM)
 #include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
 #define fasDisableInterrupts portDISABLE_INTERRUPTS
 #define fasEnableInterrupts portENABLE_INTERRUPTS
 #elif defined(ARDUINO_ARCH_SAM)

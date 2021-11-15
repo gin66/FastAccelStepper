@@ -125,8 +125,6 @@ class StepperQueue {
   bool dirHighCountsUp;
   uint8_t dirPin;
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-  volatile uint32_t* _dirPinPort;
-  uint32_t _dirPinMask;
   volatile bool _hasISRactive;
   bool _nextCommandIsPrepared;
   bool isRunning();
@@ -451,8 +449,7 @@ class StepperQueue {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_AVR) || \
-    defined(ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
     if (dir_pin != PIN_UNDEFINED) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);

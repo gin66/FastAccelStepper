@@ -105,7 +105,8 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
-    *queue->_dirPinPort ^= queue->_dirPinMask;
+	gpio_num_t dirPin = (gpio_num_t)queue->dirPin;
+	gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
   }
   uint16_t ticks = e->ticks;
   if (mcpwm->timer[timer].status.value <= 1) {  // mcpwm Timer is stopped ?
