@@ -18,7 +18,7 @@ static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 #if defined(ARDUINO_ARCH_AVR)
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
-#elif defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
 #define DEBUG_LED_HALF_PERIOD 50
 #elif defined(ARDUINO_ARCH_SAM)
 #define DEBUG_LED_HALF_PERIOD 50
@@ -36,7 +36,7 @@ FastAccelStepperEngine* fas_engine = NULL;
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
                                              FastAccelStepper()};
 #endif
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32) || defined(ARDUINO_ARCH_SAM)
 FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper()};
@@ -58,7 +58,7 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
 // to the steppers.
 //
 //*************************************************************************************************
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
 #define TASK_DELAY_4MS 4
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
@@ -77,7 +77,7 @@ void FastAccelStepperEngine::init() {
 #if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
   fas_engine = this;
 #endif
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
 #define STACK_SIZE 1000
 #define PRIORITY configMAX_PRIORITIES
   xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
@@ -488,7 +488,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 
   _queue_num = num;
   fas_queue[_queue_num].init(_queue_num, step_pin);
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
   _attached_pulse_cnt_unit = -1;
 #endif
 }
@@ -565,7 +565,7 @@ int8_t FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
 }
 void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   uint16_t delay_count = 0;
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
   delay_count = delay_ms / TASK_DELAY_4MS;
 #endif
 #if defined(ARDUINO_ARCH_SAM)
@@ -777,7 +777,7 @@ int32_t FastAccelStepper::getCurrentPosition() {
 }
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
 bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
                                             int16_t low_value,
                                             int16_t high_value) {

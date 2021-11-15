@@ -2,7 +2,7 @@
 #include "StepperISR.h"
 
 // Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use this to distinguish between the two versions
-#if defined(ARDUINO_ARCH_ESP32) && !defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
+#if (defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)) && !defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
 
 #define DEFAULT_TIMER_H_L_TRANSITION 160
 
