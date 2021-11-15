@@ -2,7 +2,8 @@
 #define FASTACCELSTEPPER_H
 #if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
 #include <Arduino.h>
-#elif defined(CONFIG_IDF_TARGET_ESP32)
+#elif defined(ESP_PLATFORM)
+#include <math.h>
 #else
 #include <math.h>
 #include <stdio.h>
@@ -39,7 +40,7 @@
 //	MIN_DIR_DELAY_US	200		[µs]
 //	MAX_DIR_DELAY_US	3120	[µs]
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
@@ -359,7 +360,7 @@ class FastAccelStepper {
   void detachFromPin();
   void reAttachToPin();
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
   // These two functions are only available on esp32.
   // The first can attach any of the eight pulse counters to this stepper.
   // The second then will read the current pulse counter value
@@ -423,7 +424,7 @@ class FastAccelStepper {
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
   int16_t _attached_pulse_cnt_unit;
 #endif
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)

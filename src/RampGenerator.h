@@ -11,7 +11,7 @@
 #define MAX_STEPPER 3
 #endif
 #define TICKS_PER_S F_CPU
-#elif defined(ARDUINO_ARCH_ESP32) || defined(CONFIG_IDF_TARGET_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #define MAX_STEPPER 6
 #define TICKS_PER_S 16000000L
 #elif defined(ARDUINO_ARCH_SAM)
