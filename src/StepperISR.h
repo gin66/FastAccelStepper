@@ -1,11 +1,12 @@
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
+    defined(ARDUINO_ARCH_SAM)
 #include <Arduino.h>
 #elif defined(ESP_PLATFORM)
 #define LOW 0
 #define HIGH 1
 #define OUTPUT GPIO_MODE_OUTPUT
-#define pinMode(pin, mode) gpio_set_direction((gpio_num_t)pin,mode)
-#define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin,level)
+#define pinMode(pin, mode) gpio_set_direction((gpio_num_t)pin, mode)
+#define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin, level)
 #else
 #include <assert.h>
 #endif

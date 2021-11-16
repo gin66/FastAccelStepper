@@ -36,7 +36,8 @@ FastAccelStepperEngine* fas_engine = NULL;
 FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
                                              FastAccelStepper()};
 #endif
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM) || \
+    defined(ARDUINO_ARCH_SAM)
 FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper()};
@@ -130,8 +131,8 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   uint8_t stepper_num = _next_stepper_num;
   _next_stepper_num++;
 
-#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM) || defined(TEST) || \
-    defined(ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || \
+    defined(ESP_PLATFORM) || defined(TEST) || defined(ARDUINO_ARCH_SAM)
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
@@ -272,11 +273,12 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
       // the first step
       if (_on_delay_ticks > 0) {
         uint32_t delay = _on_delay_ticks;
-		// this delay sets count_up appropriately. If this is shorter than
-		// dir_change_delay_ticks, then extend accordingly
-		if ((delay < _dir_change_delay_ticks) && (q->queue_end.count_up != cmd->count_up)) {
-			delay = _dir_change_delay_ticks;
-		}
+        // this delay sets count_up appropriately. If this is shorter than
+        // dir_change_delay_ticks, then extend accordingly
+        if ((delay < _dir_change_delay_ticks) &&
+            (q->queue_end.count_up != cmd->count_up)) {
+          delay = _dir_change_delay_ticks;
+        }
         while (delay > 0) {
           uint32_t ticks = delay >> 1;
           uint16_t ticks_u16 = ticks;

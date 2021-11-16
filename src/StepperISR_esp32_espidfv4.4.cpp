@@ -1,8 +1,10 @@
 
 #include "StepperISR.h"
 
-// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use this to distinguish between the two versions
-#if (defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)) && defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
+// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use
+// this to distinguish between the two versions
+#if (defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)) && \
+    defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
 
 #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
@@ -108,14 +110,17 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
-	gpio_num_t dirPin = (gpio_num_t)queue->dirPin;
-	gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+    gpio_num_t dirPin = (gpio_num_t)queue->dirPin;
+    gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
   }
   uint16_t ticks = e->ticks;
-  if (mcpwm->timer[timer].timer_status.timer_value <= 1) {  // mcpwm Timer is stopped ?
-    mcpwm->timer[timer].timer_cfg0.timer_period_upmethod = 0;    // 0 = immediate update, 1 = TEZ
+  if (mcpwm->timer[timer].timer_status.timer_value <=
+      1) {  // mcpwm Timer is stopped ?
+    mcpwm->timer[timer].timer_cfg0.timer_period_upmethod =
+        0;  // 0 = immediate update, 1 = TEZ
   } else {
-    mcpwm->timer[timer].timer_cfg0.timer_period_upmethod = 1;  // 0 = immediate update, 1 = TEZ
+    mcpwm->timer[timer].timer_cfg0.timer_period_upmethod =
+        1;  // 0 = immediate update, 1 = TEZ
   }
   mcpwm->timer[timer].timer_cfg0.timer_period = ticks;
   if (steps == 0) {
@@ -225,7 +230,7 @@ static void IRAM_ATTR pcnt_isr_service(void *arg) {
 
 // MCPWM_SERVICE is only used in case of pause
 #define MCPWM_SERVICE(mcpwm, TIMER, pcnt)             \
-  if (mcpwm.int_st.op##TIMER##_tea_int_st != 0) {   \
+  if (mcpwm.int_st.op##TIMER##_tea_int_st != 0) {     \
     /*managed in apply_command()                   */ \
     /*mcpwm.int_clr.cmpr##TIMER##_tea_int_clr = 1;*/  \
     StepperQueue *q = &fas_queue[pcnt];               \
@@ -301,29 +306,34 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     // 160 MHz/5 = 32 MHz => 16 MHz in up/down-mode
     mcpwm->clk_cfg.clk_prescale = 5 - 1;
 
-    mcpwm->operator_timersel.operator0_timersel = 0;  // timer 0 is input for operator 0
-    mcpwm->operator_timersel.operator1_timersel = 1;  // timer 1 is input for operator 1
-    mcpwm->operator_timersel.operator2_timersel = 2;  // timer 2 is input for operator 2
+    mcpwm->operator_timersel.operator0_timersel =
+        0;  // timer 0 is input for operator 0
+    mcpwm->operator_timersel.operator1_timersel =
+        1;  // timer 1 is input for operator 1
+    mcpwm->operator_timersel.operator2_timersel =
+        2;  // timer 2 is input for operator 2
   }
-  mcpwm->timer[timer].timer_cfg0.timer_period_upmethod = 1;  // 0 = immediate update, 1 = TEZ
+  mcpwm->timer[timer].timer_cfg0.timer_period_upmethod =
+      1;  // 0 = immediate update, 1 = TEZ
   mcpwm->timer[timer].timer_cfg0.timer_prescale = TIMER_PRESCALER;
   mcpwm->timer[timer].timer_cfg0.timer_period = 400;  // Random value
-  mcpwm->timer[timer].timer_cfg1.timer_mod = 3;        // 3=up/down counting
-  mcpwm->timer[timer].timer_cfg1.timer_start = 0;       // 0: stop at TEZ
+  mcpwm->timer[timer].timer_cfg1.timer_mod = 3;       // 3=up/down counting
+  mcpwm->timer[timer].timer_cfg1.timer_start = 0;     // 0: stop at TEZ
 
   // this sequence should reset the timer to 0
-  mcpwm->timer[timer].timer_sync.timer_phase = 0;  // prepare value of 0
-  mcpwm->timer[timer].timer_sync.timer_synci_en = 1;        // enable sync
-  mcpwm->timer[timer].timer_sync.timer_sync_sw ^= 1;     // force a sync
-  mcpwm->timer[timer].timer_sync.timer_synci_en = 0;        // disable sync
+  mcpwm->timer[timer].timer_sync.timer_phase = 0;     // prepare value of 0
+  mcpwm->timer[timer].timer_sync.timer_synci_en = 1;  // enable sync
+  mcpwm->timer[timer].timer_sync.timer_sync_sw ^= 1;  // force a sync
+  mcpwm->timer[timer].timer_sync.timer_synci_en = 0;  // disable sync
 
-  mcpwm->operators[timer].gen_stmp_cfg.gen_a_upmethod = 0;     // 0 = immediate update
+  mcpwm->operators[timer].gen_stmp_cfg.gen_a_upmethod =
+      0;                                         // 0 = immediate update
   mcpwm->operators[timer].timestamp[0].gen = 1;  // set compare value A
-  mcpwm->operators[timer].generator[0].val = 0;   // clear all trigger actions
-  mcpwm->operators[timer].generator[1].val = 0;   // clear all trigger actions
+  mcpwm->operators[timer].generator[0].val = 0;  // clear all trigger actions
+  mcpwm->operators[timer].generator[1].val = 0;  // clear all trigger actions
   mcpwm->operators[timer].generator[0].gen_dtep = 1;  // low at period
-  mcpwm->operators[timer].dt_cfg.val = 0;         // edge delay disabled
-  mcpwm->operators[timer].carrier_cfg.val = 0;    // carrier disabled
+  mcpwm->operators[timer].dt_cfg.val = 0;             // edge delay disabled
+  mcpwm->operators[timer].carrier_cfg.val = 0;        // carrier disabled
 
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);

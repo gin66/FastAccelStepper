@@ -1,8 +1,10 @@
 
 #include "StepperISR.h"
 
-// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use this to distinguish between the two versions
-#if (defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)) && !defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
+// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use
+// this to distinguish between the two versions
+#if (defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)) && \
+    !defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
 
 #define DEFAULT_TIMER_H_L_TRANSITION 160
 
@@ -105,8 +107,8 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
-	gpio_num_t dirPin = (gpio_num_t)queue->dirPin;
-	gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+    gpio_num_t dirPin = (gpio_num_t)queue->dirPin;
+    gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
   }
   uint16_t ticks = e->ticks;
   if (mcpwm->timer[timer].status.value <= 1) {  // mcpwm Timer is stopped ?

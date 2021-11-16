@@ -9,7 +9,7 @@
 #include <esp_task_wdt.h>
 #endif
 
-#define VERSION "post-ef199fe"
+#define VERSION "post-59d8d6d"
 
 struct stepper_config_s {
   uint8_t step;
@@ -896,7 +896,7 @@ void loop() {
         selected = 2;
       }
 #if !defined(ARDUINO_ARCH_AVR)
-	  else if ((strcmp(out_buffer, "M4") == 0) && stepper[3]) {
+      else if ((strcmp(out_buffer, "M4") == 0) && stepper[3]) {
         output_msg(MSG_SELECT_STEPPER);
         Serial.println(4);
         selected = 3;
