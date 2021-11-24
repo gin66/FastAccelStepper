@@ -9,13 +9,13 @@ bool test_seq_12(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 0:  // INIT
       stepper->setSpeedInUs(64);
       stepper->setAcceleration(1000);
-      stepper->runForward();
+      stepper->moveTo(10000000);
       seq->u32_1 = time_ms;
       seq->state++;
       break;
     case 1:
       if (stepper->getPeriodInUsAfterCommandsCompleted() == 64) {
-        stepper->setAcceleration(1000);
+        stepper->setAcceleration(10000);
         seq->s16_1 = 0;
         seq->s16_2 = 0;
         seq->u32_1 = time_ms;
@@ -23,7 +23,7 @@ bool test_seq_12(FastAccelStepper *stepper, struct test_seq_s *seq,
       }
       break;
     case 2:
-      if (time_ms - seq->u32_1 >= 50) {
+      if (time_ms - seq->u32_1 >= 20) {
         stepper->setSpeedInUs(64 + seq->s16_1);
         stepper->applySpeedAcceleration();
         seq->u32_1 = time_ms;
@@ -31,7 +31,7 @@ bool test_seq_12(FastAccelStepper *stepper, struct test_seq_s *seq,
       }
       break;
     case 3:
-      if (time_ms - seq->u32_1 >= 50) {
+      if (time_ms - seq->u32_1 >= 20) {
         stepper->setSpeedInUs(64);
         stepper->applySpeedAcceleration();
         seq->u32_1 = time_ms;

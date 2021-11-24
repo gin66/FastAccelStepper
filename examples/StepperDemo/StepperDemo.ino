@@ -9,7 +9,7 @@
 #include <esp_task_wdt.h>
 #endif
 
-#define VERSION "post-59d8d6d"
+#define VERSION "post-c3019eb"
 
 struct stepper_config_s {
   uint8_t step;
@@ -1118,67 +1118,16 @@ void loop() {
               }
             }
 #endif
-            else if (strcmp(out_buffer, "01") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_01;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "02") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_02;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "03") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_03;
-
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "04") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_04;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "05") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_05;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "06") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_06;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "07") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_07;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "08") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_08;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "09") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_09;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "10") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_10;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "11") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_11;
-              test_seq[selected].state = 0;
-            } else if (strcmp(out_buffer, "12") == 0) {
-              output_msg(MSG_SELECT_TEST_SEQUENCE);
-              Serial.println(out_buffer);
-              test_seq[selected].test = test_seq_12;
-              test_seq[selected].state = 0;
+            else {
+              for (uint8_t i = 0; i < NUM_TEST_SEQUENCE; i++) {
+                const struct test_seq_def_s *ts = &test_sequence[i];
+                if (strcmp(out_buffer, ts->code) == 0) {
+                  output_msg(MSG_SELECT_TEST_SEQUENCE);
+                  Serial.println(out_buffer);
+                  test_seq[selected].test = ts->test;
+                  test_seq[selected].state = 0;
+                }
+              }
             }
             break;
           case config:
