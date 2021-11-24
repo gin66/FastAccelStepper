@@ -1174,6 +1174,11 @@ void loop() {
               Serial.println(out_buffer);
               test_seq[selected].test = test_seq_11;
               test_seq[selected].state = 0;
+            } else if (strcmp(out_buffer, "12") == 0) {
+              output_msg(MSG_SELECT_TEST_SEQUENCE);
+              Serial.println(out_buffer);
+              test_seq[selected].test = test_seq_12;
+              test_seq[selected].state = 0;
             }
             break;
           case config:

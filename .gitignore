@@ -5,7 +5,7 @@
 .dir
 .tested
 run_avr
-pio_dirs
+pio_*
 PCB/
 examples/*/*.h
 examples/*/*.cpp
