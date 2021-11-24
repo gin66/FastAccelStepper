@@ -1,6 +1,12 @@
 #if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
     defined(ARDUINO_ARCH_SAM)
 #include <Arduino.h>
+#elif defined(ESP_PLATFORM)
+#define LOW 0
+#define HIGH 1
+#define OUTPUT GPIO_MODE_OUTPUT
+#define pinMode(pin, mode) gpio_set_direction((gpio_num_t)pin, mode)
+#define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin, level)
 #else
 #include <assert.h>
 #endif
@@ -33,7 +39,7 @@ enum channels { channelA, channelB, channelC };
 #else
 #error "Unsupported derivate"
 #endif
-#elif defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 #elif defined(ARDUINO_ARCH_SAM)
@@ -53,7 +59,7 @@ enum channels { channelA, channelB, channelC };
 
 #define TICKS_FOR_STOPPED_MOTOR 0xffffffff
 
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #include <driver/gpio.h>
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
@@ -119,9 +125,7 @@ class StepperQueue {
 #endif
   bool dirHighCountsUp;
   uint8_t dirPin;
-#if defined(ARDUINO_ARCH_ESP32)
-  volatile uint32_t* _dirPinPort;
-  uint32_t _dirPinMask;
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
   volatile bool _hasISRactive;
   bool _nextCommandIsPrepared;
   bool isRunning();
@@ -259,13 +263,13 @@ class StepperQueue {
     uint16_t pos_last16 = e->start_pos_last16;
 #endif
     uint8_t steps = e->steps;
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
     // pulse counter should go max up to 255 with perhaps few pulses overrun, so
     // this conversion is safe
     int16_t done_p = (int16_t)_getPerformedPulses();
 #endif
     fasEnableInterrupts();
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
     if (done_p == 0) {
       // fix for possible race condition described in issue #68
       fasDisableInterrupts();
@@ -313,13 +317,13 @@ class StepperQueue {
         if (e->countUp) {
 #if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
           adjust = -steps;
-#elif defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
           adjust = done_p;
 #endif
         } else {
 #if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
           adjust = steps;
-#elif defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
           adjust = -done_p;
 #endif
         }
@@ -412,7 +416,7 @@ class StepperQueue {
 #if defined(ARDUINO_ARCH_AVR)
     _isRunning = false;
     _prepareForStop = false;
-#elif defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
     _hasISRactive = false;
     _nextCommandIsPrepared = false;
 #elif defined(ARDUINO_ARCH_SAM)
@@ -433,7 +437,7 @@ class StepperQueue {
     checksum = 0;
 #endif
   }
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
   uint8_t _step_pin;
   uint16_t _getPerformedPulses();
 #endif
@@ -446,8 +450,7 @@ class StepperQueue {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
-    defined(ARDUINO_ARCH_SAM)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
     if (dir_pin != PIN_UNDEFINED) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);

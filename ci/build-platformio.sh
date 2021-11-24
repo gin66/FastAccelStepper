@@ -24,7 +24,7 @@ then
 	# pio platform install "espressif32"
 fi
 
-# arduino libraries are not allowed to contain symbolic links in the repository.
+
 # So create the pio_dirs-directory during the github action 
 rm -fR pio_dirs
 mkdir pio_dirs
@@ -36,6 +36,22 @@ do
 	cd src
 	FILES=`cd ../../../examples/$i;find . -type f`
 	for f in $FILES;do ln -s ../../../examples/$i/$f .;done
+	cd ../../..
+done
+
+# for espidf as of now, the src/* files need to be linked into the example build directory
+rm -fR pio_espidf
+mkdir pio_espidf
+for i in `ls examples`
+do
+	mkdir -p pio_espidf/$i/src
+	cd pio_espidf/$i
+	ln -s ../../ci/platformio.ini .
+	cd src
+	FILES=`cd ../../../examples/$i;find . -type f`
+	for f in $FILES;do ln -s ../../../examples/$i/$f .;done
+	FILES=`cd ../../../src/.;find . -type f`
+	for f in $FILES;do ln -s ../../../src/$f .;done
 	cd ../../..
 done
 
