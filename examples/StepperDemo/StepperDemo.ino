@@ -663,98 +663,14 @@ void info(FastAccelStepper *s, bool long_info) {
 
 const static char usage_str[] PROGMEM =
     "Enter commands separated by space, carriage return or newline:\n"
-    "     M1/M2/..  ... to select stepper\n"
-    "     c         ... Enter configuration mode\n"
-    "     V<speed>  ... Set selected stepper's speed in us/step\n"
-    "     H<speed>  ... Set selected stepper's speed in steps/s\n"
-    "     A<accel>  ... Set selected stepper's acceleration\n"
-    "     a<accel>  ... Acceleration control with +/-acceleration values\n"
-    "     U         ... Update selected stepper's speed/acceleration while "
-    "running\n"
-    "     P<pos>    ... Move selected stepper to position (can be "
-    "negative)\n"
-
-    "     R<n>      ... Move selected stepper by n steps (can be "
-    "negative)\n"
-    "     f         ... Run forward (counting up)\n"
-    "     b         ... Run backward (counting down)\n"
-    "     K         ... Keep selected stepper running in current direction\n"
-    "     @<pos>    ... Set selected stepper to position (can be "
-    "negative)\n"
-    "     E<us>     ... Set selected stepper's delay from enable to steps\n"
-    "     D<ms>     ... Set selected stepper's delay from steps to disable\n"
-    "     N         ... Turn selected stepper output on (disable auto enable)\n"
-    "     F         ... Turn selected stepper output off (disable auto "
-    "enable)\n"
-    "     O         ... Put selected stepper into auto enable mode\n"
-    "     S         ... Stop selected stepper with deceleration\n"
-    "     X         ... Immediately stop motor and set zero position\n"
-    "     I         ... Toggle motor info, while any motor is running\n"
-    "     W         ... Blocking wait until selected motor is stopped (will "
-    "deadlock if the motor will never stop)\n"
-    "     w<ms>     ... Wait time in ms\n"
-    "     +         ... Perform one step forward of the selected motor\n"
-    "     -         ... Perform one step backward of the selected motor\n"
-    "     T         ... Test selected motor with direct port access\n"
-#if defined(ARDUINO_ARCH_ESP32)
-    "     r         ... Call ESP.restart()\n"
-    "     reset     ... Perform reset\n"
-    "     p<n>      ... Attach pulse counter n<=7\n"
-    "     p<n>,l,h  ... Attach pulse counter n<=7 with low and high limits\n"
-    "     pc        ... Clear pulse counter\n"
-#endif
-    "     t         ... Enter test mode\n"
-    "     u         ... Unidirectional mode (need reset to restore)\n"
-#if defined(ARDUINO_ARCH_AVR)
-    "     r         ... Toggle erroneous digitalRead() of stepper pin\n"
-#endif
-    "     e         ... Toggle erroneous long 100us interrupt block\n"
-    "     Q         ... Toggle print usage on motor stop\n"
-    "     ?         ... Print this usage\n"
     "\n";
 
 const static char test_usage_str[] PROGMEM =
     "Enter commands separated by space, carriage return or newline:\n"
-    "     M1/M2/..  ... to select stepper\n"
-    "     c         ... Enter configuration mode\n"
-    "     R         ... start all selected tests\n"
-    "     I         ... Toggle motor info, while test sequence is running\n"
-    "     01        ... select test sequence 01 for selected stepper\n"
-    "     :\n"
-    "     11        ... select test sequence 11 for selected stepper\n"
-#ifdef SIM_TEST_INPUT
-    "     W         ... Blocking wait until test is finished\n"
-#endif
-#if defined(ARDUINO_ARCH_ESP32)
-    "     r         ... Call ESP.restart()\n"
-    "     reset     ... Perform reset\n"
-#endif
-    "     t         ... Enter test mode\n"
-    "     Q         ... Toggle print usage on motor stop\n"
-    "     ?         ... Print this usage\n"
-    "     x         ... Exit test mode\n"
     "\n";
 
 const static char config_usage_str[] PROGMEM =
     "Enter commands separated by space, carriage return or newline:\n"
-    "     M1/M2/..  ... to select stepper\n"
-    "     c         ... Enter configuration mode\n"
-    "     d<p>      ... Set direction pin\n"
-    "     d<p,n>\n"
-    "     d<p,n,t>\n"
-    "                       p ... pin number\n"
-    "                       n ... 1: high counts up 0: high counts down\n"
-    "                       t ... delay from dir change to step in us, 0 means "
-    "off\n"
-    "     dc        ... Clear direction pin (unidirectional)\n"
-#if defined(ARDUINO_ARCH_ESP32)
-    "     r         ... Call ESP.restart()\n"
-    "     reset     ... Perform reset\n"
-#endif
-    "     t         ... Enter test mode\n"
-    "     Q         ... Toggle print usage on motor stop\n"
-    "     ?         ... Print this usage\n"
-    "     x         ... Exit config mode\n"
     "\n";
 
 void stepper_info() {

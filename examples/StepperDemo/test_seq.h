@@ -10,7 +10,7 @@ struct test_seq_s {
   int16_t s16_2;
 };
 
-#define NUM_TEST_SEQUENCE 12
+#define NUM_TEST_SEQUENCE 10
 extern struct test_seq_def_s {
   char code[4];
   bool (*test)(FastAccelStepper *stepper, struct test_seq_s *,
