@@ -24,7 +24,7 @@ struct stepper_config_s {
 };
 
 #if defined(ARDUINO_ARCH_AVR)
-#if defined(__AVR_ATmega328P__)
+#if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega32U4__)
 // Example hardware configuration for Arduino Nano
 // Please adapt to your configuration
 const uint8_t led_pin = 13;  // turn off with PIN_UNDEFINED

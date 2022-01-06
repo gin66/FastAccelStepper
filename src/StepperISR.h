@@ -36,6 +36,12 @@ enum channels { channelA, channelB };
 #define fas_queue_C fas_queue[2]
 #define QUEUE_LEN 16
 enum channels { channelA, channelB, channelC };
+#elif defined(__AVR_ATmega32U4__)
+#define NUM_QUEUES 2
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define QUEUE_LEN 16
+enum channels { channelA, channelB };
 #else
 #error "Unsupported derivate"
 #endif
