@@ -40,8 +40,9 @@ enum channels { channelA, channelB, channelC };
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
+#define fas_queue_C fas_queue[2]
 #define QUEUE_LEN 16
-enum channels { channelA, channelB };
+enum channels { channelA, channelB, channelC };
 #else
 #error "Unsupported derivate"
 #endif

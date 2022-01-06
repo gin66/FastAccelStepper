@@ -42,12 +42,13 @@
 #define FAS_TIMER_MODULE 1
 #define stepPinStepper1A 9  /* OC1A */
 #define stepPinStepper1B 10 /* OC1B */
+#define stepPinStepper1C 11 /* OC1C */
 #endif
 
 #if (FAS_TIMER_MODULE == 1)
 #define stepPinStepperA stepPinStepper1A
 #define stepPinStepperB stepPinStepper1B
-#if defined(__AVR_ATmega2560__)
+#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega32U4__)
 #define stepPinStepperC stepPinStepper1C
 #endif
 #elif (FAS_TIMER_MODULE == 3)
