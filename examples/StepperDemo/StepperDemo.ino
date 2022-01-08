@@ -288,20 +288,20 @@ const static char messages[] PROGMEM =
     "Output driver " _SEP_
 #define _Cannot_set_ "\202"
     "Cannot set " _SEP_
-#define s_pin_ "\203"
+#define _pin_ "\203"
     "pin " _SEP_
 #define _step_pin_ "\204"
-    "step " s_pin_ "" _SEP_
-#define s_to_ "\205"
+    "step " _pin_ "" _SEP_
+#define _to_ "\205"
     "to " _SEP_
 #define _LOW_ "\206"
     "LOW " _SEP_
 #define _HIGH_ "\207"
     "HIGH " _SEP_
 #define _to_LOW_nl "\210"
-     s_to_  _LOW_ "" _NL_ _SEP_
+     _to_  _LOW_ "" _NL_ _SEP_
 #define _to_HIGH_nl "\211"
-     s_to_  _HIGH_ "" _NL_ _SEP_
+     _to_  _HIGH_ "" _NL_ _SEP_
 #define _Toggle_ "\212"
     "Toggle " _SEP_
 #define _ERROR_ "\213"
@@ -316,10 +316,10 @@ const static char messages[] PROGMEM =
     "pulse counter " _SEP_
 #define _attach "\220"
     "attach" _SEP_
-#define s_set_ "\221"
+#define _set_ "\221"
     "set " _SEP_
 #define _time_to_ "\222"
-    "time" s_to_ _SEP_
+    "time" _to_ _SEP_
 #define _is_not_defined_nl "\223"
     "is not defined" _NL_ _SEP_
 #define _run_ "\224"
@@ -344,11 +344,11 @@ const static char messages[] PROGMEM =
 #define MSG_RETURN_CODE 8+MSG_OFFSET
     "returncode = " _SEP_
 #define MSG_SET_POSITION 9+MSG_OFFSET
-    s_set_ "position " _SEP_
+    _set_ "position " _SEP_
 #define MSG_SET_ENABLE_TIME 10+MSG_OFFSET
-    s_set_ _enable_ _time_to_ _SEP_
+    _set_ _enable_ _time_to_ _SEP_
 #define MSG_SET_DISABLE_TIME 11+MSG_OFFSET
-    s_set_ "disable " _time_to_ _SEP_
+    _set_ "disable " _time_to_ _SEP_
 #define MSG_OUTPUT_DRIVER_ON 12+MSG_OFFSET
     _Output_driver_ "on" _NL_ _SEP_
 #define MSG_OUTPUT_DRIVER_OFF 13+MSG_OFFSET
@@ -388,19 +388,19 @@ const static char messages[] PROGMEM =
 #define MSG_FAILED_STATUS 30+MSG_OFFSET
     "Failed status from test" _NL_ _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_LOW 31+MSG_OFFSET
-    _Cannot_set_ _enable_  _LOW_  s_pin_ _to_LOW_nl _SEP_
+    _Cannot_set_ _enable_  _LOW_  _pin_ _to_LOW_nl _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_HIGH 32+MSG_OFFSET
-    _Cannot_set_ _enable_  _LOW_  s_pin_ _to_HIGH_nl _SEP_
+    _Cannot_set_ _enable_  _LOW_  _pin_ _to_HIGH_nl _SEP_
 #define MSG_ENABLE_HIGH_PIN_IS_NOT_LOW 33+MSG_OFFSET
-    _Cannot_set_ _enable_  _HIGH_  s_pin_ _to_LOW_nl _SEP_
+    _Cannot_set_ _enable_  _HIGH_  _pin_ _to_LOW_nl _SEP_
 #define MSG_ENABLE_HIGH_PIN_IS_NOT_HIGH 34+MSG_OFFSET
-    _Cannot_set_ _enable_  _HIGH_  s_pin_ _to_HIGH_nl _SEP_
+    _Cannot_set_ _enable_  _HIGH_  _pin_ _to_HIGH_nl _SEP_
 #define MSG_STEP_PIN_IS_NOT_LOW 35+MSG_OFFSET
     _Cannot_set_ _step_pin_ _to_LOW_nl _SEP_
 #define MSG_STEP_PIN_IS_NOT_HIGH 36+MSG_OFFSET
     _Cannot_set_ _step_pin_ _to_HIGH_nl _SEP_
 #define MSG_CANNOT_SET_DIRECTION_PIN 37+MSG_OFFSET
-    _Cannot_set_ _direction_ s_pin_ s_to_ _SEP_
+    _Cannot_set_ _direction_ _pin_ _to_ _SEP_
 #define MSG_STEPPER_VERSION 38+MSG_OFFSET
     "StepperDemo Version " VERSION
     "" _NL_ _SEP_
@@ -413,13 +413,13 @@ const static char messages[] PROGMEM =
 #define MSG_ERROR_MOVE_ERR_ACCELERATION_IS_UNDEFINED__MINUS_3 42+MSG_OFFSET
     _ERROR_ "acceleration" _is_not_defined_nl _SEP_
 #define MSG_ERROR_MOVE_ERR_SPEED_IS_UNDEFINED__MINUS_2 43+MSG_OFFSET
-    _ERROR_ "speed " _is_not_defined_ _SEP_
+    _ERROR_ "speed " _is_not_defined_nl _SEP_
 #define MSG_ERROR_MOVE_ERR_NO_DIRECTION_PIN__MINUS_1 44+MSG_OFFSET
-    _ERROR_ "no " _direction_  s_pin_ "=> impossible move" _NL_ _SEP_
+    _ERROR_ "no " _direction_  _pin_ "=> impossible move" _NL_ _SEP_
 #define MSG_MOVE_OK 45+MSG_OFFSET
     "OK" _NL_ _SEP_
 #define MSG_STRAY_DIGITAL_READ_TOGGLE 46+MSG_OFFSET
-    _Toggle_ "erroneous digitalRead() " s_to_ _step_pin_ "" _NL_ _SEP_
+    _Toggle_ "erroneous digitalRead() " _to_ _step_pin_ "" _NL_ _SEP_
 #define MSG_STRAY_DIGITAL_READ_ENABLED 47+MSG_OFFSET
     "ERRONEOUS digitalRead() TO STEP PIN IS ON !!!" _NL_ _SEP_
 #define MSG_LONG_INTERRUPT_BLOCK_TOGGLE 48+MSG_OFFSET
@@ -431,7 +431,7 @@ const static char messages[] PROGMEM =
 #define MSG_CLEAR_PULSE_COUNTER 51+MSG_OFFSET
     "Clear " _pulse_counter_ "" _NL_ _SEP_
 #define MSG_SET_SPEED_TO_HZ 52+MSG_OFFSET
-    s_set_ "speed (steps/s) to " _SEP_
+    _set_ "speed (steps/s) to " _SEP_
 #define MSG_PASS_STATUS 53+MSG_OFFSET
     "Test passed" _NL_ _SEP_
 #define MSG_TEST_COMPLETED 54+MSG_OFFSET
@@ -439,9 +439,9 @@ const static char messages[] PROGMEM =
 #define MSG_ENTER_CONFIG_MODE 55+MSG_OFFSET
     "Enter config mode" _NL_ _SEP_
 #define MSG_DIRECTION_PIN 56+MSG_OFFSET
-    _direction_ s_pin_ _SEP_
+    _direction_ _pin_ _SEP_
 #define MSG_SET_TO_PIN 57+MSG_OFFSET
-    s_set_  s_to_  s_pin_ _SEP_
+    _set_  _to_  _pin_ _SEP_
 #define MSG_DISABLED 58+MSG_OFFSET
     "disabled" _NL_ _SEP_
 #define MSG_HIGH_COUNT_UP 59+MSG_OFFSET
