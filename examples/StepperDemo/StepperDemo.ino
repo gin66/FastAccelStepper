@@ -278,149 +278,178 @@ struct test_seq_s test_seq[MAX_STEPPER] = {
 #endif
     {.test = NULL}, {.test = NULL}};
 
+#define _NL_ "\n"
+#define _SEP_ "|"
+
 const static char messages[] PROGMEM =
 #define _Move_ "\200"
-    "Move |"
+    "Move " _SEP_
 #define _Output_driver_ "\201"
-    "Output driver |"
+    "Output driver " _SEP_
 #define _Cannot_set_ "\202"
-    "Cannot set |"
-#define _step_pin_ "\203"
-    "step pin |"
-#define _to_LOW_nl "\204"
-    "to LOW\n|"
-#define _to_HIGH_nl "\205"
-    "to HIGH\n|"
-#define _Toggle_ "\206"
-    "Toggle |"
-#define _ERROR_ "\207"
-    "ERROR |"
-#define MSG_OFFSET 8
+    "Cannot set " _SEP_
+#define s_pin_ "\203"
+    "pin " _SEP_
+#define _step_pin_ "\204"
+    "step " s_pin_ "" _SEP_
+#define s_to_ "\205"
+    "to " _SEP_
+#define _LOW_ "\206"
+    "LOW " _SEP_
+#define _HIGH_ "\207"
+    "HIGH " _SEP_
+#define _to_LOW_nl "\210"
+     s_to_  _LOW_ "" _NL_ _SEP_
+#define _to_HIGH_nl "\211"
+     s_to_  _HIGH_ "" _NL_ _SEP_
+#define _Toggle_ "\212"
+    "Toggle " _SEP_
+#define _ERROR_ "\213"
+    "ERROR " _SEP_
+#define _high_counts_ "\214"
+    "high counts " _SEP_
+#define _enable_ "\215"
+    "enable " _SEP_
+#define _direction_ "\216"
+    "direction " _SEP_
+#define _pulse_counter_ "\217"
+    "pulse counter " _SEP_
+#define _attach "\220"
+    "attach" _SEP_
+#define s_set_ "\221"
+    "set " _SEP_
+#define _time_to_ "\222"
+    "time" s_to_ _SEP_
+#define _is_not_defined_nl "\223"
+    "is not defined" _NL_ _SEP_
+#define _run_ "\224"
+    "run " _SEP_
+#define MSG_OFFSET 21
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
-    "Select stepper |"
+    "Select stepper " _SEP_
 #define MSG_TOGGLE_MOTOR_INFO 1+MSG_OFFSET
-    _Toggle_ "motor info\n|"
+    _Toggle_ "motor info" _NL_ _SEP_
 #define MSG_TOGGLE_USAGE_INFO 2+MSG_OFFSET
-    _Toggle_ "usage info\n|"
+    _Toggle_ "usage info" _NL_ _SEP_
 #define MSG_ENTER_TEST_MODE 3+MSG_OFFSET
-    "Enter test mode\n|"
+    "Enter test mode" _NL_ _SEP_
 #define MSG_SET_ACCELERATION_TO 4+MSG_OFFSET
-    "Set acceleration to |"
+    "Set acceleration to " _SEP_
 #define MSG_SET_SPEED_TO_US 5+MSG_OFFSET
-    "Set speed (us/step) to |"
+    "Set speed (us/step) to " _SEP_
 #define MSG_MOVE_STEPS 6+MSG_OFFSET
-    _Move_ "steps |"
+    _Move_ "steps " _SEP_
 #define MSG_MOVE_TO_POSITION 7+MSG_OFFSET
-    _Move_ "to position |"
+    _Move_ "to position " _SEP_
 #define MSG_RETURN_CODE 8+MSG_OFFSET
-    "returncode = |"
+    "returncode = " _SEP_
 #define MSG_SET_POSITION 9+MSG_OFFSET
-    "set position |"
+    s_set_ "position " _SEP_
 #define MSG_SET_ENABLE_TIME 10+MSG_OFFSET
-    "set enable time to |"
+    s_set_ _enable_ _time_to_ _SEP_
 #define MSG_SET_DISABLE_TIME 11+MSG_OFFSET
-    "set disable time to |"
+    s_set_ "disable " _time_to_ _SEP_
 #define MSG_OUTPUT_DRIVER_ON 12+MSG_OFFSET
-    _Output_driver_ "on\n|"
+    _Output_driver_ "on" _NL_ _SEP_
 #define MSG_OUTPUT_DRIVER_OFF 13+MSG_OFFSET
-    _Output_driver_ "off\n|"
+    _Output_driver_ "off" _NL_ _SEP_
 #define MSG_OUTPUT_DRIVER_AUTO 14+MSG_OFFSET
-    _Output_driver_ "automatic mode\n|"
+    _Output_driver_ "automatic mode" _NL_ _SEP_
 #define MSG_STOP 15+MSG_OFFSET
-    "Stop\n|"
+    "Stop" _NL_ _SEP_
 #define MSG_KEEP_RUNNING 16+MSG_OFFSET
-    "Keep running\n|"
+    "Keep running" _NL_ _SEP_
 #define MSG_RUN_FORWARD 17+MSG_OFFSET
-    "Run forward\n|"
+    _run_ "forward" _NL_ _SEP_
 #define MSG_RUN_BACKWARD 18+MSG_OFFSET
-    "Run backward\n|"
+    _run_ "backward" _NL_ _SEP_
 #define MSG_IMMEDIATE_STOP 19+MSG_OFFSET
-    "Immediate Stop\n|"
+    "Immediate Stop" _NL_ _SEP_
 #define MSG_UPDATE_SPEED_ACCELERATION 20+MSG_OFFSET
-    "Update speed/acceleration\n|"
+    "Update speed/acceleration" _NL_ _SEP_
 #define MSG_BLOCKING_WAIT 21+MSG_OFFSET
-    "Blocking wait for running stepper to stop\n|"
+    "Blocking wait for running stepper to stop" _NL_ _SEP_
 #define MSG_TEST_DIRECT_DRIVE 22+MSG_OFFSET
-    "Test direct drive\n|"
+    "Test direct drive" _NL_ _SEP_
 #define MSG_STEPPED_FORWARD 23+MSG_OFFSET
-    "Stepped forward\n|"
+    "Stepped forward" _NL_ _SEP_
 #define MSG_STEPPED_BACKWARD 24+MSG_OFFSET
-    "Stepped backward\n|"
+    "Stepped backward" _NL_ _SEP_
 #define MSG_WAIT_MS 25+MSG_OFFSET
-    " ms wait\n|"
+    " ms wait" _NL_ _SEP_
 #define MSG_SELECT_TEST_SEQUENCE 26+MSG_OFFSET
-    "Select test_seq: |"
+    "Select test_seq: " _SEP_
 #define MSG_EXIT_TO_MAIN_MENU 27+MSG_OFFSET
-    "Exit to main menu\n|"
+    "Exit to main menu" _NL_ _SEP_
 #define MSG_RUN_TESTS 28+MSG_OFFSET
-    "Run tests\n|"
+    _run_ "tests" _NL_ _SEP_
 #define MSG_WAIT_COMPLETE 29+MSG_OFFSET
-    "Wait complete\n|"
+    "Wait complete" _NL_ _SEP_
 #define MSG_FAILED_STATUS 30+MSG_OFFSET
-    "Failed status from test\n|"
+    "Failed status from test" _NL_ _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_LOW 31+MSG_OFFSET
-    _Cannot_set_ "enable low pin " _to_LOW_nl "|"
+    _Cannot_set_ _enable_  _LOW_  s_pin_ _to_LOW_nl _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_HIGH 32+MSG_OFFSET
-    _Cannot_set_ "enable low pin " _to_HIGH_nl "|"
+    _Cannot_set_ _enable_  _LOW_  s_pin_ _to_HIGH_nl _SEP_
 #define MSG_ENABLE_HIGH_PIN_IS_NOT_LOW 33+MSG_OFFSET
-    _Cannot_set_ "enable high pin " _to_LOW_nl "|"
+    _Cannot_set_ _enable_  _HIGH_  s_pin_ _to_LOW_nl _SEP_
 #define MSG_ENABLE_HIGH_PIN_IS_NOT_HIGH 34+MSG_OFFSET
-    _Cannot_set_ "enable high pin " _to_HIGH_nl "|"
+    _Cannot_set_ _enable_  _HIGH_  s_pin_ _to_HIGH_nl _SEP_
 #define MSG_STEP_PIN_IS_NOT_LOW 35+MSG_OFFSET
-    _Cannot_set_ _step_pin_ _to_LOW_nl "|"
+    _Cannot_set_ _step_pin_ _to_LOW_nl _SEP_
 #define MSG_STEP_PIN_IS_NOT_HIGH 36+MSG_OFFSET
-    _Cannot_set_ _step_pin_ _to_HIGH_nl "|"
+    _Cannot_set_ _step_pin_ _to_HIGH_nl _SEP_
 #define MSG_CANNOT_SET_DIRECTION_PIN 37+MSG_OFFSET
-    _Cannot_set_ "direction pin to |"
+    _Cannot_set_ _direction_ s_pin_ s_to_ _SEP_
 #define MSG_STEPPER_VERSION 38+MSG_OFFSET
     "StepperDemo Version " VERSION
-    "\n|"
+    "" _NL_ _SEP_
 #define MSG_ATTACH_PULSE_COUNTER 39+MSG_OFFSET
-    "Attach pulse counter |"
+    _attach " " _pulse_counter_ _SEP_
 #define MSG_ERROR_ATTACH_PULSE_COUNTER 40+MSG_OFFSET
-    _ERROR_ "attaching pulse counter\n|"
+    _ERROR_ _attach "ing "  _pulse_counter_ "" _NL_ _SEP_
 #define MSG_ERROR_INVALID_VALUE 41+MSG_OFFSET
-    _ERROR_ "invalid value\n|"
+    _ERROR_ "invalid value" _NL_ _SEP_
 #define MSG_ERROR_MOVE_ERR_ACCELERATION_IS_UNDEFINED__MINUS_3 42+MSG_OFFSET
-    _ERROR_ "acceleration is not defined\n|"
+    _ERROR_ "acceleration" _is_not_defined_nl _SEP_
 #define MSG_ERROR_MOVE_ERR_SPEED_IS_UNDEFINED__MINUS_2 43+MSG_OFFSET
-    _ERROR_ "speed is not defined\n|"
+    _ERROR_ "speed " _is_not_defined_ _SEP_
 #define MSG_ERROR_MOVE_ERR_NO_DIRECTION_PIN__MINUS_1 44+MSG_OFFSET
-    _ERROR_ "no direction Pin => impossible move\n|"
+    _ERROR_ "no " _direction_  s_pin_ "=> impossible move" _NL_ _SEP_
 #define MSG_MOVE_OK 45+MSG_OFFSET
-    "OK\n|"
+    "OK" _NL_ _SEP_
 #define MSG_STRAY_DIGITAL_READ_TOGGLE 46+MSG_OFFSET
-    _Toggle_ "erroneous digitalRead() to step pin\n|"
+    _Toggle_ "erroneous digitalRead() " s_to_ _step_pin_ "" _NL_ _SEP_
 #define MSG_STRAY_DIGITAL_READ_ENABLED 47+MSG_OFFSET
-    "ERRONEOUS digitalRead() TO STEP PIN IS ON !!!\n|"
+    "ERRONEOUS digitalRead() TO STEP PIN IS ON !!!" _NL_ _SEP_
 #define MSG_LONG_INTERRUPT_BLOCK_TOGGLE 48+MSG_OFFSET
-    _Toggle_ "erroneous 100 µs ISR block\n|"
+    _Toggle_ "erroneous 100 µs ISR block" _NL_ _SEP_
 #define MSG_LONG_INTERRUPT_BLOCK_ENABLED 49+MSG_OFFSET
-    "ERRONEOUS 100 µs ISR BLOCK IS ON\n|"
+    "ERRONEOUS 100 µs ISR BLOCK IS ON" _NL_ _SEP_
 #define MSG_SET_UNIDIRECTIONAL_STEPPER 50+MSG_OFFSET
-    "Set unidirectional stepper\n|"
+    _set_ "unidirectional stepper" _NL_ _SEP_
 #define MSG_CLEAR_PULSE_COUNTER 51+MSG_OFFSET
-    "Clear pulse counter\n|"
+    "Clear " _pulse_counter_ "" _NL_ _SEP_
 #define MSG_SET_SPEED_TO_HZ 52+MSG_OFFSET
-    "Set speed (steps/s) to |"
+    s_set_ "speed (steps/s) to " _SEP_
 #define MSG_PASS_STATUS 53+MSG_OFFSET
-    "Test passed\n|"
+    "Test passed" _NL_ _SEP_
 #define MSG_TEST_COMPLETED 54+MSG_OFFSET
-    "Test completed\n|"
+    "Test completed" _NL_ _SEP_
 #define MSG_ENTER_CONFIG_MODE 55+MSG_OFFSET
-    "Enter config mode\n|"
+    "Enter config mode" _NL_ _SEP_
 #define MSG_DIRECTION_PIN 56+MSG_OFFSET
-    "Direction pin |"
+    _direction_ s_pin_ _SEP_
 #define MSG_SET_TO_PIN 57+MSG_OFFSET
-    "set to pin |"
+    s_set_  s_to_  s_pin_ _SEP_
 #define MSG_DISABLED 58+MSG_OFFSET
-    "disabled\n|"
+    "disabled" _NL_ _SEP_
 #define MSG_HIGH_COUNT_UP 59+MSG_OFFSET
-    "high counts up\n|"
+    _high_counts_ "up" _NL_ _SEP_
 #define MSG_HIGH_COUNT_DOWN 60+MSG_OFFSET
-    "high counts down\n|"
+    _high_counts_ "down" _NL_ _SEP_
 #define MSG_DELAY 61+MSG_OFFSET
-    "delay in us = |";
+    "delay in us = " _SEP_;
 
 void output_msg(int8_t i) {
   char ch;
