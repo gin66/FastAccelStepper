@@ -340,11 +340,13 @@ const static char messages[] PROGMEM =
     "erroneous " _SEP_
 #define _digitalRead_ "\234"
     "digitalRead() " _SEP_
-#define _____ "\235"
-    "     " _SEP_
-#define _ooo_ "\236"
+#define ____ "\235"
+    "    " _SEP_
+#define ________ "\236"
+	____ ____  _SEP_
+#define _ooo_ "\237"
     " ... " _SEP_
-#define MSG_OFFSET 31 
+#define MSG_OFFSET 32 
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
     "Select stepper " _SEP_
 #define MSG_TOGGLE_MOTOR_INFO 1+MSG_OFFSET
@@ -475,104 +477,101 @@ const static char messages[] PROGMEM =
 #define MSG_USAGE_CONFIG 64+MSG_OFFSET
     /* USAGE NORMAL */
     "Enter commands separated by space, carriage return or newline:\n"
-    _____ "M1/M2/.. " _ooo_ "to select stepper\n"
-    _____ "c        " _ooo_ "Enter configuration mode\n"
-    _____ "V<speed> " _ooo_ "Set selected stepper's speed in us/step\n"
-    _____ "H<speed> " _ooo_ "Set selected stepper's speed in steps/s\n"
-    _____ "A<accel> " _ooo_ "Set selected stepper's acceleration\n"
-    _____ "a<accel> " _ooo_ "Acceleration control with +/-acceleration values\n"
-    _____ "U        " _ooo_ "Update selected stepper's speed/acceleration while "
+    ____ "M1/M2/.. " _ooo_ "to select stepper\n"
+    ____ "c    " ____ _ooo_ "Enter configuration mode\n"
+    ____ "V<speed> " _ooo_ "Set selected stepper's speed in us/step\n"
+    ____ "H<speed> " _ooo_ "Set selected stepper's speed in steps/s\n"
+    ____ "A<accel> " _ooo_ "Set selected stepper's acceleration\n"
+    ____ "a<accel> " _ooo_ "Acceleration control with +/-acceleration values\n"
+    ____ "U    " ____ _ooo_ "Update selected stepper's speed/acceleration while "
     "running\n"
-    _____ "P<pos>   " _ooo_ "Move selected stepper to position (can be "
+    ____ "P<pos>   " _ooo_ "Move selected stepper to position (can be "
     "negative)\n"
 
-    _____ "R<n>     " _ooo_ "Move selected stepper by n steps (can be "
+    ____ "R<n> " ____ _ooo_ "Move selected stepper by n steps (can be "
     "negative)\n"
-    _____ "f        " _ooo_ "Run forward (counting up)\n"
-    _____ "b        " _ooo_ "Run backward (counting down)\n"
-    _____ "K        " _ooo_ "Keep selected stepper running in current direction\n"
-    _____ "@<pos>   " _ooo_ "Set selected stepper to position (can be "
+    ____ "f    " ____ _ooo_ "Run forward (counting up)\n"
+    ____ "b    " ____ _ooo_ "Run backward (counting down)\n"
+    ____ "K    " ____ _ooo_ "Keep selected stepper running in current direction\n"
+    ____ "@<pos>   " _ooo_ "Set selected stepper to position (can be "
     "negative)\n"
-    _____ "E<us>    " _ooo_ "Set selected stepper's delay from enable to steps\n"
-    _____ "D<ms>    " _ooo_ "Set selected stepper's delay from steps to disable\n"
-    _____ "N        " _ooo_ "Turn selected stepper output on (disable auto enable)\n"
-    _____ "F        " _ooo_ "Turn selected stepper output off (disable auto "
+    ____ "E<us>" ____ _ooo_ "Set selected stepper's delay from enable to steps\n"
+    ____ "D<ms>" ____ _ooo_ "Set selected stepper's delay from steps to disable\n"
+    ____ "N    " ____ _ooo_ "Turn selected stepper output on (disable auto enable)\n"
+    ____ "F    " ____ _ooo_ "Turn selected stepper output off (disable auto "
     "enable)\n"
-    _____ "O        " _ooo_ "Put selected stepper into auto enable mode\n"
-    _____ "S        " _ooo_ "Stop selected stepper with deceleration\n"
-    _____ "X        " _ooo_ "Immediately stop motor and set zero position\n"
-    _____ "I        " _ooo_ "Toggle motor info, while any motor is running\n"
-    _____ "W        " _ooo_ "Blocking wait until selected motor is stopped (will "
+    ____ "O    " ____ _ooo_ "Put selected stepper into auto enable mode\n"
+    ____ "S    " ____ _ooo_ "Stop selected stepper with deceleration\n"
+    ____ "X    " ____ _ooo_ "Immediately stop motor and set zero position\n"
+    ____ "I    " ____ _ooo_ "Toggle motor info, while any motor is running\n"
+    ____ "W    " ____ _ooo_ "Blocking wait until selected motor is stopped (will "
     "deadlock if the motor will never stop)\n"
-    _____ "w<ms>    " _ooo_ "Wait time in ms\n"
-    _____ "+        " _ooo_ "Perform one step forward of the selected motor\n"
-    _____ "-        " _ooo_ "Perform one step backward of the selected motor\n"
-    _____ "T        " _ooo_ "Test selected motor with direct port access\n"
+    ____ "w<ms>" ____ _ooo_ "Wait time in ms\n"
+    ____ "+    " ____ _ooo_ "Perform one step forward of the selected motor\n"
+    ____ "-    " ____ _ooo_ "Perform one step backward of the selected motor\n"
+    ____ "T    " ____ _ooo_ "Test selected motor with direct port access\n"
 #if defined(ARDUINO_ARCH_ESP32)
-    _____ "r        " _ooo_ "Call ESP.restart()\n"
-    _____ "reset    " _ooo_ "Perform reset\n"
-    _____ "p<n>     " _ooo_ "Attach pulse counter n<=7\n"
-    _____ "p<n>,l,h " _ooo_ "Attach pulse counter n<=7 with low and high limits\n"
-    _____ "pc       " _ooo_ "Clear pulse counter\n"
+    ____ "r    " ____ _ooo_ "Call ESP.restart()\n"
+    ____ "reset" ____ _ooo_ "Perform reset\n"
+    ____ "p<n> " ____ _ooo_ "Attach pulse counter n<=7\n"
+    ____ "p<n>,l,h " _ooo_ "Attach pulse counter n<=7 with low and high limits\n"
+    ____ "pc   " ____ _ooo_ "Clear pulse counter\n"
 #endif
-    _____ "t        " _ooo_ "Enter test mode\n"
-    _____ "u        " _ooo_ "Unidirectional mode (need reset to restore)\n"
+    ____ "t    " ____ _ooo_ "Enter test mode\n"
+    ____ "u    " ____ _ooo_ "Unidirectional mode (need reset to restore)\n"
 #if defined(ARDUINO_ARCH_AVR)
-    _____ "r        " _ooo_ "Toggle erroneous digitalRead() of stepper pin\n"
+    ____ "r    " ____ _ooo_ "Toggle erroneous digitalRead() of stepper pin\n"
 #endif
-    _____ "e        " _ooo_ "Toggle erroneous long 100us interrupt block\n"
-    _____ "Q        " _ooo_ "Toggle print usage on motor stop\n"
-    _____ "?        " _ooo_ "Print this usage\n"
-    "\n"
-    _SEP_
+    ____ "e    " ____ _ooo_ "Toggle erroneous long 100us interrupt block\n"
+    ____ "Q    " ____ _ooo_ "Toggle print usage on motor stop\n"
+    ____ "?    " ____ _ooo_ "Print this usage\n"
+    _NL_ _SEP_
 
 
     /* USAGE TEST */
     "Enter commands separated by space, carriage return or newline:\n"
-    _____ "M1/M2/.. " _ooo_ "to select stepper\n"
-    _____ "c        " _ooo_ "Enter configuration mode\n"
-    _____ "R        " _ooo_ "start all selected tests\n"
-    _____ "I        " _ooo_ "Toggle motor info, while test sequence is running\n"
-    _____ "01       " _ooo_ "select test sequence 01 for selected stepper\n"
-    _____ ":\n"
-    _____ "11       " _ooo_ "select test sequence 11 for selected stepper\n"
+    ____ "M1/M2/.. " _ooo_ "to select stepper\n"
+    ____ "c    " ____ _ooo_ "Enter configuration mode\n"
+    ____ "R    " ____ _ooo_ "start all selected tests\n"
+    ____ "I    " ____ _ooo_ "Toggle motor info, while test sequence is running\n"
+    ____ "01   " ____ _ooo_ "select test sequence 01 for selected stepper\n"
+    ____ ":\n"
+    ____ "11   " ____ _ooo_ "select test sequence 11 for selected stepper\n"
 #ifdef SIM_TEST_INPUT
-    _____ "W        " _ooo_ "Blocking wait until test is finished\n"
+    ____ "W    " ____ _ooo_ "Blocking wait until test is finished\n"
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
-    _____ "r        " _ooo_ "Call ESP.restart()\n"
-    _____ "reset    " _ooo_ "Perform reset\n"
+    ____ "r    " ____ _ooo_ "Call ESP.restart()\n"
+    ____ "reset" ____ _ooo_ "Perform reset\n"
 #endif
-    _____ "t        " _ooo_ "Enter test mode\n"
-    _____ "Q        " _ooo_ "Toggle print usage on motor stop\n"
-    _____ "?        " _ooo_ "Print this usage\n"
-    _____ "x        " _ooo_ "Exit test mode\n"
-    "\n"
-    _SEP_
+    ____ "t    " ____ _ooo_ "Enter test mode\n"
+    ____ "Q    " ____ _ooo_ "Toggle print usage on motor stop\n"
+    ____ "?    " ____ _ooo_ "Print this usage\n"
+    ____ "x    " ____ _ooo_ "Exit test mode\n"
+    _NL_ _SEP_
 
 
     /* USAGE CONFIG */
     "Enter commands separated by space, carriage return or newline:\n"
-    _____ "M1/M2/.. " _ooo_ "to select stepper\n"
-    _____ "c        " _ooo_ "Enter configuration mode\n"
-    _____ "d<p>     " _ooo_ "Set direction pin\n"
-    _____ "d<p,n>\n"
-    _____ "d<p,n,t>\n"
-    _____ "                  p" _ooo_ "pin number\n"
-    _____ "                  n" _ooo_ "1: high counts up 0: high counts down\n"
-    _____ "                  t" _ooo_ "delay from dir change to step in us, 0 means "
+    ____ "M1/M2/.. " _ooo_ "to select stepper\n"
+    ____ "c    " ____ _ooo_ "Enter configuration mode\n"
+    ____ "d<p> " ____ _ooo_ "Set direction pin\n"
+    ____ "d<p,n>\n"
+    ____ "d<p,n,t>\n"
+    ____ "                  p" _ooo_ "pin number\n"
+    ____ "                  n" _ooo_ "1: high counts up 0: high counts down\n"
+    ____ "                  t" _ooo_ "delay from dir change to step in us, 0 means "
     "off\n"
-    _____ "dc       " _ooo_ "Clear direction pin (unidirectional)\n"
+    ____ "dc   " ____ _ooo_ "Clear direction pin (unidirectional)\n"
 #if defined(ARDUINO_ARCH_ESP32)
-    _____ "r        " _ooo_ "Call ESP.restart()\n"
-    _____ "reset    " _ooo_ "Perform reset\n"
+    ____ "r    " ____ _ooo_ "Call ESP.restart()\n"
+    ____ "reset" ____ _ooo_ "Perform reset\n"
 #endif
-    _____ "t        " _ooo_ "Enter test mode\n"
-    _____ "Q        " _ooo_ "Toggle print usage on motor stop\n"
-    _____ "?        " _ooo_ "Print this usage\n"
-    _____ "x        " _ooo_ "Exit config mode\n"
-    "\n"
-    _SEP_
+    ____ "t    " ____ _ooo_ "Enter test mode\n"
+    ____ "Q    " ____ _ooo_ "Toggle print usage on motor stop\n"
+    ____ "?    " ____ _ooo_ "Print this usage\n"
+    ____ "x    " ____ _ooo_ "Exit config mode\n"
+    _NL_ _SEP_
 ;
 
 void output_msg(int8_t i) {
