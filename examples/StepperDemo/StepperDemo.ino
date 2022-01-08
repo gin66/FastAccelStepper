@@ -324,7 +324,17 @@ const static char messages[] PROGMEM =
     "is not defined" _NL_ _SEP_
 #define _run_ "\224"
     "run " _SEP_
-#define MSG_OFFSET 21
+#define _forward_ "\225"
+    "forward " _SEP_
+#define _backward_ "\226"
+    "backward " _SEP_
+#define _Stepped_ "\227"
+    "Stepped " _SEP_
+#define _acceleration_ "\230"
+    "acceleration " _SEP_
+#define _speed_ "\231"
+    "speed " _SEP_
+#define MSG_OFFSET 26
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
     "Select stepper " _SEP_
 #define MSG_TOGGLE_MOTOR_INFO 1+MSG_OFFSET
@@ -334,9 +344,9 @@ const static char messages[] PROGMEM =
 #define MSG_ENTER_TEST_MODE 3+MSG_OFFSET
     "Enter test mode" _NL_ _SEP_
 #define MSG_SET_ACCELERATION_TO 4+MSG_OFFSET
-    "Set acceleration to " _SEP_
+    _set_ _acceleration_ _to_ _SEP_
 #define MSG_SET_SPEED_TO_US 5+MSG_OFFSET
-    "Set speed (us/step) to " _SEP_
+    _set_ _speed_ "(us/step) " _to_ _SEP_
 #define MSG_MOVE_STEPS 6+MSG_OFFSET
     _Move_ "steps " _SEP_
 #define MSG_MOVE_TO_POSITION 7+MSG_OFFSET
@@ -360,21 +370,21 @@ const static char messages[] PROGMEM =
 #define MSG_KEEP_RUNNING 16+MSG_OFFSET
     "Keep running" _NL_ _SEP_
 #define MSG_RUN_FORWARD 17+MSG_OFFSET
-    _run_ "forward" _NL_ _SEP_
+    _run_ _forward_ _NL_ _SEP_
 #define MSG_RUN_BACKWARD 18+MSG_OFFSET
-    _run_ "backward" _NL_ _SEP_
+    _run_ _backward_ _NL_ _SEP_
 #define MSG_IMMEDIATE_STOP 19+MSG_OFFSET
     "Immediate Stop" _NL_ _SEP_
 #define MSG_UPDATE_SPEED_ACCELERATION 20+MSG_OFFSET
-    "Update speed/acceleration" _NL_ _SEP_
+    "Update " _speed_ " / " _acceleration_ _NL_ _SEP_
 #define MSG_BLOCKING_WAIT 21+MSG_OFFSET
     "Blocking wait for running stepper to stop" _NL_ _SEP_
 #define MSG_TEST_DIRECT_DRIVE 22+MSG_OFFSET
     "Test direct drive" _NL_ _SEP_
 #define MSG_STEPPED_FORWARD 23+MSG_OFFSET
-    "Stepped forward" _NL_ _SEP_
+    _Stepped_ _forward_ _NL_ _SEP_
 #define MSG_STEPPED_BACKWARD 24+MSG_OFFSET
-    "Stepped backward" _NL_ _SEP_
+    _Stepped_ _backward_ _NL_ _SEP_
 #define MSG_WAIT_MS 25+MSG_OFFSET
     " ms wait" _NL_ _SEP_
 #define MSG_SELECT_TEST_SEQUENCE 26+MSG_OFFSET
@@ -411,9 +421,9 @@ const static char messages[] PROGMEM =
 #define MSG_ERROR_INVALID_VALUE 41+MSG_OFFSET
     _ERROR_ "invalid value" _NL_ _SEP_
 #define MSG_ERROR_MOVE_ERR_ACCELERATION_IS_UNDEFINED__MINUS_3 42+MSG_OFFSET
-    _ERROR_ "acceleration" _is_not_defined_nl _SEP_
+    _ERROR_ _acceleration_ _is_not_defined_nl _SEP_
 #define MSG_ERROR_MOVE_ERR_SPEED_IS_UNDEFINED__MINUS_2 43+MSG_OFFSET
-    _ERROR_ "speed " _is_not_defined_nl _SEP_
+    _ERROR_ _speed_ _is_not_defined_nl _SEP_
 #define MSG_ERROR_MOVE_ERR_NO_DIRECTION_PIN__MINUS_1 44+MSG_OFFSET
     _ERROR_ "no " _direction_  _pin_ "=> impossible move" _NL_ _SEP_
 #define MSG_MOVE_OK 45+MSG_OFFSET
@@ -431,7 +441,7 @@ const static char messages[] PROGMEM =
 #define MSG_CLEAR_PULSE_COUNTER 51+MSG_OFFSET
     "Clear " _pulse_counter_ "" _NL_ _SEP_
 #define MSG_SET_SPEED_TO_HZ 52+MSG_OFFSET
-    _set_ "speed (steps/s) to " _SEP_
+    _set_ _speed_ "(steps/s) to " _SEP_
 #define MSG_PASS_STATUS 53+MSG_OFFSET
     "Test passed" _NL_ _SEP_
 #define MSG_TEST_COMPLETED 54+MSG_OFFSET
