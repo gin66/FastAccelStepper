@@ -1067,8 +1067,12 @@ void process_cmd(char *cmd) {
               pause_start = millis();
 		break;
 	case MODE(config, 'd'):
+		if (*cmd == 'c') {
+              output_msg(MSG_DISABLED);
+              stepper_selected->setDirectionPin(PIN_UNDEFINED);
+			break;
+        }
 		val1 = strtol(cmd, &endptr, 10);
-		cmd = endptr;
 		if (*cmd == ',') {
 			cmd++;
 			val2 = strtol(cmd, &endptr, 10);
@@ -1107,11 +1111,7 @@ void process_cmd(char *cmd) {
               output_msg(MSG_SET_TO_PIN);
               Serial.println(val1);
               stepper_selected->setDirectionPin(val1);
-		}
-		else if (*cmd == 'c') {
-              output_msg(MSG_DISABLED);
-              stepper_selected->setDirectionPin(PIN_UNDEFINED);
-        }
+			}
 		break;
 	case MODE(normal, 'N'):
               output_msg(MSG_OUTPUT_DRIVER_ON);
