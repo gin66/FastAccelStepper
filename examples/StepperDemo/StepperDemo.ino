@@ -352,12 +352,12 @@ const static char messages[] PROGMEM =
     "mode " _SEP_
 #define _clear_ "\242"
     "clear " _SEP_
-#define _stepper_ "\243"
-    "stepper " _SEP_
+#define _stepper "\243"
+    "stepper" _SEP_
 #define _select "\244"
     "select" _SEP_
-#define _selected_stepper_ "\245"
-    _select "ed" _stepper_ _SEP_
+#define _selected_stepper "\245"
+    _select "ed " _stepper _SEP_
 #define MSG_OFFSET 38
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
     "Select stepper " _SEP_
@@ -491,29 +491,29 @@ const static char messages[] PROGMEM =
     _Enter_ "commands separated by space, carriage return or newline:\n"
     ____ "M1/M2/.. " _ooo_ "to select stepper\n"
     ____ "c" ________ _ooo_ _Enter_ "configuration mode\n"
-    ____ "V<speed> " _ooo_ _set_ _selected_stepper_ "'s speed in us/step\n"
-    ____ "H<speed> " _ooo_ _set_ _selected_stepper_ "'s speed in steps/s\n"
-    ____ "A<accel> " _ooo_ _set_ _selected_stepper_ "'s acceleration\n"
+    ____ "V<speed> " _ooo_ _set_ _selected_stepper "'s speed in us/step\n"
+    ____ "H<speed> " _ooo_ _set_ _selected_stepper "'s speed in steps/s\n"
+    ____ "A<accel> " _ooo_ _set_ _selected_stepper "'s acceleration\n"
     ____ "a<accel> " _ooo_ "Acceleration control with +/-acceleration values\n"
-    ____ "U" ________ _ooo_ "Update " _selected_stepper_ "'s speed/acceleration while "
+    ____ "U" ________ _ooo_ "Update " _selected_stepper "'s speed/acceleration while "
     "running\n"
-    ____ "P<pos>   " _ooo_ "Move " _selected_stepper_ " to position (can be "
+    ____ "P<pos>   " _ooo_ "Move " _selected_stepper " to position (can be "
     "negative)\n"
 
-    ____ "R<n> " ____ _ooo_ "Move " _selected_stepper_ " by n steps (can be "
+    ____ "R<n> " ____ _ooo_ "Move " _selected_stepper " by n steps (can be "
     "negative)\n"
     ____ "f" ________ _ooo_ _run_ _forward_ "(counting up)\n"
     ____ "b" ________ _ooo_ _run_ _backward_ "(counting down)\n"
-    ____ "K" ________ _ooo_ "Keep " _selected_stepper_ " running in current direction\n"
-    ____ "@<pos>   " _ooo_ _set_ _selected_stepper_ " to position (can be "
+    ____ "K" ________ _ooo_ "Keep " _selected_stepper " running in current direction\n"
+    ____ "@<pos>   " _ooo_ _set_ _selected_stepper " to position (can be "
     "negative)\n"
-    ____ "E<us>" ____ _ooo_ _set_ _selected_stepper_ "'s delay from enable to steps\n"
-    ____ "D<ms>" ____ _ooo_ _set_ _selected_stepper_ "'s delay from steps to disable\n"
-    ____ "N" ________ _ooo_ "Turn " _selected_stepper_ " output on (disable auto enable)\n"
-    ____ "F" ________ _ooo_ "Turn " _selected_stepper_ " output off (disable auto "
+    ____ "E<us>" ____ _ooo_ _set_ _selected_stepper "'s delay from enable to steps\n"
+    ____ "D<ms>" ____ _ooo_ _set_ _selected_stepper "'s delay from steps to disable\n"
+    ____ "N" ________ _ooo_ "Turn " _selected_stepper " output on (disable auto enable)\n"
+    ____ "F" ________ _ooo_ "Turn " _selected_stepper " output off (disable auto "
     "enable)\n"
-    ____ "O" ________ _ooo_ "Put " _selected_stepper_ " into auto enable mode\n"
-    ____ "S" ________ _ooo_ "Stop " _selected_stepper_ " with deceleration\n"
+    ____ "O" ________ _ooo_ "Put " _selected_stepper " into auto enable mode\n"
+    ____ "S" ________ _ooo_ "Stop " _selected_stepper " with deceleration\n"
     ____ "X" ________ _ooo_ "Immediately stop motor and set zero position\n"
     ____ "I" ________ _ooo_ _Toggle_ "motor info, while any motor is running\n"
     ____ "W" ________ _ooo_ "Blocking wait until selected motor is stopped (will "
@@ -546,9 +546,9 @@ const static char messages[] PROGMEM =
     ____ "c" ________ _ooo_ _Enter_ "configuration mode\n"
     ____ "R" ________ _ooo_ "start all selected tests\n"
     ____ "I" ________ _ooo_ _Toggle_ "motor info, while test sequence is running\n"
-    ____ "01   " ____ _ooo_ "select test sequence 01 for " _selected_stepper_ "\n"
+    ____ "01   " ____ _ooo_ "select test sequence 01 for " _selected_stepper "\n"
     ____ ":\n"
-    ____ "11   " ____ _ooo_ "select test sequence 11 for " _selected_stepper_ "\n"
+    ____ "11   " ____ _ooo_ "select test sequence 11 for " _selected_stepper "\n"
 #ifdef SIM_TEST_INPUT
     ____ "W" ________ _ooo_ "Blocking wait until test is finished\n"
 #endif
@@ -595,8 +595,8 @@ void output_msg(int8_t i) {
     if (ch == '|') {
       i--;
     } else if (i == 0) {
-	  if (ch >= 128) {
-          output_msg(ch - 128);
+	  if (ch < 0) {
+          output_msg(ch + 128);
       }
       else {
 		  Serial.print(ch);
@@ -610,8 +610,8 @@ void output_msg(int8_t i) {
     if (ch == '|') {
       i--;
     } else if (i == 0) {
-	  if (ch >= 128) {
-          output_msg(ch - 128);
+	  if (ch < 0) {
+          output_msg(ch + 128);
       }
       else {
 		  Serial.print(ch);
