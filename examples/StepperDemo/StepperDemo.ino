@@ -291,7 +291,7 @@ const static char messages[] PROGMEM =
 #define _pin_ "\203"
     "pin " _SEP_
 #define _step_pin_ "\204"
-    "step " _pin_ "" _SEP_
+    "step " _pin_ _SEP_
 #define _to_ "\205"
     "to " _SEP_
 #define _LOW_ "\206"
@@ -299,9 +299,9 @@ const static char messages[] PROGMEM =
 #define _HIGH_ "\207"
     "HIGH " _SEP_
 #define _to_LOW_nl "\210"
-     _to_  _LOW_ "" _NL_ _SEP_
+     _to_  _LOW_ _NL_ _SEP_
 #define _to_HIGH_nl "\211"
-     _to_  _HIGH_ "" _NL_ _SEP_
+     _to_  _HIGH_ _NL_ _SEP_
 #define _Toggle_ "\212"
     "Toggle " _SEP_
 #define _ERROR_ "\213"
@@ -334,7 +334,13 @@ const static char messages[] PROGMEM =
     "acceleration " _SEP_
 #define _speed_ "\231"
     "speed " _SEP_
-#define MSG_OFFSET 26
+#define _test_ "\232"
+    "test " _SEP_
+#define _erroneous_ "\233"
+    "erroneous " _SEP_
+#define _digitalRead_ "\234"
+    "digitalRead() " _SEP_
+#define MSG_OFFSET 29
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
     "Select stepper " _SEP_
 #define MSG_TOGGLE_MOTOR_INFO 1+MSG_OFFSET
@@ -342,7 +348,7 @@ const static char messages[] PROGMEM =
 #define MSG_TOGGLE_USAGE_INFO 2+MSG_OFFSET
     _Toggle_ "usage info" _NL_ _SEP_
 #define MSG_ENTER_TEST_MODE 3+MSG_OFFSET
-    "Enter test mode" _NL_ _SEP_
+    "Enter " _test_ "mode" _NL_ _SEP_
 #define MSG_SET_ACCELERATION_TO 4+MSG_OFFSET
     _set_ _acceleration_ _to_ _SEP_
 #define MSG_SET_SPEED_TO_US 5+MSG_OFFSET
@@ -380,7 +386,7 @@ const static char messages[] PROGMEM =
 #define MSG_BLOCKING_WAIT 21+MSG_OFFSET
     "Blocking wait for running stepper to stop" _NL_ _SEP_
 #define MSG_TEST_DIRECT_DRIVE 22+MSG_OFFSET
-    "Test direct drive" _NL_ _SEP_
+    _test_ "direct drive" _NL_ _SEP_
 #define MSG_STEPPED_FORWARD 23+MSG_OFFSET
     _Stepped_ _forward_ _NL_ _SEP_
 #define MSG_STEPPED_BACKWARD 24+MSG_OFFSET
@@ -388,15 +394,15 @@ const static char messages[] PROGMEM =
 #define MSG_WAIT_MS 25+MSG_OFFSET
     " ms wait" _NL_ _SEP_
 #define MSG_SELECT_TEST_SEQUENCE 26+MSG_OFFSET
-    "Select test_seq: " _SEP_
+    "Select " _test_ "sequence: " _SEP_
 #define MSG_EXIT_TO_MAIN_MENU 27+MSG_OFFSET
     "Exit to main menu" _NL_ _SEP_
 #define MSG_RUN_TESTS 28+MSG_OFFSET
-    _run_ "tests" _NL_ _SEP_
+    _run_ _test_ _NL_ _SEP_
 #define MSG_WAIT_COMPLETE 29+MSG_OFFSET
     "Wait complete" _NL_ _SEP_
 #define MSG_FAILED_STATUS 30+MSG_OFFSET
-    "Failed status from test" _NL_ _SEP_
+    "Failed status from " _test_ _NL_ _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_LOW 31+MSG_OFFSET
     _Cannot_set_ _enable_  _LOW_  _pin_ _to_LOW_nl _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_HIGH 32+MSG_OFFSET
@@ -413,11 +419,11 @@ const static char messages[] PROGMEM =
     _Cannot_set_ _direction_ _pin_ _to_ _SEP_
 #define MSG_STEPPER_VERSION 38+MSG_OFFSET
     "StepperDemo Version " VERSION
-    "" _NL_ _SEP_
+    _NL_ _SEP_
 #define MSG_ATTACH_PULSE_COUNTER 39+MSG_OFFSET
     _attach " " _pulse_counter_ _SEP_
 #define MSG_ERROR_ATTACH_PULSE_COUNTER 40+MSG_OFFSET
-    _ERROR_ _attach "ing "  _pulse_counter_ "" _NL_ _SEP_
+    _ERROR_ _attach "ing "  _pulse_counter_ _NL_ _SEP_
 #define MSG_ERROR_INVALID_VALUE 41+MSG_OFFSET
     _ERROR_ "invalid value" _NL_ _SEP_
 #define MSG_ERROR_MOVE_ERR_ACCELERATION_IS_UNDEFINED__MINUS_3 42+MSG_OFFSET
@@ -429,23 +435,23 @@ const static char messages[] PROGMEM =
 #define MSG_MOVE_OK 45+MSG_OFFSET
     "OK" _NL_ _SEP_
 #define MSG_STRAY_DIGITAL_READ_TOGGLE 46+MSG_OFFSET
-    _Toggle_ "erroneous digitalRead() " _to_ _step_pin_ "" _NL_ _SEP_
+    _Toggle_ _erroneous_ _digitalRead_ _to_ _step_pin_ _NL_ _SEP_
 #define MSG_STRAY_DIGITAL_READ_ENABLED 47+MSG_OFFSET
-    "ERRONEOUS digitalRead() TO STEP PIN IS ON !!!" _NL_ _SEP_
+    _erroneous_ _digitalRead_ _to_ _step_pin_ "IS ON !!!" _NL_ _SEP_
 #define MSG_LONG_INTERRUPT_BLOCK_TOGGLE 48+MSG_OFFSET
-    _Toggle_ "erroneous 100 µs ISR block" _NL_ _SEP_
+    _Toggle_ _erroneous_ "100 µs ISR block" _NL_ _SEP_
 #define MSG_LONG_INTERRUPT_BLOCK_ENABLED 49+MSG_OFFSET
-    "ERRONEOUS 100 µs ISR BLOCK IS ON" _NL_ _SEP_
+    _erroneous_ "100 µs ISR BLOCK IS ON" _NL_ _SEP_
 #define MSG_SET_UNIDIRECTIONAL_STEPPER 50+MSG_OFFSET
     _set_ "unidirectional stepper" _NL_ _SEP_
 #define MSG_CLEAR_PULSE_COUNTER 51+MSG_OFFSET
-    "Clear " _pulse_counter_ "" _NL_ _SEP_
+    "Clear " _pulse_counter_ _NL_ _SEP_
 #define MSG_SET_SPEED_TO_HZ 52+MSG_OFFSET
     _set_ _speed_ "(steps/s) to " _SEP_
 #define MSG_PASS_STATUS 53+MSG_OFFSET
-    "Test passed" _NL_ _SEP_
+    _test_ "passed" _NL_ _SEP_
 #define MSG_TEST_COMPLETED 54+MSG_OFFSET
-    "Test completed" _NL_ _SEP_
+    _test_ "completed" _NL_ _SEP_
 #define MSG_ENTER_CONFIG_MODE 55+MSG_OFFSET
     "Enter config mode" _NL_ _SEP_
 #define MSG_DIRECTION_PIN 56+MSG_OFFSET
