@@ -360,7 +360,7 @@ const static char messages[] PROGMEM =
     _select "ed " _stepper _SEP_
 #define MSG_OFFSET 38
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
-    "Select " _stepper_ " " _SEP_
+    "Select " _stepper " " _SEP_
 #define MSG_TOGGLE_MOTOR_INFO 1+MSG_OFFSET
     _Toggle_ "motor info" _NL_ _SEP_
 #define MSG_TOGGLE_USAGE_INFO 2+MSG_OFFSET
@@ -402,7 +402,7 @@ const static char messages[] PROGMEM =
 #define MSG_UPDATE_SPEED_ACCELERATION 20+MSG_OFFSET
     "Update " _speed_ " / " _acceleration_ _NL_ _SEP_
 #define MSG_BLOCKING_WAIT 21+MSG_OFFSET
-    "Blocking wait for running " _stepper_ " " _to_ "stop" _NL_ _SEP_
+    "Blocking wait for running " _stepper " " _to_ "stop" _NL_ _SEP_
 #define MSG_TEST_DIRECT_DRIVE 22+MSG_OFFSET
     _test_ "direct drive" _NL_ _SEP_
 #define MSG_STEPPED_FORWARD 23+MSG_OFFSET
@@ -532,7 +532,7 @@ const static char messages[] PROGMEM =
     ____ "t" ________ _ooo_ _Enter_ _test_ _mode_ _NL_
     ____ "u" ________ _ooo_ "Unidirectional " _mode_ "(need reset " _to_ "restore)" _NL_
 #if defined(ARDUINO_ARCH_AVR)
-    ____ "r" ________ _ooo_ _Toggle_ "erroneous digitalRead() of " _stepper_ " pin" _NL_
+    ____ "r" ________ _ooo_ _Toggle_ "erroneous digitalRead() of " _stepper " pin" _NL_
 #endif
     ____ "e" ________ _ooo_ _Toggle_ "erroneous long 100us interrupt block" _NL_
     ____ "Q" ________ _ooo_ _Toggle_ "print usage on motor stop" _NL_
