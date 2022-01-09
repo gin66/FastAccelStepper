@@ -382,11 +382,23 @@ const static char messages[] PROGMEM =
     "of the " _SEP_
 #define _Turn_ "\261"
     "Turn " _SEP_
-#define _m1_m2_to_select_stepper_ "\262"
+#define _stop "\262"
+    "stop"  _SEP_
+#define _from_ "\263"
+    "from "  _SEP_
+#define _comma__counting_ "\264"
+    ", counting "  _SEP_
+#define __disable_auto_enable_nl "\265"
+    " disable auto " _enable_ _NL_ _SEP_
+#define _ooo_set_selected_stepper_s_ "\26r65"
+   _ooo_ _set_ _selected_stepper "'s " _SEP_
+#define _m1_m2_to_select_stepper_ "\26r76"
     ____ "M1/M2/.. " _ooo_ _to_ _select _stepper _NL_ _SEP_
-#define _print_this_usage_ "\263"
+#define _print_this_usage_ "\270"
     ____ "?" ________ _ooo_ "Print this usage" _NL_ _NL_ _SEP_
-#define MSG_OFFSET 52
+#define _toggle_print_usage_after_stepper_stop "\271"
+    ____ "Q" ________ _ooo_ _Toggle_ "print " _usage_ "on " _stepper " " _stop _NL_ _SEP_
+#define MSG_OFFSET 58
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
     "Select " _stepper " " _SEP_
 #define MSG_TOGGLE_MOTOR_INFO 1+MSG_OFFSET
@@ -418,7 +430,7 @@ const static char messages[] PROGMEM =
 #define MSG_OUTPUT_DRIVER_AUTO 14+MSG_OFFSET
     _Output_driver_ "automatic " _mode_ _NL_ _SEP_
 #define MSG_STOP 15+MSG_OFFSET
-    "Stop" _NL_ _SEP_
+    _stop _NL_ _SEP_
 #define MSG_KEEP_RUNNING 16+MSG_OFFSET
     "Keep running" _NL_ _SEP_
 #define MSG_RUN_FORWARD 17+MSG_OFFSET
@@ -426,11 +438,11 @@ const static char messages[] PROGMEM =
 #define MSG_RUN_BACKWARD 18+MSG_OFFSET
     _run_ _backward_ _NL_ _SEP_
 #define MSG_IMMEDIATE_STOP 19+MSG_OFFSET
-    "Immediate Stop" _NL_ _SEP_
+    "immediate " _stop _NL_ _SEP_
 #define MSG_UPDATE_SPEED_ACCELERATION 20+MSG_OFFSET
     "Update " _speed_ " / " _acceleration_ _NL_ _SEP_
 #define MSG_BLOCKING_WAIT 21+MSG_OFFSET
-    "Blocking wait for running " _stepper " " _to_ "stop" _NL_ _SEP_
+    "Blocking wait for running " _stepper " " _to_ _stop _NL_ _SEP_
 #define MSG_TEST_DIRECT_DRIVE 22+MSG_OFFSET
     _test_ "direct drive" _NL_ _SEP_
 #define MSG_STEPPED_FORWARD 23+MSG_OFFSET
@@ -448,7 +460,7 @@ const static char messages[] PROGMEM =
 #define MSG_WAIT_COMPLETE 29+MSG_OFFSET
     "Wait complete" _NL_ _SEP_
 #define MSG_FAILED_STATUS 30+MSG_OFFSET
-    "Failed status from " _test_ _NL_ _SEP_
+    "Failed status " _from_ _test_ _NL_ _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_LOW 31+MSG_OFFSET
     _Cannot_set_ _enable_  _LOW_  _pin_ _to_LOW_nl _SEP_
 #define MSG_ENABLE_LOW_PIN_IS_NOT_HIGH 32+MSG_OFFSET
@@ -521,32 +533,29 @@ const static char messages[] PROGMEM =
     _Enter_ "commands separated by space, carriage return or newline:" _NL_
 	_m1_m2_to_select_stepper_
     ____ "c" ________ _ooo_ _Enter_ _configuration_ _mode_ _NL_
-    ____ "V<speed> " _ooo_ _set_ _selected_stepper "'s " _speed_ "in us/" _step _NL_
-    ____ "H<speed> " _ooo_ _set_ _selected_stepper "'s " _speed_ "in " _steps_ "/s" _NL_
-    ____ "A<accel> " _ooo_ _set_ _selected_stepper "'s " _acceleration_ _NL_
+    ____ "V<speed> " _ooo_set_selected_stepper_s_ _speed_ "in us/" _step _NL_
+    ____ "H<speed> " _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/s" _NL_
+    ____ "A<accel> " _ooo_set_selected_stepper_s_ _acceleration_ _NL_
     ____ "a<accel> " _ooo_ _acceleration_ "control with +/-" _acceleration_ "values" _NL_
     ____ "U" ________ _ooo_ "Update " _selected_stepper "'s " _speed_ "/ " _acceleration_ " while "
     "running" _NL_
-    ____ "P<pos>   " _ooo_ _Move_ _selected_stepper " " _to_ _position_ "(can be "
-    "negative)" _NL_
-
-    ____ "R<n> " ____ _ooo_ _Move_ _selected_stepper " by n " _steps_ "(can be "
-    "negative)" _NL_
-    ____ "f" ________ _ooo_ _run_ _forward_ "(counting up)" _NL_
-    ____ "b" ________ _ooo_ _run_ _backward_ "(counting down)" _NL_
+    ____ "P<pos>   " _ooo_ _Move_ _selected_stepper " " _to_ "+/- " _position_ _NL_
+    ____ "R<n> " ____ _ooo_ _Move_ _selected_stepper " by +/- n " _steps_ _NL_
+    ____ "f" ________ _ooo_ _run_ _forward_ _comma__counting_ "up" _NL_
+    ____ "b" ________ _ooo_ _run_ _backward_ _comma__counting_ "down" _NL_
     ____ "K" ________ _ooo_ "Keep " _selected_stepper " running in current " _direction_ _NL_
     ____ "@<pos>   " _ooo_ _set_ _selected_stepper " " _to_ _position_ "(can be "
     "negative)" _NL_
-    ____ "E<us>" ____ _ooo_ _set_ _selected_stepper "'s " _delay_ "from " _enable_ _to_ _steps_ _NL_
-    ____ "D<ms>" ____ _ooo_ _set_ _selected_stepper "'s " _delay_ "from " _steps_ _to_ "disable" _NL_
-    ____ "N" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "on,  (disable auto " _enable_ _NL_
-    ____ "F" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "off,  disable auto " _enable_ _NL_
+    ____ "E<us>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _enable_ _to_ _steps_ _NL_
+    ____ "D<ms>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _steps_ _to_ "disable" _NL_
+    ____ "N" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "on, " __disable_auto_enable_nl
+    ____ "F" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "off," __disable_auto_enable_nl
     ____ "O" ________ _ooo_ "Put " _selected_stepper " into auto " _enable_ _mode_ _NL_
-    ____ "S" ________ _ooo_ "Stop " _selected_stepper " with deceleration" _NL_
-    ____ "X" ________ _ooo_ "Immediately stop " _stepper " and " _set_ "zero position" _NL_
+    ____ "S" ________ _ooo_ _stop " " _selected_stepper " with deceleration" _NL_
+    ____ "X" ________ _ooo_ "Immediately " _stop " " _stepper " and " _set_ "zero position" _NL_
     ____ "I" ________ _ooo_ _Toggle_ _stepper " info, while any " _stepper " is running" _NL_
-    ____ "W" ________ _ooo_ "Blocking wait until " _selected_stepper " is stopped (will "
-    "deadlock if the " _stepper " will never stop)" _NL_
+    ____ "W" ________ _ooo_ "Blocking wait until " _selected_stepper " is " _stop "ped, will "
+    "deadlock if " _stepper " never " _stop "s" _NL_
     ____ "w<ms>" ____ _ooo_ "Wait time in ms" _NL_
     ____ "+" ________ _ooo_ _Perform_ _one_step_ _forward_ _of_the_ _selected_stepper _NL_
     ____ "-" ________ _ooo_ _Perform_ _one_step_ _backward_ _of_the_ _selected_stepper _NL_
@@ -555,7 +564,7 @@ const static char messages[] PROGMEM =
     ____ "r" ________ _ooo_ "Call ESP.restart()" _NL_
     ____ "reset" ____ _ooo_ _Perform_ "reset" _NL_
     ____ "p<n> " ____ _ooo_ _attach " " _pulse_counter_ "n<=7" _NL_
-    ____ "p<n>,l,h " _ooo_ _attach " " _pulse_counter_ "n<=7 with low and high limits" _NL_
+    ____ "p<n>,l,h " _ooo_ _attach " " _pulse_counter_ "n<=7 with low,high limits" _NL_
     ____ "pc   " ____ _ooo_ _clear_ _pulse_counter_ _NL_
 #endif
     ____ "t" ________ _ooo_ _Enter_ _test_ _mode_ _NL_
@@ -564,7 +573,7 @@ const static char messages[] PROGMEM =
     ____ "r" ________ _ooo_ _Toggle_ _erroneous_ _digitalRead_ _of_the_ _stepper " pin" _NL_
 #endif
     ____ "e" ________ _ooo_ _Toggle_ _erroneous_ "long 100us interrupt block" _NL_
-    ____ "Q" ________ _ooo_ _Toggle_ "print " _usage_ "on " _stepper " stop" _NL_
+    _toggle_print_usage_after_stepper_stop
 	_print_this_usage_
     _SEP_
 
@@ -578,8 +587,8 @@ const static char messages[] PROGMEM =
     ____ ":" _NL_
     ____ "11   " ____ _ooo_ _select " " _test_sequence_ "11 for " _selected_stepper _NL_
     ____ "W" ________ _ooo_ "Blocking wait until test is finished" _NL_
-    ____ "Q" ________ _ooo_ _Toggle_ "print " _usage_ "on " _stepper " stop" _NL_
     ____ "x" ________ _ooo_ "Exit test mode" _NL_
+    _toggle_print_usage_after_stepper_stop
 	_print_this_usage_
     _SEP_
 
@@ -592,7 +601,7 @@ const static char messages[] PROGMEM =
     ____ "d<p,n,t>" _NL_
     ________ ________ ________ "p" _ooo_ _pin_ "number" _NL_
     ________ ________ ________ "n" _ooo_ "1: high counts up 0: high counts down" _NL_
-    ________ ________ ________ "t" _ooo_ _delay_ "from dir change " _to_ "step in us, 0 means "
+    ________ ________ ________ "t" _ooo_ _delay_ _from_ "dir change " _to_ "step in us, 0 means "
     "off" _NL_
     ____ "dc   " ____ _ooo_ _clear_ _direction_ _pin_ "(unidirectional)" _NL_
     ____ "x" ________ _ooo_ "Exit " _configuration_ _mode_ _NL_
