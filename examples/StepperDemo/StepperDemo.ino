@@ -12,7 +12,7 @@
 // Code Optimization
 //   Start   30170 Bytes
 
-#define VERSION "post-ff590ca"
+#define VERSION "post-0bf4513"
 
 struct stepper_config_s {
   uint8_t step;
@@ -280,6 +280,7 @@ struct test_seq_s test_seq[MAX_STEPPER] = {
 #define _NL_ "\n"
 #define _SEP_ "|"
 
+// clang-format off
 const static char messages[] PROGMEM =
 #define _Move_ "\200"
     "Move " _SEP_
@@ -603,6 +604,7 @@ const static char messages[] PROGMEM =
     ____ "x" ________ _ooo_ "Exit " _configuration_ _mode_ _NL_
     _NL_ _SEP_
 ;
+// clang-format on
 
 void output_msg(int8_t i) {
   char ch;
