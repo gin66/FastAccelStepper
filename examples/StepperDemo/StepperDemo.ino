@@ -501,9 +501,11 @@ const static char messages[] PROGMEM =
     _high_counts_ "down" _NL_ _SEP_
 #define MSG_DELAY 61+MSG_OFFSET
     _delay_ "in us = " _SEP_
-#define MSG_USAGE_NORMAL 62+MSG_OFFSET
-#define MSG_USAGE_TEST 63+MSG_OFFSET
-#define MSG_USAGE_CONFIG 64+MSG_OFFSET
+#define MSG_UNKNOWN_COMMAND 62 + MSG_OFFSET
+    "Cannot interpret this command: " _SEP_
+#define MSG_USAGE_NORMAL 63+MSG_OFFSET
+#define MSG_USAGE_TEST 64+MSG_OFFSET
+#define MSG_USAGE_CONFIG 65+MSG_OFFSET
     /* USAGE NORMAL */
     _Enter_ "commands separated by space, carriage return or newline:" _NL_
     ____ "M1/M2/.. " _ooo_ _to_ _select _stepper _NL_
