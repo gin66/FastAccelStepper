@@ -1,5 +1,5 @@
-#ifndef AVRSTEPPERPINS_H_YFXPAB9M
-#define AVRSTEPPERPINS_H_YFXPAB9M
+#ifndef AVRSTEPPERPINS_H
+#define AVRSTEPPERPINS_H
 #include <Arduino.h>
 
 /** * Warning: Other libraries may also use the timers!
@@ -11,7 +11,7 @@
  */
 
 #if defined(ARDUINO_ARCH_AVR)
-#if !(defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__))
+#if !(defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega32U4__))
 #error "Unsupported AVR derivate"
 #endif
 #endif
@@ -38,12 +38,17 @@
 #define stepPinStepper5A 46 /* OC5A */
 #define stepPinStepper5B 45 /* OC5B */
 #define stepPinStepper5C 44 /* OC5C */
+#elif defined(__AVR_ATmega32U4__)
+#define FAS_TIMER_MODULE 1
+#define stepPinStepper1A 9  /* OC1A */
+#define stepPinStepper1B 10 /* OC1B */
+#define stepPinStepper1C 11 /* OC1C */
 #endif
 
 #if (FAS_TIMER_MODULE == 1)
 #define stepPinStepperA stepPinStepper1A
 #define stepPinStepperB stepPinStepper1B
-#if defined(__AVR_ATmega2560__)
+#if defined(__AVR_ATmega2560__) || defined(__AVR_ATmega32U4__)
 #define stepPinStepperC stepPinStepper1C
 #endif
 #elif (FAS_TIMER_MODULE == 3)
