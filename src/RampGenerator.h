@@ -10,7 +10,7 @@
 #elif defined(__AVR_ATmega2560__)
 #define MAX_STEPPER 3
 #elif defined(__AVR_ATmega32U4__)
-#define MAX_STEPPER 2
+#define MAX_STEPPER 3
 #endif
 #define TICKS_PER_S F_CPU
 #elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
