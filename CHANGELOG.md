@@ -1,3 +1,8 @@
+next:
+- Reorganized StepperDemo to fit in smaller device like atmega32u4
+- support for espidf4.4 for arduino
+- experimental (broken ?) support for espidf4.4
+
 0.24.0:
 - Implement configurable delay after direction pin change and first step in new direction
   [Issue #83](https://github.com/gin66/FastAccelStepper/issues/83).
