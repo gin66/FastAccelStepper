@@ -2,7 +2,6 @@
 
 bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
-  char buf[100];
   switch (seq->state) {
     case 0:  // INIT
       srand(135);
@@ -29,9 +28,10 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         uint32_t accel = rand() % (AMAX * 4);
         accel = accel >> ((accel % 4) + 2);
         accel = accel + AMIN;
-        sprintf(buf, "speed=%u accel=%u", (unsigned int)speed,
-                (unsigned int)accel);
-        Serial.println(buf);
+		Serial.print("speed=");
+		Serial.print(speed);
+		Serial.print(" accel=");
+		Serial.println(accel);
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         if (rand() & 1) {

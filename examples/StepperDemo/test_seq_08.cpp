@@ -11,7 +11,6 @@ int16_t old = 0;
 
 bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
-  char buf[100];
   switch (seq->state) {
     case 0:  // INIT
       srand(135);
@@ -28,8 +27,10 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
         int16_t pcnt = stepper->readPulseCounter();
         int32_t spos = stepper->getPositionAfterCommandsCompleted();
         if ((pcnt & 0x3fff) != (spos & 0x3fff)) {
-          sprintf(buf, "stepper pos=%d  real pos=%d", spos, pcnt);
-          Serial.println(buf);
+		  Serial.print("stepper pos=");
+		  Serial.print(spos);
+		  Serial.print("  real pos=");
+		  Serial.println(pcnt);
 
           seq->state = TEST_STATE_ERROR;
           return true;
@@ -68,8 +69,12 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
           move = -move;
         }
 
-        sprintf(buf, "speed=%d accel=%d move=%d", speed, accel, move);
-        Serial.println(buf);
+		Serial.print("speed=");
+		Serial.print(speed);
+		Serial.print(" accel=");
+		Serial.print(accel);
+		Serial.print(" move=");
+		Serial.println(move);
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         stepper->move(move);
