@@ -34,3 +34,4 @@ clean:
 	rm -fR */.pio */.tested */x.vcd */result.txt
 	find . -type l -delete
 	find . -type d -empty -delete
+	make links
