@@ -417,9 +417,9 @@ const static char messages[] PROGMEM =
     ", counting "  _SEP_
 #define __disable_auto_enable_nl "\265"
     " disable auto " _enable_ _NL_ _SEP_
-#define _ooo_set_selected_stepper_s_ "\26r65"
+#define _ooo_set_selected_stepper_s_ "\266"
    _ooo_ _set_ _selected_stepper "'s " _SEP_
-#define _m1_m2_to_select_stepper_ "\26r76"
+#define _m1_m2_to_select_stepper_ "\267"
     ____ "M1/M2/.. " _ooo_ _to_ _select _stepper _NL_ _SEP_
 #define _print_this_usage_ "\270"
     ____ "?" ________ _ooo_ "Print this usage" _NL_ _NL_ _SEP_
@@ -1459,9 +1459,11 @@ void loop() {
     } else if ((ch == ' ') || (ch == '\n') || (ch == '\r')) {
       out_buffer[out_ptr] = 0;
 
-      if (!process_cmd(out_buffer)) {
-        output_msg(MSG_UNKNOWN_COMMAND);
-        Serial.println(out_buffer);
+      if (out_ptr > 0) {
+        if (!process_cmd(out_buffer)) {
+          output_msg(MSG_UNKNOWN_COMMAND);
+          Serial.println(out_buffer);
+        }
       }
       out_ptr = 0;
     }
