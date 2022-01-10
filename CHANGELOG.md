@@ -1,4 +1,5 @@
-next:
+0.24.1:
+- Add support for atmega32u4, leonardo
 - Reorganized StepperDemo to fit in smaller device like atmega32u4
 - support for espidf4.4 for arduino
 - experimental (broken ?) support for espidf4.4

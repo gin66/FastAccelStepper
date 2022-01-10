@@ -27,7 +27,7 @@ struct stepper_config_s {
 };
 
 #if defined(ARDUINO_ARCH_AVR)
-#if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega32U4__)
+#if defined(__AVR_ATmega328P__)
 // Example hardware configuration for Arduino Nano
 // Please adapt to your configuration
 const uint8_t led_pin = 13;  // turn off with PIN_UNDEFINED
@@ -89,6 +89,33 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : 43,
       enable_high_active : PIN_UNDEFINED,
       direction : 42,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }};
+#elif defined(__AVR_ATmega32U4__)
+// Example hardware configuration for Arduino ATmega32u4
+// Please adapt to your configuration
+const uint8_t led_pin = PIN_UNDEFINED;  // turn off with PIN_UNDEFINED
+const struct stepper_config_s stepper_config[MAX_STEPPER] = {
+    {
+      step : stepPinStepperA,
+      enable_low_active : 16,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 26, // PB4
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 500000,
+      off_delay_ms : 5000
+    },
+    {
+      step : stepPinStepperB,
+      enable_low_active : 15,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 14,
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
@@ -644,6 +671,7 @@ void output_msg(int8_t i) {
 }
 
 void test_direct_drive(const struct stepper_config_s *stepper) {
+#ifndef SIM_TEST_INPUT
   // Check stepper motor+driver is operational
   // This is not done via FastAccelStepper-Library for test purpose only
   uint8_t step = stepper->step;
@@ -727,6 +755,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
     }
   }
   // Done
+#endif
 }
 
 void setup() {
@@ -1029,6 +1058,8 @@ bool process_cmd(char *cmd) {
       }
       break;
     case MODE(normal, '?'):
+    case MODE(test, '?'):
+    case MODE(config, '?'):
       if (*cmd == 0) {
         usage();
         return true;
@@ -1287,7 +1318,7 @@ bool process_cmd(char *cmd) {
     case MODE(test, 'W'):
       if (*cmd == 0) {
 #ifdef SIM_TEST_INPUT
-        if (stepper_selected->isRunning()) {
+        if (stepper_selected->isRunning() || test_ongoing) {
           read_ptr -= 2;
         }
 #else

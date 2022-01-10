@@ -49,6 +49,12 @@ DEVICE=atmega328p
 TRACES+=-at StepA=trace@0x25/0x02  #OC1A PB1 9  ATMega328p
 TRACES+=-at StepB=trace@0x25/0x04  #OC1B PB2 10 ATMega328p
 
+else ifeq ($(DUT),atmega32u4)
+DEVICE=atmega32u4
+TRACES+=-at StepA=trace@0x025/0x20 #OC1A PB5 11
+TRACES+=-at StepB=trace@0x025/0x40 #OC1B PB6 12
+#TRACES+=-at StepC=trace@0x025/0x80 #OC1C PB7 13
+
 endif
 
 ifeq ($(DEVICE),atmega2560)
@@ -64,6 +70,14 @@ TRACES+=-at DirA=trace@0x2b/0x20     # Pin 5  PD5
 TRACES+=-at DirB=trace@0x2b/0x80     # Pin 7  PD7
 TRACES+=-at EnableA=trace@0x2b/0x40  # Pin 6  PD6
 TRACES+=-at EnableB=trace@0x25/0x01  # Pin 8  PB0
+
+else ifeq ($(DUT),atmega32u4)
+TRACES+=-at DirA=trace@0x25/0x10     # Pin 26 PB4
+TRACES+=-at DirB=trace@0x25/0x08     # Pin 14 PB3
+#TRACES+=-at DirC=trace@0x10b/0x80    # Pin 42 PL7
+TRACES+=-at EnableA=trace@0x25/0x04  # Pin 16 PB2
+TRACES+=-at EnableB=trace@0x25/0x02  # Pin 15 PB1
+#TRACES+=-at EnableC=trace@0x10b/0x40 # Pin 43 PL6
 
 endif 
 
