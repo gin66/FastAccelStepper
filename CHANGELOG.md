@@ -1,3 +1,7 @@
+0.24.2:
+- arduino library manager has not taken up the last minute change
+  => bump version witout change
+
 0.24.1:
 - Add support for atmega32u4, leonardo
 - Reorganized StepperDemo to fit in smaller device like atmega32u4
