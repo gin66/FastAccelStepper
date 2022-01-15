@@ -63,9 +63,10 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
 #define TASK_DELAY_4MS 4
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
-  const TickType_t delay_4ms = TASK_DELAY_4MS / portTICK_PERIOD_MS;
+  const TickType_t delay_4ms = (TASK_DELAY_4MS + portTICK_PERIOD_MS - 1)/ portTICK_PERIOD_MS;
   while (true) {
     engine->manageSteppers();
+	esp_task_wdt_reset();
     vTaskDelay(delay_4ms);
   }
 }
@@ -84,6 +85,20 @@ void FastAccelStepperEngine::init() {
   xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
 #endif
 }
+
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+void FastAccelStepperEngine::init(uint8_t cpu) {
+#define STACK_SIZE 1000
+#define PRIORITY configMAX_PRIORITIES
+  if (cpu > 1) {
+	 xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
+  }
+  else {
+     xTaskCreatePinnedToCore(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL, cpu);
+  }
+}
+#endif
+
 //*************************************************************************************************
 bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
   // ask just first queue entry....

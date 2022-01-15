@@ -1,3 +1,10 @@
+pre-0.24.3:
+- esp32 changes in response to [Issue #106](https://github.com/gin66/FastAccelStepper/issues/106):
+	- Select CPU core to run the StepperTask on by using init(cpu)
+	- Trigger the watchdog in the StepperTask
+	- Ensure that vDelayTask is not called with zero value,
+	  which could be the case for portTICK_PERIOD_MS > 5
+
 0.24.2:
 - arduino library manager has not taken up the last minute change
   => bump version witout change

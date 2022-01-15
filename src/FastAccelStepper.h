@@ -12,6 +12,9 @@
 
 #include "../tests/pc_based/stubs.h"
 #endif
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#include <esp_task_wdt.h>
+#endif
 #include <stdint.h>
 
 #include "PoorManFloat.h"
@@ -444,13 +447,20 @@ class FastAccelStepperEngine {
   // stable API functions
   void init();
 
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+  // ESP32 only: Pin the StepperTask to a CPU core
+  // For values 0 and 1, xTaskCreatePinnedToCore() is used
+  // or else xTaskCreate()
+  void init(uint8_t cpu);
+#endif
+
   // ESP32:
   // The first three steppers use mcpwm0, the next three steppers use mcpwm1
   //
   // Atmega328p:
   // Only the pins connected to OC1A and OC1B are allowed
   //
-  // Atmega2560:
+  // Atmega2560/Atmega32u4:
   // Only the pins connected to OC4A, OC4B and OC4C are allowed.
   //
   // If no stepper resources available or pin is wrong, then NULL is returned
