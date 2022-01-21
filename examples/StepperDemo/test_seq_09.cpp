@@ -28,10 +28,10 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         uint32_t accel = rand() % (AMAX * 4);
         accel = accel >> ((accel % 4) + 2);
         accel = accel + AMIN;
-		Serial.print("speed=");
-		Serial.print(speed);
-		Serial.print(" accel=");
-		Serial.println(accel);
+        Serial.print("speed=");
+        Serial.print(speed);
+        Serial.print(" accel=");
+        Serial.println(accel);
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         if (rand() & 1) {

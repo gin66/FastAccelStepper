@@ -12,7 +12,7 @@
 // Code Optimization
 //   Start   30170 Bytes
 
-#define VERSION "post-0bf4513"
+#define VERSION "post-be1d08b"
 
 struct stepper_config_s {
   uint8_t step;
@@ -104,7 +104,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       step : stepPinStepperA,
       enable_low_active : 16,
       enable_high_active : PIN_UNDEFINED,
-      direction : 26, // PB4
+      direction : 26,  // PB4
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,

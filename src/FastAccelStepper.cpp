@@ -63,10 +63,11 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
 #define TASK_DELAY_4MS 4
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
-  const TickType_t delay_4ms = (TASK_DELAY_4MS + portTICK_PERIOD_MS - 1)/ portTICK_PERIOD_MS;
+  const TickType_t delay_4ms =
+      (TASK_DELAY_4MS + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
   while (true) {
     engine->manageSteppers();
-	esp_task_wdt_reset();
+    esp_task_wdt_reset();
     vTaskDelay(delay_4ms);
   }
 }
@@ -91,10 +92,10 @@ void FastAccelStepperEngine::init(uint8_t cpu) {
 #define STACK_SIZE 1000
 #define PRIORITY configMAX_PRIORITIES
   if (cpu > 1) {
-	 xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
-  }
-  else {
-     xTaskCreatePinnedToCore(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL, cpu);
+    xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
+  } else {
+    xTaskCreatePinnedToCore(StepperTask, "StepperTask", STACK_SIZE, this,
+                            PRIORITY, NULL, cpu);
   }
 }
 #endif

@@ -11,7 +11,8 @@
  */
 
 #if defined(ARDUINO_ARCH_AVR)
-#if !(defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega32U4__))
+#if !(defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__) || \
+      defined(__AVR_ATmega32U4__))
 #error "Unsupported AVR derivate"
 #endif
 #endif
