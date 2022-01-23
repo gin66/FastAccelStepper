@@ -97,7 +97,7 @@ a(s);
 /* [wxMaxima: input   start ] */
 /*
 Now we need a mathematical function, which can be used to define a smooth acceleration ramp without jumps.
-Here we have the smoothstep function with its first derivative:
+Here we arbitrarily choose the smoothstep function with its first derivative:
 */
 f(x) := 3*x² - 2*x³;
 diff(f(x),x);
