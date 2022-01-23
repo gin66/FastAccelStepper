@@ -97,9 +97,12 @@ a(s);
 /* [wxMaxima: input   start ] */
 /*
 Now we need a mathematical function, which can be used to define a smooth acceleration ramp without jumps.
-Here we arbitrarily choose the smoothstep function with its first derivative:
+tanh(x) poses problem for the x-range. The smoothstep function starts at x=0 too slow. As we are controlling the speed,
+we already get one factor of x. So idea is to have a function coming out linearly from x with a maximum at x=1.
+
+This time sine function with its first derivative to be used:
 */
-f(x) := 3*x² - 2*x³;
+f(x) := sin(x * %pi/2);
 diff(f(x),x);
 /* [wxMaxima: input   end   ] */
 
@@ -108,7 +111,7 @@ diff(f(x),x);
 /*
 So the first derivative is simply
 */
-f_1(x) := 6*x - 6*x^2;
+f_1(x) :=%pi*cos(%pi*x/2)/2;
 /* [wxMaxima: input   end   ] */
 
 
@@ -146,19 +149,18 @@ wxplot2d([f(x)*f_1(x)],[x,0,1]);
 
 /* [wxMaxima: input   start ] */
 /*
-The maximum of this function is c at x_c  (evaluated with wolframalpha)
+The maximum of this function is c at x_c
 */
-c : 3/250 * (34 * sqrt(10) -25);
-x_c : 1-1/sqrt(10);
-
+x_c : 0.5;
+c : f(x_c)*f_1(x_c);
 /* [wxMaxima: input   end   ] */
 
 
 /* [wxMaxima: input   start ] */
 /*
-The maximum value of the function is nearly one, so we just ignore it
+The maximum value of the function is pi/4
 */
-float(c);
+float(c);float(%pi/4);
 /* [wxMaxima: input   end   ] */
 
 
@@ -166,7 +168,7 @@ float(c);
 /*
 Consequently the maximum acceleration is:
 */
-a_max = v_max² / s_ramp;
+a_max = v_max² / s_ramp * %pi/4;
 
 /* [wxMaxima: input   end   ] */
 
@@ -175,22 +177,31 @@ a_max = v_max² / s_ramp;
 /*
 In FastAccelStepper maximum acceleration and maximum speed are configured, so this equation can be used to determine s_ramp.
 */
-ref: s_ramp = v_max² / a_max;
+ref: s_ramp = %pi/4 * v_max² / a_max;
 /* [wxMaxima: input   end   ] */
 
 
 /* [wxMaxima: input   start ] */
 /*
-This is double the value of using constant acceleration.
-*/;
-/* [wxMaxima: input   end   ] */
-
-
-/* [wxMaxima: input   start ] */
-/*
-The speed at steps s = 1 is:
+The speed at step s = 1 is:
 */
-ev(v(s), s=1);
+ev(v(s), s=1,ref);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+As sin(x) ~ x for x << 1 the speed at step s=1 is:
+*/
+2*a_max/v_max;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+For reference: with constant acceleration the speed at step s=1 is independent of v_max
+*/
+v = sqrt(2*a);
 /* [wxMaxima: input   end   ] */
 
 
