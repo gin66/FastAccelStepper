@@ -44,7 +44,7 @@ v(s,a, s_ramp, s_total) := if s < s_ramp then sqrt(2 * s * a) else if s < s_tota
 /* [wxMaxima: input   start ] */
 /*
 And the acceleration over steps is simply
-*/float(c);
+*/
 a(s,a, s_ramp, s_total) := if s < s_ramp then a else if s < s_total-s_ramp then 0 else if s < s_total then -a else 0 $
 /* [wxMaxima: input   end   ] */
 
@@ -80,13 +80,16 @@ v_1(s) := v_max/s_ramp * f_1(s/s_ramp);
 
 /* [wxMaxima: input   start ] */
 /*
-Using this definition, the acceleration a(s) can be approximated at steps s using Δt and Δs:
+Using this definition, the acceleration a(s) can be approximated at steps s:
 */
 a(s) := v_1(s) * v(s);
 /* [wxMaxima: input   end   ] */
 
 
 /* [wxMaxima: input   start ] */
+/*
+With these two functions a(s) is:
+*/
 a(s);
 /* [wxMaxima: input   end   ] */
 
