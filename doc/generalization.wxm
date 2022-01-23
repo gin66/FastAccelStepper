@@ -1,0 +1,166 @@
+/* [wxMaxima batch file version 1] [ DO NOT EDIT BY HAND! ]*/
+/* [ Created with wxMaxima version 21.11.0 ] */
+/* [wxMaxima: input   start ] */
+/*
+For a constant acceleration ramp the steps and speed at time t can be calculated by:
+*/
+s(t,a) := 1/2 * a * t^2;
+v(t,a) := a * t;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+The time at a given step is then
+*/
+t(s,a) := sqrt(2 * s / a);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+and the speed at a given step is then
+*/
+v(s,a) := sqrt(2 * s * a);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+and finally the step rate R (time distance between two pulses):
+*/
+R(s,a) := 1 / sqrt(2 * s * a);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+With s_ramp being the number of steps to accelerate or decelerate and s_total being the number of the steps for the total ramp including acceleration and deceleration, the complete ramp with acceleration, coasting and deceleration can be written as
+*/
+v(s,a, s_ramp, s_total) := if s < s_ramp then sqrt(2 * s * a) else if s < s_total-s_ramp then sqrt(2 * s_ramp * a) else if s < s_total then sqrt(2 * (s_total-s) * a) else 0 $
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+And the acceleration over steps is simply
+*/
+a(s,a, s_ramp, s_total) := if s < s_ramp then a else if s < s_total-s_ramp then 0 else if s < s_total then -a else 0 $
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+As an example the acceleration over steps for acceleration = 5 m/s², ramp steps = 100 and total ramp steps = 1000:
+*/
+wxplot2d([a(s,5,100,1000)],[s,0,1000]);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+wxplot2d([v(s,5,100,1000)],[s,0,1000]);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+In order to generalize the ramp function, we introduce a dimensionless function f, which translates from range [0,1] into the range [0,1].
+*/
+v(s) := v_max * f(s/s_ramp);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Using this definition, the acceleration a(s) can be approximated at steps s using Δt and Δs:
+*/
+a(s) := (v(s+Δs)-v(s-Δs))/(2*Δt);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+derived in a couple of steps. Hereby f_1(x) shall be the derivative of f(x)
+*/
+a(s) := (v_max*f((s+Δs)/s_max)-v_max*f((s-Δs)/s_max))/(2*Δt);
+a(s) := v_max* (f((s+Δs)/s_max)-f((s-Δs)/s_max))/(2*Δt);
+a(s) := v_max* (2*f(s/s_max)*df(s/s_max)/ds*s_max*Δs)/(2*Δt);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/**
+Δs can be calulated out of  Δt using the speed:
+*/
+Δs = v*Δt ;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+derived in a couple of steps. Hereby f_1(x) shall be the derivative of f(x)
+*/
+a(s) := v_max* (f(s/s_max)*df(s/s_max)/ds*s_max*v(s)*Δt)/Δt;
+a(s) := v_max* f(s/s_max)*f_1(s/s_max)*v_max*f(s/s_max)/s_max;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Now we need a mathematical function, which can be used to define a smooth acceleration ramp without jumps.
+Here we have chosen tanh() with its first derivative:
+*/
+g(x) := tanh(x)/2;
+diff(g(x),x);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+So the first derivative is simply
+*/
+g_1(x) := sech(x)^2/2;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Drawn over the x-range from -10 to 10:
+*/
+wxplot2d([g(x),g_1(x)],[x,-10,10]);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Using this function the complete ramp with acceleration and deceleration can be written.
+With total ramp distance of 40 * s_ramp between maximum acceleration/deceleration points:
+*/
+f(x) := g(x) + g(40-x);
+f_1(x) := g_1(x) - g_1(40-x);
+wxplot2d([f(x),f_1(x)],[x,-10,50]);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+As we cannot start with negative steps, the acceleration ramp needs to move towards positive x. The value to choose still to be determined.
+The then practical x_total has been chosen as parameter in the figure with a value of 40
+*/
+f(x,x_shift,x_total) := g(x-x_shift) + g(x_total-x-x_shift);
+f_1(x, x_shift,x_total) := g_1(x-x_shift) - g_1(x_total-x-x_shift);
+wxplot2d([f(x,5,40),f_1(x,5,40)],[x,-10,50]);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+As soon as acceleration and deceleration are overlapping, the maximum value of 1 aka max speed is not reached anymore
+*/
+wxplot2d([f(x,5,11),f_1(x,5,11)],[x,-10,50],[y,-1,1]);
+/* [wxMaxima: input   end   ] */
+
+
+
+/* Old versions of Maxima abort on loading files that end in a comment. */
+"Created with wxMaxima 21.11.0"$
