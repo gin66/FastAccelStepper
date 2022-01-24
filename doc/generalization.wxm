@@ -205,6 +205,15 @@ v = sqrt(2*a);
 /* [wxMaxima: input   end   ] */
 
 
+/* [wxMaxima: input   start ] */
+/*
+The issue is, that the relation v(s) in this manner cannot be applied, if the speed shall change from v_max to -v_max. In this scenario, the acceleration at v = 0 aka the turn point shall be at maximum during deceleration/acceleration phase.
+
+Second problem is an adequate forecast, if at turnpoint the acceleration needs to be reduced in order to not overshoot the targetted speed.
+*/
+/* [wxMaxima: input   end   ] */
+
+
 
 /* Old versions of Maxima abort on loading files that end in a comment. */
 "Created with wxMaxima 21.11.0"$
