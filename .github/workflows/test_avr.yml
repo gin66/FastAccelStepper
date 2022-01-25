@@ -19,8 +19,10 @@ jobs:
       run: python3 get-platformio.py
     - name: install platform atmelavr
       run:  ~/.platformio/penv/bin/pio platform install "atmelavr"
+    - name: update packages
+      run:  sudo apt update -y
     - name: install lib elf
-      run:  sudo apt install libelf-dev
+      run:  sudo apt install -y libelf-dev
     - name: make links
       run: make -C tests/simavr_based links
     - name: make
