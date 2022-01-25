@@ -6,6 +6,7 @@ pre-0.24.3:
 	  which could be the case for portTICK_PERIOD_MS > 5
 - SAM Due: fix issue that call to isRunning() after forceStopAndNewPosition() has returned true
   [Issue #111](https://github.com/gin66/FastAccelStepper/issues/111).
+- Rework/simplify internal implementation of queue start for the different architectures.
 
 0.24.2:
 - arduino library manager has not taken up the last minute change

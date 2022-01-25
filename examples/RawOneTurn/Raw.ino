@@ -16,8 +16,8 @@ void setup() {
   }
 
   uint16_t lframes[] = {107, 107, 107, 107, 107, 107, 107, 107, 107, 107,
-                   107, 107, 107, 107, 107, 107, 107, 107, 107, 107,
-                   107, 107, 107, 107, 107, 107, 107, 107, 107, 97};
+                        107, 107, 107, 107, 107, 107, 107, 107, 107, 107,
+                        107, 107, 107, 107, 107, 107, 107, 107, 107, 97};
   // a representation of a 360 degree rot at 30 fps
   uint16_t lenAnim = 30;
 
@@ -42,9 +42,8 @@ void setup() {
           this_cmd_steps = TICKS_PER_S / 500 / ticks_per_step;
         }
         if (this_cmd_steps + this_frame_steps > steps) {
-             this_cmd_steps = steps - this_frame_steps;
+          this_cmd_steps = steps - this_frame_steps;
         }
-Serial.println(this_cmd_steps);
         struct stepper_command_s cmd_step = {.ticks = (uint16_t)ticks_per_step,
                                              .steps = this_cmd_steps,
                                              .count_up = true};
@@ -126,5 +125,4 @@ Serial.println(this_cmd_steps);
   }
 }
 
-void loop() {
-}
+void loop() {}

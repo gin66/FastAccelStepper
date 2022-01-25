@@ -244,22 +244,7 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   /* start */                                    \
   SetTimerCompareRelative(T, CHANNEL, 10);
 
-void StepperQueue::commandAddedToQueue(bool start) {
-  // Check if this is the first command and advance write pointer
-  fasDisableInterrupts();
-  bool first = (next_write_idx++ == read_idx);
-  if (_isRunning) {
-    fasEnableInterrupts();
-    return;
-  }
-  fasEnableInterrupts();
-
-  // If it is not the first command in the queue, then just return
-  // Otherwise just prepare, what is possible for start (set direction pin)
-  if (!first & !start) {
-    return;
-  }
-
+void StepperQueue::startQueue() {
   uint8_t rp;
   struct queue_entry* e;
 
@@ -267,53 +252,21 @@ void StepperQueue::commandAddedToQueue(bool start) {
     case channelA:
       GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
       PREPARE_DIRECTION_PIN(A)
-      if (start) {
-        AVR_START_QUEUE(FAS_TIMER_MODULE, A)
-      }
-      break;
-    case channelB:
-      GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
-      PREPARE_DIRECTION_PIN(B)
-      if (start) {
-        AVR_START_QUEUE(FAS_TIMER_MODULE, B)
-      }
-      break;
-#ifdef stepPinStepperC
-    case channelC:
-      GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
-      PREPARE_DIRECTION_PIN(C)
-      if (start) {
-        AVR_START_QUEUE(FAS_TIMER_MODULE, C)
-      }
-      break;
-#endif
-  }
-}
-
-int8_t StepperQueue::startPreparedQueue() {
-  if (next_write_idx == read_idx) {
-    return AQE_ERROR_EMPTY_QUEUE_TO_START;
-  }
-
-  uint8_t rp;
-  struct queue_entry* e;
-  switch (channel) {
-    case channelA:
-      GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
       AVR_START_QUEUE(FAS_TIMER_MODULE, A)
       break;
     case channelB:
       GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
+      PREPARE_DIRECTION_PIN(B)
       AVR_START_QUEUE(FAS_TIMER_MODULE, B)
       break;
 #ifdef stepPinStepperC
     case channelC:
       GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
+      PREPARE_DIRECTION_PIN(C)
       AVR_START_QUEUE(FAS_TIMER_MODULE, C)
       break;
 #endif
   }
-  return AQE_OK;
 }
 
 #define FORCE_STOP(T, CHANNEL)               \

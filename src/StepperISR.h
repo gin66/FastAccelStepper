@@ -185,8 +185,11 @@ class StepperQueue {
     //  return -1;
     //}
     if (cmd == NULL) {
-      if (start) {
-        return startPreparedQueue();
+      if (start && !isRunning()) {
+        if (next_write_idx == read_idx) {
+          return AQE_ERROR_EMPTY_QUEUE_TO_START;
+        }
+        startQueue();
       }
       return AQE_OK;
     }
@@ -254,7 +257,19 @@ class StepperQueue {
       }
     }
 #endif
-    commandAddedToQueue(start);
+    // Advance write pointer
+    fasDisableInterrupts();
+    next_write_idx++;
+    fasEnableInterrupts();
+
+    if (isRunning()) {
+      // stepper is already running, so nothing else to do
+      return AQE_OK;
+    }
+    // stepper is not yet running. Shall we start ?
+    if (start) {
+      startQueue();
+    }
     return AQE_OK;
   }
 
@@ -409,8 +424,7 @@ class StepperQueue {
   }
 
   // startQueue is always called
-  void commandAddedToQueue(bool start);
-  int8_t startPreparedQueue();
+  void startQueue();
   void forceStop();
   void _initVars() {
     dirPin = PIN_UNDEFINED;

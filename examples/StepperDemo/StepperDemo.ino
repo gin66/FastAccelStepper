@@ -12,7 +12,7 @@
 // Code Optimization
 //   Start   30170 Bytes
 
-#define VERSION "post-be1d08b"
+#define VERSION "post-f33aa8a"
 
 struct stepper_config_s {
   uint8_t step;

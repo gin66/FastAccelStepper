@@ -613,85 +613,39 @@ void StepperQueue::disconnect() {
   _connected = false;
 }
 
-void StepperQueue::commandAddedToQueue(bool start) {
-// gin66: This code will immediately change direction on port level.
-//        Think this is not appropriate unless it is the first command
-//        => added the check && !_hasISRactive
-// 
+void StepperQueue::startQueue() {
+  // This is called only, if isRunning() == false
   struct queue_entry* e = &entry[read_idx & QUEUE_LEN_MASK];
-//  interrupts();
   if (e->toggle_dir && !_hasISRactive) {
     e->toggle_dir = 0;
     *_dirPinPort ^= _dirPinMask;
   }
-  noInterrupts();
-  bool first = (next_write_idx++ == read_idx);
-  interrupts();
-  if (start) {
-    if (!first) {
-      if (e->steps > 0 || e->hasSteps) {
-        if (!_hasISRactive) {
-          _hasISRactive = true;
-          _runOnce = false;
-          _skipNextPWMInterrupt = false;
-          PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
-          attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
-                              true);
-        }
-        return;
-      } else {
-        if (!_hasISRactive) {
-          _hasISRactive = true;
-          PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0,
-                        0, 0);
-          if (PWM_INTERFACE->PWM_SR & (1 << mapping->channel)) {
-            PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
-          } else {
-            PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
-          }
-          /*Disconnect, but do not disable, enable the PWM ISR*/
-          mapping->port->PIO_IDR = g_APinDescription[mapping->pin].ulPin;
-          PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0,
-                        0, 0);
-          PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
-          _pauseCommanded = true;
-          /*Enable the ISR too so we don't miss it*/
-          PWM_INTERFACE->PWM_IER1 =
-              PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
-          return;
-        } else {
-          // The ISR should handle this case...
-        }
-      }
-      _connected = true;
-    }
-  }
-}
-
-int8_t StepperQueue::startPreparedQueue() {
-  if (next_write_idx == read_idx) {
-    return AQE_ERROR_EMPTY_QUEUE_TO_START;
-  }
-
-  uint32_t rp = read_idx;
-  struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
   _hasISRactive = true;
-  _runOnce = false;
-  _skipNextPWMInterrupt = false;
-  PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
-  if (!e->hasSteps || e->steps == 0) {
-    _pauseCommanded = true;
-    timePWMInterruptEnabled = micros();
-    uint32_t samPin = g_APinDescription[mapping->pin].ulPin;
-    PWM_INTERFACE->PWM_IER1 = mapping->channelMask;
-    PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
-    PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
-
+  if (e->steps > 0 || e->hasSteps) {
+      _runOnce = false;
+      _skipNextPWMInterrupt = false;
+      PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
+      attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
+                          true);
   } else {
-    attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
-                        true);
+    timePWMInterruptEnabled = micros();
+      PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
+                    0);
+      if (PWM_INTERFACE->PWM_SR & (1 << mapping->channel)) {
+        PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
+      } else {
+        PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
+      }
+      /*Disconnect, but do not disable, enable the PWM ISR*/
+      mapping->port->PIO_IDR = g_APinDescription[mapping->pin].ulPin;
+      PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
+                    0);
+      PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
+      _pauseCommanded = true;
+      /*Enable the ISR too so we don't miss it*/
+      PWM_INTERFACE->PWM_IER1 = PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
   }
-  return AQE_OK;
+  _connected = true;
 }
 
 void StepperQueue::forceStop() {
