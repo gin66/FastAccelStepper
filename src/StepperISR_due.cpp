@@ -614,9 +614,13 @@ void StepperQueue::disconnect() {
 }
 
 void StepperQueue::commandAddedToQueue(bool start) {
+// gin66: This code will immediately change direction on port level.
+//        Think this is not appropriate unless it is the first command
+//        => added the check && !_hasISRactive
+// 
   struct queue_entry* e = &entry[read_idx & QUEUE_LEN_MASK];
-  interrupts();
-  if (e->toggle_dir) {
+//  interrupts();
+  if (e->toggle_dir && !_hasISRactive) {
     e->toggle_dir = 0;
     *_dirPinPort ^= _dirPinMask;
   }

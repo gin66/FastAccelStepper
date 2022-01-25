@@ -241,7 +241,7 @@ class StepperQueue {
     queue_end.count_up = cmd->count_up;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     {
-      // checksum is in the struct and will updated here
+      // checksum is in the struct and will be updated here
       unsigned char* x = (unsigned char*)e;
       for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
         if (checksum & 0x80) {
