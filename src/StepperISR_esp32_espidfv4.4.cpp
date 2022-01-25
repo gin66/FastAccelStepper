@@ -385,25 +385,11 @@ bool StepperQueue::isRunning() {
   return (mcpwm->timer[timer].timer_cfg1.timer_start == 2);  // 2=run continuous
 }
 
-void StepperQueue::commandAddedToQueue(bool start) {
+void StepperQueue::startQueue() {
 #ifdef TEST_PROBE
   // The time used by this command can have an impact
   digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
 #endif
-  fasDisableInterrupts();
-  bool first = (next_write_idx++ == read_idx);
-  if (_hasISRactive) {
-    fasEnableInterrupts();
-    return;
-  }
-  fasEnableInterrupts();
-
-  // If it is not the first command in the queue, then just return
-  // Otherwise just prepare, what is possible for start (set direction pin)
-  if (!first && !start) {
-    return;
-  }
-
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
@@ -419,19 +405,7 @@ void StepperQueue::commandAddedToQueue(bool start) {
   struct queue_entry *e = &entry[read_idx & QUEUE_LEN_MASK];
   apply_command(this, e);
 
-  if (start) {
-    mcpwm->timer[timer].timer_cfg1.timer_start = 2;  // 2=run continuous
-  }
-}
-int8_t StepperQueue::startPreparedQueue() {
-  if (next_write_idx == read_idx) {
-    return AQE_ERROR_EMPTY_QUEUE_TO_START;
-  }
-  uint8_t timer = mapping->timer;
-  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   mcpwm->timer[timer].timer_cfg1.timer_start = 2;  // 2=run continuous
-  return AQE_OK;
 }
 void StepperQueue::forceStop() {
   init_stop(this);
