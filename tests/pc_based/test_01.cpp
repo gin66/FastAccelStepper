@@ -27,6 +27,7 @@ void init_queue() {
 }
 
 void basic_test() {
+  puts("basic_test...");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
   assert(0 == s.getCurrentPosition());
@@ -69,6 +70,7 @@ void queue_full() {
 void queue_out_of_range() {
   int8_t res;
 
+  puts("queue_out_of_range...");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
   s.init(NULL, 0, 0);
