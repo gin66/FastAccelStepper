@@ -695,6 +695,7 @@ void StepperQueue::forceStop() {
   read_idx = next_write_idx;
   interrupts();
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
+  _hasISRactive = false;
 }
 
 bool StepperQueue::isValidStepPin(uint8_t step_pin) {

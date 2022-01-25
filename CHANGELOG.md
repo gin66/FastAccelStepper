@@ -4,6 +4,7 @@ pre-0.24.3:
 	- Trigger the watchdog in the StepperTask
 	- Ensure that vDelayTask is not called with zero value,
 	  which could be the case for portTICK_PERIOD_MS > 5
+- SAM Due: fix issue that call to isRunning() after forceStopAndNewPosition() has returned true
 
 0.24.2:
 - arduino library manager has not taken up the last minute change
@@ -135,7 +136,7 @@ pre-0.24.3:
 - add getter functions: getSpeedInUS(), getAcceleration()
 - StepperDemo extended:
 	- move/moveTo/moveByAcceleration => verbose error code
-	- setSpeed/setAcceleration =>x report invalid data error
+	- setSpeed/setAcceleration => report invalid data error
 	- motor info with speed/acceleration
 	- less verbose: if any motor is running, only info for running motor
 - fix issue #43: Issue on moveTo() to exactly same target after a completion of stopMove()
@@ -293,7 +294,7 @@ pre-0.24.3:
 
 0.15.0:
 - For the commands in the queue, the minimum time in ticks to execute
-  a command is limited to 10*MIN_DELTA_TICKS. For esp32 this relates to
+  a command is limited to 10 * MIN_DELTA_TICKS. For esp32 this relates to
   the time between interrupts of one channel
 - AQE_ERROR_TICKS_TOO_HIGH removed, because it is already limited by the data type uint16_t
 - esp32: Change from mcpwm up count mode to up-down count mode
