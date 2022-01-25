@@ -5,6 +5,7 @@ pre-0.24.3:
 	- Ensure that vDelayTask is not called with zero value,
 	  which could be the case for portTICK_PERIOD_MS > 5
 - SAM Due: fix issue that call to isRunning() after forceStopAndNewPosition() has returned true
+  [Issue #111](https://github.com/gin66/FastAccelStepper/issues/111).
 
 0.24.2:
 - arduino library manager has not taken up the last minute change
