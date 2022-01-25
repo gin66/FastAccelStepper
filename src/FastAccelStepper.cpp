@@ -370,9 +370,19 @@ void FastAccelStepper::fill_queue() {
 #endif
     return;
   }
+  // check if addition of commands is suspended (due to forceStopAndNewPosition)
+  StepperQueue* q = &fas_queue[_queue_num];
+  if (q->ignore_commands) {
+    // seems to be. so stop the ramp
+    _rg.stopRamp();
+
+    // and remove the ignore_commands flag
+    q->ignore_commands = false;
+    return;
+  }
+
   // preconditions are fulfilled, so create the command(s)
   NextCommand cmd;
-  StepperQueue* q = &fas_queue[_queue_num];
   // Plan ahead for max. 20 ms. Currently hard coded
   bool delayed_start = !q->isRunning();
   bool need_delayed_start = false;
@@ -639,8 +649,8 @@ int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
 void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];
 
-  // first stop ramp generator
-  _rg.stopRamp();
+  // ensure no more commands are added to the queue
+  q->ignore_commands = true;
 
   // stop the stepper interrupt and empty the queue
   q->forceStop();

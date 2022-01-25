@@ -622,28 +622,28 @@ void StepperQueue::startQueue() {
   }
   _hasISRactive = true;
   if (e->steps > 0 || e->hasSteps) {
-      _runOnce = false;
-      _skipNextPWMInterrupt = false;
-      PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
-      attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
-                          true);
+    _runOnce = false;
+    _skipNextPWMInterrupt = false;
+    PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
+    attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
+                        true);
   } else {
     timePWMInterruptEnabled = micros();
-      PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
-                    0);
-      if (PWM_INTERFACE->PWM_SR & (1 << mapping->channel)) {
-        PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
-      } else {
-        PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
-      }
-      /*Disconnect, but do not disable, enable the PWM ISR*/
-      mapping->port->PIO_IDR = g_APinDescription[mapping->pin].ulPin;
-      PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
-                    0);
-      PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
-      _pauseCommanded = true;
-      /*Enable the ISR too so we don't miss it*/
-      PWM_INTERFACE->PWM_IER1 = PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
+    PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
+                  0);
+    if (PWM_INTERFACE->PWM_SR & (1 << mapping->channel)) {
+      PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
+    } else {
+      PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
+    }
+    /*Disconnect, but do not disable, enable the PWM ISR*/
+    mapping->port->PIO_IDR = g_APinDescription[mapping->pin].ulPin;
+    PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
+                  0);
+    PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
+    _pauseCommanded = true;
+    /*Enable the ISR too so we don't miss it*/
+    PWM_INTERFACE->PWM_IER1 = PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
   }
   _connected = true;
 }

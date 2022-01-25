@@ -114,6 +114,10 @@ struct queue_entry {
 class StepperQueue {
  public:
   struct queue_entry entry[QUEUE_LEN];
+
+  // In case of forceStopAndNewPosition() the adding of commands has to be
+  // temporarily suspended
+  bool ignore_commands;
 #ifdef ARDUINO_ARCH_SAM
   // gin66 thinks this is unnecessary, and I think I see the point and how it
   // has been constrained to make it unnecessary.  Instinct honed on tons of
@@ -233,15 +237,16 @@ class StepperQueue {
     e->moreThanOneStep = steps > 1 ? 1 : 0;
     e->hasSteps = steps > 0 ? 1 : 0;
     e->ticks = period;
+    struct queue_end_s next_queue_end = queue_end;
 #if defined(ARDUINO_ARCH_AVR)
-    queue_end.pos += cmd->count_up ? steps : -steps;
-    e->end_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
+    next_queue_end.pos += cmd->count_up ? steps : -steps;
+    e->end_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
 #else
-    e->start_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
-    queue_end.pos += cmd->count_up ? steps : -steps;
+    e->start_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
+    next_queue_end.pos += cmd->count_up ? steps : -steps;
 #endif
-    queue_end.dir = dir;
-    queue_end.count_up = cmd->count_up;
+    next_queue_end.dir = dir;
+    next_queue_end.count_up = cmd->count_up;
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
     {
       // checksum is in the struct and will be updated here
@@ -259,7 +264,10 @@ class StepperQueue {
 #endif
     // Advance write pointer
     fasDisableInterrupts();
-    next_write_idx++;
+    if (!ignore_commands) {
+      next_write_idx++;
+      queue_end = next_queue_end;
+    }
     fasEnableInterrupts();
 
     if (isRunning()) {
@@ -428,6 +436,7 @@ class StepperQueue {
   void forceStop();
   void _initVars() {
     dirPin = PIN_UNDEFINED;
+    ignore_commands = false;
     read_idx = 0;
     next_write_idx = 0;
     queue_end.dir = true;

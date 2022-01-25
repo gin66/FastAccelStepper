@@ -7,6 +7,7 @@ pre-0.24.3:
 - SAM Due: fix issue that call to isRunning() after forceStopAndNewPosition() has returned true
   [Issue #111](https://github.com/gin66/FastAccelStepper/issues/111).
 - Rework/simplify internal implementation of queue start for the different architectures.
+- ensure forceStopAndNewPosition() is really safe to be called from interrupt
 
 0.24.2:
 - arduino library manager has not taken up the last minute change

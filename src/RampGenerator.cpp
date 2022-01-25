@@ -578,7 +578,6 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   return _getNextCommand(&ramp, &_rw, queue_end, command);
 }
 void RampGenerator::stopRamp() {
-  // Should be safe on avr and on esp32 due to task prio
   _rw.ramp_state = RAMP_STATE_IDLE;
   _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
   _rw.performed_ramp_up_steps = 0;
