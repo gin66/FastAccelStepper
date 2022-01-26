@@ -27,14 +27,6 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
 
 //*************************************************************************************************
 //*************************************************************************************************
-//
-// Main purpose of FastAccelStepperEngine is timer 1 initialization and access
-// to the steppers.
-//
-//*************************************************************************************************
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#endif
-//*************************************************************************************************
 void FastAccelStepperEngine::init() {
 #if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
