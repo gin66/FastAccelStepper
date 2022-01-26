@@ -590,13 +590,11 @@ int32_t RampGenerator::getCurrentAcceleration() {
           (RAMP_STATE_ACCELERATING_FLAG | RAMP_STATE_DECELERATING_FLAG |
            RAMP_DIRECTION_MASK)) {
     case RAMP_STATE_ACCELERATING_FLAG | RAMP_DIRECTION_COUNT_UP:
-      return acceleration;
-    case RAMP_STATE_DECELERATING_FLAG | RAMP_DIRECTION_COUNT_UP:
-      return -acceleration;
-    case RAMP_STATE_ACCELERATING_FLAG | RAMP_DIRECTION_COUNT_DOWN:
-      return -acceleration;
     case RAMP_STATE_DECELERATING_FLAG | RAMP_DIRECTION_COUNT_DOWN:
       return acceleration;
+    case RAMP_STATE_DECELERATING_FLAG | RAMP_DIRECTION_COUNT_UP:
+    case RAMP_STATE_ACCELERATING_FLAG | RAMP_DIRECTION_COUNT_DOWN:
+      return -acceleration;
   }
   return 0;
 }

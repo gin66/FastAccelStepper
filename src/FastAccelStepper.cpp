@@ -185,6 +185,8 @@ void FastAccelStepperEngine::manageSteppers() {
 //       or ramp generator driven by speed/acceleration and move
 // - stepper position
 //
+// This implements auto enable and delay from direction change to first step
+//
 //*************************************************************************************************
 //*************************************************************************************************
 
@@ -279,21 +281,9 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
 //*************************************************************************************************
 // fill_queue generates commands to the stepper for executing a ramp
 //
-// Plan is to fill the queue with commmands with approx. 10 ms ahead (or
+// Plan is to fill the queue with commmands summing up to approx. 10 ms in the future (or
 // more). For low speeds, this results in single stepping For high speeds
 // (40kSteps/s) approx. 400 Steps to be created using 3 commands
-//
-// Basis of the calculation is the relation between steps and time via
-// acceleration a:
-//
-//
-//		s = 1/2 * a * t²
-//
-// With v = a * t for the acceleration case, then v can be deducted:
-//
-//		s = 1/2 * v² / a
-//
-//	    v = sqrt(2 * s * a)
 //
 //*************************************************************************************************
 
