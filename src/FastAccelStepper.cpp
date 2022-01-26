@@ -497,7 +497,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 
   _queue_num = num;
   fas_queue[_queue_num].init(_queue_num, step_pin);
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   _attached_pulse_cnt_unit = -1;
 #endif
 }
@@ -786,7 +786,7 @@ int32_t FastAccelStepper::getCurrentPosition() {
 }
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
 bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
                                             int16_t low_value,
                                             int16_t high_value) {

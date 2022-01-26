@@ -96,6 +96,9 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+// have support for pulse counter
+#define SUPPORT_ESP32_PULSE_COUNTER
+
 //==========================================================================
 #elif defined(ESP_PLATFORM)
 // esp32 specific includes
@@ -140,6 +143,9 @@ struct queue_end_s {
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
+
+// have support for pulse counter
+#define SUPPORT_ESP32_PULSE_COUNTER
 
 //==========================================================================
 #elif defined(ARDUINO_ARCH_SAM)

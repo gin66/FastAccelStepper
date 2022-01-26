@@ -328,7 +328,7 @@ class FastAccelStepper {
   void detachFromPin();
   void reAttachToPin();
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   // These two functions are only available on esp32.
   // The first can attach any of the eight pulse counters to this stepper.
   // The second then will read the current pulse counter value
@@ -392,7 +392,7 @@ class FastAccelStepper {
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   int16_t _attached_pulse_cnt_unit;
 #endif
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
