@@ -24,6 +24,7 @@ struct queue_end_s {
 #define inject_fill_interrupt(x)
 #endif
 
+//==========================================================================
 #if defined(TEST)
 // For pc-based testing like to have assert-macro
 #include <assert.h>
@@ -57,6 +58,7 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+//==========================================================================
 #elif defined(ARDUINO_ARCH_ESP32)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -66,7 +68,7 @@ struct queue_end_s {
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
 #include <esp_task_wdt.h>
-#include <math.h>
+//#include <math.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
@@ -94,6 +96,7 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+//==========================================================================
 #elif defined(ESP_PLATFORM)
 // esp32 specific includes
 #include <driver/gpio.h>
@@ -138,6 +141,7 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+//==========================================================================
 #elif defined(ARDUINO_ARCH_SAM)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -157,6 +161,7 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+//==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -202,6 +207,7 @@ enum channels { channelA, channelB, channelC };
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
 
+//==========================================================================
 #else
 
 // If come here, then the device is not supported

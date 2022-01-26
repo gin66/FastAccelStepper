@@ -303,7 +303,7 @@ class StepperQueue {
     while (wp != rp) {
       struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
       uint32_t tmp = e->ticks;
-      uint8_t steps = max(e->steps, 1);
+      uint8_t steps = max(e->steps, (uint8_t)1);
       tmp *= steps;
       if (tmp >= min_ticks) {
         return true;
