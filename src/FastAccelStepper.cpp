@@ -1,14 +1,10 @@
 #include "FastAccelStepper.h"
-
 #include "StepperISR.h"
-
-#ifdef TEST
-#include <assert.h>
-#endif
 
 // This define in order to not shoot myself.
 #ifndef TEST
 #define printf DO_NOT_USE_PRINTF
+#define puts DO_NOT_USE_PUTS
 #endif
 
 // Here are the global variables to interface with the interrupts
@@ -16,41 +12,26 @@
 // To realize the 1 Hz debug led
 static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
-#if defined(ARDUINO_ARCH_AVR)
-#define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#define DEBUG_LED_HALF_PERIOD 50
-#elif defined(ARDUINO_ARCH_SAM)
-#define DEBUG_LED_HALF_PERIOD 50
-#else
-#define DEBUG_LED_HALF_PERIOD 50
-#define LOW 0
-#define HIGH 1
-#endif
 
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
 // this is needed to give the background task isr access to engine
 FastAccelStepperEngine* fas_engine = NULL;
+#endif
 
 // dynamic allocation seems to not work so well on avr
-FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
-                                             FastAccelStepper()};
-#endif
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM) || \
-    defined(ARDUINO_ARCH_SAM)
 FastAccelStepper fas_stepper[MAX_STEPPER] = {
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper()};
+	FastAccelStepper(),
+#if MAX_STEPPER == 3
+	FastAccelStepper(),
 #endif
-#if defined(ARDUINO_ARCH_SAM)
-// We also need access to the engine for the timer task, so we will mimic the
-// AVR code here...
-FastAccelStepperEngine* fas_engine = NULL;
+#if MAX_STEPPER == 6
+	FastAccelStepper(),
+	FastAccelStepper(),
+	FastAccelStepper(),
+	FastAccelStepper(),
 #endif
-#if defined(TEST)
-FastAccelStepper fas_stepper[MAX_STEPPER] = {FastAccelStepper(),
-                                             FastAccelStepper()};
-#endif
+	FastAccelStepper()
+};
 
 //*************************************************************************************************
 //*************************************************************************************************

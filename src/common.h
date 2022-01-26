@@ -39,6 +39,10 @@ struct queue_end_s {
 #define fasEnableInterrupts()
 #define fasDisableInterrupts()
 
+// The TEST target needs a couple of arduino like definitions
+#define LOW 0
+#define HIGH 1
+
 // queue definitions for pc based testing
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
@@ -49,6 +53,9 @@ struct queue_end_s {
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+
+// debug led timing
+#define DEBUG_LED_HALF_PERIOD 50
 
 #elif defined(ARDUINO_ARCH_ESP32)
 // this is an arduino platform, so include the Arduino.h header file
@@ -83,6 +90,9 @@ struct queue_end_s {
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+
+// debug led timing
+#define DEBUG_LED_HALF_PERIOD 50
 
 #elif defined(ESP_PLATFORM)
 // esp32 specific includes
@@ -125,6 +135,9 @@ struct queue_end_s {
 #define pinMode(pin, mode) gpio_set_direction((gpio_num_t)pin, mode)
 #define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin, level)
 
+// debug led timing
+#define DEBUG_LED_HALF_PERIOD 50
+
 #elif defined(ARDUINO_ARCH_SAM)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -140,6 +153,9 @@ struct queue_end_s {
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+
+// debug led timing
+#define DEBUG_LED_HALF_PERIOD 50
 
 #elif defined(ARDUINO_ARCH_AVR)
 // this is an arduino platform, so include the Arduino.h header file
@@ -182,6 +198,9 @@ enum channels { channelA, channelB, channelC };
 #define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
 #define MIN_DIR_DELAY_US (MIN_DELTA_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+
+// debug led timing
+#define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
 
 #else
 
