@@ -28,8 +28,14 @@ struct queue_end_s {
 // For pc-based testing like to have assert-macro
 #include <assert.h>
 
-// For pc-based testing, the macro TEST is defined. The pc-based testing does not
-// support the concept of interrupts, so provide an empty definition
+// and some more includes
+#include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include "../tests/pc_based/stubs.h"
+
+// For pc-based testing, the macro TEST is defined. The pc-based testing does
+// not support the concept of interrupts, so provide an empty definition
 #define fasEnableInterrupts()
 #define fasDisableInterrupts()
 
@@ -39,6 +45,11 @@ struct queue_end_s {
 #define fas_queue_B fas_queue[1]
 #define QUEUE_LEN 16
 
+// timing definitions for pc-based testing
+#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+
 #elif defined(ARDUINO_ARCH_ESP32)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -47,12 +58,14 @@ struct queue_end_s {
 #include <driver/gpio.h>
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
+#include <esp_task_wdt.h>
+#include <math.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
-// For esp32 using arduino, just use arduino definition 
+// For esp32 using arduino, just use arduino definition
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
 
@@ -66,18 +79,25 @@ struct queue_end_s {
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 
+// Esp32 timing definition
+#define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
+#define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+
 #elif defined(ESP_PLATFORM)
 // esp32 specific includes
 #include <driver/gpio.h>
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
+#include <esp_task_wdt.h>
+#include <math.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
 // on espidf need to use portDISABLE/ENABLE_INTERRUPTS
-// 
+//
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #define fasDisableInterrupts portDISABLE_INTERRUPTS
@@ -92,6 +112,11 @@ struct queue_end_s {
 // Esp32 queue definitions
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
+
+// Esp32 timing definition
+#define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
+#define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 
 // The espidf-platform needs a couple of arduino like definitions
 #define LOW 0
@@ -111,18 +136,23 @@ struct queue_end_s {
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 
+// timing definitions for SAM
+#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 
 #elif defined(ARDUINO_ARCH_AVR)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
-// for AVR processors a reentrant version of disabling/enabling interrupts is used
+// for AVR processors a reentrant version of disabling/enabling interrupts is
+// used
 #define fasDisableInterrupts() \
   uint8_t prevSREG = SREG;     \
   cli()
 #define fasEnableInterrupts() SREG = prevSREG
 
-// Here are shorthand definitions for number of queues, the queues/channel relation and queue length
-// This definitions are derivate specific
+// Here are shorthand definitions for number of queues, the queues/channel
+// relation and queue length This definitions are derivate specific
 #define QUEUE_LEN 16
 #if defined(__AVR_ATmega328P__)
 #define NUM_QUEUES 2
@@ -145,6 +175,13 @@ enum channels { channelA, channelB, channelC };
 #error "Unsupported derivate"
 #endif
 
+// AVR:
+// tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
+// the main task is freezing (StepperDemo).
+// Thus the limitation set here is set to 25kSteps/s as stated in the README.
+#define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
+#define MIN_DIR_DELAY_US (MIN_DELTA_TICKS / (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 
 #else
 

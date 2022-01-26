@@ -829,4 +829,3 @@ int16_t FastAccelStepper::readPulseCounter() {
   return 0;
 }
 #endif
-

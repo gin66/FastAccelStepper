@@ -1,7 +1,7 @@
 #include <stdint.h>
 
-#include "common.h"
 #include "FastAccelStepper.h"
+#include "common.h"
 
 // Here are the global variables to interface with the interrupts
 

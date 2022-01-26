@@ -6,9 +6,7 @@
 // StepperQueue fas_queue[NUM_QUEUES];
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) { _initVars(); }
-void StepperQueue::startQueue() {
-  _isRunning = true;
-}
+void StepperQueue::startQueue() { _isRunning = true; }
 void StepperQueue::forceStop() {}
 void StepperQueue::connect() {}
 void StepperQueue::disconnect() {}

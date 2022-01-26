@@ -1,24 +1,10 @@
 #ifndef FASTACCELSTEPPER_H
 #define FASTACCELSTEPPER_H
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
-    defined(ARDUINO_ARCH_SAM)
-#include <Arduino.h>
-#elif defined(ESP_PLATFORM)
-#include <math.h>
-#else
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "../tests/pc_based/stubs.h"
-#endif
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#include <esp_task_wdt.h>
-#endif
 #include <stdint.h>
 
 #include "PoorManFloat.h"
 #include "RampGenerator.h"
+#include "common.h"
 
 //
 // Timing values - Architecture dependent
@@ -43,28 +29,6 @@
 //	MIN_CMD_TICKS		4200	[1/TICKS_PER_S seconds]
 //	MIN_DIR_DELAY_US	200		[µs]
 //	MAX_DIR_DELAY_US	3120	[µs]
-
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
-#define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
-#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
-#elif defined(ARDUINO_ARCH_AVR)
-// AVR:
-// tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
-// the main task is freezing (StepperDemo).
-// Thus the limitation set here is set to 25kSteps/s as stated in the README.
-#define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
-#define MIN_DIR_DELAY_US (MIN_DELTA_TICKS / (TICKS_PER_S / 1000000))
-#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
-#elif defined(ARDUINO_ARCH_SAM)
-#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
-#define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
-#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
-#else
-#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
-#define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
-#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
-#endif
 
 #define MIN_CMD_TICKS (10 * MIN_DELTA_TICKS)
 #define REF_CMD_TICKS (15 * MIN_DELTA_TICKS)
