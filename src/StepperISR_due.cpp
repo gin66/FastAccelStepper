@@ -73,6 +73,9 @@ uint8_t TimerChannel_Map[NUM_PWM_CHANNELS];
 
 uint8_t numChannels = 0;
 
+// this is needed to give the background task isr access to engine
+static FastAccelStepperEngine* fas_engine = NULL;
+
 // Here are the global variables to interface with the interrupts
 #if defined(KEEP_SCORE)  // If you want to count how many pulses we detect...
 volatile uint32_t totalPulsesDetected[NUM_QUEUES];

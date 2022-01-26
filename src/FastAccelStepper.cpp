@@ -13,11 +13,6 @@
 static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 
-#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
-// this is needed to give the background task isr access to engine
-FastAccelStepperEngine* fas_engine = NULL;
-#endif
-
 // dynamic allocation seems to not work so well on avr
 FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(),

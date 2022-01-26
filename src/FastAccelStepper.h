@@ -444,6 +444,4 @@ class FastAccelStepperEngine {
 
   friend class FastAccelStepper;
 };
-
-extern FastAccelStepperEngine* fas_engine;
 #endif

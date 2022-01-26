@@ -73,6 +73,9 @@
 #define EnableOverflowInterrupt(T) TIMSK##T |= _BV(TOIE##T)
 #define DisableOverflowInterrupt(T) TIMSK##T &= ~_BV(TOIE##T)
 
+// this is needed to give the background task isr access to engine
+static FastAccelStepperEngine* fas_engine = NULL;
+
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
