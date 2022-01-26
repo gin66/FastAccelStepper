@@ -98,15 +98,10 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   uint8_t stepper_num = _next_stepper_num;
   _next_stepper_num++;
 
-#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_ESP32) || \
-    defined(ESP_PLATFORM) || defined(TEST) || defined(ARDUINO_ARCH_SAM)
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
   return s;
-#else
-  return NULL;
-#endif
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
@@ -116,7 +111,7 @@ void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::manageSteppers() {
-#ifndef TEST
+#ifdef DEBUG_LED_HALF_PERIOD
   if (fas_ledPin != PIN_UNDEFINED) {
     fas_debug_led_cnt++;
     if (fas_debug_led_cnt == DEBUG_LED_HALF_PERIOD) {

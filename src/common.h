@@ -56,9 +56,6 @@ struct queue_end_s {
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 1
 
-// debug led timing
-#define DEBUG_LED_HALF_PERIOD 50
-
 //==========================================================================
 #elif defined(ARDUINO_ARCH_ESP32)
 // this is an arduino platform, so include the Arduino.h header file
