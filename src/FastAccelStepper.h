@@ -434,9 +434,6 @@ class FastAccelStepper {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
 #endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  uint32_t checksum();
-#endif
 
   friend class FastAccelStepperEngine;
   friend class FastAccelStepperTest;

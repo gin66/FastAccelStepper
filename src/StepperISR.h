@@ -102,9 +102,6 @@ class StepperQueue {
   volatile bool _isRunning;
   bool isRunning() { return _isRunning; }
 #endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-  uint8_t checksum;
-#endif
 
   struct queue_end_s queue_end;
 
@@ -184,21 +181,7 @@ class StepperQueue {
 #endif
     next_queue_end.dir = dir;
     next_queue_end.count_up = cmd->count_up;
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    {
-      // checksum is in the struct and will be updated here
-      unsigned char* x = (unsigned char*)e;
-      for (uint8_t i = 0; i < sizeof(struct queue_entry); i++) {
-        if (checksum & 0x80) {
-          checksum <<= 1;
-          checksum ^= 0xde;
-        } else {
-          checksum <<= 1;
-        }
-        checksum ^= *x++;
-      }
-    }
-#endif
+
     // Advance write pointer
     fasDisableInterrupts();
     if (!ignore_commands) {
@@ -399,9 +382,6 @@ class StepperQueue {
 
 #else
     _isRunning = false;
-#endif
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-    checksum = 0;
 #endif
   }
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)

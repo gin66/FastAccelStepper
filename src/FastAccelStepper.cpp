@@ -830,6 +830,3 @@ int16_t FastAccelStepper::readPulseCounter() {
 }
 #endif
 
-#if (TEST_CREATE_QUEUE_CHECKSUM == 1)
-uint32_t FastAccelStepper::checksum() { return fas_queue[_queue_num].checksum; }
-#endif
