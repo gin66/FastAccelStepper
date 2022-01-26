@@ -478,4 +478,27 @@ int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
   // Serial.println(PCNT.conf_unit[PCNT_UNIT_0].conf2.cnt_h_lim);
   return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].cnt_val;
 }
+
+//*************************************************************************************************
+void StepperTask(void *parameter) {
+  FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
+  const TickType_t delay_4ms =
+      (DELAY_MS_BASE + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
+  while (true) {
+    engine->manageSteppers();
+    esp_task_wdt_reset();
+    vTaskDelay(delay_4ms);
+  }
+}
+
+void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
+#define STACK_SIZE 1000
+#define PRIORITY configMAX_PRIORITIES
+  if (cpu_core > 1) {
+    xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
+  } else {
+    xTaskCreatePinnedToCore(StepperTask, "StepperTask", STACK_SIZE, engine,
+                            PRIORITY, NULL, cpu_core);
+  }
+}
 #endif

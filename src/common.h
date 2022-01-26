@@ -54,6 +54,7 @@ struct queue_end_s {
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+#define DELAY_MS_BASE 1
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
@@ -92,6 +93,7 @@ struct queue_end_s {
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+#define DELAY_MS_BASE 4
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
@@ -133,6 +135,7 @@ struct queue_end_s {
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+#define DELAY_MS_BASE 4
 
 // The espidf-platform needs a couple of arduino like definitions
 #define LOW 0
@@ -163,6 +166,7 @@ struct queue_end_s {
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+#define DELAY_MS_BASE 2
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
@@ -209,7 +213,7 @@ enum channels { channelA, channelB, channelC };
 #define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
 #define MIN_DIR_DELAY_US (MIN_DELTA_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
-
+#define DELAY_MS_BASE (65536000 / TICKS_PER_S)
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
 

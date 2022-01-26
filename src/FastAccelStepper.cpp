@@ -20,18 +20,15 @@ FastAccelStepperEngine* fas_engine = NULL;
 
 // dynamic allocation seems to not work so well on avr
 FastAccelStepper fas_stepper[MAX_STEPPER] = {
-	FastAccelStepper(),
+    FastAccelStepper(),
 #if MAX_STEPPER == 3
-	FastAccelStepper(),
+    FastAccelStepper(),
 #endif
 #if MAX_STEPPER == 6
-	FastAccelStepper(),
-	FastAccelStepper(),
-	FastAccelStepper(),
-	FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(),
 #endif
-	FastAccelStepper()
-};
+    FastAccelStepper()};
 
 //*************************************************************************************************
 //*************************************************************************************************
@@ -41,43 +38,21 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
 //
 //*************************************************************************************************
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#define TASK_DELAY_4MS 4
-void StepperTask(void* parameter) {
-  FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
-  const TickType_t delay_4ms =
-      (TASK_DELAY_4MS + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
-  while (true) {
-    engine->manageSteppers();
-    esp_task_wdt_reset();
-    vTaskDelay(delay_4ms);
-  }
-}
 #endif
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
 #if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
-#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
-  fas_engine = this;
-#endif
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#define STACK_SIZE 1000
-#define PRIORITY configMAX_PRIORITIES
-  xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
-#endif
+  fas_init_engine(this, 255);
 }
 
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 void FastAccelStepperEngine::init(uint8_t cpu) {
-#define STACK_SIZE 1000
-#define PRIORITY configMAX_PRIORITIES
-  if (cpu > 1) {
-    xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, this, PRIORITY, NULL);
-  } else {
-    xTaskCreatePinnedToCore(StepperTask, "StepperTask", STACK_SIZE, this,
-                            PRIORITY, NULL, cpu);
-  }
+#if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
+  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
+#endif
+  fas_init_engine(this, cpu);
 }
 #endif
 
@@ -573,17 +548,7 @@ int8_t FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   return DELAY_OK;
 }
 void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
-  uint16_t delay_count = 0;
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-  delay_count = delay_ms / TASK_DELAY_4MS;
-#endif
-#if defined(ARDUINO_ARCH_SAM)
-  delay_count =
-      delay_ms / 2;  // have understood, the cyclic task is run with 2ms timer
-#endif
-#if defined(ARDUINO_ARCH_AVR)
-  delay_count = delay_ms / (65536000 / TICKS_PER_S);
-#endif
+  uint16_t delay_count = delay_ms / DELAY_MS_BASE;
   if ((delay_ms > 0) && (delay_count < 2)) {
     // ensure minimum time
     delay_count = 2;

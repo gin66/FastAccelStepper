@@ -395,3 +395,5 @@ class StepperQueue {
 };
 
 extern StepperQueue fas_queue[NUM_QUEUES];
+
+void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core);

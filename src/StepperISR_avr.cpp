@@ -328,4 +328,8 @@ int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
 #endif
   return -1;
 }
+
+void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {
+  fas_engine = engine;
+}
 #endif
