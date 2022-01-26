@@ -1,79 +1,16 @@
-#if defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_AVR) || \
-    defined(ARDUINO_ARCH_SAM)
-#include <Arduino.h>
-#elif defined(ESP_PLATFORM)
-#define LOW 0
-#define HIGH 1
-#define OUTPUT GPIO_MODE_OUTPUT
-#define pinMode(pin, mode) gpio_set_direction((gpio_num_t)pin, mode)
-#define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin, level)
-#else
-#include <assert.h>
-#endif
 #include <stdint.h>
 
-#include "FastAccelStepper.h"
 #include "common.h"
+#include "FastAccelStepper.h"
 
 // Here are the global variables to interface with the interrupts
-
-#if defined(TEST)
-#define NUM_QUEUES 2
-#define fas_queue_A fas_queue[0]
-#define fas_queue_B fas_queue[1]
-#define QUEUE_LEN 16
-#elif defined(ARDUINO_ARCH_AVR)
-#if defined(__AVR_ATmega328P__)
-#define NUM_QUEUES 2
-#define fas_queue_A fas_queue[0]
-#define fas_queue_B fas_queue[1]
-#define QUEUE_LEN 16
-enum channels { channelA, channelB };
-#elif defined(__AVR_ATmega2560__)
-#define NUM_QUEUES 3
-#define fas_queue_A fas_queue[0]
-#define fas_queue_B fas_queue[1]
-#define fas_queue_C fas_queue[2]
-#define QUEUE_LEN 16
-enum channels { channelA, channelB, channelC };
-#elif defined(__AVR_ATmega32U4__)
-#define NUM_QUEUES 3
-#define fas_queue_A fas_queue[0]
-#define fas_queue_B fas_queue[1]
-#define fas_queue_C fas_queue[2]
-#define QUEUE_LEN 16
-enum channels { channelA, channelB, channelC };
-#else
-#error "Unsupported derivate"
-#endif
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#define NUM_QUEUES 6
-#define QUEUE_LEN 32
-#elif defined(ARDUINO_ARCH_SAM)
-#define NUM_QUEUES 6
-#define QUEUE_LEN 32
-#else
-#define NUM_QUEUES 6
-#define QUEUE_LEN 32
-#endif
 
 // These variables control the stepper timing behaviour
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
-#ifndef TEST
-#define inject_fill_interrupt(x)
-#endif
-
 #define TICKS_FOR_STOPPED_MOTOR 0xffffffff
 
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#include <driver/gpio.h>
-#include <driver/mcpwm.h>
-#include <driver/pcnt.h>
-#include <soc/mcpwm_reg.h>
-#include <soc/mcpwm_struct.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
 struct mapping_s {
   mcpwm_unit_t mcpwm_unit;
   uint8_t timer;

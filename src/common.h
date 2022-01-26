@@ -15,27 +15,142 @@ struct queue_end_s {
   bool dir;
 };
 
+//==============================================================================
+// All architecture specific definitions should be located here
+//==============================================================================
+
+// disable inject_fill_interrupt() for all real devices
+#ifndef TEST
+#define inject_fill_interrupt(x)
+#endif
+
 #if defined(TEST)
+// For pc-based testing like to have assert-macro
+#include <assert.h>
+
+// For pc-based testing, the macro TEST is defined. The pc-based testing does not
+// support the concept of interrupts, so provide an empty definition
 #define fasEnableInterrupts()
 #define fasDisableInterrupts()
+
+// queue definitions for pc based testing
+#define NUM_QUEUES 2
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define QUEUE_LEN 16
+
 #elif defined(ARDUINO_ARCH_ESP32)
+// this is an arduino platform, so include the Arduino.h header file
+#include <Arduino.h>
+
+// Some more esp32 specific includes
+#include <driver/gpio.h>
+#include <driver/mcpwm.h>
+#include <driver/pcnt.h>
+#include <soc/mcpwm_reg.h>
+#include <soc/mcpwm_struct.h>
+#include <soc/pcnt_reg.h>
+#include <soc/pcnt_struct.h>
+
+// For esp32 using arduino, just use arduino definition 
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
+
+// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use
+// this to distinguish between the two versions
+#if defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
+#define __ESP32_IDF_V44__
+#endif
+
+// Esp32 queue definitions
+#define NUM_QUEUES 6
+#define QUEUE_LEN 32
+
 #elif defined(ESP_PLATFORM)
+// esp32 specific includes
+#include <driver/gpio.h>
+#include <driver/mcpwm.h>
+#include <driver/pcnt.h>
+#include <soc/mcpwm_reg.h>
+#include <soc/mcpwm_struct.h>
+#include <soc/pcnt_reg.h>
+#include <soc/pcnt_struct.h>
+
+// on espidf need to use portDISABLE/ENABLE_INTERRUPTS
+// 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #define fasDisableInterrupts portDISABLE_INTERRUPTS
 #define fasEnableInterrupts portENABLE_INTERRUPTS
+
+// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use
+// this to distinguish between the two versions
+#if defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
+#define __ESP32_IDF_V44__
+#endif
+
+// Esp32 queue definitions
+#define NUM_QUEUES 6
+#define QUEUE_LEN 32
+
+// The espidf-platform needs a couple of arduino like definitions
+#define LOW 0
+#define HIGH 1
+#define OUTPUT GPIO_MODE_OUTPUT
+#define pinMode(pin, mode) gpio_set_direction((gpio_num_t)pin, mode)
+#define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin, level)
+
 #elif defined(ARDUINO_ARCH_SAM)
+// this is an arduino platform, so include the Arduino.h header file
+#include <Arduino.h>
+// on SAM just use the arduino macros
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
+
+// queue definitions for SAM
+#define NUM_QUEUES 6
+#define QUEUE_LEN 32
+
+
 #elif defined(ARDUINO_ARCH_AVR)
+// this is an arduino platform, so include the Arduino.h header file
+#include <Arduino.h>
+// for AVR processors a reentrant version of disabling/enabling interrupts is used
 #define fasDisableInterrupts() \
   uint8_t prevSREG = SREG;     \
   cli()
 #define fasEnableInterrupts() SREG = prevSREG
+
+// Here are shorthand definitions for number of queues, the queues/channel relation and queue length
+// This definitions are derivate specific
+#define QUEUE_LEN 16
+#if defined(__AVR_ATmega328P__)
+#define NUM_QUEUES 2
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+enum channels { channelA, channelB };
+#elif defined(__AVR_ATmega2560__)
+#define NUM_QUEUES 3
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define fas_queue_C fas_queue[2]
+enum channels { channelA, channelB, channelC };
+#elif defined(__AVR_ATmega32U4__)
+#define NUM_QUEUES 3
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define fas_queue_C fas_queue[2]
+enum channels { channelA, channelB, channelC };
 #else
 #error "Unsupported derivate"
+#endif
+
+
+#else
+
+// If come here, then the device is not supported
+#error "Unsupported derivate"
+
 #endif
 
 #endif /* COMMON_H */
