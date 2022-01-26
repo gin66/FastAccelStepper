@@ -1,26 +1,6 @@
 #ifndef RAMP_GENERATOR_H
 #define RAMP_GENERATOR_H
 
-#if defined(TEST)
-#define MAX_STEPPER 2
-#define TICKS_PER_S 16000000L
-#elif defined(ARDUINO_ARCH_AVR)
-#if defined(__AVR_ATmega328P__)
-#define MAX_STEPPER 2
-#elif defined(__AVR_ATmega2560__)
-#define MAX_STEPPER 3
-#elif defined(__AVR_ATmega32U4__)
-#define MAX_STEPPER 3
-#endif
-#define TICKS_PER_S F_CPU
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#define MAX_STEPPER 6
-#define TICKS_PER_S 16000000L
-#elif defined(ARDUINO_ARCH_SAM)
-#define MAX_STEPPER 6
-#define TICKS_PER_S 21000000L
-#endif
-
 #include "common.h"
 
 class FastAccelStepper;

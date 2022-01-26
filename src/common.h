@@ -45,12 +45,14 @@ struct queue_end_s {
 #define HIGH 1
 
 // queue definitions for pc based testing
+#define MAX_STEPPER 2
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define QUEUE_LEN 16
 
 // timing definitions for pc-based testing
+#define TICKS_PER_S 16000000L
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
@@ -83,10 +85,12 @@ struct queue_end_s {
 #endif
 
 // Esp32 queue definitions
+#define MAX_STEPPER 6
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 
 // Esp32 timing definition
+#define TICKS_PER_S 16000000L
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
@@ -125,10 +129,12 @@ struct queue_end_s {
 #endif
 
 // Esp32 queue definitions
+#define MAX_STEPPER 6
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 
 // Esp32 timing definition
+#define TICKS_PER_S 16000000L
 #define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
@@ -156,10 +162,12 @@ struct queue_end_s {
 #define fasDisableInterrupts noInterrupts
 
 // queue definitions for SAM
+#define MAX_STEPPER 6
 #define NUM_QUEUES 6
 #define QUEUE_LEN 32
 
 // timing definitions for SAM
+#define TICKS_PER_S 21000000L
 #define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
@@ -172,6 +180,7 @@ struct queue_end_s {
 #elif defined(ARDUINO_ARCH_AVR)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
+#include "AVRStepperPins.h"
 // for AVR processors a reentrant version of disabling/enabling interrupts is
 // used
 #define fasDisableInterrupts() \
@@ -183,17 +192,20 @@ struct queue_end_s {
 // relation and queue length This definitions are derivate specific
 #define QUEUE_LEN 16
 #if defined(__AVR_ATmega328P__)
+#define MAX_STEPPER 2
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 enum channels { channelA, channelB };
 #elif defined(__AVR_ATmega2560__)
+#define MAX_STEPPER 3
 #define NUM_QUEUES 3
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
 enum channels { channelA, channelB, channelC };
 #elif defined(__AVR_ATmega32U4__)
+#define MAX_STEPPER 3
 #define NUM_QUEUES 3
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
@@ -207,6 +219,7 @@ enum channels { channelA, channelB, channelC };
 // tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
 // the main task is freezing (StepperDemo).
 // Thus the limitation set here is set to 25kSteps/s as stated in the README.
+#define TICKS_PER_S F_CPU
 #define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
 #define MIN_DIR_DELAY_US (MIN_DELTA_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
