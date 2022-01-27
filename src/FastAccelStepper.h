@@ -290,15 +290,15 @@ class FastAccelStepper {
 
   // functions to get the fill level of the queue
   //
-  // To retrieve the forward planning time in the queue ticksInQueue()
-  // can be used. It sums up all ticks () of the not yet processed commands.
-  // For pauses, the summed up value is entry.ticks.
-  // For steps, the summed up value is entry.steps*entry.ticks
+  // To retrieve the forward planning time in the queue, ticksInQueue()
+  // can be used. It sums up all ticks of the not yet processed commands.
+  // For commands defining pauses, the summed up value is entry.ticks.
+  // For commands with steps, the summed up value is entry.steps*entry.ticks
   uint32_t ticksInQueue();
 
   // This function can be used to check, if the commands in the queue
   // will last for <min_ticks> ticks. This is again without the
-  // currently processed commands.
+  // currently processed command.
   bool hasTicksInQueue(uint32_t min_ticks);
 
   // This function allows to check the number of commands in the queue.
