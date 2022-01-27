@@ -7,7 +7,7 @@ PASS=">> M1: @30000 \\[30000\\]"
 
 LOG="$0.log"
 
-grabserial $DEV -c 'reset ' -q "M1:" -e 10
+grabserial $DEV -c ' x reset ' -q "M1:" -e 10
 sleep 2
 
 grabserial $DEV -c "$CMD" -q "$PASS" -e 3 -o $LOG
@@ -24,7 +24,7 @@ if [ `grep -c "$PASS" $LOG` -eq 1 ]
 then
 	echo PASS
 else
-	grabserial $DEV -c 'r ' -q StepperDemo -e 1
+	grabserial $DEV -c ' r ' -q StepperDemo -e 1
 	echo
 	echo "FAIL $0 result pattern: $PASS"
 	exit 1

@@ -2,8 +2,8 @@
 TTY=${1:-ttyUSB0}
 DEV="-d /dev/${TTY} -b 115200"
 
-COMPLETE="Test completed"
-PASS="Test passed"
+COMPLETE="test completed"
+PASS="test passed"
 MAX_RUN_S=300
 
 
@@ -12,9 +12,11 @@ do
 	LOG="$0_$SEQ.log"
 	CMD="M1 p7,0,0 t M1 $SEQ R "
 
-	grabserial $DEV -c 'reset ' -q "M1:" -e 10
+	echo "reset esp32"
+	grabserial $DEV -c ' x reset ' -q "M1:" -e 10
 	sleep 2
 
+	echo "send commands"
 	grabserial $DEV -c "$CMD" -q "$COMPLETE" -e $MAX_RUN_S -o $LOG
 	echo
 
@@ -30,7 +32,7 @@ do
 	then
 		echo PASS
 	else
-		grabserial $DEV -c 'r ' -q StepperDemo -e 1
+		grabserial $DEV -c ' x r ' -q StepperDemo -e 1
 		echo
 		echo "FAIL $0 result pattern: $PASS"
 		exit 1
