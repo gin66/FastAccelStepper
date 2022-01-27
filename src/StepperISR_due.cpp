@@ -481,7 +481,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   if (!isTCEnabled) {
     // Lets set it up on a 2ms timer.  That should keep the queue full...
     // Enable the peripheral
-    Serial.println("Enabling Timer Channel 5");
+// gin66: Better to remove any Serial.println() cause an application may choose to not use Serial
+//  Serial.println("Enabling Timer Channel 5");
     pmc_enable_periph_clk(ID_TC5);
     TC1->TC_CHANNEL[2].TC_CCR = 1;
     TC1->TC_CHANNEL[2].TC_CMR = 0;
@@ -507,38 +508,41 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 
   // Rising edge, so we get the interrupt at the beginning of the pulse (gives
   // us some extra time) and so we only get 1 int/pulse Change would give 2
-  switch (queue_num) {
-    case 0:
-      Serial.print("Attach 0 to ");
-      Serial.println(ISRQueueNameStr(0));
-      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(0), RISING);
-      break;
-    case 1:
-      Serial.print("Attach 1 to ");
-      Serial.println(ISRQueueNameStr(1));
-      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(1), RISING);
-      break;
-    case 2:
-      Serial.print("Attach 2 to ");
-      Serial.println(ISRQueueNameStr(2));
-      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(2), RISING);
-      break;
-    case 3:
-      Serial.print("Attach 3 to ");
-      Serial.println(ISRQueueNameStr(3));
-      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(3), RISING);
-      break;
-    case 4:
-      Serial.print("Attach 4 to ");
-      Serial.println(ISRQueueNameStr(4));
-      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(4), RISING);
-      break;
-    case 5:
-      Serial.print("Attach 5 to ");
-      Serial.println(ISRQueueNameStr(5));
-      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(5), RISING);
-      break;
-  }
+
+// gin66: Duplicated code. This attachInterrupt() is done in connect().
+//
+//  switch (queue_num) {
+//    case 0:
+//      Serial.print("Attach 0 to ");
+//      Serial.println(ISRQueueNameStr(0));
+//      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(0), RISING);
+//      break;
+//    case 1:
+//      Serial.print("Attach 1 to ");
+//      Serial.println(ISRQueueNameStr(1));
+//      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(1), RISING);
+//      break;
+//    case 2:
+//      Serial.print("Attach 2 to ");
+//      Serial.println(ISRQueueNameStr(2));
+//      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(2), RISING);
+//      break;
+//    case 3:
+//      Serial.print("Attach 3 to ");
+//      Serial.println(ISRQueueNameStr(3));
+//      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(3), RISING);
+//      break;
+//    case 4:
+//      Serial.print("Attach 4 to ");
+//      Serial.println(ISRQueueNameStr(4));
+//      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(4), RISING);
+//      break;
+//    case 5:
+//      Serial.print("Attach 5 to ");
+//      Serial.println(ISRQueueNameStr(5));
+//      attachInterrupt(digitalPinToInterrupt(step_pin), ISRQueueName(5), RISING);
+//      break;
+//  }
 
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
@@ -613,9 +617,14 @@ void StepperQueue::connect() {
 void StepperQueue::disconnect() {
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
   PWM_INTERFACE->PWM_DIS = PWM_INTERFACE->PWM_DIS & (~mapping->channelMask);
+
+// gin66: Shouldn't there be a detachInterrupt() in order to not have stray interrupt ?
+
   _connected = false;
 }
 
+// gin66: I have reworked all code to only use startQueue().
+//        This appears to be less complicated.
 void StepperQueue::startQueue() {
   // This is called only, if isRunning() == false
   struct queue_entry* e = &entry[read_idx & QUEUE_LEN_MASK];
@@ -648,6 +657,7 @@ void StepperQueue::startQueue() {
     /*Enable the ISR too so we don't miss it*/
     PWM_INTERFACE->PWM_IER1 = PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
   }
+// gin66: Shouldn't the _connected flag be set only in connect() ?
   _connected = true;
 }
 
@@ -656,6 +666,7 @@ void StepperQueue::forceStop() {
   read_idx = next_write_idx;
   interrupts();
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
+// gin66: I have added this line in the hope to make it work
   _hasISRactive = false;
 }
 
