@@ -303,7 +303,7 @@ class FastAccelStepper {
 
   // This function allows to check the number of commands in the queue.
   // This is including the currently processed command.
-  uint8_t commandsInQueue();
+  uint8_t queueEntries();
 
   // Get the future position of the stepper after all commands in queue are
   // completed

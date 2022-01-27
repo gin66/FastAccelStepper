@@ -268,15 +268,6 @@ class StepperQueue {
     }
     return pos;
   }
-  uint8_t commandsInQueue() {
-    fasDisableInterrupts();
-    uint8_t rp = read_idx;
-    uint8_t wp = next_write_idx;
-    fasEnableInterrupts();
-    // if wp has wrapped around the subtraction will overflow.
-    // This is actually ok
-    return (uint8_t)(wp - rp);
-  }
   uint32_t ticksInQueue() {
     fasDisableInterrupts();
     uint8_t rp = read_idx;
