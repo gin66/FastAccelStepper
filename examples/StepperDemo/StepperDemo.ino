@@ -12,7 +12,7 @@
 // Code Optimization
 //   Start   30170 Bytes
 
-#define VERSION "post-040e180"
+#define VERSION "post-fdd93e7"
 
 struct stepper_config_s {
   uint8_t step;
@@ -646,8 +646,8 @@ void output_msg(int8_t i) {
     if (ch == '|') {
       i--;
     } else if (i == 0) {
-      if (ch < 0) {
-        output_msg(ch + 128);
+      if (ch & 0x80) {
+        output_msg(ch ^ 0x80);
       } else {
         Serial.print(ch);
       }

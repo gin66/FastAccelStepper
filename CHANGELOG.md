@@ -1,4 +1,4 @@
-pre-0.24.3:
+0.25.0:
 - esp32 changes in response to [Issue #106](https://github.com/gin66/FastAccelStepper/issues/106):
 	- Select CPU core to run the StepperTask on by using init(cpu)
 	- Trigger the watchdog in the StepperTask
