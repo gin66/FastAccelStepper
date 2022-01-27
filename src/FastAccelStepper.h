@@ -283,10 +283,27 @@ class FastAccelStepper {
 #define AQE_ERROR_EMPTY_QUEUE_TO_START -2
 #define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE -3
 
-  // check function s for command queue being empty or full
+  // check functions for command queue being empty, full or running.
   bool isQueueEmpty();
   bool isQueueFull();
   bool isQueueRunning();
+
+  // functions to get the fill level of the queue
+  //
+  // To retrieve the forward planning time in the queue ticksInQueue()
+  // can be used. It sums up all ticks () of the not yet processed commands.
+  // For pauses, the summed up value is entry.ticks.
+  // For steps, the summed up value is entry.steps*entry.ticks
+  uint32_t ticksInQueue();
+
+  // This function can be used to check, if the commands in the queue
+  // will last for <min_ticks> ticks. This is again without the
+  // currently processed commands.
+  bool hasTicksInQueue(uint32_t min_ticks);
+
+  // This function allows to check the number of commands in the queue.
+  // This is including the currently processed command.
+  uint8_t commandsInQueue();
 
   // Get the future position of the stepper after all commands in queue are
   // completed

@@ -696,6 +696,15 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   _rg.advanceTargetPositionWithinInterruptDisabledScope(delta);
   fasEnableInterrupts();
 }
+uint8_t FastAccelStepper::commandsInQueue() {
+  return fas_queue[_queue_num].commandsInQueue();
+}
+uint32_t FastAccelStepper::ticksInQueue() {
+  return fas_queue[_queue_num].ticksInQueue();
+}
+bool FastAccelStepper::hasTicksInQueue(uint32_t min_ticks) {
+  return fas_queue[_queue_num].hasTicksInQueue(min_ticks);
+}
 bool FastAccelStepper::isQueueFull() {
   return fas_queue[_queue_num].isQueueFull();
 }

@@ -1,3 +1,9 @@
+pre-0.25.1:
+- expose internal functions for retrieving queue status as requested by [Issue #112](https://github.com/gin66/FastAccelStepper/issues/112):
+	ticksInQueue()
+	hasTicksInQueue()
+	commandsInQueue()
+
 0.25.0:
 - esp32 changes in response to [Issue #106](https://github.com/gin66/FastAccelStepper/issues/106):
 	- Select CPU core to run the StepperTask on by using init(cpu)
