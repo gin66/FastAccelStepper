@@ -54,7 +54,7 @@ class StepperQueue {
 
   // In case of forceStopAndNewPosition() the adding of commands has to be
   // temporarily suspended
-  bool ignore_commands;
+  volatile bool ignore_commands;
   volatile uint8_t read_idx;  // ISR stops if readptr == next_writeptr
   volatile uint8_t next_write_idx;
   bool dirHighCountsUp;

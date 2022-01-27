@@ -118,30 +118,30 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
 #ifndef __ESP32_IDF_V44__
   if (mcpwm->timer[timer].status.value <= 1) {  // mcpwm Timer is stopped ?
     mcpwm->timer[timer].period.upmethod = 0;    // 0 = immediate update, 1 = TEZ
-#else /* __ESP32_IDF_V44__ */
+#else                                           /* __ESP32_IDF_V44__ */
   if (mcpwm->timer[timer].timer_status.timer_value <=
       1) {  // mcpwm Timer is stopped ?
     mcpwm->timer[timer].timer_cfg0.timer_period_upmethod =
         0;  // 0 = immediate update, 1 = TEZ
-#endif /* __ESP32_IDF_V44__ */
+#endif                                          /* __ESP32_IDF_V44__ */
   } else {
-  	// 0 = immediate update, 1 = TEZ
+    // 0 = immediate update, 1 = TEZ
 #ifndef __ESP32_IDF_V44__
     mcpwm->timer[timer].period.upmethod = 1;
-#else /* __ESP32_IDF_V44__ */
+#else  /* __ESP32_IDF_V44__ */
     mcpwm->timer[timer].timer_cfg0.timer_period_upmethod = 1;
 #endif /* __ESP32_IDF_V44__ */
   }
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].period.period = ticks;
-#else /* __ESP32_IDF_V44__ */
+#else  /* __ESP32_IDF_V44__ */
   mcpwm->timer[timer].timer_cfg0.timer_period = ticks;
 #endif /* __ESP32_IDF_V44__ */
   if (steps == 0) {
     // timer value = 1 - upcounting: output low
 #ifndef __ESP32_IDF_V44__
     mcpwm->channel[timer].generator[0].utea = 1;
-#else /* __ESP32_IDF_V44__ */
+#else  /* __ESP32_IDF_V44__ */
     mcpwm->operators[timer].generator[0].gen_utea = 1;
 #endif /* __ESP32_IDF_V44__ */
     mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
@@ -197,7 +197,7 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
     // timer value = 1 - upcounting: output high
 #ifndef __ESP32_IDF_V44__
     mcpwm->channel[timer].generator[0].utea = 2;
-#else /* __ESP32_IDF_V44__ */
+#else  /* __ESP32_IDF_V44__ */
     mcpwm->operators[timer].generator[0].gen_utea = 2;
 #endif /* __ESP32_IDF_V44__ */
   }
@@ -213,9 +213,9 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   uint8_t timer = mapping->timer;
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
-#else /* __ESP32_IDF_V44__ */
+#else                                  /* __ESP32_IDF_V44__ */
   mcpwm->timer[timer].timer_cfg1.timer_start = 0;  // 0: stop at TEZ
-#endif /* __ESP32_IDF_V44__ */
+#endif                                 /* __ESP32_IDF_V44__ */
   // timer value = 1 - upcounting: output low
   mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
   // PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
@@ -346,18 +346,18 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     // 160 MHz/5 = 32 MHz => 16 MHz in up/down-mode
 #ifndef __ESP32_IDF_V44__
     mcpwm->clk_cfg.prescale = 5 - 1;
-#else /* __ESP32_IDF_V44__ */
+#else  /* __ESP32_IDF_V44__ */
     mcpwm->clk_cfg.clk_prescale = 5 - 1;
 #endif /* __ESP32_IDF_V44__ */
 
-	// timer 0 is input for operator 0
-  	// timer 1 is input for operator 1
-  	// timer 2 is input for operator 2
+    // timer 0 is input for operator 0
+    // timer 1 is input for operator 1
+    // timer 2 is input for operator 2
 #ifndef __ESP32_IDF_V44__
     mcpwm->timer_sel.operator0_sel = 0;
     mcpwm->timer_sel.operator1_sel = 1;
     mcpwm->timer_sel.operator2_sel = 2;
-#else /* __ESP32_IDF_V44__ */
+#else  /* __ESP32_IDF_V44__ */
     mcpwm->operator_timersel.operator0_timersel = 0;
     mcpwm->operator_timersel.operator1_timersel = 1;
     mcpwm->operator_timersel.operator2_timersel = 2;
@@ -369,14 +369,14 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->timer[timer].period.period = 400;  // Random value
   mcpwm->timer[timer].mode.mode = 3;        // 3=up/down counting
   mcpwm->timer[timer].mode.start = 0;       // 0: stop at TEZ
-#else /* __ESP32_IDF_V44__ */
+#else                                       /* __ESP32_IDF_V44__ */
   // 0 = immediate update, 1 = TEZ
   mcpwm->timer[timer].timer_cfg0.timer_period_upmethod = 1;
   mcpwm->timer[timer].timer_cfg0.timer_prescale = TIMER_PRESCALER;
   mcpwm->timer[timer].timer_cfg0.timer_period = 400;  // Random value
   mcpwm->timer[timer].timer_cfg1.timer_mod = 3;       // 3=up/down counting
   mcpwm->timer[timer].timer_cfg1.timer_start = 0;     // 0: stop at TEZ
-#endif /* __ESP32_IDF_V44__ */
+#endif                                      /* __ESP32_IDF_V44__ */
 
   // this sequence should reset the timer to 0
 #ifndef __ESP32_IDF_V44__
@@ -392,7 +392,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->channel[timer].generator[0].dtep = 1;  // low at period
   mcpwm->channel[timer].db_cfg.val = 0;         // edge delay disabled
   mcpwm->channel[timer].carrier_cfg.val = 0;    // carrier disabled
-#else /* __ESP32_IDF_V44__ */
+#else                                           /* __ESP32_IDF_V44__ */
   mcpwm->timer[timer].timer_sync.timer_phase = 0;     // prepare value of 0
   mcpwm->timer[timer].timer_sync.timer_synci_en = 1;  // enable sync
   mcpwm->timer[timer].timer_sync.timer_sync_sw ^= 1;  // force a sync
@@ -406,7 +406,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   mcpwm->operators[timer].generator[0].gen_dtep = 1;  // low at period
   mcpwm->operators[timer].dt_cfg.val = 0;             // edge delay disabled
   mcpwm->operators[timer].carrier_cfg.val = 0;        // carrier disabled
-#endif /* __ESP32_IDF_V44__ */
+#endif                                          /* __ESP32_IDF_V44__ */
 
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
@@ -454,16 +454,16 @@ bool StepperQueue::isRunning() {
   uint8_t timer = mapping->timer;
 #ifndef __ESP32_IDF_V44__
   if (mcpwm->timer[timer].status.value > 1) {
-#else /* __ESP32_IDF_V44__ */
+#else  /* __ESP32_IDF_V44__ */
   if (mcpwm->timer[timer].timer_status.timer_value > 1) {
 #endif /* __ESP32_IDF_V44__ */
     return true;
   }
 #ifndef __ESP32_IDF_V44__
   return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
-#else /* __ESP32_IDF_V44__ */
+#else                                            /* __ESP32_IDF_V44__ */
   return (mcpwm->timer[timer].timer_cfg1.timer_start == 2);  // 2=run continuous
-#endif /* __ESP32_IDF_V44__ */
+#endif                                           /* __ESP32_IDF_V44__ */
 }
 
 void StepperQueue::startQueue() {
@@ -488,9 +488,9 @@ void StepperQueue::startQueue() {
 
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
-#else /* __ESP32_IDF_V44__ */
-  mcpwm->timer[timer].timer_cfg1.timer_start = 2;  // 2=run continuous
-#endif /* __ESP32_IDF_V44__ */
+#else                                  /* __ESP32_IDF_V44__ */
+  mcpwm->timer[timer].timer_cfg1.timer_start = 2;            // 2=run continuous
+#endif                                 /* __ESP32_IDF_V44__ */
 }
 void StepperQueue::forceStop() {
   init_stop(this);

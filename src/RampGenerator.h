@@ -47,7 +47,7 @@ struct ramp_ro_s {
 };
 
 struct ramp_rw_s {
-  uint8_t ramp_state;
+  volatile uint8_t ramp_state;
   // if accel_change_cnt does not match config.accel_change_cnt, then
   // performed_ramp_up_steps to be recalculated
   uint8_t accel_change_cnt;

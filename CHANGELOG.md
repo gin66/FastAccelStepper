@@ -9,6 +9,7 @@ pre-0.24.3:
 - Rework/simplify internal implementation of queue start for the different architectures.
 - ensure forceStopAndNewPosition() is really safe to be called from interrupt
 - Refactor internal code for less microcontroller dependency
+- isMotorRunning() declared as deprecated and add isQueueRunning() as replacement
 
 0.24.2:
 - arduino library manager has not taken up the last minute change

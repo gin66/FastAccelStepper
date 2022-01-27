@@ -10,9 +10,9 @@ struct stepper_command_s {
 };
 
 struct queue_end_s {
-  int32_t pos;  // in steps
-  bool count_up;
-  bool dir;
+  volatile int32_t pos;  // in steps
+  volatile bool count_up;
+  volatile bool dir;
 };
 
 //==============================================================================
@@ -58,6 +58,9 @@ struct queue_end_s {
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 1
 
+// Busy wait
+#define wait_or_pause()
+
 //==========================================================================
 #elif defined(ARDUINO_ARCH_ESP32)
 // this is an arduino platform, so include the Arduino.h header file
@@ -101,6 +104,12 @@ struct queue_end_s {
 
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
+
+// have more than one core
+#define SUPPORT_CPU_AFFINITY
+
+// esp32 is a multitasking system, so yield one tick for other tasks
+#define wait_or_pause() vTaskDelay(1)
 
 //==========================================================================
 #elif defined(ESP_PLATFORM)
@@ -153,6 +162,12 @@ struct queue_end_s {
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
 
+// have more than one core
+#define SUPPORT_CPU_AFFINITY
+
+// esp32 is a multitasking system, so yield one tick for other tasks
+#define wait_or_pause() vTaskDelay(1)
+
 //==========================================================================
 #elif defined(ARDUINO_ARCH_SAM)
 // this is an arduino platform, so include the Arduino.h header file
@@ -175,6 +190,9 @@ struct queue_end_s {
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
+
+// Busy wait
+#define wait_or_pause()
 
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
@@ -226,6 +244,9 @@ enum channels { channelA, channelB, channelC };
 #define DELAY_MS_BASE (65536000 / TICKS_PER_S)
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
+
+// Busy wait
+#define wait_or_pause()
 
 //==========================================================================
 #else

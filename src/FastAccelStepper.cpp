@@ -34,18 +34,17 @@ void FastAccelStepperEngine::init() {
   fas_init_engine(this, 255);
 }
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-void FastAccelStepperEngine::init(uint8_t cpu) {
+#if defined(SUPPORT_CPU_AFFINITY)
+void FastAccelStepperEngine::init(uint8_t cpu_core) {
 #if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
 #endif
-  fas_init_engine(this, cpu);
+  fas_init_engine(this, cpu_core);
 }
 #endif
 
 //*************************************************************************************************
 bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
-  // ask just first queue entry....
   return StepperQueue::isValidStepPin(step_pin);
 }
 //*************************************************************************************************
@@ -56,7 +55,7 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
       FastAccelStepper* s = _stepper[i];
       if (s) {
         if (s->getDirectionPin() == dir_pin) {
-          if (s->isMotorRunning()) {
+          if (s->isQueueRunning()) {
             return true;
           }
         }
@@ -202,7 +201,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
   }
 
   if (_dirPin != PIN_UNDEFINED) {
-    if (!isMotorRunning()) {
+    if (!isQueueRunning()) {
       if (_engine != NULL) {
         if (_engine->isDirPinBusy(_dirPin, _queue_num)) {
           return AQE_DIR_PIN_IS_BUSY;
@@ -281,9 +280,9 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
 //*************************************************************************************************
 // fill_queue generates commands to the stepper for executing a ramp
 //
-// Plan is to fill the queue with commmands summing up to approx. 10 ms in the future (or
-// more). For low speeds, this results in single stepping For high speeds
-// (40kSteps/s) approx. 400 Steps to be created using 3 commands
+// Plan is to fill the queue with commmands summing up to approx. 10 ms in the
+// future (or more). For low speeds, this results in single stepping For high
+// speeds (40kSteps/s) approx. 400 Steps to be created using 3 commands
 //
 //*************************************************************************************************
 
@@ -527,13 +526,23 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   }
   _off_delay_count = max(delay_count, (uint16_t)1);
 }
+int8_t FastAccelStepper::runForward() { 
+	blockingWaitForForceStopComplete();
+	return _rg.startRun(true);
+}
+int8_t FastAccelStepper::runBackward() {
+	blockingWaitForForceStopComplete();
+	return _rg.startRun(false);
+}
 int8_t FastAccelStepper::moveTo(int32_t position) {
+	blockingWaitForForceStopComplete();
   return _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
 }
 int8_t FastAccelStepper::move(int32_t move) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
+	blockingWaitForForceStopComplete();
   return _rg.move(move, &fas_queue[_queue_num].queue_end);
 }
 void FastAccelStepper::keepRunning() { _rg.setKeepRunning(); }
@@ -543,6 +552,7 @@ void FastAccelStepper::applySpeedAcceleration() {
 }
 int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
                                             bool allow_reverse) {
+	blockingWaitForForceStopComplete();
   int8_t res = MOVE_OK;
   if (acceleration > 0) {
     setAcceleration(acceleration);
@@ -575,6 +585,12 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
 
   // set the new position
   q->queue_end.pos = new_pos;
+}
+void FastAccelStepper::blockingWaitForForceStopComplete() {
+  StepperQueue* q = &fas_queue[_queue_num];
+	while (q->ignore_commands) {
+		wait_or_pause();
+	}
 }
 bool FastAccelStepper::disableOutputs() {
   if (isRunning() && _autoEnable) {
@@ -689,34 +705,31 @@ bool FastAccelStepper::isQueueEmpty() {
 bool FastAccelStepper::isMotorRunning() {
   return fas_queue[_queue_num].isRunning();
 }
+bool FastAccelStepper::isQueueRunning() {
+  return fas_queue[_queue_num].isRunning();
+}
 bool FastAccelStepper::isRunning() {
   return fas_queue[_queue_num].isRunning() || _rg.isRampGeneratorActive();
 }
-void FastAccelStepper::forwardStep(bool blocking) {
+void FastAccelStepper::performOneStep(bool count_up, bool blocking) {
   if (!isRunning()) {
-    struct stepper_command_s cmd = {
-        .ticks = MIN_CMD_TICKS, .steps = 1, .count_up = true};
-    addQueueEntry(&cmd);
-    if (blocking) {
-      while (isRunning()) {
-        // busy wait
-      }
-    }
-  }
-}
-void FastAccelStepper::backwardStep(bool blocking) {
-  if (!isRunning()) {
-    if (_dirPin != PIN_UNDEFINED) {
+    if (count_up || (_dirPin != PIN_UNDEFINED)) {
       struct stepper_command_s cmd = {
-          .ticks = MIN_CMD_TICKS, .steps = 1, .count_up = false};
+          .ticks = MIN_CMD_TICKS, .steps = 1, .count_up = count_up};
       addQueueEntry(&cmd);
       if (blocking) {
         while (isRunning()) {
-          // busy wait
+          wait_or_pause();
         }
       }
     }
   }
+}
+void FastAccelStepper::forwardStep(bool blocking) {
+  performOneStep(true, blocking);
+}
+void FastAccelStepper::backwardStep(bool blocking) {
+  performOneStep(false, blocking);
 }
 int32_t FastAccelStepper::getCurrentPosition() {
   return fas_queue[_queue_num].getCurrentPosition();

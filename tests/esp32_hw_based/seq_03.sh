@@ -1,5 +1,6 @@
 #!/bin/sh
-DEV="-d /dev/ttyUSB0 -b 115200"
+TTY=${1:-ttyUSB0}
+DEV="-d /dev/${TTY} -b 115200"
 
 COMPLETE="Test completed"
 PASS="Test passed"

@@ -121,7 +121,7 @@ class FastAccelStepper {
   bool isRunning();
 
   // is true while the stepper is running
-  bool isMotorRunning();
+  [[deprecated]] bool isMotorRunning();
 
   // For stepper movement control by FastAccelStepper's ramp generator
   //
@@ -220,8 +220,8 @@ class FastAccelStepper {
   // This command just let the motor run continuously in one direction.
   // If the motor is running in the opposite direction, it will reverse
   // return value as with move/moveTo
-  int8_t runForward() { return _rg.startRun(true); }
-  int8_t runBackward() { return _rg.startRun(false); }
+  int8_t runForward();
+  int8_t runBackward();
 
   // forwardStep()/backwardstep() can be called, while stepper is not moving
   // If stepper is moving, this is a no-op.
@@ -286,6 +286,7 @@ class FastAccelStepper {
   // check function s for command queue being empty or full
   bool isQueueEmpty();
   bool isQueueFull();
+  bool isQueueRunning();
 
   // Get the future position of the stepper after all commands in queue are
   // completed
@@ -370,8 +371,10 @@ class FastAccelStepper {
 #endif
 
  private:
+  void performOneStep(bool count_up, bool blocking = false);
   void fill_queue();
   void updateAutoDisable();
+  void blockingWaitForForceStopComplete();
   bool needAutoDisable();
   bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
@@ -408,11 +411,11 @@ class FastAccelStepperEngine {
   // stable API functions
   void init();
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_CPU_AFFINITY)
   // ESP32 only: Pin the StepperTask to a CPU core
   // For values 0 and 1, xTaskCreatePinnedToCore() is used
   // or else xTaskCreate()
-  void init(uint8_t cpu);
+  void init(uint8_t cpu_core);
 #endif
 
   // ESP32:
