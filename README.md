@@ -124,10 +124,12 @@ Tested with max two stepper motors with 50 kHz step rate by clazarowitz
 
 ## Usage
 
-The library is in use with A4988, but other driver ICs could work, too.
+The library is in use with A4988, but other driver ICs should work, too.
 
 For the API definition please consult the header file [FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h).
+
 Please check the examples for application and how to use the low level interface.
+Some info is [Issue #86]https://github.com/gin66/FastAccelStepper/issues/86).
 
 The module defines the global variable fas_queue. Do not use or redefine this variable.
 
@@ -371,6 +373,9 @@ Found on youtube:
 * [Stepper motor at 1500RPM with ESP32 and A4988](https://www.youtube.com/watch?v=sQqezEsiuUU)
 * [DIY 3 AXIS CAMERA SLIDER | MOTORIZED CAMERA SLIDER](https://youtu.be/7TkybpSQULk)
 * [NEMA 17 Servo: Final Accuracy Test & New Speed Record!! - N-Gnoid TV](https://www.youtube.com/watch?v=EHHDuI3xK94)
+
+As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepper/issues/110):
+* [22 01 2021 Stepper POC3](https://youtu.be/fm2_VkUG10k)
 
 ## Contribution
 
