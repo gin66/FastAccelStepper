@@ -1,3 +1,6 @@
+pre:
+- Fix sketch name of RawOneTurn example
+
 0.25.1:
 - expose internal functions for retrieving queue status as requested by [Issue #112](https://github.com/gin66/FastAccelStepper/issues/112):
 	ticksInQueue()
