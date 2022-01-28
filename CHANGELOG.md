@@ -1,9 +1,11 @@
-pre-0.25.1:
+0.25.1:
 - expose internal functions for retrieving queue status as requested by [Issue #112](https://github.com/gin66/FastAccelStepper/issues/112):
 	ticksInQueue()
 	hasTicksInQueue()
 	queueEntries()
 - SAM: StepperDemo output function was not defined for this architecture
+- Fix for compilation error [Issue #113](https://github.com/gin66/FastAccelStepper/issues/113)
+    eventually name clash for min()/max()-definition. Renamed own version to fas_min/fas_max.
 
 0.25.0:
 - esp32 changes in response to [Issue #106](https://github.com/gin66/FastAccelStepper/issues/106):

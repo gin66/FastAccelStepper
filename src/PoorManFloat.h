@@ -1,8 +1,4 @@
 #include <stdint.h>
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-#define min(a, b) ((a) > (b) ? (b) : (a))
-#define max(a, b) ((a) > (b) ? (a) : (b))
-#endif
 
 typedef uint16_t upm_float;
 #define UPM_CONST_128E12 ((upm_float)0xaed0)

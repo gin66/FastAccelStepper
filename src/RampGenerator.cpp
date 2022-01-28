@@ -194,7 +194,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     if (pause_ticks > 0) {
       if (pause_ticks > 65535) {
         pause_ticks >>= 1;
-        pause_ticks = min(pause_ticks, 65535);
+        pause_ticks = fas_min(pause_ticks, 65535);
       }
       command->command.ticks = pause_ticks;
       command->command.steps = 0;
@@ -375,7 +375,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     if (this_state & RAMP_STATE_ACCELERATING_FLAG) {
       // do not overshoot ramp down start
       planning_steps =
-          min(planning_steps, (remaining_steps - performed_ramp_up_steps) >> 1);
+          fas_min(planning_steps, (remaining_steps - performed_ramp_up_steps) >> 1);
 
       uint32_t rs = performed_ramp_up_steps + planning_steps;
       d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
@@ -436,15 +436,15 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   uint32_t next_ticks = d_ticks_new;
   if (curr_ticks != TICKS_FOR_STOPPED_MOTOR) {
     if (this_state & RAMP_STATE_ACCELERATING_FLAG) {
-      next_ticks = min(next_ticks, curr_ticks);
+      next_ticks = fas_min(next_ticks, curr_ticks);
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       // CLIPPING: avoid reduction unless curr_ticks indicates stopped motor
       // Issue #25: root cause is, that curr_ticks can be
       // TICKS_FOR_STOPPED_MOTOR for the case, that queue is emptied before
       // the next command is issued
-      next_ticks = max(next_ticks, curr_ticks);
+      next_ticks = fas_max(next_ticks, curr_ticks);
       //      if (this_state != RAMP_STATE_DECELERATE) {
-      //        next_ticks = max(next_ticks, ramp->config.min_travel_ticks);
+      //        next_ticks = fas_max(next_ticks, ramp->config.min_travel_ticks);
       //      }
     }
   }
@@ -466,9 +466,9 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t steps = planning_steps;
-  steps = min(steps, remaining_steps);  // This could be problematic
-  steps = max(steps, 1);
-  steps = min(255, steps);
+  steps = fas_min(steps, remaining_steps);  // This could be problematic
+  steps = fas_max(steps, 1);
+  steps = fas_min(255, steps);
 
   // Check if pauses need to be added. If yes, reduce next_ticks and calculate
   // pause_ticks_left
@@ -477,7 +477,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     steps = 1;
     pause_ticks_left = next_ticks;
     next_ticks >>= 1;
-    next_ticks = min(next_ticks, 65535);
+    next_ticks = fas_min(next_ticks, 65535);
     pause_ticks_left -= next_ticks;
   } else {
     pause_ticks_left = 0;

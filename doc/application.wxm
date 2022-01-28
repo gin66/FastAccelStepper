@@ -35,7 +35,7 @@ f(x) := if select(x) then seg1(x) else seg2(x) $
 
 
 /* [wxMaxima: input   start ] */
-[seg1_2(x),seg2_2(x)];wxplot2d([%[1],%[2]],[x,0.48,0.52]);
+[seg1_2(x),seg2_2(x)];wxplot2d([%[1],%[2]],[x,0,1]);
 /* [wxMaxima: input   end   ] */
 
 

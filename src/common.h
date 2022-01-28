@@ -15,6 +15,10 @@ struct queue_end_s {
   volatile bool dir;
 };
 
+// use own min/max function, because the lib versions are messed up
+#define fas_min(a, b) ((a) > (b) ? (b) : (a))
+#define fas_max(a, b) ((a) > (b) ? (a) : (b))
+
 //==============================================================================
 // All architecture specific definitions should be located here
 //==============================================================================
