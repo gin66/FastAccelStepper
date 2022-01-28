@@ -88,7 +88,7 @@ int8_t RampGenerator::setAcceleration(int32_t accel) {
     // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
     _config.upm_sqrt_inv_accel = upm_multiply(
         upm_rsqrt(upm_from((uint32_t)accel)), UPM_TICKS_PER_S_DIV_SQRT_OF_2);
-    _config.accel_change_cnt = _rw.accel_change_cnt + 1;
+    _config.accel_change_cnt++;
   }
   return 0;
 }
@@ -183,6 +183,8 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   return _startMove(new_pos, curr_pos);
 }
 
+uint32_t reported = 0;
+
 //*************************************************************************************************
 static void _getNextCommand(const struct ramp_ro_s *ramp,
                             const struct ramp_rw_s *rw,
@@ -208,15 +210,14 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       return;
     }
   }
-
   // If the acceleration has changed, recalculate the ramp up/down steps,
   // which is the equivalent to the current speed.
   // Even if the acceleration value is constant, the calculated value
   // can deviate due to precision or clipping effect
   uint32_t curr_ticks = rw->curr_ticks;
-  uint8_t accel_change_cnt = ramp->config.accel_change_cnt;
   uint32_t performed_ramp_up_steps;
-  if (accel_change_cnt != rw->accel_change_cnt) {
+  if (ramp->config.accel_change_cnt != rw->accel_change_cnt) {
+Serial.print('X');
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
@@ -280,7 +281,6 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   }
 
   // In case of force stop just run down the ramp
-  uint32_t coast_speed = rw->curr_ticks;
   if (ramp->force_stop) {
     this_state = RAMP_STATE_DECELERATE_TO_STOP;
     remaining_steps = performed_ramp_up_steps;
@@ -292,9 +292,16 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     // If come here, then direction is same as current movement
     if (remaining_steps == performed_ramp_up_steps) {
       this_state = RAMP_STATE_DECELERATE;
-      remaining_steps = performed_ramp_up_steps;
+      // remaining_steps = performed_ramp_up_steps;
     } else if (remaining_steps < performed_ramp_up_steps) {
       // We will overshoot
+
+uint32_t dsteps = performed_ramp_up_steps-remaining_steps;
+if (reported != dsteps) {
+Serial.print("OVERSHOOT ");
+Serial.println(dsteps);
+reported=dsteps;
+}
       this_state = RAMP_STATE_REVERSE;
       remaining_steps = performed_ramp_up_steps;
     } else if (ramp->config.min_travel_ticks < rw->curr_ticks) {
@@ -336,7 +343,6 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       }
     } else {
       this_state = RAMP_STATE_COAST;
-      coast_speed = ramp->config.min_travel_ticks;
     }
   }
   if (remaining_steps == 0) {  // This implies performed_ramp_up_steps == 0
@@ -371,11 +377,16 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
 #endif
   uint32_t d_ticks_new;
   {
-    uint32_t coast_steps;
     if (this_state & RAMP_STATE_ACCELERATING_FLAG) {
+Serial.print('A');
       // do not overshoot ramp down start
-      planning_steps =
-          fas_min(planning_steps, (remaining_steps - performed_ramp_up_steps) >> 1);
+	  uint32_t coast_steps = remaining_steps - performed_ramp_up_steps;
+	  if (coast_steps < 256) {
+		  uint16_t coast_steps_u16 = coast_steps;
+		  if (coast_steps_u16 < 2 * planning_steps) {
+			  planning_steps = coast_steps_u16;
+		  }
+	  }
 
       uint32_t rs = performed_ramp_up_steps + planning_steps;
       d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
@@ -390,6 +401,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       uint32_t rs;
+Serial.print('D');
       if (performed_ramp_up_steps == 0) {
         d_ticks_new = ramp->config.min_travel_ticks;
       } else {
@@ -404,15 +416,19 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
 #endif
     } else {
-      d_ticks_new = coast_speed;
+Serial.print('C');
+      d_ticks_new = rw->curr_ticks;
       // do not overshoot ramp down start
-      coast_steps = remaining_steps - performed_ramp_up_steps;
-      if (coast_steps < planning_steps * 2) {
-        planning_steps = coast_steps;
-      }
+	  uint32_t coast_steps = remaining_steps - performed_ramp_up_steps;
+	  if (coast_steps < 256) {
+		  uint16_t coast_steps_u16 = coast_steps;
+		  if (coast_steps_u16 < 2 * planning_steps) {
+			  planning_steps = coast_steps_u16;
+		  }
+	  }
 #ifdef TEST
-      printf("planning steps=%d remaining steps=%d coast steps=%d\n",
-             planning_steps, remaining_steps, coast_steps);
+      printf("planning steps=%d remaining steps=%d\n",
+             planning_steps, remaining_steps);
 #endif
     }
   }
@@ -510,10 +526,11 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   command->command.count_up = count_up;
 
   command->rw.ramp_state = this_state;
-  command->rw.accel_change_cnt = accel_change_cnt;
+  command->rw.accel_change_cnt = ramp->config.accel_change_cnt;
   command->rw.performed_ramp_up_steps = performed_ramp_up_steps;
   command->rw.pause_ticks_left = pause_ticks_left;
   command->rw.curr_ticks = pause_ticks_left + next_ticks;
+
 
 #ifdef TEST
   printf(

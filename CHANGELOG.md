@@ -1,5 +1,7 @@
-pre:
+0.25.2:
 - Fix sketch name of RawOneTurn example
+- Fix overshooting due to clipping error
+- Minor reverse sqrt-table rework
 
 0.25.1:
 - expose internal functions for retrieving queue status as requested by [Issue #112](https://github.com/gin66/FastAccelStepper/issues/112):

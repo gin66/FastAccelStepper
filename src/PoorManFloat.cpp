@@ -27,20 +27,6 @@
 // Negative numbers and zero are not available
 //
 //
-// rsqrt-tables
-// ============
-//
-// The rsqrt-tables provide the direct solution for 1/sqrt(mantissa).
-//
-// rsqrt_exp_even is used, if the exponent is even.
-// rsqrt_exp_odd is used, if the exponent is odd.
-//
-// For even exponents 1/sqrt(mantissa) translates in the range 1.0 down to
-// 0.7077 The mantissa 256 (aka mantissa byte==0) is a special case to be
-// treated separately, that's why this table has only 255 entries The table is
-// generated with this one liner
-//		[round(512.0/math.sqrt(i/256))-256 for i in range(257,512)
-//
 // I want to expound on the original comment, and include an example to make
 // this less tedious for someone else.  You probably need to go lookup/refresh
 // your memory on floating point formats to make this make sense.  In this
@@ -75,25 +61,42 @@
 // Thats not an even number, so even with the arbitrary clock divider, the best
 // I could have managed was 16.8 MHz.  Easier to just use the modulo 4 divider
 // and add the constants.
-
+//
+//
+// rsqrt-tables
+// ============
+//
+// The rsqrt-tables provide the direct solution for 1/sqrt(mantissa).
+//
+// rsqrt_exp_even is used, if the exponent is even.
+// rsqrt_exp_odd is used, if the exponent is odd.
+//
+// For even exponents 1/sqrt(mantissa) translates in the range 1.0 down to
+// 0.7077 The mantissa 256 (aka mantissa byte==0) is a special case to be
+// treated separately, that's why this table has only 255 entries.
+//
+// The table is generated with this one liner:
+//
+// python:
+//		[round(512.0/math.sqrt(i/256))-256 for i in range(257,512)
 const PROGMEM uint8_t rsqrt_exp_even[255] = {
-    255, 254, 253, 252, 251, 250, 249, 248, 247, 247, 246, 245, 244, 243, 242,
-    241, 240, 239, 238, 237, 236, 236, 235, 234, 233, 232, 231, 230, 230, 229,
-    228, 227, 226, 225, 224, 224, 223, 222, 221, 220, 220, 219, 218, 217, 216,
-    216, 215, 214, 213, 213, 212, 211, 210, 210, 209, 208, 207, 207, 206, 205,
-    204, 204, 203, 202, 201, 201, 200, 199, 199, 198, 197, 197, 196, 195, 195,
-    194, 193, 192, 192, 191, 190, 190, 189, 189, 188, 187, 187, 186, 185, 185,
-    184, 183, 183, 182, 182, 181, 180, 180, 179, 178, 178, 177, 177, 176, 175,
-    175, 174, 174, 173, 172, 172, 171, 171, 170, 170, 169, 168, 168, 167, 167,
-    166, 166, 165, 164, 164, 163, 163, 162, 162, 161, 161, 160, 160, 159, 159,
+    255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245, 244, 243, 243, 242,
+    241, 240, 239, 238, 237, 236, 235, 234, 234, 233, 232, 231, 230, 229, 228,
+    228, 227, 226, 225, 224, 223, 223, 222, 221, 220, 219, 219, 218, 217, 216,
+    215, 215, 214, 213, 212, 212, 211, 210, 209, 209, 208, 207, 206, 206, 205,
+    204, 203, 203, 202, 201, 201, 200, 199, 198, 198, 197, 196, 196, 195, 194,
+    194, 193, 192, 192, 191, 190, 190, 189, 188, 188, 187, 186, 186, 185, 184,
+    184, 183, 183, 182, 181, 181, 180, 179, 179, 178, 178, 177, 176, 176, 175,
+    175, 174, 173, 173, 172, 172, 171, 170, 170, 169, 169, 168, 168, 167, 166,
+    166, 165, 165, 164, 164, 163, 163, 162, 162, 161, 160, 160, 159, 159, 158,
     158, 157, 157, 156, 156, 155, 155, 154, 154, 153, 153, 152, 152, 151, 151,
-    150, 150, 149, 149, 148, 148, 147, 147, 146, 146, 145, 145, 144, 144, 144,
-    143, 143, 142, 142, 141, 141, 140, 140, 139, 139, 138, 138, 137, 137, 137,
-    136, 136, 135, 135, 134, 134, 133, 133, 133, 132, 132, 131, 131, 130, 130,
-    130, 129, 129, 128, 128, 127, 127, 127, 126, 126, 125, 125, 125, 124, 124,
-    123, 123, 123, 122, 122, 121, 121, 121, 120, 120, 119, 119, 119, 118, 118,
-    117, 117, 117, 116, 116, 115, 115, 115, 114, 114, 114, 113, 113, 112, 112,
-    112, 111, 111, 111, 110, 110, 110, 109, 109, 108, 108, 108, 107, 107, 107};
+    150, 150, 149, 149, 148, 148, 147, 147, 146, 146, 145, 145, 144, 144, 143,
+    143, 142, 142, 141, 141, 140, 140, 140, 139, 139, 138, 138, 137, 137, 136,
+    136, 135, 135, 135, 134, 134, 133, 133, 132, 132, 131, 131, 131, 130, 130,
+    129, 129, 128, 128, 128, 127, 127, 126, 126, 126, 125, 125, 124, 124, 123,
+    123, 123, 122, 122, 121, 121, 121, 120, 120, 119, 119, 119, 118, 118, 118,
+    117, 117, 116, 116, 116, 115, 115, 114, 114, 114, 113, 113, 113, 112, 112,
+    111, 111, 111, 110, 110, 110, 109, 109, 109, 108, 108, 107, 107, 107, 106};
 //
 // For odd exponents, the exponent is reduced by 1 and the
 // the mantissa multiplied by 2 and as such represents 2.0 to ~3
@@ -123,7 +126,8 @@ const PROGMEM uint8_t rsqrt_exp_odd[256] = {
 // For mantissa values indexing in the second part ot the table,
 // the exponent has to be increased by 1
 const PROGMEM uint8_t square_table[256] = {
-    // [round((i/256)*(i/256) * 256)-256 for i in range(256,256+106)]
+    // python:
+    //      [round((i/256)*(i/256) * 256)-256 for i in range(256,256+106)]
     0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 27, 29, 31, 33, 35, 37, 39,
     42, 44, 46, 48, 50, 52, 55, 57, 59, 61, 64, 66, 68, 70, 73, 75, 77, 79, 82,
     84, 86, 89, 91, 93, 96, 98, 100, 103, 105, 107, 110, 112, 115, 117, 119,
@@ -131,7 +135,8 @@ const PROGMEM uint8_t square_table[256] = {
     159, 162, 164, 167, 169, 172, 175, 177, 180, 182, 185, 188, 190, 193, 196,
     198, 201, 204, 206, 209, 212, 214, 217, 220, 223, 225, 228, 231, 234, 236,
     239, 242, 245, 247, 250, 253,
-    // [round((i/256)*(i/256) * 128)-512 for i in range(256+106,256+256)]
+    // python:
+    //      [round((i/256)*(i/256) * 128)-512 for i in range(256+106,256+256)]
     0, 1, 3, 4, 6, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29,
     31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 53, 55, 56, 58,
     60, 61, 63, 64, 66, 68, 69, 71, 72, 74, 76, 77, 79, 80, 82, 84, 85, 87, 89,
@@ -147,7 +152,8 @@ const PROGMEM uint8_t square_table[256] = {
 // the exponent has to be decreased by 1
 // Zero is a special case, so the table starts with offset 1
 const PROGMEM uint8_t reciprocal_square_table[255] = {
-    // [round(1/(i/256)/(i/256) * 512)-256 for i in range(256+1,256+107)]
+    // python:
+    //      [round(1/(i/256)/(i/256) * 512)-256 for i in range(256+1,256+107)]
     252, 248, 244, 240, 237, 233, 229, 225, 222, 218, 215, 211, 208, 204, 201,
     198, 194, 191, 188, 184, 181, 178, 175, 172, 169, 166, 163, 160, 157, 154,
     151, 149, 146, 143, 140, 138, 135, 132, 130, 127, 124, 122, 119, 117, 114,
@@ -155,7 +161,9 @@ const PROGMEM uint8_t reciprocal_square_table[255] = {
     74, 72, 70, 68, 66, 64, 62, 60, 58, 56, 54, 52, 50, 48, 47, 45, 43, 41, 39,
     38, 36, 34, 33, 31, 29, 28, 26, 24, 23, 21, 19, 18, 16, 15, 13, 12, 10, 9,
     7, 6, 4, 3, 1, 0,
-    // [round(1/(i/256)/(i/256) * 1024)-256 for i in range(256+107,256+256)]
+    // python:
+    //      [round(1/(i/256)/(i/256) * 1024)-256 for i in
+    //      range(256+107,256+256)]
     253, 250, 248, 245, 242, 240, 237, 234, 232, 229, 226, 224, 221, 219, 216,
     214, 211, 209, 206, 204, 201, 199, 197, 194, 192, 190, 187, 185, 183, 181,
     179, 176, 174, 172, 170, 168, 166, 163, 161, 159, 157, 155, 153, 151, 149,
@@ -168,7 +176,9 @@ const PROGMEM uint8_t reciprocal_square_table[255] = {
 
 // The reciprocal table provides 1/mantissa
 // Zero is a special case, so the table starts with offset 1
-// [round(1/(i/256) * 512)-256 for i in range(256+0,256+256)]
+//
+// python:
+//      [round(1/(i/256) * 512)-256 for i in range(256+0,256+256)]
 const PROGMEM uint8_t reciprocal_table[255] = {
     254, 252, 250, 248, 246, 244, 242, 240, 239, 237, 235, 233, 231, 229, 228,
     226, 224, 222, 221, 219, 217, 215, 214, 212, 210, 209, 207, 206, 204, 202,
