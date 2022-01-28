@@ -378,13 +378,14 @@ reported=dsteps;
   uint32_t d_ticks_new;
   {
     if (this_state & RAMP_STATE_ACCELERATING_FLAG) {
-Serial.print('A');
+//Serial.print('A');
       // do not overshoot ramp down start
-	  uint32_t coast_steps = remaining_steps - performed_ramp_up_steps;
-	  if (coast_steps < 256) {
-		  uint16_t coast_steps_u16 = coast_steps;
-		  if (coast_steps_u16 < 2 * planning_steps) {
-			  planning_steps = coast_steps_u16;
+	  uint32_t dec_steps = remaining_steps - performed_ramp_up_steps;
+	  if (dec_steps < 512) {
+		  // Only allow half, cause the steps accelerating need to decelerate, too
+		  uint16_t dec_steps_u16 = dec_steps/2;
+		  if (dec_steps_u16 < 2 * planning_steps) {
+			  planning_steps = dec_steps_u16;
 		  }
 	  }
 
