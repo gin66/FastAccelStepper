@@ -653,7 +653,7 @@ void output_msg(int8_t i) {
       }
     }
   }
-#elif defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAM)
   const char *p = messages;
   while (i >= 0) {
     ch = *p++;
@@ -667,6 +667,8 @@ void output_msg(int8_t i) {
       }
     }
   }
+#else
+#error "Unsupported derivate"
 #endif
 }
 

@@ -210,6 +210,125 @@ v = sqrt(2*a);
 The issue is, that the relation v(s) in this manner cannot be applied, if the speed shall change from v_max to -v_max. In this scenario, the acceleration at v = 0 aka the turn point shall be at maximum during deceleration/acceleration phase.
 
 Second problem is an adequate forecast, if at turnpoint the acceleration needs to be reduced in order to not overshoot the targetted speed.
+*/;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+From application point of view, it is better to define acceleration as dependent of time and mathematically being a second derivative:
+*/
+a(t,T) := a_ref * f_2(t/T);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Using this approach speed and distance can be deducted easily:
+*/
+v(t,T) := T * a_ref * f_1(t/T);
+s(t,T) := T² * a_ref * f(t/T);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+with f_inv(x) = y as solution for f(y) = x, time can be derived as dependent of distance:
+*/
+t = T * f_inv(s / (a_ref*T²));
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Using this approach v(t,T) can be stated as dependent of s:
+*/
+v(s,T) := T * a_ref * f_1(f_inv(s / (a_ref*T²)));
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Analyzing the first derivative as function of its inverse:
+*/
+F_1(F_inv(y)) = d/dx * F(x = F_inv(y)) ;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+F_1(F_inv(y)) = d/dy * dy/dx* F(x = F_inv(y)) $
+d/dy * F(x = F_inv(y)) = 1 $
+F_1(F_inv(y)) = dy/dx $
+F_1(F_inv(y)) = 1/F_inv_1(y) ;
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Applied to v(s,T):
+*/
+v(s,T) := T * a_ref / f_inv_1(s / (a_ref*T²));
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+And for the period being 1/v:
+*/
+p(s,T) := f_inv_1(s / (a_ref*T²)) / (T*a_ref);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Using s_max = a_ref * T² this can be rewritten to:
+*/
+p(s,T) := T / s_max * f_inv_1(s / s_max);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+cross check with constant acceleration. => OK
+*/
+f_2(x) = 1;
+f(x) = x²/2;
+f_inv(x) = sqrt(2*x);
+f_inv_1(x) = 1/sqrt(2*x);
+p(s,T) := 1/sqrt(2*s/a_ref/T²)/(T*a_ref) $
+p(s,T) := sqrt(a_ref*T²)/sqrt(2*s)/(T*a_ref) $
+p(s,T) := 1/sqrt(2*s *a_ref);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+as the math is ok. So try the sine function for ramp up of the speed
+*/
+f(x) := sin(x*%pi/2);
+wxplot2d([f(x)],[x,0,1]);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+solve(y=f(x),x);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+diff(rhs(%[1]),y);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+wxplot2d([%],[y,0.1,0.9]);
+/* [wxMaxima: input   end   ] */
+
+
+/* [wxMaxima: input   start ] */
+/*
+Looks ok, too. Just the cosine will generate maximum acceleration at ramp start and end. So another function is needed.
+The smoothstep function would be interesting, but the inverse is algebraically very complex.
 */
 /* [wxMaxima: input   end   ] */
 

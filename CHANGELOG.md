@@ -3,6 +3,7 @@ pre-0.25.1:
 	ticksInQueue()
 	hasTicksInQueue()
 	queueEntries()
+- SAM: StepperDemo output function was not defined for this architecture
 
 0.25.0:
 - esp32 changes in response to [Issue #106](https://github.com/gin66/FastAccelStepper/issues/106):
