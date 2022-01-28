@@ -183,8 +183,6 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   return _startMove(new_pos, curr_pos);
 }
 
-uint32_t reported = 0;
-
 //*************************************************************************************************
 static void _getNextCommand(const struct ramp_ro_s *ramp,
                             const struct ramp_rw_s *rw,
@@ -217,7 +215,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   uint32_t curr_ticks = rw->curr_ticks;
   uint32_t performed_ramp_up_steps;
   if (ramp->config.accel_change_cnt != rw->accel_change_cnt) {
-Serial.print('X');
+	//Serial.print('X');
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
@@ -295,13 +293,6 @@ Serial.print('X');
       // remaining_steps = performed_ramp_up_steps;
     } else if (remaining_steps < performed_ramp_up_steps) {
       // We will overshoot
-
-uint32_t dsteps = performed_ramp_up_steps-remaining_steps;
-if (reported != dsteps) {
-Serial.print("OVERSHOOT ");
-Serial.println(dsteps);
-reported=dsteps;
-}
       this_state = RAMP_STATE_REVERSE;
       remaining_steps = performed_ramp_up_steps;
     } else if (ramp->config.min_travel_ticks < rw->curr_ticks) {
@@ -378,7 +369,7 @@ reported=dsteps;
   uint32_t d_ticks_new;
   {
     if (this_state & RAMP_STATE_ACCELERATING_FLAG) {
-//Serial.print('A');
+	  //Serial.print('A');
       // do not overshoot ramp down start
 	  uint32_t dec_steps = remaining_steps - performed_ramp_up_steps;
 	  if (dec_steps < 512) {
@@ -402,7 +393,7 @@ reported=dsteps;
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       uint32_t rs;
-Serial.print('D');
+	  // Serial.print('D');
       if (performed_ramp_up_steps == 0) {
         d_ticks_new = ramp->config.min_travel_ticks;
       } else {
@@ -417,7 +408,7 @@ Serial.print('D');
       printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
 #endif
     } else {
-Serial.print('C');
+    // Serial.print('C');
       d_ticks_new = rw->curr_ticks;
       // do not overshoot ramp down start
 	  uint32_t coast_steps = remaining_steps - performed_ramp_up_steps;
