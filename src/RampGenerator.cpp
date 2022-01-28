@@ -222,8 +222,8 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       performed_ramp_up_steps = upm_to_u32(upm_multiply(
           ramp->config.upm_inv_accel2, upm_rsquare(upm_from(curr_ticks))));
 #ifdef TEST
-      printf("Recalculate performed_ramp_up_steps to %d from %d ticks\n",
-             performed_ramp_up_steps, curr_ticks);
+      printf("Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
+             rw->performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
 #endif
     }
   } else {
@@ -277,6 +277,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
   } else {
     planning_steps = 1;
   }
+  uint16_t orig_planning_steps = planning_steps;
 
   // In case of force stop just run down the ramp
   if (ramp->force_stop) {
@@ -316,8 +317,8 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
         if (planning_steps > remaining_steps - performed_ramp_up_steps) {
           this_state = RAMP_STATE_DECELERATE;
         }
-      }
-      if (remaining_steps - performed_ramp_up_steps < 2 * planning_steps) {
+      } else if (remaining_steps - performed_ramp_up_steps <
+                 2 * planning_steps) {
         if (curr_ticks != TICKS_FOR_STOPPED_MOTOR) {
           this_state = RAMP_STATE_COAST;
           planning_steps = remaining_steps - performed_ramp_up_steps;
@@ -371,11 +372,16 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
     if (this_state & RAMP_STATE_ACCELERATING_FLAG) {
       // Serial.print('A');
       // do not overshoot ramp down start
+      //
+      // seems to be not necessary, as consideration already done above
       uint32_t dec_steps = remaining_steps - performed_ramp_up_steps;
       if (dec_steps < 512) {
         // Only allow half, cause the steps accelerating need to decelerate, too
-        uint16_t dec_steps_u16 = dec_steps / 2;
-        if (dec_steps_u16 < 2 * planning_steps) {
+        uint16_t dec_steps_u16 = (uint16_t)dec_steps;
+        dec_steps_u16 /= 2;
+        // Perhaps it would be better to coast instead
+        // consideration has been done above already
+        if (dec_steps_u16 < orig_planning_steps) {
           planning_steps = dec_steps_u16;
         }
       }
@@ -414,7 +420,7 @@ static void _getNextCommand(const struct ramp_ro_s *ramp,
       uint32_t coast_steps = remaining_steps - performed_ramp_up_steps;
       if (coast_steps < 256) {
         uint16_t coast_steps_u16 = coast_steps;
-        if (coast_steps_u16 < 2 * planning_steps) {
+        if (coast_steps_u16 < 2 * orig_planning_steps) {
           planning_steps = coast_steps_u16;
         }
       }

@@ -274,7 +274,7 @@ int main() {
 
   // try to identify issue #40
   test.with_pars("f24a", 5000, 200, 9999, true, 1.48 + 0.1 * nc, 1.5 + 0.1 * nc,
-                 0.1, true, true, true, true);
+                 0.1, true, true, false, true);
   test.with_pars("f24b", 5000, 200, 9999, true, 1.48 - 0.04 * nc,
                  1.50 - 0.04 * nc, 0.1, false, false, false);
   test.with_pars("f24c", 5000, 200, 9999, true, 1.48 - 0.04 * nc,

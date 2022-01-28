@@ -11,6 +11,10 @@
 
 bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
+  if (stepper->getPositionAfterCommandsCompleted() > 32000) {
+    seq->state = TEST_STATE_ERROR;
+    return true;
+  }
   switch (seq->state) {
     case 0:  // INIT
       stepper->setSpeedInUs(SPEED_1_US);
