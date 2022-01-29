@@ -357,7 +357,6 @@ class StepperQueue {
     // we cannot clear the PWM interrupt when switching to a pause, but we'll
     // get a double interrupt if we do nothing.  So this tells us that on a
     // transition from a pulse to a pause to skip the next interrupt.
-    _skipNextPWMInterrupt = false;
     _skipNextPIOInterrupt = false;
     _pauseCommanded = false;
     timePWMInterruptEnabled = 0;
