@@ -81,7 +81,6 @@ class StepperQueue {
   volatile bool _skipNextPWMInterrupt;
   volatile bool _skipNextPIOInterrupt;
   volatile bool _pauseCommanded;
-  volatile bool _runOnce;
   volatile uint32_t timePWMInterruptEnabled;
 
 #else
@@ -362,7 +361,6 @@ class StepperQueue {
     _skipNextPWMInterrupt = false;
     _skipNextPIOInterrupt = false;
     _pauseCommanded = false;
-    _runOnce = false;
     timePWMInterruptEnabled = 0;
 
 #else

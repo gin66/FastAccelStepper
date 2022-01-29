@@ -221,7 +221,6 @@ void PWM_Handler(void) {
     }
     Pio* port = q->mapping->port;
 
-    q->_runOnce = true;
     PWMCHANNELMAPPING* mapping = &gChannelMap[queue_num];
     // Now with the queue, we can get the current entry, and see if we need to
     uint8_t rp = q->read_idx;
@@ -634,7 +633,6 @@ void StepperQueue::startQueue() {
   }
   _hasISRactive = true;
   if (e->steps > 0 || e->hasSteps) {
-    _runOnce = false;
     _skipNextPWMInterrupt = false;
     PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
     attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
