@@ -1,6 +1,6 @@
 all: compile test
 
-DEV=ttyUSB1
+DEV=ttyUSB0
 
 test:
 	./seq_01.sh $(DEV)

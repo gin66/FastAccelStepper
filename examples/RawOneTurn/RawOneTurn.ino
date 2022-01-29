@@ -1,4 +1,7 @@
 #include "pinning.h"
+#ifdef ARDUINO_ARCH_AVR
+#include <avr/sleep.h>
+#endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper;
@@ -125,4 +128,10 @@ void setup() {
   }
 }
 
-void loop() {}
+void loop() {
+	Serial.println("DONE");
+	Serial.println(stepper->getPositionAfterCommandsCompleted());
+//        delay(1000);
+//        noInterrupts();
+//        sleep_cpu();
+}
