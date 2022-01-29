@@ -78,7 +78,6 @@ class StepperQueue {
   bool isRunning();
   const PWMCHANNELMAPPING* mapping;
   bool _connected;
-  volatile bool _skipNextPWMInterrupt;
   volatile bool _skipNextPIOInterrupt;
   volatile bool _pauseCommanded;
   volatile uint32_t timePWMInterruptEnabled;

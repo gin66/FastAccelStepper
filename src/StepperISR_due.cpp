@@ -205,7 +205,6 @@ void PWM_Handler(void) {
       // easily get into this ISR immediatly after enabling it for the pulse
       // that was just handled by the PIO ISR, so we still need to skip one.
       // Being too fast is a good thing :)
-      q->_skipNextPWMInterrupt = false;
       continue;
     }
     if (!q->_pauseCommanded) {
@@ -302,8 +301,8 @@ inline void disconnectPWMPeriphal(Pio* port, uint8_t pin,
   PIO_SetOutput(port, g_APinDescription[pin].ulPin, 0, 0, 0);
 }
 
-inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask,
-                                bool clearISR = false) {
+// gin66: removed the obsolete clearISR flag
+inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask) {
   PWM_INTERFACE->PWM_IDR1 = (channelMask);
   uint32_t dwSR = port->PIO_ABSR;
   port->PIO_ABSR = (g_APinDescription[pin].ulPin | dwSR);
@@ -378,7 +377,6 @@ inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask,
       if (e->steps == 0 || !e->hasSteps) {                                     \
         delayMicroseconds(7);                                                  \
         q->_pauseCommanded = true;                                             \
-        q->_skipNextPWMInterrupt = true;                                       \
         q->timePWMInterruptEnabled = micros();                                 \
         PWM_INTERFACE->PWM_IER1 = q->mapping->channelMask;                     \
         port->PIO_CODR = samPin;                                               \
@@ -627,33 +625,53 @@ void StepperQueue::disconnect() {
 void StepperQueue::startQueue() {
   // This is called only, if isRunning() == false
   struct queue_entry* e = &entry[read_idx & QUEUE_LEN_MASK];
-  if (e->toggle_dir && !_hasISRactive) {
-    e->toggle_dir = 0;
-    *_dirPinPort ^= _dirPinMask;
-  }
+
+  // gin66: This part is obsolete, because addQueueEntry() does it
+  //if (e->toggle_dir && !_hasISRactive) {
+    // e->toggle_dir = 0;
+    //*_dirPinPort ^= _dirPinMask;
+  //}
+
   _hasISRactive = true;
+  PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
+
+  // gin66: In the no steps path only partial setting of what attachPWMPeripheral() has been done.
+  //        Wonder how those other registers get set, if a step to be done ?
+  //        So I assume, it should be done in general.
+  attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask);
+
   if (e->steps > 0 || e->hasSteps) {
-    _skipNextPWMInterrupt = false;
-    PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
-    attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask,
-                        true);
+	// gin66: better to set
+    _pauseCommanded = false;
+
+	// gin66: hope this does not hurt
+    timePWMInterruptEnabled = micros();
+
+	// gin66: I believe PWM_IER1 is not set, because pin interrupt is in use instead
+	//        The funny thing is, that - if set once - it is nowhere disabled
+	//        - except perhaps implicitly with PWMC_DisableChannel() in disconnect()
   } else {
     timePWMInterruptEnabled = micros();
-    PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
-                  0);
+
+	// gin66: in startPreparedQueue() CPRD is always set
+	//    as this is then in both paths, the CPRD setting is put at the top
     if (PWM_INTERFACE->PWM_SR & (1 << mapping->channel)) {
-      PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
+	  // gin66 moved to top
     } else {
       PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
     }
+    // gin66: Below has been partial setting of what attachPWMPeripheral() does.
+	//        Removed here
     /*Disconnect, but do not disable, enable the PWM ISR*/
-    mapping->port->PIO_IDR = g_APinDescription[mapping->pin].ulPin;
-    PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
-                  0);
-    PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
+    // mapping->port->PIO_IDR = g_APinDescription[mapping->pin].ulPin;
+    //PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0, 0);
+    //PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
     _pauseCommanded = true;
+
     /*Enable the ISR too so we don't miss it*/
-    PWM_INTERFACE->PWM_IER1 = PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
+	// gin66: in the startPreparedQueue() and in the ISR this is without the "...PWM_IMR1 |"
+    //PWM_INTERFACE->PWM_IER1 = PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
+    PWM_INTERFACE->PWM_IER1 = mapping->channelMask;
   }
 // gin66: Shouldn't the _connected flag be set only in connect() ?
   _connected = true;
