@@ -219,7 +219,7 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   // timer value = 1 - upcounting: output low
   mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
   // PCNT.conf_unit[mapping->pcnt_unit].conf2.cnt_h_lim = 1;
-  q->_hasISRactive = false;
+  q->_isRunning = false;
 }
 
 static void IRAM_ATTR what_is_next(StepperQueue *q) {
@@ -444,27 +444,30 @@ void StepperQueue::disconnect() {
 // steps in pcnt
 //		- 	without next command: set mcpwm to stop mode on reaching
 // period
-
-bool StepperQueue::isRunning() {
-  if (_hasISRactive) {
-    return true;
-  }
-  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
-  uint8_t timer = mapping->timer;
-#ifndef __ESP32_IDF_V44__
-  if (mcpwm->timer[timer].status.value > 1) {
-#else  /* __ESP32_IDF_V44__ */
-  if (mcpwm->timer[timer].timer_status.timer_value > 1) {
-#endif /* __ESP32_IDF_V44__ */
-    return true;
-  }
-#ifndef __ESP32_IDF_V44__
-  return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
-#else                                            /* __ESP32_IDF_V44__ */
-  return (mcpwm->timer[timer].timer_cfg1.timer_start == 2);  // 2=run continuous
-#endif                                           /* __ESP32_IDF_V44__ */
-}
+//
+//
+//This has tested, if the HW is still active and not if the QUEUE is still running
+//bool StepperQueue::isRunning() {
+//  if (_isRunning) {
+//    return true;
+//  }
+//
+//  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
+//  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+//  uint8_t timer = mapping->timer;
+//#ifndef __ESP32_IDF_V44__
+//  if (mcpwm->timer[timer].status.value > 1) {
+//#else  /* __ESP32_IDF_V44__ */
+//  if (mcpwm->timer[timer].timer_status.timer_value > 1) {
+//#endif /* __ESP32_IDF_V44__ */
+//    return true;
+//  }
+//#ifndef __ESP32_IDF_V44__
+//  return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
+//#else                                            /* __ESP32_IDF_V44__ */
+//  return (mcpwm->timer[timer].timer_cfg1.timer_start == 2);  // 2=run continuous
+//#endif                                           /* __ESP32_IDF_V44__ */
+//}
 
 void StepperQueue::startQueue() {
 #ifdef TEST_PROBE
@@ -481,7 +484,7 @@ void StepperQueue::startQueue() {
   pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
   pcnt_counter_clear(pcnt_unit);
 
-  _hasISRactive = true;
+  _isRunning = true;
   _nextCommandIsPrepared = false;
   struct queue_entry *e = &entry[read_idx & QUEUE_LEN_MASK];
   apply_command(this, e);

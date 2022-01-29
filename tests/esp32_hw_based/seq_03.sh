@@ -7,7 +7,7 @@ PASS="test passed"
 MAX_RUN_S=300
 
 
-for SEQ in 13 01 02 03 04 06 07 10 11 12
+for SEQ in 13 01 02 03 04 06 07 10 11
 do
 	LOG="$0_$SEQ.log"
 	CMD="M1 p7,0,0 t M1 $SEQ R "

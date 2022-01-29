@@ -59,10 +59,19 @@ class StepperQueue {
   volatile uint8_t next_write_idx;
   bool dirHighCountsUp;
   uint8_t dirPin;
+
+  // a word to isRunning():
+  //    if isRunning() is false, then the _QUEUE_ is not running.
+  //
+  // For esp32 this does NOT mean, that the HW is finished.
+  // The timer is still counting down to zero until it stops at 0.
+  // But there will be no interrupt to process another command.
+  // So the queue requires startQueue() again
+
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-  volatile bool _hasISRactive;
+  volatile bool _isRunning;
   bool _nextCommandIsPrepared;
-  bool isRunning();
+  bool isRunning() { return _isRunning; }
   const struct mapping_s* mapping;
 #elif defined(ARDUINO_ARCH_AVR)
   volatile uint8_t* _dirPinPort;
@@ -80,7 +89,6 @@ class StepperQueue {
   bool _connected;
   volatile bool _pauseCommanded;
   volatile uint32_t timePWMInterruptEnabled;
-
 #else
   volatile bool _isRunning;
   bool isRunning() { return _isRunning; }
@@ -349,7 +357,7 @@ class StepperQueue {
     _isRunning = false;
     _prepareForStop = false;
 #elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-    _hasISRactive = false;
+    _isRunning = false;
     _nextCommandIsPrepared = false;
 #elif defined(ARDUINO_ARCH_SAM)
     _hasISRactive = false;

@@ -337,95 +337,103 @@ const static char messages[] PROGMEM =
     "high counts " _SEP_
 #define _enable_ "\215"
     "enable " _SEP_
-#define _direction_ "\216"
+#define _disable "\216"
+    "disable" _SEP_
+#define _direction_ "\217"
     "direction " _SEP_
-#define _pulse_counter_ "\217"
+#define _pulse_counter_ "\220"
     "pulse counter " _SEP_
-#define _attach "\220"
+#define _attach "\221"
     "attach" _SEP_
-#define _set_ "\221"
+#define _set_ "\222"
     "set " _SEP_
-#define _time_to_ "\222"
+#define _time_to_ "\223"
     "time" _to_ _SEP_
-#define _is_not_defined_nl "\223"
+#define _is_not_defined_nl "\224"
     "is not defined" _NL_ _SEP_
-#define _run_ "\224"
+#define _run_ "\225"
     "run " _SEP_
-#define _forward_ "\225"
+#define _forward_ "\226"
     "forward " _SEP_
-#define _backward_ "\226"
+#define _backward_ "\227"
     "backward " _SEP_
-#define _Stepped_ "\227"
+#define _Stepped_ "\230"
     "Stepped " _SEP_
-#define _acceleration_ "\230"
+#define _acceleration_ "\231"
     "acceleration " _SEP_
-#define _speed_ "\231"
+#define _speed_ "\232"
     "speed " _SEP_
-#define _test_ "\232"
+#define _test_ "\233"
     "test " _SEP_
-#define _erroneous_ "\233"
+#define _erroneous_ "\234"
     "erroneous " _SEP_
-#define _digitalRead_ "\234"
+#define _digitalRead_ "\235"
     "digitalRead() " _SEP_
-#define ____ "\235"
+#define ____ "\236"
     "    " _SEP_
-#define ________ "\236"
+#define ________ "\237"
 	____ ____  _SEP_
-#define _ooo_ "\237"
+#define _ooo_ "\240"
     " ... " _SEP_
-#define _Enter_ "\240"
+#define _Enter_ "\241"
     "Enter " _SEP_
-#define _mode_ "\241"
+#define _mode_ "\242"
     "mode " _SEP_
-#define _clear_ "\242"
+#define _clear_ "\243"
     "clear " _SEP_
-#define _stepper "\243"
+#define _stepper "\244"
     _step "per" _SEP_
-#define _select "\244"
+#define _select "\245"
     "select" _SEP_
-#define _selected_stepper "\245"
+#define _selected_stepper "\246"
     _select "ed " _stepper _SEP_
-#define _usage_ "\246"
+#define _usage_ "\247"
     "usage " _SEP_
-#define _steps_ "\247"
+#define _steps_ "\250"
     _step "s " _SEP_
-#define _output_ "\250"
+#define _output_ "\251"
     "output " _SEP_
-#define _test_sequence_ "\251"
+#define _test_sequence_ "\252"
     _test_ "sequence " _SEP_
-#define _Perform_ "\252"
+#define _Perform_ "\253"
     "Perform " _SEP_
-#define _configuration_ "\253"
+#define _configuration_ "\254"
     "configuration " _SEP_
-#define _delay_ "\254"
+#define _delay_ "\255"
     "delay " _SEP_
-#define _step_pin_ "\255"
+#define _step_pin_ "\256"
     _step " " _pin_ _SEP_
-#define _one_step_ "\256"
+#define _one_step_ "\257"
     "one " _step " " _SEP_
-#define _position_ "\257"
+#define _position_ "\260"
     "position " _SEP_
-#define _of_the_ "\260"
+#define _of_the_ "\261"
     "of the " _SEP_
-#define _Turn_ "\261"
+#define _Turn_ "\262"
     "Turn " _SEP_
-#define _stop "\262"
+#define _stop "\263"
     "stop"  _SEP_
-#define _from_ "\263"
+#define _from_ "\264"
     "from "  _SEP_
-#define _comma__counting_ "\264"
+#define _comma__counting_ "\265"
     ", counting "  _SEP_
-#define __disable_auto_enable_nl "\265"
-    " disable auto " _enable_ _NL_ _SEP_
-#define _ooo_set_selected_stepper_s_ "\266"
+#define __disable_auto_enable_nl "\266"
+    " " _disable " auto " _enable_ _NL_ _SEP_
+#define _ooo_set_selected_stepper_s_ "\267"
    _ooo_ _set_ _selected_stepper "'s " _SEP_
-#define _m1_m2_to_select_stepper_ "\267"
+#define _m1_m2_to_select_stepper_ "\270"
     ____ "M1/M2/.. " _ooo_ _to_ _select _stepper _NL_ _SEP_
-#define _print_this_usage_ "\270"
+#define _print_this_usage_ "\271"
     ____ "?" ________ _ooo_ "Print this usage" _NL_ _NL_ _SEP_
-#define _toggle_print_usage_after_stepper_stop "\271"
+#define _toggle_print_usage_after_stepper_stop "\272"
     ____ "Q" ________ _ooo_ _Toggle_ "print " _usage_ "on " _stepper " " _stop _NL_ _SEP_
-#define MSG_OFFSET 58
+#define _I_speed_I_ "\273"
+    "<speed> "  _SEP_
+#define _I_accel_I_ "\274"
+    "<accel> "  _SEP_
+#define _Enter_command_seperated_by_space_carriage_return_or_newline_NL "\275"
+    _Enter_ "commands separated by space, carriage return or newline:" _NL_ _SEP_
+#define MSG_OFFSET 62
 #define MSG_SELECT_STEPPER 0+MSG_OFFSET
     "Select " _stepper " " _SEP_
 #define MSG_TOGGLE_MOTOR_INFO 1+MSG_OFFSET
@@ -449,7 +457,7 @@ const static char messages[] PROGMEM =
 #define MSG_SET_ENABLE_TIME 10+MSG_OFFSET
     _set_ _enable_ _time_to_ _SEP_
 #define MSG_SET_DISABLE_TIME 11+MSG_OFFSET
-    _set_ "disable " _time_to_ _SEP_
+    _set_ _disable " " _time_to_ _SEP_
 #define MSG_OUTPUT_DRIVER_ON 12+MSG_OFFSET
     _Output_driver_ "on" _NL_ _SEP_
 #define MSG_OUTPUT_DRIVER_OFF 13+MSG_OFFSET
@@ -544,7 +552,7 @@ const static char messages[] PROGMEM =
 #define MSG_SET_TO_PIN 57+MSG_OFFSET
     _set_  _to_  _pin_ _SEP_
 #define MSG_DISABLED 58+MSG_OFFSET
-    "disabled" _NL_ _SEP_
+    _disable "d" _NL_ _SEP_
 #define MSG_HIGH_COUNT_UP 59+MSG_OFFSET
     _high_counts_ "up" _NL_ _SEP_
 #define MSG_HIGH_COUNT_DOWN 60+MSG_OFFSET
@@ -557,13 +565,13 @@ const static char messages[] PROGMEM =
 #define MSG_USAGE_TEST 64+MSG_OFFSET
 #define MSG_USAGE_CONFIG 65+MSG_OFFSET
     /* USAGE NORMAL */
-    _Enter_ "commands separated by space, carriage return or newline:" _NL_
+    _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "c" ________ _ooo_ _Enter_ _configuration_ _mode_ _NL_
-    ____ "V<speed> " _ooo_set_selected_stepper_s_ _speed_ "in us/" _step _NL_
-    ____ "H<speed> " _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/s" _NL_
-    ____ "A<accel> " _ooo_set_selected_stepper_s_ _acceleration_ _NL_
-    ____ "a<accel> " _ooo_ _acceleration_ "control with +/-" _acceleration_ "values" _NL_
+    ____ "V" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in us/" _step _NL_
+    ____ "H" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/s" _NL_
+    ____ "A" _I_accel_I_  _ooo_set_selected_stepper_s_ _acceleration_ _NL_
+    ____ "a" _I_accel_I_  _ooo_ _acceleration_ "control with +/-" _acceleration_ "values" _NL_
     ____ "U" ________ _ooo_ "Update " _selected_stepper "'s " _speed_ "/ " _acceleration_ " while "
     "running" _NL_
     ____ "P<pos>   " _ooo_ _Move_ _selected_stepper " " _to_ "+/- " _position_ _NL_
@@ -574,7 +582,7 @@ const static char messages[] PROGMEM =
     ____ "@<pos>   " _ooo_ _set_ _selected_stepper " " _to_ _position_ "(can be "
     "negative)" _NL_
     ____ "E<us>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _enable_ _to_ _steps_ _NL_
-    ____ "D<ms>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _steps_ _to_ "disable" _NL_
+    ____ "D<ms>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _steps_ _to_ _disable _NL_
     ____ "N" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "on, " __disable_auto_enable_nl
     ____ "F" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "off," __disable_auto_enable_nl
     ____ "O" ________ _ooo_ "Put " _selected_stepper " into auto " _enable_ _mode_ _NL_
@@ -606,7 +614,7 @@ const static char messages[] PROGMEM =
 
 
     /* USAGE TEST */
-    _Enter_ "commands separated by space, carriage return or newline:" _NL_
+    _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "R" ________ _ooo_ "start all " _select "ed tests" _NL_
     ____ "I" ________ _ooo_ _Toggle_ _stepper " info, while " _test_sequence_ "is running" _NL_
@@ -621,7 +629,7 @@ const static char messages[] PROGMEM =
 
 
     /* USAGE CONFIG */
-    _Enter_ "commands separated by space, carriage return or newline:" _NL_
+    _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "d<p> " ____ _ooo_ _set_ _direction_ _pin_ _NL_
     ____ "d<p,n>" _NL_

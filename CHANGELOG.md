@@ -1,3 +1,9 @@
+0.25.3:
+- esp32: fix [Issue #113](https://github.com/gin66/FastAccelStepper/issues/113):
+    Stepper can fail to start as regression introduced in 0.25.0 and present up to 0.25.2
+- sam: fix [Issue #111](https://github.com/gin66/FastAccelStepper/issues/111):
+    Stepper can fail to start as regression introduced in 0.25.0 and present up to 0.25.2
+
 0.25.2:
 - Fix sketch name of RawOneTurn example
 - Fix overshooting due to clipping error
