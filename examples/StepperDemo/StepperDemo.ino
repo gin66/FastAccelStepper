@@ -612,7 +612,7 @@ const static char messages[] PROGMEM =
     ____ "I" ________ _ooo_ _Toggle_ _stepper " info, while " _test_sequence_ "is running" _NL_
     ____ "01   " ____ _ooo_ _select " " _test_sequence_ "01 for " _selected_stepper _NL_
     ____ ":" _NL_
-    ____ "11   " ____ _ooo_ _select " " _test_sequence_ "11 for " _selected_stepper _NL_
+    ____ "13   " ____ _ooo_ _select " " _test_sequence_ "13 for " _selected_stepper _NL_
     ____ "W" ________ _ooo_ "Blocking wait until test is finished" _NL_
     ____ "x" ________ _ooo_ "Exit test mode" _NL_
     _toggle_print_usage_after_stepper_stop
