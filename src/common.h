@@ -63,7 +63,7 @@ struct queue_end_s {
 #define DELAY_MS_BASE 1
 
 // Busy wait
-#define wait_or_pause()
+#define yield_if_supported()
 
 //==========================================================================
 #elif defined(ARDUINO_ARCH_ESP32)
@@ -113,7 +113,7 @@ struct queue_end_s {
 #define SUPPORT_CPU_AFFINITY
 
 // esp32 is a multitasking system, so yield one tick for other tasks
-#define wait_or_pause() vTaskDelay(1)
+#define yield_if_supported() vTaskDelay(1)
 
 //==========================================================================
 #elif defined(ESP_PLATFORM)
@@ -170,7 +170,7 @@ struct queue_end_s {
 #define SUPPORT_CPU_AFFINITY
 
 // esp32 is a multitasking system, so yield one tick for other tasks
-#define wait_or_pause() vTaskDelay(1)
+#define yield_if_supported() vTaskDelay(1)
 
 //==========================================================================
 #elif defined(ARDUINO_ARCH_SAM)
@@ -196,7 +196,7 @@ struct queue_end_s {
 #define DEBUG_LED_HALF_PERIOD 50
 
 // Busy wait
-#define wait_or_pause()
+#define yield_if_supported()
 
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
@@ -250,7 +250,7 @@ enum channels { channelA, channelB, channelC };
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
 
 // Busy wait
-#define wait_or_pause()
+#define yield_if_supported()
 
 //==========================================================================
 #else

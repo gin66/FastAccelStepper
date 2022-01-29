@@ -589,7 +589,7 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
 void FastAccelStepper::blockingWaitForForceStopComplete() {
   StepperQueue* q = &fas_queue[_queue_num];
   while (q->ignore_commands) {
-    wait_or_pause();
+    yield_if_supported();
   }
 }
 bool FastAccelStepper::disableOutputs() {
@@ -728,7 +728,7 @@ void FastAccelStepper::performOneStep(bool count_up, bool blocking) {
       addQueueEntry(&cmd);
       if (blocking) {
         while (isRunning()) {
-          wait_or_pause();
+          yield_if_supported();
         }
       }
     }
