@@ -181,12 +181,8 @@ class StepperQueue {
     }
     fasEnableInterrupts();
 
-    if (isRunning()) {
-      // stepper is already running, so nothing else to do
-      return AQE_OK;
-    }
-    // stepper is not yet running. Shall we start ?
-    if (start) {
+    if (!isRunning() && start) {
+      // stepper is not yet running and start is requested
       startQueue();
     }
     return AQE_OK;
