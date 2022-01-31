@@ -574,6 +574,12 @@ int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
   }
   return res;
 }
+void FastAccelStepper::forceStop() {
+  StepperQueue* q = &fas_queue[_queue_num];
+
+  // ensure no more commands are added to the queue
+  q->ignore_commands = true;
+}
 void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];
 

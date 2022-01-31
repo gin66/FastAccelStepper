@@ -243,13 +243,24 @@ class FastAccelStepper {
   // return value as with move/moveTo
   int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
 
-  // stop the running stepper as fast as possible with deceleration
+  // stop the running stepper with normal deceleration.
   // This only sets a flag and can be called from an interrupt !
   void stopMove();
   bool isStopping() { return _rg.isStopping(); }
 
-  // stop the running stepper immediately and set new_pos as new position
+  // abruptly stop the running stepper without deceleration. 
   // This can be called from an interrupt !
+  //
+  // The stepper command queue will be processed, but no furter commands are added.
+  // This means, that the stepper can be expected to stop within approx. 20ms.
+  void forceStop();
+
+  // abruptly stop the running stepper without deceleration. 
+  // This can be called from an interrupt !
+  //
+  // No further step will be issued. As this is aborting all commands in the queue,
+  // the actual stop position is lost (recovering this position cannot be done within an interrupt).
+  // So the new position after stop has to be provided and will be set as current position after stop.
   void forceStopAndNewPosition(uint32_t new_pos);
 
   // get the target position for the current move

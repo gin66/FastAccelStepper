@@ -112,8 +112,8 @@ struct queue_end_s {
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
 
-// esp32 is a multitasking system, so yield one tick for other tasks
-#define yield_if_supported() vTaskDelay(1)
+// esp32 is a multitasking system, so yield for other tasks
+#define yield_if_supported() yield()
 
 //==========================================================================
 #elif defined(ESP_PLATFORM)
@@ -169,8 +169,8 @@ struct queue_end_s {
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
 
-// esp32 is a multitasking system, so yield one tick for other tasks
-#define yield_if_supported() vTaskDelay(1)
+// esp32 is a multitasking system, so yield for other tasks
+#define yield_if_supported() yield()
 
 //==========================================================================
 #elif defined(ARDUINO_ARCH_SAM)

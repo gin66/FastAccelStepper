@@ -1,3 +1,7 @@
+0.25.4:
+- Add new function forceStop() as solution for [Issue #116](https://github.com/gin66/FastAccelStepper/issues/116)
+- esp32: use yield() instead of vTaskDelay(1) as proposed by [Issue #115](https://github.com/gin55/FastAccelStepper/issues/115)
+
 0.25.3:
 - esp32: fix [Issue #113](https://github.com/gin66/FastAccelStepper/issues/113):
     Stepper can fail to start as regression introduced in 0.25.0 and present up to 0.25.2
