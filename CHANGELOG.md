@@ -1,3 +1,7 @@
+0.25.5:
+- esp32: use busy wait in forwardStep()/backwardStep() instead of yield() as proposed by [Issue #115](https://github.com/gin55/FastAccelStepper/issues/115)
+- remove blockingWait for forceStop() in move/moveTo/... as this is actually not required. 
+
 0.25.4:
 - Add new function forceStop() as solution for [Issue #116](https://github.com/gin66/FastAccelStepper/issues/116)
 - esp32: use yield() instead of vTaskDelay(1) as proposed by [Issue #115](https://github.com/gin55/FastAccelStepper/issues/115)

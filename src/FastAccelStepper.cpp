@@ -527,22 +527,18 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   _off_delay_count = max(delay_count, (uint16_t)1);
 }
 int8_t FastAccelStepper::runForward() {
-  blockingWaitForForceStopComplete();
   return _rg.startRun(true);
 }
 int8_t FastAccelStepper::runBackward() {
-  blockingWaitForForceStopComplete();
   return _rg.startRun(false);
 }
 int8_t FastAccelStepper::moveTo(int32_t position) {
-  blockingWaitForForceStopComplete();
   return _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
 }
 int8_t FastAccelStepper::move(int32_t move) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  blockingWaitForForceStopComplete();
   return _rg.move(move, &fas_queue[_queue_num].queue_end);
 }
 void FastAccelStepper::keepRunning() { _rg.setKeepRunning(); }
@@ -552,7 +548,6 @@ void FastAccelStepper::applySpeedAcceleration() {
 }
 int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
                                             bool allow_reverse) {
-  blockingWaitForForceStopComplete();
   int8_t res = MOVE_OK;
   if (acceleration > 0) {
     setAcceleration(acceleration);
@@ -591,12 +586,6 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
 
   // set the new position
   q->queue_end.pos = new_pos;
-}
-void FastAccelStepper::blockingWaitForForceStopComplete() {
-  StepperQueue* q = &fas_queue[_queue_num];
-  while (q->ignore_commands) {
-    yield_if_supported();
-  }
 }
 bool FastAccelStepper::disableOutputs() {
   if (isRunning() && _autoEnable) {
@@ -734,7 +723,6 @@ void FastAccelStepper::performOneStep(bool count_up, bool blocking) {
       addQueueEntry(&cmd);
       if (blocking) {
         while (isRunning()) {
-          yield_if_supported();
         }
       }
     }
