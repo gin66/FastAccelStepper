@@ -101,7 +101,7 @@ struct ramp_ro_s {
     target_pos += delta;
   }
   inline void initiateStop() { force_stop = true; }
-  inline void stopInitiated() { return force_stop; }
+  inline bool stopInitiated() { return force_stop; }
   inline void setKeepRunning() { keep_running = true; }
   inline bool isRunningContinuously() { return keep_running; }
 };

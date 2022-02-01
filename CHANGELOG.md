@@ -1,3 +1,6 @@
+pre-0.26.0:
+- Internal refactoring: separate RampGenerator and Constant Acceleration Ramp Calculation
+
 0.25.5:
 - esp32: use busy wait in forwardStep()/backwardStep() instead of yield() as proposed by [Issue #115](https://github.com/gin55/FastAccelStepper/issues/115)
 - remove blockingWait for forceStop() in move/moveTo/... as this is actually not required. 
