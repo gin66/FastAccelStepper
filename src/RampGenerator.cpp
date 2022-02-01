@@ -10,24 +10,12 @@
 #define puts DO_NOT_USE_PRINTF
 #endif
 
-#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
-  upm_float upm_timer_freq;
-  upm_float upm_timer_freq_div_500;
-  upm_float upm_timer_freq_div_sqrt_of_2;
-  upm_float upm_timer_freq_square_div_2;
-#endif
-
 void RampGenerator::init() {
   speed_in_ticks = 0;
   _config.init();
   _ro.init();
   _rw.init();
-#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
-  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
-  upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);
-  upm_timer_freq_div_sqrt_of_2 = upm_shr(upm_multiply(upm_timer_freq, upm_timer_freq));
-  upm_timer_freq_square_div_2 = upm_shr(upm_square(upm_timer_freq));
-#endif
+  init_ramp_module();
 }
 int8_t RampGenerator::setSpeedInTicks(uint32_t min_step_ticks) {
   if (min_step_ticks < MIN_DELTA_TICKS) {

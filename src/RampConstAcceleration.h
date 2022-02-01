@@ -28,6 +28,7 @@
 // This calculation needs more work
 #define TICKS_TO_US(u32) \
   ((uint32_t)((((uint32_t)((u32) / (TICKS_PER_S / 1000000L))) / 1L)))
+
 #endif
 
 struct ramp_config_s {
@@ -151,6 +152,7 @@ class NextCommand {
   struct ramp_rw_s rw;
 };
 
+void init_ramp_module();
 void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
                      const struct queue_end_s *queue_end, NextCommand *command);
 #endif

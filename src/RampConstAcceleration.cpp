@@ -6,6 +6,22 @@
 #include "RampConstAcceleration.h"
 #include "common.h"
 
+#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
+  static upm_float upm_timer_freq;
+  static upm_float upm_timer_freq_div_500;
+  static upm_float upm_timer_freq_div_sqrt_of_2;
+  static upm_float upm_timer_freq_square_div_2;
+#endif
+
+void init_upm_timer_freq_variables() {
+#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
+  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
+  upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);
+  upm_timer_freq_div_sqrt_of_2 = upm_shr(upm_multiply(upm_timer_freq, upm_timer_freq));
+  upm_timer_freq_square_div_2 = upm_shr(upm_square(upm_timer_freq));
+#endif
+}
+
 //*************************************************************************************************
 void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
                      const struct queue_end_s *queue_end,
