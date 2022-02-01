@@ -19,6 +19,8 @@
 #define SUPPORT_UPM_TIMER_FREQ_VARIABLES
 #define UPM_TICKS_PER_S upm_timer_freq
 #define UPM_TICKS_PER_S_DIV_500 upm_timer_freq_div_500
+#define UPM_TICKS_PER_S_DIV_SQRT_OF_2 upm_timer_freq_div_sqrt_of_2
+#define UPM_ACCEL_FACTOR upm_timer_freq_square_div_2
 // This overflows for approx. 1s at 40 MHz, only
 #define US_TO_TICKS(u32) \
   ((uint32_t)((((uint32_t)((u32) * (TICKS_PER_S / 10000L))) / 100L)))
