@@ -13,7 +13,12 @@ SRC=$(wildcard ../../src/*)
 test: $(TEST_FILES)
 
 %/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini
-	make SILENCE=$(SILENCE)  -C $(dir $@) -f ../Makefile.test
+	make SILENCE=$(SILENCE)  -C $(dir $@)
+
+makefiles: $(addsuffix /Makefile,$(TESTS))
+
+%/Makefile:
+	cd $(dir $@); ln -s ../Makefile.test Makefile
 
 links: $(SD_SRC_DIRS)
 
@@ -34,4 +39,4 @@ clean:
 	rm -fR */.pio */.tested */x.vcd */result.txt
 	find . -type l -delete
 	find . -type d -empty -delete
-	make links
+	make links makefiles

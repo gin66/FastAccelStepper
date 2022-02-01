@@ -193,7 +193,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       // remaining_steps = performed_ramp_up_steps;
     } else if (remaining_steps < performed_ramp_up_steps) {
       // We will overshoot
-      TRACE_OUTPUT("O");
+      TRACE_OUTPUT('O');
       this_state = RAMP_STATE_REVERSE;
       remaining_steps = performed_ramp_up_steps;
     } else if (ramp->config.min_travel_ticks < rw->curr_ticks) {
@@ -208,7 +208,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // curr_ticks is not necessarily correct due to speed increase
         uint32_t coast_time = possible_coast_steps * rw->curr_ticks;
         if (coast_time < 2 * MIN_CMD_TICKS) {
-          TRACE_OUTPUT("c");
+          TRACE_OUTPUT('l');
           this_state = RAMP_STATE_COAST;
 #ifdef TEST
           printf("low speed coast %d %d\n", possible_coast_steps,
@@ -226,7 +226,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         }
       }
     } else if (ramp->config.min_travel_ticks > rw->curr_ticks) {
-      TRACE_OUTPUT("d");
+      TRACE_OUTPUT('d');
       this_state = RAMP_STATE_DECELERATE;
       if (performed_ramp_up_steps <= planning_steps) {
         if (performed_ramp_up_steps > 0) {
@@ -236,7 +236,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         }
       }
     } else {
-      TRACE_OUTPUT("c");
+      TRACE_OUTPUT('c');
       this_state = RAMP_STATE_COAST;
       uint32_t possible_coast_steps = remaining_steps - performed_ramp_up_steps;
       if (possible_coast_steps < 2 * planning_steps) {
@@ -344,6 +344,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     }
   }
 
+  // The above plannings_steps evaluation uses curr_ticks,
+  // but new_ticks can be lower and so the command time not sufficient
   if (d_ticks_new < MIN_CMD_TICKS) {
     uint32_t cmd_ticks = d_ticks_new * planning_steps;
     if (cmd_ticks < MIN_CMD_TICKS) {
@@ -355,7 +357,13 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       printf("Increase planning steps %d => %d\n", planning_steps,
              new_planning_steps);
 #endif
+	  // do we need to decelerate in order to not overshoot ?
       planning_steps = new_planning_steps;
+	  if (remaining_steps < performed_ramp_up_steps + planning_steps) {
+         this_state = RAMP_STATE_DECELERATE;
+
+		 // and now the speed is actually too high....
+	  } 
     }
   }
 
