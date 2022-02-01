@@ -91,7 +91,7 @@ int8_t RampGenerator::startRun(bool countUp) {
   return MOVE_OK;
 }
 
-int8_t RampGenerator::_startMove(int32_t target_pos, int32_t curr_target_pos) {
+int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
   uint8_t res = _config.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
@@ -101,7 +101,7 @@ int8_t RampGenerator::_startMove(int32_t target_pos, int32_t curr_target_pos) {
   new_ramp.runToPosition(&_config, target_pos);
 
   fasDisableInterrupts();
-  if (target_pos != curr_target_pos) {
+  if (position_changed) {
     // Only start the ramp generator, if the target position is different
     _rw.startRampIfNotRunning();
   }
@@ -130,7 +130,7 @@ int8_t RampGenerator::moveTo(int32_t position,
     curr_pos = queue_end->pos;
   }
   inject_fill_interrupt(1);
-  int res = _startMove(position, curr_pos);
+  int res = _startMove(position, curr_pos != new_pos);
   inject_fill_interrupt(2);
   return res;
 }
@@ -142,7 +142,7 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
     curr_pos = queue_end->pos;
   }
   int32_t new_pos = curr_pos + move;
-  return _startMove(new_pos, curr_pos);
+  return _startMove(new_pos, curr_pos != new_pos);
 }
 
 void RampGenerator::afterCommandEnqueued(NextCommand *command) {
