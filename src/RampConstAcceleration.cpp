@@ -13,7 +13,7 @@
   static upm_float upm_timer_freq_square_div_2;
 #endif
 
-void init_upm_timer_freq_variables() {
+void init_ramp_module() {
 #ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
   upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);

@@ -84,7 +84,7 @@ class RampGenerator {
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);
   int8_t startRun(bool countUp);
   inline void initiateStop() { _ro.initiateStop(); }
-  inline bool isStopping() { return _ro.stopInitiated() && isRampGeneratorActive(); }
+  inline bool isStopping() { return _ro.isStopInitiated() && isRampGeneratorActive(); }
   bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
 
   void stopRamp();

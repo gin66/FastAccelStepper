@@ -55,14 +55,7 @@ struct ramp_config_s {
     min_travel_ticks = min_step_ticks;
   }
   inline void setAcceleration(int32_t accel) {
-#ifdef UPM_ACCEL_FACTOR
-    upm_float new_upm_inv_accel2 =
-        upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
-#else
-    upm_float upm_inv_accel =
-        upm_divide(upm_shr(UPM_TICKS_PER_S, 1), upm_from(accel));
-    upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
-#endif
+    upm_float new_upm_inv_accel2 = upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
     if (upm_inv_accel2 != new_upm_inv_accel2) {
       upm_inv_accel2 = new_upm_inv_accel2;
 
@@ -104,7 +97,7 @@ struct ramp_ro_s {
     target_pos += delta;
   }
   inline void initiateStop() { force_stop = true; }
-  inline bool stopInitiated() { return force_stop; }
+  inline bool isStopInitiated() { return force_stop; }
   inline void setKeepRunning() { keep_running = true; }
   inline bool isRunningContinuously() { return keep_running; }
 };
