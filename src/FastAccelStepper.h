@@ -24,8 +24,8 @@
 #define RAMP_DIRECTION_MASK (32 + 64)
 
 #include "PoorManFloat.h"
-#include "RampGenerator.h"
 #include "common.h"
+#include "RampGenerator.h"
 
 //
 // Timing values - Architecture dependent
