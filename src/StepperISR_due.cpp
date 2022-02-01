@@ -578,11 +578,11 @@ void StepperQueue::disconnect() {
   // disconnect is a strange term for what we're doing.  Instead of
   // disconnecting interrupts, we disable the source of the interrupts.  If
   // something external causes a signal on the pin, yes, we will get an
-  // interrupt.  That should never happen...but there is code in the interrupt to
-  // detect it because I used that very issue to debug the delay code :)  If I
-  // got a pulse while in delay mode, I knew there was a problem.  I had it
-  // strobe a pin I could see on the logic analyzer.  It made it very easy to see
-  // when "wrong" behavior was happening.
+  // interrupt.  That should never happen...but there is code in the interrupt
+  // to detect it because I used that very issue to debug the delay code :)  If
+  // I got a pulse while in delay mode, I knew there was a problem.  I had it
+  // strobe a pin I could see on the logic analyzer.  It made it very easy to
+  // see when "wrong" behavior was happening.
   _connected = false;
 }
 

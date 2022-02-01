@@ -9,10 +9,10 @@
 class FastAccelStepper;
 
 #ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
-  extern upm_float upm_timer_freq;
-  extern upm_float upm_timer_freq_div_500;
-  extern upm_float upm_timer_freq_div_sqrt_of_2;
-  extern upm_float upm_timer_freq_square_div_2;
+extern upm_float upm_timer_freq;
+extern upm_float upm_timer_freq_div_500;
+extern upm_float upm_timer_freq_div_sqrt_of_2;
+extern upm_float upm_timer_freq_square_div_2;
 #endif
 
 class RampGenerator {
@@ -29,9 +29,7 @@ class RampGenerator {
  public:
   uint32_t speed_in_ticks;
   uint32_t acceleration;
-  inline uint8_t rampState() {
-    return _rw.rampState();
-  }
+  inline uint8_t rampState() { return _rw.rampState(); }
   void init();
   inline int32_t targetPosition() { return _ro.targetPosition(); }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
@@ -84,13 +82,16 @@ class RampGenerator {
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);
   int8_t startRun(bool countUp);
   inline void initiateStop() { _ro.initiateStop(); }
-  inline bool isStopping() { return _ro.isStopInitiated() && isRampGeneratorActive(); }
+  inline bool isStopping() {
+    return _ro.isStopInitiated() && isRampGeneratorActive();
+  }
   bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
 
   void stopRamp();
   inline void setKeepRunning() { _ro.setKeepRunning(); }
   inline bool isRunningContinuously() { return _ro.isRunningContinuously(); }
-  void getNextCommand(const struct queue_end_s *queue_end, NextCommand *cmd_out);
+  void getNextCommand(const struct queue_end_s *queue_end,
+                      NextCommand *cmd_out);
   void afterCommandEnqueued(NextCommand *cmd_in);
   uint32_t getCurrentPeriodInTicks() {
     fasDisableInterrupts();

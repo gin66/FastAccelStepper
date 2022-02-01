@@ -1,8 +1,8 @@
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
-#include "StepperISR.h"
 #include "RampGenerator.h"
+#include "StepperISR.h"
 
 // This define in order to not shoot myself.
 #ifndef TEST
@@ -136,9 +136,7 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 
   return _getNextCommand(&ramp, &_rw, queue_end, command);
 }
-void RampGenerator::stopRamp() {
-  _rw.stopRamp();
-}
+void RampGenerator::stopRamp() { _rw.stopRamp(); }
 int32_t RampGenerator::getCurrentAcceleration() {
   switch (_rw.rampState() &
           (RAMP_STATE_ACCELERATING_FLAG | RAMP_STATE_DECELERATING_FLAG |

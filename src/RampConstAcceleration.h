@@ -55,7 +55,8 @@ struct ramp_config_s {
     min_travel_ticks = min_step_ticks;
   }
   inline void setAcceleration(int32_t accel) {
-    upm_float new_upm_inv_accel2 = upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
+    upm_float new_upm_inv_accel2 =
+        upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
     if (upm_inv_accel2 != new_upm_inv_accel2) {
       upm_inv_accel2 = new_upm_inv_accel2;
 
@@ -122,7 +123,7 @@ struct ramp_rw_s {
     curr_ticks = TICKS_FOR_STOPPED_MOTOR;
   }
   inline void init() {
-	stopRamp();
+    stopRamp();
     accel_change_cnt = 0xff;
   }
   inline uint8_t rampState() {

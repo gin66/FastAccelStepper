@@ -12,7 +12,7 @@
 // Code Optimization
 //   Start   30170 Bytes
 
-#define VERSION "post-e650939"
+#define VERSION "post-fe40b09"
 
 struct stepper_config_s {
   uint8_t step;
@@ -683,9 +683,7 @@ void output_msg(int8_t i) {
 #endif
 }
 
-void delay10us() {
-    delayMicroseconds(10);
-}
+void delay10us() { delayMicroseconds(10); }
 void do3200Steps(uint8_t step) {
   for (uint16_t i = 0; i < 3200; i++) {
     digitalWrite(step, HIGH);

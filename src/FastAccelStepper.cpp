@@ -27,9 +27,7 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
 
 //*************************************************************************************************
 //*************************************************************************************************
-void FastAccelStepperEngine::init() {
-  fas_init_engine(this, 255);
-}
+void FastAccelStepperEngine::init() { fas_init_engine(this, 255); }
 
 #if defined(SUPPORT_CPU_AFFINITY)
 void FastAccelStepperEngine::init(uint8_t cpu_core) {
