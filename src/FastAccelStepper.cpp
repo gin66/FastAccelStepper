@@ -532,7 +532,7 @@ int8_t FastAccelStepper::move(int32_t move) {
   return _rg.move(move, &fas_queue[_queue_num].queue_end);
 }
 void FastAccelStepper::keepRunning() { _rg.setKeepRunning(); }
-void FastAccelStepper::stopMove() { _rg.initiate_stop(); }
+void FastAccelStepper::stopMove() { _rg.initiateStop(); }
 void FastAccelStepper::applySpeedAcceleration() {
   _rg.applySpeedAcceleration();
 }

@@ -96,6 +96,14 @@ struct ramp_ro_s {
     target_pos = new_target_pos, force_stop = false, keep_running = false,
     keep_running_count_up = true;
   }
+  inline int32_t targetPosition() { return target_pos; }
+  inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
+    target_pos += delta;
+  }
+  inline void initiateStop() { force_stop = true; }
+  inline void stopInitiated() { return force_stop; }
+  inline void setKeepRunning() { keep_running = true; }
+  inline bool isRunningContinuously() { return keep_running; }
 };
 
 struct ramp_rw_s {
@@ -120,6 +128,10 @@ struct ramp_rw_s {
   inline void init() {
 	stopRamp();
     accel_change_cnt = 0xff;
+  }
+  inline uint8_t rampState() {
+    // reading one byte is atomic
+    return ramp_state;
   }
   inline void startRampIfNotRunning() {
     // called with interrupts disabled

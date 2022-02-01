@@ -148,7 +148,7 @@ void RampGenerator::stopRamp() {
   _rw.stopRamp();
 }
 int32_t RampGenerator::getCurrentAcceleration() {
-  switch (_rw.ramp_state &
+  switch (_rw.rampState() &
           (RAMP_STATE_ACCELERATING_FLAG | RAMP_STATE_DECELERATING_FLAG |
            RAMP_DIRECTION_MASK)) {
     case RAMP_STATE_ACCELERATING_FLAG | RAMP_DIRECTION_COUNT_UP:

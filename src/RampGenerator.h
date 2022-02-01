@@ -28,13 +28,12 @@ class RampGenerator {
   uint32_t speed_in_ticks;
   uint32_t acceleration;
   inline uint8_t rampState() {
-    // reading one byte is atomic
-    return _rw.ramp_state;
+    return _rw.rampState();
   }
   void init();
-  inline int32_t targetPosition() { return _ro.target_pos; }
+  inline int32_t targetPosition() { return _ro.targetPosition(); }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
-    _ro.target_pos += delta;
+    _ro.advanceTargetPositionWithinInterruptDisabledScope(delta);
   }
   int8_t setSpeedInTicks(uint32_t min_step_ticks);
   int8_t setSpeedInUs(uint32_t min_step_us);
@@ -82,15 +81,14 @@ class RampGenerator {
   int8_t move(int32_t move, const struct queue_end_s *queue);
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);
   int8_t startRun(bool countUp);
-  inline void initiate_stop() { _ro.force_stop = true; }
-  inline bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
+  inline void initiateStop() { _ro.initiateStop(); }
+  inline bool isStopping() { return _ro.stopInitiated() && isRampGeneratorActive(); }
   bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
 
   void stopRamp();
-  inline void setKeepRunning() { _ro.keep_running = true; }
-  inline bool isRunningContinuously() { return _ro.keep_running; }
-  void getNextCommand(const struct queue_end_s *queue_end,
-                      NextCommand *cmd_out);
+  inline void setKeepRunning() { _ro.setKeepRunning(); }
+  inline bool isRunningContinuously() { return _ro.isRunningContinuously(); }
+  void getNextCommand(const struct queue_end_s *queue_end, NextCommand *cmd_out);
   void afterCommandEnqueued(NextCommand *cmd_in);
   uint32_t getCurrentPeriodInTicks() {
     fasDisableInterrupts();
