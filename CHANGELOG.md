@@ -2,6 +2,9 @@ TODO:
 - Analyze the different behavior avr vs pc-based tests to be analyzed
 - #include-file structure need to be cleaned up
 
+0.25.7:
+- atmega32u4: Disable direct port access function in StepperDemo to free up program memory
+
 0.25.6:
 - Internal refactoring: separate RampGenerator and Constant Acceleration Ramp Calculation
 - StepperDemo extended:

@@ -9,9 +9,6 @@
 #include <esp_task_wdt.h>
 #endif
 
-// Code Optimization
-//   Start   30170 Bytes
-
 #define VERSION "post-c463fb6"
 
 struct stepper_config_s {
@@ -597,7 +594,9 @@ const static char messages[] PROGMEM =
     ____ "w<ms>" ____ _ooo_ "Wait time in ms" _NL_
     ____ "+" ________ _ooo_ _Perform_ _one_step_ _forward_ _of_the_ _selected_stepper _NL_
     ____ "-" ________ _ooo_ _Perform_ _one_step_ _backward_ _of_the_ _selected_stepper _NL_
+#if !defined(__AVR_ATmega32U4__)
     ____ "T" ________ _ooo_ _test_  _select "ed " _stepper " with direct port access" _NL_
+#endif
 #if defined(ARDUINO_ARCH_ESP32)
     ____ "r" ________ _ooo_ "Call ESP.restart()" _NL_
     ____ "reset" ____ _ooo_ _Perform_ "reset" _NL_
@@ -634,7 +633,7 @@ const static char messages[] PROGMEM =
 
 
     /* USAGE CONFIG */
-#ifndef SIM_TEST_INPUT
+#if !defined(SIM_TEST_INPUT) && !defined(__AVR_ATmega32U4__)
     _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "d<p> " ____ _ooo_ _set_ _direction_ _pin_ _NL_
@@ -687,6 +686,7 @@ void output_msg(int8_t i) {
 #endif
 }
 
+#if !defined(__AVR_ATmega32U4__)
 void delay10us() { delayMicroseconds(10); }
 void do3200Steps(uint8_t step) {
   for (uint16_t i = 0; i < 3200; i++) {
@@ -760,6 +760,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
   }
   // Done
 }
+#endif
 
 void setup() {
   Serial.begin(115200);
@@ -1351,6 +1352,7 @@ bool process_cmd(char *cmd) {
         return true;
       }
       break;
+#if !defined(__AVR_ATmega32U4__)
     case MODE(normal, 'T'):
       if (*cmd == 0) {
         if (!stepper_selected->isRunning()) {
@@ -1362,6 +1364,7 @@ bool process_cmd(char *cmd) {
         return true;
       }
       break;
+#endif
     case MODE(normal, '+'):
       if (*cmd == 0) {
         if (!stepper_selected->isRunning()) {
