@@ -8,8 +8,6 @@
 // These variables control the stepper timing behaviour
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
-#define TICKS_FOR_STOPPED_MOTOR 0xffffffff
-
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 struct mapping_s {
   mcpwm_unit_t mcpwm_unit;

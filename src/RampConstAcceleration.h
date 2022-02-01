@@ -40,10 +40,10 @@ struct ramp_config_s {
   upm_inv_accel2 = 0;
   }
   inline int8_t checkValidConfig() {
-	if (min_travel_ticks != 0) {
+	if (min_travel_ticks == 0) {
 		return MOVE_ERR_SPEED_IS_UNDEFINED;
 	}
-    if (upm_inv_accel2 != 0) {
+    if (upm_inv_accel2 == 0) {
 		return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
 	}
 	return MOVE_OK;
@@ -92,6 +92,13 @@ struct ramp_rw_s {
   uint32_t pause_ticks_left;
   // Current ticks for ongoing step
   uint32_t curr_ticks;
+  void init() {
+  pause_ticks_left = 0;
+  performed_ramp_up_steps = 0;
+  accel_change_cnt = 0xff;
+  ramp_state = RAMP_STATE_IDLE;
+  curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+  }
 };
 
 class NextCommand {

@@ -1,6 +1,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#define TICKS_FOR_STOPPED_MOTOR 0xffffffff
+
 //	ticks is multiplied by (1/TICKS_PER_S) in s
 //	If steps is 0, then a pause is generated
 struct stepper_command_s {
@@ -15,9 +17,10 @@ struct queue_end_s {
   volatile bool dir;
 };
 
-// use own min/max function, because the lib versions are messed up
+// use own min/max/abs function, because the lib versions are messed up
 #define fas_min(a, b) ((a) > (b) ? (b) : (a))
 #define fas_max(a, b) ((a) > (b) ? (a) : (b))
+#define fas_abs(x) ((x) >= 0 ? (x) : (-x))
 
 //==============================================================================
 // All architecture specific definitions should be located here

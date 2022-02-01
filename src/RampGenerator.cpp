@@ -39,11 +39,7 @@ void RampGenerator::init() {
   speed_in_ticks = 0;
   _config.init();
   _ro.target_pos = 0;
-  _rw.pause_ticks_left = 0;
-  _rw.performed_ramp_up_steps = 0;
-  _rw.accel_change_cnt = 0xff;
-  _rw.ramp_state = RAMP_STATE_IDLE;
-  _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+  _rw.init();
 #if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
   upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);

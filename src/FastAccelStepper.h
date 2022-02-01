@@ -9,6 +9,20 @@
 #define MOVE_ERR_SPEED_IS_UNDEFINED -2
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
 
+// Return value of rampState()
+#define RAMP_STATE_IDLE 0
+#define RAMP_STATE_COAST 1
+#define RAMP_STATE_ACCELERATE 2
+#define RAMP_STATE_DECELERATE_TO_STOP 4
+#define RAMP_STATE_DECELERATE (4 + 8)
+#define RAMP_STATE_REVERSE (4 + 16)
+#define RAMP_STATE_ACCELERATING_FLAG 2
+#define RAMP_STATE_DECELERATING_FLAG 4
+#define RAMP_STATE_MASK (1 + 2 + 4 + 8 + 16)
+#define RAMP_DIRECTION_COUNT_UP 32
+#define RAMP_DIRECTION_COUNT_DOWN 64
+#define RAMP_DIRECTION_MASK (32 + 64)
+
 #include "PoorManFloat.h"
 #include "RampGenerator.h"
 #include "common.h"
@@ -337,19 +351,7 @@ class FastAccelStepper {
   void setPositionAfterCommandsCompleted(int32_t new_pos);
 
   // This function provides info, in which state the high level stepper control
-  // is operating
-#define RAMP_STATE_IDLE 0
-#define RAMP_STATE_COAST 1
-#define RAMP_STATE_ACCELERATE 2
-#define RAMP_STATE_DECELERATE_TO_STOP 4
-#define RAMP_STATE_DECELERATE (4 + 8)
-#define RAMP_STATE_REVERSE (4 + 16)
-#define RAMP_STATE_ACCELERATING_FLAG 2
-#define RAMP_STATE_DECELERATING_FLAG 4
-#define RAMP_STATE_MASK (1 + 2 + 4 + 8 + 16)
-#define RAMP_DIRECTION_COUNT_UP 32
-#define RAMP_DIRECTION_COUNT_DOWN 64
-#define RAMP_DIRECTION_MASK (32 + 64)
+  // is operating. The return value is an or of RAMP_STATE_... and RAMP_DIRECTION_... flags
   inline uint8_t rampState() { return _rg.rampState(); }
 
   // returns true, if the ramp generation is active
