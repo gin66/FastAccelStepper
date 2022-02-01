@@ -10,8 +10,10 @@ test: $(TESTS) pmf_test rmc_test
 	./pmf_test
 	$(addsuffix &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
 
-LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h RampGenerator.h RampCalculator.h common.h
-LIB_O=FastAccelStepper.o PoorManFloat.o StepperISR_test.o RampGenerator.o  RampCalculator.o
+LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h \
+	  RampGenerator.h RampConstAcceleration.h RampCalculator.h common.h
+LIB_O=FastAccelStepper.o PoorManFloat.o StepperISR_test.o \
+	  RampGenerator.o RampConstAcceleration.o RampCalculator.o
 
 SRC_LIB_H=$(addprefix ../../src/,$(LIB_H))
 
@@ -34,6 +36,9 @@ PoorManFloat.o: ../../src/PoorManFloat.cpp ../../src/PoorManFloat.h
 	$(COMPILE.cpp) $< -o $@
 
 RampGenerator.o: ../../src/RampGenerator.cpp $(SRC_LIB_H)
+	$(COMPILE.cpp) $< -o $@
+
+RampConstAcceleration.o: ../../src/RampConstAcceleration.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 RampCalculator.o: ../../src/RampCalculator.cpp $(SRC_LIB_H)
