@@ -16,6 +16,7 @@
 #define US_TO_TICKS(u32) (u32 * 21)
 #define TICKS_TO_US(u32) (u32 / 21)
 #else
+#define SUPPORT_UPM_TIMER_FREQ_VARIABLES
 #define UPM_TICKS_PER_S upm_timer_freq
 #define UPM_TICKS_PER_S_DIV_500 upm_timer_freq_div_500
 // This overflows for approx. 1s at 40 MHz, only
@@ -110,12 +111,15 @@ struct ramp_rw_s {
   uint32_t pause_ticks_left;
   // Current ticks for ongoing step
   uint32_t curr_ticks;
-  void init() {
+  inline void stopRamp() {
     pause_ticks_left = 0;
     performed_ramp_up_steps = 0;
-    accel_change_cnt = 0xff;
     ramp_state = RAMP_STATE_IDLE;
     curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+  }
+  inline void init() {
+	stopRamp();
+    accel_change_cnt = 0xff;
   }
   inline void startRampIfNotRunning() {
     // called with interrupts disabled

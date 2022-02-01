@@ -2,11 +2,6 @@
 
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
-
-#ifdef TEST
-#include <assert.h>
-#endif
-
 #include "RampGenerator.h"
 
 // This define in order to not shoot myself.
@@ -15,32 +10,17 @@
 #define puts DO_NOT_USE_PRINTF
 #endif
 
-//*************************************************************************************************
-// fill_queue generates commands to the stepper for executing a ramp
-//
-// Plan is to fill the queue with commmands with approx. 10 ms ahead (or more).
-// For low speeds, this results in single stepping
-// For high speeds (40kSteps/s) approx. 400 Steps to be created using 3 commands
-//
-// Basis of the calculation is the relation between steps and time via
-// acceleration a:
-//
-//		s = 1/2 * a * t²
-//
-// With v = a * t for the acceleration case, then v can be deducted:
-//
-//		s = 1/2 * v² / a
-//
-//	    v = sqrt(2 * s * a)
-//
-//*************************************************************************************************
+#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
+  upm_float upm_timer_freq;
+  upm_float upm_timer_freq_div_500;
+#endif
 
 void RampGenerator::init() {
   speed_in_ticks = 0;
   _config.init();
   _ro.init();
   _rw.init();
-#if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
+#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
   upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);
 #endif
@@ -130,7 +110,7 @@ int8_t RampGenerator::moveTo(int32_t position,
     curr_pos = queue_end->pos;
   }
   inject_fill_interrupt(1);
-  int res = _startMove(position, curr_pos != new_pos);
+  int res = _startMove(position, curr_pos != position);
   inject_fill_interrupt(2);
   return res;
 }
@@ -165,12 +145,7 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   return _getNextCommand(&ramp, &_rw, queue_end, command);
 }
 void RampGenerator::stopRamp() {
-  _rw.ramp_state = RAMP_STATE_IDLE;
-  _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
-  _rw.performed_ramp_up_steps = 0;
-}
-bool RampGenerator::isRampGeneratorActive() {
-  return (_rw.ramp_state != RAMP_STATE_IDLE);
+  _rw.stopRamp();
 }
 int32_t RampGenerator::getCurrentAcceleration() {
   switch (_rw.ramp_state &

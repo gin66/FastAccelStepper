@@ -8,6 +8,11 @@
 
 class FastAccelStepper;
 
+#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
+  extern upm_float upm_timer_freq;
+  extern upm_float upm_timer_freq_div_500;
+#endif
+
 class RampGenerator {
  private:
   // Latest configuration for acceleration/speed calculate_move, only
@@ -79,7 +84,7 @@ class RampGenerator {
   int8_t startRun(bool countUp);
   inline void initiate_stop() { _ro.force_stop = true; }
   inline bool isStopping() { return _ro.force_stop && isRampGeneratorActive(); }
-  bool isRampGeneratorActive();
+  bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
 
   void stopRamp();
   inline void setKeepRunning() { _ro.keep_running = true; }
@@ -101,11 +106,7 @@ class RampGenerator {
   }
 
  private:
-  int8_t _startMove(int32_t target_pos, int32_t current_target_pos);
-#if (TICKS_PER_S != 16000000L)
-  upm_float upm_timer_freq;
-  upm_float upm_timer_freq_div_500;
-#endif
+  int8_t _startMove(int32_t target_pos, bool position_changed);
 };
 
 #endif

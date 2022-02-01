@@ -28,17 +28,11 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
 //*************************************************************************************************
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
-#if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
-  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
-#endif
   fas_init_engine(this, 255);
 }
 
 #if defined(SUPPORT_CPU_AFFINITY)
 void FastAccelStepperEngine::init(uint8_t cpu_core) {
-#if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
-  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
-#endif
   fas_init_engine(this, cpu_core);
 }
 #endif
