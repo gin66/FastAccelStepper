@@ -2,6 +2,13 @@
 #define FASTACCELSTEPPER_H
 #include <stdint.h>
 
+// Return codes of move() and moveTo()
+#define MOVE_OK 0
+/* negative direction requested, but no direction pin defined */
+#define MOVE_ERR_NO_DIRECTION_PIN -1
+#define MOVE_ERR_SPEED_IS_UNDEFINED -2
+#define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
+
 #include "PoorManFloat.h"
 #include "RampGenerator.h"
 #include "common.h"
@@ -201,13 +208,9 @@ class FastAccelStepper {
   // relative to the target position of any ongoing move ! If the new
   // move/moveTo for an ongoing command would reverse the direction, then the
   // command is silently ignored.
+  // return values are the MOVE_... constants
   int8_t move(int32_t move);
   int8_t moveTo(int32_t position);
-#define MOVE_OK 0
-#define MOVE_ERR_NO_DIRECTION_PIN \
-  -1 /* negative direction requested, but no direction pin defined */
-#define MOVE_ERR_SPEED_IS_UNDEFINED -2
-#define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
 
   // This command flags the stepper to keep run continuously into current
   // direction. It can be stopped by stopMove.

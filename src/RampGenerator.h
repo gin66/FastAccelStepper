@@ -2,37 +2,11 @@
 #define RAMP_GENERATOR_H
 
 #include "common.h"
+#include "FastAccelStepper.h"
 #include "RampConstAcceleration.h"
 #include "RampCalculator.h"
 
 class FastAccelStepper;
-
-#if (TICKS_PER_S == 16000000L)
-#define UPM_TICKS_PER_S UPM_CONST_16E6
-#define UPM_TICKS_PER_S_DIV_500 UPM_CONST_32000
-#define UPM_TICKS_PER_S_DIV_SQRT_OF_2 UPM_CONST_16E6_DIV_SQRT_OF_2
-#define UPM_ACCEL_FACTOR UPM_CONST_128E12
-#define US_TO_TICKS(u32) (u32 * 16)
-#define TICKS_TO_US(u32) (u32 / 16)
-#elif (TICKS_PER_S == 21000000L)
-#define UPM_TICKS_PER_S UPM_CONST_21E6
-#define UPM_TICKS_PER_S_DIV_500 UPM_CONST_42000
-#define UPM_TICKS_PER_S_DIV_SQRT_OF_2 UPM_CONST_21E6_DIV_SQRT_OF_2
-#define UPM_ACCEL_FACTOR UPM_CONST_2205E11
-#define US_TO_TICKS(u32) (u32 * 21)
-#define TICKS_TO_US(u32) (u32 / 21)
-#else
-#define UPM_TICKS_PER_S upm_timer_freq
-#define UPM_TICKS_PER_S_DIV_500 upm_timer_freq_div_500
-
-// This overflows for approx. 1s at 40 MHz, only
-#define US_TO_TICKS(u32) \
-  ((uint32_t)((((uint32_t)((u32) * (TICKS_PER_S / 10000L))) / 100L)))
-
-// This calculation needs more work
-#define TICKS_TO_US(u32) \
-  ((uint32_t)((((uint32_t)((u32) / (TICKS_PER_S / 1000000L))) / 1L)))
-#endif
 
 class RampGenerator {
  private:
@@ -99,7 +73,7 @@ class RampGenerator {
   uint32_t getAcceleration() { return acceleration; }
   int32_t getCurrentAcceleration();
   inline bool hasValidConfig() {
-	return _config.hasValidConfig();
+	return _config.checkValidConfig() == MOVE_OK;
   }
   void applySpeedAcceleration();
   int8_t move(int32_t move, const struct queue_end_s *queue);

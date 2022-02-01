@@ -37,9 +37,7 @@
 
 void RampGenerator::init() {
   speed_in_ticks = 0;
-  _config.accel_change_cnt = 0;
-  _config.min_travel_ticks = 0;
-  _config.upm_inv_accel2 = 0;
+  _config.init();
   _ro.target_pos = 0;
   _rw.pause_ticks_left = 0;
   _rw.performed_ramp_up_steps = 0;
@@ -59,7 +57,7 @@ int8_t RampGenerator::setSpeedInTicks(uint32_t min_step_ticks) {
     return -1;
   }
   speed_in_ticks = min_step_ticks;
-  _config.min_travel_ticks = min_step_ticks;
+  _config.setSpeedInTicks(min_step_ticks);
   return 0;
 }
 int8_t RampGenerator::setSpeedInUs(uint32_t min_step_us) {
@@ -74,22 +72,7 @@ int8_t RampGenerator::setAcceleration(int32_t accel) {
     return -1;
   }
   acceleration = (uint32_t)accel;
-#ifdef UPM_ACCEL_FACTOR
-  upm_float upm_inv_accel2 =
-      upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
-#else
-  upm_float upm_inv_accel =
-      upm_divide(upm_shr(UPM_TICKS_PER_S, 1), upm_from(accel));
-  upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
-#endif
-  if (_config.upm_inv_accel2 != upm_inv_accel2) {
-    _config.upm_inv_accel2 = upm_inv_accel2;
-
-    // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
-    _config.upm_sqrt_inv_accel = upm_multiply(
-        upm_rsqrt(upm_from((uint32_t)accel)), UPM_TICKS_PER_S_DIV_SQRT_OF_2);
-    _config.accel_change_cnt++;
-  }
+  _config.setAcceleration(accel);
   return 0;
 }
 void RampGenerator::applySpeedAcceleration() {
@@ -98,11 +81,9 @@ void RampGenerator::applySpeedAcceleration() {
   fasEnableInterrupts();
 }
 int8_t RampGenerator::startRun(bool countUp) {
-  if (_config.min_travel_ticks == 0) {
-    return MOVE_ERR_SPEED_IS_UNDEFINED;
-  }
-  if (_config.upm_inv_accel2 == 0) {
-    return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
+  uint8_t res = _config.checkValidConfig();
+  if (res != MOVE_OK) {
+    return res;
   }
 
   struct ramp_ro_s new_ramp = {.config = _config,
@@ -123,11 +104,9 @@ int8_t RampGenerator::startRun(bool countUp) {
 }
 
 int8_t RampGenerator::_startMove(int32_t target_pos, int32_t curr_target_pos) {
-  if (_config.min_travel_ticks == 0) {
-    return MOVE_ERR_SPEED_IS_UNDEFINED;
-  }
-  if (_config.upm_inv_accel2 == 0) {
-    return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
+  uint8_t res = _config.checkValidConfig();
+  if (res != MOVE_OK) {
+    return res;
   }
 
   struct ramp_ro_s new_ramp = {.config = _config,
