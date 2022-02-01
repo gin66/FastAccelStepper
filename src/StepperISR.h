@@ -161,12 +161,12 @@ class StepperQueue {
     e->hasSteps = steps > 0 ? 1 : 0;
     e->ticks = period;
     struct queue_end_s next_queue_end = queue_end;
-#if defined(ARDUINO_ARCH_AVR)
-    next_queue_end.pos += cmd->count_up ? steps : -steps;
-    e->end_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
-#else
+#if !defined(ARDUINO_ARCH_AVR)
     e->start_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
+#endif
     next_queue_end.pos += cmd->count_up ? steps : -steps;
+#if defined(ARDUINO_ARCH_AVR)
+    e->end_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
 #endif
     next_queue_end.dir = dir;
     next_queue_end.count_up = cmd->count_up;

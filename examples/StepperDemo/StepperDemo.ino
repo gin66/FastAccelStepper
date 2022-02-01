@@ -12,7 +12,7 @@
 // Code Optimization
 //   Start   30170 Bytes
 
-#define VERSION "post-fe40b09"
+#define VERSION "post-c463fb6"
 
 struct stepper_config_s {
   uint8_t step;
@@ -617,6 +617,7 @@ const static char messages[] PROGMEM =
 
 
     /* USAGE TEST */
+#ifndef SIM_TEST_INPUT
     _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "R" ________ _ooo_ "start all " _select "ed tests" _NL_
@@ -628,10 +629,12 @@ const static char messages[] PROGMEM =
     ____ "x" ________ _ooo_ "Exit test mode" _NL_
     _toggle_print_usage_after_stepper_stop
 	_print_this_usage_
+#endif
     _SEP_
 
 
     /* USAGE CONFIG */
+#ifndef SIM_TEST_INPUT
     _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "d<p> " ____ _ooo_ _set_ _direction_ _pin_ _NL_
@@ -644,6 +647,7 @@ const static char messages[] PROGMEM =
     ____ "dc   " ____ _ooo_ _clear_ _direction_ _pin_ "(unidirectional)" _NL_
     ____ "x" ________ _ooo_ "Exit " _configuration_ _mode_ _NL_
 	_print_this_usage_
+#endif
     _SEP_
 ;
 // clang-format on

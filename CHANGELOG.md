@@ -1,7 +1,13 @@
-pre-0.26.0:
+TODO:
+- Analyze the different behavior avr vs pc-based tests to be analyzed
+- #include-file structure need to be cleaned up
+
+0.25.6:
 - Internal refactoring: separate RampGenerator and Constant Acceleration Ramp Calculation
 - StepperDemo extended:
 	- h<speed>: Set the speed in Steps/1000s
+- Fix an issue, which has appeared on simavr with overshooting ramp end (test seq 06).
+  Actually only the overshoot is avoided, the different behavior avr vs pc-based tests to be analyzed
 
 0.25.5:
 - esp32: use busy wait in forwardStep()/backwardStep() instead of yield() as proposed by [Issue #115](https://github.com/gin55/FastAccelStepper/issues/115)

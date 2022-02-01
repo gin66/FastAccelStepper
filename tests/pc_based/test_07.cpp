@@ -39,7 +39,7 @@ class FastAccelStepperTest {
 
     // Reproduce test sequence 06
 
-	assert(s.getDirectionPin() == PIN_UNDEFINED);
+    assert(s.getDirectionPin() == PIN_UNDEFINED);
     uint32_t speed_us = 100;
     int32_t steps = 32000;
     assert(s.isQueueEmpty());
@@ -60,7 +60,7 @@ class FastAccelStepperTest {
     fprintf(gp_file, "$data <<EOF\n");
     for (int i = 0; i < 10 * steps; i++) {
       if (rc.total_ticks > next_speed_change) {
-        next_speed_change += TICKS_PER_S/10;
+        next_speed_change += TICKS_PER_S / 10;
         speed_us = 190 - speed_us;
         printf("Change speed to %d\n", speed_us);
         s.setSpeedInUs(speed_us);
@@ -127,8 +127,9 @@ class FastAccelStepperTest {
 
 int main() {
   FastAccelStepperTest test;
-  for (uint64_t time_shift = 0;time_shift < TICKS_PER_S/10;time_shift+=TICKS_PER_S/7000) { 
-	  test.do_test(time_shift);
+  for (uint64_t time_shift = 0; time_shift < TICKS_PER_S / 10;
+       time_shift += TICKS_PER_S / 7000) {
+    test.do_test(time_shift);
   }
   printf("TEST_07 PASSED\n");
   return 0;

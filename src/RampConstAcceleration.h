@@ -1,6 +1,8 @@
 #ifndef RAMP_CONST_ACCELERATION_H
 #define RAMP_CONST_ACCELERATION_H
 
+#include "common.h"
+
 #if (TICKS_PER_S == 16000000L)
 #define UPM_TICKS_PER_S UPM_CONST_16E6
 #define UPM_TICKS_PER_S_DIV_500 UPM_CONST_32000
@@ -143,7 +145,7 @@ struct ramp_rw_s {
 class NextCommand {
  public:
   struct stepper_command_s command;
-  struct ramp_rw_s rw;
+  struct ramp_rw_s rw;  // new _rw, if command has been queued
 };
 
 void init_ramp_module();

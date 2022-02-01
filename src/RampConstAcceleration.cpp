@@ -25,6 +25,13 @@ void init_ramp_module() {
 
 //*************************************************************************************************
 
+//#define TRACE
+#ifdef TRACE
+#define TRACE_OUTPUT(x) Serial.print(x)
+#else
+#define TRACE_OUTPUT(x)
+#endif
+
 #ifdef TEST
 void print_ramp_state(uint8_t this_state) {
   switch (this_state & RAMP_DIRECTION_MASK) {
@@ -86,7 +93,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   uint32_t curr_ticks = rw->curr_ticks;
   uint32_t performed_ramp_up_steps;
   if (ramp->config.accel_change_cnt != rw->accel_change_cnt) {
-    // Serial.print('X');
+    TRACE_OUTPUT('X');
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
@@ -123,6 +130,26 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     }
     remaining_steps = fas_abs(delta);
   }
+
+#ifdef TRACE
+  if (remaining_steps == performed_ramp_up_steps) {
+    Serial.print('=');
+  } else if (remaining_steps > performed_ramp_up_steps) {
+    uint32_t dx = remaining_steps - performed_ramp_up_steps;
+    if (dx < 10) {
+      char ch = '0' + dx;
+      Serial.print(ch);
+      Serial.print('x');
+    }
+  } else {
+    uint32_t dx = performed_ramp_up_steps - remaining_steps;
+    if (dx < 10) {
+      char ch = '0' + dx;
+      Serial.print(ch);
+      Serial.print('y');
+    }
+  }
+#endif
 
   // If not moving, then use requested direction
   if (performed_ramp_up_steps == 0) {
@@ -166,6 +193,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       // remaining_steps = performed_ramp_up_steps;
     } else if (remaining_steps < performed_ramp_up_steps) {
       // We will overshoot
+      TRACE_OUTPUT("O");
       this_state = RAMP_STATE_REVERSE;
       remaining_steps = performed_ramp_up_steps;
     } else if (ramp->config.min_travel_ticks < rw->curr_ticks) {
@@ -180,6 +208,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // curr_ticks is not necessarily correct due to speed increase
         uint32_t coast_time = possible_coast_steps * rw->curr_ticks;
         if (coast_time < 2 * MIN_CMD_TICKS) {
+          TRACE_OUTPUT("c");
           this_state = RAMP_STATE_COAST;
 #ifdef TEST
           printf("low speed coast %d %d\n", possible_coast_steps,
@@ -197,6 +226,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         }
       }
     } else if (ramp->config.min_travel_ticks > rw->curr_ticks) {
+      TRACE_OUTPUT("d");
       this_state = RAMP_STATE_DECELERATE;
       if (performed_ramp_up_steps <= planning_steps) {
         if (performed_ramp_up_steps > 0) {
@@ -206,7 +236,18 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         }
       }
     } else {
+      TRACE_OUTPUT("c");
       this_state = RAMP_STATE_COAST;
+      uint32_t possible_coast_steps = remaining_steps - performed_ramp_up_steps;
+      if (possible_coast_steps < 2 * planning_steps) {
+        planning_steps = possible_coast_steps;
+        if (curr_ticks < MIN_CMD_TICKS) {
+          uint32_t cmd_ticks = curr_ticks * planning_steps;
+          if (cmd_ticks < MIN_CMD_TICKS) {
+            this_state = RAMP_STATE_DECELERATE;
+          }
+        }
+      }
     }
   }
   if (remaining_steps == 0) {  // This implies performed_ramp_up_steps == 0
@@ -242,7 +283,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   uint32_t d_ticks_new;
   {
     if (this_state & RAMP_STATE_ACCELERATING_FLAG) {
-      // Serial.print('A');
+      TRACE_OUTPUT('A');
       // do not overshoot ramp down start
       //
       // seems to be not necessary, as consideration already done above
@@ -271,8 +312,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       uint32_t rs;
-      // Serial.print('D');
-      if (performed_ramp_up_steps == 0) {
+      TRACE_OUTPUT('D');
+      if (performed_ramp_up_steps == 1) {
         d_ticks_new = ramp->config.min_travel_ticks;
       } else {
         if (performed_ramp_up_steps <= planning_steps) {
@@ -286,7 +327,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
 #endif
     } else {
-      // Serial.print('C');
+      TRACE_OUTPUT('C');
       d_ticks_new = rw->curr_ticks;
       // do not overshoot ramp down start
       uint32_t coast_steps = remaining_steps - performed_ramp_up_steps;
