@@ -1,5 +1,7 @@
 pre-0.26.0:
 - Internal refactoring: separate RampGenerator and Constant Acceleration Ramp Calculation
+- StepperDemo extended:
+	- h<speed>: Set the speed in Steps/1000s
 
 0.25.5:
 - esp32: use busy wait in forwardStep()/backwardStep() instead of yield() as proposed by [Issue #115](https://github.com/gin55/FastAccelStepper/issues/115)

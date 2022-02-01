@@ -422,7 +422,7 @@ const static char messages[] PROGMEM =
 #define _ooo_set_selected_stepper_s_ "\267"
    _ooo_ _set_ _selected_stepper "'s " _SEP_
 #define _m1_m2_to_select_stepper_ "\270"
-    ____ "M1/M2/.. " _ooo_ _to_ _select _stepper _NL_ _SEP_
+    ____ "M1/M2/.. " _ooo_ _to_ _select " " _stepper _NL_ _SEP_
 #define _print_this_usage_ "\271"
     ____ "?" ________ _ooo_ "Print this usage" _NL_ _NL_ _SEP_
 #define _toggle_print_usage_after_stepper_stop "\272"
@@ -561,15 +561,18 @@ const static char messages[] PROGMEM =
     _delay_ "in us = " _SEP_
 #define MSG_UNKNOWN_COMMAND 62 + MSG_OFFSET
     "Cannot interpret this command: " _SEP_
-#define MSG_USAGE_NORMAL 63+MSG_OFFSET
-#define MSG_USAGE_TEST 64+MSG_OFFSET
-#define MSG_USAGE_CONFIG 65+MSG_OFFSET
+#define MSG_SET_SPEED_TO_MILLI_HZ 63+MSG_OFFSET
+    _set_ _speed_ "(" _steps_ "/1000s) " _to_ _SEP_
+#define MSG_USAGE_NORMAL 64+MSG_OFFSET
+#define MSG_USAGE_TEST 65+MSG_OFFSET
+#define MSG_USAGE_CONFIG 66+MSG_OFFSET
     /* USAGE NORMAL */
     _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "c" ________ _ooo_ _Enter_ _configuration_ _mode_ _NL_
     ____ "V" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in us/" _step _NL_
     ____ "H" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/s" _NL_
+    ____ "h" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/1000s" _NL_
     ____ "A" _I_accel_I_  _ooo_set_selected_stepper_s_ _acceleration_ _NL_
     ____ "a" _I_accel_I_  _ooo_ _acceleration_ "control with +/-" _acceleration_ "values" _NL_
     ____ "U" ________ _ooo_ "Update " _selected_stepper "'s " _speed_ "/ " _acceleration_ " while "
@@ -680,8 +683,35 @@ void output_msg(int8_t i) {
 #endif
 }
 
+void delay10us() {
+    delayMicroseconds(10);
+}
+void do3200Steps(uint8_t step) {
+  for (uint16_t i = 0; i < 3200; i++) {
+    digitalWrite(step, HIGH);
+    delay10us();
+    if (digitalRead(step) != HIGH) {
+      output_msg(MSG_STEP_PIN_IS_NOT_HIGH);
+    }
+    digitalWrite(step, LOW);
+    delayMicroseconds(190);
+    if (digitalRead(step) != LOW) {
+      output_msg(MSG_STEP_PIN_IS_NOT_LOW);
+    }
+  }
+}
+void setDirectionPin(uint8_t direction, bool polarity) {
+  if (direction != PIN_UNDEFINED) {
+    digitalWrite(direction, polarity);
+    pinMode(direction, OUTPUT);
+    delay10us();
+    if (digitalRead(direction) != polarity) {
+      output_msg(MSG_CANNOT_SET_DIRECTION_PIN);
+      Serial.println(polarity ? "HIGH" : "LOW");
+    }
+  }
+}
 void test_direct_drive(const struct stepper_config_s *stepper) {
-#ifndef SIM_TEST_INPUT
   // Check stepper motor+driver is operational
   // This is not done via FastAccelStepper-Library for test purpose only
   uint8_t step = stepper->step;
@@ -695,7 +725,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
   if (enableLow != PIN_UNDEFINED) {
     digitalWrite(enableLow, LOW);
     pinMode(enableLow, OUTPUT);
-    delayMicroseconds(10);
+    delay10us();
     if (digitalRead(enableLow) != LOW) {
       output_msg(MSG_ENABLE_LOW_PIN_IS_NOT_LOW);
     }
@@ -703,69 +733,30 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
   if (enableHigh != PIN_UNDEFINED) {
     digitalWrite(enableHigh, HIGH);
     pinMode(enableHigh, OUTPUT);
-    delayMicroseconds(10);
+    delay10us();
     if (digitalRead(enableHigh) != HIGH) {
       output_msg(MSG_ENABLE_HIGH_PIN_IS_NOT_HIGH);
     }
   }
-  if (direction != PIN_UNDEFINED) {
-    digitalWrite(direction, direction_high_count_up);
-    pinMode(direction, OUTPUT);
-    delayMicroseconds(10);
-    if (digitalRead(direction) != direction_high_count_up) {
-      output_msg(MSG_CANNOT_SET_DIRECTION_PIN);
-      Serial.println(direction_high_count_up ? "HIGH" : "LOW");
-    }
-  }
-  for (uint16_t i = 0; i < 3200; i++) {
-    digitalWrite(step, HIGH);
-    delayMicroseconds(10);
-    if (digitalRead(step) != HIGH) {
-      output_msg(MSG_STEP_PIN_IS_NOT_HIGH);
-    }
-    digitalWrite(step, LOW);
-    delayMicroseconds(190);
-    if (digitalRead(step) != LOW) {
-      output_msg(MSG_STEP_PIN_IS_NOT_LOW);
-    }
-  }
-  if (direction != PIN_UNDEFINED) {
-    digitalWrite(direction, !direction_high_count_up);
-    delayMicroseconds(10);
-    delayMicroseconds(10);
-    if (digitalRead(direction) != !direction_high_count_up) {
-      output_msg(MSG_CANNOT_SET_DIRECTION_PIN);
-      Serial.println(!direction_high_count_up ? "HIGH" : "LOW");
-    }
-  }
-  for (uint16_t i = 0; i < 3200; i++) {
-    digitalWrite(step, HIGH);
-    delayMicroseconds(10);
-    if (digitalRead(step) != HIGH) {
-      output_msg(MSG_STEP_PIN_IS_NOT_HIGH);
-    }
-    digitalWrite(step, LOW);
-    delayMicroseconds(190);
-    if (digitalRead(step) != LOW) {
-      output_msg(MSG_STEP_PIN_IS_NOT_LOW);
-    }
-  }
+  setDirectionPin(direction, direction_high_count_up);
+  do3200Steps(step);
+  setDirectionPin(direction, !direction_high_count_up);
+  do3200Steps(step);
   if (enableLow != PIN_UNDEFINED) {
     digitalWrite(enableLow, HIGH);
-    delayMicroseconds(10);
+    delay10us();
     if (digitalRead(enableLow) != HIGH) {
       output_msg(MSG_ENABLE_LOW_PIN_IS_NOT_HIGH);
     }
   }
   if (enableHigh != PIN_UNDEFINED) {
     digitalWrite(enableHigh, LOW);
-    delayMicroseconds(10);
+    delay10us();
     if (digitalRead(enableHigh) != LOW) {
       output_msg(MSG_ENABLE_HIGH_PIN_IS_NOT_LOW);
     }
   }
   // Done
-#endif
 }
 
 void setup() {
@@ -1130,6 +1121,19 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_SET_SPEED_TO_HZ);
         Serial.println(val1);
         res = stepper_selected->setSpeedInHz(val1);
+        if (res < 0) {
+          output_msg(MSG_ERROR_INVALID_VALUE);
+        }
+        return true;
+      }
+      break;
+    case MODE(normal, 'h'):
+      val1 = strtol(cmd, &endptr, 10);
+      if (*endptr == 0) {
+        speed_in_milli_hz = true;
+        output_msg(MSG_SET_SPEED_TO_MILLI_HZ);
+        Serial.println(val1);
+        res = stepper_selected->setSpeedInMilliHz(val1);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
         }

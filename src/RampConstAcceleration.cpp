@@ -23,6 +23,38 @@ void init_ramp_module() {
 }
 
 //*************************************************************************************************
+
+#ifdef TEST
+void print_ramp_state(uint8_t this_state) {
+  switch (this_state & RAMP_DIRECTION_MASK) {
+    case RAMP_DIRECTION_COUNT_UP:
+      printf("+");
+      break;
+    case RAMP_DIRECTION_COUNT_DOWN:
+      printf("-");
+      break;
+  }
+  switch (this_state & RAMP_STATE_MASK) {
+    case RAMP_STATE_COAST:
+      printf("COAST");
+      break;
+    case RAMP_STATE_ACCELERATE:
+      printf("ACC");
+      break;
+    case RAMP_STATE_DECELERATE:
+      printf("DEC");
+      break;
+    case RAMP_STATE_DECELERATE_TO_STOP:
+      printf("STOP");
+      break;
+    case RAMP_STATE_REVERSE:
+      printf("REVERSE");
+      break;
+  }
+}
+#endif
+
+//*************************************************************************************************
 void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
                      const struct queue_end_s *queue_end,
                      NextCommand *command) {
@@ -374,31 +406,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       "last_ticks=%u travel_ticks=%u ",
       queue_end->pos, remaining_steps, performed_ramp_up_steps, planning_steps,
       rw->curr_ticks, ramp->config.min_travel_ticks);
-  switch (this_state & RAMP_DIRECTION_MASK) {
-    case RAMP_DIRECTION_COUNT_UP:
-      printf("+");
-      break;
-    case RAMP_DIRECTION_COUNT_DOWN:
-      printf("-");
-      break;
-  }
-  switch (this_state & RAMP_STATE_MASK) {
-    case RAMP_STATE_COAST:
-      printf("COAST");
-      break;
-    case RAMP_STATE_ACCELERATE:
-      printf("ACC");
-      break;
-    case RAMP_STATE_DECELERATE:
-      printf("DEC");
-      break;
-    case RAMP_STATE_DECELERATE_TO_STOP:
-      printf("STOP");
-      break;
-    case RAMP_STATE_REVERSE:
-      printf("REVERSE");
-      break;
-  }
+  print_ramp_state(this_state);
   printf("\n");
   printf(
       "add command Steps=%u ticks=%u  Target pos=%u "
