@@ -526,12 +526,8 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   }
   _off_delay_count = max(delay_count, (uint16_t)1);
 }
-int8_t FastAccelStepper::runForward() {
-  return _rg.startRun(true);
-}
-int8_t FastAccelStepper::runBackward() {
-  return _rg.startRun(false);
-}
+int8_t FastAccelStepper::runForward() { return _rg.startRun(true); }
+int8_t FastAccelStepper::runBackward() { return _rg.startRun(false); }
 int8_t FastAccelStepper::moveTo(int32_t position) {
   return _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
 }

@@ -3,14 +3,13 @@
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
 
-#include "common.h"
 #include "RampConstAcceleration.h"
+#include "common.h"
 
 //*************************************************************************************************
-void _getNextCommand(const struct ramp_ro_s *ramp,
-                            const struct ramp_rw_s *rw,
-                            const struct queue_end_s *queue_end,
-                            NextCommand *command) {
+void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
+                     const struct queue_end_s *queue_end,
+                     NextCommand *command) {
   {
     // If there is a pause from last step, then just output a pause
     uint32_t pause_ticks = rw->pause_ticks_left;
@@ -45,8 +44,9 @@ void _getNextCommand(const struct ramp_ro_s *ramp,
       performed_ramp_up_steps = upm_to_u32(upm_multiply(
           ramp->config.upm_inv_accel2, upm_rsquare(upm_from(curr_ticks))));
 #ifdef TEST
-      printf("Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
-             rw->performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
+      printf(
+          "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
+          rw->performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
 #endif
     }
   } else {
@@ -395,4 +395,3 @@ void _getNextCommand(const struct ramp_ro_s *ramp,
   }
 #endif
 }
-

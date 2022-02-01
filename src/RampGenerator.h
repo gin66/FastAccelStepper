@@ -1,10 +1,10 @@
 #ifndef RAMP_GENERATOR_H
 #define RAMP_GENERATOR_H
 
-#include "common.h"
 #include "FastAccelStepper.h"
-#include "RampConstAcceleration.h"
 #include "RampCalculator.h"
+#include "RampConstAcceleration.h"
+#include "common.h"
 
 class FastAccelStepper;
 
@@ -72,9 +72,7 @@ class RampGenerator {
   int8_t setAcceleration(int32_t accel);
   uint32_t getAcceleration() { return acceleration; }
   int32_t getCurrentAcceleration();
-  inline bool hasValidConfig() {
-	return _config.checkValidConfig() == MOVE_OK;
-  }
+  inline bool hasValidConfig() { return _config.checkValidConfig() == MOVE_OK; }
   void applySpeedAcceleration();
   int8_t move(int32_t move, const struct queue_end_s *queue);
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);

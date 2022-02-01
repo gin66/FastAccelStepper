@@ -27,7 +27,6 @@
   ((uint32_t)((((uint32_t)((u32) / (TICKS_PER_S / 1000000L))) / 1L)))
 #endif
 
-
 struct ramp_config_s {
   uint32_t min_travel_ticks;
   upm_float upm_inv_accel2;
@@ -35,39 +34,39 @@ struct ramp_config_s {
   uint8_t accel_change_cnt;
 
   void init() {
-  accel_change_cnt = 0;
-  min_travel_ticks = 0;
-  upm_inv_accel2 = 0;
+    accel_change_cnt = 0;
+    min_travel_ticks = 0;
+    upm_inv_accel2 = 0;
   }
   inline int8_t checkValidConfig() {
-	if (min_travel_ticks == 0) {
-		return MOVE_ERR_SPEED_IS_UNDEFINED;
-	}
+    if (min_travel_ticks == 0) {
+      return MOVE_ERR_SPEED_IS_UNDEFINED;
+    }
     if (upm_inv_accel2 == 0) {
-		return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
-	}
-	return MOVE_OK;
+      return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
+    }
+    return MOVE_OK;
   }
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
-     min_travel_ticks = min_step_ticks;
+    min_travel_ticks = min_step_ticks;
   }
   inline void setAcceleration(int32_t accel) {
 #ifdef UPM_ACCEL_FACTOR
-  upm_float new_upm_inv_accel2 =
-      upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
+    upm_float new_upm_inv_accel2 =
+        upm_divide(UPM_ACCEL_FACTOR, upm_from((uint32_t)accel));
 #else
-  upm_float upm_inv_accel =
-      upm_divide(upm_shr(UPM_TICKS_PER_S, 1), upm_from(accel));
-  upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
+    upm_float upm_inv_accel =
+        upm_divide(upm_shr(UPM_TICKS_PER_S, 1), upm_from(accel));
+    upm_float upm_inv_accel2 = upm_multiply(UPM_TICKS_PER_S, upm_inv_accel);
 #endif
-  if (upm_inv_accel2 != new_upm_inv_accel2) {
-    upm_inv_accel2 = new_upm_inv_accel2;
+    if (upm_inv_accel2 != new_upm_inv_accel2) {
+      upm_inv_accel2 = new_upm_inv_accel2;
 
-    // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
-    upm_sqrt_inv_accel = upm_multiply(
-        upm_rsqrt(upm_from((uint32_t)accel)), UPM_TICKS_PER_S_DIV_SQRT_OF_2);
-    accel_change_cnt++;
-  }
+      // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
+      upm_sqrt_inv_accel = upm_multiply(upm_rsqrt(upm_from((uint32_t)accel)),
+                                        UPM_TICKS_PER_S_DIV_SQRT_OF_2);
+      accel_change_cnt++;
+    }
   }
 };
 
@@ -77,6 +76,25 @@ struct ramp_ro_s {
   bool force_stop;
   bool keep_running;
   bool keep_running_count_up;
+  inline void init() {
+    config.init();
+    target_pos = 0;
+    force_stop = false;
+    keep_running = false;
+    keep_running_count_up = false;
+  }
+  inline void keepRunning(const struct ramp_config_s *new_config,
+                          bool countUp) {
+    config = *new_config;
+    target_pos = 0, force_stop = false, keep_running = true,
+    keep_running_count_up = countUp;
+  }
+  inline void runToPosition(const struct ramp_config_s *new_config,
+                            int32_t new_target_pos) {
+    config = *new_config;
+    target_pos = new_target_pos, force_stop = false, keep_running = false,
+    keep_running_count_up = true;
+  }
 };
 
 struct ramp_rw_s {
@@ -93,11 +111,19 @@ struct ramp_rw_s {
   // Current ticks for ongoing step
   uint32_t curr_ticks;
   void init() {
-  pause_ticks_left = 0;
-  performed_ramp_up_steps = 0;
-  accel_change_cnt = 0xff;
-  ramp_state = RAMP_STATE_IDLE;
-  curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+    pause_ticks_left = 0;
+    performed_ramp_up_steps = 0;
+    accel_change_cnt = 0xff;
+    ramp_state = RAMP_STATE_IDLE;
+    curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+  }
+  inline void startRampIfNotRunning() {
+    // called with interrupts disabled
+    if (ramp_state == RAMP_STATE_IDLE) {
+      ramp_state = RAMP_STATE_ACCELERATE;
+      curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+      performed_ramp_up_steps = 0;
+    }
   }
 };
 
@@ -107,9 +133,6 @@ class NextCommand {
   struct ramp_rw_s rw;
 };
 
-void _getNextCommand(const struct ramp_ro_s *ramp,
-                            const struct ramp_rw_s *rw,
-                            const struct queue_end_s *queue_end,
-                            NextCommand *command);
+void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
+                     const struct queue_end_s *queue_end, NextCommand *command);
 #endif
-

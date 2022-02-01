@@ -265,19 +265,21 @@ class FastAccelStepper {
   void stopMove();
   bool isStopping() { return _rg.isStopping(); }
 
-  // abruptly stop the running stepper without deceleration. 
+  // abruptly stop the running stepper without deceleration.
   // This can be called from an interrupt !
   //
-  // The stepper command queue will be processed, but no furter commands are added.
-  // This means, that the stepper can be expected to stop within approx. 20ms.
+  // The stepper command queue will be processed, but no furter commands are
+  // added. This means, that the stepper can be expected to stop within approx.
+  // 20ms.
   void forceStop();
 
-  // abruptly stop the running stepper without deceleration. 
+  // abruptly stop the running stepper without deceleration.
   // This can be called from an interrupt !
   //
-  // No further step will be issued. As this is aborting all commands in the queue,
-  // the actual stop position is lost (recovering this position cannot be done within an interrupt).
-  // So the new position after stop has to be provided and will be set as current position after stop.
+  // No further step will be issued. As this is aborting all commands in the
+  // queue, the actual stop position is lost (recovering this position cannot be
+  // done within an interrupt). So the new position after stop has to be
+  // provided and will be set as current position after stop.
   void forceStopAndNewPosition(uint32_t new_pos);
 
   // get the target position for the current move
@@ -351,7 +353,8 @@ class FastAccelStepper {
   void setPositionAfterCommandsCompleted(int32_t new_pos);
 
   // This function provides info, in which state the high level stepper control
-  // is operating. The return value is an or of RAMP_STATE_... and RAMP_DIRECTION_... flags
+  // is operating. The return value is an or of RAMP_STATE_... and
+  // RAMP_DIRECTION_... flags
   inline uint8_t rampState() { return _rg.rampState(); }
 
   // returns true, if the ramp generation is active

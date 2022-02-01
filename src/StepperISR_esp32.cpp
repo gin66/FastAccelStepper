@@ -147,7 +147,7 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
     mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
-	bool disable_mcpwm_interrupt = true;
+    bool disable_mcpwm_interrupt = true;
     if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim != steps) {
       // For fast pulses, eventually the ISR is late. So take the current pulse
       // count into consideration.
@@ -191,18 +191,18 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
           // force take over
           isr_pcnt_counter_clear(pcnt_unit);
 
-		  // In case val2 == 1, then there may be a problem.
-		  // The pulse counter may not cause any interrupt with cnt_h_lim == 0
-		  // and if the mcpwm-interrupt is disabled, then the queue is stalled.
-		  // in this case, we should leave the mcpwm enabled
-		  disable_mcpwm_interrupt = val2 > 0;
+          // In case val2 == 1, then there may be a problem.
+          // The pulse counter may not cause any interrupt with cnt_h_lim == 0
+          // and if the mcpwm-interrupt is disabled, then the queue is stalled.
+          // in this case, we should leave the mcpwm enabled
+          disable_mcpwm_interrupt = val2 > 0;
         }
       }
     }
     // disable mcpwm interrupt
-	if (disable_mcpwm_interrupt) {
-       mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
-	}
+    if (disable_mcpwm_interrupt) {
+      mcpwm->int_ena.val &= ~mapping->cmpr_tea_int_ena;
+    }
     // timer value = 1 - upcounting: output high
 #ifndef __ESP32_IDF_V44__
     mcpwm->channel[timer].generator[0].utea = 2;
@@ -455,8 +455,8 @@ void StepperQueue::disconnect() {
 // period
 //
 //
-//This has tested, if the HW is still active and not if the QUEUE is still running
-//bool StepperQueue::isRunning() {
+// This has tested, if the HW is still active and not if the QUEUE is still
+// running bool StepperQueue::isRunning() {
 //  if (_isRunning) {
 //    return true;
 //  }
@@ -474,7 +474,8 @@ void StepperQueue::disconnect() {
 //#ifndef __ESP32_IDF_V44__
 //  return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
 //#else                                            /* __ESP32_IDF_V44__ */
-//  return (mcpwm->timer[timer].timer_cfg1.timer_start == 2);  // 2=run continuous
+//  return (mcpwm->timer[timer].timer_cfg1.timer_start == 2);  // 2=run
+//  continuous
 //#endif                                           /* __ESP32_IDF_V44__ */
 //}
 
@@ -501,7 +502,7 @@ void StepperQueue::startQueue() {
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
 #else                                  /* __ESP32_IDF_V44__ */
-  mcpwm->timer[timer].timer_cfg1.timer_start = 2;            // 2=run continuous
+  mcpwm->timer[timer].timer_cfg1.timer_start = 2;     // 2=run continuous
 #endif                                 /* __ESP32_IDF_V44__ */
 }
 void StepperQueue::forceStop() {

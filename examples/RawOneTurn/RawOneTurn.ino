@@ -129,9 +129,9 @@ void setup() {
 }
 
 void loop() {
-	Serial.println("DONE");
-	Serial.println(stepper->getPositionAfterCommandsCompleted());
-//        delay(1000);
-//        noInterrupts();
-//        sleep_cpu();
+  Serial.println("DONE");
+  Serial.println(stepper->getPositionAfterCommandsCompleted());
+  //        delay(1000);
+  //        noInterrupts();
+  //        sleep_cpu();
 }

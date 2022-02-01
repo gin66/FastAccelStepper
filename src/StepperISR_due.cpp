@@ -478,9 +478,10 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   if (!isTCEnabled) {
     // Lets set it up on a 2ms timer.  That should keep the queue full...
     // Enable the peripheral
-// gin66: Better to remove any Serial.println() cause an application may choose to not use Serial
-//Yes, agreed.  I had meant to do that a long time ago!
-//  Serial.println("Enabling Timer Channel 5");
+    // gin66: Better to remove any Serial.println() cause an application may
+    // choose to not use Serial
+    // Yes, agreed.  I had meant to do that a long time ago!
+    //  Serial.println("Enabling Timer Channel 5");
     pmc_enable_periph_clk(ID_TC5);
     TC1->TC_CHANNEL[2].TC_CCR = 1;
     TC1->TC_CHANNEL[2].TC_CMR = 0;
@@ -572,110 +573,103 @@ void StepperQueue::disconnect() {
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
   PWM_INTERFACE->PWM_DIS = PWM_INTERFACE->PWM_DIS & (~mapping->channelMask);
 
-// gin66: Shouldn't there be a detachInterrupt() in order to not have stray interrupt ?
-//disconnect is a strange term for what we're doing.  Instead of disconnecting
-//interrupts, we disable the source of the interrupts.  If something external
-//causes a signal on the pin, yes, we will get an interrupt.  That should never
-//happen...but there is code in the interrupt to detect it because I used that
-//very issue to debug the delay code :)  If I got a pulse while in delay mode,
-//I knew there was a problem.  I had it strobe a pin I could see on the logic
-//analyzer.  It made it very easy to see when "wrong" behavior was happening.
+  // gin66: Shouldn't there be a detachInterrupt() in order to not have stray
+  // interrupt ?
+  // disconnect is a strange term for what we're doing.  Instead of
+  // disconnecting interrupts, we disable the source of the interrupts.  If
+  // something external causes a signal on the pin, yes, we will get an
+  // interrupt.  That should never happen...but there is code in the interrupt to
+  // detect it because I used that very issue to debug the delay code :)  If I
+  // got a pulse while in delay mode, I knew there was a problem.  I had it
+  // strobe a pin I could see on the logic analyzer.  It made it very easy to see
+  // when "wrong" behavior was happening.
   _connected = false;
 }
 
 // gin66: I have reworked all code to only use startQueue().
 //        This appears to be less complicated.
-//I reworked the rework...sorry, it was easier to start with something that
-//worked and then remove unnecessary code as there was clearly unnecessary
-//code :)
+// I reworked the rework...sorry, it was easier to start with something that
+// worked and then remove unnecessary code as there was clearly unnecessary
+// code :)
 void StepperQueue::startQueue() {
   // This is called only, if isRunning() == false
   noInterrupts();
   struct queue_entry* e = &entry[read_idx & QUEUE_LEN_MASK];
-  //Somewhere there must be a call to nointerrupts, because addinf this solved
-  //the no-start issue.
+  // Somewhere there must be a call to nointerrupts, because addinf this solved
+  // the no-start issue.
   interrupts();
-  _hasISRactive=true;
+  _hasISRactive = true;
 
-  //I had this reversed, but the situation where we are starting, but the
-  //PWM peripheral is running already doesn't come up often.  If the
-  //channel is enabled, we need to use the UPD register to trigger the
-  //update on the next cycle, otherwise we can directly set PWM_CPRD.
-  //Setting the UPD register instead of the direct register fortunately wasn't
-  //harmful, and works as expected.  I'd still leave this check in here just
-  //in case, though I believe everything is controlled well enough to not need
-  //it.
+  // I had this reversed, but the situation where we are starting, but the
+  // PWM peripheral is running already doesn't come up often.  If the
+  // channel is enabled, we need to use the UPD register to trigger the
+  // update on the next cycle, otherwise we can directly set PWM_CPRD.
+  // Setting the UPD register instead of the direct register fortunately wasn't
+  // harmful, and works as expected.  I'd still leave this check in here just
+  // in case, though I believe everything is controlled well enough to not need
+  // it.
 
-  if (PWM_INTERFACE->PWM_SR&(1<<mapping->channel))
-  {
-      PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD=e->ticks;
-  }
-  else
-  {
-      PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD=e->ticks;
+  if (PWM_INTERFACE->PWM_SR & (1 << mapping->channel)) {
+    PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRDUPD = e->ticks;
+  } else {
+    PWM_INTERFACE->PWM_CH_NUM[mapping->channel].PWM_CPRD = e->ticks;
   }
 
+  if (e->steps > 0 || e->hasSteps) {
+    attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask);
+    return;
+  } else {
+    // I could see the confusion...man was I tired of this code when I
+    // committed :)  It was quite dirty.  This case is when we DO NOT
+    // want to fully attach the PWM peripheral, in that we do not want it
+    // outputting anything.  So we set the period, but do not attach it.  You
+    // moved the period to the top, and I changed it to be the period change
+    // with the check to see if we were already running, which is unlikely
+    // here, but better to be certain.  The rest of this function is about
+    // making certain the output is disabled, but the PWM interrupt used for
+    // delays only is enabled and working.
+    //
+    // I had found that every single move command always started with a delay.
+    // So even in startQueue, this is necessary.  I had seen that even before
+    // the change for adding delays for the dir pin!  So this block is still
+    // entirely necessary :)  I'll make better comments though in the code
+    // below...
 
-  if (e->steps>0||e->hasSteps)
-  {
-      attachPWMPeripheral(mapping->port, mapping->pin, mapping->channelMask);
-      return;
-  }
-  else
-  {
-      //I could see the confusion...man was I tired of this code when I
-      //committed :)  It was quite dirty.  This case is when we DO NOT
-      //want to fully attach the PWM peripheral, in that we do not want it
-      //outputting anything.  So we set the period, but do not attach it.  You
-      //moved the period to the top, and I changed it to be the period change
-      //with the check to see if we were already running, which is unlikely
-      //here, but better to be certain.  The rest of this function is about
-      //making certain the output is disabled, but the PWM interrupt used for
-      //delays only is enabled and working.
-      //
-      //I had found that every single move command always started with a delay.
-      //So even in startQueue, this is necessary.  I had seen that even before
-      //the change for adding delays for the dir pin!  So this block is still
-      //entirely necessary :)  I'll make better comments though in the code
-      //below...
+    // Disconnect the step pin entirely, and force its output to 0!  We're
+    // in a delay, we do not want extra pulses generated!
+    PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0, 0,
+                  0);
+    // Disable the PIO interrupt.  We probably do not need to do this, and I
+    // tested my test code without it, but it is still probably the "right
+    // thing" to do.  Don't jump into an interrupt unless we specifically
+    // say its ok to do so! :)
+    mapping->port->PIO_IDR = g_APinDescription[mapping->pin].ulPin;
+    // Here we enable the PWM peripheral, despite having its output
+    // disconnected.  This is how we manage the delays.  The pwm peripheral
+    // happily counts the time until its supposed to generate a pulse.  It
+    // generates the pulse into a high impedance output, because the PIO
+    // module has it switched off, but it still generates a PWM interrupt
+    // for us, so we know to advance the queue using the PWM ISR.
+    PWM_INTERFACE->PWM_ENA |= mapping->channelMask;
+    _pauseCommanded = true;
+    // We do not want to set timePWMInterruptEnabled here.  It takes a bit to
+    // explain, but the purpose of the timePWMInterruptEnabled is to check to
+    // see if we are in the PWM interrupt for the same interrupt as the pulse.
+    // That seems strange and it is.  I could probably have used the PWM
+    // interrupts only for this purpose, but it was actually nice to seperate
+    // the delay ISR from the pulse ISR.  It made things clean...up until it
+    // didn't.  We would enable the PWM ISR and it would immediatly trigger
+    // from the PIO ISR.  The only reliable way to deal with it was to see if
+    // we were within a hundred microseconds of the pulse.  If we were, we
+    // skipped that ISR call.  Without it, we'd end up skipping the delay.
+    // Enabling the check here, well, we don't seem to get to the ISR within
+    // 100 microseconds anyhow, so it...shouldn't....cause any issues if
+    // present, but why tempt fate/Murphy?  We never want to skip a PWM
+    // interrupt at this point, so lets not give it the opportunity :)
 
-
-      //Disconnect the step pin entirely, and force its output to 0!  We're
-      //in a delay, we do not want extra pulses generated!
-      PIO_SetOutput(mapping->port, g_APinDescription[mapping->pin].ulPin, 0,
-          0, 0);
-      //Disable the PIO interrupt.  We probably do not need to do this, and I
-      //tested my test code without it, but it is still probably the "right
-      //thing" to do.  Don't jump into an interrupt unless we specifically
-      //say its ok to do so! :)
-      mapping->port->PIO_IDR=g_APinDescription[mapping->pin].ulPin;
-      //Here we enable the PWM peripheral, despite having its output
-      //disconnected.  This is how we manage the delays.  The pwm peripheral
-      //happily counts the time until its supposed to generate a pulse.  It
-      //generates the pulse into a high impedance output, because the PIO
-      //module has it switched off, but it still generates a PWM interrupt
-      //for us, so we know to advance the queue using the PWM ISR.
-      PWM_INTERFACE->PWM_ENA|=mapping->channelMask;
-      _pauseCommanded=true;
-      //We do not want to set timePWMInterruptEnabled here.  It takes a bit to
-      //explain, but the purpose of the timePWMInterruptEnabled is to check to
-      //see if we are in the PWM interrupt for the same interrupt as the pulse.
-      //That seems strange and it is.  I could probably have used the PWM
-      //interrupts only for this purpose, but it was actually nice to seperate
-      //the delay ISR from the pulse ISR.  It made things clean...up until it
-      //didn't.  We would enable the PWM ISR and it would immediatly trigger
-      //from the PIO ISR.  The only reliable way to deal with it was to see if
-      //we were within a hundred microseconds of the pulse.  If we were, we
-      //skipped that ISR call.  Without it, we'd end up skipping the delay.
-      //Enabling the check here, well, we don't seem to get to the ISR within
-      //100 microseconds anyhow, so it...shouldn't....cause any issues if
-      //present, but why tempt fate/Murphy?  We never want to skip a PWM
-      //interrupt at this point, so lets not give it the opportunity :)
-
-      /*Enable the ISR too so we don't miss it*/
-      PWM_INTERFACE->PWM_IER1=
-          PWM_INTERFACE->PWM_IMR1|mapping->channelMask;
-      return;
+    /*Enable the ISR too so we don't miss it*/
+    PWM_INTERFACE->PWM_IER1 = PWM_INTERFACE->PWM_IMR1 | mapping->channelMask;
+    return;
   }
 }
 
@@ -684,7 +678,7 @@ void StepperQueue::forceStop() {
   read_idx = next_write_idx;
   interrupts();
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
-// gin66: I have added this line in the hope to make it work
+  // gin66: I have added this line in the hope to make it work
   _hasISRactive = false;
 }
 

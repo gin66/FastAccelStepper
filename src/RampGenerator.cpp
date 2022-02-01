@@ -7,12 +7,12 @@
 #include <assert.h>
 #endif
 
-#include "RampCalculator.h"
 #include "RampGenerator.h"
 
 // This define in order to not shoot myself.
 #ifndef TEST
 #define printf DO_NOT_USE_PRINTF
+#define puts DO_NOT_USE_PRINTF
 #endif
 
 //*************************************************************************************************
@@ -38,7 +38,7 @@
 void RampGenerator::init() {
   speed_in_ticks = 0;
   _config.init();
-  _ro.target_pos = 0;
+  _ro.init();
   _rw.init();
 #if (TICKS_PER_S != 16000000L) && (TICKS_PER_S != 21000000L)
   upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
@@ -81,19 +81,11 @@ int8_t RampGenerator::startRun(bool countUp) {
   if (res != MOVE_OK) {
     return res;
   }
-
-  struct ramp_ro_s new_ramp = {.config = _config,
-                               .target_pos = 0,
-                               .force_stop = false,
-                               .keep_running = true,
-                               .keep_running_count_up = countUp};
+  struct ramp_ro_s new_ramp;
+  new_ramp.keepRunning(&_config, countUp);
 
   fasDisableInterrupts();
-  if (_rw.ramp_state == RAMP_STATE_IDLE) {
-    _rw.ramp_state = RAMP_STATE_ACCELERATE;
-    _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
-    _rw.performed_ramp_up_steps = 0;
-  }
+  _rw.startRampIfNotRunning();
   _ro = new_ramp;
   fasEnableInterrupts();
   return MOVE_OK;
@@ -105,18 +97,13 @@ int8_t RampGenerator::_startMove(int32_t target_pos, int32_t curr_target_pos) {
     return res;
   }
 
-  struct ramp_ro_s new_ramp = {.config = _config,
-                               .target_pos = target_pos,
-                               .force_stop = false,
-                               .keep_running = false,
-                               .keep_running_count_up = true};
+  struct ramp_ro_s new_ramp;
+  new_ramp.runToPosition(&_config, target_pos);
 
   fasDisableInterrupts();
-  if ((_rw.ramp_state == RAMP_STATE_IDLE) && (target_pos != curr_target_pos)) {
+  if (target_pos != curr_target_pos) {
     // Only start the ramp generator, if the target position is different
-    _rw.ramp_state = RAMP_STATE_ACCELERATE;
-    _rw.curr_ticks = TICKS_FOR_STOPPED_MOTOR;
-    _rw.performed_ramp_up_steps = 0;
+    _rw.startRampIfNotRunning();
   }
   _ro = new_ramp;
   fasEnableInterrupts();
