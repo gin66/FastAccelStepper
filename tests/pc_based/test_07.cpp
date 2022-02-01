@@ -30,7 +30,7 @@ class FastAccelStepperTest {
     fas_queue[1].next_write_idx = 0;
   }
 
-  void do_test() {
+  void do_test(uint64_t dt) {
     init_queue();
     FastAccelStepper s = FastAccelStepper();
     s.init(NULL, 0, 0);
@@ -39,6 +39,7 @@ class FastAccelStepperTest {
 
     // Reproduce test sequence 06
 
+	assert(s.getDirectionPin() == PIN_UNDEFINED);
     uint32_t speed_us = 100;
     int32_t steps = 32000;
     assert(s.isQueueEmpty());
@@ -50,8 +51,7 @@ class FastAccelStepperTest {
     s.fill_queue();
     assert(!s.isQueueEmpty());
     float old_planned_time_in_buffer = 0;
-#define T100MS (TICKS_PER_S / 10)
-    uint64_t next_speed_change = T100MS;
+    uint64_t next_speed_change = dt;
     uint64_t mid_point_ticks = 0;
 
     char fname[100];
@@ -60,7 +60,7 @@ class FastAccelStepperTest {
     fprintf(gp_file, "$data <<EOF\n");
     for (int i = 0; i < 10 * steps; i++) {
       if (rc.total_ticks > next_speed_change) {
-        next_speed_change = rc.total_ticks + T100MS;
+        next_speed_change += TICKS_PER_S/10;
         speed_us = 190 - speed_us;
         printf("Change speed to %d\n", speed_us);
         s.setSpeedInUs(speed_us);
@@ -97,6 +97,7 @@ class FastAccelStepperTest {
       // This must be ensured, so that the stepper does not run out of commands
       assert((i == 0) || (old_planned_time_in_buffer > 0.005));
       old_planned_time_in_buffer = planned_time;
+      test(s.getCurrentPosition() <= steps, "has overshot");
     }
     fprintf(gp_file, "EOF\n");
     fprintf(gp_file, "plot $data using 1:2 with linespoints\n");
@@ -126,7 +127,9 @@ class FastAccelStepperTest {
 
 int main() {
   FastAccelStepperTest test;
-  test.do_test();
+  for (uint64_t time_shift = 0;time_shift < TICKS_PER_S/10;time_shift+=TICKS_PER_S/7000) { 
+	  test.do_test(time_shift);
+  }
   printf("TEST_07 PASSED\n");
   return 0;
 }
