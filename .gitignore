@@ -27,4 +27,6 @@ tests/simavr_based/*/result.txt
 tests/simavr_based/*/x.vcd
 tests/simavr_based/test*sd*/src
 tests/simavr_based/simavr
+tests/simavr_based/test_sd*/Makefile
+tests/simavr_based/test_seq*/Makefile
 tests/esp32_hw_based/*.log

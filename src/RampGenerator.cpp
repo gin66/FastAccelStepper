@@ -116,6 +116,12 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   int32_t new_pos = curr_pos + move;
   return _startMove(new_pos, curr_pos != new_pos);
 }
+void RampGenerator::advanceTargetPosition(int32_t delta, const struct queue_end_s *queue) {
+  if (isRampGeneratorActive() && !_ro.keep_running) {
+    int32_t new_pos = _ro.target_pos + delta;
+	_startMove(new_pos, true);
+  }
+}
 
 void RampGenerator::afterCommandEnqueued(NextCommand *command) {
 #ifdef TEST

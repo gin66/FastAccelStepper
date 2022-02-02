@@ -32,9 +32,7 @@ class RampGenerator {
   inline uint8_t rampState() { return _rw.rampState(); }
   void init();
   inline int32_t targetPosition() { return _ro.targetPosition(); }
-  inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
-    _ro.advanceTargetPositionWithinInterruptDisabledScope(delta);
-  }
+  void advanceTargetPosition(int32_t delta, const struct queue_end_s *queue);
   int8_t setSpeedInTicks(uint32_t min_step_ticks);
   int8_t setSpeedInUs(uint32_t min_step_us);
   uint32_t getSpeedInUs() { return speed_in_ticks / (TICKS_PER_S / 1000000); }
