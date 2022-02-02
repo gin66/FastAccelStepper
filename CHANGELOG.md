@@ -1,5 +1,5 @@
 TODO:
-- Analyze the different behavior avr vs pc-based tests to be analyzed
+- Different behavior avr vs pc-based tests to be analyzed
 - #include-file structure needs to be cleaned up
 
 0.26.0:
