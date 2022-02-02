@@ -1415,6 +1415,14 @@ bool process_cmd(char *cmd) {
         }
         return true;
       }
+      if (get_val1_val2_val3(cmd) == 1) {
+        output_msg(MSG_ATTACH_PULSE_COUNTER);
+        Serial.println(val1);
+        if (!stepper_selected->attachToPulseCounter(val1)) {
+          output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
+        }
+        return true;
+      }
       break;
 #endif
     case MODE(test, '0'):

@@ -2,6 +2,9 @@ TODO:
 - Different behavior avr vs pc-based tests to be analyzed
 - #include-file structure needs to be cleaned up
 
+next:
+- esp32: StepperDemo make p<n> command work again
+
 0.26.0:
 - avr: Max stepper speed depending on number of assigned steppers:
 		1 stepper  => ~76 kHz
