@@ -1,8 +1,9 @@
 #include <math.h>
 
 bool perform_test() {
-  upm_float x;
+  upm_float x, x1, x2;
 
+  trace("Check conversion u8");
   for (uint8_t x8 = 255; x8 > 0; x8--) {
     x = upm_from((uint8_t)x8);
     uint16_t res_16 = upm_to_u16(x);
@@ -12,6 +13,7 @@ bool perform_test() {
     test(res_16 == x8, "conversion error from uint8_t and back to uint16_t");
   }
 
+  trace("Check conversion u16");
   uint16_t significant_16 = 0xff80;
   uint16_t trigger_16 = 0x8000;
   for (uint16_t x16 = 0xffff; x16 > 0; x16--) {
@@ -29,6 +31,7 @@ bool perform_test() {
          "conversion error from uint16_t and back to uint16_t");
   }
 
+#ifndef SIMULATOR
   uint32_t significant_32 = 0xff800000;
   uint32_t trigger_32 = 0x80000000;
   uint32_t delta_32 = 0x00400000;
@@ -58,7 +61,6 @@ bool perform_test() {
   test(upm_to_u32(x) == 0xffffffff, "wrong overflow 32bit");
 
   // Check multiply
-  upm_float x1, x2;
   for (int16_t sa = -40; sa <= 40; sa++) {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       for (uint32_t b_32 = 1; b_32 <= 0x1ff; b_32++) {
@@ -86,8 +88,9 @@ bool perform_test() {
       }
     }
   }
+#endif
 
-  // Check rsqrt
+  trace("Check rsqrt");
   for (int16_t sa = -20; sa <= 20; sa++) {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       x1 = upm_from(a_32);
@@ -112,7 +115,7 @@ bool perform_test() {
     }
   }
 
-  // Check square
+  trace("Check square");
   for (int16_t sa = -20; sa <= 20; sa++) {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       x1 = upm_from(a_32);
@@ -134,7 +137,7 @@ bool perform_test() {
     }
   }
 
-  // Check reciprocal square
+  trace("Check reciprocal square");
   for (int16_t sa = -20; sa <= 20; sa++) {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       x1 = upm_from(a_32);
@@ -159,7 +162,7 @@ bool perform_test() {
     }
   }
 
-  // Check reciprocal
+  trace("Check reciprocal");
   for (int16_t sa = -20; sa <= 20; sa++) {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       x1 = upm_from(a_32);
@@ -185,6 +188,7 @@ bool perform_test() {
     }
   }
 
+  trace("Check specific use cases");
   x1 = upm_from((uint32_t)0x0ffff);
   x2 = upm_from((uint32_t)0x1fffe);
   x2 = upm_from((uint32_t)0x10100);

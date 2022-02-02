@@ -8,16 +8,18 @@
 //
 
 #include <Arduino.h>
+#ifdef SIMULATOR
+#include <avr/sleep.h>
+#endif
+
 uint16_t error_cnt = 0;
 char buffer[256];
+#define trace(s) Serial.println(s)
 #define xprintf(args...)
 #define test(x, msg)          \
   if (!(x)) {                 \
     error_cnt++;              \
     Serial.print("ERROR: ");  \
-    Serial.println(__LINE__); \
-  } else {                    \
-    Serial.print("OK: ");     \
     Serial.println(__LINE__); \
   };
 
@@ -33,6 +35,11 @@ void setup() {
     Serial.print(error_cnt);
     Serial.println(" errors");
   }
+#ifdef SIMULATOR
+	delay(1000);
+	noInterrupts();
+	sleep_cpu();
+#endif
 }
 
 void loop() {}

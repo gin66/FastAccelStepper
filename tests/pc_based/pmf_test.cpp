@@ -10,6 +10,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#define trace puts
 #define xprintf printf
 #define test(x, msg) \
   if (!(x)) {        \
