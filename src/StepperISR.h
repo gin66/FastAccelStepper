@@ -8,7 +8,7 @@
 // These variables control the stepper timing behaviour
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#ifdef SUPPPORT_ESP32_MCPWM_PCNT
 struct mapping_s {
   mcpwm_unit_t mcpwm_unit;
   uint8_t timer;
@@ -19,7 +19,9 @@ struct mapping_s {
   uint32_t cmpr_tea_int_ena;
   uint32_t cmpr_tea_int_raw;
 };
+#endif
 
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
 bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
                                  int16_t low_value, int16_t high_value);
 void _esp32_clearPulseCounter(uint8_t pcnt_unit);
@@ -70,7 +72,9 @@ class StepperQueue {
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
   bool isRunning() { return _isRunning; }
+#ifdef SUPPPORT_ESP32_MCPWM_PCNT
   const struct mapping_s* mapping;
+#endif
 #elif defined(ARDUINO_ARCH_AVR)
   volatile uint8_t* _dirPinPort;
   uint8_t _dirPinMask;
@@ -96,6 +100,9 @@ class StepperQueue {
   uint16_t max_speed_in_ticks;
 
   void init(uint8_t queue_num, uint8_t step_pin);
+#ifdef SUPPPORT_ESP32_MCPWM_PCNT
+  void init_mcpwm_pcnt(uint8_t queue_num, uint8_t step_pin);
+#endif
   inline uint8_t queueEntries() {
     fasDisableInterrupts();
     uint8_t rp = read_idx;
@@ -343,6 +350,10 @@ class StepperQueue {
   // startQueue is always called
   void startQueue();
   void forceStop();
+#ifdef SUPPPORT_ESP32_MCPWM_PCNT
+  void startQueue_mcpwm_pcnt();
+  void forceStop_mcpwm_pcnt();
+#endif
   void _initVars() {
     dirPin = PIN_UNDEFINED;
 #ifndef TEST
@@ -379,12 +390,19 @@ class StepperQueue {
   uint8_t _step_pin;
   uint16_t _getPerformedPulses();
 #endif
+#ifdef SUPPPORT_ESP32_MCPWM_PCNT
+  uint16_t _getPerformedPulses_mcpwm_pcnt();
+#endif
 #if defined(ARDUINO_ARCH_SAM)
   uint8_t _step_pin;
   uint8_t _queue_num;
 #endif
   void connect();
   void disconnect();
+#ifdef SUPPPORT_ESP32_MCPWM_PCNT
+  void connect_mcpwm_pcnt();
+  void disconnect_mcpwm_pcnt();
+#endif
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;

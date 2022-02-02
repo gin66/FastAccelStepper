@@ -72,14 +72,21 @@ struct queue_end_s {
 
 // Some more esp32 specific includes
 #include <driver/gpio.h>
+#include <esp_task_wdt.h>
+
+#if CONFIG_IDF_TARGET_ESP32
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
-#include <esp_task_wdt.h>
-//#include <math.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
+#define SUPPPORT_ESP32_MCPWM_PCNT
+// have support for pulse counter
+#define SUPPORT_ESP32_PULSE_COUNTER
+
+#elif CONFIG_IDF_TARGET_ESP32S2
+#endif
 
 // For esp32 using arduino, just use arduino definition
 #define fasEnableInterrupts interrupts
@@ -105,9 +112,6 @@ struct queue_end_s {
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
-
-// have support for pulse counter
-#define SUPPORT_ESP32_PULSE_COUNTER
 
 // have more than one core
 #define SUPPORT_CPU_AFFINITY

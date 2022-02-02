@@ -827,7 +827,7 @@ bool simulate_blocked_ISR = false;
 
 void info(FastAccelStepper *s, bool long_info) {
   Serial.print('@');
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   if (s->pulseCounterAttached()) {
     int16_t pcnt_pos_1 = s->readPulseCounter();
     int32_t pos = s->getCurrentPosition();
@@ -1400,7 +1400,7 @@ bool process_cmd(char *cmd) {
         return true;
       }
       break;
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
     case MODE(normal, 'p'):
       if (strcmp(cmd, "c") == 0) {
         output_msg(MSG_CLEAR_PULSE_COUNTER);

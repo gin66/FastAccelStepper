@@ -5,7 +5,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
   switch (seq->state) {
     case 0:  // INIT
       srand(135);
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
       if (!stepper->attachToPulseCounter(7)) {
         Serial.println("Error attaching to pulse counter");
         seq->state = TEST_STATE_ERROR;
@@ -45,7 +45,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
       break;
     case 2:
       if (time_ms - seq->u32_1 >= 1000) {
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
         seq->s16_1 = stepper->readPulseCounter();
 #endif
         stepper->forceStopAndNewPosition(0);
@@ -55,7 +55,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
       break;
     case 3:
       if (!stepper->isRunning()) {
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
         int16_t old = seq->s16_1;
         seq->s16_1 = stepper->readPulseCounter();
         Serial.print("Steps needed for stop=");
@@ -66,7 +66,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
       break;
     case 4:
       if (time_ms - seq->u32_1 >= 100) {
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
         if (seq->s16_1 != stepper->readPulseCounter()) {
           Serial.println("Step AFTER stop");
         }

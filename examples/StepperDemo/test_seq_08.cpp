@@ -1,6 +1,6 @@
 #include "test_seq.h"
 
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
 struct command_s {
   uint32_t accel;
   uint32_t speed;
