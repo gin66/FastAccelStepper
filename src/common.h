@@ -60,7 +60,7 @@ struct queue_end_s {
 
 // timing definitions for pc-based testing
 #define TICKS_PER_S 16000000L
-#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#define MIN_CMD_TICKS (TICKS_PER_S / 5000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 1
@@ -98,7 +98,7 @@ struct queue_end_s {
 
 // Esp32 timing definition
 #define TICKS_PER_S 16000000L
-#define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
+#define MIN_CMD_TICKS (TICKS_PER_S / 2000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 4
@@ -145,7 +145,7 @@ struct queue_end_s {
 
 // Esp32 timing definition
 #define TICKS_PER_S 16000000L
-#define MIN_DELTA_TICKS (TICKS_PER_S / 200000)
+#define MIN_CMD_TICKS (TICKS_PER_S / 2000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 4
@@ -181,7 +181,7 @@ struct queue_end_s {
 
 // timing definitions for SAM
 #define TICKS_PER_S 21000000L
-#define MIN_DELTA_TICKS (TICKS_PER_S / 50000)
+#define MIN_CMD_TICKS (TICKS_PER_S / 5000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 2
@@ -233,8 +233,8 @@ enum channels { channelA, channelB, channelC };
 // the main task is freezing (StepperDemo).
 // Thus the limitation set here is set to 25kSteps/s as stated in the README.
 #define TICKS_PER_S F_CPU
-#define MIN_DELTA_TICKS (TICKS_PER_S / 25000)
-#define MIN_DIR_DELAY_US (MIN_DELTA_TICKS / (TICKS_PER_S / 1000000))
+#define MIN_CMD_TICKS (TICKS_PER_S / 25000)
+#define MIN_DIR_DELAY_US 40
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE (65536000 / TICKS_PER_S)
 // debug led timing

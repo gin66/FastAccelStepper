@@ -79,8 +79,10 @@ void queue_out_of_range() {
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());
 
+  uint16_t ticks = s.getMaxSpeedInTicks();
+  ticks = ticks - 1;
   struct stepper_command_s cmd2 = {
-      .ticks = MIN_DELTA_TICKS - 1, .steps = 255, .count_up = true};
+      .ticks = ticks, .steps = 255, .count_up = true};
 
   res = s.addQueueEntry(&cmd2);
   test(res == AQE_ERROR_TICKS_TOO_LOW, "Too low ticks should trigger an error");

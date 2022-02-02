@@ -1,6 +1,14 @@
 TODO:
 - Analyze the different behavior avr vs pc-based tests to be analyzed
-- #include-file structure need to be cleaned up
+- #include-file structure needs to be cleaned up
+
+0.26.0:
+- avr: Max stepper speed depending on number of assigned steppers:
+		1 stepper  => ~76 kHz
+		2 steppers => ~37 kHz
+		3 steppers => ~25 kHz
+- API: add getMaxSpeedIn...() functions
+- Remove `MIN_DELTA_TICKS` constant
 
 0.25.7:
 - atmega32u4: Disable direct port access function in StepperDemo to free up program memory
@@ -71,11 +79,11 @@ TODO:
 - StepperDemo extended:
 	- add config mode (press c) for direction pin configuration
 - Support changed mpcwpm-definitions in esp-idf v4.4
-- Fix warning identified in this [Issue #98](https://github.com/gin66/FastAccelStepper/issues/98) for fas_abs() usage
+- Fix warning identified in this [Issue #98](https://github.com/gin66/FastAccelStepper/issues/98) for `fas_abs()` usage
 
 
 0.23.5:
-- Add missing initialization of dir pin to be PIN_UNDEFINED.
+- Add missing initialization of dir pin to be `PIN_UNDEFINED`.
   With two or more steppers without dir pin, the steppers have run only sequential and not in parallel.
 
 0.23.4:
@@ -98,7 +106,7 @@ TODO:
 0.23.0:
 - getRampState(): Add two flags for current direction
 - add function: getCurrentAcceleration()
-- setAcceleration(uint32_t) changed to setAcceleration(int32_t). Only positive values allowed.
+- `setAcceleration(uint32_t)` changed to `setAcceleration(int32_t)`. Only positive values allowed.
   This way getCurrentAcceleration() can return negative values without range problems
 - add function: getCurrentSpeedInUs(), getCurrentSpeedInMilliHz(), getSpeedInMilliHz()
 - restructure tests
@@ -114,7 +122,7 @@ TODO:
 0.22.1:
 - disableOutputs() will return false, if called on a running motor with
   autoEnable set to true
-- esp32: replace pcnt_counter_clear() by preprocessor-directive in relation to issue #55
+- esp32: replace `pcnt_counter_clear()` by preprocessor-directive in relation to issue #55
 - esp32: put const table into RAM due to issue #55
 
 0.22.0:
@@ -158,10 +166,10 @@ TODO:
 - StepperDemo extended:
 	- command u to put selected stepper into unidirectional mode (need reset to restore)
 - Fix for issue #47: Restart in unidirectional mode and position count down
-- addQueueEntry returns AQE_ERROR_NO_DIR_PIN_TO_TOGGLE, if command defines count down and direction pin is undefined
+- addQueueEntry returns `AQE_ERROR_NO_DIR_PIN_TO_TOGGLE`, if command defines count down and direction pin is undefined
 
 0.20.2:
-- Fix for issue #45: if enablePinHighActive has been set to PIN_UNDEFINED,
+- Fix for issue #45: if enablePinHighActive has been set to `PIN_UNDEFINED`,
   the externalEnableCall was cleared even if enablePinLowActive still in use.
 - Bugfix for issue #46: Avoid creation of invalid command in ramp generator while decelerating
 
@@ -198,7 +206,7 @@ TODO:
 	- avoid recalculation of ramp on setAcceleration, if unchanged value
 
 0.18.11:
-- Remove obsolete queue_end variables ticks and ticks_from_last_step
+- Remove obsolete `queue_end` variables ticks and `ticks_from_last_step`
 - Fix for issue #33: pulse counter needed to be cleared at motor start
 
 0.18.10:
@@ -220,7 +228,7 @@ TODO:
   present for move/moveTo
 
 0.18.5
-- replace 16bit division with upm_float division
+- replace 16bit division with `upm_float` division
 - ramp generator packs per command steps for 2 ms or more. 
   Before this was 1ms. This change makes huge difference on Atmega2560
 
@@ -242,14 +250,14 @@ TODO:
 - make use of this in enqueueing commands from ramp generator
 
 0.18.1:
-- moveByAcceleration() returns int8_t result code
-- setDelayToEnable() returns an int8_t instead of int
+- `moveByAcceleration()` returns `int8_t` result code
+- `setDelayToEnable()` returns an `int8_t` instead of int
 
 0.18.0:
 - StepperDemo extended:
 	- w<ms>: Option to wait in input processing for some ms
 	- test sequence 07 added, which fails on esp32
-	- avr: free RAM by usage of output_msg()
+	- avr: free RAM by usage of `output_msg()`
     - tests can return failure, which is displayed at test end
 - Rework RampGenerator: pauses are now after the step and not before. This removes
   some irregularity between steps.
@@ -280,7 +288,7 @@ TODO:
 - new function moveByAcceleration() to control stepper speed by positive and
   negative acceleration values.
 - stopMove() will not run to stop, if any move command is called afterwards.
-  The error code MOVE_ERR_STOP_ONGOING has been removed.
+  The error code `MOVE_ERR_STOP_ONGOING` has been removed.
 - StepperDemo extended:
 	- a: Allows to control the stepper speed by positive/negative acceleration values
 
@@ -289,11 +297,11 @@ TODO:
 
 0.16.7:
 - Avoid unnecessary direction pin toggle on direction change after motor stop
-- Fix MAX_STEPPER for atmega2560
+- Fix `MAX_STEPPER` for atmega2560
 - Extend simavr tests for atmega2560 and one test for each timer for both varians
 
 0.16.6:
-- bugfix in setEnablePin(): if called with PIN_UNDEFINED, that value was used with pinMode and digitalWrite()
+- bugfix in setEnablePin(): if called with `PIN_UNDEFINED`, that value was used with pinMode and digitalWrite()
 - Use simavr to perform regression test for avr on HW-simulation
 - Reworked the avr ISR code to avoid steps being lost, if the command queue is running out of commands and a new command comes in with steps to be generated
 - Extended the planning ahead time to 20ms.... possibly the load for avr is bit high !? 
@@ -341,9 +349,9 @@ TODO:
 
 0.15.0:
 - For the commands in the queue, the minimum time in ticks to execute
-  a command is limited to 10 * MIN_DELTA_TICKS. For esp32 this relates to
+  a command is limited to 10 * `MIN_DELTA_TICKS`. For esp32 this relates to
   the time between interrupts of one channel
-- AQE_ERROR_TICKS_TOO_HIGH removed, because it is already limited by the data type uint16_t
+- `AQE_ERROR_TICKS_TOO_HIGH` removed, because it is already limited by the data type `uint16_t`
 - esp32: Change from mcpwm up count mode to up-down count mode
 - avr: adjust implementation to esp32: pulse at start of ticks period of a command
 - merge pull request from ixil see (https://github.com/gin66/FastAccelStepper/pull/19)
@@ -353,7 +361,7 @@ TODO:
 - enableOutputs() returns bool to indicate, output was enabled
 - Possibility to supply external enable output control
 - AddQueueEntry() return values changed: >0 => retry again, <0 => error
-- ATmega2560: Allow to change the used timer module with preprocesser variable FAS_TIMER_MODULE
+- ATmega2560: Allow to change the used timer module with preprocesser variable `FAS_TIMER_MODULE`
 
 0.13.4:
 - Automated github test identified a compile error introduced in 0.13.3
@@ -391,8 +399,8 @@ TODO:
     - r: Call ESP.restart() to check for issue #6
 
 0.12.0:
-- reduce data type for command queue entries' ticks value from uint32_t to uint16_t
-   => remove ABS_MAX_AQE_TICKS
+- reduce data type for command queue entries' ticks value from `uint32_t` to `uint16_t`
+   => remove `ABS_MAX_AQE_TICKS`
 - each command in queue can now emit up to 255 steps
 - StepperDemo modification:
     - r: Call ESP.restart() to check for issue #6
@@ -401,7 +409,7 @@ TODO:
 - avr: fix interrupt for direction change
 
 0.11.3:
-- ABSOLUTE_MAX_AQE_TICKS is now 65535
+- `ABSOLUTE_MAX_AQE_TICKS` is now 65535
 
 0.11.2:
 - auto enable on delay implemented by filling the queue with pause
@@ -415,14 +423,14 @@ TODO:
 
 0.11.0:
 - BROKEN ON AVR
-- Slowest speed is TICKS_PER_S/0xffffffff, which is ~268s between steps
-- ABS_MAX_TICKS renamed to ABS_MAX_AQE_TICKS. Only applicable to raw commands
+- Slowest speed is `TICKS_PER_S`/0xffffffff, which is ~268s between steps
+- `ABS_MAX_TICKS` renamed to `ABS_MAX_AQE_TICKS`. Only applicable to raw commands
 - Done: Extend command queue entry to perform delay only without step (steps=0) to reduce the 1.0 steps/s
 
 0.10.0:
 - setSpeed() silently imposes lower limit for period
 - esp32: step pulse length is for high speed with 50% duty cycle and for low speed fixed at 2ms
-- addQueueEntry() receives a stepper_command_s struct
+- addQueueEntry() receives a `stepper_command_s` struct
 - esp32: Task priority of ramp generator task has been set to max Priority.
 - StepperDemo extended:
 	- Q: Quiet the usage info, which takes time to be transmitted.
@@ -433,7 +441,7 @@ TODO:
 - Fix sudden CPU reset on high interrupt load for avr variant. Issue #12
 
 0.9.4:
-- Fix possible race condition in check_for_auto_disable()
+- Fix possible race condition in `check_for_auto_disable()`
 - StepperDemo extended:
 	- blocking wait for stepper stop by press W (dangerous: can deadlock)
 
@@ -455,7 +463,7 @@ TODO:
 	- trigger forceStopAndNewPosition by press X
     - set position with press @
     - keep motor running with press K
-- addQueueEntry() returns now an int8_t instead of an int
+- addQueueEntry() returns now an `int8_t` instead of an int
 - move and moveTo goes to the closest position (+/-2147483647).
   This means continues move(1000) will let the stepper turn in same direction,
   while the position wraps around: 0,1,...,2147483647,-2147483648,-2147483647,...,-1,0,1,...
@@ -478,7 +486,7 @@ TODO:
   => All time delta between steps are cycle accurate
 - Add getPeriodAfterCommandsCompleted() to API
 - Fix bug due to AutoEnable at ramp start (can find at low speeds)
-- StepperDemo outputs: F_CPU/TICKS_PER_S and stepper period at queue end
+- StepperDemo outputs: `F_CPU`/`TICKS_PER_S` and stepper period at queue end
 
 0.8.0:
 - Change direction with running motor is possible !!!
@@ -497,8 +505,8 @@ TODO:
 - move/moveTo return error codes
 
 0.7.0: Changes towards 0.6.15
-- Fix possible floating point exception (divide by zero), which could happen rarely in isr_single_fill_queue
+- Fix possible floating point exception (divide by zero), which could happen rarely in `isr_single_fill_queue`
 - Remove deprecated functions:
 	addQueueStepperStop()
     isStopped()
-- internal: remove obsolete _stepper_num variable
+- internal: remove obsolete `_stepper_num variable`

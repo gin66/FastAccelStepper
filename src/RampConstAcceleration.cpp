@@ -352,7 +352,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       // planning_steps = MIN_CMD_TICKS / next_ticks;
 
       uint32_t new_planning_steps = upm_to_u32(upm_divide(
-          upm_from((uint32_t)(REF_CMD_TICKS)), upm_from(d_ticks_new)));
+          upm_from((uint32_t)(MIN_CMD_TICKS)), upm_from(d_ticks_new)));
+	  new_planning_steps += new_planning_steps >> 1;
 #ifdef TEST
       printf("Increase planning steps %d => %d\n", planning_steps,
              new_planning_steps);

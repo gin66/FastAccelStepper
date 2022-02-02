@@ -17,23 +17,9 @@ void RampGenerator::init() {
   _rw.init();
   init_ramp_module();
 }
-int8_t RampGenerator::setSpeedInTicks(uint32_t min_step_ticks) {
-  if (min_step_ticks < MIN_DELTA_TICKS) {
-    return -1;
-  }
-  if (min_step_ticks == TICKS_FOR_STOPPED_MOTOR) {
-    return -1;
-  }
+void RampGenerator::setSpeedInTicks(uint32_t min_step_ticks) {
   speed_in_ticks = min_step_ticks;
   _config.setSpeedInTicks(min_step_ticks);
-  return 0;
-}
-int8_t RampGenerator::setSpeedInUs(uint32_t min_step_us) {
-  if (min_step_us >= TICKS_TO_US(0xffffffff)) {
-    return -1;
-  }
-  uint32_t min_step_ticks = US_TO_TICKS(min_step_us);
-  return setSpeedInTicks(min_step_ticks);
 }
 int8_t RampGenerator::setAcceleration(int32_t accel) {
   if (accel <= 0) {

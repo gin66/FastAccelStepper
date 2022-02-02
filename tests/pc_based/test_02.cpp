@@ -87,7 +87,7 @@ class FastAccelStepperTest {
     assert(0 == s.getCurrentPosition());
 
     assert(s.isQueueEmpty());
-    s.setSpeedInUs(travel_dt);
+    assert(0 == s.setSpeedInUs(travel_dt));
     s.setAcceleration(accel);
     s.fill_queue();
     assert(s.isQueueEmpty());

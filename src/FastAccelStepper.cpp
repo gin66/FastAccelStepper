@@ -84,6 +84,10 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
+  for (uint8_t i = 0;i < _next_stepper_num;i++) {
+	  s = _stepper[i];
+	  fas_queue[s->_queue_num].adjustSpeedToStepperCount(_next_stepper_num);
+  }
   return s;
 }
 //*************************************************************************************************
@@ -188,7 +192,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
   if (cmd == NULL) {
     return q->addQueueEntry(NULL, start);
   }
-  if (cmd->ticks < MIN_DELTA_TICKS) {
+  if (cmd->ticks < q->max_speed_in_ticks) {
     return AQE_ERROR_TICKS_TOO_LOW;
   }
 
@@ -665,6 +669,55 @@ int32_t FastAccelStepper::getCurrentSpeedInMilliHz() {
   }
   return 0;
 }
+uint16_t FastAccelStepper::getMaxSpeedInTicks() {
+  return fas_queue[_queue_num].getMaxSpeedInTicks();
+}
+uint16_t FastAccelStepper::getMaxSpeedInUs() {
+  uint16_t ticks = getMaxSpeedInTicks();
+  uint16_t speed_in_us =  ticks / (TICKS_PER_S / 1000000);
+  return speed_in_us; 
+}
+uint32_t FastAccelStepper::getMaxSpeedInHz() {
+  uint16_t ticks = getMaxSpeedInTicks();
+  uint32_t speed_in_hz = TICKS_PER_S / ticks;
+  return speed_in_hz; 
+}
+uint32_t FastAccelStepper::getMaxSpeedInMilliHz() {
+  uint16_t ticks = getMaxSpeedInTicks();
+  uint32_t speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
+  return speed_in_milli_hz; 
+}
+  int8_t FastAccelStepper::setSpeedInTicks(uint32_t min_step_ticks) {
+	  if (min_step_ticks < getMaxSpeedInTicks()) {
+		return -1;
+	  }
+	  if (min_step_ticks == TICKS_FOR_STOPPED_MOTOR) {
+		return -1;
+	  }
+	  _rg.setSpeedInTicks(min_step_ticks);
+	  return 0;
+  }
+  int8_t FastAccelStepper::setSpeedInUs(uint32_t min_step_us) {
+	  if (min_step_us >= TICKS_TO_US(0xffffffff)) {
+		return -1;
+	  }
+	  uint32_t min_step_ticks = US_TO_TICKS(min_step_us);
+	  return setSpeedInTicks(min_step_ticks);
+  }
+  int8_t FastAccelStepper::setSpeedInHz(uint32_t speed_hz) {
+    if (speed_hz == 0) {
+      return -1;
+    }
+	uint32_t ticks = _rg.divForHz(speed_hz);
+    return setSpeedInTicks(ticks);
+  }
+  int8_t FastAccelStepper::setSpeedInMilliHz(uint32_t speed_mhz) {
+    if (speed_mhz <= (1000LL * TICKS_PER_S / 0xffffffff + 1)) {
+      return -1;
+    }
+	uint32_t ticks = _rg.divForMilliHz(speed_mhz);
+    return setSpeedInTicks(ticks);
+  }
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   if (delta != 0) {

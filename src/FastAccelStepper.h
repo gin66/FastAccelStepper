@@ -32,27 +32,21 @@
 //
 // AVR
 // 	TICKS_PER_S			16_000_000
-//	MIN_DELTA_TICKS		640		[1/TICKS_PER_S seconds]
-//	MIN_CMD_TICKS		6400	[1/TICKS_PER_S seconds]
+//	MIN_CMD_TICKS		640 	[1/TICKS_PER_S seconds]
 //	MIN_DIR_DELAY_US	40		[µs]
 //	MAX_DIR_DELAY_US	4095	[µs]
 //
 // ESP32
 // 	TICKS_PER_S			16_000_000
-//	MIN_DELTA_TICKS		80		[1/TICKS_PER_S seconds]
-//	MIN_CMD_TICKS		800		[1/TICKS_PER_S seconds]
-//	MIN_DIR_DELAY_US	50		[µs]
+//	MIN_CMD_TICKS		8000	[1/TICKS_PER_S seconds]
+//	MIN_DIR_DELAY_US	500		[µs]
 //	MAX_DIR_DELAY_US	4095	[µs]
 //
 // SAM DUE
 // 	TICKS_PER_S			21_000_000
-//	MIN_DELTA_TICKS		420		[1/TICKS_PER_S seconds]
 //	MIN_CMD_TICKS		4200	[1/TICKS_PER_S seconds]
 //	MIN_DIR_DELAY_US	200		[µs]
 //	MAX_DIR_DELAY_US	3120	[µs]
-
-#define MIN_CMD_TICKS (10 * MIN_DELTA_TICKS)
-#define REF_CMD_TICKS (15 * MIN_DELTA_TICKS)
 
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
 
@@ -157,13 +151,18 @@ class FastAccelStepper {
   // note: no update on stopMove()
   //
   // Returns 0 on success, or -1 on invalid value
-  // Invalid is <MIN_DELTA_TICKS in us or >~250 Mio.
-  int8_t setSpeedInUs(uint32_t min_step_us) {
-    return _rg.setSpeedInUs(min_step_us);
-  }
-  int8_t setSpeedInTicks(uint32_t min_step_us) {
-    return _rg.setSpeedInTicks(min_step_us);
-  }
+  // Invalid is faster than MaxSpeed or >~250 Mio.
+  int8_t setSpeedInUs(uint32_t min_step_us);
+  int8_t setSpeedInTicks(uint32_t min_step_ticks);
+  // setSpeedInHz() allows to set the stepper speed as step frequency in Hertz.
+  // This means steps/s.
+  int8_t setSpeedInHz(uint32_t speed_hz);
+  // setSpeedInMilliHz() allows to set the stepper speed as step frequency in
+  // milliHertz. This means steps/1000 s. This is required for very slow speeds.
+  //
+  //
+  int8_t setSpeedInMilliHz(uint32_t speed_mhz);
+
   // retrieve current set speed (while acceleration/deceleration:
   // NOT the actual speed !)
   uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
@@ -177,17 +176,11 @@ class FastAccelStepper {
   int32_t getCurrentSpeedInUs();
   int32_t getCurrentSpeedInMilliHz();
 
-  // setSpeedInHz() allows to set the stepper speed as step frequency in Hertz.
-  // This means steps/s.
-  int8_t setSpeedInHz(uint32_t speed_hz) { return _rg.setSpeedInHz(speed_hz); }
-
-  // setSpeedInMilliHz() allows to set the stepper speed as step frequency in
-  // milliHertz. This means steps/1000 s. This is required for very slow speeds.
-  //
-  //
-  int8_t setSpeedInMilliHz(uint32_t speed_mhz) {
-    return _rg.setSpeedInMilliHz(speed_mhz);
-  }
+  // retrieve maximum speed
+  uint16_t getMaxSpeedInUs();
+  uint16_t getMaxSpeedInTicks();
+  uint32_t getMaxSpeedInHz();
+  uint32_t getMaxSpeedInMilliHz();
 
   //  set Acceleration expects as parameter the change of speed
   //  as step/s².

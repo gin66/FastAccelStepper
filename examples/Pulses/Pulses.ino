@@ -51,10 +51,11 @@ void loop1() {
   delay(300);
 }
 void loop() {
+  uint16_t min_ticks = stepper->getMaxSpeedInTicks();
   const struct stepper_command_s cmd_step1 = {
       .ticks = MIN_CMD_TICKS, .steps = 1, .count_up = true};
   const struct stepper_command_s cmd_step = {
-      .ticks = MIN_DELTA_TICKS, .steps = 10, .count_up = true};
+      .ticks = min_ticks, .steps = 10, .count_up = true};
   const struct stepper_command_s cmd_pause = {
       .ticks = 5000, .steps = 0, .count_up = true};
 

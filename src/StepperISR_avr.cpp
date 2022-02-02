@@ -331,6 +331,16 @@ int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
 #endif
   return -1;
 }
+void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
+	// using test_sd_04_timing_2560 version 0.25.6 as reference
+	//   manageStepper (fillISR) already needs max 3ms !
+	//   so 25kHz for three steppers is on the limit
+	// 
+	// using test_sd_04_timing_328p version 0.25.6 as reference
+	//   manageStepper (fillISR) already needs max 2.3 ms !
+	//
+	max_speed_in_ticks =  213 * steppers;
+}
 
 void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {
   fas_engine = engine;

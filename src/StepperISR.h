@@ -93,6 +93,7 @@ class StepperQueue {
 #endif
 
   struct queue_end_s queue_end;
+  uint16_t max_speed_in_ticks;
 
   void init(uint8_t queue_num, uint8_t step_pin);
   inline uint8_t queueEntries() {
@@ -335,11 +336,20 @@ class StepperQueue {
     return 0;
   }
 
+  volatile uint16_t getMaxSpeedInTicks() {
+	  return max_speed_in_ticks;
+  }
+
   // startQueue is always called
   void startQueue();
   void forceStop();
   void _initVars() {
     dirPin = PIN_UNDEFINED;
+#ifndef TEST
+	max_speed_in_ticks = TICKS_PER_S / 1000; // use a default value 1_000 steps/s
+#else
+	max_speed_in_ticks = TICKS_PER_S / 50000; // use a default value 50_000 steps/s
+#endif
     ignore_commands = false;
     read_idx = 0;
     next_write_idx = 0;
@@ -385,6 +395,7 @@ class StepperQueue {
     }
 #endif
   }
+  void adjustSpeedToStepperCount(uint8_t steppers);
   static bool isValidStepPin(uint8_t step_pin);
   static int8_t queueNumForStepPin(uint8_t step_pin);
 };
