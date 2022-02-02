@@ -81,11 +81,20 @@ struct queue_end_s {
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
-#define SUPPPORT_ESP32_MCPWM_PCNT
+#define SUPPORT_ESP32_MCPWM_PCNT
+#define SUPPORT_ESP32_RMT
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
 
 #elif CONFIG_IDF_TARGET_ESP32S2
+#define SUPPORT_ESP32_RMT
+
+#elif CONFIG_IDF_TARGET_ESP32C3
+#define SUPPORT_ESP32_RMT
+
+#else
+// If come here, then the device is not supported
+#error "Unsupported derivate"
 #endif
 
 // For esp32 using arduino, just use arduino definition

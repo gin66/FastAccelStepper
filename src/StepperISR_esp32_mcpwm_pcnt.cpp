@@ -1,6 +1,6 @@
 #include "StepperISR.h"
 
-#ifdef SUPPPORT_ESP32_MCPWM_PCNT
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
 
 #ifdef __ESP32_IDF_V44__
 #include <driver/periph_ctrl.h>
