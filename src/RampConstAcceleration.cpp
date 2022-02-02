@@ -357,13 +357,14 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       printf("Increase planning steps %d => %d\n", planning_steps,
              new_planning_steps);
 #endif
-	  // do we need to decelerate in order to not overshoot ?
       planning_steps = new_planning_steps;
-	  if (remaining_steps < performed_ramp_up_steps + planning_steps) {
-         this_state = RAMP_STATE_DECELERATE;
 
-		 // and now the speed is actually too high....
-	  } 
+      // do we need to decelerate in order to not overshoot ?
+      if (remaining_steps < performed_ramp_up_steps + planning_steps) {
+        this_state = RAMP_STATE_DECELERATE;
+
+        // and now the speed is actually too high....
+      }
     }
   }
 

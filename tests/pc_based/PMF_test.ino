@@ -36,9 +36,9 @@ void setup() {
     Serial.println(" errors");
   }
 #ifdef SIMULATOR
-	delay(1000);
-	noInterrupts();
-	sleep_cpu();
+  delay(1000);
+  noInterrupts();
+  sleep_cpu();
 #endif
 }
 

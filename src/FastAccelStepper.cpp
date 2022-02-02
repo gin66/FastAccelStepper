@@ -668,11 +668,11 @@ int32_t FastAccelStepper::getCurrentSpeedInMilliHz() {
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   if (delta != 0) {
-	  struct queue_end_s* queue_end = &fas_queue[_queue_num].queue_end;
-	  fasDisableInterrupts();
-	  queue_end->pos += delta;
-	  fasEnableInterrupts();
-	  _rg.advanceTargetPosition(delta, queue_end);
+    struct queue_end_s* queue_end = &fas_queue[_queue_num].queue_end;
+    fasDisableInterrupts();
+    queue_end->pos += delta;
+    fasEnableInterrupts();
+    _rg.advanceTargetPosition(delta, queue_end);
   }
 }
 void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
@@ -682,7 +682,7 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   queue_end->pos = new_pos;
   fasEnableInterrupts();
   if (delta != 0) {
-	  _rg.advanceTargetPosition(delta, queue_end);
+    _rg.advanceTargetPosition(delta, queue_end);
   }
 }
 uint8_t FastAccelStepper::queueEntries() {
