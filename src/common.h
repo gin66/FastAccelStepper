@@ -83,14 +83,21 @@ struct queue_end_s {
 #include <soc/pcnt_struct.h>
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
+#define QUEUES_MCPWM_PCNT 6
+#define QUEUES_RMT 2
+
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
 
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32_RMT
+#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_RMT 2
 
 #elif CONFIG_IDF_TARGET_ESP32C3
 #define SUPPORT_ESP32_RMT
+#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_RMT 2
 
 #else
 // If come here, then the device is not supported
@@ -108,8 +115,8 @@ struct queue_end_s {
 #endif
 
 // Esp32 queue definitions
-#define MAX_STEPPER 6
-#define NUM_QUEUES 6
+#define NUM_QUEUES (QUEUES_MCPWM_PCNT+QUEUES_RMT)
+#define MAX_STEPPER (NUM_QUEUES)
 #define QUEUE_LEN 32
 
 // Esp32 timing definition

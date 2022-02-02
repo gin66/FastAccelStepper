@@ -47,7 +47,7 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
   init_stop(q);
 }
 
-void StepperQueue::init_rmt(uint8_t queue_num, uint8_t step_pin) {
+void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 #ifdef TEST_PROBE
   pinMode(TEST_PROBE, OUTPUT);
 #endif

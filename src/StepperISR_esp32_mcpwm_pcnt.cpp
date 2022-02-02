@@ -18,7 +18,7 @@
 //
 // As the ISR is accessing this table, the mapping cannot be put into flash,
 // even this is actually a constant table
-static struct mapping_s queue2mapping[NUM_QUEUES] = {
+static struct mapping_s channel2mapping[NUM_QUEUES] = {
     {
       mcpwm_unit : MCPWM_UNIT_0,
       timer : 0,
@@ -293,7 +293,7 @@ static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
   MCPWM_SERVICE(MCPWM1, 2, 5);
 }
 
-void StepperQueue::init_mcpwm_pcnt(uint8_t queue_num, uint8_t step_pin) {
+void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 #ifdef TEST_PROBE
   pinMode(TEST_PROBE, OUTPUT);
 #endif
@@ -301,7 +301,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t queue_num, uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
 
-  mapping = &queue2mapping[queue_num];
+  mapping = &channel2mapping[channel_num];
 
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -329,7 +329,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t queue_num, uint8_t step_pin) {
   pcnt_counter_clear(pcnt_unit);
   pcnt_counter_resume(pcnt_unit);
   pcnt_event_enable(pcnt_unit, PCNT_EVT_H_LIM);
-  if (queue_num == 0) {
+  if (channel_num == 0) {
     // isr_service_install apparently enables the interrupt
     PCNT.int_clr.val = PCNT.int_st.val;
     pcnt_isr_service_install(ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM);

@@ -14,58 +14,77 @@
 StepperQueue fas_queue[NUM_QUEUES];
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+	uint8_t channel = queue_num;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-	init_mcpwm_pcnt(queue_num, step_pin);
+	if (channel < 8) {
+		use_rmt = false;
+		init_mcpwm_pcnt(channel, step_pin);
+		return;
+	}
+	channel -= 8;
 #endif
 #ifdef SUPPORT_ESP32_RMT
-	init_rmt(queue_num, step_pin);
+	use_rmt = true;
+	init_rmt(channel, step_pin);
 #endif
 }
 
 void StepperQueue::connect() {
+#ifdef SUPPORT_ESP32_RMT
+	if (use_rmt) {
+		connect_rmt();
+		return;
+	}
+#endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 	connect_mcpwm_pcnt();
-#endif
-#ifdef SUPPORT_ESP32_RMT
-	connect_rmt();
 #endif
 }
 
 void StepperQueue::disconnect() {
+#ifdef SUPPORT_ESP32_RMT
+	if (use_rmt) {
+		disconnect_rmt();
+		return;
+	}
+#endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 	disconnect_mcpwm_pcnt();
-#endif
-#ifdef SUPPORT_ESP32_RMT
-	disconnect_rmt();
 #endif
 }
 
 void StepperQueue::startQueue() {
+#ifdef SUPPORT_ESP32_RMT
+	if (use_rmt) {
+		startQueue_rmt();
+		return;
+	}
+#endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 	startQueue_mcpwm_pcnt();
 #endif
-#ifdef SUPPORT_ESP32_RMT
-	startQueue_rmt();
-#endif
 }
 void StepperQueue::forceStop() {
+#ifdef SUPPORT_ESP32_RMT
+	if (use_rmt) {
+		forceStop_rmt();
+		return;
+	}
+#endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 	forceStop_mcpwm_pcnt();
 #endif
-#ifdef SUPPORT_ESP32_RMT
-	forceStop_rmt();
-#endif
 }
 uint16_t StepperQueue::_getPerformedPulses() {
+#ifdef SUPPORT_ESP32_RMT
+	if (use_rmt) {
+		return _getPerformedPulses_rmt();
+	}
+#endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 	return _getPerformedPulses_mcpwm_pcnt();
-#else
-#ifdef SUPPORT_ESP32_RMT
-	return _getPerformedPulses_rmt();
-#else
+#endif
 	return 0;
-#endif
-#endif
 }
 
 //*************************************************************************************************

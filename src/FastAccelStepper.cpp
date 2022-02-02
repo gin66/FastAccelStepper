@@ -23,6 +23,11 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(),
 #endif
+#if MAX_STEPPER == 8
+    FastAccelStepper(), FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(),
+#endif
     FastAccelStepper()};
 
 //*************************************************************************************************

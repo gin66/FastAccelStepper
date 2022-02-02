@@ -72,6 +72,7 @@ class StepperQueue {
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
   bool isRunning() { return _isRunning; }
+  bool use_rmt;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   const struct mapping_s* mapping;
 #endif
@@ -101,10 +102,10 @@ class StepperQueue {
 
   void init(uint8_t queue_num, uint8_t step_pin);
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-  void init_mcpwm_pcnt(uint8_t queue_num, uint8_t step_pin);
+  void init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  void init_rmt(uint8_t queue_num, uint8_t step_pin);
+  void init_rmt(uint8_t channel_num, uint8_t step_pin);
 #endif
   inline uint8_t queueEntries() {
     fasDisableInterrupts();

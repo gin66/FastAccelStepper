@@ -214,7 +214,33 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }};
+    }
+#if MAX_STEPPER == 8
+    ,{
+      step : 14,
+      enable_low_active : 27,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 21,  // was GPIO 3 in conflict with RXD, via wire to GPIO21
+                       // (Dir next stepper)
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    {
+      step : 27,
+      enable_low_active : 14,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 21,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }
+#endif
+};
 #elif defined(ARDUINO_ARCH_SAM)
 // Hardware configuration copied from esp32 board. Not used on due board
 // Please adapt to your configuration
@@ -1020,7 +1046,7 @@ bool process_cmd(char *cmd) {
         if ((*cmd >= '1') && (*cmd <= '0' + MAX_STEPPER)) {
           output_msg(MSG_SELECT_STEPPER);
           selected = *cmd - '1';
-          Serial.println(selected);
+          Serial.println(*cmd);
           return true;
         }
       }
