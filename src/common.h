@@ -120,7 +120,7 @@ struct queue_end_s {
 #endif
 
 // Esp32 queue definitions
-#define NUM_QUEUES (QUEUES_MCPWM_PCNT+QUEUES_RMT)
+#define NUM_QUEUES (QUEUES_MCPWM_PCNT + QUEUES_RMT)
 #define MAX_STEPPER (NUM_QUEUES)
 #define QUEUE_LEN 32
 

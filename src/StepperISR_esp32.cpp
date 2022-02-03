@@ -14,85 +14,85 @@
 StepperQueue fas_queue[NUM_QUEUES];
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
-	uint8_t channel = queue_num;
+  uint8_t channel = queue_num;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-	if (channel < 6) {
-		use_rmt = false;
-		init_mcpwm_pcnt(channel, step_pin);
-		return;
-	}
-	channel -= 6;
+  if (channel < 6) {
+    use_rmt = false;
+    init_mcpwm_pcnt(channel, step_pin);
+    return;
+  }
+  channel -= 6;
 #endif
 #ifdef SUPPORT_ESP32_RMT
-	use_rmt = true;
-	init_rmt(channel, step_pin);
+  use_rmt = true;
+  init_rmt(channel, step_pin);
 #endif
 }
 
 void StepperQueue::connect() {
 #ifdef SUPPORT_ESP32_RMT
-	if (use_rmt) {
-		connect_rmt();
-		return;
-	}
+  if (use_rmt) {
+    connect_rmt();
+    return;
+  }
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-	connect_mcpwm_pcnt();
+  connect_mcpwm_pcnt();
 #endif
 }
 
 void StepperQueue::disconnect() {
 #ifdef SUPPORT_ESP32_RMT
-	if (use_rmt) {
-		disconnect_rmt();
-		return;
-	}
+  if (use_rmt) {
+    disconnect_rmt();
+    return;
+  }
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-	disconnect_mcpwm_pcnt();
+  disconnect_mcpwm_pcnt();
 #endif
 }
 
 void StepperQueue::startQueue() {
 #ifdef SUPPORT_ESP32_RMT
-	if (use_rmt) {
-		startQueue_rmt();
-		return;
-	}
+  if (use_rmt) {
+    startQueue_rmt();
+    return;
+  }
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-	startQueue_mcpwm_pcnt();
+  startQueue_mcpwm_pcnt();
 #endif
 }
 void StepperQueue::forceStop() {
 #ifdef SUPPORT_ESP32_RMT
-	if (use_rmt) {
-		forceStop_rmt();
-		return;
-	}
+  if (use_rmt) {
+    forceStop_rmt();
+    return;
+  }
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-	forceStop_mcpwm_pcnt();
+  forceStop_mcpwm_pcnt();
 #endif
 }
 uint16_t StepperQueue::_getPerformedPulses() {
 #ifdef SUPPORT_ESP32_RMT
-	if (use_rmt) {
-		return _getPerformedPulses_rmt();
-	}
+  if (use_rmt) {
+    return _getPerformedPulses_rmt();
+  }
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-	return _getPerformedPulses_mcpwm_pcnt();
+  return _getPerformedPulses_mcpwm_pcnt();
 #endif
-	return 0;
+  return 0;
 }
 
 //*************************************************************************************************
 
-bool StepperQueue::isValidStepPin(uint8_t step_pin) { 
-	gpio_drive_cap_t strength;
-	esp_err_t res = gpio_get_drive_capability((gpio_num_t)step_pin, &strength);
-	return res == ESP_OK;
+bool StepperQueue::isValidStepPin(uint8_t step_pin) {
+  gpio_drive_cap_t strength;
+  esp_err_t res = gpio_get_drive_capability((gpio_num_t)step_pin, &strength);
+  return res == ESP_OK;
 }
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 
@@ -109,7 +109,7 @@ void StepperTask(void *parameter) {
 }
 
 void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
-	max_speed_in_ticks =  80; // This equals 200kHz @ 16MHz
+  max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
 }
 
 void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
@@ -142,17 +142,17 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
   cfg.pulse_gpio_num = stepper->getStepPin();
   if (dir_pin == PIN_UNDEFINED) {
     cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
-		cfg.hctrl_mode = PCNT_MODE_KEEP;
-		cfg.lctrl_mode = PCNT_MODE_KEEP;
+    cfg.hctrl_mode = PCNT_MODE_KEEP;
+    cfg.lctrl_mode = PCNT_MODE_KEEP;
   } else {
     cfg.ctrl_gpio_num = dir_pin;
-	  if (stepper->directionPinHighCountsUp()) {
-		cfg.lctrl_mode = PCNT_MODE_REVERSE;
-		cfg.hctrl_mode = PCNT_MODE_KEEP;
-	  } else {
-		cfg.lctrl_mode = PCNT_MODE_KEEP;
-		cfg.hctrl_mode = PCNT_MODE_REVERSE;
-	  }
+    if (stepper->directionPinHighCountsUp()) {
+      cfg.lctrl_mode = PCNT_MODE_REVERSE;
+      cfg.hctrl_mode = PCNT_MODE_KEEP;
+    } else {
+      cfg.lctrl_mode = PCNT_MODE_KEEP;
+      cfg.hctrl_mode = PCNT_MODE_REVERSE;
+    }
   }
   cfg.pos_mode = PCNT_COUNT_INC;  // increment on rising edge
   cfg.neg_mode = PCNT_COUNT_DIS;  // ignore falling edge

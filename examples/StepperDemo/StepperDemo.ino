@@ -9,7 +9,7 @@
 #include <esp_task_wdt.h>
 #endif
 
-#define VERSION "post-f8593b1"
+#define VERSION "post-06b273b"
 
 struct stepper_config_s {
   uint8_t step;
@@ -167,7 +167,8 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 1000
     }
 #if MAX_STEPPER > 2
-    ,{
+    ,
+    {
       // position 01.234567 => 4, step is linked to blue LED
       step : 2,
       enable_low_active : 12,
@@ -218,7 +219,8 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     }
 #endif
 #if MAX_STEPPER == 8
-    ,{
+    ,
+    {
       step : 14,
       enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
@@ -332,9 +334,7 @@ struct test_seq_s test_seq[MAX_STEPPER] = {
 #if MAX_STEPPER >= 3
     {.test = NULL},
 #endif
-    {.test = NULL},
-    {.test = NULL}
-};
+    {.test = NULL}, {.test = NULL}};
 
 #define _NL_ "\n"
 #define _SEP_ "|"
