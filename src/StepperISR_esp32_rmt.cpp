@@ -19,6 +19,18 @@
 //    This way, the threshold interrupt occurs after the first part
 //    and the end interrupt after the second part.
 //
+//
+// Currently with V>=1000us is ok, but V=500us has step loss. Faster yields more step loss
+//
+//  A=100000, V=40, 16000 Steps => 22 steps lost
+//  A=100000, V=40, 13000 Steps => 22 steps lost
+//  A=100000, V=40, 10000 Steps => 22 steps lost
+//  => Ramp up phase is problematic
+//
+//  A=100000, V=50, 16000 Steps => 7 steps lost
+//  A=100000, V=50, 13000 Steps => 8 steps lost
+//  A=100000, V=50, 10000 Steps => 18 steps lost
+//
 #define PART_SIZE 30
 
 static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
