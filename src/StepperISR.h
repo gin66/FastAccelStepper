@@ -76,6 +76,10 @@ class StepperQueue {
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   const struct mapping_s* mapping;
 #endif
+#ifdef SUPPORT_ESP32_RMT
+  bool last_was_first;
+  rmt_channel_t channel;
+#endif
 #elif defined(ARDUINO_ARCH_AVR)
   volatile uint8_t* _dirPinPort;
   uint8_t _dirPinMask;

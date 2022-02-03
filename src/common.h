@@ -75,14 +75,17 @@ struct queue_end_s {
 #include <esp_task_wdt.h>
 
 #if CONFIG_IDF_TARGET_ESP32
+
+#define SUPPORT_ESP32_MCPWM_PCNT
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
-#define SUPPORT_ESP32_MCPWM_PCNT
+
 #define SUPPORT_ESP32_RMT
+#include <driver/rmt.h>
 #define QUEUES_MCPWM_PCNT 6
 #define QUEUES_RMT 2
 
@@ -91,11 +94,13 @@ struct queue_end_s {
 
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32_RMT
+#include <driver/rmt.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
 
 #elif CONFIG_IDF_TARGET_ESP32C3
 #define SUPPORT_ESP32_RMT
+#include <driver/rmt.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
 

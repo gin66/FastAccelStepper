@@ -4,6 +4,7 @@ TODO:
 
 next:
 - esp32: StepperDemo make p<n> command work again
+- esp32: check step pin is a valid gpio output pin
 
 0.26.0:
 - avr: Max stepper speed depending on number of assigned steppers:

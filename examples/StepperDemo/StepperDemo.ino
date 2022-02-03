@@ -165,8 +165,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 500,
       off_delay_ms : 1000
-    },
-    {
+    }
+#if MAX_STEPPER > 2
+    ,{
       // position 01.234567 => 4, step is linked to blue LED
       step : 2,
       enable_low_active : 12,
@@ -215,13 +216,13 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     }
+#endif
 #if MAX_STEPPER == 8
     ,{
       step : 14,
-      enable_low_active : 27,
+      enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
-      direction : 21,  // was GPIO 3 in conflict with RXD, via wire to GPIO21
-                       // (Dir next stepper)
+      direction : PIN_UNDEFINED,
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
@@ -229,10 +230,10 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     },
     {
-      step : 27,
-      enable_low_active : 14,
+      step : 23,
+      enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
-      direction : 21,
+      direction : PIN_UNDEFINED,
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
@@ -322,10 +323,18 @@ FastAccelStepper *stepper[MAX_STEPPER];
 enum { normal, test, config } mode = normal;
 bool test_ongoing = false;
 struct test_seq_s test_seq[MAX_STEPPER] = {
-#if defined(ARDUINO_ARCH_ESP32)
-    {.test = NULL}, {.test = NULL}, {.test = NULL}, {.test = NULL},
+#if MAX_STEPPER == 8
+    {.test = NULL}, {.test = NULL},
 #endif
-    {.test = NULL}, {.test = NULL}};
+#if MAX_STEPPER >= 6
+    {.test = NULL}, {.test = NULL}, {.test = NULL},
+#endif
+#if MAX_STEPPER >= 3
+    {.test = NULL},
+#endif
+    {.test = NULL},
+    {.test = NULL}
+};
 
 #define _NL_ "\n"
 #define _SEP_ "|"
