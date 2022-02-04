@@ -55,26 +55,23 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
   if (!fill_part_one) {
     data += PART_SIZE;
   }
-  if (!q->_isRunning) {
-	  // second invocation to stop.
-  rmt_tx_stop(q->channel);
-  rmt_rx_stop(q->channel);
-  rmt_memory_rw_rst(q->channel);
-	  return;
-  }
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         // two pauses à 4096 ticks
         *data++ = 0x12341234;
       }
-//	  if (!fill_part_one) {
-          q->_isRunning = false;
-//	  }
 		  for (uint8_t i = 2*PART_SIZE;i < 64;i++) {
 			*data++ = 0x10001234;
 		  }
     RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
+  if (!q->_isRunning) {
+	  // second invocation to stop.
+  rmt_tx_stop(q->channel);
+  rmt_rx_stop(q->channel);
+  rmt_memory_rw_rst(q->channel);
+  }
+          q->_isRunning = false;
 	return;
   } else {
     struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
