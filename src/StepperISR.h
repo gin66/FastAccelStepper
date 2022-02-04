@@ -67,24 +67,34 @@ class StepperQueue {
   // The timer is still counting down to zero until it stops at 0.
   // But there will be no interrupt to process another command.
   // So the queue requires startQueue() again
+  //
+  // Due to the rmt version of esp32, there has been the needed to
+  // provide information, that device is not yet ready for new commands.
+  // This has been called isReadyForCommands().
+  //
 
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
   bool isRunning() { return _isRunning; }
+  bool isReadyForCommands();
   bool use_rmt;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   const struct mapping_s* mapping;
+  bool isReadyForCommands_mcpwm_pcnt();
 #endif
 #ifdef SUPPORT_ESP32_RMT
   rmt_channel_t channel;
+  bool isReadyForCommands_rmt();
+  bool _rmtStopped;
 #endif
 #elif defined(ARDUINO_ARCH_AVR)
   volatile uint8_t* _dirPinPort;
   uint8_t _dirPinMask;
   volatile bool _prepareForStop;
   volatile bool _isRunning;
-  bool isRunning() { return _isRunning; }
+  inline bool isRunning() { return _isRunning; }
+  inline bool isReadyForCommands() { return true; }
   enum channels channel;
 #elif defined(ARDUINO_ARCH_SAM)
   volatile uint32_t* _dirPinPort;
@@ -93,11 +103,13 @@ class StepperQueue {
   bool isRunning();
   const PWMCHANNELMAPPING* mapping;
   bool _connected;
+  inline bool isReadyForCommands() { return true; }
   volatile bool _pauseCommanded;
   volatile uint32_t timePWMInterruptEnabled;
 #else
   volatile bool _isRunning;
-  bool isRunning() { return _isRunning; }
+  inline bool isReadyForCommands() { return true; }
+  inline bool isRunning() { return _isRunning; }
 #endif
 
   struct queue_end_s queue_end;
@@ -126,6 +138,9 @@ class StepperQueue {
     // if (sizeof(entry) != 6 * QUEUE_LEN) {
     //  return -1;
     //}
+	if (!isReadyForCommands()) {
+		return AQE_DEVICE_NOT_READY;
+	}
     if (cmd == NULL) {
       if (start && !isRunning()) {
         if (next_write_idx == read_idx) {
@@ -189,8 +204,14 @@ class StepperQueue {
     // Advance write pointer
     fasDisableInterrupts();
     if (!ignore_commands) {
-      next_write_idx++;
-      queue_end = next_queue_end;
+		if (isReadyForCommands()) {
+		  next_write_idx++;
+		  queue_end = next_queue_end;
+		}
+		else {
+			fasEnableInterrupts();
+			return AQE_DEVICE_NOT_READY;
+		}
     }
     fasEnableInterrupts();
 
@@ -385,6 +406,9 @@ class StepperQueue {
 #elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
     _isRunning = false;
     _nextCommandIsPrepared = false;
+#if defined(SUPPORT_ESP32_RMT)
+	_rmtStopped = true;
+#endif
 #elif defined(ARDUINO_ARCH_SAM)
     _hasISRactive = false;
     // we cannot clear the PWM interrupt when switching to a pause, but we'll
@@ -392,7 +416,6 @@ class StepperQueue {
     // transition from a pulse to a pause to skip the next interrupt.
     _pauseCommanded = false;
     timePWMInterruptEnabled = 0;
-
 #else
     _isRunning = false;
 #endif

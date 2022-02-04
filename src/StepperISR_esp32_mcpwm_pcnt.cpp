@@ -448,30 +448,6 @@ void StepperQueue::disconnect_mcpwm_pcnt() {
 //		- 	without next command: set mcpwm to stop mode on reaching
 // period
 //
-//
-// This has tested, if the HW is still active and not if the QUEUE is still
-// running bool StepperQueue::isRunning() {
-//  if (_isRunning) {
-//    return true;
-//  }
-//
-//  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-//  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
-//  uint8_t timer = mapping->timer;
-//#ifndef __ESP32_IDF_V44__
-//  if (mcpwm->timer[timer].status.value > 1) {
-//#else  /* __ESP32_IDF_V44__ */
-//  if (mcpwm->timer[timer].timer_status.timer_value > 1) {
-//#endif /* __ESP32_IDF_V44__ */
-//    return true;
-//  }
-//#ifndef __ESP32_IDF_V44__
-//  return (mcpwm->timer[timer].mode.start == 2);  // 2=run continuous
-//#else                                            /* __ESP32_IDF_V44__ */
-//  return (mcpwm->timer[timer].timer_cfg1.timer_start == 2);  // 2=run
-//  continuous
-//#endif                                           /* __ESP32_IDF_V44__ */
-//}
 
 void StepperQueue::startQueue_mcpwm_pcnt() {
 #ifdef TEST_PROBE
@@ -502,6 +478,27 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
 void StepperQueue::forceStop_mcpwm_pcnt() {
   init_stop(this);
   read_idx = next_write_idx;
+}
+bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
+	if (isRunning()) {
+		return true;
+	}
+  mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
+  mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  uint8_t timer = mapping->timer;
+#ifndef __ESP32_IDF_V44__
+  if (mcpwm->timer[timer].status.value > 1) {
+#else  /* __ESP32_IDF_V44__ */
+  if (mcpwm->timer[timer].timer_status.timer_value > 1) {
+#endif /* __ESP32_IDF_V44__ */
+    return false;
+  }
+  return true;
+//#ifndef __ESP32_IDF_V44__
+//  return (mcpwm->timer[timer].mode.start != 2);  // 2=run continuous
+//#else                                            /* __ESP32_IDF_V44__ */
+//  return (mcpwm->timer[timer].timer_cfg1.timer_start != 2);  // 2=run continuous
+//#endif                                           /* __ESP32_IDF_V44__ */
 }
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() {
   return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;

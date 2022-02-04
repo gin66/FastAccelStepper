@@ -70,6 +70,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
   rmt_tx_stop(q->channel);
   rmt_rx_stop(q->channel);
   rmt_memory_rw_rst(q->channel);
+  q->_rmtStopped = true;
   }
           q->_isRunning = false;
 	return;
@@ -309,15 +310,22 @@ void StepperQueue::startQueue_rmt() {
 #endif
   if (_isRunning) {
       RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
-	  rmt_set_tx_intr_en(channel, true);
 	  rmt_set_tx_thr_intr_en(channel, true, PART_SIZE+1);// VULNERABLE !?!?
   }
+  rmt_set_tx_intr_en(channel, true);
+  _rmtStopped = false;
   RMT.conf_ch[channel].conf1.tx_start = 1;
 //  RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {
   init_stop(this);
   read_idx = next_write_idx;
+}
+bool StepperQueue::isReadyForCommands_rmt() {
+	if (_isRunning) {
+		return true;
+	}
+	return !_rmtStopped;
 }
 uint16_t StepperQueue::_getPerformedPulses_rmt() { return 0; }
 #endif

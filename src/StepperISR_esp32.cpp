@@ -53,6 +53,17 @@ void StepperQueue::disconnect() {
 #endif
 }
 
+bool StepperQueue::isReadyForCommands() {
+#ifdef SUPPORT_ESP32_RMT
+  if (use_rmt) {
+    return isReadyForCommands_rmt();
+  }
+#endif
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+  return isReadyForCommands_mcpwm_pcnt();
+#endif
+}
+
 void StepperQueue::startQueue() {
 #ifdef SUPPORT_ESP32_RMT
   if (use_rmt) {
