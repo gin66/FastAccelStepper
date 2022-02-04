@@ -7,7 +7,22 @@
 #include <soc/periph_defs.h>
 #endif /* __ESP32_IDF_V44__ */
 
-//#define TEST_PROBE 18
+#define TEST_PROBE_1 21
+#define TEST_PROBE_2 18
+#ifdef TEST_PROBE_1
+int tp1 = 0;
+#define PROBE_1(x) digitalWrite(TEST_PROBE_1, x)
+#define PROBE_1_TOGGLE tp1 = 1-tp1; digitalWrite(TEST_PROBE_1, tp1)
+#else
+#define PROBE_1(x)
+#endif
+#ifdef TEST_PROBE_2
+int tp2 = 0;
+#define PROBE_2(x) digitalWrite(TEST_PROBE_2, x)
+#define PROBE_2_TOGGLE tp2 = 2-tp2; digitalWrite(TEST_PROBE_2, tp2)
+#else
+#define PROBE_2(x)
+#endif
 
 // The following concept is in use:
 //
@@ -31,33 +46,44 @@
 //  A=100000, V=50, 13000 Steps => 8 steps lost
 //  A=100000, V=50, 10000 Steps => 18 steps lost
 //
+//
+//Of these 32 bits, the low 16-bit entry is sent first and the high entry second.
 #define PART_SIZE 30
 
 static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
-  // ignore double threshold interrupts
-  // ==> reason need to be understood
-  if (q->last_was_first == fill_part_one) {
-    return;
-  }
-  q->last_was_first = fill_part_one;
-  if (RMT.conf_ch[q->channel].conf1.tx_conti_mode == 0) {
-    return;
-  }
   uint32_t *data = (uint32_t *)RMT_CHANNEL_MEM(q->channel);
   if (!fill_part_one) {
     data += PART_SIZE;
   }
-
+  if (!q->_isRunning) {
+	  // second invocation to stop.
+  rmt_tx_stop(q->channel);
+  rmt_rx_stop(q->channel);
+  rmt_memory_rw_rst(q->channel);
+	  return;
+  }
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
-    *data = 0;
-    q->_isRunning = false;
+      for (uint8_t i = 0; i < PART_SIZE; i++) {
+        // two pauses à 4096 ticks
+        *data++ = 0x12341234;
+      }
+//	  if (!fill_part_one) {
+          q->_isRunning = false;
+//	  }
+		  for (uint8_t i = 2*PART_SIZE;i < 64;i++) {
+			*data++ = 0x10001234;
+		  }
     RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
+	return;
   } else {
     struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
 
     uint8_t steps = e_curr->steps;
     uint16_t ticks = e_curr->ticks;
+	if (steps != 0) {
+//		PROBE_2_TOGGLE;
+	}
     if (steps == 0) {
       for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
         // two pauses à 16 ticks
@@ -77,11 +103,11 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
       if (steps < PART_SIZE / 2) {
         for (uint8_t i = 1; i < steps; i++) {
           // steps-1 iterations
-          *data++ = 0x80ff0100;
-          *data++ = 0x7f007f00;
+          *data++ = 0x40017fff | 0x8000;
+          *data++ = 0x20002000;
         }
-        *data++ = 0x80ff0100;
-        uint32_t remaining = 0x7f007f00;
+        *data++ = 0x40017fff | 0x8000;
+        uint32_t remaining = 0x20002000;
         // 2*(steps - 1) + 1 already stored => 2*steps - 1
         // and after this for loop one entry added => 2*steps
         for (uint8_t i = 2 * steps; i < PART_SIZE; i++) {
@@ -93,9 +119,10 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
       } else {
         steps -= PART_SIZE / 2;
         for (uint8_t i = 0; i < PART_SIZE / 2; i++) {
-          *data++ = 0x80ff0100;
-          *data++ = 0x7f007f00;
+          *data++ = 0x40017fff | 0x8000;
+          *data++ = 0x20002000;
         }
+		data--;
       }
     } else if ((steps < 2 * PART_SIZE) && (steps != PART_SIZE)) {
       uint8_t steps_to_do = steps;
@@ -105,9 +132,9 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
 
       uint16_t ticks_l = ticks >> 1;
       uint16_t ticks_r = ticks - ticks_l;
-      uint32_t rmt_entry = ticks_l | 0x8000;  // with step
+      uint32_t rmt_entry = ticks_l;
       rmt_entry <<= 16;
-      rmt_entry |= ticks_r;
+      rmt_entry |= ticks_r | 0x8000;  // with step
       for (uint8_t i = 1; i < steps_to_do; i++) {
         *data++ = rmt_entry;
       }
@@ -118,31 +145,39 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
       }
       *last_step_data = rmt_entry;
       steps -= steps_to_do;
+      data--;
     } else {
       // every entry one step
       uint16_t ticks_l = ticks >> 1;
       uint16_t ticks_r = ticks - ticks_l;
-      uint32_t rmt_entry = ticks_l | 0x8000;  // with step
+      uint32_t rmt_entry = ticks_l;
       rmt_entry <<= 16;
-      rmt_entry |= ticks_r;
+      rmt_entry |= ticks_r | 0x8000;  // with step
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         *data++ = rmt_entry;
       }
       // This could lead to single step at high speed in next part .... so need
       // to rework The previous part tries to address this
       steps -= PART_SIZE;
+      data--;
     }
+	if (!fill_part_one) {
+//Note: When enabling the continuous transmission mode by setting RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the channel continuously, that is, from the first byte to the last one, then from the first to the last again, and so on. In this mode, there will be an idle level lasting one clk_div cycle between N and N+1 transmissions.
+	   *data -= 1;
+	}
     if (steps == 0) {
       // The command has been completed
       rp++;
       q->read_idx = rp;
-      struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
-      // The dir pin toggle at this place is problematic, but if the last
-      // command contains only one step, it could work
-      if (e_next->toggle_dir) {
-        gpio_num_t dirPin = (gpio_num_t)q->dirPin;
-        gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
-      }
+	  // The dir pin toggle at this place is problematic, but if the last
+	  // command contains only one step, it could work
+      if (rp == q->next_write_idx) {
+		  struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
+		  if (e_next->toggle_dir) {
+			gpio_num_t dirPin = (gpio_num_t)q->dirPin;
+			gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+		  }
+	  }
     } else {
       e_curr->steps = steps;
     }
@@ -158,22 +193,33 @@ static void IRAM_ATTR tx_intr_handler(void *arg) {
   uint32_t mask = RMT.int_st.val;
   RMT.int_clr.val = mask;
   if (mask & RMT_CH0_TX_END_INT_ST) {
+	  PROBE_1_TOGGLE;
     apply_command(&fas_queue[6], false);
   }
   if (mask & RMT_CH1_TX_END_INT_ST) {
     apply_command(&fas_queue[7], false);
   }
   if (mask & RMT_CH0_TX_THR_EVENT_INT_ST) {
+	  PROBE_1_TOGGLE;
+	  PROBE_2_TOGGLE;
     apply_command(&fas_queue[6], true);
+	// now repeat the interrupt at buffer size + end marker
+	RMT.tx_lim_ch[0].limit = PART_SIZE*2+1;
   }
   if (mask & RMT_CH1_TX_THR_EVENT_INT_ST) {
     apply_command(&fas_queue[7], true);
+	RMT.tx_lim_ch[1].limit = PART_SIZE*2+1;
   }
 }
 
 void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
-#ifdef TEST_PROBE
-  pinMode(TEST_PROBE, OUTPUT);
+#ifdef TEST_PROBE_1
+  pinMode(TEST_PROBE_1, OUTPUT);
+  PROBE_1(LOW);
+#endif
+#ifdef TEST_PROBE_2
+  pinMode(TEST_PROBE_2, OUTPUT);
+  PROBE_2(LOW);
 #endif
 
   _initVars();
@@ -196,7 +242,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     rmt_isr_register(tx_intr_handler, NULL,
                      ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM, NULL);
     RMT.apb_conf.fifo_mask = 1;
-    RMT.apb_conf.mem_tx_wrap_en = 1;
+    RMT.apb_conf.mem_tx_wrap_en = 0;
   }
 
   digitalWrite(step_pin, LOW);
@@ -211,6 +257,8 @@ void StepperQueue::connect_rmt() {
 #else
   rmt_set_gpio(channel, RMT_MODE_TX, (gpio_num_t)_step_pin, false);
 #endif
+  RMT.conf_ch[channel].conf1.idle_out_lv = 0;
+  RMT.conf_ch[channel].conf1.idle_out_en = 1;
 }
 
 void StepperQueue::disconnect_rmt() {
@@ -225,25 +273,50 @@ void StepperQueue::disconnect_rmt() {
 
 void StepperQueue::startQueue_rmt() {
   Serial.println("START");
-#ifdef TEST_PROBE
-  // The time used by this command can have an impact
-  digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
-#endif
-
-  _isRunning = true;
+  rmt_tx_stop(channel);
+  rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
-  for (uint8_t i = 0; i < 2 * PART_SIZE; i++) {
+  for (uint8_t i = 0; i < 64; i+=2) {
     uint32_t *mem = (uint32_t *)RMT_CHANNEL_MEM(channel);
-    mem[i] = 0x7fff7fff;
+    mem[i+0] = 0x0fff8fff;
+    mem[i+1] = 0x7fff8fff;
     mem[2 * PART_SIZE] = 0;
   }
-  rmt_set_tx_intr_en(channel, true);
-  rmt_set_tx_thr_intr_en(channel, true, PART_SIZE);
-  RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
-  last_was_first = false;
+  _isRunning = true;
+  rmt_set_tx_intr_en(channel, false);
+  rmt_set_tx_thr_intr_en(channel, false, PART_SIZE+1);// VULNERABLE !?!?
+    RMT.apb_conf.mem_tx_wrap_en = 0;
+
+  Serial.println(next_write_idx - read_idx);
+
   apply_command(this, true);
   apply_command(this, false);
-  rmt_tx_start(this->channel, true);
+
+#define TRACE
+#ifdef TRACE
+  Serial.print(RMT.conf_ch[channel].conf0.val);
+  Serial.print(' ');
+  Serial.print(RMT.conf_ch[channel].conf1.val);
+  Serial.println(' ');
+  Serial.print(RMT.apb_conf.mem_tx_wrap_en);
+  Serial.println(' ');
+  for (uint8_t i = 0; i < 64; i++) {
+    uint32_t *mem = (uint32_t *)RMT_CHANNEL_MEM(channel);
+	Serial.print(i);
+    Serial.print(' ');
+	Serial.println(mem[i], HEX);
+  }
+  if (!isRunning()) {
+	  Serial.println("STOPPED");
+  }
+#endif
+  if (_isRunning) {
+      RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
+	  rmt_set_tx_intr_en(channel, true);
+	  rmt_set_tx_thr_intr_en(channel, true, PART_SIZE+1);// VULNERABLE !?!?
+  }
+  RMT.conf_ch[channel].conf1.tx_start = 1;
+//  RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {
   init_stop(this);
