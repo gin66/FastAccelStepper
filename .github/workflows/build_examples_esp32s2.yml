@@ -1,4 +1,4 @@
-name: Build examples for esp32arduino @ latest
+name: Build examples for esp32s2arduino @ latest
 
 on:
   push:
