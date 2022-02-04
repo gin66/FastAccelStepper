@@ -3,6 +3,8 @@
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.24.1)
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.24.1)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.24.1)
+[![Build examples for esp32](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml)
+[![Build examples for esp32s2](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml)
 [![Build examples for esp32arduino @ 3.4.0](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml)
 [![Build examples for Atmega2560](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml)
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)

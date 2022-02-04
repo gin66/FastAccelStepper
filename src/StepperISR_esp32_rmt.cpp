@@ -50,8 +50,7 @@ int tp2 = 0;
 //Of these 32 bits, the low 16-bit entry is sent first and the high entry second.
 #define PART_SIZE 30
 
-static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one) {
-  uint32_t *data = (uint32_t *)RMT_CHANNEL_MEM(q->channel);
+static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one, uint32_t *data) {
   if (!fill_part_one) {
     data += PART_SIZE;
   }
@@ -192,20 +191,20 @@ static void IRAM_ATTR tx_intr_handler(void *arg) {
   RMT.int_clr.val = mask;
   if (mask & RMT_CH0_TX_END_INT_ST) {
 	  PROBE_1_TOGGLE;
-    apply_command(&fas_queue[6], false);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT+0], false, (uint32_t *)RMT_CH0DATA_REG);
   }
   if (mask & RMT_CH1_TX_END_INT_ST) {
-    apply_command(&fas_queue[7], false);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT+1], false, (uint32_t *)RMT_CH1DATA_REG);
   }
   if (mask & RMT_CH0_TX_THR_EVENT_INT_ST) {
 	  PROBE_1_TOGGLE;
 	  PROBE_2_TOGGLE;
-    apply_command(&fas_queue[6], true);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT+0], true, (uint32_t *)RMT_CH0DATA_REG);
 	// now repeat the interrupt at buffer size + end marker
 	RMT.tx_lim_ch[0].limit = PART_SIZE*2+1;
   }
   if (mask & RMT_CH1_TX_THR_EVENT_INT_ST) {
-    apply_command(&fas_queue[7], true);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT+1], true, (uint32_t *)RMT_CH1DATA_REG);
 	RMT.tx_lim_ch[1].limit = PART_SIZE*2+1;
   }
 }
@@ -274,12 +273,18 @@ void StepperQueue::startQueue_rmt() {
   rmt_tx_stop(channel);
   rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
+  uint32_t *mem;
+  if (channel == 0) {
+	  mem = (uint32_t *)RMT_CH0DATA_REG;
+  }
+  else {
+	  mem = (uint32_t *)RMT_CH1DATA_REG;
+  }
   for (uint8_t i = 0; i < 64; i+=2) {
-    uint32_t *mem = (uint32_t *)RMT_CHANNEL_MEM(channel);
     mem[i+0] = 0x0fff8fff;
     mem[i+1] = 0x7fff8fff;
-    mem[2 * PART_SIZE] = 0;
   }
+  mem[2 * PART_SIZE] = 0;
   _isRunning = true;
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, PART_SIZE+1);// VULNERABLE !?!?
@@ -287,10 +292,10 @@ void StepperQueue::startQueue_rmt() {
 
   Serial.println(next_write_idx - read_idx);
 
-  apply_command(this, true);
-  apply_command(this, false);
+  apply_command(this, true, mem);
+  apply_command(this, false, mem);
 
-#define TRACE
+//#define TRACE
 #ifdef TRACE
   Serial.print(RMT.conf_ch[channel].conf0.val);
   Serial.print(' ');
@@ -299,7 +304,6 @@ void StepperQueue::startQueue_rmt() {
   Serial.print(RMT.apb_conf.mem_tx_wrap_en);
   Serial.println(' ');
   for (uint8_t i = 0; i < 64; i++) {
-    uint32_t *mem = (uint32_t *)RMT_CHANNEL_MEM(channel);
 	Serial.print(i);
     Serial.print(' ');
 	Serial.println(mem[i], HEX);

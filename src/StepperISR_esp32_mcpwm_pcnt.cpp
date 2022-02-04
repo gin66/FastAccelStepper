@@ -2,11 +2,6 @@
 
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 
-#ifdef __ESP32_IDF_V44__
-#include <driver/periph_ctrl.h>
-#include <soc/periph_defs.h>
-#endif /* __ESP32_IDF_V44__ */
-
 #define DEFAULT_TIMER_H_L_TRANSITION 160
 
 // cannot be updated while timer is running => fix it to 0

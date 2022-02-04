@@ -95,6 +95,10 @@ struct queue_end_s {
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32_RMT
 #include <driver/rmt.h>
+#include <driver/periph_ctrl.h>
+#include <soc/rmt_periph.h>
+#include <soc/rmt_reg.h>
+#include <soc/rmt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
 
@@ -272,5 +276,10 @@ enum channels { channelA, channelB, channelC };
 #error "Unsupported derivate"
 
 #endif
+
+#ifdef __ESP32_IDF_V44__
+#include <driver/periph_ctrl.h>
+#include <soc/periph_defs.h>
+#endif /* __ESP32_IDF_V44__ */
 
 #endif /* COMMON_H */
