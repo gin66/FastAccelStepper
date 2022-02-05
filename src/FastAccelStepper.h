@@ -177,7 +177,7 @@ class FastAccelStepperEngine {
 // |MIN_DIR_DELAY_US |  200        | [µs]                    |
 // |MAX_DIR_DELAY_US | 3120        | [µs]                    |
 //
-//
+// # FastAccelStepper
 
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
 

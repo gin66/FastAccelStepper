@@ -150,7 +150,7 @@ And the two directions of a move
 |MIN_DIR_DELAY_US |  200        | [µs]                    |
 |MAX_DIR_DELAY_US | 3120        | [µs]                    |
 
-
+# FastAccelStepper
 step pin is defined at creation. Here can retrieve the pin
 ```cpp
   uint8_t getStepPin();
