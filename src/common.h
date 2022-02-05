@@ -70,6 +70,8 @@ struct queue_end_s {
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 1
 
+#define SUPPORT_QUEUE_ENTRY_END_POS_U16
+
 //==========================================================================
 //
 // This for ESP32 derivates using arduino core

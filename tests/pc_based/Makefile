@@ -13,7 +13,7 @@ test: $(TESTS) pmf_test rmc_test
 LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h \
 	  RampGenerator.h RampConstAcceleration.h RampCalculator.h common.h
 LIB_O=FastAccelStepper.o PoorManFloat.o StepperISR_test.o \
-	  RampGenerator.o RampConstAcceleration.o RampCalculator.o
+	  RampGenerator.o RampConstAcceleration.o RampCalculator.o StepperISR.o
 
 SRC_LIB_H=$(addprefix ../../src/,$(LIB_H))
 
@@ -42,6 +42,9 @@ RampConstAcceleration.o: ../../src/RampConstAcceleration.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 RampCalculator.o: ../../src/RampCalculator.cpp $(SRC_LIB_H)
+	$(COMPILE.cpp) $< -o $@
+
+StepperISR.o: ../../src/StepperISR.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
