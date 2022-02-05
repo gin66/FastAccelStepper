@@ -12,6 +12,7 @@ BEGIN {
 
 /#include/ { next }
 (NF != 0) && (in_c_header == 1) { next }
+/\/\/ *clang-format/ { next }
 
 { in_c_header = 0 }
 

@@ -53,7 +53,7 @@ ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is us
 ```
 ### Creation of FastAccelStepper
 
-Using a call to stepperConnectToPin() a FastAccelStepper instance is created.
+Using a call to `stepperConnectToPin()` a FastAccelStepper instance is created.
 This call tells the stepper, which step pin to use. As the hardware may have
 limitations - e.g. no stepper resources anymore, or the step pin cannot be used,
 then NULL is returned. So it is advised to check the return value of this call.
@@ -62,15 +62,17 @@ then NULL is returned. So it is advised to check the return value of this call.
 ```
 Comments to valid pins:
 
-| Device     | Comment                                                    |
-|:-----------|:-----------------------------------------------------------|
-| ESP32      | Every output capable GPIO can be used                      |
-| Atmega328p | Only the pins connected to OC1A and OC1B are allowed       |
-| Atmega2560 | Only the pins connected to OC4A, OC4B and OC4C are allowed.|
-| Atmega32u4 | Only the pins connected to OC4A, OC4B and OC4C are allowed |
+| Device     | Comment                                                                                           |
+|:-----------|:--------------------------------------------------------------------------------------------------|
+| ESP32      | Every output capable GPIO can be used                                                             |
+| ESP32S2    | Every output capable GPIO can be used                                                             |
+| Atmega328p | Only the pins connected to OC1A and OC1B are allowed                                              |
+| Atmega2560 | Only the pins connected to OC4A, OC4B and OC4C are allowed.                                       |
+| Atmega32u4 | Only the pins connected to OC4A, OC4B and OC4C are allowed                                        |
+| Atmel SAM  | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
 ### Debug LED
 
-If blinking of a LED is required to indicated, the stepper controller is still running,
+If blinking of a LED is required to indicate, the stepper controller is still running,
 then the port. to which the LED is connected, can be told to the engine.
 The periodic task will let the associated LED blink with 1 Hz
 ```cpp
@@ -486,8 +488,8 @@ completed. This has immediate effect to getCurrentPosition().
   void setPositionAfterCommandsCompleted(int32_t new_pos);
 ```
 This function provides info, in which state the high level stepper control
-is operating. The return value is an or of RAMP_STATE_... and
-RAMP_DIRECTION_... flags
+is operating. The return value is an `or` of RAMP_STATE_... and
+RAMP_DIRECTION_... flags. Definitions are above
 ```cpp
   inline uint8_t rampState() { return _rg.rampState(); }
 ```
@@ -501,6 +503,7 @@ Pretty low level, use with care or not at all
   void detachFromPin();
   void reAttachToPin();
 ```
+## ESP32 only: Free pulse counter
 These two functions are only available on esp32.
 The first can attach any of the eight pulse counters to this stepper.
 The second then will read the current pulse counter value
