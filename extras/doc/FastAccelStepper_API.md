@@ -34,8 +34,17 @@ This engine - actually a factory - provides you with instances of steppers.
 ### Initialization
 
 The FastAccelStepperEngine is declared with FastAccelStepperEngine().
-This is to occupy the needed memory. But it still needs to be initialized.
+This is to occupy the needed memory.
+```cpp
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+```
+But it still needs to be initialized.
 For this init shall be used:
+```cpp
+void setup() {
+   engine.init();
+}
+```
 ```cpp
   void init();
 ```
