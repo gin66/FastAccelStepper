@@ -172,6 +172,8 @@ struct queue_end_s {
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 4
 
+#define SUPPORT_QUEUE_ENTRY_START_POS_U16
+
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
@@ -235,6 +237,8 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+#define SUPPORT_QUEUE_ENTRY_START_POS_U16
+
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
 
@@ -247,6 +251,8 @@ struct queue_end_s {
 //
 //==========================================================================
 #elif defined(ARDUINO_ARCH_SAM)
+#define SUPPORT_SAM
+
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
 // on SAM just use the arduino macros
@@ -268,12 +274,19 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+#define SUPPORT_DIR_PIN_MASK uint32_t
+
+// TO BE CHECKED
+#define SUPPORT_QUEUE_ENTRY_END_POS_U16
+
 //==========================================================================
 //
 // This for the AVR family
 //
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
+#define SUPPORT_AVR
+
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
 #include "AVRStepperPins.h"
@@ -295,6 +308,10 @@ struct queue_end_s {
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
+
+#define SUPPORT_DIR_PIN_MASK uint8_t
+
+#define SUPPORT_QUEUE_ENTRY_END_POS_U16
 
 //==========================================================================
 //

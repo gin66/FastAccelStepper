@@ -8,8 +8,6 @@
 // These variables control the stepper timing behaviour
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
-#if defined(ARDUINO_ARCH_SAM)
-#endif
 struct queue_entry {
   uint8_t steps;  // if 0,  then the command only adds a delay
   uint8_t toggle_dir : 1;
@@ -17,9 +15,10 @@ struct queue_entry {
   uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
   uint16_t ticks;
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
   uint16_t end_pos_last16;
-#else
+#endif
+#if defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)
   uint16_t start_pos_last16;
 #endif
 };
@@ -65,34 +64,41 @@ class StepperQueue {
   bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
   bool use_rmt;
+  uint8_t _step_pin;
+  uint16_t _getPerformedPulses();
+#endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   const void *driver_data;
-  bool isReadyForCommands_mcpwm_pcnt();
 #endif
 #ifdef SUPPORT_ESP32_RMT
   rmt_channel_t channel;
-  bool isReadyForCommands_rmt();
   bool _rmtStopped;
 #endif
-#elif defined(ARDUINO_ARCH_AVR)
-  volatile uint8_t* _dirPinPort;
-  uint8_t _dirPinMask;
+#if defined(SUPPORT_DIR_PIN_MASK)
+  // avr uses uint8_t and sam needs uint32_t
+  // so make the SUPPORT_DIR_PIN_MASK dual use
+  volatile SUPPORT_DIR_PIN_MASK* _dirPinPort;
+  SUPPORT_DIR_PIN_MASK _dirPinMask;
+#endif
+#if defined(SUPPORT_AVR)
   volatile bool _prepareForStop;
   volatile bool _isRunning;
   inline bool isRunning() { return _isRunning; }
   inline bool isReadyForCommands() { return true; }
   enum channels channel;
-#elif defined(ARDUINO_ARCH_SAM)
+#endif
+#if defined(SUPPORT_SAM)
+  uint8_t _step_pin;
+  uint8_t _queue_num;
   void *driver_data;
-  volatile uint32_t* _dirPinPort;
-  uint32_t _dirPinMask;
   volatile bool _hasISRactive;
   bool isRunning();
   bool _connected;
   inline bool isReadyForCommands() { return true; }
   volatile bool _pauseCommanded;
   volatile uint32_t timePWMInterruptEnabled;
-#else
+#endif
+#if defined(TEST)
   volatile bool _isRunning;
   inline bool isReadyForCommands() { return true; }
   inline bool isRunning() { return _isRunning; }
@@ -125,18 +131,11 @@ class StepperQueue {
   void startQueue();
   void forceStop();
   void _initVars();
-#if defined(SUPPORT_ESP32)
-  uint8_t _step_pin;
-  uint16_t _getPerformedPulses();
-#endif
-#if defined(ARDUINO_ARCH_SAM)
-  uint8_t _step_pin;
-  uint8_t _queue_num;
-#endif
   void connect();
   void disconnect();
 
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
+  bool isReadyForCommands_mcpwm_pcnt();
   void init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_mcpwm_pcnt();
   void forceStop_mcpwm_pcnt();
@@ -145,6 +144,7 @@ class StepperQueue {
   void disconnect_mcpwm_pcnt();
 #endif
 #ifdef SUPPORT_ESP32_RMT
+  bool isReadyForCommands_rmt();
   void init_rmt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_rmt();
   void forceStop_rmt();
@@ -155,7 +155,7 @@ class StepperQueue {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
-#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
+#if defined(SUPPORT_DIR_PIN_MASK)
     if (dir_pin != PIN_UNDEFINED) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);
