@@ -128,7 +128,7 @@ Tested with max two stepper motors with 50 kHz step rate by clazarowitz
 
 The library is in use with A4988, but other driver ICs should work, too.
 
-For the API definition please consult the header file [FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h).
+For the API definition please consult the header file [FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h). Or a generated [markdown file](https://github.com/gin66/FastAccelStepper/blob/master/extras/doc/FastAccelStepper_API.md)
 
 Please check the examples for application and how to use the low level interface.
 Some info is [Issue #86](https://github.com/gin66/FastAccelStepper/issues/86).
