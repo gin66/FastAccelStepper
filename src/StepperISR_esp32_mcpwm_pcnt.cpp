@@ -13,6 +13,17 @@
 //
 // As the ISR is accessing this table, the mapping cannot be put into flash,
 // even this is actually a constant table
+struct mapping_s {
+  mcpwm_unit_t mcpwm_unit;
+  uint8_t timer;
+  mcpwm_io_signals_t pwm_output_pin;
+  pcnt_unit_t pcnt_unit;
+  uint8_t input_sig_index;
+  uint32_t cmpr_tea_int_clr;
+  uint32_t cmpr_tea_int_ena;
+  uint32_t cmpr_tea_int_raw;
+};
+
 static struct mapping_s channel2mapping[NUM_QUEUES] = {
     {
       mcpwm_unit : MCPWM_UNIT_0,
@@ -80,7 +91,7 @@ static void IRAM_ATTR prepare_for_next_command(
     StepperQueue *queue, const struct queue_entry *e_next) {
   uint8_t next_steps = e_next->steps;
   if (next_steps > 0) {
-    const struct mapping_s *mapping = queue->mapping;
+    const struct mapping_s *mapping = (const struct mapping_s *)queue->driver_data;
     pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
     // is updated only on zero
     PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = next_steps;
@@ -93,7 +104,7 @@ static void IRAM_ATTR prepare_for_next_command(
 
 static void IRAM_ATTR apply_command(StepperQueue *queue,
                                     const struct queue_entry *e) {
-  const struct mapping_s *mapping = queue->mapping;
+  const struct mapping_s *mapping = (const struct mapping_s *)queue->driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
@@ -205,7 +216,7 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   // init stop is normally called after the first command,
   // because the second command is entered too late
   // and after the last command aka running out of commands.
-  const struct mapping_s *mapping = q->mapping;
+  const struct mapping_s *mapping = (const struct mapping_s *)q->driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
@@ -296,7 +307,8 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
 
-  mapping = &channel2mapping[channel_num];
+  const struct mapping_s *mapping = &channel2mapping[channel_num];
+  driver_data = (void *)mapping;
 
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -449,6 +461,7 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
   // The time used by this command can have an impact
   digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
 #endif
+  const struct mapping_s *mapping = (const struct mapping_s *)q->driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
@@ -478,6 +491,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
   if (isRunning()) {
     return true;
   }
+  const struct mapping_s *mapping = (const struct mapping_s *)q->driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;

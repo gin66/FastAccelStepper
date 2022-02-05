@@ -8,19 +8,6 @@
 // These variables control the stepper timing behaviour
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-struct mapping_s {
-  mcpwm_unit_t mcpwm_unit;
-  uint8_t timer;
-  mcpwm_io_signals_t pwm_output_pin;
-  pcnt_unit_t pcnt_unit;
-  uint8_t input_sig_index;
-  uint32_t cmpr_tea_int_clr;
-  uint32_t cmpr_tea_int_ena;
-  uint32_t cmpr_tea_int_raw;
-};
-#endif
-
 #if defined(ARDUINO_ARCH_SAM)
 typedef struct _PWMCHANNELMAPPING {
   uint8_t pin;
@@ -74,6 +61,7 @@ class StepperQueue {
   bool isReadyForCommands();
   bool use_rmt;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
+  const void *driver_data;
   const struct mapping_s* mapping;
   bool isReadyForCommands_mcpwm_pcnt();
 #endif
