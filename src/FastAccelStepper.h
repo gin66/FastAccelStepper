@@ -79,6 +79,8 @@ class FastAccelStepperEngine {
 
   // Comments to valid pins:
   //
+  // | Device     | Comment                                                    |
+  // |:-----------|:-----------------------------------------------------------|
   // | ESP32      | Every output capable GPIO can be used                      |
   // | Atmega328p | Only the pins connected to OC1A and OC1B are allowed       |
   // | Atmega2560 | Only the pins connected to OC4A, OC4B and OC4C are allowed.|
@@ -105,15 +107,33 @@ class FastAccelStepperEngine {
   friend class FastAccelStepper;
 };
 
-
-// Return codes of move() and moveTo()
+// ### Return codes of calls to `move()` and `moveTo()`
+//
+// All is OK:
 #define MOVE_OK 0
-// negative direction requested, but no direction pin defined
+
+// Negative direction requested, but no direction pin defined
 #define MOVE_ERR_NO_DIRECTION_PIN -1
+
+// The maximum speed has not been set yet
 #define MOVE_ERR_SPEED_IS_UNDEFINED -2
+
+// The acceleration to use has not been set yet
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
 
-// Return value of rampState()
+// ### Return codes of `rampState()`
+//
+// The return value is an uint8_t, which consist of two fields:
+//
+// | Bit 7   | Bits 6-5  | Bits 4-0 |
+// |:--------|:----------|:---------|
+// |Always 0 | Direction | State    |
+//
+// The bit mask for direction and state:
+#define RAMP_DIRECTION_MASK (32 + 64)
+#define RAMP_STATE_MASK (1 + 2 + 4 + 8 + 16)
+
+// The defined ramp states are:
 #define RAMP_STATE_IDLE 0
 #define RAMP_STATE_COAST 1
 #define RAMP_STATE_ACCELERATE 2
@@ -122,26 +142,26 @@ class FastAccelStepperEngine {
 #define RAMP_STATE_REVERSE (4 + 16)
 #define RAMP_STATE_ACCELERATING_FLAG 2
 #define RAMP_STATE_DECELERATING_FLAG 4
-#define RAMP_STATE_MASK (1 + 2 + 4 + 8 + 16)
+
+// And the two directions of a move
 #define RAMP_DIRECTION_COUNT_UP 32
 #define RAMP_DIRECTION_COUNT_DOWN 64
-#define RAMP_DIRECTION_MASK (32 + 64)
 
 #include "RampGenerator.h"
 #include "common.h"
 
 //
-// # Timing values - Architecture dependent
+// ## Timing values - Architecture dependent
 //
-// ## AVR
+// ### AVR
 // |VARIABLE         | Value       | Unit                    |
 // |:----------------|------------:|:------------------------|
 // |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
 // |MIN_CMD_TICKS    |  640        | [1/TICKS_PER_S seconds] |
-// |MIN_DIR_DELAY_US |   40          | [µs]                    |
+// |MIN_DIR_DELAY_US |   40        | [µs]                    |
 // |MAX_DIR_DELAY_US | 4095        | [µs]                    |
 //
-// ## ESP32
+// ### ESP32
 // |VARIABLE         | Value       | Unit                    |
 // |:----------------|------------:|:------------------------|
 // |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
@@ -149,13 +169,14 @@ class FastAccelStepperEngine {
 // |MIN_DIR_DELAY_US |  500        | [µs]                    |
 // |MAX_DIR_DELAY_US | 4095        | [µs]                    |
 //
-// ## SAM DUE
+// ### SAM DUE
 // |VARIABLE         | Value       | Unit                    |
 // |:----------------|------------:|:------------------------|
 // |TICKS_PER_S      | 21_000_000  | [ticks/s]               |
 // |MIN_CMD_TICKS    | 4200        | [1/TICKS_PER_S seconds] |
 // |MIN_DIR_DELAY_US |  200        | [µs]                    |
 // |MAX_DIR_DELAY_US | 3120        | [µs]                    |
+//
 //
 
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
