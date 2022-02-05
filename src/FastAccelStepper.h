@@ -188,7 +188,11 @@ class FastAccelStepperEngine {
 #define PIN_UNDEFINED 255
 
 class FastAccelStepper {
+#ifdef TEST
+ public:
+#else
  private:
+#endif
   void init(FastAccelStepperEngine* engine, uint8_t num, uint8_t step_pin);
 
  public:
