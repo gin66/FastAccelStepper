@@ -4,7 +4,7 @@
 
 // Return codes of move() and moveTo()
 #define MOVE_OK 0
-/* negative direction requested, but no direction pin defined */
+// negative direction requested, but no direction pin defined
 #define MOVE_ERR_NO_DIRECTION_PIN -1
 #define MOVE_ERR_SPEED_IS_UNDEFINED -2
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
@@ -26,6 +26,8 @@
 #include "PoorManFloat.h"
 #include "RampGenerator.h"
 #include "common.h"
+
+//=========================================================================
 
 //
 // Timing values - Architecture dependent

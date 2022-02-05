@@ -4,20 +4,43 @@
 # Places all C-lines in quotes
 
 gawk '
-/\/\// && (in_code == 1) { print }
+BEGIN {
+	in_c_header = 1
+	in_code = 0
+	quote_code = 0
+}
 
-/\/\// {
-	gsub("[ \t]*// *","")
-	print
+/#include/ { next }
+(NF != 0) && (in_c_header == 1) { next }
+
+{ in_c_header = 0 }
+
+(NF == 0) {
+	if (in_code == 1) {
+		print("```")
+	}
+	in_code = 0
+	quote_code = 0
 	next
 }
 
-in_code == 0 {
-	in_code = 1
-	print("```cpp")
+/\/\// {
+	if (in_code == 1) {
+		print("```")
+	}
+
+	gsub("[ \t]*// *","")
+	print
+	in_code = 0
+	quote_code = 1
+	next
 }
 
-(in_code == 1) && /^$/ { in_code = 0 }
+(quote_code == 1) {
+	print("```cpp")
+	in_code = 1
+	quote_code = 0
+}
 
 in_code == 1 { print }
 ' ../../src/FastAccelStepper.h >../doc/FastAccelStepper_API.md
