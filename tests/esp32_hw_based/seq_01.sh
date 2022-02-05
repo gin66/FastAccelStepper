@@ -2,8 +2,8 @@
 TTY=${1:-ttyUSB0}
 DEV="-d /dev/${TTY} -b 115200"
 
-CMD="M1 p7,0,0 H25000 A10000 f w1000 X pc R1000 "
-PASS=">> M1: @1000 \\[1000\\]"
+CMD="M1 p7,0,0 H25000 A10000 f w1000 X pc R100 w100 R1000 W "
+PASS=">> M1: @1100 \\[1100\\]"
 
 LOG="$0.log"
 
