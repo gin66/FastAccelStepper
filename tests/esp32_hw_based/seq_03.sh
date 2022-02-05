@@ -1,6 +1,7 @@
 #!/bin/sh
 TTY=${1:-ttyUSB0}
 DEV="-d /dev/${TTY} -b 115200"
+MOTOR=${MOTOR:-M1}
 
 COMPLETE="test completed"
 PASS="test passed"
@@ -10,10 +11,10 @@ MAX_RUN_S=300
 for SEQ in 13 01 02 03 04 06 07 10 11
 do
 	LOG="$0_$SEQ.log"
-	CMD="M1 p7,0,0 t M1 $SEQ R "
+	CMD="$MOTOR p7,0,0 t $MOTOR $SEQ R "
 
 	echo "reset esp32"
-	grabserial $DEV -c ' x reset ' -q "M1:" -e 10
+	grabserial $DEV -c ' x reset ' -q "$MOTOR:" -e 10
 	sleep 2
 
 	echo "send commands"

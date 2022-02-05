@@ -1,13 +1,14 @@
 #!/bin/sh
 TTY=${1:-ttyUSB0}
 DEV="-d /dev/${TTY} -b 115200"
+MOTOR=${MOTOR:-M1}
 
-CMD="M1 p7,0,0 H25000 A10000 f w1000 X pc R1000 "
-PASS=">> M1: @1000 \\[1000\\]"
+CMD="$MOTOR p7,0,0 H25000 A10000 f w1000 X pc R1000 W "
+PASS=">> $MOTOR: @1000 \\[1000\\]"
 
 LOG="$0.log"
 
-grabserial $DEV -c ' x reset ' -q "M1:" -e 10
+grabserial $DEV -c ' x reset ' -q "$MOTOR:" -e 10
 sleep 2
 
 grabserial $DEV -c "$CMD" -q "$PASS" -e 3 -o $LOG
