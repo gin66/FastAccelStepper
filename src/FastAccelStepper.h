@@ -216,8 +216,8 @@ class FastAccelStepper {
   // move/moveTo for an ongoing command would reverse the direction, then the
   // command is silently ignored.
   // return values are the MOVE_... constants
-  int8_t move(int32_t move);
-  int8_t moveTo(int32_t position);
+  int8_t move(int32_t move, bool blocking = false);
+  int8_t moveTo(int32_t position, bool blocking = false);
 
   // This command flags the stepper to keep run continuously into current
   // direction. It can be stopped by stopMove.

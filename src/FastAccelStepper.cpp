@@ -528,14 +528,26 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
 }
 int8_t FastAccelStepper::runForward() { return _rg.startRun(true); }
 int8_t FastAccelStepper::runBackward() { return _rg.startRun(false); }
-int8_t FastAccelStepper::moveTo(int32_t position) {
-  return _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
+int8_t FastAccelStepper::moveTo(int32_t position, bool blocking) {
+  int8_t res = _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
+  if ((res == MOVE_OK) && blocking) {
+	  while(isRunning()) {
+		  noop_or_wait;
+	  }
+  }
+  return res;
 }
-int8_t FastAccelStepper::move(int32_t move) {
+int8_t FastAccelStepper::move(int32_t move, bool blocking) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  return _rg.move(move, &fas_queue[_queue_num].queue_end);
+  int8_t res = _rg.move(move, &fas_queue[_queue_num].queue_end);
+  if ((res == MOVE_OK) && blocking) {
+	  while(isRunning()) {
+		  noop_or_wait;
+	  }
+  }
+  return res;
 }
 void FastAccelStepper::keepRunning() { _rg.setKeepRunning(); }
 void FastAccelStepper::stopMove() { _rg.initiateStop(); }

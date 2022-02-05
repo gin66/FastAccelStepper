@@ -179,6 +179,8 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+#define noop_or_wait vTaskDelay(1)
+
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
 
@@ -239,6 +241,8 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+#define noop_or_wait vTaskDelay(1)
+
 #define SUPPORT_QUEUE_ENTRY_START_POS_U16
 
 // have support for pulse counter
@@ -276,6 +280,8 @@ struct queue_end_s {
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50
 
+#define noop_or_wait
+
 #define SUPPORT_DIR_PIN_MASK uint32_t
 
 // TO BE CHECKED
@@ -310,6 +316,8 @@ struct queue_end_s {
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
+
+#define noop_or_wait
 
 #define SUPPORT_DIR_PIN_MASK uint8_t
 
