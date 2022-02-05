@@ -23,15 +23,12 @@ struct queue_entry {
 #endif
 };
 
-
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
 bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
                                  int16_t low_value, int16_t high_value);
 void _esp32_clearPulseCounter(uint8_t pcnt_unit);
 int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
 #endif
-
-
 
 class StepperQueue {
  public:
@@ -68,7 +65,7 @@ class StepperQueue {
   uint16_t _getPerformedPulses();
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-  const void *driver_data;
+  const void* driver_data;
 #endif
 #ifdef SUPPORT_ESP32_RMT
   rmt_channel_t channel;
@@ -90,7 +87,7 @@ class StepperQueue {
 #if defined(SUPPORT_SAM)
   uint8_t _step_pin;
   uint8_t _queue_num;
-  void *driver_data;
+  void* driver_data;
   volatile bool _hasISRactive;
   bool isRunning();
   bool _connected;

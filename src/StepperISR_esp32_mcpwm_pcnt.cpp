@@ -91,7 +91,8 @@ static void IRAM_ATTR prepare_for_next_command(
     StepperQueue *queue, const struct queue_entry *e_next) {
   uint8_t next_steps = e_next->steps;
   if (next_steps > 0) {
-    const struct mapping_s *mapping = (const struct mapping_s *)queue->driver_data;
+    const struct mapping_s *mapping =
+        (const struct mapping_s *)queue->driver_data;
     pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
     // is updated only on zero
     PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = next_steps;
@@ -104,7 +105,8 @@ static void IRAM_ATTR prepare_for_next_command(
 
 static void IRAM_ATTR apply_command(StepperQueue *queue,
                                     const struct queue_entry *e) {
-  const struct mapping_s *mapping = (const struct mapping_s *)queue->driver_data;
+  const struct mapping_s *mapping =
+      (const struct mapping_s *)queue->driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
@@ -242,7 +244,8 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
       struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
       if (!isPrepared) {
         prepare_for_next_command(q, e_curr);
-		const struct mapping_s *mapping = (const struct mapping_s *)q->driver_data;
+        const struct mapping_s *mapping =
+            (const struct mapping_s *)q->driver_data;
         isr_pcnt_counter_clear(mapping->pcnt_unit);
       }
       apply_command(q, e_curr);

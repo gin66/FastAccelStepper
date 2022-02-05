@@ -163,9 +163,10 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     if (!fill_part_one) {
       // Note: When enabling the continuous transmission mode by setting
       // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
-      // channel continuously, that is, from the first byte to the last one, then
-      // from the first to the last again, and so on. In this mode, there will be
-      // an idle level lasting one clk_div cycle between N and N+1 transmissions.
+      // channel continuously, that is, from the first byte to the last one,
+      // then from the first to the last again, and so on. In this mode, there
+      // will be an idle level lasting one clk_div cycle between N and N+1
+      // transmissions.
       *data -= 1;
     }
     if (steps == 0) {
