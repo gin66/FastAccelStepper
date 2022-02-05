@@ -73,7 +73,6 @@ class StepperQueue {
   bool use_rmt;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   const void *driver_data;
-  const struct mapping_s* mapping;
   bool isReadyForCommands_mcpwm_pcnt();
 #endif
 #ifdef SUPPORT_ESP32_RMT
