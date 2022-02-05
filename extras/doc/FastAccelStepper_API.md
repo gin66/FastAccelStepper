@@ -45,9 +45,6 @@ void setup() {
    engine.init();
 }
 ```
-```cpp
-  void init();
-```
 In a multitasking and multicore system like ESP32, the steppers are controlled by a continuously running
 task. This task can be fixed to one CPU core with this modified init()-call.
 ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
@@ -58,7 +55,7 @@ ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is us
 
 Using a call to stepperConnectToPin() a FastAccelStepper instance is created.
 This call tells the stepper, which step pin to use. As the hardware may have
-limitation - e.g. no stepper resources anymore, or the step pin cannot be used,
+limitations - e.g. no stepper resources anymore, or the step pin cannot be used,
 then NULL is returned. So it is advised to check the return value of this call.
 ```cpp
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
@@ -108,26 +105,27 @@ Return value of rampState()
 ## AVR
 |VARIABLE         | Value       | Unit                    |
 |:----------------|------------:|:------------------------|
- |TICKS_PER_S		 |	16_000_000 | [ticks/s]               |
-|MIN_CMD_TICKS	 |	640 	   | [1/TICKS_PER_S seconds] |
-|MIN_DIR_DELAY_US |	40		   | [µs]                    |
-|MAX_DIR_DELAY_US |	4095	   | [µs]                    |
+ |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
+|MIN_CMD_TICKS    |  640        | [1/TICKS_PER_S seconds] |
+|MIN_DIR_DELAY_US |   40          | [µs]                    |
+|MAX_DIR_DELAY_US | 4095        | [µs]                    |
 
 ## ESP32
 |VARIABLE         | Value       | Unit                    |
 |:----------------|------------:|:------------------------|
-|TICKS_PER_S		 |	16_000_000 | [ticks/s]               |
-|MIN_CMD_TICKS	 |	8000	   | [1/TICKS_PER_S seconds] |
-|MIN_DIR_DELAY_US |	500		   | [µs]                    |
-|MAX_DIR_DELAY_US |	4095	   | [µs]                    |
+|TICKS_PER_S      | 16_000_000  | [ticks/s]               |
+|MIN_CMD_TICKS    | 8000        | [1/TICKS_PER_S seconds] |
+|MIN_DIR_DELAY_US |  500        | [µs]                    |
+|MAX_DIR_DELAY_US | 4095        | [µs]                    |
 
 ## SAM DUE
 |VARIABLE         | Value       | Unit                    |
 |:----------------|------------:|:------------------------|
 |TICKS_PER_S      | 21_000_000  | [ticks/s]               |
-|MIN_CMD_TICKS    |	4200	   | [1/TICKS_PER_S seconds] |
-|MIN_DIR_DELAY_US |	200		   | [µs]                    |
-|MAX_DIR_DELAY_US | 3120	       | [µs]                    |
+|MIN_CMD_TICKS    | 4200        | [1/TICKS_PER_S seconds] |
+|MIN_DIR_DELAY_US |  200        | [µs]                    |
+|MAX_DIR_DELAY_US | 3120        | [µs]                    |
+
 step pin is defined at creation. Here can retrieve the pin
 ```cpp
   uint8_t getStepPin();
@@ -150,8 +148,8 @@ if enable pin is connected, then use this function.
 
 In case there are two enable pins: one low and one high active, then
 these calls are valid and both pins will be operated:
-	setEnablePin(pin1, true);
-	setEnablePin(pin2, false);
+   setEnablePin(pin1, true);
+   setEnablePin(pin2, false);
 If pin1 and pin2 are same, then the last call will be used.
 ```cpp
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
@@ -253,9 +251,9 @@ NOT the actual speed !)
   uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
 ```
 getCurrentSpeed() retrieves the actual speed.
-	= 0 while not moving
-	> 0 while position counting up
-	< 0 while position counting down
+   = 0 while not moving
+   > 0 while position counting up
+   < 0 while position counting down
 ```cpp
   int32_t getCurrentSpeedInUs();
   int32_t getCurrentSpeedInMilliHz();
@@ -285,9 +283,9 @@ Returns 0 on success, or -1 on invalid value (<=0)
   uint32_t getAcceleration() { return _rg.getAcceleration(); }
 ```
 getCurrentAcceleration() retrieves the actual acceleration.
-	= 0 while idle or coasting
-	> 0 while speed is changing towards positive values
-	< 0 while speed is changeing towards negative values
+   = 0 while idle or coasting
+   > 0 while speed is changing towards positive values
+   < 0 while speed is changeing towards negative values
 ```cpp
   int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
 ```
@@ -337,11 +335,11 @@ moveByAcceleration() can be called, if only the speed of the stepper
 is of interest and that speed to be controlled by acceleration.
 The maximum speed (in both directions) to be set by setSpeedInUs() before.
 The behaviour will be:
-	acceleration > 0  => accelerate towards positive maximum speed
-	acceleration = 0  => keep current speed
-	acceleration < 0
-		=> accelerate towards negative maximum speed if allow_reverse
-		=> decelerate towards motor stop if allow_reverse = false
+   acceleration > 0  => accelerate towards positive maximum speed
+   acceleration = 0  => keep current speed
+   acceleration < 0
+       => accelerate towards negative maximum speed if allow_reverse
+       => decelerate towards motor stop if allow_reverse = false
 return value as with move/moveTo
 ```cpp
   int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);

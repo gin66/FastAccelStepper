@@ -58,6 +58,7 @@ class FastAccelStepperEngine {
   //    engine.init();
   // }
   // ```
+  
   void init();
 
 #if defined(SUPPORT_CPU_AFFINITY)
@@ -72,7 +73,7 @@ class FastAccelStepperEngine {
   //
   // Using a call to stepperConnectToPin() a FastAccelStepper instance is created.
   // This call tells the stepper, which step pin to use. As the hardware may have
-  // limitation - e.g. no stepper resources anymore, or the step pin cannot be used,
+  // limitations - e.g. no stepper resources anymore, or the step pin cannot be used,
   // then NULL is returned. So it is advised to check the return value of this call.
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 
@@ -135,26 +136,27 @@ class FastAccelStepperEngine {
 // ## AVR
 // |VARIABLE         | Value       | Unit                    |
 // |:----------------|------------:|:------------------------|
-// |TICKS_PER_S		 |	16_000_000 | [ticks/s]               |
-// |MIN_CMD_TICKS	 |	640 	   | [1/TICKS_PER_S seconds] |
-// |MIN_DIR_DELAY_US |	40		   | [µs]                    |
-// |MAX_DIR_DELAY_US |	4095	   | [µs]                    |
+// |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
+// |MIN_CMD_TICKS    |  640        | [1/TICKS_PER_S seconds] |
+// |MIN_DIR_DELAY_US |   40          | [µs]                    |
+// |MAX_DIR_DELAY_US | 4095        | [µs]                    |
 //
 // ## ESP32
 // |VARIABLE         | Value       | Unit                    |
 // |:----------------|------------:|:------------------------|
-// |TICKS_PER_S		 |	16_000_000 | [ticks/s]               |
-// |MIN_CMD_TICKS	 |	8000	   | [1/TICKS_PER_S seconds] |
-// |MIN_DIR_DELAY_US |	500		   | [µs]                    |
-// |MAX_DIR_DELAY_US |	4095	   | [µs]                    |
+// |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
+// |MIN_CMD_TICKS    | 8000        | [1/TICKS_PER_S seconds] |
+// |MIN_DIR_DELAY_US |  500        | [µs]                    |
+// |MAX_DIR_DELAY_US | 4095        | [µs]                    |
 //
 // ## SAM DUE
 // |VARIABLE         | Value       | Unit                    |
 // |:----------------|------------:|:------------------------|
 // |TICKS_PER_S      | 21_000_000  | [ticks/s]               |
-// |MIN_CMD_TICKS    |	4200	   | [1/TICKS_PER_S seconds] |
-// |MIN_DIR_DELAY_US |	200		   | [µs]                    |
-// |MAX_DIR_DELAY_US | 3120	       | [µs]                    |
+// |MIN_CMD_TICKS    | 4200        | [1/TICKS_PER_S seconds] |
+// |MIN_DIR_DELAY_US |  200        | [µs]                    |
+// |MAX_DIR_DELAY_US | 3120        | [µs]                    |
+//
 
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
 
@@ -185,8 +187,8 @@ class FastAccelStepper {
   //
   // In case there are two enable pins: one low and one high active, then
   // these calls are valid and both pins will be operated:
-  //	setEnablePin(pin1, true);
-  //	setEnablePin(pin2, false);
+  //    setEnablePin(pin1, true);
+  //    setEnablePin(pin2, false);
   // If pin1 and pin2 are same, then the last call will be used.
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
   uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
@@ -276,9 +278,9 @@ class FastAccelStepper {
   uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
 
   // getCurrentSpeed() retrieves the actual speed.
-  //	= 0 while not moving
-  //	> 0 while position counting up
-  //	< 0 while position counting down
+  //    = 0 while not moving
+  //    > 0 while position counting up
+  //    < 0 while position counting down
   int32_t getCurrentSpeedInUs();
   int32_t getCurrentSpeedInMilliHz();
 
@@ -305,9 +307,9 @@ class FastAccelStepper {
   uint32_t getAcceleration() { return _rg.getAcceleration(); }
 
   // getCurrentAcceleration() retrieves the actual acceleration.
-  //	= 0 while idle or coasting
-  //	> 0 while speed is changing towards positive values
-  //	< 0 while speed is changeing towards negative values
+  //    = 0 while idle or coasting
+  //    > 0 while speed is changing towards positive values
+  //    < 0 while speed is changeing towards negative values
   int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
 
   // This function applies new values for speed/acceleration.
@@ -351,11 +353,11 @@ class FastAccelStepper {
   // is of interest and that speed to be controlled by acceleration.
   // The maximum speed (in both directions) to be set by setSpeedInUs() before.
   // The behaviour will be:
-  //	acceleration > 0  => accelerate towards positive maximum speed
-  //	acceleration = 0  => keep current speed
-  //	acceleration < 0
-  //		=> accelerate towards negative maximum speed if allow_reverse
-  //		=> decelerate towards motor stop if allow_reverse = false
+  //    acceleration > 0  => accelerate towards positive maximum speed
+  //    acceleration = 0  => keep current speed
+  //    acceleration < 0
+  //        => accelerate towards negative maximum speed if allow_reverse
+  //        => decelerate towards motor stop if allow_reverse = false
   // return value as with move/moveTo
   int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
 
