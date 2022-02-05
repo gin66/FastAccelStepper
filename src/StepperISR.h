@@ -9,12 +9,6 @@
 #define QUEUE_LEN_MASK (QUEUE_LEN - 1)
 
 #if defined(ARDUINO_ARCH_SAM)
-typedef struct _PWMCHANNELMAPPING {
-  uint8_t pin;
-  uint32_t channel;
-  Pio* port;
-  uint32_t channelMask;
-} PWMCHANNELMAPPING;
 #endif
 struct queue_entry {
   uint8_t steps;  // if 0,  then the command only adds a delay
@@ -89,11 +83,11 @@ class StepperQueue {
   inline bool isReadyForCommands() { return true; }
   enum channels channel;
 #elif defined(ARDUINO_ARCH_SAM)
+  void *driver_data;
   volatile uint32_t* _dirPinPort;
   uint32_t _dirPinMask;
   volatile bool _hasISRactive;
   bool isRunning();
-  const PWMCHANNELMAPPING* mapping;
   bool _connected;
   inline bool isReadyForCommands() { return true; }
   volatile bool _pauseCommanded;

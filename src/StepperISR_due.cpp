@@ -68,6 +68,13 @@ this...
 #include "FastAccelStepper.h"
 inline void disconnectPWMPeriphal(Pio* port, uint8_t pin, uint32_t channelMask);
 
+typedef struct _PWMCHANNELMAPPING {
+  uint8_t pin;
+  uint32_t channel;
+  Pio* port;
+  uint32_t channelMask;
+} PWMCHANNELMAPPING;
+
 #define NUM_PWM_CHANNELS 8
 uint8_t TimerChannel_Map[NUM_PWM_CHANNELS];
 
@@ -218,9 +225,11 @@ void PWM_Handler(void) {
       PWM_INTERFACE->PWM_IDR1 = mask;
       continue;
     }
-    Pio* port = q->mapping->port;
+	PWMCHANNELMAPPING *mapping = &gChannelMap[queue_num];
+	q->driver_data = (void *)mapping;
 
-    PWMCHANNELMAPPING* mapping = &gChannelMap[queue_num];
+    Pio* port = mapping->port;
+
     // Now with the queue, we can get the current entry, and see if we need to
     uint8_t rp = q->read_idx;
     if (rp == q->next_write_idx) {
@@ -323,11 +332,10 @@ inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask) {
     /*know if these values change or not?  const requires setting it at */     \
     /*instantiation or casting...this is the next best thing :) */             \
     static StepperQueue* const q = &fas_queue[Q];                              \
-    static uint32_t channel = fas_queue[Q].mapping->channel;                   \
-    static uint32_t samPin =                                                   \
-        g_APinDescription[fas_queue[Q].mapping->pin].ulPin;                    \
-    static const PWMCHANNELMAPPING* mapping = fas_queue[Q].mapping;            \
-    static Pio* port = fas_queue[Q].mapping->port;                             \
+	const PWMCHANNELMAPPING *mapping = (const PWMCHANNELMAPPING *)fas_queue[Q].driver_data; \
+    static uint32_t channel = mapping->channel;                                \
+    static uint32_t samPin = g_APinDescription[mapping->pin].ulPin;            \
+    static Pio* port = mapping->port;                                          \
     if (!q->_hasISRactive || q->_pauseCommanded) {                             \
       /*In the immortal words of Richard Gray aka levelord, */                 \
       /*"YOU'RE NOT SUPPOSED TO BE HERE!" */                                   \
@@ -378,7 +386,7 @@ inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask) {
         delayMicroseconds(7);                                                  \
         q->_pauseCommanded = true;                                             \
         q->timePWMInterruptEnabled = micros();                                 \
-        PWM_INTERFACE->PWM_IER1 = q->mapping->channelMask;                     \
+        PWM_INTERFACE->PWM_IER1 = mapping->channelMask;                        \
         port->PIO_CODR = samPin;                                               \
         port->PIO_OER = samPin;                                                \
         port->PIO_PER = samPin;                                                \
@@ -445,7 +453,7 @@ inline uint32_t pinToChannel(uint32_t pin) {
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _queue_num = queue_num;
-  mapping = &gChannelMap[queue_num];
+  driver_data = (void *)&gChannelMap[queue_num];
   _initVars();
   _step_pin = step_pin;
   channelsUsed[pinToChannel(step_pin)] = true;
@@ -519,6 +527,7 @@ void StepperQueue::connect() {
                 g_APinDescription[_step_pin].ulPinType,
                 g_APinDescription[_step_pin].ulPin,
                 g_APinDescription[_step_pin].ulPinConfiguration);
+	const PWMCHANNELMAPPING *mapping = (const PWMCHANNELMAPPING *)driver_data;
   PWMC_ConfigureChannel(PWM_INTERFACE, mapping->channel, PWM_CMR_CPRE_CLKB, 0,
                         0);
   // 21 pulses makes for a microsecond pulse.  I believe my drivers need 5us.
@@ -570,6 +579,7 @@ void StepperQueue::connect() {
 }
 
 void StepperQueue::disconnect() {
+	const PWMCHANNELMAPPING *mapping = (const PWMCHANNELMAPPING *)driver_data;
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
   PWM_INTERFACE->PWM_DIS = PWM_INTERFACE->PWM_DIS & (~mapping->channelMask);
 
@@ -599,6 +609,8 @@ void StepperQueue::startQueue() {
   // the no-start issue.
   interrupts();
   _hasISRactive = true;
+
+	const PWMCHANNELMAPPING *mapping = (const PWMCHANNELMAPPING *)driver_data;
 
   // I had this reversed, but the situation where we are starting, but the
   // PWM peripheral is running already doesn't come up often.  If the
@@ -677,6 +689,7 @@ void StepperQueue::forceStop() {
   noInterrupts();
   read_idx = next_write_idx;
   interrupts();
+	const PWMCHANNELMAPPING *mapping = (const PWMCHANNELMAPPING *)driver_data;
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
   // gin66: I have added this line in the hope to make it work
   _hasISRactive = false;
