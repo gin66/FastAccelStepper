@@ -1,6 +1,83 @@
 #ifndef FASTACCELSTEPPER_H
 #define FASTACCELSTEPPER_H
 #include <stdint.h>
+#include "PoorManFloat.h"
+#include "common.h"
+
+//=========================================================================
+// # FastAccelStepper
+//
+// FastAccelStepper is an high speed alternative for the
+// [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
+// Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
+//
+// Here is a basic example to run a stepper from position 0 to 1000 and back again to 0.
+// ```
+// FastAccelStepperEngine engine = FastAccelStepperEngine();
+// FastAccelStepper *stepper = NULL;
+// 
+// #define dirPinStepper    5
+// #define enablePinStepper 6
+// #define stepPinStepper   9
+// void setup() {
+//    engine.init();
+//    stepper = engine.stepperConnectToPin(stepPinStepper);
+//    if (stepper) {
+//       stepper->setDirectionPin(dirPinStepper);
+//       stepper->setEnablePin(enablePinStepper);
+//       stepper->setAutoEnable(true);
+// 
+//       stepper->setSpeedInHz(500);
+//       stepper->setAcceleration(100);
+//       stepper->moveTo(1000, true);
+//       stepper->moveTo(0, true);
+//    }
+// }
+// ```
+
+class FastAccelStepper;
+
+class FastAccelStepperEngine {
+ public:
+  void init();
+
+#if defined(SUPPORT_CPU_AFFINITY)
+  // ESP32 only: Pin the StepperTask to a CPU core
+  // For values 0 and 1, xTaskCreatePinnedToCore() is used
+  // or else xTaskCreate()
+  void init(uint8_t cpu_core);
+#endif
+
+  // ESP32:
+  // The first three steppers use mcpwm0, the next three steppers use mcpwm1
+  //
+  // Atmega328p:
+  // Only the pins connected to OC1A and OC1B are allowed
+  //
+  // Atmega2560/Atmega32u4:
+  // Only the pins connected to OC4A, OC4B and OC4C are allowed.
+  //
+  // If no stepper resources available or pin is wrong, then NULL is returned
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
+
+  // If this is called, then the periodic task will let the associated LED
+  // blink with 1 Hz
+  void setDebugLed(uint8_t ledPin);
+
+  // This should be only called from ISR or stepper task
+  void manageSteppers();
+
+ private:
+  bool isDirPinBusy(uint8_t dirPin, uint8_t except_stepper);
+
+  uint8_t _next_stepper_num;
+  FastAccelStepper* _stepper[MAX_STEPPER];
+
+  bool _isValidStepPin(uint8_t step_pin);
+
+  friend class FastAccelStepper;
+};
+
 
 // Return codes of move() and moveTo()
 #define MOVE_OK 0
@@ -23,14 +100,9 @@
 #define RAMP_DIRECTION_COUNT_DOWN 64
 #define RAMP_DIRECTION_MASK (32 + 64)
 
-#include "PoorManFloat.h"
 #include "RampGenerator.h"
 #include "common.h"
 
-//=========================================================================
-// # FastAccelStepper
-//
-//
 //
 // # Timing values - Architecture dependent
 //
@@ -61,8 +133,6 @@
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
 
 #define PIN_UNDEFINED 255
-
-class FastAccelStepperEngine;
 
 class FastAccelStepper {
  private:
@@ -446,45 +516,4 @@ class FastAccelStepper {
   friend class FastAccelStepperTest;
 };
 
-class FastAccelStepperEngine {
- public:
-  // stable API functions
-  void init();
-
-#if defined(SUPPORT_CPU_AFFINITY)
-  // ESP32 only: Pin the StepperTask to a CPU core
-  // For values 0 and 1, xTaskCreatePinnedToCore() is used
-  // or else xTaskCreate()
-  void init(uint8_t cpu_core);
-#endif
-
-  // ESP32:
-  // The first three steppers use mcpwm0, the next three steppers use mcpwm1
-  //
-  // Atmega328p:
-  // Only the pins connected to OC1A and OC1B are allowed
-  //
-  // Atmega2560/Atmega32u4:
-  // Only the pins connected to OC4A, OC4B and OC4C are allowed.
-  //
-  // If no stepper resources available or pin is wrong, then NULL is returned
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
-
-  // If this is called, then the periodic task will let the associated LED
-  // blink with 1 Hz
-  void setDebugLed(uint8_t ledPin);
-
-  // This should be only called from ISR or stepper task
-  void manageSteppers();
-
- private:
-  bool isDirPinBusy(uint8_t dirPin, uint8_t except_stepper);
-
-  uint8_t _next_stepper_num;
-  FastAccelStepper* _stepper[MAX_STEPPER];
-
-  bool _isValidStepPin(uint8_t step_pin);
-
-  friend class FastAccelStepper;
-};
 #endif
