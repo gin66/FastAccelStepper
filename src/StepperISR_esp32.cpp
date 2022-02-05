@@ -60,7 +60,7 @@ bool StepperQueue::isReadyForCommands() {
 #elif defined(SUPPORT_ESP32_MCPWM_PCNT)
   return isReadyForCommands_mcpwm_pcnt();
 #elif defined(SUPPORT_ESP32_RMT)
-    return isReadyForCommands_rmt();
+  return isReadyForCommands_rmt();
 #else
 #error "Nothing defined here"
 #endif

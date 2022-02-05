@@ -475,9 +475,9 @@ void StepperQueue::forceStop_mcpwm_pcnt() {
   read_idx = next_write_idx;
 }
 bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
-	if (isRunning()) {
-		return true;
-	}
+  if (isRunning()) {
+    return true;
+  }
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
@@ -489,11 +489,12 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
     return false;
   }
   return true;
-//#ifndef __ESP32_IDF_V44__
-//  return (mcpwm->timer[timer].mode.start != 2);  // 2=run continuous
-//#else                                            /* __ESP32_IDF_V44__ */
-//  return (mcpwm->timer[timer].timer_cfg1.timer_start != 2);  // 2=run continuous
-//#endif                                           /* __ESP32_IDF_V44__ */
+  //#ifndef __ESP32_IDF_V44__
+  //  return (mcpwm->timer[timer].mode.start != 2);  // 2=run continuous
+  //#else                                            /* __ESP32_IDF_V44__ */
+  //  return (mcpwm->timer[timer].timer_cfg1.timer_start != 2);  // 2=run
+  //  continuous
+  //#endif                                           /* __ESP32_IDF_V44__ */
 }
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() {
   return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;

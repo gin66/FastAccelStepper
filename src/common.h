@@ -114,8 +114,8 @@ struct queue_end_s {
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32_RMT
-#include <driver/rmt.h>
 #include <driver/periph_ctrl.h>
+#include <driver/rmt.h>
 #include <soc/rmt_periph.h>
 #include <soc/rmt_reg.h>
 #include <soc/rmt_struct.h>
@@ -130,8 +130,8 @@ struct queue_end_s {
 #elif CONFIG_IDF_TARGET_ESP32C3
 #error "esp32c3 is not supported"
 #define SUPPORT_ESP32_RMT
-#include <driver/rmt.h>
 #include <driver/periph_ctrl.h>
+#include <driver/rmt.h>
 #include <soc/rmt_periph.h>
 #include <soc/rmt_reg.h>
 #include <soc/rmt_struct.h>
