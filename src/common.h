@@ -32,6 +32,11 @@ struct queue_end_s {
 #endif
 
 //==========================================================================
+//
+// The TEST "architecture" is in use with pc_based testing.
+//
+//
+//==========================================================================
 #if defined(TEST)
 // For pc-based testing like to have assert-macro
 #include <assert.h>
@@ -66,16 +71,26 @@ struct queue_end_s {
 #define DELAY_MS_BASE 1
 
 //==========================================================================
+//
+// This for ESP32 derivates using arduino core
+//
+//==========================================================================
 #elif defined(ARDUINO_ARCH_ESP32)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
+
+#define SUPPORT_ESP32
 
 // Some more esp32 specific includes
 #include <driver/gpio.h>
 #include <esp_task_wdt.h>
 
+//==========================================================================
+//
+// ESP32 derivate - the first one
+//
+//==========================================================================
 #if CONFIG_IDF_TARGET_ESP32
-
 #define SUPPORT_ESP32_MCPWM_PCNT
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
@@ -92,6 +107,11 @@ struct queue_end_s {
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
 
+//==========================================================================
+//
+// ESP32 derivate - ESP32S2
+//
+//==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32_RMT
 #include <driver/rmt.h>
@@ -102,14 +122,28 @@ struct queue_end_s {
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
 
+//==========================================================================
+//
+// ESP32 derivate - ESP32C3 - NOT SUPPORTED
+//
+//==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C3
+#error "esp32c3 is not supported"
 #define SUPPORT_ESP32_RMT
 #include <driver/rmt.h>
+#include <driver/periph_ctrl.h>
+#include <soc/rmt_periph.h>
+#include <soc/rmt_reg.h>
+#include <soc/rmt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
 
+//==========================================================================
+//
+// For all unsupported ESP32 derivates
+//
+//==========================================================================
 #else
-// If come here, then the device is not supported
 #error "Unsupported derivate"
 #endif
 
@@ -121,6 +155,9 @@ struct queue_end_s {
 // this to distinguish between the two versions
 #if defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
 #define __ESP32_IDF_V44__
+
+#include <driver/periph_ctrl.h>
+#include <soc/periph_defs.h>
 #endif
 
 // Esp32 queue definitions
@@ -142,7 +179,16 @@ struct queue_end_s {
 #define SUPPORT_CPU_AFFINITY
 
 //==========================================================================
+//
+// This for ESP32 derivates using espidf
+//
+// This is most likely broken and not tested on github actions
+//
+//==========================================================================
 #elif defined(ESP_PLATFORM)
+
+#define SUPPORT_ESP32
+
 // esp32 specific includes
 #include <driver/gpio.h>
 #include <driver/mcpwm.h>
@@ -196,6 +242,10 @@ struct queue_end_s {
 #define SUPPORT_CPU_AFFINITY
 
 //==========================================================================
+//
+// This for SAM-architecture
+//
+//==========================================================================
 #elif defined(ARDUINO_ARCH_SAM)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -219,6 +269,10 @@ struct queue_end_s {
 #define DEBUG_LED_HALF_PERIOD 50
 
 //==========================================================================
+//
+// This for the AVR family
+//
+//==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -233,12 +287,31 @@ struct queue_end_s {
 // Here are shorthand definitions for number of queues, the queues/channel
 // relation and queue length This definitions are derivate specific
 #define QUEUE_LEN 16
+#define TICKS_PER_S F_CPU
+#define MIN_CMD_TICKS (TICKS_PER_S / 25000)
+#define MIN_DIR_DELAY_US 40
+#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
+#define DELAY_MS_BASE (65536000 / TICKS_PER_S)
+
+// debug led timing
+#define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
+
+//==========================================================================
+//
+// AVR derivate ATmega 328P
+//
+//==========================================================================
 #if defined(__AVR_ATmega328P__)
 #define MAX_STEPPER 2
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 enum channels { channelA, channelB };
+//==========================================================================
+//
+// AVR derivate ATmega 2560
+//
+//==========================================================================
 #elif defined(__AVR_ATmega2560__)
 #define MAX_STEPPER 3
 #define NUM_QUEUES 3
@@ -246,6 +319,11 @@ enum channels { channelA, channelB };
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
 enum channels { channelA, channelB, channelC };
+//==========================================================================
+//
+// AVR derivate ATmega 32U4
+//
+//==========================================================================
 #elif defined(__AVR_ATmega32U4__)
 #define MAX_STEPPER 3
 #define NUM_QUEUES 3
@@ -253,27 +331,22 @@ enum channels { channelA, channelB, channelC };
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
 enum channels { channelA, channelB, channelC };
-#else
-#error "Unsupported derivate"
-#endif
-
-// AVR:
-// tests on arduino nano indicate, that at 40ksteps/s in dual stepper mode,
-// the main task is freezing (StepperDemo).
-// Thus the limitation set here is set to 25kSteps/s as stated in the README.
-#define TICKS_PER_S F_CPU
-#define MIN_CMD_TICKS (TICKS_PER_S / 25000)
-#define MIN_DIR_DELAY_US 40
-#define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
-#define DELAY_MS_BASE (65536000 / TICKS_PER_S)
-// debug led timing
-#define DEBUG_LED_HALF_PERIOD (TICKS_PER_S / 65536 / 2)
-
+//==========================================================================
+//
+// For all unsupported AVR derivates
+//
 //==========================================================================
 #else
+#error "Unsupported AVR derivate"
+#endif
 
-// If come here, then the device is not supported
-#error "Unsupported derivate"
+//==========================================================================
+//
+// For all unsupported devices
+//
+//==========================================================================
+#else
+#error "Unsupported devices"
 
 #endif
 

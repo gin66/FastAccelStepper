@@ -73,7 +73,7 @@ class StepperQueue {
   // This has been called isReadyForCommands().
   //
 
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32)
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
   bool isRunning() { return _isRunning; }
@@ -234,13 +234,13 @@ class StepperQueue {
     uint16_t pos_last16 = e->start_pos_last16;
 #endif
     uint8_t steps = e->steps;
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32)
     // pulse counter should go max up to 255 with perhaps few pulses overrun, so
     // this conversion is safe
     int16_t done_p = (int16_t)_getPerformedPulses();
 #endif
     fasEnableInterrupts();
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32)
     if (done_p == 0) {
       // fix for possible race condition described in issue #68
       fasDisableInterrupts();
@@ -288,13 +288,13 @@ class StepperQueue {
         if (e->countUp) {
 #if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
           adjust = -steps;
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#elif defined(SUPPORT_ESP32)
           adjust = done_p;
 #endif
         } else {
 #if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_SAM)
           adjust = steps;
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#elif defined(SUPPORT_ESP32)
           adjust = -done_p;
 #endif
         }
@@ -403,7 +403,7 @@ class StepperQueue {
 #if defined(ARDUINO_ARCH_AVR)
     _isRunning = false;
     _prepareForStop = false;
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#elif defined(SUPPORT_ESP32)
     _isRunning = false;
     _nextCommandIsPrepared = false;
 #if defined(SUPPORT_ESP32_RMT)
@@ -420,7 +420,7 @@ class StepperQueue {
     _isRunning = false;
 #endif
   }
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32)
   uint8_t _step_pin;
   uint16_t _getPerformedPulses();
 #endif

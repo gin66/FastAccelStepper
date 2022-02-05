@@ -2,11 +2,6 @@
 
 #ifdef SUPPORT_ESP32_RMT
 
-#ifdef __ESP32_IDF_V44__
-#include <driver/periph_ctrl.h>
-#include <soc/periph_defs.h>
-#endif /* __ESP32_IDF_V44__ */
-
 #define TEST_PROBE_1 21
 #define TEST_PROBE_2 18
 #ifdef TEST_PROBE_1

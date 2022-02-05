@@ -1,9 +1,7 @@
 
 #include "StepperISR.h"
 
-// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use
-// this to distinguish between the two versions
-#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(SUPPORT_ESP32)
 
 #ifdef __ESP32_IDF_V44__
 #include <driver/periph_ctrl.h>
