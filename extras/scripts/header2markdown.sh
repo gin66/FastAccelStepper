@@ -29,7 +29,7 @@ BEGIN {
 		print("```")
 	}
 
-	gsub("[ \t]*// *","")
+	gsub("[ \t]*// ?","")
 	print
 	in_code = 0
 	quote_code = 1

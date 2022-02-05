@@ -34,17 +34,24 @@
 //    }
 // }
 // ```
+//
+// ## FastAccelStepperEngine
+//
+// This engine - actually a factory - provides you with instances of steppers.
 
 class FastAccelStepper;
 
 class FastAccelStepperEngine {
  public:
+  // The FastAccelStepperEngine is declared with FastAccelStepperEngine().
+  // This is to occupy the needed memory. But it still needs to be initialized.
+  // For this init shall be used:
   void init();
 
 #if defined(SUPPORT_CPU_AFFINITY)
-  // ESP32 only: Pin the StepperTask to a CPU core
-  // For values 0 and 1, xTaskCreatePinnedToCore() is used
-  // or else xTaskCreate()
+  // In a multitasking and multicore system like ESP32, the steppers are controlled by a continuously running
+  // task. This task can be fixed to one CPU core with this modified init()-call.
+  // ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
   void init(uint8_t cpu_core);
 #endif
 

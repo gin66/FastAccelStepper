@@ -1,3 +1,72 @@
+=========================================================================
+# FastAccelStepper
+
+FastAccelStepper is an high speed alternative for the
+[AccelStepper library](http:www.airspayce.com/mikem/arduino/AccelStepper/).
+Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
+
+Here is a basic example to run a stepper from position 0 to 1000 and back again to 0.
+```
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper *stepper = NULL;
+
+#define dirPinStepper    5
+#define enablePinStepper 6
+#define stepPinStepper   9
+void setup() {
+   engine.init();
+   stepper = engine.stepperConnectToPin(stepPinStepper);
+   if (stepper) {
+      stepper->setDirectionPin(dirPinStepper);
+      stepper->setEnablePin(enablePinStepper);
+      stepper->setAutoEnable(true);
+
+      stepper->setSpeedInHz(500);
+      stepper->setAcceleration(100);
+      stepper->moveTo(1000, true);
+      stepper->moveTo(0, true);
+   }
+}
+```
+
+## FastAccelStepperEngine
+
+This engine - actually a factory - provides you with instances of steppers.
+The FastAccelStepperEngine is declared with FastAccelStepperEngine().
+This is to occupy the needed memory. But it still needs to be initialized.
+For this init shall be used:
+```cpp
+  void init();
+```
+In a multitasking and multicore system like ESP32, the steppers are controlled by a continuously running
+task. This task can be fixed to one CPU core with this modified init()-call.
+ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
+```cpp
+  void init(uint8_t cpu_core);
+#endif
+```
+ESP32:
+The first three steppers use mcpwm0, the next three steppers use mcpwm1
+
+Atmega328p:
+Only the pins connected to OC1A and OC1B are allowed
+
+Atmega2560/Atmega32u4:
+Only the pins connected to OC4A, OC4B and OC4C are allowed.
+
+If no stepper resources available or pin is wrong, then NULL is returned
+```cpp
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
+```
+If this is called, then the periodic task will let the associated LED
+blink with 1 Hz
+```cpp
+  void setDebugLed(uint8_t ledPin);
+```
+This should be only called from ISR or stepper task
+```cpp
+  void manageSteppers();
+```
 Return codes of move() and moveTo()
 ```cpp
 #define MOVE_OK 0
@@ -23,10 +92,6 @@ Return value of rampState()
 #define RAMP_DIRECTION_COUNT_DOWN 64
 #define RAMP_DIRECTION_MASK (32 + 64)
 ```
-=========================================================================
-# FastAccelStepper
-
-
 
 # Timing values - Architecture dependent
 
@@ -126,9 +191,9 @@ Retrieve the current position of the stepper
 ```
 Set the current position of the stepper - either in standstill or while
 moving.
-for esp32: the implementation uses getCurrentPosition(), which does not
-consider the steps of the current command
-=> recommend to use only in standstill
+   for esp32: the implementation uses getCurrentPosition(), which does not
+              consider the steps of the current command
+              => recommend to use only in standstill
 ```cpp
   void setCurrentPosition(int32_t new_pos);
 ```
@@ -145,7 +210,7 @@ For stepper movement control by FastAccelStepper's ramp generator
 setSpeedInUs expects as parameter the minimum time between two steps.
 If for example 5 steps/s shall be the maximum speed of the stepper,
 then t = 0.2 s/steps = 200000 us/step, so call
-setSpeedInUs(200000);
+     setSpeedInUs(200000);
 
 New value will be used after call to
 move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
@@ -192,10 +257,10 @@ retrieve maximum speed
   uint32_t getMaxSpeedInHz();
   uint32_t getMaxSpeedInMilliHz();
 ```
-set Acceleration expects as parameter the change of speed
-as step/s².
-If for example the speed should ramp up from 0 to 10000 steps/s within
-10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
+ set Acceleration expects as parameter the change of speed
+ as step/s².
+ If for example the speed should ramp up from 0 to 10000 steps/s within
+ 10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
 
 New value will be used after call to
 move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
@@ -320,7 +385,7 @@ started.
   int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start = true);
 ```
 Return codes for addQueueEntry
-positive values mean, that caller should retry later
+   positive values mean, that caller should retry later
 ```cpp
 #define AQE_OK 0
 #define AQE_QUEUE_FULL 1
@@ -433,37 +498,4 @@ counter. If the value is negative, then just add 3200.
   void clearPulseCounter();
   bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
 #endif
-```
-stable API functions
-```cpp
-  void init();
-```
-ESP32 only: Pin the StepperTask to a CPU core
-For values 0 and 1, xTaskCreatePinnedToCore() is used
-or else xTaskCreate()
-```cpp
-  void init(uint8_t cpu_core);
-#endif
-```
-ESP32:
-The first three steppers use mcpwm0, the next three steppers use mcpwm1
-
-Atmega328p:
-Only the pins connected to OC1A and OC1B are allowed
-
-Atmega2560/Atmega32u4:
-Only the pins connected to OC4A, OC4B and OC4C are allowed.
-
-If no stepper resources available or pin is wrong, then NULL is returned
-```cpp
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
-```
-If this is called, then the periodic task will let the associated LED
-blink with 1 Hz
-```cpp
-  void setDebugLed(uint8_t ledPin);
-```
-This should be only called from ISR or stepper task
-```cpp
-  void manageSteppers();
 ```
