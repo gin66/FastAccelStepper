@@ -21,12 +21,6 @@ struct mapping_s {
 };
 #endif
 
-#if defined(SUPPORT_ESP32_PULSE_COUNTER)
-bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
-                                 int16_t low_value, int16_t high_value);
-void _esp32_clearPulseCounter(uint8_t pcnt_unit);
-int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
-#endif
 #if defined(ARDUINO_ARCH_SAM)
 typedef struct _PWMCHANNELMAPPING {
   uint8_t pin;
@@ -116,12 +110,6 @@ class StepperQueue {
   uint16_t max_speed_in_ticks;
 
   void init(uint8_t queue_num, uint8_t step_pin);
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  void init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
-#endif
-#ifdef SUPPORT_ESP32_RMT
-  void init_rmt(uint8_t channel_num, uint8_t step_pin);
-#endif
   inline uint8_t queueEntries() {
     fasDisableInterrupts();
     uint8_t rp = read_idx;
@@ -144,24 +132,10 @@ class StepperQueue {
   // startQueue is always called
   void startQueue();
   void forceStop();
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  void startQueue_mcpwm_pcnt();
-  void forceStop_mcpwm_pcnt();
-#endif
-#ifdef SUPPORT_ESP32_RMT
-  void startQueue_rmt();
-  void forceStop_rmt();
-#endif
   void _initVars();
 #if defined(SUPPORT_ESP32)
   uint8_t _step_pin;
   uint16_t _getPerformedPulses();
-#endif
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  uint16_t _getPerformedPulses_mcpwm_pcnt();
-#endif
-#ifdef SUPPORT_ESP32_RMT
-  uint16_t _getPerformedPulses_rmt();
 #endif
 #if defined(ARDUINO_ARCH_SAM)
   uint8_t _step_pin;
@@ -169,11 +143,27 @@ class StepperQueue {
 #endif
   void connect();
   void disconnect();
+
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
+bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
+                                 int16_t low_value, int16_t high_value);
+void _esp32_clearPulseCounter(uint8_t pcnt_unit);
+int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
+#endif
+
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
+  void init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
+  void startQueue_mcpwm_pcnt();
+  void forceStop_mcpwm_pcnt();
+  uint16_t _getPerformedPulses_mcpwm_pcnt();
   void connect_mcpwm_pcnt();
   void disconnect_mcpwm_pcnt();
 #endif
 #ifdef SUPPORT_ESP32_RMT
+  void init_rmt(uint8_t channel_num, uint8_t step_pin);
+  void startQueue_rmt();
+  void forceStop_rmt();
+  uint16_t _getPerformedPulses_rmt();
   void connect_rmt();
   void disconnect_rmt();
 #endif
