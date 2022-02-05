@@ -461,7 +461,7 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
   // The time used by this command can have an impact
   digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
 #endif
-  const struct mapping_s *mapping = (const struct mapping_s *)q->driver_data;
+  const struct mapping_s *mapping = (const struct mapping_s *)driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
@@ -491,7 +491,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
   if (isRunning()) {
     return true;
   }
-  const struct mapping_s *mapping = (const struct mapping_s *)q->driver_data;
+  const struct mapping_s *mapping = (const struct mapping_s *)driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t *mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;

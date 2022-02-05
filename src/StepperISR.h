@@ -29,6 +29,17 @@ struct queue_entry {
   uint16_t start_pos_last16;
 #endif
 };
+
+
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
+bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
+                                 int16_t low_value, int16_t high_value);
+void _esp32_clearPulseCounter(uint8_t pcnt_unit);
+int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
+#endif
+
+
+
 class StepperQueue {
  public:
   struct queue_entry entry[QUEUE_LEN];
@@ -131,13 +142,6 @@ class StepperQueue {
 #endif
   void connect();
   void disconnect();
-
-#if defined(SUPPORT_ESP32_PULSE_COUNTER)
-bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
-                                 int16_t low_value, int16_t high_value);
-void _esp32_clearPulseCounter(uint8_t pcnt_unit);
-int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
-#endif
 
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   void init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
