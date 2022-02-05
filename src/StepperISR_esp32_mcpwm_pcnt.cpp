@@ -242,7 +242,8 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
       struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
       if (!isPrepared) {
         prepare_for_next_command(q, e_curr);
-        isr_pcnt_counter_clear(q->mapping->pcnt_unit);
+		const struct mapping_s *mapping = (const struct mapping_s *)q->driver_data;
+        isr_pcnt_counter_clear(mapping->pcnt_unit);
       }
       apply_command(q, e_curr);
       rp++;
@@ -426,6 +427,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect_mcpwm_pcnt() {
+  const struct mapping_s *mapping = (const struct mapping_s *)driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_gpio_init(mcpwm_unit, mapping->pwm_output_pin, _step_pin);
   // Doesn't work with gpio_matrix_in
@@ -511,6 +513,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
   //#endif                                           /* __ESP32_IDF_V44__ */
 }
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() {
+  const struct mapping_s *mapping = (const struct mapping_s *)driver_data;
   return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
 }
 
