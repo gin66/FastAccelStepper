@@ -9,6 +9,7 @@ pre-0.27.0:
 - esp32s2: experimental support
 - new return code for `addQueueEntry()`: `AQE_DEVICE_NOT_READY`
 - `move()` and `moveTo()` expect an optional parameter to opt for blocking operation
+- add more `ìnline` in FastAccelStepper.h for short routines to be inlined
 
 0.26.0:
 - avr: Max stepper speed depending on number of assigned steppers:

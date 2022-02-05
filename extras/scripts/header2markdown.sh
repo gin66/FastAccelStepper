@@ -43,5 +43,8 @@ BEGIN {
 	quote_code = 0
 }
 
-in_code == 1 { print }
+in_code == 1 {
+	gsub("inline ","")
+	print
+}
 ' ../../src/FastAccelStepper.h >../doc/FastAccelStepper_API.md

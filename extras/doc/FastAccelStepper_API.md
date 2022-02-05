@@ -267,12 +267,12 @@ The new value will be used only after call of these functions:
 - `moveTo()`
 - `runForward()`
 - `runBackward()`
-- `/applySpeedAcceleration()`
+- `applySpeedAcceleration()`
 - `moveByAcceleration()`
 
-Note: no update on stopMove()
+Note: no update on `stopMove()`
 
-Returns 0 on success, or -1 on invalid value
+Returns 0 on success, or -1 on invalid value.
 Invalid is faster than MaxSpeed or slower than ~250 Mio ticks/step.
 ```cpp
   int8_t setSpeedInUs(uint32_t min_step_us);
@@ -408,7 +408,7 @@ provided and will be set as current position after stop.
 ```
 get the target position for the current move
 ```cpp
-  inline int32_t targetPos() { return _rg.targetPosition(); }
+  int32_t targetPos() { return _rg.targetPosition(); }
 ```
 ## Low Level Stepper Queue Management (low level access)
 
@@ -491,11 +491,11 @@ This function provides info, in which state the high level stepper control
 is operating. The return value is an `or` of RAMP_STATE_... and
 RAMP_DIRECTION_... flags. Definitions are above
 ```cpp
-  inline uint8_t rampState() { return _rg.rampState(); }
+  uint8_t rampState() { return _rg.rampState(); }
 ```
 returns true, if the ramp generation is active
 ```cpp
-  inline bool isRampGeneratorActive() { return _rg.isRampGeneratorActive(); }
+  bool isRampGeneratorActive() { return _rg.isRampGeneratorActive(); }
 ```
 These functions allow to detach and reAttach a step pin for other use.
 Pretty low level, use with care or not at all

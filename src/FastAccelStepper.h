@@ -207,8 +207,8 @@ class FastAccelStepper {
   // to MAX_DIR_DELAY_US.
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
-  uint8_t getDirectionPin() { return _dirPin; }
-  bool directionPinHighCountsUp() { return _dirHighCountsUp; }
+  inline uint8_t getDirectionPin() { return _dirPin; }
+  inline bool directionPinHighCountsUp() { return _dirHighCountsUp; }
 
   // ## Enable Pin
   // if enable pin is connected, then use this function.
@@ -219,8 +219,8 @@ class FastAccelStepper {
   //    setEnablePin(pin2, false);
   // If pin1 and pin2 are same, then the last call will be used.
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
-  uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
-  uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
+  inline uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
+  inline uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
 
   // If the enable pins are e.g. connected via external HW (shift registers),
   // then an external callback function can be supplied.
@@ -297,12 +297,12 @@ class FastAccelStepper {
   // - `moveTo()`
   // - `runForward()`
   // - `runBackward()`
-  // - `/applySpeedAcceleration()`
+  // - `applySpeedAcceleration()`
   // - `moveByAcceleration()`
   //
-  // Note: no update on stopMove()
+  // Note: no update on `stopMove()`
   //
-  // Returns 0 on success, or -1 on invalid value
+  // Returns 0 on success, or -1 on invalid value.
   // Invalid is faster than MaxSpeed or slower than ~250 Mio ticks/step.
   int8_t setSpeedInUs(uint32_t min_step_us);
   int8_t setSpeedInTicks(uint32_t min_step_ticks);
@@ -311,9 +311,9 @@ class FastAccelStepper {
 
   // To retrieve current set speed. This means, while accelerating and/or decelerating, this is 
   // NOT the actual speed !
-  uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
-  uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
-  uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
+  inline uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
+  inline uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
+  inline uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
 
   // If the current speed is needed, then use `getCurrentSpeed...()`. This retrieves the actual speed.
   //
@@ -339,16 +339,16 @@ class FastAccelStepper {
   // note: no update on stopMove()
   //
   // Returns 0 on success, or -1 on invalid value (<=0)
-  int8_t setAcceleration(int32_t step_s_s) {
+  inline int8_t setAcceleration(int32_t step_s_s) {
     return _rg.setAcceleration(step_s_s);
   }
-  uint32_t getAcceleration() { return _rg.getAcceleration(); }
+  inline uint32_t getAcceleration() { return _rg.getAcceleration(); }
 
   // getCurrentAcceleration() retrieves the actual acceleration.
   //    = 0 while idle or coasting
   //    > 0 while speed is changing towards positive values
   //    < 0 while speed is changeing towards negative values
-  int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
+  inline int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
 
   // ## Apply new speed/acceleration value
   // This function applies new values for speed/acceleration.
@@ -404,7 +404,7 @@ class FastAccelStepper {
   // stop the running stepper with normal deceleration.
   // This only sets a flag and can be called from an interrupt !
   void stopMove();
-  bool isStopping() { return _rg.isStopping(); }
+  inline bool isStopping() { return _rg.isStopping(); }
 
   // abruptly stop the running stepper without deceleration.
   // This can be called from an interrupt !
