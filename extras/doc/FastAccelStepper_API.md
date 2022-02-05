@@ -1,7 +1,6 @@
-=========================================================================
 # FastAccelStepper
 
-FastAccelStepper is an high speed alternative for the
+FastAccelStepper is a high speed alternative for the
 [AccelStepper library](http:www.airspayce.com/mikem/arduino/AccelStepper/).
 Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
 
@@ -32,6 +31,8 @@ void setup() {
 ## FastAccelStepperEngine
 
 This engine - actually a factory - provides you with instances of steppers.
+### Initialization
+
 The FastAccelStepperEngine is declared with FastAccelStepperEngine().
 This is to occupy the needed memory. But it still needs to be initialized.
 For this init shall be used:
@@ -43,29 +44,29 @@ task. This task can be fixed to one CPU core with this modified init()-call.
 ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
 ```cpp
   void init(uint8_t cpu_core);
-#endif
 ```
-ESP32:
-The first three steppers use mcpwm0, the next three steppers use mcpwm1
+### Creation of FastAccelStepper
 
-Atmega328p:
-Only the pins connected to OC1A and OC1B are allowed
-
-Atmega2560/Atmega32u4:
-Only the pins connected to OC4A, OC4B and OC4C are allowed.
-
-If no stepper resources available or pin is wrong, then NULL is returned
+Using a call to stepperConnectToPin() a FastAccelStepper instance is created.
+This call tells the stepper, which step pin to use. As the hardware may have
+limitation - e.g. no stepper resources anymore, or the step pin cannot be used,
+then NULL is returned. So it is advised to check the return value of this call.
 ```cpp
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 ```
-If this is called, then the periodic task will let the associated LED
-blink with 1 Hz
+Comments to valid pins:
+
+| ESP32      | Every output capable GPIO can be used                      |
+| Atmega328p | Only the pins connected to OC1A and OC1B are allowed       |
+| Atmega2560 | Only the pins connected to OC4A, OC4B and OC4C are allowed.|
+| Atmega32u4 | Only the pins connected to OC4A, OC4B and OC4C are allowed |
+### Debug LED
+
+If blinking of a LED is required to indicated, the stepper controller is still running,
+then the port. to which the LED is connected, can be told to the engine.
+The periodic task will let the associated LED blink with 1 Hz
 ```cpp
   void setDebugLed(uint8_t ledPin);
-```
-This should be only called from ISR or stepper task
-```cpp
-  void manageSteppers();
 ```
 Return codes of move() and moveTo()
 ```cpp
