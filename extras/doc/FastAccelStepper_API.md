@@ -24,30 +24,35 @@ Return value of rampState()
 #define RAMP_DIRECTION_MASK (32 + 64)
 ```
 =========================================================================
+# FastAccelStepper
 
-Timing values - Architecture dependent
 
-AVR
-	TICKS_PER_S			16_000_000
-	MIN_CMD_TICKS		640 	[1/TICKS_PER_S seconds]
-	MIN_DIR_DELAY_US	40		[µs]
-	MAX_DIR_DELAY_US	4095	[µs]
 
-ESP32
-	TICKS_PER_S			16_000_000
-	MIN_CMD_TICKS		8000	[1/TICKS_PER_S seconds]
-	MIN_DIR_DELAY_US	500		[µs]
-	MAX_DIR_DELAY_US	4095	[µs]
+# Timing values - Architecture dependent
 
-SAM DUE
-	TICKS_PER_S			21_000_000
-	MIN_CMD_TICKS		4200	[1/TICKS_PER_S seconds]
-	MIN_DIR_DELAY_US	200		[µs]
-	MAX_DIR_DELAY_US	3120	[µs]
-This should be only called by FastAccelStepperEngine !
-```cpp
-  void init(FastAccelStepperEngine* engine, uint8_t num, uint8_t step_pin);
-```
+## AVR
+|VARIABLE         | Value       | Unit                    |
+|:----------------|------------:|:------------------------|
+ |TICKS_PER_S		 |	16_000_000 | [ticks/s]               |
+|MIN_CMD_TICKS	 |	640 	   | [1/TICKS_PER_S seconds] |
+|MIN_DIR_DELAY_US |	40		   | [µs]                    |
+|MAX_DIR_DELAY_US |	4095	   | [µs]                    |
+
+## ESP32
+|VARIABLE         | Value       | Unit                    |
+|:----------------|------------:|:------------------------|
+|TICKS_PER_S		 |	16_000_000 | [ticks/s]               |
+|MIN_CMD_TICKS	 |	8000	   | [1/TICKS_PER_S seconds] |
+|MIN_DIR_DELAY_US |	500		   | [µs]                    |
+|MAX_DIR_DELAY_US |	4095	   | [µs]                    |
+
+## SAM DUE
+|VARIABLE         | Value       | Unit                    |
+|:----------------|------------:|:------------------------|
+|TICKS_PER_S      | 21_000_000  | [ticks/s]               |
+|MIN_CMD_TICKS    |	4200	   | [1/TICKS_PER_S seconds] |
+|MIN_DIR_DELAY_US |	200		   | [µs]                    |
+|MAX_DIR_DELAY_US | 3120	       | [µs]                    |
 step pin is defined at creation. Here can retrieve the pin
 ```cpp
   uint8_t getStepPin();
