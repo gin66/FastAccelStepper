@@ -151,10 +151,12 @@ And the two directions of a move
 |MAX_DIR_DELAY_US | 3120        | [µs]                    |
 
 # FastAccelStepper
+## Step Pin
 step pin is defined at creation. Here can retrieve the pin
 ```cpp
   uint8_t getStepPin();
 ```
+## Direction Pin
 if direction pin is connected, call this function.
 
 For slow driver hardware the first step after any polarity change of the
@@ -169,6 +171,7 @@ to MAX_DIR_DELAY_US.
   uint8_t getDirectionPin() { return _dirPin; }
   bool directionPinHighCountsUp() { return _dirHighCountsUp; }
 ```
+## Enable Pin
 if enable pin is connected, then use this function.
 
 In case there are two enable pins: one low and one high active, then
@@ -218,6 +221,7 @@ ms jitter.
 #define DELAY_TOO_LOW -1
 #define DELAY_TOO_HIGH -2
 ```
+## Stepper Position
 Retrieve the current position of the stepper
 ```cpp
   int32_t getCurrentPosition();
@@ -230,6 +234,7 @@ moving.
 ```cpp
   void setCurrentPosition(int32_t new_pos);
 ```
+## Stepper running status
 is true while the stepper is running or ramp generation is active
 ```cpp
   bool isRunning();
@@ -238,58 +243,61 @@ is true while the stepper is running
 ```cpp
   [[deprecated]] bool isMotorRunning();
 ```
+## Speed
 For stepper movement control by FastAccelStepper's ramp generator
 
-setSpeedInUs expects as parameter the minimum time between two steps.
-If for example 5 steps/s shall be the maximum speed of the stepper,
-then t = 0.2 s/steps = 200000 us/step, so call
-     setSpeedInUs(200000);
+Speed can be defined in four different units:
+- In Hz: This means steps/s
+- In millHz: This means in steps/1000s
+- In us: This means in us/step
 
-New value will be used after call to
-move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
-
-note: no update on stopMove()
-
-Returns 0 on success, or -1 on invalid value
-Invalid is faster than MaxSpeed or >~250 Mio.
-```cpp
-  int8_t setSpeedInUs(uint32_t min_step_us);
-  int8_t setSpeedInTicks(uint32_t min_step_ticks);
-```
-setSpeedInHz() allows to set the stepper speed as step frequency in Hertz.
-This means steps/s.
-```cpp
-  int8_t setSpeedInHz(uint32_t speed_hz);
-```
-setSpeedInMilliHz() allows to set the stepper speed as step frequency in
-milliHertz. This means steps/1000 s. This is required for very slow speeds.
-
-
-```cpp
-  int8_t setSpeedInMilliHz(uint32_t speed_mhz);
-```
-retrieve current set speed (while acceleration/deceleration:
-NOT the actual speed !)
-```cpp
-  uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
-  uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
-  uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
-```
-getCurrentSpeed() retrieves the actual speed.
-   = 0 while not moving
-   > 0 while position counting up
-   < 0 while position counting down
-```cpp
-  int32_t getCurrentSpeedInUs();
-  int32_t getCurrentSpeedInMilliHz();
-```
-retrieve maximum speed
+For the device's maximum allowed speed, the following calls can be used. 
 ```cpp
   uint16_t getMaxSpeedInUs();
   uint16_t getMaxSpeedInTicks();
   uint32_t getMaxSpeedInHz();
   uint32_t getMaxSpeedInMilliHz();
 ```
+Setting the speed can be done with the four `setSpeed...()` calls.
+The new value will be used only after call of these functions:
+
+- `move()`
+- `moveTo()`
+- `runForward()`
+- `runBackward()`
+- `/applySpeedAcceleration()`
+- `moveByAcceleration()`
+
+Note: no update on stopMove()
+
+Returns 0 on success, or -1 on invalid value
+Invalid is faster than MaxSpeed or slower than ~250 Mio ticks/step.
+```cpp
+  int8_t setSpeedInUs(uint32_t min_step_us);
+  int8_t setSpeedInTicks(uint32_t min_step_ticks);
+  int8_t setSpeedInHz(uint32_t speed_hz);
+  int8_t setSpeedInMilliHz(uint32_t speed_mhz);
+```
+To retrieve current set speed. This means, while accelerating and/or decelerating, this is 
+NOT the actual speed !
+```cpp
+  uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
+  uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
+  uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
+```
+If the current speed is needed, then use `getCurrentSpeed...()`. This retrieves the actual speed.
+
+| value | description                  |
+|:-----:|:-----------------------------|
+|   = 0 | while not moving             |
+|   > 0 | while position counting up   |
+|   < 0 | while position counting down |
+
+```cpp
+  int32_t getCurrentSpeedInUs();
+  int32_t getCurrentSpeedInMilliHz();
+```
+## Acceleration
  set Acceleration expects as parameter the change of speed
  as step/s².
  If for example the speed should ramp up from 0 to 10000 steps/s within
@@ -314,11 +322,13 @@ getCurrentAcceleration() retrieves the actual acceleration.
 ```cpp
   int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
 ```
+## Apply new speed/acceleration value
 This function applies new values for speed/acceleration.
 This is convenient especially, if the stepper is set to continuous running.
 ```cpp
   void applySpeedAcceleration();
 ```
+## Move commands
 start/move the stepper for (move) steps or to an absolute position.
 
 If the stepper is already running, then the current running move will be
@@ -398,7 +408,7 @@ get the target position for the current move
 ```cpp
   inline int32_t targetPos() { return _rg.targetPosition(); }
 ```
-stepper queue management (low level access)
+## Low Level Stepper Queue Management (low level access)
 
 If the queue is already running, then the start parameter is obsolote.
 But the queue may run out of commands while executing addQueueEntry,
@@ -429,13 +439,13 @@ Return codes for addQueueEntry
 #define AQE_ERROR_EMPTY_QUEUE_TO_START -2
 #define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE -3
 ```
-check functions for command queue being empty, full or running.
+### check functions for command queue being empty, full or running.
 ```cpp
   bool isQueueEmpty();
   bool isQueueFull();
   bool isQueueRunning();
 ```
-functions to get the fill level of the queue
+### functions to get the fill level of the queue
 
 To retrieve the forward planning time in the queue, ticksInQueue()
 can be used. It sums up all ticks of the not yet processed commands.
