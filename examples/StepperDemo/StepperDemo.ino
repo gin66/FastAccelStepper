@@ -222,9 +222,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     ,
     {
       step : 14,
-      enable_low_active : PIN_UNDEFINED,
+      enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
+      direction : 18,
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
