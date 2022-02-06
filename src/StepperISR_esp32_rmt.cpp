@@ -46,6 +46,7 @@ int tp2 = 0;
 #define PART_SIZE 30
 
 static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one, uint32_t *data) {
+  data = (uint32_t *)RMT_CHANNEL_MEM(q->channel);
   if (!fill_part_one) {
     data += PART_SIZE;
   }
@@ -275,6 +276,7 @@ void StepperQueue::startQueue_rmt() {
   else {
 	  mem = (uint32_t *)RMT_CH1DATA_REG;
   }
+  mem = (uint32_t *)RMT_CHANNEL_MEM(channel);
   for (uint8_t i = 0; i < 64; i+=2) {
     mem[i+0] = 0x0fff8fff;
     mem[i+1] = 0x7fff8fff;
@@ -324,7 +326,7 @@ bool StepperQueue::isReadyForCommands_rmt() {
 	if (_isRunning) {
 		return true;
 	}
-	return !_rmtStopped;
+	return _rmtStopped;
 }
 uint16_t StepperQueue::_getPerformedPulses_rmt() { return 0; }
 #endif
