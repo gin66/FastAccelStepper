@@ -45,7 +45,7 @@ int8_t RampGenerator::startRun(bool countUp) {
   fasDisableInterrupts();
   _rw.startRampIfNotRunning();
   if (_ro.isImmediateStopInitiated()) {
-	  new_ramp.markIncompleteImmediateStop();
+    new_ramp.markIncompleteImmediateStop();
   }
   _ro = new_ramp;
   fasEnableInterrupts();
@@ -67,7 +67,7 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
     _rw.startRampIfNotRunning();
   }
   if (_ro.isImmediateStopInitiated()) {
-	  new_ramp.markIncompleteImmediateStop();
+    new_ramp.markIncompleteImmediateStop();
   }
   _ro = new_ramp;
   fasEnableInterrupts();
@@ -137,15 +137,15 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   _ro.clearImmediateStop();
 
   if (ramp.isImmediateStopInitiated()) {
-	  // no more commands
+    // no more commands
     command->command.ticks = 0;
-	_ro.clearImmediateStop();
-	command->rw.stopRamp();
-	return;
+    _ro.clearImmediateStop();
+    command->rw.stopRamp();
+    return;
   }
   if (ramp.isImmediateStopIncomplete()) {
-	_rw.stopRamp();
-	ramp.clearImmediateStop();
+    _rw.stopRamp();
+    ramp.clearImmediateStop();
   }
   _getNextCommand(&ramp, &_rw, &qe, command);
 }

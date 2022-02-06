@@ -10,11 +10,12 @@
 // [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
 // Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
 //
-// Here is a basic example to run a stepper from position 0 to 1000 and back again to 0.
+// Here is a basic example to run a stepper from position 0 to 1000 and back
+// again to 0.
 // ```
 // FastAccelStepperEngine engine = FastAccelStepperEngine();
 // FastAccelStepper *stepper = NULL;
-// 
+//
 // #define dirPinStepper    5
 // #define enablePinStepper 6
 // #define stepPinStepper   9
@@ -25,7 +26,7 @@
 //       stepper->setDirectionPin(dirPinStepper);
 //       stepper->setEnablePin(enablePinStepper);
 //       stepper->setAutoEnable(true);
-// 
+//
 //       stepper->setSpeedInHz(500);
 //       stepper->setAcceleration(100);
 //       stepper->moveTo(1000, true);
@@ -37,7 +38,6 @@
 class FastAccelStepper;
 
 class FastAccelStepperEngine {
-
   //
   // ## FastAccelStepperEngine
   //
@@ -58,23 +58,25 @@ class FastAccelStepperEngine {
   //    engine.init();
   // }
   // ```
-  
+
   void init();
 
 #if defined(SUPPORT_CPU_AFFINITY)
-  // In a multitasking and multicore system like ESP32, the steppers are controlled by a continuously running
-  // task. This task can be fixed to one CPU core with this modified init()-call.
-  // ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
+  // In a multitasking and multicore system like ESP32, the steppers are
+  // controlled by a continuously running task. This task can be fixed to one
+  // CPU core with this modified init()-call. ESP32 implementation detail: For
+  // values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
   void init(uint8_t cpu_core);
 
 #endif
 
   // ### Creation of FastAccelStepper
   //
-  // Using a call to `stepperConnectToPin()` a FastAccelStepper instance is created.
-  // This call tells the stepper, which step pin to use. As the hardware may have
-  // limitations - e.g. no stepper resources anymore, or the step pin cannot be used,
-  // then NULL is returned. So it is advised to check the return value of this call.
+  // Using a call to `stepperConnectToPin()` a FastAccelStepper instance is
+  // created. This call tells the stepper, which step pin to use. As the
+  // hardware may have limitations - e.g. no stepper resources anymore, or the
+  // step pin cannot be used, then NULL is returned. So it is advised to check
+  // the return value of this call.
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 
   // Comments to valid pins:
@@ -92,9 +94,9 @@ class FastAccelStepperEngine {
 
   // ### Debug LED
   //
-  // If blinking of a LED is required to indicate, the stepper controller is still running,
-  // then the port. to which the LED is connected, can be told to the engine.
-  // The periodic task will let the associated LED blink with 1 Hz
+  // If blinking of a LED is required to indicate, the stepper controller is
+  // still running, then the port. to which the LED is connected, can be told to
+  // the engine. The periodic task will let the associated LED blink with 1 Hz
   void setDebugLed(uint8_t ledPin);
 
   /* This should be only called from ISR or stepper task. So do not call it */
@@ -282,13 +284,13 @@ class FastAccelStepper {
 
   // ## Speed
   // For stepper movement control by FastAccelStepper's ramp generator
-  // 
+  //
   // Speed can be defined in four different units:
   // - In Hz: This means steps/s
   // - In millHz: This means in steps/1000s
   // - In us: This means in us/step
   //
-  // For the device's maximum allowed speed, the following calls can be used. 
+  // For the device's maximum allowed speed, the following calls can be used.
   uint16_t getMaxSpeedInUs();
   uint16_t getMaxSpeedInTicks();
   uint32_t getMaxSpeedInHz();
@@ -313,13 +315,14 @@ class FastAccelStepper {
   int8_t setSpeedInHz(uint32_t speed_hz);
   int8_t setSpeedInMilliHz(uint32_t speed_mhz);
 
-  // To retrieve current set speed. This means, while accelerating and/or decelerating, this is 
-  // NOT the actual speed !
+  // To retrieve current set speed. This means, while accelerating and/or
+  // decelerating, this is NOT the actual speed !
   inline uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
   inline uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
   inline uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
 
-  // If the current speed is needed, then use `getCurrentSpeed...()`. This retrieves the actual speed.
+  // If the current speed is needed, then use `getCurrentSpeed...()`. This
+  // retrieves the actual speed.
   //
   // | value | description                  |
   // |:-----:|:-----------------------------|
@@ -329,7 +332,6 @@ class FastAccelStepper {
   //
   int32_t getCurrentSpeedInUs();
   int32_t getCurrentSpeedInMilliHz();
-
 
   // ## Acceleration
   //  set Acceleration expects as parameter the change of speed
@@ -352,7 +354,9 @@ class FastAccelStepper {
   //    = 0 while idle or coasting
   //    > 0 while speed is changing towards positive values
   //    < 0 while speed is changeing towards negative values
-  inline int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
+  inline int32_t getCurrentAcceleration() {
+    return _rg.getCurrentAcceleration();
+  }
 
   // ## Apply new speed/acceleration value
   // This function applies new values for speed/acceleration.

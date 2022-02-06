@@ -37,7 +37,8 @@ int tp2 = 0;
 // second.
 #define PART_SIZE 30
 
-static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one, uint32_t *data) {
+static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
+                                    uint32_t *data) {
   if (!fill_part_one) {
     data += PART_SIZE;
   }
@@ -286,9 +287,9 @@ void StepperQueue::startQueue_rmt() {
   apply_command(this, true, mem);
 
 #ifdef TRACE
-  Serial.print(RMT.conf_ch[channel].conf0.val,BIN);
+  Serial.print(RMT.conf_ch[channel].conf0.val, BIN);
   Serial.print(' ');
-  Serial.print(RMT.conf_ch[channel].conf1.val,BIN);
+  Serial.print(RMT.conf_ch[channel].conf1.val, BIN);
   Serial.println(' ');
   Serial.print(RMT.apb_conf.mem_tx_wrap_en);
   Serial.println(' ');
@@ -305,9 +306,9 @@ void StepperQueue::startQueue_rmt() {
   apply_command(this, false, mem);
 
 #ifdef TRACE
-  Serial.print(RMT.conf_ch[channel].conf0.val,BIN);
+  Serial.print(RMT.conf_ch[channel].conf0.val, BIN);
   Serial.print(' ');
-  Serial.print(RMT.conf_ch[channel].conf1.val,BIN);
+  Serial.print(RMT.conf_ch[channel].conf1.val, BIN);
   Serial.println(' ');
   Serial.print(RMT.apb_conf.mem_tx_wrap_en);
   Serial.println(' ');

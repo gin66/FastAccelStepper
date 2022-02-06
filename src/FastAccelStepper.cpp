@@ -27,7 +27,7 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
 #endif
-#if MAX_STEPPER == 14 
+#if MAX_STEPPER == 14
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
@@ -253,7 +253,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
           q->addQueueEntry(&start_cmd, false);
           delay -= ticks_u16;
         }
-		res = q->addQueueEntry(NULL, start);
+        res = q->addQueueEntry(NULL, start);
         if (res != AQE_OK) {
           return res;
         }
@@ -307,9 +307,9 @@ void FastAccelStepper::fill_queue() {
   // check if addition of commands is suspended (due to forceStopAndNewPosition)
   StepperQueue* q = &fas_queue[_queue_num];
 
-  // if force stop has been called, then ignore_commands is true and ramp stopped.
-  // So the ramp generator will not create a new command, unless new move command has
-  // been given after forceStop..(). So we just clear the flag
+  // if force stop has been called, then ignore_commands is true and ramp
+  // stopped. So the ramp generator will not create a new command, unless new
+  // move command has been given after forceStop..(). So we just clear the flag
   q->ignore_commands = false;
 
   // preconditions are fulfilled, so create the command(s)
@@ -535,9 +535,9 @@ int8_t FastAccelStepper::runBackward() { return _rg.startRun(false); }
 int8_t FastAccelStepper::moveTo(int32_t position, bool blocking) {
   int8_t res = _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
   if ((res == MOVE_OK) && blocking) {
-	  while(isRunning()) {
-		  noop_or_wait;
-	  }
+    while (isRunning()) {
+      noop_or_wait;
+    }
   }
   return res;
 }
@@ -547,9 +547,9 @@ int8_t FastAccelStepper::move(int32_t move, bool blocking) {
   }
   int8_t res = _rg.move(move, &fas_queue[_queue_num].queue_end);
   if ((res == MOVE_OK) && blocking) {
-	  while(isRunning()) {
-		  noop_or_wait;
-	  }
+    while (isRunning()) {
+      noop_or_wait;
+    }
   }
   return res;
 }

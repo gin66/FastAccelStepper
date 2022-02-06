@@ -16,14 +16,13 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 2:
     case 3:
       res = stepper->addQueueEntry(&cmd_step);
-	  if (res > 1) {
-	     Serial.print(res);
-		 Serial.print(' ');
-	  }
-	  else {
-         seq->u32_1 = time_ms;
-         seq->state++;
-	  }
+      if (res > 1) {
+        Serial.print(res);
+        Serial.print(' ');
+      } else {
+        seq->u32_1 = time_ms;
+        seq->state++;
+      }
       break;
     case 4:
       if (time_ms - seq->u32_1 >= 20) {

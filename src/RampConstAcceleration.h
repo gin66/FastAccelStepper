@@ -73,17 +73,17 @@ struct ramp_config_s {
 struct ramp_ro_s {
   struct ramp_config_s config;
   int32_t target_pos;
-  bool force_stop:1;
-  bool force_immediate_stop:1;
-  bool incomplete_immediate_stop:1;
-  bool keep_running:1;
-  bool keep_running_count_up:1;
+  bool force_stop : 1;
+  bool force_immediate_stop : 1;
+  bool incomplete_immediate_stop : 1;
+  bool keep_running : 1;
+  bool keep_running_count_up : 1;
   inline void init() {
     config.init();
     target_pos = 0;
     force_stop = false;
-	force_immediate_stop = false;
-	incomplete_immediate_stop = false;
+    force_immediate_stop = false;
+    incomplete_immediate_stop = false;
     keep_running = false;
     keep_running_count_up = false;
   }
@@ -91,20 +91,19 @@ struct ramp_ro_s {
                           bool countUp) {
     config = *new_config;
     target_pos = 0;
-	force_stop = false;
-	force_immediate_stop = false;
-	incomplete_immediate_stop = false;
-   	keep_running = true,
-    keep_running_count_up = countUp;
+    force_stop = false;
+    force_immediate_stop = false;
+    incomplete_immediate_stop = false;
+    keep_running = true, keep_running_count_up = countUp;
   }
   inline void runToPosition(const struct ramp_config_s *new_config,
                             int32_t new_target_pos) {
     config = *new_config;
-    target_pos = new_target_pos; 
-	force_stop = false; 
-	force_immediate_stop = false;
-	incomplete_immediate_stop = false;
-	keep_running = false;
+    target_pos = new_target_pos;
+    force_stop = false;
+    force_immediate_stop = false;
+    incomplete_immediate_stop = false;
+    keep_running = false;
     keep_running_count_up = true;
   }
   inline int32_t targetPosition() { return target_pos; }
@@ -112,10 +111,15 @@ struct ramp_ro_s {
     target_pos += delta;
   }
   inline void immediateStop() { force_immediate_stop = true; }
-  inline void markIncompleteImmediateStop() { incomplete_immediate_stop = true; }
+  inline void markIncompleteImmediateStop() {
+    incomplete_immediate_stop = true;
+  }
   inline bool isImmediateStopInitiated() { return force_immediate_stop; }
   inline bool isImmediateStopIncomplete() { return incomplete_immediate_stop; }
-  inline void clearImmediateStop() { force_immediate_stop = false; incomplete_immediate_stop = false; }
+  inline void clearImmediateStop() {
+    force_immediate_stop = false;
+    incomplete_immediate_stop = false;
+  }
   inline void initiateStop() { force_stop = true; }
   inline bool isStopInitiated() { return force_stop; }
   inline void setKeepRunning() { keep_running = true; }
