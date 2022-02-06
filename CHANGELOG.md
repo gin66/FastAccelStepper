@@ -1,6 +1,10 @@
 TODO:
 - Analyze the different behavior avr vs pc-based tests to be analyzed
 - #include-file structure needs to be cleaned up
+- setCurrentPosition() should adjust the maintained last position bits in queue
+
+pre:
+- after forceStop, the first command was lost
 
 0.26.0:
 - avr: Max stepper speed depending on number of assigned steppers:

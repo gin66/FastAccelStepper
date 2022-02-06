@@ -44,6 +44,9 @@ int8_t RampGenerator::startRun(bool countUp) {
 
   fasDisableInterrupts();
   _rw.startRampIfNotRunning();
+  if (_ro.isImmediateStopInitiated()) {
+	  new_ramp.markIncompleteImmediateStop();
+  }
   _ro = new_ramp;
   fasEnableInterrupts();
   return MOVE_OK;
@@ -62,6 +65,9 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
   if (position_changed) {
     // Only start the ramp generator, if the target position is different
     _rw.startRampIfNotRunning();
+  }
+  if (_ro.isImmediateStopInitiated()) {
+	  new_ramp.markIncompleteImmediateStop();
   }
   _ro = new_ramp;
   fasEnableInterrupts();
@@ -127,7 +133,19 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   struct ramp_ro_s ramp = _ro;
   fasEnableInterrupts();
 
-  return _getNextCommand(&ramp, &_rw, queue_end, command);
+  _ro.clearImmediateStop();
+
+  if (ramp.isImmediateStopInitiated()) {
+	  // no more commands
+    command->command.ticks = 0;
+	_rw.stopRamp();
+	return;
+  }
+  if (ramp.isImmediateStopIncomplete()) {
+	_rw.stopRamp();
+	ramp.clearImmediateStop();
+  }
+  _getNextCommand(&ramp, &_rw, queue_end, command);
 }
 void RampGenerator::stopRamp() { _rw.stopRamp(); }
 int32_t RampGenerator::getCurrentAcceleration() {
