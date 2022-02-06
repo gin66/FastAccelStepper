@@ -1,9 +1,9 @@
 TODO:
 - Different behavior avr vs pc-based tests to be analyzed
 - #include-file structure needs to be cleaned up
-- setCurrentPosition() should adjust the maintained last position bits in queue
+- setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
-pre-0.27.0:
+0.27.0:
 - esp32: StepperDemo make p<n> command work again
 - esp32: check step pin is a valid gpio output pin
 - esp32: Support rmt device with two steppers

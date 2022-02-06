@@ -11,7 +11,8 @@
 [![Build examples for Atmega328](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml)
 [![Build examples for Atmega32U4](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega32u4.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega32u4.yml)
 
-This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/). Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
+This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
+Supported are avr (ATmega 328, ATmega2560), esp32, esp32s2 and atmelsam due.
 [Arduino library manager log](https://downloads.arduino.cc/libraries/logs/github.com/gin66/FastAccelStepper/)
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
@@ -113,7 +114,14 @@ Comments to pin sharing:
 ### ESP32
 
 * allows up 200000 generated steps per second
-* supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* supports up to 14 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+
+### ESP32S2
+
+* UNTESTED
+* allows up 200000 generated steps per second ?
+* supports up to 2 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### Atmel SAM Due
@@ -232,13 +240,15 @@ sketch.ino
 
 ### ESP32
 
-This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six. In addition, the pulse counter module is used starting from unit_0 to unit_5. This driver uses the pcnt_isr_service, so unallocated modules can still be used by the application.
+This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six.  In addition, the pulse counter module is used starting from `unit_0` to `unit_5`. This driver uses the `pcnt_isr_service`, so unallocated modules can still be used by the application.
 
-The mcpwm modules' outputs are fed into the pulse counter by direct gpio_matrix-modification.
+The mcpwm modules' outputs are fed into the pulse counter by direct gpio-matrix-modification.
 
-A note to MIN_CMD_TICKS: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
+For stepper motors 7-14, the rmt module comes into use.
 
-Compatibility with ESP32-S2 and ESP32-C3: Not supported due to lack of mcpwm modules. see [reference](https://docs.espressif.com/projects/esp-idf/en/latest/esp32c3/hw-reference/chip-series-comparison.html) in the related data sheets. ledpwm modules cannot be used for steppers, too.
+A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
+
+Compatibility with ESP32-C3: Not supported currently. The rmt module has more changes compared to esp32/esp32s2
 
 Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are listed in the datasheet. So there are chances, that this lib works.
 

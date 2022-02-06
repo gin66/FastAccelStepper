@@ -27,6 +27,12 @@ FastAccelStepper fas_stepper[MAX_STEPPER] = {
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
     FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
 #endif
+#if MAX_STEPPER == 14 
+    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
+    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
+#endif
     FastAccelStepper()};
 
 //*************************************************************************************************
@@ -244,9 +250,10 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
           }
           struct stepper_command_s start_cmd = {
               .ticks = ticks_u16, .steps = 0, .count_up = cmd->count_up};
-          res = q->addQueueEntry(&start_cmd, start);
+          q->addQueueEntry(&start_cmd, false);
           delay -= ticks_u16;
         }
+		res = q->addQueueEntry(NULL, start);
         if (res != AQE_OK) {
           return res;
         }

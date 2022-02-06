@@ -261,7 +261,10 @@ void StepperQueue::disconnect_rmt() {
 }
 
 void StepperQueue::startQueue_rmt() {
+//#define TRACE
+#ifdef TRACE
   Serial.println("START");
+#endif
   rmt_tx_stop(channel);
   rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
@@ -276,16 +279,35 @@ void StepperQueue::startQueue_rmt() {
   rmt_set_tx_thr_intr_en(channel, false, PART_SIZE + 1);  // VULNERABLE !?!?
   RMT.apb_conf.mem_tx_wrap_en = 0;
 
+#ifdef TRACE
   Serial.println(next_write_idx - read_idx);
+#endif
 
   apply_command(this, true, mem);
+
+#ifdef TRACE
+  Serial.print(RMT.conf_ch[channel].conf0.val,BIN);
+  Serial.print(' ');
+  Serial.print(RMT.conf_ch[channel].conf1.val,BIN);
+  Serial.println(' ');
+  Serial.print(RMT.apb_conf.mem_tx_wrap_en);
+  Serial.println(' ');
+  for (uint8_t i = 0; i < 64; i++) {
+    Serial.print(i);
+    Serial.print(' ');
+    Serial.println(mem[i], HEX);
+  }
+  if (!isRunning()) {
+    Serial.println("STOPPED");
+  }
+#endif
+
   apply_command(this, false, mem);
 
-//#define TRACE
 #ifdef TRACE
-  Serial.print(RMT.conf_ch[channel].conf0.val);
+  Serial.print(RMT.conf_ch[channel].conf0.val,BIN);
   Serial.print(' ');
-  Serial.print(RMT.conf_ch[channel].conf1.val);
+  Serial.print(RMT.conf_ch[channel].conf1.val,BIN);
   Serial.println(' ');
   Serial.print(RMT.apb_conf.mem_tx_wrap_en);
   Serial.println(' ');
@@ -300,8 +322,8 @@ void StepperQueue::startQueue_rmt() {
 #endif
   if (_isRunning) {
     RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
-    rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   }
+  rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   rmt_set_tx_intr_en(channel, true);
   _rmtStopped = false;
   RMT.conf_ch[channel].conf1.tx_start = 1;
