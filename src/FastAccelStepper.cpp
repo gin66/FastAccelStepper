@@ -579,7 +579,7 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   // stop the stepper interrupt and empty the queue
   q->forceStop();
 
-  // set the new position
+  // set the new position. This is not safe
   q->queue_end.pos = new_pos;
 }
 bool FastAccelStepper::disableOutputs() {

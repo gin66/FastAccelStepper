@@ -131,6 +131,7 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   fasDisableInterrupts();
   // copy consistent ramp state
   struct ramp_ro_s ramp = _ro;
+  struct queue_end_s qe = *queue_end;
   fasEnableInterrupts();
 
   _ro.clearImmediateStop();
@@ -138,14 +139,15 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   if (ramp.isImmediateStopInitiated()) {
 	  // no more commands
     command->command.ticks = 0;
-	_rw.stopRamp();
+	_ro.clearImmediateStop();
+	command->rw.stopRamp();
 	return;
   }
   if (ramp.isImmediateStopIncomplete()) {
 	_rw.stopRamp();
 	ramp.clearImmediateStop();
   }
-  _getNextCommand(&ramp, &_rw, queue_end, command);
+  _getNextCommand(&ramp, &_rw, &qe, command);
 }
 void RampGenerator::stopRamp() { _rw.stopRamp(); }
 int32_t RampGenerator::getCurrentAcceleration() {
