@@ -12,6 +12,7 @@ int tp1 = 0;
   digitalWrite(TEST_PROBE_1, tp1)
 #else
 #define PROBE_1(x)
+#define PROBE_1_TOGGLE
 #endif
 #ifdef TEST_PROBE_2
 int tp2 = 0;
@@ -21,6 +22,7 @@ int tp2 = 0;
   digitalWrite(TEST_PROBE_2, tp2)
 #else
 #define PROBE_2(x)
+#define PROBE_2_TOGGLE
 #endif
 
 // The following concept is in use:
