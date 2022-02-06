@@ -3,7 +3,7 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue
 
-pre:
+0.26.1:
 - after forceStop, the first command was lost
 
 0.26.0:
