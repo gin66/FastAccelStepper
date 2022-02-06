@@ -6,7 +6,7 @@ TODO:
 0.27.0:
 - esp32: StepperDemo make p<n> command work again
 - esp32: check step pin is a valid gpio output pin
-- esp32: Support rmt device with two steppers
+- esp32: Support rmt device with two steppers. so in total 8 steppers for now
 - esp32s2: experimental support
 - new return code for `addQueueEntry()`: `AQE_DEVICE_NOT_READY`
 - `move()` and `moveTo()` expect an optional parameter to opt for blocking operation

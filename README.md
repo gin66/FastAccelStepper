@@ -93,33 +93,33 @@ Comments to pin sharing:
 
 * allows up to 76000 generated steps per second for single stepper operation, 37000 for dual stepper
 * supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
+* Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
 * Steppers' command queue depth: 16
 
 ### AVR ATMega 32u4
 
 * allows up to 76000 generated steps per second for single stepper operation, 37000 for dual stepper and 25000 for three steppers
 * supports up to three stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
+* Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
 * Steppers' command queue depth: 16
 
 ### AVR ATMega 2560
 
 * allows up to 76000 generated steps per second for single stepper operation, 37000 for dual stepper and 25000 for three steppers
 * supports up to three stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Uses F_CPU Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
+* Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
 * Steppers' command queue depth: 16
 * This device has four 16 bit timers, so extension up to 12 steppers should be possible (not implemented)
 
 ### ESP32
 
 * allows up 200000 generated steps per second
-* supports up to 14 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* supports up to 8 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### ESP32S2
 
-* UNTESTED
+* UNTESTED !!!
 * allows up 200000 generated steps per second ?
 * supports up to 2 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
@@ -141,7 +141,7 @@ For the API definition please consult the header file [FastAccelStepper.h](https
 Please check the examples for application and how to use the low level interface.
 Some info is [Issue #86](https://github.com/gin66/FastAccelStepper/issues/86).
 
-The module defines the global variable fas_queue. Do not use or redefine this variable.
+The module defines the global variable `fas_queue`. Do not use or redefine this variable.
 
 Using the high level interface with ramp up/down as in [UsageExample.ino](https://github.com/gin66/FastAccelStepper/blob/master/examples/UsageExample/UsageExample.ino).
 
@@ -217,7 +217,7 @@ Measurement of the acceleration/deacceleration aka timer overflow interrupt yiel
 
 Similar to ATmega328, but instead of timer 1, timer 4 is used.
 
-For users of platformio, the used timer can be changed to either 1, 3, 4 or 5. For e.g. timer module 3 add to platformio.ini under build_flags:
+For users of platformio, the used timer can be changed to either 1, 3, 4 or 5. For e.g. timer module 3 add to platformio.ini under `build_flags`:
 ```
 build_flags = -DFAS_TIMER_MODULE=3
 ```
@@ -244,7 +244,7 @@ This stepper driver uses mcpwm modules of the esp32: for the first three stepper
 
 The mcpwm modules' outputs are fed into the pulse counter by direct gpio-matrix-modification.
 
-For stepper motors 7-14, the rmt module comes into use.
+For the other stepper motors, the rmt module comes into use.
 
 A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
 
@@ -302,13 +302,13 @@ For any questions/support please contact [gagank1](https://github.com/gagank1), 
 ## TEST STRATEGY
 
 The library is tested with different kind of tests:
-* PC only (sub folder ./tests/pc_based)
+* PC only (sub folder `./tests/pc_based`)
 
   These tests focussing primarily the ramp generator and part of the API
-* simavr based for avr (sub folder ./tests/simavr_based)
+* simavr based for avr (sub folder `./tests/simavr_based`)
 
   The simavr is an excellent simulator for avr microcontrollers. This allows to check the avr implementation thoroughly: number of steps generated, virtual stepper position and even timing. Tested code is mainly the StepperDemo, which gets fed in a one line sequence of commands to execute. These tests are focused on avr, but help to check the whole library code, used by esp32, too.
-* esp32 tests with another pulse counter attached (e.g. test_seq_08 in StepperDemo)
+* esp32 tests with another pulse counter attached (e.g. `test_seq_08` in StepperDemo)
 
   The FastAccelStepper-API supports to attach another free pulse counter to a stepper's step and dir pins. This counter counts in the range of -16383 to 16383 with wrap around to 0. The test condition is, that the library's view of the position should match the independently counted one. These tests are still evolving
 
@@ -318,7 +318,7 @@ The library is tested with different kind of tests:
 
 * esp32 hw tests
 
-  These tests live under sub folder ./tests/esp32_hw_based
+  These tests live under sub folder `./tests/esp32_hw_based`
 
 * manual tests using examples/StepperDemo
 
