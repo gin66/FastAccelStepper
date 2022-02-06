@@ -3,9 +3,6 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue
 
-0.26.1:
-- after forceStop, the first command was lost
-
 pre-0.27.0:
 - esp32: StepperDemo make p<n> command work again
 - esp32: check step pin is a valid gpio output pin
@@ -14,6 +11,10 @@ pre-0.27.0:
 - new return code for `addQueueEntry()`: `AQE_DEVICE_NOT_READY`
 - `move()` and `moveTo()` expect an optional parameter to opt for blocking operation
 - add more `ìnline` in FastAccelStepper.h for short routines to be inlined
+- StepperDemo: fix output of usage config
+
+0.26.1:
+- after forceStop, the first command was lost
 
 0.26.0:
 - avr: Max stepper speed depending on number of assigned steppers:
