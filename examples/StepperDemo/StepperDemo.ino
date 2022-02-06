@@ -338,6 +338,7 @@ struct test_seq_s test_seq[MAX_STEPPER] = {
 
 #define _NL_ "\n"
 #define _SEP_ "|"
+#define _SEP_CHAR_ '|'
 
 // clang-format off
 const static char messages[] PROGMEM =
@@ -598,6 +599,9 @@ const static char messages[] PROGMEM =
 #define MSG_USAGE_NORMAL 64+MSG_OFFSET
 #define MSG_USAGE_TEST 65+MSG_OFFSET
 #define MSG_USAGE_CONFIG 66+MSG_OFFSET
+#if MSG_USAGE_CONFIG >= 128+32
+#error "TOO MANY ENTRIES"
+#endif
     /* USAGE NORMAL */
     _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
@@ -686,39 +690,32 @@ const static char messages[] PROGMEM =
 ;
 // clang-format on
 
-void output_msg(int8_t i) {
+// The preprocessor for .ino is buggy
+#include "generic.h"
+
+void output_msg(uint8_t x) {
   char ch;
-#if defined(ARDUINO_ARCH_AVR)
-  PGM_P p = messages;
-  while (i >= 0) {
-    ch = pgm_read_byte(p++);
-    if (ch == '|') {
-      i--;
-    } else if (i == 0) {
-      if (ch & 0x80) {
-        output_msg(ch ^ 0x80);
-      } else {
-        Serial.print(ch);
-      }
+  MSG_TYPE p = messages;
+  while (x > 0) {
+    ch = get_char(p);
+    p++;
+    if (ch == _SEP_CHAR_) {
+      x--;
     }
   }
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAM)
-  const char *p = messages;
-  while (i >= 0) {
-    ch = *p++;
-    if (ch == '|') {
-      i--;
-    } else if (i == 0) {
-      if (ch & 0x80) {
-        output_msg(ch ^ 0x80);
-      } else {
-        Serial.print(ch);
-      }
+  for (;;) {
+    ch = get_char(p);
+    p++;
+    if (ch == _SEP_CHAR_) {
+      break;
+    }
+    uint8_t y = (uint8_t)(ch ^ 0x80);
+    if (y <= MSG_USAGE_CONFIG) {
+      output_msg(y);
+    } else {
+      Serial.print(ch);
     }
   }
-#else
-#error "Unsupported derivate"
-#endif
 }
 
 #if !defined(__AVR_ATmega32U4__)
