@@ -3,6 +3,9 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+0.27.1:
+- esp32/esp32s2: disable test probes
+
 0.27.0:
 - esp32: StepperDemo make p<n> command work again
 - esp32: check step pin is a valid gpio output pin

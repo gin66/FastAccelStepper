@@ -2,8 +2,8 @@
 
 #ifdef SUPPORT_ESP32_RMT
 
-#define TEST_PROBE_1 21
-#define TEST_PROBE_2 18
+//#define TEST_PROBE_1 21
+//#define TEST_PROBE_2 18
 #ifdef TEST_PROBE_1
 int tp1 = 0;
 #define PROBE_1(x) digitalWrite(TEST_PROBE_1, x)
