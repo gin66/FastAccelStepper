@@ -1,6 +1,10 @@
 TODO:
 - Different behavior avr vs pc-based tests to be analyzed
 - #include-file structure needs to be cleaned up
+- setCurrentPosition() should adjust the maintained last position bits in queue
+
+0.26.1:
+- after forceStop, the first command was lost
 
 pre-0.27.0:
 - esp32: StepperDemo make p<n> command work again
