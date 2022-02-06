@@ -33,26 +33,11 @@ int tp2 = 0;
 //    This way, the threshold interrupt occurs after the first part
 //    and the end interrupt after the second part.
 //
-//
-// Currently with V>=1000us is ok, but V=500us has step loss. Faster yields more
-// step loss
-//
-//  A=100000, V=40, 16000 Steps => 22 steps lost
-//  A=100000, V=40, 13000 Steps => 22 steps lost
-//  A=100000, V=40, 10000 Steps => 22 steps lost
-//  => Ramp up phase is problematic
-//
-//  A=100000, V=50, 16000 Steps => 7 steps lost
-//  A=100000, V=50, 13000 Steps => 8 steps lost
-//  A=100000, V=50, 10000 Steps => 18 steps lost
-//
-//
 // Of these 32 bits, the low 16-bit entry is sent first and the high entry
 // second.
 #define PART_SIZE 30
 
 static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one, uint32_t *data) {
-  data = (uint32_t *)RMT_CHANNEL_MEM(q->channel);
   if (!fill_part_one) {
     data += PART_SIZE;
   }
@@ -198,24 +183,20 @@ static void IRAM_ATTR tx_intr_handler(void *arg) {
   RMT.int_clr.val = mask;
   if (mask & RMT_CH0_TX_END_INT_ST) {
     PROBE_1_TOGGLE;
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 0], false,
-                  (uint32_t *)RMT_CH0DATA_REG);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 0], false, FAS_RMT_MEM(0));
   }
   if (mask & RMT_CH1_TX_END_INT_ST) {
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 1], false,
-                  (uint32_t *)RMT_CH1DATA_REG);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 1], false, FAS_RMT_MEM(1));
   }
   if (mask & RMT_CH0_TX_THR_EVENT_INT_ST) {
     PROBE_1_TOGGLE;
     PROBE_2_TOGGLE;
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 0], true,
-                  (uint32_t *)RMT_CH0DATA_REG);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 0], true, FAS_RMT_MEM(0));
     // now repeat the interrupt at buffer size + end marker
     RMT.tx_lim_ch[0].limit = PART_SIZE * 2 + 1;
   }
   if (mask & RMT_CH1_TX_THR_EVENT_INT_ST) {
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 1], true,
-                  (uint32_t *)RMT_CH1DATA_REG);
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 1], true, FAS_RMT_MEM(1));
     RMT.tx_lim_ch[1].limit = PART_SIZE * 2 + 1;
   }
 }
@@ -284,13 +265,7 @@ void StepperQueue::startQueue_rmt() {
   rmt_tx_stop(channel);
   rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
-  uint32_t *mem;
-  if (channel == 0) {
-    mem = (uint32_t *)RMT_CH0DATA_REG;
-  } else {
-    mem = (uint32_t *)RMT_CH1DATA_REG;
-  }
-  mem = (uint32_t *)RMT_CHANNEL_MEM(channel);
+  uint32_t *mem = FAS_RMT_MEM(channel);
   for (uint8_t i = 0; i < 64; i += 2) {
     mem[i + 0] = 0x0fff8fff;
     mem[i + 1] = 0x7fff8fff;
@@ -325,7 +300,7 @@ void StepperQueue::startQueue_rmt() {
 #endif
   if (_isRunning) {
     RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
-    rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);  // VULNERABLE !?!?
+    rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   }
   rmt_set_tx_intr_en(channel, true);
   _rmtStopped = false;
