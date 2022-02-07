@@ -119,7 +119,7 @@ Comments to pin sharing:
 
 ### ESP32S2
 
-* UNTESTED !!!
+* reported to work
 * allows up 200000 generated steps per second ?
 * supports up to 4 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
@@ -245,6 +245,19 @@ This stepper driver uses mcpwm modules of the esp32: for the first three stepper
 For the other stepper motors, the rmt module comes into use.
 
 A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
+
+What are the differences between mcpwm/pcnt and rmt ?
+
+|                            | mcpwm/pcnt                              | rmt                                                                           |
+|:---------------------------|:----------------------------------------|:------------------------------------------------------------------------------|
+|Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed |
+|Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          |
+|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           |
+|esp32 notes                 | availabe pcnt modules can be connected  | no pcnt module used, so can be attached to rmt output as realtime position    |
+
+If the interrupt load is not an issue, then rmt is the better choice. With rmt the below (multi-axis application) mentioned loss of synchonicity at high speeds can be avoided. The rmt driver is - besides some rmt modules perks - less complex and way more straightforward.
+
+As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers and then the 8 rmt drivers. In future this may be under application control.
 
 ### ESP32S2
 
