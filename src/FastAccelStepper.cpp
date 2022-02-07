@@ -14,26 +14,7 @@ static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 
 // dynamic allocation seems to not work so well on avr
-FastAccelStepper fas_stepper[MAX_STEPPER] = {
-    FastAccelStepper(),
-#if MAX_STEPPER == 3
-    FastAccelStepper(),
-#endif
-#if MAX_STEPPER == 6
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-    FastAccelStepper(),
-#endif
-#if MAX_STEPPER == 8
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-#endif
-#if MAX_STEPPER == 14
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-    FastAccelStepper(), FastAccelStepper(), FastAccelStepper(),
-#endif
-    FastAccelStepper()};
+FastAccelStepper fas_stepper[MAX_STEPPER];
 
 //*************************************************************************************************
 //*************************************************************************************************

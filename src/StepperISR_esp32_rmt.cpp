@@ -181,27 +181,32 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
   q->_isRunning = false;
 }
 
+#define PROCESS_CHANNEL(ch) \
+  if (mask & RMT_CH ## ch ## _TX_END_INT_ST) { \
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], false, FAS_RMT_MEM(ch)); \
+  } \
+  if (mask & RMT_CH ## ch ## _TX_THR_EVENT_INT_ST) { \
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], true, FAS_RMT_MEM(ch)); \
+    /* now repeat the interrupt at buffer size + end marker */ \
+    RMT.tx_lim_ch[ch].limit = PART_SIZE * 2 + 1; \
+  }
+
+
 static void IRAM_ATTR tx_intr_handler(void *arg) {
   uint32_t mask = RMT.int_st.val;
   RMT.int_clr.val = mask;
-  if (mask & RMT_CH0_TX_END_INT_ST) {
-    PROBE_1_TOGGLE;
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 0], false, FAS_RMT_MEM(0));
-  }
-  if (mask & RMT_CH1_TX_END_INT_ST) {
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 1], false, FAS_RMT_MEM(1));
-  }
-  if (mask & RMT_CH0_TX_THR_EVENT_INT_ST) {
-    PROBE_1_TOGGLE;
-    PROBE_2_TOGGLE;
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 0], true, FAS_RMT_MEM(0));
-    // now repeat the interrupt at buffer size + end marker
-    RMT.tx_lim_ch[0].limit = PART_SIZE * 2 + 1;
-  }
-  if (mask & RMT_CH1_TX_THR_EVENT_INT_ST) {
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + 1], true, FAS_RMT_MEM(1));
-    RMT.tx_lim_ch[1].limit = PART_SIZE * 2 + 1;
-  }
+  PROCESS_CHANNEL(0);
+  PROCESS_CHANNEL(1);
+#if QUEUES_RMT >= 4
+  PROCESS_CHANNEL(2);
+  PROCESS_CHANNEL(3);
+#endif
+#if QUEUES_RMT ==8 
+  PROCESS_CHANNEL(4);
+  PROCESS_CHANNEL(5);
+  PROCESS_CHANNEL(6);
+  PROCESS_CHANNEL(7);
+#endif
 }
 
 void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
