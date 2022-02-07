@@ -176,11 +176,6 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   }
 }
 
-static void IRAM_ATTR init_stop(StepperQueue *q) {
-  rmt_tx_stop(q->channel);
-  q->_isRunning = false;
-}
-
 #define PROCESS_CHANNEL(ch) \
   if (mask & RMT_CH ## ch ## _TX_END_INT_ST) { \
     apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], false, FAS_RMT_MEM(ch)); \
@@ -285,7 +280,7 @@ void StepperQueue::startQueue_rmt() {
   mem[2 * PART_SIZE] = 0;
   _isRunning = true;
   rmt_set_tx_intr_en(channel, false);
-  rmt_set_tx_thr_intr_en(channel, false, PART_SIZE + 1);  // VULNERABLE !?!?
+  rmt_set_tx_thr_intr_en(channel, false, 0);
   RMT.apb_conf.mem_tx_wrap_en = 0;
 
 #ifdef TRACE
@@ -339,8 +334,34 @@ void StepperQueue::startQueue_rmt() {
   //  RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {
-  init_stop(this);
+  // Based on finding in issue #101, the rmt module in esp32 and esp32s2 behaves differently.
+  // Apparently, the esp32 rmt cannot be stopped, while esp32s2 can.
+  // So implement a version, which should be able to cope with both
+
+  // try to stop the rmt module. Seems to work only on esp32s2
+  rmt_tx_stop(channel);
+
+  // esp32 will continue to run, so disable the interrupts
+  rmt_set_tx_intr_en(channel, false);
+  rmt_set_tx_thr_intr_en(channel, false, 0);
+
+  // stop esp32 rmt, by let it hit the end
+  RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
+
+  // replace buffer with only pauses, coming from end
+  uint32_t *data = FAS_RMT_MEM(channel)+63;
+  for (uint8_t i = 0; i < 64; i++) {
+    *data-- = 0x00010001;
+  }
+
+  // the queue is not running anymore
+  _isRunning = false;
+
+  // and empty the buffer
   read_idx = next_write_idx;
+
+  // as the rmt is not running anymore, mark it as stopped
+  _rmtStopped = true;
 }
 bool StepperQueue::isReadyForCommands_rmt() {
   if (_isRunning) {
