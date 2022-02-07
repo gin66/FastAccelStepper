@@ -27,17 +27,17 @@ int tp2 = 0;
 
 // The following concept is in use:
 //
-//    The buffer of 64Bytes is split into two parts à  30 words.
+//    The buffer of 64Bytes is split into two parts à  31 words.
 //    Each part will hold on command (or part of).
-//    After the 2*30 words an end marker is placed.
-//    The threshold is set to 30.
+//    After the 2*31 words an end marker is placed.
+//    The threshold is set to 31.
 //
 //    This way, the threshold interrupt occurs after the first part
 //    and the end interrupt after the second part.
 //
 // Of these 32 bits, the low 16-bit entry is sent first and the high entry
 // second.
-#define PART_SIZE 30
+#define PART_SIZE 31
 
 static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
                                     uint32_t *data) {
@@ -201,7 +201,7 @@ static void IRAM_ATTR tx_intr_handler(void *arg) {
   PROCESS_CHANNEL(2);
   PROCESS_CHANNEL(3);
 #endif
-#if QUEUES_RMT ==8 
+#if QUEUES_RMT == 8 
   PROCESS_CHANNEL(4);
   PROCESS_CHANNEL(5);
   PROCESS_CHANNEL(6);
