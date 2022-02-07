@@ -26,6 +26,7 @@ do
 		grabserial $DEV -c 'r ' -q StepperDemo -e 1
 		echo
 		echo FAIL $0 pulse counter mismatch
+		echo "test sequence $SEQ"
 		exit 1
 	fi
 
@@ -36,6 +37,7 @@ do
 		grabserial $DEV -c ' x r ' -q StepperDemo -e 1
 		echo
 		echo "FAIL $0 result pattern: $PASS"
+		echo "test sequence $SEQ"
 		exit 1
 	fi
 done

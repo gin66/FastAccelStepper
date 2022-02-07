@@ -106,7 +106,7 @@ struct queue_end_s {
 #define SUPPORT_ESP32_RMT
 #include <driver/rmt.h>
 #define QUEUES_MCPWM_PCNT 6
-#define QUEUES_RMT 2
+#define QUEUES_RMT 8
 
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
@@ -125,7 +125,7 @@ struct queue_end_s {
 #include <soc/rmt_reg.h>
 #include <soc/rmt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
-#define QUEUES_RMT 2
+#define QUEUES_RMT 4
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 //==========================================================================

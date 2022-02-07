@@ -114,14 +114,14 @@ Comments to pin sharing:
 ### ESP32
 
 * allows up 200000 generated steps per second
-* supports up to 8 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* supports up to 14 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### ESP32S2
 
 * UNTESTED !!!
 * allows up 200000 generated steps per second ?
-* supports up to 2 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* supports up to 4 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### Atmel SAM Due
@@ -240,13 +240,17 @@ sketch.ino
 
 ### ESP32
 
-This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six.  In addition, the pulse counter module is used starting from `unit_0` to `unit_5`. This driver uses the `pcnt_isr_service`, so unallocated modules can still be used by the application.
-
-The mcpwm modules' outputs are fed into the pulse counter by direct gpio-matrix-modification.
+This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six.  In addition, the pulse counter module is used starting from `unit_0` to `unit_5`. This driver uses the `pcnt_isr_service`, so unallocated modules can still be used by the application. The mcpwm modules' outputs are fed into the pulse counter by direct gpio-matrix-modification.
 
 For the other stepper motors, the rmt module comes into use.
 
 A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
+
+### ESP32S2
+
+This stepper driver uses rmt module.
+
+### ESP32C3/ESP32-MINI-1
 
 Compatibility with ESP32-C3: Not supported currently. The rmt module has more changes compared to esp32/esp32s2
 

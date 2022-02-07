@@ -2,9 +2,6 @@
 
 // u32_1 shall be milliseconds from last tick
 //
-// Run 320000 steps with speed changes every 100ms
-// in order to reproduce issue #24
-
 bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
   switch (seq->state) {
@@ -18,8 +15,8 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
       if ((stepper->rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST) {
         int32_t dt = time_ms - seq->u32_1;
         Serial.println(dt);
-        if (abs(dt - 792) >
-            19) {  // 779 esp, 805 avr (neu 810 avr), 811: esp32 with rmt
+		// 779 esp, 805 avr (neu 810 avr), 811: esp32 with rmt, 812: esp32 with rmt second channel
+        if (abs(dt - 792) > 20) {
           seq->state = TEST_STATE_ERROR;
           return true;
         }

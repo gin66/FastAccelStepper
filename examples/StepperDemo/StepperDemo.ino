@@ -125,22 +125,18 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 // Please adapt to your configuration
 const uint8_t led_pin = PIN_UNDEFINED;
 const struct stepper_config_s stepper_config[MAX_STEPPER] = {
+    // clang-format off
     // Test-HW
     // Position 01 linked to atmega nano
-    // 2: Enable Left Pin 13 GPIO13   , DIR Right Pin 7 GPIO18,    Step Right
-    // Pin 13 GPIO15
-    // 3: Enable Left Pin 12 GPIO12   , DIR Right Pin 6 GPIO19,    Step Right
-    // Pin 12 GPIO2  blue LED
-    // 4: Enable Left Pin 11 GPIO14   , DIR Right Pin 5 GPIO21,    Step Right
-    // Pin 11 GPIO4
-    // 5: Enable Left Pin 10 GPIO27   , DIR Right Pin 4 GPIO3 RX0, Step Right
-    // Pin 10 GPIO16 RX2
-    // 6: Enable Left Pin 9  GPIO26 A9, DIR Right Pin 3 GPIO1 TX0, Step Right
-    // Pin 9  GPIO17 TX2
-    // 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right
-    // Pin 8  GPIO5
+    // 2: Enable Left Pin 13 GPIO13   , DIR Right Pin 7 GPIO18,    Step Right Pin 13 GPIO15
+    // 3: Enable Left Pin 12 GPIO12   , DIR Right Pin 6 GPIO19,    Step Right Pin 12 GPIO2  blue LED
+    // 4: Enable Left Pin 11 GPIO14   , DIR Right Pin 5 GPIO21,    Step Right Pin 11 GPIO4
+    // 5: Enable Left Pin 10 GPIO27   , DIR Right Pin 4 GPIO3 RX0, Step Right Pin 10 GPIO16 RX2
+    // 6: Enable Left Pin 9  GPIO26 A9, DIR Right Pin 3 GPIO1 TX0, Step Right Pin 9  GPIO17 TX2
+    // 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right Pin 8  GPIO5
     //                          ALL Enable: Right Pin 1 GPIO23
     // Left Pin 15: +5V
+    // clang-format on
     {
       // position 01.234567 => 2
       step : 17,
@@ -191,8 +187,10 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    },
-    {
+    }
+#endif
+#if MAX_STEPPER > 4
+    ,{
       // position 01.234567 => 6
       step : 16,
       enable_low_active : 27,
@@ -218,10 +216,10 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     }
 #endif
-#if MAX_STEPPER == 8
+#if MAX_STEPPER > 6
     ,
     {
-      step : 14,
+      step : 14, // direction pin of M3
       enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
       direction : 19,
@@ -232,10 +230,81 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     },
     {
-      step : 23,
+      step : 23,  // ALL ENABLE PIN !!!!
       enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }
+#endif
+#if MAX_STEPPER == 14
+    ,
+    {
+      step : 32,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    {
+      step : 33,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }
+    ,
+    {
+      step : 25, // enable pin of M6
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    {
+      step : 26, // enable pin of M5
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }
+    ,
+    {
+      step : 22, // direction pin of M6
+      enable_low_active : 26,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    },
+    {
+      step : 21, // direction pin of M3
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
@@ -1048,10 +1117,10 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'M'):
     case MODE(test, 'M'):
     case MODE(config, 'M'):
-      if (cmd[1] == 0) {
-        if ((*cmd >= '1') && (*cmd <= '0' + MAX_STEPPER)) {
+      if (get_val1_val2_val3(cmd) == 1) {
+        if ((val1 > 0) && (val1 <= MAX_STEPPER)) {
           output_msg(MSG_SELECT_STEPPER);
-          selected = *cmd - '1';
+          selected = val1 - 1;
           Serial.println(*cmd);
           return true;
         }

@@ -3,6 +3,9 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+pre-0.27.3:
+- esp32/esp32s2: enable all 8/4 rmt backed steppers
+
 0.27.2:
 - esp32/esp32s2: fix compilation error of 0.27.1
 

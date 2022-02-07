@@ -266,6 +266,7 @@ void StepperQueue::disconnect_rmt() {
 #else
   rmt_set_gpio(channel, RMT_MODE_TX, GPIO_NUM_NC, false);
 #endif
+  RMT.conf_ch[channel].conf1.idle_out_en = 0;
 }
 
 void StepperQueue::startQueue_rmt() {
