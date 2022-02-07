@@ -1121,7 +1121,7 @@ bool process_cmd(char *cmd) {
         if ((val1 > 0) && (val1 <= MAX_STEPPER)) {
           output_msg(MSG_SELECT_STEPPER);
           selected = val1 - 1;
-          Serial.println(*cmd);
+          Serial.println(selected+1);
           return true;
         }
       }
