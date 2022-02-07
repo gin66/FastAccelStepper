@@ -3,6 +3,9 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+0.27.4:
+- esp32s2: fix not moving stepper after forcestop as reported by [Issue #101](https://github.com/gin66/FastAccelStepper/issues/101)
+
 0.27.3:
 - esp32/esp32s2: enable all 8/4 rmt backed steppers
 
