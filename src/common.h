@@ -45,7 +45,7 @@ struct queue_end_s {
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "../tests/pc_based/stubs.h"
+#include "../extras/tests/pc_based/stubs.h"
 
 // For pc-based testing, the macro TEST is defined. The pc-based testing does
 // not support the concept of interrupts, so provide an empty definition
