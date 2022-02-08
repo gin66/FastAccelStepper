@@ -14,6 +14,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v2
+    - name: Make directories
+      run: bash extras/scripts/build-pio-dirs.h
     - name: Build on PlatformIO
-      run: bash ci/build-platformio.sh atmelsam
+      run: bash extras/scripts/build-platformio.sh atmelsam
 
