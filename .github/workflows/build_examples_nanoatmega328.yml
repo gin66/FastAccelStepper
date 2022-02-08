@@ -15,7 +15,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v2
     - name: Make directories
-      run: bash extras/scripts/build-pio_dirs.sh
+      run: bash extras/scripts/build-pio-dirs.sh
     - name: Build on PlatformIO
       run: bash extras/scripts/build-platformio.sh nanoatmega328
 
