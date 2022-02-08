@@ -1,6 +1,6 @@
 #!/bin/sh
 
-echo "execute for ${TARGETS}"
+echo "build directories"
 
 if [ "$GITHUB_WORKSPACE" != "" ]
 then
@@ -11,6 +11,8 @@ fi
 # Whatever this script is started from, cd to the top level
 ROOT=`git rev-parse --show-toplevel`
 cd $ROOT
+
+pwd
 
 # So create the pio_dirs-directory during the github action 
 rm -fR pio_dirs
@@ -53,3 +55,4 @@ ln -s ../../../tests/pc_based/test_03.h .
 ln -s ../../../tests/pc_based/PMF_test.ino PMF_test.ino
 cd ../../..
 
+ls -al pio*
