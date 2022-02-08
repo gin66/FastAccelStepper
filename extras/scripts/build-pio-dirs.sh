@@ -44,15 +44,15 @@ do
 	cd ../../..
 done
 
-# Make one directory to test PoorManFloat no device
+# Make one directory to test PoorManFloat on simulator
 mkdir pio_dirs/PMF_test
 mkdir pio_dirs/PMF_test/src
 cd pio_dirs/PMF_test
 ln -s ../../extras/ci/platformio.ini .
 cd src
 #sed  -e 's/%d/%ld/g' <../../../tests/test_03.h >test_03.h
-ln -s ../../../tests/pc_based/test_03.h .
-ln -s ../../../tests/pc_based/PMF_test.ino PMF_test.ino
+ln -s ../../../extras/tests/pc_based/test_03.h .
+ln -s ../../../extras/tests/pc_based/PMF_test.ino PMF_test.ino
 cd ../../..
 
 ls -al pio*
