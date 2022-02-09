@@ -4,8 +4,10 @@ FastAccelStepper is a high speed alternative for the
 [AccelStepper library](http:www.airspayce.com/mikem/arduino/AccelStepper/).
 Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
 
-Here is a basic example to run a stepper from position 0 to 1000 and back again to 0.
+Here is a basic example to run a stepper from position 0 to 1000 and back
+again to 0.
 ```
+
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
 
@@ -26,6 +28,8 @@ void setup() {
       stepper->moveTo(0, true);
    }
 }
+
+void loop() {}
 ```
 
 ## FastAccelStepperEngine
@@ -45,18 +49,20 @@ void setup() {
    engine.init();
 }
 ```
-In a multitasking and multicore system like ESP32, the steppers are controlled by a continuously running
-task. This task can be fixed to one CPU core with this modified init()-call.
-ESP32 implementation detail: For values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
+In a multitasking and multicore system like ESP32, the steppers are
+controlled by a continuously running task. This task can be fixed to one
+CPU core with this modified init()-call. ESP32 implementation detail: For
+values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
 ```cpp
   void init(uint8_t cpu_core);
 ```
 ### Creation of FastAccelStepper
 
-Using a call to `stepperConnectToPin()` a FastAccelStepper instance is created.
-This call tells the stepper, which step pin to use. As the hardware may have
-limitations - e.g. no stepper resources anymore, or the step pin cannot be used,
-then NULL is returned. So it is advised to check the return value of this call.
+Using a call to `stepperConnectToPin()` a FastAccelStepper instance is
+created. This call tells the stepper, which step pin to use. As the
+hardware may have limitations - e.g. no stepper resources anymore, or the
+step pin cannot be used, then NULL is returned. So it is advised to check
+the return value of this call.
 ```cpp
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 ```
@@ -68,13 +74,13 @@ Comments to valid pins:
 | ESP32S2    | Every output capable GPIO can be used                                                             |
 | Atmega328p | Only the pins connected to OC1A and OC1B are allowed                                              |
 | Atmega2560 | Only the pins connected to OC4A, OC4B and OC4C are allowed.                                       |
-| Atmega32u4 | Only the pins connected to OC4A, OC4B and OC4C are allowed                                        |
+| Atmega32u4 | Only the pins connected to OC1A, OC1B and OC1C are allowed                                        |
 | Atmel SAM  | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
 ### Debug LED
 
-If blinking of a LED is required to indicate, the stepper controller is still running,
-then the port. to which the LED is connected, can be told to the engine.
-The periodic task will let the associated LED blink with 1 Hz
+If blinking of a LED is required to indicate, the stepper controller is
+still running, then the port. to which the LED is connected, can be told to
+the engine. The periodic task will let the associated LED blink with 1 Hz
 ```cpp
   void setDebugLed(uint8_t ledPin);
 ```
@@ -131,7 +137,7 @@ And the two directions of a move
 ### AVR
 |VARIABLE         | Value       | Unit                    |
 |:----------------|------------:|:------------------------|
- |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
+|TICKS_PER_S      | 16_000_000  | [ticks/s]               |
 |MIN_CMD_TICKS    |  640        | [1/TICKS_PER_S seconds] |
 |MIN_DIR_DELAY_US |   40        | [µs]                    |
 |MAX_DIR_DELAY_US | 4095        | [µs]                    |
@@ -253,7 +259,7 @@ Speed can be defined in four different units:
 - In millHz: This means in steps/1000s
 - In us: This means in us/step
 
-For the device's maximum allowed speed, the following calls can be used. 
+For the device's maximum allowed speed, the following calls can be used.
 ```cpp
   uint16_t getMaxSpeedInUs();
   uint16_t getMaxSpeedInTicks();
@@ -280,14 +286,15 @@ Invalid is faster than MaxSpeed or slower than ~250 Mio ticks/step.
   int8_t setSpeedInHz(uint32_t speed_hz);
   int8_t setSpeedInMilliHz(uint32_t speed_mhz);
 ```
-To retrieve current set speed. This means, while accelerating and/or decelerating, this is 
-NOT the actual speed !
+To retrieve current set speed. This means, while accelerating and/or
+decelerating, this is NOT the actual speed !
 ```cpp
   uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
   uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
   uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
 ```
-If the current speed is needed, then use `getCurrentSpeed...()`. This retrieves the actual speed.
+If the current speed is needed, then use `getCurrentSpeed...()`. This
+retrieves the actual speed.
 
 | value | description                  |
 |:-----:|:-----------------------------|
@@ -322,7 +329,9 @@ getCurrentAcceleration() retrieves the actual acceleration.
    > 0 while speed is changing towards positive values
    < 0 while speed is changeing towards negative values
 ```cpp
-  int32_t getCurrentAcceleration() { return _rg.getCurrentAcceleration(); }
+  int32_t getCurrentAcceleration() {
+    return _rg.getCurrentAcceleration();
+  }
 ```
 ## Apply new speed/acceleration value
 This function applies new values for speed/acceleration.
