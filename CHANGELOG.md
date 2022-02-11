@@ -3,6 +3,9 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+0.27.5:
+- esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #117](https://github.com/gin66/FastAccelStepper/issues/117) 
+
 0.27.4:
 - esp32s2: fix not moving stepper after forcestop as reported by [Issue #101](https://github.com/gin66/FastAccelStepper/issues/101)
 

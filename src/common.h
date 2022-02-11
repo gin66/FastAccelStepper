@@ -121,9 +121,6 @@ struct queue_end_s {
 #define SUPPORT_ESP32_RMT
 #include <driver/periph_ctrl.h>
 #include <driver/rmt.h>
-#include <soc/rmt_periph.h>
-#include <soc/rmt_reg.h>
-#include <soc/rmt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 4
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
@@ -157,13 +154,14 @@ struct queue_end_s {
 #define fasEnableInterrupts interrupts
 #define fasDisableInterrupts noInterrupts
 
-// Only since esp-idf v4.4 MCPWM_TIMER0_PHASE_DIRECTION_S is defined. So use
-// this to distinguish between the two versions
-#if defined(MCPWM_TIMER0_PHASE_DIRECTION_S)
+#if ESP_IDF_VERSION_MAJOR == 4
 #define __ESP32_IDF_V44__
-
 #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
+#include <soc/rmt_periph.h>
+#include <soc/rmt_reg.h>
+#include <soc/rmt_struct.h>
+#elif ESP_IDF_VERSION_MAJOR == 3 
 #endif
 
 // Esp32 queue definitions
