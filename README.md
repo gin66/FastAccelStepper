@@ -1,8 +1,11 @@
 # FastAccelStepper 
  
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.24.1)
+[[![PlatformIO Registry](https://badges.registry.platformio.org/packages/gin66/library/FastAccelStepper.svg)](https://registry.platformio.org/libraries/gin66/FastAccelStepper)]
+
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.24.1)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.24.1)
+
 [![Build examples for esp32](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml)
 [![Build examples for esp32s2](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml)
 [![Build examples for esp32arduino @ 3.4.0](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml)
@@ -14,7 +17,6 @@
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
 Supported are avr (ATmega 328, ATmega2560), esp32, esp32s2 and atmelsam due.
-[Arduino library manager log](https://downloads.arduino.cc/libraries/logs/github.com/gin66/FastAccelStepper/)
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
@@ -114,20 +116,20 @@ Comments to pin sharing:
 
 ### ESP32
 
-* allows up 200000 generated steps per second
+* allows up to 200000 generated steps per second
 * supports up to 14 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### ESP32S2
 
 * reported to work
-* allows up 200000 generated steps per second ?
-* supports up to 4 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* allows up to 200000 generated steps per second ?
+* supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### Atmel SAM Due
 
-* allows up 50000 generated steps per second
+* allows up to 50000 generated steps per second
 * supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
@@ -296,7 +298,13 @@ To keep up the synchronization of two steppers please keep in mind:
 
 See [project](https://github.com/gin66/FastAccelStepper/projects/1)
 
+## Arduino
+
+[Arduino library manager log](https://downloads.arduino.cc/libraries/logs/github.com/gin66/FastAccelStepper/)
+
 ## PLATFORMIO
+
+[Library on platformio](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
 
 If you prefer platformio and you are running Linux, then platformio version of the examples are created by executing
 
