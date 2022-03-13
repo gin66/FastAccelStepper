@@ -1,4 +1,4 @@
-#if defined(ARDUINO_ARCH_AVR)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_AVR_NANO_EVERY) 
 #include "AVRStepperPins.h"
 #include "FastAccelStepper.h"
 #include "StepperISR.h"

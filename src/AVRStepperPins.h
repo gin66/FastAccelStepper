@@ -12,7 +12,7 @@
 
 #if defined(ARDUINO_ARCH_AVR)
 #if !(defined(__AVR_ATmega328P__) || defined(__AVR_ATmega2560__) || \
-      defined(__AVR_ATmega32U4__))
+      defined(__AVR_ATmega32U4__) || defined(ARDUINO_AVR_NANO_EVERY))
 #error "Unsupported AVR derivate"
 #endif
 #endif
@@ -40,6 +40,11 @@
 #define stepPinStepper5B 45 /* OC5B */
 #define stepPinStepper5C 44 /* OC5C */
 #elif defined(__AVR_ATmega32U4__)
+#define FAS_TIMER_MODULE 1
+#define stepPinStepper1A 9  /* OC1A */
+#define stepPinStepper1B 10 /* OC1B */
+#define stepPinStepper1C 11 /* OC1C */
+#elif defined(ARDUINO_AVR_NANO_EVERY)
 #define FAS_TIMER_MODULE 1
 #define stepPinStepper1A 9  /* OC1A */
 #define stepPinStepper1B 10 /* OC1B */

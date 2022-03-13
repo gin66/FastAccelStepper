@@ -294,7 +294,7 @@ struct queue_end_s {
 // This for the AVR family
 //
 //==========================================================================
-#elif defined(ARDUINO_ARCH_AVR)
+#elif defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_AVR_NANO_EVERY)
 #define SUPPORT_AVR
 
 // this is an arduino platform, so include the Arduino.h header file
@@ -354,6 +354,18 @@ enum channels { channelA, channelB, channelC };
 //
 //==========================================================================
 #elif defined(__AVR_ATmega32U4__)
+#define MAX_STEPPER 3
+#define NUM_QUEUES 3
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define fas_queue_C fas_queue[2]
+enum channels { channelA, channelB, channelC };
+//==========================================================================
+//
+// AVR derivate ATmega 4809
+//
+//==========================================================================
+#elif defined(ARDUINO_AVR_NANO_EVERY)
 #define MAX_STEPPER 3
 #define NUM_QUEUES 3
 #define fas_queue_A fas_queue[0]
