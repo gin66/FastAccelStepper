@@ -77,7 +77,7 @@ class StepperQueue {
   volatile SUPPORT_DIR_PIN_MASK* _dirPinPort;
   SUPPORT_DIR_PIN_MASK _dirPinMask;
 #endif
-#if defined(SUPPORT_AVR)
+#if defined(SUPPORT_AVR) || defined(SUPPORT_AVRMEGA)
   volatile bool _prepareForStop;
   volatile bool _isRunning;
   inline bool isRunning() { return _isRunning; }

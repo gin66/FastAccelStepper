@@ -1,5 +1,5 @@
 #include "common.h"
-#if defined(SUPPORT_AVR)
+#if defined(SUPPORT_AVRMEGA)
 #include "AVRStepperPins.h"
 #include "FastAccelStepper.h"
 #include "StepperISR.h"

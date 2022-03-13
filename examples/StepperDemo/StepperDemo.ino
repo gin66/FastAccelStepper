@@ -23,7 +23,7 @@ struct stepper_config_s {
   uint16_t off_delay_ms;
 };
 
-#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_AVR_NANO_EVERY)
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_MEGAAVR)
 #if defined(__AVR_ATmega328P__)
 // Example hardware configuration for Arduino Nano
 // Please adapt to your configuration
@@ -119,7 +119,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     }};
-#elif defined(ARDUINO_AVR_NANO_EVERY)
+#elif defined(__AVR_ATmega4809__)
 // Example hardware configuration for Arduino ATmega32u4
 // Please adapt to your configuration
 const uint8_t led_pin = PIN_UNDEFINED;  // turn off with PIN_UNDEFINED
