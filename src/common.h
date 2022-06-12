@@ -82,8 +82,10 @@ struct queue_end_s {
 #elif defined(ARDUINO_ARCH_ESP32)
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
+#include <sdkconfig.h>
 
 #define SUPPORT_ESP32
+#define SUPPORT_EXTERNAL_DIRECTION_PIN
 
 // Some more esp32 specific includes
 #include <driver/gpio.h>
@@ -94,8 +96,8 @@ struct queue_end_s {
 // ESP32 derivate - the first one
 //
 //==========================================================================
-//#if CONFIG_IDF_TARGET_ESP32
-#if defined(MCPWM_UNIT_0) && defined(MCPWM_UNIT_1) && defined(PCNT_UNIT_0) && defined(PCNT_UNIT_7) && defined(PERIPH_RMT_MODULE)
+
+#if CONFIG_IDF_TARGET_ESP32
 #define SUPPORT_ESP32_MCPWM_PCNT
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
