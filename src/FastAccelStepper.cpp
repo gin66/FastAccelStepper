@@ -484,6 +484,12 @@ void FastAccelStepper::setExternalEnableCall(bool (*func)(uint8_t enablePin,
                                                           uint8_t value)) {
   _externalEnableCall = func;
 }
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+void FastAccelStepper::setExternalDirectionCall(bool (*func)(uint8_t directionPin,
+                                                          uint8_t value)) {
+  _externalDirectionCall = func;
+}
+#endif
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
   _autoEnable = auto_enable;
   if (auto_enable && (_off_delay_count == 0)) {

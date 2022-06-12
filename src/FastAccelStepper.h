@@ -220,6 +220,28 @@ class FastAccelStepper {
   inline uint8_t getDirectionPin() { return _dirPin; }
   inline bool directionPinHighCountsUp() { return _dirHighCountsUp; }
 
+  // ESP32 only
+  // If the direction pins are e.g. connected via external HW (shift registers),
+  // then an external callback function can be supplied.
+  // This will be called for defined direction pins.
+  // The supplied value is either LOW or HIGH. The return value shall be
+  // the status of the pin (either LOW or HIGH). If returned value and supplied
+  // value do not match, the stepper does not continue, but calls this function again.
+  //
+  // This function is called from cyclic task with 4ms rate, which creates
+  // the commands to put into the command queue.
+  // Thus the supplied function should take much less time than 4ms.
+  // Otherwise there is risk, that other running steppers are running out of
+  // commands in the queue. If this takes longer, then the function should be
+  // offloaded and return the new status, after the enable/disable function has
+  // been successfully completed.
+  //
+  // Theortically an invocation from the ISR would be possible, but this would
+  // require the external function (and all its called subfunctions) to reside in IRAM.
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+  void setExternalDirectionCall(bool (*func)(uint8_t directionPin, uint8_t value));
+#endif
+
   // ## Enable Pin
   // if enable pin is connected, then use this function.
   //
@@ -237,7 +259,8 @@ class FastAccelStepper {
   // This will be called for defined low active and high active enable pins.
   // If both pins are defined, the function will be called
   // twice. The supplied value is either LOW or HIGH. The return value shall be
-  // the status of the pin (either LOW or HIGH).
+  // the status of the pin (either LOW or HIGH). If returned value and supplied
+  // value do not match, the stepper does not continue, but calls this function again.
   //
   // In auto enable mode, this function is called from cyclic task/interrupt
   // with 4ms rate, which creates the commands to put into the command queue.
@@ -572,6 +595,9 @@ class FastAccelStepper {
 
   FastAccelStepperEngine* _engine;
   bool (*_externalEnableCall)(uint8_t enablePin, uint8_t value);
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+  bool (*_externalDirectionCall)(uint8_t directionPin, uint8_t value);
+#endif
   RampGenerator _rg;
   uint8_t _stepPin;
   uint8_t _dirPin;
