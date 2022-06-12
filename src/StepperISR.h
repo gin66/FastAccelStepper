@@ -165,7 +165,7 @@ class StepperQueue {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
 #if defined(SUPPORT_DIR_PIN_MASK)
-    if ((dir_pin != PIN_UNDEFINED) && ((pin & PIN_EXTERNAL_FLAG) == 0)) {
+    if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);
     }
