@@ -19,6 +19,7 @@ struct queue_entry {
   // This mechanism only works for pauses (steps == 0)
   // Used for external direction pin
   uint8_t repeat_entry: 1;
+  uint8_t dirPinState: 1;
 #endif
   uint16_t ticks;
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
@@ -121,6 +122,11 @@ class StepperQueue {
   }
   inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
   inline bool isQueueEmpty() { return queueEntries() == 0; }
+#ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
+  inline bool isOnRepeatingEntry() { return entry[read_idx & QUEUES_RMT].repeat_entry == 1;}
+  inline uint8_t dirPinState() { return entry[read_idx & QUEUES_RMT].dirPinState;}
+  inline void clearRepeatingFlag() { entry[read_idx & QUEUES_RMT].repeat_entry = 0;}
+#endif
 
   int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start);
   int32_t getCurrentPosition();
@@ -159,7 +165,7 @@ class StepperQueue {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
 #if defined(SUPPORT_DIR_PIN_MASK)
-    if (dir_pin != PIN_UNDEFINED) {
+    if ((dir_pin != PIN_UNDEFINED) && ((pin & PIN_EXTERNAL_FLAG) == 0)) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);
     }

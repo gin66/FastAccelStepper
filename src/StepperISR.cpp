@@ -41,8 +41,11 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
   bool dir = (cmd->count_up == dirHighCountsUp);
   bool toggle_dir = false;
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+  bool repeat_entry = false;
+#endif
   if (dirPin != PIN_UNDEFINED) {
-    if (isQueueEmpty()) {
+    if (isQueueEmpty() && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
       // set the dirPin here. Necessary with shared direction pins
       digitalWrite(dirPin, dir);
 #ifdef ARDUINO_ARCH_SAM
@@ -52,9 +55,19 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
       queue_end.dir = dir;
     } else {
       toggle_dir = (dir != queue_end.dir);
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+      if (toggle_dir && (dirPin & PIN_EXTERNAL_FLAG)) {
+        repeat_entry = toggle_dir;
+        toggle_dir = false;
+      }
+#endif
     }
   }
   e->steps = steps;
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+  e->repeat_entry = repeat_entry;
+  e->dirPinState = dir;
+#endif
   e->toggle_dir = toggle_dir;
   e->countUp = cmd->count_up ? 1 : 0;
   e->moreThanOneStep = steps > 1 ? 1 : 0;

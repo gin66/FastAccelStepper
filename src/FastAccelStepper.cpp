@@ -108,7 +108,13 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < _next_stepper_num; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
+#ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
+      if (s->externalDirPinChangeCompletedIfNeeded()) {
+         s->fill_queue();
+	  }
+#else
       s->fill_queue();
+#endif
     }
   }
 
@@ -268,6 +274,25 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
 
   return res;
 }
+
+#ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
+bool FastAccelStepper::externalDirPinChangeCompletedIfNeeded() {
+  StepperQueue* q = &fas_queue[_queue_num];
+  if (_dirPin != PIN_UNDEFINED) {
+     if (q->isOnRepeatingEntry()) {
+        if (_engine->_externalCallForPin) {
+			uint8_t state = q->dirPinState();
+			bool newState = _engine->_externalCallForPin(_dirPin, state);
+			if (newState != state) {
+				return false;
+			}
+			q->clearRepeatingFlag();
+		}
+     }
+  }
+  return true;
+}
+#endif
 
 //*************************************************************************************************
 // fill_queue generates commands to the stepper for executing a ramp

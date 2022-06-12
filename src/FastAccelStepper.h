@@ -572,6 +572,9 @@ class FastAccelStepper {
 
  private:
   void performOneStep(bool count_up, bool blocking = false);
+#ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
+  bool externalDirPinChangeCompletedIfNeeded();
+#endif
   void fill_queue();
   void updateAutoDisable();
   void blockingWaitForForceStopComplete();
