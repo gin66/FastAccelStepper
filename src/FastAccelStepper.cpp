@@ -18,10 +18,14 @@ FastAccelStepper fas_stepper[MAX_STEPPER];
 
 //*************************************************************************************************
 //*************************************************************************************************
-void FastAccelStepperEngine::init() { fas_init_engine(this, 255); }
+void FastAccelStepperEngine::init() {
+  _externalCallForPin = NULL;
+  fas_init_engine(this, 255);
+}
 
 #if defined(SUPPORT_CPU_AFFINITY)
 void FastAccelStepperEngine::init(uint8_t cpu_core) {
+  _externalCallForPin = NULL;
   fas_init_engine(this, cpu_core);
 }
 #endif
@@ -424,7 +428,6 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _dirHighCountsUp = true;
   _dirPin = PIN_UNDEFINED;
   _rg.init();
-  _externalEnableCall = NULL;
 
   _queue_num = num;
   fas_queue[_queue_num].init(_queue_num, step_pin);
@@ -475,21 +478,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
       }
     }
   }
-  if ((_enablePinHighActive == PIN_UNDEFINED) &&
-      (_enablePinLowActive == PIN_UNDEFINED)) {
-    _externalEnableCall = NULL;
-  }
 }
-void FastAccelStepper::setExternalEnableCall(bool (*func)(uint8_t enablePin,
-                                                          uint8_t value)) {
-  _externalEnableCall = func;
-}
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
-void FastAccelStepper::setExternalDirectionCall(bool (*func)(uint8_t directionPin,
-                                                          uint8_t value)) {
-  _externalDirectionCall = func;
-}
-#endif
 void FastAccelStepper::setAutoEnable(bool auto_enable) {
   _autoEnable = auto_enable;
   if (auto_enable && (_off_delay_count == 0)) {
@@ -597,19 +586,24 @@ bool FastAccelStepper::disableOutputs() {
     return false;
   }
   bool disabled = true;
-  if (_externalEnableCall == NULL) {
-    if (_enablePinLowActive != PIN_UNDEFINED) {
+  if (_enablePinLowActive != PIN_UNDEFINED) {
+    if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
+      if (_engine->_externalCallForPin != NULL) {
+        disabled &= (_engine->_externalCallForPin(_enablePinLowActive, HIGH) == HIGH);
+      }
+	}
+	else {
       digitalWrite(_enablePinLowActive, HIGH);
     }
-    if (_enablePinHighActive != PIN_UNDEFINED) {
+  }
+  if (_enablePinHighActive != PIN_UNDEFINED) {
+    if (_enablePinHighActive & PIN_EXTERNAL_FLAG) {
+      if (_engine->_externalCallForPin != NULL) {
+        disabled &= (_engine->_externalCallForPin(_enablePinHighActive, LOW) == LOW);
+      }
+	}
+	else {
       digitalWrite(_enablePinHighActive, LOW);
-    }
-  } else {
-    if (_enablePinLowActive != PIN_UNDEFINED) {
-      disabled &= (_externalEnableCall(_enablePinLowActive, HIGH) == HIGH);
-    }
-    if (_enablePinHighActive != PIN_UNDEFINED) {
-      disabled &= (_externalEnableCall(_enablePinHighActive, LOW) == LOW);
     }
   }
   if (disabled) {
@@ -619,19 +613,24 @@ bool FastAccelStepper::disableOutputs() {
 }
 bool FastAccelStepper::enableOutputs() {
   bool enabled = true;
-  if (_externalEnableCall == NULL) {
-    if (_enablePinLowActive != PIN_UNDEFINED) {
+  if (_enablePinLowActive != PIN_UNDEFINED) {
+    if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
+      if (_engine->_externalCallForPin != NULL) {
+        enabled &= (_engine->_externalCallForPin(_enablePinLowActive, LOW) == LOW);
+      }
+	}
+	else {
       digitalWrite(_enablePinLowActive, LOW);
     }
-    if (_enablePinHighActive != PIN_UNDEFINED) {
+  }
+  if (_enablePinHighActive != PIN_UNDEFINED) {
+    if (_enablePinHighActive & PIN_EXTERNAL_FLAG) {
+      if (_engine->_externalCallForPin != NULL) {
+        enabled &= (_engine->_externalCallForPin(_enablePinHighActive, HIGH) == HIGH);
+      }
+	}
+	else {
       digitalWrite(_enablePinHighActive, HIGH);
-    }
-  } else {
-    if (_enablePinLowActive != PIN_UNDEFINED) {
-      enabled &= (_externalEnableCall(_enablePinLowActive, LOW) == LOW);
-    }
-    if (_enablePinHighActive != PIN_UNDEFINED) {
-      enabled &= (_externalEnableCall(_enablePinHighActive, HIGH) == HIGH);
     }
   }
   return enabled;
@@ -765,9 +764,6 @@ bool FastAccelStepper::isQueueFull() {
 }
 bool FastAccelStepper::isQueueEmpty() {
   return fas_queue[_queue_num].isQueueEmpty();
-}
-bool FastAccelStepper::isMotorRunning() {
-  return fas_queue[_queue_num].isRunning();
 }
 bool FastAccelStepper::isQueueRunning() {
   return fas_queue[_queue_num].isRunning();

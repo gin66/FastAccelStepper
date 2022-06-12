@@ -96,6 +96,23 @@ class FastAccelStepperEngine {
   // | Atmel SAM  | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
   // clang-format on
 
+  // ## External Pins
+  //
+  // If the direction/enable pins are e.g. connected via external HW (shift registers),
+  // then an external callback function can be supplied.
+  // The supplied value is either LOW or HIGH. The return value shall be
+  // the status of the pin (either LOW or HIGH). If returned value and supplied
+  // value do not match, the stepper does not continue, but calls this function again.
+  //
+  // This function is called from cyclic task/interrupt with 4ms rate, which creates
+  // the commands to put into the command queue.
+  // Thus the supplied function should take much less time than 4ms.
+  // Otherwise there is risk, that other running steppers are running out of
+  // commands in the queue. If this takes longer, then the function should be
+  // offloaded and return the new status, after the pin change has
+  // been successfully completed.
+  void setExternalCallForPin(bool (*func)(uint8_t pin, uint8_t value));
+
   // ### Debug LED
   //
   // If blinking of a LED is required to indicate, the stepper controller is
@@ -113,6 +130,7 @@ class FastAccelStepperEngine {
   FastAccelStepper* _stepper[MAX_STEPPER];
 
   bool _isValidStepPin(uint8_t step_pin);
+  bool (*_externalCallForPin)(uint8_t pin, uint8_t value);
 
   friend class FastAccelStepper;
 };
@@ -192,6 +210,7 @@ class FastAccelStepperEngine {
 #define MAX_ON_DELAY_TICKS ((uint32_t)(65535 * (QUEUE_LEN - 1)))
 
 #define PIN_UNDEFINED 255
+#define PIN_EXTERNAL_FLAG 128
 
 class FastAccelStepper {
 #ifdef TEST
@@ -209,6 +228,11 @@ class FastAccelStepper {
   // ## Direction Pin
   // if direction pin is connected, call this function.
   //
+  // If the pin number is >= 128, then the direction pin is assumed to be
+  // external and the external callback function (set by `setExternalCallForPin()`)
+  // is used to set the pin. For direction pin, this is only implemented for esp32
+  // and its supported derivates.
+  //
   // For slow driver hardware the first step after any polarity change of the
   // direction pin can be delayed by the value dir_change_delay_us. The allowed
   // range is MIN_DIR_DELAY_US and MAX_DIR_DELAY_US. The special value of 0
@@ -220,30 +244,12 @@ class FastAccelStepper {
   inline uint8_t getDirectionPin() { return _dirPin; }
   inline bool directionPinHighCountsUp() { return _dirHighCountsUp; }
 
-  // ESP32 only
-  // If the direction pins are e.g. connected via external HW (shift registers),
-  // then an external callback function can be supplied.
-  // This will be called for defined direction pins.
-  // The supplied value is either LOW or HIGH. The return value shall be
-  // the status of the pin (either LOW or HIGH). If returned value and supplied
-  // value do not match, the stepper does not continue, but calls this function again.
-  //
-  // This function is called from cyclic task with 4ms rate, which creates
-  // the commands to put into the command queue.
-  // Thus the supplied function should take much less time than 4ms.
-  // Otherwise there is risk, that other running steppers are running out of
-  // commands in the queue. If this takes longer, then the function should be
-  // offloaded and return the new status, after the enable/disable function has
-  // been successfully completed.
-  //
-  // Theortically an invocation from the ISR would be possible, but this would
-  // require the external function (and all its called subfunctions) to reside in IRAM.
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
-  void setExternalDirectionCall(bool (*func)(uint8_t directionPin, uint8_t value));
-#endif
-
   // ## Enable Pin
   // if enable pin is connected, then use this function.
+  //
+  // If the pin number is >= 128, then the enable pin is assumed to be
+  // external and the external callback function (set by `setExternalCallForPin()`)
+  // is used to set the pin.
   //
   // In case there are two enable pins: one low and one high active, then
   // these calls are valid and both pins will be operated:
@@ -253,23 +259,6 @@ class FastAccelStepper {
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
   inline uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
   inline uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
-
-  // If the enable pins are e.g. connected via external HW (shift registers),
-  // then an external callback function can be supplied.
-  // This will be called for defined low active and high active enable pins.
-  // If both pins are defined, the function will be called
-  // twice. The supplied value is either LOW or HIGH. The return value shall be
-  // the status of the pin (either LOW or HIGH). If returned value and supplied
-  // value do not match, the stepper does not continue, but calls this function again.
-  //
-  // In auto enable mode, this function is called from cyclic task/interrupt
-  // with 4ms rate, which creates the commands to put into the command queue.
-  // Thus the supplied function should take much less time than 4ms.
-  // Otherwise there is risk, that other running steppers are running out of
-  // commands in the queue. If this takes longer, then the function should be
-  // offloaded and return the new status, after the enable/disable function has
-  // been successfully completed.
-  void setExternalEnableCall(bool (*func)(uint8_t enablePin, uint8_t value));
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
   // For a running motor with autoEnable set, disableOutputs() will return false
@@ -305,9 +294,6 @@ class FastAccelStepper {
   // ## Stepper running status
   // is true while the stepper is running or ramp generation is active
   bool isRunning();
-
-  // is true while the stepper is running
-  [[deprecated]] bool isMotorRunning();
 
   // ## Speed
   // For stepper movement control by FastAccelStepper's ramp generator
@@ -594,10 +580,6 @@ class FastAccelStepper {
   bool usesAutoEnablePin(uint8_t pin);
 
   FastAccelStepperEngine* _engine;
-  bool (*_externalEnableCall)(uint8_t enablePin, uint8_t value);
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
-  bool (*_externalDirectionCall)(uint8_t directionPin, uint8_t value);
-#endif
   RampGenerator _rg;
   uint8_t _stepPin;
   uint8_t _dirPin;
