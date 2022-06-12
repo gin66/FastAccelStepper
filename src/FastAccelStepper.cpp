@@ -462,19 +462,33 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
   if (low_active_enables_stepper) {
     _enablePinLowActive = enablePin;
     if (enablePin != PIN_UNDEFINED) {
-      digitalWrite(enablePin, HIGH);
-      pinMode(enablePin, OUTPUT);
-      if (_enablePinHighActive == enablePin) {
-        _enablePinHighActive = PIN_UNDEFINED;
+      if (enablePin & PIN_EXTERNAL_FLAG) {
+        if (_engine->_externalCallForPin) {
+           _engine->_externalCallForPin(enablePin, HIGH);
+        }
+      }
+      else {
+        digitalWrite(enablePin, HIGH);
+        pinMode(enablePin, OUTPUT);
+        if (_enablePinHighActive == enablePin) {
+          _enablePinHighActive = PIN_UNDEFINED;
+        }
       }
     }
   } else {
+    _enablePinHighActive = enablePin;
     if (enablePin != PIN_UNDEFINED) {
-      _enablePinHighActive = enablePin;
-      digitalWrite(enablePin, LOW);
-      pinMode(enablePin, OUTPUT);
-      if (_enablePinLowActive == enablePin) {
-        _enablePinLowActive = PIN_UNDEFINED;
+      if (enablePin & PIN_EXTERNAL_FLAG) {
+        if (_engine->_externalCallForPin) {
+           _engine->_externalCallForPin(enablePin, LOW);
+        }
+      }
+      else {
+        digitalWrite(enablePin, LOW);
+        pinMode(enablePin, OUTPUT);
+        if (_enablePinLowActive == enablePin) {
+          _enablePinLowActive = PIN_UNDEFINED;
+        }
       }
     }
   }
