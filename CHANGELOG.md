@@ -3,6 +3,10 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+pre-0.28.0:
+- esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #127](https://github.com/gin66/FastAccelStepper/issues/127)
+  Still not clear how to reliable detect esp32 version on idf and arduino. So instead - for esp32 - check for HW related preprocessor definitions
+
 0.27.5:
 - esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #117](https://github.com/gin66/FastAccelStepper/issues/117) 
 
