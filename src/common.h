@@ -94,7 +94,8 @@ struct queue_end_s {
 // ESP32 derivate - the first one
 //
 //==========================================================================
-#if CONFIG_IDF_TARGET_ESP32
+//#if CONFIG_IDF_TARGET_ESP32
+#if defined(MCPWM_UNIT_0) && defined(MCPWM_UNIT_1) && defined(PCNT_UNIT_0) && defined(PCNT_UNIT_7) && defined(PERIPH_RMT_MODULE)
 #define SUPPORT_ESP32_MCPWM_PCNT
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
