@@ -14,6 +14,12 @@ struct queue_entry {
   uint8_t countUp : 1;
   uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+  // if repeat_entry==1, then this entry shall be repeated.
+  // This mechanism only works for pauses (steps == 0)
+  // Used for external direction pin
+  uint8_t repeat_entry: 1;
+#endif
   uint16_t ticks;
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
   uint16_t end_pos_last16;

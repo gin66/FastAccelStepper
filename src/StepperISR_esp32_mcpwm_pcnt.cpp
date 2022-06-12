@@ -234,16 +234,22 @@ static void IRAM_ATTR init_stop(StepperQueue *q) {
 }
 
 static void IRAM_ATTR what_is_next(StepperQueue *q) {
+  // when starting the queue, apply_command for the first entry is called.
+  // the read pointer stays at this position. This function is reached,
+  // if the command to which read pointer points to is completed.
   bool isPrepared = q->_nextCommandIsPrepared;
   q->_nextCommandIsPrepared = false;
   uint8_t rp = q->read_idx;
   if (rp != q->next_write_idx) {
-    rp++;
-    q->read_idx = rp;
+    struct queue_entry *e_completed = &q->entry[rp & QUEUE_LEN_MASK];
+    if (e_completed->repeat_entry == 0) {
+      rp++;
+      q->read_idx = rp;
+    }
     if (rp != q->next_write_idx) {
       struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
       if (!isPrepared) {
-        prepare_for_next_command(q, e_curr);
+        prepare_for_next_command(q, e_curr); // a no-op for pause command
         const struct mapping_s *mapping =
             (const struct mapping_s *)q->driver_data;
         isr_pcnt_counter_clear(mapping->pcnt_unit);
@@ -253,7 +259,7 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
       if (rp != q->next_write_idx) {
         struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
         q->_nextCommandIsPrepared = true;
-        prepare_for_next_command(q, e_next);
+        prepare_for_next_command(q, e_next); // a no-op for pause command
       }
       return;
     }

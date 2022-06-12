@@ -159,7 +159,9 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     }
     if (steps == 0) {
       // The command has been completed
-      rp++;
+      if (e_curr->repeat_entry == 0) {
+        rp++;
+      }
       q->read_idx = rp;
       // The dir pin toggle at this place is problematic, but if the last
       // command contains only one step, it could work
