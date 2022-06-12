@@ -178,6 +178,15 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   }
 }
 
+#ifndef RMT_CHANNEL_MEM
+#define RMT_LIMIT tx_lim
+#define RMT_FIFO apb_fifo_mask
+#else
+#define RMT_LIMIT limit
+#define RMT_FIFO fifo_mask
+#endif
+
+
 #define PROCESS_CHANNEL(ch) \
   if (mask & RMT_CH ## ch ## _TX_END_INT_ST) { \
     apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], false, FAS_RMT_MEM(ch)); \
@@ -185,7 +194,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   if (mask & RMT_CH ## ch ## _TX_THR_EVENT_INT_ST) { \
     apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], true, FAS_RMT_MEM(ch)); \
     /* now repeat the interrupt at buffer size + end marker */ \
-    RMT.tx_lim_ch[ch].limit = PART_SIZE * 2 + 1; \
+    RMT.tx_lim_ch[ch].RMT_LIMIT = PART_SIZE * 2 + 1; \
   }
 
 
@@ -235,7 +244,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   if (channel_num == 0) {
     rmt_isr_register(tx_intr_handler, NULL,
                      ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM, NULL);
-    RMT.apb_conf.fifo_mask = 1;
+    RMT.apb_conf.RMT_FIFO = 1;
     RMT.apb_conf.mem_tx_wrap_en = 0;
   }
 
