@@ -16,7 +16,7 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
         int32_t dt = time_ms - seq->u32_1;
         Serial.println(dt);
 		// 779 esp, 805 avr (neu 810 avr), 811: esp32 with rmt, 812: esp32 with rmt second channel
-        if (abs(dt - 792) > 20) {
+        if (abs(dt - 792) > 23) {
           seq->state = TEST_STATE_ERROR;
           return true;
         }
