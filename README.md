@@ -31,9 +31,11 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
 * Direction Signal (optional)
 	- This can be any output capable port pin.
     - Position counting up on direction pin high or low, as per optional parameter to setDirectionPin(). Default is high.
+    - With external callback on esp32 derivates, even shift register outputs can be used
 * Enable Signal (optional)
 	- This can be any output capable port pin.
     - Stepper will be enabled on pin high or low, as per optional parameter to setEnablePin(). Default is low.
+    - With external callback, even shift register outputs can be used
 
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
@@ -49,7 +51,7 @@ FastAccelStepper offers the following features:
 * Enable pins can be shared between motors
 * Direction pins can be shared between motors
 * Configurable delay between direction change and following step
-* External callback function can be used to drive the enable pins (e.g. connected to shift register)
+* External callback function can be used to drive the enable pins (e.g. connected to shift register) and, only esp32 derivates: the direction pins
 * No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
