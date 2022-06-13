@@ -251,8 +251,29 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
       }
     }
   }
-  if (_dir_change_delay_ticks != 0) {
-    if ((q->queue_end.count_up != cmd->count_up) && (cmd->steps != 0)) {
+  if (q->queue_end.count_up != cmd->count_up) {
+	// Change of direction has been detected.
+	if (_dirPin & PIN_EXTERNAL_FLAG) {
+	  // for external pins, two pause commands need to be added. The first one
+	  // with the dir pin change. The second one just a pause.
+	  // The queue's addQueueEntry() will set repeat_entry for the command entry
+	  if (q->queueEntries() > QUEUE_LEN-2) {
+		  // no space for two commands => do nothing and return QUEUE_FULL
+		  return AQE_QUEUE_FULL;
+	  }
+      struct stepper_command_s start_cmd = {.ticks = US_TO_TICKS(500),
+                                            .steps = 0,
+                                            .count_up = cmd->count_up};
+      res = q->addQueueEntry(&start_cmd, start);
+      if (res != AQE_OK) {
+        return res;
+      }
+      res = q->addQueueEntry(&start_cmd, start);
+      if (res != AQE_OK) {
+        return res;
+      }
+	}
+	else if ((_dir_change_delay_ticks != 0) && (cmd->steps != 0)) {
       // add pause command to delay dir pin change to first step
       struct stepper_command_s start_cmd = {.ticks = _dir_change_delay_ticks,
                                             .steps = 0,
@@ -278,7 +299,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
 #ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
 bool FastAccelStepper::externalDirPinChangeCompletedIfNeeded() {
   StepperQueue* q = &fas_queue[_queue_num];
-  if (_dirPin != PIN_UNDEFINED) {
+  if ((_dirPin != PIN_UNDEFINED) && (_dirPin & PIN_EXTERNAL_FLAG)) {
      if (q->isOnRepeatingEntry()) {
         if (_engine->_externalCallForPin) {
 			uint8_t state = q->dirPinState();

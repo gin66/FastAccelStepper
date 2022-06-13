@@ -238,7 +238,9 @@ class FastAccelStepper {
   // range is MIN_DIR_DELAY_US and MAX_DIR_DELAY_US. The special value of 0
   // means, that no delay is added. Values 1 up to MIN_DIR_DELAY_US will be
   // clamped to MIN_DIR_DELAY_US. Values above MAX_DIR_DELAY_US will be clamped
-  // to MAX_DIR_DELAY_US.
+  // to MAX_DIR_DELAY_US. For external pins, dir_change_delay_us is ignored,
+  // because the mechanism applied for external pins provides already pause
+  // in the range of ms or more.
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
   inline uint8_t getDirectionPin() { return _dirPin; }
