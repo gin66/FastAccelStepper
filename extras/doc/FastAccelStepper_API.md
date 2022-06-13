@@ -76,6 +76,24 @@ Comments to valid pins:
 | Atmega2560 | Only the pins connected to OC4A, OC4B and OC4C are allowed.                                       |
 | Atmega32u4 | Only the pins connected to OC1A, OC1B and OC1C are allowed                                        |
 | Atmel SAM  | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
+## External Pins
+
+If the direction/enable pins are e.g. connected via external HW (shift registers),
+then an external callback function can be supplied.
+The supplied value is either LOW or HIGH. The return value shall be
+the status of the pin (either LOW or HIGH). If returned value and supplied
+value do not match, the stepper does not continue, but calls this function again.
+
+This function is called from cyclic task/interrupt with 4ms rate, which creates
+the commands to put into the command queue.
+Thus the supplied function should take much less time than 4ms.
+Otherwise there is risk, that other running steppers are running out of
+commands in the queue. If this takes longer, then the function should be
+offloaded and return the new status, after the pin change has
+been successfully completed.
+```cpp
+  void setExternalCallForPin(bool (*func)(uint8_t pin, uint8_t value));
+```
 ### Debug LED
 
 If blinking of a LED is required to indicate, the stepper controller is
@@ -167,12 +185,19 @@ step pin is defined at creation. Here can retrieve the pin
 ## Direction Pin
 if direction pin is connected, call this function.
 
+If the pin number is >= 128, then the direction pin is assumed to be
+external and the external callback function (set by `setExternalCallForPin()`)
+is used to set the pin. For direction pin, this is only implemented for esp32
+and its supported derivates.
+
 For slow driver hardware the first step after any polarity change of the
 direction pin can be delayed by the value dir_change_delay_us. The allowed
 range is MIN_DIR_DELAY_US and MAX_DIR_DELAY_US. The special value of 0
 means, that no delay is added. Values 1 up to MIN_DIR_DELAY_US will be
 clamped to MIN_DIR_DELAY_US. Values above MAX_DIR_DELAY_US will be clamped
-to MAX_DIR_DELAY_US.
+to MAX_DIR_DELAY_US. For external pins, dir_change_delay_us is ignored,
+because the mechanism applied for external pins provides already pause
+in the range of ms or more.
 ```cpp
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
@@ -181,6 +206,10 @@ to MAX_DIR_DELAY_US.
 ```
 ## Enable Pin
 if enable pin is connected, then use this function.
+
+If the pin number is >= 128, then the enable pin is assumed to be
+external and the external callback function (set by `setExternalCallForPin()`)
+is used to set the pin.
 
 In case there are two enable pins: one low and one high active, then
 these calls are valid and both pins will be operated:
@@ -191,23 +220,6 @@ If pin1 and pin2 are same, then the last call will be used.
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
   uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
   uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
-```
-If the enable pins are e.g. connected via external HW (shift registers),
-then an external callback function can be supplied.
-This will be called for defined low active and high active enable pins.
-If both pins are defined, the function will be called
-twice. The supplied value is either LOW or HIGH. The return value shall be
-the status of the pin (either LOW or HIGH).
-
-In auto enable mode, this function is called from cyclic task/interrupt
-with 4ms rate, which creates the commands to put into the command queue.
-Thus the supplied function should take much less time than 4ms.
-Otherwise there is risk, that other running steppers are running out of
-commands in the queue. If this takes longer, then the function should be
-offloaded and return the new status, after the enable/disable function has
-been successfully completed.
-```cpp
-  void setExternalEnableCall(bool (*func)(uint8_t enablePin, uint8_t value));
 ```
 using enableOutputs/disableOutputs the stepper can be enabled and disabled
 For a running motor with autoEnable set, disableOutputs() will return false
@@ -246,10 +258,6 @@ moving.
 is true while the stepper is running or ramp generation is active
 ```cpp
   bool isRunning();
-```
-is true while the stepper is running
-```cpp
-  [[deprecated]] bool isMotorRunning();
 ```
 ## Speed
 For stepper movement control by FastAccelStepper's ramp generator
