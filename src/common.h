@@ -164,7 +164,7 @@ struct queue_end_s {
 #include <soc/rmt_periph.h>
 #include <soc/rmt_reg.h>
 #include <soc/rmt_struct.h>
-#elif ESP_IDF_VERSION_MAJOR == 3 
+#elif ESP_IDF_VERSION_MAJOR == 3
 #endif
 
 // Esp32 queue definitions

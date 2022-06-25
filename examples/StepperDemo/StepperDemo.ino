@@ -190,7 +190,8 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     }
 #endif
 #if MAX_STEPPER > 4
-    ,{
+    ,
+    {
       // position 01.234567 => 6
       step : 16,
       enable_low_active : 27,
@@ -219,7 +220,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 #if MAX_STEPPER > 6
     ,
     {
-      step : 14, // direction pin of M3
+      step : 14,  // direction pin of M3
       enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
       direction : 19,
@@ -264,10 +265,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
-    ,
+    },
     {
-      step : 25, // enable pin of M6
+      step : 25,  // enable pin of M6
       enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
       direction : 18,
@@ -278,7 +278,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     },
     {
-      step : 26, // enable pin of M5
+      step : 26,  // enable pin of M5
       enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
       direction : 18,
@@ -287,10 +287,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
-    ,
+    },
     {
-      step : 22, // direction pin of M6
+      step : 22,  // direction pin of M6
       enable_low_active : 26,
       enable_high_active : PIN_UNDEFINED,
       direction : 18,
@@ -301,7 +300,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     },
     {
-      step : 21, // direction pin of M3
+      step : 21,  // direction pin of M3
       enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
       direction : 18,
@@ -1121,7 +1120,7 @@ bool process_cmd(char *cmd) {
         if ((val1 > 0) && (val1 <= MAX_STEPPER)) {
           output_msg(MSG_SELECT_STEPPER);
           selected = val1 - 1;
-          Serial.println(selected+1);
+          Serial.println(selected + 1);
           return true;
         }
       }

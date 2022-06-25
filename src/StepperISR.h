@@ -18,8 +18,8 @@ struct queue_entry {
   // if repeat_entry==1, then this entry shall be repeated.
   // This mechanism only works for pauses (steps == 0)
   // Used for external direction pin
-  uint8_t repeat_entry: 1;
-  uint8_t dirPinState: 1;
+  uint8_t repeat_entry : 1;
+  uint8_t dirPinState : 1;
 #endif
   uint16_t ticks;
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
@@ -123,9 +123,15 @@ class StepperQueue {
   inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
   inline bool isQueueEmpty() { return queueEntries() == 0; }
 #ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
-  inline bool isOnRepeatingEntry() { return entry[read_idx & QUEUES_RMT].repeat_entry == 1;}
-  inline uint8_t dirPinState() { return entry[read_idx & QUEUES_RMT].dirPinState;}
-  inline void clearRepeatingFlag() { entry[read_idx & QUEUES_RMT].repeat_entry = 0;}
+  inline bool isOnRepeatingEntry() {
+    return entry[read_idx & QUEUES_RMT].repeat_entry == 1;
+  }
+  inline uint8_t dirPinState() {
+    return entry[read_idx & QUEUES_RMT].dirPinState;
+  }
+  inline void clearRepeatingFlag() {
+    entry[read_idx & QUEUES_RMT].repeat_entry = 0;
+  }
 #endif
 
   int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start);

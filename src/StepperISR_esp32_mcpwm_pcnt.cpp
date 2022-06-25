@@ -249,7 +249,7 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
     if (rp != q->next_write_idx) {
       struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
       if (!isPrepared) {
-        prepare_for_next_command(q, e_curr); // a no-op for pause command
+        prepare_for_next_command(q, e_curr);  // a no-op for pause command
         const struct mapping_s *mapping =
             (const struct mapping_s *)q->driver_data;
         isr_pcnt_counter_clear(mapping->pcnt_unit);
@@ -259,7 +259,7 @@ static void IRAM_ATTR what_is_next(StepperQueue *q) {
       if (rp != q->next_write_idx) {
         struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
         q->_nextCommandIsPrepared = true;
-        prepare_for_next_command(q, e_next); // a no-op for pause command
+        prepare_for_next_command(q, e_next);  // a no-op for pause command
       }
       return;
     }

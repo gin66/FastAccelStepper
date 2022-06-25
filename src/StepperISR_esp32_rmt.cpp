@@ -186,17 +186,15 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 #define RMT_FIFO fifo_mask
 #endif
 
-
-#define PROCESS_CHANNEL(ch) \
-  if (mask & RMT_CH ## ch ## _TX_END_INT_ST) { \
+#define PROCESS_CHANNEL(ch)                                                    \
+  if (mask & RMT_CH##ch##_TX_END_INT_ST) {                                     \
     apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], false, FAS_RMT_MEM(ch)); \
-  } \
-  if (mask & RMT_CH ## ch ## _TX_THR_EVENT_INT_ST) { \
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], true, FAS_RMT_MEM(ch)); \
-    /* now repeat the interrupt at buffer size + end marker */ \
-    RMT.tx_lim_ch[ch].RMT_LIMIT = PART_SIZE * 2 + 1; \
+  }                                                                            \
+  if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {                               \
+    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], true, FAS_RMT_MEM(ch));  \
+    /* now repeat the interrupt at buffer size + end marker */                 \
+    RMT.tx_lim_ch[ch].RMT_LIMIT = PART_SIZE * 2 + 1;                           \
   }
-
 
 static void IRAM_ATTR tx_intr_handler(void *arg) {
   uint32_t mask = RMT.int_st.val;
@@ -207,7 +205,7 @@ static void IRAM_ATTR tx_intr_handler(void *arg) {
   PROCESS_CHANNEL(2);
   PROCESS_CHANNEL(3);
 #endif
-#if QUEUES_RMT == 8 
+#if QUEUES_RMT == 8
   PROCESS_CHANNEL(4);
   PROCESS_CHANNEL(5);
   PROCESS_CHANNEL(6);
@@ -345,9 +343,9 @@ void StepperQueue::startQueue_rmt() {
   //  RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {
-  // Based on finding in issue #101, the rmt module in esp32 and esp32s2 behaves differently.
-  // Apparently, the esp32 rmt cannot be stopped, while esp32s2 can.
-  // So implement a version, which should be able to cope with both
+  // Based on finding in issue #101, the rmt module in esp32 and esp32s2 behaves
+  // differently. Apparently, the esp32 rmt cannot be stopped, while esp32s2
+  // can. So implement a version, which should be able to cope with both
 
   // try to stop the rmt module. Seems to work only on esp32s2
   rmt_tx_stop(channel);
@@ -360,7 +358,7 @@ void StepperQueue::forceStop_rmt() {
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
 
   // replace buffer with only pauses, coming from end
-  uint32_t *data = FAS_RMT_MEM(channel)+63;
+  uint32_t *data = FAS_RMT_MEM(channel) + 63;
   for (uint8_t i = 0; i < 64; i++) {
     *data-- = 0x00010001;
   }

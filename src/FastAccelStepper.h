@@ -98,19 +98,18 @@ class FastAccelStepperEngine {
 
   // ## External Pins
   //
-  // If the direction/enable pins are e.g. connected via external HW (shift registers),
-  // then an external callback function can be supplied.
-  // The supplied value is either LOW or HIGH. The return value shall be
-  // the status of the pin (either LOW or HIGH). If returned value and supplied
-  // value do not match, the stepper does not continue, but calls this function again.
+  // If the direction/enable pins are e.g. connected via external HW (shift
+  // registers), then an external callback function can be supplied. The
+  // supplied value is either LOW or HIGH. The return value shall be the status
+  // of the pin (either LOW or HIGH). If returned value and supplied value do
+  // not match, the stepper does not continue, but calls this function again.
   //
-  // This function is called from cyclic task/interrupt with 4ms rate, which creates
-  // the commands to put into the command queue.
-  // Thus the supplied function should take much less time than 4ms.
-  // Otherwise there is risk, that other running steppers are running out of
-  // commands in the queue. If this takes longer, then the function should be
-  // offloaded and return the new status, after the pin change has
-  // been successfully completed.
+  // This function is called from cyclic task/interrupt with 4ms rate, which
+  // creates the commands to put into the command queue. Thus the supplied
+  // function should take much less time than 4ms. Otherwise there is risk, that
+  // other running steppers are running out of commands in the queue. If this
+  // takes longer, then the function should be offloaded and return the new
+  // status, after the pin change has been successfully completed.
   void setExternalCallForPin(bool (*func)(uint8_t pin, uint8_t value));
 
   // ### Debug LED
@@ -229,9 +228,9 @@ class FastAccelStepper {
   // if direction pin is connected, call this function.
   //
   // If the pin number is >= 128, then the direction pin is assumed to be
-  // external and the external callback function (set by `setExternalCallForPin()`)
-  // is used to set the pin. For direction pin, this is only implemented for esp32
-  // and its supported derivates.
+  // external and the external callback function (set by
+  // `setExternalCallForPin()`) is used to set the pin. For direction pin, this
+  // is only implemented for esp32 and its supported derivates.
   //
   // For slow driver hardware the first step after any polarity change of the
   // direction pin can be delayed by the value dir_change_delay_us. The allowed
@@ -250,8 +249,8 @@ class FastAccelStepper {
   // if enable pin is connected, then use this function.
   //
   // If the pin number is >= 128, then the enable pin is assumed to be
-  // external and the external callback function (set by `setExternalCallForPin()`)
-  // is used to set the pin.
+  // external and the external callback function (set by
+  // `setExternalCallForPin()`) is used to set the pin.
   //
   // In case there are two enable pins: one low and one high active, then
   // these calls are valid and both pins will be operated:

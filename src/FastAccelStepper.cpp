@@ -110,8 +110,8 @@ void FastAccelStepperEngine::manageSteppers() {
     if (s) {
 #ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
       if (s->externalDirPinChangeCompletedIfNeeded()) {
-         s->fill_queue();
-	  }
+        s->fill_queue();
+      }
 #else
       s->fill_queue();
 #endif
@@ -252,18 +252,17 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
     }
   }
   if (q->queue_end.count_up != cmd->count_up) {
-	// Change of direction has been detected.
-	if (_dirPin & PIN_EXTERNAL_FLAG) {
-	  // for external pins, two pause commands need to be added. The first one
-	  // with the dir pin change. The second one just a pause.
-	  // The queue's addQueueEntry() will set repeat_entry for the command entry
-	  if (q->queueEntries() > QUEUE_LEN-2) {
-		  // no space for two commands => do nothing and return QUEUE_FULL
-		  return AQE_QUEUE_FULL;
-	  }
-      struct stepper_command_s start_cmd = {.ticks = US_TO_TICKS(500),
-                                            .steps = 0,
-                                            .count_up = cmd->count_up};
+    // Change of direction has been detected.
+    if (_dirPin & PIN_EXTERNAL_FLAG) {
+      // for external pins, two pause commands need to be added. The first one
+      // with the dir pin change. The second one just a pause.
+      // The queue's addQueueEntry() will set repeat_entry for the command entry
+      if (q->queueEntries() > QUEUE_LEN - 2) {
+        // no space for two commands => do nothing and return QUEUE_FULL
+        return AQE_QUEUE_FULL;
+      }
+      struct stepper_command_s start_cmd = {
+          .ticks = US_TO_TICKS(500), .steps = 0, .count_up = cmd->count_up};
       res = q->addQueueEntry(&start_cmd, start);
       if (res != AQE_OK) {
         return res;
@@ -272,8 +271,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
       if (res != AQE_OK) {
         return res;
       }
-	}
-	else if ((_dir_change_delay_ticks != 0) && (cmd->steps != 0)) {
+    } else if ((_dir_change_delay_ticks != 0) && (cmd->steps != 0)) {
       // add pause command to delay dir pin change to first step
       struct stepper_command_s start_cmd = {.ticks = _dir_change_delay_ticks,
                                             .steps = 0,
@@ -300,16 +298,16 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
 bool FastAccelStepper::externalDirPinChangeCompletedIfNeeded() {
   StepperQueue* q = &fas_queue[_queue_num];
   if ((_dirPin != PIN_UNDEFINED) && (_dirPin & PIN_EXTERNAL_FLAG)) {
-     if (q->isOnRepeatingEntry()) {
-        if (_engine->_externalCallForPin) {
-			uint8_t state = q->dirPinState();
-			bool newState = _engine->_externalCallForPin(_dirPin, state);
-			if (newState != state) {
-				return false;
-			}
-			q->clearRepeatingFlag();
-		}
-     }
+    if (q->isOnRepeatingEntry()) {
+      if (_engine->_externalCallForPin) {
+        uint8_t state = q->dirPinState();
+        bool newState = _engine->_externalCallForPin(_dirPin, state);
+        if (newState != state) {
+          return false;
+        }
+        q->clearRepeatingFlag();
+      }
+    }
   }
   return true;
 }
@@ -491,8 +489,7 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
       if (_engine->_externalCallForPin) {
         _engine->_externalCallForPin(_dirPin, dirHighCountsUp ? HIGH : LOW);
       }
-    }
-    else {
+    } else {
       digitalWrite(dirPin, dirHighCountsUp ? HIGH : LOW);
       pinMode(dirPin, OUTPUT);
     }
@@ -517,10 +514,9 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
     if (enablePin != PIN_UNDEFINED) {
       if (enablePin & PIN_EXTERNAL_FLAG) {
         if (_engine->_externalCallForPin) {
-           _engine->_externalCallForPin(enablePin, HIGH);
+          _engine->_externalCallForPin(enablePin, HIGH);
         }
-      }
-      else {
+      } else {
         digitalWrite(enablePin, HIGH);
         pinMode(enablePin, OUTPUT);
         if (_enablePinHighActive == enablePin) {
@@ -533,10 +529,9 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
     if (enablePin != PIN_UNDEFINED) {
       if (enablePin & PIN_EXTERNAL_FLAG) {
         if (_engine->_externalCallForPin) {
-           _engine->_externalCallForPin(enablePin, LOW);
+          _engine->_externalCallForPin(enablePin, LOW);
         }
-      }
-      else {
+      } else {
         digitalWrite(enablePin, LOW);
         pinMode(enablePin, OUTPUT);
         if (_enablePinLowActive == enablePin) {
@@ -656,20 +651,20 @@ bool FastAccelStepper::disableOutputs() {
   if (_enablePinLowActive != PIN_UNDEFINED) {
     if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
       if (_engine->_externalCallForPin != NULL) {
-        disabled &= (_engine->_externalCallForPin(_enablePinLowActive, HIGH) == HIGH);
+        disabled &=
+            (_engine->_externalCallForPin(_enablePinLowActive, HIGH) == HIGH);
       }
-	}
-	else {
+    } else {
       digitalWrite(_enablePinLowActive, HIGH);
     }
   }
   if (_enablePinHighActive != PIN_UNDEFINED) {
     if (_enablePinHighActive & PIN_EXTERNAL_FLAG) {
       if (_engine->_externalCallForPin != NULL) {
-        disabled &= (_engine->_externalCallForPin(_enablePinHighActive, LOW) == LOW);
+        disabled &=
+            (_engine->_externalCallForPin(_enablePinHighActive, LOW) == LOW);
       }
-	}
-	else {
+    } else {
       digitalWrite(_enablePinHighActive, LOW);
     }
   }
@@ -683,20 +678,20 @@ bool FastAccelStepper::enableOutputs() {
   if (_enablePinLowActive != PIN_UNDEFINED) {
     if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
       if (_engine->_externalCallForPin != NULL) {
-        enabled &= (_engine->_externalCallForPin(_enablePinLowActive, LOW) == LOW);
+        enabled &=
+            (_engine->_externalCallForPin(_enablePinLowActive, LOW) == LOW);
       }
-	}
-	else {
+    } else {
       digitalWrite(_enablePinLowActive, LOW);
     }
   }
   if (_enablePinHighActive != PIN_UNDEFINED) {
     if (_enablePinHighActive & PIN_EXTERNAL_FLAG) {
       if (_engine->_externalCallForPin != NULL) {
-        enabled &= (_engine->_externalCallForPin(_enablePinHighActive, HIGH) == HIGH);
+        enabled &=
+            (_engine->_externalCallForPin(_enablePinHighActive, HIGH) == HIGH);
       }
-	}
-	else {
+    } else {
       digitalWrite(_enablePinHighActive, HIGH);
     }
   }
