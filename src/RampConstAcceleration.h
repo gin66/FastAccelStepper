@@ -94,7 +94,8 @@ struct ramp_ro_s {
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
-    keep_running = true, keep_running_count_up = countUp;
+    keep_running = true;
+   	keep_running_count_up = countUp;
   }
   inline void runToPosition(const struct ramp_config_s *new_config,
                             int32_t new_target_pos) {
