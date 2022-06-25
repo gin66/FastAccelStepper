@@ -52,10 +52,5 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 
 VERSION=$(shell git rev-parse --short HEAD)
 
-fmt:
-	clang-format --style=Google -i $(PRJ_ROOT)/src/* *.ino *.cpp *.h $(PRJ_ROOT)/examples/*/*.ino $(PRJ_ROOT)/examples/*/test_seq*
-	echo $(VERSION)
-	sed -i -e 's/#define VERSION.*$$/#define VERSION "post-$(VERSION)"/' $(PRJ_ROOT)/examples/StepperDemo/StepperDemo.ino
-
 clean:
 	rm *.o test_[0-9][0-9] *.gnuplot pmf_test rmc_test
