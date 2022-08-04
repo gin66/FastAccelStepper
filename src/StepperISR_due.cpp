@@ -183,6 +183,8 @@ void PWM_Handler(void) {
     uint32_t mask = (1 << channel);
     sr = sr & (~mask);
     uint8_t queue_num = TimerChannel_Map[channel];
+    if (channelsUsed[channel]==false)
+      continue;
     StepperQueue* q = &fas_queue[queue_num];
     // if (q->_skipNextPWMInterrupt)
     // The idea of just blindly telling the microcontroller to skip an
@@ -479,8 +481,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     // might be the better number...This puts us at roughly 1/2 the performance
     // of the esp32...Will have to see how many channels it can tolerate...
     // remain compatible with due - We'll use MCK or clk B as necessary.
-    PWMC_ConfigureClocks(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK / 4,
-                         VARIANT_MCK);
+    //PWMC_ConfigureClocks(PWM_FREQUENCY * PWM_MAX_DUTY_CYCLE, VARIANT_MCK / 4,
+    //                     VARIANT_MCK);
     isPWMEnabled = true;
   }
   static bool isTCEnabled = false;
@@ -529,7 +531,7 @@ void StepperQueue::connect() {
                 g_APinDescription[_step_pin].ulPin,
                 g_APinDescription[_step_pin].ulPinConfiguration);
   const PWMCHANNELMAPPING* mapping = (const PWMCHANNELMAPPING*)driver_data;
-  PWMC_ConfigureChannel(PWM_INTERFACE, mapping->channel, PWM_CMR_CPRE_CLKB, 0,
+  PWMC_ConfigureChannel(PWM_INTERFACE, mapping->channel, PWM_CMR_CPRE_MCK_DIV_4, 0,
                         0);
   // 21 pulses makes for a microsecond pulse.  I believe my drivers need 5us.
   // I'll set this to 10 just to make sure the drivers receive this.  At 20us
