@@ -30,7 +30,7 @@ void FastAccelStepperEngine::init(uint8_t cpu_core) {
 }
 #endif
 void FastAccelStepperEngine::setExternalCallForPin( bool (*func)(uint8_t pin, uint8_t value)) {
-  _externalEnableCall = func;
+  _externalCallForPin = func;
 }
 //*************************************************************************************************
 bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
