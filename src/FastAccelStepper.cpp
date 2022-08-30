@@ -29,7 +29,9 @@ void FastAccelStepperEngine::init(uint8_t cpu_core) {
   fas_init_engine(this, cpu_core);
 }
 #endif
-
+void FastAccelStepperEngine::setExternalCallForPin( bool (*func)(uint8_t pin, uint8_t value)) {
+  _externalEnableCall = func;
+}
 //*************************************************************************************************
 bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
   return StepperQueue::isValidStepPin(step_pin);
