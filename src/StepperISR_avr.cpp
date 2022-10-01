@@ -55,9 +55,9 @@
 #endif
 
 #ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
-#define TEST_REPEATING_ENTRY (e->repeat_entry == 0)
+#define TEST_NOT_REPEATING_ENTRY (e->repeat_entry == 0)
 #else
-#define TEST_REPEATING_ENTRY (0 != 0)
+#define TEST_NOT_REPEATING_ENTRY (0 == 0)
 #endif
 
 #define ForceCompare(T, X) TCCR##T##C = _BV(FOC##T##X)
@@ -177,7 +177,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         }                                                                     \
       }                                                                       \
     }                                                                         \
-    if (TEST_REPEATING_ENTRY) {                                               \
+    if (TEST_NOT_REPEATING_ENTRY) {                                           \
       rp++;                                                                   \
 	}                                                                         \
     fas_queue_##CHANNEL.read_idx = rp;                                        \
