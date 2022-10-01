@@ -11,7 +11,10 @@ SD_SRC_DIRS=$(addsuffix /src/.dir,$(TESTS_SD))
 
 SRC=$(wildcard ../../src/*)
 
-test: $(TEST_FILES)
+test: $(TEST_FILES) pmf
+
+pmf:
+	make -C test_pmf
 
 %/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini
 	make SILENCE=$(SILENCE)  -C $(dir $@)

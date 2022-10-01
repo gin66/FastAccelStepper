@@ -28,7 +28,8 @@ char buffer[256];
 void setup() {
   Serial.begin(115200);
   Serial.println("Start test...");
-  if (perform_test()) {
+  bool result = perform_test();
+  if (result) {
     Serial.println("TEST PASSED");
   } else {
     Serial.print("TEST FAILED: ");
@@ -36,6 +37,16 @@ void setup() {
     Serial.println(" errors");
   }
 #ifdef SIMULATOR
+  // if result is Ok. Toggle port twice, otherwise once
+#define PIN 10
+  pinMode(PIN,OUTPUT);
+  digitalWrite(PIN, HIGH);
+  digitalWrite(PIN, LOW);
+  if (result) {
+    digitalWrite(PIN, HIGH);
+    digitalWrite(PIN, LOW);
+  }
+
   delay(1000);
   noInterrupts();
   sleep_cpu();
