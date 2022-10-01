@@ -237,7 +237,8 @@ class FastAccelStepper {
   // If the pin number is >= 128, then the direction pin is assumed to be
   // external and the external callback function (set by
   // `setExternalCallForPin()`) is used to set the pin. For direction pin, this
-  // is only implemented for esp32 and its supported derivates.
+  // is implemented for esp32 and its supported derivates, and avr and its derivates
+  // except atmega32u4
   //
   // For slow driver hardware the first step after any polarity change of the
   // direction pin can be delayed by the value dir_change_delay_us. The allowed

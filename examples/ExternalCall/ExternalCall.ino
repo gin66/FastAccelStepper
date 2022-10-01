@@ -24,7 +24,7 @@ FastAccelStepper *stepper2 = NULL;
 void setup() {
   Serial.begin(115200);
   Serial.println("External call test");
-  Serial.println("Stepper 1 use external dir pin");
+  Serial.println("Stepper 1 uses external dir pin");
   Serial.println("Stepper 2 uses direct dir pin");
 
   engine.init();

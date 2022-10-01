@@ -299,7 +299,6 @@ struct queue_end_s {
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
 #define SUPPORT_AVR
-#define SUPPORT_EXTERNAL_DIRECTION_PIN
 
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -335,6 +334,7 @@ struct queue_end_s {
 //
 //==========================================================================
 #if defined(__AVR_ATmega328P__)
+#define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define MAX_STEPPER 2
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
@@ -346,6 +346,7 @@ enum channels { channelA, channelB };
 //
 //==========================================================================
 #elif defined(__AVR_ATmega2560__)
+#define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define MAX_STEPPER 3
 #define NUM_QUEUES 3
 #define fas_queue_A fas_queue[0]
