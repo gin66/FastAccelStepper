@@ -6,7 +6,7 @@ TODO:
 pre-0.28.0:
 - esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #127](https://github.com/gin66/FastAccelStepper/issues/127)
 - remove deprecated isMotorRunning()
-- external callback for pins are now defined on the engine level. This allows generalization for enable and direction pins for esp32. This will break existing code, which have used external enable pin.
+- external callback for pins are now defined on the engine level. This allows generalization for enable and direction pins for esp32 and avr. This will break existing code, which has used external enable pin.
 
 0.27.5:
 - esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #117](https://github.com/gin66/FastAccelStepper/issues/117) 
