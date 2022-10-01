@@ -8,41 +8,67 @@
 #endif
 
 // As in StepperDemo for Motor 1 on AVR
-#define dirPinStepper    5
-#define enablePinStepper 6
-#define stepPinStepper   9  // OC1A in case of AVR
+#define dirPinStepper1    5
+#define enablePinStepper1 6
+#define stepPinStepper1   9  // OC1A in case of AVR
 
-// As in StepperDemo for Motor 1 on ESP32
-//#define dirPinStepper 18
-//#define enablePinStepper 26
-//#define stepPinStepper 17
+// As in StepperDemo for Motor 2 on AVR
+#define dirPinStepper2    7
+#define enablePinStepper2 8
+#define stepPinStepper2   10  // OC1B in case of AVR
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper = NULL;
+FastAccelStepper *stepper1 = NULL;
+FastAccelStepper *stepper2 = NULL;
 
 void setup() {
   Serial.begin(115200);
   Serial.println("External call test");
+  Serial.println("Stepper 1 use external dir pin");
+  Serial.println("Stepper 2 uses direct dir pin");
 
   engine.init();
-  stepper = engine.stepperConnectToPin(stepPinStepper);
-  if (stepper) {
-    stepper->setDirectionPin(dirPinStepper);
-    stepper->setEnablePin(enablePinStepper);
-    stepper->setAutoEnable(true);
+  engine.setExternalCallForPin(setExternalPin);
+  stepper1 = engine.stepperConnectToPin(stepPinStepper1);
+  if (stepper1) {
+    stepper1->setDirectionPin(dirPinStepper1 | PIN_EXTERNAL_FLAG);
+    stepper1->setEnablePin(enablePinStepper1);
+    stepper1->setAutoEnable(true);
 
-    // If auto enable/disable need delays, just add (one or both):
-    // stepper->setDelayToEnable(50);
-    // stepper->setDelayToDisable(1000);
+    stepper1->setSpeedInUs(10000);  // the parameter is us/step !!!
+    stepper1->setAcceleration(1000);
+  }
 
-    stepper->setSpeedInUs(1000);  // the parameter is us/step !!!
-    stepper->setAcceleration(100);
+  stepper2 = engine.stepperConnectToPin(stepPinStepper2);
+  if (stepper2) {
+    stepper2->setDirectionPin(dirPinStepper2);
+    stepper2->setEnablePin(enablePinStepper2);
+    stepper2->setAutoEnable(true);
+
+    stepper2->setSpeedInUs(10000);  // the parameter is us/step !!!
+    stepper2->setAcceleration(1000);
   }
 }
 
+bool setExternalPin(uint8_t pin, uint8_t value) {
+  pin = pin & ~PIN_EXTERNAL_FLAG;
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, value);
+  return value;
+}
+
 void loop() {
-  stepper->move(1000, true);
-  stepper->move(-1000, true);
+  // Blocking moves are used.
+  if (stepper1) {
+    stepper1->move(1000, true);
+    stepper1->move(-900, true);
+    stepper1->move(50, true);
+  }
+  if (stepper2) {
+    stepper2->move(1000, true);
+    stepper2->move(-900, true);
+    stepper2->move(50, true);
+  }
 
 #ifdef SIMULATOR
   delay(1000);
