@@ -3,7 +3,7 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
-pre-0.28.0:
+0.28.0:
 - esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #127](https://github.com/gin66/FastAccelStepper/issues/127)
 - remove deprecated isMotorRunning()
 - external callback for pins are now defined on the engine level. This allows generalization for enable and direction pins for esp32 and avr (not atmega32u4). This will break existing code, which has used external enable pin.
