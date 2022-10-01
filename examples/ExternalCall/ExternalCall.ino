@@ -51,10 +51,14 @@ void setup() {
 }
 
 bool setExternalPin(uint8_t pin, uint8_t value) {
+  // This example returns the previous value of the output.
+  // Consequently, FastAccelStepper needs to call setExternalPin twice
+  // in order to successfully change the output value.
   pin = pin & ~PIN_EXTERNAL_FLAG;
   pinMode(pin, OUTPUT);
-  digitalWrite(pin, value); // 2890 if = 1, -2890 if = 0, 2890 if = value
-  return value;
+  bool oldValue = digitalRead(pin);
+  digitalWrite(pin, value);
+  return oldValue;
 }
 
 void loop() {
