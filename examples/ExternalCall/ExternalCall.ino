@@ -53,7 +53,7 @@ void setup() {
 bool setExternalPin(uint8_t pin, uint8_t value) {
   pin = pin & ~PIN_EXTERNAL_FLAG;
   pinMode(pin, OUTPUT);
-  digitalWrite(pin, value);
+  digitalWrite(pin, value); // 2890 if = 1, -2890 if = 0, 2890 if = value
   return value;
 }
 
@@ -62,12 +62,16 @@ void loop() {
   if (stepper1) {
     stepper1->move(1000, true);
     stepper1->move(-900, true);
-    stepper1->move(50, true);
+    stepper1->move(500, true);
+    stepper1->move(-450, true);
+    stepper1->move(40, true);
   }
   if (stepper2) {
     stepper2->move(1000, true);
     stepper2->move(-900, true);
-    stepper2->move(50, true);
+    stepper2->move(500, true);
+    stepper2->move(-450, true);
+    stepper2->move(40, true);
   }
 
 #ifdef SIMULATOR

@@ -101,7 +101,7 @@ class FastAccelStepperEngine {
   // If the direction/enable pins are e.g. connected via external HW (shift
   // registers), then an external callback function can be supplied. The
   // supplied value is either LOW or HIGH. The return value shall be the status
-  // of the pin (either LOW or HIGH). If returned value and supplied value do
+  // of the pin (false for LOW or true for HIGH). If returned value and supplied value do
   // not match, the stepper does not continue, but calls this function again.
   //
   // This function is called from cyclic task/interrupt with 4ms rate, which
@@ -110,6 +110,13 @@ class FastAccelStepperEngine {
   // other running steppers are running out of commands in the queue. If this
   // takes longer, then the function should be offloaded and return the new
   // status, after the pin change has been successfully completed.
+  //
+  // The callback has to be called on the FastAccelStepperEngine.
+  // See examples/ExternalCall
+  //
+  // Stepperpins (enable or direction), which should use this external callback,
+  // need to be or'ed with PIN_EXTERNAL_FLAG ! FastAccelStepper uses this flag
+  // to determine, if a pin is external or internal.
   void setExternalCallForPin(bool (*func)(uint8_t pin, uint8_t value));
 
   // ### Debug LED

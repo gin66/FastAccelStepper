@@ -122,15 +122,15 @@ class StepperQueue {
   }
   inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
   inline bool isQueueEmpty() { return queueEntries() == 0; }
-#ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
   inline bool isOnRepeatingEntry() {
-    return entry[read_idx & QUEUES_RMT].repeat_entry == 1;
+    return entry[read_idx & QUEUE_LEN_MASK].repeat_entry == 1;
   }
   inline uint8_t dirPinState() {
-    return entry[read_idx & QUEUES_RMT].dirPinState;
+    return entry[read_idx & QUEUE_LEN_MASK].dirPinState;
   }
   inline void clearRepeatingFlag() {
-    entry[read_idx & QUEUES_RMT].repeat_entry = 0;
+    entry[read_idx & QUEUE_LEN_MASK].repeat_entry = 0;
   }
 #endif
 

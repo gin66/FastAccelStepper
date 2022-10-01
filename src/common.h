@@ -299,6 +299,7 @@ struct queue_end_s {
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
 #define SUPPORT_AVR
+#define SUPPORT_EXTERNAL_DIRECTION_PIN
 
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>

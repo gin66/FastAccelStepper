@@ -171,7 +171,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         }                                                                     \
       }                                                                       \
     }                                                                         \
-    rp++;                                                                     \
+    if (e->repeat_entry == 0) {                                               \
+      rp++;                                                                   \
+	}                                                                         \
     fas_queue_##CHANNEL.read_idx = rp;                                        \
     if (rp != fas_queue_##CHANNEL.next_write_idx) {                           \
       /* command in queue */                                                  \

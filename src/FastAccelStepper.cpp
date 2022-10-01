@@ -299,7 +299,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
 #ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
 bool FastAccelStepper::externalDirPinChangeCompletedIfNeeded() {
   StepperQueue* q = &fas_queue[_queue_num];
-  if ((_dirPin != PIN_UNDEFINED) && (_dirPin & PIN_EXTERNAL_FLAG)) {
+  if ((_dirPin != PIN_UNDEFINED) && ((_dirPin & PIN_EXTERNAL_FLAG) != 0)) {
     if (q->isOnRepeatingEntry()) {
       if (_engine->_externalCallForPin) {
         uint8_t state = q->dirPinState();
