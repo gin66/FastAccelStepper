@@ -8,14 +8,14 @@
 #endif
 
 // As in StepperDemo for Motor 1 on AVR
-#define dirPinStepper1    5
+#define dirPinStepper1 5
 #define enablePinStepper1 6
-#define stepPinStepper1   9  // OC1A in case of AVR
+#define stepPinStepper1 9  // OC1A in case of AVR
 
 // As in StepperDemo for Motor 2 on AVR
-#define dirPinStepper2    7
+#define dirPinStepper2 7
 #define enablePinStepper2 8
-#define stepPinStepper2   10  // OC1B in case of AVR
+#define stepPinStepper2 10  // OC1B in case of AVR
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper1 = NULL;
