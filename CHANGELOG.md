@@ -3,6 +3,9 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+0.28.1:
+- try to fix #142 for esp32 mcpwm/pcnt and format code
+
 0.28.0:
 - esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #127](https://github.com/gin66/FastAccelStepper/issues/127)
 - remove deprecated isMotorRunning()
