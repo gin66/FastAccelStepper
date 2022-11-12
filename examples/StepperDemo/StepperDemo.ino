@@ -493,7 +493,7 @@ const static char messages[] PROGMEM =
 #define _steps_ "\250"
     _step "s " _SEP_
 #define _output_ "\251"
-    "output " _SEP_
+    " output " _SEP_
 #define _test_sequence_ "\252"
     _test_ "sequence " _SEP_
 #define _Perform_ "\253"
@@ -690,18 +690,18 @@ const static char messages[] PROGMEM =
     "negative)" _NL_
     ____ "E<us>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _enable_ _to_ _steps_ _NL_
     ____ "D<ms>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _steps_ _to_ _disable _NL_
-    ____ "N" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "on, " __disable_auto_enable_nl
-    ____ "F" ________ _ooo_ _Turn_ _selected_stepper " " _output_ "off," __disable_auto_enable_nl
+    ____ "N" ________ _ooo_ _Turn_ _selected_stepper _output_ "on, " __disable_auto_enable_nl
+    ____ "F" ________ _ooo_ _Turn_ _selected_stepper _output_ "off," __disable_auto_enable_nl
     ____ "O" ________ _ooo_ "Put " _selected_stepper " into auto " _enable_ _mode_ _NL_
     ____ "S" ________ _ooo_ _stop " " _selected_stepper " with deceleration" _NL_
     ____ "X" ________ _ooo_ "Immediately " _stop " " _stepper " and " _set_ "zero position" _NL_
     ____ "I" ________ _ooo_ _Toggle_ _stepper " info, while any " _stepper " is running" _NL_
+#if !defined(__AVR_ATmega32U4__)
     ____ "W" ________ _ooo_ "Blocking wait until " _selected_stepper " is " _stop "ped, will "
     "deadlock if " _stepper " never " _stop "s" _NL_
     ____ "w<ms>" ____ _ooo_ "Wait time in ms" _NL_
     ____ "+" ________ _ooo_ _Perform_ _one_step_ _forward_ _of_the_ _selected_stepper _NL_
     ____ "-" ________ _ooo_ _Perform_ _one_step_ _backward_ _of_the_ _selected_stepper _NL_
-#if !defined(__AVR_ATmega32U4__)
     ____ "T" ________ _ooo_ _test_  _select "ed " _stepper " with direct port access" _NL_
 #endif
 #if defined(ARDUINO_ARCH_ESP32)

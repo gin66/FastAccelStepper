@@ -3,8 +3,11 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+0.28.2:
+- fix for issue [Issue #150](https://github.com/gin66/FastAccelStepper/issues/150)
+
 0.28.1:
-- try to fix #142 for esp32 mcpwm/pcnt and format code
+- try to fix [Issue #142](https://github.com/gin66/FastAccelStepper/issues/142) for esp32 mcpwm/pcnt and format code
 
 0.28.0:
 - esp32: fix for compile issue on arduino 1.8.19 as reported by [Issue #127](https://github.com/gin66/FastAccelStepper/issues/127)
