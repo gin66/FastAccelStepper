@@ -52,7 +52,7 @@ int8_t RampGenerator::startRun(bool countUp) {
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: curr_ticks = %lu travel_ticks = %lu\n",
-         _rw.curr_ticks, _config.min_travel_ticks);
+          _rw.curr_ticks, _config.min_travel_ticks);
   Serial.println(buf);
 #endif
   return MOVE_OK;

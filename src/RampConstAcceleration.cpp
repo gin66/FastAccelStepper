@@ -322,12 +322,12 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
           rs = performed_ramp_up_steps - planning_steps;
         }
         d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
-		// If the ramp generator cannot decelerate by going down the ramp,
-		// then we need to clip the new d_ticks to the min travel ticks
-		// This is for issue #150
-		if ((rs == 1) && (ramp->config.min_travel_ticks > d_ticks_new)) {
-			d_ticks_new = ramp->config.min_travel_ticks;
-		}
+        // If the ramp generator cannot decelerate by going down the ramp,
+        // then we need to clip the new d_ticks to the min travel ticks
+        // This is for issue #150
+        if ((rs == 1) && (ramp->config.min_travel_ticks > d_ticks_new)) {
+          d_ticks_new = ramp->config.min_travel_ticks;
+        }
       }
 #ifdef TEST
       printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
