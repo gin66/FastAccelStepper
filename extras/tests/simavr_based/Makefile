@@ -11,7 +11,10 @@ SD_SRC_DIRS=$(addsuffix /src/.dir,$(TESTS_SD))
 
 SRC=$(wildcard ../../src/*)
 
-test: $(TEST_FILES) pmf externalCall
+test: $(TEST_FILES) pmf externalCall issue150
+
+issue150:
+	make -C test_issue150
 
 pmf:
 	make -C test_pmf
@@ -47,3 +50,4 @@ clean:
 	find . -type l -delete
 	find . -type d -empty -delete
 	make links makefiles
+

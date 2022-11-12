@@ -39,6 +39,9 @@ void setup() {
 #ifdef SIMULATOR
   // if result is Ok. Toggle port twice, otherwise once
 #define PIN 10
+#define DIRPIN 7
+  pinMode(DIRPIN, OUTPUT);
+  digitalWrite(DIRPIN, HIGH);
   pinMode(PIN, OUTPUT);
   digitalWrite(PIN, HIGH);
   digitalWrite(PIN, LOW);
