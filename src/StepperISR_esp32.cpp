@@ -126,7 +126,7 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
 }
 
 void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
-#define STACK_SIZE 1000
+#define STACK_SIZE 2000
 #define PRIORITY configMAX_PRIORITIES
   if (cpu_core > 1) {
     xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
