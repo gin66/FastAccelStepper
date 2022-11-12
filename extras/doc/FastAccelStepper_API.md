@@ -81,8 +81,9 @@ Comments to valid pins:
 If the direction/enable pins are e.g. connected via external HW (shift
 registers), then an external callback function can be supplied. The
 supplied value is either LOW or HIGH. The return value shall be the status
-of the pin (false for LOW or true for HIGH). If returned value and supplied value do
-not match, the stepper does not continue, but calls this function again.
+of the pin (false for LOW or true for HIGH). If returned value and supplied
+value do not match, the stepper does not continue, but calls this function
+again.
 
 This function is called from cyclic task/interrupt with 4ms rate, which
 creates the commands to put into the command queue. Thus the supplied
@@ -194,8 +195,8 @@ if direction pin is connected, call this function.
 If the pin number is >= 128, then the direction pin is assumed to be
 external and the external callback function (set by
 `setExternalCallForPin()`) is used to set the pin. For direction pin, this
-is implemented for esp32 and its supported derivates, and avr and its derivates
-except atmega32u4
+is implemented for esp32 and its supported derivates, and avr and its
+derivates except atmega32u4
 
 For slow driver hardware the first step after any polarity change of the
 direction pin can be delayed by the value dir_change_delay_us. The allowed
