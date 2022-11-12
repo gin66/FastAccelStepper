@@ -98,7 +98,7 @@ test: .tested
 	test -f .tested
 
 result.txt: x.vcd
-	gawk -v SILENCE=$(SILENCE) -f ../eval.awk x.vcd
+	gawk -v SILENCE=$(SILENCE) -f ../eval.awk x.vcd >/dev/null
 	cat expect.txt
 
 x.vcd: $(SRC) ../run_avr platformio.ini src/Issue150.ino
@@ -111,3 +111,4 @@ src/Issue150.ino:
 
 clean:
 	rm -fR .pio .tested x.vcd result.txt
+
