@@ -1,9 +1,17 @@
 #include "FastAccelStepper.h"
 
-// As in StepperDemo for Motor 1 on ESP32
-#define dirPinStepper 18
-#define stepPinStepper 17
-#define enablePinStepper 26
+
+#if defined(__AVR_ATmega328P__)
+#include "AVRStepperPins.h"
+#define dirPinStepperAVR 5
+#define stepPinStepperAVR stepPinStepper1A
+#define enablePinStepperAVR 6
+#elif defined(ARDUINO_ARCH_ESP32)
+#define dirPinStepperESP 18
+#define stepPinStepperESP 17
+#define enablePinStepperESP 26
+#endif
+
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper;
@@ -13,9 +21,16 @@ void setup() {
     engine.init();
 
     // pins are set to outputs here automatically
-    stepper = engine.stepperConnectToPin(stepPinStepper);
-    stepper->setDirectionPin(dirPinStepper);
-	stepper->setEnablePin(enablePinStepper, true);
+#if defined(__AVR_ATmega328P__)
+    stepper = engine.stepperConnectToPin(stepPinStepperAVR);
+    stepper->setDirectionPin(dirPinStepperAVR);
+	stepper->setEnablePin(enablePinStepperAVR, true);
+#elif defined(ARDUINO_ARCH_ESP32)
+    stepper = engine.stepperConnectToPin(stepPinStepperESP);
+    stepper->setDirectionPin(dirPinStepperESP);
+	stepper->setEnablePin(enablePinStepperESP, true);
+#endif
+
 	stepper->setAutoEnable(true);
     stepper->setAcceleration(1000000);
 }
@@ -31,19 +46,23 @@ void loop() {
     stepper->runForward();
     delay(500);
     int actual = stepper->getCurrentSpeedInUs();
-	Serial.printf("Loop: %d\n", loopCnt);
-    Serial.printf("target: %d\n", targetSpeed);
-    Serial.printf("actual: %d\n", actual);
+	Serial.print("Loop");
+	Serial.println(loopCnt);
+    Serial.print("target: ");
+    Serial.println(targetSpeed);
+    Serial.print("actual: ");
+    Serial.println(actual);
 	if ((actual == lastTarget) && (targetSpeed != lastTarget)) {
 		fail++;
 	}
 	if (fail == 0) {
 		if (loopCnt > 100) {
-			Serial.printf("PASS\n");
+			Serial.println("PASS");
 		}
 	}
 	else {
-		Serial.printf("FAILS = %d\n", fail);
+		Serial.print("FAILS = ");
+		Serial.println(fail);
 	}
 	lastTarget = targetSpeed;
 }
