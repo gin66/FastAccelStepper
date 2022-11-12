@@ -49,6 +49,12 @@ int8_t RampGenerator::startRun(bool countUp) {
   }
   _ro = new_ramp;
   fasEnableInterrupts();
+#ifdef DEBUG
+  char buf[256];
+  sprintf(buf, "Ramp data: curr_ticks = %lu travel_ticks = %lu\n",
+         _rw.curr_ticks, _config.min_travel_ticks);
+  Serial.println(buf);
+#endif
   return MOVE_OK;
 }
 
@@ -79,7 +85,7 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu\n",
-          target_pos, _rw.curr_ticks, _min_travel_ticks);
+          target_pos, _rw.curr_ticks, _config.min_travel_ticks);
   Serial.println(buf);
 #endif
   return MOVE_OK;
