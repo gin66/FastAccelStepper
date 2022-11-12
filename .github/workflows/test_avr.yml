@@ -2,7 +2,7 @@ name: Run tests with simavr
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master Issue150 ]
   pull_request:
     branches: [ master ]
 
