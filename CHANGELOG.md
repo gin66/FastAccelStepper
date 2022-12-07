@@ -3,8 +3,11 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+0.28.3:
+- reduce AVR max single stepper speed to 70kSteps/s due to issue [Issue #152](https://github.com/gin66/FastAccelStepper/issues/152)
+
 0.28.2:
-- fix for issue [Issue #150](https://github.com/gin66/FastAccelStepper/issues/150)
+- fix for issue [Issue #150](https://github.com/gin66/FastAccelStepper/issues/150) for low speed not reducing below startup speed
 
 0.28.1:
 - try to fix [Issue #142](https://github.com/gin66/FastAccelStepper/issues/142) for esp32 mcpwm/pcnt and format code

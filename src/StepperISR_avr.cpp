@@ -347,7 +347,7 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   // using test_sd_04_timing_328p version 0.25.6 as reference
   //   manageStepper (fillISR) already needs max 2.3 ms !
   //
-  max_speed_in_ticks = 213 * steppers;
+  max_speed_in_ticks = (steppers == 1) ? 228 : 213 * steppers;
 }
 
 void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {
