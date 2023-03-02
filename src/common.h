@@ -130,6 +130,27 @@ struct queue_end_s {
 
 //==========================================================================
 //
+// ESP32 derivate - ESP32S3 - NOT SUPPORTED
+//
+//==========================================================================
+#elif CONFIG_IDF_TARGET_ESP32S3
+#define SUPPORT_ESP32_MCPWM_PCNT
+#include <driver/mcpwm.h>
+#include <driver/pcnt.h>
+#include <soc/mcpwm_reg.h>
+#include <soc/mcpwm_struct.h>
+#include <soc/pcnt_reg.h>
+#include <soc/pcnt_struct.h>
+
+#include <driver/rmt.h>
+#define QUEUES_MCPWM_PCNT 4
+#define QUEUES_RMT 0
+
+// have support for pulse counter
+#define SUPPORT_ESP32_PULSE_COUNTER
+
+//==========================================================================
+//
 // ESP32 derivate - ESP32C3 - NOT SUPPORTED
 //
 //==========================================================================
