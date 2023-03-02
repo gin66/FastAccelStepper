@@ -130,11 +130,12 @@ struct queue_end_s {
 
 //==========================================================================
 //
-// ESP32 derivate - ESP32S3 - NOT SUPPORTED
+// ESP32 derivate - ESP32S3
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S3
 #define SUPPORT_ESP32_MCPWM_PCNT
+#define SUPPORT_ESP32S3_MCPWM_PCNT
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
 #include <soc/mcpwm_reg.h>
