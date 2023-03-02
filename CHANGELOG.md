@@ -3,6 +3,9 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+0.28.4:
+- include esp32s3 port
+
 0.28.3:
 - reduce AVR max single stepper speed to 70kSteps/s due to issue [Issue #152](https://github.com/gin66/FastAccelStepper/issues/152)
 

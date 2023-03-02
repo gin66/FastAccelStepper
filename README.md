@@ -432,4 +432,5 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks ixil for pull request (https://github.com/gin66/FastAccelStepper/pull/19) for ATmega2560
 - Thanks gagank1 for esp-idf integration by adding CMakeLists.txt (https://github.com/gin66/FastAccelStepper/pull/81)
 - Thanks clazarowitz for the amazing atmel sam due port (https://github.com/gin66/FastAccelStepper/pull/82)
+- Thanks HeldeReis for the awesome ESP32-S3 port (https://github.com/gin66/FastAccelStepper/pull/162)
 
