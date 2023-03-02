@@ -137,6 +137,7 @@ void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
 }
 
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
 uint32_t sig_idx[8] = {PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,
                        PCNT_SIG_CH0_IN2_IDX, PCNT_SIG_CH0_IN3_IDX,
                        PCNT_SIG_CH0_IN4_IDX, PCNT_SIG_CH0_IN5_IDX,
@@ -145,7 +146,12 @@ uint32_t ctrl_idx[8] = {PCNT_CTRL_CH0_IN0_IDX, PCNT_CTRL_CH0_IN1_IDX,
                         PCNT_CTRL_CH0_IN2_IDX, PCNT_CTRL_CH0_IN3_IDX,
                         PCNT_CTRL_CH0_IN4_IDX, PCNT_CTRL_CH0_IN5_IDX,
                         PCNT_CTRL_CH0_IN6_IDX, PCNT_CTRL_CH0_IN7_IDX};
-
+#else
+uint32_t sig_idx[8] = {PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,
+                       PCNT_SIG_CH0_IN2_IDX};
+uint32_t ctrl_idx[8] = {PCNT_CTRL_CH0_IN0_IDX, PCNT_CTRL_CH0_IN1_IDX,
+                        PCNT_CTRL_CH0_IN2_IDX};
+#endif
 bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
                                  int16_t low_value, int16_t high_value) {
   // TODO: Check if free pulse counter
@@ -175,8 +181,13 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
 
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
   PCNT.conf_unit[cfg.unit].conf0.thr_h_lim_en = 0;
   PCNT.conf_unit[cfg.unit].conf0.thr_l_lim_en = 0;
+#else
+  PCNT.conf_unit[cfg.unit].conf0.thr_h_lim_en_un = 0;
+  PCNT.conf_unit[cfg.unit].conf0.thr_l_lim_en_un = 0;
+#endif
 
   stepper->detachFromPin();
   stepper->reAttachToPin();
@@ -198,7 +209,11 @@ int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
   // Serial.println(' ');
   // Serial.println(PCNT.cnt_unit[PCNT_UNIT_0].cnt_val);
   // Serial.println(PCNT.conf_unit[PCNT_UNIT_0].conf2.cnt_h_lim);
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
   return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].cnt_val;
+#else
+  return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].pulse_cnt_un;
+#endif
 }
 #endif
 #endif
