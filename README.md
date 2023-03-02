@@ -129,6 +129,12 @@ Comments to pin sharing:
 * supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
+### ESP32S3
+
+* allows up to 200000 generated steps per second ?
+* supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+
 ### Atmel SAM Due
 
 * allows up to 50000 generated steps per second
@@ -267,6 +273,10 @@ As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers a
 ### ESP32S2
 
 This stepper driver uses rmt module.
+
+### ESP32S3
+
+This stepper driver uses mcpwm/pcnt modules. Can drive up to 4 motors. Tested with 2 motors.
 
 ### ESP32C3/ESP32-MINI-1
 
