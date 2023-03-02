@@ -55,6 +55,7 @@ static struct mapping_s channel2mapping[NUM_QUEUES] = {
       cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA,
       cmpr_tea_int_raw : MCPWM_OP2_TEA_INT_RAW
     },
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
     {
       mcpwm_unit : MCPWM_UNIT_1,
       timer : 0,
@@ -85,6 +86,7 @@ static struct mapping_s channel2mapping[NUM_QUEUES] = {
       cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA,
       cmpr_tea_int_raw : MCPWM_OP2_TEA_INT_RAW
     },
+#endif
 };
 
 static void IRAM_ATTR prepare_for_next_command(
@@ -95,7 +97,11 @@ static void IRAM_ATTR prepare_for_next_command(
         (const struct mapping_s *)queue->driver_data;
     pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
     // is updated only on zero
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
     PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = next_steps;
+#else
+    PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim_un = next_steps;
+#endif
   }
 }
 
@@ -150,7 +156,11 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
     mcpwm->int_ena.val |= mapping->cmpr_tea_int_ena;
   } else {
     bool disable_mcpwm_interrupt = true;
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
     if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim != steps) {
+#else
+    if (PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim_un != steps) {
+#endif
       // For fast pulses, eventually the ISR is late. So take the current pulse
       // count into consideration.
       //
@@ -161,11 +171,19 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
       // available yet 		3 pulses
       //
       // Read counter
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
       uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
+#else
+      uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit].pulse_cnt_un;
+#endif
       // Clear flag for l-->h transition
       mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
       // Read counter again
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
       uint16_t val2 = steps - PCNT.cnt_unit[pcnt_unit].cnt_val;
+#else
+      uint16_t val2 = steps - PCNT.cnt_unit[pcnt_unit].pulse_cnt_un;
+#endif
       // If no pulse arrives between val1 and val2:
       //		val2 == val1
       // If pulse arrives between val1 and int_clr:
@@ -179,17 +197,29 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
       }
 
       // is updated only on zero
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
       PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2;
+#else
+      PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim_un = val2;
+#endif
       // force take over
       isr_pcnt_counter_clear(pcnt_unit);
       // Check, if pulse has come in
       if ((mcpwm->int_raw.val & mapping->cmpr_tea_int_raw) != 0) {
         // Pulse has come in
         // Check if the pulse has been counted or not
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
         if (PCNT.cnt_unit[pcnt_unit].cnt_val == 0) {
+#else
+        if (PCNT.cnt_unit[pcnt_unit].pulse_cnt_un == 0) {
+#endif
           // pulse hasn't been counted, so adjust the limit
           // is updated only on zero
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
           PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = val2 - 1;
+#else
+          PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim_un = val2 - 1;
+#endif
           // force take over
           isr_pcnt_counter_clear(pcnt_unit);
 
@@ -344,9 +374,16 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
 
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
   PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim = 1;
   PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en = 1;
   PCNT.conf_unit[pcnt_unit].conf0.thr_l_lim_en = 0;
+#else
+  PCNT.conf_unit[pcnt_unit].conf2.cnt_h_lim_un = 1;
+  PCNT.conf_unit[pcnt_unit].conf0.thr_h_lim_en_un = 1;
+  PCNT.conf_unit[pcnt_unit].conf0.thr_l_lim_en_un = 0;
+#endif
+
 
   pcnt_counter_clear(pcnt_unit);
   pcnt_counter_resume(pcnt_unit);
@@ -528,7 +565,12 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
 }
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() {
   const struct mapping_s *mapping = (const struct mapping_s *)driver_data;
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
   return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
+#else
+  return PCNT.cnt_unit[mapping->pcnt_unit].pulse_cnt_un;
+#endif
+
 }
 
 #endif
