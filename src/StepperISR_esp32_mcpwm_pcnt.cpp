@@ -339,9 +339,11 @@ static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
   MCPWM_SERVICE(MCPWM0, 2, 2);
 }
 static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
   MCPWM_SERVICE(MCPWM1, 0, 3);
   MCPWM_SERVICE(MCPWM1, 1, 4);
   MCPWM_SERVICE(MCPWM1, 2, 5);
+#endif
 }
 
 void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
