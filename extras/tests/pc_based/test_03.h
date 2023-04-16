@@ -257,8 +257,14 @@ bool perform_test() {
   xprintf("upm_shr(upm_shl(%x/%x,20),20)=%x (%ld)\n", x1, x2, x, back);
   test(back == 0, "upm_divide/upm_shl");
 
+  x1 = upm_from((uint32_t)1);
+  xprintf("const 1=0x%x\n", x1);
+  test(x1 == UPM_CONST_1, "const 1");
   x1 = upm_from((uint32_t)500);
   test(x1 == UPM_CONST_500, "const 500");
+  x1 = upm_divide(UPM_CONST_1, UPM_CONST_500);
+  xprintf("const 1/500=0x%x\n", x1);
+  test(x1 == UPM_CONST_1_DIV_500, "const 0.002");
   x1 = upm_from((uint32_t)1000);
   test(x1 == UPM_CONST_1000, "const 1000");
   x1 = upm_from((uint32_t)2000);

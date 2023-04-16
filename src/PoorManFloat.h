@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 typedef uint16_t upm_float;
+#define UPM_CONST_1 ((upm_float)0x8000)
 #define UPM_CONST_128E12 ((upm_float)0xaed0)
 #define UPM_CONST_16E6 ((upm_float)0x97e8)
 #define UPM_CONST_500 ((upm_float)0x88f4)
@@ -12,6 +13,7 @@ typedef uint16_t upm_float;
 #define UPM_CONST_42000 ((upm_float)0x8f48)
 #define UPM_CONST_21E6_DIV_SQRT_OF_2 ((upm_float)0x97c4)
 #define UPM_CONST_2205E11 ((upm_float)0xaf91)
+#define UPM_CONST_1_DIV_500 ((upm_float)0x7706)
 upm_float upm_from(uint8_t x);
 upm_float upm_from(uint16_t x);
 upm_float upm_from(uint32_t x);
