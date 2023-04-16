@@ -78,7 +78,7 @@
 // The table is generated with this one liner:
 //
 // python:
-//		[round(512.0/math.sqrt(i/256))-256 for i in range(257,512)
+//		[round(512.0/math.sqrt(i/256))-256 for i in range(257,512)]
 const PROGMEM uint8_t rsqrt_exp_even[255] = {
     255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245, 244, 243, 243, 242,
     241, 240, 239, 238, 237, 236, 235, 234, 234, 233, 232, 231, 230, 229, 228,
