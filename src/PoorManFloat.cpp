@@ -62,6 +62,59 @@
 // I could have managed was 16.8 MHz.  Easier to just use the modulo 4 divider
 // and add the constants.
 //
+// In order to support cubic functions, more tables would be necessary.
+// Using logarithmic/exponential functions the number of tables can be limited.
+// For example:
+//    square/cubic root would be simply: exp(log(x) * a), with a = 1/2 for square and 1/3 for cubic
+//
+// As base for exp/log we will use 2  (not 10 or e). This way the exponent of an upm float
+// being 2^n needs no calculation, as log2(2^n) = n. Still the offset by 128 needs to be considered
+//
+// The mantissa of an upm float with the leading 1 is in the range 1 <= m < 2.
+//
+// As log2(1) = 0 and log2(2) = 1 is at the corners identical to x + 1. So it is interesting to look
+// at function f(x) = log2(x) - x + 1. This function is 0 for x at 1 and 2, positive over the range inbetween
+// and reaches max value of 0.08607 at x = 1.442695. This max value is at x = 1/ln(2)
+//
+// The upm mantissa is in total nine bits:
+//       m = 1_xxxx_xxxx
+// 
+// So the log2 of the mantissa can be calculated by:
+//       m    = 1_xxxx_xxxx
+//     - 1    = 1_0000_0000      
+//     + f(m) = 0_000y_yyyy
+//     yields = 0_zzzz_zzzz
+//
+// It is guaranteed, that xxxx_xxxx >= y_yyyy.
+//
+// Using python3 this can be calculated by:
+//     [round(math.log(i/256)/math.log(2) * 256 - (i-256)) for i in range(256,512)]
+//
+// For better precision y_yyyy is shifted by 3 and can be calculated as:
+//	   [round(math.log(i/256)/math.log(2) * 2048 - 8 * (i-256)) for i in range(256,512)]
+//
+const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_3[256] = {
+	0, 4, 7, 10, 14, 17, 20, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 62, 65, 68, 70, 73, 75, 78, 80, 83, 85, 87, 90, 92, 94, 96, 99, 101, 103, 105, 107, 109, 111, 113, 115, 117, 118, 120, 122, 124, 125, 127, 129, 130, 132, 134, 135, 137, 138, 139, 141, 142, 143, 145, 146, 147, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 163, 164, 165, 166, 166, 167, 168, 168, 169, 170, 170, 171, 171, 172, 172, 173, 173, 173, 174, 174, 174, 175, 175, 175, 175, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 175, 175, 175, 175, 175, 174, 174, 174, 173, 173, 173, 172, 172, 171, 171, 170, 170, 169, 169, 168, 168, 167, 167, 166, 165, 165, 164, 163, 163, 162, 161, 160, 160, 159, 158, 157, 156, 155, 155, 154, 153, 152, 151, 150, 149, 148, 147, 146, 145, 144, 143, 141, 140, 139, 138, 137, 136, 134, 133, 132, 131, 130, 128, 127, 126, 124, 123, 122, 120, 119, 117, 116, 115, 113, 112, 110, 109, 107, 106, 104, 103, 101, 100, 98, 96, 95, 93, 92, 90, 88, 87, 85, 83, 81, 80, 78, 76, 74, 73, 71, 69, 67, 65, 63, 62, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20, 17, 15, 13, 11, 9, 7, 4, 2
+};
+
+// For the inverse pow(2,x) needs to be calculated. Similarly it makes sense to evaluate instead
+//     g(x) = x - pow(2,x-1)
+// 
+// This function equals 0 for x at 1 and 2, with extremum 0.08607 at x = 1.528766.
+// This max. value is at x = 1 - ln(ln(2))/ln(2)
+//
+// Noteworthy the max values of log2(x) - x + 1 and x - pow(2, x-1) are identical,
+// calculated by (-1 + ln(2) - ln(ln(2)))/ln(2)
+//
+// Using python3 this can be calculated by:
+//	   [round(i - math.pow(2,i/256-1)*256) for i in range(256,512)]
+//
+// Similarly shifted by three bits:
+//     [round((i - math.pow(2,i/256-1)*256)*8) for i in range(256,512)] 
+//
+const PROGMEM uint8_t x_minus_pow2_of_x_minus_one_shifted_by_3[256] = {
+	0, 2, 5, 7, 10, 12, 14, 17, 19, 21, 24, 26, 28, 31, 33, 35, 37, 40, 42, 44, 46, 48, 50, 52, 54, 57, 59, 61, 63, 65, 67, 69, 71, 73, 75, 76, 78, 80, 82, 84, 86, 88, 89, 91, 93, 95, 96, 98, 100, 101, 103, 105, 106, 108, 110, 111, 113, 114, 116, 117, 119, 120, 122, 123, 125, 126, 127, 129, 130, 131, 133, 134, 135, 136, 138, 139, 140, 141, 142, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 158, 159, 160, 161, 162, 162, 163, 164, 165, 165, 166, 167, 167, 168, 168, 169, 169, 170, 170, 171, 171, 172, 172, 173, 173, 173, 174, 174, 174, 175, 175, 175, 175, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 175, 175, 175, 175, 175, 174, 174, 174, 173, 173, 172, 172, 172, 171, 171, 170, 170, 169, 168, 168, 167, 167, 166, 165, 164, 164, 163, 162, 161, 160, 160, 159, 158, 157, 156, 155, 154, 153, 152, 151, 149, 148, 147, 146, 145, 144, 142, 141, 140, 138, 137, 136, 134, 133, 131, 130, 128, 127, 125, 124, 122, 120, 119, 117, 115, 113, 112, 110, 108, 106, 104, 102, 100, 98, 96, 94, 92, 90, 88, 86, 84, 82, 80, 77, 75, 73, 70, 68, 66, 63, 61, 58, 56, 53, 51, 48, 46, 43, 40, 38, 35, 32, 29, 27, 24, 21, 18, 15, 12, 9, 6, 3
+};
 //
 // rsqrt-tables
 // ============
@@ -422,3 +475,14 @@ upm_float upm_reciprocal(upm_float x) {  // TESTED
   }
   return UPM_FROM_PARTS(mantissa, exponent);
 }
+
+upm_numeric upm_log2(upm_float x) {
+  uint8_t mantissa = x & 0x00ff;
+  uint8_t exponent = x >> 8;
+  uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_3[mantissa]);
+  x -= 0x8000;
+  int16_t numeric = (x << 3);
+  numeric += offset;
+  return (upm_numeric)numeric;
+}
+

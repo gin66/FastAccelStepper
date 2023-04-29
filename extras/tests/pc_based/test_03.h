@@ -1,7 +1,8 @@
 #include <math.h>
 
 bool perform_test() {
-  upm_float x, x1, x2;
+  upm_float x, x1, x2, x3;
+  uint16_t l1,l2,l3,l12;
 
   trace("Check conversion u8");
   for (uint8_t x8 = 255; x8 > 0; x8--) {
@@ -188,9 +189,48 @@ bool perform_test() {
     }
   }
 
+  trace("Check log2");
+  x1 = upm_from((uint32_t)3);
+  x2 = upm_from((uint32_t)6);
+  x3 = upm_from((uint32_t)12);
+  l1 = upm_log2(x1);
+  l2 = upm_log2(x2);
+  l3 = upm_log2(x3);
+  xprintf("%x %x %x\n",l1,l2,l3);
+  test(l1+0x800 == l2, "correct exponent");
+  test(l2+0x800 == l3, "correct exponent");
+
+  x1 = upm_from((uint32_t)3);
+  x2 = upm_from((uint32_t)5);
+  x3 = upm_from((uint32_t)(3*5));
+  l1 = upm_log2(x1);
+  l2 = upm_log2(x2);
+  l3 = upm_log2(x3);
+  xprintf("%x %x %x\n",l1,l2,l3);
+  test(l1+l2 == l3, "correct multiplication");
+
+  x1 = upm_from((uint32_t)123);
+  x2 = upm_from((uint32_t)12345);
+  x3 = upm_from((uint32_t)(123*12345));
+  l1 = upm_log2(x1);
+  l2 = upm_log2(x2);
+  l3 = upm_log2(x3);
+  xprintf("%x %x %x\n",l1,l2,l3);
+  test(l1+l2 == l3, "correct multiplication");
+
+  x1 = UPM_CONST_1_DIV_500;
+  x2 = upm_from((uint32_t)500);
+  x3 = UPM_CONST_1;
+  l1 = upm_log2(x1);
+  l2 = upm_log2(x2);
+  l3 = upm_log2(x3);
+  l12 = l1+l2;
+  l12 += 2; // account for calculation error
+  xprintf("%x %x %x %x\n",l1,l2,l12,l3);
+  test(l12 == l3, "correct multiplication");
+
   trace("Check specific use cases");
   x1 = upm_from((uint32_t)0x0ffff);
-  x2 = upm_from((uint32_t)0x1fffe);
   x2 = upm_from((uint32_t)0x10100);
   x = upm_multiply(x1, x2);
   unsigned long back = upm_to_u32(x);
