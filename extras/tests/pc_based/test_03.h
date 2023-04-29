@@ -247,11 +247,11 @@ bool perform_test() {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       p1 = pmfl_from(a_32);
       if (sa > 0) {
-        p1 = pmlf_shl(p1, sa);
+        p1 = pmfl_shl(p1, sa);
       } else if (sa < 0) {
-        p1 = pmlf_shr(p1, -sa);
+        p1 = pmfl_shr(p1, -sa);
       }
-      pmf_logarithmic up = pmlf_rsqrt(p1);
+      pmf_logarithmic p = pmfl_rsqrt(p1);
       pmf_logarithmic pe =
           pmfl_multiply(p1, pmfl_multiply(p, p));  // sqrt not yet tested
       // pe should be approximately 1
