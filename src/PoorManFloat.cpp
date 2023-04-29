@@ -625,6 +625,9 @@ uint16_t pmfl_to_u16(upm_logarithmic x) {
   return x;
 }
 uint32_t pmfl_to_u32(upm_logarithmic x) {
+  if (x < 0) {
+	  return 0;
+  }
   if (x >= 0x4000) {
 	  return 0xffffffff;
   }
