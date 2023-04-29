@@ -19,7 +19,7 @@ bool perform_test() {
   test(l1 == 2,"value 2");
 
   for (uint8_t x_8 = 255; x_8 > 0; x_8--) {
-	p0 = pmfl_from((uint8_t)x_8);
+	p1 = pmfl_from((uint8_t)x_8);
     uint16_t res_16 = pmfl_to_u16(p1);
     if (res_16 != x_8) {
       xprintf("%u => %x => %u\n", x_8, x, res_16);
