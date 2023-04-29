@@ -561,41 +561,41 @@ pmf_logarithmic pmfl_from(uint8_t x) {
 }
 pmf_logarithmic pmfl_from(uint16_t x) {
   if ((x & 0xff00) == 0) {
-    return pmf_logarithmic((uint8_t)x);
+    return pmfl_from((uint8_t)x);
   }
   uint8_t exponent;
   if ((x & 0xf000) != 0) {
     if ((x & 0xc000) != 0) {
       if ((x & 0x8000) != 0) {
-        x >>= 7;
+        x >>= 6;
         exponent = 15;
       } else {
-        x >>= 6;
+        x >>= 5;
         exponent = 14;
       }
     } else {
       if ((x & 0x2000) != 0) {
-        x >>= 5;
+        x >>= 4;
         exponent = 13;
       } else {
-        x >>= 4;
+        x >>= 3;
         exponent = 12;
       }
     }
   } else {
     if ((x & 0x0c00) != 0) {
       if ((x & 0x0800) != 0) {
-        x >>= 3;
+        x >>= 2;
         exponent = 11;
       } else {
-        x >>= 2;
+        x >>= 1;
         exponent = 10;
       }
     } else {
       if ((x & 0x0200) != 0) {
-        x >>= 1;
         exponent = 9;
       } else {
+        x <<= 1;
         exponent = 8;
       }
     }
@@ -603,26 +603,35 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   uint8_t index = x >> 1;
   uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
   x += offset;
-  x += exponent << 9;
+  x -= 0x200;
+  x += ((uint16_t)exponent) << 9;
   return x;
 }
 uint16_t pmfl_to_u16(upm_logarithmic x) {
   if (x < 0) {
 	  return 0;
   }
+  if (x >= 0x2000) {
+	  return 0xffff;
+  }
   uint8_t exponent = ((uint16_t)x) >> 9;
   x &= 0x01ff;
   uint8_t index = ((uint16_t)x) >> 1;
   uint8_t offset = pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_1[index]);
-  x -= offset;
   x += 0x201;  // add one with rounding
-  x >>= 1;
-  if (exponent > 8) {
-	  x <<= exponent-8;
+  x -= offset;
+  if (exponent > 9) {
+	  x <<= exponent-9;
   }
-  else if (exponent < 8) {
-	  x >>= 8-exponent;
+  else if (exponent < 9) {
+	  x >>= 9-exponent;
   }
   return x;
+}
+pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n) {
+	return x + (((int16_t)n)<<9);
+}
+pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n) {
+	return x - (((int16_t)n)<<9);
 }
 

@@ -42,4 +42,6 @@ pmf_logarithmic pmfl_from(uint32_t x);
 
 uint16_t pmfl_to_u16(upm_logarithmic x);
 
+pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n);
+pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n);
 

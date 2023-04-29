@@ -22,9 +22,29 @@ bool perform_test() {
 	p1 = pmfl_from((uint8_t)x_8);
     uint16_t res_16 = pmfl_to_u16(p1);
     if (res_16 != x_8) {
-      xprintf("%u => %x => %u\n", x_8, x, res_16);
+      xprintf("%u => %x => %u\n", x_8, p1, res_16);
     }
     test(res_16 == x_8, "conversion error from uint8_t and back to uint16_t");
+  }
+
+  for (uint8_t n = 1;n <= 8;n++) {
+	  for (uint8_t x_8 = 255; x_8 > 0; x_8--) {
+		uint16_t x_16 = x_8;
+		x_16 <<= n;
+		p1 = pmfl_from((uint8_t)x_8);
+		p1 = pmfl_shl(p1, n);
+		uint16_t res_16 = pmfl_to_u16(p1);
+		uint16_t delta = x_16 - res_16;
+		if (res_16 > x_16) {
+			delta = res_16 - x_16;
+		}
+		uint16_t limit = 1;
+		limit <<= n-1;
+		if (delta > limit) {
+		  xprintf("%u: %u => %x => %u, shifted: %d\n", x_8, x_16, p1, res_16, n);
+		}
+		test(delta <= limit, "conversion error from uint8_t and back to uint16_t with shift");
+	  }
   }
 
   trace("Check conversion u8");
@@ -38,26 +58,30 @@ bool perform_test() {
   }
 
   trace("Check conversion u16 <=> pmfl");
-  uint16_t significant_16 = 0xff80;
+  uint16_t limit = 0x100;
   uint16_t trigger_16 = 0x8000;
   for (uint16_t x16 = 0xffff; x16 > 0; x16--) {
     if ((x16 & trigger_16) == 0) {
-      significant_16 >>= 1;
+      limit >>= 1;
       trigger_16 >>= 1;
     }
     x = pmfl_from((uint16_t)x16);
     uint16_t res_16 = pmfl_to_u16(x);
-    if (res_16 != (x16 & significant_16)) {
-      xprintf("%x => %x => %x  (significant=%x)\n", x16, x, res_16,
-              significant_16);
+	uint16_t delta = x16 - res_16;
+	if (res_16 > x16) {
+		delta = res_16 - x16;
+	}
+    if (delta > limit) {
+      xprintf("%x => %x => %x  (limit=%x)\n", x16, x, res_16,
+              limit);
     }
-    test(res_16 == (x16 & significant_16),
+    test(delta <= limit,
          "conversion error from uint16_t and back to uint16_t");
   }
 
   trace("Check conversion u16");
   uint16_t significant_16 = 0xff80;
-  uint16_t trigger_16 = 0x8000;
+  trigger_16 = 0x8000;
   for (uint16_t x16 = 0xffff; x16 > 0; x16--) {
     if ((x16 & trigger_16) == 0) {
       significant_16 >>= 1;
