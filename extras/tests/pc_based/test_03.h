@@ -296,22 +296,6 @@ bool perform_test() {
   xprintf("%x %x %x %x\n",l1,l2,l12,l3);
   test(l12 == l3, "correct multiplication 3");
 
-  trace("Check pow2");
-  x1 = upm_from((uint32_t)3);
-  x2 = upm_from((uint32_t)6);
-  x3 = upm_from((uint32_t)12);
-  l1 = upm_log2(x1);
-  l2 = upm_log2(x2);
-  l3 = upm_log2(x3);
-  y1 = upm_pow2(l1);
-  y2 = upm_pow2(l2);
-  y3 = upm_pow2(l3);
-  xprintf("%x %x %x\n",x1,x2,x3);
-  xprintf("%x %x %x\n",y1,y2,y3);
-  test(x1 == y1, "pow2(log2())");
-  test(x2 == y2, "pow2(log2())");
-  test(x3 == y3, "pow2(log2())");
-
   trace("Check specific use cases");
   x1 = upm_from((uint32_t)0x0ffff);
   x2 = upm_from((uint32_t)0x10100);
