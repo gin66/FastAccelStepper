@@ -33,4 +33,5 @@ upm_float upm_rsqrt(upm_float x);    // TESTED. Reciprocal sqrt() = 1/sqrt(x)
 upm_float upm_divide(upm_float x, upm_float y);
 
 upm_numeric upm_log2(upm_float x);
+upm_float   upm_pow2(upm_numeric x);
 

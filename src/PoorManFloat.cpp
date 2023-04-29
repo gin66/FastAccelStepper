@@ -486,3 +486,11 @@ upm_numeric upm_log2(upm_float x) {
   return (upm_numeric)numeric;
 }
 
+upm_float   upm_pow2(upm_numeric x) {
+	uint8_t raw_mantissa = (((uint16_t)x)>>3) & 0x00ff;
+  uint8_t offset = pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_3[raw_mantissa]);
+  x -= offset;
+  x >>= 3;
+  return ((uint16_t)x) ^ 0x8000;
+}
+
