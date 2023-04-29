@@ -1,6 +1,28 @@
 #include <math.h>
 
+struct const_tab {
+	  uint32_t val_nom;
+	  uint32_t val_denom;
+	  bool squared;
+	  pmf_logarithmic c;
+};
+
 bool perform_test() {
+  static const struct const_tab constants[13] = {
+	  { 1, 1, false, PMF_CONST_1 },
+      { 16000000, 1, false, PMF_CONST_16E6 },
+      { 500, 1, false, PMF_CONST_500 },
+      { 1000, 1, false, PMF_CONST_1000 },
+      { 2000, 1, false, PMF_CONST_2000 },
+      { 32000, 1, false, PMF_CONST_32000 },
+      { 11313708, 1, false, PMF_CONST_16E6_DIV_SQRT_OF_2 },
+      { 21000000, 1, false, PMF_CONST_21E6 },
+      { 42000, 1, false, PMF_CONST_42000 },
+      { 14849242, 1, false, PMF_CONST_21E6_DIV_SQRT_OF_2 },
+      { 1, 500, false, PMF_CONST_1_DIV_500 },
+      { 16000000, 2, true, PMF_CONST_128E12 }, // (16e6)^2 / 2
+      { 22100000, 2, true, PMF_CONST_2205E11 }  // (21e6)^2 / 2
+  };
   upm_float x, x1, x2, x3, y1, y2, y3;
   uint16_t l1,l2,l3,l12;
   pmf_logarithmic p1; 
@@ -126,7 +148,7 @@ bool perform_test() {
   x = upm_shl(x, 1);
   test(upm_to_u32(x) == 0xffffffff, "wrong overflow 32bit");
 
-  // Check multiply
+  trace("Check multiply");
   for (int16_t sa = -40; sa <= 40; sa++) {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       for (uint32_t b_32 = 1; b_32 <= 0x1ff; b_32++) {
@@ -155,6 +177,26 @@ bool perform_test() {
     }
   }
 #endif
+
+  trace("Check pmf constants");
+  bool error = false;
+  for (uint8_t i = 0;i < 13;i++) {
+	  const struct const_tab *dut = &constants[i];
+	  pmf_logarithmic val = pmfl_from(dut->val_nom);
+	  if (dut->val_denom > 1) {
+		pmf_logarithmic val_denom = pmfl_from(dut->val_denom);
+		val -= val_denom;
+	  }
+	  if (dut->squared) {
+		  val += val;
+	  }
+	  pmf_logarithmic c = dut->c;
+	  if (c != val) {
+		  xprintf("(%d/%d)^%d => %x != %x\n", dut->val_nom, dut->val_denom, dut->squared ? 2:1, val, c);
+		  error = true;
+	  }
+  }
+  test(!error, "constants");
 
   trace("Check rsqrt");
   for (int16_t sa = -20; sa <= 20; sa++) {

@@ -589,6 +589,18 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   x += ((uint16_t)exponent) << 9;
   return x;
 }
+pmf_logarithmic pmfl_from(uint32_t x) {
+  if ((x & 0xffff0000) == 0) {
+    return pmfl_from((uint16_t)x);
+  }
+  if ((x & 0xff000000) == 0) {
+    uint16_t w = x >> 8;
+    return pmfl_from(w) + 0x1000;
+  } else {
+    uint16_t w = x >> 16;
+    return pmfl_from(w) + 0x2000;
+  }
+}
 uint16_t pmfl_to_u16(upm_logarithmic x) {
   if (x < 0) {
 	  return 0;
@@ -609,6 +621,20 @@ uint16_t pmfl_to_u16(upm_logarithmic x) {
 	  x >>= 9-exponent;
   }
   return x;
+}
+uint32_t pmfl_to_u32(upm_logarithmic x) {
+  if (x >= 0x4000) {
+	  return 0xffffffff;
+  }
+  uint8_t exponent = ((uint16_t)x) >> 9;
+  if (exponent < 0x10) {
+	  return pmfl_to_u16(x);
+  }
+  uint8_t shift = exponent - 0x0f;
+  x = pmfl_shr(x, shift);
+  uint32_t res = pmfl_to_u16(x);
+  res <<= shift;
+  return res;
 }
 pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n) {
 	return x + (((int16_t)n)<<9);
