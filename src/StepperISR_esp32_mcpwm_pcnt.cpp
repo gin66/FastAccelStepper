@@ -386,7 +386,6 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   PCNT.conf_unit[pcnt_unit].conf0.thr_l_lim_en_un = 0;
 #endif
 
-
   pcnt_counter_clear(pcnt_unit);
   pcnt_counter_resume(pcnt_unit);
   pcnt_event_enable(pcnt_unit, PCNT_EVT_H_LIM);
@@ -572,7 +571,6 @@ uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() {
 #else
   return PCNT.cnt_unit[mapping->pcnt_unit].pulse_cnt_un;
 #endif
-
 }
 
 #endif
