@@ -191,22 +191,22 @@ bool perform_test() {
   for (int16_t sa = -40; sa <= 40; sa++) {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       for (uint32_t b_32 = 1; b_32 <= 0x1ff; b_32++) {
-        x1 = upm_from(a_32);
-        x2 = upm_from(b_32);
+        p1 = pmfl_from(a_32);
+        p2 = pmfl_from(b_32);
         if (sa > 0) {
-          x1 = upm_shl(x1, sa);
+          p1 = pmf_shl(p1, sa);
         } else if (sa < 0) {
-          x1 = upm_shr(x1, -sa);
+          p1 = pmf_shr(p1, -sa);
         }
-        x = upm_multiply(x1, x2);
+        pmf_logarithmic p = pmf_multiply(p1, p2);
         if (sa > 0) {
-          x = upm_shr(x, sa);
+          p = pmf_shr(p, sa);
         } else if (sa < 0) {
-          x = upm_shl(x, -sa);
+          p = pmf_shl(p, -sa);
         }
-        uint32_t res = upm_to_u32(x);
+        uint32_t res = pmlf_to_u32(x);
         uint32_t real_res = a_32 * b_32;
-        uint32_t repr_real = upm_to_u32(upm_from(real_res));
+        uint32_t repr_real = pmlf_to_u32(upm_from(real_res));
         if (res != repr_real) {
           xprintf("%d*%d=%d ~ %d =?= %d, diff=%d\n", a_32, b_32, a_32 * b_32,
                   repr_real, res, (int32_t)res - (int32_t)repr_real);
