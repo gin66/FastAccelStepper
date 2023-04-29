@@ -70,31 +70,31 @@ bool perform_test() {
   }
 
   trace("Check conversion u8");
-  for (uint8_t x8 = 255; x8 > 0; x8--) {
-    x = upm_from((uint8_t)x8);
+  for (uint8_t x_8 = 255; x_8 > 0; x_8--) {
+    x = upm_from((uint8_t)x_8);
     uint16_t res_16 = upm_to_u16(x);
-    if (res_16 != x8) {
-      xprintf("%u => %x => %u\n", x8, x, res_16);
+    if (res_16 != x_8) {
+      xprintf("%u => %x => %u\n", x_8, x, res_16);
     }
-    test(res_16 == x8, "conversion error from uint8_t and back to uint16_t");
+    test(res_16 == x_8, "conversion error from uint8_t and back to uint16_t");
   }
 
   trace("Check conversion u16 <=> pmfl");
   uint16_t limit = 0x100;
   uint16_t trigger_16 = 0x8000;
-  for (uint16_t x16 = 0xffff; x16 > 0; x16--) {
-    if ((x16 & trigger_16) == 0) {
+  for (uint16_t x_16 = 0xffff; x_16 > 0; x_16--) {
+    if ((x_16 & trigger_16) == 0) {
       limit >>= 1;
       trigger_16 >>= 1;
     }
-    x = pmfl_from((uint16_t)x16);
+    x = pmfl_from((uint16_t)x_16);
     uint16_t res_16 = pmfl_to_u16(x);
-	uint16_t delta = x16 - res_16;
-	if (res_16 > x16) {
-		delta = res_16 - x16;
+	uint16_t delta = x_16 - res_16;
+	if (res_16 > x_16) {
+		delta = res_16 - x_16;
 	}
     if (delta > limit) {
-      xprintf("%x => %x => %x  (limit=%x)\n", x16, x, res_16,
+      xprintf("%x => %x => %x  (limit=%x)\n", x_16, x, res_16,
               limit);
     }
     test(delta <= limit,
@@ -104,18 +104,18 @@ bool perform_test() {
   trace("Check conversion u16");
   uint16_t significant_16 = 0xff80;
   trigger_16 = 0x8000;
-  for (uint16_t x16 = 0xffff; x16 > 0; x16--) {
-    if ((x16 & trigger_16) == 0) {
+  for (uint16_t x_16 = 0xffff; x_16 > 0; x_16--) {
+    if ((x_16 & trigger_16) == 0) {
       significant_16 >>= 1;
       trigger_16 >>= 1;
     }
-    x = upm_from((uint16_t)x16);
+    x = upm_from((uint16_t)x_16);
     uint16_t res_16 = upm_to_u16(x);
-    if (res_16 != (x16 & significant_16)) {
-      xprintf("%x => %x => %x  (significant=%x)\n", x16, x, res_16,
+    if (res_16 != (x_16 & significant_16)) {
+      xprintf("%x => %x => %x  (significant=%x)\n", x_16, x, res_16,
               significant_16);
     }
-    test(res_16 == (x16 & significant_16),
+    test(res_16 == (x_16 & significant_16),
          "conversion error from uint16_t and back to uint16_t");
   }
 
