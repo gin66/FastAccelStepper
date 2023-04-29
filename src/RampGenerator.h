@@ -8,11 +8,11 @@
 
 class FastAccelStepper;
 
-#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
-extern upm_float upm_timer_freq;
-extern upm_float upm_timer_freq_div_500;
-extern upm_float upm_timer_freq_div_sqrt_of_2;
-extern upm_float upm_timer_freq_square_div_2;
+#ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
+extern pmf_logarithmic pmfl_timer_freq;
+extern pmf_logarithmic pmfl_timer_freq_div_500;
+extern pmf_logarithmic pmfl_timer_freq_div_sqrt_of_2;
+extern pmf_logarithmic pmfl_timer_freq_square_div_2;
 #endif
 
 class RampGenerator {
