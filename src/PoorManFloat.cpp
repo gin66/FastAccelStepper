@@ -560,6 +560,9 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   return res;
 }
 uint16_t pmfl_to_u16(upm_logarithmic x) {
+  if (x < 0) {
+	  return 0;
+  }
   uint8_t exponent = ((uint16_t)x) >> 9;
   x &= 0x01ff;
   uint8_t index = ((uint16_t)x) >> 1;

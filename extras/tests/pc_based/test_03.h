@@ -18,6 +18,15 @@ bool perform_test() {
   test(p1 == 0x0200,"value 2");
   test(l1 == 2,"value 2");
 
+  for (uint8_t x_8 = 255; x_8 > 0; x_8--) {
+	p0 = pmfl_from((uint8_t)x_8);
+    uint16_t res_16 = pmfl_to_u16(p1);
+    if (res_16 != x_8) {
+      xprintf("%u => %x => %u\n", x_8, x, res_16);
+    }
+    test(res_16 == x_8, "conversion error from uint8_t and back to uint16_t");
+  }
+
   trace("Check conversion u8");
   for (uint8_t x8 = 255; x8 > 0; x8--) {
     x = upm_from((uint8_t)x8);
