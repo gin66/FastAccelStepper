@@ -481,24 +481,6 @@ upm_float upm_reciprocal(upm_float x) {  // TESTED
   return UPM_FROM_PARTS(mantissa, exponent);
 }
 
-upm_logarithmic upm_log2(upm_float x) {
-  uint8_t mantissa = x & 0x00ff;
-  uint8_t exponent = x >> 8;
-  uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[mantissa]);
-  x -= 0x8000;
-  int16_t logarithmic = (x << 1);
-  logarithmic += offset;
-  return (upm_logarithmic)logarithmic;
-}
-
-upm_float   upm_pow2(upm_logarithmic x) {
-	uint8_t raw_mantissa = (((uint16_t)x)>>3) & 0x00ff;
-  uint8_t offset = pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_1[raw_mantissa]);
-  x -= offset;
-  x >>= 1;
-  return ((uint16_t)x) ^ 0x8000;
-}
-
 pmf_logarithmic pmfl_from(uint8_t x) {
   // calling with x == 0 is considered an error.
   //

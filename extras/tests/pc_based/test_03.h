@@ -254,48 +254,6 @@ bool perform_test() {
     }
   }
 
-  trace("Check log2");
-  x1 = upm_from((uint32_t)3);
-  x2 = upm_from((uint32_t)6);
-  x3 = upm_from((uint32_t)12);
-  l1 = upm_log2(x1);
-  l2 = upm_log2(x2);
-  l3 = upm_log2(x3);
-  xprintf("%x %x %x\n",l1,l2,l3);
-  test(l1+0x200 == l2, "correct exponent");
-  test(l2+0x200 == l3, "correct exponent");
-
-  x1 = upm_from((uint32_t)3);
-  x2 = upm_from((uint32_t)5);
-  x3 = upm_from((uint32_t)(3*5));
-  l1 = upm_log2(x1);
-  l2 = upm_log2(x2);
-  l3 = upm_log2(x3);
-  l12 = l1 + l2;
-  l12 -= 1; // correction
-  xprintf("%x %x %x %x\n",l1,l2,l12,l3);
-  test(l12 == l3, "correct multiplication 1");
-
-  x1 = upm_from((uint32_t)123);
-  x2 = upm_from((uint32_t)12345);
-  x3 = upm_from((uint32_t)(123*12345));
-  l1 = upm_log2(x1);
-  l2 = upm_log2(x2);
-  l3 = upm_log2(x3);
-  xprintf("%x %x %x\n",l1,l2,l3);
-  test(l1+l2 == l3, "correct multiplication 2");
-
-  x1 = UPM_CONST_1_DIV_500;
-  x2 = upm_from((uint32_t)500);
-  x3 = UPM_CONST_1;
-  l1 = upm_log2(x1);
-  l2 = upm_log2(x2);
-  l3 = upm_log2(x3);
-  l12 = l1+l2;
-  l12 += 1; // account for calculation error
-  xprintf("%x %x %x %x\n",l1,l2,l12,l3);
-  test(l12 == l3, "correct multiplication 3");
-
   trace("Check specific use cases");
   x1 = upm_from((uint32_t)0x0ffff);
   x2 = upm_from((uint32_t)0x10100);
