@@ -90,13 +90,11 @@
 //     + f(m) = 0_000y_yyyy
 //     yields = 0_zzzz_zzzz
 //
-// It is guaranteed, that xxxx_xxxx >= y_yyyy.
-//
 // Using python3 this can be calculated by:
-//     [round(math.log(i/256)/math.log(2) * 256 - (i-256)) for i in range(256,512)]
+//     [round(math.log2(i/256) * 256 - (i-256)) for i in range(256,512)]
 //
 // For better precision y_yyyy is shifted by 1 and can be calculated as:
-//	   [round((math.log(i/256)/math.log(2) * 256 - (i-256))*2) for i in range(256,512)]
+//	   [round((math.log2(i/256) * 256 - (i-256))*2) for i in range(256,512)]
 //
 const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_1[256] = {
 0, 1, 2, 3, 3, 4, 5, 6, 7, 8, 8, 9, 10, 11, 11, 12, 13, 13, 14, 15, 16, 16, 17, 18, 18, 19, 19, 20, 21, 21, 22, 22, 23, 24, 24, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 31, 32, 32, 33, 33, 33, 34, 34, 34, 35, 35, 36, 36, 36, 37, 37, 37, 37, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 40, 40, 41, 41, 41, 41, 41, 42, 42, 42, 42, 42, 42, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 43, 43, 43, 43, 43, 43, 43, 43, 43, 42, 42, 42, 42, 42, 42, 42, 41, 41, 41, 41, 41, 41, 40, 40, 40, 40, 40, 39, 39, 39, 39, 39, 38, 38, 38, 38, 37, 37, 37, 37, 36, 36, 36, 36, 35, 35, 35, 35, 34, 34, 34, 33, 33, 33, 32, 32, 32, 31, 31, 31, 30, 30, 30, 29, 29, 29, 28, 28, 28, 27, 27, 26, 26, 26, 25, 25, 24, 24, 24, 23, 23, 22, 22, 22, 21, 21, 20, 20, 19, 19, 19, 18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1
@@ -615,12 +613,13 @@ uint16_t pmfl_to_u16(upm_logarithmic x) {
   x &= 0x01ff;
   uint8_t index = ((uint16_t)x) >> 1;
   uint8_t offset = pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_1[index]);
-  x += 0x201;  // add one with rounding
+  x += 0x200;
   x -= offset;
   if (exponent > 9) {
 	  x <<= exponent-9;
   }
   else if (exponent < 9) {
+	  x += 1;
 	  x >>= 9-exponent;
   }
   return x;
