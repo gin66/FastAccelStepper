@@ -5,7 +5,7 @@ bool perform_test() {
   uint16_t l1,l2,l3,l12;
   pmf_logarithmic p1; 
 
-  trace("Check conversion u8");
+  trace("Check conversion u8 <=> pmfl");
   p1 = pmfl_from((uint8_t)1);
   l1 = pmfl_to_u16(p1);
   xprintf("%x %d\n", p1,l1);
@@ -35,6 +35,24 @@ bool perform_test() {
       xprintf("%u => %x => %u\n", x8, x, res_16);
     }
     test(res_16 == x8, "conversion error from uint8_t and back to uint16_t");
+  }
+
+  trace("Check conversion u16 <=> pmfl");
+  uint16_t significant_16 = 0xff80;
+  uint16_t trigger_16 = 0x8000;
+  for (uint16_t x16 = 0xffff; x16 > 0; x16--) {
+    if ((x16 & trigger_16) == 0) {
+      significant_16 >>= 1;
+      trigger_16 >>= 1;
+    }
+    x = pmfl_from((uint16_t)x16);
+    uint16_t res_16 = pmfl_to_u16(x);
+    if (res_16 != (x16 & significant_16)) {
+      xprintf("%x => %x => %x  (significant=%x)\n", x16, x, res_16,
+              significant_16);
+    }
+    test(res_16 == (x16 & significant_16),
+         "conversion error from uint16_t and back to uint16_t");
   }
 
   trace("Check conversion u16");

@@ -559,6 +559,53 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   res += offset;
   return res;
 }
+pmf_logarithmic pmfl_from(uint16_t x) {
+  if ((x & 0xff00) == 0) {
+    return pmf_logarithmic((uint8_t)x);
+  }
+  uint8_t exponent;
+  if ((x & 0xf000) != 0) {
+    if ((x & 0xc000) != 0) {
+      if ((x & 0x8000) != 0) {
+        x >>= 7;
+        exponent = 15;
+      } else {
+        x >>= 6;
+        exponent = 14;
+      }
+    } else {
+      if ((x & 0x2000) != 0) {
+        x >>= 5;
+        exponent = 13;
+      } else {
+        x >>= 4;
+        exponent = 12;
+      }
+    }
+  } else {
+    if ((x & 0x0c00) != 0) {
+      if ((x & 0x0800) != 0) {
+        x >>= 3;
+        exponent = 11;
+      } else {
+        x >>= 2;
+        exponent = 10;
+      }
+    } else {
+      if ((x & 0x0200) != 0) {
+        x >>= 1;
+        exponent = 9;
+      } else {
+        exponent = 8;
+      }
+    }
+  }
+  uint8_t index = x >> 1;
+  uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
+  x += offset;
+  x += exponent << 9;
+  return x;
+}
 uint16_t pmfl_to_u16(upm_logarithmic x) {
   if (x < 0) {
 	  return 0;
