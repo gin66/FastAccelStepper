@@ -501,6 +501,9 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   if ((x & 0xf0) == 0) {
     if ((x & 0x0c) == 0) {
       if ((x & 0x02) == 0) {
+		if (x == 0) {
+			return (int16_t)0x8000;
+		}
 		x = 0;
         res = 0x0000;
       } else {
@@ -641,5 +644,29 @@ pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n) {
 }
 pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n) {
 	return x - (((int16_t)n)<<9);
+}
+pmf_logarithmic pmfl_multiply(pmf_logarithmic x, pmf_logarithmic y) {
+	return x+y;
+}
+pmf_logarithmic pmfl_reciprocal(pmf_logarithmic x) {
+	return -x;
+}
+pmf_logarithmic pmfl_square(pmf_logarithmic x) {
+	if (x >= 0x4000) {
+		return 0x7fff;
+	}
+	if (x < -0x4000) {
+		return (int16_t)0x8001;
+	}
+	return x+x;
+}
+pmf_logarithmic pmfl_rsquare(pmf_logarithmic x) {  // Reciprocal square = 1/(x*x)
+	return pmfl_reciprocal(pmfl_square(x));
+}
+pmf_logarithmic pmfl_rsqrt(pmf_logarithmic x) {    // Reciprocal sqrt() = 1/sqrt(x)
+	return (-x)/2;
+}
+pmf_logarithmic pmfl_divide(pmf_logarithmic x, pmf_logarithmic y) {
+	return x-y;
 }
 

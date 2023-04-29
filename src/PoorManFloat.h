@@ -56,3 +56,10 @@ uint32_t pmfl_to_u32(upm_logarithmic x);
 pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n);
 pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n);
 
+pmf_logarithmic pmfl_multiply(pmf_logarithmic x, pmf_logarithmic y);
+pmf_logarithmic pmfl_reciprocal(pmf_logarithmic x);
+pmf_logarithmic pmfl_square(pmf_logarithmic x);
+pmf_logarithmic pmfl_rsquare(pmf_logarithmic x);  // Reciprocal square = 1/(x*x)
+pmf_logarithmic pmfl_rsqrt(pmf_logarithmic x);    // . Reciprocal sqrt() = 1/sqrt(x)
+pmf_logarithmic pmfl_divide(pmf_logarithmic x, pmf_logarithmic y);
+
