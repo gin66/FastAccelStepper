@@ -3,6 +3,20 @@
 bool perform_test() {
   upm_float x, x1, x2, x3, y1, y2, y3;
   uint16_t l1,l2,l3,l12;
+  pmf_logarithmic p1; 
+
+  trace("Check conversion u8");
+  p1 = pmfl_from((uint8_t)1);
+  l1 = pmfl_to_u16(p1);
+  xprintf("%x %d\n", p1,l1);
+  test(p1 == 0x0000,"value 1");
+  test(l1 == 1,"value 1");
+
+  p1 = pmfl_from((uint8_t)2);
+  l1 = pmfl_to_u16(p1);
+  xprintf("%x %d\n", p1,l1);
+  test(p1 == 0x0200,"value 2");
+  test(l1 == 2,"value 2");
 
   trace("Check conversion u8");
   for (uint8_t x8 = 255; x8 > 0; x8--) {
@@ -197,8 +211,8 @@ bool perform_test() {
   l2 = upm_log2(x2);
   l3 = upm_log2(x3);
   xprintf("%x %x %x\n",l1,l2,l3);
-  test(l1+0x800 == l2, "correct exponent");
-  test(l2+0x800 == l3, "correct exponent");
+  test(l1+0x200 == l2, "correct exponent");
+  test(l2+0x200 == l3, "correct exponent");
 
   x1 = upm_from((uint32_t)3);
   x2 = upm_from((uint32_t)5);
@@ -206,8 +220,10 @@ bool perform_test() {
   l1 = upm_log2(x1);
   l2 = upm_log2(x2);
   l3 = upm_log2(x3);
-  xprintf("%x %x %x\n",l1,l2,l3);
-  test(l1+l2 == l3, "correct multiplication");
+  l12 = l1 + l2;
+  l12 -= 1; // correction
+  xprintf("%x %x %x %x\n",l1,l2,l12,l3);
+  test(l12 == l3, "correct multiplication 1");
 
   x1 = upm_from((uint32_t)123);
   x2 = upm_from((uint32_t)12345);
@@ -216,7 +232,7 @@ bool perform_test() {
   l2 = upm_log2(x2);
   l3 = upm_log2(x3);
   xprintf("%x %x %x\n",l1,l2,l3);
-  test(l1+l2 == l3, "correct multiplication");
+  test(l1+l2 == l3, "correct multiplication 2");
 
   x1 = UPM_CONST_1_DIV_500;
   x2 = upm_from((uint32_t)500);
@@ -225,9 +241,9 @@ bool perform_test() {
   l2 = upm_log2(x2);
   l3 = upm_log2(x3);
   l12 = l1+l2;
-  l12 += 2; // account for calculation error
+  l12 += 1; // account for calculation error
   xprintf("%x %x %x %x\n",l1,l2,l12,l3);
-  test(l12 == l3, "correct multiplication");
+  test(l12 == l3, "correct multiplication 3");
 
   trace("Check pow2");
   x1 = upm_from((uint32_t)3);

@@ -13,7 +13,7 @@
 #define UPM_FROM_PARTS(mantissa, exponent) \
   ((((uint16_t)exponent) << 8) | ((uint8_t)(mantissa)))
 
-// new representation is:
+// upm representation is:
 //
 //     76543210: 76543210
 //     XXXXXXXX:1XXXXXXXX
@@ -62,10 +62,15 @@
 // I could have managed was 16.8 MHz.  Easier to just use the modulo 4 divider
 // and add the constants.
 //
+//
 // In order to support cubic functions, more tables would be necessary.
 // Using logarithmic/exponential functions the number of tables can be limited.
 // For example:
 //    square/cubic root would be simply: exp(log(x) * a), with a = 1/2 for square and 1/3 for cubic
+//
+// In addition, within FastAccelStepper there is no need for adding or subtracting floats.
+// Even negative numbers are not needed and not supported by upm_float.
+// Consequently, a purely logarithmic representation is completely sufficient.
 //
 // As base for exp/log we will use 2  (not 10 or e). This way the exponent of an upm float
 // being 2^n needs no calculation, as log2(2^n) = n. Still the offset by 128 needs to be considered
@@ -90,11 +95,11 @@
 // Using python3 this can be calculated by:
 //     [round(math.log(i/256)/math.log(2) * 256 - (i-256)) for i in range(256,512)]
 //
-// For better precision y_yyyy is shifted by 3 and can be calculated as:
-//	   [round(math.log(i/256)/math.log(2) * 2048 - 8 * (i-256)) for i in range(256,512)]
+// For better precision y_yyyy is shifted by 1 and can be calculated as:
+//	   [round((math.log(i/256)/math.log(2) * 256 - (i-256))*2) for i in range(256,512)]
 //
-const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_3[256] = {
-	0, 4, 7, 10, 14, 17, 20, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60, 62, 65, 68, 70, 73, 75, 78, 80, 83, 85, 87, 90, 92, 94, 96, 99, 101, 103, 105, 107, 109, 111, 113, 115, 117, 118, 120, 122, 124, 125, 127, 129, 130, 132, 134, 135, 137, 138, 139, 141, 142, 143, 145, 146, 147, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 159, 160, 161, 162, 163, 163, 164, 165, 166, 166, 167, 168, 168, 169, 170, 170, 171, 171, 172, 172, 173, 173, 173, 174, 174, 174, 175, 175, 175, 175, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 175, 175, 175, 175, 175, 174, 174, 174, 173, 173, 173, 172, 172, 171, 171, 170, 170, 169, 169, 168, 168, 167, 167, 166, 165, 165, 164, 163, 163, 162, 161, 160, 160, 159, 158, 157, 156, 155, 155, 154, 153, 152, 151, 150, 149, 148, 147, 146, 145, 144, 143, 141, 140, 139, 138, 137, 136, 134, 133, 132, 131, 130, 128, 127, 126, 124, 123, 122, 120, 119, 117, 116, 115, 113, 112, 110, 109, 107, 106, 104, 103, 101, 100, 98, 96, 95, 93, 92, 90, 88, 87, 85, 83, 81, 80, 78, 76, 74, 73, 71, 69, 67, 65, 63, 62, 60, 58, 56, 54, 52, 50, 48, 46, 44, 42, 40, 38, 36, 34, 32, 30, 28, 26, 24, 22, 20, 17, 15, 13, 11, 9, 7, 4, 2
+const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_1[256] = {
+0, 1, 2, 3, 3, 4, 5, 6, 7, 8, 8, 9, 10, 11, 11, 12, 13, 13, 14, 15, 16, 16, 17, 18, 18, 19, 19, 20, 21, 21, 22, 22, 23, 24, 24, 25, 25, 26, 26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 31, 32, 32, 33, 33, 33, 34, 34, 34, 35, 35, 36, 36, 36, 37, 37, 37, 37, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 40, 40, 41, 41, 41, 41, 41, 42, 42, 42, 42, 42, 42, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 43, 43, 43, 43, 43, 43, 43, 43, 43, 42, 42, 42, 42, 42, 42, 42, 41, 41, 41, 41, 41, 41, 40, 40, 40, 40, 40, 39, 39, 39, 39, 39, 38, 38, 38, 38, 37, 37, 37, 37, 36, 36, 36, 36, 35, 35, 35, 35, 34, 34, 34, 33, 33, 33, 32, 32, 32, 31, 31, 31, 30, 30, 30, 29, 29, 29, 28, 28, 28, 27, 27, 26, 26, 26, 25, 25, 24, 24, 24, 23, 23, 22, 22, 22, 21, 21, 20, 20, 19, 19, 19, 18, 18, 17, 17, 16, 16, 15, 15, 14, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9, 9, 8, 8, 7, 6, 6, 5, 5, 4, 4, 3, 3, 2, 2, 1, 1
 };
 
 // For the inverse pow(2,x) needs to be calculated. Similarly it makes sense to evaluate instead
@@ -109,11 +114,11 @@ const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_3[256] = {
 // Using python3 this can be calculated by:
 //	   [round(i - math.pow(2,i/256-1)*256) for i in range(256,512)]
 //
-// Similarly shifted by three bits:
-//     [round((i - math.pow(2,i/256-1)*256)*8) for i in range(256,512)] 
+// Similarly shifted by one bit:
+//     [round((i - math.pow(2,i/256-1)*256)*2) for i in range(256,512)] 
 //
-const PROGMEM uint8_t x_minus_pow2_of_x_minus_one_shifted_by_3[256] = {
-	0, 2, 5, 7, 10, 12, 14, 17, 19, 21, 24, 26, 28, 31, 33, 35, 37, 40, 42, 44, 46, 48, 50, 52, 54, 57, 59, 61, 63, 65, 67, 69, 71, 73, 75, 76, 78, 80, 82, 84, 86, 88, 89, 91, 93, 95, 96, 98, 100, 101, 103, 105, 106, 108, 110, 111, 113, 114, 116, 117, 119, 120, 122, 123, 125, 126, 127, 129, 130, 131, 133, 134, 135, 136, 138, 139, 140, 141, 142, 144, 145, 146, 147, 148, 149, 150, 151, 152, 153, 154, 155, 156, 157, 158, 158, 159, 160, 161, 162, 162, 163, 164, 165, 165, 166, 167, 167, 168, 168, 169, 169, 170, 170, 171, 171, 172, 172, 173, 173, 173, 174, 174, 174, 175, 175, 175, 175, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 176, 175, 175, 175, 175, 175, 174, 174, 174, 173, 173, 172, 172, 172, 171, 171, 170, 170, 169, 168, 168, 167, 167, 166, 165, 164, 164, 163, 162, 161, 160, 160, 159, 158, 157, 156, 155, 154, 153, 152, 151, 149, 148, 147, 146, 145, 144, 142, 141, 140, 138, 137, 136, 134, 133, 131, 130, 128, 127, 125, 124, 122, 120, 119, 117, 115, 113, 112, 110, 108, 106, 104, 102, 100, 98, 96, 94, 92, 90, 88, 86, 84, 82, 80, 77, 75, 73, 70, 68, 66, 63, 61, 58, 56, 53, 51, 48, 46, 43, 40, 38, 35, 32, 29, 27, 24, 21, 18, 15, 12, 9, 6, 3
+const PROGMEM uint8_t x_minus_pow2_of_x_minus_one_shifted_by_1[256] = {
+	0, 1, 1, 2, 2, 3, 4, 4, 5, 5, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20, 21, 21, 21, 22, 22, 23, 23, 24, 24, 25, 25, 25, 26, 26, 27, 27, 27, 28, 28, 29, 29, 29, 30, 30, 30, 31, 31, 31, 32, 32, 32, 33, 33, 33, 34, 34, 34, 35, 35, 35, 36, 36, 36, 36, 37, 37, 37, 38, 38, 38, 38, 38, 39, 39, 39, 39, 40, 40, 40, 40, 40, 41, 41, 41, 41, 41, 41, 42, 42, 42, 42, 42, 42, 42, 43, 43, 43, 43, 43, 43, 43, 43, 43, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 43, 43, 43, 43, 43, 43, 43, 43, 43, 43, 42, 42, 42, 42, 42, 42, 41, 41, 41, 41, 41, 41, 40, 40, 40, 40, 39, 39, 39, 39, 38, 38, 38, 38, 37, 37, 37, 37, 36, 36, 36, 35, 35, 35, 34, 34, 34, 33, 33, 32, 32, 32, 31, 31, 30, 30, 30, 29, 29, 28, 28, 27, 27, 27, 26, 26, 25, 25, 24, 24, 23, 23, 22, 22, 21, 20, 20, 19, 19, 18, 18, 17, 16, 16, 15, 15, 14, 13, 13, 12, 11, 11, 10, 9, 9, 8, 7, 7, 6, 5, 5, 4, 3, 2, 2, 1
 };
 //
 // rsqrt-tables
@@ -476,21 +481,98 @@ upm_float upm_reciprocal(upm_float x) {  // TESTED
   return UPM_FROM_PARTS(mantissa, exponent);
 }
 
-upm_numeric upm_log2(upm_float x) {
+upm_logarithmic upm_log2(upm_float x) {
   uint8_t mantissa = x & 0x00ff;
   uint8_t exponent = x >> 8;
-  uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_3[mantissa]);
+  uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[mantissa]);
   x -= 0x8000;
-  int16_t numeric = (x << 3);
-  numeric += offset;
-  return (upm_numeric)numeric;
+  int16_t logarithmic = (x << 1);
+  logarithmic += offset;
+  return (upm_logarithmic)logarithmic;
 }
 
-upm_float   upm_pow2(upm_numeric x) {
+upm_float   upm_pow2(upm_logarithmic x) {
 	uint8_t raw_mantissa = (((uint16_t)x)>>3) & 0x00ff;
-  uint8_t offset = pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_3[raw_mantissa]);
+  uint8_t offset = pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_1[raw_mantissa]);
   x -= offset;
-  x >>= 3;
+  x >>= 1;
   return ((uint16_t)x) ^ 0x8000;
+}
+
+pmf_logarithmic pmfl_from(uint8_t x) {
+  // calling with x == 0 is considered an error.
+  //
+  // In a first step convert to 
+  //    0000_0eee_mmmm_mmmm
+  //
+  // Hereby mmmm_mmmm are the lower bits right from the first 1 in x
+  // An example with only four valid mantissa bits:
+  //	x = 0001_mmmm   =>  0000_0100_mmmm_0000
+  // 
+  // eee is the exponent
+  //
+  // The second convert this to the logarithm of x
+  //    1. Use mmmm_mmmm as index in the log2_minus_x_plus_one_shifted_by_1 table
+  //    2. shift left 0000_0eee_mmmm_mmmm by 1
+  //    3. add the value from the log2_minus_x_plus_one_shifted_by_1 table
+  uint16_t res;
+  if ((x & 0xf0) == 0) {
+    if ((x & 0x0c) == 0) {
+      if ((x & 0x02) == 0) {
+		x = 0;
+        res = 0x0000;
+      } else {
+        x <<= 7;
+        res = x | 0x0100;
+      }
+    } else {
+      if ((x & 0x08) == 0) {
+        x <<= 6;
+        res = x | 0x0200;
+      } else {
+        x <<= 5;
+        res = x | 0x0300;
+      }
+    }
+  } else {
+    if ((x & 0xc0) == 0) {
+      if ((x & 0x20) == 0) {
+        x <<= 4;
+        res = x | 0x0400;
+      } else {
+        x <<= 3;
+        res = x | 0x0500;
+      }
+    } else {
+      if ((x & 0x80) == 0) {
+        x <<= 2;
+        res = x | 0x0600;
+      } else {
+        x <<= 1;
+        res = x | 0x0700;
+      }
+    }
+  }
+  uint8_t index = res & 0x00ff;
+  uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
+  res <<= 1;
+  res += offset;
+  return res;
+}
+uint16_t pmfl_to_u16(upm_logarithmic x) {
+  uint8_t exponent = ((uint16_t)x) >> 9;
+  x &= 0x01ff;
+  uint8_t index = ((uint16_t)x) >> 1;
+  uint8_t offset = pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_1[index]);
+  x -= offset;
+  x += 0x201;  // add one with rounding
+  x >>= 1;
+  if (exponent > 8) {
+	  x <<= exponent-8;
+  }
+  else if (exponent < 8) {
+	  x >>= 8-exponent;
+  }
+  return x;
 }
 

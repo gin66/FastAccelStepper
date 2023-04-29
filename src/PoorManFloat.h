@@ -1,7 +1,8 @@
 #include <stdint.h>
 
 typedef uint16_t upm_float;
-typedef int16_t upm_numeric;
+typedef int16_t upm_logarithmic;
+typedef int16_t pmf_logarithmic;
 #define UPM_CONST_1 ((upm_float)0x8000)
 #define UPM_CONST_128E12 ((upm_float)0xaed0)
 #define UPM_CONST_16E6 ((upm_float)0x97e8)
@@ -32,6 +33,13 @@ upm_float upm_rsquare(upm_float x);  // TESTED Reciprocal square = 1/(x*x)
 upm_float upm_rsqrt(upm_float x);    // TESTED. Reciprocal sqrt() = 1/sqrt(x)
 upm_float upm_divide(upm_float x, upm_float y);
 
-upm_numeric upm_log2(upm_float x);
-upm_float   upm_pow2(upm_numeric x);
+upm_logarithmic upm_log2(upm_float x);
+upm_float   upm_pow2(upm_logarithmic x);
+
+pmf_logarithmic pmfl_from(uint8_t x);
+pmf_logarithmic pmfl_from(uint16_t x);
+pmf_logarithmic pmfl_from(uint32_t x);
+
+uint16_t pmfl_to_u16(upm_logarithmic x);
+
 
