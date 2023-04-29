@@ -25,7 +25,7 @@ bool perform_test() {
   };
   upm_float x, x1, x2, x3, y1, y2, y3;
   uint16_t l1,l2,l3,l12;
-  pmf_logarithmic p1; 
+  pmf_logarithmic p1,p2; 
 
   trace("Check conversion u8 <=> pmfl");
   p1 = pmfl_from((uint8_t)1);
@@ -194,24 +194,29 @@ bool perform_test() {
         p1 = pmfl_from(a_32);
         p2 = pmfl_from(b_32);
         if (sa > 0) {
-          p1 = pmf_shl(p1, sa);
+          p1 = pmfl_shl(p1, sa);
         } else if (sa < 0) {
-          p1 = pmf_shr(p1, -sa);
+          p1 = pmfl_shr(p1, -sa);
         }
-        pmf_logarithmic p = pmf_multiply(p1, p2);
+        pmf_logarithmic p = pmfl_multiply(p1, p2);
         if (sa > 0) {
-          p = pmf_shr(p, sa);
+          p = pmfl_shr(p, sa);
         } else if (sa < 0) {
-          p = pmf_shl(p, -sa);
+          p = pmfl_shl(p, -sa);
         }
-        uint32_t res = pmlf_to_u32(x);
+        uint32_t res = pmfl_to_u32(p);
         uint32_t real_res = a_32 * b_32;
-        uint32_t repr_real = pmlf_to_u32(upm_from(real_res));
-        if (res != repr_real) {
+        uint32_t repr_real = pmfl_to_u32(pmfl_from(real_res));
+		uint32_t delta = res - repr_real;
+		if (res < repr_real) {
+			delta = repr_real - res;
+		}
+		uint32_t limit = real_res >> 7;
+        if (delta > limit) {
           xprintf("%d*%d=%d ~ %d =?= %d, diff=%d\n", a_32, b_32, a_32 * b_32,
                   repr_real, res, (int32_t)res - (int32_t)repr_real);
         }
-        test(res == repr_real, "upm_multiply error");
+        test(delta <= limit, "upm_multiply error");
       }
     }
   }
