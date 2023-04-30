@@ -10,7 +10,7 @@
 #include <stdio.h>
 #endif
 
-// upm implementation is dropped from 0.10 onwards
+// upm implementation is dropped from 0.29 onwards
 //
 // upm representation is:
 //

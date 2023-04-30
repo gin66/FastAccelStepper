@@ -3,6 +3,9 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+pre-0.29.0:
+- replace former PoorManFloat implementation `ump_float` being exponent+mantissa with `pmfl_logarithmic` as log2 representation
+
 0.28.4:
 - include esp32s3 port
 
