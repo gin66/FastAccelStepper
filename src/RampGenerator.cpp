@@ -125,8 +125,8 @@ void RampGenerator::advanceTargetPosition(int32_t delta,
 void RampGenerator::afterCommandEnqueued(NextCommand *command) {
 #ifdef TEST
   printf(
-      "after Command Enqueued: performed ramp up steps = %d, pause left = %d, "
-      "curr_ticks = %d\n",
+      "after Command Enqueued: performed ramp up steps = %u, pause left = %u, "
+      "curr_ticks = %u\n",
       command->rw.performed_ramp_up_steps, command->rw.pause_ticks_left,
       command->rw.curr_ticks);
 #endif

@@ -296,6 +296,9 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // consideration has been done above already
         if (dec_steps_u16 < orig_planning_steps) {
           planning_steps = dec_steps_u16;
+          if (planning_steps == 0) {
+            planning_steps = 1;
+          }
         }
       }
 
@@ -311,11 +314,14 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         d_ticks_new = ramp->config.min_travel_ticks;
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
-      uint32_t rs;
       TRACE_OUTPUT('D');
       if (performed_ramp_up_steps == 1) {
         d_ticks_new = ramp->config.min_travel_ticks;
+#ifdef TEST
+		printf("Set d_ticks_new=%u to min_travel_ticks\n", d_ticks_new);
+#endif
       } else {
+        uint32_t rs;
         if (performed_ramp_up_steps <= planning_steps) {
           rs = planning_steps;
         } else {
@@ -328,10 +334,10 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         if ((rs == 1) && (ramp->config.min_travel_ticks > d_ticks_new)) {
           d_ticks_new = ramp->config.min_travel_ticks;
         }
-      }
 #ifdef TEST
-      printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
+		printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
 #endif
+      }
     } else {
       TRACE_OUTPUT('C');
       d_ticks_new = rw->curr_ticks;
