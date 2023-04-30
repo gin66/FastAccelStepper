@@ -23,8 +23,8 @@ bool perform_test() {
       {16000000, 2, true, PMF_CONST_128E12},  // (16e6)^2 / 2
       {22100000, 2, true, PMF_CONST_2205E11}  // (21e6)^2 / 2
   };
-  uint16_t l1, l2, l3, l12;
-  pmf_logarithmic p1, p2;
+  uint16_t l1;
+  pmf_logarithmic p1;
 
   trace("Check conversion u8 <=> pmfl");
   p1 = pmfl_from((uint8_t)1);
@@ -33,33 +33,38 @@ bool perform_test() {
   test(p1 == 0x0000, "value 1");
   test(l1 == 1, "value 1");
 
+  trace("Check conversion u8 <=> pmfl by shift 8bit");
   for (uint8_t n = 1; n < 8; n++) {
     uint8_t v = 1 << n;
     p1 = pmfl_from((uint8_t)v);
     l1 = pmfl_to_u16(p1);
     xprintf("8bit: %x %d\n", p1, l1);
-    test(p1 == ((uint16_t)n) << 9, "value");
+    test(p1 == ((int16_t)n) << 9, "value");
     test(l1 == v, "value");
   }
 
+  trace("Check conversion u8 <=> pmfl by shift 16bit");
   for (uint8_t n = 1; n < 16; n++) {
     uint16_t v = 1 << n;
     p1 = pmfl_from((uint16_t)v);
     l1 = pmfl_to_u16(p1);
     xprintf("16bit: %x %d\n", p1, l1);
-    test(p1 == ((uint16_t)n) << 9, "value");
+    test(p1 == ((int16_t)n) << 9, "value");
     test(l1 == v, "value");
   }
 
+  trace("Check conversion u8 <=> pmfl by shift 32bit");
   for (uint8_t n = 1; n < 32; n++) {
-    uint32_t v = 1 << n;
+    uint32_t v = 1;
+	v <<= n;
     p1 = pmfl_from((uint32_t)v);
     uint32_t res = pmfl_to_u32(p1);
     xprintf("32bit: %x %u\n", p1, res);
-    test(p1 == ((uint32_t)n) << 9, "value");
+    test(p1 == (((int16_t)n) << 9), "value");
     test(res == v, "value");
   }
 
+  trace("Check conversion u8 <=> pmfl for all values");
   for (uint8_t x_8 = 255; x_8 > 0; x_8--) {
     p1 = pmfl_from((uint8_t)x_8);
     uint16_t res_16 = pmfl_to_u16(p1);
