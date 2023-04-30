@@ -296,9 +296,10 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // consideration has been done above already
         if (dec_steps_u16 < orig_planning_steps) {
           planning_steps = dec_steps_u16;
-          if (planning_steps == 0) {
-            planning_steps = 1;
-          }
+// Fails with ump floats, but works with new pmfl_logarithmic....?
+//          if (planning_steps == 0) {
+//            planning_steps = 1;
+//          }
         }
       }
 
