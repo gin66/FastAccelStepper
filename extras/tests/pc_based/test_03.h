@@ -198,7 +198,7 @@ bool perform_test() {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       for (uint32_t b_32 = 1; b_32 <= 0x1ff; b_32++) {
         p1 = pmfl_from(a_32);
-        p2 = pmfl_from(b_32);
+        pmf_logarithmic p2 = pmfl_from(b_32);
         if (sa > 0) {
           p1 = pmfl_shl(p1, sa);
         } else if (sa < 0) {
