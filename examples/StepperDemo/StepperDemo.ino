@@ -454,10 +454,10 @@ const static char messages[] PROGMEM =
     "is not defined" _NL_ _SEP_
 #define _run_ "\225"
     "run " _SEP_
-#define _forward_ "\226"
-    "forward " _SEP_
-#define _backward_ "\227"
-    "backward " _SEP_
+#define _forward "\226"
+    "forward" _SEP_
+#define _backward "\227"
+    "backward" _SEP_
 #define _Stepped_ "\230"
     "Stepped " _SEP_
 #define _acceleration_ "\231"
@@ -478,8 +478,8 @@ const static char messages[] PROGMEM =
     " ... " _SEP_
 #define _Enter_ "\241"
     "Enter " _SEP_
-#define _mode_ "\242"
-    "mode " _SEP_
+#define _mode "\242"
+    "mode" _SEP_
 #define _clear_ "\243"
     "clear " _SEP_
 #define _stepper "\244"
@@ -542,7 +542,7 @@ const static char messages[] PROGMEM =
 #define MSG_TOGGLE_USAGE_INFO 2+MSG_OFFSET
     _Toggle_  _usage_ "info" _NL_ _SEP_
 #define MSG_ENTER_TEST_MODE 3+MSG_OFFSET
-    _Enter_ _test_ _mode_ _NL_ _SEP_
+    _Enter_ _test_ _mode _NL_ _SEP_
 #define MSG_SET_ACCELERATION_TO 4+MSG_OFFSET
     _set_ _acceleration_ _to_ _SEP_
 #define MSG_SET_SPEED_TO_US 5+MSG_OFFSET
@@ -564,15 +564,15 @@ const static char messages[] PROGMEM =
 #define MSG_OUTPUT_DRIVER_OFF 13+MSG_OFFSET
     _Output_driver_ "off" _NL_ _SEP_
 #define MSG_OUTPUT_DRIVER_AUTO 14+MSG_OFFSET
-    _Output_driver_ "automatic " _mode_ _NL_ _SEP_
+    _Output_driver_ "automatic " _mode _NL_ _SEP_
 #define MSG_STOP 15+MSG_OFFSET
     _stop _NL_ _SEP_
 #define MSG_KEEP_RUNNING 16+MSG_OFFSET
     "Keep running" _NL_ _SEP_
 #define MSG_RUN_FORWARD 17+MSG_OFFSET
-    _run_ _forward_ _NL_ _SEP_
+    _run_ _forward _NL_ _SEP_
 #define MSG_RUN_BACKWARD 18+MSG_OFFSET
-    _run_ _backward_ _NL_ _SEP_
+    _run_ _backward _NL_ _SEP_
 #define MSG_IMMEDIATE_STOP 19+MSG_OFFSET
     "immediate " _stop _NL_ _SEP_
 #define MSG_UPDATE_SPEED_ACCELERATION 20+MSG_OFFSET
@@ -582,9 +582,9 @@ const static char messages[] PROGMEM =
 #define MSG_TEST_DIRECT_DRIVE 22+MSG_OFFSET
     _test_ "direct drive" _NL_ _SEP_
 #define MSG_STEPPED_FORWARD 23+MSG_OFFSET
-    _Stepped_ _forward_ _NL_ _SEP_
+    _Stepped_ _forward _NL_ _SEP_
 #define MSG_STEPPED_BACKWARD 24+MSG_OFFSET
-    _Stepped_ _backward_ _NL_ _SEP_
+    _Stepped_ _backward _NL_ _SEP_
 #define MSG_WAIT_MS 25+MSG_OFFSET
     " ms wait" _NL_ _SEP_
 #define MSG_SELECT_TEST_SEQUENCE 26+MSG_OFFSET
@@ -647,7 +647,7 @@ const static char messages[] PROGMEM =
 #define MSG_TEST_COMPLETED 54+MSG_OFFSET
     _test_ "completed" _NL_ _SEP_
 #define MSG_ENTER_CONFIG_MODE 55+MSG_OFFSET
-    _Enter_ "config " _mode_ _NL_ _SEP_
+    _Enter_ "config " _mode _NL_ _SEP_
 #define MSG_DIRECTION_PIN 56+MSG_OFFSET
     _direction_ _pin_ _SEP_
 #define MSG_SET_TO_PIN 57+MSG_OFFSET
@@ -673,18 +673,18 @@ const static char messages[] PROGMEM =
     /* USAGE NORMAL */
     _Enter_command_seperated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
-    ____ "c" ________ _ooo_ _Enter_ _configuration_ _mode_ _NL_
+    ____ "c" ________ _ooo_ _Enter_ _configuration_ _mode _NL_
     ____ "V" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in us/" _step _NL_
     ____ "H" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/s" _NL_
     ____ "h" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/1000s" _NL_
     ____ "A" _I_accel_I_  _ooo_set_selected_stepper_s_ _acceleration_ _NL_
     ____ "a" _I_accel_I_  _ooo_ _acceleration_ "control with +/-" _acceleration_ "values" _NL_
-    ____ "U" ________ _ooo_ "Update " _selected_stepper "'s " _speed_ "/ " _acceleration_ " while "
+    ____ "U" ________ _ooo_ "Update " _selected_stepper "'s " _speed_ "/ " _acceleration_ "while "
     "running" _NL_
     ____ "P<pos>   " _ooo_ _Move_ _selected_stepper " " _to_ "+/- " _position_ _NL_
     ____ "R<n> " ____ _ooo_ _Move_ _selected_stepper " by +/- n " _steps_ _NL_
-    ____ "f" ________ _ooo_ _run_ _forward_ _comma__counting_ "up" _NL_
-    ____ "b" ________ _ooo_ _run_ _backward_ _comma__counting_ "down" _NL_
+    ____ "f" ________ _ooo_ _run_ _forward _comma__counting_ "up" _NL_
+    ____ "b" ________ _ooo_ _run_ _backward _comma__counting_ "down" _NL_
     ____ "K" ________ _ooo_ "Keep " _selected_stepper " running in current " _direction_ _NL_
     ____ "@<pos>   " _ooo_ _set_ _selected_stepper " " _to_ _position_ "(can be "
     "negative)" _NL_
@@ -692,7 +692,7 @@ const static char messages[] PROGMEM =
     ____ "D<ms>" ____ _ooo_set_selected_stepper_s_ _delay_ _from_ _steps_ _to_ _disable _NL_
     ____ "N" ________ _ooo_ _Turn_ _selected_stepper _output_ "on, " __disable_auto_enable_nl
     ____ "F" ________ _ooo_ _Turn_ _selected_stepper _output_ "off," __disable_auto_enable_nl
-    ____ "O" ________ _ooo_ "Put " _selected_stepper " into auto " _enable_ _mode_ _NL_
+    ____ "O" ________ _ooo_ "Put " _selected_stepper " into auto " _enable_ _mode _NL_
     ____ "S" ________ _ooo_ _stop " " _selected_stepper " with deceleration" _NL_
     ____ "X" ________ _ooo_ "Immediately " _stop " " _stepper " and " _set_ "zero position" _NL_
     ____ "I" ________ _ooo_ _Toggle_ _stepper " info, while any " _stepper " is running" _NL_
@@ -700,8 +700,8 @@ const static char messages[] PROGMEM =
     ____ "W" ________ _ooo_ "Blocking wait until " _selected_stepper " is " _stop "ped, will "
     "deadlock if " _stepper " never " _stop "s" _NL_
     ____ "w<ms>" ____ _ooo_ "Wait time in ms" _NL_
-    ____ "+" ________ _ooo_ _Perform_ _one_step_ _forward_ _of_the_ _selected_stepper _NL_
-    ____ "-" ________ _ooo_ _Perform_ _one_step_ _backward_ _of_the_ _selected_stepper _NL_
+    ____ "+" ________ _ooo_ _Perform_ _one_step_ _forward _of_the_ _selected_stepper _NL_
+    ____ "-" ________ _ooo_ _Perform_ _one_step_ _backward _of_the_ _selected_stepper _NL_
     ____ "T" ________ _ooo_ _test_  _select "ed " _stepper " with direct port access" _NL_
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
@@ -711,8 +711,8 @@ const static char messages[] PROGMEM =
     ____ "p<n>,l,h " _ooo_ _attach " " _pulse_counter_ "n<=7 with low,high limits" _NL_
     ____ "pc   " ____ _ooo_ _clear_ _pulse_counter_ _NL_
 #endif
-    ____ "t" ________ _ooo_ _Enter_ _test_ _mode_ _NL_
-    ____ "u" ________ _ooo_ "Unidirectional " _mode_ "(need reset " _to_ "restore)" _NL_
+    ____ "t" ________ _ooo_ _Enter_ _test_ _mode _NL_
+    ____ "u" ________ _ooo_ "Unidirectional " _mode " (need reset " _to_ "restore)" _NL_
 #if defined(ARDUINO_ARCH_AVR)
     ____ "r" ________ _ooo_ _Toggle_ _erroneous_ _digitalRead_ _of_the_ _stepper " pin" _NL_
 #endif
@@ -751,7 +751,7 @@ const static char messages[] PROGMEM =
     ________ ________ ________ "t" _ooo_ _delay_ _from_ "dir change " _to_ "step in us, 0 means "
     "off" _NL_
     ____ "dc   " ____ _ooo_ _clear_ _direction_ _pin_ "(unidirectional)" _NL_
-    ____ "x" ________ _ooo_ "Exit " _configuration_ _mode_ _NL_
+    ____ "x" ________ _ooo_ "Exit " _configuration_ _mode _NL_
 	_print_this_usage_
 #endif
     _SEP_
