@@ -6,20 +6,20 @@
 #include "RampConstAcceleration.h"
 #include "common.h"
 
-#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
-static upm_float upm_timer_freq;
-static upm_float upm_timer_freq_div_500;
-static upm_float upm_timer_freq_div_sqrt_of_2;
-static upm_float upm_timer_freq_square_div_2;
+#ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
+static pmf_logarithmic pmfl_timer_freq;
+static pmf_logarithmic pmfl_timer_freq_div_500;
+static pmf_logarithmic pmfl_timer_freq_div_sqrt_of_2;
+static pmf_logarithmic pmfl_timer_freq_square_div_2;
 #endif
 
 void init_ramp_module() {
-#ifdef SUPPORT_UPM_TIMER_FREQ_VARIABLES
-  upm_timer_freq = upm_from((uint32_t)TICKS_PER_S);
-  upm_timer_freq_div_500 = upm_divide(upm_timer_freq, UPM_CONST_500);
-  upm_timer_freq_div_sqrt_of_2 =
-      upm_shr(upm_multiply(upm_timer_freq, upm_timer_freq));
-  upm_timer_freq_square_div_2 = upm_shr(upm_square(upm_timer_freq));
+#ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
+  pmfl_timer_freq = pmfl_from((uint32_t)TICKS_PER_S);
+  pmfl_timer_freq_div_500 = pmfl_multiply(pmfl_timer_freq, PMF_CONST_1_DIV_500);
+  pmfl_timer_freq_div_sqrt_of_2 =
+      pmfl_shr(pmfl_multiply(pmfl_timer_freq, pmfl_timer_freq));
+  pmfl_timer_freq_square_div_2 = pmfl_shr(pmfl_square(pmfl_timer_freq));
 #endif
 }
 
@@ -97,8 +97,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
-      performed_ramp_up_steps = upm_to_u32(upm_multiply(
-          ramp->config.upm_inv_accel2, upm_rsquare(upm_from(curr_ticks))));
+      performed_ramp_up_steps = pmfl_to_u32(pmfl_multiply(
+          ramp->config.pmfl_inv_accel2, pmfl_rsquare(pmfl_from(curr_ticks))));
 #ifdef TEST
       printf(
           "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
@@ -170,9 +170,9 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   // Forward planning of 2ms or more on slow speed.
   uint16_t planning_steps;
   if (curr_ticks < TICKS_PER_S / 1000) {
-    upm_float upm_ps =
-        upm_divide(UPM_TICKS_PER_S_DIV_500, upm_from(curr_ticks));
-    planning_steps = upm_to_u16(upm_ps);
+    pmf_logarithmic pmfl_ps =
+        pmfl_divide(PMF_TICKS_PER_S_DIV_500, pmfl_from(curr_ticks));
+    planning_steps = pmfl_to_u16(pmfl_ps);
   } else {
     planning_steps = 1;
   }
@@ -296,17 +296,19 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // consideration has been done above already
         if (dec_steps_u16 < orig_planning_steps) {
           planning_steps = dec_steps_u16;
-// Fails with ump floats, but works with new pmfl_logarithmic....?
-//          if (planning_steps == 0) {
-//            planning_steps = 1;
-//          }
+		  if (planning_steps == 0) {
+			  planning_steps = 1;
+		  }
+#ifdef TEST
+	      printf("Change planning_steps=%u\n", planning_steps);
+#endif
         }
       }
 
       uint32_t rs = performed_ramp_up_steps + planning_steps;
-      d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
+      d_ticks_new = calculate_ticks_v8(rs, ramp->config.pmfl_sqrt_inv_accel);
 #ifdef TEST
-      printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
+      printf("Calculate d_ticks_new=%u from ramp steps=%u\n", d_ticks_new, rs);
 #endif
 
       // if acceleration is very high, then d_ticks_new can be lower than
@@ -328,7 +330,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         } else {
           rs = performed_ramp_up_steps - planning_steps;
         }
-        d_ticks_new = calculate_ticks_v8(rs, ramp->config.upm_sqrt_inv_accel);
+        d_ticks_new = calculate_ticks_v8(rs, ramp->config.pmfl_sqrt_inv_accel);
         // If the ramp generator cannot decelerate by going down the ramp,
         // then we need to clip the new d_ticks to the min travel ticks
         // This is for issue #150
@@ -364,8 +366,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (cmd_ticks < MIN_CMD_TICKS) {
       // planning_steps = MIN_CMD_TICKS / next_ticks;
 
-      uint32_t new_planning_steps = upm_to_u32(upm_divide(
-          upm_from((uint32_t)(MIN_CMD_TICKS)), upm_from(d_ticks_new)));
+      uint32_t new_planning_steps = pmfl_to_u32(pmfl_divide(
+          pmfl_from((uint32_t)(MIN_CMD_TICKS)), pmfl_from(d_ticks_new)));
       new_planning_steps += new_planning_steps >> 1;
 #ifdef TEST
       printf("Increase planning steps %d => %d\n", planning_steps,

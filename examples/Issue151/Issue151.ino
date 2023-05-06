@@ -42,25 +42,25 @@ void loop() {
   int32_t target = 20000;
   stepper->setSpeedInHz(70000);
   stepper->moveTo(target);
-  while(stepper->isRunning()) {
+  while (stepper->isRunning()) {
   };
 #ifdef SIMULATOR
     // if result is Ok. Toggle port twice, otherwise once
 #define PIN 10
 #define DIRPIN 7
-    pinMode(DIRPIN, OUTPUT);
-    digitalWrite(DIRPIN, HIGH);
-    pinMode(PIN, OUTPUT);
+  pinMode(DIRPIN, OUTPUT);
+  digitalWrite(DIRPIN, HIGH);
+  pinMode(PIN, OUTPUT);
+  digitalWrite(PIN, HIGH);
+  digitalWrite(PIN, LOW);
+  Serial.println(stepper->getCurrentPosition());
+  if (stepper->getCurrentPosition() == target) {
     digitalWrite(PIN, HIGH);
     digitalWrite(PIN, LOW);
-    Serial.println(stepper->getCurrentPosition());
-    if (stepper->getCurrentPosition() == target) {
-      digitalWrite(PIN, HIGH);
-      digitalWrite(PIN, LOW);
-    }
+  }
 
-    delay(1000);
-    noInterrupts();
-    sleep_cpu();
+  delay(1000);
+  noInterrupts();
+  sleep_cpu();
 #endif
 }

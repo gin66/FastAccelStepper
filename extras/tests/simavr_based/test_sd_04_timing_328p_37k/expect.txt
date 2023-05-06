@@ -6,9 +6,9 @@
    StepB:        0*L->H,        0*H->L, Max High=0us Total High=0us
 Position[A]=1000
 
-Time in EnableA  max=213059 us, total=213059 us
+Time in EnableA  max=213052 us, total=213052 us
 
-Time in FillISR  max=1937 us, total=26715 us
+Time in FillISR  max=1785 us, total=25555 us
 
 Time in StepA  max=12 us, total=5262 us
 

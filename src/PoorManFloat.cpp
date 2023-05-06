@@ -10,10 +10,9 @@
 #include <stdio.h>
 #endif
 
-#define UPM_FROM_PARTS(mantissa, exponent) \
-  ((((uint16_t)exponent) << 8) | ((uint8_t)(mantissa)))
-
-// new representation is:
+// upm implementation is dropped from 0.29 onwards
+//
+// upm representation is:
 //
 //     76543210: 76543210
 //     XXXXXXXX:1XXXXXXXX
@@ -63,148 +62,117 @@
 // and add the constants.
 //
 //
-// rsqrt-tables
-// ============
+// In order to support cubic functions, more tables would be necessary.
+// Using logarithmic/exponential functions the number of tables can be limited.
+// For example:
+//    square/cubic root would be simply: exp(log(x) * a), with a = 1/2 for
+//    square and 1/3 for cubic
 //
-// The rsqrt-tables provide the direct solution for 1/sqrt(mantissa).
+// In addition, within FastAccelStepper there is no need for adding or
+// subtracting floats. Even negative numbers are not needed and not supported by
+// upm_float. Consequently, a purely logarithmic representation is completely
+// sufficient.
 //
-// rsqrt_exp_even is used, if the exponent is even.
-// rsqrt_exp_odd is used, if the exponent is odd.
+// As base for exp/log we will use 2  (not 10 or e). This way the exponent of an
+// upm float being 2^n needs no calculation, as log2(2^n) = n. Still the offset
+// by 128 needs to be considered
 //
-// For even exponents 1/sqrt(mantissa) translates in the range 1.0 down to
-// 0.7077 The mantissa 256 (aka mantissa byte==0) is a special case to be
-// treated separately, that's why this table has only 255 entries.
+// The mantissa of an upm float with the leading 1 is in the range 1 <= m < 2.
 //
-// The table is generated with this one liner:
+// As log2(1) = 0 and log2(2) = 1 is at the corners identical to x + 1. So it is
+// interesting to look at function f(x) = log2(x) - x + 1. This function is 0
+// for x at 1 and 2, positive over the range inbetween and reaches max value of
+// 0.08607 at x = 1.442695. This max value is at x = 1/ln(2)
 //
-// python:
-//		[round(512.0/math.sqrt(i/256))-256 for i in range(257,512)
-const PROGMEM uint8_t rsqrt_exp_even[255] = {
-    255, 254, 253, 252, 251, 250, 249, 248, 247, 246, 245, 244, 243, 243, 242,
-    241, 240, 239, 238, 237, 236, 235, 234, 234, 233, 232, 231, 230, 229, 228,
-    228, 227, 226, 225, 224, 223, 223, 222, 221, 220, 219, 219, 218, 217, 216,
-    215, 215, 214, 213, 212, 212, 211, 210, 209, 209, 208, 207, 206, 206, 205,
-    204, 203, 203, 202, 201, 201, 200, 199, 198, 198, 197, 196, 196, 195, 194,
-    194, 193, 192, 192, 191, 190, 190, 189, 188, 188, 187, 186, 186, 185, 184,
-    184, 183, 183, 182, 181, 181, 180, 179, 179, 178, 178, 177, 176, 176, 175,
-    175, 174, 173, 173, 172, 172, 171, 170, 170, 169, 169, 168, 168, 167, 166,
-    166, 165, 165, 164, 164, 163, 163, 162, 162, 161, 160, 160, 159, 159, 158,
-    158, 157, 157, 156, 156, 155, 155, 154, 154, 153, 153, 152, 152, 151, 151,
-    150, 150, 149, 149, 148, 148, 147, 147, 146, 146, 145, 145, 144, 144, 143,
-    143, 142, 142, 141, 141, 140, 140, 140, 139, 139, 138, 138, 137, 137, 136,
-    136, 135, 135, 135, 134, 134, 133, 133, 132, 132, 131, 131, 131, 130, 130,
-    129, 129, 128, 128, 128, 127, 127, 126, 126, 126, 125, 125, 124, 124, 123,
-    123, 123, 122, 122, 121, 121, 121, 120, 120, 119, 119, 119, 118, 118, 118,
-    117, 117, 116, 116, 116, 115, 115, 114, 114, 114, 113, 113, 113, 112, 112,
-    111, 111, 111, 110, 110, 110, 109, 109, 109, 108, 108, 107, 107, 107, 106};
+// The upm mantissa is in total nine bits:
+//       m = 1_xxxx_xxxx
 //
-// For odd exponents, the exponent is reduced by 1 and the
-// the mantissa multiplied by 2 and as such represents 2.0 to ~3
-// Consequently 1/sqrt(mantissa) is in range 0.707107 down to ~0.5
+// So the log2 of the mantissa can be calculated by:
+//       m    = 1_xxxx_xxxx
+//     - 1    = 1_0000_0000
+//     + f(m) = 0_000y_yyyy
+//     yields = 0_zzzz_zzzz
 //
-// python:
-//		[round(512.0/math.sqrt(2*i/256))-256 for i in range(256,512)]
-const PROGMEM uint8_t rsqrt_exp_odd[256] = {
-    106, 106, 105, 104, 103, 103, 102, 101, 101, 100, 99, 99, 98, 97, 97, 96,
-    95,  95,  94,  94,  93,  92,  92,  91,  90,  90,  89, 89, 88, 87, 87, 86,
-    86,  85,  84,  84,  83,  83,  82,  82,  81,  80,  80, 79, 79, 78, 78, 77,
-    76,  76,  75,  75,  74,  74,  73,  73,  72,  72,  71, 71, 70, 70, 69, 69,
-    68,  68,  67,  67,  66,  66,  65,  65,  64,  64,  63, 63, 62, 62, 61, 61,
-    60,  60,  59,  59,  58,  58,  57,  57,  57,  56,  56, 55, 55, 54, 54, 53,
-    53,  53,  52,  52,  51,  51,  50,  50,  50,  49,  49, 48, 48, 47, 47, 47,
-    46,  46,  45,  45,  45,  44,  44,  43,  43,  43,  42, 42, 41, 41, 41, 40,
-    40,  39,  39,  39,  38,  38,  38,  37,  37,  36,  36, 36, 35, 35, 35, 34,
-    34,  34,  33,  33,  32,  32,  32,  31,  31,  31,  30, 30, 30, 29, 29, 29,
-    28,  28,  28,  27,  27,  27,  26,  26,  26,  25,  25, 25, 24, 24, 24, 23,
-    23,  23,  22,  22,  22,  21,  21,  21,  20,  20,  20, 19, 19, 19, 19, 18,
-    18,  18,  17,  17,  17,  16,  16,  16,  16,  15,  15, 15, 14, 14, 14, 13,
-    13,  13,  13,  12,  12,  12,  11,  11,  11,  11,  10, 10, 10, 9,  9,  9,
-    9,   8,   8,   8,   8,   7,   7,   7,   6,   6,   6,  6,  5,  5,  5,  5,
-    4,   4,   4,   4,   3,   3,   3,   3,   2,   2,   2,  2,  1,  1,  1,  1};
+// Using python3 this can be calculated by:
+//     [round(math.log2(i/256) * 256 - (i-256)) for i in range(256,512)]
+//
+// For better precision y_yyyy is shifted by 1 and can be calculated as:
+//	   [round((math.log2(i/256) * 256 - (i-256))*2) for i in range(256,512)]
+//
+const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_1[256] = {
+    0,  1,  2,  3,  3,  4,  5,  6,  7,  8,  8,  9,  10, 11, 11, 12, 13, 13, 14,
+    15, 16, 16, 17, 18, 18, 19, 19, 20, 21, 21, 22, 22, 23, 24, 24, 25, 25, 26,
+    26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 31, 32, 32, 33, 33, 33, 34, 34,
+    34, 35, 35, 36, 36, 36, 37, 37, 37, 37, 38, 38, 38, 39, 39, 39, 39, 40, 40,
+    40, 40, 40, 41, 41, 41, 41, 41, 42, 42, 42, 42, 42, 42, 43, 43, 43, 43, 43,
+    43, 43, 43, 43, 43, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44,
+    44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 43, 43, 43, 43,
+    43, 43, 43, 43, 43, 42, 42, 42, 42, 42, 42, 42, 41, 41, 41, 41, 41, 41, 40,
+    40, 40, 40, 40, 39, 39, 39, 39, 39, 38, 38, 38, 38, 37, 37, 37, 37, 36, 36,
+    36, 36, 35, 35, 35, 35, 34, 34, 34, 33, 33, 33, 32, 32, 32, 31, 31, 31, 30,
+    30, 30, 29, 29, 29, 28, 28, 28, 27, 27, 26, 26, 26, 25, 25, 24, 24, 24, 23,
+    23, 22, 22, 22, 21, 21, 20, 20, 19, 19, 19, 18, 18, 17, 17, 16, 16, 15, 15,
+    14, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9,  9,  8,  8,  7,  6,  6,  5,
+    5,  4,  4,  3,  3,  2,  2,  1,  1};
 
-// The square table provides mantissa^2.
-// For mantissa values indexing in the second part ot the table,
-// the exponent has to be increased by 1
-const PROGMEM uint8_t square_table[256] = {
-    // python:
-    //      [round((i/256)*(i/256) * 256)-256 for i in range(256,256+106)]
-    0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 27, 29, 31, 33, 35, 37, 39,
-    42, 44, 46, 48, 50, 52, 55, 57, 59, 61, 64, 66, 68, 70, 73, 75, 77, 79, 82,
-    84, 86, 89, 91, 93, 96, 98, 100, 103, 105, 107, 110, 112, 115, 117, 119,
-    122, 124, 127, 129, 132, 134, 137, 139, 142, 144, 147, 149, 152, 154, 157,
-    159, 162, 164, 167, 169, 172, 175, 177, 180, 182, 185, 188, 190, 193, 196,
-    198, 201, 204, 206, 209, 212, 214, 217, 220, 223, 225, 228, 231, 234, 236,
-    239, 242, 245, 247, 250, 253,
-    // python:
-    //      [round((i/256)*(i/256) * 128)-512 for i in range(256+106,256+256)]
-    0, 1, 3, 4, 6, 7, 8, 10, 11, 13, 14, 16, 17, 19, 20, 22, 23, 25, 26, 28, 29,
-    31, 32, 34, 35, 37, 38, 40, 41, 43, 44, 46, 47, 49, 50, 52, 53, 55, 56, 58,
-    60, 61, 63, 64, 66, 68, 69, 71, 72, 74, 76, 77, 79, 80, 82, 84, 85, 87, 89,
-    90, 92, 93, 95, 97, 98, 100, 102, 103, 105, 107, 108, 110, 112, 114, 115,
-    117, 119, 120, 122, 124, 126, 127, 129, 131, 133, 134, 136, 138, 140, 141,
-    143, 145, 147, 148, 150, 152, 154, 155, 157, 159, 161, 163, 164, 166, 168,
-    170, 172, 174, 175, 177, 179, 181, 183, 185, 187, 188, 190, 192, 194, 196,
-    198, 200, 202, 203, 205, 207, 209, 211, 213, 215, 217, 219, 221, 223, 224,
-    226, 228, 230, 232, 234, 236, 238, 240, 242, 244, 246, 248, 250, 252, 254};
-
-// The reciprocal square table provides 1/mantissa^2.
-// For mantissa values indexing in the second part ot the table,
-// the exponent has to be decreased by 1
-// Zero is a special case, so the table starts with offset 1
-const PROGMEM uint8_t reciprocal_square_table[255] = {
-    // python:
-    //      [round(1/(i/256)/(i/256) * 512)-256 for i in range(256+1,256+107)]
-    252, 248, 244, 240, 237, 233, 229, 225, 222, 218, 215, 211, 208, 204, 201,
-    198, 194, 191, 188, 184, 181, 178, 175, 172, 169, 166, 163, 160, 157, 154,
-    151, 149, 146, 143, 140, 138, 135, 132, 130, 127, 124, 122, 119, 117, 114,
-    112, 109, 107, 105, 102, 100, 98, 95, 93, 91, 89, 87, 84, 82, 80, 78, 76,
-    74, 72, 70, 68, 66, 64, 62, 60, 58, 56, 54, 52, 50, 48, 47, 45, 43, 41, 39,
-    38, 36, 34, 33, 31, 29, 28, 26, 24, 23, 21, 19, 18, 16, 15, 13, 12, 10, 9,
-    7, 6, 4, 3, 1, 0,
-    // python:
-    //      [round(1/(i/256)/(i/256) * 1024)-256 for i in
-    //      range(256+107,256+256)]
-    253, 250, 248, 245, 242, 240, 237, 234, 232, 229, 226, 224, 221, 219, 216,
-    214, 211, 209, 206, 204, 201, 199, 197, 194, 192, 190, 187, 185, 183, 181,
-    179, 176, 174, 172, 170, 168, 166, 163, 161, 159, 157, 155, 153, 151, 149,
-    147, 145, 143, 141, 139, 137, 136, 134, 132, 130, 128, 126, 124, 123, 121,
-    119, 117, 116, 114, 112, 110, 109, 107, 105, 104, 102, 100, 99, 97, 95, 94,
-    92, 91, 89, 88, 86, 84, 83, 81, 80, 78, 77, 75, 74, 72, 71, 70, 68, 67, 65,
-    64, 63, 61, 60, 58, 57, 56, 54, 53, 52, 50, 49, 48, 47, 45, 44, 43, 41, 40,
-    39, 38, 36, 35, 34, 33, 32, 30, 29, 28, 27, 26, 25, 24, 22, 21, 20, 19, 18,
-    17, 16, 15, 14, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1};
-
-// The reciprocal table provides 1/mantissa
-// Zero is a special case, so the table starts with offset 1
+// For the inverse pow(2,x) needs to be calculated. Similarly it makes sense to
+// evaluate instead
+//     g(x) = x - pow(2,x-1)
 //
-// python:
-//      [round(1/(i/256) * 512)-256 for i in range(256+0,256+256)]
-const PROGMEM uint8_t reciprocal_table[255] = {
-    254, 252, 250, 248, 246, 244, 242, 240, 239, 237, 235, 233, 231, 229, 228,
-    226, 224, 222, 221, 219, 217, 215, 214, 212, 210, 209, 207, 206, 204, 202,
-    201, 199, 198, 196, 194, 193, 191, 190, 188, 187, 185, 184, 182, 181, 179,
-    178, 177, 175, 174, 172, 171, 170, 168, 167, 165, 164, 163, 161, 160, 159,
-    157, 156, 155, 154, 152, 151, 150, 149, 147, 146, 145, 144, 142, 141, 140,
-    139, 138, 136, 135, 134, 133, 132, 131, 130, 128, 127, 126, 125, 124, 123,
-    122, 121, 120, 118, 117, 116, 115, 114, 113, 112, 111, 110, 109, 108, 107,
-    106, 105, 104, 103, 102, 101, 100, 99,  98,  97,  96,  95,  94,  94,  93,
-    92,  91,  90,  89,  88,  87,  86,  85,  84,  84,  83,  82,  81,  80,  79,
-    78,  78,  77,  76,  75,  74,  73,  73,  72,  71,  70,  69,  68,  68,  67,
-    66,  65,  64,  64,  63,  62,  61,  61,  60,  59,  58,  58,  57,  56,  55,
-    55,  54,  53,  52,  52,  51,  50,  50,  49,  48,  47,  47,  46,  45,  45,
-    44,  43,  43,  42,  41,  41,  40,  39,  39,  38,  37,  37,  36,  35,  35,
-    34,  33,  33,  32,  31,  31,  30,  30,  29,  28,  28,  27,  26,  26,  25,
-    25,  24,  23,  23,  22,  22,  21,  21,  20,  19,  19,  18,  18,  17,  16,
-    16,  15,  15,  14,  14,  13,  13,  12,  11,  11,  10,  10,  9,   9,   8,
-    8,   7,   7,   6,   6,   5,   5,   4,   4,   3,   3,   2,   2,   1,   1};
+// This function equals 0 for x at 1 and 2, with extremum 0.08607 at x
+// = 1.528766. This max. value is at x = 1 - ln(ln(2))/ln(2)
+//
+// Noteworthy the max values of log2(x) - x + 1 and x - pow(2, x-1) are
+// identical, calculated by (-1 + ln(2) - ln(ln(2)))/ln(2)
+//
+// Using python3 this can be calculated by:
+//	   [round(i - math.pow(2,i/256-1)*256) for i in range(256,512)]
+//
+// Similarly shifted by one bit:
+//     [round((i - math.pow(2,i/256-1)*256)*2) for i in range(256,512)]
+//
+const PROGMEM uint8_t x_minus_pow2_of_x_minus_one_shifted_by_1[256] = {
+    0,  1,  1,  2,  2,  3,  4,  4,  5,  5,  6,  7,  7,  8,  8,  9,  9,  10, 10,
+    11, 12, 12, 13, 13, 14, 14, 15, 15, 16, 16, 17, 17, 18, 18, 19, 19, 20, 20,
+    21, 21, 21, 22, 22, 23, 23, 24, 24, 25, 25, 25, 26, 26, 27, 27, 27, 28, 28,
+    29, 29, 29, 30, 30, 30, 31, 31, 31, 32, 32, 32, 33, 33, 33, 34, 34, 34, 35,
+    35, 35, 36, 36, 36, 36, 37, 37, 37, 38, 38, 38, 38, 38, 39, 39, 39, 39, 40,
+    40, 40, 40, 40, 41, 41, 41, 41, 41, 41, 42, 42, 42, 42, 42, 42, 42, 43, 43,
+    43, 43, 43, 43, 43, 43, 43, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44,
+    44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 43, 43,
+    43, 43, 43, 43, 43, 43, 43, 43, 42, 42, 42, 42, 42, 42, 41, 41, 41, 41, 41,
+    41, 40, 40, 40, 40, 39, 39, 39, 39, 38, 38, 38, 38, 37, 37, 37, 37, 36, 36,
+    36, 35, 35, 35, 34, 34, 34, 33, 33, 32, 32, 32, 31, 31, 30, 30, 30, 29, 29,
+    28, 28, 27, 27, 27, 26, 26, 25, 25, 24, 24, 23, 23, 22, 22, 21, 20, 20, 19,
+    19, 18, 18, 17, 16, 16, 15, 15, 14, 13, 13, 12, 11, 11, 10, 9,  9,  8,  7,
+    7,  6,  5,  5,  4,  3,  2,  2,  1};
 
-upm_float upm_from(uint8_t x) {  // TESTED
+pmf_logarithmic pmfl_from(uint8_t x) {
+  // calling with x == 0 is considered an error.
+  //
+  // In a first step convert to
+  //    0000_0eee_mmmm_mmmm
+  //
+  // Hereby mmmm_mmmm are the lower bits right from the first 1 in x
+  // An example with only four valid mantissa bits:
+  //	x = 0001_mmmm   =>  0000_0100_mmmm_0000
+  //
+  // eee is the exponent
+  //
+  // The second convert this to the logarithm of x
+  //    1. Use mmmm_mmmm as index in the log2_minus_x_plus_one_shifted_by_1
+  //    table
+  //    2. shift left 0000_0eee_mmmm_mmmm by 1
+  //    3. add the value from the log2_minus_x_plus_one_shifted_by_1 table
   uint16_t res;
   if ((x & 0xf0) == 0) {
     if ((x & 0x0c) == 0) {
       if ((x & 0x02) == 0) {
-        x <<= 8;
-        res = x;
+        if (x == 0) {
+          return (int16_t)0x8000;
+        }
+        x = 0;
+        res = 0x0000;
       } else {
         x <<= 7;
         res = x | 0x0100;
@@ -237,188 +205,140 @@ upm_float upm_from(uint8_t x) {  // TESTED
       }
     }
   }
-  return res | 0x8000;
+  uint8_t index = res & 0x00ff;
+  uint8_t offset =
+      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
+  res <<= 1;
+  res += offset;
+  return res;
 }
-upm_float upm_from(uint16_t x) {  // TESTED
+pmf_logarithmic pmfl_from(uint16_t x) {
   if ((x & 0xff00) == 0) {
-    return upm_from((uint8_t)x);
+    return pmfl_from((uint8_t)x);
   }
   uint8_t exponent;
   if ((x & 0xf000) != 0) {
     if ((x & 0xc000) != 0) {
       if ((x & 0x8000) != 0) {
-        x <<= 1;
-        exponent = 0x8f;
+        x >>= 6;
+        exponent = 15;
       } else {
-        x <<= 2;
-        exponent = 0x8e;
+        x >>= 5;
+        exponent = 14;
       }
     } else {
       if ((x & 0x2000) != 0) {
-        x <<= 3;
-        exponent = 0x8d;
+        x >>= 4;
+        exponent = 13;
       } else {
-        x <<= 4;
-        exponent = 0x8c;
+        x >>= 3;
+        exponent = 12;
       }
     }
   } else {
     if ((x & 0x0c00) != 0) {
       if ((x & 0x0800) != 0) {
-        x <<= 5;
-        exponent = 0x8b;
+        x >>= 2;
+        exponent = 11;
       } else {
-        x <<= 6;
-        exponent = 0x8a;
+        x >>= 1;
+        exponent = 10;
       }
     } else {
       if ((x & 0x0200) != 0) {
-        x <<= 7;
-        exponent = 0x89;
+        exponent = 9;
       } else {
-        x <<= 8;
-        exponent = 0x88;
+        x <<= 1;
+        exponent = 8;
       }
     }
   }
-  x >>= 8;
-  return UPM_FROM_PARTS(x, exponent);
+  uint8_t index = x >> 1;
+  uint8_t offset =
+      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
+  x += offset;
+  x -= 0x200;
+  x += ((uint16_t)exponent) << 9;
+  return x;
 }
-upm_float upm_from(uint32_t x) {  // TESTED
+pmf_logarithmic pmfl_from(uint32_t x) {
   if ((x & 0xffff0000) == 0) {
-    return upm_from((uint16_t)x);
+    return pmfl_from((uint16_t)x);
   }
   if ((x & 0xff000000) == 0) {
     uint16_t w = x >> 8;
-    return upm_from(w) + 0x0800;
+    return pmfl_from(w) + 0x1000;
   } else {
     uint16_t w = x >> 16;
-    return upm_from(w) + 0x1000;
+    return pmfl_from(w) + 0x2000;
   }
 }
-upm_float upm_multiply(upm_float x, upm_float y) {  // TESTED
-  uint8_t mant_x = x & 255;
-  uint8_t mant_y = y & 255;
-  // the multiplication is
-  //	(0x100+mant_x)*(0x100+,mant_y)
-  //		= mant_x*mant_y+0x100*(mant_x+mant_y)+0x100*0x100
-  //
-  uint16_t xy = mant_x * mant_y;
-  xy >>= 2;  // result is 0x10000..0x3fc01, so need to shift by 2
-  xy += (mant_x + mant_y) << 6;  // add missing 0x100 multiplication
-  xy += 0x4000;                  // add result of 0x100*0x100
-
-  uint8_t mant;
-  uint8_t exponent = (x >> 8) + (y >> 8) - 0x80;
-  if ((xy & 0x8000) != 0) {
-    mant = xy >> 7;
-    exponent += 1;
-  } else {
-    mant = xy >> 6;
-  }
-  return UPM_FROM_PARTS(mant, exponent);
-}
-upm_float upm_square(upm_float x) {  // TESTED
-  uint8_t mantissa = x & 0x00ff;
-  uint8_t exponent = x >> 8;
-  if (exponent >= 128) {
-    exponent = (exponent - 64) << 1;
-  } else {
-    exponent = 128 - ((128 - exponent) << 1);
-  }
-  if (mantissa >= 106) {
-    exponent++;
-  }
-  mantissa = pgm_read_byte_near(&square_table[mantissa]);
-  return UPM_FROM_PARTS(mantissa, exponent);
-}
-upm_float upm_divide(upm_float x, upm_float y) {
-  return upm_multiply(x, upm_reciprocal(y));
-}
-uint16_t upm_to_u16(upm_float x) {  // TESTED
-  uint8_t exponent = x >> 8;
-  if (exponent < 128) {
+uint16_t pmfl_to_u16(pmf_logarithmic x) {
+  if (x < 0) {
     return 0;
   }
-  exponent -= 128;
-  if (exponent > 15) {
+  if (x >= 0x2000) {
     return 0xffff;
   }
-  uint8_t mantissa = x & 0x00ff;
-  uint16_t res = mantissa | 0x0100;
-  if (exponent < 8) {
-    res >>= (8 - exponent);
-  } else {
-    res <<= exponent - 8;
+  uint8_t exponent = ((uint16_t)x) >> 9;
+  x &= 0x01ff;
+  uint8_t index = ((uint16_t)x) >> 1;
+  uint8_t offset =
+      pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_1[index]);
+  x += 0x200;
+  x -= offset;
+  if (exponent > 9) {
+    x <<= exponent - 9;
+  } else if (exponent < 9) {
+    x += 1;
+    x >>= 9 - exponent;
   }
-  return res;
+  return x;
 }
-uint32_t upm_to_u32(upm_float x) {  // TESTED
-  uint8_t exponent = x >> 8;
-  if (exponent < 128) {
+uint32_t pmfl_to_u32(pmf_logarithmic x) {
+  if (x < 0) {
     return 0;
   }
-  exponent -= 128;
-  if (exponent > 31) {
+  if (x >= 0x4000) {
     return 0xffffffff;
   }
-  uint8_t mantissa = x & 0x00ff;
-  uint32_t res = mantissa | 0x100;
-  if (exponent < 8) {
-    res >>= (8 - exponent);
-  } else if (exponent > 8) {
-    res <<= exponent - 8;
+  uint8_t exponent = ((uint16_t)x) >> 9;
+  if (exponent < 0x10) {
+    return pmfl_to_u16(x);
   }
+  uint8_t shift = exponent - 0x0f;
+  x = pmfl_shr(x, shift);
+  uint32_t res = pmfl_to_u16(x);
+  res <<= shift;
   return res;
 }
-upm_float upm_shl(upm_float x, uint8_t n) { return x + (((uint16_t)n) << 8); }
-upm_float upm_shr(upm_float x, uint8_t n) { return x - (((uint16_t)n) << 8); }
-upm_float upm_rsqrt(upm_float x) {  // TESTED
-  uint8_t mantissa = x & 0x00ff;
-  uint8_t exponent = x >> 8;
-  bool exp_even = (exponent & 1) == 0;
-  if (exponent >= 128) {
-    exponent = 191 - (exponent >> 1);
-  } else {
-    exponent = 127 + ((129 - exponent) >> 1);
-  }
-  if (exp_even) {
-    if (mantissa == 0) {
-      exponent++;
-    } else {
-      mantissa = pgm_read_byte_near(&rsqrt_exp_even[mantissa - 1]);
-    }
-  } else {
-    mantissa = pgm_read_byte_near(&rsqrt_exp_odd[mantissa]);
-  }
-  return UPM_FROM_PARTS(mantissa, exponent);
+pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n) {
+  return x + (((int16_t)n) << 9);
 }
-upm_float upm_rsquare(upm_float x) {  // TESTED
-  uint8_t mantissa = x & 0x00ff;
-  uint8_t exponent = x >> 8;
-  if (exponent >= 128) {
-    exponent = 127 - ((exponent - 128) << 1);
-  } else {
-    exponent = 127 + ((128 - exponent) << 1);
-  }
-  if (mantissa == 0) {
-    exponent++;
-  } else {
-    if (mantissa >= 107) {
-      exponent--;
-    }
-    mantissa = pgm_read_byte_near(&reciprocal_square_table[mantissa - 1]);
-  }
-  return UPM_FROM_PARTS(mantissa, exponent);
+pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n) {
+  return x - (((int16_t)n) << 9);
 }
-upm_float upm_reciprocal(upm_float x) {  // TESTED
-  uint8_t mantissa = x & 0x00ff;
-  uint8_t exponent = x >> 8;
-  exponent = 255 - exponent;
-  if (mantissa == 0) {
-    exponent++;
-  } else {
-    mantissa = pgm_read_byte_near(&reciprocal_table[mantissa - 1]);
+pmf_logarithmic pmfl_multiply(pmf_logarithmic x, pmf_logarithmic y) {
+  return x + y;
+}
+pmf_logarithmic pmfl_reciprocal(pmf_logarithmic x) { return -x; }
+pmf_logarithmic pmfl_square(pmf_logarithmic x) {
+  if (x >= 0x4000) {
+    return 0x7fff;
   }
-  return UPM_FROM_PARTS(mantissa, exponent);
+  if (x <= -0x4000) {
+    return (int16_t)0x8001;
+  }
+  return x + x;
+}
+pmf_logarithmic pmfl_rsquare(
+    pmf_logarithmic x) {  // Reciprocal square = 1/(x*x)
+  return pmfl_reciprocal(pmfl_square(x));
+}
+pmf_logarithmic pmfl_rsqrt(
+    pmf_logarithmic x) {  // Reciprocal sqrt() = 1/sqrt(x)
+  return (-x) / 2;
+}
+pmf_logarithmic pmfl_divide(pmf_logarithmic x, pmf_logarithmic y) {
+  return x - y;
 }

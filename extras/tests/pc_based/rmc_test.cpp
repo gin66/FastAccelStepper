@@ -16,13 +16,13 @@ int main() {
   float correct;
   float err;
   for (int mode = 0; mode <= 1; mode++) {
-    upm_float upm_pre_calc = upm_from(pre_calc);
+    pmf_logarithmic pmfl_pre_calc = pmfl_from(pre_calc);
     if (mode == 0) {
-      res = calculate_ticks_v8(steps, upm_pre_calc);
+      res = calculate_ticks_v8(steps, pmfl_pre_calc);
     } else {
-      res = calculate_ticks_v9(steps, upm_pre_calc);
+      res = calculate_ticks_v9(steps, pmfl_pre_calc);
     }
-    correct = upm_to_u32(upm_pre_calc) * 1.0 / sqrt(steps);
+    correct = pmfl_to_u32(pmfl_pre_calc) * 1.0 / sqrt(steps);
     err = res - correct;
     printf("%d %f  %f\n", res, correct, err);
   }

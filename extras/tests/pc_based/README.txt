@@ -35,3 +35,6 @@ Tests;
   test case for M1 A1000 V10000 f w300 V100000 U
   This is stuck in state RED.
   Revised test: M1 A1000 V10000 P100 w300 V100000 U
+
+- test 12
+  ramp up with 1 step/s^2 to 1000us/step

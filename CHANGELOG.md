@@ -3,6 +3,12 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+pre-0.29.0:
+- replace former PoorManFloat implementation `ump_float` being exponent+mantissa with `pmfl_logarithmic` as log2 representation
+- reduce max speed for 3 steppers to 20kSteps/s from 25kSteps/s
+- The tests `simavr_based/test_sd_12_328p` and`simavr_based/test_sd_14_328p` yield significant different results than before.
+  Current assumption is, that the new behavior in regard to acceleration/deceleration is correct.
+
 0.28.4:
 - include esp32s3 port
 

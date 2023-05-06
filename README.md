@@ -1,5 +1,4 @@
 # FastAccelStepper 
- 
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.28.1)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/gin66/library/FastAccelStepper.svg)](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
 
@@ -52,7 +51,7 @@ FastAccelStepper offers the following features:
 * Direction pins can be shared between motors
 * Configurable delay between direction change and following step
 * External callback function can be used to drive the enable pins (e.g. connected to shift register) and, only esp32 derivates: the direction pins
-* No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
+* No float calculation (poor man float: use log2 representation in range -64..64 with 16bit integer representation and 1/512th resolution)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
 
@@ -110,7 +109,7 @@ Comments to pin sharing:
 
 ### AVR ATMega 2560
 
-* allows up to 70000 generated steps per second for single stepper operation, 37000 for dual stepper and 25000 for three steppers
+* allows up to 70000 generated steps per second for single stepper operation, 37000 for dual stepper and 20000 for three steppers
 * supports up to three stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
 * Steppers' command queue depth: 16
