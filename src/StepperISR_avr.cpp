@@ -344,10 +344,22 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   //   manageStepper (fillISR) already needs max 3ms !
   //   so 25kHz for three steppers is on the limit
   //
+  //   commit 9577e9bfd4b9a6cf1ad830901c00c8b129a62aee fails
+  //   test_sd_04_timing_2560 as timer 3 reaches 40us.
+  //   This includes port set/clear for timer measurement.
+  //   So choose 20kHz
+  //
   // using test_sd_04_timing_328p version 0.25.6 as reference
   //   manageStepper (fillISR) already needs max 2.3 ms !
   //
-  max_speed_in_ticks = (steppers == 1) ? 228 : 213 * steppers;
+  if (steppers == 1) {
+	  max_speed_in_ticks = 228;
+  } else if (steppers == 2) {
+	  max_speed_in_ticks = 426;
+  }
+  else {
+	  max_speed_in_ticks = TICKS_PER_S / 20000;
+  }
 }
 
 void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {
