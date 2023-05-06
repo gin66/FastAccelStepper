@@ -9,7 +9,7 @@ version pre-0.29.0 Issues:
 - `M1 A1000 V1000 f w2000 A1 V10 U` does not speed up from V1000
 - `M1 A1000 V1000 f w2000 A50 V10 U` speed up from V1000 with several seconds delay
 - `M1 A1000 V1000 f w2000 A1 V2000 U` jumps from v=1000us to 1412us
-- `M1 A1000 V1000 f w2000 A2 V2000 U` jumps from v=1000us to 1412us
+- `M1 A1000 V1000 f w2000 A50 V2000 U` jumps from v=1000us to 1412us
 
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.28.1)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/gin66/library/FastAccelStepper.svg)](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
