@@ -233,12 +233,12 @@ bool perform_test() {
   for (uint8_t i = 0; i < 13; i++) {
     const struct const_tab *dut = &constants[i];
     pmf_logarithmic val = pmfl_from(dut->val_nom);
+    if (dut->squared) {
+      val += val;
+    }
     if (dut->val_denom > 1) {
       pmf_logarithmic val_denom = pmfl_from(dut->val_denom);
       val -= val_denom;
-    }
-    if (dut->squared) {
-      val += val;
     }
     pmf_logarithmic c = dut->c;
     if (c != val) {

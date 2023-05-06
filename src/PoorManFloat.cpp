@@ -326,7 +326,7 @@ pmf_logarithmic pmfl_square(pmf_logarithmic x) {
   if (x >= 0x4000) {
     return 0x7fff;
   }
-  if (x < -0x4000) {
+  if (x <= -0x4000) {
     return (int16_t)0x8001;
   }
   return x + x;
