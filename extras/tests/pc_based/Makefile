@@ -9,7 +9,7 @@ TESTS=$(basename $(wildcard test_??.cpp))
 test: $(TESTS) pmf_test rmc_test
 	./rmc_test
 	./pmf_test
-	$(addsuffix &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
+	($(addsuffix &&,$(addprefix ./,$(TESTS))) echo "All tests passed") > test.log
 
 LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h \
 	  RampGenerator.h RampConstAcceleration.h RampCalculator.h common.h
