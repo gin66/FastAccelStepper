@@ -1,5 +1,14 @@
 # FastAccelStepper 
- 
+
+version pre-0.29.0 Issues:
+- test 06 on esp32 fails
+- test 07 on esp32 fails (2nd result is 1143 with kind of a jump on REV)
+- test 02 on esp32 seems to be more noisy (subjective impression)
+- decelerate to stop with test case 10 is sometimes noisy (esp32)
+- ramp `M1 A1 V10 f` appears to have speed steps at 5 Hz and hangs at v=1/14880 ticks
+- `M1 A1000 V1000 f w2000 A1 V10 U` does not speed up from V1000
+- `M1 A1000 V1000 f w2000 A50 V10 U` speed up from V1000 with several seconds delay
+
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.28.1)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/gin66/library/FastAccelStepper.svg)](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
 
