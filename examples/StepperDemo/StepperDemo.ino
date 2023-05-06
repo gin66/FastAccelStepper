@@ -508,8 +508,8 @@ const static char messages[] PROGMEM =
     "one " _step " " _SEP_
 #define _position_ "\260"
     "position " _SEP_
-#define _of_the_ "\261"
-    "of the " _SEP_
+#define __of_the_ "\261"
+    " of the " _SEP_
 #define _Turn_ "\262"
     "Turn " _SEP_
 #define _stop "\263"
@@ -700,8 +700,8 @@ const static char messages[] PROGMEM =
     ____ "W" ________ _ooo_ "Blocking wait until " _selected_stepper " is " _stop "ped, will "
     "deadlock if " _stepper " never " _stop "s" _NL_
     ____ "w<ms>" ____ _ooo_ "Wait time in ms" _NL_
-    ____ "+" ________ _ooo_ _Perform_ _one_step_ _forward _of_the_ _selected_stepper _NL_
-    ____ "-" ________ _ooo_ _Perform_ _one_step_ _backward _of_the_ _selected_stepper _NL_
+    ____ "+" ________ _ooo_ _Perform_ _one_step_ _forward __of_the_ _selected_stepper _NL_
+    ____ "-" ________ _ooo_ _Perform_ _one_step_ _backward __of_the_ _selected_stepper _NL_
     ____ "T" ________ _ooo_ _test_  _select "ed " _stepper " with direct port access" _NL_
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
@@ -714,7 +714,7 @@ const static char messages[] PROGMEM =
     ____ "t" ________ _ooo_ _Enter_ _test_ _mode _NL_
     ____ "u" ________ _ooo_ "Unidirectional " _mode " (need reset " _to_ "restore)" _NL_
 #if defined(ARDUINO_ARCH_AVR)
-    ____ "r" ________ _ooo_ _Toggle_ _erroneous_ _digitalRead_ _of_the_ _stepper " pin" _NL_
+    ____ "r" ________ _ooo_ _Toggle_ _erroneous_ _digitalRead_ __of_the_ _stepper " pin" _NL_
 #endif
     ____ "e" ________ _ooo_ _Toggle_ _erroneous_ "long 100us interrupt block" _NL_
     _toggle_print_usage_after_stepper_stop
