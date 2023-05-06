@@ -1,16 +1,4 @@
 # FastAccelStepper 
-
-version pre-0.29.0 Issues:
-- test 06 on esp32 fails
-- test 07 on esp32 fails (2nd result is 1143 with kind of a jump on REV)
-- test 02 on esp32 seems to be more noisy (subjective impression)
-- decelerate to stop with test case 10 is sometimes noisy (esp32)
-- ramp `M1 A1 V10 f` appears to have speed steps at 5 Hz and hangs at v=1/14880 ticks
-- `M1 A1000 V1000 f w2000 A1 V10 U` does not speed up from V1000
-- `M1 A1000 V1000 f w2000 A50 V10 U` speed up from V1000 with several seconds delay
-- `M1 A1000 V1000 f w2000 A1 V2000 U` jumps from v=1000us to 1412us
-- `M1 A1000 V1000 f w2000 A50 V2000 U` jumps from v=1000us to 1412us
-
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.28.1)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/gin66/library/FastAccelStepper.svg)](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
 
@@ -63,7 +51,7 @@ FastAccelStepper offers the following features:
 * Direction pins can be shared between motors
 * Configurable delay between direction change and following step
 * External callback function can be used to drive the enable pins (e.g. connected to shift register) and, only esp32 derivates: the direction pins
-* No float calculation (use own implementation of poor man float: 8 bit mantissa+8 bit exponent)
+* No float calculation (poor man float: use log2 representation in range -64..64 with 16bit integer representation and 1/512th resolution)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
 
