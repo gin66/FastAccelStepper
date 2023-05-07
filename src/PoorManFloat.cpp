@@ -262,15 +262,11 @@ uint16_t pmfl_to_u16(pmf_logarithmic x) {
     offset >>= 1;
   }
   x -= offset;
-  if (exponent > 9) {
-    x >>= 1;
-    x <<= exponent - 9;
-  } else if (exponent < 9) {
-    x >>= 1;
-    x += 1;
-    x >>= 9 - exponent;
-  } else {
-    x >>= 1;
+  if (exponent > 10) {
+    x <<= exponent - 10;
+  } else if (exponent < 10) {
+	x += (exponent != 9) ? 2 : 1;
+    x >>= 10 - exponent;
   }
   return x;
 }
