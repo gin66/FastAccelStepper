@@ -200,7 +200,7 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   }
   x <<= leading + 1;
   uint8_t e = 7 - leading;
-  uint16_t res = (e << 8) | x;
+  uint16_t res = (((uint16_t)e) << 8) | x;
   uint8_t index = res & 0x00ff;
   uint8_t offset =
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
@@ -221,10 +221,9 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   uint8_t index = x >> 2;
   uint8_t offset =
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
-  if (((x & 2) != 0) && (index != 255)) {
-    offset +=
-        pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index + 1]);
-	offset += 1;
+  if (((x & 2) != 0) && (index++ != 255)) {
+    offset += pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
+    offset += 1;
     offset >>= 1;
   }
   x += offset;
@@ -258,16 +257,16 @@ uint16_t pmfl_to_u16(pmf_logarithmic x) {
   x <<= 1;
   uint8_t offset =
       pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_2[index]);
-  if (((x & 2) != 0) && (index != 255)) {
-    offset += pgm_read_byte_near(
-        &x_minus_pow2_of_x_minus_one_shifted_by_2[index + 1]);
+  if (((x & 2) != 0) && (index++ != 255)) {
+    offset +=
+        pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_2[index]);
     offset >>= 1;
   }
   x -= offset;
   if (exponent > 10) {
     x <<= exponent - 10;
   } else if (exponent < 10) {
-	x += (exponent != 9) ? 2 : 1;
+    x += (exponent != 9) ? 2 : 1;
     x >>= 10 - exponent;
   }
   return x;
@@ -295,10 +294,6 @@ pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n) {
 pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n) {
   return x - (((int16_t)n) << 9);
 }
-pmf_logarithmic pmfl_multiply(pmf_logarithmic x, pmf_logarithmic y) {
-  return x + y;
-}
-pmf_logarithmic pmfl_reciprocal(pmf_logarithmic x) { return -x; }
 pmf_logarithmic pmfl_square(pmf_logarithmic x) {
   if (x >= 0x4000) {
     return 0x7fff;
@@ -311,12 +306,4 @@ pmf_logarithmic pmfl_square(pmf_logarithmic x) {
 pmf_logarithmic pmfl_rsquare(
     pmf_logarithmic x) {  // Reciprocal square = 1/(x*x)
   return pmfl_reciprocal(pmfl_square(x));
-}
-pmf_logarithmic pmfl_sqrt(pmf_logarithmic x) { return x / 2; }
-pmf_logarithmic pmfl_rsqrt(
-    pmf_logarithmic x) {  // Reciprocal sqrt() = 1/sqrt(x)
-  return (-x) / 2;
-}
-pmf_logarithmic pmfl_divide(pmf_logarithmic x, pmf_logarithmic y) {
-  return x - y;
 }

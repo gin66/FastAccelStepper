@@ -58,7 +58,9 @@ uint32_t calculate_ticks_v4(uint32_t steps, uint32_t acceleration) {
 }
 //
 // Precalculating the acceleration related constant improves further to 12-4 =
-// 8us
+// 8us. This measurement was actually done with ump_float.
+// So this routine does not fit to that measurement anymore
+//
 uint32_t calculate_ticks_v5(uint32_t steps, pmf_logarithmic pre_calc) {
   pmf_logarithmic pmfl_s = pmfl_from(steps);
   pmf_logarithmic pmfl_res = pmfl_divide(pre_calc, pmfl_sqrt(pmfl_s));
@@ -68,10 +70,11 @@ uint32_t calculate_ticks_v5(uint32_t steps, pmf_logarithmic pre_calc) {
 //
 // using the combined function yields actually no measureable improvement
 uint32_t calculate_ticks_v6(uint32_t steps, pmf_logarithmic pre_calc) {
-  pmf_logarithmic pmfl_s = pmfl_from(steps);
-  pmf_logarithmic pmfl_res = pmfl_sqrt_after_divide(pre_calc, pmfl_s);
-  uint32_t res = pmfl_to_u32(pmfl_res);
-  return res;
+  //  pmf_logarithmic pmfl_s = pmfl_from(steps);
+  //  pmf_logarithmic pmfl_res = pmfl_sqrt_after_divide(pre_calc, pmfl_s);
+  //  uint32_t res = pmfl_to_u32(pmfl_res);
+  //  return res;
+  return calculate_ticks_v5(steps, pre_calc);
 }
 //
 // In order to increase the precision to more than 8 bits and avoid
@@ -161,95 +164,29 @@ uint32_t calculate_ticks_v7(uint32_t steps, pmf_logarithmic pre_calc) {
   }
   return n_i;
 }
-//
-// New approach is to calculate the draft result and then increase the
-// resolution by another operation.
-//
-// Starting again with:
-//
-//		n * timeticks = 1 / sqrt(2*s*a)
-//
-// solved for n and timeticks replaced with 1/f
-//
-//		n = 1 / sqrt(s) * f / sqrt(2 * a)
-//
-// The second part should be the precalculated A
-//
-//	    A = f / sqrt(2 * a)
-//
-// Thus
-//		n = A / sqrt(s)
-//
-// Now we define
-//
-//		s = s_r + e = s_r * (1 + e/s_r)
-//
-// When calculate n, actually calculated with rounding/truncation from 8 bit
-// operation:
-//
-//		n_r = A / sqrt(s_r)
-//
-// The error from the rounding/truncation can be fixed by:
-//
-//     n = n_r * 1/sqrt(1+e/s_r) ~ n_r * (1 - 0.5 * e/s_r) = n_r - n_r * e/s_r/2
-//
-// How to get e and s_r ?
-//
-// If calculating sqrt(s), the result squared is s_r
-//
-//    s_r = (sqrt(s))²
-//
-// And so:
-//
-//	  e = s - s_r
-//
-// This algorithm works pretty well, but the division error is not compensated
 #endif
 
+// This is used and requires 9.5us.
+//
+// Measure with:
+//   cd extras/tests/simavr_based
+//   make -C off_test_timing
+//   From the results subtract port B from port A measurement
 uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc) {
   pmf_logarithmic pmfl_steps = pmfl_from(steps);
-  pmf_logarithmic pmfl_rsqrt_steps = pmfl_rsqrt(pmfl_steps);
-  pmf_logarithmic pmfl_res = pmfl_multiply(pre_calc, pmfl_rsqrt_steps);
+  pmf_logarithmic pmfl_sqrt_steps = pmfl_sqrt(pmfl_steps);
+  pmf_logarithmic pmfl_res = pmfl_divide(pre_calc, pmfl_sqrt_steps);
   uint32_t res = pmfl_to_u32(pmfl_res);
   return res;
 }
 
-#ifdef TEST
-uint32_t calculate_ticks_v9(uint32_t steps, pmf_logarithmic pre_calc) {
-  pmf_logarithmic pmfl_steps = pmfl_from(steps);
-  pmf_logarithmic pmfl_rsqrt_steps = pmfl_rsqrt(pmfl_steps);
-  pmf_logarithmic pmfl_res = pmfl_multiply(pre_calc, pmfl_rsqrt_steps);
-  uint32_t res = pmfl_to_u32(pmfl_res);
-
-#ifdef OFF
-  // now improving the result
-  uint16_t sqrt_steps = pmfl_to_u16(pmfl_sqrt_steps);
-  uint32_t steps_r = sqrt_steps;
-  steps_r *= sqrt_steps;
-  printf("%d ->sqrt -> %d ->^2-> %d\n", steps, sqrt_steps, steps_r);
-  printf("%d / sqrt(steps) = %d,   %d\n", pmfl_to_u32(pre_calc), res,
-         pmfl_to_u32(pre_calc) / sqrt_steps);
-
-  if (steps > steps_r) {
-    uint32_t e = steps - steps_r;
-    pmf_logarithmic pmfl_e = pmfl_from(e >> 1);
-    pmf_logarithmic pmfl_corr =
-        pmfl_divide(pmfl_e, pmfl_steps);  // steps instead of steps_r
-    pmf_logarithmic pmfl_val = pmfl_multiply(pmfl_corr, pmfl_res);
-    uint32_t val = pmfl_to_u32(pmfl_val);
-    printf("%d %d\n", e, val);
-    res -= val;
-  } else if (steps < steps_r) {
-    uint32_t e = steps_r - steps;
-    pmf_logarithmic pmfl_e = pmfl_from(e >> 1);
-    pmf_logarithmic pmfl_corr =
-        pmfl_divide(pmfl_e, pmfl_steps);  // steps instead of steps_r
-    pmf_logarithmic pmfl_val = pmfl_multiply(pmfl_corr, pmfl_res);
-    uint32_t val = pmfl_to_u32(pmfl_val);
-    res += val;
-  }
-#endif
-  printf("%d / sqrt(steps) = %d\n", pmfl_to_u32(pre_calc), res);
-  return res;
+uint32_t calculate_ramp_steps(uint32_t ticks, pmf_logarithmic pmfl_accel) {
+  // pmfl is in range -64..<64 due to shift by 1
+  // pmfl_ticks is in range 0..<32
+  // pmfl_accel is in range 0..<32
+  // PMF_ACCEL_FACTOR is approx. 47 for 16 Mticks/s
+  // pmfl_ticks squared is in range 0..<64
+  pmf_logarithmic pmfl_ticks = pmfl_from(ticks);
+  pmf_logarithmic pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
+  return pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
 }
-#endif

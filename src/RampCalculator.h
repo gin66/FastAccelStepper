@@ -15,3 +15,5 @@ uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc);
 #ifdef TEST
 uint32_t calculate_ticks_v9(uint32_t steps, pmf_logarithmic pre_calc);
 #endif
+
+uint32_t calculate_ramp_steps(uint32_t ticks, pmf_logarithmic pmfl_accel);

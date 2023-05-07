@@ -352,7 +352,7 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   // using test_sd_04_timing_328p version 0.25.6 as reference
   //   manageStepper (fillISR) already needs max 2.3 ms !
   //
-  // check if Issue_152.ino, the interrupt need 14us. 
+  // check if Issue_152.ino, the interrupt need 14us.
   // So 70000 Steps/s is too high.
   if (steppers == 1) {
     max_speed_in_ticks = TICKS_PER_S / 60000;

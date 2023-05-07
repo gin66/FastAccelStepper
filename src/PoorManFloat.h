@@ -25,12 +25,13 @@ uint32_t pmfl_to_u32(pmf_logarithmic x);
 pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n);
 pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n);
 
-pmf_logarithmic pmfl_multiply(pmf_logarithmic x, pmf_logarithmic y);
-pmf_logarithmic pmfl_reciprocal(pmf_logarithmic x);
+#define pmfl_multiply(x, y) ((x) + (y))
+#define pmfl_divide(x, y) ((x) - (y))
+#define pmfl_reciprocal(x) (-(x))
+#define pmfl_sqrt(x) ((x) / 2)
+#define pmfl_rsqrt(x) (-(x) / 2)
+
 pmf_logarithmic pmfl_square(pmf_logarithmic x);
 pmf_logarithmic pmfl_rsquare(pmf_logarithmic x);  // Reciprocal square = 1/(x*x)
-pmf_logarithmic pmfl_sqrt(pmf_logarithmic x);
-pmf_logarithmic pmfl_rsqrt(pmf_logarithmic x);  // Reciprocal sqrt() = 1/sqrt(x)
-pmf_logarithmic pmfl_divide(pmf_logarithmic x, pmf_logarithmic y);
 
 uint8_t leading_zeros(uint8_t x);
