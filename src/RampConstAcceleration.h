@@ -5,14 +5,12 @@
 
 #if (TICKS_PER_S == 16000000L)
 #define PMF_TICKS_PER_S PMF_CONST_16E6
-#define PMF_TICKS_PER_S_DIV_500 PMF_CONST_32000
 #define PMF_TICKS_PER_S_DIV_SQRT_OF_2 PMF_CONST_16E6_DIV_SQRT_OF_2
 #define PMF_ACCEL_FACTOR PMF_CONST_128E12
 #define US_TO_TICKS(u32) (u32 * 16)
 #define TICKS_TO_US(u32) (u32 / 16)
 #elif (TICKS_PER_S == 21000000L)
 #define PMF_TICKS_PER_S PMF_CONST_21E6
-#define PMF_TICKS_PER_S_DIV_500 PMF_CONST_42000
 #define PMF_TICKS_PER_S_DIV_SQRT_OF_2 PMF_CONST_21E6_DIV_SQRT_OF_2
 #define PMF_ACCEL_FACTOR PMF_CONST_2205E11
 #define US_TO_TICKS(u32) (u32 * 21)
@@ -20,7 +18,6 @@
 #else
 #define SUPPORT_PMF_TIMER_FREQ_VARIABLES
 #define PMF_TICKS_PER_S pmfl_timer_freq
-#define PMF_TICKS_PER_S_DIV_500 pmfl_timer_freq_div_500
 #define PMF_TICKS_PER_S_DIV_SQRT_OF_2 pmfl_timer_freq_div_sqrt_of_2
 #define PMF_ACCEL_FACTOR pmfl_timer_freq_square_div_2
 // This overflows for approx. 1s at 40 MHz, only

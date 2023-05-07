@@ -8,7 +8,6 @@
 
 #ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
 static pmf_logarithmic pmfl_timer_freq;
-static pmf_logarithmic pmfl_timer_freq_div_500;
 static pmf_logarithmic pmfl_timer_freq_div_sqrt_of_2;
 static pmf_logarithmic pmfl_timer_freq_square_div_2;
 #endif
@@ -16,7 +15,6 @@ static pmf_logarithmic pmfl_timer_freq_square_div_2;
 void init_ramp_module() {
 #ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
   pmfl_timer_freq = pmfl_from((uint32_t)TICKS_PER_S);
-  pmfl_timer_freq_div_500 = pmfl_divide(pmfl_timer_freq, PMF_CONST_500);
   pmfl_timer_freq_div_sqrt_of_2 =
       pmfl_shr(pmfl_multiply(pmfl_timer_freq, pmfl_timer_freq));
   pmfl_timer_freq_square_div_2 = pmfl_shr(pmfl_square(pmfl_timer_freq));
