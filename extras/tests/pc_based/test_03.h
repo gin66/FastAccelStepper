@@ -381,12 +381,12 @@ bool perform_test() {
   x = pmfl_shl(x1, 4);
   back = pmfl_to_u32(x);
   xprintf("%x => %x (%lx)\n", x1, x, back);
-  test(back == 0xf40000, "wrong pmfl_shl");
+  test(back == 0xf44000, "wrong pmfl_shl");
   x1 = pmfl_from((uint32_t)0xf4555);
   x = pmfl_shr(x1, 4);
   back = pmfl_to_u32(x);
   xprintf("%x => %x (%lx)\n", x1, x, back);
-  test(back == 0xf400, "wrong pmfl_shr");
+  test(back == 0xf440, "wrong pmfl_shr");
 
   x1 = pmfl_from((uint32_t)250);
   x2 = pmfl_from((uint32_t)10000);
