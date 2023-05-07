@@ -2,6 +2,7 @@
 
 typedef int16_t pmf_logarithmic;
 
+#define PMF_CONST_INVALID ((pmf_logarithmic)0x8000)
 #define PMF_CONST_1 ((pmf_logarithmic)0x0000)
 #define PMF_CONST_128E12 ((pmf_logarithmic)0x5dba)
 #define PMF_CONST_16E6 ((pmf_logarithmic)0x2fdd)

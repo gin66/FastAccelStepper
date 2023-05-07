@@ -97,8 +97,10 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
-      performed_ramp_up_steps = pmfl_to_u32(pmfl_multiply(
-          ramp->config.pmfl_inv_accel2, pmfl_rsquare(pmfl_from(curr_ticks))));
+      pmf_logarithmic pmfl_ticks = pmfl_from(curr_ticks);
+      pmf_logarithmic pmfl_accel = ramp->config.pmfl_accel;
+      pmf_logarithmic pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
+      performed_ramp_up_steps = pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
 #ifdef TEST
       printf(
           "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
