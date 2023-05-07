@@ -205,6 +205,7 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   uint8_t offset =
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
   res <<= 1;
+  offset += 1;
   res += offset >> 1;
   return res;
 }
@@ -223,6 +224,7 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   if (((x & 2) != 0) && (index != 255)) {
     offset +=
         pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index + 1]);
+	offset += 1;
     offset >>= 1;
   }
   x += offset;

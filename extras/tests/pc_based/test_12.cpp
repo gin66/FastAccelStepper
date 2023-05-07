@@ -104,8 +104,8 @@ class FastAccelStepperTest {
 };
 int main() {
   FastAccelStepperTest test;
-  test.ramp(1, 1000, 995000, false);
-  test.ramp(1, 1000, 1000000, true);
+  test.ramp(1, 1000,  999000, false);
+  test.ramp(1, 1000, 1001000, true);
   printf("TEST_12 PASSED\n");
   return 0;
 }

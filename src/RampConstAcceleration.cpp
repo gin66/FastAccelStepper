@@ -97,17 +97,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
-      // pmfl is in range -64..<64 due to shift by 1
-      // pmfl_ticks is in range 0..<32
-      // pmfl_accel is in range 0..<32
-      // PMF_ACCEL_FACTOR is approx. 47 for 16 Mticks/s
-      // pmfl_ticks squared is in range 0..<64
-      pmf_logarithmic pmfl_ticks = pmfl_from(curr_ticks);
-      pmf_logarithmic pmfl_accel = ramp->config.pmfl_accel;
-      pmf_logarithmic pmfl_inv_accel2 =
-          pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
-      performed_ramp_up_steps =
-          pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
+      performed_ramp_up_steps = ramp->config.ramp_steps(curr_ticks, ramp->config.pmfl_accel);
 #ifdef TEST
       printf(
           "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
@@ -214,16 +204,18 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // part dec
         uint32_t possible_coast_steps =
             (remaining_steps - performed_ramp_up_steps) >> 2;
+		if (possible_coast_steps > 0) {
         // curr_ticks is not necessarily correct due to speed increase
         uint32_t coast_time = possible_coast_steps * rw->curr_ticks;
         if (coast_time < 2 * MIN_CMD_TICKS) {
           TRACE_OUTPUT('l');
           this_state = RAMP_STATE_COAST;
 #ifdef TEST
-          printf("low speed coast %d %d\n", possible_coast_steps,
+          printf("high speed coast %d %d\n", possible_coast_steps,
                  remaining_steps - performed_ramp_up_steps);
 #endif
         }
+		}
         if (planning_steps > remaining_steps - performed_ramp_up_steps) {
           this_state = RAMP_STATE_DECELERATE;
         }
@@ -340,16 +332,20 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
           rs = performed_ramp_up_steps - planning_steps;
         }
         d_ticks_new = calculate_ticks_v8(rs, ramp->config.pmfl_sqrt_inv_accel);
+#ifdef TEST
+        printf("Calculate d_ticks_new=%d from ramp steps=%d for deceleration\n", d_ticks_new,
+               rs);
+#endif
         // If the ramp generator cannot decelerate by going down the ramp,
         // then we need to clip the new d_ticks to the min travel ticks
         // This is for issue #150
-        if ((rs == 1) && (ramp->config.min_travel_ticks > d_ticks_new)) {
-          d_ticks_new = ramp->config.min_travel_ticks;
-        }
+		uint32_t min_travel_ticks = ramp->config.min_travel_ticks;
+        if ((rs == 1) && (min_travel_ticks > d_ticks_new)) {
+          d_ticks_new = min_travel_ticks;
 #ifdef TEST
-        printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new,
-               rs);
+        printf("Clip d_ticks_new=%d for deceleration\n", d_ticks_new);
 #endif
+        }
       }
     } else {
       TRACE_OUTPUT('C');
@@ -452,12 +448,27 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (performed_ramp_up_steps < steps) {
       // This can occur with performed_ramp_up_steps = 0 and steps = 1
 #ifdef TEST
+	  printf("prus=%d steps=%d\n", performed_ramp_up_steps, steps);
       assert((performed_ramp_up_steps == 0) && (steps == 1));
 #endif
       // based on above assumption actually obsolete
       performed_ramp_up_steps = 0;
     } else {
-      performed_ramp_up_steps -= steps;
+      uint32_t max_ramp_up_steps = ramp->config.max_ramp_up_steps;
+#ifdef TEST
+	  printf("prus=%d steps=%d max_prus=%d\n", performed_ramp_up_steps, steps, max_ramp_up_steps);
+#endif
+	  if ((performed_ramp_up_steps >= max_ramp_up_steps) && (max_ramp_up_steps+steps <= remaining_steps) && (performed_ramp_up_steps - steps < max_ramp_up_steps)) {
+		 // Speed was too high. So we need to ensure to not overshoot deceleration
+		performed_ramp_up_steps = max_ramp_up_steps;
+		next_ticks = ramp->config.min_travel_ticks;
+#ifdef TEST
+	  printf("clipped prus=%d\n", performed_ramp_up_steps);
+#endif
+	  }
+	  else {
+        performed_ramp_up_steps -= steps;
+	  }
     }
   }
 
