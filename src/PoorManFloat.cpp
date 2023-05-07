@@ -213,43 +213,9 @@ pmf_logarithmic pmfl_from(uint16_t x) {
 	if (leading == 8) { 
     return pmfl_from((uint8_t)x);
   }
-  uint8_t exponent;
-  if ((x & 0xf000) != 0) {
-    if ((x & 0xc000) != 0) {
-      if ((x & 0x8000) != 0) {
-        x >>= 6;
-        exponent = 15;
-      } else {
-        x >>= 5;
-        exponent = 14;
-      }
-    } else {
-      if ((x & 0x2000) != 0) {
-        x >>= 4;
-        exponent = 13;
-      } else {
-        x >>= 3;
-        exponent = 12;
-      }
-    }
-  } else {
-    if ((x & 0x0c00) != 0) {
-      if ((x & 0x0800) != 0) {
-        x >>= 2;
-        exponent = 11;
-      } else {
-        x >>= 1;
-        exponent = 10;
-      }
-    } else {
-      if ((x & 0x0200) != 0) {
-        exponent = 9;
-      } else {
-        x <<= 1;
-        exponent = 8;
-      }
-    }
-  }
+  x <<= leading;
+  x >>= 6;
+  uint8_t exponent = 15 - leading;
   uint8_t index = x >> 1;
   uint8_t offset =
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
