@@ -102,7 +102,7 @@ Comments to pin sharing:
 
 ### AVR ATMega 32u4
 
-* allows up to 60000 generated steps per second for single stepper operation, 37000 for dual stepper and 25000 for three steppers
+* allows up to 60000 generated steps per second for single stepper operation, 37000 for dual stepper and 20000 for three steppers
 * supports up to three stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
 * Steppers' command queue depth: 16
