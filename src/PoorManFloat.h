@@ -14,7 +14,6 @@ typedef int16_t pmf_logarithmic;
 #define PMF_CONST_42000 ((pmf_logarithmic)0x1eb7)
 #define PMF_CONST_21E6_DIV_SQRT_OF_2 ((pmf_logarithmic)0x2fa6)
 #define PMF_CONST_2205E11 ((pmf_logarithmic)0x5f96)
-#define PMF_CONST_1_DIV_500 ((pmf_logarithmic)0xee12)
 pmf_logarithmic pmfl_from(uint8_t x);
 pmf_logarithmic pmfl_from(uint16_t x);
 pmf_logarithmic pmfl_from(uint32_t x);

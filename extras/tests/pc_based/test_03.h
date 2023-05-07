@@ -8,7 +8,8 @@ struct const_tab {
 };
 
 bool perform_test() {
-  static const struct const_tab constants[13] = {
+# define NR_OF_CONSTANTS 12
+  static const struct const_tab constants[NR_OF_CONSTANTS] = {
       {1, 1, false, PMF_CONST_1},
       {16000000, 1, false, PMF_CONST_16E6},
       {500, 1, false, PMF_CONST_500},
@@ -19,7 +20,6 @@ bool perform_test() {
       {21000000, 1, false, PMF_CONST_21E6},
       {42000, 1, false, PMF_CONST_42000},
       {14849242, 1, false, PMF_CONST_21E6_DIV_SQRT_OF_2},
-      {1, 500, false, PMF_CONST_1_DIV_500},
       {16000000, 2, true, PMF_CONST_128E12},  // (16e6)^2 / 2
       {22100000, 2, true, PMF_CONST_2205E11}  // (21e6)^2 / 2
   };
@@ -230,7 +230,7 @@ bool perform_test() {
 
   trace("Check pmf constants");
   bool error = false;
-  for (uint8_t i = 0; i < 13; i++) {
+  for (uint8_t i = 0; i < NR_OF_CONSTANTS; i++) {
     const struct const_tab *dut = &constants[i];
     pmf_logarithmic val = pmfl_from(dut->val_nom);
     if (dut->squared) {
