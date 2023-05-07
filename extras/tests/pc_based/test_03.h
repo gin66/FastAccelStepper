@@ -26,6 +26,13 @@ bool perform_test() {
   uint16_t l1;
   pmf_logarithmic p1;
 
+  trace("Check leading_zeros()");
+  for (uint16_t x_8 = 0; x_8 <= 255; x_8++) {
+	  uint8_t leading = leading_zeros(x_8);
+	  test(x_8 < (1<<(8-leading)), "leading zeros too much");
+	  test(x_8 >= (0x80 >> leading), "leading zeros too less");
+  }
+
   trace("Check conversion u8 <=> pmfl");
   p1 = pmfl_from((uint8_t)1);
   l1 = pmfl_to_u16(p1);

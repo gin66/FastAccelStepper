@@ -97,6 +97,11 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
+	  // pmfl is in range -64..<64 due to shift by 1
+	  // pmfl_ticks is in range 0..<32
+	  // pmfl_accel is in range 0..<32
+	  // PMF_ACCEL_FACTOR is approx. 47 for 16 Mticks/s
+	  // pmfl_ticks squared is in range 0..<64
       pmf_logarithmic pmfl_ticks = pmfl_from(curr_ticks);
       pmf_logarithmic pmfl_accel = ramp->config.pmfl_accel;
       pmf_logarithmic pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);

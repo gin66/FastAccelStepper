@@ -147,6 +147,36 @@ const PROGMEM uint8_t x_minus_pow2_of_x_minus_one_shifted_by_1[256] = {
     19, 18, 18, 17, 16, 16, 15, 15, 14, 13, 13, 12, 11, 11, 10, 9,  9,  8,  7,
     7,  6,  5,  5,  4,  3,  2,  2,  1};
 
+uint8_t leading_zeros(uint8_t x) {
+  if ((x & 0xf0) == 0) {
+    if ((x & 0x0c) == 0) {
+      if ((x & 0x02) == 0) {
+        if (x == 0) {
+          return 8; 
+        }
+		return 7;
+      }
+	  return 6;
+    } 
+      if ((x & 0x08) == 0) {
+		  return 5;
+      } else {
+		  return 4;
+      }
+  } 
+  if ((x & 0xc0) == 0) {
+    if ((x & 0x20) == 0) {
+		return 3;
+    } else {
+		return 2;
+   }
+    } 
+      if ((x & 0x80) == 0) {
+		  return 1;
+    }
+  return 0;
+}
+
 pmf_logarithmic pmfl_from(uint8_t x) {
   // calling with x == 0 is considered an error.
   //
@@ -164,47 +194,13 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   //    table
   //    2. shift left 0000_0eee_mmmm_mmmm by 1
   //    3. add the value from the log2_minus_x_plus_one_shifted_by_1 table
-  uint16_t res;
-  if ((x & 0xf0) == 0) {
-    if ((x & 0x0c) == 0) {
-      if ((x & 0x02) == 0) {
-        if (x == 0) {
-          return (int16_t)0x8000;
-        }
-        x = 0;
-        res = 0x0000;
-      } else {
-        x <<= 7;
-        res = x | 0x0100;
-      }
-    } else {
-      if ((x & 0x08) == 0) {
-        x <<= 6;
-        res = x | 0x0200;
-      } else {
-        x <<= 5;
-        res = x | 0x0300;
-      }
-    }
-  } else {
-    if ((x & 0xc0) == 0) {
-      if ((x & 0x20) == 0) {
-        x <<= 4;
-        res = x | 0x0400;
-      } else {
-        x <<= 3;
-        res = x | 0x0500;
-      }
-    } else {
-      if ((x & 0x80) == 0) {
-        x <<= 2;
-        res = x | 0x0600;
-      } else {
-        x <<= 1;
-        res = x | 0x0700;
-      }
-    }
+  uint8_t leading = leading_zeros(x);
+  if (leading == 8) {
+	  return PMF_CONST_INVALID;
   }
+  uint8_t e = 7 - leading;
+  x <<= leading+1;
+  uint16_t res = (e << 8) | x;
   uint8_t index = res & 0x00ff;
   uint8_t offset =
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
@@ -213,7 +209,8 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   return res;
 }
 pmf_logarithmic pmfl_from(uint16_t x) {
-  if ((x & 0xff00) == 0) {
+	uint8_t leading = leading_zeros(x >> 8);
+	if (leading == 8) { 
     return pmfl_from((uint8_t)x);
   }
   uint8_t exponent;
