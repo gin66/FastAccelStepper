@@ -27,7 +27,7 @@ bool perform_test() {
   pmf_logarithmic p1;
 
   trace("Check leading_zeros()");
-  for (uint16_t x_8 = 0; x_8 <= 255; x_8++) {
+  for (int16_t x_8 = 0; x_8 <= 255; x_8++) {
     uint8_t leading = leading_zeros(x_8);
     test(x_8 < (1 << (8 - leading)), "leading zeros too much");
     test(x_8 >= (0x80 >> leading), "leading zeros too less");

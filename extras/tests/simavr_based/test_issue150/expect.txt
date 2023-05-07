@@ -2,15 +2,15 @@
     DirB:        1*L->H,        0*H->L
  EnableA:        1*L->H,        1*H->L
  EnableB:        0*L->H,        0*H->L
-   StepA:     3993*L->H,     3993*H->L, Max High=13us Total High=20860us
+   StepA:     4000*L->H,     4000*H->L, Max High=13us Total High=20840us
    StepB:        2*L->H,        2*H->L, Max High=4us Total High=9us
-Position[A]=3993
+Position[A]=4000
 
 Position[B]=2
 
-Time in EnableA  max=4152 us, total=4152 us
+Time in EnableA  max=4159 us, total=4159 us
 
-Time in StepA  max=13 us, total=20860 us
+Time in StepA  max=13 us, total=20840 us
 
 Time in StepB  max=4 us, total=9 us
 

@@ -3,6 +3,10 @@ TODO:
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 
+pre-0.29.1:
+- improve rounding for log2/pow2 conversion
+- avr: reduce max speed for 1 stepper to 60kSteps/s from 70kSteps/s
+
 0.29.0:
 - replace former PoorManFloat implementation `ump_float` being exponent+mantissa with `pmfl_logarithmic` as log2 representation
 - avr: reduce max speed for 3 steppers to 20kSteps/s from 25kSteps/s
