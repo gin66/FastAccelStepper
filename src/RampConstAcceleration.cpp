@@ -97,15 +97,17 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
-	  // pmfl is in range -64..<64 due to shift by 1
-	  // pmfl_ticks is in range 0..<32
-	  // pmfl_accel is in range 0..<32
-	  // PMF_ACCEL_FACTOR is approx. 47 for 16 Mticks/s
-	  // pmfl_ticks squared is in range 0..<64
+      // pmfl is in range -64..<64 due to shift by 1
+      // pmfl_ticks is in range 0..<32
+      // pmfl_accel is in range 0..<32
+      // PMF_ACCEL_FACTOR is approx. 47 for 16 Mticks/s
+      // pmfl_ticks squared is in range 0..<64
       pmf_logarithmic pmfl_ticks = pmfl_from(curr_ticks);
       pmf_logarithmic pmfl_accel = ramp->config.pmfl_accel;
-      pmf_logarithmic pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
-      performed_ramp_up_steps = pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
+      pmf_logarithmic pmfl_inv_accel2 =
+          pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
+      performed_ramp_up_steps =
+          pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
 #ifdef TEST
       printf(
           "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
@@ -303,11 +305,11 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // consideration has been done above already
         if (dec_steps_u16 < orig_planning_steps) {
           planning_steps = dec_steps_u16;
-		  if (planning_steps == 0) {
-			  planning_steps = 1;
-		  }
+          if (planning_steps == 0) {
+            planning_steps = 1;
+          }
 #ifdef TEST
-	      printf("Change planning_steps=%u\n", planning_steps);
+          printf("Change planning_steps=%u\n", planning_steps);
 #endif
         }
       }
@@ -328,7 +330,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       if (performed_ramp_up_steps == 1) {
         d_ticks_new = ramp->config.min_travel_ticks;
 #ifdef TEST
-		printf("Set d_ticks_new=%u to min_travel_ticks\n", d_ticks_new);
+        printf("Set d_ticks_new=%u to min_travel_ticks\n", d_ticks_new);
 #endif
       } else {
         uint32_t rs;
@@ -345,7 +347,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
           d_ticks_new = ramp->config.min_travel_ticks;
         }
 #ifdef TEST
-		printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new, rs);
+        printf("Calculate d_ticks_new=%d from ramp steps=%d\n", d_ticks_new,
+               rs);
 #endif
       }
     } else {

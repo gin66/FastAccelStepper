@@ -8,7 +8,7 @@ struct const_tab {
 };
 
 bool perform_test() {
-# define NR_OF_CONSTANTS 12
+#define NR_OF_CONSTANTS 12
   static const struct const_tab constants[NR_OF_CONSTANTS] = {
       {1, 1, false, PMF_CONST_1},
       {16000000, 1, false, PMF_CONST_16E6},
@@ -28,9 +28,9 @@ bool perform_test() {
 
   trace("Check leading_zeros()");
   for (uint16_t x_8 = 0; x_8 <= 255; x_8++) {
-	  uint8_t leading = leading_zeros(x_8);
-	  test(x_8 < (1<<(8-leading)), "leading zeros too much");
-	  test(x_8 >= (0x80 >> leading), "leading zeros too less");
+    uint8_t leading = leading_zeros(x_8);
+    test(x_8 < (1 << (8 - leading)), "leading zeros too much");
+    test(x_8 >= (0x80 >> leading), "leading zeros too less");
   }
 
   trace("Check conversion u8 <=> pmfl");
@@ -63,7 +63,7 @@ bool perform_test() {
   trace("Check conversion u8 <=> pmfl by shift 32bit");
   for (uint8_t n = 1; n < 32; n++) {
     uint32_t v = 1;
-	v <<= n;
+    v <<= n;
     p1 = pmfl_from((uint32_t)v);
     uint32_t res = pmfl_to_u32(p1);
     xprintf("32bit: %x %u\n", p1, res);

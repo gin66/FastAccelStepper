@@ -353,12 +353,11 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   //   manageStepper (fillISR) already needs max 2.3 ms !
   //
   if (steppers == 1) {
-	  max_speed_in_ticks = 228;
+    max_speed_in_ticks = 228;
   } else if (steppers == 2) {
-	  max_speed_in_ticks = 426;
-  }
-  else {
-	  max_speed_in_ticks = TICKS_PER_S / 20000;
+    max_speed_in_ticks = 426;
+  } else {
+    max_speed_in_ticks = TICKS_PER_S / 20000;
   }
 }
 

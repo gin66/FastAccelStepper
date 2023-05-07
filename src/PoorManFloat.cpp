@@ -152,28 +152,28 @@ uint8_t leading_zeros(uint8_t x) {
     if ((x & 0x0c) == 0) {
       if ((x & 0x02) == 0) {
         if (x == 0) {
-          return 8; 
+          return 8;
         }
-		return 7;
+        return 7;
       }
-	  return 6;
-    } 
-      if ((x & 0x08) == 0) {
-		  return 5;
-      } else {
-		  return 4;
-      }
-  } 
+      return 6;
+    }
+    if ((x & 0x08) == 0) {
+      return 5;
+    } else {
+      return 4;
+    }
+  }
   if ((x & 0xc0) == 0) {
     if ((x & 0x20) == 0) {
-		return 3;
+      return 3;
     } else {
-		return 2;
-   }
-    } 
-      if ((x & 0x80) == 0) {
-		  return 1;
+      return 2;
     }
+  }
+  if ((x & 0x80) == 0) {
+    return 1;
+  }
   return 0;
 }
 
@@ -196,10 +196,10 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   //    3. add the value from the log2_minus_x_plus_one_shifted_by_1 table
   uint8_t leading = leading_zeros(x);
   if (leading == 8) {
-	  return PMF_CONST_INVALID;
+    return PMF_CONST_INVALID;
   }
   uint8_t e = 7 - leading;
-  x <<= leading+1;
+  x <<= leading + 1;
   uint16_t res = (e << 8) | x;
   uint8_t index = res & 0x00ff;
   uint8_t offset =
@@ -209,8 +209,8 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   return res;
 }
 pmf_logarithmic pmfl_from(uint16_t x) {
-	uint8_t leading = leading_zeros(x >> 8);
-	if (leading == 8) { 
+  uint8_t leading = leading_zeros(x >> 8);
+  if (leading == 8) {
     return pmfl_from((uint8_t)x);
   }
   x <<= leading;
@@ -298,10 +298,7 @@ pmf_logarithmic pmfl_rsquare(
     pmf_logarithmic x) {  // Reciprocal square = 1/(x*x)
   return pmfl_reciprocal(pmfl_square(x));
 }
-pmf_logarithmic pmfl_sqrt(
-    pmf_logarithmic x) {
-  return x / 2;
-}
+pmf_logarithmic pmfl_sqrt(pmf_logarithmic x) { return x / 2; }
 pmf_logarithmic pmfl_rsqrt(
     pmf_logarithmic x) {  // Reciprocal sqrt() = 1/sqrt(x)
   return (-x) / 2;

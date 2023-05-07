@@ -30,7 +30,8 @@ class FastAccelStepperTest {
     fas_queue[1].next_write_idx = 0;
   }
 
-  void ramp(uint32_t accel, uint32_t speed_us, uint32_t steps, bool reach_coasting) {
+  void ramp(uint32_t accel, uint32_t speed_us, uint32_t steps,
+            bool reach_coasting) {
     init_queue();
     FastAccelStepper s = FastAccelStepper();
     s.init(NULL, 0, 0);
@@ -51,7 +52,7 @@ class FastAccelStepperTest {
     sprintf(fname, "test_12.gnuplot");
     FILE *gp_file = fopen(fname, "w");
     fprintf(gp_file, "$data <<EOF\n");
-	bool coast = false;
+    bool coast = false;
     for (int i = 0; i < 100 * steps; i++) {
       if (true) {
         printf(
@@ -72,14 +73,14 @@ class FastAccelStepperTest {
         rc.check_section(
             &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
         fas_queue[0].read_idx++;
-		if ((i % 100) == 0) {
-        fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
-                16000000.0 / rc.last_dt, rc.last_dt);
-		}
+        if ((i % 100) == 0) {
+          fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
+                  16000000.0 / rc.last_dt, rc.last_dt);
+        }
       }
-	  if ((s.rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST) {
-		  coast = true;
-	  }
+      if ((s.rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST) {
+        coast = true;
+      }
       uint32_t to_dt = rc.total_ticks;
       float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
       printf("planned time in buffer: %.6fs\n", planned_time);
@@ -103,7 +104,7 @@ class FastAccelStepperTest {
 };
 int main() {
   FastAccelStepperTest test;
-  test.ramp(1, 1000,  995000, false);
+  test.ramp(1, 1000, 995000, false);
   test.ramp(1, 1000, 1000000, true);
   printf("TEST_12 PASSED\n");
   return 0;
