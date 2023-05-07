@@ -37,7 +37,6 @@ struct ramp_config_s {
   uint32_t min_travel_ticks;
   uint32_t max_ramp_up_steps;
   pmf_logarithmic pmfl_accel;
-  pmf_logarithmic pmfl_sqrt_inv_accel;
   uint8_t accel_change_cnt;
 
   void init() {
@@ -68,9 +67,6 @@ struct ramp_config_s {
     if (pmfl_accel != new_pmfl_accel) {
       pmfl_accel = new_pmfl_accel;
 
-      // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
-      pmfl_sqrt_inv_accel =
-          pmfl_divide(PMF_TICKS_PER_S_DIV_SQRT_OF_2, pmfl_sqrt(new_pmfl_accel));
       if (checkValidConfig() == MOVE_OK) {
         max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks, pmfl_accel);
       }

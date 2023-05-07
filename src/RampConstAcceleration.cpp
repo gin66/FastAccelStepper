@@ -308,7 +308,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       }
 
       uint32_t rs = performed_ramp_up_steps + planning_steps;
-      d_ticks_new = calculate_ticks_v8(rs, ramp->config.pmfl_sqrt_inv_accel);
+      d_ticks_new = calculate_ticks(rs, ramp->config.pmfl_accel);
 #ifdef TEST
       printf("Calculate d_ticks_new=%u from ramp steps=%u\n", d_ticks_new, rs);
 #endif
@@ -332,7 +332,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         } else {
           rs = performed_ramp_up_steps - planning_steps;
         }
-        d_ticks_new = calculate_ticks_v8(rs, ramp->config.pmfl_sqrt_inv_accel);
+        d_ticks_new = calculate_ticks(rs, ramp->config.pmfl_accel);
 #ifdef TEST
         printf("Calculate d_ticks_new=%d from ramp steps=%d for deceleration\n",
                d_ticks_new, rs);
@@ -371,7 +371,10 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   if (d_ticks_new < MIN_CMD_TICKS) {
     uint32_t cmd_ticks = d_ticks_new * planning_steps;
     if (cmd_ticks < MIN_CMD_TICKS) {
-	  uint16_t min_cmd_ticks = MIN_CMD_TICKS;
+	  uint16_t min_cmd_ticks = 2*MIN_CMD_TICKS-1;
+#ifdef TEST
+	  printf("min_cmd_ticks=%d d_ticks_new=%d\n", min_cmd_ticks, d_ticks_new);
+#endif
 	  min_cmd_ticks /= ((uint16_t)d_ticks_new);
 	  uint32_t new_planning_steps = min_cmd_ticks;
       new_planning_steps += new_planning_steps >> 1;

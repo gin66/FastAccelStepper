@@ -180,6 +180,19 @@ uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc) {
   return res;
 }
 
+uint32_t calculate_ticks(uint32_t steps, pmf_logarithmic pmfl_accel) {
+  // s = 1/2 * a * t^2
+  // 2*a*s = (a*t)^2 = v^2 = (TICKS_PER_S/ticks)^2
+  // ticks = TICKS_PER_S / sqrt(2*a*s) 
+  // ticks = TICKS_PER_S/sqrt(2) / sqrt(a*s) 
+  pmf_logarithmic pmfl_steps = pmfl_from(steps);
+  pmf_logarithmic pmfl_steps_mul_accel = pmfl_multiply(pmfl_steps, pmfl_accel);
+  pmf_logarithmic pmfl_sqrt_steps_mul_accel = pmfl_sqrt(pmfl_steps_mul_accel);
+  pmf_logarithmic pmfl_res = pmfl_divide(PMF_TICKS_PER_S_DIV_SQRT_OF_2, pmfl_sqrt_steps_mul_accel);
+  uint32_t res = pmfl_to_u32(pmfl_res);
+  return res;
+}
+
 uint32_t calculate_ramp_steps(uint32_t ticks, pmf_logarithmic pmfl_accel) {
   // pmfl is in range -64..<64 due to shift by 1
   // pmfl_ticks is in range 0..<32
