@@ -44,6 +44,11 @@ simavr/simavr/run_avr: simavr/simavr/sim/run_avr.c
 
 simavr/simavr/sim/run_avr.c:
 	git clone https://github.com/gin66/simavr.git
+	(cd simavr;git checkout	8d660ce)
+
+proper: clean
+	rm -f run_avr
+	rm -fR simavr
 
 clean:
 	rm -fR */.pio */.tested */x.vcd */result.txt
