@@ -164,7 +164,6 @@ uint32_t calculate_ticks_v7(uint32_t steps, pmf_logarithmic pre_calc) {
   }
   return n_i;
 }
-#endif
 
 // This is used and requires 9.5us.
 //
@@ -179,6 +178,7 @@ uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc) {
   uint32_t res = pmfl_to_u32(pmfl_res);
   return res;
 }
+#endif
 
 uint32_t calculate_ticks(uint32_t steps, pmf_logarithmic pmfl_accel) {
   // s = 1/2 * a * t^2
@@ -203,3 +203,4 @@ uint32_t calculate_ramp_steps(uint32_t ticks, pmf_logarithmic pmfl_accel) {
   pmf_logarithmic pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
   return pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
 }
+
