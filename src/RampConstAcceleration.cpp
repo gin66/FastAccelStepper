@@ -170,9 +170,9 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   // Forward planning of 2ms or more on slow speed.
   uint16_t planning_steps;
   if (curr_ticks < TICKS_PER_S / 1000) {
-    pmf_logarithmic pmfl_ps =
-        pmfl_divide(PMF_TICKS_PER_S_DIV_500, pmfl_from(curr_ticks));
-    planning_steps = pmfl_to_u16(pmfl_ps);
+	uint16_t ps = TICKS_PER_S/500;
+	ps /= (uint16_t)curr_ticks;
+    planning_steps = ps;
   } else {
     planning_steps = 1;
   }
@@ -371,10 +371,9 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   if (d_ticks_new < MIN_CMD_TICKS) {
     uint32_t cmd_ticks = d_ticks_new * planning_steps;
     if (cmd_ticks < MIN_CMD_TICKS) {
-      // planning_steps = MIN_CMD_TICKS / next_ticks;
-
-      uint32_t new_planning_steps = pmfl_to_u32(pmfl_divide(
-          pmfl_from((uint32_t)(MIN_CMD_TICKS)), pmfl_from(d_ticks_new)));
+	  uint16_t min_cmd_ticks = MIN_CMD_TICKS;
+	  min_cmd_ticks /= ((uint16_t)d_ticks_new);
+	  uint32_t new_planning_steps = min_cmd_ticks;
       new_planning_steps += new_planning_steps >> 1;
 #ifdef TEST
       printf("Increase planning steps %d => %d\n", planning_steps,

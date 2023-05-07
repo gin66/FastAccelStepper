@@ -59,7 +59,7 @@ struct ramp_config_s {
     if (min_travel_ticks != min_step_ticks) {
       min_travel_ticks = min_step_ticks;
       if (checkValidConfig() == MOVE_OK) {
-        max_ramp_up_steps = ramp_steps(min_step_ticks, pmfl_accel);
+        max_ramp_up_steps = calculate_ramp_steps(min_step_ticks, pmfl_accel);
       }
     }
   }
@@ -72,7 +72,7 @@ struct ramp_config_s {
       pmfl_sqrt_inv_accel =
           pmfl_divide(PMF_TICKS_PER_S_DIV_SQRT_OF_2, pmfl_sqrt(new_pmfl_accel));
       if (checkValidConfig() == MOVE_OK) {
-        max_ramp_up_steps = ramp_steps(min_travel_ticks, pmfl_accel);
+        max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks, pmfl_accel);
       }
       accel_change_cnt++;
     }
