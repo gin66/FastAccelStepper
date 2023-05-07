@@ -335,6 +335,10 @@ pmf_logarithmic pmfl_rsquare(
     pmf_logarithmic x) {  // Reciprocal square = 1/(x*x)
   return pmfl_reciprocal(pmfl_square(x));
 }
+pmf_logarithmic pmfl_sqrt(
+    pmf_logarithmic x) {
+  return x / 2;
+}
 pmf_logarithmic pmfl_rsqrt(
     pmf_logarithmic x) {  // Reciprocal sqrt() = 1/sqrt(x)
   return (-x) / 2;

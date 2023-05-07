@@ -57,14 +57,13 @@ struct ramp_config_s {
     min_travel_ticks = min_step_ticks;
   }
   inline void setAcceleration(int32_t accel) {
-    pmf_logarithmic new_pmfl_inv_accel2 =
-        pmfl_divide(PMF_ACCEL_FACTOR, pmfl_from((uint32_t)accel));
+	pmf_logarithmic pmfl_accel = pmfl_from((uint32_t)accel);
+    pmf_logarithmic new_pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
     if (pmfl_inv_accel2 != new_pmfl_inv_accel2) {
       pmfl_inv_accel2 = new_pmfl_inv_accel2;
 
       // This is A = f / sqrt(2*a) = (f/sqrt(2))*rsqrt(a)
-      pmfl_sqrt_inv_accel = pmfl_multiply(pmfl_rsqrt(pmfl_from((uint32_t)accel)),
-                                        PMF_TICKS_PER_S_DIV_SQRT_OF_2);
+      pmfl_sqrt_inv_accel = pmfl_divide(PMF_TICKS_PER_S_DIV_SQRT_OF_2, pmfl_sqrt(pmfl_accel));
       accel_change_cnt++;
     }
   }
