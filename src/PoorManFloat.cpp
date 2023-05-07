@@ -96,24 +96,24 @@
 // Using python3 this can be calculated by:
 //     [round(math.log2(i/256) * 256 - (i-256)) for i in range(256,512)]
 //
-// For better precision y_yyyy is shifted by 1 and can be calculated as:
-//	   [round((math.log2(i/256) * 256 - (i-256))*2) for i in range(256,512)]
+// For better precision y_yyyy is shifted by 2 and can be calculated as:
+//	   [round((math.log2(i/256) * 256 - (i-256))*4) for i in range(256,512)]
 //
-const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_1[256] = {
-    0,  1,  2,  3,  3,  4,  5,  6,  7,  8,  8,  9,  10, 11, 11, 12, 13, 13, 14,
-    15, 16, 16, 17, 18, 18, 19, 19, 20, 21, 21, 22, 22, 23, 24, 24, 25, 25, 26,
-    26, 27, 27, 28, 28, 29, 29, 30, 30, 31, 31, 31, 32, 32, 33, 33, 33, 34, 34,
-    34, 35, 35, 36, 36, 36, 37, 37, 37, 37, 38, 38, 38, 39, 39, 39, 39, 40, 40,
-    40, 40, 40, 41, 41, 41, 41, 41, 42, 42, 42, 42, 42, 42, 43, 43, 43, 43, 43,
-    43, 43, 43, 43, 43, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44,
-    44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 44, 43, 43, 43, 43,
-    43, 43, 43, 43, 43, 42, 42, 42, 42, 42, 42, 42, 41, 41, 41, 41, 41, 41, 40,
-    40, 40, 40, 40, 39, 39, 39, 39, 39, 38, 38, 38, 38, 37, 37, 37, 37, 36, 36,
-    36, 36, 35, 35, 35, 35, 34, 34, 34, 33, 33, 33, 32, 32, 32, 31, 31, 31, 30,
-    30, 30, 29, 29, 29, 28, 28, 28, 27, 27, 26, 26, 26, 25, 25, 24, 24, 24, 23,
-    23, 22, 22, 22, 21, 21, 20, 20, 19, 19, 19, 18, 18, 17, 17, 16, 16, 15, 15,
-    14, 14, 14, 13, 13, 12, 12, 11, 11, 10, 10, 9,  9,  8,  8,  7,  6,  6,  5,
-    5,  4,  4,  3,  3,  2,  2,  1,  1};
+const PROGMEM uint8_t log2_minus_x_plus_one_shifted_by_2[256] = {
+    0,  2,  3,  5,  7,  9,  10, 12, 13, 15, 17, 18, 20, 21, 23, 24, 26, 27, 28,
+    30, 31, 32, 34, 35, 36, 38, 39, 40, 41, 43, 44, 45, 46, 47, 48, 49, 50, 51,
+    52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 64, 65, 66, 67, 68, 68,
+    69, 70, 70, 71, 72, 72, 73, 74, 74, 75, 75, 76, 77, 77, 78, 78, 79, 79, 80,
+    80, 80, 81, 81, 82, 82, 83, 83, 83, 84, 84, 84, 84, 85, 85, 85, 86, 86, 86,
+    86, 86, 87, 87, 87, 87, 87, 87, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88,
+    88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 88, 87, 87, 87, 87, 87, 87, 86, 86,
+    86, 86, 86, 85, 85, 85, 85, 84, 84, 84, 84, 83, 83, 83, 82, 82, 82, 81, 81,
+    81, 80, 80, 79, 79, 79, 78, 78, 77, 77, 76, 76, 75, 75, 74, 74, 73, 73, 72,
+    72, 71, 71, 70, 70, 69, 68, 68, 67, 67, 66, 65, 65, 64, 63, 63, 62, 61, 61,
+    60, 59, 59, 58, 57, 57, 56, 55, 54, 54, 53, 52, 51, 51, 50, 49, 48, 47, 47,
+    46, 45, 44, 43, 42, 42, 41, 40, 39, 38, 37, 36, 35, 34, 34, 33, 32, 31, 30,
+    29, 28, 27, 26, 25, 24, 23, 22, 21, 20, 19, 18, 17, 16, 15, 14, 13, 12, 11,
+    10, 9,  8,  7,  6,  4,  3,  2,  1};
 
 // For the inverse pow(2,x) needs to be calculated. Similarly it makes sense to
 // evaluate instead
@@ -198,14 +198,14 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   if (leading == 8) {
     return PMF_CONST_INVALID;
   }
-  uint8_t e = 7 - leading;
   x <<= leading + 1;
+  uint8_t e = 7 - leading;
   uint16_t res = (e << 8) | x;
   uint8_t index = res & 0x00ff;
   uint8_t offset =
-      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
+      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
   res <<= 1;
-  res += offset;
+  res += offset >> 1;
   return res;
 }
 pmf_logarithmic pmfl_from(uint16_t x) {
@@ -213,14 +213,20 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   if (leading == 8) {
     return pmfl_from((uint8_t)x);
   }
-  x <<= leading;
+  // shift msb out
+  x <<= leading + 1;
   x >>= 6;
   uint8_t exponent = 15 - leading;
-  uint8_t index = x >> 1;
+  uint8_t index = x >> 2;
   uint8_t offset =
-      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_1[index]);
+      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
+  if (((x & 2) != 0) && (index != 255)) {
+    offset +=
+        pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index + 1]);
+    offset >>= 1;
+  }
   x += offset;
-  x -= 0x200;
+  x >>= 1;
   x += ((uint16_t)exponent) << 9;
   return x;
 }

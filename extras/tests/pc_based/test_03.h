@@ -380,11 +380,13 @@ bool perform_test() {
   x1 = pmfl_from((uint32_t)0xf4555);
   x = pmfl_shl(x1, 4);
   back = pmfl_to_u32(x);
-  test(back == 0xf48000, "wrong pmfl_shl");
+  xprintf("%x => %x (%lx)\n", x1, x, back);
+  test(back == 0xf40000, "wrong pmfl_shl");
   x1 = pmfl_from((uint32_t)0xf4555);
   x = pmfl_shr(x1, 4);
   back = pmfl_to_u32(x);
-  test(back == 0xf480, "wrong pmfl_shr");
+  xprintf("%x => %x (%lx)\n", x1, x, back);
+  test(back == 0xf400, "wrong pmfl_shr");
 
   x1 = pmfl_from((uint32_t)250);
   x2 = pmfl_from((uint32_t)10000);
@@ -418,7 +420,7 @@ bool perform_test() {
   x = pmfl_shl(x, 20);
   back = pmfl_to_u32(x);
   xprintf("pmfl_shl(%x/%x,20)=%x (%ld)\n", x1, x2, x, back);
-  test(back + 2 == 1680, "pmfl_divide/pmfl_shl");
+  test(back + 2 == 1678, "pmfl_divide/pmfl_shl");
   x = pmfl_shr(x, 20);
   back = pmfl_to_u32(x);
   xprintf("pmfl_shr(pmfl_shl(%x/%x,20),20)=%x (%ld)\n", x1, x2, x, back);
