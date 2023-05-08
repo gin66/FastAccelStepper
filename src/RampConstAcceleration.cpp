@@ -95,8 +95,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
     } else {
-      performed_ramp_up_steps =
-          ramp->config.calculate_ramp_steps(curr_ticks);
+      performed_ramp_up_steps = ramp->config.calculate_ramp_steps(curr_ticks);
 #ifdef TEST
       printf(
           "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
@@ -168,8 +167,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   // Forward planning of 2ms or more on slow speed.
   uint16_t planning_steps;
   if (curr_ticks < TICKS_PER_S / 1000) {
-	uint16_t ps = TICKS_PER_S/500;
-	ps /= (uint16_t)curr_ticks;
+    uint16_t ps = TICKS_PER_S / 500;
+    ps /= (uint16_t)curr_ticks;
     planning_steps = ps;
   } else {
     planning_steps = 1;
@@ -369,12 +368,12 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   if (d_ticks_new < MIN_CMD_TICKS) {
     uint32_t cmd_ticks = d_ticks_new * planning_steps;
     if (cmd_ticks < MIN_CMD_TICKS) {
-	  uint16_t min_cmd_ticks = 2*MIN_CMD_TICKS-1;
+      uint16_t min_cmd_ticks = 2 * MIN_CMD_TICKS - 1;
 #ifdef TEST
-	  printf("min_cmd_ticks=%d d_ticks_new=%d\n", min_cmd_ticks, d_ticks_new);
+      printf("min_cmd_ticks=%d d_ticks_new=%d\n", min_cmd_ticks, d_ticks_new);
 #endif
-	  min_cmd_ticks /= ((uint16_t)d_ticks_new);
-	  uint32_t new_planning_steps = min_cmd_ticks;
+      min_cmd_ticks /= ((uint16_t)d_ticks_new);
+      uint32_t new_planning_steps = min_cmd_ticks;
       new_planning_steps += new_planning_steps >> 1;
 #ifdef TEST
       printf("Increase planning steps %d => %d\n", planning_steps,
