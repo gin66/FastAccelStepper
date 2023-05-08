@@ -40,7 +40,7 @@ void setup() {
 void loop() {
   // test to check single stepper high speed operation
   int32_t target = 20000;
-  stepper->setSpeedInHz(60000);
+  stepper->setSpeedInHz(50000);
   stepper->moveTo(target);
   while (stepper->isRunning()) {
   };

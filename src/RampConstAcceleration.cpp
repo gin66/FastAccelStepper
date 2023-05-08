@@ -96,7 +96,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       performed_ramp_up_steps = 0;
     } else {
       performed_ramp_up_steps =
-          calculate_ramp_steps(curr_ticks, ramp->config.pmfl_accel);
+          ramp->config.calculate_ramp_steps(curr_ticks);
 #ifdef TEST
       printf(
           "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
@@ -306,7 +306,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       }
 
       uint32_t rs = performed_ramp_up_steps + planning_steps;
-      d_ticks_new = calculate_ticks(rs, ramp->config.pmfl_accel);
+      d_ticks_new = ramp->config.calculate_ticks(rs);
 #ifdef TEST
       printf("Calculate d_ticks_new=%u from ramp steps=%u\n", d_ticks_new, rs);
 #endif
@@ -330,7 +330,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         } else {
           rs = performed_ramp_up_steps - planning_steps;
         }
-        d_ticks_new = calculate_ticks(rs, ramp->config.pmfl_accel);
+        d_ticks_new = ramp->config.calculate_ticks(rs);
 #ifdef TEST
         printf("Calculate d_ticks_new=%d from ramp steps=%d for deceleration\n",
                d_ticks_new, rs);

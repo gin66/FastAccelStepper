@@ -355,7 +355,7 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   // check if Issue_152.ino, the interrupt need 14us.
   // So 70000 Steps/s is too high.
   if (steppers == 1) {
-    max_speed_in_ticks = TICKS_PER_S / 60000;
+    max_speed_in_ticks = TICKS_PER_S / 50000;
   } else if (steppers == 2) {
     max_speed_in_ticks = 426;
   } else {
