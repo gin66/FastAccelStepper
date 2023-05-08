@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "PoorManFloat.h"
+#include "common.h"
 
 #ifdef TEST_TIMING
 uint32_t calculate_ticks_v1(uint32_t steps, float acceleration);
