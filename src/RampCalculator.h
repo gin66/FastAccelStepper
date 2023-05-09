@@ -57,7 +57,7 @@ struct ramp_config_s {
     accel_change_cnt = 0;
     min_travel_ticks = 0;
     max_ramp_up_steps = 0;
-	s_h = 1000;
+	s_h = 0;
 	pmfl_ticks_h = PMF_CONST_MAX;
 	cubic = PMF_CONST_INVALID;
     pmfl_accel = PMF_CONST_INVALID;
@@ -90,6 +90,10 @@ struct ramp_config_s {
 		}
         max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks);
       }
+  }
+  inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
+	  s_h = s_cubic_steps;
+	  update();
   }
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
     if (min_travel_ticks != min_step_ticks) {

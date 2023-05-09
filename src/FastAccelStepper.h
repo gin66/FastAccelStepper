@@ -351,7 +351,7 @@ class FastAccelStepper {
   int32_t getCurrentSpeedInMilliHz();
 
   // ## Acceleration
-  //  set Acceleration expects as parameter the change of speed
+  //  setAcceleration() expects as parameter the change of speed
   //  as step/s².
   //  If for example the speed should ramp up from 0 to 10000 steps/s within
   //  10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
@@ -373,6 +373,21 @@ class FastAccelStepper {
   //    < 0 while speed is changeing towards negative values
   inline int32_t getCurrentAcceleration() {
     return _rg.getCurrentAcceleration();
+  }
+
+  // ## Linear Acceleration
+  //  setLinearAcceleration expects as parameter the number of steps,
+  //  where the acceleration is increased linearly from standstill up to the configured acceleration value.
+  //
+  //  If for example the acceleration should ramp up from 0 to 10000 steps/s^2 within
+  //  100 steps, then call setLinearAcceleration(100)
+  //
+  // New value will be used after call to
+  // move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
+  //
+  // note: no update on stopMove()
+  inline void setLinearAcceleration(uint32_t linear_acceleration_steps) {
+    _rg.setLinearAcceleration(linear_acceleration_steps);
   }
 
   // ## Apply new speed/acceleration value

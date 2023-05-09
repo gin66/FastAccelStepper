@@ -59,6 +59,9 @@ class RampGenerator {
   }
   int8_t setAcceleration(int32_t accel);
   uint32_t getAcceleration() { return acceleration; }
+  void setLinearAcceleration(uint32_t linear_acceleration_steps) {
+	  _config.setCubicAccelerationSteps(linear_acceleration_steps);
+  }
   int32_t getCurrentAcceleration();
   inline bool hasValidConfig() { return _config.checkValidConfig() == MOVE_OK; }
   void applySpeedAcceleration();
