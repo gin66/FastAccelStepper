@@ -8,10 +8,11 @@ struct const_tab {
 };
 
 bool perform_test() {
-#define NR_OF_CONSTANTS 12
+#define NR_OF_CONSTANTS 13
   static const struct const_tab constants[NR_OF_CONSTANTS] = {
-      {1, 1, false, PMF_CONST_1},
+	  {1, 1, false, PMF_CONST_1},
       {16000000, 1, false, PMF_CONST_16E6},
+      {3, 2, false, PMF_CONST_3_DIV_2},
       {500, 1, false, PMF_CONST_500},
       {1000, 1, false, PMF_CONST_1000},
       {2000, 1, false, PMF_CONST_2000},
@@ -425,6 +426,12 @@ bool perform_test() {
   back = pmfl_to_u32(x);
   xprintf("pmfl_shr(pmfl_shl(%x/%x,20),20)=%x (%ld)\n", x1, x2, x, back);
   test(back == 0, "pmfl_divide/pmfl_shl");
+
+  x1 = pmf_logarithmic((uint32_t)1500);
+  x = pmfl_pow_div_3(x1);
+  xprintf("%d/3=%d\n", x1, x);
+  // +1 is deviation
+  test(x+1 == 500, "pmfl_pow_div_3");
 
   return (error_cnt == 0);
 }

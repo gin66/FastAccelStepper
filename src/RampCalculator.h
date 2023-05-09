@@ -47,6 +47,8 @@ uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc);
 struct ramp_config_s {
   uint32_t min_travel_ticks;
   uint32_t max_ramp_up_steps;
+  uint32_t s_h;
+  pmf_logarithmic cubic;
   pmf_logarithmic pmfl_accel;
   uint8_t accel_change_cnt;
 
@@ -54,6 +56,7 @@ struct ramp_config_s {
     accel_change_cnt = 0;
     min_travel_ticks = 0;
     max_ramp_up_steps = 0;
+	s_h = 1000;
     pmfl_accel = PMF_CONST_INVALID;
   }
   inline int8_t checkValidConfig() const {
@@ -65,22 +68,28 @@ struct ramp_config_s {
     }
     return MOVE_OK;
   }
+  inline void update() {
+      if (checkValidConfig() == MOVE_OK) {
+        max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks);
+		// 1/cubic = sqrt(3/2 * a) / s_h^(1/6) / TICKS_PER_S
+		//         = sqrt(3/2 * a / s_h^(1/3)) / TICKS_PER_S
+		// cubic = TICKS_PER_S / sqrt(s_h^(1/3) / (3/2 * a))
+		cubic = pmfl_multiply(PMF_CONST_3_DIV_2, pmfl_accel);
+		cubic = pmfl_sqrt(pmfl_divide(pmfl_pow_div_3(pmfl_from(s_h)), cubic));
+		cubic = pmfl_multiply(PMF_TICKS_PER_S, cubic);
+      }
+  }
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
     if (min_travel_ticks != min_step_ticks) {
       min_travel_ticks = min_step_ticks;
-      if (checkValidConfig() == MOVE_OK) {
-        max_ramp_up_steps = calculate_ramp_steps(min_step_ticks);
-      }
+	  update();
     }
   }
   inline void setAcceleration(int32_t accel) {
     pmf_logarithmic new_pmfl_accel = pmfl_from((uint32_t)accel);
     if (pmfl_accel != new_pmfl_accel) {
       pmfl_accel = new_pmfl_accel;
-
-      if (checkValidConfig() == MOVE_OK) {
-        max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks);
-      }
+	  update();
       accel_change_cnt++;
     }
   }
@@ -90,14 +99,22 @@ struct ramp_config_s {
     // 2*a*s = (a*t)^2 = v^2 = (TICKS_PER_S/ticks)^2
     // ticks = TICKS_PER_S / sqrt(2*a*s)
     // ticks = TICKS_PER_S/sqrt(2) / sqrt(a*s)
-    pmf_logarithmic pmfl_steps = pmfl_from(steps);
-    pmf_logarithmic pmfl_steps_mul_accel =
-        pmfl_multiply(pmfl_steps, pmfl_accel);
-    pmf_logarithmic pmfl_sqrt_steps_mul_accel = pmfl_sqrt(pmfl_steps_mul_accel);
-    pmf_logarithmic pmfl_res =
-        pmfl_divide(PMF_TICKS_PER_S_DIV_SQRT_OF_2, pmfl_sqrt_steps_mul_accel);
-    uint32_t res = pmfl_to_u32(pmfl_res);
-    return res;
+	if (steps >= s_h) {
+		steps -= (s_h + 2)>>2;
+		pmf_logarithmic pmfl_steps = pmfl_from(steps);
+		pmf_logarithmic pmfl_steps_mul_accel =
+			pmfl_multiply(pmfl_steps, pmfl_accel);
+		pmf_logarithmic pmfl_sqrt_steps_mul_accel = pmfl_sqrt(pmfl_steps_mul_accel);
+		pmf_logarithmic pmfl_res =
+			pmfl_divide(PMF_TICKS_PER_S_DIV_SQRT_OF_2, pmfl_sqrt_steps_mul_accel);
+		uint32_t res = pmfl_to_u32(pmfl_res);
+		return res;
+	}
+	// ticks = cubic / s^(2/3)
+	pmf_logarithmic pmfl_steps = pmfl_from(steps);
+	pmf_logarithmic pmfl_res = pmfl_divide(cubic, pmfl_pow_2_div_3(pmfl_steps));
+	uint32_t res = pmfl_to_u32(pmfl_res);
+	return res;
   }
   uint32_t calculate_ramp_steps(uint32_t ticks) const {
     // pmfl is in range -64..<64 due to shift by 1
