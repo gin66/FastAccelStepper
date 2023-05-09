@@ -48,6 +48,7 @@ struct ramp_config_s {
   uint32_t min_travel_ticks;
   uint32_t max_ramp_up_steps;
   uint32_t s_h;
+  uint32_t ticks_h;
   pmf_logarithmic cubic;
   pmf_logarithmic pmfl_accel;
   uint8_t accel_change_cnt;
@@ -57,6 +58,7 @@ struct ramp_config_s {
     min_travel_ticks = 0;
     max_ramp_up_steps = 0;
 	s_h = 1000;
+	ticks_h = 0;
     pmfl_accel = PMF_CONST_INVALID;
   }
   inline int8_t checkValidConfig() const {
@@ -77,6 +79,7 @@ struct ramp_config_s {
 		cubic = pmfl_multiply(PMF_CONST_3_DIV_2, pmfl_accel);
 		cubic = pmfl_sqrt(pmfl_divide(pmfl_pow_div_3(pmfl_from(s_h)), cubic));
 		cubic = pmfl_multiply(PMF_TICKS_PER_S, cubic);
+		ticks_h = calculate_ticks(s_h);
       }
   }
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
@@ -122,9 +125,17 @@ struct ramp_config_s {
     // pmfl_accel is in range 0..<32
     // PMF_ACCEL_FACTOR is approx. 47 for 16 Mticks/s
     // pmfl_ticks squared is in range 0..<64
-    pmf_logarithmic pmfl_ticks = pmfl_from(ticks);
-    pmf_logarithmic pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
-    return pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
+	pmf_logarithmic pmfl_ticks = pmfl_from(ticks);
+	if (ticks <= ticks_h) {
+		pmf_logarithmic pmfl_inv_accel2 = pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
+		uint32_t steps = pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
+		steps += (s_h + 2)>>2;
+		return steps;
+	}
+	// s = (ticks/cubic)^(3/2)
+	pmf_logarithmic pmfl_res = pmfl_divide(pmfl_ticks, cubic);
+	pmfl_res = pmfl_pow_3_div_2(pmfl_res);
+	return pmfl_to_u32(pmfl_res);
   }
 };
 

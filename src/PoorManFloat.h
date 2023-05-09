@@ -44,6 +44,7 @@ inline pmf_logarithmic pmfl_pow_div_3(pmf_logarithmic x) {
 	return x/2;
 }
 #define pmfl_pow_2_div_3(x) ((x) - pmfl_pow_div_3(x))
+#define pmfl_pow_3_div_2(x) ((x) + (x)/2)
 
 pmf_logarithmic pmfl_square(pmf_logarithmic x);
 pmf_logarithmic pmfl_rsquare(pmf_logarithmic x);  // Reciprocal square = 1/(x*x)
