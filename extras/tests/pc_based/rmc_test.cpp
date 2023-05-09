@@ -12,9 +12,10 @@ int main() {
 
   // Calculation is pre_calc/sqrt(steps)
   //
+  float ramp_acceleration = 10.0;
   struct ramp_config_s c;
   c.init();
-  c.setAcceleration(100);
+  c.setAcceleration(ramp_acceleration);
   c.setSpeedInTicks(16 * 1000);
 
   char fname[100];
@@ -23,18 +24,67 @@ int main() {
   fprintf(gp_file, "$data <<EOF\n");
 
   uint64_t sum_ticks = 0;
+  float old_speed = 0;
+  float iir_acceleration = 0;
   for (uint32_t s = 1; s <= c.max_ramp_up_steps; s++) {
+	float ideal_speed = sqrt(2*float(s)*ramp_acceleration);
     uint32_t ticks = c.calculate_ticks(s);
     sum_ticks += ticks;
     uint32_t rs = c.calculate_ramp_steps(ticks);
+    uint32_t ticks_back = c.calculate_ticks(rs);
     uint32_t err = rs >= s ? rs - s : s - rs;
-    printf("%d: %d %d %ld %d delta=%d\n", s, 16000000 / ticks, ticks, sum_ticks,
-           rs, err);
-    fprintf(gp_file, "%d %ld %d %d %d\n", s, sum_ticks, 16000000 / ticks, ticks,
-            rs);
+    uint32_t err_ticks = ticks >= ticks_back ? ticks - ticks_back : ticks_back - ticks;
+	float speed = 16000000.0/float(ticks);
+	float speed_back = 16000000.0/float(ticks_back);
+	float acceleration = (speed - old_speed) * speed;
+	printf("%f\n", speed * 0.001);
+	iir_acceleration += (acceleration - iir_acceleration) * min(1, 10/speed);
+	old_speed = speed;
+    float err_speed = speed <= speed_back ? speed - speed_back : speed_back - speed;
+    printf("%d: %d %d %f %d delta=%d delta_ticks=%d speed=%f acceleration=%f/%f\n",
+		   s, 16000000 / ticks, ticks, float(sum_ticks)/16000000.0,
+           rs, err, err_ticks, err_speed, iir_acceleration, acceleration);
+    fprintf(gp_file, "%d %f %d %d %d %d %d %f %f %f %f\n", s, float(sum_ticks)/16000000.0, 16000000 / ticks, ticks,
+            rs, err, err_ticks, err_speed, iir_acceleration, acceleration, ideal_speed);
   }
   fprintf(gp_file, "EOF\n");
-  fprintf(gp_file, "plot $data using 2:3 with linespoints\n");
+  // fprintf(gp_file, "plot $data using 2:3 with linespoints\n");
+  //fprintf(gp_file, "set terminal pngcairo size 1024,768\n");
+  //fprintf(gp_file, "set output \"ramp.png\"\n");
+  fprintf(gp_file, "set terminal qt\n");
+  fprintf(gp_file, "set term qt size 1024,768\n");
+  fprintf(gp_file, "set multiplot title \"Hi\"\n");
+
+  fprintf(gp_file, "set size 0.5,0.5\n");
+
+  fprintf(gp_file, "set origin 0.5,0.5\n");
+  fprintf(gp_file, "set xlabel \"ramp steps\"\n");
+  fprintf(gp_file, "set ylabel \"speed in steps/s\"\n");
+  fprintf(gp_file, "plot $data using 1:3 with line title \"step to speed dependency\"\n");
+
+  fprintf(gp_file, "set origin 0.0,0.5\n");
+  fprintf(gp_file, "set xlabel \"time in s\"\n");
+  fprintf(gp_file, "set ylabel \"speed in steps/s\"\n");
+  fprintf(gp_file, "plot $data using 2:3 with line title \"speed over time\",");
+  fprintf(gp_file, "     $data using 2:11 with line title \"ideal speed\"\n");
+
+//  fprintf(gp_file, "set origin 0.0,0.5\n");
+//  fprintf(gp_file, "set xlabel \"time in s\"\n");
+//  fprintf(gp_file, "set ylabel \"acceleration in steps/s^2\"\n");
+//  fprintf(gp_file, "plot $data using 2:9 with line title \"acceleration over time\"\n");
+
+  fprintf(gp_file, "set origin 0.5,0.0\n");
+  fprintf(gp_file, "set xlabel \"ramp steps\"\n");
+  fprintf(gp_file, "set ylabel \"recovered ramp steps\"\n");
+  fprintf(gp_file, "plot $data using 1:5 with line title \"steps(speed(steps))\"\n");
+
+  fprintf(gp_file, "set origin 0.0,0.0\n");
+  fprintf(gp_file, "set xlabel \"time in s\"\n");
+  fprintf(gp_file, "set ylabel \"speed error in steps/s\"\n");
+//  fprintf(gp_file, "set yrange [-100:100]\n");
+  fprintf(gp_file, "plot $data using 2:8 with line title \"speed error on ramp change\",");
+  fprintf(gp_file, "     $data using 2:($3-$11) with line title \"speed error to ideal\"\n");
+
   fprintf(gp_file, "pause -1\n");
   fclose(gp_file);
   //	assert(false);
