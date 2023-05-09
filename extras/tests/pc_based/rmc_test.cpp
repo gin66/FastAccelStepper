@@ -12,11 +12,13 @@ int main() {
 
   // Calculation is pre_calc/sqrt(steps)
   //
-  float ramp_acceleration = 10.0;
+  float ramp_acceleration = 10000.0;
+  uint32_t max_speed_in_ticks = 1600;
+
   struct ramp_config_s c;
   c.init();
   c.setAcceleration(ramp_acceleration);
-  c.setSpeedInTicks(16 * 1000);
+  c.setSpeedInTicks(max_speed_in_ticks);
 
   char fname[100];
   sprintf(fname, "ramp.gnuplot");
@@ -53,16 +55,16 @@ int main() {
   //fprintf(gp_file, "set output \"ramp.png\"\n");
   fprintf(gp_file, "set terminal qt\n");
   fprintf(gp_file, "set term qt size 1024,768\n");
-  fprintf(gp_file, "set multiplot title \"Hi\"\n");
+  fprintf(gp_file, "set multiplot title \"Acceleration=%f max speed=%d steps/s\" layout 2,2 columnsfirst margins 0.1,0.9,0.1,0.9 spacing 0.1 columnsfirst\n", ramp_acceleration, 16000000/max_speed_in_ticks);
 
-  fprintf(gp_file, "set size 0.5,0.5\n");
-
-  fprintf(gp_file, "set origin 0.5,0.5\n");
   fprintf(gp_file, "set xlabel \"ramp steps\"\n");
   fprintf(gp_file, "set ylabel \"speed in steps/s\"\n");
   fprintf(gp_file, "plot $data using 1:3 with line title \"step to speed dependency\"\n");
 
-  fprintf(gp_file, "set origin 0.0,0.5\n");
+  fprintf(gp_file, "set xlabel \"ramp steps\"\n");
+  fprintf(gp_file, "set ylabel \"recovered ramp steps\"\n");
+  fprintf(gp_file, "plot $data using 1:5 with line title \"steps(speed(steps))\"\n");
+
   fprintf(gp_file, "set xlabel \"time in s\"\n");
   fprintf(gp_file, "set ylabel \"speed in steps/s\"\n");
   fprintf(gp_file, "plot $data using 2:3 with line title \"speed over time\",");
@@ -73,17 +75,13 @@ int main() {
 //  fprintf(gp_file, "set ylabel \"acceleration in steps/s^2\"\n");
 //  fprintf(gp_file, "plot $data using 2:9 with line title \"acceleration over time\"\n");
 
-  fprintf(gp_file, "set origin 0.5,0.0\n");
-  fprintf(gp_file, "set xlabel \"ramp steps\"\n");
-  fprintf(gp_file, "set ylabel \"recovered ramp steps\"\n");
-  fprintf(gp_file, "plot $data using 1:5 with line title \"steps(speed(steps))\"\n");
-
-  fprintf(gp_file, "set origin 0.0,0.0\n");
   fprintf(gp_file, "set xlabel \"time in s\"\n");
   fprintf(gp_file, "set ylabel \"speed error in steps/s\"\n");
-//  fprintf(gp_file, "set yrange [-100:100]\n");
+  fprintf(gp_file, "set yrange [-10:10]\n");
   fprintf(gp_file, "plot $data using 2:8 with line title \"speed error on ramp change\",");
   fprintf(gp_file, "     $data using 2:($3-$11) with line title \"speed error to ideal\"\n");
+
+  fprintf(gp_file, "unset multiplot\n");
 
   fprintf(gp_file, "pause -1\n");
   fclose(gp_file);
