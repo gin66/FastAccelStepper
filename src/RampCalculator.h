@@ -48,7 +48,7 @@ struct ramp_config_s {
   uint32_t min_travel_ticks;
   uint32_t s_h;
   pmf_logarithmic pmfl_accel;
-  unsigned int change_cnt:4;
+  unsigned int change_cnt:5; // if equal=0, then no valid info
   bool valid_acceleration:1;
   bool valid_speed:1;
   bool recalc_ramp_steps:1;
@@ -97,6 +97,10 @@ struct ramp_config_s {
 			pmfl_ticks_h = PMF_CONST_MAX;
 		}
         max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks);
+		change_cnt++;
+		if (change_cnt == 0) {
+			change_cnt++;
+		}
       }
   }
   inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
