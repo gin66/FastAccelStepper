@@ -113,8 +113,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   uint8_t this_state;
   uint32_t remaining_steps;
   bool need_count_up;
-  if (ramp->keep_running) {
-    need_count_up = ramp->keep_running_count_up;
+  if (ramp->config.keep_running) {
+    need_count_up = ramp->config.keep_running_count_up;
     remaining_steps = 0xfffffff;
   } else {
     // this can overflow, which is legal

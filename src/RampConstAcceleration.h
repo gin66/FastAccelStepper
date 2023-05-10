@@ -8,15 +8,11 @@ struct ramp_ro_s {
   bool force_stop : 1;
   bool force_immediate_stop : 1;
   bool incomplete_immediate_stop : 1;
-  bool keep_running : 1;
-  bool keep_running_count_up : 1;
   inline void init() {
     config.init();
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
-    keep_running = false;
-    keep_running_count_up = false;
   }
   inline void keepRunning(const struct ramp_config_s *new_config,
                           bool countUp) {
@@ -25,8 +21,8 @@ struct ramp_ro_s {
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
-    keep_running = true;
-    keep_running_count_up = countUp;
+    config.keep_running = true;
+    config.keep_running_count_up = countUp;
   }
   inline void runToPosition(const struct ramp_config_s *new_config,
                             int32_t new_target_pos) {
@@ -35,8 +31,8 @@ struct ramp_ro_s {
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
-    keep_running = false;
-    keep_running_count_up = true;
+    config.keep_running = false;
+    config.keep_running_count_up = true;
   }
   inline int32_t targetPosition() { return config.target_pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
@@ -54,8 +50,8 @@ struct ramp_ro_s {
   }
   inline void initiateStop() { force_stop = true; }
   inline bool isStopInitiated() { return force_stop; }
-  inline void setKeepRunning() { keep_running = true; }
-  inline bool isRunningContinuously() { return keep_running; }
+  inline void setKeepRunning() { config.keep_running = true; }
+  inline bool isRunningContinuously() { return config.keep_running; }
 };
 
 struct ramp_rw_s {
