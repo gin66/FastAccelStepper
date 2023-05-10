@@ -5,7 +5,6 @@
 
 struct ramp_ro_s {
   struct ramp_config_s config;
-  int32_t target_pos;
   bool force_stop : 1;
   bool force_immediate_stop : 1;
   bool incomplete_immediate_stop : 1;
@@ -13,7 +12,6 @@ struct ramp_ro_s {
   bool keep_running_count_up : 1;
   inline void init() {
     config.init();
-    target_pos = 0;
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
@@ -23,7 +21,7 @@ struct ramp_ro_s {
   inline void keepRunning(const struct ramp_config_s *new_config,
                           bool countUp) {
     config = *new_config;
-    target_pos = 0;
+    config.target_pos = 0;
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
@@ -33,16 +31,16 @@ struct ramp_ro_s {
   inline void runToPosition(const struct ramp_config_s *new_config,
                             int32_t new_target_pos) {
     config = *new_config;
-    target_pos = new_target_pos;
+    config.target_pos = new_target_pos;
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
     keep_running = false;
     keep_running_count_up = true;
   }
-  inline int32_t targetPosition() { return target_pos; }
+  inline int32_t targetPosition() { return config.target_pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
-    target_pos += delta;
+    config.target_pos += delta;
   }
   inline void immediateStop() { force_immediate_stop = true; }
   inline void markIncompleteImmediateStop() {

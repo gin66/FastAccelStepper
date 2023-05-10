@@ -95,7 +95,7 @@ int8_t RampGenerator::moveTo(int32_t position,
                              const struct queue_end_s *queue_end) {
   int32_t curr_pos;
   if (isRampGeneratorActive() && !_ro.keep_running) {
-    curr_pos = _ro.target_pos;
+    curr_pos = _ro.config.target_pos;
   } else {
     curr_pos = queue_end->pos;
   }
@@ -107,7 +107,7 @@ int8_t RampGenerator::moveTo(int32_t position,
 int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   int32_t curr_pos;
   if (isRampGeneratorActive() && !_ro.keep_running) {
-    curr_pos = _ro.target_pos;
+    curr_pos = _ro.config.target_pos;
   } else {
     curr_pos = queue_end->pos;
   }
@@ -117,7 +117,7 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
 void RampGenerator::advanceTargetPosition(int32_t delta,
                                           const struct queue_end_s *queue) {
   if (isRampGeneratorActive() && !_ro.keep_running) {
-    int32_t new_pos = _ro.target_pos + delta;
+    int32_t new_pos = _ro.config.target_pos + delta;
     _startMove(new_pos, true);
   }
 }

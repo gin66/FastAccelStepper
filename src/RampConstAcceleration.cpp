@@ -118,7 +118,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     remaining_steps = 0xfffffff;
   } else {
     // this can overflow, which is legal
-    int32_t delta = ramp->target_pos - queue_end->pos;
+    int32_t delta = ramp->config.target_pos - queue_end->pos;
 
     if (delta == 0) {
       // this case can happen on overshoot. So reverse current direction

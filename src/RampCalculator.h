@@ -45,14 +45,17 @@ uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc);
 #endif
 
 struct ramp_config_s {
+  int32_t target_pos;
   uint32_t min_travel_ticks;
   uint32_t s_h;
   pmf_logarithmic pmfl_accel;
-  unsigned int change_cnt : 4;  // if equal=0, then no valid info
+  unsigned int change_cnt : 2;  // if equal=0, then no valid info
   bool any_change: 1;
   bool valid_acceleration : 1;
   bool valid_speed : 1;
   bool recalc_ramp_steps : 1;
+  bool keep_running : 1;
+  bool keep_running_count_up : 1;
 
   // These three variables are derived
   uint32_t max_ramp_up_steps;
@@ -61,6 +64,7 @@ struct ramp_config_s {
 
   void init() {
     change_cnt = 0;
+	target_pos = 0;
     valid_acceleration = false;
     valid_speed = false;
     recalc_ramp_steps = false;
