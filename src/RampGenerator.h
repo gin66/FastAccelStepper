@@ -34,11 +34,17 @@ class RampGenerator {
   void init();
   inline int32_t targetPosition() { return _ro.targetPosition(); }
   void advanceTargetPosition(int32_t delta, const struct queue_end_s *queue);
-  void setSpeedInTicks(uint32_t min_step_ticks);
-  inline uint32_t getSpeedInUs() {
-    return _config->min_travel_ticks / (TICKS_PER_S / 1000000);
+  inline void setSpeedInTicks(uint32_t min_step_ticks) {
+	struct ramp_config_s *c = get_new_config();
+	c->setSpeedInTicks(min_step_ticks);
   }
-  inline uint32_t getSpeedInTicks() { return _config->min_travel_ticks; }
+  inline uint32_t getSpeedInUs() {
+    return getSpeedInTicks() / (TICKS_PER_S / 1000000);
+  }
+  inline uint32_t getSpeedInTicks() { 
+	struct ramp_config_s *c = get_new_config();
+	return c->min_travel_ticks;
+  }
   uint32_t divForMilliHz(uint32_t f) {
     uint32_t base = (uint32_t)250 * TICKS_PER_S;
     uint32_t res = base / f;
@@ -59,15 +65,19 @@ class RampGenerator {
     if (_config->min_travel_ticks == 0) {
       return 0;
     }
-    return divForMilliHz(_config->min_travel_ticks);
+    return divForMilliHz(getSpeedInTicks());
   }
   int8_t setAcceleration(int32_t accel);
   inline uint32_t getAcceleration() { return acceleration; }
   void setLinearAcceleration(uint32_t linear_acceleration_steps) {
-    _config->setCubicAccelerationSteps(linear_acceleration_steps);
+    struct ramp_config_s *c = get_new_config();
+    c->setCubicAccelerationSteps(linear_acceleration_steps);
   }
   int32_t getCurrentAcceleration();
-  inline bool hasValidConfig() { return _config->checkValidConfig() == MOVE_OK; }
+  inline bool hasValidConfig() { 
+    struct ramp_config_s *c = get_new_config();
+	 return c->checkValidConfig() == MOVE_OK;
+  }
   void applySpeedAcceleration();
   int8_t move(int32_t move, const struct queue_end_s *queue);
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);
@@ -97,6 +107,27 @@ class RampGenerator {
 
  private:
   int8_t _startMove(int32_t target_pos, bool position_changed);
+  struct ramp_config_s *get_new_config() {
+	// _config points to the last valid config
+	struct ramp_config_s *new_config = (_config == &_config1) ? &_config2 : &_config1;
+	return new_config;
+  }
+  void apply_modification() {
+	// _config points to the last valid config
+	struct ramp_config_s *old_config = _config;
+	struct ramp_config_s *new_config = (_config == &_config1) ? &_config2 : &_config1;
+
+	// make new config visible to interrupt
+    fasDisableInterrupts();
+	new_config->change_cnt = _ro.config.change_cnt + 1;
+	_config = new_config;
+    fasEnableInterrupts();
+
+	// copy over the configuration
+	*old_config = *new_config;
+	old_config->recalc_ramp_steps = false;
+	old_config->any_change = false;
+  }
 };
 
 #endif

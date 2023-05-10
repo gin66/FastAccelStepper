@@ -18,23 +18,20 @@ void RampGenerator::init() {
   _rw.init();
   init_ramp_module();
 }
-void RampGenerator::setSpeedInTicks(uint32_t min_step_ticks) {
-  _config->setSpeedInTicks(min_step_ticks);
-}
 int8_t RampGenerator::setAcceleration(int32_t accel) {
   if (accel <= 0) {
     return -1;
   }
   acceleration = (uint32_t)accel;
-  _config->setAcceleration(accel);
+  struct ramp_config_s *c = get_new_config();
+  c->setAcceleration(accel);
   return 0;
 }
 void RampGenerator::applySpeedAcceleration() {
-  fasDisableInterrupts();
-  _ro.config = *_config;
-  fasEnableInterrupts();
+  apply_modification();
 }
 int8_t RampGenerator::startRun(bool countUp) {
+  apply_modification();
   uint8_t res = _config->checkValidConfig();
   if (res != MOVE_OK) {
     return res;
@@ -59,6 +56,8 @@ int8_t RampGenerator::startRun(bool countUp) {
 }
 
 int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
+	Serial.println("xxx startMove");
+  apply_modification();
   uint8_t res = _config->checkValidConfig();
   if (res != MOVE_OK) {
     return res;
@@ -134,9 +133,14 @@ void RampGenerator::afterCommandEnqueued(NextCommand *command) {
 }
 void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
                                    NextCommand *command) {
-  fasDisableInterrupts();
+  // we are running in higher priority than the application
+  // so we can just read the config without disable interrupts
   // copy consistent ramp state
+  if (_config->change_cnt != _ro.config.change_cnt) {
+	  _ro.config = *_config;
+  }
   struct ramp_ro_s ramp = _ro;
+  fasDisableInterrupts();
   struct queue_end_s qe = *queue_end;
   fasEnableInterrupts();
 

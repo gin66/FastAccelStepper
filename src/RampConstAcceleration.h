@@ -17,7 +17,7 @@ struct ramp_ro_s {
   inline void keepRunning(const struct ramp_config_s *new_config,
                           bool countUp) {
     config = *new_config;
-    config.target_pos = 0;
+    config.setTargetPosition(0);
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;
@@ -27,7 +27,7 @@ struct ramp_ro_s {
   inline void runToPosition(const struct ramp_config_s *new_config,
                             int32_t new_target_pos) {
     config = *new_config;
-    config.target_pos = new_target_pos;
+    config.setTargetPosition(new_target_pos);
     force_stop = false;
     force_immediate_stop = false;
     incomplete_immediate_stop = false;

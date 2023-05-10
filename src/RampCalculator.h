@@ -49,7 +49,7 @@ struct ramp_config_s {
   uint32_t min_travel_ticks;
   uint32_t s_h;
   pmf_logarithmic pmfl_accel;
-  unsigned int change_cnt : 2;  // if equal=0, then no valid info
+  unsigned int change_cnt : 2;
   bool any_change: 1;
   bool valid_acceleration : 1;
   bool valid_speed : 1;
@@ -103,10 +103,11 @@ struct ramp_config_s {
       }
       max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks);
       change_cnt++;
-      if (change_cnt == 0) {
-        change_cnt++;
-      }
     }
+  }
+  inline void setTargetPosition(int32_t pos) {
+	  target_pos = pos;
+	  any_change = true;
   }
   inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
     if (s_h != s_cubic_steps) {
