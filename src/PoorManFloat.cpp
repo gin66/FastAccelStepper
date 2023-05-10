@@ -148,33 +148,25 @@ const PROGMEM uint8_t x_minus_pow2_of_x_minus_one_shifted_by_2[256] = {
     13, 12, 10, 9,  8,  6,  5,  3,  2};
 
 uint8_t leading_zeros(uint8_t x) {
+  uint8_t res;
   if ((x & 0xf0) == 0) {
-    if ((x & 0x0c) == 0) {
-      if ((x & 0x02) == 0) {
-        if (x == 0) {
-          return 8;
-        }
-        return 7;
-      }
-      return 6;
-    }
-    if ((x & 0x08) == 0) {
-      return 5;
-    } else {
-      return 4;
-    }
+	x <<= 4;
+	res = 4;
+  }
+  else {
+	res = 0;
   }
   if ((x & 0xc0) == 0) {
-    if ((x & 0x20) == 0) {
-      return 3;
-    } else {
-      return 2;
-    }
+	x <<= 2;
+	res += 2;
   }
   if ((x & 0x80) == 0) {
-    return 1;
+	res += 1;
+	if ((x & 0x40) == 0) {
+	  res += 1;
+	}
   }
-  return 0;
+  return res;
 }
 
 pmf_logarithmic pmfl_from(uint8_t x) {

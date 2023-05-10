@@ -147,7 +147,7 @@ class FastAccelStepperEngine {
 // The defined preprocessor macros are MOVE_xxx:
 // MOVE_OK: All is OK:
 // MOVE_ERR_NO_DIRECTION_PIN: Negative direction requested, but no direction pin
-// defined MOVE_ERR_SPEED_IS_UNDEFINED: The maximum speed has not been set yet
+// MOVE_ERR_SPEED_IS_UNDEFINED: The maximum speed has not been set yet
 // MOVE_ERR_ACCELERATION_IS_UNDEFINED: The acceleration to use has not been set
 // yet
 
