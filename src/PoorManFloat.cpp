@@ -150,21 +150,20 @@ const PROGMEM uint8_t x_minus_pow2_of_x_minus_one_shifted_by_2[256] = {
 uint8_t leading_zeros(uint8_t x) {
   uint8_t res;
   if ((x & 0xf0) == 0) {
-	x <<= 4;
-	res = 4;
-  }
-  else {
-	res = 0;
+    x <<= 4;
+    res = 4;
+  } else {
+    res = 0;
   }
   if ((x & 0xc0) == 0) {
-	x <<= 2;
-	res += 2;
+    x <<= 2;
+    res += 2;
   }
   if ((x & 0x80) == 0) {
-	res += 1;
-	if ((x & 0x40) == 0) {
-	  res += 1;
-	}
+    res += 1;
+    if ((x & 0x40) == 0) {
+      res += 1;
+    }
   }
   return res;
 }

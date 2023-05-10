@@ -1208,7 +1208,7 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'J'):
       val1 = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
-		Serial.print("linear acceleration steps=");
+        Serial.print("linear acceleration steps=");
         Serial.println(val1);
         stepper_selected->setLinearAcceleration(val1);
         return true;

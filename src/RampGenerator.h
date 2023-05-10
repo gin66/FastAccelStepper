@@ -33,7 +33,9 @@ class RampGenerator {
   inline int32_t targetPosition() { return _ro.targetPosition(); }
   void advanceTargetPosition(int32_t delta, const struct queue_end_s *queue);
   void setSpeedInTicks(uint32_t min_step_ticks);
-  inline uint32_t getSpeedInUs() { return speed_in_ticks / (TICKS_PER_S / 1000000); }
+  inline uint32_t getSpeedInUs() {
+    return speed_in_ticks / (TICKS_PER_S / 1000000);
+  }
   inline uint32_t getSpeedInTicks() { return speed_in_ticks; }
   uint32_t divForMilliHz(uint32_t f) {
     uint32_t base = (uint32_t)250 * TICKS_PER_S;
@@ -60,7 +62,7 @@ class RampGenerator {
   int8_t setAcceleration(int32_t accel);
   inline uint32_t getAcceleration() { return acceleration; }
   void setLinearAcceleration(uint32_t linear_acceleration_steps) {
-	  _config.setCubicAccelerationSteps(linear_acceleration_steps);
+    _config.setCubicAccelerationSteps(linear_acceleration_steps);
   }
   int32_t getCurrentAcceleration();
   inline bool hasValidConfig() { return _config.checkValidConfig() == MOVE_OK; }

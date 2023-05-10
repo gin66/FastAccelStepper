@@ -10,7 +10,7 @@ struct const_tab {
 bool perform_test() {
 #define NR_OF_CONSTANTS 13
   static const struct const_tab constants[NR_OF_CONSTANTS] = {
-	  {1, 1, false, PMF_CONST_1},
+      {1, 1, false, PMF_CONST_1},
       {16000000, 1, false, PMF_CONST_16E6},
       {3, 2, false, PMF_CONST_3_DIV_2},
       {500, 1, false, PMF_CONST_500},
@@ -431,7 +431,7 @@ bool perform_test() {
   x = pmfl_pow_div_3(x1);
   xprintf("%d/3=%d\n", x1, x);
   // +1 is deviation
-  test(x+1 == 500, "pmfl_pow_div_3");
+  test(x + 1 == 500, "pmfl_pow_div_3");
 
   return (error_cnt == 0);
 }
