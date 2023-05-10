@@ -48,7 +48,10 @@ struct ramp_config_s {
   uint32_t min_travel_ticks;
   uint32_t s_h;
   pmf_logarithmic pmfl_accel;
-  uint8_t accel_change_cnt;
+  unsigned int change_cnt:4;
+  bool valid_acceleration:1;
+  bool valid_speed:1;
+  bool recalc_ramp_steps:1;
 
   // These three variables are derived
   uint32_t max_ramp_up_steps;
@@ -56,19 +59,22 @@ struct ramp_config_s {
   pmf_logarithmic cubic;
 
   void init() {
-    accel_change_cnt = 0;
-    min_travel_ticks = 0;
-    max_ramp_up_steps = 0;
+    change_cnt = 0;
+	valid_acceleration = false;
+	valid_speed = false;
+	recalc_ramp_steps  = false;
 	s_h = 0;
-	pmfl_ticks_h = PMF_CONST_MAX;
-	cubic = PMF_CONST_INVALID;
-    pmfl_accel = PMF_CONST_INVALID;
+    //min_travel_ticks = 0;
+    //max_ramp_up_steps = 0;
+	//pmfl_ticks_h = PMF_CONST_MAX;
+	//cubic = PMF_CONST_INVALID;
+    //pmfl_accel = PMF_CONST_INVALID;
   }
   inline int8_t checkValidConfig() const {
-    if (min_travel_ticks == 0) {
+    if (!valid_speed) {
       return MOVE_ERR_SPEED_IS_UNDEFINED;
     }
-    if (pmfl_accel == PMF_CONST_INVALID) {
+    if (!valid_acceleration) {
       return MOVE_ERR_ACCELERATION_IS_UNDEFINED;
     }
     return MOVE_OK;
@@ -94,21 +100,26 @@ struct ramp_config_s {
       }
   }
   inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
-	  s_h = s_cubic_steps;
-	  update();
+	  if (s_h != s_cubic_steps) {
+		  s_h = s_cubic_steps;
+		  recalc_ramp_steps = true;
+		  update();
+	  }
   }
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
-    if (min_travel_ticks != min_step_ticks) {
+    if (!valid_speed || (min_travel_ticks != min_step_ticks)) {
       min_travel_ticks = min_step_ticks;
+	  valid_speed = true;
 	  update();
     }
   }
   inline void setAcceleration(int32_t accel) {
     pmf_logarithmic new_pmfl_accel = pmfl_from((uint32_t)accel);
-    if (pmfl_accel != new_pmfl_accel) {
+    if (!valid_acceleration || (pmfl_accel != new_pmfl_accel)) {
+	  valid_acceleration = true;
+	  recalc_ramp_steps = true;
       pmfl_accel = new_pmfl_accel;
 	  update();
-      accel_change_cnt++;
     }
   }
 

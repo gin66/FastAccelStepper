@@ -90,7 +90,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   // can deviate due to precision or clipping effect
   uint32_t curr_ticks = rw->curr_ticks;
   uint32_t performed_ramp_up_steps;
-  if (ramp->config.accel_change_cnt != rw->accel_change_cnt) {
+  if (ramp->config.recalc_ramp_steps && (ramp->config.change_cnt != rw->change_cnt)) {
     TRACE_OUTPUT('X');
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
       performed_ramp_up_steps = 0;
@@ -486,7 +486,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   command->command.count_up = count_up;
 
   command->rw.ramp_state = this_state;
-  command->rw.accel_change_cnt = ramp->config.accel_change_cnt;
+  command->rw.change_cnt = ramp->config.change_cnt;
   command->rw.performed_ramp_up_steps = performed_ramp_up_steps;
   command->rw.pause_ticks_left = pause_ticks_left;
   command->rw.curr_ticks = pause_ticks_left + next_ticks;
