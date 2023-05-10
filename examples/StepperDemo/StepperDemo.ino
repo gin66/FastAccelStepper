@@ -664,9 +664,17 @@ const static char messages[] PROGMEM =
     "Cannot interpret this command: " _SEP_
 #define MSG_SET_SPEED_TO_MILLI_HZ 63+MSG_OFFSET
     _set_ _speed_ "(" _steps_ "/1000s) " _to_ _SEP_
-#define MSG_USAGE_NORMAL 64+MSG_OFFSET
-#define MSG_USAGE_TEST 65+MSG_OFFSET
-#define MSG_USAGE_CONFIG 66+MSG_OFFSET
+#define MSG_ACCELERATION_STATUS 64+MSG_OFFSET
+     " " _acceleration_ " [Steps/s^2]=" _SEP_
+#define MSG_SPEED_STATUS_FREQ 65+MSG_OFFSET
+     " Speed [mStep/s]=" _SEP_
+#define MSG_SPEED_STATUS_TIME 66+MSG_OFFSET
+     " Speed [us/step]=" _SEP_
+#define MSG_LINEAR_ACCELERATION 67+MSG_OFFSET
+     "linear acceleration steps=" _SEP_
+#define MSG_USAGE_NORMAL 68+MSG_OFFSET
+#define MSG_USAGE_TEST 69+MSG_OFFSET
+#define MSG_USAGE_CONFIG 70+MSG_OFFSET
 #if MSG_USAGE_CONFIG >= 128+32
 #error "TOO MANY ENTRIES"
 #endif
@@ -998,13 +1006,13 @@ void info(FastAccelStepper *s, bool long_info) {
     }
   } else {
     if (long_info) {
-      Serial.print(" Acceleration [Steps/s^2]=");
+	  output_msg(MSG_ACCELERATION_STATUS);
       Serial.print(s->getAcceleration());
       if (speed_in_milli_hz) {
-        Serial.print(" Speed [mStep/s]=");
+	    output_msg(MSG_SPEED_STATUS_FREQ);
         Serial.print(s->getSpeedInMilliHz());
       } else {
-        Serial.print(" Speed [us/step]=");
+	    output_msg(MSG_SPEED_STATUS_TIME);
         Serial.print(s->getSpeedInUs());
       }
     }
@@ -1208,7 +1216,7 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'J'):
       val1 = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
-        Serial.print("linear acceleration steps=");
+		output_msg(MSG_LINEAR_ACCELERATION);
         Serial.println(val1);
         stepper_selected->setLinearAcceleration(val1);
         return true;
