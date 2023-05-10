@@ -16,6 +16,8 @@ extern pmf_logarithmic pmfl_timer_freq_square_div_2;
 
 class RampGenerator {
  private:
+  struct ramp_parameters_s _parameters;
+
   // Latest configuration for acceleration/speed calculate_move, only
   struct ramp_config_s *_config;
 

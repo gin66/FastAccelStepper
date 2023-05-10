@@ -44,6 +44,58 @@ uint32_t calculate_ticks_v7(uint32_t steps, pmf_logarithmic pre_calc);
 uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc);
 #endif
 
+struct ramp_parameters_s {
+  int32_t target_pos;
+  uint32_t min_travel_ticks;
+  uint32_t s_h;
+  pmf_logarithmic pmfl_accel;
+  bool any_change: 1;			// clear on read by interrupt
+  bool recalc_ramp_steps : 1;	// clear on read by interrupt
+  bool valid_acceleration : 1;
+  bool valid_speed : 1;
+  bool keep_running : 1;
+  bool keep_running_count_up : 1;
+
+  void init() {
+	target_pos = 0;
+    valid_acceleration = false;
+    valid_speed = false;
+    recalc_ramp_steps = false;
+	any_change = false;
+	keep_running = false;
+	keep_running_count_up = true;
+    s_h = 0;
+    min_travel_ticks = 0;
+  }
+  inline void setTargetPosition(int32_t pos) {
+	  target_pos = pos;
+	  any_change = true;
+  }
+  inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
+    if (s_h != s_cubic_steps) {
+      s_h = s_cubic_steps;
+      recalc_ramp_steps = true;
+	  any_change = true;
+    }
+  }
+  inline void setSpeedInTicks(uint32_t min_step_ticks) {
+    if (!valid_speed || (min_travel_ticks != min_step_ticks)) {
+      min_travel_ticks = min_step_ticks;
+      valid_speed = true;
+	  any_change = true;
+    }
+  }
+  inline void setAcceleration(int32_t accel) {
+    pmf_logarithmic new_pmfl_accel = pmfl_from((uint32_t)accel);
+    if (!valid_acceleration || (pmfl_accel != new_pmfl_accel)) {
+      valid_acceleration = true;
+	  any_change = true;
+      recalc_ramp_steps = true;
+      pmfl_accel = new_pmfl_accel;
+    }
+  }
+};
+
 struct ramp_config_s {
   int32_t target_pos;
   uint32_t min_travel_ticks;

@@ -11,6 +11,7 @@
 #endif
 
 void RampGenerator::init() {
+  _parameters.init();
   _config1.init();
   _config2.init();
   _config = &_config1;
@@ -139,25 +140,24 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   if (_config->change_cnt != _ro.config.change_cnt) {
 	  _ro.config = *_config;
   }
-  struct ramp_ro_s ramp = _ro;
   fasDisableInterrupts();
   struct queue_end_s qe = *queue_end;
   fasEnableInterrupts();
 
   _ro.clearImmediateStop();
 
-  if (ramp.isImmediateStopInitiated()) {
+  if (_ro.isImmediateStopInitiated()) {
     // no more commands
     command->command.ticks = 0;
     _ro.clearImmediateStop();
     command->rw.stopRamp();
     return;
   }
-  if (ramp.isImmediateStopIncomplete()) {
+  if (_ro.isImmediateStopIncomplete()) {
     _rw.stopRamp();
-    ramp.clearImmediateStop();
+    _ro.clearImmediateStop();
   }
-  _getNextCommand(&ramp, &_rw, &qe, command);
+  _getNextCommand(&_ro, &_rw, &qe, command);
 }
 void RampGenerator::stopRamp() { _rw.stopRamp(); }
 int32_t RampGenerator::getCurrentAcceleration() {
