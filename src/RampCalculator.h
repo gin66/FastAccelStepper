@@ -46,12 +46,14 @@ uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc);
 
 struct ramp_config_s {
   uint32_t min_travel_ticks;
-  uint32_t max_ramp_up_steps;
   uint32_t s_h;
-  pmf_logarithmic pmfl_ticks_h;
-  pmf_logarithmic cubic;
   pmf_logarithmic pmfl_accel;
   uint8_t accel_change_cnt;
+
+  // These three variables are derived
+  uint32_t max_ramp_up_steps;
+  pmf_logarithmic pmfl_ticks_h;
+  pmf_logarithmic cubic;
 
   void init() {
     accel_change_cnt = 0;

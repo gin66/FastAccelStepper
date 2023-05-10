@@ -46,7 +46,7 @@ FastAccelStepper offers the following features:
 * Allows the motor to continuously run in the current direction until stopMove() is called.
 * speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
 * Constant acceleration control: In this mode the motor can be controled by acceleration values and with acceleration=0 will keep current speed
-* Linear acceleration increase from standstill using cubic speed function - configurable by `setLinearAcceleration()`
+* Linear acceleration increase from/to standstill using cubic speed function - configurable by `setLinearAcceleration()`
 * Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
 * Enable pins can be shared between motors
 * Direction pins can be shared between motors
@@ -291,6 +291,8 @@ This is supported by clazarowitz
 ### ALL
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup using log2/pow2. Sufficient exact for this purpose.
+
+For the linear acceleration from/to standstill the used formula is s = 1/2 * j * t³. The variable j is calculated from acceleration and steps of linear acceleration, which is set by `setLinearAcceleration()`.
 
 The compare interrupt routines use 16bit tick counters, which translates to approx. 4ms. For longer time between pulses, pauses without step output can be added. With this approach the ramp generation supports up to one step per 268s. 
 

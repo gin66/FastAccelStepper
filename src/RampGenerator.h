@@ -33,8 +33,8 @@ class RampGenerator {
   inline int32_t targetPosition() { return _ro.targetPosition(); }
   void advanceTargetPosition(int32_t delta, const struct queue_end_s *queue);
   void setSpeedInTicks(uint32_t min_step_ticks);
-  uint32_t getSpeedInUs() { return speed_in_ticks / (TICKS_PER_S / 1000000); }
-  uint32_t getSpeedInTicks() { return speed_in_ticks; }
+  inline uint32_t getSpeedInUs() { return speed_in_ticks / (TICKS_PER_S / 1000000); }
+  inline uint32_t getSpeedInTicks() { return speed_in_ticks; }
   uint32_t divForMilliHz(uint32_t f) {
     uint32_t base = (uint32_t)250 * TICKS_PER_S;
     uint32_t res = base / f;
@@ -51,14 +51,14 @@ class RampGenerator {
     uint32_t res = base / f;
     return res;
   }
-  uint32_t getSpeedInMilliHz() {
+  inline uint32_t getSpeedInMilliHz() {
     if (speed_in_ticks == 0) {
       return 0;
     }
     return divForMilliHz(speed_in_ticks);
   }
   int8_t setAcceleration(int32_t accel);
-  uint32_t getAcceleration() { return acceleration; }
+  inline uint32_t getAcceleration() { return acceleration; }
   void setLinearAcceleration(uint32_t linear_acceleration_steps) {
 	  _config.setCubicAccelerationSteps(linear_acceleration_steps);
   }
@@ -73,7 +73,7 @@ class RampGenerator {
   inline bool isStopping() {
     return _ro.isStopInitiated() && isRampGeneratorActive();
   }
-  bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
+  inline bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
 
   void stopRamp();
   inline void setKeepRunning() { _ro.setKeepRunning(); }
@@ -87,11 +87,8 @@ class RampGenerator {
     fasEnableInterrupts();
     return ticks;
   }
-  uint32_t getCurrentPeriodInUs() {
-    fasDisableInterrupts();
-    uint32_t ticks = _rw.curr_ticks;
-    fasEnableInterrupts();
-    return TICKS_TO_US(ticks);
+  inline uint32_t getCurrentPeriodInUs() {
+    return TICKS_TO_US(getCurrentPeriodInTicks());
   }
 
  private:

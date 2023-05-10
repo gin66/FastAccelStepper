@@ -7,6 +7,7 @@ pre-0.29.1:
 - improve rounding for log2/pow2 conversion
 - avr: reduce max speed for 1 stepper to 50kSteps/s from 70kSteps/s
 - improve linear acceleration from standstill - configurable by setLinearAcceleration()
+- StepperDemo: Add J<steps> command to set linear acceleration
 
 0.29.0:
 - replace former PoorManFloat implementation `ump_float` being exponent+mantissa with `pmfl_logarithmic` as log2 representation

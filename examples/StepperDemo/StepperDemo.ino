@@ -679,6 +679,7 @@ const static char messages[] PROGMEM =
     ____ "h" _I_speed_I_  _ooo_set_selected_stepper_s_ _speed_ "in " _steps_ "/1000s" _NL_
     ____ "A" _I_accel_I_  _ooo_set_selected_stepper_s_ _acceleration_ _NL_
     ____ "a" _I_accel_I_  _ooo_ _acceleration_ "control with +/-" _acceleration_ "values" _NL_
+    ____ "J<" _step "s> " _ooo_set_selected_stepper_s_ "linear " _acceleration_  " for <" _step "s>" _NL_
     ____ "U" ________ _ooo_ "Update " _selected_stepper "'s " _speed_ "/ " _acceleration_ "while "
     "running" _NL_
     ____ "P<pos>   " _ooo_ _Move_ _selected_stepper " " _to_ "+/- " _position_ _NL_
@@ -1201,6 +1202,15 @@ bool process_cmd(char *cmd) {
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
         }
+        return true;
+      }
+      break;
+    case MODE(normal, 'J'):
+      val1 = strtol(cmd, &endptr, 10);
+      if (*endptr == 0) {
+		Serial.print("linear acceleration steps=");
+        Serial.println(val1);
+        stepper_selected->setLinearAcceleration(val1);
         return true;
       }
       break;

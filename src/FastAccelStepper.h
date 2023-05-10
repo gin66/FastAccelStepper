@@ -378,6 +378,7 @@ class FastAccelStepper {
   // ## Linear Acceleration
   //  setLinearAcceleration expects as parameter the number of steps,
   //  where the acceleration is increased linearly from standstill up to the configured acceleration value.
+  //  If this parameter is 0, then there will be no linear acceleration phase
   //
   //  If for example the acceleration should ramp up from 0 to 10000 steps/s^2 within
   //  100 steps, then call setLinearAcceleration(100)
