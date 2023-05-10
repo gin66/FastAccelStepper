@@ -11,36 +11,36 @@
 #endif
 
 void RampGenerator::init() {
-  speed_in_ticks = 0;
-  _config.init();
+  _config1.init();
+  _config2.init();
+  _config = &_config1;
   _ro.init();
   _rw.init();
   init_ramp_module();
 }
 void RampGenerator::setSpeedInTicks(uint32_t min_step_ticks) {
-  speed_in_ticks = min_step_ticks;
-  _config.setSpeedInTicks(min_step_ticks);
+  _config->setSpeedInTicks(min_step_ticks);
 }
 int8_t RampGenerator::setAcceleration(int32_t accel) {
   if (accel <= 0) {
     return -1;
   }
   acceleration = (uint32_t)accel;
-  _config.setAcceleration(accel);
+  _config->setAcceleration(accel);
   return 0;
 }
 void RampGenerator::applySpeedAcceleration() {
   fasDisableInterrupts();
-  _ro.config = _config;
+  _ro.config = *_config;
   fasEnableInterrupts();
 }
 int8_t RampGenerator::startRun(bool countUp) {
-  uint8_t res = _config.checkValidConfig();
+  uint8_t res = _config->checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }
   struct ramp_ro_s new_ramp;
-  new_ramp.keepRunning(&_config, countUp);
+  new_ramp.keepRunning(_config, countUp);
 
   fasDisableInterrupts();
   _rw.startRampIfNotRunning();
@@ -52,20 +52,20 @@ int8_t RampGenerator::startRun(bool countUp) {
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: curr_ticks = %lu travel_ticks = %lu\n",
-          _rw.curr_ticks, _config.min_travel_ticks);
+          _rw.curr_ticks, _config->min_travel_ticks);
   Serial.println(buf);
 #endif
   return MOVE_OK;
 }
 
 int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
-  uint8_t res = _config.checkValidConfig();
+  uint8_t res = _config->checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }
 
   struct ramp_ro_s new_ramp;
-  new_ramp.runToPosition(&_config, target_pos);
+  new_ramp.runToPosition(_config, target_pos);
 
   fasDisableInterrupts();
   if (position_changed) {
@@ -80,12 +80,12 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
 
 #ifdef TEST
   printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
-         _rw.curr_ticks, _config.min_travel_ticks);
+         _rw.curr_ticks, _config->min_travel_ticks);
 #endif
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu\n",
-          target_pos, _rw.curr_ticks, _config.min_travel_ticks);
+          target_pos, _rw.curr_ticks, _config->min_travel_ticks);
   Serial.println(buf);
 #endif
   return MOVE_OK;

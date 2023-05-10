@@ -17,7 +17,10 @@ extern pmf_logarithmic pmfl_timer_freq_square_div_2;
 class RampGenerator {
  private:
   // Latest configuration for acceleration/speed calculate_move, only
-  struct ramp_config_s _config;
+  struct ramp_config_s *_config;
+
+  struct ramp_config_s _config1;
+  struct ramp_config_s _config2;
 
   // The ro variables are those, which are only read from _getNextCommand().
   // The rw variables are only read and written by _getNextCommand() and
@@ -26,7 +29,6 @@ class RampGenerator {
   struct ramp_rw_s _rw;
 
  public:
-  uint32_t speed_in_ticks;
   uint32_t acceleration;
   inline uint8_t rampState() { return _rw.rampState(); }
   void init();
@@ -34,9 +36,9 @@ class RampGenerator {
   void advanceTargetPosition(int32_t delta, const struct queue_end_s *queue);
   void setSpeedInTicks(uint32_t min_step_ticks);
   inline uint32_t getSpeedInUs() {
-    return speed_in_ticks / (TICKS_PER_S / 1000000);
+    return _config->min_travel_ticks / (TICKS_PER_S / 1000000);
   }
-  inline uint32_t getSpeedInTicks() { return speed_in_ticks; }
+  inline uint32_t getSpeedInTicks() { return _config->min_travel_ticks; }
   uint32_t divForMilliHz(uint32_t f) {
     uint32_t base = (uint32_t)250 * TICKS_PER_S;
     uint32_t res = base / f;
@@ -54,18 +56,18 @@ class RampGenerator {
     return res;
   }
   inline uint32_t getSpeedInMilliHz() {
-    if (speed_in_ticks == 0) {
+    if (_config->min_travel_ticks == 0) {
       return 0;
     }
-    return divForMilliHz(speed_in_ticks);
+    return divForMilliHz(_config->min_travel_ticks);
   }
   int8_t setAcceleration(int32_t accel);
   inline uint32_t getAcceleration() { return acceleration; }
   void setLinearAcceleration(uint32_t linear_acceleration_steps) {
-    _config.setCubicAccelerationSteps(linear_acceleration_steps);
+    _config->setCubicAccelerationSteps(linear_acceleration_steps);
   }
   int32_t getCurrentAcceleration();
-  inline bool hasValidConfig() { return _config.checkValidConfig() == MOVE_OK; }
+  inline bool hasValidConfig() { return _config->checkValidConfig() == MOVE_OK; }
   void applySpeedAcceleration();
   int8_t move(int32_t move, const struct queue_end_s *queue);
   int8_t moveTo(int32_t position, const struct queue_end_s *queue);

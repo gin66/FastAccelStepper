@@ -48,7 +48,8 @@ struct ramp_config_s {
   uint32_t min_travel_ticks;
   uint32_t s_h;
   pmf_logarithmic pmfl_accel;
-  unsigned int change_cnt : 5;  // if equal=0, then no valid info
+  unsigned int change_cnt : 4;  // if equal=0, then no valid info
+  bool any_change: 1;
   bool valid_acceleration : 1;
   bool valid_speed : 1;
   bool recalc_ramp_steps : 1;
@@ -63,8 +64,9 @@ struct ramp_config_s {
     valid_acceleration = false;
     valid_speed = false;
     recalc_ramp_steps = false;
+	any_change = false;
     s_h = 0;
-    // min_travel_ticks = 0;
+    min_travel_ticks = 0;
     // max_ramp_up_steps = 0;
     // pmfl_ticks_h = PMF_CONST_MAX;
     // cubic = PMF_CONST_INVALID;
@@ -106,6 +108,7 @@ struct ramp_config_s {
     if (s_h != s_cubic_steps) {
       s_h = s_cubic_steps;
       recalc_ramp_steps = true;
+	  any_change = true;
       update();
     }
   }
@@ -113,6 +116,7 @@ struct ramp_config_s {
     if (!valid_speed || (min_travel_ticks != min_step_ticks)) {
       min_travel_ticks = min_step_ticks;
       valid_speed = true;
+	  any_change = true;
       update();
     }
   }
@@ -120,6 +124,7 @@ struct ramp_config_s {
     pmf_logarithmic new_pmfl_accel = pmfl_from((uint32_t)accel);
     if (!valid_acceleration || (pmfl_accel != new_pmfl_accel)) {
       valid_acceleration = true;
+	  any_change = true;
       recalc_ramp_steps = true;
       pmfl_accel = new_pmfl_accel;
       update();
