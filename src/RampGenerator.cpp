@@ -24,27 +24,25 @@ int8_t RampGenerator::setAcceleration(int32_t accel) {
   _parameters.setAcceleration(accel);
   return 0;
 }
-void RampGenerator::applySpeedAcceleration() {
-	_parameters.applyParameters();
-}
+void RampGenerator::applySpeedAcceleration() { _parameters.applyParameters(); }
 int8_t RampGenerator::startRun(bool countUp) {
   uint8_t res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }
-    _parameters.setTargetPosition(0);
-    _ro.force_stop = false;
-    //force_immediate_stop = false;
-    //incomplete_immediate_stop = false;
-    _parameters.keep_running = true;
-    _parameters.keep_running_count_up = countUp;
-	_parameters.applyParameters();
+  _parameters.setTargetPosition(0);
+  _ro.force_stop = false;
+  // force_immediate_stop = false;
+  // incomplete_immediate_stop = false;
+  _parameters.keep_running = true;
+  _parameters.keep_running_count_up = countUp;
+  _parameters.applyParameters();
 
   fasDisableInterrupts();
   _rw.startRampIfNotRunning();
-  //if (_ro.isImmediateStopInitiated()) {
-  //  new_ramp.markIncompleteImmediateStop();
-  //}
+  // if (_ro.isImmediateStopInitiated()) {
+  //   new_ramp.markIncompleteImmediateStop();
+  // }
   //_ro = new_ramp;
   fasEnableInterrupts();
 #ifdef DEBUG
@@ -62,24 +60,24 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
     return res;
   }
 
-    _parameters.setTargetPosition(target_pos);
-    _ro.force_stop = false;
-    //force_immediate_stop = false;
-    //incomplete_immediate_stop = false;
-    _parameters.keep_running = false;
-    _parameters.keep_running_count_up = true;
-	_parameters.applyParameters();
+  _parameters.setTargetPosition(target_pos);
+  _ro.force_stop = false;
+  // force_immediate_stop = false;
+  // incomplete_immediate_stop = false;
+  _parameters.keep_running = false;
+  _parameters.keep_running_count_up = true;
+  _parameters.applyParameters();
 
-  //fasDisableInterrupts();
+  // fasDisableInterrupts();
   if (position_changed) {
     // Only start the ramp generator, if the target position is different
     _rw.startRampIfNotRunning();
   }
-  //if (_ro.isImmediateStopInitiated()) {
-  //  new_ramp.markIncompleteImmediateStop();
-  //}
+  // if (_ro.isImmediateStopInitiated()) {
+  //   new_ramp.markIncompleteImmediateStop();
+  // }
   //_ro = new_ramp;
-  //fasEnableInterrupts();
+  // fasEnableInterrupts();
 
 #ifdef TEST
   printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
@@ -141,11 +139,11 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   // so we can just read the config without disable interrupts
   // copy consistent ramp state
   if (_parameters.apply) {
-	  _ro.config.parameters = _parameters;
-	  _parameters.apply = false;
-	  _parameters.any_change = false;
-	  _parameters.recalc_ramp_steps = false;
-	  _ro.config.update();
+    _ro.config.parameters = _parameters;
+    _parameters.apply = false;
+    _parameters.any_change = false;
+    _parameters.recalc_ramp_steps = false;
+    _ro.config.update();
   }
 
   fasDisableInterrupts();

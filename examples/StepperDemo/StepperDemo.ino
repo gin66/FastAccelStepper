@@ -1006,13 +1006,13 @@ void info(FastAccelStepper *s, bool long_info) {
     }
   } else {
     if (long_info) {
-	  output_msg(MSG_ACCELERATION_STATUS);
+      output_msg(MSG_ACCELERATION_STATUS);
       Serial.print(s->getAcceleration());
       if (speed_in_milli_hz) {
-	    output_msg(MSG_SPEED_STATUS_FREQ);
+        output_msg(MSG_SPEED_STATUS_FREQ);
         Serial.print(s->getSpeedInMilliHz());
       } else {
-	    output_msg(MSG_SPEED_STATUS_TIME);
+        output_msg(MSG_SPEED_STATUS_TIME);
         Serial.print(s->getSpeedInUs());
       }
     }
@@ -1216,7 +1216,7 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'J'):
       val1 = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
-		output_msg(MSG_LINEAR_ACCELERATION);
+        output_msg(MSG_LINEAR_ACCELERATION);
         Serial.println(val1);
         stepper_selected->setLinearAcceleration(val1);
         return true;

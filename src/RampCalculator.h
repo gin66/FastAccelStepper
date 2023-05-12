@@ -49,66 +49,66 @@ struct ramp_parameters_s {
   uint32_t min_travel_ticks;
   uint32_t s_h;
   pmf_logarithmic pmfl_accel;
-  bool apply: 1;				// clear on read by stepper task. Triggers read !
-  bool any_change: 1;			// clear on read by stepper task
-  bool recalc_ramp_steps : 1;	// clear on read by stepper task
+  bool apply : 1;              // clear on read by stepper task. Triggers read !
+  bool any_change : 1;         // clear on read by stepper task
+  bool recalc_ramp_steps : 1;  // clear on read by stepper task
   bool valid_acceleration : 1;
   bool valid_speed : 1;
   bool keep_running : 1;
   bool keep_running_count_up : 1;
 
   void init() {
-	target_pos = 0;
+    target_pos = 0;
     valid_acceleration = false;
     valid_speed = false;
-	apply = false;
-	any_change = false;
+    apply = false;
+    any_change = false;
     recalc_ramp_steps = false;
-	keep_running = false;
-	keep_running_count_up = true;
+    keep_running = false;
+    keep_running_count_up = true;
     s_h = 0;
     min_travel_ticks = 0;
   }
   inline void applyParameters() {
-	if (any_change) {
-	  fasDisableInterrupts();
-	  apply = true;
-	  fasEnableInterrupts();
-	}
+    if (any_change) {
+      fasDisableInterrupts();
+      apply = true;
+      fasEnableInterrupts();
+    }
   }
   inline void setTargetPosition(int32_t pos) {
-	  fasDisableInterrupts();
-	  target_pos = pos;
-	  any_change = true;
-	  fasEnableInterrupts();
+    fasDisableInterrupts();
+    target_pos = pos;
+    any_change = true;
+    fasEnableInterrupts();
   }
   inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
     if (s_h != s_cubic_steps) {
-	  fasDisableInterrupts();
+      fasDisableInterrupts();
       s_h = s_cubic_steps;
       recalc_ramp_steps = true;
-	  any_change = true;
-	  fasEnableInterrupts();
+      any_change = true;
+      fasEnableInterrupts();
     }
   }
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
     if (!valid_speed || (min_travel_ticks != min_step_ticks)) {
-	  fasDisableInterrupts();
+      fasDisableInterrupts();
       min_travel_ticks = min_step_ticks;
       valid_speed = true;
-	  any_change = true;
-	  fasEnableInterrupts();
+      any_change = true;
+      fasEnableInterrupts();
     }
   }
   inline void setAcceleration(int32_t accel) {
     pmf_logarithmic new_pmfl_accel = pmfl_from((uint32_t)accel);
     if (!valid_acceleration || (pmfl_accel != new_pmfl_accel)) {
-	  fasDisableInterrupts();
+      fasDisableInterrupts();
       valid_acceleration = true;
-	  any_change = true;
+      any_change = true;
       recalc_ramp_steps = true;
       pmfl_accel = new_pmfl_accel;
-	  fasEnableInterrupts();
+      fasEnableInterrupts();
     }
   }
   inline int8_t checkValidConfig() const {
@@ -131,25 +131,23 @@ struct ramp_config_s {
   pmf_logarithmic pmfl_ticks_h;
   pmf_logarithmic cubic;
 
-  void init() {
-	parameters.init();
-  }
+  void init() { parameters.init(); }
   inline void update() {
-      if (parameters.s_h > 0) {
-        pmf_logarithmic pmfl_s_h = pmfl_from(parameters.s_h);
-        // 1/cubic = sqrt(3/2 * a) / s_h^(1/6) / TICKS_PER_S
-        //         = sqrt(3/2 * a / s_h^(1/3)) / TICKS_PER_S
-        // cubic = TICKS_PER_S / sqrt(s_h^(1/3) / (3/2 * a))
-        cubic = pmfl_multiply(PMF_CONST_3_DIV_2, parameters.pmfl_accel);
-        cubic = pmfl_sqrt(pmfl_divide(pmfl_pow_div_3(pmfl_s_h), cubic));
-        cubic = pmfl_multiply(PMF_TICKS_PER_S, cubic);
+    if (parameters.s_h > 0) {
+      pmf_logarithmic pmfl_s_h = pmfl_from(parameters.s_h);
+      // 1/cubic = sqrt(3/2 * a) / s_h^(1/6) / TICKS_PER_S
+      //         = sqrt(3/2 * a / s_h^(1/3)) / TICKS_PER_S
+      // cubic = TICKS_PER_S / sqrt(s_h^(1/3) / (3/2 * a))
+      cubic = pmfl_multiply(PMF_CONST_3_DIV_2, parameters.pmfl_accel);
+      cubic = pmfl_sqrt(pmfl_divide(pmfl_pow_div_3(pmfl_s_h), cubic));
+      cubic = pmfl_multiply(PMF_TICKS_PER_S, cubic);
 
-        // calculate_ticks(s_h)
-        pmfl_ticks_h = pmfl_divide(cubic, pmfl_pow_2_div_3(pmfl_s_h));
-      } else {
-        pmfl_ticks_h = PMF_CONST_MAX;
-      }
-      max_ramp_up_steps = calculate_ramp_steps(parameters.min_travel_ticks);
+      // calculate_ticks(s_h)
+      pmfl_ticks_h = pmfl_divide(cubic, pmfl_pow_2_div_3(pmfl_s_h));
+    } else {
+      pmfl_ticks_h = PMF_CONST_MAX;
+    }
+    max_ramp_up_steps = calculate_ramp_steps(parameters.min_travel_ticks);
   }
 
   uint32_t calculate_ticks(uint32_t steps) const {

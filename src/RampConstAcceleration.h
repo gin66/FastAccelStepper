@@ -16,7 +16,7 @@ struct ramp_ro_s {
   }
   inline int32_t targetPosition() { return config.parameters.target_pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
-    config.parameters.target_pos += delta; //TODO
+    config.parameters.target_pos += delta;  // TODO
   }
   inline void immediateStop() { force_immediate_stop = true; }
   inline void markIncompleteImmediateStop() {

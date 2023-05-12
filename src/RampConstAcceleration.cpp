@@ -504,10 +504,11 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       "add command Steps=%u ticks=%u  Target pos=%u "
       "Remaining steps=%u, planning_steps=%u, "
       "d_ticks_new=%u, pause_left=%u\n",
-      steps, next_ticks, ramp->config.parameters.target_pos, remaining_steps, planning_steps,
-      d_ticks_new, pause_ticks_left);
+      steps, next_ticks, ramp->config.parameters.target_pos, remaining_steps,
+      planning_steps, d_ticks_new, pause_ticks_left);
   if ((this_state & RAMP_STATE_MASK) == RAMP_STATE_ACCELERATE) {
-    assert(pause_ticks_left + next_ticks >= ramp->config.parameters.min_travel_ticks);
+    assert(pause_ticks_left + next_ticks >=
+           ramp->config.parameters.min_travel_ticks);
   }
 #endif
 }
