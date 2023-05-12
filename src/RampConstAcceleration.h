@@ -12,22 +12,14 @@ struct ramp_ro_s {
     config.init();
     force_stop = false;
     force_immediate_stop = false;
-    incomplete_immediate_stop = false;
   }
   inline int32_t targetPosition() { return config.parameters.target_pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
-    config.parameters.target_pos += delta;  // TODO
+    config.parameters.target_pos += delta;
   }
   inline void immediateStop() { force_immediate_stop = true; }
-  inline void markIncompleteImmediateStop() {
-    incomplete_immediate_stop = true;
-  }
   inline bool isImmediateStopInitiated() { return force_immediate_stop; }
-  inline bool isImmediateStopIncomplete() { return incomplete_immediate_stop; }
-  inline void clearImmediateStop() {
-    force_immediate_stop = false;
-    incomplete_immediate_stop = false;
-  }
+  inline void clearImmediateStop() { force_immediate_stop = false; }
   inline void initiateStop() { force_stop = true; }
   inline bool isStopInitiated() { return force_stop; }
   inline void setKeepRunning() { config.parameters.keep_running = true; }
@@ -39,7 +31,7 @@ struct ramp_rw_s {
   // if change_cnt does not match config.change_cnt, then eventually
   // performed_ramp_up_steps to be recalculated
   uint8_t change_cnt;
-  // the speed is linked on both ramp slopes to this variable as per
+  // the speed is linked on both ramp slopes to this variable as per (if no cubic ramp)
   //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t performed_ramp_up_steps;
   // Are the ticks stored of the last previous step, if pulse time requires
@@ -64,9 +56,11 @@ struct ramp_rw_s {
   inline void startRampIfNotRunning() {
     // called with interrupts disabled
     if (ramp_state == RAMP_STATE_IDLE) {
+      fasDisableInterrupts();
       ramp_state = RAMP_STATE_ACCELERATE;
       curr_ticks = TICKS_FOR_STOPPED_MOTOR;
       performed_ramp_up_steps = 0;
+      fasEnableInterrupts();
     }
   }
 };

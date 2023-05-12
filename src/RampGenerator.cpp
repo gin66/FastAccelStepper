@@ -24,7 +24,11 @@ int8_t RampGenerator::setAcceleration(int32_t accel) {
   _parameters.setAcceleration(accel);
   return 0;
 }
-void RampGenerator::applySpeedAcceleration() { _parameters.applyParameters(); }
+void RampGenerator::applySpeedAcceleration() { 
+	if (!_ro.isImmediateStopInitiated()) {
+		_parameters.applyParameters(); 
+	}
+}
 int8_t RampGenerator::startRun(bool countUp) {
   uint8_t res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
@@ -32,19 +36,10 @@ int8_t RampGenerator::startRun(bool countUp) {
   }
   _parameters.setTargetPosition(0);
   _ro.force_stop = false;
-  // force_immediate_stop = false;
-  // incomplete_immediate_stop = false;
   _parameters.keep_running = true;
   _parameters.keep_running_count_up = countUp;
   _parameters.applyParameters();
-
-  fasDisableInterrupts();
   _rw.startRampIfNotRunning();
-  // if (_ro.isImmediateStopInitiated()) {
-  //   new_ramp.markIncompleteImmediateStop();
-  // }
-  //_ro = new_ramp;
-  fasEnableInterrupts();
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: curr_ticks = %lu travel_ticks = %lu\n",
@@ -62,22 +57,14 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
 
   _parameters.setTargetPosition(target_pos);
   _ro.force_stop = false;
-  // force_immediate_stop = false;
-  // incomplete_immediate_stop = false;
   _parameters.keep_running = false;
   _parameters.keep_running_count_up = true;
   _parameters.applyParameters();
 
-  // fasDisableInterrupts();
   if (position_changed) {
     // Only start the ramp generator, if the target position is different
     _rw.startRampIfNotRunning();
   }
-  // if (_ro.isImmediateStopInitiated()) {
-  //   new_ramp.markIncompleteImmediateStop();
-  // }
-  //_ro = new_ramp;
-  // fasEnableInterrupts();
 
 #ifdef TEST
   printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
@@ -150,18 +137,12 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   struct queue_end_s qe = *queue_end;
   fasEnableInterrupts();
 
-  _ro.clearImmediateStop();
-
   if (_ro.isImmediateStopInitiated()) {
     // no more commands
     command->command.ticks = 0;
     _ro.clearImmediateStop();
     command->rw.stopRamp();
     return;
-  }
-  if (_ro.isImmediateStopIncomplete()) {
-    _rw.stopRamp();
-    _ro.clearImmediateStop();
   }
   _getNextCommand(&_ro, &_rw, &qe, command);
 }
