@@ -145,6 +145,9 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     return;
   }
   _getNextCommand(&_ro, &_rw, &qe, command);
+
+  // clear recalc flag
+  _ro.config.parameters.recalc_ramp_steps = false;
 }
 void RampGenerator::stopRamp() { _rw.stopRamp(); }
 int32_t RampGenerator::getCurrentAcceleration() {
