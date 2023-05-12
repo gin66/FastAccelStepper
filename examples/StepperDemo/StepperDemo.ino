@@ -655,23 +655,23 @@ const static char messages[] PROGMEM =
 #define MSG_DISABLED 58+MSG_OFFSET
     _disable "d" _NL_ _SEP_
 #define MSG_HIGH_COUNT_UP 59+MSG_OFFSET
-    _high_counts_ "up" _NL_ _SEP_
+    _high_counts_ "up" _SEP_
 #define MSG_HIGH_COUNT_DOWN 60+MSG_OFFSET
-    _high_counts_ "down" _NL_ _SEP_
+    _high_counts_ "down" _SEP_
 #define MSG_DELAY 61+MSG_OFFSET
     _delay_ "in us = " _SEP_
 #define MSG_UNKNOWN_COMMAND 62 + MSG_OFFSET
-    "Cannot interpret this command: " _SEP_
+    "Unknown command: " _SEP_
 #define MSG_SET_SPEED_TO_MILLI_HZ 63+MSG_OFFSET
     _set_ _speed_ "(" _steps_ "/1000s) " _to_ _SEP_
 #define MSG_ACCELERATION_STATUS 64+MSG_OFFSET
      " " _acceleration_ " [Steps/s^2]=" _SEP_
 #define MSG_SPEED_STATUS_FREQ 65+MSG_OFFSET
-     " Speed [mStep/s]=" _SEP_
+     " " _speed_ "[m" _step "/s]=" _SEP_
 #define MSG_SPEED_STATUS_TIME 66+MSG_OFFSET
-     " Speed [us/step]=" _SEP_
+     " " _speed_ "[us/" _step "]=" _SEP_
 #define MSG_LINEAR_ACCELERATION 67+MSG_OFFSET
-     "linear acceleration steps=" _SEP_
+     "linear " _acceleration_ _step "s=" _SEP_
 #define MSG_USAGE_NORMAL 68+MSG_OFFSET
 #define MSG_USAGE_TEST 69+MSG_OFFSET
 #define MSG_USAGE_CONFIG 70+MSG_OFFSET
@@ -756,7 +756,7 @@ const static char messages[] PROGMEM =
     ____ "d<p,n>" _NL_
     ____ "d<p,n,t>" _NL_
     ________ ________ ________ "p" _ooo_ _pin_ "number" _NL_
-    ________ ________ ________ "n" _ooo_ "1: high counts up 0: high counts down" _NL_
+    ________ ________ ________ "n" _ooo_ "1: " MSG_HIGH_COUNT_UP " 0: " MSG_HIGH_COUNT_DOWN _NL_
     ________ ________ ________ "t" _ooo_ _delay_ _from_ "dir change " _to_ "step in us, 0 means "
     "off" _NL_
     ____ "dc   " ____ _ooo_ _clear_ _direction_ _pin_ "(unidirectional)" _NL_
@@ -1121,6 +1121,7 @@ bool process_cmd(char *cmd) {
   uint16_t s = *cmd++;
   char *endptr;
   int8_t res;
+  int8_t gv;
   switch (MODE(mode, s)) {
     case MODE(normal, 'M'):
     case MODE(test, 'M'):
@@ -1336,7 +1337,8 @@ bool process_cmd(char *cmd) {
         stepper_selected->setDirectionPin(PIN_UNDEFINED);
         return true;
       }
-      switch (get_val1_val2_val3(cmd)) {
+      gv = get_val1_val2_val3(cmd);
+      switch (gv) {
         case 1:
           output_msg(MSG_DIRECTION_PIN);
           output_msg(MSG_SET_TO_PIN);
@@ -1344,19 +1346,7 @@ bool process_cmd(char *cmd) {
           stepper_selected->setDirectionPin(val1);
           return true;
         case 2:
-          output_msg(MSG_DIRECTION_PIN);
-          output_msg(MSG_SET_TO_PIN);
-          Serial.println(val1);
-          output_msg(MSG_DIRECTION_PIN);
-          if (val2 != 0) {
-            output_msg(MSG_HIGH_COUNT_DOWN);
-          } else {
-            output_msg(MSG_HIGH_COUNT_UP);
-          }
-          stepper_selected->setDirectionPin(val1, val2);
-          return true;
         case 3:
-          val3 = strtol(cmd, &endptr, 10);
           output_msg(MSG_DIRECTION_PIN);
           output_msg(MSG_SET_TO_PIN);
           Serial.println(val1);
@@ -1366,9 +1356,14 @@ bool process_cmd(char *cmd) {
           } else {
             output_msg(MSG_HIGH_COUNT_UP);
           }
-          output_msg(MSG_DELAY);
-          Serial.println(val3);
-          stepper_selected->setDirectionPin(val1, val2, val3);
+          Serial.println();
+          if (gv == 2) {
+            stepper_selected->setDirectionPin(val1, val2);
+          } else {
+            output_msg(MSG_DELAY);
+            Serial.println(val3);
+            stepper_selected->setDirectionPin(val1, val2, val3);
+          }
           return true;
         default:
           break;
