@@ -33,7 +33,7 @@ int8_t RampGenerator::startRun(bool countUp) {
     return res;
   }
     _parameters.setTargetPosition(0);
-    //force_stop = false;
+    _ro.force_stop = false;
     //force_immediate_stop = false;
     //incomplete_immediate_stop = false;
     _parameters.keep_running = true;
@@ -63,7 +63,7 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
   }
 
     _parameters.setTargetPosition(target_pos);
-    //force_stop = false;
+    _ro.force_stop = false;
     //force_immediate_stop = false;
     //incomplete_immediate_stop = false;
     _parameters.keep_running = false;

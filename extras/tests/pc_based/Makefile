@@ -54,4 +54,4 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 VERSION=$(shell git rev-parse --short HEAD)
 
 clean:
-	rm *.o test_[0-9][0-9] *.gnuplot pmf_test rmc_test
+	rm *.o test_[0-9][0-9] *.gnuplot pmf_test rmc_test test.log

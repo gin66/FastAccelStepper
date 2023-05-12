@@ -69,7 +69,7 @@ class RampChecker {
         "process command in ramp checker @%.6fs: steps = %d last = %u current "
         "= %u "
         " min_dt "
-        "= %d   accel=%.6f inc=%s dec=%s\n",
+        "= %u   accel=%.6f inc=%s dec=%s\n",
         total_ticks / 16000000.0, steps, last_dt, curr_dt, min_dt, accel,
         increase_ok ? "ALLOW" : "NO", decrease_ok ? "ALLOW" : "NO");
 
