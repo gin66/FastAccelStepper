@@ -28,9 +28,6 @@ struct ramp_ro_s {
 
 struct ramp_rw_s {
   volatile uint8_t ramp_state;
-  // if change_cnt does not match config.change_cnt, then eventually
-  // performed_ramp_up_steps to be recalculated
-  uint8_t change_cnt;
   // the speed is linked on both ramp slopes to this variable as per (if no
   // cubic ramp)
   //       s = v²/2a   =>   v = sqrt(2*a*s)
@@ -48,7 +45,6 @@ struct ramp_rw_s {
   }
   inline void init() {
     stopRamp();
-    change_cnt = 0xff;
   }
   inline uint8_t rampState() {
     // reading one byte is atomic

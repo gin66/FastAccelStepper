@@ -486,7 +486,6 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   command->command.count_up = count_up;
 
   command->rw.ramp_state = this_state;
-  command->rw.change_cnt = ramp->config.change_cnt;
   command->rw.performed_ramp_up_steps = performed_ramp_up_steps;
   command->rw.pause_ticks_left = pause_ticks_left;
   command->rw.curr_ticks = pause_ticks_left + next_ticks;

@@ -124,7 +124,6 @@ struct ramp_parameters_s {
 
 struct ramp_config_s {
   struct ramp_parameters_s parameters;
-  unsigned int change_cnt : 2;
 
   // These three variables are derived
   uint32_t max_ramp_up_steps;
