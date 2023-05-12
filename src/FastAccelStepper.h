@@ -384,6 +384,12 @@ class FastAccelStepper {
   //  If for example the acceleration should ramp up from 0 to 10000 steps/s^2
   //  within 100 steps, then call setLinearAcceleration(100)
   //
+  //  The speed at which linear acceleration turns into constant acceleration
+  //  can b e calculated from the parameter linear_acceleration_steps.
+  //  Let's call this parameter `s_h` for handover steps.
+  //  Then the speed is:
+  //       v_h = sqrt(1.5 * a * s_h)
+  //
   // New value will be used after call to
   // move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
   //

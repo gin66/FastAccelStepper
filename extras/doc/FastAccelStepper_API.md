@@ -111,22 +111,12 @@ the engine. The periodic task will let the associated LED blink with 1 Hz
 ```
 ### Return codes of calls to `move()` and `moveTo()`
 
-All is OK:
-```cpp
-#define MOVE_OK 0
-```
-Negative direction requested, but no direction pin defined
-```cpp
-#define MOVE_ERR_NO_DIRECTION_PIN -1
-```
-The maximum speed has not been set yet
-```cpp
-#define MOVE_ERR_SPEED_IS_UNDEFINED -2
-```
-The acceleration to use has not been set yet
-```cpp
-#define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
-```
+The defined preprocessor macros are MOVE_xxx:
+MOVE_OK: All is OK:
+MOVE_ERR_NO_DIRECTION_PIN: Negative direction requested, but no direction pin
+MOVE_ERR_SPEED_IS_UNDEFINED: The maximum speed has not been set yet
+MOVE_ERR_ACCELERATION_IS_UNDEFINED: The acceleration to use has not been set
+yet
 ### Return codes of `rampState()`
 
 The return value is an uint8_t, which consist of two fields:
@@ -323,7 +313,7 @@ retrieves the actual speed.
   int32_t getCurrentSpeedInMilliHz();
 ```
 ## Acceleration
- set Acceleration expects as parameter the change of speed
+ setAcceleration() expects as parameter the change of speed
  as step/s².
  If for example the speed should ramp up from 0 to 10000 steps/s within
  10s, then the acceleration is 10000 steps/s / 10s = 1000 steps/s²
@@ -347,6 +337,30 @@ getCurrentAcceleration() retrieves the actual acceleration.
 ```cpp
   int32_t getCurrentAcceleration() {
     return _rg.getCurrentAcceleration();
+  }
+```
+## Linear Acceleration
+ setLinearAcceleration expects as parameter the number of steps,
+ where the acceleration is increased linearly from standstill up to the
+ configured acceleration value. If this parameter is 0, then there will be
+ no linear acceleration phase
+
+ If for example the acceleration should ramp up from 0 to 10000 steps/s^2
+ within 100 steps, then call setLinearAcceleration(100)
+
+ The speed at which linear acceleration turns into constant acceleration
+ can b e calculated from the parameter linear_acceleration_steps.
+ Let's call this parameter `s_h` for handover steps.
+ Then the speed is:
+      v_h = sqrt(1.5 * a * s_h)
+
+New value will be used after call to
+move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
+
+note: no update on stopMove()
+```cpp
+  void setLinearAcceleration(uint32_t linear_acceleration_steps) {
+    _rg.setLinearAcceleration(linear_acceleration_steps);
   }
 ```
 ## Apply new speed/acceleration value

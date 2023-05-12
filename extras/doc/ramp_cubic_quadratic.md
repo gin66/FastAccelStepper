@@ -57,7 +57,7 @@ Check cubic:
            = [sqrt(3/2) * sqrt(a) ] * s_h^(1/2)
 
 and quadratic:
-	v(s_h) = sqrt(2 * a *s_h * 3 / 4) = sqrt(3/2 * a * s_h) equals cubuc
+	v(s_h) = sqrt(2 * a * s_h * 3 / 4) = sqrt(3/2 * a * s_h) equals cubic
 
 With s_h = 0 there will be no cubic ramp start.
 
