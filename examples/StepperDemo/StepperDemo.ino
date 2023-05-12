@@ -665,7 +665,7 @@ const static char messages[] PROGMEM =
 #define MSG_SET_SPEED_TO_MILLI_HZ 63+MSG_OFFSET
     _set_ _speed_ "(" _steps_ "/1000s) " _to_ _SEP_
 #define MSG_ACCELERATION_STATUS 64+MSG_OFFSET
-     " " _acceleration_ " [Steps/s^2]=" _SEP_
+     " " _acceleration_ " [" _step "s/s^2]=" _SEP_
 #define MSG_SPEED_STATUS_FREQ 65+MSG_OFFSET
      " " _speed_ "[m" _step "/s]=" _SEP_
 #define MSG_SPEED_STATUS_TIME 66+MSG_OFFSET
@@ -756,7 +756,7 @@ const static char messages[] PROGMEM =
     ____ "d<p,n>" _NL_
     ____ "d<p,n,t>" _NL_
     ________ ________ ________ "p" _ooo_ _pin_ "number" _NL_
-    ________ ________ ________ "n" _ooo_ "1: " MSG_HIGH_COUNT_UP " 0: " MSG_HIGH_COUNT_DOWN _NL_
+    ________ ________ ________ "n" _ooo_ "1: " _high_counts_ "up 0: " _high_counts_ "down" _NL_
     ________ ________ ________ "t" _ooo_ _delay_ _from_ "dir change " _to_ "step in us, 0 means "
     "off" _NL_
     ____ "dc   " ____ _ooo_ _clear_ _direction_ _pin_ "(unidirectional)" _NL_
