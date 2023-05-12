@@ -5,7 +5,7 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
-pre-0.29.1:
+0.29.1:
 - improve rounding for log2/pow2 conversion
 - avr: reduce max speed for single stepper use down to 50kSteps/s from 70kSteps/s
 - implement linear acceleration from/to standstill - configurable by setLinearAcceleration()
