@@ -90,7 +90,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   // can deviate due to precision or clipping effect
   uint32_t curr_ticks = rw->curr_ticks;
   uint32_t performed_ramp_up_steps;
-  if (ramp->config.recalc_ramp_steps &&
+  if (ramp->config.parameters.recalc_ramp_steps &&
       (ramp->config.change_cnt != rw->change_cnt)) {
     TRACE_OUTPUT('X');
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
@@ -113,12 +113,12 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   uint8_t this_state;
   uint32_t remaining_steps;
   bool need_count_up;
-  if (ramp->config.keep_running) {
-    need_count_up = ramp->config.keep_running_count_up;
+  if (ramp->config.parameters.keep_running) {
+    need_count_up = ramp->config.parameters.keep_running_count_up;
     remaining_steps = 0xfffffff;
   } else {
     // this can overflow, which is legal
-    int32_t delta = ramp->config.target_pos - queue_end->pos;
+    int32_t delta = ramp->config.parameters.target_pos - queue_end->pos;
 
     if (delta == 0) {
       // this case can happen on overshoot. So reverse current direction
@@ -194,7 +194,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       TRACE_OUTPUT('O');
       this_state = RAMP_STATE_REVERSE;
       remaining_steps = performed_ramp_up_steps;
-    } else if (ramp->config.min_travel_ticks < rw->curr_ticks) {
+    } else if (ramp->config.parameters.min_travel_ticks < rw->curr_ticks) {
       this_state = RAMP_STATE_ACCELERATE;
       if (rw->curr_ticks < 2 * MIN_CMD_TICKS) {
         // special consideration needed, that invalid commands are not generated
@@ -225,7 +225,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
           planning_steps = remaining_steps - performed_ramp_up_steps;
         }
       }
-    } else if (ramp->config.min_travel_ticks > rw->curr_ticks) {
+    } else if (ramp->config.parameters.min_travel_ticks > rw->curr_ticks) {
       TRACE_OUTPUT('d');
       this_state = RAMP_STATE_DECELERATE;
       if (performed_ramp_up_steps <= planning_steps) {
@@ -313,13 +313,13 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
 
       // if acceleration is very high, then d_ticks_new can be lower than
       // min_travel_ticks
-      if (d_ticks_new < ramp->config.min_travel_ticks) {
-        d_ticks_new = ramp->config.min_travel_ticks;
+      if (d_ticks_new < ramp->config.parameters.min_travel_ticks) {
+        d_ticks_new = ramp->config.parameters.min_travel_ticks;
       }
     } else if (this_state & RAMP_STATE_DECELERATING_FLAG) {
       TRACE_OUTPUT('D');
       if (performed_ramp_up_steps == 1) {
-        d_ticks_new = ramp->config.min_travel_ticks;
+        d_ticks_new = ramp->config.parameters.min_travel_ticks;
 #ifdef TEST
         printf("Set d_ticks_new=%u to min_travel_ticks\n", d_ticks_new);
 #endif
@@ -338,7 +338,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // If the ramp generator cannot decelerate by going down the ramp,
         // then we need to clip the new d_ticks to the min travel ticks
         // This is for issue #150
-        uint32_t min_travel_ticks = ramp->config.min_travel_ticks;
+        uint32_t min_travel_ticks = ramp->config.parameters.min_travel_ticks;
         if ((rs == 1) && (min_travel_ticks > d_ticks_new)) {
           d_ticks_new = min_travel_ticks;
 #ifdef TEST
@@ -466,7 +466,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // Speed was too high. So we need to ensure to not overshoot
         // deceleration
         performed_ramp_up_steps = max_ramp_up_steps;
-        next_ticks = ramp->config.min_travel_ticks;
+        next_ticks = ramp->config.parameters.min_travel_ticks;
 #ifdef TEST
         printf("clipped prus=%d\n", performed_ramp_up_steps);
 #endif
@@ -497,17 +497,17 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       "pos@queue_end=%d remaining=%u ramp steps=%u planning steps=%d "
       "last_ticks=%u travel_ticks=%u ",
       queue_end->pos, remaining_steps, performed_ramp_up_steps, planning_steps,
-      rw->curr_ticks, ramp->config.min_travel_ticks);
+      rw->curr_ticks, ramp->config.parameters.min_travel_ticks);
   print_ramp_state(this_state);
   printf("\n");
   printf(
       "add command Steps=%u ticks=%u  Target pos=%u "
       "Remaining steps=%u, planning_steps=%u, "
       "d_ticks_new=%u, pause_left=%u\n",
-      steps, next_ticks, ramp->target_pos, remaining_steps, planning_steps,
+      steps, next_ticks, ramp->config.parameters.target_pos, remaining_steps, planning_steps,
       d_ticks_new, pause_ticks_left);
   if ((this_state & RAMP_STATE_MASK) == RAMP_STATE_ACCELERATE) {
-    assert(pause_ticks_left + next_ticks >= ramp->config.min_travel_ticks);
+    assert(pause_ticks_left + next_ticks >= ramp->config.parameters.min_travel_ticks);
   }
 #endif
 }

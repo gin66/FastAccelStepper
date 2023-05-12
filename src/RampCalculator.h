@@ -49,8 +49,9 @@ struct ramp_parameters_s {
   uint32_t min_travel_ticks;
   uint32_t s_h;
   pmf_logarithmic pmfl_accel;
-  bool any_change: 1;			// clear on read by interrupt
-  bool recalc_ramp_steps : 1;	// clear on read by interrupt
+  bool apply: 1;				// clear on read by stepper task. Triggers read !
+  bool any_change: 1;			// clear on read by stepper task
+  bool recalc_ramp_steps : 1;	// clear on read by stepper task
   bool valid_acceleration : 1;
   bool valid_speed : 1;
   bool keep_running : 1;
@@ -60,73 +61,55 @@ struct ramp_parameters_s {
 	target_pos = 0;
     valid_acceleration = false;
     valid_speed = false;
-    recalc_ramp_steps = false;
+	apply = false;
 	any_change = false;
+    recalc_ramp_steps = false;
 	keep_running = false;
 	keep_running_count_up = true;
     s_h = 0;
     min_travel_ticks = 0;
   }
+  inline void applyParameters() {
+	if (any_change) {
+	  fasDisableInterrupts();
+	  apply = true;
+	  fasEnableInterrupts();
+	}
+  }
   inline void setTargetPosition(int32_t pos) {
+	  fasDisableInterrupts();
 	  target_pos = pos;
 	  any_change = true;
+	  fasEnableInterrupts();
   }
   inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
     if (s_h != s_cubic_steps) {
+	  fasDisableInterrupts();
       s_h = s_cubic_steps;
       recalc_ramp_steps = true;
 	  any_change = true;
+	  fasEnableInterrupts();
     }
   }
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
     if (!valid_speed || (min_travel_ticks != min_step_ticks)) {
+	  fasDisableInterrupts();
       min_travel_ticks = min_step_ticks;
       valid_speed = true;
 	  any_change = true;
+	  fasEnableInterrupts();
     }
   }
   inline void setAcceleration(int32_t accel) {
     pmf_logarithmic new_pmfl_accel = pmfl_from((uint32_t)accel);
     if (!valid_acceleration || (pmfl_accel != new_pmfl_accel)) {
+	  fasDisableInterrupts();
       valid_acceleration = true;
 	  any_change = true;
       recalc_ramp_steps = true;
       pmfl_accel = new_pmfl_accel;
+	  fasEnableInterrupts();
     }
-  }
-};
-
-struct ramp_config_s {
-  int32_t target_pos;
-  uint32_t min_travel_ticks;
-  uint32_t s_h;
-  pmf_logarithmic pmfl_accel;
-  unsigned int change_cnt : 2;
-  bool any_change: 1;
-  bool valid_acceleration : 1;
-  bool valid_speed : 1;
-  bool recalc_ramp_steps : 1;
-  bool keep_running : 1;
-  bool keep_running_count_up : 1;
-
-  // These three variables are derived
-  uint32_t max_ramp_up_steps;
-  pmf_logarithmic pmfl_ticks_h;
-  pmf_logarithmic cubic;
-
-  void init() {
-    change_cnt = 0;
-	target_pos = 0;
-    valid_acceleration = false;
-    valid_speed = false;
-    recalc_ramp_steps = false;
-	any_change = false;
-    s_h = 0;
-    min_travel_ticks = 0;
-    // max_ramp_up_steps = 0;
-    // pmfl_ticks_h = PMF_CONST_MAX;
-    // cubic = PMF_CONST_INVALID;
-    // pmfl_accel = PMF_CONST_INVALID;
   }
   inline int8_t checkValidConfig() const {
     if (!valid_speed) {
@@ -137,14 +120,27 @@ struct ramp_config_s {
     }
     return MOVE_OK;
   }
+};
+
+struct ramp_config_s {
+  struct ramp_parameters_s parameters;
+  unsigned int change_cnt : 2;
+
+  // These three variables are derived
+  uint32_t max_ramp_up_steps;
+  pmf_logarithmic pmfl_ticks_h;
+  pmf_logarithmic cubic;
+
+  void init() {
+	parameters.init();
+  }
   inline void update() {
-    if (checkValidConfig() == MOVE_OK) {
-      if (s_h > 0) {
-        pmf_logarithmic pmfl_s_h = pmfl_from(s_h);
+      if (parameters.s_h > 0) {
+        pmf_logarithmic pmfl_s_h = pmfl_from(parameters.s_h);
         // 1/cubic = sqrt(3/2 * a) / s_h^(1/6) / TICKS_PER_S
         //         = sqrt(3/2 * a / s_h^(1/3)) / TICKS_PER_S
         // cubic = TICKS_PER_S / sqrt(s_h^(1/3) / (3/2 * a))
-        cubic = pmfl_multiply(PMF_CONST_3_DIV_2, pmfl_accel);
+        cubic = pmfl_multiply(PMF_CONST_3_DIV_2, parameters.pmfl_accel);
         cubic = pmfl_sqrt(pmfl_divide(pmfl_pow_div_3(pmfl_s_h), cubic));
         cubic = pmfl_multiply(PMF_TICKS_PER_S, cubic);
 
@@ -153,39 +149,7 @@ struct ramp_config_s {
       } else {
         pmfl_ticks_h = PMF_CONST_MAX;
       }
-      max_ramp_up_steps = calculate_ramp_steps(min_travel_ticks);
-      change_cnt++;
-    }
-  }
-  inline void setTargetPosition(int32_t pos) {
-	  target_pos = pos;
-	  any_change = true;
-  }
-  inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {
-    if (s_h != s_cubic_steps) {
-      s_h = s_cubic_steps;
-      recalc_ramp_steps = true;
-	  any_change = true;
-      update();
-    }
-  }
-  inline void setSpeedInTicks(uint32_t min_step_ticks) {
-    if (!valid_speed || (min_travel_ticks != min_step_ticks)) {
-      min_travel_ticks = min_step_ticks;
-      valid_speed = true;
-	  any_change = true;
-      update();
-    }
-  }
-  inline void setAcceleration(int32_t accel) {
-    pmf_logarithmic new_pmfl_accel = pmfl_from((uint32_t)accel);
-    if (!valid_acceleration || (pmfl_accel != new_pmfl_accel)) {
-      valid_acceleration = true;
-	  any_change = true;
-      recalc_ramp_steps = true;
-      pmfl_accel = new_pmfl_accel;
-      update();
-    }
+      max_ramp_up_steps = calculate_ramp_steps(parameters.min_travel_ticks);
   }
 
   uint32_t calculate_ticks(uint32_t steps) const {
@@ -193,11 +157,11 @@ struct ramp_config_s {
     // 2*a*s = (a*t)^2 = v^2 = (TICKS_PER_S/ticks)^2
     // ticks = TICKS_PER_S / sqrt(2*a*s)
     // ticks = TICKS_PER_S/sqrt(2) / sqrt(a*s)
-    if (steps >= s_h) {
-      steps -= (s_h + 2) >> 2;
+    if (steps >= parameters.s_h) {
+      steps -= (parameters.s_h + 2) >> 2;
       pmf_logarithmic pmfl_steps = pmfl_from(steps);
       pmf_logarithmic pmfl_steps_mul_accel =
-          pmfl_multiply(pmfl_steps, pmfl_accel);
+          pmfl_multiply(pmfl_steps, parameters.pmfl_accel);
       pmf_logarithmic pmfl_sqrt_steps_mul_accel =
           pmfl_sqrt(pmfl_steps_mul_accel);
       pmf_logarithmic pmfl_res =
@@ -220,10 +184,10 @@ struct ramp_config_s {
     pmf_logarithmic pmfl_ticks = pmfl_from(ticks);
     if (pmfl_ticks <= pmfl_ticks_h) {
       pmf_logarithmic pmfl_inv_accel2 =
-          pmfl_divide(PMF_ACCEL_FACTOR, pmfl_accel);
+          pmfl_divide(PMF_ACCEL_FACTOR, parameters.pmfl_accel);
       uint32_t steps =
           pmfl_to_u32(pmfl_divide(pmfl_inv_accel2, pmfl_square(pmfl_ticks)));
-      steps += (s_h + 2) >> 2;
+      steps += (parameters.s_h + 2) >> 2;
       return steps;
     }
     // s = (cubic/ticks)^(3/2)

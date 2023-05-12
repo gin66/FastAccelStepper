@@ -12,9 +12,6 @@
 
 void RampGenerator::init() {
   _parameters.init();
-  _config1.init();
-  _config2.init();
-  _config = &_config1;
   _ro.init();
   _rw.init();
   init_ramp_module();
@@ -24,28 +21,31 @@ int8_t RampGenerator::setAcceleration(int32_t accel) {
     return -1;
   }
   acceleration = (uint32_t)accel;
-  struct ramp_config_s *c = get_new_config();
-  c->setAcceleration(accel);
+  _parameters.setAcceleration(accel);
   return 0;
 }
 void RampGenerator::applySpeedAcceleration() {
-  apply_modification();
+	_parameters.applyParameters();
 }
 int8_t RampGenerator::startRun(bool countUp) {
-  apply_modification();
-  uint8_t res = _config->checkValidConfig();
+  uint8_t res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }
-  struct ramp_ro_s new_ramp;
-  new_ramp.keepRunning(_config, countUp);
+    _parameters.setTargetPosition(0);
+    //force_stop = false;
+    //force_immediate_stop = false;
+    //incomplete_immediate_stop = false;
+    _parameters.keep_running = true;
+    _parameters.keep_running_count_up = countUp;
+	_parameters.applyParameters();
 
   fasDisableInterrupts();
   _rw.startRampIfNotRunning();
-  if (_ro.isImmediateStopInitiated()) {
-    new_ramp.markIncompleteImmediateStop();
-  }
-  _ro = new_ramp;
+  //if (_ro.isImmediateStopInitiated()) {
+  //  new_ramp.markIncompleteImmediateStop();
+  //}
+  //_ro = new_ramp;
   fasEnableInterrupts();
 #ifdef DEBUG
   char buf[256];
@@ -57,35 +57,38 @@ int8_t RampGenerator::startRun(bool countUp) {
 }
 
 int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
-	Serial.println("xxx startMove");
-  apply_modification();
-  uint8_t res = _config->checkValidConfig();
+  uint8_t res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }
 
-  struct ramp_ro_s new_ramp;
-  new_ramp.runToPosition(_config, target_pos);
+    _parameters.setTargetPosition(target_pos);
+    //force_stop = false;
+    //force_immediate_stop = false;
+    //incomplete_immediate_stop = false;
+    _parameters.keep_running = false;
+    _parameters.keep_running_count_up = true;
+	_parameters.applyParameters();
 
-  fasDisableInterrupts();
+  //fasDisableInterrupts();
   if (position_changed) {
     // Only start the ramp generator, if the target position is different
     _rw.startRampIfNotRunning();
   }
-  if (_ro.isImmediateStopInitiated()) {
-    new_ramp.markIncompleteImmediateStop();
-  }
-  _ro = new_ramp;
-  fasEnableInterrupts();
+  //if (_ro.isImmediateStopInitiated()) {
+  //  new_ramp.markIncompleteImmediateStop();
+  //}
+  //_ro = new_ramp;
+  //fasEnableInterrupts();
 
 #ifdef TEST
   printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
-         _rw.curr_ticks, _config->min_travel_ticks);
+         _rw.curr_ticks, _ro.config.parameters.min_travel_ticks);
 #endif
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu\n",
-          target_pos, _rw.curr_ticks, _config->min_travel_ticks);
+          target_pos, _rw.curr_ticks, _ro.config.parameters.min_travel_ticks);
   Serial.println(buf);
 #endif
   return MOVE_OK;
@@ -94,8 +97,8 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
 int8_t RampGenerator::moveTo(int32_t position,
                              const struct queue_end_s *queue_end) {
   int32_t curr_pos;
-  if (isRampGeneratorActive() && !_ro.config.keep_running) {
-    curr_pos = _ro.config.target_pos;
+  if (isRampGeneratorActive() && !_ro.config.parameters.keep_running) {
+    curr_pos = _ro.config.parameters.target_pos;
   } else {
     curr_pos = queue_end->pos;
   }
@@ -106,8 +109,8 @@ int8_t RampGenerator::moveTo(int32_t position,
 }
 int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   int32_t curr_pos;
-  if (isRampGeneratorActive() && !_ro.config.keep_running) {
-    curr_pos = _ro.config.target_pos;
+  if (isRampGeneratorActive() && !_ro.config.parameters.keep_running) {
+    curr_pos = _ro.config.parameters.target_pos;
   } else {
     curr_pos = queue_end->pos;
   }
@@ -116,8 +119,8 @@ int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
 }
 void RampGenerator::advanceTargetPosition(int32_t delta,
                                           const struct queue_end_s *queue) {
-  if (isRampGeneratorActive() && !_ro.config.keep_running) {
-    int32_t new_pos = _ro.config.target_pos + delta;
+  if (isRampGeneratorActive() && !_ro.config.parameters.keep_running) {
+    int32_t new_pos = _ro.config.parameters.target_pos + delta;
     _startMove(new_pos, true);
   }
 }
@@ -137,9 +140,14 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   // we are running in higher priority than the application
   // so we can just read the config without disable interrupts
   // copy consistent ramp state
-  if (_config->change_cnt != _ro.config.change_cnt) {
-	  _ro.config = *_config;
+  if (_parameters.apply) {
+	  _ro.config.parameters = _parameters;
+	  _parameters.apply = false;
+	  _parameters.any_change = false;
+	  _parameters.recalc_ramp_steps = false;
+	  _ro.config.update();
   }
+
   fasDisableInterrupts();
   struct queue_end_s qe = *queue_end;
   fasEnableInterrupts();

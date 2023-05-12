@@ -17,8 +17,8 @@ int main() {
 
   struct ramp_config_s c;
   c.init();
-  c.setAcceleration(ramp_acceleration);
-  c.setSpeedInTicks(max_speed_in_ticks);
+  c.parameters.setAcceleration(ramp_acceleration);
+  c.parameters.setSpeedInTicks(max_speed_in_ticks);
 
   char fname[100];
   sprintf(fname, "ramp.gnuplot");
