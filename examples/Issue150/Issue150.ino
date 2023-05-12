@@ -80,6 +80,9 @@ void loop() {
       digitalWrite(PIN, LOW);
     }
 
+    // go to standard position, so test passes
+    stepper->moveTo(4000, true);
+
     delay(1000);
     noInterrupts();
     sleep_cpu();

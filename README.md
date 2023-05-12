@@ -15,7 +15,7 @@
 [![Build examples for Atmega32U4](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega32u4.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega32u4.yml)
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 328, ATmega2560), esp32, esp32s2 and atmelsam due.
+Supported are avr (ATmega 328, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal

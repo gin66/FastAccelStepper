@@ -24,10 +24,10 @@ int8_t RampGenerator::setAcceleration(int32_t accel) {
   _parameters.setAcceleration(accel);
   return 0;
 }
-void RampGenerator::applySpeedAcceleration() { 
-	if (!_ro.isImmediateStopInitiated()) {
-		_parameters.applyParameters(); 
-	}
+void RampGenerator::applySpeedAcceleration() {
+  if (!_ro.isImmediateStopInitiated()) {
+    _parameters.applyParameters();
+  }
 }
 int8_t RampGenerator::startRun(bool countUp) {
   uint8_t res = _parameters.checkValidConfig();

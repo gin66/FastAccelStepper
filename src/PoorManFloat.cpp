@@ -279,15 +279,6 @@ uint32_t pmfl_to_u32(pmf_logarithmic x) {
   res <<= shift;
   return res;
 }
-#ifdef TEST
-// not needed
-pmf_logarithmic pmfl_shl(pmf_logarithmic x, uint8_t n) {
-  return x + (((int16_t)n) << 9);
-}
-#endif
-pmf_logarithmic pmfl_shr(pmf_logarithmic x, uint8_t n) {
-  return x - (((int16_t)n) << 9);
-}
 pmf_logarithmic pmfl_square(pmf_logarithmic x) {
   if (x >= 0x4000) {
     return 0x7fff;
@@ -297,10 +288,3 @@ pmf_logarithmic pmfl_square(pmf_logarithmic x) {
   }
   return x + x;
 }
-#ifdef TEST
-// not needed
-pmf_logarithmic pmfl_rsquare(
-    pmf_logarithmic x) {  // Reciprocal square = 1/(x*x)
-  return pmfl_reciprocal(pmfl_square(x));
-}
-#endif

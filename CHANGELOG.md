@@ -2,11 +2,13 @@ TODO:
 - Different behavior avr vs pc-based tests to be analyzed
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
+- rename PoorManFloat to e.g. Log2Representation
+- rename RampConstAcceleration to e.g. RampControl
 
 pre-0.29.1:
 - improve rounding for log2/pow2 conversion
-- avr: reduce max speed for 1 stepper to 50kSteps/s from 70kSteps/s
-- improve linear acceleration from standstill - configurable by setLinearAcceleration()
+- avr: reduce max speed for single stepper use down to 50kSteps/s from 70kSteps/s
+- implement linear acceleration from/to standstill - configurable by setLinearAcceleration()
 - StepperDemo: Add J<steps> command to set linear acceleration
 
 0.29.0:

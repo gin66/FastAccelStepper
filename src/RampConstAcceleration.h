@@ -31,7 +31,8 @@ struct ramp_rw_s {
   // if change_cnt does not match config.change_cnt, then eventually
   // performed_ramp_up_steps to be recalculated
   uint8_t change_cnt;
-  // the speed is linked on both ramp slopes to this variable as per (if no cubic ramp)
+  // the speed is linked on both ramp slopes to this variable as per (if no
+  // cubic ramp)
   //       s = v²/2a   =>   v = sqrt(2*a*s)
   uint32_t performed_ramp_up_steps;
   // Are the ticks stored of the last previous step, if pulse time requires
