@@ -103,7 +103,6 @@ struct queue_end_s {
 //==========================================================================
 
 #if CONFIG_IDF_TARGET_ESP32
-#define SUPPORT_ESP32_MCPWM_PCNT
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
 #include <soc/mcpwm_reg.h>
@@ -111,6 +110,8 @@ struct queue_end_s {
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
+#define SUPPORT_SELECT_DRIVER_TYPE
+#define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #include <driver/rmt.h>
 #define QUEUES_MCPWM_PCNT 6
