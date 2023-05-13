@@ -14,9 +14,32 @@ FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
 
 void setup() {
+  Serial.begin(115200);
+  Serial.println("START");
   engine.init();
+
+#ifdef SUPPORT_SELECT_DRIVER_TYPE
+// The code below is only relevant for original esp32
+//#define TEST_DONT_CARE_RMT
+#ifdef TEST_DONT_CARE_RMT
+  // here occupy first all mcpwm/pcnt modules, then uses rmt
+  stepper = engine.stepperConnectToPin(19,DRIVER_DONT_CARE);
+  stepper = engine.stepperConnectToPin(16,DRIVER_DONT_CARE);
+  stepper = engine.stepperConnectToPin(15,DRIVER_DONT_CARE);
+  stepper = engine.stepperConnectToPin(14,DRIVER_DONT_CARE);
+  stepper = engine.stepperConnectToPin(13,DRIVER_DONT_CARE);
+  stepper = engine.stepperConnectToPin(12,DRIVER_DONT_CARE);
+  // now I get the rmt, I want
+  stepper = engine.stepperConnectToPin(stepPinStepper,DRIVER_DONT_CARE);
+#else
+  // This is uses the new interface to enforce usage of RMT
+  stepper = engine.stepperConnectToPin(stepPinStepper, DRIVER_RMT);
+#endif
+#else
   stepper = engine.stepperConnectToPin(stepPinStepper);
+#endif
   if (stepper) {
+    Serial.println("HAVE STEPPER");
     stepper->setDirectionPin(dirPinStepper);
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
@@ -29,7 +52,12 @@ void setup() {
     stepper->setSpeedInHz(50000);
     stepper->setAcceleration(2000000);
   }
-  Serial.begin(115200);
+  else {
+    while(true) {
+		Serial.println("NO STEPPER");
+		delay(1000);
+    }
+  }
 }
 
 enum struct modes_e {

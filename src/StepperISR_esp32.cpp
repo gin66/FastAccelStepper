@@ -14,12 +14,12 @@ StepperQueue fas_queue[NUM_QUEUES];
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   uint8_t channel = queue_num;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-  if (channel < 6) {
+  if (channel < QUEUES_MCPWM_PCNT) {
     use_rmt = false;
     init_mcpwm_pcnt(channel, step_pin);
     return;
   }
-  channel -= 6;
+  channel -= QUEUES_MCPWM_PCNT;
 #endif
 #ifdef SUPPORT_ESP32_RMT
   use_rmt = true;
