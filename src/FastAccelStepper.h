@@ -89,6 +89,7 @@ class FastAccelStepperEngine {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #define DRIVER_MCPWM_PCNT 0
 #define DRIVER_RMT        1
+#define DRIVER_DONT_CARE  2
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin, uint8_t driver_type);
 #endif
 

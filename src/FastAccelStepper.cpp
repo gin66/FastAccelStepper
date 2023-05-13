@@ -55,6 +55,7 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
   return false;
 }
 //*************************************************************************************************
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
   // Check if already connected
@@ -76,11 +77,10 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     }
     fas_stepper_num = _stepper_cnt;
   }
-  uint8_t stepper_num = _stepper_cnt;
   _stepper_cnt++;
 
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
-  _stepper[stepper_num] = s;
+  _stepper[fas_stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
   for (uint8_t i = 0; i < _stepper_cnt; i++) {
     s = _stepper[i];
@@ -88,7 +88,12 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
   return s;
 }
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#else
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin) {
+	return stepperConnectToPin(step_pin, DRIVER_DONT_CARE);
+}
+
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, uint8_t driver_type) {
   // Check if already connected
@@ -111,7 +116,8 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   else if (driver_type == DRIVER_RMT) {
 	queue_from = QUEUES_MCPWM_PCNT;
   }
-  FastAccelStepper *s == NULL;
+  FastAccelStepper *s = NULL;
+  int8_t fas_stepper_num = -1;
   for (uint8_t i = queue_from; i < queue_to; i++) {
     s = _stepper[i];
     if (s == NULL) {
