@@ -32,21 +32,21 @@ void setup() {
   Serial.begin(115200);
 }
 
-enum modes {
+enum struct modes_e {
 	start_with_linear,
 	start_stop_with_linear,
 	start_stop_without_linear,
 	only_linear,
 	done
 } modes[] = {
-	start_with_linear,
+	modes_e::start_with_linear,
 	// repeat the next for better comparison
-	start_stop_with_linear,
-	start_stop_without_linear,
-	start_stop_with_linear,
-	start_stop_without_linear,
-	only_linear,
-	done
+	modes_e::start_stop_with_linear,
+	modes_e::start_stop_without_linear,
+	modes_e::start_stop_with_linear,
+	modes_e::start_stop_without_linear,
+	modes_e::only_linear,
+	modes_e::done
 };
 uint8_t mode_i = 0;
 bool need_clear_linear = false;
@@ -61,25 +61,25 @@ void loop() {
 		if (pos > 0) {
 			// next mode
 			mode_i = mode_i + 1;
-			if (modes[mode_i] == done) {
+			if (modes[mode_i] == modes_e::done) {
 				mode_i = 0;
 			}
 
 			// now we have plenty of time to write to the Serial
 			switch (modes[mode_i]) {
-				case modes::start_with_linear:
+				case modes_e::start_with_linear:
 					Serial.println("start with linear and stop without");
 					break;
-				case modes::start_stop_with_linear:
+				case modes_e::start_stop_with_linear:
 					Serial.println("start and stop with linear");
 					break;
-				case modes::start_stop_without_linear:
+				case modes_e::start_stop_without_linear:
 					Serial.println("start and stop without linear");
 					break;
-				case modes::only_linear:
+				case modes_e::only_linear:
 					Serial.println("no constant acceleration");
 					break;
-				case modes::done:
+				case modes_e::done:
 					break;
 			}
 			// let the user read the message
@@ -95,19 +95,19 @@ void loop() {
 		}
 		need_clear_linear = false;
 		switch (modes[mode_i]) {
-			case modes::start_with_linear:
+			case modes_e::start_with_linear:
 				need_clear_linear = true;
-			case modes::start_stop_with_linear:
+			case modes_e::start_stop_with_linear:
 				// 100 steps linear, then constant acceleration
 				stepper->setLinearAcceleration(100);
 				break;
-			case modes::start_stop_without_linear:
+			case modes_e::start_stop_without_linear:
 				stepper->setLinearAcceleration(0);
 				break;
-			case modes::only_linear:
+			case modes_e::only_linear:
 				stepper->setLinearAcceleration(100000);// just big enough value
 				break;
-			case modes::done:
+			case modes_e::done:
 				break;
 		}
 		stepper->moveTo(pos);
