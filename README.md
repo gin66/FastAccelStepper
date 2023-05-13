@@ -17,6 +17,10 @@
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
 Supported are avr (ATmega 328, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3 and atmelsam due.
 
+# BE AWARE: ARDUINO LIBRARY MANAGER IS BROKEN AND 0.29.x do not show.
+
+No issue with platformio. Check the [related issue](https://github.com/arduino/library-registry/issues/2829) for the arduino library manager
+
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
 	- avr atmega328p: only Pin 9 and 10.
