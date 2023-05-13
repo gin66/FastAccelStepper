@@ -21,8 +21,8 @@ FastAccelStepper fas_stepper[MAX_STEPPER];
 void FastAccelStepperEngine::init() {
   _externalCallForPin = NULL;
   fas_init_engine(this, 255);
-  for (uint8_t i = 0;i < MAX_STEPPER;i++) {
-	  _stepper[i] = NULL;
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    _stepper[i] = NULL;
   }
 }
 
@@ -86,7 +86,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   _stepper[fas_stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
   for (uint8_t i = 0; i < _stepper_cnt; i++) {
-    FastAccelStepper *sx = _stepper[i];
+    FastAccelStepper* sx = _stepper[i];
     fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
   }
   return s;
@@ -94,7 +94,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 #else
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
-	return stepperConnectToPin(step_pin, DRIVER_DONT_CARE);
+  return stepperConnectToPin(step_pin, DRIVER_DONT_CARE);
 }
 
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
@@ -114,32 +114,31 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   uint8_t queue_from = 0;
   uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT;
   if (driver_type == DRIVER_MCPWM_PCNT) {
-	queue_to = QUEUES_MCPWM_PCNT;
-  }
-  else if (driver_type == DRIVER_RMT) {
-	queue_from = QUEUES_MCPWM_PCNT;
+    queue_to = QUEUES_MCPWM_PCNT;
+  } else if (driver_type == DRIVER_RMT) {
+    queue_from = QUEUES_MCPWM_PCNT;
   }
   int8_t fas_stepper_num = -1;
   for (uint8_t i = queue_from; i < queue_to; i++) {
-    FastAccelStepper *s = _stepper[i];
+    FastAccelStepper* s = _stepper[i];
     if (s == NULL) {
-		fas_stepper_num = i;
-		break;
+      fas_stepper_num = i;
+      break;
     }
   }
   if (fas_stepper_num < 0) {
-	  return NULL;
+    return NULL;
   }
   _stepper_cnt++;
 
-  FastAccelStepper *s = &fas_stepper[fas_stepper_num];
+  FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[fas_stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper *sx = _stepper[i];
-	if (sx) {
-		fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
-	}
+    FastAccelStepper* sx = _stepper[i];
+    if (sx) {
+      fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
+    }
   }
   return s;
 }

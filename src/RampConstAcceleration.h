@@ -43,9 +43,7 @@ struct ramp_rw_s {
     ramp_state = RAMP_STATE_IDLE;
     curr_ticks = TICKS_FOR_STOPPED_MOTOR;
   }
-  inline void init() {
-    stopRamp();
-  }
+  inline void init() { stopRamp(); }
   inline uint8_t rampState() {
     // reading one byte is atomic
     return ramp_state;

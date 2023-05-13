@@ -277,7 +277,7 @@ What are the differences between mcpwm/pcnt and rmt ?
 
 If the interrupt load is not an issue, then rmt is the better choice. With rmt the below (multi-axis application) mentioned loss of synchonicity at high speeds can be avoided. The rmt driver is - besides some rmt modules perks - less complex and way more straightforward.
 
-As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers and then the 8 rmt drivers. In future this may be under application control.
+As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers and then the 8 rmt drivers. In future this may be under application control. Starting with 0.29.2, the module can be directly selected on call of `stepperConnectToPin()`. So the allocation gets more flexible.
 
 ### ESP32S2
 
