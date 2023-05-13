@@ -66,6 +66,16 @@ the return value of this call.
 ```cpp
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 ```
+For e.g. esp32, there are two types of driver.
+One using mcpwm and pcnt module. And another using rmt module.
+This call allows to select the respective driver
+```cpp
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#define DRIVER_MCPWM_PCNT 0
+#define DRIVER_RMT        1
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin, uint8_t driver_type);
+#endif
+```
 Comments to valid pins:
 
 | Device     | Comment                                                                                           |

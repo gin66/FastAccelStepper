@@ -71,20 +71,20 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
   int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
   if (fas_stepper_num < 0) {  // flexible, so just choose next
-    if (_next_stepper_num >= MAX_STEPPER) {
+    if (_stepper_cnt >= MAX_STEPPER) {
       return NULL;
     }
-    fas_stepper_num = _next_stepper_num;
+    fas_stepper_num = _stepper_cnt;
   }
-  uint8_t stepper_num = _next_stepper_num;
-  _next_stepper_num++;
+  uint8_t stepper_num = _stepper_cnt;
+  _stepper_cnt++;
 
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   _stepper[stepper_num] = s;
   s->init(this, fas_stepper_num, step_pin);
-  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+  for (uint8_t i = 0; i < _stepper_cnt; i++) {
     s = _stepper[i];
-    fas_queue[s->_queue_num].adjustSpeedToStepperCount(_next_stepper_num);
+    fas_queue[s->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
   }
   return s;
 }
@@ -118,7 +118,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 		fas_stepper_num = i;
 		s = &fas_stepper[fas_stepper_num];
 		_stepper[fas_stepper_num] = s;
-		_next_stepper_num++;
+		_stepper_cnt++;
 		break;
     }
   }
@@ -127,9 +127,9 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
 
   s->init(this, fas_stepper_num, step_pin);
-  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+  for (uint8_t i = 0; i < _stepper_cnt; i++) {
     s = _stepper[i];
-    fas_queue[s->_queue_num].adjustSpeedToStepperCount(_next_stepper_num);
+    fas_queue[s->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
   }
   return s;
 }
@@ -154,7 +154,7 @@ void FastAccelStepperEngine::manageSteppers() {
     }
   }
 #endif
-  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+  for (uint8_t i = 0; i < _stepper_cnt; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
 #ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
@@ -168,7 +168,7 @@ void FastAccelStepperEngine::manageSteppers() {
   }
 
   // Check for auto disable
-  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+  for (uint8_t i = 0; i < _stepper_cnt; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
       if (s->needAutoDisable()) {
@@ -177,7 +177,7 @@ void FastAccelStepperEngine::manageSteppers() {
 
         // fasDisableInterrupts(); // TODO
         bool agree = true;
-        for (uint8_t j = 0; j < _next_stepper_num; j++) {
+        for (uint8_t j = 0; j < _stepper_cnt; j++) {
           if (i != j) {
             FastAccelStepper* other = _stepper[j];
             if (other) {
@@ -192,7 +192,7 @@ void FastAccelStepperEngine::manageSteppers() {
           }
         }
         if (agree) {
-          for (uint8_t j = 0; j < _next_stepper_num; j++) {
+          for (uint8_t j = 0; j < _stepper_cnt; j++) {
             FastAccelStepper* current = _stepper[j];
             if (current) {
               if (current->usesAutoEnablePin(high_active_pin) ||
@@ -210,7 +210,7 @@ void FastAccelStepperEngine::manageSteppers() {
   }
 
   // Update the auto disable counters
-  for (uint8_t i = 0; i < _next_stepper_num; i++) {
+  for (uint8_t i = 0; i < _stepper_cnt; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
       fasDisableInterrupts();

@@ -142,7 +142,7 @@ class FastAccelStepperEngine {
  private:
   bool isDirPinBusy(uint8_t dirPin, uint8_t except_stepper);
 
-  uint8_t _next_stepper_num;
+  uint8_t _stepper_cnt;
   FastAccelStepper* _stepper[MAX_STEPPER];
 
   bool _isValidStepPin(uint8_t step_pin);
