@@ -432,7 +432,7 @@ void FastAccelStepper::fill_queue() {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
     runtime_us = micros() - runtime_us;
-    max_micros = max(max_micros, runtime_us);
+    max_micros = fas_max(max_micros, runtime_us);
 #endif
     if (cmd.command.ticks == 0) {
       break;
@@ -624,7 +624,7 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
     // ensure minimum time
     delay_count = 2;
   }
-  _off_delay_count = max(delay_count, (uint16_t)1);
+  _off_delay_count = fas_max(delay_count, (uint16_t)1);
 }
 int8_t FastAccelStepper::runForward() { return _rg.startRun(true); }
 int8_t FastAccelStepper::runBackward() { return _rg.startRun(false); }
