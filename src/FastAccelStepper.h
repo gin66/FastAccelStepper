@@ -395,10 +395,10 @@ class FastAccelStepper {
   //  within 100 steps, then call setLinearAcceleration(100)
   //
   //  The speed at which linear acceleration turns into constant acceleration
-  //  can b e calculated from the parameter linear_acceleration_steps.
+  //  can be calculated from the parameter linear_acceleration_steps.
   //  Let's call this parameter `s_h` for handover steps.
   //  Then the speed is:
-  //       v_h = sqrt(1.5 * a * s_h)
+  //       `v_h = sqrt(1.5 * a * s_h)`
   //
   // New value will be used after call to
   // move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
@@ -407,6 +407,22 @@ class FastAccelStepper {
   inline void setLinearAcceleration(uint32_t linear_acceleration_steps) {
     _rg.setLinearAcceleration(linear_acceleration_steps);
   }
+
+  // ## Jump Start
+  // setJumpStart expects as parameter the ramp step to start from standstill.
+  //
+  // The speed at which the stepper will start can be calculated like this:
+  // - If linear acceleration is not in use:
+  //       start speed `v = sqrt(2 * a * jump_step)`
+  // - If linear acceleration is in use and `jump_step <= s_h`:
+  //       start speed `v = sqrt(1.5*a)/s_h^(1/6) * jump_step^(2/3)`
+  // - If linear acceleration is in use and `jump_step > s_h`:
+  //       start speed `v = sqrt(2 * a * (jump_step - s_h/4))`
+  //
+  //
+  // New value will be used after call to
+  // move/moveTo/runForward/runBackward
+  inline void setJumpStart(uint32_t jump_step) { _rg.setJumpStart(jump_step); }
 
   // ## Apply new speed/acceleration value
   // This function applies new values for speed/acceleration.

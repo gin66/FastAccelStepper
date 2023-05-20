@@ -48,6 +48,7 @@ struct ramp_parameters_s {
   int32_t target_pos;
   uint32_t min_travel_ticks;
   uint32_t s_h;
+  uint32_t s_jump;
   pmf_logarithmic pmfl_accel;
   bool apply : 1;              // clear on read by stepper task. Triggers read !
   bool any_change : 1;         // clear on read by stepper task
@@ -67,6 +68,7 @@ struct ramp_parameters_s {
     keep_running = false;
     keep_running_count_up = true;
     s_h = 0;
+    s_jump = 0;
     min_travel_ticks = 0;
   }
   inline void applyParameters() {
@@ -111,6 +113,7 @@ struct ramp_parameters_s {
       fasEnableInterrupts();
     }
   }
+  inline void setJumpStart(uint32_t jump_step) { s_jump = jump_step; }
   inline int8_t checkValidConfig() const {
     if (!valid_speed) {
       return MOVE_ERR_SPEED_IS_UNDEFINED;

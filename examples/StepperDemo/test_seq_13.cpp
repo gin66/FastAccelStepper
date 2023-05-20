@@ -5,6 +5,7 @@
 
 bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
+#if !defined(__AVR_ATmega32U4__)
   uint8_t res;
   struct stepper_command_s cmd_step = {
       .ticks = 50000, .steps = 1, .count_up = true};
@@ -34,5 +35,6 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
       }
       break;
   }
+#endif
   return false;
 }

@@ -8,6 +8,8 @@ TODO:
 pre-0.29.2:
 - add `stepperConnectToPin(pin, driver_type)` to allow the module selection
 - fix issue #170 and use consequently `fas_max()` instead of `max()`
+- add `setJumpStart(jump_step)` to start the ramp with higher speed
+- StepperDemo: Add j<steps> command to set steps for jump start
 
 0.29.1:
 - improve rounding for log2/pow2 conversion

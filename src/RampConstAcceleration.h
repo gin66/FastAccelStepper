@@ -48,13 +48,13 @@ struct ramp_rw_s {
     // reading one byte is atomic
     return ramp_state;
   }
-  inline void startRampIfNotRunning() {
+  inline void startRampIfNotRunning(uint32_t s_jump) {
     // called with interrupts disabled
     if (ramp_state == RAMP_STATE_IDLE) {
       fasDisableInterrupts();
       ramp_state = RAMP_STATE_ACCELERATE;
       curr_ticks = TICKS_FOR_STOPPED_MOTOR;
-      performed_ramp_up_steps = 0;
+      performed_ramp_up_steps = s_jump;
       fasEnableInterrupts();
     }
   }

@@ -72,8 +72,8 @@ This call allows to select the respective driver
 ```cpp
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #define DRIVER_MCPWM_PCNT 0
-#define DRIVER_RMT        1
-#define DRIVER_DONT_CARE  2
+#define DRIVER_RMT 1
+#define DRIVER_DONT_CARE 2
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin, uint8_t driver_type);
 #endif
 ```
@@ -360,10 +360,10 @@ getCurrentAcceleration() retrieves the actual acceleration.
  within 100 steps, then call setLinearAcceleration(100)
 
  The speed at which linear acceleration turns into constant acceleration
- can b e calculated from the parameter linear_acceleration_steps.
+ can be calculated from the parameter linear_acceleration_steps.
  Let's call this parameter `s_h` for handover steps.
  Then the speed is:
-      v_h = sqrt(1.5 * a * s_h)
+      `v_h = sqrt(1.5 * a * s_h)`
 
 New value will be used after call to
 move/moveTo/runForward/runBackward/applySpeedAcceleration/moveByAcceleration
@@ -372,6 +372,25 @@ note: no update on stopMove()
 ```cpp
   void setLinearAcceleration(uint32_t linear_acceleration_steps) {
     _rg.setLinearAcceleration(linear_acceleration_steps);
+  }
+```
+## Jump Start
+setJumpStart expects as parameter the ramp step to start from standstill.
+
+The speed at which the stepper will start can be calculated like this:
+- If linear acceleration is not in use:
+      start speed `v = sqrt(2 * a * jump_step)`
+- If linear acceleration is in use and `jump_step <= s_h`:
+      start speed `v = sqrt(1.5*a)/s_h^(1/6) * jump_step^(2/3)`
+- If linear acceleration is in use and `jump_step > s_h`:
+      start speed `v = sqrt(2 * a * (jump_step - s_h/4))`
+
+
+New value will be used after call to
+move/moveTo/runForward/runBackward
+```cpp
+  void setJumpStart(uint32_t jump_step) {
+	  _rg.setJumpStart(jump_step);
   }
 ```
 ## Apply new speed/acceleration value
