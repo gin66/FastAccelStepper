@@ -5,7 +5,7 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
-pre-0.29.2:
+0.29.2:
 - add `stepperConnectToPin(pin, driver_type)` to allow the module selection
 - fix issue #170 and use consequently `fas_max()` instead of `max()`
 - add `setJumpStart(jump_step)` to start the ramp with higher speed
