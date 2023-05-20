@@ -93,7 +93,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   if (ramp->config.parameters.recalc_ramp_steps) {
     TRACE_OUTPUT('X');
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
-      performed_ramp_up_steps = 0;
+      performed_ramp_up_steps = ramp->config.parameters.s_jump;
     } else {
       performed_ramp_up_steps = ramp->config.calculate_ramp_steps(curr_ticks);
 #ifdef TEST
