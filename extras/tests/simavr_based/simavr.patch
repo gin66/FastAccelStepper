@@ -24,28 +24,6 @@ index 64adbc4..ca43896 100644
  static uint8_t
  avr_ioport_read(
  		struct avr_t * avr,
-@@ -34,11 +49,11 @@ avr_ioport_read(
- 	uint8_t ddr = avr->data[p->r_ddr];
- 	uint8_t v = (avr->data[p->r_pin] & ~ddr) | (avr->data[p->r_port] & ddr);
- 	avr->data[addr] = v;
--	// made to trigger potential watchpoints
--	v = avr_core_watch_read(avr, addr);
- 	avr_raise_irq(p->io.irq + IOPORT_IRQ_REG_PIN, v);
- 	D(if (avr->data[addr] != v) printf("** PIN%c(%02x) = %02x\r\n", p->name, addr, v);)
- 
-+	// made to trigger potential watchpoints
-+	v = avr_core_watch_read(avr, addr);
- 	return v;
- }
- 
-@@ -122,7 +137,6 @@ avr_ioport_ddr_write(
- 	D(if (avr->data[addr] != v) printf("** DDR%c(%02x) = %02x\r\n", p->name, addr, v);)
- 	avr_raise_irq(p->io.irq + IOPORT_IRQ_DIRECTION_ALL, v);
- 	avr_core_watch_write(avr, addr, v);
--
- 	avr_ioport_update_irqs(p);
- }
- 
 @@ -143,19 +157,47 @@ avr_ioport_irq_notify(
  	int output = value & AVR_IOPORT_OUTPUT;
  	value &= 0xff;
@@ -102,15 +80,6 @@ index 64adbc4..ca43896 100644
  		if (uiRegMask) // If mask is 0, do nothing (backwards compat)
  			raisedata &= uiRegMask; // Mask off
  
-@@ -252,7 +294,7 @@ static const char * irq_names[IOPORT_IRQ_COUNT] = {
- 	[IOPORT_IRQ_PIN5] = "=pin5",
- 	[IOPORT_IRQ_PIN6] = "=pin6",
- 	[IOPORT_IRQ_PIN7] = "=pin7",
--	[IOPORT_IRQ_PIN_ALL] = "8=all",
-+	[IOPORT_IRQ_PIN_ALL] = "8>all",
- 	[IOPORT_IRQ_DIRECTION_ALL] = "8>ddr",
- 	[IOPORT_IRQ_REG_PORT] = "8>port",
- 	[IOPORT_IRQ_REG_PIN] = "8>pin",
 @@ -282,11 +324,17 @@ void avr_ioport_init(avr_t * avr, avr_ioport_t * p)
  	// allocate this module's IRQ
  	avr_io_setirqs(&p->io, AVR_IOCTL_IOPORT_GETIRQ(p->name), IOPORT_IRQ_COUNT, NULL);
