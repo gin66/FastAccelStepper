@@ -2,28 +2,6 @@ diff --git a/simavr/sim/avr_ioport.c b/simavr/sim/avr_ioport.c
 index 64adbc4..ca43896 100644
 --- a/simavr/sim/avr_ioport.c
 +++ b/simavr/sim/avr_ioport.c
-@@ -24,6 +24,21 @@
- 
- #define D(_w)
- 
-+static void
-+avr_ioport_flag_write(
-+		struct avr_t * avr,
-+		avr_io_addr_t addr,
-+		uint8_t v,
-+		void * param)
-+{
-+	avr_ioport_t * p = (avr_ioport_t *)param;
-+
-+	// Clear interrupt if 1 is written to flag.
-+
-+	if (avr_regbit_from_value(avr, p->pcint.raised, v))
-+		avr_clear_interrupt(avr, &p->pcint);
-+}
-+
- static uint8_t
- avr_ioport_read(
- 		struct avr_t * avr,
 @@ -143,19 +157,47 @@ avr_ioport_irq_notify(
  	int output = value & AVR_IOPORT_OUTPUT;
  	value &= 0xff;
@@ -80,23 +58,3 @@ index 64adbc4..ca43896 100644
  		if (uiRegMask) // If mask is 0, do nothing (backwards compat)
  			raisedata &= uiRegMask; // Mask off
  
-@@ -282,11 +324,17 @@ void avr_ioport_init(avr_t * avr, avr_ioport_t * p)
- 	// allocate this module's IRQ
- 	avr_io_setirqs(&p->io, AVR_IOCTL_IOPORT_GETIRQ(p->name), IOPORT_IRQ_COUNT, NULL);
- 
--	for (int i = 0; i < IOPORT_IRQ_COUNT; i++)
-+	for (int i = 0; i < IOPORT_IRQ_REG_PIN; i++) {
- 		p->io.irq[i].flags |= IRQ_FLAG_FILTERED;
--
-+                if (i < IOPORT_IRQ_PIN_ALL)
-+                    p->io.irq[i].flags &= ~IRQ_FLAG_INIT;
-+	}
- 	avr_register_io_write(avr, p->r_port, avr_ioport_write, p);
- 	avr_register_io_read(avr, p->r_pin, avr_ioport_read, p);
- 	avr_register_io_write(avr, p->r_pin, avr_ioport_pin_write, p);
- 	avr_register_io_write(avr, p->r_ddr, avr_ioport_ddr_write, p);
-+	if (p->pcint.raised.reg) {
-+		avr_register_io_write(avr, p->pcint.raised.reg,
-+				      avr_ioport_flag_write, p);
-+	}
- }
