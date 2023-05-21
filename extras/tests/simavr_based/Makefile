@@ -58,7 +58,7 @@ simavr/simavr/sim/run_avr.c:
 	#(cd simavr;git checkout	ce6738b)
 	#(cd simavr;git checkout	a5634af)
 	#(cd simavr;git checkout	13363d5)
-	(cd simavr;git checkout	1379eed)
+	#(cd simavr;git checkout	1379eed)
 	#
 	# these versions cannot be reverse patched
 	#(cd simavr;git checkout	c96ea61) # fails
@@ -71,7 +71,9 @@ simavr/simavr/sim/run_avr.c:
 	# patch derived by:
 	#     git diff b653a13..d2aaebd >../../simavr.patch
 	#
-	# apply patch:
+	# select current HEAD as of now
+	(cd simavr;git checkout	7003af)
+	# apply patch, which is now minimal:
 	(cd simavr;patch -p1 -t <../simavr.patch)
 
 proper: clean

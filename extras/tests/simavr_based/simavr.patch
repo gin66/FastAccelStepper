@@ -1,5 +1,5 @@
 diff --git a/simavr/sim/avr_ioport.c b/simavr/sim/avr_ioport.c
-index ca43896..3cf0565 100644
+index 91cf106..3d489d5 100644
 --- a/simavr/sim/avr_ioport.c
 +++ b/simavr/sim/avr_ioport.c
 @@ -158,6 +158,11 @@ avr_ioport_irq_notify(
@@ -14,23 +14,3 @@ index ca43896..3cf0565 100644
  
  	if (output) {
  		if ((mask & ddr) == 0)
-@@ -170,19 +175,6 @@ avr_ioport_irq_notify(
- 				 (avr->data[p->r_port] & ~mask) |
- 				     (value ? mask : 0),
- 				 p);
--	} else {
--		// Set the real PIN bit. Ignore DDR as it's masked when read.
--
--		avr->data[p->r_pin] &= ~mask;
--		if (value)
--			avr->data[p->r_pin] |= mask;
--
--		/* BUG: If DDR bit is set here, there should be no
--		 * interrupt.  But a spurious IRQ call by the user
--		 * is indistinguishable from an internal one
--		 * caused by writing the output port register and
--		 * that should cause an interrupt. Doh!
--		 */
- 	}
- 
- 	if (p->r_pcint) {
