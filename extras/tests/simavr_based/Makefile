@@ -72,7 +72,7 @@ simavr/simavr/sim/run_avr.c:
 	#     git diff b653a13..d2aaebd >../../simavr.patch
 	#
 	# apply patch:
-	(cd simavr;patch -p1 --reverse -t <../simavr.patch)
+	(cd simavr;patch -p1 -t <../simavr.patch)
 
 proper: clean
 	rm -f run_avr
