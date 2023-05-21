@@ -44,7 +44,35 @@ simavr/simavr/run_avr: simavr/simavr/sim/run_avr.c
 
 simavr/simavr/sim/run_avr.c:
 	git clone https://github.com/gin66/simavr.git
-	(cd simavr;git checkout	8d660ce)
+	# these versions work out of the box
+	#(cd simavr;git checkout	8d660ce)
+	#(cd simavr;git checkout	a56b550)
+	#(cd simavr;git checkout	c6d5375)
+	#(cd simavr;git checkout	9ed8eb6)
+	#(cd simavr;git checkout	b653a13)
+	#
+	# these versions work only with patch applied
+	#(cd simavr;git checkout	d2aaebd)
+	#(cd simavr;git checkout	ea4c450)
+	#(cd simavr;git checkout	d6ba83c)
+	#(cd simavr;git checkout	ce6738b)
+	#(cd simavr;git checkout	a5634af)
+	#(cd simavr;git checkout	13363d5)
+	(cd simavr;git checkout	1379eed)
+	#
+	# these versions cannot be reverse patched
+	#(cd simavr;git checkout	c96ea61) # fails
+	#(cd simavr;git checkout	4d1750b) # fails
+	#(cd simavr;git checkout	adfce91) # fails
+	#
+	# test using:
+	#     make proper run_avr;make -C test_sd_01b_2560t3/
+	#
+	# patch derived by:
+	#     git diff b653a13..d2aaebd >../../simavr.patch
+	#
+	# apply patch:
+	(cd simavr;patch -p1 --reverse -t <../simavr.patch)
 
 proper: clean
 	rm -f run_avr

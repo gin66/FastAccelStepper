@@ -1,0 +1,959 @@
+diff --git a/simavr/cores/sim_mega1280.c b/simavr/cores/sim_mega1280.c
+index 316bfd6..448cfd9 100644
+--- a/simavr/cores/sim_mega1280.c
++++ b/simavr/cores/sim_mega1280.c
+@@ -85,23 +85,35 @@ const struct mcu_t {
+ 		AVR_EXTINT_MEGA_DECLARE(7, 'E', PE7, B),
+ 	},
+ 	AVR_IOPORT_DECLARE(a, 'A', A),
+-	.portb = {
+-		.name = 'B', .r_port = PORTB, .r_ddr = DDRB, .r_pin = PINB,
++	AVR_IOPORT_DECLARE_PC(b, 'B', B, 0),      // PB0-7 have PCINT0-7
++	AVR_IOPORT_DECLARE(c, 'C', C),
++	AVR_IOPORT_DECLARE(d, 'D', D),
++	.porte = {
++		.name = 'E', .r_port = PORTE, .r_ddr = DDRE, .r_pin = PINE,
+ 		.pcint = {
+-			.enable = AVR_IO_REGBIT(PCICR, PCIE0),
+-			.raised = AVR_IO_REGBIT(PCIFR, PCIF0),
+-			.vector = PCINT0_vect,
++			 .enable = AVR_IO_REGBIT(PCICR, PCIE1),
++			 .raised = AVR_IO_REGBIT(PCIFR, PCIF1),
++			 .vector = PCINT1_vect,
+ 		},
+-		.r_pcint = PCMSK0,
++		.r_pcint = PCMSK1,
++		.mask = 1,                        // PE0 has PCINT8
++		.shift = 0
+ 	},
+-	AVR_IOPORT_DECLARE(c, 'C', C),
+-	AVR_IOPORT_DECLARE(d, 'D', D),
+-	AVR_IOPORT_DECLARE(e, 'E', E),
+ 	AVR_IOPORT_DECLARE(f, 'F', F),
+ 	AVR_IOPORT_DECLARE(g, 'G', G),
+ 	AVR_IOPORT_DECLARE(h, 'H', H),
+-	AVR_IOPORT_DECLARE(j, 'J', J),
+-	AVR_IOPORT_DECLARE(k, 'K', K),
++	.portj = {
++		.name = 'J', .r_port = PORTJ, .r_ddr = DDRJ, .r_pin = PINJ,
++		.pcint = {
++			 .enable = AVR_IO_REGBIT(PCICR, PCIE1),
++			 .raised = AVR_IO_REGBIT(PCIFR, PCIF1),
++			 .vector = PCINT1_vect,
++		},
++		.r_pcint = PCMSK1,
++		.mask = 0b11111110,               // PJ0-6 have PCINT9-15
++		.shift = -1
++	},
++	AVR_IOPORT_DECLARE_PC(k, 'K', K, 2),      // PK0-7 have PCINT16-23
+ 	AVR_IOPORT_DECLARE(l, 'L', L),
+ 
+ 	AVR_UARTX_DECLARE(0, PRR0, PRUSART0),
+@@ -368,7 +380,7 @@ const struct mcu_t {
+ 					.vector = TIMER2_COMPA_vect,
+ 				},
+ 			},
+-            // TIMER2_COMPB is only appeared in 1280
++		// TIMER2_COMPB is only appeared in 1280
+ 			//[AVR_TIMER_COMPB] = {
+ 			//	.r_ocr = OCR2B,
+ 			//	.com = AVR_IO_REGBITS(TCCR2A, COM2B0, 0x3),
+@@ -651,8 +663,8 @@ static avr_t * make()
+ }
+ 
+ avr_kind_t mega1280 = {
+-        .names = { "atmega1280" },
+-        .make = make
++	.names = { "atmega1280" },
++	.make = make
+ };
+ 
+ void m1280_init(struct avr_t * avr)
+diff --git a/simavr/cores/sim_mega1281.c b/simavr/cores/sim_mega1281.c
+index 222743c..1d121e5 100644
+--- a/simavr/cores/sim_mega1281.c
++++ b/simavr/cores/sim_mega1281.c
+@@ -81,18 +81,20 @@ const struct mcu_t {
+ 		AVR_EXTINT_MEGA_DECLARE(7, 'E', PE7, B),
+ 	},
+ 	AVR_IOPORT_DECLARE(a, 'A', A),
+-	.portb = {
+-		.name = 'B', .r_port = PORTB, .r_ddr = DDRB, .r_pin = PINB,
++	AVR_IOPORT_DECLARE_PC(b, 'B', B, 0),      // PB0-7 have PCINT0-7
++	AVR_IOPORT_DECLARE(c, 'C', C),
++	AVR_IOPORT_DECLARE(d, 'D', D),
++	.porte = {
++		.name = 'E', .r_port = PORTE, .r_ddr = DDRE, .r_pin = PINE,
+ 		.pcint = {
+-			.enable = AVR_IO_REGBIT(PCICR, PCIE0),
+-			.raised = AVR_IO_REGBIT(PCIFR, PCIF0),
+-			.vector = PCINT0_vect,
++			 .enable = AVR_IO_REGBIT(PCICR, PCIE1),
++			 .raised = AVR_IO_REGBIT(PCIFR, PCIF1),
++			 .vector = PCINT1_vect,
+ 		},
+-		.r_pcint = PCMSK0,
++		.r_pcint = PCMSK1,
++                .mask = 1,                        // PE0 has PCINT8
++                .shift = 0
+ 	},
+-	AVR_IOPORT_DECLARE(c, 'C', C),
+-	AVR_IOPORT_DECLARE(d, 'D', D),
+-	AVR_IOPORT_DECLARE(e, 'E', E),
+ 	AVR_IOPORT_DECLARE(f, 'F', F),
+ 	AVR_IOPORT_DECLARE(g, 'G', G),
+ 
+diff --git a/simavr/cores/sim_mega2560.c b/simavr/cores/sim_mega2560.c
+index a967b78..ecd1949 100644
+--- a/simavr/cores/sim_mega2560.c
++++ b/simavr/cores/sim_mega2560.c
+@@ -29,8 +29,8 @@ static avr_t * make()
+ }
+ 
+ avr_kind_t mega2560 = {
+-		 .names = { "atmega2560" },
+-		 .make = make
++		.names = { "atmega2560", "atmega2561" },
++		.make = make
+ };
+ 
+ void m2560_init(struct avr_t * avr)
+@@ -57,6 +57,7 @@ void m2560_init(struct avr_t * avr)
+ 	avr_uart_init(avr, &mcu->uart1);
+ 	avr_uart_init(avr, &mcu->uart2);
+ 	avr_uart_init(avr, &mcu->uart3);
++        avr_acomp_init(avr, &mcu->acomp);
+ 	avr_adc_init(avr, &mcu->adc);
+ 	avr_timer_init(avr, &mcu->timer0);
+ 	avr_timer_init(avr, &mcu->timer1);
+diff --git a/simavr/cores/sim_mega2560.h b/simavr/cores/sim_mega2560.h
+index f8a41a1..8fb48e8 100644
+--- a/simavr/cores/sim_mega2560.h
++++ b/simavr/cores/sim_mega2560.h
+@@ -87,18 +87,20 @@ const struct mcu_t {
+ 		AVR_EXTINT_MEGA_DECLARE(7, 'E', PE7, B),
+ 	},
+ 	AVR_IOPORT_DECLARE(a, 'A', A),
+-	.portb = {
+-		.name = 'B', .r_port = PORTB, .r_ddr = DDRB, .r_pin = PINB,
++	AVR_IOPORT_DECLARE_PC(b, 'B', B, 0),      // PB0-7 have PCINT0-7
++	AVR_IOPORT_DECLARE(c, 'C', C),
++	AVR_IOPORT_DECLARE(d, 'D', D),
++	.porte = {
++		.name = 'E', .r_port = PORTE, .r_ddr = DDRE, .r_pin = PINE,
+ 		.pcint = {
+-			 .enable = AVR_IO_REGBIT(PCICR, PCIE0),
+-			 .raised = AVR_IO_REGBIT(PCIFR, PCIF0),
+-			 .vector = PCINT0_vect,
++			 .enable = AVR_IO_REGBIT(PCICR, PCIE1),
++			 .raised = AVR_IO_REGBIT(PCIFR, PCIF1),
++			 .vector = PCINT1_vect,
+ 		},
+-		.r_pcint = PCMSK0,
++		.r_pcint = PCMSK1,
++                .mask = 1,                        // PE0 has PCINT8
++                .shift = 0
+ 	},
+-	AVR_IOPORT_DECLARE(c, 'C', C),
+-	AVR_IOPORT_DECLARE(d, 'D', D),
+-	AVR_IOPORT_DECLARE(e, 'E', E),
+ 	AVR_IOPORT_DECLARE(f, 'F', F),
+ 	AVR_IOPORT_DECLARE(g, 'G', G),
+ 	AVR_IOPORT_DECLARE(h, 'H', H),
+@@ -108,12 +110,12 @@ const struct mcu_t {
+ 			 .enable = AVR_IO_REGBIT(PCICR, PCIE1),
+ 			 .raised = AVR_IO_REGBIT(PCIFR, PCIF1),
+ 			 .vector = PCINT1_vect,
+-			 .mask = 0b11111110,
+-			 .shift = -1
+ 		},
+ 		.r_pcint = PCMSK1,
++                .mask = 0b11111110,               // PJ0-6 have PCINT9-15
++                .shift = -1
+ 	},
+-	AVR_IOPORT_DECLARE(k, 'K', K),
++	AVR_IOPORT_DECLARE_PC(k, 'K', K, 2),      // PK0-7 have PCINT16-23
+ 	AVR_IOPORT_DECLARE(l, 'L', L),
+ 
+ 	AVR_UARTX_DECLARE(0, PRR0, PRUSART0),
+diff --git a/simavr/sim/avr_extint.c b/simavr/sim/avr_extint.c
+index e8dd9bc..6f85660 100644
+--- a/simavr/sim/avr_extint.c
++++ b/simavr/sim/avr_extint.c
+@@ -37,9 +37,14 @@ static avr_cycle_count_t avr_extint_poll_level_trig(
+ 		void * param)
+ {
+ 	avr_extint_poll_context_t *poll = (avr_extint_poll_context_t *)param;
+-	avr_extint_t * p = (avr_extint_t *)poll->extint;
++	avr_extint_t * p = poll->extint;
+ 
+-	char port = p->eint[poll->eint_no].port_ioctl & 0xFF;
++	/* Check for change of interrupt mode. */
++
++	if (avr_regbit_get_array(avr, p->eint[poll->eint_no].isc, 2))
++		goto terminate_poll;
++
++	uint8_t port = p->eint[poll->eint_no].port_ioctl & 0xFF;
+ 	avr_ioport_state_t iostate;
+ 	if (avr_ioctl(avr, AVR_IOCTL_IOPORT_GETSTATE( port ), &iostate) < 0)
+ 		goto terminate_poll;
+@@ -176,9 +181,9 @@ static void avr_extint_reset(avr_io_t * port)
+ 	avr_extint_t * p = (avr_extint_t *)port;
+ 
+ 	for (int i = 0; i < EXTINT_COUNT; i++) {
+-		avr_irq_register_notify(p->io.irq + i, avr_extint_irq_notify, p);
+-
+ 		if (p->eint[i].port_ioctl) {
++			avr_irq_register_notify(p->io.irq + i, avr_extint_irq_notify, p);
++
+ 			if (p->eint[i].isc[1].reg) // level triggering available
+ 				p->eint[i].strict_lvl_trig = 1; // turn on repetitive level triggering by default
+ 			avr_irq_t * irq = avr_io_getirq(p->io.avr,
+@@ -211,10 +216,13 @@ void avr_extint_init(avr_t * avr, avr_extint_t * p)
+ 	p->io = _io;
+ 
+ 	avr_register_io(avr, &p->io);
+-	for (int i = 0; i < EXTINT_COUNT; i++)
++	for (int i = 0; i < EXTINT_COUNT; i++) {
++		if (!p->eint[i].port_ioctl)
++			break;
+ 		avr_register_vector(avr, &p->eint[i].vector);
+-
++	}
+ 	// allocate this module's IRQ
++
+ 	avr_io_setirqs(&p->io, AVR_IOCTL_EXTINT_GETIRQ(), EXTINT_COUNT, NULL);
+ }
+ 
+diff --git a/simavr/sim/avr_ioport.c b/simavr/sim/avr_ioport.c
+index 64adbc4..ca43896 100644
+--- a/simavr/sim/avr_ioport.c
++++ b/simavr/sim/avr_ioport.c
+@@ -24,6 +24,21 @@
+ 
+ #define D(_w)
+ 
++static void
++avr_ioport_flag_write(
++		struct avr_t * avr,
++		avr_io_addr_t addr,
++		uint8_t v,
++		void * param)
++{
++	avr_ioport_t * p = (avr_ioport_t *)param;
++
++	// Clear interrupt if 1 is written to flag.
++
++	if (avr_regbit_from_value(avr, p->pcint.raised, v))
++		avr_clear_interrupt(avr, &p->pcint);
++}
++
+ static uint8_t
+ avr_ioport_read(
+ 		struct avr_t * avr,
+@@ -34,11 +49,11 @@ avr_ioport_read(
+ 	uint8_t ddr = avr->data[p->r_ddr];
+ 	uint8_t v = (avr->data[p->r_pin] & ~ddr) | (avr->data[p->r_port] & ddr);
+ 	avr->data[addr] = v;
+-	// made to trigger potential watchpoints
+-	v = avr_core_watch_read(avr, addr);
+ 	avr_raise_irq(p->io.irq + IOPORT_IRQ_REG_PIN, v);
+ 	D(if (avr->data[addr] != v) printf("** PIN%c(%02x) = %02x\r\n", p->name, addr, v);)
+ 
++	// made to trigger potential watchpoints
++	v = avr_core_watch_read(avr, addr);
+ 	return v;
+ }
+ 
+@@ -122,7 +137,6 @@ avr_ioport_ddr_write(
+ 	D(if (avr->data[addr] != v) printf("** DDR%c(%02x) = %02x\r\n", p->name, addr, v);)
+ 	avr_raise_irq(p->io.irq + IOPORT_IRQ_DIRECTION_ALL, v);
+ 	avr_core_watch_write(avr, addr, v);
+-
+ 	avr_ioport_update_irqs(p);
+ }
+ 
+@@ -143,19 +157,47 @@ avr_ioport_irq_notify(
+ 	int output = value & AVR_IOPORT_OUTPUT;
+ 	value &= 0xff;
+ 	uint8_t mask = 1 << irq->irq;
+-		// set the real PIN bit. ddr doesn't matter here as it's masked when read.
+-	avr->data[p->r_pin] &= ~mask;
+-	if (value)
+-		avr->data[p->r_pin] |= mask;
++	uint8_t ddr = avr->data[p->r_ddr];
+ 
+-	if (output)	// if the IRQ was marked as Output, also do the IO write
+-		avr_ioport_write(avr, p->r_port, (avr->data[p->r_port] & ~mask) | (value ? mask : 0), p);
++	if (output) {
++		if ((mask & ddr) == 0)
++			return;	   // TODO: stop further processing of IRQ.
++
++		// If the IRQ was marked as Output, also do the IO write.
++
++		avr_ioport_write(avr,
++				 p->r_port,
++				 (avr->data[p->r_port] & ~mask) |
++				     (value ? mask : 0),
++				 p);
++	} else {
++		// Set the real PIN bit. Ignore DDR as it's masked when read.
++
++		avr->data[p->r_pin] &= ~mask;
++		if (value)
++			avr->data[p->r_pin] |= mask;
++
++		/* BUG: If DDR bit is set here, there should be no
++		 * interrupt.  But a spurious IRQ call by the user
++		 * is indistinguishable from an internal one
++		 * caused by writing the output port register and
++		 * that should cause an interrupt. Doh!
++		 */
++	}
+ 
+ 	if (p->r_pcint) {
++		// Ignore lingering copy of AVR_IOPORT_OUTPUT, or
++		// differing non-zero values.
++
++		if (!value == !(irq->value & 0xff))
++			return;
++
+ 		// if the pcint bit is on, try to raise it
++
+ 		int raisedata = avr->data[p->r_pcint];
+-		uint8_t uiRegMask = p->pcint.mask;
+-		int8_t iShift = p->pcint.shift;
++		uint8_t uiRegMask = p->mask;
++		int8_t iShift = p->shift;
++
+ 		if (uiRegMask) // If mask is 0, do nothing (backwards compat)
+ 			raisedata &= uiRegMask; // Mask off
+ 
+@@ -252,7 +294,7 @@ static const char * irq_names[IOPORT_IRQ_COUNT] = {
+ 	[IOPORT_IRQ_PIN5] = "=pin5",
+ 	[IOPORT_IRQ_PIN6] = "=pin6",
+ 	[IOPORT_IRQ_PIN7] = "=pin7",
+-	[IOPORT_IRQ_PIN_ALL] = "8=all",
++	[IOPORT_IRQ_PIN_ALL] = "8>all",
+ 	[IOPORT_IRQ_DIRECTION_ALL] = "8>ddr",
+ 	[IOPORT_IRQ_REG_PORT] = "8>port",
+ 	[IOPORT_IRQ_REG_PIN] = "8>pin",
+@@ -282,11 +324,17 @@ void avr_ioport_init(avr_t * avr, avr_ioport_t * p)
+ 	// allocate this module's IRQ
+ 	avr_io_setirqs(&p->io, AVR_IOCTL_IOPORT_GETIRQ(p->name), IOPORT_IRQ_COUNT, NULL);
+ 
+-	for (int i = 0; i < IOPORT_IRQ_COUNT; i++)
++	for (int i = 0; i < IOPORT_IRQ_REG_PIN; i++) {
+ 		p->io.irq[i].flags |= IRQ_FLAG_FILTERED;
+-
++                if (i < IOPORT_IRQ_PIN_ALL)
++                    p->io.irq[i].flags &= ~IRQ_FLAG_INIT;
++	}
+ 	avr_register_io_write(avr, p->r_port, avr_ioport_write, p);
+ 	avr_register_io_read(avr, p->r_pin, avr_ioport_read, p);
+ 	avr_register_io_write(avr, p->r_pin, avr_ioport_pin_write, p);
+ 	avr_register_io_write(avr, p->r_ddr, avr_ioport_ddr_write, p);
++	if (p->pcint.raised.reg) {
++		avr_register_io_write(avr, p->pcint.raised.reg,
++				      avr_ioport_flag_write, p);
++	}
+ }
+diff --git a/simavr/sim/avr_ioport.h b/simavr/sim/avr_ioport.h
+index 5734df8..024b695 100644
+--- a/simavr/sim/avr_ioport.h
++++ b/simavr/sim/avr_ioport.h
+@@ -104,9 +104,15 @@ typedef struct avr_ioport_t {
+ 	avr_io_addr_t r_pin;
+ 
+ 	avr_int_vector_t pcint;	// PCINT vector
+-	avr_io_addr_t r_pcint;		// pcint 8 pins mask
++	avr_io_addr_t r_pcint;	// pcint 8 pins mask
+ 
+-	// this represent the default IRQ value when
++	// Mask and shift for PCINTs.  This is needed for chips like the 2560
++	// where PCINT do not align with IRQs.
++
++	uint8_t 	mask;
++	int8_t 		shift;
++
++	// This represent the default IRQ value when
+ 	// the port is set as input.
+ 	// If the mask is not set, no output value is sent
+ 	// on the output IRQ. If the mask is set, the specified
+@@ -123,6 +129,18 @@ void avr_ioport_init(avr_t * avr, avr_ioport_t * port);
+ 		.name = _cname, .r_port = PORT ## _uname, .r_ddr = DDR ## _uname, .r_pin = PIN ## _uname, \
+ 	}
+ 
++#define AVR_IOPORT_DECLARE_PC(_lname, _cname, _uname, _pcnum)	\
++	.port ## _lname = { \
++		.name = _cname, .r_port = PORT ## _uname, \
++		.r_ddr = DDR ## _uname, .r_pin = PIN ## _uname, \
++		.pcint = { \
++			 .enable = AVR_IO_REGBIT(PCICR, PCIE ## _pcnum), \
++			 .raised = AVR_IO_REGBIT(PCIFR, PCIF ## _pcnum), \
++			 .vector = PCINT ## _pcnum ## _vect, \
++		}, \
++		.r_pcint = PCMSK ## _pcnum, \
++	}
++
+ #ifdef __cplusplus
+ };
+ #endif
+diff --git a/simavr/sim/avr_timer.c b/simavr/sim/avr_timer.c
+index 39a46bd..dbd1ff1 100644
+--- a/simavr/sim/avr_timer.c
++++ b/simavr/sim/avr_timer.c
+@@ -745,25 +745,26 @@ avr_timer_write_pending(
+ 		void * param)
+ {
+ 	avr_timer_t * p = (avr_timer_t *)param;
+-
+-	// All bits in this register are assumed to be write-1-to-clear.
+-
+-	if (addr == p->overflow.raised.reg &&
+-	    avr_regbit_from_value(avr, p->overflow.raised, v)) {
+-		avr_clear_interrupt(avr, &p->overflow);
+-	}
+-	if (addr == p->icr.raised.reg &&
+-	    avr_regbit_from_value(avr, p->icr.raised, v)) {
+-		avr_clear_interrupt(avr, &p->icr);
+-	}
+-
+-	for (int compi = 0; compi < AVR_TIMER_COMP_COUNT; compi++) {
+-		if (addr == p->comp[compi].interrupt.raised.reg &&
+-		    avr_regbit_from_value(avr, p->comp[compi].interrupt.raised,
+-					  v)) {
+-			avr_clear_interrupt(avr, &p->comp[compi].interrupt);
+-		}
+-	}
++	// save old bits values
++	uint8_t ov = avr_regbit_get(avr, p->overflow.raised);
++	uint8_t ic = avr_regbit_get(avr, p->icr.raised);
++	uint8_t cp[AVR_TIMER_COMP_COUNT];
++
++	for (int compi = 0; compi < AVR_TIMER_COMP_COUNT; compi++)
++		cp[compi] = avr_regbit_get(avr, p->comp[compi].interrupt.raised);
++
++	// write the value
++	// avr_core_watch_write(avr, addr, v); // This raises flags instead of clearing it.
++
++	// clear any interrupts & flags
++	if (avr_regbit_from_value(avr, p->overflow.raised, v))
++		avr_clear_interrupt_if(avr, &p->overflow, ov);
++	if (avr_regbit_from_value(avr, p->icr.raised, v))
++		avr_clear_interrupt_if(avr, &p->icr, ic);
++
++	for (int compi = 0; compi < AVR_TIMER_COMP_COUNT; compi++)
++		if (avr_regbit_from_value(avr, p->comp[compi].interrupt.raised, v))
++			avr_clear_interrupt_if(avr, &p->comp[compi].interrupt, cp[compi]);
+ }
+ 
+ static void
+diff --git a/simavr/sim/sim_core.h b/simavr/sim/sim_core.h
+index 992c068..403c119 100644
+--- a/simavr/sim/sim_core.h
++++ b/simavr/sim/sim_core.h
+@@ -113,7 +113,7 @@ static inline void avr_sreg_set(avr_t * avr, uint8_t flag, uint8_t ival)
+ 	if (flag == S_I) {
+ 		if (ival) {
+ 			if (!avr->sreg[S_I])
+-				avr->interrupt_state = -1;
++				avr->interrupt_state = -2;
+ 		} else
+ 			avr->interrupt_state = 0;
+ 	}
+diff --git a/tests/atmega168_ioport.c b/tests/atmega168_ioport.c
+new file mode 100644
+index 0000000..96d1284
+--- /dev/null
++++ b/tests/atmega168_ioport.c
+@@ -0,0 +1,133 @@
++#ifndef F_CPU
++#define F_CPU 8000000
++#endif
++#include <avr/io.h>
++#include <stdio.h>
++#include <avr/interrupt.h>
++#include <avr/sleep.h>
++
++/*
++ * This demonstrate how to use the avr_mcu_section.h file
++ * The macro adds a section to the ELF file with useful
++ * information for the simulator
++ */
++#include "avr_mcu_section.h"
++AVR_MCU(F_CPU, "atmega168");
++
++static int uart_putchar(char c, FILE *stream) {
++	if (c == '\n')
++		uart_putchar('\r', stream);
++	loop_until_bit_is_set(UCSR0A, UDRE0);
++	UDR0 = c;
++	return 0;
++}
++
++static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL,
++                                         _FDEV_SETUP_WRITE);
++
++ISR(INT0_vect)
++{
++    printf("I<%02X ", PIND);
++}
++
++ISR(PCINT0_vect)
++{
++    printf("K ");
++}
++
++ISR(PCINT2_vect)
++{
++    printf("J<%02X ", PORTD);
++    PORTD = 0;
++}
++
++int main()
++{
++	stdout = &mystdout;
++
++        /* Enable output on Port D pins 0-3 and write to them. */
++
++        DDRD = 0xf;
++        PORTD = 0xa;
++
++        printf("P<%02X ", PIND); // Should say P<2A as caller sets bit 5.
++
++        /* Toggle some outputs. */
++
++        PIND = 3;
++
++        /* Change directions. */
++
++        DDRD = 0x3c;
++
++        /* Change output. */
++
++        PORTD = 0xf0;
++
++        /* This should say P<70 - pullups and direct output give 0xF0
++         * but the caller sees that and turns off bit 7 input,
++         * overriding that pullup.
++         */
++
++        printf("P<%02X ", PIND);
++
++        /* Set-up rising edge interrupt on pin 2 (INT 0). */
++
++        EICRA = 3;
++        EIMSK = 1;
++
++        /* Turn off pin 4, signal the caller to raise pin 2. */
++
++        PORTD = 0xe0;
++
++        /* Verify the interrupt flag is set. */
++
++        printf("F<%02X ", EIFR);
++
++        sei();
++
++        /* This duplicates the value in the INT0 handler, but it
++         * takes sufficient time to be sure that there is only one
++         * interrupt.  There was a bug that caused continuous interrupts
++         * when this was first tried.
++         */
++
++        printf("P<%02X ", PIND);
++
++        /* TODO: Test the level-triggered interupt.  It can be started
++         * by a pin-value change or by writing to either of EICRA and EIMSK.
++         */
++
++        /* Try pin change interrupt. */
++
++        PCICR = (1 << PCIE2); /* Interrupt enable. */
++        PCMSK2 = 0x0a;        /* Pins 1 and 3. */
++        DDRD = 3;
++        PORTD = 1;            /* No interrupt. */
++        PORTD = 3;            /* Interrupt. */
++
++        /* Allow time for second interrupt. */
++
++        printf("P<%02X ", PIND);
++
++        // Test "write 1 to clear" on PORT B.
++
++        DDRB = 0xff;
++        PCICR = (1 << PCIE0); /* Interrupt enable. */
++        PCMSK0 = 3;           /* Pins 0 and 1. */
++        cli();
++        PORTB = 1;
++        PCIFR = 1;            /* Clear interrupt. */
++        sei();
++        printf("| ");
++        cli();
++        PORTB = 3;
++        PCIFR = 6;
++        sei();                /* Interrupt. */
++        printf("| ");
++
++	// this quits the simulator, since interupts are off
++	// this is a "feature" that allows running tests cases and exit
++        cli();
++	sleep_cpu();
++}
+diff --git a/tests/atmega2560_pin_change.c b/tests/atmega2560_pin_change.c
+new file mode 100644
+index 0000000..a715aba
+--- /dev/null
++++ b/tests/atmega2560_pin_change.c
+@@ -0,0 +1,115 @@
++/*
++	atmega2560_pin_change.c
++
++	Test for pin_change interrupt simulation.
++ */
++
++#include <stdio.h>
++#include <avr/io.h>
++#include <avr/interrupt.h>
++#include <avr/sleep.h>
++
++#include "avr_mcu_section.h"
++
++/*
++ * This demonstrate how to use the avr_mcu_section.h file
++ * The macro adds a section to the ELF file with useful
++ * information for the simulator
++ */
++AVR_MCU(F_CPU, "atmega2560");
++
++static int uart_putchar(char c, FILE *stream)
++{
++	if (c == '\n')
++		uart_putchar('\r', stream);
++	loop_until_bit_is_set(UCSR3A, UDRE3);
++	UDR3 = c;
++	return 0;
++}
++
++static FILE mystdout = FDEV_SETUP_STREAM(uart_putchar, NULL,
++                                         _FDEV_SETUP_WRITE);
++
++volatile uint8_t interrupts;
++volatile char    buffer[32];
++
++ISR(PCINT0_vect)
++{
++    buffer[interrupts++] = '0';
++}
++
++ISR(PCINT1_vect)
++{
++    buffer[interrupts++] = '1';
++}
++
++ISR(PCINT2_vect)
++{
++    buffer[interrupts++] = '2';
++}
++
++int main()
++{
++    stdout = &mystdout;
++    PCICR = (1 <<PCIE0) + (1 << PCIE1) + (1 <<PCIE2); // Enable interrupts.
++    PCMSK0 = 0xf0;
++
++    sei();
++
++    /* Test for interrupt caused external (timer) peripheral: no interrupt. */
++
++    PORTA = 0xff;                  // Triggers output to PORTB/4, no output.
++    PORTA = 0x0f;                  // Toogle output bit back to zero.
++    DDRB = 0xff;                   // Set ports for output.
++    buffer[interrupts++] = ' ';
++
++    /* Test for interrupt caused external (timer) peripheral: interrupts. */
++
++    PORTA = 0;                     // Triggers output to PORTB/4
++    buffer[interrupts++] = ' ';
++
++    DDRE = 0xff;
++    DDRJ = 0xff;
++    DDRK = 0xff;
++    PORTB = 0x20;                  // Interrupt
++    PORTE = 0xff;                  // No interrupt
++    PORTJ = 0x20;                  // No interrupt
++    PORTK = 0x20;                  // No interrupt
++    buffer[interrupts++] = ' ';
++    PORTB = 0x22;                  // No interrupt
++    PCMSK1 = 0x7f;
++    PCMSK2 = 0x7f;
++    PORTE = 0xfe;                  // Interrupt
++    PORTB = 0x32;                  // Interrupt
++    PORTK = 0x00;                  // Interrupt
++    PORTJ = 0x01;                  // Interrupt
++    cli();
++    buffer[interrupts++] = ' ';
++//    PORTE = 0xff; // Fails! Double interrupt after sei().
++    PORTJ = 0xff;
++    sei();                         // Only one interrupt
++    PORTK = 0x80;                  // No interrupt;
++    PORTB = 0x00;                  // Interrupt
++    PORTK = 0xC0;                  // Interrupt;
++
++    PCMSK1 = 0x7e;
++    PORTJ = 0x3F;                  // No interrupt;
++    PORTK = 0;                     // Interrupt;
++    PORTE = 0;                     // No interrupt;
++    PORTJ = 0xe0;                  // Interrupt;
++
++    /* Show that normal GPIO input works. */
++
++    DDRB = 0xff;                   // Set ports for output.
++    PORTA = 1;                     // Triggers input to PORTB/4
++
++    cli();
++    buffer[interrupts] = '\0';
++    fputs((const char *)buffer, stdout);
++    putchar('\n');
++
++    // this quits the simulator, since interupts are off
++    // this is a "feature" that allows running tests cases and exit
++
++    sleep_cpu();
++}
+diff --git a/tests/atmega48_enabled_timer.c b/tests/atmega48_enabled_timer.c
+index 527e44a..04b8db4 100644
+--- a/tests/atmega48_enabled_timer.c
++++ b/tests/atmega48_enabled_timer.c
+@@ -14,11 +14,8 @@
+ #include "avr_mcu_section.h"
+ AVR_MCU(F_CPU, "atmega48");
+ 
+-volatile uint8_t count;
+-
+ ISR(TIMER0_COMPA_vect)
+ {
+-    ++count;
+ }
+ 
+ int main(void)
+@@ -30,30 +27,13 @@ int main(void)
+ 
+ 	TCCR0B |= (1 << CS00) | (1 << CS01);        // Start timer: clk/64
+ 
+-	while ((TIFR0 & (1 << OCF0A)) == 0)
+-		;
+-
+-	// Now interrupt is pending.  Try and clear it.
+-
+-	TIFR0 = 0;
+-	if (TIFR0 & (1 << OCF0A))
+-		++count;			    // Should not clear
+-	TIFR0 = (1 << OCF0A);
+-	if ((TIFR0 & (1 << OCF0A)) == 0)
+-		++count;			    // Should clear!
+-
+ 	sei();                                      // Enable global interrupts
+ 
+-	// Let it run to next interrupt.
+-
++	// here the interupts are enabled, but the interupt
++	// vector should not be called
+ 	sleep_mode();
+-	TIMSK0 = 0;		                    // Disable CTC interrupt
+-
+-	if (count == 3)				    // Expected
+-		cli();
+ 
+-	// Time out if interrupting or count wrong.
+-
+-	for (;;)
+-		sleep_mode();
++	// this should not be reached
++	cli();
++	sleep_mode();
+ }
+diff --git a/tests/test_atmega168_ioport.c b/tests/test_atmega168_ioport.c
+new file mode 100644
+index 0000000..24e8c25
+--- /dev/null
++++ b/tests/test_atmega168_ioport.c
+@@ -0,0 +1,130 @@
++#include <stdio.h>
++#include <string.h>
++#include "tests.h"
++#include "avr_ioport.h"
++
++/* Start of the IOPORT's IRQ list. */
++
++static avr_irq_t *base_irq;
++
++/* Accumulate log of events for comparison at the end. */
++
++static char  log[256];
++static char *fill = log;
++
++#define LOG(...) \
++    (fill += snprintf(fill, (log + sizeof log) - fill, __VA_ARGS__))
++
++/* IRQ call-back function for changes in pin levels. */
++
++static void monitor_5(struct avr_irq_t *irq, uint32_t value, void *param)
++{
++    LOG("5-%02X ", value);
++}
++
++/* This monitors the simulator's idea of the I/O pin states.
++ * Changes this program makes to inputs are not reported,
++ * presumably because the simulator "knows" we made them.
++ */
++
++static void monitor(struct avr_irq_t *irq, uint32_t value, void *param)
++{
++    LOG("P-%02X ", value);
++
++    if (value == 9) {
++        /* Assume this is because bit 0 was left high when its
++         * direction switched to input.  Make it low.
++         */
++
++        avr_raise_irq(base_irq + IOPORT_IRQ_PIN0, 0);
++    } if (value == 0xf0) {
++        /* Assume this is a combination of 0x30 (direct) and 0xc0 (pullups).
++         * So change inputs.
++         */
++
++        avr_raise_irq(base_irq + IOPORT_IRQ_PIN4, 0); // Ignored.
++        avr_raise_irq(base_irq + IOPORT_IRQ_PIN7, 0);
++    }
++
++}
++
++/* Writes to output ports and DDR are reported here. */
++
++static void reg_write(struct avr_irq_t *irq, uint32_t value, void *param)
++{
++    static int zero_count;
++    char       c;
++
++    if (irq->irq == IOPORT_IRQ_REG_PORT)
++        c = 'o';
++    else if (irq->irq == IOPORT_IRQ_DIRECTION_ALL)
++        c = 'd';
++    else
++        c = '?';
++    LOG("%c-%02X ", c, value);
++
++    if (irq->irq == IOPORT_IRQ_REG_PORT) {
++        if (value == 0xe0) {
++            /* Program request to raise bit 2: external interrupt. */
++
++            avr_raise_irq(base_irq + IOPORT_IRQ_PIN2, 1);
++        } else if (value == 0) {
++            if (zero_count++ == 0) {
++                /* Raise bit 3: pin change interrupt. */
++            
++                avr_raise_irq(base_irq + IOPORT_IRQ_PIN3, 1);
++            }
++        }
++    }
++}
++
++/* Called when the AVR reads the input port. */
++
++static void reg_read(struct avr_irq_t *irq, uint32_t value, void *param)
++{
++    LOG("I-%02X ", value);
++
++    /* Change the value read. */
++
++    avr_raise_irq(base_irq + IOPORT_IRQ_PIN5, 1);
++}
++
++/* This string should be sent by the firmware. */
++
++static const char *expected =
++    "P<2A P<70 F<01 I<E0 P<E0 J<03 J<00 P<E8 | K | ";
++
++/* This string is expected in variable log. */
++
++static const char *log_expected =
++    "d-0F P-00 o-0A P-0A I-0A 5-01 o-09 P-29 d-3C 5-00 P-09 o-F0 5-01 P-F0 "
++    "I-70 "                                     // Interrupts off testing.
++    "o-E0 P-E0 I-E0 I-E0 "                      // External interrupt test.
++    "d-03 o-01 P-E1 o-03 P-E3 o-00 P-E8 I-E8 "; // Pin change interrupt test.
++
++
++int main(int argc, char **argv) {
++	avr_t             *avr;
++
++	tests_init(argc, argv);
++        avr = tests_init_avr("atmega168_ioport.axf");
++        base_irq = avr_io_getirq(avr, AVR_IOCTL_IOPORT_GETIRQ('D'), 0);
++
++        avr_irq_register_notify(base_irq + IOPORT_IRQ_PIN5,
++                                monitor_5, NULL);
++        avr_irq_register_notify(base_irq + IOPORT_IRQ_PIN_ALL,
++                                monitor, NULL);
++        avr_irq_register_notify(base_irq + IOPORT_IRQ_DIRECTION_ALL,
++                                reg_write, NULL);
++        avr_irq_register_notify(base_irq + IOPORT_IRQ_REG_PORT,
++                                reg_write, NULL);
++        avr_irq_register_notify(base_irq + IOPORT_IRQ_REG_PIN,
++                                reg_read, NULL);
++
++        tests_assert_uart_receive_avr(avr, 100000, expected, '0');
++
++        if (strcmp(log, log_expected))
++            fail("Internal log: %s.\nExpected: %s.\n", log, log_expected);
++	tests_success();
++	return 0;
++}
+diff --git a/tests/test_atmega2560_pin_change.c b/tests/test_atmega2560_pin_change.c
+new file mode 100644
+index 0000000..ff49008
+--- /dev/null
++++ b/tests/test_atmega2560_pin_change.c
+@@ -0,0 +1,41 @@
++#include "tests.h"
++#include "sim_avr.h"
++#include "avr_ioport.h"
++
++static avr_irq_t *twiddle_irq;
++
++/* Called on write to port A, twiddle PORTB/4 as peripheral might. */
++
++static void reg_write(struct avr_irq_t *irq, uint32_t value, void *param)
++{
++    static int count;
++    uint32_t   flag;
++
++    /* Set the output flag on the first two calls.
++     *
++     * BUG: 3 should be 4 here, but it still works.
++     */
++
++    flag = (++count < 3) ? AVR_IOPORT_OUTPUT : 0;
++    avr_raise_irq(twiddle_irq, (twiddle_irq->value ^ 1) | flag);
++}
++
++int main(int argc, char **argv) {
++    static const char *expected = " 0 0 1021 102210\r\n";
++    avr_t             *avr;
++
++    tests_init(argc, argv);
++    avr = tests_init_avr("atmega2560_pin_change.axf");
++
++    twiddle_irq = avr_io_getirq(avr,
++                                AVR_IOCTL_IOPORT_GETIRQ('B'),
++                                IOPORT_IRQ_PIN4);
++    avr_irq_register_notify(avr_io_getirq(avr,
++                                          AVR_IOCTL_IOPORT_GETIRQ('A'),
++                                          IOPORT_IRQ_REG_PORT),
++                            reg_write, avr);
++
++    tests_assert_uart_receive_avr(avr, 10000000, expected, '3');
++    tests_success();
++    return 0;
++}
