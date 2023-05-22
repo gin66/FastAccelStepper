@@ -483,7 +483,7 @@ class FastAccelStepper {
   // abruptly stop the running stepper without deceleration.
   // This can be called from an interrupt !
   //
-  // The stepper command queue will be processed, but no furter commands are
+  // The stepper command queue will be processed, but no further commands are
   // added. This means, that the stepper can be expected to stop within approx.
   // 20ms.
   void forceStop();

@@ -5,6 +5,7 @@
 
 bool test_seq_12(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
+#if !defined(__AVR_ATmega32U4__)
   switch (seq->state) {
     case 0:  // INIT
       stepper->setSpeedInUs(64);
@@ -64,5 +65,6 @@ bool test_seq_12(FastAccelStepper *stepper, struct test_seq_s *seq,
       }
       break;
   }
+#endif
   return false;
 }

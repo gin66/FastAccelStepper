@@ -5,6 +5,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+pre-0.29.3:
+- fix issue #172: `move()` during ramping down of `stopMove()` has used old target position as reference
+
 0.29.2:
 - add `stepperConnectToPin(pin, driver_type)` to allow the module selection
 - fix issue #170 and use consequently `fas_max()` instead of `max()`

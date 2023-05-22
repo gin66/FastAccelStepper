@@ -95,7 +95,14 @@ int8_t RampGenerator::moveTo(int32_t position,
 int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
   int32_t curr_pos;
   if (isRampGeneratorActive() && !_ro.config.parameters.keep_running) {
-    curr_pos = _ro.config.parameters.target_pos;
+	if (_ro.force_stop) {
+	  fasDisableInterrupts();
+      curr_pos = queue_end->pos;
+	  fasEnableInterrupts();
+	}
+	else {
+	  curr_pos = _ro.config.parameters.target_pos;
+	}
   } else {
     curr_pos = queue_end->pos;
   }

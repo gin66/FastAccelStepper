@@ -389,9 +389,7 @@ The speed at which the stepper will start can be calculated like this:
 New value will be used after call to
 move/moveTo/runForward/runBackward
 ```cpp
-  void setJumpStart(uint32_t jump_step) {
-	  _rg.setJumpStart(jump_step);
-  }
+  void setJumpStart(uint32_t jump_step) { _rg.setJumpStart(jump_step); }
 ```
 ## Apply new speed/acceleration value
 This function applies new values for speed/acceleration.
@@ -459,7 +457,7 @@ This only sets a flag and can be called from an interrupt !
 abruptly stop the running stepper without deceleration.
 This can be called from an interrupt !
 
-The stepper command queue will be processed, but no furter commands are
+The stepper command queue will be processed, but no further commands are
 added. This means, that the stepper can be expected to stop within approx.
 20ms.
 ```cpp

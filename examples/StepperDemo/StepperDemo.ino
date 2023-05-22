@@ -1055,23 +1055,22 @@ void output_info(bool only_running) {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (stepper[i]) {
       if (!only_running) {
-		  if (i == selected) {
-			Serial.print(">> ");
-		  } else {
-			Serial.print("   ");
-		  }
-	  }
+        if (i == selected) {
+          Serial.print(">> ");
+        } else {
+          Serial.print("   ");
+        }
+      }
       if (!only_running || stepper[i]->isRunning()) {
         Serial.print('M');
         Serial.print(i + 1);
         Serial.print(": ");
         info(stepper[i], !only_running);
-		if (!only_running) {
-			Serial.println();
-		}
-		else {
-			need_ln = true;
-		}
+        if (!only_running) {
+          Serial.println();
+        } else {
+          need_ln = true;
+        }
       }
     }
   }
@@ -1085,18 +1084,18 @@ void output_info(bool only_running) {
 long val_n[3];
 int8_t get_val1_val2_val3(char *cmd) {
   char *endptr;
-  for (uint8_t i = 0;i < 3;i++) {
-	  val_n[i] = strtol(cmd, &endptr, 10);
-	  if (endptr == cmd) {
-		return -1;
-	  }
-	  cmd = endptr;
-	  if (*cmd == 0) {
-		return i+1;
-	  }
-	  if ((i < 2) && (*cmd++ != ',')) {
-		return -1;
-	  }
+  for (uint8_t i = 0; i < 3; i++) {
+    val_n[i] = strtol(cmd, &endptr, 10);
+    if (endptr == cmd) {
+      return -1;
+    }
+    cmd = endptr;
+    if (*cmd == 0) {
+      return i + 1;
+    }
+    if ((i < 2) && (*cmd++ != ',')) {
+      return -1;
+    }
   }
   return -1;
 }
@@ -1517,7 +1516,8 @@ bool process_cmd(char *cmd) {
       if (get_val1_val2_val3(cmd) == 3) {
         output_msg(MSG_ATTACH_PULSE_COUNTER);
         Serial.println(val_n[0]);
-        if (!stepper_selected->attachToPulseCounter(val_n[0], val_n[1], val_n[2])) {
+        if (!stepper_selected->attachToPulseCounter(val_n[0], val_n[1],
+                                                    val_n[2])) {
           output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
         }
         return true;
