@@ -50,7 +50,7 @@ void setup() {
 
   // but we only wait until the deceleration starts
   while ((stepper->rampState() & RAMP_STATE_MASK) != RAMP_STATE_DECELERATE_TO_STOP) {
-    // wait for coasting
+    // wait for deceleration to start
   }
 
   // let get the position at the end of the queue
@@ -59,7 +59,7 @@ void setup() {
   // As per issue 172, the stepper will run towards 10000, but expectation is ~0
   stepper->move(-pos, true);
 
-  // lets print the position after the move(), so that the ramp generator could add more
+  // lets print the position after the move(), so that the ramp generator can not add more
   // commands to the queue after getPositionAfterCommandsCompleted()
   Serial.print("stop at ");
   Serial.println(pos);
