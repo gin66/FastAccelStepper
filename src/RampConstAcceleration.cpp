@@ -84,27 +84,6 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       return;
     }
   }
-  // If the acceleration has changed, recalculate the ramp up/down steps,
-  // which is the equivalent to the current speed.
-  // Even if the acceleration value is constant, the calculated value
-  // can deviate due to precision or clipping effect
-  uint32_t curr_ticks = rw->curr_ticks;
-  uint32_t performed_ramp_up_steps;
-  if (ramp->config.parameters.recalc_ramp_steps) {
-    TRACE_OUTPUT('X');
-    if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
-      performed_ramp_up_steps = ramp->config.parameters.s_jump;
-    } else {
-      performed_ramp_up_steps = ramp->config.calculate_ramp_steps(curr_ticks);
-#ifdef TEST
-      printf(
-          "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
-          rw->performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
-#endif
-    }
-  } else {
-    performed_ramp_up_steps = rw->performed_ramp_up_steps;
-  }
 
   bool count_up = queue_end->count_up;
 
@@ -117,7 +96,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     remaining_steps = 0xfffffff;
   } else {
     // this can overflow, which is legal
-    int32_t delta = ramp->config.parameters.target_pos - queue_end->pos;
+    int32_t delta = ramp->target_pos - queue_end->pos;
 
     if (delta == 0) {
       // this case can happen on overshoot. So reverse current direction
@@ -149,6 +128,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
 #endif
 
   // If not moving, then use requested direction
+  uint32_t performed_ramp_up_steps = rw->performed_ramp_up_steps;
   if (performed_ramp_up_steps == 0) {
     count_up = need_count_up;
   }
@@ -164,6 +144,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
     return;
   }
 
+  uint32_t curr_ticks = rw->curr_ticks;
+
   // Forward planning of 2ms or more on slow speed.
   uint16_t planning_steps;
   if (curr_ticks < TICKS_PER_S / 1000) {
@@ -176,10 +158,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   uint16_t orig_planning_steps = planning_steps;
 
   // In case of force stop just run down the ramp
-  if (ramp->force_stop) {
-    this_state = RAMP_STATE_DECELERATE_TO_STOP;
-    remaining_steps = performed_ramp_up_steps;
-  } else if (count_up != need_count_up) {
+  if (count_up != need_count_up) {
     // On direction change, do reversing
     this_state = RAMP_STATE_REVERSE;
     remaining_steps = performed_ramp_up_steps;
@@ -502,7 +481,7 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       "add command Steps=%u ticks=%u  Target pos=%u "
       "Remaining steps=%u, planning_steps=%u, "
       "d_ticks_new=%u, pause_left=%u\n",
-      steps, next_ticks, ramp->config.parameters.target_pos, remaining_steps,
+      steps, next_ticks, ramp->target_pos, remaining_steps,
       planning_steps, d_ticks_new, pause_ticks_left);
   if ((this_state & RAMP_STATE_MASK) == RAMP_STATE_ACCELERATE) {
     assert(pause_ticks_left + next_ticks >=

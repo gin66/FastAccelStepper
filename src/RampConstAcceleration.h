@@ -5,6 +5,7 @@
 
 struct ramp_ro_s {
   struct ramp_config_s config;
+  uint32_t target_pos;
   bool force_stop : 1;
   bool force_immediate_stop : 1;
   bool incomplete_immediate_stop : 1;
@@ -13,9 +14,9 @@ struct ramp_ro_s {
     force_stop = false;
     force_immediate_stop = false;
   }
-  inline int32_t targetPosition() { return config.parameters.target_pos; }
+  inline int32_t targetPosition() { return target_pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
-    config.parameters.target_pos += delta;
+    target_pos += delta;
   }
   inline void immediateStop() { force_immediate_stop = true; }
   inline bool isImmediateStopInitiated() { return force_immediate_stop; }

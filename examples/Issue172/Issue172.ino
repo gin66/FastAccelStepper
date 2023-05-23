@@ -49,20 +49,34 @@ void setup() {
   stepper->stopMove();
 
   // but we only wait until the deceleration starts
-  while ((stepper->rampState() & RAMP_STATE_MASK) != RAMP_STATE_DECELERATE_TO_STOP) {
+  while ((stepper->rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST) {
     // wait for deceleration to start
   }
 
   // let get the position at the end of the queue
   pos = stepper->getPositionAfterCommandsCompleted();
+  uint32_t target_pos = stepper->targetPos();
 
   // As per issue 172, the stepper will run towards 10000, but expectation is ~0
-  stepper->move(-pos, true);
+  stepper->move(-1);
+  stepper->move(1-target_pos);
+
+  while ((stepper->rampState() & RAMP_STATE_MASK) != RAMP_STATE_ACCELERATE) {
+    // wait for acceleration to start
+  }
+  uint32_t max_pos = stepper->getCurrentPosition();
+  while (stepper->isRunning()) {
+    // wait for stepper to stop
+  }
 
   // lets print the position after the move(), so that the ramp generator can not add more
   // commands to the queue after getPositionAfterCommandsCompleted()
-  Serial.print("stop at ");
+  Serial.print("target position after stopMove() processed ");
+  Serial.println(target_pos);
+  Serial.print("stop at and move back ");
   Serial.println(pos);
+  Serial.print("max position ");
+  Serial.println(max_pos);
 
   // let's check the position. if 0, then all ok
   pos = stepper->getCurrentPosition();

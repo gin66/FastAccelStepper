@@ -45,7 +45,7 @@ uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc);
 #endif
 
 struct ramp_parameters_s {
-  int32_t target_pos;
+  int32_t move_value;
   uint32_t min_travel_ticks;
   uint32_t s_h;
   uint32_t s_jump;
@@ -55,16 +55,18 @@ struct ramp_parameters_s {
   bool recalc_ramp_steps : 1;  // clear on read by stepper task
   bool valid_acceleration : 1;
   bool valid_speed : 1;
+  bool move_absolute: 1;
   bool keep_running : 1;
   bool keep_running_count_up : 1;
 
   void init() {
-    target_pos = 0;
+    move_value = 0;
     valid_acceleration = false;
     valid_speed = false;
     apply = false;
     any_change = false;
     recalc_ramp_steps = false;
+	move_absolute = true;
     keep_running = false;
     keep_running_count_up = true;
     s_h = 0;
@@ -78,10 +80,37 @@ struct ramp_parameters_s {
       fasEnableInterrupts();
     }
   }
+  inline void setRunning(bool count_up) {
+    fasDisableInterrupts();
+    keep_running = true;
+    keep_running_count_up = count_up;
+    any_change = true;
+    apply = true;
+    fasEnableInterrupts();
+  }
   inline void setTargetPosition(int32_t pos) {
     fasDisableInterrupts();
-    target_pos = pos;
+    move_value = pos;
+	move_absolute = true;
+    keep_running = false;
+    keep_running_count_up = true;
     any_change = true;
+    apply = true;
+    fasEnableInterrupts();
+  }
+  inline void setTargetRelativePosition(int32_t move) {
+    fasDisableInterrupts();
+	if (any_change && !move_absolute) {
+      move_value += move;
+	}
+	else {
+      move_value = move;
+	}
+	move_absolute = false;
+    keep_running = false;
+    keep_running_count_up = true;
+    any_change = true;
+    apply = true;
     fasEnableInterrupts();
   }
   inline void setCubicAccelerationSteps(uint32_t s_cubic_steps) {

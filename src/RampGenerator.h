@@ -99,7 +99,7 @@ class RampGenerator {
   }
 
  private:
-  int8_t _startMove(int32_t target_pos, bool position_changed);
+  void _startMove(bool position_changed);
 };
 
 #endif

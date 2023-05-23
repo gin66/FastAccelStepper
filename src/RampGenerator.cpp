@@ -34,11 +34,8 @@ int8_t RampGenerator::startRun(bool countUp) {
   if (res != MOVE_OK) {
     return res;
   }
-  _parameters.setTargetPosition(0);
   _ro.force_stop = false;
-  _parameters.keep_running = true;
-  _parameters.keep_running_count_up = countUp;
-  _parameters.applyParameters();
+  _parameters.setRunning(countUp);
   _rw.startRampIfNotRunning(_parameters.s_jump);
 #ifdef DEBUG
   char buf[256];
@@ -49,17 +46,8 @@ int8_t RampGenerator::startRun(bool countUp) {
   return MOVE_OK;
 }
 
-int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
-  uint8_t res = _parameters.checkValidConfig();
-  if (res != MOVE_OK) {
-    return res;
-  }
-
-  _parameters.setTargetPosition(target_pos);
+void RampGenerator::_startMove(bool position_changed) {
   _ro.force_stop = false;
-  _parameters.keep_running = false;
-  _parameters.keep_running_count_up = true;
-  _parameters.applyParameters();
 
   if (position_changed) {
     // Only start the ramp generator, if the target position is different
@@ -67,54 +55,48 @@ int8_t RampGenerator::_startMove(int32_t target_pos, bool position_changed) {
   }
 
 #ifdef TEST
-  printf("Ramp data: go to %d  curr_ticks = %u travel_ticks = %u\n", target_pos,
+  printf("Ramp data: go to %s %d  curr_ticks = %u travel_ticks = %u\n", _parameters.move_absolute ? "ABS":"REL", _parameters.move_value,
          _rw.curr_ticks, _ro.config.parameters.min_travel_ticks);
 #endif
 #ifdef DEBUG
   char buf[256];
-  sprintf(buf, "Ramp data: go to = %ld  curr_ticks = %lu travel_ticks = %lu\n",
-          target_pos, _rw.curr_ticks, _ro.config.parameters.min_travel_ticks);
+  sprintf(buf, "Ramp data: go to = %s %ld  curr_ticks = %lu travel_ticks = %lu\n",
+          _parameters.move_absolute ? "ABS":"REL", _parameters.move_value, _rw.curr_ticks, _ro.config.parameters.min_travel_ticks);
   Serial.println(buf);
 #endif
-  return MOVE_OK;
 }
 
 int8_t RampGenerator::moveTo(int32_t position,
                              const struct queue_end_s *queue_end) {
-  int32_t curr_pos;
+  uint8_t res = _parameters.checkValidConfig();
+  if (res != MOVE_OK) {
+    return res;
+  }
+  int32_t curr_target;
   if (isRampGeneratorActive() && !_ro.config.parameters.keep_running) {
-    curr_pos = _ro.config.parameters.target_pos;
+    curr_target = _ro.target_pos;
   } else {
-    curr_pos = queue_end->pos;
+    curr_target = queue_end->pos;
   }
   inject_fill_interrupt(1);
-  int res = _startMove(position, curr_pos != position);
+  _parameters.setTargetPosition(position);
+  _startMove(curr_target != position);
   inject_fill_interrupt(2);
-  return res;
+  return MOVE_OK;
 }
 int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
-  int32_t curr_pos;
-  if (isRampGeneratorActive() && !_ro.config.parameters.keep_running) {
-	if (_ro.force_stop) {
-	  fasDisableInterrupts();
-      curr_pos = queue_end->pos;
-	  fasEnableInterrupts();
-	}
-	else {
-	  curr_pos = _ro.config.parameters.target_pos;
-	}
-  } else {
-    curr_pos = queue_end->pos;
+  uint8_t res = _parameters.checkValidConfig();
+  if (res != MOVE_OK) {
+    return res;
   }
-  int32_t new_pos = curr_pos + move;
-  return _startMove(new_pos, curr_pos != new_pos);
+  _parameters.setTargetRelativePosition(move);
+  _startMove(move != 0);
+  return MOVE_OK;
 }
 void RampGenerator::advanceTargetPosition(int32_t delta,
                                           const struct queue_end_s *queue) {
-  if (isRampGeneratorActive() && !_ro.config.parameters.keep_running) {
-    int32_t new_pos = _ro.config.parameters.target_pos + delta;
-    _startMove(new_pos, true);
-  }
+  // called with interrupts disabled
+  _ro.target_pos += delta;
 }
 
 void RampGenerator::afterCommandEnqueued(NextCommand *command) {
@@ -136,6 +118,8 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     _ro.config.parameters = _parameters;
     _parameters.apply = false;
     _parameters.any_change = false;
+	_parameters.move_value = 0;
+	_parameters.move_absolute = false;
     _parameters.recalc_ramp_steps = false;
     _ro.config.update();
   }
@@ -143,6 +127,57 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   fasDisableInterrupts();
   struct queue_end_s qe = *queue_end;
   fasEnableInterrupts();
+
+  // If the acceleration has changed, recalculate the ramp up/down steps,
+  // which is the equivalent to the current speed.
+  // Even if the acceleration value is constant, the calculated value
+  // can deviate due to precision or clipping effect
+  if (_ro.config.parameters.recalc_ramp_steps) {
+    uint32_t performed_ramp_up_steps;
+	uint32_t curr_ticks = _rw.curr_ticks;
+    if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
+      performed_ramp_up_steps = _ro.config.parameters.s_jump;
+    } else {
+      performed_ramp_up_steps = _ro.config.calculate_ramp_steps(curr_ticks);
+#ifdef TEST
+      printf(
+          "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
+          _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
+#endif
+    }
+	_rw.performed_ramp_up_steps = performed_ramp_up_steps;
+  }
+
+  if (_ro.force_stop) {
+	_ro.config.parameters.keep_running = false;
+	uint32_t target_pos = qe.pos;
+	if (qe.count_up) {
+		target_pos += _rw.performed_ramp_up_steps;
+	}
+	else {
+		target_pos -= _rw.performed_ramp_up_steps;
+	}
+#ifdef TEST
+      printf(
+          "Force stop: adjust target position from %d to %d\n",
+          _ro.target_pos, target_pos);
+#endif
+	_ro.target_pos = target_pos;
+  }
+  else if (_ro.config.parameters.any_change) {
+	  // calculate new target position
+	  _ro.config.parameters.any_change = false;
+	  if (_ro.config.parameters.keep_running) {
+	  }
+	  else if (_ro.config.parameters.move_absolute) {
+		  _ro.target_pos = _ro.config.parameters.move_value;
+	  }
+	  else {
+		 _ro.target_pos = _ro.target_pos + _ro.config.parameters.move_value;
+	  }
+  }
+
+  _ro.force_stop = false;
 
   if (_ro.isImmediateStopInitiated()) {
     // no more commands

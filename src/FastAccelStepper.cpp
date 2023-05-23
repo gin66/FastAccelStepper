@@ -856,8 +856,8 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
     struct queue_end_s* queue_end = &fas_queue[_queue_num].queue_end;
     fasDisableInterrupts();
     queue_end->pos += delta;
-    fasEnableInterrupts();
     _rg.advanceTargetPosition(delta, queue_end);
+    fasEnableInterrupts();
   }
 }
 void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
@@ -865,10 +865,10 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   fasDisableInterrupts();
   int32_t delta = new_pos - fas_queue[_queue_num].queue_end.pos;
   queue_end->pos = new_pos;
-  fasEnableInterrupts();
   if (delta != 0) {
     _rg.advanceTargetPosition(delta, queue_end);
   }
+  fasEnableInterrupts();
 }
 uint8_t FastAccelStepper::queueEntries() {
   return fas_queue[_queue_num].queueEntries();
