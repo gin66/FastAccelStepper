@@ -55,13 +55,13 @@ void RampGenerator::_startMove(bool position_changed) {
   }
 
 #ifdef TEST
-  printf("Ramp data: go to %s %d  curr_ticks = %u travel_ticks = %u\n", _parameters.move_absolute ? "ABS":"REL", _parameters.move_value,
-         _rw.curr_ticks, _ro.config.parameters.min_travel_ticks);
+  printf("Ramp data: go to %s %d  curr_ticks = %u travel_ticks = %u prus=%u\n", _parameters.move_absolute ? "ABS":"REL", _parameters.move_value,
+         _rw.curr_ticks, _ro.config.parameters.min_travel_ticks, _rw.performed_ramp_up_steps);
 #endif
 #ifdef DEBUG
   char buf[256];
-  sprintf(buf, "Ramp data: go to = %s %ld  curr_ticks = %lu travel_ticks = %lu\n",
-          _parameters.move_absolute ? "ABS":"REL", _parameters.move_value, _rw.curr_ticks, _ro.config.parameters.min_travel_ticks);
+  sprintf(buf, "Ramp data: go to = %s %ld  curr_ticks = %lu travel_ticks = %lu prus=%lu\n",
+          _parameters.move_absolute ? "ABS":"REL", _parameters.move_value, _rw.curr_ticks, _ro.config.parameters.min_travel_ticks, _rw.performed_ramp_up_steps);
   Serial.println(buf);
 #endif
 }
@@ -133,19 +133,19 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   // Even if the acceleration value is constant, the calculated value
   // can deviate due to precision or clipping effect
   if (_ro.config.parameters.recalc_ramp_steps) {
-    uint32_t performed_ramp_up_steps;
 	uint32_t curr_ticks = _rw.curr_ticks;
     if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
-      performed_ramp_up_steps = _ro.config.parameters.s_jump;
-    } else {
-      performed_ramp_up_steps = _ro.config.calculate_ramp_steps(curr_ticks);
+		// Why come here ???
+	}
+	else {
+      uint32_t performed_ramp_up_steps = _ro.config.calculate_ramp_steps(curr_ticks);
 #ifdef TEST
       printf(
           "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
           _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
 #endif
+	  _rw.performed_ramp_up_steps = performed_ramp_up_steps;
     }
-	_rw.performed_ramp_up_steps = performed_ramp_up_steps;
   }
 
   if (_ro.force_stop) {
@@ -179,6 +179,9 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 
   _ro.force_stop = false;
 
+  // clear recalc flag
+  _ro.config.parameters.recalc_ramp_steps = false;
+
   if (_ro.isImmediateStopInitiated()) {
     // no more commands
     command->command.ticks = 0;
@@ -187,9 +190,6 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     return;
   }
   _getNextCommand(&_ro, &_rw, &qe, command);
-
-  // clear recalc flag
-  _ro.config.parameters.recalc_ramp_steps = false;
 }
 void RampGenerator::stopRamp() { _rw.stopRamp(); }
 int32_t RampGenerator::getCurrentAcceleration() {

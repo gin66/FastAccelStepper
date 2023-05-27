@@ -43,6 +43,9 @@ struct ramp_rw_s {
     performed_ramp_up_steps = 0;
     ramp_state = RAMP_STATE_IDLE;
     curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+#ifdef TEST
+	printf("stopRamp() called\n");
+#endif
   }
   inline void init() { stopRamp(); }
   inline uint8_t rampState() {
@@ -50,13 +53,15 @@ struct ramp_rw_s {
     return ramp_state;
   }
   inline void startRampIfNotRunning(uint32_t s_jump) {
+#ifdef TEST
+	printf("startRampIfNotRunning(%d) called\n", s_jump);
+#endif
     // called with interrupts disabled
     if (ramp_state == RAMP_STATE_IDLE) {
-      fasDisableInterrupts();
       ramp_state = RAMP_STATE_ACCELERATE;
       curr_ticks = TICKS_FOR_STOPPED_MOTOR;
       performed_ramp_up_steps = s_jump;
-      fasEnableInterrupts();
+
     }
   }
 };

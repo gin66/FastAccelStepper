@@ -31,6 +31,7 @@ class FastAccelStepperTest {
   }
 
   void with_empty_queue() {
+	printf("Test with empty queue\n");
     init_queue();
     FastAccelStepper s = FastAccelStepper();
     s.init(NULL, 0, 0);
