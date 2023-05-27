@@ -7,6 +7,8 @@ TODO:
 
 pre-0.29.3:
 - fix issue #172: `move()` during ramping down of `stopMove()` has used old target position as reference
+- fix issue #173: After `forceStopWithNewPosition()` next `move()` was not executed properly
+- Fix: With high acceleration and jump start value, the speed could be too high for the motor. Now is limited
 
 0.29.2:
 - add `stepperConnectToPin(pin, driver_type)` to allow the module selection

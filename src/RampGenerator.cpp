@@ -128,16 +128,25 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
   struct queue_end_s qe = *queue_end;
   fasEnableInterrupts();
 
+  uint32_t curr_ticks = _rw.curr_ticks;
+  if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
+	  // just started
+      uint32_t s_jump = _ro.config.parameters.s_jump;
+	  if (s_jump != 0) {
+		  uint32_t ticks = _ro.config.calculate_ticks(s_jump);
+		  if (ticks < _ro.config.parameters.min_travel_ticks) {
+			  s_jump = _ro.config.calculate_ramp_steps(_ro.config.parameters.min_travel_ticks);
+		  }
+	  }
+      _rw.performed_ramp_up_steps = s_jump;
+	  _ro.config.parameters.recalc_ramp_steps = false;
+	}
+
   // If the acceleration has changed, recalculate the ramp up/down steps,
   // which is the equivalent to the current speed.
   // Even if the acceleration value is constant, the calculated value
   // can deviate due to precision or clipping effect
   if (_ro.config.parameters.recalc_ramp_steps) {
-	uint32_t curr_ticks = _rw.curr_ticks;
-    if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
-		// Why come here ???
-	}
-	else {
       uint32_t performed_ramp_up_steps = _ro.config.calculate_ramp_steps(curr_ticks);
 #ifdef TEST
       printf(
@@ -145,7 +154,6 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
           _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
 #endif
 	  _rw.performed_ramp_up_steps = performed_ramp_up_steps;
-    }
   }
 
   if (_ro.force_stop) {

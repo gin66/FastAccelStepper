@@ -60,8 +60,6 @@ struct ramp_rw_s {
     if (ramp_state == RAMP_STATE_IDLE) {
       ramp_state = RAMP_STATE_ACCELERATE;
       curr_ticks = TICKS_FOR_STOPPED_MOTOR;
-      performed_ramp_up_steps = s_jump;
-
     }
   }
 };
