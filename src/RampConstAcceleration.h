@@ -58,8 +58,10 @@ struct ramp_rw_s {
 #endif
     // called with interrupts disabled
     if (ramp_state == RAMP_STATE_IDLE) {
-      ramp_state = RAMP_STATE_ACCELERATE;
       curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+	  // ramp_state value is significant to start the ramp generator.
+	  // so initialize curr_ticks before
+      ramp_state = RAMP_STATE_ACCELERATE;
     }
   }
 };
