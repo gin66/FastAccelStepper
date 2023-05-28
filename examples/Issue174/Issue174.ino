@@ -105,20 +105,27 @@ void loop()
   Position_Next += 500; // increment position
   Position_Next %= 10000; // reset position
 
+  // the targetPos shows, what actual targetPos the stepper intends to run to
   Serial.print(Position_Next);
+  Serial.print(':');
+  Serial.print(stepper->targetPos());
   Serial.print(':');
   Serial.println(stepper->getCurrentPosition());
 
   // add target position
   stepper->moveTo(Position_Next, false);
 
-  // give the stepper some time to move
-  delay(1000);
+  // give the stepper some time to move. Enabling this, the code works
+  // delay(1500);
 
   loopCnt++;
   if ((loopCnt > 40) && (Position_Next == 0)) {
+    // let the stepper run to position 0
     while (stepper->isRunning()) {
     }
+    // test expectation is, that the sum of all step pulses taken into 
+    // consideration the direction pin yields a position of 0.
+    // This works with every delay value above - as it should.
     Serial.println(stepper->getCurrentPosition());
     exitSimulator(true);
   }
