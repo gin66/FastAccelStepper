@@ -2,7 +2,7 @@ BEGIN {
 	pass = 1
 }
 
-/^M1:/ {
+/^M[17]:/ {
 	print
 	api = substr($2,2)
 	pcnt = substr($3,2,length($3)-2)
@@ -20,7 +20,7 @@ BEGIN {
 		print "FAIL HERE ^^^"
 	}
 }
-/^>> M1:/ {
+/^>> M[17]:/ {
 	print
 	api = substr($3,2)
 	api = api % 65536
