@@ -393,7 +393,6 @@ void FastAccelStepper::fill_queue() {
   }
   // check if addition of commands is suspended (due to forceStopAndNewPosition)
   StepperQueue* q = &fas_queue[_queue_num];
-
   // if force stop has been called, then ignore_commands is true and ramp
   // stopped. So the ramp generator will not create a new command, unless new
   // move command has been given after forceStop..(). So we just clear the flag
@@ -701,6 +700,7 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
 
   // set the new position. This is not safe
   q->queue_end.pos = new_pos;
+  _rg.setTargetPosition(new_pos);
 }
 bool FastAccelStepper::disableOutputs() {
   if (isRunning() && _autoEnable) {

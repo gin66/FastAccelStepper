@@ -15,6 +15,9 @@ struct ramp_ro_s {
     force_immediate_stop = false;
   }
   inline int32_t targetPosition() { return target_pos; }
+  inline void setTargetPosition(int32_t pos) {
+    target_pos = pos;
+  }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
     target_pos += delta;
   }
