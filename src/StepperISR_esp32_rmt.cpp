@@ -165,13 +165,13 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       q->read_idx = rp;
       // The dir pin toggle at this place is problematic, but if the last
       // command contains only one step, it could work
-      if (rp == q->next_write_idx) {
+//      if (rp == q->next_write_idx) {
         struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
         if (e_next->toggle_dir) {
           gpio_num_t dirPin = (gpio_num_t)q->dirPin;
           gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
         }
-      }
+//      }
     } else {
       e_curr->steps = steps;
     }
