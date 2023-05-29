@@ -7,6 +7,7 @@ test: M1.test M7.test
 %.test:
 	MOTOR=$* ./seq_04.sh $(DEV)
 	MOTOR=$* ./seq_05.sh $(DEV)
+	MOTOR=$* ./seq_06.sh $(DEV)
 	MOTOR=$* ./seq_01.sh $(DEV)
 	MOTOR=$* ./seq_02.sh $(DEV)
 	MOTOR=$* ./seq_03.sh $(DEV)
