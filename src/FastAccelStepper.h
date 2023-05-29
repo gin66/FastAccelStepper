@@ -296,6 +296,10 @@ class FastAccelStepper {
 
   // ## Stepper Position
   // Retrieve the current position of the stepper
+  //
+  // Comment for esp32 with rmt module:
+  // The actual position may be off by the number of steps in the ongoing command.
+  // If precise real time position is needed, attaching a pulse counter may be of help.
   int32_t getCurrentPosition();
 
   // Set the current position of the stepper - either in standstill or while
