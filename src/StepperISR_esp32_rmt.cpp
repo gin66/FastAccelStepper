@@ -27,8 +27,8 @@ int tp2 = 0;
 
 // The following concept is in use:
 //
-//    The buffer of 64Bytes is split into two parts à  31 words.
-//    Each part will hold on command (or part of).
+//    The buffer of 64Bytes is split into two parts à 31 words.
+//    Each part will hold one command (or part of).
 //    After the 2*31 words an end marker is placed.
 //    The threshold is set to 31.
 //
@@ -144,7 +144,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
         *data++ = rmt_entry;
       }
       // This could lead to single step at high speed in next part .... so need
-      // to rework The previous part tries to address this
+      // to rework the previous part to address this
       steps -= PART_SIZE;
       data--;
     }
