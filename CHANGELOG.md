@@ -8,6 +8,7 @@ TODO:
 pre-0.29.3:
 - fix issue #172: `move()` during ramping down of `stopMove()` has used old target position as reference
 - fix issue #173: After `forceStopWithNewPosition()` next `move()` was not executed properly
+- fix issue #173: After `forceStop()` target position was not updated
 - Fix: With high acceleration and jump start value, the speed could be too high for the motor. Now is limited
 
 0.29.2:

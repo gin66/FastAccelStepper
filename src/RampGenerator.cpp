@@ -194,6 +194,7 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     // no more commands
     command->command.ticks = 0;
     _ro.clearImmediateStop();
+	_ro.target_pos = qe.pos;
     command->rw.stopRamp();
     return;
   }
