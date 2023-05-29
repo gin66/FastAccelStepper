@@ -25,9 +25,9 @@ FastAccelStepper *stepper = NULL;
 // not sure, if the compiler properly change float to uint32_t.
 // so better to due to calculation in integer domain
 uint32_t steps_per_rev = 800;
-uint32_t rpm = 1000;
+uint32_t rpm = 2000;
 uint32_t maxStepperSpeed = (rpm*steps_per_rev/60);   //needs to be in us per step || 1 sec = 1000000 us
-uint32_t maxStepperAccel = 10000;
+uint32_t maxStepperAccel = 100;
 
 void setup()
 {
@@ -87,7 +87,6 @@ void exitSimulator(bool ok) {
 #endif
 }
 
-uint16_t loopCnt = 0;
 void loop()
 { 
   // obtain time
@@ -106,11 +105,11 @@ void loop()
   Position_Next %= 10000; // reset position
 
   // the targetPos shows, what actual targetPos the stepper intends to run to
-  Serial.print(Position_Next);
-  Serial.print(':');
-  Serial.print(stepper->targetPos());
-  Serial.print(':');
-  Serial.println(stepper->getCurrentPosition());
+//  Serial.print(Position_Next);
+//  Serial.print(':');
+//  Serial.print(stepper->targetPos());
+//  Serial.print(':');
+//  Serial.println(stepper->getCurrentPosition());
 
   // add target position
   stepper->moveTo(Position_Next, false);
@@ -118,8 +117,7 @@ void loop()
   // give the stepper some time to move. Enabling this, the code works
   // delay(1500);
 
-  loopCnt++;
-  if ((loopCnt > 40) && (Position_Next == 0)) {
+  if ((currentTime > 50000000) && (Position_Next == 0)) {
     // let the stepper run to position 0
     while (stepper->isRunning()) {
     }
