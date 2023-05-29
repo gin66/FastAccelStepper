@@ -122,9 +122,18 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 	_parameters.move_absolute = false;
     _parameters.recalc_ramp_steps = false;
     _ro.config.update();
-	// new command. so reset any immediate stop flag
-    _ro.clearImmediateStop();
-  }
+	// if new move command,then reset any immediate stop flag
+	if (_ro.isImmediateStopInitiated()) {
+		if (_ro.config.parameters.move_absolute) {
+			if (_ro.target_pos != (uint32_t)_ro.config.parameters.move_value) {
+				_ro.clearImmediateStop();
+			}
+		}
+		else if (_ro.config.parameters.move_value != 0) {
+			_ro.clearImmediateStop();
+		}
+	  }
+	}
 
   fasDisableInterrupts();
   struct queue_end_s qe = *queue_end;
