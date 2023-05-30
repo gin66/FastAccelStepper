@@ -80,14 +80,14 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 //    for (uint8_t i = 2 * PART_SIZE; i < 64; i++) {
 //      *data++ = 0x10001234;
 //    }
-    RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
+//    RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
     if (!q->_isRunning) {
       // second invocation to stop.
 	  q->stop_rmt();
 //      rmt_tx_stop(q->channel);
 //      rmt_rx_stop(q->channel);
 //      rmt_memory_rw_rst(q->channel);
-      q->_rmtStopped = true;
+//      q->_rmtStopped = true;
     }
     q->_isRunning = false;
     return;
@@ -186,21 +186,37 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       *data -= 1;
     }
     if (steps == 0) {
-//Serial.print('Q');
       // The command has been completed
       if (e_curr->repeat_entry == 0) {
         rp++;
       }
+	  if (rp == q->next_write_idx) {
+		  // there is another command
+		  if (q->entry[rp & QUEUE_LEN_MASK].toggle_dir) {
+			  // the next command requests dir pin toggle
+			  // This is ok only, if the ongoing command does not contain steps
+			  if (e_curr->hasSteps) {
+				  // So we need a pause. change the finished read entry into a pause
+				 e_curr->steps = 0;
+				 e_curr->toggle_dir = 0;
+				 e_curr->moreThanOneStep = 0;
+				 e_curr->hasSteps = 0;
+				 e_curr->ticks = MIN_CMD_TICKS;
+				 // done
+				 return;
+			  }
+		  }
+	  }
       q->read_idx = rp;
       // The dir pin toggle at this place is problematic, but if the last
       // command contains only one step, it could work
-//      if (rp == q->next_write_idx) {
+      if (rp != q->next_write_idx) {
         struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
         if (e_next->toggle_dir) {
           gpio_num_t dirPin = (gpio_num_t)q->dirPin;
           gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
         }
-//      }
+      }
     } else {
       e_curr->steps = steps;
     }
@@ -331,6 +347,17 @@ void StepperQueue::startQueue_rmt() {
 #ifdef TRACE
   Serial.println(next_write_idx - read_idx);
 #endif
+
+  // set dirpin toggle here
+  uint8_t rp = read_idx;
+  if (rp == next_write_idx) {
+	  // nothing to do ?
+	  // Should not happen, so bail
+	  return;
+  }
+  if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
+	  gpio_set_level((gpio_num_t)dirPin, gpio_get_level((gpio_num_t)dirPin) ^ 1);
+  }
 
   apply_command(this, true, mem);
 

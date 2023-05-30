@@ -280,6 +280,8 @@ If the interrupt load is not an issue, then rmt is the better choice. With rmt t
 
 As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers and then the 8 rmt drivers. In future this may be under application control. Starting with 0.29.2, the module can be directly selected on call of `stepperConnectToPin()`. So the allocation gets more flexible.
 
+One specific note for the rmt: If a direction pin toggle is needed directly after a command with steps, then the driver will add before that direction pin toggle another pause of `MIN_CMD_TICKS` ticks.
+
 ### ESP32S2
 
 This stepper driver uses rmt module.
