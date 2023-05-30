@@ -76,6 +76,7 @@ class StepperQueue {
 #endif
 #ifdef SUPPORT_ESP32_RMT
   rmt_channel_t channel;
+  bool _lastEntryWithCommand;
   bool _rmtStopped;
 #endif
 #if defined(SUPPORT_DIR_PIN_MASK)
@@ -162,6 +163,7 @@ class StepperQueue {
   bool isReadyForCommands_rmt();
   void init_rmt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_rmt();
+  void stop_rmt();
   void forceStop_rmt();
   uint16_t _getPerformedPulses_rmt();
   void connect_rmt();

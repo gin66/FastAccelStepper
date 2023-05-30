@@ -25,10 +25,34 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   }
   uint16_t period = cmd->ticks;
   uint8_t steps = cmd->steps;
-  // Serial.print(period);
-  // Serial.print(" ");
-  // Serial.println(steps);
+//generation discrepancy: pc vs target
+//after Command Enqueued: performed ramp up steps = 1, pause left = 0, curr_ticks = 11320
+//after Command Enqueued: performed ramp up steps = 3, pause left = 0, curr_ticks = 6536
+//after Command Enqueued: performed ramp up steps = 7, pause left = 0, curr_ticks = 4276
+//after Command Enqueued: performed ramp up steps = 14, pause left = 0, curr_ticks = 3024
+//after Command Enqueued: performed ramp up steps = 24, pause left = 0, curr_ticks = 2312
+//after Command Enqueued: performed ramp up steps = 17, pause left = 0, curr_ticks = 3412
+//after Command Enqueued: performed ramp up steps = 8, pause left = 0, curr_ticks = 4004
+//after Command Enqueued: performed ramp up steps = 1, pause left = 0, curr_ticks = 11320
+//
+// esp32 mcpwm and rmt:
+// 0/268435455us/4294967295:1:11320X:2:6536X:4:4276X:7:3024X:10:2312X:13:3412X:9:4004X:7:11320X:1:11320X
+//
+//
+// Failed 10steps:
+// :0:40000X:0:40000X:1:56608X:0:56608X:1:40032X:0:40032X:1:65344X:1:56608X:1:50624X:1:56608X:1:65344X:1:40032X:0:40032X:1:56608X:0:56608X:1:56608X:0:56608X
+//
+// Failed seq_07
+// :0:40000X:0:40000X:1:56608X:0:56608X:1:40032X:0:40032X:1:65344X:1:56608X:1:50624X
+// :1:46208X:1:42784X:1:40032X:1:37728X:1:35808X:1:34112X:1:32672X:1:31376X:1:30256X:1:29216X:1:28304X:1:27440X:1:26672X:1:25968X:1:25312X:1:24688X:1:24128X:1:23616X:1:23104X:1:22640X:1:22192X:1:21776X:1:21392X:1:21024X:1:20656X:1:20320X:1:20016X:1:19696X:1:19408X:1:19152X:1:18864X:1:18608X:1:18352X:1:18144X:1:17904X:1:17680X:1:17472X:1:17280X:1:17056X:1:16880X:1:16704X:1:16512X:1:16336X:1:16160X:1:16016X:1:15840X:2:15544X:2:15272X:2:14984X:2:14744X:2:14488X:2:14256X:2:14040X:2:13840X:2:13632X
+// :2:13432X:2:13248X:2:13072X:2:12896X:2:12736X:2:12584X:2:12432X:2:12280X:2:12128X:2:12000X:2:11872X:2:11744X:2:11616X:2:11488X:2:11384X:2:11264X:2:11152X:2:11048X:2:10944X:2:10840X:2:10736X:2:10656X:3:10512X:3:10384X:3:10248X:3:10120X:3:10008X:3:9888X:3:9784X:3:9680X:3:9576X:3:9472X:3:9368X:3:9280X:3:9176X:3:9096X:3:9008X:3:8928X:3:8840X:3:8760X:3:8688X:3:8600X:3:8528X:3:8464X:3:8392X:3:8328X:3:8256X:3:8192X:3:8124X:3:8060X:3:8008X:3:7944X:4:7864X:4:7792X:4:7720X:4:7648X:4:7584X:4:7512X:4:7452X:4:7384X:4:7324X
+// :4:7264X:4:7204X:4:7148X:4:7088X:4:7040X:4:6984X:4:6928X
 
+//Serial.print(':');
+//Serial.print(steps);
+//Serial.print(':');
+//Serial.print(period);
+//Serial.print('X');
   uint32_t command_rate_ticks = period;
   if (steps > 1) {
     command_rate_ticks *= steps;
