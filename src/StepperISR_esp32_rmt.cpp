@@ -44,14 +44,15 @@ void IRAM_ATTR StepperQueue::stop_rmt() {
   // We are stopping the rmt by letting it run into the end at high speed.
   //
   // disable the interrupts
-  rmt_set_tx_intr_en(channel, false);
-  rmt_set_tx_thr_intr_en(channel, false, 0);
+//  rmt_set_tx_intr_en(channel, false);
+//  rmt_set_tx_thr_intr_en(channel, false, 0);
 
   // stop esp32 rmt, by let it hit the end
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
 
   // replace buffer with only pauses, coming from end
-  uint32_t *data = FAS_RMT_MEM(channel) + 63;
+  uint32_t *data = FAS_RMT_MEM(channel);
+  data = &data[63];
   for (uint8_t i = 0; i < 64; i++) {
     *data-- = 0x00010001;
   }
@@ -71,18 +72,21 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
     for (uint8_t i = 0; i < PART_SIZE; i++) {
-      // two pauses à 4096 ticks
-      *data++ = 0x12341234;
+      // make a pause with approx. 1ms
+      //    258 ticks * 2 * 31 = 159996 @ 16MHz
+      *data++ = 0x01020102;
     }
-    for (uint8_t i = 2 * PART_SIZE; i < 64; i++) {
-      *data++ = 0x10001234;
-    }
+	// overwrite end markers
+//    for (uint8_t i = 2 * PART_SIZE; i < 64; i++) {
+//      *data++ = 0x10001234;
+//    }
     RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
     if (!q->_isRunning) {
       // second invocation to stop.
-      rmt_tx_stop(q->channel);
-      rmt_rx_stop(q->channel);
-      rmt_memory_rw_rst(q->channel);
+	  q->stop_rmt();
+//      rmt_tx_stop(q->channel);
+//      rmt_rx_stop(q->channel);
+//      rmt_memory_rw_rst(q->channel);
       q->_rmtStopped = true;
     }
     q->_isRunning = false;
@@ -303,10 +307,11 @@ void StepperQueue::disconnect_rmt() {
 }
 
 void StepperQueue::startQueue_rmt() {
-#define TRACE
+//#define TRACE
 #ifdef TRACE
   Serial.println("START");
 #endif
+  PROBE_1_TOGGLE;
   rmt_tx_stop(channel);
   rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
@@ -342,7 +347,7 @@ void StepperQueue::startQueue_rmt() {
     Serial.println(mem[i], HEX);
   }
   if (!isRunning()) {
-    Serial.println("STOPPED");
+    Serial.println("STOPPED 1");
   }
 #endif
 
@@ -362,7 +367,7 @@ void StepperQueue::startQueue_rmt() {
     Serial.println(mem[i], HEX);
   }
   if (!isRunning()) {
-    Serial.println("STOPPED");
+    Serial.println("STOPPED 2");
   }
 #endif
   if (_isRunning) {

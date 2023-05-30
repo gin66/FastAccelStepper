@@ -30,16 +30,17 @@ void setup() {
 	  delay(1);
 	  digitalWrite(stepPinStepper, LOW);
 	  delay(1);
-
+  }
+  if (false) {
 	  pinMode(18, OUTPUT);
 	  digitalWrite(18, HIGH);
-	  delay(1);
+	  delay(1000);
 	  digitalWrite(18, LOW);
-	  delay(1);
+	  delay(1000);
 	  digitalWrite(18, HIGH);
-	  delay(1);
+	  delay(1000);
 	  digitalWrite(18, LOW);
-	  delay(1);
+	  delay(1000);
 	}
 
   engine.init();
@@ -78,22 +79,33 @@ void loop() {
   if (stepper) {
     min_ticks = stepper->getMaxSpeedInTicks();
   }
-min_ticks = 60000;
+min_ticks = 30000;
   const struct stepper_command_s cmd_step1 = {
       .ticks = MIN_CMD_TICKS, .steps = 2, .count_up = true};
-  const struct stepper_command_s cmd_step = {
+  const struct stepper_command_s cmd_step10 = {
       .ticks = min_ticks, .steps = 10, .count_up = true};
+  const struct stepper_command_s cmd_step5 = {
+      .ticks = 45000, .steps = 5, .count_up = true};
   const struct stepper_command_s cmd_pause = {
       .ticks = 5000, .steps = 0, .count_up = true};
-  uint8_t res;
+  uint8_t res[10];
+  uint8_t *r = res;
   if (stepper) {
 //  stepper->addQueueEntry(&cmd_step1);
-    res = stepper->addQueueEntry(&cmd_step);
+    *r++ = stepper->addQueueEntry(&cmd_step10, false);
 //  stepper->addQueueEntry(&cmd_step1);
 //  stepper->addQueueEntry(&cmd_step1);
-//  stepper->addQueueEntry(&cmd_step);
+    *r++ = stepper->addQueueEntry(&cmd_step5, false);
+    *r++ = stepper->addQueueEntry(&cmd_step10, false);
+    *r++ = stepper->addQueueEntry(&cmd_step5, false);
+    *r++ = stepper->addQueueEntry(&cmd_step10, false);
+    *r++ = stepper->addQueueEntry(&cmd_step5, false);
+    *r++ = stepper->addQueueEntry(&cmd_step10, false);
 //  stepper->addQueueEntry(&cmd_pause);
-    Serial.println(res);
+    *r++ = stepper->addQueueEntry(NULL);
+    Serial.print(res[0]);
+    Serial.print('-');
+    Serial.println(res[1]);
   }
   delay(100);
 }
