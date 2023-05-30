@@ -44,7 +44,11 @@ void setup() {
 	}
 
   engine.init();
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   stepper = engine.stepperConnectToPin(stepPinStepper, DRIVER_RMT);
+#else
+  stepper = engine.stepperConnectToPin(stepPinStepper);
+#endif
 }
 
 void loop1() {
@@ -91,7 +95,7 @@ min_ticks = 30000;
   uint8_t res[10];
   uint8_t *r = res;
   if (stepper) {
-//  stepper->addQueueEntry(&cmd_step1);
+  stepper->addQueueEntry(&cmd_step1);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
 //  stepper->addQueueEntry(&cmd_step1);
 //  stepper->addQueueEntry(&cmd_step1);
@@ -101,7 +105,7 @@ min_ticks = 30000;
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
     *r++ = stepper->addQueueEntry(&cmd_step5, false);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
-//  stepper->addQueueEntry(&cmd_pause);
+  stepper->addQueueEntry(&cmd_pause);
     *r++ = stepper->addQueueEntry(NULL);
     Serial.print(res[0]);
     Serial.print('-');
