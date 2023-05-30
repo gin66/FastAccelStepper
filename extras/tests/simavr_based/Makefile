@@ -71,7 +71,8 @@ simavr/simavr/sim/run_avr.c:
 	# select current HEAD as of now
 	(cd simavr;git checkout	7003af)
 	# apply patch, which is now minimal:
-	(cd simavr;patch -p1 -t <../simavr.patch)
+#	(cd simavr;patch -p1 -t <../simavr.patch)
+	(cd simavr;patch -p1 -t <../simavr.patch2)
 
 proper: clean
 	rm -f run_avr
