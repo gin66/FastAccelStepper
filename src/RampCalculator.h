@@ -140,6 +140,7 @@ struct ramp_parameters_s {
       recalc_ramp_steps = true;
       pmfl_accel = new_pmfl_accel;
       fasEnableInterrupts();
+
     }
   }
   inline void setJumpStart(uint32_t jump_step) { s_jump = jump_step; }
@@ -179,6 +180,12 @@ struct ramp_config_s {
       pmfl_ticks_h = PMF_CONST_MAX;
     }
     max_ramp_up_steps = calculate_ramp_steps(parameters.min_travel_ticks);
+	if (max_ramp_up_steps == 0) {
+		max_ramp_up_steps = 1;
+	}
+#ifdef TEST
+	printf("MAX_RAMP_UP_STEPS=%d from %d ticks\n",max_ramp_up_steps, parameters.min_travel_ticks);
+#endif
   }
 
   uint32_t calculate_ticks(uint32_t steps) const {

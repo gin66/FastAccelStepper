@@ -12,6 +12,7 @@ pre-0.29.3:
 - Fix: With high acceleration and jump start value, the speed could be too high for the motor. Now is limited
 - hot fix for issue #174: esp32-rmt module has not changed direction under high load
 - esp32s2: Enable pulse counter support
+- remove ramp state `RAMP_STATE_DECELERATE_TO_STOP`
 
 0.29.2:
 - add `stepperConnectToPin(pin, driver_type)` to allow the module selection

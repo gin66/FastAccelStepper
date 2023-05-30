@@ -37,6 +37,9 @@ void setup() {
   stepper->setAcceleration(100000);
   stepper->setSpeedInUs(100);  // the parameter is us/step !!!
 
+  // time to reach speed of 10.000 Hz with 100.000 steps/s^2 is 0.1s.
+  // 0.1s is reached in 500 steps
+
   stepper->move(10000);
   while ((stepper->rampState() & RAMP_STATE_MASK) != RAMP_STATE_COAST) {
     // wait for coasting
@@ -53,7 +56,7 @@ void setup() {
     // wait for deceleration to start
   }
 
-  // let get the position at the end of the queue
+  // get the position at the end of the queue
   pos = stepper->getPositionAfterCommandsCompleted();
   uint32_t target_pos = stepper->targetPos();
 

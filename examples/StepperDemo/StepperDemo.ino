@@ -989,9 +989,6 @@ void info(FastAccelStepper *s, bool long_info) {
         case RAMP_STATE_ACCELERATE:
           Serial.print(" ACC  ");
           break;
-        case RAMP_STATE_DECELERATE_TO_STOP:
-          Serial.print(" DEC  ");
-          break;
         case RAMP_STATE_DECELERATE:
           Serial.print(" RED  ");  // Reduce
           break;
