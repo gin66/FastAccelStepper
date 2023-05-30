@@ -5,7 +5,7 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
-pre-0.29.3:
+pre-0.30.0:
 - fix issue #172: `move()` during ramping down of `stopMove()` has used old target position as reference
 - fix issue #173: After `forceStopWithNewPosition()` next `move()` was not executed properly
 - fix issue #173: After `forceStop()` target position was not updated

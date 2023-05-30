@@ -8,6 +8,7 @@ PASS="test passed"
 MAX_RUN_S=300
 
 
+# rmt fails 03, 04
 for SEQ in 13 01 02 03 04 06 07 10 11
 do
 	LOG="$0_$SEQ.log"
