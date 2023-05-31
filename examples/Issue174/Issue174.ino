@@ -94,11 +94,10 @@ void loop() {
     uint16_t pcnt = stepper->readPulseCounter();
     if (pcnt == 0) {
       Serial.println("=> OK");
-    } else
-       {
-        Serial.println("=> FAIL with pcnt=");
-        Serial.println(pcnt);
-      }
+    } else {
+      Serial.println("=> FAIL with pcnt=");
+      Serial.println(pcnt);
+    }
   }
 
   float chirpTime = (micros() - chirpTimeInitial) * 1e-6;
