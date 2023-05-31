@@ -91,7 +91,7 @@ void loop() {
     Serial.print("Return to 0 from ");
     Serial.println(stepper->getCurrentPosition());
     stepper->moveTo(0, true);
-    uint16_t pcnt = stepper->readPulseCounter();
+    int16_t pcnt = stepper->readPulseCounter();
     if (pcnt == 0) {
       Serial.println("=> OK");
     } else {
