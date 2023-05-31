@@ -2,7 +2,7 @@
 
 #ifdef SUPPORT_ESP32_RMT
 
-#define TEST_PROBE_1 18
+//#define TEST_PROBE_1 18
 //#define TEST_PROBE_2 18
 #ifdef TEST_PROBE_1
 int tp1 = 0;
