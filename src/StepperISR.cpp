@@ -69,7 +69,7 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   bool repeat_entry = false;
 #endif
   if (dirPin != PIN_UNDEFINED) {
-    if (isQueueEmpty() && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
+    if ((isQueueEmpty() && !isRunning()) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
       // set the dirPin here. Necessary with shared direction pins
       digitalWrite(dirPin, dir);
 #ifdef ARDUINO_ARCH_SAM

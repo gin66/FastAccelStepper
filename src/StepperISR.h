@@ -78,6 +78,7 @@ class StepperQueue {
   rmt_channel_t channel;
   bool _lastEntryWithCommand;
   bool _rmtStopped;
+  bool bufferContainsSteps[2];
 #endif
 #if defined(SUPPORT_DIR_PIN_MASK)
   // avr uses uint8_t and sam needs uint32_t

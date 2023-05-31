@@ -71,6 +71,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   }
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
+	// no command in queue
     for (uint8_t i = 0; i < PART_SIZE; i++) {
       // make a pause with approx. 1ms
       //    258 ticks * 2 * 31 = 159996 @ 16MHz
@@ -91,8 +92,39 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     }
     q->_isRunning = false;
     return;
-  } else {
+  } 
+  // Process command
     struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+
+			  if (e_curr->toggle_dir) {
+				  // the command requests dir pin toggle
+				  // This is ok only, if the ongoing command does not contain steps
+				  if (q->bufferContainsSteps[fill_part_one ? 1:0]) {
+					  // So we need a pause. change the finished read entry into a pause
+	  q->bufferContainsSteps[fill_part_one ? 0:1] = false;
+      for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
+        // two pauses à 16 ticks
+        *data++ = 0x00010001 * (MIN_CMD_TICKS/62+1);
+      }
+	  data--;
+    if (!fill_part_one) {
+      // Note: When enabling the continuous transmission mode by setting
+      // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
+      // channel continuously, that is, from the first byte to the last one,
+      // then from the first to the last again, and so on. In this mode, there
+      // will be an idle level lasting one clk_div cycle between N and N+1
+      // transmissions.
+      *data -= 1;
+    }
+					 // done
+					 return;
+				  }
+			  // The dir pin toggle at this place is problematic, but if the last
+			  // command contains only one step, it could work
+			  gpio_num_t dirPin = (gpio_num_t)q->dirPin;
+			  gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+			}
+
 
     uint8_t steps = e_curr->steps;
     uint16_t ticks = e_curr->ticks;
@@ -100,6 +132,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       //		PROBE_2_TOGGLE;
     }
     if (steps == 0) {
+	  q->bufferContainsSteps[fill_part_one ? 0:1] = false;
       for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
         // two pauses à 16 ticks
         *data++ = 0x00100010;
@@ -111,7 +144,9 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       rmt_entry <<= 16;
       rmt_entry |= ticks_r;
       *data = rmt_entry;
-    } else if (ticks == 0xffff) {
+    } else {
+	  q->bufferContainsSteps[fill_part_one ? 0:1] = true;
+ 	if (ticks == 0xffff) {
       // special treatment for this case, because an rmt entry can only cover up
       // to 0xfffe ticks every step must be minimum split into two rmt entries,
       // so at max PART/2 steps can be done.
@@ -176,6 +211,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       steps -= PART_SIZE;
       data--;
     }
+	}
     if (!fill_part_one) {
       // Note: When enabling the continuous transmission mode by setting
       // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
@@ -189,38 +225,11 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       // The command has been completed
       if (e_curr->repeat_entry == 0) {
         rp++;
-      }
-	  if (rp == q->next_write_idx) {
-		  // there is another command
-		  if (q->entry[rp & QUEUE_LEN_MASK].toggle_dir) {
-			  // the next command requests dir pin toggle
-			  // This is ok only, if the ongoing command does not contain steps
-			  if (e_curr->hasSteps) {
-				  // So we need a pause. change the finished read entry into a pause
-				 e_curr->steps = 0;
-				 e_curr->toggle_dir = 0;
-				 e_curr->moreThanOneStep = 0;
-				 e_curr->hasSteps = 0;
-				 e_curr->ticks = MIN_CMD_TICKS;
-				 // done
-				 return;
-			  }
 		  }
-	  }
-      q->read_idx = rp;
-      // The dir pin toggle at this place is problematic, but if the last
-      // command contains only one step, it could work
-      if (rp != q->next_write_idx) {
-        struct queue_entry *e_next = &q->entry[rp & QUEUE_LEN_MASK];
-        if (e_next->toggle_dir) {
-          gpio_num_t dirPin = (gpio_num_t)q->dirPin;
-          gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
-        }
-      }
+		  q->read_idx = rp;
     } else {
       e_curr->steps = steps;
     }
-  }
 }
 
 #ifndef RMT_CHANNEL_MEM
@@ -357,8 +366,10 @@ void StepperQueue::startQueue_rmt() {
   }
   if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
 	  gpio_set_level((gpio_num_t)dirPin, gpio_get_level((gpio_num_t)dirPin) ^ 1);
+	  entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
+  bufferContainsSteps[1] = true;
   apply_command(this, true, mem);
 
 #ifdef TRACE
@@ -378,6 +389,7 @@ void StepperQueue::startQueue_rmt() {
   }
 #endif
 
+  bufferContainsSteps[0] = true;
   apply_command(this, false, mem);
 
 #ifdef TRACE
