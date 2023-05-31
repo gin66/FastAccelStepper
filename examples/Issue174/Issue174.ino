@@ -64,7 +64,9 @@ void setup() {
   stepper->forceStopAndNewPosition(0);
   stepper->moveTo(0);
   // pulse counter 0 is occupied, if using mcpwm/pcnt => so use 1
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   stepper->attachToPulseCounter(1, 0, 0);
+#endif
 
   chirpTimeInitial = micros();
 }
@@ -87,6 +89,7 @@ uint16_t loopCnt = 0;
 
 void loop() {
   loopCnt++;
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   if ((loopCnt % 1000) == 0) {
     Serial.print("Return to 0 from ");
     Serial.println(stepper->getCurrentPosition());
@@ -99,6 +102,7 @@ void loop() {
       Serial.println(pcnt);
     }
   }
+#endif
 
   float chirpTime = (micros() - chirpTimeInitial) * 1e-6;
 
