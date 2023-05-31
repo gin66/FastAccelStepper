@@ -2,17 +2,13 @@
 
 long chirpTimeInitial = 0;
 
-#if defined(__AVR_ATmega328P__)
 // Stepper Wiring
-#define dirPinStepper 8   // This can be any output capable port pin.
-#define stepPinStepper 9  // step pin must be pin 9, 10 or 11
+//#define dirPinStepper 8   // This can be any output capable port pin.
+//#define stepPinStepper 9  // step pin must be pin 9, 10 or 11
 
-#elif defined(ARDUINO_ARCH_ESP32)
 // Stepper Wiring
 #define dirPinStepper 18
 #define stepPinStepper 17
-#define enablePinStepper 26
-#endif
 
 // no clue what this does
 FastAccelStepperEngine engine = FastAccelStepperEngine();
