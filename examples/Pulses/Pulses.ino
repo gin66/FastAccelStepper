@@ -21,27 +21,27 @@ void setup() {
   Serial.begin(115200);
 
   if (false) {
-	  pinMode(stepPinStepper, OUTPUT);
-	  digitalWrite(stepPinStepper, HIGH);
-	  delay(1);
-	  digitalWrite(stepPinStepper, LOW);
-	  delay(1);
-	  digitalWrite(stepPinStepper, HIGH);
-	  delay(1);
-	  digitalWrite(stepPinStepper, LOW);
-	  delay(1);
+    pinMode(stepPinStepper, OUTPUT);
+    digitalWrite(stepPinStepper, HIGH);
+    delay(1);
+    digitalWrite(stepPinStepper, LOW);
+    delay(1);
+    digitalWrite(stepPinStepper, HIGH);
+    delay(1);
+    digitalWrite(stepPinStepper, LOW);
+    delay(1);
   }
   if (false) {
-	  pinMode(18, OUTPUT);
-	  digitalWrite(18, HIGH);
-	  delay(1000);
-	  digitalWrite(18, LOW);
-	  delay(1000);
-	  digitalWrite(18, HIGH);
-	  delay(1000);
-	  digitalWrite(18, LOW);
-	  delay(1000);
-	}
+    pinMode(18, OUTPUT);
+    digitalWrite(18, HIGH);
+    delay(1000);
+    digitalWrite(18, LOW);
+    delay(1000);
+    digitalWrite(18, HIGH);
+    delay(1000);
+    digitalWrite(18, LOW);
+    delay(1000);
+  }
 
   engine.init();
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
@@ -83,7 +83,7 @@ void loop() {
   if (stepper) {
     min_ticks = stepper->getMaxSpeedInTicks();
   }
-min_ticks = 30000;
+  min_ticks = 30000;
   const struct stepper_command_s cmd_step1 = {
       .ticks = MIN_CMD_TICKS, .steps = 2, .count_up = true};
   const struct stepper_command_s cmd_step10 = {
@@ -95,17 +95,17 @@ min_ticks = 30000;
   uint8_t res[10];
   uint8_t *r = res;
   if (stepper) {
-  stepper->addQueueEntry(&cmd_step1);
+    stepper->addQueueEntry(&cmd_step1);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
-//  stepper->addQueueEntry(&cmd_step1);
-//  stepper->addQueueEntry(&cmd_step1);
+    //  stepper->addQueueEntry(&cmd_step1);
+    //  stepper->addQueueEntry(&cmd_step1);
     *r++ = stepper->addQueueEntry(&cmd_step5, false);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
     *r++ = stepper->addQueueEntry(&cmd_step5, false);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
     *r++ = stepper->addQueueEntry(&cmd_step5, false);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
-  stepper->addQueueEntry(&cmd_pause);
+    stepper->addQueueEntry(&cmd_pause);
     *r++ = stepper->addQueueEntry(NULL);
     Serial.print(res[0]);
     Serial.print('-');

@@ -55,7 +55,7 @@ struct ramp_parameters_s {
   bool recalc_ramp_steps : 1;  // clear on read by stepper task
   bool valid_acceleration : 1;
   bool valid_speed : 1;
-  bool move_absolute: 1;
+  bool move_absolute : 1;
   bool keep_running : 1;
   bool keep_running_count_up : 1;
 
@@ -66,7 +66,7 @@ struct ramp_parameters_s {
     apply = false;
     any_change = false;
     recalc_ramp_steps = false;
-	move_absolute = true;
+    move_absolute = true;
     keep_running = false;
     keep_running_count_up = true;
     s_h = 0;
@@ -91,7 +91,7 @@ struct ramp_parameters_s {
   inline void setTargetPosition(int32_t pos) {
     fasDisableInterrupts();
     move_value = pos;
-	move_absolute = true;
+    move_absolute = true;
     keep_running = false;
     keep_running_count_up = true;
     any_change = true;
@@ -100,13 +100,12 @@ struct ramp_parameters_s {
   }
   inline void setTargetRelativePosition(int32_t move) {
     fasDisableInterrupts();
-	if (any_change && !move_absolute) {
+    if (any_change && !move_absolute) {
       move_value += move;
-	}
-	else {
+    } else {
       move_value = move;
-	}
-	move_absolute = false;
+    }
+    move_absolute = false;
     keep_running = false;
     keep_running_count_up = true;
     any_change = true;
@@ -140,7 +139,6 @@ struct ramp_parameters_s {
       recalc_ramp_steps = true;
       pmfl_accel = new_pmfl_accel;
       fasEnableInterrupts();
-
     }
   }
   inline void setJumpStart(uint32_t jump_step) { s_jump = jump_step; }
@@ -180,11 +178,12 @@ struct ramp_config_s {
       pmfl_ticks_h = PMF_CONST_MAX;
     }
     max_ramp_up_steps = calculate_ramp_steps(parameters.min_travel_ticks);
-	if (max_ramp_up_steps == 0) {
-		max_ramp_up_steps = 1;
-	}
+    if (max_ramp_up_steps == 0) {
+      max_ramp_up_steps = 1;
+    }
 #ifdef TEST
-	printf("MAX_RAMP_UP_STEPS=%d from %d ticks\n",max_ramp_up_steps, parameters.min_travel_ticks);
+    printf("MAX_RAMP_UP_STEPS=%d from %d ticks\n", max_ramp_up_steps,
+           parameters.min_travel_ticks);
 #endif
   }
 

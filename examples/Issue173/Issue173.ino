@@ -69,7 +69,7 @@ void setup() {
   }
 
   stepper->move(-1);
-  stepper->move(1-pos);
+  stepper->move(1 - pos);
 
   while (stepper->isRunning()) {
     // wait for stepper to stop

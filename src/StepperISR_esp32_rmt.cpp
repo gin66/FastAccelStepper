@@ -37,15 +37,16 @@ int tp2 = 0;
 //
 // Of these 32 bits, the low 16-bit entry is sent first and the high entry
 // second.
-// Every 16 bit entry defines with MSB the output level and the lower 15 bits the ticks.
+// Every 16 bit entry defines with MSB the output level and the lower 15 bits
+// the ticks.
 #define PART_SIZE 31
 
 void IRAM_ATTR StepperQueue::stop_rmt() {
   // We are stopping the rmt by letting it run into the end at high speed.
   //
   // disable the interrupts
-//  rmt_set_tx_intr_en(channel, false);
-//  rmt_set_tx_thr_intr_en(channel, false, 0);
+  //  rmt_set_tx_intr_en(channel, false);
+  //  rmt_set_tx_thr_intr_en(channel, false, 0);
 
   // stop esp32 rmt, by let it hit the end
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
@@ -71,82 +72,81 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   }
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
-	// no command in queue
+    // no command in queue
     for (uint8_t i = 0; i < PART_SIZE; i++) {
       // make a pause with approx. 1ms
       //    258 ticks * 2 * 31 = 159996 @ 16MHz
       *data++ = 0x01020102;
     }
-	// overwrite end markers
-//    for (uint8_t i = 2 * PART_SIZE; i < 64; i++) {
-//      *data++ = 0x10001234;
-//    }
-//    RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
+    // overwrite end markers
+    //    for (uint8_t i = 2 * PART_SIZE; i < 64; i++) {
+    //      *data++ = 0x10001234;
+    //    }
+    //    RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
     if (!q->_isRunning) {
       // second invocation to stop.
-	  q->stop_rmt();
-//      rmt_tx_stop(q->channel);
-//      rmt_rx_stop(q->channel);
-//      rmt_memory_rw_rst(q->channel);
-//      q->_rmtStopped = true;
+      q->stop_rmt();
+      //      rmt_tx_stop(q->channel);
+      //      rmt_rx_stop(q->channel);
+      //      rmt_memory_rw_rst(q->channel);
+      //      q->_rmtStopped = true;
     }
     q->_isRunning = false;
     return;
-  } 
+  }
   // Process command
-    struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+  struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
 
-			  if (e_curr->toggle_dir) {
-				  // the command requests dir pin toggle
-				  // This is ok only, if the ongoing command does not contain steps
-				  if (q->bufferContainsSteps[fill_part_one ? 1:0]) {
-					  // So we need a pause. change the finished read entry into a pause
-	  q->bufferContainsSteps[fill_part_one ? 0:1] = false;
+  if (e_curr->toggle_dir) {
+    // the command requests dir pin toggle
+    // This is ok only, if the ongoing command does not contain steps
+    if (q->bufferContainsSteps[fill_part_one ? 1 : 0]) {
+      // So we need a pause. change the finished read entry into a pause
+      q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
       for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
         // two pauses à 16 ticks
-        *data++ = 0x00010001 * (MIN_CMD_TICKS/62+1);
+        *data++ = 0x00010001 * (MIN_CMD_TICKS / 62 + 1);
       }
-	  data--;
-    if (!fill_part_one) {
-      // Note: When enabling the continuous transmission mode by setting
-      // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
-      // channel continuously, that is, from the first byte to the last one,
-      // then from the first to the last again, and so on. In this mode, there
-      // will be an idle level lasting one clk_div cycle between N and N+1
-      // transmissions.
-      *data -= 1;
-    }
-					 // done
-					 return;
-				  }
-			  // The dir pin toggle at this place is problematic, but if the last
-			  // command contains only one step, it could work
-			  gpio_num_t dirPin = (gpio_num_t)q->dirPin;
-			  gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
-			}
-
-
-    uint8_t steps = e_curr->steps;
-    uint16_t ticks = e_curr->ticks;
-    if (steps != 0) {
-      //		PROBE_2_TOGGLE;
-    }
-    if (steps == 0) {
-	  q->bufferContainsSteps[fill_part_one ? 0:1] = false;
-      for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
-        // two pauses à 16 ticks
-        *data++ = 0x00100010;
-        ticks -= 32;
+      data--;
+      if (!fill_part_one) {
+        // Note: When enabling the continuous transmission mode by setting
+        // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
+        // channel continuously, that is, from the first byte to the last one,
+        // then from the first to the last again, and so on. In this mode, there
+        // will be an idle level lasting one clk_div cycle between N and N+1
+        // transmissions.
+        *data -= 1;
       }
-      uint16_t ticks_l = ticks >> 1;
-      uint16_t ticks_r = ticks - ticks_l;
-      uint32_t rmt_entry = ticks_l;
-      rmt_entry <<= 16;
-      rmt_entry |= ticks_r;
-      *data = rmt_entry;
-    } else {
-	  q->bufferContainsSteps[fill_part_one ? 0:1] = true;
- 	if (ticks == 0xffff) {
+      // done
+      return;
+    }
+    // The dir pin toggle at this place is problematic, but if the last
+    // command contains only one step, it could work
+    gpio_num_t dirPin = (gpio_num_t)q->dirPin;
+    gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+  }
+
+  uint8_t steps = e_curr->steps;
+  uint16_t ticks = e_curr->ticks;
+  if (steps != 0) {
+    //		PROBE_2_TOGGLE;
+  }
+  if (steps == 0) {
+    q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
+    for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
+      // two pauses à 16 ticks
+      *data++ = 0x00100010;
+      ticks -= 32;
+    }
+    uint16_t ticks_l = ticks >> 1;
+    uint16_t ticks_r = ticks - ticks_l;
+    uint32_t rmt_entry = ticks_l;
+    rmt_entry <<= 16;
+    rmt_entry |= ticks_r;
+    *data = rmt_entry;
+  } else {
+    q->bufferContainsSteps[fill_part_one ? 0 : 1] = true;
+    if (ticks == 0xffff) {
       // special treatment for this case, because an rmt entry can only cover up
       // to 0xfffe ticks every step must be minimum split into two rmt entries,
       // so at max PART/2 steps can be done.
@@ -211,25 +211,25 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       steps -= PART_SIZE;
       data--;
     }
-	}
-    if (!fill_part_one) {
-      // Note: When enabling the continuous transmission mode by setting
-      // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
-      // channel continuously, that is, from the first byte to the last one,
-      // then from the first to the last again, and so on. In this mode, there
-      // will be an idle level lasting one clk_div cycle between N and N+1
-      // transmissions.
-      *data -= 1;
+  }
+  if (!fill_part_one) {
+    // Note: When enabling the continuous transmission mode by setting
+    // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
+    // channel continuously, that is, from the first byte to the last one,
+    // then from the first to the last again, and so on. In this mode, there
+    // will be an idle level lasting one clk_div cycle between N and N+1
+    // transmissions.
+    *data -= 1;
+  }
+  if (steps == 0) {
+    // The command has been completed
+    if (e_curr->repeat_entry == 0) {
+      rp++;
     }
-    if (steps == 0) {
-      // The command has been completed
-      if (e_curr->repeat_entry == 0) {
-        rp++;
-		  }
-		  q->read_idx = rp;
-    } else {
-      e_curr->steps = steps;
-    }
+    q->read_idx = rp;
+  } else {
+    e_curr->steps = steps;
+  }
 }
 
 #ifndef RMT_CHANNEL_MEM
@@ -242,11 +242,11 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 
 #define PROCESS_CHANNEL(ch)                                                    \
   if (mask & RMT_CH##ch##_TX_END_INT_ST) {                                     \
-	  PROBE_1_TOGGLE;\
+    PROBE_1_TOGGLE;                                                            \
     apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], false, FAS_RMT_MEM(ch)); \
   }                                                                            \
   if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {                               \
-	  PROBE_1_TOGGLE;\
+    PROBE_1_TOGGLE;                                                            \
     apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], true, FAS_RMT_MEM(ch));  \
     /* now repeat the interrupt at buffer size + end marker */                 \
     RMT.tx_lim_ch[ch].RMT_LIMIT = PART_SIZE * 2 + 1;                           \
@@ -342,10 +342,10 @@ void StepperQueue::startQueue_rmt() {
   rmt_memory_rw_rst(channel);
   uint32_t *mem = FAS_RMT_MEM(channel);
   // Fill the buffer with a significant pattern for debugging
-   for (uint8_t i = 0; i < 64; i += 2) {
-     mem[i + 0] = 0x0fff8fff;
-     mem[i + 1] = 0x7fff8fff;
-   }
+  for (uint8_t i = 0; i < 64; i += 2) {
+    mem[i + 0] = 0x0fff8fff;
+    mem[i + 1] = 0x7fff8fff;
+  }
   mem[2 * PART_SIZE] = 0;
   _isRunning = true;
   _lastEntryWithCommand = false;
@@ -360,13 +360,13 @@ void StepperQueue::startQueue_rmt() {
   // set dirpin toggle here
   uint8_t rp = read_idx;
   if (rp == next_write_idx) {
-	  // nothing to do ?
-	  // Should not happen, so bail
-	  return;
+    // nothing to do ?
+    // Should not happen, so bail
+    return;
   }
   if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
-	  gpio_set_level((gpio_num_t)dirPin, gpio_get_level((gpio_num_t)dirPin) ^ 1);
-	  entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
+    gpio_set_level((gpio_num_t)dirPin, gpio_get_level((gpio_num_t)dirPin) ^ 1);
+    entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
   bufferContainsSteps[1] = true;

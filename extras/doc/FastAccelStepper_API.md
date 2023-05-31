@@ -146,9 +146,8 @@ The defined ramp states are:
 #define RAMP_STATE_IDLE 0
 #define RAMP_STATE_COAST 1
 #define RAMP_STATE_ACCELERATE 2
-#define RAMP_STATE_DECELERATE_TO_STOP 4
-#define RAMP_STATE_DECELERATE (4 + 8)
-#define RAMP_STATE_REVERSE (4 + 16)
+#define RAMP_STATE_DECELERATE 4
+#define RAMP_STATE_REVERSE (4 + 8)
 #define RAMP_STATE_ACCELERATING_FLAG 2
 #define RAMP_STATE_DECELERATING_FLAG 4
 ```
@@ -252,6 +251,11 @@ ms jitter.
 ```
 ## Stepper Position
 Retrieve the current position of the stepper
+
+Comment for esp32 with rmt module:
+The actual position may be off by the number of steps in the ongoing
+command. If precise real time position is needed, attaching a pulse counter
+may be of help.
 ```cpp
   int32_t getCurrentPosition();
 ```

@@ -443,7 +443,7 @@ void FastAccelStepper::fill_queue() {
       } else {
 #ifdef SIM_TEST_INPUT
         Serial.println("Abort ramp due to queue error res=");
-		Serial.print(res);
+        Serial.print(res);
         Serial.print(" Steps=");
         Serial.print(cmd.command.steps);
         Serial.print(" ticks=");

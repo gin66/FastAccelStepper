@@ -55,13 +55,19 @@ void RampGenerator::_startMove(bool position_changed) {
   }
 
 #ifdef TEST
-  printf("Ramp data: go to %s %d  curr_ticks = %u travel_ticks = %u prus=%u\n", _parameters.move_absolute ? "ABS":"REL", _parameters.move_value,
-         _rw.curr_ticks, _ro.config.parameters.min_travel_ticks, _rw.performed_ramp_up_steps);
+  printf("Ramp data: go to %s %d  curr_ticks = %u travel_ticks = %u prus=%u\n",
+         _parameters.move_absolute ? "ABS" : "REL", _parameters.move_value,
+         _rw.curr_ticks, _ro.config.parameters.min_travel_ticks,
+         _rw.performed_ramp_up_steps);
 #endif
 #ifdef DEBUG
   char buf[256];
-  sprintf(buf, "Ramp data: go to = %s %ld  curr_ticks = %lu travel_ticks = %lu prus=%lu\n",
-          _parameters.move_absolute ? "ABS":"REL", _parameters.move_value, _rw.curr_ticks, _ro.config.parameters.min_travel_ticks, _rw.performed_ramp_up_steps);
+  sprintf(buf,
+          "Ramp data: go to = %s %ld  curr_ticks = %lu travel_ticks = %lu "
+          "prus=%lu\n",
+          _parameters.move_absolute ? "ABS" : "REL", _parameters.move_value,
+          _rw.curr_ticks, _ro.config.parameters.min_travel_ticks,
+          _rw.performed_ramp_up_steps);
   Serial.println(buf);
 #endif
 }
@@ -118,22 +124,21 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     _ro.config.parameters = _parameters;
     _parameters.apply = false;
     _parameters.any_change = false;
-	_parameters.move_value = 0;
-	_parameters.move_absolute = false;
+    _parameters.move_value = 0;
+    _parameters.move_absolute = false;
     _parameters.recalc_ramp_steps = false;
     _ro.config.update();
-	// if new move command,then reset any immediate stop flag
-	if (_ro.isImmediateStopInitiated()) {
-		if (_ro.config.parameters.move_absolute) {
-			if (_ro.target_pos != (uint32_t)_ro.config.parameters.move_value) {
-				_ro.clearImmediateStop();
-			}
-		}
-		else if (_ro.config.parameters.move_value != 0) {
-			_ro.clearImmediateStop();
-		}
-	  }
-	}
+    // if new move command,then reset any immediate stop flag
+    if (_ro.isImmediateStopInitiated()) {
+      if (_ro.config.parameters.move_absolute) {
+        if (_ro.target_pos != (uint32_t)_ro.config.parameters.move_value) {
+          _ro.clearImmediateStop();
+        }
+      } else if (_ro.config.parameters.move_value != 0) {
+        _ro.clearImmediateStop();
+      }
+    }
+  }
 
   fasDisableInterrupts();
   struct queue_end_s qe = *queue_end;
@@ -141,59 +146,55 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 
   uint32_t curr_ticks = _rw.curr_ticks;
   if (curr_ticks == TICKS_FOR_STOPPED_MOTOR) {
-	  // just started
-      uint32_t s_jump = _ro.config.parameters.s_jump;
-	  if (s_jump != 0) {
-		  uint32_t ticks = _ro.config.calculate_ticks(s_jump);
-		  if (ticks < _ro.config.parameters.min_travel_ticks) {
-			  s_jump = _ro.config.calculate_ramp_steps(_ro.config.parameters.min_travel_ticks);
-		  }
-	  }
-      _rw.performed_ramp_up_steps = s_jump;
-	  _ro.config.parameters.recalc_ramp_steps = false;
-	}
+    // just started
+    uint32_t s_jump = _ro.config.parameters.s_jump;
+    if (s_jump != 0) {
+      uint32_t ticks = _ro.config.calculate_ticks(s_jump);
+      if (ticks < _ro.config.parameters.min_travel_ticks) {
+        s_jump = _ro.config.calculate_ramp_steps(
+            _ro.config.parameters.min_travel_ticks);
+      }
+    }
+    _rw.performed_ramp_up_steps = s_jump;
+    _ro.config.parameters.recalc_ramp_steps = false;
+  }
 
   // If the acceleration has changed, recalculate the ramp up/down steps,
   // which is the equivalent to the current speed.
   // Even if the acceleration value is constant, the calculated value
   // can deviate due to precision or clipping effect
   if (_ro.config.parameters.recalc_ramp_steps) {
-      uint32_t performed_ramp_up_steps = _ro.config.calculate_ramp_steps(curr_ticks);
+    uint32_t performed_ramp_up_steps =
+        _ro.config.calculate_ramp_steps(curr_ticks);
 #ifdef TEST
-      printf(
-          "Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
-          _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
+    printf("Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
+           _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
 #endif
-	  _rw.performed_ramp_up_steps = performed_ramp_up_steps;
+    _rw.performed_ramp_up_steps = performed_ramp_up_steps;
   }
 
   if (_ro.force_stop) {
-	_ro.config.parameters.keep_running = false;
-	uint32_t target_pos = qe.pos;
-	if (qe.count_up) {
-		target_pos += _rw.performed_ramp_up_steps;
-	}
-	else {
-		target_pos -= _rw.performed_ramp_up_steps;
-	}
+    _ro.config.parameters.keep_running = false;
+    uint32_t target_pos = qe.pos;
+    if (qe.count_up) {
+      target_pos += _rw.performed_ramp_up_steps;
+    } else {
+      target_pos -= _rw.performed_ramp_up_steps;
+    }
 #ifdef TEST
-      printf(
-          "Force stop: adjust target position from %d to %d\n",
-          _ro.target_pos, target_pos);
+    printf("Force stop: adjust target position from %d to %d\n", _ro.target_pos,
+           target_pos);
 #endif
-	_ro.target_pos = target_pos;
-  }
-  else if (_ro.config.parameters.any_change) {
-	  // calculate new target position
-	  _ro.config.parameters.any_change = false;
-	  if (_ro.config.parameters.keep_running) {
-	  }
-	  else if (_ro.config.parameters.move_absolute) {
-		  _ro.target_pos = _ro.config.parameters.move_value;
-	  }
-	  else {
-		 _ro.target_pos = _ro.target_pos + _ro.config.parameters.move_value;
-	  }
+    _ro.target_pos = target_pos;
+  } else if (_ro.config.parameters.any_change) {
+    // calculate new target position
+    _ro.config.parameters.any_change = false;
+    if (_ro.config.parameters.keep_running) {
+    } else if (_ro.config.parameters.move_absolute) {
+      _ro.target_pos = _ro.config.parameters.move_value;
+    } else {
+      _ro.target_pos = _ro.target_pos + _ro.config.parameters.move_value;
+    }
   }
 
   _ro.force_stop = false;
@@ -205,7 +206,7 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     // no more commands
     command->command.ticks = 0;
     _ro.clearImmediateStop();
-	_ro.target_pos = qe.pos;
+    _ro.target_pos = qe.pos;
     command->rw.stopRamp();
     return;
   }

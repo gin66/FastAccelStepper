@@ -31,7 +31,7 @@ class FastAccelStepperTest {
   }
 
   void with_empty_queue() {
-	printf("Test with empty queue\n");
+    printf("Test with empty queue\n");
     init_queue();
     FastAccelStepper s = FastAccelStepper();
     s.init(NULL, 0, 0);
@@ -139,14 +139,14 @@ class FastAccelStepperTest {
       assert((i == 0) || (old_planned_time_in_buffer > 0.005));
       old_planned_time_in_buffer = planned_time;
     }
-	// Empty the queue 
-      while (!s.isQueueEmpty()) {
-        rc.check_section(
-            &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
-        fas_queue[0].read_idx++;
-        fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
-                16000000.0 / rc.last_dt, rc.last_dt);
-      }
+    // Empty the queue
+    while (!s.isQueueEmpty()) {
+      rc.check_section(
+          &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+      fas_queue[0].read_idx++;
+      fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
+              16000000.0 / rc.last_dt, rc.last_dt);
+    }
     fprintf(gp_file, "EOF\n");
     fprintf(gp_file, "plot $data using 1:2 with linespoints\n");
     fprintf(gp_file, "pause -1\n");

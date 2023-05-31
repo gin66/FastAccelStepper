@@ -15,9 +15,7 @@ struct ramp_ro_s {
     force_immediate_stop = false;
   }
   inline int32_t targetPosition() { return target_pos; }
-  inline void setTargetPosition(int32_t pos) {
-    target_pos = pos;
-  }
+  inline void setTargetPosition(int32_t pos) { target_pos = pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
     target_pos += delta;
   }
@@ -47,7 +45,7 @@ struct ramp_rw_s {
     ramp_state = RAMP_STATE_IDLE;
     curr_ticks = TICKS_FOR_STOPPED_MOTOR;
 #ifdef TEST
-	printf("stopRamp() called\n");
+    printf("stopRamp() called\n");
 #endif
   }
   inline void init() { stopRamp(); }
@@ -57,13 +55,13 @@ struct ramp_rw_s {
   }
   inline void startRampIfNotRunning(uint32_t s_jump) {
 #ifdef TEST
-	printf("startRampIfNotRunning(%d) called\n", s_jump);
+    printf("startRampIfNotRunning(%d) called\n", s_jump);
 #endif
     // called with interrupts disabled
     if (ramp_state == RAMP_STATE_IDLE) {
       curr_ticks = TICKS_FOR_STOPPED_MOTOR;
-	  // ramp_state value is significant to start the ramp generator.
-	  // so initialize curr_ticks before
+      // ramp_state value is significant to start the ramp generator.
+      // so initialize curr_ticks before
       ramp_state = RAMP_STATE_ACCELERATE;
     }
   }

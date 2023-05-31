@@ -62,7 +62,7 @@ void setup() {
 
   // As per issue 172, the stepper will run towards 10000, but expectation is ~0
   stepper->move(-1);
-  stepper->move(1-target_pos);
+  stepper->move(1 - target_pos);
 
   while ((stepper->rampState() & RAMP_STATE_MASK) != RAMP_STATE_ACCELERATE) {
     // wait for acceleration to start
@@ -72,8 +72,9 @@ void setup() {
     // wait for stepper to stop
   }
 
-  // lets print the position after the move(), so that the ramp generator can not add more
-  // commands to the queue after getPositionAfterCommandsCompleted()
+  // lets print the position after the move(), so that the ramp generator can
+  // not add more commands to the queue after
+  // getPositionAfterCommandsCompleted()
   Serial.print("target position after stopMove() processed ");
   Serial.println(target_pos);
   Serial.print("stop at and move back ");

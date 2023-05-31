@@ -435,18 +435,17 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       printf("prus=%d steps=%d max_prus=%d\n", performed_ramp_up_steps, steps,
              max_ramp_up_steps);
 #endif
-	  if (performed_ramp_up_steps > max_ramp_up_steps) {
-		// Speed is too high, which is ok while decelerating
-		// So need to run down the ramp
-		uint32_t steps_to_max = performed_ramp_up_steps - max_ramp_up_steps;
-		if (steps < steps_to_max) {
-			steps = steps_to_max;
-		}
-		performed_ramp_up_steps -= steps;
-	  }
-	  else if ((performed_ramp_up_steps >= max_ramp_up_steps)
-          && (max_ramp_up_steps + steps <= remaining_steps)
-          && (performed_ramp_up_steps - steps < max_ramp_up_steps)) {
+      if (performed_ramp_up_steps > max_ramp_up_steps) {
+        // Speed is too high, which is ok while decelerating
+        // So need to run down the ramp
+        uint32_t steps_to_max = performed_ramp_up_steps - max_ramp_up_steps;
+        if (steps < steps_to_max) {
+          steps = steps_to_max;
+        }
+        performed_ramp_up_steps -= steps;
+      } else if ((performed_ramp_up_steps >= max_ramp_up_steps) &&
+                 (max_ramp_up_steps + steps <= remaining_steps) &&
+                 (performed_ramp_up_steps - steps < max_ramp_up_steps)) {
         // Speed was too high. So we need to ensure to not overshoot
         // deceleration
         performed_ramp_up_steps = max_ramp_up_steps;
@@ -455,20 +454,20 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         printf("clipped prus=%d\n", performed_ramp_up_steps);
 #endif
       } else {
-		if (remaining_steps > performed_ramp_up_steps)  {
-			if (remaining_steps - performed_ramp_up_steps < steps) {
-				performed_ramp_up_steps = remaining_steps - steps;
+        if (remaining_steps > performed_ramp_up_steps) {
+          if (remaining_steps - performed_ramp_up_steps < steps) {
+            performed_ramp_up_steps = remaining_steps - steps;
 #ifdef TEST
-				printf("set prus to remaining steps %d minus %d steps\n", remaining_steps, steps);
+            printf("set prus to remaining steps %d minus %d steps\n",
+                   remaining_steps, steps);
 #endif
-			}
-		}
-		else {
-			performed_ramp_up_steps -= steps;
+          }
+        } else {
+          performed_ramp_up_steps -= steps;
 #ifdef TEST
-		    printf("reduce prus by %d steps\n", steps);
+          printf("reduce prus by %d steps\n", steps);
 #endif
-		}
+        }
       }
     }
   }
@@ -500,8 +499,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
       "add command Steps=%u ticks=%u  Target pos=%u "
       "Remaining steps=%u, planning_steps=%u, "
       "d_ticks_new=%u, pause_left=%u\n",
-      steps, next_ticks, ramp->target_pos, remaining_steps,
-      planning_steps, d_ticks_new, pause_ticks_left);
+      steps, next_ticks, ramp->target_pos, remaining_steps, planning_steps,
+      d_ticks_new, pause_ticks_left);
   if ((this_state & RAMP_STATE_MASK) == RAMP_STATE_ACCELERATE) {
     assert(pause_ticks_left + next_ticks >=
            ramp->config.parameters.min_travel_ticks);

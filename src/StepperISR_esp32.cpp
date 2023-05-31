@@ -158,8 +158,8 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
                                  int16_t low_value, int16_t high_value) {
   // TODO: Check if free pulse counter
   if (pcnt_unit >= PCNT_MODULE_CNT) {
-	  // fail
-	  return false;
+    // fail
+    return false;
   }
   pcnt_config_t cfg;
   uint8_t dir_pin = stepper->getDirectionPin();

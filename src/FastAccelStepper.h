@@ -178,7 +178,7 @@ class FastAccelStepperEngine {
 #define RAMP_STATE_COAST 1
 #define RAMP_STATE_ACCELERATE 2
 #define RAMP_STATE_DECELERATE 4
-#define RAMP_STATE_REVERSE (4+8) 
+#define RAMP_STATE_REVERSE (4 + 8)
 #define RAMP_STATE_ACCELERATING_FLAG 2
 #define RAMP_STATE_DECELERATING_FLAG 4
 
@@ -297,8 +297,9 @@ class FastAccelStepper {
   // Retrieve the current position of the stepper
   //
   // Comment for esp32 with rmt module:
-  // The actual position may be off by the number of steps in the ongoing command.
-  // If precise real time position is needed, attaching a pulse counter may be of help.
+  // The actual position may be off by the number of steps in the ongoing
+  // command. If precise real time position is needed, attaching a pulse counter
+  // may be of help.
   int32_t getCurrentPosition();
 
   // Set the current position of the stepper - either in standstill or while
