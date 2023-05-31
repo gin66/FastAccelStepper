@@ -43,7 +43,7 @@ void setup() {
   // DRIVER_MCPWM_PCNT
   // DRIVER_RMT
 
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   stepper = engine.stepperConnectToPin(stepPinStepper, DRIVER_RMT);
   // stepper = engine.stepperConnectToPin(stepPinStepper);
 #else
