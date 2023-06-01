@@ -890,7 +890,8 @@ bool FastAccelStepper::isQueueRunning() {
   return fas_queue[_queue_num].isRunning();
 }
 bool FastAccelStepper::isRunning() {
-  return fas_queue[_queue_num].isRunning() || _rg.isRampGeneratorActive();
+  StepperQueue* q = &fas_queue[_queue_num];
+  return q->isRunning() || _rg.isRampGeneratorActive() || !isQueueEmpty();
 }
 void FastAccelStepper::performOneStep(bool count_up, bool blocking) {
   if (!isRunning()) {
