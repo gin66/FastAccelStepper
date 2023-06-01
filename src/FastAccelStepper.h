@@ -206,8 +206,8 @@ class FastAccelStepperEngine {
 // |VARIABLE         | Value       | Unit                    |
 // |:----------------|------------:|:------------------------|
 // |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
-// |MIN_CMD_TICKS    | 8000        | [1/TICKS_PER_S seconds] |
-// |MIN_DIR_DELAY_US |  500        | [µs]                    |
+// |MIN_CMD_TICKS    | 3200        | [1/TICKS_PER_S seconds] |
+// |MIN_DIR_DELAY_US |  200        | [µs]                    |
 // |MAX_DIR_DELAY_US | 4095        | [µs]                    |
 //
 // ### SAM DUE

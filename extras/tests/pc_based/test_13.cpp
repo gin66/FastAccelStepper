@@ -114,7 +114,9 @@ class FastAccelStepperTest {
 int main() {
   FastAccelStepperTest test;
   for (uint16_t s = 1;s <= 255;s++) {
+	printf("test with steps s=%d\n", s);
 	test.ramp(INT32_MAX, 50, s, false);
+	puts("");
   }
   printf("TEST_13 PASSED\n");
   return 0;

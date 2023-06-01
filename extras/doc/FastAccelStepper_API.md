@@ -156,6 +156,8 @@ And the two directions of a move
 #define RAMP_DIRECTION_COUNT_UP 32
 #define RAMP_DIRECTION_COUNT_DOWN 64
 ```
+A ramp state value of 2 is set after any move call on a stopped motor
+and until the stepper task. The stepper task will then control the direction flags
 
 ## Timing values - Architecture dependent
 
@@ -171,8 +173,8 @@ And the two directions of a move
 |VARIABLE         | Value       | Unit                    |
 |:----------------|------------:|:------------------------|
 |TICKS_PER_S      | 16_000_000  | [ticks/s]               |
-|MIN_CMD_TICKS    | 8000        | [1/TICKS_PER_S seconds] |
-|MIN_DIR_DELAY_US |  500        | [µs]                    |
+|MIN_CMD_TICKS    | 3200        | [1/TICKS_PER_S seconds] |
+|MIN_DIR_DELAY_US |  200        | [µs]                    |
 |MAX_DIR_DELAY_US | 4095        | [µs]                    |
 
 ### SAM DUE
