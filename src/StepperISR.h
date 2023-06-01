@@ -76,7 +76,6 @@ class StepperQueue {
 #endif
 #ifdef SUPPORT_ESP32_RMT
   rmt_channel_t channel;
-  bool _lastEntryWithCommand;
   bool _rmtStopped;
   bool bufferContainsSteps[2];
 #endif

@@ -333,7 +333,6 @@ void StepperQueue::startQueue_rmt() {
   }
   mem[2 * PART_SIZE] = 0;
   _isRunning = true;
-  _lastEntryWithCommand = false;
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, 0);
   RMT.apb_conf.mem_tx_wrap_en = 0;
