@@ -92,15 +92,28 @@ void loop() {
     Serial.print(stepper->rampState());
     Serial.print(' ');
     int res = stepper->moveTo(0);
+    if (!stepper->isRunning()) {
+      Serial.println();
+      Serial.println("stepper is not running !!!");
+    }
     if (res != MOVE_OK) {
       Serial.println();
       Serial.print("Error return from move: ");
       Serial.println(res);
     }
-    delay(10);
     while (stepper->isRunning()) {
     }
+    int32_t pos = stepper->getCurrentPosition();
     delay(10);
+    int32_t pos2 = stepper->getCurrentPosition();
+    if (pos != pos2) {
+		Serial.println();
+	   Serial.print("stepper position changed after isRunning() loop: ");
+       Serial.print(pos);
+       Serial.print(' ');
+       Serial.println(pos2);
+    }
+    //delay(10);
       Serial.print(stepper->rampState());
       Serial.print(':');
       Serial.print(stepper->getPositionAfterCommandsCompleted());
