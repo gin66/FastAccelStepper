@@ -88,15 +88,15 @@ class FastAccelStepperTest {
       assert((i == 0) || (old_planned_time_in_buffer > 0.005));
       old_planned_time_in_buffer = planned_time;
     }
-      while (!s.isQueueEmpty()) {
-        rc.increase_ok = true;
-        rc.decrease_ok = true;
-        rc.check_section(
-            &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
-        fas_queue[0].read_idx++;
-          fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
-                  16000000.0 / rc.last_dt, rc.last_dt);
-      }
+    while (!s.isQueueEmpty()) {
+      rc.increase_ok = true;
+      rc.decrease_ok = true;
+      rc.check_section(
+          &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+      fas_queue[0].read_idx++;
+      fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
+              16000000.0 / rc.last_dt, rc.last_dt);
+    }
     fprintf(gp_file, "EOF\n");
     fprintf(gp_file, "plot $data using 1:2 with linespoints\n");
     fprintf(gp_file, "pause -1\n");
@@ -113,10 +113,10 @@ class FastAccelStepperTest {
 };
 int main() {
   FastAccelStepperTest test;
-  for (uint16_t s = 1;s <= 255;s++) {
-	printf("test with steps s=%d\n", s);
-	test.ramp(INT32_MAX, 50, s, false);
-	puts("");
+  for (uint16_t s = 1; s <= 255; s++) {
+    printf("test with steps s=%d\n", s);
+    test.ramp(INT32_MAX, 50, s, false);
+    puts("");
   }
   printf("TEST_13 PASSED\n");
   return 0;

@@ -344,46 +344,47 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
   if (d_ticks_new < MIN_CMD_TICKS) {
     uint32_t cmd_ticks = d_ticks_new * planning_steps;
     if (cmd_ticks < MIN_CMD_TICKS) {
-	  // using planning_steps and d_ticks_new would create invalid commands
+      // using planning_steps and d_ticks_new would create invalid commands
 
-	  uint16_t steps = MIN_CMD_TICKS + d_ticks_new - 1;
-	  steps /= ((uint16_t)d_ticks_new);
+      uint16_t steps = MIN_CMD_TICKS + d_ticks_new - 1;
+      steps /= ((uint16_t)d_ticks_new);
 #ifdef TEST
-	  printf("new steps=%d d_ticks_new=%d\n", steps, d_ticks_new);
+      printf("new steps=%d d_ticks_new=%d\n", steps, d_ticks_new);
 #endif
-	  if (steps >= remaining_steps) {
+      if (steps >= remaining_steps) {
 #ifdef TEST
-		  printf("command time too low, with increased steps will reach ramp end\n");
+        printf(
+            "command time too low, with increased steps will reach ramp end\n");
 #endif
-		  planning_steps = remaining_steps;
-		  this_state = RAMP_STATE_DECELERATE;
-	  }
+        planning_steps = remaining_steps;
+        this_state = RAMP_STATE_DECELERATE;
+      }
 
-	  // if we are at ramp end, then reduce speed
-	  steps = fas_max(planning_steps, steps);
-	  if (2*steps >= remaining_steps) {
-		  d_ticks_new = MIN_CMD_TICKS + remaining_steps - 1;
-		  d_ticks_new /= remaining_steps;
-		  planning_steps = remaining_steps;
-		  this_state = RAMP_STATE_DECELERATE;
+      // if we are at ramp end, then reduce speed
+      steps = fas_max(planning_steps, steps);
+      if (2 * steps >= remaining_steps) {
+        d_ticks_new = MIN_CMD_TICKS + remaining_steps - 1;
+        d_ticks_new /= remaining_steps;
+        planning_steps = remaining_steps;
+        this_state = RAMP_STATE_DECELERATE;
 #ifdef TEST
-		  printf("command time too low, so reduce speed to %d ticks\n", d_ticks_new);
+        printf("command time too low, so reduce speed to %d ticks\n",
+               d_ticks_new);
 #endif
-	  }
-	  else {
+      } else {
 #ifdef TEST
-		  printf("Increase planning steps %d => %d due to command time\n", planning_steps,
-				 steps);
+        printf("Increase planning steps %d => %d due to command time\n",
+               planning_steps, steps);
 #endif
-		  planning_steps = steps;
+        planning_steps = steps;
 
-		  // do we need to decelerate in order to not overshoot ?
-		  if (remaining_steps < performed_ramp_up_steps + planning_steps) {
-			this_state = RAMP_STATE_DECELERATE;
+        // do we need to decelerate in order to not overshoot ?
+        if (remaining_steps < performed_ramp_up_steps + planning_steps) {
+          this_state = RAMP_STATE_DECELERATE;
 
-			// and now the speed is actually too high....
-		  }
-	  }
+          // and now the speed is actually too high....
+        }
+      }
     }
   }
 

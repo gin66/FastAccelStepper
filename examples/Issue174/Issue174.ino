@@ -36,7 +36,7 @@ void setup() {
 
   // FastAccelStepper setup
   engine.init();
-//  engine.setDebugLed(1); // will disable communication
+  //  engine.setDebugLed(1); // will disable communication
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   stepper = engine.stepperConnectToPin(stepPinStepper, DRIVER_RMT);
@@ -89,14 +89,14 @@ void loop() {
     Serial.print("Return to 0 from ");
     Serial.println(stepper->getCurrentPosition());
     Serial.print("ramp state = ");
-  Serial.println(stepper->rampState());
+    Serial.println(stepper->rampState());
     stepper->moveTo(0);
-    while(stepper->isRunning()) {
-       Serial.print(stepper->rampState());
-       Serial.print(' ');
-       Serial.print(stepper->getPositionAfterCommandsCompleted());
-       Serial.print(' ');
-       delay(10);
+    while (stepper->isRunning()) {
+      Serial.print(stepper->rampState());
+      Serial.print(' ');
+      Serial.print(stepper->getPositionAfterCommandsCompleted());
+      Serial.print(' ');
+      delay(10);
     }
     int16_t pcnt = stepper->readPulseCounter();
     if (pcnt == 0) {
