@@ -38,3 +38,6 @@ Tests;
 
 - test 12
   ramp up with 1 step/s^2 to 1000us/step
+
+- test 13
+  tests with maximum high acceleration

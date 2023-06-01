@@ -186,6 +186,9 @@ class FastAccelStepperEngine {
 #define RAMP_DIRECTION_COUNT_UP 32
 #define RAMP_DIRECTION_COUNT_DOWN 64
 
+// A ramp state value of 2 is set after any move call on a stopped motor
+// and until the stepper task. The stepper task will then control the direction flags
+
 #include "RampGenerator.h"
 
 //
