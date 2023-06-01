@@ -46,20 +46,21 @@ void IRAM_ATTR StepperQueue::stop_rmt() {
   //
   // disable the interrupts
   //  rmt_set_tx_intr_en(channel, false);
-  //  rmt_set_tx_thr_intr_en(channel, false, 0);
+  //  FUNNY: disabling this generates a lot of step loss, which is not plausible
+  //rmt_set_tx_thr_intr_en(channel, false, 0);
 
   // stop esp32 rmt, by let it hit the end
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
 
   // replace buffer with only pauses, coming from end
   uint32_t *data = FAS_RMT_MEM(channel);
-  data = &data[63];
-  for (uint8_t i = 0; i < 64; i++) {
+  data = &data[2*PART_SIZE-1];
+  for (uint8_t i = 0; i < 2*PART_SIZE; i++) {
     *data-- = 0x00010001;
   }
 
   // the queue is not running anymore
-  _isRunning = false;
+  //_isRunning = false;
 
   // as the rmt is not running anymore, mark it as stopped
   _rmtStopped = true;
@@ -243,13 +244,24 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 #define PROCESS_CHANNEL(ch)                                                    \
   if (mask & RMT_CH##ch##_TX_END_INT_ST) {                                     \
     PROBE_1_TOGGLE;                                                            \
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], false, FAS_RMT_MEM(ch)); \
+    StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch];                      \
+	if (q->_rmtStopped) {                                                      \
+	   rmt_set_tx_intr_en(q->channel, false); \
+		rmt_set_tx_thr_intr_en(q->channel, false, 0); \
+	   q->_isRunning = false; \
+	}                                                                          \
+	else {                                                                     \
+       apply_command(q, false, FAS_RMT_MEM(ch));                               \
+	}                                                                          \
   }                                                                            \
   if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {                               \
     PROBE_1_TOGGLE;                                                            \
+    StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch];                      \
+	if (!q->_rmtStopped) {                                                      \
     apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], true, FAS_RMT_MEM(ch));  \
     /* now repeat the interrupt at buffer size + end marker */                 \
     RMT.tx_lim_ch[ch].RMT_LIMIT = PART_SIZE * 2 + 1;                           \
+	}                                                                          \
   }
 
 static void IRAM_ATTR tx_intr_handler(void *arg) {
