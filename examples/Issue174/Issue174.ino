@@ -88,17 +88,23 @@ void loop() {
   if ((loopCnt % 1000) == 0) {
     Serial.print("Return to 0 from ");
     Serial.print(stepper->getCurrentPosition());
-    Serial.print(" ramp state = ");
+    Serial.print(" ramp state=");
     Serial.print(stepper->rampState());
     Serial.print(' ');
-    stepper->moveTo(0);
+    int res = stepper->moveTo(0);
+    if (res != MOVE_OK) {
+      Serial.println();
+      Serial.print("Error return from move: ");
+      Serial.println(res);
+    }
+    delay(10);
     while (stepper->isRunning()) {
+    }
+    delay(10);
       Serial.print(stepper->rampState());
       Serial.print(':');
       Serial.print(stepper->getPositionAfterCommandsCompleted());
       Serial.print(' ');
-      delay(10);
-    }
     int16_t pcnt = stepper->readPulseCounter();
     if (pcnt == 0) {
       Serial.print("=> OK");

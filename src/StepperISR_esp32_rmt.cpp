@@ -52,15 +52,13 @@ void IRAM_ATTR StepperQueue::stop_rmt() {
   // stop esp32 rmt, by let it hit the end
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
 
-  // replace buffer with only pauses, coming from end
+  // replace buffer with only pauses
   uint32_t *data = FAS_RMT_MEM(channel);
-  data = &data[2*PART_SIZE-1];
-  for (uint8_t i = 0; i < 2*PART_SIZE; i++) {
-    *data-- = 0x00010001;
+  data = &data[PART_SIZE];
+  for (uint8_t i = 0; i < PART_SIZE; i++) {
+    *data++ = 0x00010001;
   }
-
-  // the queue is not running anymore
-  //_isRunning = false;
+  *data = 0;
 
   // as the rmt is not running anymore, mark it as stopped
   _rmtStopped = true;
@@ -74,25 +72,17 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
     // no command in queue
-    for (uint8_t i = 0; i < PART_SIZE; i++) {
-      // make a pause with approx. 1ms
-      //    258 ticks * 2 * 31 = 159996 @ 16MHz
-      *data++ = 0x01020102;
-    }
-    // overwrite end markers
-    //    for (uint8_t i = 2 * PART_SIZE; i < 64; i++) {
-    //      *data++ = 0x10001234;
-    //    }
-    //    RMT.conf_ch[q->channel].conf1.tx_conti_mode = 0;
-    if (!q->_isRunning) {
-      // second invocation to stop.
-      q->stop_rmt();
-      //      rmt_tx_stop(q->channel);
-      //      rmt_rx_stop(q->channel);
-      //      rmt_memory_rw_rst(q->channel);
-      //      q->_rmtStopped = true;
-    }
-    q->_isRunning = false;
+	if (fill_part_one) {
+        q->bufferContainsSteps[0] = false;
+		for (uint8_t i = 0; i < PART_SIZE; i++) {
+		  // make a pause with approx. 1ms
+		  //    258 ticks * 2 * 31 = 15996 @ 16MHz
+		  *data++ = 0x01020102;
+		}
+	}
+	else {
+	  q->stop_rmt();
+	}
     return;
   }
   // Process command
@@ -104,25 +94,13 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     if (q->bufferContainsSteps[fill_part_one ? 1 : 0]) {
       // So we need a pause. change the finished read entry into a pause
       q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
-      for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
+      for (uint8_t i = 0; i < PART_SIZE; i++) {
         // two pauses à 16 ticks
         *data++ = 0x00010001 * (MIN_CMD_TICKS / 62 + 1);
       }
-      data--;
-      if (!fill_part_one) {
-        // Note: When enabling the continuous transmission mode by setting
-        // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
-        // channel continuously, that is, from the first byte to the last one,
-        // then from the first to the last again, and so on. In this mode, there
-        // will be an idle level lasting one clk_div cycle between N and N+1
-        // transmissions.
-        *data -= 1;
-      }
-      // done
       return;
     }
-    // The dir pin toggle at this place is problematic, but if the last
-    // command contains only one step, it could work
+	// The ongoing command does not contain steps, so change dir here should be ok
     gpio_num_t dirPin = (gpio_num_t)q->dirPin;
     gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
   }
@@ -135,9 +113,9 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   if (steps == 0) {
     q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
     for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
-      // two pauses à 16 ticks
-      *data++ = 0x00100010;
-      ticks -= 32;
+      // two pauses à 2 ticks
+      *data++ = 0x00010001;
+      ticks -= 2;
     }
     uint16_t ticks_l = ticks >> 1;
     uint16_t ticks_r = ticks - ticks_l;
@@ -158,14 +136,14 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
           *data++ = 0x20002000;
         }
         *data++ = 0x40017fff | 0x8000;
-        uint32_t remaining = 0x20002000;
+		uint16_t delta = PART_SIZE - 2*steps;
+		delta <<= 5;
+		*data++ = 0x20002000 - delta;
         // 2*(steps - 1) + 1 already stored => 2*steps - 1
         // and after this for loop one entry added => 2*steps
-        for (uint8_t i = 2 * steps; i < PART_SIZE; i++) {
-          *data++ = 0x01000100;
-          remaining -= 0x01000100;
+        for (uint8_t i = 2*steps; i < PART_SIZE; i++) {
+          *data++ = 0x00100010;
         }
-        *data = remaining;
         steps = 0;
       } else {
         steps -= PART_SIZE / 2;
@@ -173,12 +151,11 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
           *data++ = 0x40017fff | 0x8000;
           *data++ = 0x20002000;
         }
-        data--;
       }
     } else if ((steps < 2 * PART_SIZE) && (steps != PART_SIZE)) {
       uint8_t steps_to_do = steps;
       if (steps > PART_SIZE) {
-        steps_to_do = steps / 2;
+        steps_to_do /= 2;
       }
 
       uint16_t ticks_l = ticks >> 1;
@@ -189,15 +166,15 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       for (uint8_t i = 1; i < steps_to_do; i++) {
         *data++ = rmt_entry;
       }
-      uint32_t *last_step_data = data++;
+	  uint32_t delta = PART_SIZE - steps_to_do;
+	  delta <<= 17; // shift in upper 16bit and multiply with 2
+	  *data++ = rmt_entry - delta;
       for (uint8_t i = steps_to_do; i < PART_SIZE; i++) {
-        *data++ = 0x00040004;
-        rmt_entry -= 0x00040004;
+        *data++ = 0x00010001;
       }
-      *last_step_data = rmt_entry;
       steps -= steps_to_do;
-      data--;
     } else {
+	  // either >= 2*PART_SIZE or = PART_SIZE
       // every entry one step
       uint16_t ticks_l = ticks >> 1;
       uint16_t ticks_r = ticks - ticks_l;
@@ -207,10 +184,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         *data++ = rmt_entry;
       }
-      // This could lead to single step at high speed in next part .... so need
-      // to rework the previous part to address this
       steps -= PART_SIZE;
-      data--;
     }
   }
   if (!fill_part_one) {
@@ -220,14 +194,13 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     // then from the first to the last again, and so on. In this mode, there
     // will be an idle level lasting one clk_div cycle between N and N+1
     // transmissions.
-    *data -= 1;
+    *data = 0;
   }
   if (steps == 0) {
     // The command has been completed
     if (e_curr->repeat_entry == 0) {
-      rp++;
+	  q->read_idx = rp + 1;
     }
-    q->read_idx = rp;
   } else {
     e_curr->steps = steps;
   }
@@ -258,7 +231,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     PROBE_1_TOGGLE;                                                            \
     StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch];                      \
 	if (!q->_rmtStopped) {                                                      \
-    apply_command(&fas_queue[QUEUES_MCPWM_PCNT + ch], true, FAS_RMT_MEM(ch));  \
+       apply_command(q, true, FAS_RMT_MEM(ch));  \
     /* now repeat the interrupt at buffer size + end marker */                 \
     RMT.tx_lim_ch[ch].RMT_LIMIT = PART_SIZE * 2 + 1;                           \
 	}                                                                          \
@@ -417,13 +390,8 @@ void StepperQueue::startQueue_rmt() {
     Serial.print(' ');
     Serial.println(mem[i], HEX);
   }
-  if (!isRunning()) {
-    Serial.println("STOPPED 2");
-  }
 #endif
-  if (_isRunning) {
-    RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
-  }
+  RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
   rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   rmt_set_tx_intr_en(channel, true);
   _rmtStopped = false;
@@ -438,9 +406,9 @@ void StepperQueue::forceStop_rmt() {
 }
 bool StepperQueue::isReadyForCommands_rmt() {
   if (_isRunning) {
-    return true;
+    return !_rmtStopped;
   }
-  return _rmtStopped;
+  return true;
 }
 uint16_t StepperQueue::_getPerformedPulses_rmt() { return 0; }
 #endif
