@@ -282,8 +282,8 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   if (channel_num == 0) {
     rmt_isr_register(tx_intr_handler, NULL,
                      ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM, NULL);
-    RMT.apb_conf.RMT_FIFO = 0;
-    RMT.apb_conf.mem_tx_wrap_en = 1;
+    RMT.apb_conf.RMT_FIFO = 1;
+    RMT.apb_conf.mem_tx_wrap_en = 0;
   }
 
   digitalWrite(step_pin, LOW);
@@ -337,7 +337,7 @@ void StepperQueue::startQueue_rmt() {
   _rmtStopped = false;
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, 0);
-  RMT.apb_conf.mem_tx_wrap_en = 1;
+  RMT.apb_conf.mem_tx_wrap_en = 0;
 
 #ifdef TRACE
   Serial.println(next_write_idx - read_idx);
@@ -392,14 +392,14 @@ void StepperQueue::startQueue_rmt() {
     Serial.println(mem[i], HEX);
   }
 #endif
-  RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
   rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   rmt_set_tx_intr_en(channel, true);
   _rmtStopped = false;
 
   // Seems that  tx_conti_mode already starts transmission in FIFO mode
-  //  RMT.conf_ch[channel].conf1.tx_start = 1;
-  //  RMT.conf_ch[channel].conf1.tx_start = 0;
+  RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
+  // RMT.conf_ch[channel].conf1.tx_start = 1;
+  // RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {
   stop_rmt();

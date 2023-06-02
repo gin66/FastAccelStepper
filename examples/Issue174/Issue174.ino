@@ -86,12 +86,14 @@ void loop() {
   loopCnt++;
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
   if ((loopCnt % 1000) == 0) {
-    Serial.print("Return to 0 from ");
+    Serial.print("Go to ");
+	Serial.print(loopCnt);
+    Serial.print(" from ");
     Serial.print(stepper->getCurrentPosition());
     Serial.print(" ramp state=");
     Serial.print(stepper->rampState());
     Serial.print(' ');
-    int res = stepper->moveTo(0);
+    int res = stepper->moveTo(loopCnt);
     if (!stepper->isRunning()) {
       Serial.println();
       Serial.println("stepper is not running !!!");
@@ -119,11 +121,13 @@ void loop() {
       Serial.print(stepper->getPositionAfterCommandsCompleted());
       Serial.print(' ');
     int16_t pcnt = stepper->readPulseCounter();
-    if (pcnt == 0) {
+    if (pcnt == loopCnt) {
       Serial.print("=> OK");
     } else {
       Serial.print("=> FAIL with pcnt=");
       Serial.print(pcnt);
+	  Serial.print("!=");
+      Serial.print(loopCnt);
     }
     Serial.print(" ramp state (must be 0) = ");
     Serial.println(stepper->rampState());
