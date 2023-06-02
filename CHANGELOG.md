@@ -4,6 +4,8 @@ TODO:
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
+- Issue174 using esp32 mcpwm/pcnt runs well, but once a while the running flag and pcnt value show a mismatch. 
+  => No steps lost, but isRunning() may provide wrong information
 
 pre-0.30.0:
 - fix issue #172: `move()` during ramping down of `stopMove()` has used old target position as reference

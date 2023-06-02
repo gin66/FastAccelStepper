@@ -332,7 +332,9 @@ void StepperQueue::startQueue_rmt() {
     mem[i + 1] = 0x7fff8fff;
   }
   mem[2 * PART_SIZE] = 0;
+  RMT.data_ch[channel] = 0;
   _isRunning = true;
+  _rmtStopped = false;
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, 0);
   RMT.apb_conf.mem_tx_wrap_en = 0;
@@ -394,7 +396,9 @@ void StepperQueue::startQueue_rmt() {
   rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   rmt_set_tx_intr_en(channel, true);
   _rmtStopped = false;
-  RMT.conf_ch[channel].conf1.tx_start = 1;
+
+  // Seems that  tx_conti_mode already starts transmission in FIFO mode
+  //  RMT.conf_ch[channel].conf1.tx_start = 1;
   //  RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {

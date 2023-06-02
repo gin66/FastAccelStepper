@@ -8,7 +8,7 @@ long chirpTimeInitial = 0;
 
 // Stepper Wiring
 #define dirPinStepper 18
-#define stepPinStepper 17
+#define stepPinStepper 14
 
 // no clue what this does
 FastAccelStepperEngine engine = FastAccelStepperEngine();
