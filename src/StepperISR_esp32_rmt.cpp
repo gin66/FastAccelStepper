@@ -282,8 +282,8 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   if (channel_num == 0) {
     rmt_isr_register(tx_intr_handler, NULL,
                      ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM, NULL);
-    RMT.apb_conf.RMT_FIFO = 1;
-    RMT.apb_conf.mem_tx_wrap_en = 0;
+    RMT.apb_conf.RMT_FIFO = 0;
+    RMT.apb_conf.mem_tx_wrap_en = 1;
   }
 
   digitalWrite(step_pin, LOW);
@@ -337,7 +337,7 @@ void StepperQueue::startQueue_rmt() {
   _rmtStopped = false;
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, 0);
-  RMT.apb_conf.mem_tx_wrap_en = 0;
+  RMT.apb_conf.mem_tx_wrap_en = 1;
 
 #ifdef TRACE
   Serial.println(next_write_idx - read_idx);
