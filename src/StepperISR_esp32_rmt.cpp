@@ -376,6 +376,9 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
   }
   delay(1000);
+  // actually no need to enable/disable interrupts.
+  // and this seems to avoid some pitfalls
+
   // This runs the RMT buffer once
     RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
   delay(1);
