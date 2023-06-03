@@ -10,7 +10,11 @@ struct test_seq_s {
   int16_t s16_2;
 };
 
+#if !defined(__AVR_ATmega32U4__)
 #define NUM_TEST_SEQUENCE 13
+#else
+#define NUM_TEST_SEQUENCE 12
+#endif
 extern struct test_seq_def_s {
   char code[4];
   bool (*test)(FastAccelStepper *stepper, struct test_seq_s *,
