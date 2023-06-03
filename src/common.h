@@ -206,7 +206,7 @@ struct queue_end_s {
 
 // Esp32 timing definition
 #define TICKS_PER_S 16000000L
-#define MIN_CMD_TICKS (TICKS_PER_S / 2000)
+#define MIN_CMD_TICKS (TICKS_PER_S / 5000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 4

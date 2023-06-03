@@ -11,7 +11,7 @@ LOG="$0.log"
 grabserial $DEV -c ' x reset ' -q "$MOTOR:" -e 10
 sleep 2
 
-grabserial $DEV -c "$CMD" -q "$PASS" -e 3 -o $LOG
+grabserial $DEV -c "$CMD" -q "$PASS" -e 10 -o $LOG
 echo
 
 #if [ `gawk -f judge_pcnt_sync.awk $LOG | grep -c PASS` -ne 1 ]

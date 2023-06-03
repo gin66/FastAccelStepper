@@ -49,6 +49,12 @@ void setup() {
 #else
   stepper = engine.stepperConnectToPin(stepPinStepper);
 #endif
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
+// attaching the pulse counter stops the interrupts !?
+//  stepper->attachToPulseCounter(QUEUES_MCPWM_PCNT, 0, 0);
+//  stepper->clearPulseCounter();
+//  Serial.println(stepper->readPulseCounter());
+#endif
 }
 
 void loop1() {
@@ -79,12 +85,13 @@ void loop1() {
   delay(300);
 }
 void loop() {
+return;
   uint16_t min_ticks = 0;
   if (stepper) {
     min_ticks = stepper->getMaxSpeedInTicks();
   }
   min_ticks = 30000;
-  const struct stepper_command_s cmd_step1 = {
+  const struct stepper_command_s cmd_step2 = {
       .ticks = MIN_CMD_TICKS, .steps = 2, .count_up = true};
   const struct stepper_command_s cmd_step10 = {
       .ticks = min_ticks, .steps = 10, .count_up = true};
@@ -92,24 +99,39 @@ void loop() {
       .ticks = 45000, .steps = 5, .count_up = true};
   const struct stepper_command_s cmd_pause = {
       .ticks = 5000, .steps = 0, .count_up = true};
-  uint8_t res[10];
+  uint8_t res[20];
   uint8_t *r = res;
   if (stepper) {
-    stepper->addQueueEntry(&cmd_step1);
+    stepper->clearPulseCounter();
+    *r++ = stepper->addQueueEntry(&cmd_step2, false);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
-    //  stepper->addQueueEntry(&cmd_step1);
-    //  stepper->addQueueEntry(&cmd_step1);
-    *r++ = stepper->addQueueEntry(&cmd_step5, false);
-    *r++ = stepper->addQueueEntry(&cmd_step10, false);
-    *r++ = stepper->addQueueEntry(&cmd_step5, false);
-    *r++ = stepper->addQueueEntry(&cmd_step10, false);
-    *r++ = stepper->addQueueEntry(&cmd_step5, false);
-    *r++ = stepper->addQueueEntry(&cmd_step10, false);
-    stepper->addQueueEntry(&cmd_pause);
+    //  stepper->addQueueEntry(&cmd_step2);
+    //  stepper->addQueueEntry(&cmd_step2);
+    //*r++ = stepper->addQueueEntry(&cmd_step5, false);
+    //*r++ = stepper->addQueueEntry(&cmd_step10, false);
+    //*r++ = stepper->addQueueEntry(&cmd_step5, false);
+    //*r++ = stepper->addQueueEntry(&cmd_step10, false);
+    //*r++ = stepper->addQueueEntry(&cmd_step5, false);
+    //*r++ = stepper->addQueueEntry(&cmd_step10, false);
+    //*r++ = stepper->addQueueEntry(&cmd_pause);
     *r++ = stepper->addQueueEntry(NULL);
     Serial.print(res[0]);
     Serial.print('-');
-    Serial.println(res[1]);
+    Serial.print(res[1]);
+    Serial.print('-');
+    Serial.println(res[2]);
   }
+  while(stepper->isRunning()) {
+  }
+  int16_t pc = stepper->readPulseCounter();
+  digitalWrite(dirPinStepper, pc==12 ? HIGH:LOW);
+  Serial.print(pc);
+  Serial.println(pc == 12 ? " OK":" FAIL");
+  digitalWrite(dirPinStepper,LOW);
   delay(100);
+  digitalWrite(dirPinStepper, pc==12 ? HIGH:LOW);
+  Serial.print(pc);
+  Serial.println(pc == 12 ? " OK":" FAIL");
+  delay(100);
+  digitalWrite(dirPinStepper,LOW);
 }

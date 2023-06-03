@@ -50,11 +50,17 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   //  :2:13432X:2:13248X:2:13072X:2:12896X:2:12736X:2:12584X:2:12432X:2:12280X:2:12128X:2:12000X:2:11872X:2:11744X:2:11616X:2:11488X:2:11384X:2:11264X:2:11152X:2:11048X:2:10944X:2:10840X:2:10736X:2:10656X:3:10512X:3:10384X:3:10248X:3:10120X:3:10008X:3:9888X:3:9784X:3:9680X:3:9576X:3:9472X:3:9368X:3:9280X:3:9176X:3:9096X:3:9008X:3:8928X:3:8840X:3:8760X:3:8688X:3:8600X:3:8528X:3:8464X:3:8392X:3:8328X:3:8256X:3:8192X:3:8124X:3:8060X:3:8008X:3:7944X:4:7864X:4:7792X:4:7720X:4:7648X:4:7584X:4:7512X:4:7452X:4:7384X:4:7324X
   //  :4:7264X:4:7204X:4:7148X:4:7088X:4:7040X:4:6984X:4:6928X
 
-  // Serial.print(':');
-  // Serial.print(steps);
-  // Serial.print(':');
-  // Serial.print(period);
-  // Serial.print('X');
+#define TRACE
+#ifdef TRACE
+  Serial.print(':');
+  Serial.print(start ? "START":"CONT");
+  Serial.print(':');
+  Serial.print(steps);
+  Serial.print(':');
+  Serial.print(period);
+  Serial.print('X');
+#endif
+
   uint32_t command_rate_ticks = period;
   if (steps > 1) {
     command_rate_ticks *= steps;
@@ -126,8 +132,19 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 
   if (!isRunning() && start) {
     // stepper is not yet running and start is requested
+#ifdef TRACE
+    Serial.print('S');
+#endif
     startQueue();
   }
+#ifdef TRACE
+  else {
+	  // WHY IS start 0 in seq_01c
+	Serial.print(isRunning() ? 'R':'T');
+	Serial.print(start ? '1':'0');
+    Serial.print('N');
+  }
+#endif
   return AQE_OK;
 }
 
