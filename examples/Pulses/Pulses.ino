@@ -50,10 +50,12 @@ void setup() {
   stepper = engine.stepperConnectToPin(stepPinStepper);
 #endif
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
-// attaching the pulse counter stops the interrupts !?
-//  stepper->attachToPulseCounter(QUEUES_MCPWM_PCNT, 0, 0);
-//  stepper->clearPulseCounter();
-//  Serial.println(stepper->readPulseCounter());
+  stepper->attachToPulseCounter(QUEUES_MCPWM_PCNT, 0, 0);
+  stepper->clearPulseCounter();
+while (true) {
+  Serial.println(stepper->readPulseCounter());
+  delay(100);
+}
 #endif
 }
 
@@ -85,7 +87,6 @@ void loop1() {
   delay(300);
 }
 void loop() {
-return;
   uint16_t min_ticks = 0;
   if (stepper) {
     min_ticks = stepper->getMaxSpeedInTicks();

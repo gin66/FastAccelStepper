@@ -3,11 +3,9 @@
 
 #define TEST_MODE
 
-#ifdef TEST_MODE
 #define TEST_PROBE_1 18
 #define TEST_PROBE_2 5
 #define TEST_PROBE_3 4
-#endif
 
 #ifdef TEST_PROBE_1
 #define PROBE_1(x) digitalWrite(TEST_PROBE_1, x)
@@ -365,15 +363,27 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   //rmt_tx_start(channel, true);
   PROBE_2_TOGGLE;
-//  while(true) {
-//	  Serial.println(RMT.int_st.val);
-//	  delay(100);
-//  }
+
+  delay(10000);
+  if (false) {
+    mem--;
+    mem--;
+    // destroy end marker => no end interrupt 
+    *mem++ = 0x00010001;
+    *mem = 0x00010001;
+  }
+  if (true) {
+	// just clear conti mode => causes end interrupt
+    RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
+  }
+  while(true) { delay(1); }
   }
 #endif
 }
 
 void StepperQueue::connect_rmt() {
+  // rmt_set_tx_intr_en(channel, true);
+  // rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   RMT.conf_ch[channel].conf1.idle_out_lv = 0;
   RMT.conf_ch[channel].conf1.idle_out_en = 1;
 #ifndef __ESP32_IDF_V44__
