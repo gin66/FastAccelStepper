@@ -692,13 +692,13 @@ void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
   // ensure no more commands are added to the queue
   q->ignore_commands = true;
 
-  // inform ramp generator to force stop
-  _rg.forceStop();
+  // stop ramp generator
+  _rg.stopRamp();
 
   // stop the stepper interrupt and empty the queue
   q->forceStop();
 
-  // set the new position. This is not safe
+  // set the new position. This should be safe
   q->queue_end.pos = new_pos;
   _rg.setTargetPosition(new_pos);
 }

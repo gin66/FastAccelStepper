@@ -40,9 +40,9 @@ struct ramp_rw_s {
   // Current ticks for ongoing step
   uint32_t curr_ticks;
   inline void stopRamp() {
+    ramp_state = RAMP_STATE_IDLE;	// this prevents fill_queue to be executed
     pause_ticks_left = 0;
     performed_ramp_up_steps = 0;
-    ramp_state = RAMP_STATE_IDLE;
     curr_ticks = TICKS_FOR_STOPPED_MOTOR;
 #ifdef TEST
     printf("stopRamp() called\n");

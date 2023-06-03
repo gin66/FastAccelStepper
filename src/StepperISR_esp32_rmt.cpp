@@ -41,22 +41,23 @@ int tp2 = 0;
 // the ticks.
 #define PART_SIZE 31
 
-void IRAM_ATTR StepperQueue::stop_rmt() {
+void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   // We are stopping the rmt by letting it run into the end at high speed.
   //
   // disable the interrupts
   //  rmt_set_tx_intr_en(channel, false);
-  //  FUNNY: disabling this generates a lot of step loss, which is not plausible
-  //rmt_set_tx_thr_intr_en(channel, false, 0);
+  rmt_set_tx_thr_intr_en(channel, false, 0);
 
   // stop esp32 rmt, by let it hit the end
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
 
-  // replace buffer with only pauses
+  // replace second part of buffer with pauses
   uint32_t *data = FAS_RMT_MEM(channel);
-  data = &data[PART_SIZE];
-  for (uint8_t i = 0; i < PART_SIZE; i++) {
-    *data++ = 0x00010001;
+  uint8_t start = both ? 0 : PART_SIZE;
+  data = &data[start];
+  for (uint8_t i = start; i < 2*PART_SIZE; i++) {
+	// two pauses à n ticks to achieve MIN_CMD_TICKS
+	*data++ = 0x00010001 * ((MIN_CMD_TICKS + 61) / 62);
   }
   *data = 0;
 
@@ -81,7 +82,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 		}
 	}
 	else {
-	  q->stop_rmt();
+	  q->stop_rmt(false);
 	}
     return;
   }
@@ -95,8 +96,9 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       // So we need a pause. change the finished read entry into a pause
       q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
       for (uint8_t i = 0; i < PART_SIZE; i++) {
-        // two pauses à 16 ticks
-        *data++ = 0x00010001 * (MIN_CMD_TICKS / 62 + 1);
+        // two pauses à 1 tick
+		// two pauses à n ticks to achieve MIN_CMD_TICKS
+		*data++ = 0x00010001 * ((MIN_CMD_TICKS + 61) / 62);
       }
       return;
     }
@@ -402,7 +404,7 @@ void StepperQueue::startQueue_rmt() {
   // RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {
-  stop_rmt();
+  stop_rmt(true);
 
   // and empty the buffer
   read_idx = next_write_idx;

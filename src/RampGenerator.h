@@ -83,7 +83,7 @@ class RampGenerator {
   }
   inline bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
 
-  void stopRamp();
+  inline void stopRamp() { _rw.stopRamp(); }
   inline void setKeepRunning() { _ro.setKeepRunning(); }
   inline bool isRunningContinuously() { return _ro.isRunningContinuously(); }
   void getNextCommand(const struct queue_end_s *queue_end,

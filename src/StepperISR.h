@@ -65,7 +65,7 @@ class StepperQueue {
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
-  bool isRunning() { return _isRunning; }
+  inline bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
   bool use_rmt;
   uint8_t _step_pin;
@@ -163,7 +163,7 @@ class StepperQueue {
   bool isReadyForCommands_rmt();
   void init_rmt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_rmt();
-  void stop_rmt();
+  void stop_rmt(bool both);
   void forceStop_rmt();
   uint16_t _getPerformedPulses_rmt();
   void connect_rmt();
