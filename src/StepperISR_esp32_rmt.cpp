@@ -1,7 +1,7 @@
 #include "StepperISR.h"
 #ifdef SUPPORT_ESP32_RMT
 
-#define TEST_MODE
+//#define TEST_MODE
 
 #define TEST_PROBE_1 18
 #define TEST_PROBE_2 5
@@ -56,11 +56,10 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   //
   // disable the interrupts
   //  rmt_set_tx_intr_en(channel, false);
-  rmt_set_tx_thr_intr_en(channel, false, 0);
+  //  rmt_set_tx_thr_intr_en(channel, false, 0);
 
   // stop esp32 rmt, by let it hit the end
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
-  RMT.apb_conf.mem_tx_wrap_en = 0;
 
   // replace second part of buffer with pauses
   uint32_t *data = FAS_RMT_MEM(channel);
@@ -252,7 +251,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch];                      \
 	if (q->_rmtStopped) {                                                      \
 	   rmt_set_tx_intr_en(q->channel, false); \
-	   rmt_set_tx_thr_intr_en(q->channel, false, 0); \
+	   rmt_set_tx_thr_intr_en(q->channel, false, PART_SIZE+1); \
 	   q->_isRunning = false; \
 	PROBE_1_TOGGLE; \
 	}                                                                          \
@@ -323,7 +322,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   }
   // 80 MHz/5 = 16 MHz
 	   rmt_set_tx_intr_en(channel, false); 
-	   rmt_set_tx_thr_intr_en(channel, false, 0); 
+	   rmt_set_tx_thr_intr_en(channel, false, PART_SIZE+1); 
   rmt_set_source_clk(channel, RMT_BASECLK_APB);
   rmt_set_clk_div(channel, 5);
   rmt_set_mem_block_num(channel, 1);
@@ -364,18 +363,23 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   //rmt_tx_start(channel, true);
   PROBE_2_TOGGLE;
 
-  delay(10000);
+  delay(1000);
   if (false) {
     mem--;
     mem--;
-    // destroy end marker => no end interrupt 
+    // destroy end marker => no end interrupt, no repeat
     *mem++ = 0x00010001;
     *mem = 0x00010001;
   }
   if (true) {
-	// just clear conti mode => causes end interrupt
+	// just clear conti mode => causes end interrup, no repeat
     RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
   }
+  delay(1000);
+  // This runs the RMT buffer once
+    RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
+  delay(1);
+    RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
   while(true) { delay(1); }
   }
 #endif
@@ -395,7 +399,7 @@ void StepperQueue::connect_rmt() {
 
 void StepperQueue::disconnect_rmt() {
   rmt_set_tx_intr_en(channel, false);
-  rmt_set_tx_thr_intr_en(channel, false, 0);
+  rmt_set_tx_thr_intr_en(channel, false, PART_SIZE+1);
 #ifndef __ESP32_IDF_V44__
 //  rmt_set_pin(channel, RMT_MODE_TX, (gpio_num_t)-1);
 #else
@@ -425,24 +429,34 @@ void StepperQueue::startQueue_rmt() {
   delay(1);
 #endif
   rmt_tx_stop(channel);
-  rmt_rx_stop(channel);
+  // rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
   RMT.data_ch[channel] = 0;
   uint32_t *mem = FAS_RMT_MEM(channel);
   // Fill the buffer with a significant pattern for debugging
-  for (uint8_t i = 0; i < 64; i += 2) {
-    mem[i + 0] = 0x0fff8fff;
-    mem[i + 1] = 0x7fff8fff;
+  for (uint8_t i = 0; i < 2*PART_SIZE; i += 2) {
+    mem[i] = 0x0fff8fff;
+    mem[i+1] = 0x7fff8fff;
   }
-  mem[2 * PART_SIZE] = 0;
+  mem[2*PART_SIZE] = 0;
+  mem[2*PART_SIZE+1] = 0;
   _isRunning = true;
   _rmtStopped = false;
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, 0);
-  RMT.apb_conf.mem_tx_wrap_en = 0;
+ // RMT.apb_conf.mem_tx_wrap_en = 0;
 
+//#define TRACE
 #ifdef TRACE
-  Serial.println(next_write_idx - read_idx);
+  Serial.print("Queue:");
+  Serial.print(read_idx);
+  Serial.print('/');
+  Serial.println(next_write_idx);
+  for (uint8_t i = 0; i < 64; i++) {
+    Serial.print(i);
+    Serial.print(' ');
+    Serial.println(mem[i], HEX);
+  }
 #endif
 
   // set dirpin toggle here
@@ -457,14 +471,11 @@ void StepperQueue::startQueue_rmt() {
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
+  bufferContainsSteps[0] = true;
   bufferContainsSteps[1] = true;
   apply_command(this, true, mem);
 
 #ifdef TRACE
-  Serial.print("Queue:");
-  Serial.print(rp);
-  Serial.print('/');
-  Serial.println(next_write_idx);
   Serial.print(RMT.conf_ch[channel].conf0.val, BIN);
   Serial.print(' ');
   Serial.print(RMT.conf_ch[channel].conf1.val, BIN);
@@ -481,10 +492,8 @@ void StepperQueue::startQueue_rmt() {
   }
 #endif
 
-  bufferContainsSteps[0] = true;
   apply_command(this, false, mem);
 
-#define TRACE
 #ifdef TRACE
   Serial.print(RMT.conf_ch[channel].conf0.val, BIN);
   Serial.print(' ');
@@ -503,10 +512,7 @@ void StepperQueue::startQueue_rmt() {
   rmt_set_tx_intr_en(channel, true);
   _rmtStopped = false;
 
-  // Seems that  tx_conti_mode already starts transmission in FIFO mode
   RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
-  // RMT.conf_ch[channel].conf1.tx_start = 1;
-  // RMT.conf_ch[channel].conf1.tx_start = 0;
 }
 void StepperQueue::forceStop_rmt() {
   stop_rmt(true);

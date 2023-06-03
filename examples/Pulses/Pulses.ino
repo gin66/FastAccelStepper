@@ -52,10 +52,6 @@ void setup() {
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
   stepper->attachToPulseCounter(QUEUES_MCPWM_PCNT, 0, 0);
   stepper->clearPulseCounter();
-while (true) {
-  Serial.println(stepper->readPulseCounter());
-  delay(100);
-}
 #endif
 }
 
