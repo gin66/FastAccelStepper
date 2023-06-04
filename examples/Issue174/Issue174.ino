@@ -7,7 +7,7 @@ long chirpTimeInitial = 0;
 //#define stepPinStepper 9  // step pin must be pin 9, 10 or 11
 
 // Stepper Wiring
-#define dirPinStepper 18
+#define dirPinStepper 19
 #define stepPinStepper 14
 
 // no clue what this does
@@ -120,7 +120,10 @@ void loop() {
       Serial.print(':');
       Serial.print(stepper->getPositionAfterCommandsCompleted());
       Serial.print(' ');
-    int16_t pcnt = stepper->readPulseCounter();
+    int32_t pcnt = stepper->readPulseCounter();
+    if (pcnt < 0) {
+		pcnt += 65536;
+	}
     if (pcnt == loopCnt) {
       Serial.print("=> OK");
     } else {
@@ -128,6 +131,12 @@ void loop() {
       Serial.print(pcnt);
 	  Serial.print("!=");
       Serial.print(loopCnt);
+      digitalWrite(dirPinStepper, digitalRead(dirPinStepper) == HIGH ? LOW: HIGH);
+	  delay(10);
+      stepper->clearPulseCounter();
+	  stepper->setCurrentPosition(0);
+      digitalWrite(dirPinStepper, digitalRead(dirPinStepper) == HIGH ? LOW: HIGH);
+	  delay(10);
     }
     Serial.print(" ramp state (must be 0) = ");
     Serial.println(stepper->rampState());
