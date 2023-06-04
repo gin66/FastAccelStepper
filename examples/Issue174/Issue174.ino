@@ -87,7 +87,7 @@ void loop() {
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
   if ((loopCnt % 1000) == 0) {
     Serial.print("Go to ");
-	Serial.print(loopCnt);
+    Serial.print(loopCnt);
     Serial.print(" from ");
     Serial.print(stepper->getCurrentPosition());
     Serial.print(" ramp state=");
@@ -109,34 +109,36 @@ void loop() {
     delay(10);
     int32_t pos2 = stepper->getCurrentPosition();
     if (pos != pos2) {
-		Serial.println();
-	   Serial.print("stepper position changed after isRunning() loop: ");
-       Serial.print(pos);
-       Serial.print(' ');
-       Serial.println(pos2);
-    }
-    //delay(10);
-      Serial.print(stepper->rampState());
-      Serial.print(':');
-      Serial.print(stepper->getPositionAfterCommandsCompleted());
+      Serial.println();
+      Serial.print("stepper position changed after isRunning() loop: ");
+      Serial.print(pos);
       Serial.print(' ');
+      Serial.println(pos2);
+    }
+    // delay(10);
+    Serial.print(stepper->rampState());
+    Serial.print(':');
+    Serial.print(stepper->getPositionAfterCommandsCompleted());
+    Serial.print(' ');
     int32_t pcnt = stepper->readPulseCounter();
     if (pcnt < 0) {
-		pcnt += 65536;
-	}
+      pcnt += 65536;
+    }
     if (pcnt == loopCnt) {
       Serial.print("=> OK");
     } else {
       Serial.print("=> FAIL with pcnt=");
       Serial.print(pcnt);
-	  Serial.print("!=");
+      Serial.print("!=");
       Serial.print(loopCnt);
-      digitalWrite(dirPinStepper, digitalRead(dirPinStepper) == HIGH ? LOW: HIGH);
-	  delay(10);
+      digitalWrite(dirPinStepper,
+                   digitalRead(dirPinStepper) == HIGH ? LOW : HIGH);
+      delay(10);
       stepper->clearPulseCounter();
-	  stepper->setCurrentPosition(0);
-      digitalWrite(dirPinStepper, digitalRead(dirPinStepper) == HIGH ? LOW: HIGH);
-	  delay(10);
+      stepper->setCurrentPosition(0);
+      digitalWrite(dirPinStepper,
+                   digitalRead(dirPinStepper) == HIGH ? LOW : HIGH);
+      delay(10);
     }
     Serial.print(" ramp state (must be 0) = ");
     Serial.println(stepper->rampState());

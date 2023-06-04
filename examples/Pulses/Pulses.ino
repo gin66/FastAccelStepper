@@ -118,17 +118,17 @@ void loop() {
     Serial.print('-');
     Serial.println(res[2]);
   }
-  while(stepper->isRunning()) {
+  while (stepper->isRunning()) {
   }
   int16_t pc = stepper->readPulseCounter();
-  digitalWrite(dirPinStepper, pc==12 ? HIGH:LOW);
+  digitalWrite(dirPinStepper, pc == 12 ? HIGH : LOW);
   Serial.print(pc);
-  Serial.println(pc == 12 ? " OK":" FAIL");
-  digitalWrite(dirPinStepper,LOW);
+  Serial.println(pc == 12 ? " OK" : " FAIL");
+  digitalWrite(dirPinStepper, LOW);
   delay(100);
-  digitalWrite(dirPinStepper, pc==12 ? HIGH:LOW);
+  digitalWrite(dirPinStepper, pc == 12 ? HIGH : LOW);
   Serial.print(pc);
-  Serial.println(pc == 12 ? " OK":" FAIL");
+  Serial.println(pc == 12 ? " OK" : " FAIL");
   delay(100);
-  digitalWrite(dirPinStepper,LOW);
+  digitalWrite(dirPinStepper, LOW);
 }

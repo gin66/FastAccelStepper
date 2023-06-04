@@ -53,7 +53,7 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 //#define TRACE
 #ifdef TRACE
   Serial.print(':');
-  Serial.print(start ? "START":"PUSH");
+  Serial.print(start ? "START" : "PUSH");
   Serial.print(':');
   Serial.print(cmd->count_up ? 'U' : 'D');
   Serial.print(':');
@@ -141,9 +141,9 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   }
 #ifdef TRACE
   else {
-	  // WHY IS start 0 in seq_01c
-	Serial.print(isRunning() ? 'R':'T');
-	Serial.print(start ? '1':'0');
+    // WHY IS start 0 in seq_01c
+    Serial.print(isRunning() ? 'R' : 'T');
+    Serial.print(start ? '1' : '0');
     Serial.println('N');
   }
 #endif
