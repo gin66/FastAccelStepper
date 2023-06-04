@@ -75,7 +75,6 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       // So we need a pause. change the finished read entry into a pause
       q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
       for (uint8_t i = 0; i < PART_SIZE; i++) {
-        // two pauses à 1 tick
         // two pauses à n ticks to achieve MIN_CMD_TICKS
         *data++ = 0x00010001 * ((MIN_CMD_TICKS + 61) / 62);
       }
@@ -91,9 +90,9 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 
   uint8_t steps = e_curr->steps;
   uint16_t ticks = e_curr->ticks;
-  if (steps != 0) {
-    //		PROBE_2_TOGGLE;
-  }
+  //  if (steps != 0) {
+  //  	PROBE_2_TOGGLE;
+  //}
   uint32_t last_entry;
   if (steps == 0) {
     q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
@@ -407,9 +406,11 @@ void StepperQueue::startQueue_rmt() {
   rmt_tx_stop(channel);
   // rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
+  // the following assignment should not be needed;
   RMT.data_ch[channel] = 0;
   uint32_t *mem = FAS_RMT_MEM(channel);
   // Fill the buffer with a significant pattern for debugging
+  // Keep it for now
   for (uint8_t i = 0; i < 2 * PART_SIZE; i += 2) {
     mem[i] = 0x0fff8fff;
     mem[i + 1] = 0x7fff8fff;
@@ -488,6 +489,7 @@ void StepperQueue::startQueue_rmt() {
   rmt_set_tx_intr_en(channel, true);
   _rmtStopped = false;
 
+  // This starts the rmt module
   RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
 }
 void StepperQueue::forceStop_rmt() {
