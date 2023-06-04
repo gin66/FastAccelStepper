@@ -4,10 +4,8 @@ TODO:
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
-- Issue174 using esp32 mcpwm/pcnt runs well, but once a while the running flag and pcnt value show a mismatch. 
-  => No steps lost, but isRunning() may provide wrong information
 
-pre-0.30.0:
+0.30.0:
 - fix issue #172: `move()` during ramping down of `stopMove()` has used old target position as reference
 - fix issue #173: After `forceStopWithNewPosition()` next `move()` was not executed properly
 - fix issue #173: After `forceStop()` target position was not updated
@@ -15,7 +13,7 @@ pre-0.30.0:
 - hot fix for issue #174: esp32-rmt module has not changed direction under high load
 - esp32s2: Enable pulse counter support
 - remove ramp state `RAMP_STATE_DECELERATE_TO_STOP`
-- Fix for command errors at very high acceleration as detected by issue #17
+- Fix for command errors at very high acceleration as detected by issue #174
 
 0.29.2:
 - add `stepperConnectToPin(pin, driver_type)` to allow the module selection
