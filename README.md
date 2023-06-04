@@ -322,6 +322,9 @@ To keep up the synchronization of two steppers please keep in mind:
 * If the stepper is configured for delays for direction change, then one pause is added to the command queue for each direction change together with a step.
   => Execute direction change together with a pause or do not configure direction change delay
 
+Note for esp32 rmt driver:
+- Due to the inner implementation, there has been the need to introduce pauses e.g. before a direction change. So the tick-exact of commands cannot be assumed, if during command generation pauses before/after dir changes are generated.
+
 ## TODO
 
 See [project](https://github.com/gin66/FastAccelStepper/projects/1)
