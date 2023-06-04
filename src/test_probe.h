@@ -2,9 +2,13 @@
 #define TEST_PROBE_H
 //#define TEST_MODE
 
+//#define ESP32_TEST_PROBE
+
+#ifdef ESP32_TEST_PROBE
 #define TEST_PROBE_1 18
 #define TEST_PROBE_2 5
 #define TEST_PROBE_3 4
+#endif
 
 #ifdef TEST_PROBE_1
 #define PROBE_1(x) digitalWrite(TEST_PROBE_1, x)
