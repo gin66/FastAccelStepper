@@ -92,14 +92,16 @@ void loop() {
       .ticks = MIN_CMD_TICKS, .steps = 2, .count_up = true};
   const struct stepper_command_s cmd_step10 = {
       .ticks = min_ticks, .steps = 10, .count_up = true};
-  const struct stepper_command_s cmd_step5 = {
-      .ticks = 45000, .steps = 5, .count_up = true};
-  const struct stepper_command_s cmd_pause = {
-      .ticks = 5000, .steps = 0, .count_up = true};
+//  const struct stepper_command_s cmd_step5 = {
+//      .ticks = 45000, .steps = 5, .count_up = true};
+//  const struct stepper_command_s cmd_pause = {
+//      .ticks = 5000, .steps = 0, .count_up = true};
   uint8_t res[20];
   uint8_t *r = res;
   if (stepper) {
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
     stepper->clearPulseCounter();
+#endif
     *r++ = stepper->addQueueEntry(&cmd_step2, false);
     *r++ = stepper->addQueueEntry(&cmd_step10, false);
     //  stepper->addQueueEntry(&cmd_step2);
@@ -120,6 +122,7 @@ void loop() {
   }
   while (stepper->isRunning()) {
   }
+#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   int16_t pc = stepper->readPulseCounter();
   digitalWrite(dirPinStepper, pc == 12 ? HIGH : LOW);
   Serial.print(pc);
@@ -131,4 +134,6 @@ void loop() {
   Serial.println(pc == 12 ? " OK" : " FAIL");
   delay(100);
   digitalWrite(dirPinStepper, LOW);
+#endif
+  delay(100);
 }
