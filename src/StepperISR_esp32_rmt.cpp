@@ -407,7 +407,7 @@ void StepperQueue::startQueue_rmt() {
   // rmt_rx_stop(channel);
   rmt_memory_rw_rst(channel);
   // the following assignment should not be needed;
-  RMT.data_ch[channel] = 0;
+  //RMT.data_ch[channel] = 0;
   uint32_t *mem = FAS_RMT_MEM(channel);
   // Fill the buffer with a significant pattern for debugging
   // Keep it for now

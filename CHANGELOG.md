@@ -5,6 +5,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+0.30.1:
+- Fix compile error for esp32s2/s3 in rmt module
+
 0.30.0:
 - fix issue #172: `move()` during ramping down of `stopMove()` has used old target position as reference
 - fix issue #173: After `forceStopWithNewPosition()` next `move()` was not executed properly
