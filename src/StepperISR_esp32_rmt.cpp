@@ -299,7 +299,8 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   rmt_set_tx_carrier(channel, false, 0, 0, RMT_CARRIER_LEVEL_LOW);
   rmt_tx_stop(channel);
   rmt_rx_stop(channel);
-  rmt_tx_memory_reset(channel);
+  // rmt_tx_memory_reset is not defined in arduino V340 and based on test result not needed
+  // rmt_tx_memory_reset(channel);
   if (channel_num == 0) {
     rmt_isr_register(tx_intr_handler, NULL,
                      ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM, NULL);

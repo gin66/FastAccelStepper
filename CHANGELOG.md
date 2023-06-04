@@ -5,6 +5,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+0.30.2:
+- Fix compile error for esp32 arduino V3.4.0
+
 0.30.1:
 - Fix compile error for esp32s2/s3 in rmt module
 
