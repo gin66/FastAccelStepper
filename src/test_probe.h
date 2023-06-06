@@ -1,17 +1,18 @@
 #ifndef TEST_PROBE_H
 #define TEST_PROBE_H
 //#define TEST_MODE
-// test mode in rmt: 
+// test mode in rmt:
 //   code to investigate rmt module functioning
 
 //#define ESP32_TEST_PROBE
 
 #ifdef ESP32_TEST_PROBE
 
-// in rmt: 
-//   TEST_PROBE_1  on startQueue and queue stop, with double toggle at startQueue
-//   TEST_PROBE_2  end interrupt, when rmt transmission hits buffer end
-//   TEST_PROBE_3  threshold interrupt, after first buffer half transmission is complete
+// in rmt:
+//   TEST_PROBE_1  on startQueue and queue stop, with double toggle at
+//   startQueue TEST_PROBE_2  end interrupt, when rmt transmission hits buffer
+//   end TEST_PROBE_3  threshold interrupt, after first buffer half transmission
+//   is complete
 #define TEST_PROBE_1 18
 #define TEST_PROBE_2 5
 #define TEST_PROBE_3 4

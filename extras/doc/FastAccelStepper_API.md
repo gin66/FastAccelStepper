@@ -157,7 +157,8 @@ And the two directions of a move
 #define RAMP_DIRECTION_COUNT_DOWN 64
 ```
 A ramp state value of 2 is set after any move call on a stopped motor
-and until the stepper task. The stepper task will then control the direction flags
+and until the stepper task. The stepper task will then control the direction
+flags
 
 ## Timing values - Architecture dependent
 
@@ -479,7 +480,10 @@ provided and will be set as current position after stop.
 ```cpp
   void forceStopAndNewPosition(uint32_t new_pos);
 ```
-get the target position for the current move
+get the target position for the current move.
+As of now, this position is the view of the stepper task.
+This means, the value will stay unchanged after a move/moveTo until the 
+stepper task is executed.
 ```cpp
   int32_t targetPos() { return _rg.targetPosition(); }
 ```

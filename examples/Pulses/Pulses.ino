@@ -92,10 +92,10 @@ void loop() {
       .ticks = MIN_CMD_TICKS, .steps = 2, .count_up = true};
   const struct stepper_command_s cmd_step10 = {
       .ticks = min_ticks, .steps = 10, .count_up = true};
-//  const struct stepper_command_s cmd_step5 = {
-//      .ticks = 45000, .steps = 5, .count_up = true};
-//  const struct stepper_command_s cmd_pause = {
-//      .ticks = 5000, .steps = 0, .count_up = true};
+  //  const struct stepper_command_s cmd_step5 = {
+  //      .ticks = 45000, .steps = 5, .count_up = true};
+  //  const struct stepper_command_s cmd_pause = {
+  //      .ticks = 5000, .steps = 0, .count_up = true};
   uint8_t res[20];
   uint8_t *r = res;
   if (stepper) {

@@ -505,7 +505,10 @@ class FastAccelStepper {
   // provided and will be set as current position after stop.
   void forceStopAndNewPosition(uint32_t new_pos);
 
-  // get the target position for the current move
+  // get the target position for the current move.
+  // As of now, this position is the view of the stepper task.
+  // This means, the value will stay unchanged after a move/moveTo until the
+  // stepper task is executed.
   inline int32_t targetPos() { return _rg.targetPosition(); }
 
   // ## Low Level Stepper Queue Management (low level access)
