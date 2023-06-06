@@ -5,6 +5,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+0.30.3:
+- esp32s2: Add an explicit start for rmt module, which is for esp32 not needed
+
 0.30.2:
 - Fix compile error for esp32 arduino V3.4.0
 

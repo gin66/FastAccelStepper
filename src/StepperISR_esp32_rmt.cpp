@@ -492,6 +492,8 @@ void StepperQueue::startQueue_rmt() {
 
   // This starts the rmt module
   RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
+
+  RMT.conf_ch[channel].conf1.tx_start = 1;
 }
 void StepperQueue::forceStop_rmt() {
   stop_rmt(true);
