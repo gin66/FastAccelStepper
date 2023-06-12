@@ -41,3 +41,6 @@ Tests;
 
 - test 13
   tests with maximum high acceleration
+
+- test 14
+  test case for issue #178: Speed jump instead of decrease
