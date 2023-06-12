@@ -76,7 +76,9 @@ class FastAccelStepperTest {
                  bool call_moveTo_repeatedly = false,
                  bool call_setAccelertion_repeatedly = false,
                  bool alternatingAccelerationValue = false,
-                 bool reversing_allowed = false) {
+                 bool reversing_allowed = false,
+				 uint32_t linear_acceleration_steps = 0,
+				 uint32_t jump_step = 0) {
     printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n",
            name, steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
     init_queue();
@@ -90,6 +92,8 @@ class FastAccelStepperTest {
     assert(s.isQueueEmpty());
     assert(0 == s.setSpeedInUs(travel_dt));
     s.setAcceleration(accel);
+	s.setLinearAcceleration(linear_acceleration_steps);
+	s.setJumpStart(jump_step);
     s.fill_queue();
     assert(s.isQueueEmpty());
     s.move(steps);
@@ -289,6 +293,14 @@ int main() {
 
   // very short ramp. detected by esp32_hw_based tests seq_06.sh
   test.with_pars("seq_06.sh", 54, 40, 1000000, false, 0.012, 0.018, 0.1);
+
+  // ramp with jump start
+  test.with_pars("f5_jumpstart", 15000, 100, 10000, true, 2 * 1.0 + 0.0 - 0.1,
+                 2 * 1.0 + 0.5 + 0.1, 0.2, false, false, false, false, 0, 100);
+
+  // ramp with linea acceleration
+  test.with_pars("f5_linear_a", 15000, 100, 10000, true, 3,
+                 4, 0.2, false, false, false, false, 1000);
 
   printf("TEST_02 PASSED\n");
   return 0;
