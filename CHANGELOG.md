@@ -5,6 +5,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+0.30.4:
+- Fix for issue #178: speed does not decelerate but jumps to lower value
+
 0.30.3:
 - esp32s2: Add an explicit start for rmt module, which is for esp32 not needed
 

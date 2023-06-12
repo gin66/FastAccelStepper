@@ -417,8 +417,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
 #endif
 
 #ifdef TEST
-  printf("planning steps=%d remaining steps=%d\n", planning_steps,
-         remaining_steps);
+  printf("planning steps=%d remaining steps=%d prus=%d\n", planning_steps,
+         remaining_steps, performed_ramp_up_steps);
 #endif
   // Number of steps to execute with limitation to min 1 and max remaining steps
   uint16_t steps = planning_steps;
@@ -458,23 +458,20 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
              max_ramp_up_steps);
 #endif
       if (performed_ramp_up_steps > max_ramp_up_steps) {
-        // Speed is too high, which is ok while decelerating
-        // So need to run down the ramp
-        uint32_t steps_to_max = performed_ramp_up_steps - max_ramp_up_steps;
-        if (steps < steps_to_max) {
-          steps = steps_to_max;
-        }
+#ifdef TEST
+        printf("reduce prus=%d by %d\n", performed_ramp_up_steps, steps);
+#endif
         performed_ramp_up_steps -= steps;
       } else if ((performed_ramp_up_steps >= max_ramp_up_steps) &&
                  (max_ramp_up_steps + steps <= remaining_steps) &&
                  (performed_ramp_up_steps - steps < max_ramp_up_steps)) {
         // Speed was too high. So we need to ensure to not overshoot
         // deceleration
+#ifdef TEST
+        printf("clip prus=%d to %d\n", performed_ramp_up_steps, max_ramp_up_steps);
+#endif
         performed_ramp_up_steps = max_ramp_up_steps;
         next_ticks = ramp->config.parameters.min_travel_ticks;
-#ifdef TEST
-        printf("clipped prus=%d\n", performed_ramp_up_steps);
-#endif
       } else {
         if (remaining_steps > performed_ramp_up_steps) {
           if (remaining_steps - performed_ramp_up_steps < steps) {

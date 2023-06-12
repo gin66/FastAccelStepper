@@ -47,8 +47,7 @@ class FastAccelStepperTest {
 
     char fname[100];
     sprintf(fname, "test_09.gnuplot");
-    FILE *gp_file = fopen(fname, "w");
-    fprintf(gp_file, "$data <<EOF\n");
+	rc.start_plot(fname);
     for (int j = 0; j < 2; j++) {
       s.move(steps);
       for (int i = 0; i < 100 * steps; i++) {
@@ -71,8 +70,6 @@ class FastAccelStepperTest {
           rc.check_section(
               &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
           fas_queue[0].read_idx++;
-          fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
-                  16000000.0 / rc.last_dt, rc.last_dt);
         }
         uint32_t to_dt = rc.total_ticks;
         float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
@@ -83,10 +80,7 @@ class FastAccelStepperTest {
         old_planned_time_in_buffer = planned_time;
       }
     }
-    fprintf(gp_file, "EOF\n");
-    fprintf(gp_file, "plot $data using 1:2 with linespoints\n");
-    fprintf(gp_file, "pause -1\n");
-    fclose(gp_file);
+	rc.finish_plot();
     test(!s.isRampGeneratorActive(), "too many commands created");
     test(s.getCurrentPosition() == 2 * steps,
          "has not reached target position");

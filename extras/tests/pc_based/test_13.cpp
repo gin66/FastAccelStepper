@@ -50,8 +50,7 @@ class FastAccelStepperTest {
 
     char fname[100];
     sprintf(fname, "test_12.gnuplot");
-    FILE *gp_file = fopen(fname, "w");
-    fprintf(gp_file, "$data <<EOF\n");
+	rc.start_plot(fname);
     bool coast = false;
     for (int i = 0; i < 100 * steps; i++) {
       if (true) {
@@ -73,10 +72,6 @@ class FastAccelStepperTest {
         rc.check_section(
             &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
         fas_queue[0].read_idx++;
-        if ((i % 100) == 0) {
-          fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
-                  16000000.0 / rc.last_dt, rc.last_dt);
-        }
       }
       if ((s.rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST) {
         coast = true;
@@ -94,13 +89,8 @@ class FastAccelStepperTest {
       rc.check_section(
           &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
-      fprintf(gp_file, "%.6f %.2f %d\n", rc.total_ticks / 1000000.0,
-              16000000.0 / rc.last_dt, rc.last_dt);
     }
-    fprintf(gp_file, "EOF\n");
-    fprintf(gp_file, "plot $data using 1:2 with linespoints\n");
-    fprintf(gp_file, "pause -1\n");
-    fclose(gp_file);
+	rc.finish_plot();
     test(!s.isRampGeneratorActive(), "too many commands created");
     test(s.getCurrentPosition() == steps, "has not reached target position");
     test(coast == reach_coasting, "coasting target not met");

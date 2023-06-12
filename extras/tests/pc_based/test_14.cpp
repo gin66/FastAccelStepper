@@ -47,11 +47,11 @@ class FastAccelStepperTest {
 
     char fname[100];
     sprintf(fname, "test_14.gnuplot");
-    FILE *gp_file = fopen(fname, "w");
-    fprintf(gp_file, "$data <<EOF\n");
+	rc.start_plot(fname);
       s.runForward();
       for (int i = 0; i < 2000; i++) {
 		if (i == 1000) {
+			printf("Change speed\n");
 			s.setSpeedInUs(10000);
 			s.applySpeedAcceleration();
 		}
@@ -74,8 +74,6 @@ class FastAccelStepperTest {
           rc.check_section(
               &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
           fas_queue[0].read_idx++;
-          fprintf(gp_file, "%.6f %.2f %d %d\n", rc.total_ticks / 16000000.0,
-                  16000000.0 / rc.last_dt, rc.last_dt, s.getCurrentPosition());
         }
         uint32_t to_dt = rc.total_ticks;
         float planned_time = (to_dt - from_dt) * 1.0 / 16000000;
@@ -89,14 +87,10 @@ class FastAccelStepperTest {
 			break;
 		}
       }
-    fprintf(gp_file, "EOF\n");
-    fprintf(gp_file, "set multiplot layout 2,1\n");
-    fprintf(gp_file, "plot $data using 1:2 with lines\n");
-    fprintf(gp_file, "plot $data using 4:2 with lines\n");
-    fprintf(gp_file, "pause -1\n");
-    fclose(gp_file);
+	  rc.finish_plot();
     //test(!s.isRampGeneratorActive(), "too many commands created");
-    test(s.getCurrentPosition() > 60000, "stepper runs too slow");
+    test(s.getCurrentPosition() > 70000, "stepper runs too slow");
+    test(s.getCurrentPosition() < 80000, "stepper runs too fast");
     printf("Total time  %f\n", rc.total_ticks / 16000000.0);
 
 #if (TEST_CREATE_QUEUE_CHECKSUM == 1)
@@ -107,6 +101,6 @@ class FastAccelStepperTest {
 int main() {
   FastAccelStepperTest test;
   test.ramp();
-  printf("TEST_09 PASSED\n");
+  printf("TEST_14 PASSED\n");
   return 0;
 }

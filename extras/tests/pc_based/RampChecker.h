@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 class RampChecker {
  public:
   uint64_t total_ticks;
@@ -14,6 +16,7 @@ class RampChecker {
   uint32_t time_coasting;
   uint32_t pos;
   uint32_t ticks_since_last_step = 0;
+  FILE *gp_file = NULL;
 
   void next_ramp() {
     increase_ok = true;
@@ -31,6 +34,21 @@ class RampChecker {
     total_ticks = 0;
     pos = 0;
     next_ramp();
+  }
+  void start_plot(char *fname) {
+    gp_file = fopen(fname, "w");
+    fprintf(gp_file, "$data <<EOF\n");
+  }
+  void finish_plot() {
+	if (gp_file != NULL) {
+    fprintf(gp_file, "EOF\n");
+    fprintf(gp_file, "set multiplot layout 2,1\n");
+    fprintf(gp_file, "plot $data using 1:2 with lines\n");
+    fprintf(gp_file, "plot $data using 4:2 with lines\n");
+    fprintf(gp_file, "pause -1\n");
+    fclose(gp_file);
+	gp_file = NULL;
+	}
   }
   void check_section(struct queue_entry *e) {
     uint8_t steps = e->steps;
@@ -72,6 +90,11 @@ class RampChecker {
         "= %u   accel=%.6f inc=%s dec=%s\n",
         total_ticks / 16000000.0, steps, last_dt, curr_dt, min_dt, accel,
         increase_ok ? "ALLOW" : "NO", decrease_ok ? "ALLOW" : "NO");
+
+    if (gp_file != NULL) {
+        fprintf(gp_file, "%.6f %.2f %d %d\n", total_ticks / 16000000.0,
+                  16000000.0 / last_dt, last_dt, pos);
+	}
 
     assert(first || (steps * curr_dt > 0));
 
