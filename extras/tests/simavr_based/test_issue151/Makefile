@@ -7,6 +7,9 @@ SRC=$(wildcard ../../../src/*) $(wildcard src/*)
 
 # platformio should contain only one env section.
 # This section states the dut name
+#		atmega168
+#		atmega168p
+#		atmega328
 #		atmega328p
 #		atmega2560_timer1
 #		atmega2560_timer3
@@ -44,6 +47,21 @@ TRACES+=-at StepA=trace@0x10b/0x08 #OC5A PL3 46 ATMega2560
 TRACES+=-at StepB=trace@0x10b/0x10 #OC5B PL4 45 ATMega2560
 TRACES+=-at StepC=trace@0x10b/0x20 #OC5C PL5 44 ATMega2560
 
+else ifeq ($(DUT),atmega168)
+DEVICE=atmega168
+TRACES+=-at StepA=trace@0x25/0x02  #OC1A PB1 9  atmega168
+TRACES+=-at StepB=trace@0x25/0x04  #OC1B PB2 10 atmega168
+
+else ifeq ($(DUT),atmega168p)
+DEVICE=atmega168p
+TRACES+=-at StepA=trace@0x25/0x02  #OC1A PB1 9  atmega168p
+TRACES+=-at StepB=trace@0x25/0x04  #OC1B PB2 10 atmega168p
+
+else ifeq ($(DUT),atmega328)
+DEVICE=atmega328
+TRACES+=-at StepA=trace@0x25/0x02  #OC1A PB1 9  ATMega328
+TRACES+=-at StepB=trace@0x25/0x04  #OC1B PB2 10 ATMega328
+
 else ifeq ($(DUT),atmega328p)
 DEVICE=atmega328p
 TRACES+=-at StepA=trace@0x25/0x02  #OC1A PB1 9  ATMega328p
@@ -65,7 +83,7 @@ TRACES+=-at EnableA=trace@0x2b/0x04  # Pin 19 PD2
 TRACES+=-at EnableB=trace@0x2b/0x08  # Pin 18 PD3
 TRACES+=-at EnableC=trace@0x10b/0x40 # Pin 43 PL6
 
-else ifeq ($(DEVICE),atmega328p)
+else ifeq ($(DEVICE),$(filter $(DEVICE),atmega168 atmega168p atmega328 atmega328p))
 TRACES+=-at DirA=trace@0x2b/0x20     # Pin 5  PD5
 TRACES+=-at DirB=trace@0x2b/0x80     # Pin 7  PD7
 TRACES+=-at EnableA=trace@0x2b/0x40  # Pin 6  PD6

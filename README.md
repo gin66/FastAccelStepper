@@ -20,15 +20,15 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 [![Build examples for esp32arduino @ latest](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinolatest.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinolatest.yml)
 [![Build examples for Atmega2560](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml)
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
-[![Build examples for Atmega328](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml)
+[![Build examples for Atmega168/328](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml)
 [![Build examples for Atmega32U4](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega32u4.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega32u4.yml)
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 328, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3 and atmelsam due.
+Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
-	- avr atmega328p: only Pin 9 and 10.
+	- avr atmega168/328/p: only Pin 9 and 10.
 	- avr atmega32u4: only Pin 9, 10 and 11.
 	- avr atmega2560: only Pin 6, 7 and 8.
       On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 5 with FAS_TIMER_MODULE setting.
@@ -104,7 +104,7 @@ Comments to pin sharing:
   Every motor will adhere to its auto enable delay, even if other motors already have enabled the pin.
 * Direction pin sharing: The direction pin will be exclusively driven by one motor. If one motor is operating, another motor will wait until the direction pin comes available
 
-### AVR ATMega 328
+### AVR ATMega 168/168P/328/328P
 
 * allows up to 50000 generated steps per second for single stepper operation, 37000 for dual stepper
 * supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
@@ -224,7 +224,7 @@ Few comments to auto enable/disable:
 
 ## Behind the curtains
 
-### AVR ATmega328 and Atmega32u4
+### AVR ATmega168/328 and Atmega32u4
 
 The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This timer overflow interrupt is used for adjusting the speed. 
 

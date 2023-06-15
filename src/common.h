@@ -362,10 +362,11 @@ struct queue_end_s {
 
 //==========================================================================
 //
-// AVR derivate ATmega 328P
+// AVR derivate ATmega 168/328/P
 //
 //==========================================================================
-#if defined(__AVR_ATmega328P__)
+#if (defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
+     defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__))
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define MAX_STEPPER 2
 #define NUM_QUEUES 2
