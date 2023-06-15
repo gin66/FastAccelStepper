@@ -8,7 +8,7 @@
 //
 // FastAccelStepper is a high speed alternative for the
 // [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-// Supported are avr (ATmega 328, ATmega2560), esp32 and atmelsam due.
+// Supported are avr (ATmega 168/328/P, ATmega2560), esp32 and atmelsam due.
 //
 // Here is a basic example to run a stepper from position 0 to 1000 and back
 // again to 0.
@@ -96,14 +96,14 @@ class FastAccelStepperEngine {
   // Comments to valid pins:
   //
   // clang-format off
-  // | Device     | Comment                                                                                           |
-  // |:-----------|:--------------------------------------------------------------------------------------------------|
-  // | ESP32      | Every output capable GPIO can be used                                                             |
-  // | ESP32S2    | Every output capable GPIO can be used                                                             |
-  // | Atmega328p | Only the pins connected to OC1A and OC1B are allowed                                              |
-  // | Atmega2560 | Only the pins connected to OC4A, OC4B and OC4C are allowed.                                       |
-  // | Atmega32u4 | Only the pins connected to OC1A, OC1B and OC1C are allowed                                        |
-  // | Atmel SAM  | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
+  // | Device          | Comment                                                                                           |
+  // |:----------------|:--------------------------------------------------------------------------------------------------|
+  // | ESP32           | Every output capable GPIO can be used                                                             |
+  // | ESP32S2         | Every output capable GPIO can be used                                                             |
+  // | Atmega168/328/p | Only the pins connected to OC1A and OC1B are allowed                                              |
+  // | Atmega2560      | Only the pins connected to OC4A, OC4B and OC4C are allowed.                                       |
+  // | Atmega32u4      | Only the pins connected to OC1A, OC1B and OC1C are allowed                                        |
+  // | Atmel SAM       | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
   // clang-format on
 
   // ## External Pins

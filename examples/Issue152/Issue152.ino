@@ -4,7 +4,8 @@
 #include <avr/sleep.h>
 #endif
 
-#if defined(__AVR_ATmega328P__)
+#if (defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
+     defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__))
 #include "AVRStepperPins.h"
 #define dirPinStepperAVR 5
 #define stepPinStepperAVR stepPinStepper1A
@@ -23,7 +24,8 @@ void setup() {
   engine.init();
 
   // pins are set to outputs here automatically
-#if defined(__AVR_ATmega328P__)
+#if (defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
+     defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__))
   stepper = engine.stepperConnectToPin(stepPinStepperAVR);
   stepper->setDirectionPin(dirPinStepperAVR);
   stepper->setEnablePin(enablePinStepperAVR, true);
