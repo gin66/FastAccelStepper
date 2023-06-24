@@ -140,26 +140,26 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
       }
     }
 #ifdef DEBUG
-	Serial.print("new command: move=");
-	if (_ro.config.parameters.keep_running) {
-		Serial.print(_ro.config.parameters.keep_running_count_up ? "forward":"backward");
-	}
-	else {
-		Serial.print(_ro.config.parameters.move_absolute ? '@':'r');
-		Serial.print(_ro.config.parameters.move_value);
-	}
-	if (_ro.config.parameters.valid_speed) {
-		Serial.print(" v=");
-		Serial.print(_ro.config.parameters.min_travel_ticks);
-	}
-	if (_ro.config.parameters.valid_acceleration) {
-		Serial.print(" a=");
-		Serial.print(pmfl_to_u32(_ro.config.parameters.pmfl_accel));
-	}
-	if (_ro.config.parameters.recalc_ramp_steps) {
-		Serial.print(" recalc");
-	}
-	Serial.println();
+    Serial.print("new command: move=");
+    if (_ro.config.parameters.keep_running) {
+      Serial.print(_ro.config.parameters.keep_running_count_up ? "forward"
+                                                               : "backward");
+    } else {
+      Serial.print(_ro.config.parameters.move_absolute ? '@' : 'r');
+      Serial.print(_ro.config.parameters.move_value);
+    }
+    if (_ro.config.parameters.valid_speed) {
+      Serial.print(" v=");
+      Serial.print(_ro.config.parameters.min_travel_ticks);
+    }
+    if (_ro.config.parameters.valid_acceleration) {
+      Serial.print(" a=");
+      Serial.print(pmfl_to_u32(_ro.config.parameters.pmfl_accel));
+    }
+    if (_ro.config.parameters.recalc_ramp_steps) {
+      Serial.print(" recalc");
+    }
+    Serial.println();
 #endif
   }
 
@@ -194,10 +194,12 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
            _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
 #endif
 #ifdef DEBUG
-	char buf[100];
-    sprintf(buf,"Recalculate performed_ramp_up_steps from %lu to %lu from %lu ticks\n",
-           _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
-	Serial.print(buf);
+    char buf[100];
+    sprintf(
+        buf,
+        "Recalculate performed_ramp_up_steps from %lu to %lu from %lu ticks\n",
+        _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
+    Serial.print(buf);
 #endif
     _rw.performed_ramp_up_steps = performed_ramp_up_steps;
   }
@@ -215,10 +217,10 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
            target_pos);
 #endif
 #ifdef DEBUG
-	char buf[100];
-    sprintf(buf, "Force stop: adjust target position from %ld to %ld\n", _ro.target_pos,
-           target_pos);
-	Serial.print(buf);
+    char buf[100];
+    sprintf(buf, "Force stop: adjust target position from %ld to %ld\n",
+            _ro.target_pos, target_pos);
+    Serial.print(buf);
 #endif
     _ro.target_pos = target_pos;
   } else if (_ro.config.parameters.any_change) {
@@ -228,16 +230,16 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     } else if (_ro.config.parameters.move_absolute) {
       _ro.target_pos = _ro.config.parameters.move_value;
     } else {
-		uint32_t target_pos = _ro.target_pos;
-		if (was_keep_running) {
-			// target_pos is not valid for keep running
-			target_pos = qe.pos;
-		}
+      uint32_t target_pos = _ro.target_pos;
+      if (was_keep_running) {
+        // target_pos is not valid for keep running
+        target_pos = qe.pos;
+      }
       _ro.target_pos = target_pos + _ro.config.parameters.move_value;
     }
 #ifdef DEBUG
-	Serial.print("target pos=");
-	Serial.println(_ro.target_pos);
+    Serial.print("target pos=");
+    Serial.println(_ro.target_pos);
 #endif
   }
 

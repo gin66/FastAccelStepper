@@ -47,7 +47,7 @@ class FastAccelStepperTest {
 
     char fname[100];
     sprintf(fname, "test_09.gnuplot");
-	rc.start_plot(fname);
+    rc.start_plot(fname);
     for (int j = 0; j < 2; j++) {
       s.move(steps);
       for (int i = 0; i < 100 * steps; i++) {
@@ -80,7 +80,7 @@ class FastAccelStepperTest {
         old_planned_time_in_buffer = planned_time;
       }
     }
-	rc.finish_plot();
+    rc.finish_plot();
     test(!s.isRampGeneratorActive(), "too many commands created");
     test(s.getCurrentPosition() == 2 * steps,
          "has not reached target position");

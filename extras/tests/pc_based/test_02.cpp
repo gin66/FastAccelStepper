@@ -77,8 +77,8 @@ class FastAccelStepperTest {
                  bool call_setAccelertion_repeatedly = false,
                  bool alternatingAccelerationValue = false,
                  bool reversing_allowed = false,
-				 uint32_t linear_acceleration_steps = 0,
-				 uint32_t jump_step = 0) {
+                 uint32_t linear_acceleration_steps = 0,
+                 uint32_t jump_step = 0) {
     printf("Test %s test_with_pars steps=%d travel_dt=%d accel=%d dir=%s\n",
            name, steps, travel_dt, accel, reach_max_speed ? "CW" : "CCW");
     init_queue();
@@ -92,8 +92,8 @@ class FastAccelStepperTest {
     assert(s.isQueueEmpty());
     assert(0 == s.setSpeedInUs(travel_dt));
     s.setAcceleration(accel);
-	s.setLinearAcceleration(linear_acceleration_steps);
-	s.setJumpStart(jump_step);
+    s.setLinearAcceleration(linear_acceleration_steps);
+    s.setJumpStart(jump_step);
     s.fill_queue();
     assert(s.isQueueEmpty());
     s.move(steps);
@@ -102,7 +102,7 @@ class FastAccelStepperTest {
     float old_planned_time_in_buffer = 0;
     char fname[100];
     sprintf(fname, "test_02_%s.gnuplot", name);
-	rc.start_plot(fname);
+    rc.start_plot(fname);
     for (int i = 0; i < steps * 100; i++) {
       if (call_moveTo_repeatedly) {
         s.moveTo(steps);
@@ -146,7 +146,7 @@ class FastAccelStepperTest {
           &fas_queue_A.entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
     }
-	rc.finish_plot();
+    rc.finish_plot();
     printf("TEST=%s\n", name);
     test(!s.isRampGeneratorActive(), "too many commands created");
     printf("Total time  %f < %f < %f ?\n", min_time,
@@ -299,8 +299,8 @@ int main() {
                  2 * 1.0 + 0.5 + 0.1, 0.2, false, false, false, false, 0, 100);
 
   // ramp with linea acceleration
-  test.with_pars("f5_linear_a", 15000, 100, 10000, true, 3,
-                 4, 0.2, false, false, false, false, 1000);
+  test.with_pars("f5_linear_a", 15000, 100, 10000, true, 3, 4, 0.2, false,
+                 false, false, false, 1000);
 
   printf("TEST_02 PASSED\n");
   return 0;

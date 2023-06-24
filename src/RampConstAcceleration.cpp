@@ -468,7 +468,8 @@ void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
         // Speed was too high. So we need to ensure to not overshoot
         // deceleration
 #ifdef TEST
-        printf("clip prus=%d to %d\n", performed_ramp_up_steps, max_ramp_up_steps);
+        printf("clip prus=%d to %d\n", performed_ramp_up_steps,
+               max_ramp_up_steps);
 #endif
         performed_ramp_up_steps = max_ramp_up_steps;
         next_ticks = ramp->config.parameters.min_travel_ticks;

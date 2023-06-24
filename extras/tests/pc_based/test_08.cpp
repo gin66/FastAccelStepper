@@ -52,7 +52,7 @@ class FastAccelStepperTest {
 
     char fname[100];
     sprintf(fname, "test_08.gnuplot");
-	rc.start_plot(fname);
+    rc.start_plot(fname);
     for (int i = 0; i < 100 * steps; i++) {
       if (true) {
         printf(
@@ -81,7 +81,7 @@ class FastAccelStepperTest {
       assert((i == 0) || (old_planned_time_in_buffer > 0.005));
       old_planned_time_in_buffer = planned_time;
     }
-	rc.finish_plot();
+    rc.finish_plot();
     test(!s.isRampGeneratorActive(), "too many commands created");
     test(s.getCurrentPosition() == steps, "has not reached target position");
     printf("Total time  %f\n", rc.total_ticks / 16000000.0);

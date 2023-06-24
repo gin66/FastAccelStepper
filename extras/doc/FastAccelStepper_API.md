@@ -482,8 +482,9 @@ provided and will be set as current position after stop.
 ```
 get the target position for the current move.
 As of now, this position is the view of the stepper task.
-This means, the value will stay unchanged after a move/moveTo until the 
+This means, the value will stay unchanged after a move/moveTo until the
 stepper task is executed.
+In keep running mode, the targetPos() is not updated
 ```cpp
   int32_t targetPos() { return _rg.targetPosition(); }
 ```

@@ -452,4 +452,5 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks gagank1 for esp-idf integration by adding CMakeLists.txt (https://github.com/gin66/FastAccelStepper/pull/81)
 - Thanks clazarowitz for the amazing atmel sam due port (https://github.com/gin66/FastAccelStepper/pull/82)
 - Thanks HeldeReis for the awesome ESP32-S3 port (https://github.com/gin66/FastAccelStepper/pull/162)
+- Thanks DaAwesomeP for the extension to ATmega 168/168P/328 (https://github.com/gin66/FastAccelStepper/pull/179)
 

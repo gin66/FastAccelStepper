@@ -41,22 +41,24 @@ class RampChecker {
     fprintf(gp_file, "$data <<EOF\n");
   }
   void finish_plot() {
-	if (gp_file != NULL) {
-    fprintf(gp_file, "EOF\n");
-    fprintf(gp_file, "set term x11 size 1600, 800\n");
-    fprintf(gp_file, "set multiplot layout 2,2\n");
-    fprintf(gp_file, "set title \"speed [steps/s] over time [s]\"\n");
-    fprintf(gp_file, "plot $data using 1:2 with lines notitle\n");
-    fprintf(gp_file, "set title \"speed [steps/s] over position\"\n");
-    fprintf(gp_file, "plot $data using 4:2 with lines notitle\n");
-    fprintf(gp_file, "set title \"position over time [s]\"\n");
-    fprintf(gp_file, "plot $data using 1:4 with lines notitle\n");
-    fprintf(gp_file, "set title \"averaged (!) acceleration [steps/s*s] over time [s]\"\n");
-    fprintf(gp_file, "plot $data using 1:5 with lines notitle\n");
-    fprintf(gp_file, "pause -1\n");
-    fclose(gp_file);
-	gp_file = NULL;
-	}
+    if (gp_file != NULL) {
+      fprintf(gp_file, "EOF\n");
+      fprintf(gp_file, "set term x11 size 1600, 800\n");
+      fprintf(gp_file, "set multiplot layout 2,2\n");
+      fprintf(gp_file, "set title \"speed [steps/s] over time [s]\"\n");
+      fprintf(gp_file, "plot $data using 1:2 with lines notitle\n");
+      fprintf(gp_file, "set title \"speed [steps/s] over position\"\n");
+      fprintf(gp_file, "plot $data using 4:2 with lines notitle\n");
+      fprintf(gp_file, "set title \"position over time [s]\"\n");
+      fprintf(gp_file, "plot $data using 1:4 with lines notitle\n");
+      fprintf(gp_file,
+              "set title \"averaged (!) acceleration [steps/s*s] over time "
+              "[s]\"\n");
+      fprintf(gp_file, "plot $data using 1:5 with lines notitle\n");
+      fprintf(gp_file, "pause -1\n");
+      fclose(gp_file);
+      gp_file = NULL;
+    }
   }
   void check_section(struct queue_entry *e) {
     uint8_t steps = e->steps;
@@ -89,8 +91,8 @@ class RampChecker {
     float accel = 0;
     if (last_dt != ~0) {
       accel = (16000000.0 / float(curr_dt) - 16000000.0 / float(last_dt)) /
-              (1.0 / 16000000.0 * float(steps*curr_dt));
-	  avg_accel += (accel - avg_accel)/(steps*20);
+              (1.0 / 16000000.0 * float(steps * curr_dt));
+      avg_accel += (accel - avg_accel) / (steps * 20);
     }
     printf(
         "process command in ramp checker @%.6fs: steps = %d last = %u current "
@@ -101,9 +103,9 @@ class RampChecker {
         increase_ok ? "ALLOW" : "NO", decrease_ok ? "ALLOW" : "NO");
 
     if (gp_file != NULL) {
-        fprintf(gp_file, "%.6f %.2f %d %d %f\n", total_ticks / 16000000.0,
-                  16000000.0 / last_dt, last_dt, pos, avg_accel);
-	}
+      fprintf(gp_file, "%.6f %.2f %d %d %f\n", total_ticks / 16000000.0,
+              16000000.0 / last_dt, last_dt, pos, avg_accel);
+    }
 
     assert(first || (steps * curr_dt > 0));
 

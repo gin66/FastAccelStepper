@@ -50,7 +50,7 @@ class FastAccelStepperTest {
 
     char fname[100];
     sprintf(fname, "test_12.gnuplot");
-	rc.start_plot(fname);
+    rc.start_plot(fname);
     bool coast = false;
     for (int i = 0; i < 100 * steps; i++) {
       if (true) {
@@ -90,7 +90,7 @@ class FastAccelStepperTest {
           &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
       fas_queue[0].read_idx++;
     }
-	rc.finish_plot();
+    rc.finish_plot();
     test(!s.isRampGeneratorActive(), "too many commands created");
     test(s.getCurrentPosition() == steps, "has not reached target position");
     test(coast == reach_coasting, "coasting target not met");
