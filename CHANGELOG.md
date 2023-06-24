@@ -5,6 +5,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+pre-0.30.5:
+- Fix target position for a move() interrupting the keep running mode
+
 0.30.4:
 - Fix for issue #178: speed does not decelerate but jumps to lower value
 
