@@ -509,6 +509,7 @@ class FastAccelStepper {
   // As of now, this position is the view of the stepper task.
   // This means, the value will stay unchanged after a move/moveTo until the
   // stepper task is executed.
+  // In keep running mode, the targetPos() is not updated
   inline int32_t targetPos() { return _rg.targetPosition(); }
 
   // ## Low Level Stepper Queue Management (low level access)
