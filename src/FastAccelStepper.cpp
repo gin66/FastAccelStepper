@@ -529,6 +529,8 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _stepPin = step_pin;
   _dirHighCountsUp = true;
   _dirPin = PIN_UNDEFINED;
+  _enablePinHighActive = PIN_UNDEFINED;
+  _enablePinLowActive = PIN_UNDEFINED;
   _rg.init();
 
   _queue_num = num;
