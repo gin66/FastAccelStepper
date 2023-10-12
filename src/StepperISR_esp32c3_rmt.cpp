@@ -1,7 +1,7 @@
 #include "StepperISR.h"
 #ifdef SUPPORT_ESP32C3_RMT
 
-#define TEST_MODE
+//#define TEST_MODE
 
 #include "test_probe.h"
 
@@ -36,6 +36,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
 
   // stop esp32 rmt, by let it hit the end
   RMT.tx_conf[channel].tx_conti_mode = 0;
+  RMT.tx_conf[channel].conf_update = 1;
 
   // replace second part of buffer with pauses
   uint32_t *data = FAS_RMT_MEM(channel);
@@ -349,6 +350,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     RMT.tx_conf[channel].tx_conti_mode = 1;
     rmt_set_tx_intr_en(channel, true);
     rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
+  RMT.tx_conf[channel].conf_update = 1;
   RMT.tx_conf[channel].tx_start = 1;
 
     delay(1000);
@@ -362,6 +364,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     if (true) {
       // just clear conti mode => causes end interrupt, no repeat
       RMT.tx_conf[channel].tx_conti_mode = 0;
+  RMT.tx_conf[channel].conf_update = 1;
     }
     delay(1000);
     // actually no need to enable/disable interrupts.
@@ -369,8 +372,10 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 
     // This runs the RMT buffer once
     RMT.tx_conf[channel].tx_conti_mode = 1;
+  RMT.tx_conf[channel].conf_update = 1;
     delay(1);
     RMT.tx_conf[channel].tx_conti_mode = 0;
+  RMT.tx_conf[channel].conf_update = 1;
     while (true) {
       delay(1000);
 	  PROBE_1_TOGGLE;
@@ -569,6 +574,7 @@ void StepperQueue::startQueue_rmt() {
 
   // This starts the rmt module
   RMT.tx_conf[channel].tx_conti_mode = 1;
+  RMT.tx_conf[channel].conf_update = 1;
 
   RMT.tx_conf[channel].tx_start = 1;
 }
