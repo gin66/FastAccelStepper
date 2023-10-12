@@ -140,7 +140,7 @@ struct queue_end_s {
 
 //==========================================================================
 //
-// ESP32 derivate - ESP32S3 - NOT SUPPORTED
+// ESP32 derivate - ESP32S3
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S3
@@ -162,12 +162,12 @@ struct queue_end_s {
 
 //==========================================================================
 //
-// ESP32 derivate - ESP32C3 - NOT SUPPORTED
+// ESP32 derivate - ESP32C3
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C3
-#error "esp32c3 is not supported"
 #define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32C3_RMT
 #include <driver/periph_ctrl.h>
 #include <driver/rmt.h>
 #include <soc/rmt_periph.h>
@@ -175,6 +175,7 @@ struct queue_end_s {
 #include <soc/rmt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
+#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 //==========================================================================
 //

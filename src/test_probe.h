@@ -18,6 +18,13 @@
 #define TEST_PROBE_3 4
 #endif
 
+#define ESP32C3_TEST_PROBE
+#ifdef ESP32C3_TEST_PROBE
+#define TEST_PROBE_1 1
+#define TEST_PROBE_2 2
+#define TEST_PROBE_3 3
+#endif
+
 #ifdef TEST_PROBE_1
 #define PROBE_1(x) digitalWrite(TEST_PROBE_1, x)
 #define PROBE_1_TOGGLE           \
