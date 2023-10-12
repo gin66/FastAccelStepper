@@ -1,15 +1,15 @@
 #include "StepperISR.h"
 #ifdef SUPPORT_ESP32C3_RMT
 
-//#define TEST_MODE
+#define TEST_MODE
 
 #include "test_probe.h"
 
 // The following concept is in use:
 //
-//    The buffer of 64Bytes is split into two parts à 31 words.
+//    The buffer of 48 Bytes is split into two parts à 31 words.
 //    Each part will hold one command (or part of).
-//    After the 2*31 words an end marker is placed.
+//    After the 2*23 words an end marker is placed.
 //    The threshold is set to 31.
 //
 //    This way, the threshold interrupt occurs after the first part
@@ -19,6 +19,14 @@
 // second.
 // Every 16 bit entry defines with MSB the output level and the lower 15 bits
 // the ticks.
+//
+//
+// Important difference of esp32c3 (compared to esp32):
+// - configuration updates need an conf_update strobe
+//   (apparently the manual is not correct by mentioning to set conf_update first)
+// - if the end marker is hit in continuous mode, there is no end interrupt
+//
+//
 #ifdef SUPPORT_ESP32C3_RMT
 #define PART_SIZE 23
 #define MEM_SIZE 48
@@ -35,8 +43,8 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   //  rmt_set_tx_thr_intr_en(channel, false, 0);
 
   // stop esp32 rmt, by let it hit the end
-  RMT.tx_conf[channel].tx_conti_mode = 0;
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].tx_conti_mode = 0;
 
   // replace second part of buffer with pauses
   uint32_t *data = FAS_RMT_MEM(channel);
@@ -212,15 +220,34 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 #define RMT_FIFO fifo_mask
 #endif
 
+// The threshold interrupts are happening in the "middle" of the previous entry.
+// Best strategy:
+// 1. enable threshold interrupt with PART_SIZE+2
+// 2. On every threshold interrupt toggle PART_SIZE and PART_SIZE+1
+// This way the first interrupt happens on the first entry of second half,
+// and the second interrupt on the first entry of the first half.
+// Afterwards alternating. This way the end interrupt is always "half buffer away"
+// from the threshold interrupt
 #ifdef TEST_MODE
 #define PROCESS_CHANNEL(ch)                                    \
   if (mask & RMT_CH##ch##_TX_END_INT_ST) {                     \
-    PROBE_2_TOGGLE;                                            \
+    PROBE_1_TOGGLE;                                            \
   }                                                            \
   if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {               \
-    PROBE_3_TOGGLE;                                            \
-    /* now repeat the interrupt at buffer size + end marker */ \
-    RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE * 2 + 1;              \
+	uint8_t old_limit = RMT.tx_lim[ch].RMT_LIMIT;               \
+	if (old_limit == PART_SIZE+1) { \
+		/* first half of buffer sent */ \
+       PROBE_2_TOGGLE;                                            \
+       RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE;              \
+	} \
+	else { \
+		/* second half of buffer sent */ \
+       PROBE_3_TOGGLE;                                            \
+       RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE + 1;              \
+	} \
+    /*  */ \
+    RMT.tx_conf[ch].conf_update = 1; \
+    RMT.tx_conf[ch].conf_update = 0; \
   }
 #else
 #define PROCESS_CHANNEL(ch)                                      \
@@ -242,13 +269,13 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     if (!q->_rmtStopped) {                                       \
       apply_command(q, true, FAS_RMT_MEM(ch));                   \
       /* now repeat the interrupt at buffer size + end marker */ \
+      RMT.tx_conf[ch].conf_update = 1; \
       RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE * 2 + 1;              \
     }                                                            \
   }
 #endif
 
 static void IRAM_ATTR tx_intr_handler(void *arg) {
-	PROBE_1_TOGGLE;
   uint32_t mask = RMT.int_st.val;
   RMT.int_clr.val = mask;
   PROCESS_CHANNEL(0);
@@ -324,33 +351,35 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 #ifdef TEST_MODE
   if (channel == 0) {
     RMT.tx_conf[channel].mem_rd_rst = 1;
+    RMT.tx_conf[channel].mem_rd_rst = 0;
     uint32_t *mem = FAS_RMT_MEM(channel);
     // Fill the buffer with a significant pattern for debugging
-    for (uint8_t i = 0; i < MEM_SIZE/2; i += 2) {
+    for (uint8_t i = 0; i < PART_SIZE; i++) {
       *mem++ = 0x7fffffff;
-      *mem++ = 0x7fff7fff;
     }
-    for (uint8_t i = MEM_SIZE/2; i < MEM_SIZE-2; i += 2) {
+    for (uint8_t i = PART_SIZE; i < 2*PART_SIZE; i++) {
       *mem++ = 0x3fffdfff;
-      *mem++ = 0x3fff3fff;
     }
     // without end marker it does not loop
     *mem++ = 0;
     *mem++ = 0;
-    // rmt_tx_start(channel, true);
-    PROBE_2_TOGGLE;
 
-  RMT.tx_conf[channel].idle_out_lv = 1;
-  delay(1);
-  RMT.tx_conf[channel].idle_out_lv = 0;
-  delay(1);
-
-    PROBE_3_TOGGLE;
-
+	// conti mode is accepted with the conf_update 1 strobe
+	// but still do not see interrupts
     RMT.tx_conf[channel].tx_conti_mode = 1;
-    rmt_set_tx_intr_en(channel, true);
-    rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+    rmt_set_tx_intr_en(channel, true);
+	// In order to avoid threshold/end interrupt on end, add one
+    rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 2);
+	// intr enable needs conf_update strobe
+  RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+  RMT.tx_conf[channel].mem_tx_wrap_en = 0;
+  RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+	// tx_start does not need conf_update
+    PROBE_1_TOGGLE; // end interrupt will toggle again PROBE_1
   RMT.tx_conf[channel].tx_start = 1;
 
     delay(1000);
@@ -365,6 +394,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
       // just clear conti mode => causes end interrupt, no repeat
       RMT.tx_conf[channel].tx_conti_mode = 0;
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
     }
     delay(1000);
     // actually no need to enable/disable interrupts.
@@ -373,9 +403,11 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     // This runs the RMT buffer once
     RMT.tx_conf[channel].tx_conti_mode = 1;
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
     delay(1);
     RMT.tx_conf[channel].tx_conti_mode = 0;
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
     while (true) {
       delay(1000);
 	  PROBE_1_TOGGLE;
@@ -389,6 +421,8 @@ void StepperQueue::connect_rmt() {
   // rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   RMT.tx_conf[channel].idle_out_lv = 0;
   RMT.tx_conf[channel].idle_out_en = 1;
+  RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
   //RMT.tx_conf[channel].mem_tx_wrap_en = 0;
 #ifndef __ESP32_IDF_V44__
   rmt_set_pin(channel, RMT_MODE_TX, (gpio_num_t)_step_pin);
@@ -397,46 +431,40 @@ void StepperQueue::connect_rmt() {
 #endif
 
 #ifdef TEST_MODE
+  // here gpio is 0
+  delay(1);
   PROBE_3_TOGGLE;
   RMT.tx_conf[channel].idle_out_lv = 1;
-  RMT.tx_conf[channel].idle_out_en = 1;
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+  // here gpio is 1
   delay(2);
   PROBE_3_TOGGLE;
   RMT.tx_conf[channel].idle_out_lv = 0;
+  RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+  // here gpio is 0
+  delay(2);
+  PROBE_3_TOGGLE;
   RMT.tx_conf[channel].idle_out_en = 0;
   RMT.tx_conf[channel].conf_update = 1;
-  delay(2);
-  PROBE_3_TOGGLE;
-  RMT.tx_conf[channel].idle_out_lv = 1;
-  RMT.tx_conf[channel].idle_out_en = 0;
-  RMT.tx_conf[channel].conf_update = 1;
-  delay(2);
-  PROBE_3_TOGGLE;
-  RMT.tx_conf[channel].idle_out_lv = 0;
-  RMT.tx_conf[channel].idle_out_en = 1;
-  RMT.tx_conf[channel].conf_update = 1;
-  delay(2);
-  PROBE_3_TOGGLE;
-  RMT.tx_conf[channel].idle_out_lv = 0;
-  RMT.tx_conf[channel].idle_out_en = 1;
-  RMT.tx_conf[channel].conf_update = 1;
-  delay(2);
-  PROBE_3_TOGGLE;
-  RMT.tx_conf[channel].idle_out_lv = 1;
-  RMT.tx_conf[channel].idle_out_en = 0;
-  RMT.tx_conf[channel].conf_update = 1;
-  delay(2);
-  PROBE_3_TOGGLE;
-  RMT.tx_conf[channel].idle_out_lv = 0;
-  RMT.tx_conf[channel].idle_out_en = 0;
-  RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+  // here gpio is 0
   delay(2);
   PROBE_3_TOGGLE;
   RMT.tx_conf[channel].idle_out_lv = 1;
   RMT.tx_conf[channel].idle_out_en = 1;
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+  // here gpio is 1
   delay(2);
+  PROBE_3_TOGGLE;
+  RMT.tx_conf[channel].idle_out_lv = 0;
+  RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].conf_update = 0;
+  // here gpio is 0
+  delay(2);
+  PROBE_3_TOGGLE;
 #endif
 }
 
@@ -448,6 +476,7 @@ void StepperQueue::disconnect_rmt() {
 #else
 //  rmt_set_gpio(channel, RMT_MODE_TX, GPIO_NUM_NC, false);
 #endif
+  RMT.tx_conf[channel].conf_update = 1;
   RMT.tx_conf[channel].idle_out_en = 0;
 }
 
@@ -462,7 +491,7 @@ void StepperQueue::startQueue_rmt() {
 #ifdef TEST_PROBE_3
   PROBE_3(LOW);
 #endif
-#ifdef TEST_PROBE_1
+#if defined(TEST_PROBE_1) && defined(TEST_PROBE_2) && defined(TEST_PROBE_3)
   delay(1);
   PROBE_1_TOGGLE;
   delay(1);
@@ -497,8 +526,11 @@ void StepperQueue::startQueue_rmt() {
   _rmtStopped = false;
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, 0);
+  RMT.tx_conf[channel].conf_update = 1;
   RMT.tx_conf[channel].mem_tx_wrap_en = 0;
   RMT.tx_conf[channel].mem_rd_rst = 1;
+  RMT.tx_conf[channel].mem_rd_rst = 0;
+  RMT.tx_conf[channel].conf_update = 0;
   // RMT.apb_conf.mem_tx_wrap_en = 0;
 
 //#define TRACE
@@ -573,8 +605,8 @@ void StepperQueue::startQueue_rmt() {
 #endif
 
   // This starts the rmt module
-  RMT.tx_conf[channel].tx_conti_mode = 1;
   RMT.tx_conf[channel].conf_update = 1;
+  RMT.tx_conf[channel].tx_conti_mode = 1;
 
   RMT.tx_conf[channel].tx_start = 1;
 }
