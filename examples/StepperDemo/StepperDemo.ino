@@ -909,7 +909,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
 void setup() {
   SerialInterface.begin(115200);
 #ifdef CONFIG_IDF_TARGET_ESP32C3
-  while (!USBSerial) {
+  while (!Serial) {
     ;  // wait for USB serial port to connect.
   }
 #endif
