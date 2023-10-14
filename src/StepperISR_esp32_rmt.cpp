@@ -115,10 +115,10 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       if (steps < PART_SIZE / 2) {
         for (uint8_t i = 1; i < steps; i++) {
           // steps-1 iterations
-          *data++ = 0x40017fff | 0x8000;
+          *data++ = 0x40007fff | 0x8000;
           *data++ = 0x20002000;
         }
-        *data++ = 0x40017fff | 0x8000;
+        *data++ = 0x40007fff | 0x8000;
         uint16_t delta = PART_SIZE - 2 * steps;
         delta <<= 5;
         *data++ = 0x20002000 - delta;
@@ -132,10 +132,10 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       } else {
         steps -= PART_SIZE / 2;
         for (uint8_t i = 0; i < PART_SIZE / 2 - 1; i++) {
-          *data++ = 0x40017fff | 0x8000;
+          *data++ = 0x40007fff | 0x8000;
           *data++ = 0x20002000;
         }
-        *data++ = 0x40017fff | 0x8000;
+        *data++ = 0x40007fff | 0x8000;
         last_entry = 0x20002000;
       }
     } else if ((steps < 2 * PART_SIZE) && (steps != PART_SIZE)) {
