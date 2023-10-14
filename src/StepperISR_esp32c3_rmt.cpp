@@ -28,11 +28,11 @@
 //
 #ifdef SUPPORT_ESP32C3_RMT
 #define PART_SIZE 23
-#define MEM_SIZE 48
+#define RMT_MEM_SIZE 48
 #else
 #error
 #define PART_SIZE 31
-#define MEM_SIZE 64
+#define RMT_MEM_SIZE 64
 #endif
 
 // In order to avoid threshold/end interrupt on end, add one
@@ -563,7 +563,7 @@ void StepperQueue::startQueue_rmt() {
   USBSerial.print(read_idx);
   USBSerial.print('/');
   USBSerial.println(next_write_idx);
-  for (uint8_t i = 0; i < MEM_SIZE; i++) {
+  for (uint8_t i = 0; i < RMT_MEM_SIZE; i++) {
     USBSerial.print(i);
     USBSerial.print(' ');
     USBSerial.println(mem[i], HEX);
@@ -591,7 +591,7 @@ void StepperQueue::startQueue_rmt() {
   USBSerial.println(' ');
   USBSerial.print(RMT.tx_conf[channel].mem_tx_wrap_en);
   USBSerial.println(' ');
-  for (uint8_t i = 0; i < MEM_SIZE; i++) {
+  for (uint8_t i = 0; i < RMT_MEM_SIZE; i++) {
     USBSerial.print(i);
     USBSerial.print(' ');
     USBSerial.println(mem[i], HEX);
@@ -609,7 +609,7 @@ void StepperQueue::startQueue_rmt() {
   USBSerial.print(RMT.tx_conf[channel].mem_tx_wrap_en);
   USBSerial.println(' ');
 
-  for (uint8_t i = 0; i < MEM_SIZE; i++) {
+  for (uint8_t i = 0; i < RMT_MEM_SIZE; i++) {
     USBSerial.print(i);
     USBSerial.print(' ');
     USBSerial.println(mem[i], HEX);
