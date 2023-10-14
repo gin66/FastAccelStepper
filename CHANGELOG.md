@@ -6,8 +6,9 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
-pre-0.30.6:
-- Partly tested support for ESP32C3
+0.30.6:
+- Support for ESP32C3
+- Fix for missing `_stepper_cnt` initialization (patch #204)
 
 0.30.5:
 - Fix target position for a move() interrupting the keep running mode

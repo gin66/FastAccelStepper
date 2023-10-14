@@ -1,4 +1,4 @@
-# BE AWARE: ARDUINO LIBRARY MANAGER IS BROKEN AND 0.29.x do not show.
+# BE AWARE: ARDUINO LIBRARY MANAGER IS BROKEN AND 0.29.x/0.30.x with x>1 do not show.
 
 No issue with platformio. Check the [related issue](https://github.com/arduino/library-registry/issues/2829) for the arduino library manager
 
@@ -435,6 +435,7 @@ This feature of StepperDemo allows to compare non-smooth running stepper in an a
 * In one setup, operating A4988 without microsteps has led to erratic behaviour at some specific low speed (erratic means step forward/backward, while DIR is kept low). No issue with 16 microstep. These two youtube videos show similar behavior: [hard disc stepper](https://youtu.be/DsYgw3GFHZo) and [axes movement](https://youtu.be/Nw18B81Ylhk)
 * The pulse counters in esp32 have several comparators to trigger interrupts. What the documentation does not mention: All those reference values are only forwarded to the actual comparator on pulse counter reset. Thus the pulse counters cannot be used as lower 16bit of the position, unfortunately.
 * The [issue #60](https://github.com/gin66/FastAccelStepper/issues/60) was raised due to wrong position on negative moves with esp32. Apparently the issue was with proper ground and/or power lines to the stepper driver. If similar issue is encountered, please check on this issue
+* ESP32C3: USBSerial works only under Arduino IDE. platformio support for USBSerial is missing
 
 ## 3rd party videos in action
 
