@@ -2,6 +2,7 @@
 #ifdef SUPPORT_ESP32C3_RMT
 
 //#define TEST_MODE
+//#define TRACE
 
 #include "test_probe.h"
 
@@ -507,7 +508,6 @@ void StepperQueue::disconnect_rmt() {
 }
 
 void StepperQueue::startQueue_rmt() {
-#define TRACE
 #ifdef TRACE
   USBSerial.println("START");
 #endif
