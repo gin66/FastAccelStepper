@@ -4,6 +4,10 @@ TODO:
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
+- merge the two esp32 rmt drivers as soon as esp32c3 works
+
+pre-0.30.6:
+- Untested support for ESP32C3
 
 0.30.5:
 - Fix target position for a move() interrupting the keep running mode

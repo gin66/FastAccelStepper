@@ -15,7 +15,7 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 0:  // INIT
       srand(135);
       if (!stepper->attachToPulseCounter(7)) {
-        Serial.println("Error attaching to pulse counter");
+        SerialInterface.println("Error attaching to pulse counter");
         seq->state = TEST_STATE_ERROR;
         return true;
       }
@@ -27,10 +27,10 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
         int16_t pcnt = stepper->readPulseCounter();
         int32_t spos = stepper->getPositionAfterCommandsCompleted();
         if ((pcnt & 0x3fff) != (spos & 0x3fff)) {
-          Serial.print("stepper pos=");
-          Serial.print(spos);
-          Serial.print("  real pos=");
-          Serial.println(pcnt);
+          SerialInterface.print("stepper pos=");
+          SerialInterface.print(spos);
+          SerialInterface.print("  real pos=");
+          SerialInterface.println(pcnt);
 
           seq->state = TEST_STATE_ERROR;
           return true;
@@ -69,12 +69,12 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
           move = -move;
         }
 
-        Serial.print("speed=");
-        Serial.print(speed);
-        Serial.print(" accel=");
-        Serial.print(accel);
-        Serial.print(" move=");
-        Serial.println(move);
+        SerialInterface.print("speed=");
+        SerialInterface.print(speed);
+        SerialInterface.print(" accel=");
+        SerialInterface.print(accel);
+        SerialInterface.print(" move=");
+        SerialInterface.println(move);
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         stepper->move(move);
