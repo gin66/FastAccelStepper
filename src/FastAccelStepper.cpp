@@ -20,6 +20,7 @@ FastAccelStepper fas_stepper[MAX_STEPPER];
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
   _externalCallForPin = NULL;
+  _stepper_cnt = 0;
   fas_init_engine(this, 255);
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
@@ -29,6 +30,7 @@ void FastAccelStepperEngine::init() {
 #if defined(SUPPORT_CPU_AFFINITY)
 void FastAccelStepperEngine::init(uint8_t cpu_core) {
   _externalCallForPin = NULL;
+  _stepper_cnt = 0;
   fas_init_engine(this, cpu_core);
 }
 #endif
