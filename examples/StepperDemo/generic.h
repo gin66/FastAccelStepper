@@ -1,6 +1,8 @@
 #ifndef GENERIC_H
 #define GENERIC_H
 
+#include <Arduino.h>
+
 #if defined(ARDUINO_ARCH_AVR)
 #define get_char(x) pgm_read_byte(x)
 #define MSG_TYPE PGM_P
@@ -11,8 +13,7 @@
 #error "Unsupported derivate"
 #endif
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3) && defined(CONFIG_TINYUSB_CDC_ENABLED) && (CONFIG_TINYUSB_CDC_ENABLED == 1)
-USBCDC USBSerial;
+#if defined(CONFIG_IDF_TARGET_ESP32C3) && (ARDUINO_USB_MODE==1)
 #define SerialInterface USBSerial
 #else
 #define SerialInterface Serial
