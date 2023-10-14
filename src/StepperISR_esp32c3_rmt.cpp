@@ -23,7 +23,8 @@
 //
 // Important difference of esp32c3 (compared to esp32):
 // - configuration updates need an conf_update strobe
-//   (apparently the manual is not correct by mentioning to set conf_update first)
+//   (apparently the manual is not correct by mentioning to set conf_update
+//   first)
 // - if the end marker is hit in continuous mode, there is no end interrupt
 //
 //
@@ -91,7 +92,8 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         // two pauses à n ticks to achieve MIN_CMD_TICKS
-        *data++ = 0x00010001 * ((MIN_CMD_TICKS + 2 * PART_SIZE - 1) / (2*PART_SIZE));
+        *data++ = 0x00010001 *
+                  ((MIN_CMD_TICKS + 2 * PART_SIZE - 1) / (2 * PART_SIZE));
       }
       return;
     }
@@ -226,28 +228,27 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 // 2. On every threshold interrupt toggle PART_SIZE and PART_SIZE+1
 // This way the first interrupt happens on the first entry of second half,
 // and the second interrupt on the first entry of the first half.
-// Afterwards alternating. This way the end interrupt is always "half buffer away"
-// from the threshold interrupt
+// Afterwards alternating. This way the end interrupt is always "half buffer
+// away" from the threshold interrupt
 #ifdef TEST_MODE
-#define PROCESS_CHANNEL(ch)                                    \
-  if (mask & RMT_CH##ch##_TX_END_INT_ST) {                     \
-    PROBE_1_TOGGLE;                                            \
-  }                                                            \
-  if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {               \
-	uint8_t old_limit = RMT.tx_lim[ch].RMT_LIMIT;               \
-	if (old_limit == PART_SIZE+1) { \
-		/* first half of buffer sent */ \
-       PROBE_2_TOGGLE;                                            \
-       RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE;              \
-	} \
-	else { \
-		/* second half of buffer sent */ \
-       PROBE_3_TOGGLE;                                            \
-       RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE + 1;              \
-	} \
-    /*  */ \
-    RMT.tx_conf[ch].conf_update = 1; \
-    RMT.tx_conf[ch].conf_update = 0; \
+#define PROCESS_CHANNEL(ch)                       \
+  if (mask & RMT_CH##ch##_TX_END_INT_ST) {        \
+    PROBE_1_TOGGLE;                               \
+  }                                               \
+  if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {  \
+    uint8_t old_limit = RMT.tx_lim[ch].RMT_LIMIT; \
+    if (old_limit == PART_SIZE + 1) {             \
+      /* first half of buffer sent */             \
+      PROBE_2_TOGGLE;                             \
+      RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE;       \
+    } else {                                      \
+      /* second half of buffer sent */            \
+      PROBE_3_TOGGLE;                             \
+      RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE + 1;   \
+    }                                             \
+    /*  */                                        \
+    RMT.tx_conf[ch].conf_update = 1;              \
+    RMT.tx_conf[ch].conf_update = 0;              \
   }
 #else
 #define PROCESS_CHANNEL(ch)                                      \
@@ -269,7 +270,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     if (!q->_rmtStopped) {                                       \
       apply_command(q, true, FAS_RMT_MEM(ch));                   \
       /* now repeat the interrupt at buffer size + end marker */ \
-      RMT.tx_conf[ch].conf_update = 1; \
+      RMT.tx_conf[ch].conf_update = 1;                           \
       RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE * 2 + 1;              \
     }                                                            \
   }
@@ -317,8 +318,8 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 
   _initVars();
   _step_pin = step_pin;
-//  digitalWrite(step_pin, LOW);
-//  pinMode(step_pin, OUTPUT);
+  //  digitalWrite(step_pin, LOW);
+  //  pinMode(step_pin, OUTPUT);
 
   channel = (rmt_channel_t)channel_num;
 
@@ -334,9 +335,9 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   rmt_set_tx_carrier(channel, false, 0, 0, RMT_CARRIER_LEVEL_LOW);
   rmt_tx_stop(channel);
   rmt_memory_rw_rst(channel);
-  //rmt_rx_stop(channel); TX only channel !
-  // rmt_tx_memory_reset is not defined in arduino V340 and based on test result
-  // not needed rmt_tx_memory_reset(channel);
+  // rmt_rx_stop(channel); TX only channel !
+  //  rmt_tx_memory_reset is not defined in arduino V340 and based on test
+  //  result not needed rmt_tx_memory_reset(channel);
   if (channel_num == 0) {
     rmt_isr_register(tx_intr_handler, NULL,
                      ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM, NULL);
@@ -357,30 +358,30 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     for (uint8_t i = 0; i < PART_SIZE; i++) {
       *mem++ = 0x7fffffff;
     }
-    for (uint8_t i = PART_SIZE; i < 2*PART_SIZE; i++) {
+    for (uint8_t i = PART_SIZE; i < 2 * PART_SIZE; i++) {
       *mem++ = 0x3fffdfff;
     }
     // without end marker it does not loop
     *mem++ = 0;
     *mem++ = 0;
 
-	// conti mode is accepted with the conf_update 1 strobe
-	// but still do not see interrupts
+    // conti mode is accepted with the conf_update 1 strobe
+    // but still do not see interrupts
     RMT.tx_conf[channel].tx_conti_mode = 1;
-  RMT.tx_conf[channel].conf_update = 1;
-  RMT.tx_conf[channel].conf_update = 0;
+    RMT.tx_conf[channel].conf_update = 1;
+    RMT.tx_conf[channel].conf_update = 0;
     rmt_set_tx_intr_en(channel, true);
-	// In order to avoid threshold/end interrupt on end, add one
+    // In order to avoid threshold/end interrupt on end, add one
     rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 2);
-	// intr enable needs conf_update strobe
-  RMT.tx_conf[channel].conf_update = 1;
-  RMT.tx_conf[channel].conf_update = 0;
-  RMT.tx_conf[channel].mem_tx_wrap_en = 0;
-  RMT.tx_conf[channel].conf_update = 1;
-  RMT.tx_conf[channel].conf_update = 0;
-	// tx_start does not need conf_update
-    PROBE_1_TOGGLE; // end interrupt will toggle again PROBE_1
-  RMT.tx_conf[channel].tx_start = 1;
+    // intr enable needs conf_update strobe
+    RMT.tx_conf[channel].conf_update = 1;
+    RMT.tx_conf[channel].conf_update = 0;
+    RMT.tx_conf[channel].mem_tx_wrap_en = 0;
+    RMT.tx_conf[channel].conf_update = 1;
+    RMT.tx_conf[channel].conf_update = 0;
+    // tx_start does not need conf_update
+    PROBE_1_TOGGLE;  // end interrupt will toggle again PROBE_1
+    RMT.tx_conf[channel].tx_start = 1;
 
     delay(1000);
     if (false) {
@@ -393,8 +394,8 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     if (true) {
       // just clear conti mode => causes end interrupt, no repeat
       RMT.tx_conf[channel].tx_conti_mode = 0;
-  RMT.tx_conf[channel].conf_update = 1;
-  RMT.tx_conf[channel].conf_update = 0;
+      RMT.tx_conf[channel].conf_update = 1;
+      RMT.tx_conf[channel].conf_update = 0;
     }
     delay(1000);
     // actually no need to enable/disable interrupts.
@@ -402,15 +403,15 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 
     // This runs the RMT buffer once
     RMT.tx_conf[channel].tx_conti_mode = 1;
-  RMT.tx_conf[channel].conf_update = 1;
-  RMT.tx_conf[channel].conf_update = 0;
+    RMT.tx_conf[channel].conf_update = 1;
+    RMT.tx_conf[channel].conf_update = 0;
     delay(1);
     RMT.tx_conf[channel].tx_conti_mode = 0;
-  RMT.tx_conf[channel].conf_update = 1;
-  RMT.tx_conf[channel].conf_update = 0;
+    RMT.tx_conf[channel].conf_update = 1;
+    RMT.tx_conf[channel].conf_update = 0;
     while (true) {
       delay(1000);
-	  PROBE_1_TOGGLE;
+      PROBE_1_TOGGLE;
     }
   }
 #endif
@@ -423,7 +424,7 @@ void StepperQueue::connect_rmt() {
   RMT.tx_conf[channel].idle_out_en = 1;
   RMT.tx_conf[channel].conf_update = 1;
   RMT.tx_conf[channel].conf_update = 0;
-  //RMT.tx_conf[channel].mem_tx_wrap_en = 0;
+  // RMT.tx_conf[channel].mem_tx_wrap_en = 0;
 #ifndef __ESP32_IDF_V44__
   rmt_set_pin(channel, RMT_MODE_TX, (gpio_num_t)_step_pin);
 #else
