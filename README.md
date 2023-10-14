@@ -288,11 +288,15 @@ This stepper driver uses rmt module.
 
 ### ESP32S3
 
-This stepper driver uses mcpwm/pcnt modules. Can drive up to 4 motors. Tested with 2 motors.
+This stepper driver uses mcpwm/pcnt modules. Can drive up to 4 motors. Tested with 2 motors (not by me). 
 
-### ESP32C3/ESP32-MINI-1
+Apparently the ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels. Theoretically can drive 4 more steppers.
 
-Compatibility with ESP32-C3: Not supported currently. The rmt module has more changes compared to esp32/esp32s2
+### ESP32C3
+
+This stepper driver uses rmt module and can drive up to 2 motors. Not thoroughly tested, so only experimental support.
+
+### ESP32-MINI-1
 
 Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are listed in the datasheet. So there are chances, that this lib works.
 
