@@ -11,7 +11,7 @@
 #error "Unsupported derivate"
 #endif
 
-#if defined(CONFIG_TINYUSB_CDC_ENABLED)
+#if defined(CONFIG_IDF_TARGET_ESP32C3) && defined(CONFIG_TINYUSB_CDC_ENABLED) && (CONFIG_TINYUSB_CDC_ENABLED == 1)
 USBCDC USBSerial;
 #define SerialInterface USBSerial
 #else
