@@ -101,6 +101,15 @@ void setup() {
   bool pass = test();
   stepper->stopMove();
 
+#ifndef SIMULATOR
+  if (pass) {
+    Serial.print("PASS");
+  }
+  else {
+    Serial.print("FAIL");
+  }
+#endif
+
 #ifdef SIMULATOR
   // if result is Ok. Toggle port twice, otherwise once
 #define PIN stepPinStepperB
