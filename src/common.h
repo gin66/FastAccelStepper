@@ -16,6 +16,11 @@ struct stepper_command_s {
   bool count_up;
 };
 
+struct actual_ticks_s {
+  uint32_t ticks;		// ticks == 0 means standstill
+  bool count_up;
+};
+
 struct queue_end_s {
   volatile int32_t pos;  // in steps
   volatile bool count_up;

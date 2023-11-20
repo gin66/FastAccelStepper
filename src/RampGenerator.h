@@ -89,6 +89,13 @@ class RampGenerator {
   void getNextCommand(const struct queue_end_s *queue_end,
                       NextCommand *cmd_out);
   void afterCommandEnqueued(NextCommand *cmd_in);
+  void getCurrentSpeedInTicks(struct actual_ticks_s *speed) {
+    fasDisableInterrupts();
+    speed->ticks = _rw.curr_ticks;
+	uint8_t rs = _rw.rampState();
+    fasEnableInterrupts();
+	speed->count_up = ((rs & RAMP_DIRECTION_COUNT_UP) != 0);
+  }
   uint32_t getCurrentPeriodInTicks() {
     fasDisableInterrupts();
     uint32_t ticks = _rw.curr_ticks;

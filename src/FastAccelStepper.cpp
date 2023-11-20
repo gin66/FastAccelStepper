@@ -775,34 +775,32 @@ uint32_t FastAccelStepper::getPeriodInUsAfterCommandsCompleted() {
   }
   return 0;
 }
+void FastAccelStepper::getCurrentSpeedInTicks(struct actual_ticks_s *speed) {
+  bool valid = fas_queue[_queue_num].getActualTicksWithDirection(speed);
+  if (!valid) {
+    if (_rg.isRampGeneratorActive()) {
+	  _rg.getCurrentSpeedInTicks(speed);
+	}
+  }
+}
 int32_t FastAccelStepper::getCurrentSpeedInUs() {
-  uint32_t ticks = fas_queue[_queue_num].getActualTicks();
-  if (ticks == 0) {
-    ticks = getPeriodInTicksAfterCommandsCompleted();
+  struct actual_ticks_s speed;
+  getCurrentSpeedInTicks(&speed);
+  int32_t speed_in_us = speed.ticks / (TICKS_PER_S / 1000000);
+  if (speed.count_up) {
+	  return speed_in_us;
   }
-  int32_t speed_in_us = ticks / (TICKS_PER_S / 1000000);
-  switch (_rg.rampState() & RAMP_DIRECTION_MASK) {
-    case RAMP_DIRECTION_COUNT_UP:
-      return speed_in_us;
-    case RAMP_DIRECTION_COUNT_DOWN:
-      return -speed_in_us;
-  }
-  return 0;
+  return -speed_in_us;
 }
 int32_t FastAccelStepper::getCurrentSpeedInMilliHz() {
-  uint32_t ticks = fas_queue[_queue_num].getActualTicks();
-  if (ticks == 0) {
-    ticks = getPeriodInTicksAfterCommandsCompleted();
-  }
-  int32_t speed_in_milli_hz = 0;
-  if (ticks > 0) {
-    speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
-  }
-  switch (_rg.rampState() & RAMP_DIRECTION_MASK) {
-    case RAMP_DIRECTION_COUNT_UP:
-      return speed_in_milli_hz;
-    case RAMP_DIRECTION_COUNT_DOWN:
-      return -speed_in_milli_hz;
+  struct actual_ticks_s speed;
+  getCurrentSpeedInTicks(&speed);
+  if (speed.ticks > 0) {
+    int32_t speed_in_mhz = ((uint32_t)250 * TICKS_PER_S) / speed.ticks * 4;
+	if (speed.count_up) {
+		return speed_in_mhz;
+	}
+	return -speed_in_mhz;
   }
   return 0;
 }

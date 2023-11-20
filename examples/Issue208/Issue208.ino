@@ -42,6 +42,10 @@ bool test() {
      }
      last_v_mHz = v_mHz;
   }
+  // There can be still speed increases in the queue, even so the ramp generator
+  // is already coasting
+  delay(20);
+  last_v_mHz = stepper->getCurrentSpeedInMilliHz();
 
   Serial.println("Reverse");
 

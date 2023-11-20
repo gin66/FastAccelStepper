@@ -646,6 +646,7 @@ class FastAccelStepper {
   bool needAutoDisable();
   bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
+  void getCurrentSpeedInTicks(struct actual_ticks_s *speed);
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;

@@ -6,6 +6,10 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
+pre-0.30.7:
+- Fix for issue #208: close to speed reversal is the sign of current speed incorrect.
+  Still the speed increase during acceleration/deceleraion is not monotonic
+
 0.30.6:
 - Support for ESP32C3
 - Fix for missing `_stepper_cnt` initialization (patch #204)
