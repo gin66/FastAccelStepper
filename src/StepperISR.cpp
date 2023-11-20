@@ -281,7 +281,7 @@ bool StepperQueue::hasTicksInQueue(uint32_t min_ticks) {
   return false;
 }
 
-bool StepperQueue::getActualTicksWithDirection(struct actual_ticks_s *speed) {
+bool StepperQueue::getActualTicksWithDirection(struct actual_ticks_s* speed) {
   // Retrieve current step rate from the current command.
   // This is valid only, if the command describes more than one step,
   // or if the next command contains one step, too.
@@ -290,19 +290,19 @@ bool StepperQueue::getActualTicksWithDirection(struct actual_ticks_s *speed) {
   uint8_t wp = next_write_idx;
   fasEnableInterrupts();
   if (wp == rp) {
-	speed->ticks = 0;
+    speed->ticks = 0;
     return true;
   }
   struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
   if (e->hasSteps) {
-	speed->count_up = e->countUp;
-	speed->ticks = e->ticks;
+    speed->count_up = e->countUp;
+    speed->ticks = e->ticks;
     if (e->moreThanOneStep) {
-	  return true;
+      return true;
     }
     if (wp != ++rp) {
       if (entry[rp & QUEUE_LEN_MASK].hasSteps) {
-		return true;
+        return true;
       }
     }
   }

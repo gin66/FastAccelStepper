@@ -7,8 +7,8 @@ TODO:
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
 pre-0.30.7:
-- Fix for issue #208: close to speed reversal is the sign of current speed incorrect.
-  Still the speed increase during acceleration/deceleraion is not monotonic
+- Fix for issue #208: the sign of current speed may be incorrect close to direction change 
+- The functions `getCurrentSpeedInMilliHz()` and `getCurrentSpeedInUs()` have been extended to supply a bool parameter about being realtime.
 
 0.30.6:
 - Support for ESP32C3

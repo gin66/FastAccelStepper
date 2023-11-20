@@ -17,7 +17,7 @@ struct stepper_command_s {
 };
 
 struct actual_ticks_s {
-  uint32_t ticks;		// ticks == 0 means standstill
+  uint32_t ticks;  // ticks == 0 means standstill
   bool count_up;
 };
 

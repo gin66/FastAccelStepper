@@ -13,7 +13,7 @@
 #error "Unsupported derivate"
 #endif
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3) && (ARDUINO_USB_MODE==1)
+#if defined(CONFIG_IDF_TARGET_ESP32C3) && (ARDUINO_USB_MODE == 1)
 #define SerialInterface USBSerial
 #else
 #define SerialInterface Serial

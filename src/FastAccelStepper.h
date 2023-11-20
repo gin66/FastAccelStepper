@@ -187,8 +187,8 @@ class FastAccelStepperEngine {
 #define RAMP_DIRECTION_COUNT_DOWN 64
 
 // A ramp state value of 2 is set after any move call on a stopped motor
-// and until the stepper task. The stepper task will then control the direction
-// flags
+// and until the stepper task is serviced. The stepper task will then 
+// control the direction flags
 
 #include "RampGenerator.h"
 
@@ -365,8 +365,21 @@ class FastAccelStepper {
   // |   > 0 | while position counting up   |
   // |   < 0 | while position counting down |
   //
-  int32_t getCurrentSpeedInUs();
-  int32_t getCurrentSpeedInMilliHz();
+  // If the parameter realtime is true, then the most actual speed
+  // from the stepper queue is derived. This works only, if the queue
+  // does not contain pauses, which is normally the case for slow speeds.
+  // Otherwise the speed from the ramp generator is reported, which is
+  // done always in case of `realtime == false`. That speed is typically
+  // the value of the speed a couple of milliseconds later.
+  //
+  // The drawback of `realtime == true` is, that the reported speed
+  // may either come from the queue or from the ramp generator.
+  // This means the returned speed may have jumps during
+  // acceleration/deceleration.
+  //
+  // For backward compatibility, the default is true.
+  int32_t getCurrentSpeedInUs(bool realtime = true);
+  int32_t getCurrentSpeedInMilliHz(bool realtime = true);
 
   // ## Acceleration
   //  setAcceleration() expects as parameter the change of speed
@@ -646,7 +659,7 @@ class FastAccelStepper {
   bool needAutoDisable();
   bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
-  void getCurrentSpeedInTicks(struct actual_ticks_s *speed);
+  void getCurrentSpeedInTicks(struct actual_ticks_s* speed, bool realtime);
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;

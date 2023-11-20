@@ -19,6 +19,7 @@ FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper;
 
 bool test() {
+  bool verbose = false;
   int32_t errCnt = 0;
   Serial.println("Start test: speed up");
   int32_t last_v_mHz = 0;
@@ -26,52 +27,53 @@ bool test() {
   stepper->setSpeedInHz(36800);
   stepper->runForward();
 
-  while(stepper->rampState() != (RAMP_STATE_COAST | RAMP_DIRECTION_COUNT_UP)) {
-     int32_t v_mHz = stepper->getCurrentSpeedInMilliHz();
-     if (v_mHz == last_v_mHz) {
-        continue;
-     }
-     Serial.println(v_mHz);
-     if (v_mHz < last_v_mHz) {
-        Serial.print("FAIL: last=");
-        Serial.print(last_v_mHz);
-        Serial.print("  new=");
-        Serial.println(v_mHz);
-        errCnt++;
- //       return false;
-     }
-     last_v_mHz = v_mHz;
+  while (stepper->rampState() != (RAMP_STATE_COAST | RAMP_DIRECTION_COUNT_UP)) {
+    int32_t v_mHz = stepper->getCurrentSpeedInMilliHz(false);
+    if (v_mHz == last_v_mHz) {
+      continue;
+    }
+    if (verbose) Serial.println(v_mHz);
+    if (v_mHz < last_v_mHz) {
+      Serial.print("FAIL: last=");
+      Serial.print(last_v_mHz);
+      Serial.print("  new=");
+      Serial.println(v_mHz);
+      errCnt++;
+      //       return false;
+    }
+    last_v_mHz = v_mHz;
   }
   // There can be still speed increases in the queue, even so the ramp generator
   // is already coasting
   delay(20);
-  last_v_mHz = stepper->getCurrentSpeedInMilliHz();
+  last_v_mHz = stepper->getCurrentSpeedInMilliHz(false);
 
   Serial.println("Reverse");
 
   stepper->runBackward();
 
-  while(stepper->rampState() != (RAMP_STATE_COAST | RAMP_DIRECTION_COUNT_DOWN)) {
-     int32_t v_mHz = stepper->getCurrentSpeedInMilliHz();
-     if (v_mHz == last_v_mHz) {
-        continue;
-     }
-     Serial.println(v_mHz);
-     if (v_mHz > last_v_mHz) {
-        Serial.print("FAIL: last=");
-        Serial.print(last_v_mHz);
-        Serial.print("  new=");
-        Serial.println(v_mHz);
-        errCnt++;
- //       return false;
-     }
-     last_v_mHz = v_mHz;
+  while (stepper->rampState() !=
+         (RAMP_STATE_COAST | RAMP_DIRECTION_COUNT_DOWN)) {
+    int32_t v_mHz = stepper->getCurrentSpeedInMilliHz(false);
+    if (v_mHz == last_v_mHz) {
+      continue;
+    }
+    if (verbose) Serial.println(v_mHz);
+    if (v_mHz > last_v_mHz) {
+      Serial.print("FAIL: last=");
+      Serial.print(last_v_mHz);
+      Serial.print("  new=");
+      Serial.println(v_mHz);
+      errCnt++;
+      //       return false;
+    }
+    last_v_mHz = v_mHz;
   }
   if (errCnt > 0) {
-     Serial.print("Errors=");
-     Serial.println(errCnt);
+    Serial.print("Errors=");
+    Serial.println(errCnt);
   }
-  return errCnt != 0;
+  return errCnt == 0;
 }
 
 void setup() {
@@ -112,8 +114,7 @@ void setup() {
     Serial.println("PASS");
     digitalWrite(PIN, HIGH);
     digitalWrite(PIN, LOW);
-  }
-  else {
+  } else {
     Serial.println("FAIL");
   }
   delay(1000);
@@ -122,6 +123,4 @@ void setup() {
 #endif
 }
 
-
-void loop() {
-}
+void loop() {}
