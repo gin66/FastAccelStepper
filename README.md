@@ -66,6 +66,11 @@ FastAccelStepper offers the following features:
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.com/#gin66/FastAccelStepper&Date)
+
+
 General behaviour:
 * The desired end position to move to is set by calls to moveTo() and move()
 * The desired end position is in case of moveTo() given as absolute position
