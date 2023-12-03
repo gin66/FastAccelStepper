@@ -104,8 +104,7 @@ void setup() {
 #ifndef SIMULATOR
   if (pass) {
     Serial.print("PASS");
-  }
-  else {
+  } else {
     Serial.print("FAIL");
   }
 #endif

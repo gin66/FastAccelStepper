@@ -187,7 +187,7 @@ class FastAccelStepperEngine {
 #define RAMP_DIRECTION_COUNT_DOWN 64
 
 // A ramp state value of 2 is set after any move call on a stopped motor
-// and until the stepper task is serviced. The stepper task will then 
+// and until the stepper task is serviced. The stepper task will then
 // control the direction flags
 
 #include "RampGenerator.h"
@@ -332,9 +332,9 @@ class FastAccelStepper {
   uint32_t getMaxSpeedInMilliHz();
 
   // For esp32, the device's maximum allowed speed can be overridden
-  // This is absolutely untested and use at your own risk.
-#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING==1
-  setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
+  // This is absolutely untested. Use at your own risk.
+#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+  void setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
 #endif
 
   // Setting the speed can be done with the four `setSpeed...()` calls.

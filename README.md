@@ -24,7 +24,7 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 [![Build examples for Atmega32U4](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega32u4.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega32u4.yml)
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3 and atmelsam due.
+Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
@@ -148,6 +148,12 @@ Comments to pin sharing:
 
 * allows up to 200000 generated steps per second ?
 * supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+
+### ESP32C3
+
+* allows up to 200000 generated steps per second ?
+* supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### Atmel SAM Due

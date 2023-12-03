@@ -157,7 +157,7 @@ And the two directions of a move
 #define RAMP_DIRECTION_COUNT_DOWN 64
 ```
 A ramp state value of 2 is set after any move call on a stopped motor
-and until the stepper task is serviced. The stepper task will then 
+and until the stepper task is serviced. The stepper task will then
 control the direction flags
 
 ## Timing values - Architecture dependent
@@ -289,6 +289,13 @@ For the device's maximum allowed speed, the following calls can be used.
   uint16_t getMaxSpeedInTicks();
   uint32_t getMaxSpeedInHz();
   uint32_t getMaxSpeedInMilliHz();
+```
+For esp32, the device's maximum allowed speed can be overridden
+This is absolutely untested. Use at your own risk.
+```cpp
+#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+  void setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
+#endif
 ```
 Setting the speed can be done with the four `setSpeed...()` calls.
 The new value will be used only after call of these functions:
