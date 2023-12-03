@@ -828,6 +828,9 @@ uint32_t FastAccelStepper::getMaxSpeedInMilliHz() {
   uint32_t speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
   return speed_in_milli_hz;
 }
+void FastAccelStepper::setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks) {
+  fas_queue[_queue_num].setAbsoluteSpeedLimit(max_speed_in_ticks);
+}
 int8_t FastAccelStepper::setSpeedInTicks(uint32_t min_step_ticks) {
   if (min_step_ticks < getMaxSpeedInTicks()) {
     return -1;

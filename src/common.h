@@ -79,6 +79,7 @@ struct queue_end_s {
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 1
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 0
 
 #define noop_or_wait
 
@@ -96,6 +97,7 @@ struct queue_end_s {
 
 #define SUPPORT_ESP32
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 // Some more esp32 specific includes
 #include <driver/gpio.h>
@@ -237,6 +239,7 @@ struct queue_end_s {
 #elif defined(ESP_PLATFORM)
 
 #define SUPPORT_ESP32
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 // esp32 specific includes
 #include <driver/gpio.h>
@@ -337,6 +340,7 @@ struct queue_end_s {
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
 #define SUPPORT_AVR
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 0
 
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>

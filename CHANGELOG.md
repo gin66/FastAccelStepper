@@ -6,6 +6,9 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
+pre-0.30.8:
+- Implement `setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks)` as proposed by issue #210
+
 0.30.7:
 - Fix for issue #208: the sign of current speed may be incorrect close to direction change 
 - The functions `getCurrentSpeedInMilliHz()` and `getCurrentSpeedInUs()` have been extended to supply a bool parameter about being realtime.
