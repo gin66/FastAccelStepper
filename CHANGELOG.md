@@ -6,6 +6,9 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
+pre-0.30.9:
+- Fix esp32s3 to support the fourth stepper (issue #212)
+
 0.30.8:
 - Implement `setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks)` as proposed by issue #210
 
