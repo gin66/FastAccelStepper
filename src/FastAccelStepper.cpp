@@ -61,8 +61,7 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
 }
 //*************************************************************************************************
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin)
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
 #else
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, uint8_t driver_type)

@@ -64,7 +64,9 @@ hardware may have limitations - e.g. no stepper resources anymore, or the
 step pin cannot be used, then NULL is returned. So it is advised to check
 the return value of this call.
 ```cpp
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
+#endif
 ```
 For e.g. esp32, there are two types of driver.
 One using mcpwm and pcnt module. And another using rmt module.
@@ -74,7 +76,7 @@ This call allows to select the respective driver
 #define DRIVER_MCPWM_PCNT 0
 #define DRIVER_RMT 1
 #define DRIVER_DONT_CARE 2
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin, uint8_t driver_type);
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin, uint8_t driver_type = DRIVER_DONT_CARE);
 #endif
 ```
 Comments to valid pins:
