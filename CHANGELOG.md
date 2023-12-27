@@ -8,6 +8,8 @@ TODO:
 
 pre-0.30.10:
 - Unify code in stepperConnectToPin to fix bug mentioned in #221
+  This ensures setting of per stepper speed limit is working for avr variants without side effect
+  of uncontrolled write to I/O-region
 - rename `common.h` to `fas_common.h` as proposed in #220
 
 0.30.9:
