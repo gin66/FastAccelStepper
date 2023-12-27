@@ -62,7 +62,12 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
 //*************************************************************************************************
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin) {
+    uint8_t step_pin)
+#else
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin, uint8_t driver_type)
+#endif
+{
   // Check if already connected
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
@@ -75,6 +80,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (!_isValidStepPin(step_pin)) {
     return NULL;
   }
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
   int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
   if (fas_stepper_num < 0) {  // flexible, so just choose next
     if (_stepper_cnt >= MAX_STEPPER) {
@@ -82,32 +88,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     }
     fas_stepper_num = _stepper_cnt;
   }
-  _stepper_cnt++;
-
-  FastAccelStepper* s = &fas_stepper[fas_stepper_num];
-  _stepper[fas_stepper_num] = s;
-  s->init(this, fas_stepper_num, step_pin);
-  for (uint8_t i = 0; i < _stepper_cnt; i++) {
-    FastAccelStepper* sx = _stepper[i];
-    fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
-  }
-  return s;
-}
 #else
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin, uint8_t driver_type) {
-  // Check if already connected
-  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper* s = _stepper[i];
-    if (s) {
-      if (s->getStepPin() == step_pin) {
-        return NULL;
-      }
-    }
-  }
-  if (!_isValidStepPin(step_pin)) {
-    return NULL;
-  }
   uint8_t queue_from = 0;
   uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT;
   if (driver_type == DRIVER_MCPWM_PCNT) {
@@ -126,6 +107,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (fas_stepper_num < 0) {
     return NULL;
   }
+#endif
   _stepper_cnt++;
 
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
@@ -139,7 +121,6 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
   return s;
 }
-#endif
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
