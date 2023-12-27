@@ -2,7 +2,7 @@
 #define FASTACCELSTEPPER_H
 #include <stdint.h>
 #include "PoorManFloat.h"
-#include "common.h"
+#include "fas_common.h"
 
 // # FastAccelStepper
 //

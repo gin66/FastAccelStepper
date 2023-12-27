@@ -8,6 +8,7 @@ TODO:
 
 pre-0.30.10:
 - Unify code in stepperConnectToPin to fix bug mentioned in #221
+- rename `common.h` to `fas_common.h` as proposed in #220
 
 0.30.9:
 - Fix esp32s3 to support the fourth stepper (issue #212)

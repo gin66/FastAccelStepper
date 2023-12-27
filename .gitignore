@@ -20,7 +20,7 @@ extras/tests/pc_based/RampGenerator.cpp
 extras/tests/pc_based/RampGenerator.h
 extras/tests/pc_based/StepperISR*.cpp
 extras/tests/pc_based/StepperISR.h
-extras/tests/pc_based/common.h
+extras/tests/pc_based/fas_common.h
 extras/tests/pc_based/*.gnuplot
 extras/tests/pc_based/*_test
 extras/tests/pc_based/test.log
