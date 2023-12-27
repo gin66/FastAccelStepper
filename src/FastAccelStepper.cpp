@@ -95,11 +95,6 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 }
 #else
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin) {
-  return stepperConnectToPin(step_pin, DRIVER_DONT_CARE);
-}
-
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, uint8_t driver_type) {
   // Check if already connected
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
