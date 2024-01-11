@@ -11,20 +11,20 @@
 //	ticks is multiplied by (1/TICKS_PER_S) in s
 //	If steps is 0, then a pause is generated
 struct stepper_command_s {
-  uint16_t ticks;
-  uint8_t steps;
-  bool count_up;
+    uint16_t ticks;
+    uint8_t steps;
+    bool count_up;
 };
 
 struct actual_ticks_s {
-  uint32_t ticks;  // ticks == 0 means standstill
-  bool count_up;
+    uint32_t ticks;  // ticks == 0 means standstill
+    bool count_up;
 };
 
 struct queue_end_s {
-  volatile int32_t pos;  // in steps
-  volatile bool count_up;
-  volatile bool dir;
+    volatile int32_t pos;  // in steps
+    volatile bool count_up;
+    volatile bool dir;
 };
 
 // use own min/max/abs function, because the lib versions are messed up
@@ -55,6 +55,7 @@ struct queue_end_s {
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "../extras/tests/pc_based/stubs.h"
 
 // For pc-based testing, the macro TEST is defined. The pc-based testing does
@@ -136,8 +137,8 @@ struct queue_end_s {
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32S3_PULSE_COUNTER
 #define SUPPORT_ESP32_RMT
-#include <driver/periph_ctrl.h>
 #include <driver/pcnt.h>
+#include <driver/periph_ctrl.h>
 #include <driver/rmt.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
@@ -160,9 +161,17 @@ struct queue_end_s {
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
+#define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32S3_RMT
+#include <driver/periph_ctrl.h>
 #include <driver/rmt.h>
+#include <soc/rmt_periph.h>
+#include <soc/rmt_reg.h>
+#include <soc/rmt_struct.h>
+#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
+
 #define QUEUES_MCPWM_PCNT 4
-#define QUEUES_RMT 0
+#define QUEUES_RMT 2
 
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
@@ -344,12 +353,13 @@ struct queue_end_s {
 
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
+
 #include "AVRStepperPins.h"
 // for AVR processors a reentrant version of disabling/enabling interrupts is
 // used
 #define fasDisableInterrupts() \
-  uint8_t prevSREG = SREG;     \
-  cli()
+    uint8_t prevSREG = SREG;   \
+    cli()
 #define fasEnableInterrupts() SREG = prevSREG
 
 // Here are shorthand definitions for number of queues, the queues/channel
@@ -382,7 +392,8 @@ struct queue_end_s {
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
-enum channels { channelA, channelB };
+enum channels { channelA,
+                channelB };
 //==========================================================================
 //
 // AVR derivate ATmega 2560
@@ -395,7 +406,9 @@ enum channels { channelA, channelB };
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
-enum channels { channelA, channelB, channelC };
+enum channels { channelA,
+                channelB,
+                channelC };
 //==========================================================================
 //
 // AVR derivate ATmega 32U4
@@ -407,7 +420,9 @@ enum channels { channelA, channelB, channelC };
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
-enum channels { channelA, channelB, channelC };
+enum channels { channelA,
+                channelB,
+                channelC };
 //==========================================================================
 //
 // For all unsupported AVR derivates
