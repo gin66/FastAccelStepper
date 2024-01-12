@@ -36,13 +36,13 @@
 #endif
 
 // In order to avoid threshold/end interrupt on end, add one
-#define enable_rmt_interrupts(channel)                 \
-    {                                                  \
-        RMT.tx_lim[channel].RMT_LIMIT = PART_SIZE + 2; \
-        RMT.tx_conf[channel].conf_update = 1;          \
-        RMT.tx_conf[channel].conf_update = 0;          \
-        RMT.int_clr.val |= 0x101 << channel;           \
-        RMT.int_ena.val |= 0x101 << channel;           \
+#define enable_rmt_interrupts(channel)                     \
+    {                                                      \
+        RMT.chn_tx_lim[channel].RMT_LIMIT = PART_SIZE + 2; \
+        RMT.chnconf0[channel].conf_update_n = 1;           \
+        RMT.chnconf0[channel].conf_update_n = 0;           \
+        RMT.int_clr.val |= 0x101 << channel;               \
+        RMT.int_ena.val |= 0x101 << channel;               \
     }
 #define disable_rmt_interrupts(channel) \
     { RMT.int_ena.val &= ~(0x101 << channel); }
@@ -55,9 +55,9 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
     //  rmt_set_tx_thr_intr_en(channel, false, 0);
 
     // stop esp32 rmt, by let it hit the end
-    RMT.tx_conf[channel].tx_conti_mode = 0;
-    RMT.tx_conf[channel].conf_update = 1;
-    RMT.tx_conf[channel].conf_update = 0;
+    RMT.chnconf0[channel].tx_conti_mode_n = 0;
+    RMT.chnconf0[channel].conf_update_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 0;
 
     // replace second part of buffer with pauses
     uint32_t *data = FAS_RMT_MEM(channel);
@@ -230,12 +230,12 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     }
 }
 
-#if !defined(RMT_CHANNEL_MEM) && !defined(SUPPORT_ESP32C3_RMT)
+#if !defined(RMT_CHANNEL_MEM) && !defined(SUPPORT_ESP32S3_RMT)
 #define RMT_LIMIT tx_lim
 #define RMT_FIFO apb_fifo_mask
 #else
-#define RMT_LIMIT limit
-#define RMT_FIFO fifo_mask
+#define RMT_LIMIT tx_lim_chn
+#define RMT_FIFO apb_fifo_mask
 #endif
 
 // The threshold interrupts are happening in the "middle" of the previous entry.
@@ -247,26 +247,26 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 // Afterwards alternating. This way the end interrupt is always "half buffer
 // away" from the threshold interrupt
 #ifdef TEST_MODE
-#define PROCESS_CHANNEL(ch)                           \
-    if (mask & RMT_CH##ch##_TX_END_INT_ST) {          \
-        PROBE_1_TOGGLE;                               \
-    }                                                 \
-    if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {    \
-        uint8_t old_limit = RMT.tx_lim[ch].RMT_LIMIT; \
-        if (old_limit == PART_SIZE + 1) {             \
-            /* second half of buffer sent */          \
-            PROBE_2_TOGGLE;                           \
-            /* demonstrate modification of RAM */     \
-            uint32_t *mem = FAS_RMT_MEM(ch);          \
-            mem[PART_SIZE] = 0x33ff33ff;              \
-            RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE;     \
-        } else {                                      \
-            /* first half of buffer sent */           \
-            PROBE_3_TOGGLE;                           \
-            RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE + 1; \
-        }                                             \
-        RMT.tx_conf[ch].conf_update = 1;              \
-        RMT.tx_conf[ch].conf_update = 0;              \
+#define PROCESS_CHANNEL(ch)                               \
+    if (mask & RMT_CH##ch##_TX_END_INT_ST) {              \
+        PROBE_1_TOGGLE;                                   \
+    }                                                     \
+    if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {        \
+        uint8_t old_limit = RMT.chn_tx_lim[ch].RMT_LIMIT; \
+        if (old_limit == PART_SIZE + 1) {                 \
+            /* second half of buffer sent */              \
+            PROBE_2_TOGGLE;                               \
+            /* demonstrate modification of RAM */         \
+            uint32_t *mem = FAS_RMT_MEM(ch);              \
+            mem[PART_SIZE] = 0x33ff33ff;                  \
+            RMT.chn_tx_lim[ch].RMT_LIMIT = PART_SIZE;     \
+        } else {                                          \
+            /* first half of buffer sent */               \
+            PROBE_3_TOGGLE;                               \
+            RMT.chn_tx_lim[ch].RMT_LIMIT = PART_SIZE + 1; \
+        }                                                 \
+        RMT.tx_conf[ch].conf_update = 1;                  \
+        RMT.tx_conf[ch].conf_update = 0;                  \
     }
 #else
 #define PROCESS_CHANNEL(ch)                                   \
@@ -279,7 +279,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
         PROBE_3_TOGGLE;                                       \
     }                                                         \
     if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {            \
-        uint8_t old_limit = RMT.tx_lim[ch].RMT_LIMIT;         \
+        uint8_t old_limit = RMT.chn_tx_lim[ch].RMT_LIMIT;     \
         StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch]; \
         uint32_t *mem = FAS_RMT_MEM(ch);                      \
         if (old_limit == PART_SIZE + 1) {                     \
@@ -288,15 +288,15 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
             apply_command(q, false, mem);                     \
             /* demonstrate modification of RAM */             \
             /*mem[PART_SIZE] = 0x33fff3ff;       */           \
-            RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE;             \
+            RMT.chn_tx_lim[ch].RMT_LIMIT = PART_SIZE;         \
         } else {                                              \
             /* first half of buffer sent */                   \
             PROBE_3_TOGGLE;                                   \
             apply_command(q, true, mem);                      \
-            RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE + 1;         \
+            RMT.chn_tx_lim[ch].RMT_LIMIT = PART_SIZE + 1;     \
         }                                                     \
-        RMT.tx_conf[ch].conf_update = 1;                      \
-        RMT.tx_conf[ch].conf_update = 0;                      \
+        RMT.chnconf0[ch].conf_update_n = 1;                   \
+        RMT.chnconf0[ch].conf_update_n = 0;                   \
     }
 #endif
 
@@ -378,7 +378,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     if (channel_num == 0) {
         rmt_isr_register(tx_intr_handler, NULL,
                          ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM, NULL);
-        RMT.sys_conf.fifo_mask = 1;  // disable fifo mode
+        RMT.sys_conf.apb_fifo_mask = 1;  // disable fifo mode
     }
 
     _isRunning = false;
@@ -446,10 +446,10 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect_rmt() {
-    RMT.tx_conf[channel].idle_out_lv = 0;
-    RMT.tx_conf[channel].idle_out_en = 1;
-    RMT.tx_conf[channel].conf_update = 1;
-    RMT.tx_conf[channel].conf_update = 0;
+    RMT.chnconf0[channel].idle_out_lv_n = 0;
+    RMT.chnconf0[channel].idle_out_en_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 0;
     // RMT.tx_conf[channel].mem_tx_wrap_en = 0;
 #ifndef __ESP32_IDF_V44__
     rmt_set_pin(channel, RMT_MODE_TX, (gpio_num_t)_step_pin);
@@ -502,9 +502,9 @@ void StepperQueue::disconnect_rmt() {
 #else
 //  rmt_set_gpio(channel, RMT_MODE_TX, GPIO_NUM_NC, false);
 #endif
-    RMT.tx_conf[channel].idle_out_en = 0;
-    RMT.tx_conf[channel].conf_update = 1;
-    RMT.tx_conf[channel].conf_update = 0;
+    RMT.chnconf0[channel].idle_out_en_n = 0;
+    RMT.chnconf0[channel].conf_update_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 0;
 }
 
 void StepperQueue::startQueue_rmt() {
@@ -536,8 +536,8 @@ void StepperQueue::startQueue_rmt() {
 #endif
     rmt_tx_stop(channel);
     // rmt_rx_stop(channel);
-    RMT.tx_conf[channel].mem_rd_rst = 1;
-    RMT.tx_conf[channel].mem_rd_rst = 0;
+    RMT.chnconf0[channel].mem_rd_rst_n = 1;
+    RMT.chnconf0[channel].mem_rd_rst_n = 0;
     uint32_t *mem = FAS_RMT_MEM(channel);
 // #define TRACE
 #ifdef TRACE
@@ -554,9 +554,9 @@ void StepperQueue::startQueue_rmt() {
     _isRunning = true;
     _rmtStopped = false;
     disable_rmt_interrupts(channel);
-    RMT.tx_conf[channel].mem_tx_wrap_en = 0;
-    RMT.tx_conf[channel].conf_update = 1;
-    RMT.tx_conf[channel].conf_update = 0;
+    RMT.chnconf0[channel].mem_tx_wrap_en_n = 0;
+    RMT.chnconf0[channel].conf_update_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 0;
 
 #ifdef TRACE
     USBSerial.print("Queue:");
@@ -627,15 +627,15 @@ void StepperQueue::startQueue_rmt() {
 #endif
 
     // This starts the rmt module
-    RMT.tx_conf[channel].tx_conti_mode = 1;
-    RMT.tx_conf[channel].conf_update = 1;
-    RMT.tx_conf[channel].conf_update = 0;
-    RMT.tx_conf[channel].mem_tx_wrap_en = 0;
-    RMT.tx_conf[channel].conf_update = 1;
-    RMT.tx_conf[channel].conf_update = 0;
+    RMT.chnconf0[channel].tx_conti_mode_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 0;
+    RMT.chnconf0[channel].mem_tx_wrap_en_n = 0;
+    RMT.chnconf0[channel].conf_update_n = 1;
+    RMT.chnconf0[channel].conf_update_n = 0;
 
     PROBE_1_TOGGLE;
-    RMT.tx_conf[channel].tx_start = 1;
+    RMT.chnconf0[channel].tx_start_n = 1;
 }
 void StepperQueue::forceStop_rmt() {
     stop_rmt(true);
