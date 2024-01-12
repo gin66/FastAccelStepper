@@ -147,7 +147,7 @@ Comments to pin sharing:
 ### ESP32S3
 
 * allows up to 200000 generated steps per second ?
-* supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* supports up to eight stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### ESP32C3
@@ -280,12 +280,12 @@ A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one 
 
 What are the differences between mcpwm/pcnt and rmt ?
 
-|                            | mcpwm/pcnt                              | rmt                                                                           |
-|:---------------------------|:----------------------------------------|:------------------------------------------------------------------------------|
-|Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed |
-|Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          |
-|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           |
-|esp32 notes                 | availabe pcnt modules can be connected  | no pcnt module used, so can be attached to rmt output as realtime position    |
+|                             | mcpwm/pcnt                              | rmt                                                                           |
+| :-------------------------- | :-------------------------------------- | :---------------------------------------------------------------------------- |
+| Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed |
+| Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          |
+| Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           |
+| esp32 notes                 | availabe pcnt modules can be connected  | no pcnt module used, so can be attached to rmt output as realtime position    |
 
 If the interrupt load is not an issue, then rmt is the better choice. With rmt the below (multi-axis application) mentioned loss of synchonicity at high speeds can be avoided. The rmt driver is - besides some rmt modules perks - less complex and way more straightforward.
 
@@ -299,9 +299,9 @@ This stepper driver uses rmt module.
 
 ### ESP32S3
 
-This stepper driver uses mcpwm/pcnt modules. Can drive up to 4 motors. Tested with 2 motors (not by me). 
+This stepper driver uses mcpwm/pcnt + rmt modules. Can drive up to 8 motors. Tested with 6 motors (not by me). 
 
-Apparently the ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels. Theoretically can drive 4 more steppers.
+The ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels and with different register names.
 
 ### ESP32C3
 
