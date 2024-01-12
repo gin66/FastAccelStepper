@@ -171,7 +171,7 @@ struct queue_end_s {
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 #define QUEUES_MCPWM_PCNT 4
-#define QUEUES_RMT 2
+#define QUEUES_RMT 4
 
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER

@@ -247,26 +247,26 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 // Afterwards alternating. This way the end interrupt is always "half buffer
 // away" from the threshold interrupt
 #ifdef TEST_MODE
-#define PROCESS_CHANNEL(ch)                               \
-    if (mask & RMT_CH##ch##_TX_END_INT_ST) {              \
-        PROBE_1_TOGGLE;                                   \
-    }                                                     \
-    if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {        \
-        uint8_t old_limit = RMT.chn_tx_lim[ch].RMT_LIMIT; \
-        if (old_limit == PART_SIZE + 1) {                 \
-            /* second half of buffer sent */              \
-            PROBE_2_TOGGLE;                               \
-            /* demonstrate modification of RAM */         \
-            uint32_t *mem = FAS_RMT_MEM(ch);              \
-            mem[PART_SIZE] = 0x33ff33ff;                  \
-            RMT.chn_tx_lim[ch].RMT_LIMIT = PART_SIZE;     \
-        } else {                                          \
-            /* first half of buffer sent */               \
-            PROBE_3_TOGGLE;                               \
-            RMT.chn_tx_lim[ch].RMT_LIMIT = PART_SIZE + 1; \
-        }                                                 \
-        RMT.tx_conf[ch].conf_update = 1;                  \
-        RMT.tx_conf[ch].conf_update = 0;                  \
+#define PROCESS_CHANNEL(ch)                           \
+    if (mask & RMT_CH##ch##_TX_END_INT_ST) {          \
+        PROBE_1_TOGGLE;                               \
+    }                                                 \
+    if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {    \
+        uint8_t old_limit = RMT.tx_lim[ch].RMT_LIMIT; \
+        if (old_limit == PART_SIZE + 1) {             \
+            /* second half of buffer sent */          \
+            PROBE_2_TOGGLE;                           \
+            /* demonstrate modification of RAM */     \
+            uint32_t *mem = FAS_RMT_MEM(ch);          \
+            mem[PART_SIZE] = 0x33ff33ff;              \
+            RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE;     \
+        } else {                                      \
+            /* first half of buffer sent */           \
+            PROBE_3_TOGGLE;                           \
+            RMT.tx_lim[ch].RMT_LIMIT = PART_SIZE + 1; \
+        }                                             \
+        RMT.tx_conf[ch].conf_update = 1;              \
+        RMT.tx_conf[ch].conf_update = 0;              \
     }
 #else
 #define PROCESS_CHANNEL(ch)                                   \
