@@ -17,7 +17,7 @@
 // Every 16 bit entry defines with MSB the output level and the lower 15 bits
 // the ticks.
 //
-// Important difference of esp32c3 (compared to esp32):
+// Important difference of esp32s3 (compared to esp32):
 // - configuration updates need an conf_update strobe
 //   (apparently the manual is not correct by mentioning to set conf_update
 //   first)
@@ -207,7 +207,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
             steps -= PART_SIZE;
         }
     }
-    // No tick lost mentioned for esp32c3
+    // No tick lost mentioned for esp32s3
     // if (!fill_part_one) {
     // Note: When enabling the continuous transmission mode by setting
     // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
@@ -353,13 +353,13 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     // APB_CLOCK=80 MHz
     // CLK_DIV = APB_CLOCK/5 = 16 MHz
     //
-    // Relation 1 in esp32c3 technical reference:
+    // Relation 1 in esp32s3 technical reference:
     //      3 * T_APB + 5 * T_RMT_CLK < period * T_CLK_DIV
     //      => 8 * T_APB < period * T_APB*5
     //      => period > 8/5
     //      => period >= 2
     //
-    // Relation 2 in esp32c3 technical reference before end marker:
+    // Relation 2 in esp32s3 technical reference before end marker:
     //      6 * T_APB + 12 * T_RMT_CLK < period * T_CLK_DIV
     //      => 18 * T_APB < period * T_APB*5
     //      => period > 18/5
