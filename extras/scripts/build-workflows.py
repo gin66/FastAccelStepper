@@ -40,6 +40,9 @@ for section in config.sections():
     flds = s.split("_")
     derivate = flds[0]
     version = s.replace(derivate + "_","")
+    if "disabled" in s:
+        print(f"Skip: {derivate} {version}")
+        continue
     if version[0] == "V":
         print(f"Section: {derivate} {version}")
         action = template.format(derivate=derivate,version=version)
