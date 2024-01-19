@@ -14,9 +14,9 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.28.1)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.28.1)
 
-## Build for ESP33-platform
+## Build for ESP32-platform
 
-Build examples for different versions:
+Build examples for different versions of espressif-arduino platform:
 
 ### esp32
 [![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml)
