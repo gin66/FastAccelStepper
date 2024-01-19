@@ -14,14 +14,43 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.28.1)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.28.1)
 
-[![Build examples for esp32](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml)
-[![Build examples for esp32s2](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml)
-[![Build examples for esp32arduino @ 3.4.0](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml)
-[![Build examples for esp32arduino @ latest](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinolatest.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinolatest.yml)
+## Build for ESP33-platform
+
+Build examples for different versions:
+
+### esp32
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml)
+[![`V6_4_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_4_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_4_0.yml)
+[![`V6_3_2`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_3_2.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_3_2.yml)
+[![`V6_2_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_2_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_2_0.yml)
+[![`V6_1_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_1_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_1_0.yml)
+[![`V6_0_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_0_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_0_1.yml)
+[![`V5_3_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_3_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_3_0.yml)
+[![`V5_2_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_2_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_2_0.yml)
+[![`V5_1_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_1_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_1_1.yml)
+[![`V5_0_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_0_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_0_0.yml)
+[![`V4_4_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_4_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_4_0.yml)
+[![`V4_3_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_3_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_3_0.yml)
+[![`V4_2_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_2_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_2_0.yml)
+[![`V4_1_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_1_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_1_0.yml)
+[![`V3_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V3_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V3_5_0.yml)
+
+### esp32s2
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_5_0.yml)
+
+### esp32s3
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_5_0.yml)
+
+### esp32c3
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml)
+
+## Build for avr-platform
 [![Build examples for Atmega2560](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml)
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
 [![Build examples for Atmega168/328](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml)
 [![Build examples for Atmega32U4](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega32u4.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega32u4.yml)
+
+## Overview
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
 Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3 and atmelsam due.
