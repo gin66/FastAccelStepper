@@ -118,7 +118,6 @@ struct queue_end_s {
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
-#define SUPPORT_SELECT_DRIVER_TYPE
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #include <driver/rmt.h>
@@ -441,5 +440,13 @@ enum channels { channelA, channelB, channelC };
 #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
 #endif /* __ESP32_IDF_V44__ */
+
+//==========================================================================
+// determine, if driver type selection should be supported
+#if defined(QUEUES_MCPWM_PCNT) && defined(QUEUES_RMT)
+#if (QUEUES_MCPWM_PCNT > 0) && (QUEUES_RMT > 0)
+#define SUPPORT_SELECT_DRIVER_TYPE
+#endif
+#endif
 
 #endif /* COMMON_H */
