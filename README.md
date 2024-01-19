@@ -280,12 +280,12 @@ A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one 
 
 What are the differences between mcpwm/pcnt and rmt ?
 
-|                             | mcpwm/pcnt                              | rmt                                                                           |
-| :-------------------------- | :-------------------------------------- | :---------------------------------------------------------------------------- |
-| Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed |
-| Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          |
-| Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           |
-| esp32 notes                 | availabe pcnt modules can be connected  | no pcnt module used, so can be attached to rmt output as realtime position    |
+|                            | mcpwm/pcnt                              | rmt                                                                           |
+|:---------------------------|:----------------------------------------|:------------------------------------------------------------------------------|
+|Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed |
+|Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          |
+|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           |
+|esp32 notes                 | availabe pcnt modules can be connected  | no pcnt module used, so can be attached to rmt output as realtime position    |
 
 If the interrupt load is not an issue, then rmt is the better choice. With rmt the below (multi-axis application) mentioned loss of synchonicity at high speeds can be avoided. The rmt driver is - besides some rmt modules perks - less complex and way more straightforward.
 
@@ -470,4 +470,5 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks HeldeReis for the awesome ESP32-S3 port (https://github.com/gin66/FastAccelStepper/pull/162)
 - Thanks DaAwesomeP for the extension to ATmega 168/168P/328 (https://github.com/gin66/FastAccelStepper/pull/179)
 - Thanks turley for the patch for missing `_stepper_cnt` initialization (https://github.com/gin66/FastAccelStepper/pull/204)
+- Thanks GarmischWg for adding rmt-support to ESP32-S3 (https://github.com/gin66/FastAccelStepper/pull/225)
 

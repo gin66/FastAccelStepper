@@ -6,6 +6,9 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
+pre-0.30.11:
+- esp32s3: add support for rmt from patch #225
+
 0.30.10:
 - Unify code in stepperConnectToPin to fix bug mentioned in #221
   This ensures setting of per stepper speed limit is working for avr variants without side effect
