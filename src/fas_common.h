@@ -11,20 +11,20 @@
 //	ticks is multiplied by (1/TICKS_PER_S) in s
 //	If steps is 0, then a pause is generated
 struct stepper_command_s {
-    uint16_t ticks;
-    uint8_t steps;
-    bool count_up;
+  uint16_t ticks;
+  uint8_t steps;
+  bool count_up;
 };
 
 struct actual_ticks_s {
-    uint32_t ticks;  // ticks == 0 means standstill
-    bool count_up;
+  uint32_t ticks;  // ticks == 0 means standstill
+  bool count_up;
 };
 
 struct queue_end_s {
-    volatile int32_t pos;  // in steps
-    volatile bool count_up;
-    volatile bool dir;
+  volatile int32_t pos;  // in steps
+  volatile bool count_up;
+  volatile bool dir;
 };
 
 // use own min/max/abs function, because the lib versions are messed up
@@ -358,8 +358,8 @@ struct queue_end_s {
 // for AVR processors a reentrant version of disabling/enabling interrupts is
 // used
 #define fasDisableInterrupts() \
-    uint8_t prevSREG = SREG;   \
-    cli()
+  uint8_t prevSREG = SREG;     \
+  cli()
 #define fasEnableInterrupts() SREG = prevSREG
 
 // Here are shorthand definitions for number of queues, the queues/channel
@@ -392,8 +392,7 @@ struct queue_end_s {
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
-enum channels { channelA,
-                channelB };
+enum channels { channelA, channelB };
 //==========================================================================
 //
 // AVR derivate ATmega 2560
@@ -406,9 +405,7 @@ enum channels { channelA,
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
-enum channels { channelA,
-                channelB,
-                channelC };
+enum channels { channelA, channelB, channelC };
 //==========================================================================
 //
 // AVR derivate ATmega 32U4
@@ -420,9 +417,7 @@ enum channels { channelA,
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
-enum channels { channelA,
-                channelB,
-                channelC };
+enum channels { channelA, channelB, channelC };
 //==========================================================================
 //
 // For all unsupported AVR derivates
