@@ -25,7 +25,7 @@ jobs:
     - name: Make directories
       run: bash extras/scripts/build-pio-dirs.sh
     - name: Build on PlatformIO
-      run: bash extras/scripts/build-platformio.sh {derivate}{version}
+      run: bash extras/scripts/build-platformio.sh {derivate}_{version}
 """
 
 # Create a ConfigParser object

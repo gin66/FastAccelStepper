@@ -18,4 +18,4 @@ jobs:
     - name: Make directories
       run: bash extras/scripts/build-pio-dirs.sh
     - name: Build on PlatformIO
-      run: bash extras/scripts/build-platformio.sh esp32c3V6_5_0
+      run: bash extras/scripts/build-platformio.sh esp32c3_V6_5_0
