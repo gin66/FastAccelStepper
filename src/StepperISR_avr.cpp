@@ -26,6 +26,7 @@
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
 #define Stepper_IsOneIfOutput(T, X) ((TCCR##T##A & _BV(COM##T##X##0)) != 0)
+#define Stepper_ToggleDirection(CHANNEL) *fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask
 
 #ifdef SIMAVR_TIME_MEASUREMENT
 #define prepareISRtimeMeasurement() DDRB |= 0x18
@@ -119,6 +120,8 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 #endif
 }
 
+
+
 // The interrupt is called on compare event, which eventually
 // generates a L->H transition. In any case, the current command's
 // wait time has still to be executed for the next command, if any.
@@ -161,6 +164,9 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
        */                                                                     \
       fas_queue_##CHANNEL._prepareForStop = false;                            \
       if (e->steps > 0) {                                                     \
+        if (e->toggle_dir) {                                                  \
+            Stepper_ToggleDirection(CHANNEL);                                 \
+        }                                                                     \
         /* That's the problem, so generate a step */                          \
         Stepper_One(T, CHANNEL);                                              \
         ForceCompare(T, CHANNEL);                                             \
@@ -188,7 +194,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         Stepper_One(T, CHANNEL);                                              \
       }                                                                       \
       if (e->toggle_dir) {                                                    \
-        *fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask;  \
+        Stepper_ToggleDirection(CHANNEL);                                     \
       }                                                                       \
     } else {                                                                  \
       fas_queue_##CHANNEL._prepareForStop = true;                             \
