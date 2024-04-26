@@ -32,3 +32,4 @@ extras/tests/simavr_based/test_sd*/Makefile
 extras/tests/simavr_based/test_seq*/Makefile
 extras/tests/esp32_hw_based/*.log
 library.properties
+examples
