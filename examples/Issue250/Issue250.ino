@@ -47,7 +47,9 @@ void loop() {
   stepper->runForward();
   delay(delayForward);
   stepper->runBackward();
-  delay(delayBackward);
+  uint32_t start_ms = millis();
+  while (millis() < delayBackward + start_ms) {
+  }
   if (loopcnt == 100) {
 #ifdef SIMULATOR
      stepper->moveTo(0, true);

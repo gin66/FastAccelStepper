@@ -109,10 +109,10 @@ endif
 
 test: .tested
 
-.tested: result.txt expect.txt ../judge.awk
+.tested: result.txt ../judge_pos0.awk
 	echo DUT=$(DUT)
 	rm -f .tested
-	gawk -f ../judge.awk -v DIR=$(DIR) result.txt expect.txt
+	gawk -f ../judge_pos0.awk -v DIR=$(DIR) result.txt
 	test -f .tested
 
 result.txt: x.vcd
