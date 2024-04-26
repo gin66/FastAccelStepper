@@ -43,18 +43,24 @@ void loop() {
   loopcnt++;
   Serial.print("Loop=");
   Serial.println(loopcnt);
+  uint32_t start_ms;
   uint32_t delayForward = (rand() % 50) + 50;
   uint32_t delayBackward = (rand() % 50) + 50;
   stepper->runForward();
-  delay(delayForward);
+  start_ms = millis();
+  while (millis() < delayForward + start_ms) {
+     noInterrupts();
+     _delay_us(25);
+     interrupts();
+  }
   stepper->runBackward();
-  uint32_t start_ms = millis();
+  start_ms = millis();
   while (millis() < delayBackward + start_ms) {
      noInterrupts();
      _delay_us(25);
      interrupts();
   }
-  if (loopcnt == 1000) {
+  if (loopcnt == 200) {
 #ifdef SIMULATOR
      stepper->moveTo(0, true);
      noInterrupts();
