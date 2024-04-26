@@ -50,14 +50,18 @@ void loop() {
   start_ms = millis();
   while (millis() < delayForward + start_ms) {
      noInterrupts();
+#ifdef SIMULATOR
      _delay_us(25);
+#endif
      interrupts();
   }
   stepper->runBackward();
   start_ms = millis();
   while (millis() < delayBackward + start_ms) {
      noInterrupts();
+#ifdef SIMULATOR
      _delay_us(25);
+#endif
      interrupts();
   }
   if (loopcnt == 200) {
