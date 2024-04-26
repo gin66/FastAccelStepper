@@ -117,7 +117,6 @@ test: .tested
 
 result.txt: x.vcd
 	gawk -v SILENCE=$(SILENCE) -f ../eval.awk x.vcd >/dev/null
-	cat expect.txt
 
 x.vcd: $(SRC) ../run_avr platformio.ini src/Issue250.ino
 	~/.platformio/penv/bin/pio run -e $(DUT) || ~/.local/bin/pio run -e $(DUT) || env pio run -e $(DUT)

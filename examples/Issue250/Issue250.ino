@@ -1,6 +1,7 @@
 #include "FastAccelStepper.h"
 
 #ifdef SIMULATOR
+#include <util/delay.h>
 #include <avr/sleep.h>
 #endif
 
@@ -30,7 +31,7 @@ void setup() {
     stepper->setDelayToEnable(50);
     stepper->setDelayToDisable(50);
 
-    stepper->setSpeedInHz(5000);  
+    stepper->setSpeedInHz(40000);
     stepper->setAcceleration(100000);
 
   }
@@ -42,15 +43,18 @@ void loop() {
   loopcnt++;
   Serial.print("Loop=");
   Serial.println(loopcnt);
-  uint32_t delayForward = (rand() % 500) + 50;
-  uint32_t delayBackward = (rand() % 500) + 50;
+  uint32_t delayForward = (rand() % 50) + 50;
+  uint32_t delayBackward = (rand() % 50) + 50;
   stepper->runForward();
   delay(delayForward);
   stepper->runBackward();
   uint32_t start_ms = millis();
   while (millis() < delayBackward + start_ms) {
+     noInterrupts();
+     _delay_us(25);
+     interrupts();
   }
-  if (loopcnt == 100) {
+  if (loopcnt == 1000) {
 #ifdef SIMULATOR
      stepper->moveTo(0, true);
      noInterrupts();
