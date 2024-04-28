@@ -124,8 +124,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 #endif
 }
 
-
-
 // The interrupt is called on compare event, which eventually
 // generates a L->H transition. In any case, the current command's
 // wait time has still to be executed for the next command, if any.
@@ -167,10 +165,10 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       /* if this new command requires a step, then this step would be lost    \
        */                                                                     \
       fas_queue_##CHANNEL._prepareForStop = false;                            \
+      if (e->toggle_dir) {                                                    \
+          Stepper_ToggleDirection(CHANNEL);                                   \
+      }                                                                       \
       if (e->steps > 0) {                                                     \
-        if (e->toggle_dir) {                                                  \
-            Stepper_ToggleDirection(CHANNEL);                                 \
-        }                                                                     \
         /* That's the problem, so generate a step */                          \
         Stepper_One(T, CHANNEL);                                              \
         ForceCompare(T, CHANNEL);                                             \
@@ -194,13 +192,14 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     if (rp != fas_queue_##CHANNEL.next_write_idx) {                           \
       /* command in queue */                                                  \
       e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];                    \
-      if (e->steps != 0) {                                                    \
-        Stepper_One(T, CHANNEL);                                              \
-      }                                                                       \
       if (e->toggle_dir) {                                                    \
         Stepper_ToggleDirection(CHANNEL);                                     \
       }                                                                       \
+      if (e->steps != 0) {                                                    \
+        Stepper_One(T, CHANNEL);                                              \
+      }                                                                       \
     } else {                                                                  \
+      /* queue is empty, so wait this command to complete, then disconnect */ \
       fas_queue_##CHANNEL._prepareForStop = true;                             \
     }                                                                         \
     exitStepperISR();                                                         \
@@ -243,8 +242,6 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];
 
 #define AVR_START_QUEUE(T, CHANNEL)              \
-  _isRunning = true;                             \
-  _prepareForStop = false;                       \
   /* ensure no compare event */                  \
   SetTimerCompareRelative(T, CHANNEL, 32768);    \
   /* set output one, if steps to be generated */ \
@@ -260,23 +257,35 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   /* start */                                    \
   SetTimerCompareRelative(T, CHANNEL, 10);
 
+#define DISABLE(T, CHANNEL) \
+  DisableCompareInterrupt(T, CHANNEL)
+
 void StepperQueue::startQueue() {
   uint8_t rp;
   struct queue_entry* e;
 
   switch (channel) {
     case channelA:
+      DISABLE(FAS_TIMER_MODULE, A);
+      _isRunning = true;
+      _prepareForStop = false;
       GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
       PREPARE_DIRECTION_PIN(A)
       AVR_START_QUEUE(FAS_TIMER_MODULE, A)
       break;
     case channelB:
+      DISABLE(FAS_TIMER_MODULE, B);
+      _isRunning = true;
+      _prepareForStop = false;
       GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
       PREPARE_DIRECTION_PIN(B)
       AVR_START_QUEUE(FAS_TIMER_MODULE, B)
       break;
 #ifdef stepPinStepperC
     case channelC:
+      DISABLE(FAS_TIMER_MODULE, C);
+      _isRunning = true;
+      _prepareForStop = false;
       GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
       PREPARE_DIRECTION_PIN(C)
       AVR_START_QUEUE(FAS_TIMER_MODULE, C)
