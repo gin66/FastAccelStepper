@@ -26,10 +26,11 @@
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
 #define Stepper_IsOneIfOutput(T, X) ((TCCR##T##A & _BV(COM##T##X##0)) != 0)
-#define Stepper_ToggleDirection(CHANNEL) *fas_queue_##CHANNEL._dirTogglePinPort = fas_queue_##CHANNEL._dirTogglePinMask
-#define PREPARE_DIRECTION_PIN(CHANNEL)                                   \
-  if (e->toggle_dir) {                                                   \
-    Stepper_ToggleDirection(CHANNEL);                                    \
+#define Stepper_ToggleDirection(CHANNEL) \
+  *fas_queue_##CHANNEL._dirTogglePinPort = fas_queue_##CHANNEL._dirTogglePinMask
+#define PREPARE_DIRECTION_PIN(CHANNEL) \
+  if (e->toggle_dir) {                 \
+    Stepper_ToggleDirection(CHANNEL);  \
   }
 
 #ifdef SIMAVR_TIME_MEASUREMENT
@@ -166,7 +167,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
        */                                                                     \
       fas_queue_##CHANNEL._prepareForStop = false;                            \
       if (e->toggle_dir) {                                                    \
-          Stepper_ToggleDirection(CHANNEL);                                   \
+        Stepper_ToggleDirection(CHANNEL);                                     \
       }                                                                       \
       if (e->steps > 0) {                                                     \
         /* That's the problem, so generate a step */                          \
@@ -257,8 +258,7 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   /* start */                                    \
   SetTimerCompareRelative(T, CHANNEL, 10);
 
-#define DISABLE(T, CHANNEL) \
-  DisableCompareInterrupt(T, CHANNEL)
+#define DISABLE(T, CHANNEL) DisableCompareInterrupt(T, CHANNEL)
 
 void StepperQueue::startQueue() {
   uint8_t rp;

@@ -19,6 +19,7 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 Build examples for different versions of espressif-arduino platform:
 
 ### esp32
+[![`V6_6_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_6_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_6_0.yml)
 [![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml)
 [![`V6_4_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_4_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_4_0.yml)
 [![`V6_3_2`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_3_2.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_3_2.yml)
