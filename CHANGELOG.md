@@ -1,5 +1,5 @@
 TODO:
-- Different behavior avr vs pc-based tests to be analyzed
+- Different behavior avr vs pc-based testgis to be analyzed
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 - rename PoorManFloat to e.g. Log2Representation
@@ -8,6 +8,9 @@ TODO:
 
 pre-0.30.12:
 - esp32: fix deprecation warning for `rmt_memory_rw_rst()`
+- simavr-tests: 
+- avr: Fix issue #250
+- avr: In course of issue #250, interrupt blocks of 20us from application are tested.
 
 0.30.11:
 - esp32s3: add support for rmt from patch #225

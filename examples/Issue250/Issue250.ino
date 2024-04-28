@@ -39,11 +39,12 @@ void setup() {
 
 uint16_t loopcnt = 0;
 
+// fails with blocking 30us
 #ifndef BLOCK_INTERRUPT_US 
-#define BLOCK_INTERRUPT_US 30
+#define BLOCK_INTERRUPT_US 20
 #endif
 #ifndef TOGGLE_DIRECTION
-#define TOGGLE_DIRECTION false
+#define TOGGLE_DIRECTION true
 #endif
 #ifndef USE_MOVETO
 #define USE_MOVETO true
