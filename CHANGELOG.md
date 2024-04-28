@@ -8,7 +8,8 @@ TODO:
 
 0.30.12:
 - esp32: fix deprecation warning for `rmt_memory_rw_rst()`
-- simavr-tests: 
+- esp32: add build test for platform espressif v6.6.0 with arduino core (#251)
+- simavr-tests: automatically create links/makefiles
 - avr: Fix issue #250
 - avr: In course of issue #250, interrupt blocks of 20us from application are tested.
 
