@@ -19,15 +19,21 @@ pmf:
 externalCall:
 	make -C test_externalCall
 
-%/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini
+%/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini .makefiles .links
 	make SILENCE=$(SILENCE)  -C $(dir $@)
 
+.makefiles: makefiles
+
 makefiles: $(addsuffix /Makefile,$(TESTS))
+	touch .makefiles
 
 %/Makefile:
 	cd $(dir $@); ln -s ../Makefile.test Makefile
 
+.links: links
+
 links: $(SD_SRC_DIRS)
+	touch .links
 
 %/src/.dir:
 	mkdir -p $(dir $@)
@@ -82,5 +88,5 @@ clean:
 	rm -fR */.pio */.tested */x.vcd */result.txt
 	find . -type l -delete
 	find . -type d -empty -delete
-	make links makefiles
+	rm .links .makefiles
 
