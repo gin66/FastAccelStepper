@@ -39,34 +39,59 @@ void setup() {
 
 uint16_t loopcnt = 0;
 
+#ifndef BLOCK_INTERRUPT_US 
+#define BLOCK_INTERRUPT_US 30
+#endif
+#ifndef TOGGLE_DIRECTION
+#define TOGGLE_DIRECTION false
+#endif
+#ifndef USE_MOVETO
+#define USE_MOVETO true
+#endif
+
+uint32_t previous_runtime = 0;
+
 void loop() {
   loopcnt++;
   Serial.print("Loop=");
   Serial.println(loopcnt);
-  uint32_t start_ms;
-  uint32_t delayForward = (rand() % 50) + 50;
-  uint32_t delayBackward = (rand() % 50) + 50;
-  stepper->runForward();
-  start_ms = millis();
-  while (millis() < delayForward + start_ms) {
+  uint32_t runtime = (rand() % 50) + 50;
+  if (((loopcnt & 1) == 1) || !TOGGLE_DIRECTION) {
+     if (USE_MOVETO) {
+        stepper->moveTo(10000);
+     }
+     else {
+        stepper->runForward();
+     }
+  }
+  else {
+     if (USE_MOVETO) {
+        stepper->moveTo(-10000);
+     }
+     else {
+        stepper->runBackward();
+     }
+  }
+  uint32_t start_ms = millis();
+  while (millis() < 2*previous_runtime + runtime + start_ms) {
      noInterrupts();
 #ifdef SIMULATOR
-     _delay_us(25);
+     _delay_us(BLOCK_INTERRUPT_US);
 #endif
      interrupts();
   }
-  stepper->runBackward();
-  start_ms = millis();
-  while (millis() < delayBackward + start_ms) {
-     noInterrupts();
-#ifdef SIMULATOR
-     _delay_us(25);
-#endif
-     interrupts();
-  }
+  previous_runtime = runtime;
+
   if (loopcnt == 200) {
+     stepper->stopMove();
+     while(stepper->isRunning()) {}
 #ifdef SIMULATOR
+     Serial.print("Reached Position=");
+     Serial.println(stepper->getCurrentPosition());
      stepper->moveTo(0, true);
+     Serial.print("Position=");
+     Serial.println(stepper->getCurrentPosition());
+     delay(100);
      noInterrupts();
      sleep_cpu();
 #endif
