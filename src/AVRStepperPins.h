@@ -26,9 +26,11 @@
 #define stepPinStepper1A 9  /* OC1A */
 #define stepPinStepper1B 10 /* OC1B */
 #define OC1A_PORT PORTB
-#define OC1A_PORT_BIT 0x20
+#define OC1A_PIN PINB
+#define OC1A_BIT 0x20
 #define OC1B_PORT PORTB
-#define OC1B_PORT_BIT 0x40
+#define OC1B_PIN PINB
+#define OC1B_BIT 0x40
 #elif defined(__AVR_ATmega2560__)
 #ifndef FAS_TIMER_MODULE
 #define FAS_TIMER_MODULE 4
@@ -47,32 +49,44 @@
 #define stepPinStepper5C 44 /* OC5C */
 
 #define OC1A_PORT PORTB
-#define OC1A_PORT_BIT 0x20
+#define OC1A_PIN PINB
+#define OC1A_BIT 0x20
 #define OC1B_PORT PORTB
-#define OC1B_PORT_BIT 0x40
+#define OC1B_PIN PINB
+#define OC1B_BIT 0x40
 #define OC1C_PORT PORTB
-#define OC1C_PORT_BIT 0x80
+#define OC1C_PIN PINB
+#define OC1C_BIT 0x80
 
 #define OC3A_PORT PORTC
-#define OC3A_PORT_BIT 0x08
+#define OC3A_PIN PINC
+#define OC3A_BIT 0x08
 #define OC3B_PORT PORTC
-#define OC3B_PORT_BIT 0x10
+#define OC3B_PIN PINC
+#define OC3B_BIT 0x10
 #define OC3C_PORT PORTC
-#define OC3C_PORT_BIT 0x20
+#define OC3C_PIN PINC
+#define OC3C_BIT 0x20
 
 #define OC4A_PORT PORTH
-#define OC4A_PORT_BIT 0x08
+#define OC4A_PIN PINH
+#define OC4A_BIT 0x08
 #define OC4B_PORT PORTH
-#define OC4B_PORT_BIT 0x10
+#define OC4B_PIN PINH
+#define OC4B_BIT 0x10
 #define OC4C_PORT PORTH
-#define OC4C_PORT_BIT 0x20
+#define OC4C_PIN PINH
+#define OC4C_BIT 0x20
 
 #define OC5A_PORT PORTL
-#define OC5A_PORT_BIT 0x08
+#define OC5A_PIN PINL
+#define OC5A_BIT 0x08
 #define OC5B_PORT PORTL
-#define OC5B_PORT_BIT 0x10
+#define OC5B_PIN PINL
+#define OC5B_BIT 0x10
 #define OC5C_PORT PORTL
-#define OC5C_PORT_BIT 0x20
+#define OC5C_PIN PINL
+#define OC5C_BIT 0x20
 
 #elif defined(__AVR_ATmega32U4__)
 #define FAS_TIMER_MODULE 1
@@ -80,11 +94,14 @@
 #define stepPinStepper1B 10 /* OC1B */
 #define stepPinStepper1C 11 /* OC1C */
 #define OC1A_PORT PORTB
-#define OC1A_PORT_BIT 0x20
+#define OC1A_PIN PINB
+#define OC1A_BIT 0x20
 #define OC1B_PORT PORTB
-#define OC1B_PORT_BIT 0x40
+#define OC1B_PIN PINB
+#define OC1B_BIT 0x40
 #define OC1C_PORT PORTB
-#define OC1C_PORT_BIT 0x80
+#define OC1C_PIN PINB
+#define OC1C_BIT 0x80
 #endif
 
 #if (FAS_TIMER_MODULE == 1)
