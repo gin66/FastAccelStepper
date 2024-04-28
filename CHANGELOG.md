@@ -6,7 +6,7 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
-pre-0.30.12:
+0.30.12:
 - esp32: fix deprecation warning for `rmt_memory_rw_rst()`
 - simavr-tests: 
 - avr: Fix issue #250
