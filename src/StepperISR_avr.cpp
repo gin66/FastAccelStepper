@@ -177,7 +177,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     else {                                                                    \
       e->steps--;                                                             \
     }                                                                         \
-    SetTimerCompareRelative(T, CHANNEL, ticks);                               \
+    OCR##T##CHANNEL += ticks;                                                 \
     exitStepperISR();                                                         \
   }
 
@@ -231,7 +231,9 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   /* enable compare interrupt */                 \
   EnableCompareInterrupt(T, CHANNEL);            \
   /* start */                                    \
-  SetTimerCompareRelative(T, CHANNEL, 10);
+  noInterrupts();                                \
+  SetTimerCompareRelative(T, CHANNEL, 10);       \
+  interrupts();
 
 void StepperQueue::startQueue() {
   uint8_t rp;
