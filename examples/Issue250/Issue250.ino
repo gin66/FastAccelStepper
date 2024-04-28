@@ -48,6 +48,9 @@ uint16_t loopcnt = 0;
 #ifndef USE_MOVETO
 #define USE_MOVETO true
 #endif
+#ifndef LOOPS
+#define LOOPS 200
+#endif
 
 uint32_t previous_runtime = 0;
 
@@ -79,7 +82,7 @@ void loop() {
   }
   previous_runtime = runtime;
 
-  if (loopcnt == 200) {
+  if (loopcnt == LOOPS) {
     stepper->stopMove();
     while (stepper->isRunning()) {
     }

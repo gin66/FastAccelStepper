@@ -91,7 +91,7 @@ class StepperQueue {
   volatile bool _prepareForStop;
   volatile bool _isRunning;
   inline bool isRunning() { return _isRunning; }
-  inline bool isReadyForCommands() { return true; }
+  inline bool isReadyForCommands() { return !_prepareForStop; }
   enum channels channel;
 #endif
 #if defined(SUPPORT_SAM)
