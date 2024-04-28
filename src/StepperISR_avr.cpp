@@ -26,7 +26,11 @@
 #define Stepper_IsDisconnected(T, X) \
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
 #define Stepper_IsOneIfOutput(T, X) ((TCCR##T##A & _BV(COM##T##X##0)) != 0)
-#define Stepper_ToggleDirection(CHANNEL) *fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask
+#define Stepper_ToggleDirection(CHANNEL) *fas_queue_##CHANNEL._dirTogglePinPort = fas_queue_##CHANNEL._dirTogglePinMask
+#define PREPARE_DIRECTION_PIN(CHANNEL)                                   \
+  if (e->toggle_dir) {                                                   \
+    Stepper_ToggleDirection(CHANNEL);                                    \
+  }
 
 #ifdef SIMAVR_TIME_MEASUREMENT
 #define prepareISRtimeMeasurement() DDRB |= 0x18
@@ -237,11 +241,6 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
 #define GET_ENTRY_PTR(T, CHANNEL)    \
   rp = fas_queue_##CHANNEL.read_idx; \
   e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];
-
-#define PREPARE_DIRECTION_PIN(CHANNEL)                                   \
-  if (e->toggle_dir) {                                                   \
-    *fas_queue_##CHANNEL._dirPinPort ^= fas_queue_##CHANNEL._dirPinMask; \
-  }
 
 #define AVR_START_QUEUE(T, CHANNEL)              \
   _isRunning = true;                             \

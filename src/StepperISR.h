@@ -80,10 +80,12 @@ class StepperQueue {
   bool bufferContainsSteps[2];
 #endif
 #if defined(SUPPORT_DIR_PIN_MASK)
-  // avr uses uint8_t and sam needs uint32_t
-  // so make the SUPPORT_DIR_PIN_MASK dual use
   volatile SUPPORT_DIR_PIN_MASK* _dirPinPort;
   SUPPORT_DIR_PIN_MASK _dirPinMask;
+#endif
+#if defined(SUPPORT_DIR_TOGGLE_PIN_MASK)
+  volatile SUPPORT_DIR_TOGGLE_PIN_MASK* _dirTogglePinPort;
+  SUPPORT_DIR_TOGGLE_PIN_MASK _dirTogglePinMask;
 #endif
 #if defined(SUPPORT_AVR)
   volatile bool _prepareForStop;
@@ -179,6 +181,12 @@ class StepperQueue {
     if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);
+    }
+#endif
+#if defined(SUPPORT_DIR_TOGGLE_PIN_MASK)
+    if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
+      _dirTogglePinPort = portInputRegister(digitalPinToPort(dir_pin));
+      _dirTogglePinMask = digitalPinToBitMask(dir_pin);
     }
 #endif
   }

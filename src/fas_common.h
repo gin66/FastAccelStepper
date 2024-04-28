@@ -375,7 +375,7 @@ struct queue_end_s {
 
 #define noop_or_wait
 
-#define SUPPORT_DIR_PIN_MASK uint8_t
+#define SUPPORT_DIR_TOGGLE_PIN_MASK uint8_t
 
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
 
