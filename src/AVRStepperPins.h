@@ -25,6 +25,10 @@
 #define FAS_TIMER_MODULE 1
 #define stepPinStepper1A 9  /* OC1A */
 #define stepPinStepper1B 10 /* OC1B */
+#define OC1A_PORT PORTB
+#define OC1A_PORT_BIT 0x20
+#define OC1B_PORT PORTB
+#define OC1B_PORT_BIT 0x40
 #elif defined(__AVR_ATmega2560__)
 #ifndef FAS_TIMER_MODULE
 #define FAS_TIMER_MODULE 4
@@ -75,6 +79,12 @@
 #define stepPinStepper1A 9  /* OC1A */
 #define stepPinStepper1B 10 /* OC1B */
 #define stepPinStepper1C 11 /* OC1C */
+#define OC1A_PORT PORTB
+#define OC1A_PORT_BIT 0x20
+#define OC1B_PORT PORTB
+#define OC1B_PORT_BIT 0x40
+#define OC1C_PORT PORTB
+#define OC1C_PORT_BIT 0x80
 #endif
 
 #if (FAS_TIMER_MODULE == 1)
