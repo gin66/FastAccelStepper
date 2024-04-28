@@ -31,7 +31,7 @@
 #endif
 #define stepPinStepper1A 11 /* OC1A */
 #define stepPinStepper1B 12 /* OC1B */
-#define stepPinStepper1C 13 /* OC1B */
+#define stepPinStepper1C 13 /* OC1C */
 #define stepPinStepper3A 5  /* OC3A */
 #define stepPinStepper3B 2  /* OC3B */
 #define stepPinStepper3C 3  /* OC3C */
@@ -41,6 +41,35 @@
 #define stepPinStepper5A 46 /* OC5A */
 #define stepPinStepper5B 45 /* OC5B */
 #define stepPinStepper5C 44 /* OC5C */
+
+#define OC1A_PORT PORTB
+#define OC1A_PORT_BIT 0x20
+#define OC1B_PORT PORTB
+#define OC1B_PORT_BIT 0x40
+#define OC1C_PORT PORTB
+#define OC1C_PORT_BIT 0x80
+
+#define OC3A_PORT PORTC
+#define OC3A_PORT_BIT 0x08
+#define OC3B_PORT PORTC
+#define OC3B_PORT_BIT 0x10
+#define OC3C_PORT PORTC
+#define OC3C_PORT_BIT 0x20
+
+#define OC4A_PORT PORTH
+#define OC4A_PORT_BIT 0x08
+#define OC4B_PORT PORTH
+#define OC4B_PORT_BIT 0x10
+#define OC4C_PORT PORTH
+#define OC4C_PORT_BIT 0x20
+
+#define OC5A_PORT PORTL
+#define OC5A_PORT_BIT 0x08
+#define OC5B_PORT PORTL
+#define OC5B_PORT_BIT 0x10
+#define OC5C_PORT PORTL
+#define OC5C_PORT_BIT 0x20
+
 #elif defined(__AVR_ATmega32U4__)
 #define FAS_TIMER_MODULE 1
 #define stepPinStepper1A 9  /* OC1A */
