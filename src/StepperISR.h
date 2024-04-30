@@ -88,10 +88,10 @@ class StepperQueue {
   SUPPORT_DIR_TOGGLE_PIN_MASK _dirTogglePinMask;
 #endif
 #if defined(SUPPORT_AVR)
-  volatile bool _prepareForStop;
+  volatile bool _noMoreCommands;
   volatile bool _isRunning;
   inline bool isRunning() { return _isRunning; }
-  inline bool isReadyForCommands() { return !_prepareForStop; }
+  inline bool isReadyForCommands() { return true; }
   enum channels channel;
 #endif
 #if defined(SUPPORT_SAM)

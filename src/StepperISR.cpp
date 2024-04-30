@@ -326,7 +326,7 @@ void StepperQueue::_initVars() {
   dirHighCountsUp = true;
 #if defined(ARDUINO_ARCH_AVR)
   _isRunning = false;
-  _prepareForStop = false;
+  _noMoreCommands = false;
 #endif
 #if defined(SUPPORT_ESP32)
   _isRunning = false;

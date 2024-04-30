@@ -12,10 +12,12 @@
 // Toggle      is 0   1
 // Disconnect  is 0   0
 //
+#define Stepper_OneToZero(T, X) TCCR##T##A = TCCR##T##A & ~_BV(COM##T##X##0)
 #define Stepper_Zero(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##1)) & ~_BV(COM##T##X##0)
 #define Stepper_Toggle(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
+#define Stepper_One(T, X) TCCR##T##A |= _BV(COM##T##X##1) | _BV(COM##T##X##0)
 #define Stepper_Disconnect(T, X) \
   TCCR##T##A &= ~(_BV(COM##T##X##1) | _BV(COM##T##X##0))
 #define Stepper_IsOne(T, X)                                  \
@@ -143,41 +145,65 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
       /* disable compare interrupt */                                         \
       DisableCompareInterrupt(T, CHANNEL);                                    \
       fas_queue_##CHANNEL._isRunning = false;                                 \
-      fas_queue_##CHANNEL._prepareForStop = false;                            \
+      fas_queue_##CHANNEL._noMoreCommands = false;                            \
       exitStepperISR();                                                       \
       return;                                                                 \
     }                                                                         \
     struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];  \
-    /* There is a risk, that the new compare time is delayed by one cycle */  \
-    uint16_t ticks = e->ticks;                                                \
-    /* Clear output bit by another compare event */                           \
-    ForceCompare(T, CHANNEL);                                                 \
-    if (e->steps == 0) {                                                      \
-      /* mo more steps with this queue entry */                               \
-      if (TEST_NOT_REPEATING_ENTRY) {                                         \
-        rp++;                                                                 \
-        fas_queue_##CHANNEL.read_idx = rp;                                    \
-        e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];                  \
+    /* There is a risk, that this new compare time is delayed by one cycle */ \
+    OCR##T##CHANNEL += e->ticks;                                              \
+    if (Stepper_IsOneIfOutput(T, CHANNEL)) {                                  \
+      /* Clear output bit by another compare event */                         \
+      Stepper_OneToZero(T, CHANNEL);                                          \
+      ForceCompare(T, CHANNEL);                                               \
+      if (e->steps-- > 1) {                                                   \
+        /* perform another step with this queue entry */                      \
+        Stepper_One(T, CHANNEL);                                              \
+        exitStepperISR();                                                     \
+        return;                                                               \
       }                                                                       \
-      Stepper_Zero(T, CHANNEL);                                               \
-      if (rp != fas_queue_##CHANNEL.next_write_idx) {                         \
-        /* command in queue */                                                \
-        if (e->toggle_dir) {                                                  \
-           Stepper_ToggleDirection(CHANNEL);                                  \
+    } else if (fas_queue_##CHANNEL._noMoreCommands) {                         \
+      /* new command received after running out of commands */                \
+      /* if this new command requires a step, then this step would be lost    \
+       */                                                                     \
+      fas_queue_##CHANNEL._noMoreCommands = false;                            \
+      if (e->toggle_dir) {                                                    \
+        Stepper_ToggleDirection(CHANNEL);                                     \
+      }                                                                       \
+      if (e->steps > 0) {                                                     \
+        /* That's the problem, so generate a step */                          \
+        Stepper_One(T, CHANNEL);                                              \
+        ForceCompare(T, CHANNEL);                                             \
+        /* Use a high time of 3us */                                          \
+        delayMicroseconds(3);                                                 \
+        /* Clear output bit by another toggle */                              \
+        Stepper_OneToZero(T, CHANNEL);                                        \
+        ForceCompare(T, CHANNEL);                                             \
+        if (e->steps-- > 1) {                                                 \
+          /* perform another step with this queue entry */                    \
+          Stepper_One(T, CHANNEL);                                            \
+          exitStepperISR();                                                   \
+          return;                                                             \
         }                                                                     \
-        if (e->steps != 0) {                                                  \
-           Stepper_Toggle(T, CHANNEL);                                        \
-           e->steps--;                                                        \
-        }                                                                     \
-      } else {                                                                \
-        /* queue empty: wait this command to complete, then disconnect */     \
-        fas_queue_##CHANNEL._prepareForStop = true;                           \
       }                                                                       \
     }                                                                         \
-    else {                                                                    \
-      e->steps--;                                                             \
+    if (TEST_NOT_REPEATING_ENTRY) {                                           \
+      rp++;                                                                   \
     }                                                                         \
-    OCR##T##CHANNEL += ticks;                                                 \
+    fas_queue_##CHANNEL.read_idx = rp;                                        \
+    if (rp != fas_queue_##CHANNEL.next_write_idx) {                           \
+      /* command in queue */                                                  \
+      e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];                    \
+      if (e->toggle_dir) {                                                    \
+        Stepper_ToggleDirection(CHANNEL);                                     \
+      }                                                                       \
+      if (e->steps != 0) {                                                    \
+        Stepper_One(T, CHANNEL);                                              \
+      }                                                                       \
+    } else {                                                                  \
+      /* queue is empty, so wait this command to complete, then disconnect */ \
+      fas_queue_##CHANNEL._noMoreCommands = true;                             \
+    }                                                                         \
     exitStepperISR();                                                         \
   }
 
