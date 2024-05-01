@@ -12,9 +12,10 @@
 // Toggle      is 0   1
 // Disconnect  is 0   0
 //
-#define Stepper_OneToZero(T, X) TCCR##T##A = TCCR##T##A & ~_BV(COM##T##X##0)
 #define Stepper_Zero(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##1)) & ~_BV(COM##T##X##0)
+// Force compare of Stepper_Toggle appears to be broken in simavr
+// In other words, use of Stepper_Toggle yields errors in simavr, for which root cause is unclear
 #define Stepper_Toggle(T, X) \
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
 #define Stepper_One(T, X) TCCR##T##A |= _BV(COM##T##X##1) | _BV(COM##T##X##0)
@@ -133,78 +134,68 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 // Remark: Interrupt Flag is automatically cleared on ISR execution
 //
 // If reaching here without further commands, then the queue is done
-#define AVR_STEPPER_ISR(T, CHANNEL)                                           \
-  ISR(TIMER##T##_COMP##CHANNEL##_vect) {                                      \
-    enterStepperISR();                                                        \
-    uint8_t rp = fas_queue_##CHANNEL.read_idx;                                \
-    if (rp == fas_queue_##CHANNEL.next_write_idx) {                           \
-      /* queue is empty => set to disconnect */                               \
-      Stepper_Disconnect(T, CHANNEL);                                         \
-      /* force compare to ensure disconnect */                                \
-      ForceCompare(T, CHANNEL);                                               \
-      /* disable compare interrupt */                                         \
-      DisableCompareInterrupt(T, CHANNEL);                                    \
-      fas_queue_##CHANNEL._isRunning = false;                                 \
-      fas_queue_##CHANNEL._noMoreCommands = false;                            \
-      exitStepperISR();                                                       \
-      return;                                                                 \
-    }                                                                         \
-    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];  \
-    /* There is a risk, that this new compare time is delayed by one cycle */ \
-    OCR##T##CHANNEL += e->ticks;                                              \
-    if (Stepper_IsOneIfOutput(T, CHANNEL)) {                                  \
-      /* Clear output bit by another compare event */                         \
-      Stepper_OneToZero(T, CHANNEL);                                          \
-      ForceCompare(T, CHANNEL);                                               \
-      if (e->steps-- > 1) {                                                   \
-        /* perform another step with this queue entry */                      \
-        Stepper_One(T, CHANNEL);                                              \
-        exitStepperISR();                                                     \
-        return;                                                               \
-      }                                                                       \
-    } else if (fas_queue_##CHANNEL._noMoreCommands) {                         \
-      /* new command received after running out of commands */                \
-      /* if this new command requires a step, then this step would be lost    \
-       */                                                                     \
-      fas_queue_##CHANNEL._noMoreCommands = false;                            \
-      if (e->toggle_dir) {                                                    \
-        Stepper_ToggleDirection(CHANNEL);                                     \
-      }                                                                       \
-      if (e->steps > 0) {                                                     \
-        /* That's the problem, so generate a step */                          \
-        Stepper_One(T, CHANNEL);                                              \
-        ForceCompare(T, CHANNEL);                                             \
-        /* Use a high time of 3us */                                          \
-        delayMicroseconds(3);                                                 \
-        /* Clear output bit by another toggle */                              \
-        Stepper_OneToZero(T, CHANNEL);                                        \
-        ForceCompare(T, CHANNEL);                                             \
-        if (e->steps-- > 1) {                                                 \
-          /* perform another step with this queue entry */                    \
-          Stepper_One(T, CHANNEL);                                            \
-          exitStepperISR();                                                   \
-          return;                                                             \
-        }                                                                     \
-      }                                                                       \
-    }                                                                         \
-    if (TEST_NOT_REPEATING_ENTRY) {                                           \
-      rp++;                                                                   \
-    }                                                                         \
-    fas_queue_##CHANNEL.read_idx = rp;                                        \
-    if (rp != fas_queue_##CHANNEL.next_write_idx) {                           \
-      /* command in queue */                                                  \
-      e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];                    \
-      if (e->toggle_dir) {                                                    \
-        Stepper_ToggleDirection(CHANNEL);                                     \
-      }                                                                       \
-      if (e->steps != 0) {                                                    \
-        Stepper_One(T, CHANNEL);                                              \
-      }                                                                       \
-    } else {                                                                  \
-      /* queue is empty, so wait this command to complete, then disconnect */ \
-      fas_queue_##CHANNEL._noMoreCommands = true;                             \
-    }                                                                         \
-    exitStepperISR();                                                         \
+#define AVR_STEPPER_ISR(T, CHANNEL)                                             \
+  ISR(TIMER##T##_COMP##CHANNEL##_vect) {                                        \
+    enterStepperISR();                                                          \
+    uint8_t rp = fas_queue_##CHANNEL.read_idx;                                  \
+    uint8_t wp = fas_queue_##CHANNEL.next_write_idx;                            \
+    if (rp == wp) {                                                             \
+      /* queue is empty => set to disconnect */                                 \
+      /* disable compare interrupt */                                           \
+      DisableCompareInterrupt(T, CHANNEL);                                      \
+      Stepper_Disconnect(T, CHANNEL);                                           \
+      /* force compare to ensure disconnect */                                  \
+      ForceCompare(T, CHANNEL);                                                 \
+      fas_queue_##CHANNEL._isRunning = false;                                   \
+      fas_queue_##CHANNEL._noMoreCommands = false;                              \
+      exitStepperISR();                                                         \
+      return;                                                                   \
+    }                                                                           \
+    struct queue_entry* e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];    \
+    /* There is a risk, that this new compare time is delayed by one cycle */   \
+    uint16_t ticks = e->ticks;                                                  \
+    /* Set output to zero, this works in any case. In case of pause: no-op */   \
+          Stepper_Zero(T, CHANNEL);                                             \
+    ForceCompare(T, CHANNEL);                                                   \
+    if (e->steps > 1) {                                                         \
+      /* perform another step with this queue entry, toggle mode is active */   \
+      e->steps--;                                                               \
+        Stepper_Toggle(T, CHANNEL);                                             \
+    } else {                                                                    \
+      /* either pause command or no more steps */                               \
+      if (fas_queue_##CHANNEL._noMoreCommands) {                                \
+        /* new command received after running out of commands */                \
+        /* if this new command requires a step, then this step would be lost */ \
+        fas_queue_##CHANNEL._noMoreCommands = false;                            \
+        if (e->steps != 0) {                                                    \
+          /* New command needs steps, so do it immediately */                   \
+          ticks = 10;                                                           \
+        }                                                                       \
+      }                                                                         \
+      else if (TEST_NOT_REPEATING_ENTRY) {                                      \
+        rp++;                                                                   \
+        fas_queue_##CHANNEL.read_idx = rp;                                      \
+        if (rp == wp) {                                                         \
+          /* queue is empty, wait this command to complete, then disconnect */  \
+          Stepper_Zero(T, CHANNEL);                                             \
+          fas_queue_##CHANNEL._noMoreCommands = true;                           \
+          OCR##T##CHANNEL += ticks;                                             \
+          exitStepperISR();                                                     \
+          return;                                                               \
+        }                                                                       \
+        e = &fas_queue_##CHANNEL.entry[rp & QUEUE_LEN_MASK];                    \
+      }                                                                         \
+      if (e->toggle_dir) {                                                      \
+        Stepper_ToggleDirection(CHANNEL);                                       \
+      }                                                                         \
+      if (e->steps != 0) {                                                      \
+        Stepper_Toggle(T, CHANNEL);                                             \
+      } else {                                                                  \
+        Stepper_Zero(T, CHANNEL);                                               \
+      }                                                                         \
+    }                                                                           \
+    OCR##T##CHANNEL += ticks;                                                   \
+    exitStepperISR();                                                           \
   }
 
 #define AVR_STEPPER_ISR_GEN(T, CHANNEL) AVR_STEPPER_ISR(T, CHANNEL)
@@ -250,7 +241,6 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   Stepper_Zero(T, CHANNEL);                      \
   if (e->steps != 0) {                           \
     Stepper_Toggle(T, CHANNEL);                  \
-    e->steps--;                                  \
   }                                              \
   /* clear interrupt flag */                     \
   ClearInterruptFlag(T, CHANNEL);                \
