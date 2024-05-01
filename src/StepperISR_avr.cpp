@@ -16,8 +16,10 @@
   TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##1)) & ~_BV(COM##T##X##0)
 // Force compare of Stepper_Toggle appears to be broken in simavr
 // In other words, use of Stepper_Toggle yields errors in simavr, for which root cause is unclear
+#ifdef DISABLE
 #define Stepper_Toggle(T, X) \
-  TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
+    TCCR##T##A = (TCCR##T##A | _BV(COM##T##X##0)) & ~_BV(COM##T##X##1)
+#endif
 #define Stepper_One(T, X) TCCR##T##A |= _BV(COM##T##X##1) | _BV(COM##T##X##0)
 #define Stepper_Disconnect(T, X) \
   TCCR##T##A &= ~(_BV(COM##T##X##1) | _BV(COM##T##X##0))
@@ -155,12 +157,12 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     /* There is a risk, that this new compare time is delayed by one cycle */   \
     uint16_t ticks = e->ticks;                                                  \
     /* Set output to zero, this works in any case. In case of pause: no-op */   \
-          Stepper_Zero(T, CHANNEL);                                             \
+    Stepper_Zero(T, CHANNEL);                                                   \
     ForceCompare(T, CHANNEL);                                                   \
     if (e->steps > 1) {                                                         \
-      /* perform another step with this queue entry, toggle mode is active */   \
+      /* perform another step with this queue entry */                          \
       e->steps--;                                                               \
-        Stepper_Toggle(T, CHANNEL);                                             \
+      Stepper_One(T, CHANNEL);                                                  \
     } else {                                                                    \
       /* either pause command or no more steps */                               \
       if (fas_queue_##CHANNEL._noMoreCommands) {                                \
@@ -177,7 +179,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         fas_queue_##CHANNEL.read_idx = rp;                                      \
         if (rp == wp) {                                                         \
           /* queue is empty, wait this command to complete, then disconnect */  \
-          Stepper_Zero(T, CHANNEL);                                             \
           fas_queue_##CHANNEL._noMoreCommands = true;                           \
           OCR##T##CHANNEL += ticks;                                             \
           exitStepperISR();                                                     \
@@ -189,9 +190,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
         Stepper_ToggleDirection(CHANNEL);                                       \
       }                                                                         \
       if (e->steps != 0) {                                                      \
-        Stepper_Toggle(T, CHANNEL);                                             \
-      } else {                                                                  \
-        Stepper_Zero(T, CHANNEL);                                               \
+        Stepper_One(T, CHANNEL);                                                \
       }                                                                         \
     }                                                                           \
     OCR##T##CHANNEL += ticks;                                                   \
@@ -238,9 +237,10 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
   /* ensure no compare event */                  \
   SetTimerCompareRelative(T, CHANNEL, 32768);    \
   /* set output one, if steps to be generated */ \
-  Stepper_Zero(T, CHANNEL);                      \
   if (e->steps != 0) {                           \
-    Stepper_Toggle(T, CHANNEL);                  \
+    Stepper_One(T, CHANNEL);                     \
+  } else {                                       \
+    Stepper_Zero(T, CHANNEL);                    \
   }                                              \
   /* clear interrupt flag */                     \
   ClearInterruptFlag(T, CHANNEL);                \
