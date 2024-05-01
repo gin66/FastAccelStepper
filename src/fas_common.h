@@ -348,7 +348,7 @@ struct queue_end_s {
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
 #define SUPPORT_AVR
-#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 0
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>

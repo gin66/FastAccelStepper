@@ -125,10 +125,6 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
 }
 
-void StepperQueue::setAbsoluteSpeedLimit(uint16_t ticks) {
-  max_speed_in_ticks = ticks;
-}
-
 void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
 #define STACK_SIZE 2000
 #define PRIORITY configMAX_PRIORITIES

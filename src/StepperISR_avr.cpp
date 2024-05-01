@@ -337,17 +337,10 @@ int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
   return -1;
 }
 void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
-  // using test_sd_04_timing_2560 version 0.25.6 as reference
-  //   manageStepper (fillISR) already needs max 3ms !
-  //   so 25kHz for three steppers is on the limit
-  //
   //   commit 9577e9bfd4b9a6cf1ad830901c00c8b129a62aee fails
   //   test_sd_04_timing_2560 as timer 3 reaches 40us.
   //   This includes port set/clear for timer measurement.
   //   So choose 20kHz
-  //
-  // using test_sd_04_timing_328p version 0.25.6 as reference
-  //   manageStepper (fillISR) already needs max 2.3 ms !
   //
   // check if Issue_152.ino, the interrupt need 14us.
   // So 70000 Steps/s is too high.

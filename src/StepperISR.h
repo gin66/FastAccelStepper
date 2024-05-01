@@ -136,9 +136,6 @@ class StepperQueue {
     entry[read_idx & QUEUE_LEN_MASK].repeat_entry = 0;
   }
 #endif
-#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
-  void setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
-#endif
 
   int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start);
   int32_t getCurrentPosition();
@@ -190,6 +187,11 @@ class StepperQueue {
     }
 #endif
   }
+  #if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+  void setAbsoluteSpeedLimit(uint16_t ticks) {
+    max_speed_in_ticks = ticks;
+  }
+  #endif
   void adjustSpeedToStepperCount(uint8_t steppers);
   static bool isValidStepPin(uint8_t step_pin);
   static int8_t queueNumForStepPin(uint8_t step_pin);

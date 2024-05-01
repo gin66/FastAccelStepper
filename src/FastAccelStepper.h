@@ -333,8 +333,10 @@ class FastAccelStepper {
   uint32_t getMaxSpeedInHz();
   uint32_t getMaxSpeedInMilliHz();
 
-  // For esp32, the device's maximum allowed speed can be overridden
-  // This is absolutely untested. Use at your own risk.
+  // For esp32 and avr, the device's maximum allowed speed can be overridden.
+  // Allocating a new stepper will override any absolute speed limit.
+  // This is absolutely untested, no error checking implemented.
+  // Use at your own risk !
 #if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
   void setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
 #endif
