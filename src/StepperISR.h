@@ -187,11 +187,9 @@ class StepperQueue {
     }
 #endif
   }
-  #if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
-  void setAbsoluteSpeedLimit(uint16_t ticks) {
-    max_speed_in_ticks = ticks;
-  }
-  #endif
+#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+  void setAbsoluteSpeedLimit(uint16_t ticks) { max_speed_in_ticks = ticks; }
+#endif
   void adjustSpeedToStepperCount(uint8_t steppers);
   static bool isValidStepPin(uint8_t step_pin);
   static int8_t queueNumForStepPin(uint8_t step_pin);

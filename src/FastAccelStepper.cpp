@@ -383,7 +383,8 @@ void FastAccelStepper::fill_queue() {
   bool need_delayed_start = false;
   uint32_t ticksPrepared = q->ticksInQueue();
   while (!isQueueFull() &&
-         ((ticksPrepared < _forward_planning_in_ticks) || q->queueEntries() <= 1) &&
+         ((ticksPrepared < _forward_planning_in_ticks) ||
+          q->queueEntries() <= 1) &&
          _rg.isRampGeneratorActive()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
@@ -509,7 +510,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _dirPin = PIN_UNDEFINED;
   _enablePinHighActive = PIN_UNDEFINED;
   _enablePinLowActive = PIN_UNDEFINED;
-  _forward_planning_in_ticks = TICKS_PER_S/50;
+  _forward_planning_in_ticks = TICKS_PER_S / 50;
   _rg.init();
 
   _queue_num = num;
