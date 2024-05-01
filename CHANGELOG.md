@@ -6,6 +6,10 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
+pre-0.30.13:1
+- avr: rework Stepper-ISR routine. It should now be robust against interrupt blockage in regard to steps lost. If interrupt blockage is too long, then 4ms paus could occur between two steps.
+- avr: Interrupt blockage of 30us tested and passed
+
 0.30.12:
 - esp32: fix deprecation warning for `rmt_memory_rw_rst()`
 - esp32: add build test for platform espressif v6.6.0 with arduino core (#251)
