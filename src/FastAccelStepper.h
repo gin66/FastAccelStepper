@@ -535,6 +535,36 @@ class FastAccelStepper {
   // In keep running mode, the targetPos() is not updated
   inline int32_t targetPos() { return _rg.targetPosition(); }
 
+  // The stepper task adds commands to the stepper queue until
+  // either at least two commands are planned, or the commands
+  // cover sufficient time into the future. Default value for that time is 20ms.
+  //
+  // The stepper task is cyclically executed every ~4ms.
+  // Especially for avr, the step interrupts puts a significant load on the uC,
+  // so the cyclical stepper task can even run for 2-3 ms. On top of that,
+  // other interrupts caused by the application could increase the load even further.
+  //
+  // Consequently, the forward planning should fill the queue for ideally two cycles,
+  // this means 8ms. This means, the default 20ms provide a sufficient margin and
+  // even a missed cycle is not an issue.
+  //
+  // The drawback of the 20ms is, that any change in speed/acceleration are added after
+  // those 20ms and for an application, requiring fast reaction times, this may 
+  // impact the expected performance.
+  //
+  // Due to this the forward planning time can be adjusted with the following API call
+  // for each stepper individually.
+  //
+  // Attention:
+  // - This is only for advanced users: no error checking is implemented.
+  // - Only change the forward planning time, if the stepper is not running.
+  // - Too small values bear the risk of a stepper running at full speed suddenly stopping
+  //   due to lack of commands in the queue.
+  inline void setForwardPlanningTimeInMs(uint8_t ms) {
+    _forward_planning_in_ticks = ms;
+    _forward_planning_in_ticks *= TICKS_PER_S / 1000; // ticks per ms
+  }
+
   // ## Low Level Stepper Queue Management (low level access)
   //
   // If the queue is already running, then the start parameter is obsolote.
@@ -685,6 +715,8 @@ class FastAccelStepper {
   uint32_t _on_delay_ticks;
   uint16_t _off_delay_count;
   uint16_t _auto_disable_delay_counter;
+
+  uint32_t _forward_planning_in_ticks;
 
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
   int16_t _attached_pulse_cnt_unit;

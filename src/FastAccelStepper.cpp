@@ -377,12 +377,13 @@ void FastAccelStepper::fill_queue() {
 
   // preconditions are fulfilled, so create the command(s)
   NextCommand cmd;
-  // Plan ahead for max. 20 ms. Currently hard coded
+  // Plan ahead for max. 20 ms and minimum two commands.
+  // This is now configurable using _forward_planning_in_ticks.
   bool delayed_start = !q->isRunning();
   bool need_delayed_start = false;
   uint32_t ticksPrepared = q->ticksInQueue();
   while (!isQueueFull() &&
-         ((ticksPrepared < TICKS_PER_S / 50) || q->queueEntries() <= 1) &&
+         ((ticksPrepared < _forward_planning_in_ticks) || q->queueEntries() <= 1) &&
          _rg.isRampGeneratorActive()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
@@ -508,6 +509,7 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _dirPin = PIN_UNDEFINED;
   _enablePinHighActive = PIN_UNDEFINED;
   _enablePinLowActive = PIN_UNDEFINED;
+  _forward_planning_in_ticks = TICKS_PER_S/50;
   _rg.init();
 
   _queue_num = num;

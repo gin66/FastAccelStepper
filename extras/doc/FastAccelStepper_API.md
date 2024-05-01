@@ -76,7 +76,8 @@ This call allows to select the respective driver
 #define DRIVER_MCPWM_PCNT 0
 #define DRIVER_RMT 1
 #define DRIVER_DONT_CARE 2
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin, uint8_t driver_type = DRIVER_DONT_CARE);
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin,
+                                        uint8_t driver_type = DRIVER_DONT_CARE);
 #endif
 ```
 Comments to valid pins:
@@ -292,8 +293,10 @@ For the device's maximum allowed speed, the following calls can be used.
   uint32_t getMaxSpeedInHz();
   uint32_t getMaxSpeedInMilliHz();
 ```
-For esp32, the device's maximum allowed speed can be overridden
-This is absolutely untested. Use at your own risk.
+For esp32 and avr, the device's maximum allowed speed can be overridden.
+Allocating a new stepper will override any absolute speed limit.
+This is absolutely untested, no error checking implemented.
+Use at your own risk !
 ```cpp
 #if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
   void setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
@@ -509,6 +512,39 @@ stepper task is executed.
 In keep running mode, the targetPos() is not updated
 ```cpp
   int32_t targetPos() { return _rg.targetPosition(); }
+```
+The stepper task adds commands to the stepper queue until
+either at least two commands are planned, or the commands
+cover sufficient time into the future. Default value for that time is 20ms.
+
+The stepper task is cyclically executed every ~4ms.
+Especially for avr, the step interrupts puts a significant load on the uC,
+so the cyclical stepper task can even run for 2-3 ms. On top of that,
+other interrupts caused by the application could increase the load even further.
+
+Consequently, the forward planning should fill the queue for ideally two cycles,
+this means 8ms. This means, the default 20ms provide a sufficient margin and
+even a missed cycle is not an issue.
+
+The drawback of the 20ms is, that any change in speed/acceleration are added after
+those 20ms and for an application, requiring fast reaction times, this may 
+impact the expected performance.
+
+Due to this the forward planning time can be adjusted with the following API call
+for each stepper individually.
+
+Attention:
+- This is only for advanced users: no error checking is implemented.
+- Only change the forward planning time, if the stepper is not running.
+- Too small values bear the risk of a stepper running at full speed suddenly stopping
+  due to lack of commands in the queue.
+```cpp
+  void setForwardPlanningTimeInMs(uint8_t ms) {
+    _forward_planning_in_ticks = ms;
+```
+    _forward_planning_in_ticks *= TICKS_PER_S / 1000;ticks per ms
+```cpp
+  }
 ```
 ## Low Level Stepper Queue Management (low level access)
 

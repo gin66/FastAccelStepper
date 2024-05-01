@@ -6,9 +6,11 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
-pre-0.30.13:1
+pre-0.30.13:
 - avr: rework Stepper-ISR routine. It should now be robust against interrupt blockage in regard to steps lost. If interrupt blockage is too long, then 4ms paus could occur between two steps.
 - avr: Interrupt blockage of 30us tested and passed
+- Add configurable forward planning time for filling the stepper queue (#253)
+- avr: make `setAbsoluteSpeedLimit()` available
 
 0.30.12:
 - esp32: fix deprecation warning for `rmt_memory_rw_rst()`
