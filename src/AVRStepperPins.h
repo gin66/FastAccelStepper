@@ -31,7 +31,7 @@
 #endif
 #define stepPinStepper1A 11 /* OC1A */
 #define stepPinStepper1B 12 /* OC1B */
-#define stepPinStepper1C 13 /* OC1B */
+#define stepPinStepper1C 13 /* OC1C */
 #define stepPinStepper3A 5  /* OC3A */
 #define stepPinStepper3B 2  /* OC3B */
 #define stepPinStepper3C 3  /* OC3C */
@@ -41,6 +41,7 @@
 #define stepPinStepper5A 46 /* OC5A */
 #define stepPinStepper5B 45 /* OC5B */
 #define stepPinStepper5C 44 /* OC5C */
+
 #elif defined(__AVR_ATmega32U4__)
 #define FAS_TIMER_MODULE 1
 #define stepPinStepper1A 9  /* OC1A */

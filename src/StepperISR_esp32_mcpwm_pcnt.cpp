@@ -55,7 +55,6 @@ static struct mapping_s channel2mapping[NUM_QUEUES] = {
       cmpr_tea_int_ena : MCPWM_OP2_TEA_INT_ENA,
       cmpr_tea_int_raw : MCPWM_OP2_TEA_INT_RAW
     },
-#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
     {
       mcpwm_unit : MCPWM_UNIT_1,
       timer : 0,
@@ -66,6 +65,7 @@ static struct mapping_s channel2mapping[NUM_QUEUES] = {
       cmpr_tea_int_ena : MCPWM_OP0_TEA_INT_ENA,
       cmpr_tea_int_raw : MCPWM_OP0_TEA_INT_RAW
     },
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
     {
       mcpwm_unit : MCPWM_UNIT_1,
       timer : 1,
@@ -339,8 +339,8 @@ static void IRAM_ATTR mcpwm0_isr_service(void *arg) {
   MCPWM_SERVICE(MCPWM0, 2, 2);
 }
 static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
-#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
   MCPWM_SERVICE(MCPWM1, 0, 3);
+#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
   MCPWM_SERVICE(MCPWM1, 1, 4);
   MCPWM_SERVICE(MCPWM1, 2, 5);
 #endif

@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
-#include "common.h"
+#include "fas_common.h"
 
 // Here are the global variables to interface with the interrupts
 
@@ -80,13 +80,15 @@ class StepperQueue {
   bool bufferContainsSteps[2];
 #endif
 #if defined(SUPPORT_DIR_PIN_MASK)
-  // avr uses uint8_t and sam needs uint32_t
-  // so make the SUPPORT_DIR_PIN_MASK dual use
   volatile SUPPORT_DIR_PIN_MASK* _dirPinPort;
   SUPPORT_DIR_PIN_MASK _dirPinMask;
 #endif
+#if defined(SUPPORT_DIR_TOGGLE_PIN_MASK)
+  volatile SUPPORT_DIR_TOGGLE_PIN_MASK* _dirTogglePinPort;
+  SUPPORT_DIR_TOGGLE_PIN_MASK _dirTogglePinMask;
+#endif
 #if defined(SUPPORT_AVR)
-  volatile bool _prepareForStop;
+  volatile bool _noMoreCommands;
   volatile bool _isRunning;
   inline bool isRunning() { return _isRunning; }
   inline bool isReadyForCommands() { return true; }
@@ -139,7 +141,7 @@ class StepperQueue {
   int32_t getCurrentPosition();
   uint32_t ticksInQueue();
   bool hasTicksInQueue(uint32_t min_ticks);
-  uint16_t getActualTicks();
+  bool getActualTicksWithDirection(struct actual_ticks_s* speed);
 
   volatile uint16_t getMaxSpeedInTicks() { return max_speed_in_ticks; }
 
@@ -178,7 +180,16 @@ class StepperQueue {
       _dirPinMask = digitalPinToBitMask(dir_pin);
     }
 #endif
+#if defined(SUPPORT_DIR_TOGGLE_PIN_MASK)
+    if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
+      _dirTogglePinPort = portInputRegister(digitalPinToPort(dir_pin));
+      _dirTogglePinMask = digitalPinToBitMask(dir_pin);
+    }
+#endif
   }
+#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+  void setAbsoluteSpeedLimit(uint16_t ticks) { max_speed_in_ticks = ticks; }
+#endif
   void adjustSpeedToStepperCount(uint8_t steppers);
   static bool isValidStepPin(uint8_t step_pin);
   static int8_t queueNumForStepPin(uint8_t step_pin);

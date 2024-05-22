@@ -1,7 +1,8 @@
 #include "StepperISR.h"
-#ifdef SUPPORT_ESP32_RMT
+#if defined(SUPPORT_ESP32_RMT) && !defined(SUPPORT_ESP32C3_RMT) && \
+    !defined(SUPPORT_ESP32S3_RMT)
 
-//#define TEST_MODE
+// #define TEST_MODE
 
 #include "test_probe.h"
 
@@ -115,10 +116,10 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       if (steps < PART_SIZE / 2) {
         for (uint8_t i = 1; i < steps; i++) {
           // steps-1 iterations
-          *data++ = 0x40017fff | 0x8000;
+          *data++ = 0x40007fff | 0x8000;
           *data++ = 0x20002000;
         }
-        *data++ = 0x40017fff | 0x8000;
+        *data++ = 0x40007fff | 0x8000;
         uint16_t delta = PART_SIZE - 2 * steps;
         delta <<= 5;
         *data++ = 0x20002000 - delta;
@@ -132,10 +133,10 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       } else {
         steps -= PART_SIZE / 2;
         for (uint8_t i = 0; i < PART_SIZE / 2 - 1; i++) {
-          *data++ = 0x40017fff | 0x8000;
+          *data++ = 0x40007fff | 0x8000;
           *data++ = 0x20002000;
         }
-        *data++ = 0x40017fff | 0x8000;
+        *data++ = 0x40007fff | 0x8000;
         last_entry = 0x20002000;
       }
     } else if ((steps < 2 * PART_SIZE) && (steps != PART_SIZE)) {
@@ -385,7 +386,7 @@ void StepperQueue::disconnect_rmt() {
 }
 
 void StepperQueue::startQueue_rmt() {
-//#define TRACE
+// #define TRACE
 #ifdef TRACE
   Serial.println("START");
 #endif
@@ -406,7 +407,7 @@ void StepperQueue::startQueue_rmt() {
 #endif
   rmt_tx_stop(channel);
   // rmt_rx_stop(channel);
-  rmt_memory_rw_rst(channel);
+  // rmt_tx_memory_reset(channel);
   // the following assignment should not be needed;
   // RMT.data_ch[channel] = 0;
   uint32_t *mem = FAS_RMT_MEM(channel);
@@ -424,7 +425,7 @@ void StepperQueue::startQueue_rmt() {
   rmt_set_tx_thr_intr_en(channel, false, 0);
   // RMT.apb_conf.mem_tx_wrap_en = 0;
 
-//#define TRACE
+// #define TRACE
 #ifdef TRACE
   Serial.print("Queue:");
   Serial.print(read_idx);

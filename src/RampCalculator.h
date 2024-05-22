@@ -4,7 +4,7 @@
 #include <stdint.h>
 
 #include "PoorManFloat.h"
-#include "common.h"
+#include "fas_common.h"
 
 #if (TICKS_PER_S == 16000000L)
 #define PMF_TICKS_PER_S PMF_CONST_16E6

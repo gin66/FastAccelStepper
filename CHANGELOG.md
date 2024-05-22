@@ -1,12 +1,50 @@
 TODO:
-- Different behavior avr vs pc-based tests to be analyzed
+- Different behavior avr vs pc-based testgis to be analyzed
 - #include-file structure needs to be cleaned up
 - setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
+- merge the two esp32 rmt drivers as soon as esp32c3 works
 
-pre-0.30.5:
+0.30.13:
+- avr: rework Stepper-ISR routine. It should now be robust against interrupt blockage in regard to steps lost. If interrupt blockage is too long, then 4ms paus could occur between two steps.
+- avr: Interrupt blockage of 30us tested and passed
+- Add configurable forward planning time for filling the stepper queue (#253)
+- avr: make `setAbsoluteSpeedLimit()` available
+
+0.30.12:
+- esp32: fix deprecation warning for `rmt_memory_rw_rst()`
+- esp32: add build test for platform espressif v6.6.0 with arduino core (#251)
+- simavr-tests: automatically create links/makefiles
+- avr: Fix issue #250
+- avr: In course of issue #250, interrupt blocks of 20us from application are tested.
+
+0.30.11:
+- esp32s3: add support for rmt from patch #225
+
+0.30.10:
+- Unify code in stepperConnectToPin to fix bug mentioned in #221
+  This ensures setting of per stepper speed limit is working for avr variants without side effect
+  of uncontrolled write to I/O-region
+- rename `common.h` to `fas_common.h` as proposed in #220
+
+0.30.9:
+- Fix esp32s3 to support the fourth stepper (issue #212)
+
+0.30.8:
+- Implement `setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks)` as proposed by issue #210
+
+0.30.7:
+- Fix for issue #208: the sign of current speed may be incorrect close to direction change 
+- The functions `getCurrentSpeedInMilliHz()` and `getCurrentSpeedInUs()` have been extended to supply a bool parameter about being realtime.
+
+0.30.6:
+- Support for ESP32C3
+- Fix for missing `_stepper_cnt` initialization (patch #204)
+
+0.30.5:
 - Fix target position for a move() interrupting the keep running mode
+- Fix issue #199: add initialization of `_enablePinHighActive` and `_enablePinLowActive`
 
 0.30.4:
 - Fix for issue #178: speed does not decelerate but jumps to lower value

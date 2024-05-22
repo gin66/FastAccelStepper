@@ -16,6 +16,11 @@ struct stepper_command_s {
   bool count_up;
 };
 
+struct actual_ticks_s {
+  uint32_t ticks;  // ticks == 0 means standstill
+  bool count_up;
+};
+
 struct queue_end_s {
   volatile int32_t pos;  // in steps
   volatile bool count_up;
@@ -50,6 +55,7 @@ struct queue_end_s {
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "../extras/tests/pc_based/stubs.h"
 
 // For pc-based testing, the macro TEST is defined. The pc-based testing does
@@ -74,6 +80,7 @@ struct queue_end_s {
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 1
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 0
 
 #define noop_or_wait
 
@@ -91,6 +98,7 @@ struct queue_end_s {
 
 #define SUPPORT_ESP32
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 // Some more esp32 specific includes
 #include <driver/gpio.h>
@@ -110,7 +118,6 @@ struct queue_end_s {
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
-#define SUPPORT_SELECT_DRIVER_TYPE
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #include <driver/rmt.h>
@@ -129,8 +136,8 @@ struct queue_end_s {
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32S3_PULSE_COUNTER
 #define SUPPORT_ESP32_RMT
-#include <driver/periph_ctrl.h>
 #include <driver/pcnt.h>
+#include <driver/periph_ctrl.h>
 #include <driver/rmt.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
@@ -140,7 +147,7 @@ struct queue_end_s {
 
 //==========================================================================
 //
-// ESP32 derivate - ESP32S3 - NOT SUPPORTED
+// ESP32 derivate - ESP32S3
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S3
@@ -153,21 +160,29 @@ struct queue_end_s {
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
+#define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32S3_RMT
+#include <driver/periph_ctrl.h>
 #include <driver/rmt.h>
+#include <soc/rmt_periph.h>
+#include <soc/rmt_reg.h>
+#include <soc/rmt_struct.h>
+#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
+
 #define QUEUES_MCPWM_PCNT 4
-#define QUEUES_RMT 0
+#define QUEUES_RMT 4
 
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
 
 //==========================================================================
 //
-// ESP32 derivate - ESP32C3 - NOT SUPPORTED
+// ESP32 derivate - ESP32C3
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C3
-#error "esp32c3 is not supported"
 #define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32C3_RMT
 #include <driver/periph_ctrl.h>
 #include <driver/rmt.h>
 #include <soc/rmt_periph.h>
@@ -175,6 +190,7 @@ struct queue_end_s {
 #include <soc/rmt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
+#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 //==========================================================================
 //
@@ -231,6 +247,7 @@ struct queue_end_s {
 #elif defined(ESP_PLATFORM)
 
 #define SUPPORT_ESP32
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 // esp32 specific includes
 #include <driver/gpio.h>
@@ -331,9 +348,11 @@ struct queue_end_s {
 //==========================================================================
 #elif defined(ARDUINO_ARCH_AVR)
 #define SUPPORT_AVR
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
+
 #include "AVRStepperPins.h"
 // for AVR processors a reentrant version of disabling/enabling interrupts is
 // used
@@ -356,7 +375,7 @@ struct queue_end_s {
 
 #define noop_or_wait
 
-#define SUPPORT_DIR_PIN_MASK uint8_t
+#define SUPPORT_DIR_TOGGLE_PIN_MASK uint8_t
 
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
 
@@ -421,5 +440,13 @@ enum channels { channelA, channelB, channelC };
 #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
 #endif /* __ESP32_IDF_V44__ */
+
+//==========================================================================
+// determine, if driver type selection should be supported
+#if defined(QUEUES_MCPWM_PCNT) && defined(QUEUES_RMT)
+#if (QUEUES_MCPWM_PCNT > 0) && (QUEUES_RMT > 0)
+#define SUPPORT_SELECT_DRIVER_TYPE
+#endif
+#endif
 
 #endif /* COMMON_H */

@@ -7,7 +7,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
       srand(135);
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
       if (!stepper->attachToPulseCounter(7)) {
-        Serial.println("Error attaching to pulse counter");
+        SerialInterface.println("Error attaching to pulse counter");
         seq->state = TEST_STATE_ERROR;
         return true;
       }
@@ -28,10 +28,10 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         uint32_t accel = rand() % (AMAX * 4);
         accel = accel >> ((accel % 4) + 2);
         accel = accel + AMIN;
-        Serial.print("speed=");
-        Serial.print(speed);
-        Serial.print(" accel=");
-        Serial.println(accel);
+        SerialInterface.print("speed=");
+        SerialInterface.print(speed);
+        SerialInterface.print(" accel=");
+        SerialInterface.println(accel);
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         if (rand() & 1) {
@@ -58,8 +58,8 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
         int16_t old = seq->s16_1;
         seq->s16_1 = stepper->readPulseCounter();
-        Serial.print("Steps needed for stop=");
-        Serial.println(old - seq->s16_1);
+        SerialInterface.print("Steps needed for stop=");
+        SerialInterface.println(old - seq->s16_1);
 #endif
         seq->state++;
       }
@@ -68,7 +68,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
       if (time_ms - seq->u32_1 >= 100) {
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
         if (seq->s16_1 != stepper->readPulseCounter()) {
-          Serial.println("Step AFTER stop");
+          SerialInterface.println("Step AFTER stop");
         }
 #endif
         seq->u32_1 = time_ms;

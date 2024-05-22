@@ -1,4 +1,6 @@
 #include "FastAccelStepper.h"
+#include "generic.h"
+
 #define TEST_STATE_ERROR 0xffff
 struct test_seq_s {
   bool (*test)(FastAccelStepper *stepper, struct test_seq_s *,

@@ -281,28 +281,32 @@ bool StepperQueue::hasTicksInQueue(uint32_t min_ticks) {
   return false;
 }
 
-uint16_t StepperQueue::getActualTicks() {
-  // Retrieve current step rate from the current view.
-  // This is valid only, if the command describes more than one step
+bool StepperQueue::getActualTicksWithDirection(struct actual_ticks_s* speed) {
+  // Retrieve current step rate from the current command.
+  // This is valid only, if the command describes more than one step,
+  // or if the next command contains one step, too.
   fasDisableInterrupts();
   uint8_t rp = read_idx;
   uint8_t wp = next_write_idx;
   fasEnableInterrupts();
   if (wp == rp) {
-    return 0;
+    speed->ticks = 0;
+    return true;
   }
   struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
   if (e->hasSteps) {
+    speed->count_up = e->countUp;
+    speed->ticks = e->ticks;
     if (e->moreThanOneStep) {
-      return e->ticks;
+      return true;
     }
     if (wp != ++rp) {
       if (entry[rp & QUEUE_LEN_MASK].hasSteps) {
-        return e->ticks;
+        return true;
       }
     }
   }
-  return 0;
+  return false;
 }
 
 void StepperQueue::_initVars() {
@@ -322,7 +326,7 @@ void StepperQueue::_initVars() {
   dirHighCountsUp = true;
 #if defined(ARDUINO_ARCH_AVR)
   _isRunning = false;
-  _prepareForStop = false;
+  _noMoreCommands = false;
 #endif
 #if defined(SUPPORT_ESP32)
   _isRunning = false;

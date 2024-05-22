@@ -4,7 +4,7 @@
 #include "StepperISR.h"
 
 #include "RampConstAcceleration.h"
-#include "common.h"
+#include "fas_common.h"
 
 #ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
 static pmf_logarithmic pmfl_timer_freq;

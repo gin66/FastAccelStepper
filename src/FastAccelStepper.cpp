@@ -20,6 +20,7 @@ FastAccelStepper fas_stepper[MAX_STEPPER];
 //*************************************************************************************************
 void FastAccelStepperEngine::init() {
   _externalCallForPin = NULL;
+  _stepper_cnt = 0;
   fas_init_engine(this, 255);
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
@@ -29,6 +30,7 @@ void FastAccelStepperEngine::init() {
 #if defined(SUPPORT_CPU_AFFINITY)
 void FastAccelStepperEngine::init(uint8_t cpu_core) {
   _externalCallForPin = NULL;
+  _stepper_cnt = 0;
   fas_init_engine(this, cpu_core);
 }
 #endif
@@ -59,8 +61,12 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
 }
 //*************************************************************************************************
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
+#else
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin) {
+    uint8_t step_pin, uint8_t driver_type)
+#endif
+{
   // Check if already connected
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
@@ -73,6 +79,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (!_isValidStepPin(step_pin)) {
     return NULL;
   }
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
   int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
   if (fas_stepper_num < 0) {  // flexible, so just choose next
     if (_stepper_cnt >= MAX_STEPPER) {
@@ -80,37 +87,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     }
     fas_stepper_num = _stepper_cnt;
   }
-  _stepper_cnt++;
-
-  FastAccelStepper* s = &fas_stepper[fas_stepper_num];
-  _stepper[fas_stepper_num] = s;
-  s->init(this, fas_stepper_num, step_pin);
-  for (uint8_t i = 0; i < _stepper_cnt; i++) {
-    FastAccelStepper* sx = _stepper[i];
-    fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
-  }
-  return s;
-}
 #else
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin) {
-  return stepperConnectToPin(step_pin, DRIVER_DONT_CARE);
-}
-
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin, uint8_t driver_type) {
-  // Check if already connected
-  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper* s = _stepper[i];
-    if (s) {
-      if (s->getStepPin() == step_pin) {
-        return NULL;
-      }
-    }
-  }
-  if (!_isValidStepPin(step_pin)) {
-    return NULL;
-  }
   uint8_t queue_from = 0;
   uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT;
   if (driver_type == DRIVER_MCPWM_PCNT) {
@@ -129,6 +106,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (fas_stepper_num < 0) {
     return NULL;
   }
+#endif
   _stepper_cnt++;
 
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
@@ -142,7 +120,6 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
   return s;
 }
-#endif
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
@@ -400,12 +377,14 @@ void FastAccelStepper::fill_queue() {
 
   // preconditions are fulfilled, so create the command(s)
   NextCommand cmd;
-  // Plan ahead for max. 20 ms. Currently hard coded
+  // Plan ahead for max. 20 ms and minimum two commands.
+  // This is now configurable using _forward_planning_in_ticks.
   bool delayed_start = !q->isRunning();
   bool need_delayed_start = false;
   uint32_t ticksPrepared = q->ticksInQueue();
   while (!isQueueFull() &&
-         ((ticksPrepared < TICKS_PER_S / 50) || q->queueEntries() <= 1) &&
+         ((ticksPrepared < _forward_planning_in_ticks) ||
+          q->queueEntries() <= 1) &&
          _rg.isRampGeneratorActive()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
@@ -529,6 +508,9 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _stepPin = step_pin;
   _dirHighCountsUp = true;
   _dirPin = PIN_UNDEFINED;
+  _enablePinHighActive = PIN_UNDEFINED;
+  _enablePinLowActive = PIN_UNDEFINED;
+  _forward_planning_in_ticks = TICKS_PER_S / 50;
   _rg.init();
 
   _queue_num = num;
@@ -771,34 +753,38 @@ uint32_t FastAccelStepper::getPeriodInUsAfterCommandsCompleted() {
   }
   return 0;
 }
-int32_t FastAccelStepper::getCurrentSpeedInUs() {
-  uint32_t ticks = fas_queue[_queue_num].getActualTicks();
-  if (ticks == 0) {
-    ticks = getPeriodInTicksAfterCommandsCompleted();
+void FastAccelStepper::getCurrentSpeedInTicks(struct actual_ticks_s* speed,
+                                              bool realtime) {
+  bool valid;
+  if (realtime) {
+    valid = fas_queue[_queue_num].getActualTicksWithDirection(speed);
+  } else {
+    valid = false;
   }
-  int32_t speed_in_us = ticks / (TICKS_PER_S / 1000000);
-  switch (_rg.rampState() & RAMP_DIRECTION_MASK) {
-    case RAMP_DIRECTION_COUNT_UP:
-      return speed_in_us;
-    case RAMP_DIRECTION_COUNT_DOWN:
-      return -speed_in_us;
+  if (!valid) {
+    if (_rg.isRampGeneratorActive()) {
+      _rg.getCurrentSpeedInTicks(speed);
+    }
   }
-  return 0;
 }
-int32_t FastAccelStepper::getCurrentSpeedInMilliHz() {
-  uint32_t ticks = fas_queue[_queue_num].getActualTicks();
-  if (ticks == 0) {
-    ticks = getPeriodInTicksAfterCommandsCompleted();
+int32_t FastAccelStepper::getCurrentSpeedInUs(bool realtime) {
+  struct actual_ticks_s speed;
+  getCurrentSpeedInTicks(&speed, realtime);
+  int32_t speed_in_us = speed.ticks / (TICKS_PER_S / 1000000);
+  if (speed.count_up) {
+    return speed_in_us;
   }
-  int32_t speed_in_milli_hz = 0;
-  if (ticks > 0) {
-    speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
-  }
-  switch (_rg.rampState() & RAMP_DIRECTION_MASK) {
-    case RAMP_DIRECTION_COUNT_UP:
-      return speed_in_milli_hz;
-    case RAMP_DIRECTION_COUNT_DOWN:
-      return -speed_in_milli_hz;
+  return -speed_in_us;
+}
+int32_t FastAccelStepper::getCurrentSpeedInMilliHz(bool realtime) {
+  struct actual_ticks_s speed;
+  getCurrentSpeedInTicks(&speed, realtime);
+  if (speed.ticks > 0) {
+    int32_t speed_in_mhz = ((uint32_t)250 * TICKS_PER_S) / speed.ticks * 4;
+    if (speed.count_up) {
+      return speed_in_mhz;
+    }
+    return -speed_in_mhz;
   }
   return 0;
 }
@@ -820,6 +806,11 @@ uint32_t FastAccelStepper::getMaxSpeedInMilliHz() {
   uint32_t speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
   return speed_in_milli_hz;
 }
+#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+void FastAccelStepper::setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks) {
+  fas_queue[_queue_num].setAbsoluteSpeedLimit(max_speed_in_ticks);
+}
+#endif
 int8_t FastAccelStepper::setSpeedInTicks(uint32_t min_step_ticks) {
   if (min_step_ticks < getMaxSpeedInTicks()) {
     return -1;

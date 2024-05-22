@@ -1,4 +1,5 @@
-name: Build examples for esp32arduino @ latest
+
+name: Build examples for esp32s3 @ V6_5_0
 
 on:
   push:
@@ -13,9 +14,8 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
     - name: Make directories
       run: bash extras/scripts/build-pio-dirs.sh
     - name: Build on PlatformIO
-      run: bash extras/scripts/build-platformio.sh esp32arduinolatest
-
+      run: bash extras/scripts/build-platformio.sh esp32s3_V6_5_0

@@ -14,7 +14,7 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 1:
       if ((stepper->rampState() & RAMP_STATE_MASK) == RAMP_STATE_COAST) {
         int32_t dt = time_ms - seq->u32_1;
-        Serial.println(dt);
+        SerialInterface.println(dt);
         // 779 esp, 805 avr (neu 810 avr), 820: esp32 with rmt, 812: esp32 with
         // rmt second channel
         if (abs(dt - 792) > 30) {
@@ -43,11 +43,11 @@ bool test_seq_07(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 4:
       if (!stepper->isRunning()) {
         int32_t dt = time_ms - seq->u32_1;
-        Serial.println(dt);
+        SerialInterface.println(dt);
         if (abs(dt - 1495) > 30) {
           seq->state = TEST_STATE_ERROR;
         }
-        Serial.println(stepper->getPositionAfterCommandsCompleted());
+        SerialInterface.println(stepper->getPositionAfterCommandsCompleted());
         if (stepper->getPositionAfterCommandsCompleted() != 0) {
           seq->state = TEST_STATE_ERROR;
         }

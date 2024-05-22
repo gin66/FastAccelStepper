@@ -1,4 +1,4 @@
-# BE AWARE: ARDUINO LIBRARY MANAGER IS BROKEN AND 0.29.x do not show.
+# BE AWARE: ARDUINO LIBRARY MANAGER IS BROKEN AND 0.29.x/0.30.x with x>0 do not show.
 
 No issue with platformio. Check the [related issue](https://github.com/arduino/library-registry/issues/2829) for the arduino library manager
 
@@ -14,17 +14,47 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.28.1)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.28.1)
 
-[![Build examples for esp32](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32.yml)
-[![Build examples for esp32s2](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2.yml)
-[![Build examples for esp32arduino @ 3.4.0](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinoV340.yml)
-[![Build examples for esp32arduino @ latest](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinolatest.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32arduinolatest.yml)
+## Build for ESP32-platform
+
+Build examples for different versions of espressif-arduino platform:
+
+### esp32
+[![`V6_6_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_6_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_6_0.yml)
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml)
+[![`V6_4_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_4_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_4_0.yml)
+[![`V6_3_2`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_3_2.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_3_2.yml)
+[![`V6_2_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_2_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_2_0.yml)
+[![`V6_1_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_1_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_1_0.yml)
+[![`V6_0_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_0_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_0_1.yml)
+[![`V5_3_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_3_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_3_0.yml)
+[![`V5_2_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_2_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_2_0.yml)
+[![`V5_1_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_1_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_1_1.yml)
+[![`V5_0_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_0_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V5_0_0.yml)
+[![`V4_4_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_4_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_4_0.yml)
+[![`V4_3_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_3_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_3_0.yml)
+[![`V4_2_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_2_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_2_0.yml)
+[![`V4_1_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_1_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V4_1_0.yml)
+[![`V3_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V3_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V3_5_0.yml)
+
+### esp32s2
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_5_0.yml)
+
+### esp32s3
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_5_0.yml)
+
+### esp32c3
+[![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml)
+
+## Build for avr-platform
 [![Build examples for Atmega2560](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml)
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
 [![Build examples for Atmega168/328](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega328.yml)
 [![Build examples for Atmega32U4](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega32u4.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_nanoatmega32u4.yml)
 
+## Overview
+
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3 and atmelsam due.
+Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
@@ -65,6 +95,11 @@ FastAccelStepper offers the following features:
 * No float calculation (poor man float: use log2 representation in range -64..64 with 16bit integer representation and 1/512th resolution)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.com/#gin66/FastAccelStepper&Date)
+
 
 General behaviour:
 * The desired end position to move to is set by calls to moveTo() and move()
@@ -142,7 +177,13 @@ Comments to pin sharing:
 ### ESP32S3
 
 * allows up to 200000 generated steps per second ?
-* supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* supports up to eight stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+
+### ESP32C3
+
+* allows up to 200000 generated steps per second ?
+* supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### Atmel SAM Due
@@ -273,7 +314,7 @@ What are the differences between mcpwm/pcnt and rmt ?
 |:---------------------------|:----------------------------------------|:------------------------------------------------------------------------------|
 |Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed |
 |Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          |
-|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           |
+|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           |
 |esp32 notes                 | availabe pcnt modules can be connected  | no pcnt module used, so can be attached to rmt output as realtime position    |
 
 If the interrupt load is not an issue, then rmt is the better choice. With rmt the below (multi-axis application) mentioned loss of synchonicity at high speeds can be avoided. The rmt driver is - besides some rmt modules perks - less complex and way more straightforward.
@@ -288,11 +329,15 @@ This stepper driver uses rmt module.
 
 ### ESP32S3
 
-This stepper driver uses mcpwm/pcnt modules. Can drive up to 4 motors. Tested with 2 motors.
+This stepper driver uses mcpwm/pcnt + rmt modules. Can drive up to 8 motors. Tested with 6 motors (not by me). 
 
-### ESP32C3/ESP32-MINI-1
+The ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels and with different register names.
 
-Compatibility with ESP32-C3: Not supported currently. The rmt module has more changes compared to esp32/esp32s2
+### ESP32C3
+
+This stepper driver uses rmt module and can drive up to 2 motors. Not thoroughly tested, so only experimental support.
+
+### ESP32-MINI-1
 
 Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are listed in the datasheet. So there are chances, that this lib works.
 
@@ -431,6 +476,7 @@ This feature of StepperDemo allows to compare non-smooth running stepper in an a
 * In one setup, operating A4988 without microsteps has led to erratic behaviour at some specific low speed (erratic means step forward/backward, while DIR is kept low). No issue with 16 microstep. These two youtube videos show similar behavior: [hard disc stepper](https://youtu.be/DsYgw3GFHZo) and [axes movement](https://youtu.be/Nw18B81Ylhk)
 * The pulse counters in esp32 have several comparators to trigger interrupts. What the documentation does not mention: All those reference values are only forwarded to the actual comparator on pulse counter reset. Thus the pulse counters cannot be used as lower 16bit of the position, unfortunately.
 * The [issue #60](https://github.com/gin66/FastAccelStepper/issues/60) was raised due to wrong position on negative moves with esp32. Apparently the issue was with proper ground and/or power lines to the stepper driver. If similar issue is encountered, please check on this issue
+* ESP32C3: USBSerial works only under Arduino IDE. platformio support for USBSerial is missing
 
 ## 3rd party videos in action
 
@@ -453,4 +499,6 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks clazarowitz for the amazing atmel sam due port (https://github.com/gin66/FastAccelStepper/pull/82)
 - Thanks HeldeReis for the awesome ESP32-S3 port (https://github.com/gin66/FastAccelStepper/pull/162)
 - Thanks DaAwesomeP for the extension to ATmega 168/168P/328 (https://github.com/gin66/FastAccelStepper/pull/179)
-
+- Thanks turley for the patch for missing `_stepper_cnt` initialization (https://github.com/gin66/FastAccelStepper/pull/204)
+- Thanks GarmischWg for adding rmt-support to ESP32-S3 (https://github.com/gin66/FastAccelStepper/pull/225)
+- THanks SHWotever for avr patch to fix missing direction pin toggle (https://github.com/gin66/FastAccelStepper/pull/252)

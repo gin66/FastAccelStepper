@@ -64,7 +64,9 @@ hardware may have limitations - e.g. no stepper resources anymore, or the
 step pin cannot be used, then NULL is returned. So it is advised to check
 the return value of this call.
 ```cpp
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
+#endif
 ```
 For e.g. esp32, there are two types of driver.
 One using mcpwm and pcnt module. And another using rmt module.
@@ -74,7 +76,8 @@ This call allows to select the respective driver
 #define DRIVER_MCPWM_PCNT 0
 #define DRIVER_RMT 1
 #define DRIVER_DONT_CARE 2
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin, uint8_t driver_type);
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin,
+                                        uint8_t driver_type = DRIVER_DONT_CARE);
 #endif
 ```
 Comments to valid pins:
@@ -157,8 +160,8 @@ And the two directions of a move
 #define RAMP_DIRECTION_COUNT_DOWN 64
 ```
 A ramp state value of 2 is set after any move call on a stopped motor
-and until the stepper task. The stepper task will then control the direction
-flags
+and until the stepper task is serviced. The stepper task will then
+control the direction flags
 
 ## Timing values - Architecture dependent
 
@@ -290,6 +293,15 @@ For the device's maximum allowed speed, the following calls can be used.
   uint32_t getMaxSpeedInHz();
   uint32_t getMaxSpeedInMilliHz();
 ```
+For esp32 and avr, the device's maximum allowed speed can be overridden.
+Allocating a new stepper will override any absolute speed limit.
+This is absolutely untested, no error checking implemented.
+Use at your own risk !
+```cpp
+#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+  void setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
+#endif
+```
 Setting the speed can be done with the four `setSpeed...()` calls.
 The new value will be used only after call of these functions:
 
@@ -326,9 +338,22 @@ retrieves the actual speed.
 |   > 0 | while position counting up   |
 |   < 0 | while position counting down |
 
+If the parameter realtime is true, then the most actual speed
+from the stepper queue is derived. This works only, if the queue
+does not contain pauses, which is normally the case for slow speeds.
+Otherwise the speed from the ramp generator is reported, which is
+done always in case of `realtime == false`. That speed is typically
+the value of the speed a couple of milliseconds later.
+
+The drawback of `realtime == true` is, that the reported speed
+may either come from the queue or from the ramp generator.
+This means the returned speed may have jumps during
+acceleration/deceleration.
+
+For backward compatibility, the default is true.
 ```cpp
-  int32_t getCurrentSpeedInUs();
-  int32_t getCurrentSpeedInMilliHz();
+  int32_t getCurrentSpeedInUs(bool realtime = true);
+  int32_t getCurrentSpeedInMilliHz(bool realtime = true);
 ```
 ## Acceleration
  setAcceleration() expects as parameter the change of speed
@@ -487,6 +512,39 @@ stepper task is executed.
 In keep running mode, the targetPos() is not updated
 ```cpp
   int32_t targetPos() { return _rg.targetPosition(); }
+```
+The stepper task adds commands to the stepper queue until
+either at least two commands are planned, or the commands
+cover sufficient time into the future. Default value for that time is 20ms.
+
+The stepper task is cyclically executed every ~4ms.
+Especially for avr, the step interrupts puts a significant load on the uC,
+so the cyclical stepper task can even run for 2-3 ms. On top of that,
+other interrupts caused by the application could increase the load even further.
+
+Consequently, the forward planning should fill the queue for ideally two cycles,
+this means 8ms. This means, the default 20ms provide a sufficient margin and
+even a missed cycle is not an issue.
+
+The drawback of the 20ms is, that any change in speed/acceleration are added after
+those 20ms and for an application, requiring fast reaction times, this may 
+impact the expected performance.
+
+Due to this the forward planning time can be adjusted with the following API call
+for each stepper individually.
+
+Attention:
+- This is only for advanced users: no error checking is implemented.
+- Only change the forward planning time, if the stepper is not running.
+- Too small values bear the risk of a stepper running at full speed suddenly stopping
+  due to lack of commands in the queue.
+```cpp
+  void setForwardPlanningTimeInMs(uint8_t ms) {
+    _forward_planning_in_ticks = ms;
+```
+    _forward_planning_in_ticks *= TICKS_PER_S / 1000;ticks per ms
+```cpp
+  }
 ```
 ## Low Level Stepper Queue Management (low level access)
 
