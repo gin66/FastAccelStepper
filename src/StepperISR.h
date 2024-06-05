@@ -143,7 +143,7 @@ class StepperQueue {
   bool hasTicksInQueue(uint32_t min_ticks);
   bool getActualTicksWithDirection(struct actual_ticks_s* speed);
 
-  volatile uint16_t getMaxSpeedInTicks() { return max_speed_in_ticks; }
+  uint16_t getMaxSpeedInTicks() { return max_speed_in_ticks; }
 
   // startQueue is always called
   void startQueue();

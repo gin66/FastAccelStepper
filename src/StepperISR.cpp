@@ -112,7 +112,7 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 #if defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)
   e->start_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
 #endif
-  next_queue_end.pos += cmd->count_up ? steps : -steps;
+  next_queue_end.pos = next_queue_end.pos + (cmd->count_up ? steps : -steps);
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
   e->end_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
 #endif
@@ -123,7 +123,7 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   fasDisableInterrupts();
   if (!ignore_commands) {
     if (isReadyForCommands()) {
-      next_write_idx++;
+      next_write_idx = next_write_idx + 1;
       queue_end = next_queue_end;
     } else {
       fasEnableInterrupts();

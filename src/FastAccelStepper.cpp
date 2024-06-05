@@ -847,7 +847,7 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   if (delta != 0) {
     struct queue_end_s* queue_end = &fas_queue[_queue_num].queue_end;
     fasDisableInterrupts();
-    queue_end->pos += delta;
+    queue_end->pos = queue_end->pos + delta;
     _rg.advanceTargetPosition(delta, queue_end);
     fasEnableInterrupts();
   }
