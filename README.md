@@ -52,6 +52,10 @@ Build examples for different versions of espressif-arduino platform:
 [![`V6_6_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_6_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_6_0.yml)
 [![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml)
 
+### esp32 tasmota
+[![`V3_0_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_3_0_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_3_0_0.yml)
+[![`V2_0_15`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml)
+
 ## Build for avr-platform
 [![Build examples for Atmega2560](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmega2560.yml)
 [![Build examples for Atmel SAM](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_atmelsam.yml)
