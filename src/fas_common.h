@@ -111,22 +111,35 @@ struct queue_end_s {
 //==========================================================================
 
 #if CONFIG_IDF_TARGET_ESP32
+#include "core_version.h"
+#ifdef ARDUINO_ESP32_RELEASE_3_0_0
+#include <driver/mcpwm_prelude.h>
+#include <driver/pulse_cnt.h>
+#else
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
+#endif
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
 
+#if defined(ARDUINO_ESP32_RELEASE_3_0_0)
+#define SUPPORT_ESP32_RMT
+#else
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
+#endif
 #include <driver/rmt.h>
 #define QUEUES_MCPWM_PCNT 6
 #define QUEUES_RMT 8
 
+#if defined(ARDUINO_ESP32_RELEASE_3_0_0)
+#else
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMT_CHANNEL_MEM(channel))
+#endif
 
 //==========================================================================
 //

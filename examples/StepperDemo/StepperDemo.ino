@@ -1159,7 +1159,15 @@ bool process_cmd(char *cmd) {
 #if defined(ARDUINO_ARCH_ESP32)
       if (strcmp(cmd, "eset") == 0) {
         SerialInterface.println("ESP reset");
+  #if defined(ARDUINO_ESP32_RELEASE_3_0_0)
+        esp_task_wdt_config_t wdt_config;
+        wdt_config.idle_core_mask = 1<<1;
+        wdt_config.timeout_ms = 100;
+        wdt_config.trigger_panic = false;
+        esp_task_wdt_init(&wdt_config);
+  #else
         esp_task_wdt_init(1, true);
+  #endif
         esp_task_wdt_add(NULL);
         while (true)
           ;
