@@ -19,8 +19,7 @@ void setup() {
   Serial.begin(USB_BAUD);
   randomSeed(42);
   delay(100);
-  Serial.print("hello");
-
+  Serial.println("hello");
 }
 
 void loop() {
@@ -40,7 +39,8 @@ void loop() {
   while (stepper -> getCurrentSpeedInMilliHz() != 0) {
     count ++;
     if (count > 20) {
-      Serial.print("No stop iter# ");
+      Serial.print(millis());
+      Serial.print("ms: No stop iter# ");
       Serial.print(count);
       Serial.print(".");
       Serial.print(" Target: ");
@@ -55,16 +55,5 @@ void loop() {
     delay(5);
     if (count > 200)
       break;
-  }
-  for (i =0; i< 100; i++) {
-   delay(5);
-    uint32_t sp = stepper-> getCurrentSpeedInMilliHz();
-    if (sp !=0) {
-      Serial.print("Speed error. Received value: ");
-      Serial.print(sp);
-      Serial.print(". Target speed was ");
-      Serial.print(target);
-      Serial.println();
-    }
   }
 }
