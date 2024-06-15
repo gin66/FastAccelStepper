@@ -23,7 +23,7 @@ void setup() {
 }
 
 void loop() {
-  int i, count;
+  int count;
   long target;
  // Serial.println("Starting");
   target = random(minSpeed, maxSpeed);
