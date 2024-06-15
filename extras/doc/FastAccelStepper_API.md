@@ -430,6 +430,7 @@ This is convenient especially, if the stepper is set to continuous running.
   void applySpeedAcceleration();
 ```
 ## Move commands
+### move() and moveTo()
 start/move the stepper for (move) steps or to an absolute position.
 
 If the stepper is already running, then the current running move will be
@@ -442,6 +443,7 @@ return values are the MOVE_... constants
   int8_t move(int32_t move, bool blocking = false);
   int8_t moveTo(int32_t position, bool blocking = false);
 ```
+### keepRunning()
 This command flags the stepper to keep run continuously into current
 direction. It can be stopped by stopMove.
 Be aware, if the motor is currently decelerating towards reversed
@@ -451,13 +453,15 @@ reversal first.
   void keepRunning();
   bool isRunningContinuously() { return _rg.isRunningContinuously(); }
 ```
-This command just let the motor run continuously in one direction.
+### runForward() and runBackwards()
+These commands just let the motor run continuously in one direction.
 If the motor is running in the opposite direction, it will reverse
 return value as with move/moveTo
 ```cpp
   int8_t runForward();
   int8_t runBackward();
 ```
+### forwardStep() and backwardStep()
 forwardStep()/backwardstep() can be called, while stepper is not moving
 If stepper is moving, this is a no-op.
 backwardStep() is a no-op, if no direction pin defined
@@ -467,6 +471,7 @@ If blocking = true, then the routine will wait till isRunning() is false
   void forwardStep(bool blocking = false);
   void backwardStep(bool blocking = false);
 ```
+### moveByAcceleration()
 moveByAcceleration() can be called, if only the speed of the stepper
 is of interest and that speed to be controlled by acceleration.
 The maximum speed (in both directions) to be set by setSpeedInUs() before.
@@ -480,13 +485,15 @@ return value as with move/moveTo
 ```cpp
   int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
 ```
-stop the running stepper with normal deceleration.
+### stopMove()
+Stop the running stepper with normal deceleration.
 This only sets a flag and can be called from an interrupt !
 ```cpp
   void stopMove();
   bool isStopping() { return _rg.isStopping(); }
 ```
-abruptly stop the running stepper without deceleration.
+### forceStop()
+Abruptly stop the running stepper without deceleration.
 This can be called from an interrupt !
 
 The stepper command queue will be processed, but no further commands are
@@ -513,6 +520,7 @@ In keep running mode, the targetPos() is not updated
 ```cpp
   int32_t targetPos() { return _rg.targetPosition(); }
 ```
+### Task planning
 The stepper task adds commands to the stepper queue until
 either at least two commands are planned, or the commands
 cover sufficient time into the future. Default value for that time is 20ms.
