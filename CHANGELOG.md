@@ -6,6 +6,9 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
+0.30.15:
+- Fix missing initialization in `getCurrentSpeedInTicks()` (#262)
+
 0.30.14:
 - Fix typo in library.properties. No functional changes
 

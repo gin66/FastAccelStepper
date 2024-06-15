@@ -765,6 +765,9 @@ void FastAccelStepper::getCurrentSpeedInTicks(struct actual_ticks_s* speed,
     if (_rg.isRampGeneratorActive()) {
       _rg.getCurrentSpeedInTicks(speed);
     }
+    else {
+      speed->ticks = 0;
+    }
   }
 }
 int32_t FastAccelStepper::getCurrentSpeedInUs(bool realtime) {
