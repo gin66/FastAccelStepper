@@ -1,7 +1,7 @@
 #include <FastAccelStepper.h>
 
 #define stepPin 9
-#define dirPin 5
+#define dirPin 10
 #define USB_BAUD 250000
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -12,21 +12,18 @@ const int32_t acc = 2000;
 const int32_t minSpeed = 1;
 const int32_t maxSpeed = 2000;
 
-void memoryMix() {
-  delay(30);
-}
-
 void setup() {
   engine.init();
   stepper = engine.stepperConnectToPin(stepPin);
   stepper->setDirectionPin(dirPin);
   Serial.begin(USB_BAUD);
   randomSeed(42);
+  delay(100);
+  Serial.print("hello");
 
 }
 
 void loop() {
-  uint32_t sp, oldSp;
   int i, count;
   long target;
  // Serial.println("Starting");
@@ -39,31 +36,29 @@ void loop() {
  // Serial.println("Stopping");
   stepper ->moveByAcceleration(-quickAcc, false);
   stepper ->applySpeedAcceleration();
-  oldSp = stepper -> getCurrentSpeedInMilliHz();
   count = 0;
-  while ((sp = stepper -> getCurrentSpeedInMilliHz()) != 0) {
+  while (stepper -> getCurrentSpeedInMilliHz() != 0) {
     count ++;
     if (count > 20) {
-      Serial.print("No stop iter ");
+      Serial.print("No stop iter# ");
       Serial.print(count);
       Serial.print(".");
-      if (!stepper -> isRunning())
-        Serial.print("isRunning() reports stopped");
+      Serial.print(" Target: ");
+      Serial.print(target);
+      Serial.print(".");
+      if (stepper -> isRunning())
+        Serial.print("isRunning() reports true.");
+      else
+        Serial.print("isRunning() reports false.");
       Serial.println();
   }
-    if (sp > oldSp) {
-      Serial.print("Speed moves wrong way ");
-      Serial.print(sp);
-      Serial.print(">");
-      Serial.print(oldSp);
-      Serial.println();
-    }
-    oldSp = sp;
-    memoryMix();
+    delay(5);
+    if (count > 200)
+      break;
   }
   for (i =0; i< 100; i++) {
-    memoryMix();
-    sp = stepper-> getCurrentSpeedInMilliHz();
+   delay(5);
+    uint32_t sp = stepper-> getCurrentSpeedInMilliHz();
     if (sp !=0) {
       Serial.print("Speed error. Received value: ");
       Serial.print(sp);
