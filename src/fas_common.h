@@ -18,10 +18,19 @@
 // There are some constraints on the values:
 // - `ticks` must be greater or equal to FastAccelStepper::getMaxSpeedInTicks.
 // - `ticks*steps` must be greater or equal to MIN_CMD_TICKS
+//
+// For example:
+// A command with ticks=TICKS_PER_S/1000, steps = 3, count_up = true means that:
+// 1. The direction pin is set to HIGH.
+// 2. One step is generated.
+// 3. Exactly 1 ms after the first step, the second step is issued.
+// 4. Exactly 1 ms after the second step, the third step is issued.
+// 5. The stepper waits for 1 ms.
+// 6. The next command is processed.
 struct stepper_command_s {
   // Number of ticks between each step.
   //
-  // See TICKS_PER_S
+  // There are `TICKS_PER_S` ticks per second. This may vary between different platforms.
   uint16_t ticks;
   // Number of steps to send to the stepper motor during this command.
   //
