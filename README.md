@@ -508,4 +508,6 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks DaAwesomeP for the extension to ATmega 168/168P/328 (https://github.com/gin66/FastAccelStepper/pull/179)
 - Thanks turley for the patch for missing `_stepper_cnt` initialization (https://github.com/gin66/FastAccelStepper/pull/204)
 - Thanks GarmischWg for adding rmt-support to ESP32-S3 (https://github.com/gin66/FastAccelStepper/pull/225)
-- THanks SHWotever for avr patch to fix missing direction pin toggle (https://github.com/gin66/FastAccelStepper/pull/252)
+- Thanks SHWotever for avr patch to fix missing direction pin toggle (https://github.com/gin66/FastAccelStepper/pull/252)
+- Thanks HalfVoxel for pull requests (https://github.com/gin66/FastAccelStepper/pull/270) and (https://github.com/gin66/FastAccelStepper/pull/271): improved doc and missing parenthesis in preprocessor macros
+

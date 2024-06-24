@@ -533,7 +533,7 @@ class FastAccelStepper {
   // queue, the actual stop position is lost (recovering this position cannot be
   // done within an interrupt). So the new position after stop has to be
   // provided and will be set as current position after stop.
-  void forceStopAndNewPosition(uint32_t new_pos);
+  void forceStopAndNewPosition(int32_t new_pos);
 
   // get the target position for the current move.
   // As of now, this position is the view of the stepper task.

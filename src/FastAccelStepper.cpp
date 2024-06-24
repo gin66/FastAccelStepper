@@ -668,7 +668,7 @@ void FastAccelStepper::forceStop() {
   // inform ramp generator to force stop
   _rg.forceStop();
 }
-void FastAccelStepper::forceStopAndNewPosition(uint32_t new_pos) {
+void FastAccelStepper::forceStopAndNewPosition(int32_t new_pos) {
   StepperQueue* q = &fas_queue[_queue_num];
 
   // ensure no more commands are added to the queue
