@@ -517,6 +517,21 @@ class FastAccelStepper {
   void stopMove();
   inline bool isStopping() { return _rg.isStopping(); }
 
+  // ### stepsToStop()
+  // This returns the current step value of the ramp.
+  // This equals the number of steps for a motor to
+  // reach the current position and speed from standstill
+  // and to come to standstill with deceleration if stopped
+  // immediately.
+  // This value is valid with or without linear acceleration
+  // being used.
+  // Primary use is to forecast possible stop position.
+  // The stop position is:
+  //    getCurrentPosition() + stepsToStop()
+  // in case of a motor running in positive direction.
+  uint32_t stepsToStop() { return _rg.stepsToStop(); }
+
+
   // ### forceStop()
   // Abruptly stop the running stepper without deceleration.
   // This can be called from an interrupt !
