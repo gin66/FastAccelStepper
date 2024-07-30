@@ -19,6 +19,8 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 Build examples for different versions of espressif-arduino platform:
 
 ### esp32
+[![`V6_8_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_8_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_8_1.yml)
+[![`V6_8_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_8_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_8_0.yml)
 [![`V6_7_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_7_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_7_0.yml)
 [![`V6_6_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_6_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_6_0.yml)
 [![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V6_5_0.yml)
@@ -38,16 +40,22 @@ Build examples for different versions of espressif-arduino platform:
 [![`V3_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V3_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_V3_5_0.yml)
 
 ### esp32s2
+[![`V6_8_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_8_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_8_1.yml)
+[![`V6_8_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_8_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_8_0.yml)
 [![`V6_7_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_7_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_7_0.yml)
 [![`V6_6_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_6_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_6_0.yml)
 [![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s2_V6_5_0.yml)
 
 ### esp32s3
+[![`V6_8_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_8_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_8_1.yml)
+[![`V6_8_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_8_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_8_0.yml)
 [![`V6_7_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_7_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_7_0.yml)
 [![`V6_6_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_6_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_6_0.yml)
 [![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32s3_V6_5_0.yml)
 
 ### esp32c3
+[![`V6_8_1`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_8_1.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_8_1.yml)
+[![`V6_8_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_8_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_8_0.yml)
 [![`V6_7_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_7_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_7_0.yml)
 [![`V6_6_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_6_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_6_0.yml)
 [![`V6_5_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32c3_V6_5_0.yml)
