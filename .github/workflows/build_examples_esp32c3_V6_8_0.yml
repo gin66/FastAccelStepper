@@ -1,0 +1,20 @@
+name: Build examples for esp32c3 @ V6_8_0
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Make directories
+      run: bash extras/scripts/build-pio-dirs.sh
+    - name: Build on PlatformIO
+      run: bash extras/scripts/build-platformio.sh esp32c3_V6_8_0
