@@ -71,7 +71,6 @@ class FastAccelStepperEngine {
   // CPU core with this modified init()-call. ESP32 implementation detail: For
   // values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
   void init(uint8_t cpu_core);
-
 #endif
 
   // ### Creation of FastAccelStepper
@@ -461,6 +460,7 @@ class FastAccelStepper {
   void applySpeedAcceleration();
 
   // ## Move commands
+  // ### move() and moveTo()
   // start/move the stepper for (move) steps or to an absolute position.
   //
   // If the stepper is already running, then the current running move will be
@@ -472,6 +472,7 @@ class FastAccelStepper {
   int8_t move(int32_t move, bool blocking = false);
   int8_t moveTo(int32_t position, bool blocking = false);
 
+  // ### keepRunning()
   // This command flags the stepper to keep run continuously into current
   // direction. It can be stopped by stopMove.
   // Be aware, if the motor is currently decelerating towards reversed
@@ -480,12 +481,14 @@ class FastAccelStepper {
   void keepRunning();
   bool isRunningContinuously() { return _rg.isRunningContinuously(); }
 
-  // This command just let the motor run continuously in one direction.
+  // ### runForward() and runBackwards()
+  // These commands just let the motor run continuously in one direction.
   // If the motor is running in the opposite direction, it will reverse
   // return value as with move/moveTo
   int8_t runForward();
   int8_t runBackward();
 
+  // ### forwardStep() and backwardStep()
   // forwardStep()/backwardstep() can be called, while stepper is not moving
   // If stepper is moving, this is a no-op.
   // backwardStep() is a no-op, if no direction pin defined
@@ -494,6 +497,7 @@ class FastAccelStepper {
   void forwardStep(bool blocking = false);
   void backwardStep(bool blocking = false);
 
+  // ### moveByAcceleration()
   // moveByAcceleration() can be called, if only the speed of the stepper
   // is of interest and that speed to be controlled by acceleration.
   // The maximum speed (in both directions) to be set by setSpeedInUs() before.
@@ -506,12 +510,29 @@ class FastAccelStepper {
   // return value as with move/moveTo
   int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
 
-  // stop the running stepper with normal deceleration.
+  // ### stopMove()
+  // Stop the running stepper with normal deceleration.
   // This only sets a flag and can be called from an interrupt !
   void stopMove();
   inline bool isStopping() { return _rg.isStopping(); }
 
-  // abruptly stop the running stepper without deceleration.
+  // ### stepsToStop()
+  // This returns the current step value of the ramp.
+  // This equals the number of steps for a motor to
+  // reach the current position and speed from standstill
+  // and to come to standstill with deceleration if stopped
+  // immediately.
+  // This value is valid with or without linear acceleration
+  // being used.
+  // Primary use is to forecast possible stop position.
+  // The stop position is:
+  //    getCurrentPosition() + stepsToStop()
+  // in case of a motor running in positive direction.
+  uint32_t stepsToStop() { return _rg.stepsToStop(); }
+
+
+  // ### forceStop()
+  // Abruptly stop the running stepper without deceleration.
   // This can be called from an interrupt !
   //
   // The stepper command queue will be processed, but no further commands are
@@ -526,7 +547,7 @@ class FastAccelStepper {
   // queue, the actual stop position is lost (recovering this position cannot be
   // done within an interrupt). So the new position after stop has to be
   // provided and will be set as current position after stop.
-  void forceStopAndNewPosition(uint32_t new_pos);
+  void forceStopAndNewPosition(int32_t new_pos);
 
   // get the target position for the current move.
   // As of now, this position is the view of the stepper task.
@@ -535,6 +556,7 @@ class FastAccelStepper {
   // In keep running mode, the targetPos() is not updated
   inline int32_t targetPos() { return _rg.targetPosition(); }
 
+  // ### Task planning
   // The stepper task adds commands to the stepper queue until
   // either at least two commands are planned, or the commands
   // cover sufficient time into the future. Default value for that time is 20ms.

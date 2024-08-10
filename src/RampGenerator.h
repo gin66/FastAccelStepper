@@ -82,7 +82,12 @@ class RampGenerator {
     return _ro.isStopInitiated() && isRampGeneratorActive();
   }
   inline bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
-
+  inline uint32_t stepsToStop() {
+    fasDisableInterrupts();
+    uint32_t v = _rw.performed_ramp_up_steps;
+    fasEnableInterrupts();
+    return v;
+  }
   inline void stopRamp() { _rw.stopRamp(); }
   inline void setKeepRunning() { _ro.setKeepRunning(); }
   inline bool isRunningContinuously() { return _ro.isRunningContinuously(); }

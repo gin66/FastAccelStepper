@@ -6,6 +6,14 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - merge the two esp32 rmt drivers as soon as esp32c3 works
 
+pre-0.30.16:
+- Fix missing parenthesis in preprocessor macro (#271)
+- Position parameter for `forceStopAndNewPosition()` changed from `uint32_t` to `int32_t` (#268)
+- Add `stepsToStop()` to predict motor stop position
+
+0.30.15:
+- Fix missing initialization in `getCurrentSpeedInTicks()` (#262)
+
 0.30.14:
 - Fix typo in library.properties. No functional changes
 

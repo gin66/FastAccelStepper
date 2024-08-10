@@ -8,11 +8,35 @@
 #define MOVE_ERR_SPEED_IS_UNDEFINED -2
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
 
-//	ticks is multiplied by (1/TICKS_PER_S) in s
+// Low level stepper motor command.
 //	If steps is 0, then a pause is generated
+//	If steps is 0, then a pause is generated
+//
+// You can add these using the addQueueEntry method.
+// They will be executed sequentially until the queue runs out.
+//
+// There are some constraints on the values:
+// - `ticks` must be greater or equal to FastAccelStepper::getMaxSpeedInTicks.
+// - `ticks*steps` must be greater or equal to MIN_CMD_TICKS
+//
+// For example:
+// A command with ticks=TICKS_PER_S/1000, steps = 3, count_up = true means that:
+// 1. The direction pin is set to HIGH.
+// 2. One step is generated.
+// 3. Exactly 1 ms after the first step, the second step is issued.
+// 4. Exactly 1 ms after the second step, the third step is issued.
+// 5. The stepper waits for 1 ms.
+// 6. The next command is processed.
 struct stepper_command_s {
+  // Number of ticks between each step.
+  //
+  // There are `TICKS_PER_S` ticks per second. This may vary between different platforms.
   uint16_t ticks;
+  // Number of steps to send to the stepper motor during this command.
+  //
+  // If zero, then this command will be treated as a pause, lasting for a number of ticks given by `ticks`.
   uint8_t steps;
+  // True if the direction pin should be high during this command, false if it should be low.
   bool count_up;
 };
 
