@@ -71,7 +71,6 @@ class FastAccelStepperEngine {
   // CPU core with this modified init()-call. ESP32 implementation detail: For
   // values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
   void init(uint8_t cpu_core);
-
 #endif
 
   // ### Creation of FastAccelStepper
