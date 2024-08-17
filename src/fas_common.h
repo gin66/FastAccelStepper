@@ -287,6 +287,7 @@ struct queue_end_s {
 #define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 #define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32_MCPWM_PCNT
 
 // esp32 specific includes
 #include <driver/gpio.h>
@@ -318,7 +319,7 @@ struct queue_end_s {
 // Esp32 queue definitions
 #define MAX_STEPPER 6
 #define NUM_QUEUES 6
-#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_MCPWM_PCNT 6 
 #define QUEUES_RMT 8
 #define QUEUE_LEN 32
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
