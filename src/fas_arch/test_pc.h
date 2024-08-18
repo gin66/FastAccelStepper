@@ -1,5 +1,5 @@
-#ifndef FAS_ARCH_H
-#define FAS_ARCH_H
+#ifndef FAS_ARCH_TEST_PC_H
+#define FAS_ARCH_TEST_PC_H
 
 // For pc-based testing like to have assert-macro
 #include <assert.h>
@@ -39,4 +39,4 @@
 
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
 
-#endif /* FAS_ARCH_H */
+#endif /* FAS_ARCH_TEST_PC_H */
