@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cinttypes>
 
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
@@ -104,7 +105,7 @@ class FastAccelStepperTest {
     printf("Time coasting = %d\n", rc.time_coasting);
     test(rc.time_coasting < 46000000, "too much coasting");
 
-    printf("mid point @ %llu => total = %llu, total ticks = %llu\n",
+    printf("mid point @ %" PRIu64 " => total = %" PRIu64 ", total ticks = %" PRIu64 "\n",
            mid_point_ticks, 2 * mid_point_ticks, rc.total_ticks);
 #define ALLOWED_ASYMMETRY 1000000L
     printf("%ld\n", ALLOWED_ASYMMETRY);
