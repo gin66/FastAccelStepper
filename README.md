@@ -21,7 +21,6 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 [![Build espidf](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml)
 
 ## Build for esp32 with tasmota
-[![`V3_0_0`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_3_0_0.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_3_0_0.yml)
 [![`V2_0_15`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml)
 
 ## Overview
