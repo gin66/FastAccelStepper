@@ -101,7 +101,7 @@ class FastAccelStepperTest {
     assert(!s.isQueueEmpty());
     float old_planned_time_in_buffer = 0;
     char fname[100];
-    sprintf(fname, "test_02_%s.gnuplot", name);
+    snprintf(fname, 100, "test_02_%s.gnuplot", name);
     rc.start_plot(fname);
     for (int i = 0; i < steps * 100; i++) {
       if (call_moveTo_repeatedly) {

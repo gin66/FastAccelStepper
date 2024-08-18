@@ -15,9 +15,9 @@ class RampChecker {
   uint32_t coast_till;
   uint32_t time_coasting;
   uint32_t pos;
-  uint32_t ticks_since_last_step = 0;
-  float avg_accel = 0;
-  FILE *gp_file = NULL;
+  uint32_t ticks_since_last_step;
+  float avg_accel;
+  FILE *gp_file;
 
   void next_ramp() {
     increase_ok = true;
@@ -32,6 +32,9 @@ class RampChecker {
     reversing_allowed = false;
   }
   RampChecker() {
+    ticks_since_last_step = 0;
+    avg_accel = 0;
+    gp_file = NULL;
     total_ticks = 0;
     pos = 0;
     next_ramp();

@@ -49,7 +49,7 @@ class FastAccelStepperTest {
     float old_planned_time_in_buffer = 0;
 
     char fname[100];
-    sprintf(fname, "test_12.gnuplot");
+    snprintf(fname, 100, "test_13.gnuplot");
     rc.start_plot(fname);
     bool coast = false;
     for (int i = 0; i < 100 * steps; i++) {

@@ -55,7 +55,7 @@ class FastAccelStepperTest {
     uint64_t mid_point_ticks = 0;
 
     char fname[100];
-    sprintf(fname, "test_07.gnuplot");
+    snprintf(fname, 100, "test_07.gnuplot");
     rc.start_plot(fname);
     for (int i = 0; i < 10 * steps; i++) {
       if (rc.total_ticks > next_speed_change) {
@@ -104,7 +104,7 @@ class FastAccelStepperTest {
     printf("Time coasting = %d\n", rc.time_coasting);
     test(rc.time_coasting < 46000000, "too much coasting");
 
-    printf("mid point @ %ld => total = %ld, total ticks = %ld\n",
+    printf("mid point @ %llu => total = %llu, total ticks = %llu\n",
            mid_point_ticks, 2 * mid_point_ticks, rc.total_ticks);
 #define ALLOWED_ASYMMETRY 1000000L
     printf("%ld\n", ALLOWED_ASYMMETRY);

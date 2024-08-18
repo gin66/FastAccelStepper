@@ -21,7 +21,7 @@ int main() {
   c.parameters.setSpeedInTicks(max_speed_in_ticks);
 
   char fname[100];
-  sprintf(fname, "ramp.gnuplot");
+  snprintf(fname, 100, "ramp.gnuplot");
   FILE *gp_file = fopen(fname, "w");
   fprintf(gp_file, "$data <<EOF\n");
 
