@@ -76,4 +76,17 @@
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMT_CHANNEL_MEM(channel))
 #endif
 
+#ifdef __ESP32_IDF_V44__
+#include <driver/periph_ctrl.h>
+#include <soc/periph_defs.h>
+#endif /* __ESP32_IDF_V44__ */
+
+//==========================================================================
+// determine, if driver type selection should be supported
+#if defined(QUEUES_MCPWM_PCNT) && defined(QUEUES_RMT)
+#if (QUEUES_MCPWM_PCNT > 0) && (QUEUES_RMT > 0)
+#define SUPPORT_SELECT_DRIVER_TYPE
+#endif
+#endif
+
 #endif /* FAS_ARCH_ESPIDF_ESP32_H */

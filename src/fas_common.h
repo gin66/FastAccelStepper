@@ -1,5 +1,5 @@
-#ifndef COMMON_H
-#define COMMON_H
+#ifndef FAS_COMMON_H
+#define FAS_COMMON_H
 
 #define TICKS_FOR_STOPPED_MOTOR 0xffffffff
 
@@ -60,75 +60,34 @@ struct queue_end_s {
 // All architecture specific definitions should be located here
 //==============================================================================
 
-// disable inject_fill_interrupt() for all real devices
-#ifndef TEST
+//==========================================================================
+#if defined(TEST)
+// TEST "architecture" is in use with pc_based testing.
+#include "fas_arch/test_pc.h"
+
+#elif defined(ARDUINO_ARCH_ESP32)
+// ESP32 derivates using arduino core
+#include "fas_arch/arduino_esp32.h"
+
+#elif defined(ESP_PLATFORM)
+// ESP32 derivates using espidf
+#include "fas_arch/espidf_esp32.h"
+
+#elif defined(ARDUINO_ARCH_SAM)
+// SAM-architecture
+#include "fas_arch/arduino_sam.h"
+
+#elif defined(ARDUINO_ARCH_AVR)
+// AVR family
+#include "fas_arch/arduino_avr.h"
+
+#else
+#error "Unsupported devices"
+#endif
+
+// disable inject_fill_interrupt() for all real devices. Only defined in TEST
+#ifndef inject_fill_interrupt
 #define inject_fill_interrupt(x)
 #endif
 
-//==========================================================================
-//
-// The TEST "architecture" is in use with pc_based testing.
-//
-//
-//==========================================================================
-#if defined(TEST)
-#include "fas_arch/test_pc.h"
-
-//==========================================================================
-//
-// This for ESP32 derivates using arduino core
-//
-//==========================================================================
-#elif defined(ARDUINO_ARCH_ESP32)
-#include "fas_arch/arduino_esp32.h"
-
-//==========================================================================
-//
-// This for ESP32 derivates using espidf
-//
-// This is most likely broken and not tested on github actions
-//
-//==========================================================================
-#elif defined(ESP_PLATFORM)
-#include "fas_arch/espidf_esp32.h"
-
-//==========================================================================
-//
-// This for SAM-architecture
-//
-//==========================================================================
-#elif defined(ARDUINO_ARCH_SAM)
-#include "fas_arch/arduino_sam.h"
-
-//==========================================================================
-//
-// This for the AVR family
-//
-//==========================================================================
-#elif defined(ARDUINO_ARCH_AVR)
-#include "fas_arch/arduino_avr.h"
-
-//==========================================================================
-//
-// For all unsupported devices
-//
-//==========================================================================
-#else
-#error "Unsupported devices"
-
-#endif
-
-#ifdef __ESP32_IDF_V44__
-#include <driver/periph_ctrl.h>
-#include <soc/periph_defs.h>
-#endif /* __ESP32_IDF_V44__ */
-
-//==========================================================================
-// determine, if driver type selection should be supported
-#if defined(QUEUES_MCPWM_PCNT) && defined(QUEUES_RMT)
-#if (QUEUES_MCPWM_PCNT > 0) && (QUEUES_RMT > 0)
-#define SUPPORT_SELECT_DRIVER_TYPE
-#endif
-#endif
-
-#endif /* COMMON_H */
+#endif /* FAS_COMMON_H */

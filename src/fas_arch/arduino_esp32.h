@@ -146,4 +146,17 @@
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
 
+#ifdef __ESP32_IDF_V44__
+#include <driver/periph_ctrl.h>
+#include <soc/periph_defs.h>
+#endif /* __ESP32_IDF_V44__ */
+
+//==========================================================================
+// determine, if driver type selection should be supported
+#if defined(QUEUES_MCPWM_PCNT) && defined(QUEUES_RMT)
+#if (QUEUES_MCPWM_PCNT > 0) && (QUEUES_RMT > 0)
+#define SUPPORT_SELECT_DRIVER_TYPE
+#endif
+#endif
+
 #endif /* FAS_ARCH_ARDUINO_ESP32_H */
