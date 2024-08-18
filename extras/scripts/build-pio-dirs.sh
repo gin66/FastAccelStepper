@@ -39,8 +39,6 @@ do
 	cd src
 	FILES=`cd ../../../extras/idf_examples/$i;find . -type f`
 	for f in $FILES;do ln -s ../../../extras/idf_examples/$i/$f .;done
-	FILES=`cd ../../../src/.;find . -type f`
-	for f in $FILES;do ln -s ../../../src/$f .;done
 	cd ../../..
 done
 
