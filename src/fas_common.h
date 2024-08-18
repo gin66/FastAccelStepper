@@ -86,7 +86,7 @@ struct queue_end_s {
 #endif
 
 // disable inject_fill_interrupt() for all real devices. Only defined in TEST
-#ifndef inject_fill_interrupt
+#ifndef TEST
 #define inject_fill_interrupt(x)
 #endif
 
