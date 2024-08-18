@@ -1,0 +1,24 @@
+name: Build df examples
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        version:
+          - esp32idf
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Make directories
+      run: bash extras/scripts/build-pio-dirs.sh
+    - name: Build on PlatformIO
+      run: bash extras/scripts/build-idf-platformio.sh ${{ matrix.version }}
