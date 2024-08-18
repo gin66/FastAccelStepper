@@ -15,7 +15,7 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.28.1)
 
 ## Matrix build for arduino using platformio (esp32, esp32c3, atmega328,...)
-[![Build examples](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_matrix.yml)
+[![Build examples](https://github.com/gin66/FastAccelStepper/actions/workflows/build_arduino_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_arduino_examples_matrix.yml)
 
 ## Matrix build for espidf using platformio
 [![Build espidf](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml)
