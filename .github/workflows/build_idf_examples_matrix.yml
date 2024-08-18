@@ -1,4 +1,4 @@
-name: Build df examples
+name: Build idf examples
 
 on:
   push:
@@ -11,7 +11,12 @@ jobs:
     strategy:
       matrix:
         version:
-          - esp32idf
+          - esp32_idf_V4_4_0
+          - esp32_idf_V5_0_0
+          - esp32_idf_V5_1_0
+          - esp32c3_idf_V5_0_0
+          - esp32s2_idf_V5_0_0
+          - esp32s3_idf_V5_0_0
 
     runs-on: ubuntu-latest
 
