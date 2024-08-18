@@ -273,19 +273,25 @@ struct queue_end_s {
 #define SUPPORT_ESP32
 #define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
+#define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32_MCPWM_PCNT
+
 // esp32 specific includes
 #include <driver/gpio.h>
 #include <driver/mcpwm.h>
 #include <driver/pcnt.h>
+#include <driver/rmt.h>
 #include <esp_task_wdt.h>
 #include <math.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #include <soc/pcnt_reg.h>
 #include <soc/pcnt_struct.h>
+#include <soc/rmt_periph.h>
+#include <soc/rmt_reg.h>
+#include <soc/rmt_struct.h>
 
 // on espidf need to use portDISABLE/ENABLE_INTERRUPTS
-//
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #define fasDisableInterrupts portDISABLE_INTERRUPTS
@@ -300,7 +306,10 @@ struct queue_end_s {
 // Esp32 queue definitions
 #define MAX_STEPPER 6
 #define NUM_QUEUES 6
+#define QUEUES_MCPWM_PCNT 6 
+#define QUEUES_RMT 8
 #define QUEUE_LEN 32
+#define SUPPORT_EXTERNAL_DIRECTION_PIN
 
 // Esp32 timing definition
 #define TICKS_PER_S 16000000L
@@ -328,6 +337,13 @@ struct queue_end_s {
 
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
+
+#if defined(ARDUINO_ESP32_RELEASE_3_0_0)
+#else
+// have support for pulse counter
+#define SUPPORT_ESP32_PULSE_COUNTER
+#define FAS_RMT_MEM(channel) ((uint32_t *)RMT_CHANNEL_MEM(channel))
+#endif
 
 //==========================================================================
 //

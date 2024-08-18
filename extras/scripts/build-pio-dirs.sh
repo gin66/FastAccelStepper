@@ -31,14 +31,14 @@ done
 # for espidf as of now, the src/* files need to be linked into the example build directory
 rm -fR pio_espidf
 mkdir pio_espidf
-for i in `ls examples`
+for i in `cd extras;ls idf_examples`
 do
 	mkdir -p pio_espidf/$i/src
 	cd pio_espidf/$i
 	ln -s ../../extras/ci/platformio.ini .
 	cd src
-	FILES=`cd ../../../examples/$i;find . -type f`
-	for f in $FILES;do ln -s ../../../examples/$i/$f .;done
+	FILES=`cd ../../../extras/idf_examples/$i;find . -type f`
+	for f in $FILES;do ln -s ../../../extras/idf_examples/$i/$f .;done
 	FILES=`cd ../../../src/.;find . -type f`
 	for f in $FILES;do ln -s ../../../src/$f .;done
 	cd ../../..
@@ -55,4 +55,5 @@ ln -s ../../../extras/tests/pc_based/test_03.h .
 ln -s ../../../extras/tests/pc_based/PMF_test.ino PMF_test.ino
 cd ../../..
 
-ls -al pio*
+ls -al pio_*
+

@@ -1,0 +1,41 @@
+
+name: Build esp32
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        version:
+          - esp32_V3_5_0
+          - esp32_V4_1_0
+          - esp32_V4_2_0
+          - esp32_V4_3_0
+          - esp32_V4_4_0
+          - esp32_V5_0_0
+          - esp32_V5_1_1
+          - esp32_V5_2_0
+          - esp32_V5_3_0
+          - esp32_V6_0_1
+          - esp32_V6_2_0
+          - esp32_V6_3_2
+          - esp32_V6_4_0
+          - esp32_V6_5_0
+          - esp32_V6_6_0
+          - esp32_V6_7_0
+          - esp32_V6_8_1
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    - name: Make directories
+      run: bash extras/scripts/build-pio-dirs.sh
+    - name: Build on PlatformIO
+      run: bash extras/scripts/build-platformio.sh {{ matrix.version }}
