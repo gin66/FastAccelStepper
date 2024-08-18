@@ -47,7 +47,7 @@ void loop() {
   while (stepper->isRunning()) {
   };
 #ifdef SIMULATOR
-    // if result is Ok. Toggle port twice, otherwise once
+  // if result is Ok. Toggle port twice, otherwise once
 #define PIN 10
 #define DIRPIN 7
   pinMode(DIRPIN, OUTPUT);

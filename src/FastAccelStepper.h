@@ -530,7 +530,6 @@ class FastAccelStepper {
   // in case of a motor running in positive direction.
   uint32_t stepsToStop() { return _rg.stepsToStop(); }
 
-
   // ### forceStop()
   // Abruptly stop the running stepper without deceleration.
   // This can be called from an interrupt !

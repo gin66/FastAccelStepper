@@ -23,7 +23,7 @@ void init_ramp_module() {
 
 //*************************************************************************************************
 
-//#define TRACE
+// #define TRACE
 #ifdef TRACE
 #define TRACE_OUTPUT(x) Serial.print(x)
 #else

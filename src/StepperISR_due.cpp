@@ -1,8 +1,8 @@
 #include "StepperISR.h"
-//#ifndef ARDUINO_ARCH_SAM
-//#define ARDUINO_ARCH_SAM
-//#endif
-//#define KEEP_SCORE
+// #ifndef ARDUINO_ARCH_SAM
+// #define ARDUINO_ARCH_SAM
+// #endif
+// #define KEEP_SCORE
 #if defined(ARDUINO_ARCH_SAM)
 const bool enabled = false;
 uint32_t junk = 0;

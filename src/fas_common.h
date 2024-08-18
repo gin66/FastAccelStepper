@@ -9,11 +9,9 @@
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
 
 // Low level stepper motor command.
-//	If steps is 0, then a pause is generated
-//	If steps is 0, then a pause is generated
 //
 // You can add these using the addQueueEntry method.
-// They will be executed sequentially until the queue runs out.
+// They will be executed sequentially until the queue is empty.
 //
 // There are some constraints on the values:
 // - `ticks` must be greater or equal to FastAccelStepper::getMaxSpeedInTicks.
@@ -29,14 +27,17 @@
 // 6. The next command is processed.
 struct stepper_command_s {
   // Number of ticks between each step.
-  //
-  // There are `TICKS_PER_S` ticks per second. This may vary between different platforms.
+  // There are `TICKS_PER_S` ticks per second. This may vary between different
+  // platforms.
   uint16_t ticks;
+
   // Number of steps to send to the stepper motor during this command.
-  //
-  // If zero, then this command will be treated as a pause, lasting for a number of ticks given by `ticks`.
+  // If zero, then this command will be treated as a pause, lasting for a number
+  // of ticks given by `ticks`.
   uint8_t steps;
-  // True if the direction pin should be high during this command, false if it should be low.
+
+  // True if the direction pin should be high during this command, false if it
+  // should be low.
   bool count_up;
 };
 
@@ -45,6 +46,7 @@ struct actual_ticks_s {
   bool count_up;
 };
 
+// I doubt, volatile is needed.
 struct queue_end_s {
   volatile int32_t pos;  // in steps
   volatile bool count_up;

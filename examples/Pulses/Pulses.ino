@@ -5,9 +5,9 @@
 //
 
 // As in StepperDemo for Motor 1 on AVR
-//#define dirPinStepper    5
-//#define enablePinStepper 6
-//#define stepPinStepper   9  // OC1A in case of AVR
+// #define dirPinStepper    5
+// #define enablePinStepper 6
+// #define stepPinStepper   9  // OC1A in case of AVR
 
 // As in StepperDemo for Motor 7 on ESP32
 #define dirPinStepper 19

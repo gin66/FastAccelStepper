@@ -1,8 +1,8 @@
 #include "StepperISR.h"
 #ifdef SUPPORT_ESP32C3_RMT
 
-//#define TEST_MODE
-//#define TRACE
+// #define TEST_MODE
+// #define TRACE
 
 #include "test_probe.h"
 
@@ -539,7 +539,7 @@ void StepperQueue::startQueue_rmt() {
   RMT.tx_conf[channel].mem_rd_rst = 1;
   RMT.tx_conf[channel].mem_rd_rst = 0;
   uint32_t *mem = FAS_RMT_MEM(channel);
-//#define TRACE
+// #define TRACE
 #ifdef TRACE
   // Fill the buffer with a significant pattern for debugging
   // Keep it for now

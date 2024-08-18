@@ -1,11 +1,11 @@
 #ifndef TEST_PROBE_H
 #define TEST_PROBE_H
-//#define TEST_MODE
-// test mode in rmt:
-//   code to investigate rmt module functioning
+// #define TEST_MODE
+//  test mode in rmt:
+//    code to investigate rmt module functioning
 
-//#define ESP32_TEST_PROBE
-//#define ESP32C3_TEST_PROBE
+// #define ESP32_TEST_PROBE
+// #define ESP32C3_TEST_PROBE
 
 // in rmt:
 //   TEST_PROBE_1  on startQueue and queue stop, with double toggle at

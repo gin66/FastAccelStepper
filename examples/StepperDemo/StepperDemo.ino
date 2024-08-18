@@ -1161,8 +1161,7 @@ bool process_cmd(char *cmd) {
         SerialInterface.println("ESP reset");
         esp_task_wdt_init(1, true);
         esp_task_wdt_add(NULL);
-        while (true)
-          ;
+        while (true);
       }
       SerialInterface.println("ESP restart");
       ESP.restart();

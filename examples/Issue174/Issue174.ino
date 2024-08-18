@@ -3,8 +3,8 @@
 long chirpTimeInitial = 0;
 
 // Stepper Wiring
-//#define dirPinStepper 8   // This can be any output capable port pin.
-//#define stepPinStepper 9  // step pin must be pin 9, 10 or 11
+// #define dirPinStepper 8   // This can be any output capable port pin.
+// #define stepPinStepper 9  // step pin must be pin 9, 10 or 11
 
 // Stepper Wiring
 #define dirPinStepper 19

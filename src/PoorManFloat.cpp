@@ -18,7 +18,7 @@
 //     XXXXXXXX:1XXXXXXXX
 //     exponent mantissa
 //
-// The mantissa represents encodes 256..511 and interpreted as 1.0 to ~2.0.
+// The mantissa encodes 256..511 and interpreted as 1.0 to ~2.0.
 // The exponent uses an offset 128 to encode negative values and base 2
 //
 // 0x8000 => is 1
@@ -73,13 +73,13 @@
 // upm_float. Consequently, a purely logarithmic representation is completely
 // sufficient.
 //
-// As base for exp/log we will use 2  (not 10 or e). This way the exponent of an
+// As base for exp/log we will use 2 (not 10 or e). This way the exponent of an
 // upm float being 2^n needs no calculation, as log2(2^n) = n. Still the offset
 // by 128 needs to be considered
 //
 // The mantissa of an upm float with the leading 1 is in the range 1 <= m < 2.
 //
-// As log2(1) = 0 and log2(2) = 1 is at the corners identical to x + 1. So it is
+// As log2(1) = 0 and log2(2) = 1 is at the corners identical to x - 1. So it is
 // interesting to look at function f(x) = log2(x) - x + 1. This function is 0
 // for x at 1 and 2, positive over the range inbetween and reaches max value of
 // 0.08607 at x = 1.442695. This max value is at x = 1/ln(2)
@@ -161,7 +161,7 @@ uint8_t leading_zeros(uint8_t x) {
   }
   if ((x & 0x80) == 0) {
     res += 1;
-    if ((x & 0x40) == 0) {
+    if (x == 0) {
       res += 1;
     }
   }
@@ -200,6 +200,7 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   res += offset >> 1;
   return res;
 }
+
 pmf_logarithmic pmfl_from(uint16_t x) {
   uint8_t leading = leading_zeros(x >> 8);
   if (leading == 8) {

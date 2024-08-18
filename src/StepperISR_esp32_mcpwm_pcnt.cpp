@@ -7,7 +7,7 @@
 // cannot be updated while timer is running => fix it to 0
 #define TIMER_PRESCALER 0
 
-//#define TEST_PROBE 18
+// #define TEST_PROBE 18
 
 // Here the associated mapping from queue to mcpwm/pcnt units
 //
@@ -534,7 +534,7 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
 #else                                  /* __ESP32_IDF_V44__ */
-  mcpwm->timer[timer].timer_cfg1.timer_start = 2;     // 2=run continuous
+  mcpwm->timer[timer].timer_cfg1.timer_start = 2;  // 2=run continuous
 #endif                                 /* __ESP32_IDF_V44__ */
 }
 void StepperQueue::forceStop_mcpwm_pcnt() {
@@ -557,12 +557,12 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
     return false;
   }
   return true;
-  //#ifndef __ESP32_IDF_V44__
-  //  return (mcpwm->timer[timer].mode.start != 2);  // 2=run continuous
-  //#else                                            /* __ESP32_IDF_V44__ */
-  //  return (mcpwm->timer[timer].timer_cfg1.timer_start != 2);  // 2=run
-  //  continuous
-  //#endif                                           /* __ESP32_IDF_V44__ */
+  // #ifndef __ESP32_IDF_V44__
+  //   return (mcpwm->timer[timer].mode.start != 2);  // 2=run continuous
+  // #else                                            /* __ESP32_IDF_V44__ */
+  //   return (mcpwm->timer[timer].timer_cfg1.timer_start != 2);  // 2=run
+  //   continuous
+  // #endif                                           /* __ESP32_IDF_V44__ */
 }
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() {
   const struct mapping_s *mapping = (const struct mapping_s *)driver_data;

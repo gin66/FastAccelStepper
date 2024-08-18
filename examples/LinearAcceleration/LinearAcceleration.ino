@@ -1,9 +1,9 @@
 #include "FastAccelStepper.h"
 
 // As in StepperDemo for Motor 1 on AVR
-//#define dirPinStepper    5
-//#define enablePinStepper 6
-//#define stepPinStepper   9  // OC1A in case of AVR
+// #define dirPinStepper    5
+// #define enablePinStepper 6
+// #define stepPinStepper   9  // OC1A in case of AVR
 
 // As in StepperDemo for Motor 1 on ESP32
 #define dirPinStepper 18
@@ -20,7 +20,7 @@ void setup() {
 
 #ifdef SUPPORT_SELECT_DRIVER_TYPE
 // The code below is only relevant for original esp32
-//#define TEST_DONT_CARE_RMT
+// #define TEST_DONT_CARE_RMT
 #ifdef TEST_DONT_CARE_RMT
   // here occupy first all mcpwm/pcnt modules, then uses rmt
   stepper = engine.stepperConnectToPin(19, DRIVER_DONT_CARE);

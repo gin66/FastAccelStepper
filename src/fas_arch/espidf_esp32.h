@@ -37,7 +37,7 @@
 // Esp32 queue definitions
 #define MAX_STEPPER 6
 #define NUM_QUEUES 6
-#define QUEUES_MCPWM_PCNT 6 
+#define QUEUES_MCPWM_PCNT 6
 #define QUEUES_RMT 8
 #define QUEUE_LEN 32
 #define SUPPORT_EXTERNAL_DIRECTION_PIN

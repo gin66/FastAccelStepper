@@ -11,9 +11,9 @@
 #define stepPinStepper 9  // OC1A in case of AVR
 
 // As in StepperDemo for Motor 1 on ESP32
-//#define dirPinStepper 18
-//#define enablePinStepper 26
-//#define stepPinStepper 19
+// #define dirPinStepper 18
+// #define enablePinStepper 26
+// #define stepPinStepper 19
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;

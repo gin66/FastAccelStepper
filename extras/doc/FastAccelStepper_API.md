@@ -55,6 +55,7 @@ CPU core with this modified init()-call. ESP32 implementation detail: For
 values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
 ```cpp
   void init(uint8_t cpu_core);
+#endif
 ```
 ### Creation of FastAccelStepper
 
@@ -491,6 +492,21 @@ This only sets a flag and can be called from an interrupt !
 ```cpp
   void stopMove();
   bool isStopping() { return _rg.isStopping(); }
+```
+### stepsToStop()
+This returns the current step value of the ramp.
+This equals the number of steps for a motor to
+reach the current position and speed from standstill
+and to come to standstill with deceleration if stopped
+immediately.
+This value is valid with or without linear acceleration
+being used.
+Primary use is to forecast possible stop position.
+The stop position is:
+   getCurrentPosition() + stepsToStop()
+in case of a motor running in positive direction.
+```cpp
+  uint32_t stepsToStop() { return _rg.stepsToStop(); }
 ```
 ### forceStop()
 Abruptly stop the running stepper without deceleration.
