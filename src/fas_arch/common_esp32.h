@@ -20,16 +20,13 @@
 #if CONFIG_IDF_TARGET_ESP32
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32_PULSE_COUNTER
 #define HAVE_ESP32_RMT
 #define QUEUES_MCPWM_PCNT 6
 #define QUEUES_RMT 8
 #define NEED_RMT_HEADERS
 #define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
-
-// have support for pulse counter
-#define SUPPORT_ESP32_PULSE_COUNTER
-#define FAS_RMT_MEM(channel) ((uint32_t *)RMT_CHANNEL_MEM(channel))
 
 //==========================================================================
 //
@@ -45,8 +42,6 @@
 #define NEED_RMT_HEADERS
 #define NEED_PCNT_HEADERS
 
-#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
-
 //==========================================================================
 //
 // ESP32 derivate - ESP32S3
@@ -55,10 +50,9 @@
 #elif CONFIG_IDF_TARGET_ESP32S3
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32S3_MCPWM_PCNT
-
+#define SUPPORT_ESP32_PULSE_COUNTER
 #define SUPPORT_ESP32_RMT
 #define HAVE_ESP32S3_RMT
-#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 #define QUEUES_MCPWM_PCNT 4
 #define QUEUES_RMT 4
@@ -66,8 +60,6 @@
 #define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
-// have support for pulse counter
-#define SUPPORT_ESP32_PULSE_COUNTER
 
 //==========================================================================
 //
@@ -80,7 +72,6 @@
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
-#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 //==========================================================================
 //
@@ -120,6 +111,8 @@
 #include <soc/rmt_periph.h>
 #include <soc/rmt_reg.h>
 #include <soc/rmt_struct.h>
+
+#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 #endif
 
 #elif ESP_IDF_VERSION_MAJOR == 3
