@@ -1,5 +1,7 @@
 #include "FastAccelStepper.h"
 
+#include <cinttypes>
+
 // As in StepperDemo for Motor 1 on ESP32
 #define dirPinStepper 18
 #define enablePinStepper 26
@@ -61,7 +63,7 @@ void setup() {
 void loop() {
   while (stepper->isRunning()) {
     esp_task_wdt_reset();
-    printf("pos=%d\n", stepper->getCurrentPosition());
+    printf("pos=%" PRId32 "\n", stepper->getCurrentPosition());
     vTaskDelay(pdMS_TO_TICKS(500));
   }
   stepper->move(1000);
