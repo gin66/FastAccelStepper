@@ -1,5 +1,5 @@
 #include "StepperISR.h"
-#ifdef SUPPORT_ESP32S3_RMT
+#if defined(HAVE_ESP32S3_RMT) && (ESP_IDF_VERSION_MAJOR == 4)
 
 // #define TEST_MODE
 // #define TRACE

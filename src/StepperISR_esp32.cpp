@@ -1,4 +1,3 @@
-
 #include "StepperISR.h"
 
 #if defined(SUPPORT_ESP32)

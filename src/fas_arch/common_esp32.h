@@ -20,6 +20,7 @@
 #if CONFIG_IDF_TARGET_ESP32
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
+#define HAVE_ESP32_RMT
 #define QUEUES_MCPWM_PCNT 6
 #define QUEUES_RMT 8
 #define NEED_RMT_HEADERS
@@ -38,6 +39,7 @@
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32S3_PULSE_COUNTER
 #define SUPPORT_ESP32_RMT
+#define HAVE_ESP32_RMT
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 4
 #define NEED_RMT_HEADERS
@@ -55,7 +57,7 @@
 #define SUPPORT_ESP32S3_MCPWM_PCNT
 
 #define SUPPORT_ESP32_RMT
-#define SUPPORT_ESP32S3_RMT
+#define HAVE_ESP32S3_RMT
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 #define QUEUES_MCPWM_PCNT 4
@@ -74,7 +76,7 @@
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C3
 #define SUPPORT_ESP32_RMT
-#define SUPPORT_ESP32C3_RMT
+#define HAVE_ESP32C3_RMT
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS

@@ -1,6 +1,5 @@
 #include "StepperISR.h"
-
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
+#if defined(SUPPORT_ESP32_MCPWM_PCNT) && (ESP_IDF_VERSION_MAJOR == 4)
 
 #define DEFAULT_TIMER_H_L_TRANSITION 160
 

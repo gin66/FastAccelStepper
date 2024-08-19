@@ -1,5 +1,10 @@
 name: Build idf examples
 
+# The versions here are defined by platformio:
+#    https://github.com/platformio/platform-espressif32/releases
+# For determining the underlying ESP-IDF-version, check for Supported Frameworks
+# under each release on github
+
 on:
   push:
     branches: [ master ]
