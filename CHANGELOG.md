@@ -11,6 +11,7 @@ pre-0.30.16:
 - Position parameter for `forceStopAndNewPosition()` changed from `uint32_t` to `int32_t` (#268)
 - Add `stepsToStop()` to predict motor stop position
 - espidf compatibility: `pio run -e esp32idf` in `pio_espidf` works.
+- Drop support for espressif 3.x.y versions
 
 0.30.15:
 - Fix missing initialization in `getCurrentSpeedInTicks()` (#262)

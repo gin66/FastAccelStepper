@@ -18,18 +18,13 @@
 //==========================================================================
 
 #if CONFIG_IDF_TARGET_ESP32
-#include <driver/mcpwm.h>
-#include <driver/pcnt.h>
-#include <soc/mcpwm_reg.h>
-#include <soc/mcpwm_struct.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
-#include <driver/rmt.h>
-
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define QUEUES_MCPWM_PCNT 6
 #define QUEUES_RMT 8
+#define NEED_RMT_HEADERS
+#define NEED_MCPWM_HEADERS
+#define NEED_PCNT_HEADERS
 
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
@@ -43,13 +38,11 @@
 #elif CONFIG_IDF_TARGET_ESP32S2
 #define SUPPORT_ESP32S3_PULSE_COUNTER
 #define SUPPORT_ESP32_RMT
-#include <driver/pcnt.h>
-#include <driver/periph_ctrl.h>
-#include <driver/rmt.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 4
+#define NEED_RMT_HEADERS
+#define NEED_PCNT_HEADERS
+
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 //==========================================================================
@@ -60,24 +53,16 @@
 #elif CONFIG_IDF_TARGET_ESP32S3
 #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32S3_MCPWM_PCNT
-#include <driver/mcpwm.h>
-#include <driver/pcnt.h>
-#include <soc/mcpwm_reg.h>
-#include <soc/mcpwm_struct.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
 
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32S3_RMT
-#include <driver/periph_ctrl.h>
-#include <driver/rmt.h>
-#include <soc/rmt_periph.h>
-#include <soc/rmt_reg.h>
-#include <soc/rmt_struct.h>
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 #define QUEUES_MCPWM_PCNT 4
 #define QUEUES_RMT 4
+#define NEED_RMT_HEADERS
+#define NEED_MCPWM_HEADERS
+#define NEED_PCNT_HEADERS
 
 // have support for pulse counter
 #define SUPPORT_ESP32_PULSE_COUNTER
@@ -90,13 +75,9 @@
 #elif CONFIG_IDF_TARGET_ESP32C3
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32C3_RMT
-#include <driver/periph_ctrl.h>
-#include <driver/rmt.h>
-#include <soc/rmt_periph.h>
-#include <soc/rmt_reg.h>
-#include <soc/rmt_struct.h>
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
+#define NEED_RMT_HEADERS
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 //==========================================================================
@@ -108,14 +89,37 @@
 #error "Unsupported derivate"
 #endif
 
-#if ESP_IDF_VERSION_MAJOR == 4
+#if ESP_IDF_VERSION_MAJOR == 5
+#error "Not supported"
+
+#elif ESP_IDF_VERSION_MAJOR == 4
 #define __ESP32_IDF_V44__
 #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
+
+#ifdef NEED_MCPWM_HEADERS
+#include <driver/mcpwm.h>
+#include <soc/mcpwm_reg.h>
+#include <soc/mcpwm_struct.h>
+#endif
+
+#ifdef NEED_PCNT_HEADERS
+#include <driver/pcnt.h>
+#include <soc/pcnt_reg.h>
+#include <soc/pcnt_struct.h>
+#endif
+
+#ifdef NEED_RMT_HEADERS
+#include <driver/rmt.h>
 #include <soc/rmt_periph.h>
 #include <soc/rmt_reg.h>
 #include <soc/rmt_struct.h>
+#endif
+
 #elif ESP_IDF_VERSION_MAJOR == 3
+
+#pragma "Last supported by FastAccelStepper 0.30.15"
+
 #endif
 
 // Esp32 queue definitions
