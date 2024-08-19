@@ -93,7 +93,11 @@
 #error "Not supported"
 
 #elif ESP_IDF_VERSION_MAJOR == 4
+
+#if ESP_IDF_VERSION_MINOR == 4
 #define __ESP32_IDF_V44__
+#endif
+
 #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
 
