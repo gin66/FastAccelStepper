@@ -65,7 +65,6 @@ generator, but set the output to 0 and still get interrupts on the PIO when a
 pulse would have happened if we hadn't overridden the output to 0.  Look into
 this...
 */
-#include "FastAccelStepper.h"
 inline void disconnectPWMPeriphal(Pio* port, uint8_t pin, uint32_t channelMask);
 
 typedef struct _PWMCHANNELMAPPING {

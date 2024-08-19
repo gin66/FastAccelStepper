@@ -2,11 +2,6 @@
 
 #if defined(SUPPORT_ESP32)
 
-#ifdef __ESP32_IDF_V44__
-#include <driver/periph_ctrl.h>
-#include <soc/periph_defs.h>
-#endif /* __ESP32_IDF_V44__ */
-
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
