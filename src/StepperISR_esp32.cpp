@@ -136,7 +136,7 @@ void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
 }
 
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
-#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
+#ifndef HAVE_ESP32S3_PULSE_COUNTER
 #define PCNT_MODULE_CNT 8
 uint32_t sig_idx[8] = {PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,
                        PCNT_SIG_CH0_IN2_IDX, PCNT_SIG_CH0_IN3_IDX,
@@ -185,7 +185,7 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
   cfg.channel = PCNT_CHANNEL_0;
   pcnt_unit_config(&cfg);
 
-#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
+#ifndef HAVE_ESP32S3_PULSE_COUNTER
   PCNT.conf_unit[cfg.unit].conf0.thr_h_lim_en = 0;
   PCNT.conf_unit[cfg.unit].conf0.thr_l_lim_en = 0;
 #else
@@ -213,7 +213,7 @@ int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
   // Serial.println(' ');
   // Serial.println(PCNT.cnt_unit[PCNT_UNIT_0].cnt_val);
   // Serial.println(PCNT.conf_unit[PCNT_UNIT_0].conf2.cnt_h_lim);
-#ifndef SUPPORT_ESP32S3_MCPWM_PCNT
+#ifndef HAVE_ESP32S3_PULSE_COUNTER
   return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].cnt_val;
 #else
   return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].pulse_cnt_un;

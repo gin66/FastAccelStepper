@@ -914,7 +914,7 @@ void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
 bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
                                             int16_t low_value,
                                             int16_t high_value) {
-  if (pcnt_unit < 8) {
+  if (pcnt_unit < SUPPORT_ESP32_PULSE_COUNTER) {
     if (_esp32_attachToPulseCounter(pcnt_unit, this, low_value, high_value)) {
       _attached_pulse_cnt_unit = pcnt_unit;
       return true;
