@@ -75,7 +75,7 @@ class StepperQueue {
   const void* driver_data;
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  rmt_channel_t channel;
+  RMT_CHANNEL_T channel;
   bool _rmtStopped;
   bool bufferContainsSteps[2];
 #endif
