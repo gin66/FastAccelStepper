@@ -26,7 +26,7 @@
 // - minimum periods as per relation 1 and 2 to be adhered to
 //
 //
-#ifdef SUPPORT_ESP32C3_RMT
+#ifdef HAVE_ESP32C3_RMT
 #define PART_SIZE 23
 #define RMT_MEM_SIZE 48
 #else
@@ -230,7 +230,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   }
 }
 
-#if !defined(RMT_CHANNEL_MEM) && !defined(SUPPORT_ESP32C3_RMT)
+#if !defined(RMT_CHANNEL_MEM) && !defined(HAVE_ESP32C3_RMT)
 #define RMT_LIMIT tx_lim
 #define RMT_FIFO apb_fifo_mask
 #else
