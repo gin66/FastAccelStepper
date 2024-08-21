@@ -1,23 +1,18 @@
 #include "StepperISR.h"
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
 
-#ifndef HAVE_ESP32S3_PULSE_COUNTER
-#define PCNT_MODULE_CNT 8
-#else
-#define PCNT_MODULE_CNT 4
-#endif
-uint32_t sig_idx[PCNT_MODULE_CNT] = {
+uint32_t sig_idx[SUPPORT_ESP32_PULSE_COUNTER] = {
 	PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,
 	PCNT_SIG_CH0_IN2_IDX, PCNT_SIG_CH0_IN3_IDX,
-#if PCNT_MODULE_CNT == 8
+#if SUPPORT_ESP32_PULSE_COUNTER == 8
 	PCNT_SIG_CH0_IN4_IDX, PCNT_SIG_CH0_IN5_IDX,
 	PCNT_SIG_CH0_IN6_IDX, PCNT_SIG_CH0_IN7_IDX,
 #endif
 };
-uint32_t ctrl_idx[PCNT_MODULE_CNT] = {
+uint32_t ctrl_idx[SUPPORT_ESP32_PULSE_COUNTER] = {
 	PCNT_CTRL_CH0_IN0_IDX, PCNT_CTRL_CH0_IN1_IDX,
 	PCNT_CTRL_CH0_IN2_IDX, PCNT_CTRL_CH0_IN3_IDX,
-#if PCNT_MODULE_CNT == 8
+#if SUPPORT_ESP32_PULSE_COUNTER == 8
 	PCNT_CTRL_CH0_IN4_IDX, PCNT_CTRL_CH0_IN5_IDX,
 	PCNT_CTRL_CH0_IN6_IDX, PCNT_CTRL_CH0_IN7_IDX
 #endif
@@ -26,7 +21,7 @@ uint32_t ctrl_idx[PCNT_MODULE_CNT] = {
 bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
                                  int16_t low_value, int16_t high_value) {
   // TODO: Check if free pulse counter
-  if (pcnt_unit >= PCNT_MODULE_CNT) {
+  if (pcnt_unit >= SUPPORT_ESP32_PULSE_COUNTER) {
     // fail
     return false;
   }

@@ -670,7 +670,7 @@ class FastAccelStepper {
   void reAttachToPin();
 
   // ## ESP32 only: Free pulse counter
-  // These two functions are only available on esp32.
+  // These four functions are only available on esp32.
   // The first can attach any of the eight pulse counters to this stepper.
   // The second then will read the current pulse counter value
   //
@@ -692,7 +692,7 @@ class FastAccelStepper {
   // then the pulse counter counts towards low_value. When the low value is hit,
   // the pulse counter is reset to 0.
   //
-  // If low_value and high_value is set 0 zero, then the pulse counter is just
+  // If low_value and high_value are set to zero, then the pulse counter is just
   // counting like any int16_t counter: 0...32767,-32768,-32767,...,0 and
   // backwards accordingly
   //
@@ -703,8 +703,12 @@ class FastAccelStepper {
   // stepper (at exact this moment) can be retrieved just by reading the pulse
   // counter. If the value is negative, then just add 3200.
   //
+  // Update for idf5 version:
+  // The pcnt_unit value is not used, because the available units are managed
+  // by the system. The parameter is kept for compatibility.
+  //
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
-  bool attachToPulseCounter(uint8_t unused_pcnt_unit, int16_t low_value = -16384,
+  bool attachToPulseCounter(uint8_t unused_pcnt_unit = 0, int16_t low_value = -16384,
                             int16_t high_value = 16384);
   int16_t readPulseCounter();
   void clearPulseCounter();
