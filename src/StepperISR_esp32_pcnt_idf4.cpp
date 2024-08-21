@@ -32,7 +32,8 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
   }
   pcnt_config_t cfg;
   uint8_t dir_pin = stepper->getDirectionPin();
-  cfg.pulse_gpio_num = stepper->getStepPin();
+  uint8_t step_pin = stepper->getStepPin();
+  cfg.pulse_gpio_num = step_pin;
   if (dir_pin == PIN_UNDEFINED) {
     cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
     cfg.hctrl_mode = PCNT_MODE_KEEP;
@@ -65,11 +66,11 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
 
   stepper->detachFromPin();
   stepper->reAttachToPin();
-  gpio_iomux_in(stepper->getStepPin(), sig_idx[pcnt_unit]);
+  gpio_iomux_in(step_pin, sig_idx[pcnt_unit]);
   if (dir_pin != PIN_UNDEFINED) {
-    gpio_matrix_out(stepper->getDirectionPin(), 0x100, false, false);
-    gpio_iomux_in(stepper->getDirectionPin(), ctrl_idx[pcnt_unit]);
-    pinMode(stepper->getDirectionPin(), OUTPUT);
+    gpio_matrix_out(dir_pin, 0x100, false, false);
+    gpio_iomux_in(dir_pin, ctrl_idx[pcnt_unit]);
+    pinMode(dir_pin, OUTPUT);
   }
 
   pcnt_counter_clear(cfg.unit);

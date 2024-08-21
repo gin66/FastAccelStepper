@@ -5,23 +5,10 @@
 
 #include "test_probe.h"
 
-// The following concept is in use:
-//
-//    The buffer of 64Bytes is split into two parts à 31 words.
-//    Each part will hold one command (or part of).
-//    After the 2*31 words an end marker is placed.
-//    The threshold is set to 31.
-//
-//    This way, the threshold interrupt occurs after the first part
-//    and the end interrupt after the second part.
-//
-// Of these 32 bits, the low 16-bit entry is sent first and the high entry
-// second.
-// Every 16 bit entry defines with MSB the output level and the lower 15 bits
-// the ticks.
 #define PART_SIZE 31
 
 void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
+#ifdef OLD
   // We are stopping the rmt by letting it run into the end at high speed.
   //
   // disable the interrupts
@@ -43,10 +30,24 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
 
   // as the rmt is not running anymore, mark it as stopped
   _rmtStopped = true;
+#endif
+}
+
+static size_t IRAM_ATTR encode_commands(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state) {
+	return 0;
+}
+
+static esp_err_t IRAM_ATTR encoder_reset(rmt_encoder_t *encoder) {
+	return ESP_OK;
+}
+
+static esp_err_t IRAM_ATTR encoder_del(rmt_encoder_t *encoder) {
+	return ESP_OK;
 }
 
 static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
                                     uint32_t *data) {
+#ifdef OLD
   if (!fill_part_one) {
     data += PART_SIZE;
   }
@@ -195,6 +196,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
   } else {
     e_curr->steps = steps;
   }
+#endif
 }
 
 #ifndef RMT_CHANNEL_MEM
@@ -241,6 +243,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
 #endif
 
 static void IRAM_ATTR tx_intr_handler(void *arg) {
+#ifdef OLD
   uint32_t mask = RMT.int_st.val;
   RMT.int_clr.val = mask;
   PROCESS_CHANNEL(0);
@@ -254,6 +257,7 @@ static void IRAM_ATTR tx_intr_handler(void *arg) {
   PROCESS_CHANNEL(5);
   PROCESS_CHANNEL(6);
   PROCESS_CHANNEL(7);
+#endif
 #endif
 }
 
@@ -285,6 +289,38 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
 
+  rmt_tx_channel_config_t config;
+  rmt_transmit_config_t tx_config;
+  rmt_encoder_t tx_encoder;
+
+  config.gpio_num = (gpio_num_t)step_pin;
+  config.clk_src = RMT_CLK_SRC_DEFAULT;
+  config.resolution_hz = TICKS_PER_S;
+  config.mem_block_symbols = 2*PART_SIZE;
+  config.trans_queue_depth = PART_SIZE;
+  config.intr_priority = 3;
+  config.flags.invert_out = 0;
+  config.flags.with_dma = 0;
+  config.flags.io_loop_back = 0;
+  config.flags.io_od_mode = 0;
+
+  tx_config.loop_count = -1;     // infinite
+  tx_config.flags.eot_level = 0; // output level at end of transmission
+  tx_config.flags.queue_nonblocking = 1;
+
+  tx_encoder.encode = encode_commands;
+  tx_encoder.reset = encoder_reset;
+  tx_encoder.del = encoder_del;
+
+  rmt_channel_handle_t channel;
+
+  esp_err_t rc;  
+  rc = rmt_new_tx_channel(&config, &channel);
+  if (rc != ESP_OK) {
+	  printf("Error creation %d\n", rc);
+  }
+
+#ifdef OLD
   channel = (rmt_channel_t)channel_num;
 
   if (channel_num == 0) {
@@ -359,9 +395,11 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     }
   }
 #endif
+#endif
 }
 
 void StepperQueue::connect_rmt() {
+#ifdef OLD
   // rmt_set_tx_intr_en(channel, true);
   // rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
   RMT.conf_ch[channel].conf1.idle_out_lv = 0;
@@ -371,9 +409,11 @@ void StepperQueue::connect_rmt() {
 #else
   rmt_set_gpio(channel, RMT_MODE_TX, (gpio_num_t)_step_pin, false);
 #endif
+#endif
 }
 
 void StepperQueue::disconnect_rmt() {
+#ifdef OLD
   rmt_set_tx_intr_en(channel, false);
   rmt_set_tx_thr_intr_en(channel, false, PART_SIZE + 1);
 #ifndef __ESP32_IDF_V44__
@@ -382,9 +422,11 @@ void StepperQueue::disconnect_rmt() {
   rmt_set_gpio(channel, RMT_MODE_TX, GPIO_NUM_NC, false);
 #endif
   RMT.conf_ch[channel].conf1.idle_out_en = 0;
+#endif
 }
 
 void StepperQueue::startQueue_rmt() {
+#ifdef OLD
 // #define TRACE
 #ifdef TRACE
   Serial.println("START");
@@ -494,6 +536,7 @@ void StepperQueue::startQueue_rmt() {
   RMT.conf_ch[channel].conf1.tx_conti_mode = 1;
 
   RMT.conf_ch[channel].conf1.tx_start = 1;
+#endif
 }
 void StepperQueue::forceStop_rmt() {
   stop_rmt(true);

@@ -669,7 +669,6 @@ class FastAccelStepper {
   void detachFromPin();
   void reAttachToPin();
 
-#if defined(SUPPORT_ESP32_PULSE_COUNTER)
   // ## ESP32 only: Free pulse counter
   // These two functions are only available on esp32.
   // The first can attach any of the eight pulse counters to this stepper.
@@ -704,11 +703,19 @@ class FastAccelStepper {
   // stepper (at exact this moment) can be retrieved just by reading the pulse
   // counter. If the value is negative, then just add 3200.
   //
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
+  bool attachToPulseCounter(uint8_t unused_pcnt_unit, int16_t low_value = -16384,
+                            int16_t high_value = 16384);
+  int16_t readPulseCounter();
+  void clearPulseCounter();
+  inline bool pulseCounterAttached() { return _attached_pulse_unit != NULL; }
+#endif
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
   bool attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value = -16384,
                             int16_t high_value = 16384);
   int16_t readPulseCounter();
   void clearPulseCounter();
-  bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
+  inline bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
 #endif
 
  private:
@@ -741,7 +748,10 @@ class FastAccelStepper {
 
   uint32_t _forward_planning_in_ticks;
 
-#if defined(SUPPORT_ESP32_PULSE_COUNTER)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
+  pcnt_unit_handle_t _attached_pulse_unit;
+#endif
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
   int16_t _attached_pulse_cnt_unit;
 #endif
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
