@@ -30,13 +30,6 @@ struct queue_entry {
 #endif
 };
 
-#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
-bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper* stepper,
-                                 int16_t low_value, int16_t high_value);
-void _esp32_clearPulseCounter(uint8_t pcnt_unit);
-int16_t _esp32_readPulseCounter(uint8_t pcnt_unit);
-#endif
-
 class StepperQueue {
  public:
   struct queue_entry entry[QUEUE_LEN];

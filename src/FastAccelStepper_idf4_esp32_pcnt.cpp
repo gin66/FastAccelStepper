@@ -18,16 +18,16 @@ uint32_t ctrl_idx[SUPPORT_ESP32_PULSE_COUNTER] = {
 #endif
 };
 
-bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
-                                 int16_t low_value, int16_t high_value) {
-  // TODO: Check if free pulse counter
+bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
+                                            int16_t low_value,
+                                            int16_t high_value) {
   if (pcnt_unit >= SUPPORT_ESP32_PULSE_COUNTER) {
-    // fail
-    return false;
+	  return false;
   }
+
   pcnt_config_t cfg;
-  uint8_t dir_pin = stepper->getDirectionPin();
-  uint8_t step_pin = stepper->getStepPin();
+  uint8_t dir_pin = getDirectionPin();
+  uint8_t step_pin = getStepPin();
   cfg.pulse_gpio_num = step_pin;
   if (dir_pin == PIN_UNDEFINED) {
     cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
@@ -35,7 +35,7 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
     cfg.lctrl_mode = PCNT_MODE_KEEP;
   } else {
     cfg.ctrl_gpio_num = dir_pin;
-    if (stepper->directionPinHighCountsUp()) {
+    if (directionPinHighCountsUp()) {
       cfg.lctrl_mode = PCNT_MODE_REVERSE;
       cfg.hctrl_mode = PCNT_MODE_KEEP;
     } else {
@@ -59,8 +59,8 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
   PCNT.conf_unit[cfg.unit].conf0.thr_l_lim_en_un = 0;
 #endif
 
-  stepper->detachFromPin();
-  stepper->reAttachToPin();
+  detachFromPin();
+  reAttachToPin();
   gpio_iomux_in(step_pin, sig_idx[pcnt_unit]);
   if (dir_pin != PIN_UNDEFINED) {
     gpio_matrix_out(dir_pin, 0x100, false, false);
@@ -70,20 +70,24 @@ bool _esp32_attachToPulseCounter(uint8_t pcnt_unit, FastAccelStepper *stepper,
 
   pcnt_counter_clear(cfg.unit);
   pcnt_counter_resume(cfg.unit);
+
+  _attached_pulse_cnt_unit = pcnt_unit;
   return true;
 }
-void _esp32_clearPulseCounter(uint8_t pcnt_unit) {
-  pcnt_counter_clear((pcnt_unit_t)pcnt_unit);
+void FastAccelStepper::clearPulseCounter() {
+  if (pulseCounterAttached()) {
+    pcnt_counter_clear((pcnt_unit_t)_attached_pulse_cnt_unit);
+  }
 }
-int16_t _esp32_readPulseCounter(uint8_t pcnt_unit) {
-  // Serial.println(' ');
-  // Serial.println(PCNT.cnt_unit[PCNT_UNIT_0].cnt_val);
-  // Serial.println(PCNT.conf_unit[PCNT_UNIT_0].conf2.cnt_h_lim);
+int16_t FastAccelStepper::readPulseCounter() {
+  if (pulseCounterAttached()) {
 #ifndef HAVE_ESP32S3_PULSE_COUNTER
-  return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].cnt_val;
+    return PCNT.cnt_unit[(pcnt_unit_t)_attached_pulse_cnt_unit].cnt_val;
 #else
-  return PCNT.cnt_unit[(pcnt_unit_t)pcnt_unit].pulse_cnt_un;
+    return PCNT.cnt_unit[(pcnt_unit_t)_attached_pulse_cnt_unit].pulse_cnt_un;
 #endif
+  }
+  return 0;
 }
 #endif
 

@@ -913,27 +913,4 @@ int32_t FastAccelStepper::getCurrentPosition() {
 }
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
-#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
-bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
-                                            int16_t low_value,
-                                            int16_t high_value) {
-  if (pcnt_unit < SUPPORT_ESP32_PULSE_COUNTER) {
-    if (_esp32_attachToPulseCounter(pcnt_unit, this, low_value, high_value)) {
-      _attached_pulse_cnt_unit = pcnt_unit;
-      return true;
-    }
-  }
-  return false;
-}
-void FastAccelStepper::clearPulseCounter() {
-  if (pulseCounterAttached()) {
-    _esp32_clearPulseCounter(_attached_pulse_cnt_unit);
-  }
-}
-int16_t FastAccelStepper::readPulseCounter() {
-  if (pulseCounterAttached()) {
-    return _esp32_readPulseCounter(_attached_pulse_cnt_unit);
-  }
-  return 0;
-}
-#endif
+
