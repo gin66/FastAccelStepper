@@ -5,11 +5,11 @@
 
 #include "test_probe.h"
 
-#define PART_SIZE 31
+#define PART_SIZE 32
 
 static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan, const rmt_tx_done_event_data_t *edata, void *user_ctx) {
 	StepperQueue *q = (StepperQueue *)user_ctx;
-	q->_rmtStopped = true;
+	q->_isRunning = false;
 	return false;
 }
 
@@ -26,6 +26,11 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size, size
 
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
+	  *done = true;
+	  q->_rmtStopped = true;
+	  return 0;
+  }
+  if (q->_rmtStopped) {
 	  *done = true;
 	  return 0;
   }
@@ -287,12 +292,9 @@ void StepperQueue::startQueue_rmt() {
   delay(1);
 #endif
 
-// #define TRACE
+#define TRACE
 #ifdef TRACE
-  Serial.print("Queue:");
-  Serial.print(read_idx);
-  Serial.print('/');
-  Serial.println(next_write_idx);
+  printf("Queue: %d/%d %s\n", read_idx, next_write_idx, _isRunning ? "Running":"Stopped");
 #endif
 
   // set dirpin toggle here
@@ -307,6 +309,8 @@ void StepperQueue::startQueue_rmt() {
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
+  rmt_disable(channel);
+
   lastChunkContainsSteps = false;
   _isRunning = true;
   _rmtStopped = false;
@@ -317,6 +321,10 @@ void StepperQueue::startQueue_rmt() {
   tx_config.loop_count = 0;
   tx_config.flags.eot_level = 0; // output level at end of transmission
   tx_config.flags.queue_nonblocking = 1;
+  _tx_encoder->reset(_tx_encoder);
+
+  rmt_enable(channel);
+
   esp_err_t rc = rmt_transmit(channel, _tx_encoder, &payload, 1, &tx_config);
   if (rc != ESP_OK) {
 	  printf("Error start transmission %d\n", rc);

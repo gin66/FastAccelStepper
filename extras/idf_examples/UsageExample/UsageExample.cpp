@@ -66,6 +66,9 @@ extern "C" void app_main() {
 	  printf("\n");
       vTaskDelay(pdMS_TO_TICKS(500));
     }
+	printf("done\n");
+    vTaskDelay(pdMS_TO_TICKS(500));
+	printf("move\n");
     stepper->move(1000);
   }
   // WARNING: if program reaches end of function app_main() the MCU will
