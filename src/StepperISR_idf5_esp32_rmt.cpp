@@ -5,7 +5,7 @@
 
 #include "test_probe.h"
 
-#define PART_SIZE 32
+#define PART_SIZE (RMT_SIZE/2)
 
 static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan, const rmt_tx_done_event_data_t *edata, void *user_ctx) {
 	StepperQueue *q = (StepperQueue *)user_ctx;
@@ -207,9 +207,6 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   };
   esp_err_t rc;  
   rc = rmt_new_simple_encoder(&enc_config, &_tx_encoder);
-  if (rc != ESP_OK) {
-	  printf("Error creation %d\n", rc);
-  }
   ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
 
   connect_rmt();
@@ -218,12 +215,11 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect_rmt() {
-  printf("before new tx channel\n");
   rmt_tx_channel_config_t config;
   config.gpio_num = (gpio_num_t)_step_pin;
   config.clk_src = RMT_CLK_SRC_DEFAULT;
   config.resolution_hz = TICKS_PER_S;
-  config.mem_block_symbols = 64;//2*PART_SIZE;
+  config.mem_block_symbols = 2*PART_SIZE;
   config.trans_queue_depth = 1;
   config.intr_priority = 0;
   config.flags.invert_out = 0;
@@ -231,9 +227,6 @@ void StepperQueue::connect_rmt() {
   config.flags.io_loop_back = 0;
   config.flags.io_od_mode = 0;
   esp_err_t rc = rmt_new_tx_channel(&config, &channel);
-  if (rc != ESP_OK) {
-	  printf("Error creation %d\n", rc);
-  }
   ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
 
   rmt_tx_event_callbacks_t callbacks = {
@@ -273,7 +266,7 @@ void StepperQueue::startQueue_rmt() {
   delay(1);
 #endif
 
-#define TRACE
+//#define TRACE
 #ifdef TRACE
   printf("Queue: %d/%d %s\n", read_idx, next_write_idx, _isRunning ? "Running":"Stopped");
 #endif
@@ -317,11 +310,10 @@ void StepperQueue::startQueue_rmt() {
   }
 
   esp_err_t rc = rmt_transmit(channel, _tx_encoder, &payload, 1, &tx_config);
-  if (rc != ESP_OK) {
-	  printf("Error start transmission %d\n", rc);
-  }
   ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
+#ifdef TRACE
   printf("Transmission started\n");
+#endif
 }
 void StepperQueue::forceStop_rmt() {
   rmt_disable(channel);
