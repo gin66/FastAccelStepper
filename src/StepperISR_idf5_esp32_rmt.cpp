@@ -25,14 +25,15 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size, size
 	}
 
   uint8_t rp = q->read_idx;
-  if (rp == q->next_write_idx) {
+  if ((rp == q->next_write_idx) || q->_rmtStopped) {
 	  *done = true;
 	  q->_rmtStopped = true;
-	  return 0;
-  }
-  if (q->_rmtStopped) {
-	  *done = true;
-	  return 0;
+	  uint32_t w = 0x00010001 * ((MIN_CMD_TICKS + 2*PART_SIZE-1) / (2*PART_SIZE));
+      for (uint8_t i = 0; i < PART_SIZE; i++) {
+        // two pauses à n ticks to achieve MIN_CMD_TICKS
+		(*symbols++).val = w;
+      }
+      return PART_SIZE;
   }
 
   // Process command
@@ -294,8 +295,8 @@ void StepperQueue::startQueue_rmt() {
   }
 
   if (_channel_enabled) {
-	rmt_disable(channel);
-	_channel_enabled = false;
+//	rmt_disable(channel);
+//	_channel_enabled = false;
   }
 
   lastChunkContainsSteps = false;
@@ -310,8 +311,10 @@ void StepperQueue::startQueue_rmt() {
   tx_config.flags.queue_nonblocking = 1;
   _tx_encoder->reset(_tx_encoder);
 
-  rmt_enable(channel);
-  _channel_enabled = true;
+  if (!_channel_enabled) {
+    rmt_enable(channel);
+    _channel_enabled = true;
+  }
 
   esp_err_t rc = rmt_transmit(channel, _tx_encoder, &payload, 1, &tx_config);
   if (rc != ESP_OK) {
