@@ -44,7 +44,7 @@ void setup() {
     stepper->setAcceleration(100);
 
 #ifdef SUPPORT_ESP32_PULSE_COUNTER
-	stepper->attachToPulseCounter();
+	stepper->attachToPulseCounter(7);
 #endif
 
     printf("Stepper initialized\n");
