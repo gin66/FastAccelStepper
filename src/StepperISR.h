@@ -163,7 +163,11 @@ class StepperQueue {
   bool isReadyForCommands_rmt();
   void init_rmt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_rmt();
+#if ESP_IDF_VERSION_MAJOR == 4
   void stop_rmt(bool both);
+#else
+  bool _channel_enabled;
+#endif
   void forceStop_rmt();
   uint16_t _getPerformedPulses_rmt();
   void connect_rmt();

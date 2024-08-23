@@ -199,19 +199,6 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   pinMode(step_pin, OUTPUT);
   digitalWrite(step_pin, LOW);
 
-  rmt_tx_channel_config_t config;
-
-  config.gpio_num = (gpio_num_t)step_pin;
-  config.clk_src = RMT_CLK_SRC_DEFAULT;
-  config.resolution_hz = TICKS_PER_S;
-  config.mem_block_symbols = 64;//2*PART_SIZE;
-  config.trans_queue_depth = 1;
-  config.intr_priority = 0;
-  config.flags.invert_out = 0;
-  config.flags.with_dma = 0;
-  config.flags.io_loop_back = 0;
-  config.flags.io_od_mode = 0;
-
   rmt_simple_encoder_config_t enc_config = {
 	  .callback = encode_commands,
 	  .arg = this,
@@ -224,10 +211,25 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   }
   ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
 
+  connect_rmt();
+  _isRunning = false;
+  _rmtStopped = true;
+}
 
+void StepperQueue::connect_rmt() {
   printf("before new tx channel\n");
-
-  rc = rmt_new_tx_channel(&config, &channel);
+  rmt_tx_channel_config_t config;
+  config.gpio_num = (gpio_num_t)_step_pin;
+  config.clk_src = RMT_CLK_SRC_DEFAULT;
+  config.resolution_hz = TICKS_PER_S;
+  config.mem_block_symbols = 64;//2*PART_SIZE;
+  config.trans_queue_depth = 1;
+  config.intr_priority = 0;
+  config.flags.invert_out = 0;
+  config.flags.with_dma = 0;
+  config.flags.io_loop_back = 0;
+  config.flags.io_od_mode = 0;
+  esp_err_t rc = rmt_new_tx_channel(&config, &channel);
   if (rc != ESP_OK) {
 	  printf("Error creation %d\n", rc);
   }
@@ -238,37 +240,15 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   };
   rmt_tx_register_event_callbacks(channel, &callbacks, this);
 
-  rmt_enable(channel);
-
-  _isRunning = false;
-  _rmtStopped = true;
-}
-
-void StepperQueue::connect_rmt() {
-#ifdef OLD
-  // rmt_set_tx_intr_en(channel, true);
-  // rmt_set_tx_thr_intr_en(channel, true, PART_SIZE + 1);
-  RMT.conf_ch[channel].conf1.idle_out_lv = 0;
-  RMT.conf_ch[channel].conf1.idle_out_en = 1;
-#ifndef __ESP32_IDF_V44__
-  rmt_set_pin(channel, RMT_MODE_TX, (gpio_num_t)_step_pin);
-#else
-  rmt_set_gpio(channel, RMT_MODE_TX, (gpio_num_t)_step_pin, false);
-#endif
-#endif
+  _channel_enabled = false;
 }
 
 void StepperQueue::disconnect_rmt() {
-#ifdef OLD
-  rmt_set_tx_intr_en(channel, false);
-  rmt_set_tx_thr_intr_en(channel, false, PART_SIZE + 1);
-#ifndef __ESP32_IDF_V44__
-//  rmt_set_pin(channel, RMT_MODE_TX, (gpio_num_t)-1);
-#else
-  rmt_set_gpio(channel, RMT_MODE_TX, GPIO_NUM_NC, false);
-#endif
-  RMT.conf_ch[channel].conf1.idle_out_en = 0;
-#endif
+	if (_channel_enabled || _isRunning || !_rmtStopped) {
+		return;
+	}
+    rmt_del_channel(channel);
+	channel = NULL;
 }
 
 void StepperQueue::startQueue_rmt() {
@@ -296,6 +276,10 @@ void StepperQueue::startQueue_rmt() {
 #ifdef TRACE
   printf("Queue: %d/%d %s\n", read_idx, next_write_idx, _isRunning ? "Running":"Stopped");
 #endif
+ 
+  if (channel == NULL) {
+	  return;
+  }
 
   // set dirpin toggle here
   uint8_t rp = read_idx;
@@ -309,7 +293,10 @@ void StepperQueue::startQueue_rmt() {
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
-  rmt_disable(channel);
+  if (_channel_enabled) {
+	rmt_disable(channel);
+	_channel_enabled = false;
+  }
 
   lastChunkContainsSteps = false;
   _isRunning = true;
@@ -324,6 +311,7 @@ void StepperQueue::startQueue_rmt() {
   _tx_encoder->reset(_tx_encoder);
 
   rmt_enable(channel);
+  _channel_enabled = true;
 
   esp_err_t rc = rmt_transmit(channel, _tx_encoder, &payload, 1, &tx_config);
   if (rc != ESP_OK) {
@@ -333,7 +321,10 @@ void StepperQueue::startQueue_rmt() {
   printf("Transmission started\n");
 }
 void StepperQueue::forceStop_rmt() {
-  stop_rmt(true);
+  rmt_disable(channel);
+  _channel_enabled = false;
+  _isRunning = false;
+  _rmtStopped = true;
 
   // and empty the buffer
   read_idx = next_write_idx;
