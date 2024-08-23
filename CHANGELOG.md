@@ -10,9 +10,10 @@ pre-0.31.0:
 - Fix missing parenthesis in preprocessor macro (#271)
 - Position parameter for `forceStopAndNewPosition()` changed from `uint32_t` to `int32_t` (#268)
 - Add `stepsToStop()` to predict motor stop position
-- espidf compatibility: `pio run -e esp32idf` in `pio_espidf` works.
-- Drop support for espressif 3.x.y versions
-- WIP: compatibility with esp-idf 5.x.y
+- compatibility with esp-idf 5.3.0 (not working with 5.0.x to 5.2.x)
+  `pio run -e esp32_idf_V6_8_1` in `pio_espidf/UsageExample` works.
+- Drop support for esp-idf 3.x.y versions
+  beta level. barely tested
 
 0.30.15:
 - Fix missing initialization in `getCurrentSpeedInTicks()` (#262)
