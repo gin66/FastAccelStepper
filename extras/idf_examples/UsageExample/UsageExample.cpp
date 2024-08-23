@@ -32,9 +32,9 @@ void setup() {
   }
 
   if (stepper) {
-    //    stepper->setDirectionPin(dirPinStepper);
-    //    stepper->setEnablePin(enablePinStepper);
-    //    stepper->setAutoEnable(true);
+    stepper->setDirectionPin(dirPinStepper);
+    stepper->setEnablePin(enablePinStepper);
+    stepper->setAutoEnable(true);
 
     // If auto enable/disable need delays, just add (one or both):
     // stepper->setDelayToEnable(50);
@@ -55,6 +55,7 @@ void setup() {
 
 extern "C" void app_main() {
   setup();
+  int32_t target = 0;
   while (true) {
     while (stepper->isRunning()) {
 //      esp_task_wdt_reset();
@@ -69,7 +70,8 @@ extern "C" void app_main() {
 	printf("done\n");
     vTaskDelay(pdMS_TO_TICKS(500));
 	printf("move\n");
-    stepper->move(1000);
+	target = 1000 - target;
+    stepper->moveTo(target);
   }
   // WARNING: if program reaches end of function app_main() the MCU will
   // restart.

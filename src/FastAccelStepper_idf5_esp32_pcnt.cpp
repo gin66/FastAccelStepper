@@ -93,10 +93,11 @@ printf("pins = %d/%d unit_id=%d channel_id=%d\n", step_pin, dir_pin, unit_id,cha
   gpio_matrix_in(step_pin, signal,0);
   gpio_iomux_in(step_pin, signal);
   if (dir_pin != PIN_UNDEFINED) {
+    pinMode(dir_pin, OUTPUT);
     int control = pcnt_periph_signals.groups[0].units[unit_id].channels[channel_id].control_sig;
     gpio_iomux_out(dir_pin, 0x100, false);
+    gpio_matrix_in(dir_pin, control,0);
     gpio_iomux_in(dir_pin, control);
-    pinMode(dir_pin, OUTPUT);
   }
 
   _attached_pulse_unit = punit;
