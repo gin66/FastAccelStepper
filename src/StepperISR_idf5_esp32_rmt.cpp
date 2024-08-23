@@ -33,17 +33,37 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
 #endif
 }
 
-static size_t IRAM_ATTR encode_commands(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state) {
-	return 0;
+static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size, size_t symbols_written, size_t symbols_free, rmt_symbol_word_t *symbols, bool *done, void *arg) {
+	//printf("encode commands\n");
+	*done = false;
+	if (symbols_free < PART_SIZE) {
+		return 0;
+	}
+	//*done = true;
+	for (uint8_t i = 0;i < PART_SIZE;i++) {
+		rmt_symbol_word_t w;
+		w.duration0 = 32767;
+		w.level0 = 1;
+		w.duration1 = 32767;
+		w.level1 = 0;
+		symbols[i] = w;
+	}
+	return PART_SIZE;
 }
 
-static esp_err_t IRAM_ATTR encoder_reset(rmt_encoder_t *encoder) {
-	return ESP_OK;
-}
-
-static esp_err_t IRAM_ATTR encoder_del(rmt_encoder_t *encoder) {
-	return ESP_OK;
-}
+//static size_t IRAM_ATTR encode_commands(rmt_encoder_t *encoder, rmt_channel_handle_t channel, const void *primary_data, size_t data_size, rmt_encode_state_t *ret_state) {
+//	printf("encode commands\n");
+//	*ret_state = RMT_ENCODING_COMPLETE;
+//	return 1;
+//}
+//
+//static esp_err_t IRAM_ATTR encoder_reset(rmt_encoder_t *encoder) {
+//	return ESP_OK;
+//}
+//
+//static esp_err_t IRAM_ATTR encoder_del(rmt_encoder_t *encoder) {
+//	return ESP_OK;
+//}
 
 static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
                                     uint32_t *data) {
@@ -286,39 +306,65 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 
   _initVars();
   _step_pin = step_pin;
-  digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
+  digitalWrite(step_pin, LOW);
 
   rmt_tx_channel_config_t config;
   rmt_transmit_config_t tx_config;
-  rmt_encoder_t tx_encoder;
 
   config.gpio_num = (gpio_num_t)step_pin;
   config.clk_src = RMT_CLK_SRC_DEFAULT;
   config.resolution_hz = TICKS_PER_S;
-  config.mem_block_symbols = 2*PART_SIZE;
-  config.trans_queue_depth = PART_SIZE;
-  config.intr_priority = 3;
+  config.mem_block_symbols = 64;//2*PART_SIZE;
+  config.trans_queue_depth = 1;
+  config.intr_priority = 0;
   config.flags.invert_out = 0;
   config.flags.with_dma = 0;
   config.flags.io_loop_back = 0;
   config.flags.io_od_mode = 0;
 
-  tx_config.loop_count = -1;     // infinite
+  tx_config.loop_count = 0;
   tx_config.flags.eot_level = 0; // output level at end of transmission
   tx_config.flags.queue_nonblocking = 1;
 
-  tx_encoder.encode = encode_commands;
-  tx_encoder.reset = encoder_reset;
-  tx_encoder.del = encoder_del;
+//  rmt_encoder_t tx_encoder = {
+//     .encode = encode_commands,
+//     .reset = encoder_reset,
+//     .del = encoder_del
+//  };
+  rmt_simple_encoder_config_t enc_config = {
+	  .callback = encode_commands,
+	  .arg = NULL,
+	  .min_chunk_size = PART_SIZE 
+  };
+  rmt_encoder_handle_t tx_encoder;
+  esp_err_t rc;  
+  rc = rmt_new_simple_encoder(&enc_config, &tx_encoder);
+  if (rc != ESP_OK) {
+	  printf("Error creation %d\n", rc);
+  }
+  ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
+
+
+  printf("before new tx channel\n");
 
   rmt_channel_handle_t channel;
-
-  esp_err_t rc;  
   rc = rmt_new_tx_channel(&config, &channel);
   if (rc != ESP_OK) {
 	  printf("Error creation %d\n", rc);
   }
+  ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
+
+  rmt_enable(channel);
+
+  int payload = 0;
+  // payload and payload bytes must not be 0
+  rc = rmt_transmit(channel, tx_encoder, &payload, 1, &tx_config);
+  if (rc != ESP_OK) {
+	  printf("Error start transmission %d\n", rc);
+  }
+  ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
+  printf("Transmission started\n");
 
 #ifdef OLD
   channel = (rmt_channel_t)channel_num;

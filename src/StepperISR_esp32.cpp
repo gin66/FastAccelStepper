@@ -110,7 +110,10 @@ void StepperTask(void *parameter) {
       (DELAY_MS_BASE + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
   while (true) {
     engine->manageSteppers();
+#if ESP_IDF_VERSION_MAJOR == 4
+	// not clear, if the wdt reset is needed. With idf-version 5, the reset causes an issue.
     esp_task_wdt_reset();
+#endif
     vTaskDelay(delay_4ms);
   }
 }
@@ -121,7 +124,7 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
 
 void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
 #define STACK_SIZE 2000
-#define PRIORITY configMAX_PRIORITIES
+#define PRIORITY (configMAX_PRIORITIES-1)
   if (cpu_core > 1) {
     xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
   } else {

@@ -7,6 +7,7 @@
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
 #include <esp_task_wdt.h>
+#include <esp_log.h>
 #endif
 
 #define VERSION "post-4f2e1e4"
@@ -913,12 +914,20 @@ void setup() {
     ;  // wait for USB serial port to connect.
   }
 #endif
+#ifdef ARDUINO_ARCH_ESP32
+  printf("LOG start\n");
+  esp_log_level_set("*", ESP_LOG_INFO);
+  esp_log_level_set("rmt", ESP_LOG_INFO);
+  ESP_LOGI("StepperDemo", "Started INFO");
+  ESP_LOGE("*", "Started ERROR");
+#endif
 
   output_msg(MSG_STEPPER_VERSION);
   SerialInterface.print("    F_CPU=");
   SerialInterface.println(F_CPU);
   SerialInterface.print("    TICKS_PER_S=");
   SerialInterface.println(TICKS_PER_S);
+  SerialInterface.print("    Steppers=");
   SerialInterface.println(MAX_STEPPER);
 
   // If you are not sure, that the stepper hardware is working,

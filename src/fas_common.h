@@ -87,6 +87,15 @@ struct queue_end_s {
 #error "Unsupported devices"
 #endif
 
+// in order to avoid spikes, first set the value and then make an output
+// esp32 idf5 does not like this approach
+#ifndef PIN_OUTPUT
+#define PIN_OUTPUT(pin, value) { \
+	digitalWrite(pin, (value)); \
+	pinMode(pin, OUTPUT); \
+}
+#endif
+
 // disable inject_fill_interrupt() for all real devices. Only defined in TEST
 #ifndef TEST
 #define inject_fill_interrupt(x)

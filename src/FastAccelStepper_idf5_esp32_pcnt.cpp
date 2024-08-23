@@ -1,27 +1,16 @@
 #include "StepperISR.h"
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
 
-uint32_t sig_idx[SUPPORT_ESP32_PULSE_COUNTER] = {
-	PCNT_SIG_CH0_IN0_IDX, PCNT_SIG_CH0_IN1_IDX,
-	PCNT_SIG_CH0_IN2_IDX, PCNT_SIG_CH0_IN3_IDX,
-#if SUPPORT_ESP32_PULSE_COUNTER == 8
-	PCNT_SIG_CH0_IN4_IDX, PCNT_SIG_CH0_IN5_IDX,
-	PCNT_SIG_CH0_IN6_IDX, PCNT_SIG_CH0_IN7_IDX,
-#endif
-};
-uint32_t ctrl_idx[SUPPORT_ESP32_PULSE_COUNTER] = {
-	PCNT_CTRL_CH0_IN0_IDX, PCNT_CTRL_CH0_IN1_IDX,
-	PCNT_CTRL_CH0_IN2_IDX, PCNT_CTRL_CH0_IN3_IDX,
-#if SUPPORT_ESP32_PULSE_COUNTER == 8
-	PCNT_CTRL_CH0_IN4_IDX, PCNT_CTRL_CH0_IN5_IDX,
-	PCNT_CTRL_CH0_IN6_IDX, PCNT_CTRL_CH0_IN7_IDX
-#endif
-};
-
-// Why the hell, does espressif think, that the channel id is not needed ?
-// Without channel ID, the needed parameter for gpio_iomux_in cannot be derived.
+// Why the hell, does espressif think, that the unit and channel id are not needed ?
+// Without unit/channel ID, the needed parameter for gpio_matrix_in/gpio_iomux_in cannot be derived.
 //
 // Here we declare the private pcnt_chan_t structure, which is not save.
+struct pcnt_unit_t {
+	/*pcnt_group_t*/ void *group;
+	portMUX_TYPE spinlock;
+	int unit_id;
+	// remainder of struct not needed
+};
 struct pcnt_chan_t {
 	pcnt_unit_t *unit;
 	int channel_id;
@@ -46,9 +35,8 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
 	  return false;
   }
 
-  uint8_t step_pin = getStepPin();
   pcnt_chan_config_t chan_config = {
-	  .edge_gpio_num = step_pin,
+	  .edge_gpio_num = -1,
 	  .level_gpio_num = -1,
 	  .flags = {
 		  .invert_edge_input = 0,
@@ -78,30 +66,38 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
 	  return false;
   }
 
+  int unit_id = punit->unit_id;
   int channel_id = pcnt_chan->channel_id;
-  if ((channel_id < 0) || (channel_id >= SUPPORT_ESP32_PULSE_COUNTER)) {
+  if ((unit_id < 0) || (unit_id >= SUPPORT_ESP32_PULSE_COUNTER)) {
 	  // perhaps the pcnt_chan_t-structure is changed !?
 	  pcnt_del_channel(pcnt_chan);
 	  pcnt_del_unit(punit);
 	  return false;
   }
 
-  pcnt_channel_set_edge_action(pcnt_chan, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD);
-  pcnt_channel_set_level_action(pcnt_chan, level_high, level_low);
+rc = pcnt_channel_set_edge_action(pcnt_chan, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD);
+printf("rc=%d\n",rc);
+rc = pcnt_channel_set_level_action(pcnt_chan, level_high, level_low);
+printf("rc=%d\n",rc);
 
-  pcnt_unit_enable(punit);
+rc = pcnt_unit_enable(punit);
+printf("rc=%d\n",rc);
+rc =  pcnt_unit_clear_count(punit);
+printf("rc=%d\n",rc);
+rc =  pcnt_unit_start(punit);
+printf("rc=%d\n",rc);
 
-  detachFromPin();
-  reAttachToPin();
-  gpio_iomux_in(step_pin, sig_idx[channel_id]);
+  uint8_t step_pin = getStepPin();
+printf("pins = %d/%d unit_id=%d channel_id=%d\n", step_pin, dir_pin, unit_id,channel_id);
+  int signal = pcnt_periph_signals.groups[0].units[unit_id].channels[channel_id].pulse_sig;
+  gpio_matrix_in(step_pin, signal,0);
+  gpio_iomux_in(step_pin, signal);
   if (dir_pin != PIN_UNDEFINED) {
+    int control = pcnt_periph_signals.groups[0].units[unit_id].channels[channel_id].control_sig;
     gpio_iomux_out(dir_pin, 0x100, false);
-    gpio_iomux_in(dir_pin, ctrl_idx[channel_id]);
+    gpio_iomux_in(dir_pin, control);
     pinMode(dir_pin, OUTPUT);
   }
-
-  pcnt_unit_clear_count(punit);
-  pcnt_unit_start(punit);
 
   _attached_pulse_unit = punit;
 
@@ -122,4 +118,3 @@ int16_t FastAccelStepper::readPulseCounter() {
 }
 
 #endif
-

@@ -123,8 +123,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
-  pinMode(fas_ledPin, OUTPUT);
-  digitalWrite(fas_ledPin, LOW);
+  PIN_OUTPUT(fas_ledPin, LOW);
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::manageSteppers() {
@@ -533,8 +532,7 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
         _engine->_externalCallForPin(_dirPin, dirHighCountsUp ? HIGH : LOW);
       }
     } else {
-      digitalWrite(dirPin, dirHighCountsUp ? HIGH : LOW);
-      pinMode(dirPin, OUTPUT);
+	  PIN_OUTPUT(dirPin, dirHighCountsUp ? HIGH : LOW);
     }
   }
   fas_queue[_queue_num].setDirPin(dirPin, dirHighCountsUp);
@@ -560,8 +558,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
           _engine->_externalCallForPin(enablePin, HIGH);
         }
       } else {
-        digitalWrite(enablePin, HIGH);
-        pinMode(enablePin, OUTPUT);
+		PIN_OUTPUT(enablePin, HIGH);
         if (_enablePinHighActive == enablePin) {
           _enablePinHighActive = PIN_UNDEFINED;
         }
@@ -575,8 +572,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
           _engine->_externalCallForPin(enablePin, LOW);
         }
       } else {
-        digitalWrite(enablePin, LOW);
-        pinMode(enablePin, OUTPUT);
+		PIN_OUTPUT(enablePin, LOW);
         if (_enablePinLowActive == enablePin) {
           _enablePinLowActive = PIN_UNDEFINED;
         }

@@ -17,13 +17,18 @@ void setup() {
 
   printf("Engine initialized\n");
 
+  for (uint8_t i = 0; i < 10; i++) {
+    printf("LOOP %d\n", i);
+    vTaskDelay(pdMS_TO_TICKS(500));
+//    esp_task_wdt_reset();
+  }
   stepper = engine.stepperConnectToPin(stepPinStepper);
 
   printf("Stepper connected\n");
   for (uint8_t i = 0; i < 10; i++) {
     printf("LOOP %d\n", i);
     vTaskDelay(pdMS_TO_TICKS(500));
-    esp_task_wdt_reset();
+//    esp_task_wdt_reset();
   }
 
   if (stepper) {
@@ -52,7 +57,7 @@ extern "C" void app_main() {
   setup();
   while (true) {
     while (stepper->isRunning()) {
-      esp_task_wdt_reset();
+//      esp_task_wdt_reset();
       printf("pos=%" PRId32, stepper->getCurrentPosition());
 #ifdef SUPPORT_ESP32_PULSE_COUNTER
    	  int16_t pcnt = stepper->readPulseCounter();

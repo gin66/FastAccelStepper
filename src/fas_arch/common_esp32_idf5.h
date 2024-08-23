@@ -87,8 +87,13 @@
 
 #ifdef NEED_PCNT_HEADERS
 #include <driver/pulse_cnt.h>
-#include <soc/pcnt_reg.h>
-#include <soc/pcnt_struct.h>
+//#include <soc/pcnt_reg.h>
+//#include <soc/pcnt_struct.h>
+#include <soc/pcnt_periph.h>
+#include <driver/gpio.h>
+#include <rom/gpio.h>
+#include <hal/gpio_ll.h>
+#include <esp_rom_gpio.h>
 #endif
 
 #ifdef NEED_RMT_HEADERS
@@ -100,5 +105,12 @@
 #define RMT_CHANNEL_T rmt_channel_handle_t
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 #endif
+
+// in order to avoid spikes, first set the value and then make an output
+// esp32 idf5 does not like this approach => output first, then value
+#define PIN_OUTPUT(pin, value) { \
+	pinMode(pin, OUTPUT); \
+	digitalWrite(pin, (value)); \
+}
 
 #endif /* FAS_ARCH_COMMON_ESP32_IDF5_H */
