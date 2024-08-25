@@ -63,6 +63,8 @@
 #include <thread>
 #include <driver/uart.h>
 #include <esp_timer.h>
+#include <cstring>
+#include <cinttypes>
 
 const uart_port_t uart_num = UART_NUM_0;
 
@@ -82,8 +84,8 @@ uart_param_config(uart_num, &config);
 #define PRINTU8(v) printf("%u",v)
 #define PRINTU16(v) printf("%u",v)
 #define PRINTI16(v) printf("%d",v)
-#define PRINTU32(v) printf("%lu",v)
-#define PRINTI32(v) printf("%ld",v)
+#define PRINTU32(v) printf("%" PRIu32,v)
+#define PRINTI32(v) printf("%" PRIi32,v)
 #define PRINTCH(ch) printf("%c",ch)
 #define PRINT(s)    printf("%s",s)
 #define POLL_CHAR_IF_ANY(ch) {uint8_t _ch = getchar();if (_ch != 255) { ch = _ch;}}

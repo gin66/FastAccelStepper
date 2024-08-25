@@ -922,7 +922,7 @@ void setup() {
   PRINTLN("");
 #endif
   PRINT("    TICKS_PER_S=");
-  PRINTU32(TICKS_PER_S);
+  PRINTU32((uint32_t)TICKS_PER_S);
   PRINTLN("");
   PRINT("    Steppers=");
   PRINTU8(MAX_STEPPER);
@@ -1122,9 +1122,23 @@ void output_info(bool only_running) {
   }
 }
 
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+void esp_reset() {
+#if ESP_IDF_VERSION_MAJOR == 5
+const esp_task_wdt_config_t wdt_config = {.timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = true};
+
+		esp_task_wdt_reconfigure(&wdt_config);
+#else
+        esp_task_wdt_init(1, true);
+        esp_task_wdt_add(NULL);
+#endif
+        while (true) {}
+}
+#endif
+
 #define MODE(mode, CMD) ((mode << 8) + CMD)
 
-long val_n[3];
+int32_t val_n[3];
 int8_t get_val1_val2_val3(char *cmd) {
   char *endptr;
   for (uint8_t i = 0; i < 3; i++) {
@@ -1142,10 +1156,6 @@ int8_t get_val1_val2_val3(char *cmd) {
   }
   return -1;
 }
-
-#if ESP_IDF_VERSION_MAJOR == 5
-const esp_task_wdt_config_t wdt_config = {.timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = true};
-#endif
 
 bool process_cmd(char *cmd) {
   FastAccelStepper *stepper_selected = stepper[selected];
@@ -1171,22 +1181,17 @@ bool process_cmd(char *cmd) {
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
       if (strcmp(cmd, "eset") == 0) {
         PRINTLN("ESP reset");
-#if ESP_IDF_VERSION_MAJOR == 5
-		esp_task_wdt_reconfigure(&wdt_config);
-#else
-        esp_task_wdt_init(1, true);
-        esp_task_wdt_add(NULL);
-#endif
-        while (true) {}
+		esp_reset();
       }
-#if ESP_IDF_VERSION_MAJOR == 5
-		esp_task_wdt_reconfigure(&wdt_config);
-        while (true) {}
-#else
+      if (*cmd == 0) {
+#if defined(ARDUINO_ARCH_ESP32)
       PRINTLN("ESP restart");
       ESP.restart();
+#else
+	  esp_reset();
 #endif
 #endif
+	  }
 #if defined(ARDUINO_ARCH_AVR)
       if (*cmd == 0) {
         output_msg(MSG_STRAY_DIGITAL_READ_TOGGLE);
@@ -1765,10 +1770,15 @@ void loop() {
 #ifdef NEED_APP_MAIN
 #include "hal/wdt_hal.h"
 extern "C" void app_main() {
+#if ESP_IDF_VERSION_MAJOR == 5
 		esp_task_wdt_deinit();
         esp_task_wdt_config_t config = {
             .timeout_ms = 1000, .idle_core_mask = 0, .trigger_panic = true};
         esp_task_wdt_init(&config);
+#else
+        esp_task_wdt_init(1000, true);
+        esp_task_wdt_add(NULL);
+#endif
         esp_task_wdt_add(NULL);
   setup();
   while(true) {

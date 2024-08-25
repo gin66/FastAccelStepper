@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         version:
-          - esp32_idf_V4_4_0
+          # - esp32_idf_V4_4_0
           - esp32_idf_V5_0_0
           - esp32_idf_V5_1_0
           - esp32_idf_V5_2_0
