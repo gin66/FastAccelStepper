@@ -8,7 +8,7 @@ Position[A]=1000
 
 Time in EnableA  max=225399 us, total=225399 us
 
-Time in FillISR  max=2023 us, total=27791 us
+Time in FillISR  max=2023 us, total=27796 us
 
 Time in StepA  max=9 us, total=3978 us
 

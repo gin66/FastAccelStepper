@@ -903,12 +903,20 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
 
 void setup() {
   PRINT_INIT();
-#ifdef ARDUINO_ARCH_ESP32
+#if defined(ARDUINO_ARCH_ESP32)
   printf("LOG start\n");
   esp_log_level_set("*", ESP_LOG_INFO);
   esp_log_level_set("rmt", ESP_LOG_INFO);
   ESP_LOGI("StepperDemo", "Started INFO");
   ESP_LOGE("*", "Started ERROR");
+  PRINTLN("");
+#endif
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+  PRINT("ESP-IDF: ");
+  PRINTI16((int16_t)ESP_IDF_VERSION_MAJOR);
+  PRINTCH('.');
+  PRINTI16((int16_t)ESP_IDF_VERSION_MINOR);
+  PRINTLN("");
 #endif
 
   for(uint8_t i = 0;i < MAX_STEPPER;i++) {
@@ -1190,8 +1198,8 @@ bool process_cmd(char *cmd) {
 #else
 	  esp_reset();
 #endif
-#endif
 	  }
+#endif
 #if defined(ARDUINO_ARCH_AVR)
       if (*cmd == 0) {
         output_msg(MSG_STRAY_DIGITAL_READ_TOGGLE);
@@ -1780,6 +1788,8 @@ extern "C" void app_main() {
         esp_task_wdt_add(NULL);
 #endif
         esp_task_wdt_add(NULL);
+
+  printf("Non-arduino version\n");
   setup();
   while(true) {
     loop();

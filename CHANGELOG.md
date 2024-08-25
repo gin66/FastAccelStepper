@@ -13,7 +13,8 @@ pre-0.31.0:
 - compatibility with esp-idf 5.3.0 (not working with 5.0.x to 5.2.x)
   `pio run -e esp32_idf_V6_8_1` in `pio_espidf/UsageExample` works.
 - Drop support for esp-idf 3.x.y versions
-  beta level. barely tested
+- Add github build tests for esp32c6 with espidf5
+- StepperDemo can be compiled with esp-idf4/5 without arduino
 
 0.30.15:
 - Fix missing initialization in `getCurrentSpeedInTicks()` (#262)
