@@ -50,9 +50,9 @@ bool test_seq_10(FastAccelStepper *stepper, struct test_seq_s *seq,
             stepper->applySpeedAcceleration();
             stepper->stopMove();
           } else {
-            SerialInterface.print("Speed changes 64us <=> ");
-            SerialInterface.print(64 + seq->s16_1);
-            SerialInterface.println("us");
+            PRINT("Speed changes 64us <=> ");
+            PRINT(64 + seq->s16_1);
+            PRINTLN("us");
             seq->state = 2;
           }
         }

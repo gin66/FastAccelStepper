@@ -18,8 +18,8 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 3:
       res = stepper->addQueueEntry(&cmd_step);
       if (res > 1) {
-        SerialInterface.print(res);
-        SerialInterface.print(' ');
+        PRINT(res);
+        PRINT(' ');
       } else {
         seq->u32_1 = time_ms;
         seq->state++;
@@ -28,7 +28,7 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 4:
       if (time_ms - seq->u32_1 >= 20) {
         if (stepper->getCurrentPosition() != 4) {
-          SerialInterface.println("not all raw commands executed");
+          PRINTLN("not all raw commands executed");
           seq->state = TEST_STATE_ERROR;
         }
         return true;

@@ -28,16 +28,16 @@ bool test_seq_11(FastAccelStepper *stepper, struct test_seq_s *seq,
       for (uint16_t i = 0; i <= 1000; i++) {
         int32_t pos = stepper->getCurrentPosition();
         if (pos < seq->s32_1) {
-          SerialInterface.print("i=");
-          SerialInterface.print(i);
+          PRINT("i=");
+          PRINT(i);
           if (i != 0) {
-            SerialInterface.print(" prev pos=");
-            SerialInterface.print(prev_pos);
+            PRINT(" prev pos=");
+            PRINT(prev_pos);
           }
-          SerialInterface.print(" old pos=");
-          SerialInterface.print(seq->s32_1);
-          SerialInterface.print(" curr pos=");
-          SerialInterface.println(pos);
+          PRINT(" old pos=");
+          PRINT(seq->s32_1);
+          PRINT(" curr pos=");
+          PRINTLN(pos);
           stepper->stopMove();
           seq->state = TEST_STATE_ERROR;
           return true;
@@ -54,16 +54,16 @@ bool test_seq_11(FastAccelStepper *stepper, struct test_seq_s *seq,
       for (uint16_t i = 0; i <= 1000; i++) {
         int32_t pos = stepper->getCurrentPosition();
         if (pos > seq->s32_1) {
-          SerialInterface.print("i=");
-          SerialInterface.print(i);
+          PRINT("i=");
+          PRINT(i);
           if (i != 0) {
-            SerialInterface.print(" prev pos=");
-            SerialInterface.print(prev_pos);
+            PRINT(" prev pos=");
+            PRINT(prev_pos);
           }
-          SerialInterface.print(" old pos=");
-          SerialInterface.print(seq->s32_1);
-          SerialInterface.print(" curr pos=");
-          SerialInterface.println(pos);
+          PRINT(" old pos=");
+          PRINT(seq->s32_1);
+          PRINT(" curr pos=");
+          PRINTLN(pos);
           stepper->stopMove();
           seq->state = TEST_STATE_ERROR;
           return true;

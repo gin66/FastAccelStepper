@@ -824,7 +824,7 @@ void output_msg(uint8_t x) {
     if (y <= MSG_USAGE_CONFIG) {
       output_msg(y);
     } else {
-      SerialInterface.print(ch);
+      PRINT(ch);
     }
   }
 }
@@ -852,7 +852,7 @@ void setDirectionPin(uint8_t direction, bool polarity) {
     delay10us();
     if (digitalRead(direction) != polarity) {
       output_msg(MSG_CANNOT_SET_DIRECTION_PIN);
-      SerialInterface.println(polarity ? "HIGH" : "LOW");
+      PRINTLN(polarity ? "HIGH" : "LOW");
     }
   }
 }
@@ -908,12 +908,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
 #endif
 
 void setup() {
-  SerialInterface.begin(115200);
-#ifdef CONFIG_IDF_TARGET_ESP32C3
-  while (!Serial) {
-    ;  // wait for USB serial port to connect.
-  }
-#endif
+  PRINT_INIT();
 #ifdef ARDUINO_ARCH_ESP32
   printf("LOG start\n");
   esp_log_level_set("*", ESP_LOG_INFO);
@@ -923,12 +918,12 @@ void setup() {
 #endif
 
   output_msg(MSG_STEPPER_VERSION);
-  SerialInterface.print("    F_CPU=");
-  SerialInterface.println(F_CPU);
-  SerialInterface.print("    TICKS_PER_S=");
-  SerialInterface.println(TICKS_PER_S);
-  SerialInterface.print("    Steppers=");
-  SerialInterface.println(MAX_STEPPER);
+  PRINT("    F_CPU=");
+  PRINTLN(F_CPU);
+  PRINT("    TICKS_PER_S=");
+  PRINTLN(TICKS_PER_S);
+  PRINT("    Steppers=");
+  PRINTLN(MAX_STEPPER);
 
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
@@ -986,86 +981,86 @@ bool simulate_digitalRead_error = false;
 bool simulate_blocked_ISR = false;
 
 void info(FastAccelStepper *s, bool long_info) {
-  SerialInterface.print('@');
+  PRINT('@');
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
   if (s->pulseCounterAttached()) {
     int16_t pcnt_pos_1 = s->readPulseCounter();
     int32_t pos = s->getCurrentPosition();
     int16_t pcnt_pos_2 = s->readPulseCounter();
-    SerialInterface.print(pos);
-    SerialInterface.print(" [");
-    SerialInterface.print(pcnt_pos_1);
-    SerialInterface.print(']');
+    PRINT(pos);
+    PRINT(" [");
+    PRINT(pcnt_pos_1);
+    PRINT(']');
     if (pcnt_pos_1 != pcnt_pos_2) {
-      SerialInterface.print(" [");
-      SerialInterface.print(pcnt_pos_2);
-      SerialInterface.print(']');
+      PRINT(" [");
+      PRINT(pcnt_pos_2);
+      PRINT(']');
     }
   } else {
     int32_t pos = s->getCurrentPosition();
-    SerialInterface.print(pos);
+    PRINT(pos);
   }
 #else
   int32_t pos = s->getCurrentPosition();
-  SerialInterface.print(pos);
+  PRINT(pos);
 #endif
   if (s->isRunning()) {
     if (s->isRunningContinuously()) {
-      SerialInterface.print(" nonstop");
+      PRINT(" nonstop");
     } else {
-      SerialInterface.print(" => ");
-      SerialInterface.print(s->targetPos());
+      PRINT(" => ");
+      PRINT(s->targetPos());
     }
-    SerialInterface.print(" QueueEnd=");
-    SerialInterface.print(s->getPositionAfterCommandsCompleted());
+    PRINT(" QueueEnd=");
+    PRINT(s->getPositionAfterCommandsCompleted());
     if (speed_in_milli_hz) {
-      SerialInterface.print(" v=");
-      SerialInterface.print(s->getCurrentSpeedInMilliHz());
-      SerialInterface.print("mSteps/s");
+      PRINT(" v=");
+      PRINT(s->getCurrentSpeedInMilliHz());
+      PRINT("mSteps/s");
     } else {
-      SerialInterface.print('/');
-      SerialInterface.print(s->getPeriodInUsAfterCommandsCompleted());
-      SerialInterface.print("us/");
-      SerialInterface.print(s->getPeriodInTicksAfterCommandsCompleted());
-      SerialInterface.print("ticks");
+      PRINT('/');
+      PRINT(s->getPeriodInUsAfterCommandsCompleted());
+      PRINT("us/");
+      PRINT(s->getPeriodInTicksAfterCommandsCompleted());
+      PRINT("ticks");
     }
     if (s->isRampGeneratorActive()) {
       switch (s->rampState() & RAMP_STATE_MASK) {
         case RAMP_STATE_IDLE:
-          SerialInterface.print(" IDLE ");
+          PRINT(" IDLE ");
           break;
         case RAMP_STATE_ACCELERATE:
-          SerialInterface.print(" ACC  ");
+          PRINT(" ACC  ");
           break;
         case RAMP_STATE_DECELERATE:
-          SerialInterface.print(" RED  ");  // Reduce
+          PRINT(" RED  ");  // Reduce
           break;
         case RAMP_STATE_COAST:
-          SerialInterface.print(" COAST");
+          PRINT(" COAST");
           break;
         case RAMP_STATE_REVERSE:
-          SerialInterface.print(" REV  ");
+          PRINT(" REV  ");
           break;
         default:
-          SerialInterface.print(s->rampState());
+          PRINT(s->rampState());
       }
     } else {
-      SerialInterface.print(" MANU");
+      PRINT(" MANU");
     }
   } else {
     if (long_info) {
       output_msg(MSG_ACCELERATION_STATUS);
-      SerialInterface.print(s->getAcceleration());
+      PRINT(s->getAcceleration());
       if (speed_in_milli_hz) {
         output_msg(MSG_SPEED_STATUS_FREQ);
-        SerialInterface.print(s->getSpeedInMilliHz());
+        PRINT(s->getSpeedInMilliHz());
       } else {
         output_msg(MSG_SPEED_STATUS_TIME);
-        SerialInterface.print(s->getSpeedInUs());
+        PRINT(s->getSpeedInUs());
       }
     }
   }
-  SerialInterface.print(' ');
+  PRINT(' ');
 }
 
 void stepper_info() {
@@ -1101,18 +1096,18 @@ void output_info(bool only_running) {
     if (stepper[i]) {
       if (!only_running) {
         if (i == selected) {
-          SerialInterface.print(">> ");
+          PRINT(">> ");
         } else {
-          SerialInterface.print("   ");
+          PRINT("   ");
         }
       }
       if (!only_running || stepper[i]->isRunning()) {
-        SerialInterface.print('M');
-        SerialInterface.print(i + 1);
-        SerialInterface.print(": ");
+        PRINT('M');
+        PRINT(i + 1);
+        PRINT(": ");
         info(stepper[i], !only_running);
         if (!only_running) {
-          SerialInterface.println();
+          PRINTLN();
         } else {
           need_ln = true;
         }
@@ -1120,7 +1115,7 @@ void output_info(bool only_running) {
     }
   }
   if (need_ln) {
-    SerialInterface.println();
+    PRINTLN();
   }
 }
 
@@ -1159,7 +1154,7 @@ bool process_cmd(char *cmd) {
         if ((val_n[0] > 0) && (val_n[0] <= MAX_STEPPER)) {
           output_msg(MSG_SELECT_STEPPER);
           selected = val_n[0] - 1;
-          SerialInterface.println(selected + 1);
+          PRINTLN(selected + 1);
           return true;
         }
       }
@@ -1167,7 +1162,7 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'r'):
 #if defined(ARDUINO_ARCH_ESP32)
       if (strcmp(cmd, "eset") == 0) {
-        SerialInterface.println("ESP reset");
+        PRINTLN("ESP reset");
 #if ESP_IDF_VERSION_MAJOR == 5
         esp_task_wdt_config_t config = {
             .timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = 0};
@@ -1179,7 +1174,7 @@ bool process_cmd(char *cmd) {
         while (true)
           ;
       }
-      SerialInterface.println("ESP restart");
+      PRINTLN("ESP restart");
       ESP.restart();
 #endif
 #if defined(ARDUINO_ARCH_AVR)
@@ -1241,7 +1236,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_ACCELERATION_TO);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->setAcceleration(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1253,7 +1248,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_LINEAR_ACCELERATION);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         stepper_selected->setLinearAcceleration(val_n[0]);
         return true;
       }
@@ -1262,7 +1257,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_JUMP_START);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         stepper_selected->setJumpStart(val_n[0]);
         return true;
       }
@@ -1272,7 +1267,7 @@ bool process_cmd(char *cmd) {
       if (*endptr == 0) {
         speed_in_milli_hz = false;
         output_msg(MSG_SET_SPEED_TO_US);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->setSpeedInUs(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1285,7 +1280,7 @@ bool process_cmd(char *cmd) {
       if (*endptr == 0) {
         speed_in_milli_hz = true;
         output_msg(MSG_SET_SPEED_TO_HZ);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->setSpeedInHz(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1298,7 +1293,7 @@ bool process_cmd(char *cmd) {
       if (*endptr == 0) {
         speed_in_milli_hz = true;
         output_msg(MSG_SET_SPEED_TO_MILLI_HZ);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->setSpeedInMilliHz(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1310,7 +1305,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_ACCELERATION_TO);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->moveByAcceleration(val_n[0]);
         output_msg(MSG_MOVE_OK + res);
         return true;
@@ -1320,7 +1315,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_MOVE_STEPS);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->move(val_n[0]);
         output_msg(MSG_MOVE_OK + res);
         return true;
@@ -1330,7 +1325,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_MOVE_TO_POSITION);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->moveTo(val_n[0]);
         output_msg(MSG_MOVE_OK + res);
         return true;
@@ -1340,7 +1335,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_POSITION);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         stepper_selected->setCurrentPosition(val_n[0]);
         return true;
       }
@@ -1349,10 +1344,10 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_ENABLE_TIME);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         res = stepper_selected->setDelayToEnable(val_n[0]);
         output_msg(MSG_RETURN_CODE);
-        SerialInterface.println(res);
+        PRINTLN(res);
         return true;
       }
       break;
@@ -1360,7 +1355,7 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_DISABLE_TIME);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         stepper_selected->setDelayToDisable(val_n[0]);
         return true;
       }
@@ -1368,7 +1363,7 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'w'):
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
-        SerialInterface.print(val_n[0]);
+        PRINT(val_n[0]);
         output_msg(MSG_WAIT_MS);
         pause_ms = val_n[0];
         pause_start = millis();
@@ -1386,26 +1381,26 @@ bool process_cmd(char *cmd) {
         case 1:
           output_msg(MSG_DIRECTION_PIN);
           output_msg(MSG_SET_TO_PIN);
-          SerialInterface.println(val_n[0]);
+          PRINTLN(val_n[0]);
           stepper_selected->setDirectionPin(val_n[0]);
           return true;
         case 2:
         case 3:
           output_msg(MSG_DIRECTION_PIN);
           output_msg(MSG_SET_TO_PIN);
-          SerialInterface.println(val_n[0]);
+          PRINTLN(val_n[0]);
           output_msg(MSG_DIRECTION_PIN);
           if (val_n[1] != 0) {
             output_msg(MSG_HIGH_COUNT_DOWN);
           } else {
             output_msg(MSG_HIGH_COUNT_UP);
           }
-          SerialInterface.println();
+          PRINTLN();
           if (gv == 2) {
             stepper_selected->setDirectionPin(val_n[0], val_n[1]);
           } else {
             output_msg(MSG_DELAY);
-            SerialInterface.println(val_n[2]);
+            PRINTLN(val_n[2]);
             stepper_selected->setDirectionPin(val_n[0], val_n[1], val_n[2]);
           }
           return true;
@@ -1454,7 +1449,7 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_RUN_FORWARD);
         res = stepper_selected->runForward();
         output_msg(MSG_RETURN_CODE);
-        SerialInterface.println(res);
+        PRINTLN(res);
         return true;
       }
       break;
@@ -1463,7 +1458,7 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_RUN_BACKWARD);
         res = stepper_selected->runBackward();
         output_msg(MSG_RETURN_CODE);
-        SerialInterface.println(res);
+        PRINTLN(res);
         return true;
       }
       break;
@@ -1503,7 +1498,7 @@ bool process_cmd(char *cmd) {
           while (stepper_selected->isRunning()) {
             // do nothing
           }
-          SerialInterface.println("STOPPED");
+          PRINTLN("STOPPED");
         }
 #endif
         return true;
@@ -1566,7 +1561,7 @@ bool process_cmd(char *cmd) {
       }
       if (get_val1_val2_val3(cmd) == 3) {
         output_msg(MSG_ATTACH_PULSE_COUNTER);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         if (!stepper_selected->attachToPulseCounter(val_n[0], val_n[1],
                                                     val_n[2])) {
           output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
@@ -1575,7 +1570,7 @@ bool process_cmd(char *cmd) {
       }
       if (get_val1_val2_val3(cmd) == 1) {
         output_msg(MSG_ATTACH_PULSE_COUNTER);
-        SerialInterface.println(val_n[0]);
+        PRINTLN(val_n[0]);
         if (!stepper_selected->attachToPulseCounter(val_n[0])) {
           output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
         }
@@ -1589,7 +1584,7 @@ bool process_cmd(char *cmd) {
         const struct test_seq_def_s *ts = &test_sequence[i];
         if (strcmp(out_buffer, ts->code) == 0) {
           output_msg(MSG_SELECT_TEST_SEQUENCE);
-          SerialInterface.println(out_buffer);
+          PRINTLN(out_buffer);
           test_seq[selected].test = ts->test;
           test_seq[selected].state = 0;
           return true;
@@ -1604,9 +1599,7 @@ bool process_cmd(char *cmd) {
 void loop() {
   char ch = 0;
   if (input == NULL) {
-    if (SerialInterface.available()) {
-      ch = SerialInterface.read();
-    }
+    POLL_CHAR_IF_ANY(ch)
   } else {
     ch = *input;
     if (ch == 0) {
@@ -1647,7 +1640,7 @@ void loop() {
       if (out_ptr > 0) {
         if (!process_cmd(out_buffer)) {
           output_msg(MSG_UNKNOWN_COMMAND);
-          SerialInterface.println(out_buffer);
+          PRINTLN(out_buffer);
         }
       }
       out_ptr = 0;
