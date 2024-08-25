@@ -532,7 +532,7 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
         _engine->_externalCallForPin(_dirPin, dirHighCountsUp ? HIGH : LOW);
       }
     } else {
-	  PIN_OUTPUT(dirPin, dirHighCountsUp ? HIGH : LOW);
+      PIN_OUTPUT(dirPin, dirHighCountsUp ? HIGH : LOW);
     }
   }
   fas_queue[_queue_num].setDirPin(dirPin, dirHighCountsUp);
@@ -558,7 +558,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
           _engine->_externalCallForPin(enablePin, HIGH);
         }
       } else {
-		PIN_OUTPUT(enablePin, HIGH);
+        PIN_OUTPUT(enablePin, HIGH);
         if (_enablePinHighActive == enablePin) {
           _enablePinHighActive = PIN_UNDEFINED;
         }
@@ -572,7 +572,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
           _engine->_externalCallForPin(enablePin, LOW);
         }
       } else {
-		PIN_OUTPUT(enablePin, LOW);
+        PIN_OUTPUT(enablePin, LOW);
         if (_enablePinLowActive == enablePin) {
           _enablePinLowActive = PIN_UNDEFINED;
         }
@@ -909,4 +909,3 @@ int32_t FastAccelStepper::getCurrentPosition() {
 }
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
-

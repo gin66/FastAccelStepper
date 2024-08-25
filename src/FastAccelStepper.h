@@ -708,7 +708,8 @@ class FastAccelStepper {
   // by the system. The parameter is kept for compatibility.
   //
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
-  bool attachToPulseCounter(uint8_t unused_pcnt_unit = 0, int16_t low_value = -16384,
+  bool attachToPulseCounter(uint8_t unused_pcnt_unit = 0,
+                            int16_t low_value = -16384,
                             int16_t high_value = 16384);
   int16_t readPulseCounter();
   void clearPulseCounter();

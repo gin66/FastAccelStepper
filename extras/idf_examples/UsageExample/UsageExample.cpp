@@ -20,7 +20,7 @@ void setup() {
   for (uint8_t i = 0; i < 10; i++) {
     printf("LOOP %d\n", i);
     vTaskDelay(pdMS_TO_TICKS(500));
-//    esp_task_wdt_reset();
+    //    esp_task_wdt_reset();
   }
   stepper = engine.stepperConnectToPin(stepPinStepper);
 
@@ -28,7 +28,7 @@ void setup() {
   for (uint8_t i = 0; i < 10; i++) {
     printf("LOOP %d\n", i);
     vTaskDelay(pdMS_TO_TICKS(500));
-//    esp_task_wdt_reset();
+    //    esp_task_wdt_reset();
   }
 
   if (stepper) {
@@ -44,7 +44,7 @@ void setup() {
     stepper->setAcceleration(100);
 
 #ifdef SUPPORT_ESP32_PULSE_COUNTER
-	stepper->attachToPulseCounter(7);
+    stepper->attachToPulseCounter(7);
 #endif
 
     printf("Stepper initialized\n");
@@ -58,19 +58,19 @@ extern "C" void app_main() {
   int32_t target = 0;
   while (true) {
     while (stepper->isRunning()) {
-//      esp_task_wdt_reset();
+      //      esp_task_wdt_reset();
       printf("pos=%" PRId32, stepper->getCurrentPosition());
 #ifdef SUPPORT_ESP32_PULSE_COUNTER
-   	  int16_t pcnt = stepper->readPulseCounter();
+      int16_t pcnt = stepper->readPulseCounter();
       printf("  pcnt=%d", pcnt);
 #endif
-	  printf("\n");
+      printf("\n");
       vTaskDelay(pdMS_TO_TICKS(500));
     }
-	printf("done\n");
+    printf("done\n");
     vTaskDelay(pdMS_TO_TICKS(500));
-	printf("move\n");
-	target = 1000 - target;
+    printf("move\n");
+    target = 1000 - target;
     stepper->moveTo(target);
   }
   // WARNING: if program reaches end of function app_main() the MCU will

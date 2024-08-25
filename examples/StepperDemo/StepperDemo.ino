@@ -1169,17 +1169,15 @@ bool process_cmd(char *cmd) {
       if (strcmp(cmd, "eset") == 0) {
         SerialInterface.println("ESP reset");
 #if ESP_IDF_VERSION_MAJOR == 5
-		esp_task_wdt_config_t config = {
-			.timeout_ms = 1,
-			.idle_core_mask = 1,
-			.trigger_panic = 0
-		};
+        esp_task_wdt_config_t config = {
+            .timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = 0};
         esp_task_wdt_init(&config);
 #else
         esp_task_wdt_init(1, true);
 #endif
         esp_task_wdt_add(NULL);
-        while (true);
+        while (true)
+          ;
       }
       SerialInterface.println("ESP restart");
       ESP.restart();

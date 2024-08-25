@@ -90,10 +90,11 @@ struct queue_end_s {
 // in order to avoid spikes, first set the value and then make an output
 // esp32 idf5 does not like this approach
 #ifndef PIN_OUTPUT
-#define PIN_OUTPUT(pin, value) { \
-	digitalWrite(pin, (value)); \
-	pinMode(pin, OUTPUT); \
-}
+#define PIN_OUTPUT(pin, value)  \
+  {                             \
+    digitalWrite(pin, (value)); \
+    pinMode(pin, OUTPUT);       \
+  }
 #endif
 
 // disable inject_fill_interrupt() for all real devices. Only defined in TEST

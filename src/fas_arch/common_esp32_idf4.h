@@ -51,7 +51,6 @@
 #define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
-
 //==========================================================================
 //
 // ESP32 derivate - ESP32C3

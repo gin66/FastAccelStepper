@@ -111,7 +111,8 @@ void StepperTask(void *parameter) {
   while (true) {
     engine->manageSteppers();
 #if ESP_IDF_VERSION_MAJOR == 4
-	// not clear, if the wdt reset is needed. With idf-version 5, the reset causes an issue.
+    // not clear, if the wdt reset is needed. With idf-version 5, the reset
+    // causes an issue.
     esp_task_wdt_reset();
 #endif
     vTaskDelay(delay_4ms);
@@ -128,7 +129,7 @@ void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
 #define PRIORITY configMAX_PRIORITIES
 #else
 #define STACK_SIZE 3000
-#define PRIORITY (configMAX_PRIORITIES-1)
+#define PRIORITY (configMAX_PRIORITIES - 1)
 #endif
   if (cpu_core > 1) {
     xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);

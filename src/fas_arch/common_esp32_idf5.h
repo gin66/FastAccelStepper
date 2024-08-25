@@ -143,9 +143,10 @@
 
 // in order to avoid spikes, first set the value and then make an output
 // esp32 idf5 does not like this approach => output first, then value
-#define PIN_OUTPUT(pin, value) { \
-	pinMode(pin, OUTPUT); \
-	digitalWrite(pin, (value)); \
-}
+#define PIN_OUTPUT(pin, value)  \
+  {                             \
+    pinMode(pin, OUTPUT);       \
+    digitalWrite(pin, (value)); \
+  }
 
 #endif /* FAS_ARCH_COMMON_ESP32_IDF5_H */

@@ -533,7 +533,7 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].mode.start = 2;  // 2=run continuous
 #else                                  /* __ESP32_IDF_V44__ */
-  mcpwm->timer[timer].timer_cfg1.timer_start = 2;  // 2=run continuous
+  mcpwm->timer[timer].timer_cfg1.timer_start = 2;     // 2=run continuous
 #endif                                 /* __ESP32_IDF_V44__ */
 }
 void StepperQueue::forceStop_mcpwm_pcnt() {
