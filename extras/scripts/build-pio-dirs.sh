@@ -41,6 +41,8 @@ do
 	for f in $FILES;do ln -s ../../../extras/idf_examples/$i/$f .;done
 	cd ../../..
 done
+mkdir -p pio_espidf/StepperDemo/src
+(cd pio_espidf/StepperDemo;ln -s ../../extras/ci/platformio.ini;cd src;cp ../../../examples/StepperDemo/* .;mv StepperDemo.ino StepperDemo.cpp)
 
 # Make one directory to test PoorManFloat on simulator
 mkdir pio_dirs/PMF_test
