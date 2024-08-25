@@ -48,7 +48,7 @@
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_PULSE_COUNTER 8
 #define HAVE_ESP32S3_PULSE_COUNTER
-#define HAVE_ESP32S3_RMT
+#define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 
 //#define QUEUES_MCPWM_PCNT 4
@@ -65,7 +65,7 @@
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C3
 #define SUPPORT_ESP32_RMT
-#define HAVE_ESP32C3_RMT
+#define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
@@ -79,7 +79,7 @@
 #elif CONFIG_IDF_TARGET_ESP32C6
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_PULSE_COUNTER 4
-#define HAVE_ESP32C3_RMT
+#define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
@@ -94,7 +94,7 @@
 #elif CONFIG_IDF_TARGET_ESP32H2
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_PULSE_COUNTER 4
-#define HAVE_ESP32C3_RMT
+#define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 2
