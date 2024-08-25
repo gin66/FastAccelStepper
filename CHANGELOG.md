@@ -15,6 +15,7 @@ pre-0.31.0:
 - Drop support for esp-idf 3.x.y versions
 - Add github build tests for esp32c6 with espidf5
 - StepperDemo can be compiled with esp-idf4/5 without arduino
+- idf5 version yields mismatch with pulse counter. not ready for use
 
 0.30.15:
 - Fix missing initialization in `getCurrentSpeedInTicks()` (#262)
