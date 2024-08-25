@@ -3,7 +3,7 @@ TTY=${1:-ttyUSB0}
 DEV="-d /dev/${TTY} -b 115200"
 MOTOR=${MOTOR:-M1}
 
-CMD="$MOTOR p7,0,0 H25000 A10000 f w10 X W pc w 20 R1 W "
+CMD="$MOTOR p7,-32767,32767 H25000 A10000 f w10 X W pc w 20 R1 W "
 PASS=">> $MOTOR: @1 \\[1\\]"
 
 LOG="$0.log"

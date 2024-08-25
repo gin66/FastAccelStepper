@@ -11,7 +11,7 @@ MAX_RUN_S=300
 for SEQ in 13 01 02 03 04 06 07 10 11
 do
 	LOG="$0_$SEQ.log"
-	CMD="$MOTOR p7,0,0 t $MOTOR $SEQ R "
+	CMD="$MOTOR p7,-32767,32767 t $MOTOR $SEQ R "
 
 	echo "reset esp32"
 	grabserial $DEV -c ' x reset ' -q "$MOTOR:" -e 10
