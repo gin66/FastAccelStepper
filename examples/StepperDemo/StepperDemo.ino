@@ -1143,6 +1143,10 @@ int8_t get_val1_val2_val3(char *cmd) {
   return -1;
 }
 
+#if ESP_IDF_VERSION_MAJOR == 5
+const esp_task_wdt_config_t wdt_config = {.timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = true};
+#endif
+
 bool process_cmd(char *cmd) {
   FastAccelStepper *stepper_selected = stepper[selected];
   uint16_t s = *cmd++;
@@ -1164,22 +1168,24 @@ bool process_cmd(char *cmd) {
       }
       break;
     case MODE(normal, 'r'):
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
       if (strcmp(cmd, "eset") == 0) {
         PRINTLN("ESP reset");
 #if ESP_IDF_VERSION_MAJOR == 5
-        esp_task_wdt_config_t config = {
-            .timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = 0};
-		esp_task_wdt_reconfigure(&config);
+		esp_task_wdt_reconfigure(&wdt_config);
 #else
         esp_task_wdt_init(1, true);
         esp_task_wdt_add(NULL);
 #endif
-        while (true)
-          ;
+        while (true) {}
       }
+#if ESP_IDF_VERSION_MAJOR == 5
+		esp_task_wdt_reconfigure(&wdt_config);
+        while (true) {}
+#else
       PRINTLN("ESP restart");
       ESP.restart();
+#endif
 #endif
 #if defined(ARDUINO_ARCH_AVR)
       if (*cmd == 0) {

@@ -26,13 +26,13 @@
       /* wait for USB serial port to connect */ \
     }
 #define PRINTLN USBSerial.println
-#define PRINTCH USBSerial.println
-#define PRINTU8 USBSerial.println
-#define PRINTU16 USBSerial.println
-#define PRINTI16 USBSerial.println
-#define PRINTU32 USBSerial.println
-#define PRINTI32 USBSerial.println
-#define PRINT USBSerial.println
+#define PRINTCH USBSerial.print
+#define PRINTU8 USBSerial.print
+#define PRINTU16 USBSerial.print
+#define PRINTI16 USBSerial.print
+#define PRINTU32 USBSerial.print
+#define PRINTI32 USBSerial.print
+#define PRINT USBSerial.print
 #define POLL_CHAR_IF_ANY(ch) \
     if (USBSerial.available()) { \
       ch = USBSerial.read(); \
@@ -44,13 +44,13 @@
 
 #define PRINT_INIT() Serial.begin(115200);
 #define PRINTLN Serial.println
-#define PRINTCH Serial.println
-#define PRINTU8 Serial.println
-#define PRINTU16 Serial.println
-#define PRINTI16 Serial.println
-#define PRINTU32 Serial.println
-#define PRINTI32 Serial.println
-#define PRINT Serial.println
+#define PRINTCH Serial.print
+#define PRINTU8 Serial.print
+#define PRINTU16 Serial.print
+#define PRINTI16 Serial.print
+#define PRINTU32 Serial.print
+#define PRINTI32 Serial.print
+#define PRINT Serial.print
 #define POLL_CHAR_IF_ANY(ch) \
     if (Serial.available()) { \
       ch = Serial.read(); \
