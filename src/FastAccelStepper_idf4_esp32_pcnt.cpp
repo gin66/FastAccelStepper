@@ -64,9 +64,10 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
   gpio_matrix_in(step_pin, sig_idx[pcnt_unit], 0);
   gpio_iomux_in(step_pin, sig_idx[pcnt_unit]); // test failure without this call
   if (dir_pin != PIN_UNDEFINED) {
-    gpio_matrix_out(dir_pin, 0x100, false, false);
-    gpio_iomux_in(dir_pin, ctrl_idx[pcnt_unit]);
     pinMode(dir_pin, OUTPUT);
+    gpio_matrix_out(dir_pin, 0x100, false, false);
+    gpio_matrix_in(dir_pin, ctrl_idx[pcnt_unit], 0);
+    gpio_iomux_in(dir_pin, ctrl_idx[pcnt_unit]);
   }
 
   pcnt_counter_clear(cfg.unit);
