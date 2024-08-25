@@ -76,19 +76,21 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
   }
 
 rc = pcnt_channel_set_edge_action(pcnt_chan, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_HOLD);
-printf("rc=%d\n",rc);
+if (rc != ESP_OK) { return false; }
 rc = pcnt_channel_set_level_action(pcnt_chan, level_high, level_low);
-printf("rc=%d\n",rc);
+if (rc != ESP_OK) { return false; }
 
 rc = pcnt_unit_enable(punit);
-printf("rc=%d\n",rc);
+if (rc != ESP_OK) { return false; }
 rc =  pcnt_unit_clear_count(punit);
-printf("rc=%d\n",rc);
+if (rc != ESP_OK) { return false; }
 rc =  pcnt_unit_start(punit);
-printf("rc=%d\n",rc);
+if (rc != ESP_OK) { return false; }
 
   uint8_t step_pin = getStepPin();
+#ifdef TRACE
 printf("pins = %d/%d unit_id=%d channel_id=%d\n", step_pin, dir_pin, unit_id,channel_id);
+#endif
   int signal = pcnt_periph_signals.groups[0].units[unit_id].channels[channel_id].pulse_sig;
   gpio_matrix_in(step_pin, signal,0);
   gpio_iomux_in(step_pin, signal);
