@@ -29,9 +29,10 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         accel = accel >> ((accel % 4) + 2);
         accel = accel + AMIN;
         PRINT("speed=");
-        PRINT(speed);
+        PRINTU32(speed);
         PRINT(" accel=");
-        PRINTLN(accel);
+        PRINTU32(accel);
+		PRINTLN("");
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         if (rand() & 1) {
@@ -59,7 +60,8 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         int16_t old = seq->s16_1;
         seq->s16_1 = stepper->readPulseCounter();
         PRINT("Steps needed for stop=");
-        PRINTLN(old - seq->s16_1);
+        PRINTU16(old - seq->s16_1);
+        PRINTLN("");
 #endif
         seq->state++;
       }

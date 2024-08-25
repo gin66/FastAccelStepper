@@ -122,7 +122,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     }};
 #endif
-#elif defined(ARDUINO_ARCH_ESP32)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 // Example hardware configuration for esp32 board.
 // Please adapt to your configuration
 #ifdef CONFIG_IDF_TARGET_ESP32C3
@@ -423,17 +423,11 @@ FastAccelStepper *stepper[MAX_STEPPER];
 
 enum { normal, test, config } mode = normal;
 bool test_ongoing = false;
-struct test_seq_s test_seq[MAX_STEPPER] = {
-#if MAX_STEPPER == 8
-    {.test = NULL}, {.test = NULL},
-#endif
-#if MAX_STEPPER >= 6
-    {.test = NULL}, {.test = NULL}, {.test = NULL},
-#endif
-#if MAX_STEPPER >= 3
-    {.test = NULL},
-#endif
-    {.test = NULL}, {.test = NULL}};
+struct test_seq_s test_seq[MAX_STEPPER];
+
+// Forward declaration
+void usage();
+void output_info(bool only_running);
 
 #define _NL_ "\n"
 #define _SEP_ "|"
@@ -824,13 +818,13 @@ void output_msg(uint8_t x) {
     if (y <= MSG_USAGE_CONFIG) {
       output_msg(y);
     } else {
-      PRINT(ch);
+      PRINTCH(ch);
     }
   }
 }
 
 #if !defined(__AVR_ATmega32U4__)
-void delay10us() { delayMicroseconds(10); }
+void delay10us() { DELAY_US(10); }
 void do3200Steps(uint8_t step) {
   for (uint16_t i = 0; i < 3200; i++) {
     digitalWrite(step, HIGH);
@@ -839,7 +833,7 @@ void do3200Steps(uint8_t step) {
       output_msg(MSG_STEP_PIN_IS_NOT_HIGH);
     }
     digitalWrite(step, LOW);
-    delayMicroseconds(190);
+    DELAY_US(190);
     if (digitalRead(step) != LOW) {
       output_msg(MSG_STEP_PIN_IS_NOT_LOW);
     }
@@ -917,13 +911,22 @@ void setup() {
   ESP_LOGE("*", "Started ERROR");
 #endif
 
+  for(uint8_t i = 0;i < MAX_STEPPER;i++) {
+	test_seq[i].test = NULL;
+  }
+
   output_msg(MSG_STEPPER_VERSION);
+#ifdef F_CPU
   PRINT("    F_CPU=");
-  PRINTLN(F_CPU);
+  PRINTU32(F_CPU);
+  PRINTLN("");
+#endif
   PRINT("    TICKS_PER_S=");
-  PRINTLN(TICKS_PER_S);
+  PRINTU32(TICKS_PER_S);
+  PRINTLN("");
   PRINT("    Steppers=");
-  PRINTLN(MAX_STEPPER);
+  PRINTU8(MAX_STEPPER);
+  PRINTLN("");
 
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
@@ -972,7 +975,7 @@ bool verbose = true;
 bool usage_info = true;
 bool speed_in_milli_hz = false;
 uint32_t last_time = 0;
-int selected = 0;
+int16_t selected = 0;
 uint32_t pause_ms = 0;
 uint32_t pause_start = 0;
 #if defined(ARDUINO_ARCH_AVR)
@@ -981,47 +984,47 @@ bool simulate_digitalRead_error = false;
 bool simulate_blocked_ISR = false;
 
 void info(FastAccelStepper *s, bool long_info) {
-  PRINT('@');
+  PRINTCH('@');
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
   if (s->pulseCounterAttached()) {
     int16_t pcnt_pos_1 = s->readPulseCounter();
     int32_t pos = s->getCurrentPosition();
     int16_t pcnt_pos_2 = s->readPulseCounter();
-    PRINT(pos);
+    PRINTI32(pos);
     PRINT(" [");
-    PRINT(pcnt_pos_1);
-    PRINT(']');
+    PRINTI16(pcnt_pos_1);
+    PRINTCH(']');
     if (pcnt_pos_1 != pcnt_pos_2) {
       PRINT(" [");
-      PRINT(pcnt_pos_2);
-      PRINT(']');
+      PRINTI16(pcnt_pos_2);
+      PRINTCH(']');
     }
   } else {
     int32_t pos = s->getCurrentPosition();
-    PRINT(pos);
+    PRINTI32(pos);
   }
 #else
   int32_t pos = s->getCurrentPosition();
-  PRINT(pos);
+  PRINTI32(pos);
 #endif
   if (s->isRunning()) {
     if (s->isRunningContinuously()) {
       PRINT(" nonstop");
     } else {
       PRINT(" => ");
-      PRINT(s->targetPos());
+      PRINTI32(s->targetPos());
     }
     PRINT(" QueueEnd=");
-    PRINT(s->getPositionAfterCommandsCompleted());
+    PRINTI32(s->getPositionAfterCommandsCompleted());
     if (speed_in_milli_hz) {
       PRINT(" v=");
-      PRINT(s->getCurrentSpeedInMilliHz());
+      PRINTU32(s->getCurrentSpeedInMilliHz());
       PRINT("mSteps/s");
     } else {
-      PRINT('/');
-      PRINT(s->getPeriodInUsAfterCommandsCompleted());
+      PRINTCH('/');
+      PRINTU32(s->getPeriodInUsAfterCommandsCompleted());
       PRINT("us/");
-      PRINT(s->getPeriodInTicksAfterCommandsCompleted());
+      PRINTU32(s->getPeriodInTicksAfterCommandsCompleted());
       PRINT("ticks");
     }
     if (s->isRampGeneratorActive()) {
@@ -1042,7 +1045,7 @@ void info(FastAccelStepper *s, bool long_info) {
           PRINT(" REV  ");
           break;
         default:
-          PRINT(s->rampState());
+          PRINTU8(s->rampState());
       }
     } else {
       PRINT(" MANU");
@@ -1050,17 +1053,17 @@ void info(FastAccelStepper *s, bool long_info) {
   } else {
     if (long_info) {
       output_msg(MSG_ACCELERATION_STATUS);
-      PRINT(s->getAcceleration());
+      PRINTU32(s->getAcceleration());
       if (speed_in_milli_hz) {
         output_msg(MSG_SPEED_STATUS_FREQ);
-        PRINT(s->getSpeedInMilliHz());
+        PRINTU32(s->getSpeedInMilliHz());
       } else {
         output_msg(MSG_SPEED_STATUS_TIME);
-        PRINT(s->getSpeedInUs());
+        PRINTU32(s->getSpeedInUs());
       }
     }
   }
-  PRINT(' ');
+  PRINTCH(' ');
 }
 
 void stepper_info() {
@@ -1102,12 +1105,12 @@ void output_info(bool only_running) {
         }
       }
       if (!only_running || stepper[i]->isRunning()) {
-        PRINT('M');
-        PRINT(i + 1);
+        PRINTCH('M');
+        PRINTU8(i + 1);
         PRINT(": ");
         info(stepper[i], !only_running);
         if (!only_running) {
-          PRINTLN();
+          PRINTLN("");
         } else {
           need_ln = true;
         }
@@ -1115,7 +1118,7 @@ void output_info(bool only_running) {
     }
   }
   if (need_ln) {
-    PRINTLN();
+    PRINTLN("");
   }
 }
 
@@ -1154,7 +1157,8 @@ bool process_cmd(char *cmd) {
         if ((val_n[0] > 0) && (val_n[0] <= MAX_STEPPER)) {
           output_msg(MSG_SELECT_STEPPER);
           selected = val_n[0] - 1;
-          PRINTLN(selected + 1);
+          PRINTI16(selected + 1);
+		  PRINTLN("");
           return true;
         }
       }
@@ -1166,11 +1170,11 @@ bool process_cmd(char *cmd) {
 #if ESP_IDF_VERSION_MAJOR == 5
         esp_task_wdt_config_t config = {
             .timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = 0};
-        esp_task_wdt_init(&config);
+		esp_task_wdt_reconfigure(&config);
 #else
         esp_task_wdt_init(1, true);
-#endif
         esp_task_wdt_add(NULL);
+#endif
         while (true)
           ;
       }
@@ -1236,7 +1240,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_ACCELERATION_TO);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->setAcceleration(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1248,7 +1253,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_LINEAR_ACCELERATION);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         stepper_selected->setLinearAcceleration(val_n[0]);
         return true;
       }
@@ -1257,7 +1263,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_JUMP_START);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         stepper_selected->setJumpStart(val_n[0]);
         return true;
       }
@@ -1267,7 +1274,8 @@ bool process_cmd(char *cmd) {
       if (*endptr == 0) {
         speed_in_milli_hz = false;
         output_msg(MSG_SET_SPEED_TO_US);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->setSpeedInUs(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1280,7 +1288,8 @@ bool process_cmd(char *cmd) {
       if (*endptr == 0) {
         speed_in_milli_hz = true;
         output_msg(MSG_SET_SPEED_TO_HZ);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->setSpeedInHz(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1293,7 +1302,8 @@ bool process_cmd(char *cmd) {
       if (*endptr == 0) {
         speed_in_milli_hz = true;
         output_msg(MSG_SET_SPEED_TO_MILLI_HZ);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->setSpeedInMilliHz(val_n[0]);
         if (res < 0) {
           output_msg(MSG_ERROR_INVALID_VALUE);
@@ -1305,7 +1315,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_ACCELERATION_TO);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->moveByAcceleration(val_n[0]);
         output_msg(MSG_MOVE_OK + res);
         return true;
@@ -1315,7 +1326,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_MOVE_STEPS);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->move(val_n[0]);
         output_msg(MSG_MOVE_OK + res);
         return true;
@@ -1325,7 +1337,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_MOVE_TO_POSITION);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->moveTo(val_n[0]);
         output_msg(MSG_MOVE_OK + res);
         return true;
@@ -1335,7 +1348,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_POSITION);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         stepper_selected->setCurrentPosition(val_n[0]);
         return true;
       }
@@ -1344,10 +1358,12 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_ENABLE_TIME);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         res = stepper_selected->setDelayToEnable(val_n[0]);
         output_msg(MSG_RETURN_CODE);
-        PRINTLN(res);
+        PRINTU8(res);
+        PRINTLN("");
         return true;
       }
       break;
@@ -1355,7 +1371,8 @@ bool process_cmd(char *cmd) {
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
         output_msg(MSG_SET_DISABLE_TIME);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+		PRINTLN("");
         stepper_selected->setDelayToDisable(val_n[0]);
         return true;
       }
@@ -1363,10 +1380,10 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'w'):
       val_n[0] = strtol(cmd, &endptr, 10);
       if (*endptr == 0) {
-        PRINT(val_n[0]);
+        PRINTI32(val_n[0]);
         output_msg(MSG_WAIT_MS);
         pause_ms = val_n[0];
-        pause_start = millis();
+        pause_start = MILLIS();
         return true;
       }
       break;
@@ -1381,32 +1398,36 @@ bool process_cmd(char *cmd) {
         case 1:
           output_msg(MSG_DIRECTION_PIN);
           output_msg(MSG_SET_TO_PIN);
-          PRINTLN(val_n[0]);
+          PRINTI32(val_n[0]);
+          PRINTLN("");
           stepper_selected->setDirectionPin(val_n[0]);
           return true;
         case 2:
         case 3:
           output_msg(MSG_DIRECTION_PIN);
           output_msg(MSG_SET_TO_PIN);
-          PRINTLN(val_n[0]);
+          PRINTI32(val_n[0]);
+          PRINTLN("");
           output_msg(MSG_DIRECTION_PIN);
           if (val_n[1] != 0) {
             output_msg(MSG_HIGH_COUNT_DOWN);
           } else {
             output_msg(MSG_HIGH_COUNT_UP);
           }
-          PRINTLN();
+          PRINTLN("");
           if (gv == 2) {
             stepper_selected->setDirectionPin(val_n[0], val_n[1]);
           } else {
             output_msg(MSG_DELAY);
-            PRINTLN(val_n[2]);
+            PRINTI32(val_n[2]);
+            PRINTLN("");
             stepper_selected->setDirectionPin(val_n[0], val_n[1], val_n[2]);
           }
           return true;
         default:
           break;
       }
+	  break;
     case MODE(normal, 'N'):
       if (*cmd == 0) {
         output_msg(MSG_OUTPUT_DRIVER_ON);
@@ -1449,7 +1470,8 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_RUN_FORWARD);
         res = stepper_selected->runForward();
         output_msg(MSG_RETURN_CODE);
-        PRINTLN(res);
+        PRINTU8(res);
+		PRINTLN("");
         return true;
       }
       break;
@@ -1458,7 +1480,8 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_RUN_BACKWARD);
         res = stepper_selected->runBackward();
         output_msg(MSG_RETURN_CODE);
-        PRINTLN(res);
+        PRINTU8(res);
+		PRINTLN("");
         return true;
       }
       break;
@@ -1561,7 +1584,8 @@ bool process_cmd(char *cmd) {
       }
       if (get_val1_val2_val3(cmd) == 3) {
         output_msg(MSG_ATTACH_PULSE_COUNTER);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         if (!stepper_selected->attachToPulseCounter(val_n[0], val_n[1],
                                                     val_n[2])) {
           output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
@@ -1570,7 +1594,8 @@ bool process_cmd(char *cmd) {
       }
       if (get_val1_val2_val3(cmd) == 1) {
         output_msg(MSG_ATTACH_PULSE_COUNTER);
-        PRINTLN(val_n[0]);
+        PRINTI32(val_n[0]);
+        PRINTLN("");
         if (!stepper_selected->attachToPulseCounter(val_n[0])) {
           output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
         }
@@ -1623,7 +1648,7 @@ void loop() {
     in_buffer[write_ptr++] = ch;
   }
   if (pause_ms > 0) {
-    if ((uint32_t)(millis() - pause_start) >= pause_ms) {
+    if ((uint32_t)(MILLIS() - pause_start) >= pause_ms) {
       pause_ms = 0;
       output_msg(MSG_WAIT_COMPLETE);
     }
@@ -1647,7 +1672,7 @@ void loop() {
     }
   }
 
-  uint32_t ms = millis();
+  uint32_t ms = MILLIS();
 
 #if defined(ARDUINO_ARCH_AVR)
   if (simulate_digitalRead_error) {
@@ -1660,9 +1685,9 @@ void loop() {
 #endif
   if (simulate_blocked_ISR) {
     if ((ms & 0xff) < 0x40) {
-      noInterrupts();
-      delayMicroseconds(100);
-      interrupts();
+      fasDisableInterrupts();
+      DELAY_US(100);
+      fasEnableInterrupts();
     }
   }
 
@@ -1697,7 +1722,7 @@ void loop() {
         }
         output_msg(MSG_TEST_COMPLETED);
       } else {
-        uint32_t now = millis();
+        uint32_t now = MILLIS();
         if (now - last_time >= 100) {
           if (verbose) {
             output_info(true);
@@ -1730,3 +1755,21 @@ void loop() {
     stopped = !running;
   }
 }
+
+#ifdef NEED_APP_MAIN
+#include "hal/wdt_hal.h"
+extern "C" void app_main() {
+		esp_task_wdt_deinit();
+        esp_task_wdt_config_t config = {
+            .timeout_ms = 1000, .idle_core_mask = 0, .trigger_panic = true};
+        esp_task_wdt_init(&config);
+        esp_task_wdt_add(NULL);
+  setup();
+  while(true) {
+    loop();
+    esp_task_wdt_reset();
+	DELAY_MS(2);
+  }
+}
+#endif
+

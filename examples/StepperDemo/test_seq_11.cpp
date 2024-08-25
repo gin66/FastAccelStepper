@@ -29,15 +29,16 @@ bool test_seq_11(FastAccelStepper *stepper, struct test_seq_s *seq,
         int32_t pos = stepper->getCurrentPosition();
         if (pos < seq->s32_1) {
           PRINT("i=");
-          PRINT(i);
+          PRINTU16(i);
           if (i != 0) {
             PRINT(" prev pos=");
-            PRINT(prev_pos);
+            PRINTI32(prev_pos);
           }
           PRINT(" old pos=");
-          PRINT(seq->s32_1);
+          PRINTI32(seq->s32_1);
           PRINT(" curr pos=");
-          PRINTLN(pos);
+          PRINTI32(pos);
+          PRINTLN("");
           stepper->stopMove();
           seq->state = TEST_STATE_ERROR;
           return true;
@@ -55,15 +56,16 @@ bool test_seq_11(FastAccelStepper *stepper, struct test_seq_s *seq,
         int32_t pos = stepper->getCurrentPosition();
         if (pos > seq->s32_1) {
           PRINT("i=");
-          PRINT(i);
+          PRINTU16(i);
           if (i != 0) {
             PRINT(" prev pos=");
-            PRINT(prev_pos);
+            PRINTI32(prev_pos);
           }
           PRINT(" old pos=");
-          PRINT(seq->s32_1);
+          PRINTI32(seq->s32_1);
           PRINT(" curr pos=");
-          PRINTLN(pos);
+          PRINTI32(pos);
+          PRINTLN("");
           stepper->stopMove();
           seq->state = TEST_STATE_ERROR;
           return true;

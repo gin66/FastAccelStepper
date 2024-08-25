@@ -1,5 +1,7 @@
 #ifndef AVRSTEPPERPINS_H
 #define AVRSTEPPERPINS_H
+
+#if defined(ARDUINO_ARCH_AVR)
 #include <Arduino.h>
 
 /** * Warning: Other libraries may also use the timers!
@@ -10,12 +12,10 @@
  * possible!
  */
 
-#if defined(ARDUINO_ARCH_AVR)
 #if !(defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
       defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__) || \
       defined(__AVR_ATmega2560__) || defined(__AVR_ATmega32U4__))
 #error "Unsupported AVR derivate"
-#endif
 #endif
 
 // The ATmega328P has one 16 bit timer: Timer 1
@@ -75,4 +75,6 @@
 #endif
 #endif
 
+#endif  // ARDUINO_ARCH_AVR
+	
 #endif  // AVRSTEPPERPINS_H

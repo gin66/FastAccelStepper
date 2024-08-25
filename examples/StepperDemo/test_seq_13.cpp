@@ -13,13 +13,14 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 0:  // INIT
       stepper->setAutoEnable(false);
       stepper->enableOutputs();
+	  // fall through
     case 1:
     case 2:
     case 3:
       res = stepper->addQueueEntry(&cmd_step);
       if (res > 1) {
-        PRINT(res);
-        PRINT(' ');
+        PRINTU8(res);
+        PRINTCH(' ');
       } else {
         seq->u32_1 = time_ms;
         seq->state++;

@@ -51,7 +51,7 @@ bool test_seq_10(FastAccelStepper *stepper, struct test_seq_s *seq,
             stepper->stopMove();
           } else {
             PRINT("Speed changes 64us <=> ");
-            PRINT(64 + seq->s16_1);
+            PRINTU16(64 + seq->s16_1);
             PRINTLN("us");
             seq->state = 2;
           }

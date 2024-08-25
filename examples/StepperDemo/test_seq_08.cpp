@@ -28,9 +28,10 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
         int32_t spos = stepper->getPositionAfterCommandsCompleted();
         if ((pcnt & 0x3fff) != (spos & 0x3fff)) {
           PRINT("stepper pos=");
-          PRINT(spos);
+          PRINTI32(spos);
           PRINT("  real pos=");
-          PRINTLN(pcnt);
+          PRINTI16(pcnt);
+          PRINTLN("");
 
           seq->state = TEST_STATE_ERROR;
           return true;
@@ -70,11 +71,12 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
         }
 
         PRINT("speed=");
-        PRINT(speed);
+        PRINTU16(speed);
         PRINT(" accel=");
-        PRINT(accel);
+        PRINTU32(accel);
         PRINT(" move=");
-        PRINTLN(move);
+        PRINTI32(move);
+        PRINTLN("");
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         stepper->move(move);

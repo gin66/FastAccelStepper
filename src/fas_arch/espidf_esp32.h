@@ -16,6 +16,7 @@
 #define OUTPUT GPIO_MODE_OUTPUT
 #define pinMode(pin, mode) gpio_set_direction((gpio_num_t)pin, mode)
 #define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin, level)
+#define digitalRead(pin) gpio_get_level((gpio_num_t)pin)
 
 #include "fas_arch/common_esp32.h"
 
