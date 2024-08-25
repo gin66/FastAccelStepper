@@ -20,4 +20,4 @@ compile:
 	(cd ../../../pio_dirs/StepperDemo;rm -fR .pio; pio run -e esp32_V6_8_1 -t upload --upload-port /dev/$(DEV))
 
 clean:
-	rm seq*.log
+	rm -f seq*.log
