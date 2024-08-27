@@ -2,6 +2,8 @@
 
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 
+#include <hal/gpio_ll.h>
+
 #define DEFAULT_TIMER_H_L_TRANSITION 160
 
 // cannot be updated while timer is running => fix it to 0
@@ -120,7 +122,7 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
     gpio_num_t dirPin = (gpio_num_t)queue->dirPin;
-    gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+    gpio_ll_set_level(&GPIO, dirPin, gpio_ll_get_level(&GPIO, dirPin) ^ 1);
   }
   uint16_t ticks = e->ticks;
 #ifndef __ESP32_IDF_V44__

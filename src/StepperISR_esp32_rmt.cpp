@@ -5,6 +5,7 @@
 // #define TEST_MODE
 
 #include "test_probe.h"
+#include <hal/gpio_ll.h>
 
 // The following concept is in use:
 //
@@ -84,7 +85,7 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
     // The ongoing command does not contain steps, so change dir here should be
     // ok
     gpio_num_t dirPin = (gpio_num_t)q->dirPin;
-    gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+    gpio_ll_set_level(&GPIO, dirPin, gpio_ll_get_level(&GPIO, dirPin) ^ 1);
     // and delete the request
     e_curr->toggle_dir = 0;
   }
