@@ -5,7 +5,7 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - for esp-idf 5 make use of espressif resource management of rmt channels
 
-pre-0.31.0:
+0.31.0:
 - Fix missing parenthesis in preprocessor macro (#271)
 - Position parameter for `forceStopAndNewPosition()` changed from `uint32_t` to `int32_t` (#268)
 - Add `stepsToStop()` to predict motor stop position
