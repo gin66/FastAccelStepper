@@ -4,7 +4,7 @@
 #include "FastAccelStepper.h"
 #include "RampCalculator.h"
 #include "RampConstAcceleration.h"
-#include "fas_common.h"
+#include "fas_arch/common.h"
 
 class FastAccelStepper;
 

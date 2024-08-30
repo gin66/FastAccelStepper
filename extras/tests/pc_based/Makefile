@@ -13,7 +13,8 @@ test: $(TESTS) pmf_test rmc_test
 	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
 
 LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h \
-	  RampGenerator.h RampConstAcceleration.h RampCalculator.h fas_common.h
+	  RampGenerator.h RampConstAcceleration.h RampCalculator.h \
+	  fas_arch/common.h
 LIB_O=FastAccelStepper.o PoorManFloat.o StepperISR_test.o \
 	  RampGenerator.o RampConstAcceleration.o RampCalculator.o StepperISR.o
 

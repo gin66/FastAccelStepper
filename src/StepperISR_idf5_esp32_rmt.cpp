@@ -3,7 +3,7 @@
 
 // #define TEST_MODE
 
-#include "test_probe.h"
+#include "fas_arch/test_probe.h"
 
 #define PART_SIZE (RMT_SIZE / 2)
 

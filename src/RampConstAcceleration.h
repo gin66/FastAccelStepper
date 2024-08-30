@@ -1,7 +1,7 @@
 #ifndef RAMP_CONST_ACCELERATION_H
 #define RAMP_CONST_ACCELERATION_H
 
-#include "fas_common.h"
+#include "fas_arch/common.h"
 
 struct ramp_ro_s {
   struct ramp_config_s config;

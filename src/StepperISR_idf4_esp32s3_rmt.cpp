@@ -4,7 +4,7 @@
 // #define TEST_MODE
 // #define TRACE
 
-#include "test_probe.h"
+#include "fas_arch/test_probe.h"
 
 // The following concept is in use:
 //
