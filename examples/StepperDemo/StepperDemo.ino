@@ -1024,12 +1024,11 @@ void info(FastAccelStepper *s, bool long_info) {
     }
     PRINT(" QueueEnd=");
     PRINTI32(s->getPositionAfterCommandsCompleted());
+    PRINT(" v=");
     if (speed_in_milli_hz) {
-      PRINT(" v=");
-      PRINTU32(s->getCurrentSpeedInMilliHz());
+      PRINTI32(s->getCurrentSpeedInMilliHz());
       PRINT("mSteps/s");
     } else {
-      PRINTCH('/');
       PRINTU32(s->getPeriodInUsAfterCommandsCompleted());
       PRINT("us/");
       PRINTU32(s->getPeriodInTicksAfterCommandsCompleted());
