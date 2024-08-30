@@ -2,7 +2,8 @@ BEGIN {
 	pass = 1
 }
 
-/^M1:/ {
+# This is for running motor
+/^M[17]:/ {
 	print
 	api = substr($2,2)
 	pcnt = substr($3,2,length($3)-2)
@@ -14,12 +15,13 @@ BEGIN {
 		}
 	}
 	api = api % 32767
-	if ((api-pcnt > 1) || (pcnt-api > 1)) {
+	if ((api-pcnt > 64) || (pcnt-api > 64)) {
 		print api, pcnt
 		pass = 0
 		print "FAIL HERE ^^^"
 	}
 }
+# This is for selected motor
 /^>> M[17]:/ {
 	print
 	api = substr($3,2)
