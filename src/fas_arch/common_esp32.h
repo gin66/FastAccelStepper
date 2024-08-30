@@ -13,10 +13,13 @@
 #include <esp_task_wdt.h>
 
 #if ESP_IDF_VERSION_MAJOR == 5
+#if ESP_IDF_VERSION_MINOR < 3
+#error "FastAccelStepper requires esp-idf >= 5.3.0"
+#endif
 #include "fas_arch/common_esp32_idf5.h"
 #elif ESP_IDF_VERSION_MAJOR == 4
 #include "fas_arch/common_esp32_idf4.h"
-#elif ESP_IDF_VERSION_MAJOR == 3
+#elif ESP_IDF_VERSION_MAJOR <= 3
 #pragma "Last supported by FastAccelStepper 0.30.15"
 #endif
 

@@ -1,10 +1,9 @@
 TODO:
 - Different behavior avr vs pc-based testgis to be analyzed
 - #include-file structure needs to be cleaned up
-- setCurrentPosition() should adjust the maintained last position bits in queue. can be called a bug
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
-- merge the two esp32 rmt drivers as soon as esp32c3 works
+- for esp-idf 5 make use of espressif resource management of rmt channels
 
 pre-0.31.0:
 - Fix missing parenthesis in preprocessor macro (#271)

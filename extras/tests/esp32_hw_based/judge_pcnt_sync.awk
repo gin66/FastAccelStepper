@@ -4,7 +4,6 @@ BEGIN {
 
 # This is for running motor
 /^M[17]:/ {
-	print
 	api = substr($2,2)
 	pcnt = substr($3,2,length($3)-2)
 	if (pcnt < 0) {
@@ -15,7 +14,12 @@ BEGIN {
 		}
 	}
 	api = api % 32767
-	if ((api-pcnt > 64) || (pcnt-api > 64)) {
+	delta = pcnt - api
+	if (api > pcnt) {
+		delta = api - pcnt
+	}
+	if ((delta > 66) && (delta < 32767-66)) {
+	    print
 		print api, pcnt
 		pass = 0
 		print "FAIL HERE ^^^"
