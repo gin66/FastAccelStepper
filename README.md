@@ -26,7 +26,7 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 ## Overview
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3 and atmelsam due.
+Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3, esp32c6 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
@@ -135,8 +135,14 @@ Comments to pin sharing:
 
 ### ESP32
 
+#### ESP-IDF version 4.x.y:
 * allows up to 200000 generated steps per second
 * supports up to 14 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+
+#### ESP-IDF version >=5.3.0:
+* allows up to 200000 generated steps per second
+* supports up to 8 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### ESP32S2
@@ -148,8 +154,14 @@ Comments to pin sharing:
 
 ### ESP32S3
 
+#### ESP-IDF version 4.x.y:
 * allows up to 200000 generated steps per second ?
 * supports up to eight stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+
+#### ESP-IDF version >=5.3.0:
+* allows up to 200000 generated steps per second ?
+* supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 
 ### ESP32C3
@@ -157,6 +169,14 @@ Comments to pin sharing:
 * allows up to 200000 generated steps per second ?
 * supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
+
+### ESP32C6
+
+* only from esp-idf >=v5.3.0
+* allows up to 200000 generated steps per second ?
+* supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
+* Steppers' command queue depth: 32
+* untested
 
 ### Atmel SAM Due
 
@@ -274,10 +294,16 @@ sketch.ino
 
 ### ESP32
 
+#### ESP-IDF version 4.x.y:
 This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six.  In addition, the pulse counter module is used starting from `unit_0` to `unit_5`. This driver uses the `pcnt_isr_service`, so unallocated modules can still be used by the application. The mcpwm modules' outputs are fed into the pulse counter by direct gpio-matrix-modification.
 
 For the other stepper motors, the rmt module comes into use.
 
+#### ESP-IDF version >=5.3.0:
+
+Only rmt module is supported.
+
+#### All
 A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
 
 What are the differences between mcpwm/pcnt and rmt ?
@@ -301,9 +327,12 @@ This stepper driver uses rmt module.
 
 ### ESP32S3
 
-This stepper driver uses mcpwm/pcnt + rmt modules. Can drive up to 8 motors. Tested with 6 motors (not by me). 
-
 The ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels and with different register names.
+
+#### ESP-IDF version 4.x.y:
+This stepper driver uses mcpwm/pcnt + rmt modules. Can drive up to 8 motors. Tested with 6 motors (not by me). 
+#### ESP-IDF version >=5.3.0:
+This stepper driver uses rmt modules. Can drive up to 4 motors. 
 
 ### ESP32C3
 
