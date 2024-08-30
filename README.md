@@ -22,11 +22,11 @@ No issue with platformio. Check the [related issue](https://github.com/arduino/l
 ## Build for esp32 with tasmota
 [![`V2_0_15`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml)
 
-## Arduino Core 3.0.0-4
+## Arduino and esp32
 
-As long as arduino core is using esp-idf V5.0-2, FastAccelStepper will fail to compile.
-FastAccelStepper supports >= V5.3.0 => Users need to be patient until Arduino Core gets up to date.
-Same holds true for tasmota 3.x.y
+Arduino core v3.0.x are using esp-idf v5.0 up to v5.1 and FastAccelStepper will fail to compile.
+
+Arduino core 3.1.0 will support ESP-IDF V5.3.0 (based on RC1)
 
 ## Overview
 
