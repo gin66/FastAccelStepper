@@ -919,8 +919,8 @@ void setup() {
   PRINTLN("");
 #endif
 
-  for(uint8_t i = 0;i < MAX_STEPPER;i++) {
-	test_seq[i].test = NULL;
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    test_seq[i].test = NULL;
   }
 
   output_msg(MSG_STEPPER_VERSION);
@@ -1132,14 +1132,16 @@ void output_info(bool only_running) {
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 void esp_reset() {
 #if ESP_IDF_VERSION_MAJOR == 5
-const esp_task_wdt_config_t wdt_config = {.timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = true};
+  const esp_task_wdt_config_t wdt_config = {
+      .timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = true};
 
-		esp_task_wdt_reconfigure(&wdt_config);
+  esp_task_wdt_reconfigure(&wdt_config);
 #else
-        esp_task_wdt_init(1, true);
-        esp_task_wdt_add(NULL);
+  esp_task_wdt_init(1, true);
+  esp_task_wdt_add(NULL);
 #endif
-        while (true) {}
+  while (true) {
+  }
 }
 #endif
 
@@ -1179,7 +1181,7 @@ bool process_cmd(char *cmd) {
           output_msg(MSG_SELECT_STEPPER);
           selected = val_n[0] - 1;
           PRINTI16(selected + 1);
-		  PRINTLN("");
+          PRINTLN("");
           return true;
         }
       }
@@ -1188,16 +1190,16 @@ bool process_cmd(char *cmd) {
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
       if (strcmp(cmd, "eset") == 0) {
         PRINTLN("ESP reset");
-		esp_reset();
+        esp_reset();
       }
       if (*cmd == 0) {
 #if defined(ARDUINO_ARCH_ESP32)
-      PRINTLN("ESP restart");
-      ESP.restart();
+        PRINTLN("ESP restart");
+        ESP.restart();
 #else
-	  esp_reset();
+        esp_reset();
 #endif
-	  }
+      }
 #endif
 #if defined(ARDUINO_ARCH_AVR)
       if (*cmd == 0) {
@@ -1390,7 +1392,7 @@ bool process_cmd(char *cmd) {
       if (*endptr == 0) {
         output_msg(MSG_SET_DISABLE_TIME);
         PRINTI32(val_n[0]);
-		PRINTLN("");
+        PRINTLN("");
         stepper_selected->setDelayToDisable(val_n[0]);
         return true;
       }
@@ -1445,7 +1447,7 @@ bool process_cmd(char *cmd) {
         default:
           break;
       }
-	  break;
+      break;
     case MODE(normal, 'N'):
       if (*cmd == 0) {
         output_msg(MSG_OUTPUT_DRIVER_ON);
@@ -1489,7 +1491,7 @@ bool process_cmd(char *cmd) {
         res = stepper_selected->runForward();
         output_msg(MSG_RETURN_CODE);
         PRINTU8(res);
-		PRINTLN("");
+        PRINTLN("");
         return true;
       }
       break;
@@ -1499,7 +1501,7 @@ bool process_cmd(char *cmd) {
         res = stepper_selected->runBackward();
         output_msg(MSG_RETURN_CODE);
         PRINTU8(res);
-		PRINTLN("");
+        PRINTLN("");
         return true;
       }
       break;
@@ -1778,23 +1780,22 @@ void loop() {
 #include "hal/wdt_hal.h"
 extern "C" void app_main() {
 #if ESP_IDF_VERSION_MAJOR == 5
-		esp_task_wdt_deinit();
-        esp_task_wdt_config_t config = {
-            .timeout_ms = 1000, .idle_core_mask = 0, .trigger_panic = true};
-        esp_task_wdt_init(&config);
+  esp_task_wdt_deinit();
+  esp_task_wdt_config_t config = {
+      .timeout_ms = 1000, .idle_core_mask = 0, .trigger_panic = true};
+  esp_task_wdt_init(&config);
 #else
-        esp_task_wdt_init(1000, true);
-        esp_task_wdt_add(NULL);
+  esp_task_wdt_init(1000, true);
+  esp_task_wdt_add(NULL);
 #endif
-        esp_task_wdt_add(NULL);
+  esp_task_wdt_add(NULL);
 
   printf("Non-arduino version\n");
   setup();
-  while(true) {
+  while (true) {
     loop();
     esp_task_wdt_reset();
-	DELAY_MS(2);
+    DELAY_MS(2);
   }
 }
 #endif
-

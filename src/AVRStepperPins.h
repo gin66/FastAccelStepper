@@ -76,5 +76,5 @@
 #endif
 
 #endif  // ARDUINO_ARCH_AVR
-	
+
 #endif  // AVRSTEPPERPINS_H

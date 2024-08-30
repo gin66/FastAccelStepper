@@ -15,18 +15,19 @@ static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
   return false;
 }
 
-#define ENTER_PAUSE(ticks) { \
-	uint16_t remaining_ticks = ticks; \
-	uint16_t half_ticks_per_symbol = ticks / (2*PART_SIZE); \
-	uint32_t main_symbol = 0x00010001 * half_ticks_per_symbol; \
-    for (uint8_t i = 0; i < PART_SIZE - 1; i++) { \
-      (*symbols++).val = main_symbol; \
-    } \
-	remaining_ticks -= 2*(PART_SIZE-1) * half_ticks_per_symbol; \
-	uint16_t first_ticks = remaining_ticks/2; \
-	remaining_ticks -= first_ticks; \
-	last_entry = 0x00010000 * first_ticks + remaining_ticks; \
-}
+#define ENTER_PAUSE(ticks)                                          \
+  {                                                                 \
+    uint16_t remaining_ticks = ticks;                               \
+    uint16_t half_ticks_per_symbol = ticks / (2 * PART_SIZE);       \
+    uint32_t main_symbol = 0x00010001 * half_ticks_per_symbol;      \
+    for (uint8_t i = 0; i < PART_SIZE - 1; i++) {                   \
+      (*symbols++).val = main_symbol;                               \
+    }                                                               \
+    remaining_ticks -= 2 * (PART_SIZE - 1) * half_ticks_per_symbol; \
+    uint16_t first_ticks = remaining_ticks / 2;                     \
+    remaining_ticks -= first_ticks;                                 \
+    last_entry = 0x00010000 * first_ticks + remaining_ticks;        \
+  }
 
 static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
                                         size_t symbols_written,
@@ -40,22 +41,22 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
 
   *done = false;
   if (symbols_free < PART_SIZE) {
-	// not sufficient space for the symbols
+    // not sufficient space for the symbols
     return 0;
   }
 
   uint8_t rp = q->read_idx;
   if (q->_rmtStopped) {
     *done = true;
-	return 0;
+    return 0;
   }
   if ((rp == q->next_write_idx) || q->_rmtStopped) {
-	// if we return done already here, then single stepping fails
+    // if we return done already here, then single stepping fails
     q->_rmtStopped = true;
-	// Not sure if this pause is really needed
-	uint16_t last_entry;
-	ENTER_PAUSE(MIN_CMD_TICKS);
-	symbols->val = last_entry;
+    // Not sure if this pause is really needed
+    uint16_t last_entry;
+    ENTER_PAUSE(MIN_CMD_TICKS);
+    symbols->val = last_entry;
     return PART_SIZE;
   }
 
@@ -68,14 +69,14 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
     if (q->lastChunkContainsSteps) {
       // So we need a pause. change the finished read entry into a pause
       q->lastChunkContainsSteps = false;
-	  uint16_t last_entry;
-	  ENTER_PAUSE(MIN_CMD_TICKS);
-	  symbols->val = last_entry;
+      uint16_t last_entry;
+      ENTER_PAUSE(MIN_CMD_TICKS);
+      symbols->val = last_entry;
       return PART_SIZE;
     }
     // The ongoing command does not contain steps, so change dir here should be
     // ok
-	LL_TOGGLE_PIN(q->dirPin);
+    LL_TOGGLE_PIN(q->dirPin);
     // and delete the request
     e_curr->toggle_dir = 0;
   }
@@ -88,7 +89,7 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
   uint32_t last_entry;
   if (steps == 0) {
     q->lastChunkContainsSteps = false;
-	ENTER_PAUSE(ticks);
+    ENTER_PAUSE(ticks);
   } else {
     q->lastChunkContainsSteps = true;
     if (ticks == 0xffff) {
@@ -101,7 +102,7 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
           (*symbols++).val = 0x40007fff | 0x8000;
           (*symbols++).val = 0x20002000;
         }
-		// the last step needs to be stretched to fill PART_SIZE entries
+        // the last step needs to be stretched to fill PART_SIZE entries
         (*symbols++).val = 0x40007fff | 0x8000;
         uint16_t delta = PART_SIZE - 2 * steps;
         delta <<= 5;
@@ -292,14 +293,14 @@ void StepperQueue::startQueue_rmt() {
     return;
   }
   if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
-	LL_TOGGLE_PIN(dirPin);
+    LL_TOGGLE_PIN(dirPin);
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
 #ifdef TRACE
   queue_entry *e = &entry[rp & QUEUE_LEN_MASK];
-  printf("first command: ticks=%u steps=%u %s %s\n",
-		  e->ticks, e->steps, e->countUp ? "up" : "down", e->toggle_dir ? "toggle":"");
+  printf("first command: ticks=%u steps=%u %s %s\n", e->ticks, e->steps,
+         e->countUp ? "up" : "down", e->toggle_dir ? "toggle" : "");
 #endif
 
   if (_channel_enabled) {

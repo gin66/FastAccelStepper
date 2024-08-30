@@ -45,7 +45,9 @@
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
 
-#define LL_TOGGLE_PIN(dirPin) gpio_ll_set_level(&GPIO, (gpio_num_t)dirPin, gpio_ll_get_level(&GPIO, (gpio_num_t)dirPin) ^ 1)
+#define LL_TOGGLE_PIN(dirPin)                  \
+  gpio_ll_set_level(&GPIO, (gpio_num_t)dirPin, \
+                    gpio_ll_get_level(&GPIO, (gpio_num_t)dirPin) ^ 1)
 
 //==========================================================================
 // determine, if driver type selection should be supported

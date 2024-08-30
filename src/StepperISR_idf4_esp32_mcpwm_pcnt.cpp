@@ -118,7 +118,7 @@ static void IRAM_ATTR apply_command(StepperQueue *queue,
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
-	LL_TOGGLE_PIN(queue->dirPin);
+    LL_TOGGLE_PIN(queue->dirPin);
   }
   uint16_t ticks = e->ticks;
 #ifndef __ESP32_IDF_V44__

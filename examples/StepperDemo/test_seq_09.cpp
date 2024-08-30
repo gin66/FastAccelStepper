@@ -32,7 +32,7 @@ bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
         PRINTU32(speed);
         PRINT(" accel=");
         PRINTU32(accel);
-		PRINTLN("");
+        PRINTLN("");
         stepper->setSpeedInUs(speed);
         stepper->setAcceleration(accel);
         if (rand() & 1) {

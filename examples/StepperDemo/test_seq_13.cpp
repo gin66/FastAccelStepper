@@ -13,7 +13,7 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 0:  // INIT
       stepper->setAutoEnable(false);
       stepper->enableOutputs();
-	  // fall through
+      // fall through
     case 1:
     case 2:
     case 3:

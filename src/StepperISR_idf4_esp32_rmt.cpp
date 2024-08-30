@@ -81,8 +81,9 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
       return;
     }
     // The ongoing command does not contain steps, so change dir here should be
-    // ok. But we need the gpio_ll functions, which are always inlined...hopefully.
-	LL_TOGGLE_PIN(q->dirPin);
+    // ok. But we need the gpio_ll functions, which are always
+    // inlined...hopefully.
+    LL_TOGGLE_PIN(q->dirPin);
     // and delete the request
     e_curr->toggle_dir = 0;
   }
@@ -444,7 +445,7 @@ void StepperQueue::startQueue_rmt() {
     return;
   }
   if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
-	LL_TOGGLE_PIN(dirPin);
+    LL_TOGGLE_PIN(dirPin);
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
