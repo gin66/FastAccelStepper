@@ -16,6 +16,7 @@ pre-0.31.0:
 - Add github build tests for esp32c6 with espidf5
 - StepperDemo can be compiled with esp-idf4/5 without arduino
 - idf5 version yields mismatch with pulse counter. not ready for use
+- esp32: dirPin toggle in ISR should not cause cache error due to use of `gpio_ll` routines
 
 0.30.15:
 - Fix missing initialization in `getCurrentSpeedInTicks()` (#262)

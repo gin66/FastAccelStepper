@@ -8,6 +8,7 @@
 #define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 
 // Some more esp32 specific includes
+#include <hal/gpio_ll.h>
 #include <driver/gpio.h>
 #include <esp_task_wdt.h>
 
@@ -40,6 +41,8 @@
 
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
+
+#define LL_TOGGLE_PIN(dirPin) gpio_ll_set_level(&GPIO, (gpio_num_t)dirPin, gpio_ll_get_level(&GPIO, (gpio_num_t)dirPin) ^ 1)
 
 //==========================================================================
 // determine, if driver type selection should be supported

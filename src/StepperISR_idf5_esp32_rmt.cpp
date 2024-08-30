@@ -62,8 +62,7 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
     }
     // The ongoing command does not contain steps, so change dir here should be
     // ok
-    gpio_num_t dirPin = (gpio_num_t)q->dirPin;
-    gpio_set_level(dirPin, gpio_get_level(dirPin) ^ 1);
+	LL_TOGGLE_PIN(q->dirPin);
     // and delete the request
     e_curr->toggle_dir = 0;
   }
@@ -287,7 +286,7 @@ void StepperQueue::startQueue_rmt() {
     return;
   }
   if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
-    gpio_set_level((gpio_num_t)dirPin, gpio_get_level((gpio_num_t)dirPin) ^ 1);
+	LL_TOGGLE_PIN(dirPin);
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
