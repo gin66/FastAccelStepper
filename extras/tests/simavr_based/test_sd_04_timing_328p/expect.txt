@@ -2,21 +2,21 @@
     DirB:        1*L->H,        0*H->L
  EnableA:        1*L->H,        1*H->L
  EnableB:        2*L->H,        1*H->L
-   StepA:     1000*L->H,     1000*H->L, Max High=13us Total High=4252us
-   StepB:     1000*L->H,     1000*H->L, Max High=16us Total High=5046us
+   StepA:     1000*L->H,     1000*H->L, Max High=14us Total High=4299us
+   StepB:     1000*L->H,     1000*H->L, Max High=13us Total High=4983us
 Position[A]=1000
 
 Position[B]=1000
 
 Time in EnableA  max=225398 us, total=225398 us
 
-Time in EnableB  max=238118 us, total=238118 us
+Time in EnableB  max=238116 us, total=238116 us
 
-Time in FillISR  max=2651 us, total=47849 us
+Time in FillISR  max=2644 us, total=47762 us
 
-Time in StepA  max=13 us, total=4252 us
+Time in StepA  max=14 us, total=4299 us
 
-Time in StepB  max=16 us, total=5046 us
+Time in StepB  max=13 us, total=4983 us
 
 Time in StepISR  max=6 us, total=8566 us
 

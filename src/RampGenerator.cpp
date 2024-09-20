@@ -243,7 +243,8 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
 #endif
   }
 
-  _ro.force_stop = false;
+  // This line is the root cause for the failure in issue #280
+  //_ro.force_stop = false;
 
   // clear recalc flag
   _ro.config.parameters.recalc_ramp_steps = false;
