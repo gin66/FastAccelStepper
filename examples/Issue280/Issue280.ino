@@ -41,6 +41,12 @@ void loop() {
   // Let the stepper task process the stopMove()
   delay(20);
 
+  bool err = false;
+  if (!stepper->isStopping()) {
+    Serial.println("Stepper is not stopping");
+     err = true;
+  }
+
   // Then update speed
   stepper->setAcceleration(90000);
   stepper->applySpeedAcceleration();
@@ -57,7 +63,6 @@ void loop() {
   Serial.println(stepper->getCurrentSpeedInUs());
 
   // If still running, then this is an error
-  bool err = false;
   if (stepper->isRunning()) {
     Serial.println("Stepper did not stop");
     err = true;

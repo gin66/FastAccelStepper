@@ -5,6 +5,10 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - for esp-idf 5 make use of espressif resource management of rmt channels
 
+0.31.1:
+- Fix for issue #280: stopMove() is interrupted if followed by update of speed/acceleration
+- Related to issue #280: `isStopping()` did not work as expected and this should be fixed, too.
+
 0.31.0:
 - Fix missing parenthesis in preprocessor macro (#271)
 - Position parameter for `forceStopAndNewPosition()` changed from `uint32_t` to `int32_t` (#268)
