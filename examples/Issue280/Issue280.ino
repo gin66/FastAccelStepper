@@ -68,6 +68,9 @@ void loop() {
     err = true;
   }
 
+  if (err) {
+    Serial.println("Test failed");
+  }
 #ifdef SIMULATOR
     Serial.print("Reached Position=");
     Serial.println(stepper->getCurrentPosition());
