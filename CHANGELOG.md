@@ -7,6 +7,7 @@ TODO:
 
 pre-0.31.2:
 - Move constants out of PoorManFloat.h
+- Fix pmfl constant used by SAM Due aka 21MHz
 
 0.31.1:
 - Fix for issue #280: stopMove() is interrupted if followed by update of speed/acceleration

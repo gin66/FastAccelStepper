@@ -33,3 +33,5 @@ extras/tests/simavr_based/test_seq*/Makefile
 extras/tests/esp32_hw_based/*.log
 library.properties
 examples
+extras/gen_pmf_const/PoorManFloat.cpp
+extras/gen_pmf_const/main

@@ -22,7 +22,7 @@ bool perform_test() {
       {42000, 1, false, PMF_CONST_42000},
       {14849242, 1, false, PMF_CONST_21E6_DIV_SQRT_OF_2},
       {16000000, 2, true, PMF_CONST_128E12},  // (16e6)^2 / 2
-      {22100000, 2, true, PMF_CONST_2205E11}  // (21e6)^2 / 2
+      {21000000, 2, true, PMF_CONST_2205E11}  // (21e6)^2 / 2
   };
   uint16_t l1;
   pmf_logarithmic p1;
