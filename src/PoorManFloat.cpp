@@ -72,18 +72,17 @@
 // So the log2 can be calculated for e.g.:
 //       x    = 0001_mmmm_mmmm_mmmm    three leading zeros
 // 
-// Shift left by leading zeros+1 (removing leading 1) and then right by 4:
+// Shift left by leading zeros+1 (removing leading 1) and then right by 5:
 //       x    = 0001_mmmm_mmmm_mmmm    three leading zeros
 //              mmmm_mmmm_mmmm_m000    shift left (3+1)
-//              0000_mmmm_mmmm_mmmm    shift right (4)
-//            +      0000_tttt_tttt    add table value for mmmm_mmmm
+//              0000_0mmm_mmmm_mmmm    shift right (5)
 //                                     if ninth bit is 0:
-//            +      0000_tttt_tttt    add table value for mmmm_mmmm again
+//            +           ttt_tttt0    add table value for mmmm_mmmm shifted one
 //                                     else:
-//            +      0000_tttt_tttt    add table value for mmmm_mmmm+1
-//
-//            + 0000_0000_0000_0100    round
-//     result:       mmmm_mmmm_mx00
+//            +           0ttt_tttt      add table value for mmmm_mmmm
+//            +           0ttt_tttt      add table value for mmmm_mmmm+1
+//            +           0000_0001      round
+//     result:       mmmm_mmmm_m
 //     final:   000e_eeem_mmmm_mmmm    For up to 32bits (e = 31)
 //
 // We are using a table of length 256, so first 8 bits are the index.
@@ -188,10 +187,9 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   }
   x <<= leading + 1;
   uint8_t e = 7 - leading;
-  uint16_t res = (((uint16_t)e) << 8) | x;
-  uint8_t index = res & 0x00ff;
   uint8_t offset =
-      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
+      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[x]);
+  uint16_t res = (((uint16_t)e) << 8) | x;
   res <<= 1;
   offset += 1;
   res += offset >> 1;
@@ -205,18 +203,21 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   }
   // shift msb out
   x <<= leading + 1;
-  x >>= 6;
   uint8_t exponent = 15 - leading;
-  uint8_t index = x >> 2;
+  x >>= 5;
+  uint8_t index = x >> 3;
   uint8_t offset =
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
   if (((x & 2) != 0) && (index++ != 255)) {
     offset += pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
     offset += 1;
-    offset >>= 1;
+  }
+  else {
+    offset <<= 1;
+    // offset += 1;
   }
   x += offset;
-  x >>= 1;
+  x >>= 2;
   x += ((uint16_t)exponent) << 9;
   return x;
 }
@@ -227,10 +228,9 @@ pmf_logarithmic pmfl_from(uint32_t x) {
   if ((x & 0xff000000) == 0) {
     uint16_t w = x >> 8;
     return pmfl_from(w) + 0x1000;
-  } else {
-    uint16_t w = x >> 16;
-    return pmfl_from(w) + 0x2000;
   }
+  uint16_t w = x >> 16;
+  return pmfl_from(w) + 0x2000;
 }
 uint16_t pmfl_to_u16(pmf_logarithmic x) {
   if (x < 0) {

@@ -1,8 +1,17 @@
 #include <stdio.h>
+#include <math.h>
 
 #include <PoorManFloat.h>
 
-void out(const char *name, pmf_logarithmic value) {
+void out(const char *name, float x, pmf_logarithmic value) {
+	float ld2 = log2(x);
+	float pmf = ld2 * 512;
+	int16_t pmf_int = (uint16_t)round(pmf);
+	puts("");
+	printf("// %s = %f  %d = 0x%04x\n", name, pmf, pmf_int, pmf_int);
+	if (pmf_int != value) {
+		printf("// %s should be 0x%04x\n", name, pmf_int);
+	}
 	printf("#define %s ((pmf_logarithmic)0x%04x)\n", name, value);
 }
 
@@ -13,55 +22,55 @@ int main() {
 	puts("#define POORMANFLOATCONST_H");
 	puts("");
 	puts("#include <PoorManFloat.h>");
-	puts("");
 
 	pmf_logarithmic x;
 
 	x = pmfl_from((uint8_t)1);
-	out("PMF_CONST_1", x);
+	out("PMF_CONST_1", 1.0, x);
 
 	x = pmfl_shr(pmfl_from((uint8_t)3), 1);
-	out("PMF_CONST_3_DIV_2", x);
+	out("PMF_CONST_3_DIV_2", 1.5, x);
 	
 	x = pmfl_multiply(pmfl_from((uint32_t)16e6), pmfl_from((uint32_t)8e6));
-	out("PMF_CONST_128E12", x);
+	out("PMF_CONST_128E12", 1.28e14, x);
 	
 	x = pmfl_from((uint32_t)16e6);
-	out("PMF_CONST_16E6", x);
+	out("PMF_CONST_16E6", 1.6e7, x);
 	
 	x = pmfl_from((uint16_t)500);
-	out("PMF_CONST_500", x);
+	out("PMF_CONST_500", 500, x);
 	
 	x = pmfl_from((uint16_t)1000);
-	out("PMF_CONST_1000", x);
+	out("PMF_CONST_1000", 1000, x);
 	
 	x = pmfl_from((uint16_t)2000);
-	out("PMF_CONST_2000", x);
+	out("PMF_CONST_2000", 2000, x);
 	
 	x = pmfl_from((uint16_t)32000);
-	out("PMF_CONST_32000", x);
+	out("PMF_CONST_32000", 32000, x);
 	
-	x = pmfl_divide(pmfl_from((uint32_t)16e6), pmfl_sqrt(pmfl_from((uint8_t)2)));
-	out("PMF_CONST_16E6_DIV_SQRT_OF_2", x);
+	x = pmfl_multiply(pmfl_from((uint32_t)16e6), pmfl_from((uint32_t)8e6));
+	x = pmfl_sqrt(x);
+	out("PMF_CONST_16E6_DIV_SQRT_OF_2", 1.6e7/sqrt(2), x);
 
 	x = pmfl_from((uint32_t)21e6);
-	out("PMF_CONST_21E6", x);
+	out("PMF_CONST_21E6", 21e6, x);
 	
 	x = pmfl_from((uint16_t)42000);
-	out("PMF_CONST_42000", x);
+	out("PMF_CONST_42000", 42000, x);
 	
 	x = pmfl_divide(pmfl_from((uint32_t)21e6), pmfl_sqrt(pmfl_from((uint8_t)2)));
-	out("PMF_CONST_21E6_DIV_SQRT_OF_2", x);
+	out("PMF_CONST_21E6_DIV_SQRT_OF_2", 21e6/sqrt(2), x);
 	
 	x = pmfl_square(pmfl_from((uint32_t)21e6));
 	x = pmfl_shr(x, 1);
-	out("PMF_CONST_2205E11", x);
+	out("PMF_CONST_2205E11", 2.205e14, x);
 
 	puts("");
 	puts("// used in PoorManFloat.cpp as example");
         printf("// ");
 	x = pmfl_from((uint16_t)15373);
-	out("PMF_CONST_15373", x);
+	out("PMF_CONST_15373", 15373, x);
 	
 	puts("#endif");
 	

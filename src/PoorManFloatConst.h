@@ -5,20 +5,50 @@
 
 #include <PoorManFloat.h>
 
+// PMF_CONST_1 = 0.000000  0 = 0x0000
 #define PMF_CONST_1 ((pmf_logarithmic)0x0000)
+
+// PMF_CONST_3_DIV_2 = 299.500793  300 = 0x012c
 #define PMF_CONST_3_DIV_2 ((pmf_logarithmic)0x012c)
+
+// PMF_CONST_128E12 = 23993.925781  23994 = 0x5dba
 #define PMF_CONST_128E12 ((pmf_logarithmic)0x5dba)
+
+// PMF_CONST_16E6 = 12252.962891  12253 = 0x2fdd
 #define PMF_CONST_16E6 ((pmf_logarithmic)0x2fdd)
+
+// PMF_CONST_500 = 4590.481445  4590 = 0x11ee
 #define PMF_CONST_500 ((pmf_logarithmic)0x11ee)
+
+// PMF_CONST_1000 = 5102.481445  5102 = 0x13ee
 #define PMF_CONST_1000 ((pmf_logarithmic)0x13ee)
+
+// PMF_CONST_2000 = 5614.481445  5614 = 0x15ee
 #define PMF_CONST_2000 ((pmf_logarithmic)0x15ee)
+
+// PMF_CONST_32000 = 7662.481445  7662 = 0x1dee
 #define PMF_CONST_32000 ((pmf_logarithmic)0x1dee)
+
+// PMF_CONST_16E6_DIV_SQRT_OF_2 = 11996.962891  11997 = 0x2edd
 #define PMF_CONST_16E6_DIV_SQRT_OF_2 ((pmf_logarithmic)0x2edd)
+
+// PMF_CONST_21E6 = 12453.830078  12454 = 0x30a6
+// PMF_CONST_21E6 should be 0x30a6
 #define PMF_CONST_21E6 ((pmf_logarithmic)0x30a5)
+
+// PMF_CONST_42000 = 7863.348145  7863 = 0x1eb7
 #define PMF_CONST_42000 ((pmf_logarithmic)0x1eb7)
+
+// PMF_CONST_21E6_DIV_SQRT_OF_2 = 12197.830078  12198 = 0x2fa6
+// PMF_CONST_21E6_DIV_SQRT_OF_2 should be 0x2fa6
 #define PMF_CONST_21E6_DIV_SQRT_OF_2 ((pmf_logarithmic)0x2fa5)
+
+// PMF_CONST_2205E11 = 24395.660156  24396 = 0x5f4c
+// PMF_CONST_2205E11 should be 0x5f4c
 #define PMF_CONST_2205E11 ((pmf_logarithmic)0x5f4a)
 
 // used in PoorManFloat.cpp as example
-// #define PMF_CONST_15373 ((pmf_logarithmic)0x1bd1)
+// 
+// PMF_CONST_15373 = 7120.953125  7121 = 0x1bd1
+#define PMF_CONST_15373 ((pmf_logarithmic)0x1bd1)
 #endif
