@@ -78,7 +78,7 @@ FastAccelStepper offers the following features:
 [![Star History Chart](https://api.star-history.com/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.com/#gin66/FastAccelStepper&Date)
 
 
-General behaviour:
+## General behaviour of Moves
 * The desired end position to move to is set by calls to moveTo() and move()
 * The desired end position is in case of moveTo() given as absolute position
 * For move() the delta is added to the latest desired end position
@@ -93,7 +93,7 @@ General behaviour:
 	- Assume counting up turns stepper clockwise, and counting down, anti-clockwise.
     - Current position is -2.000.000.000, move to 2.000.000.000.
     - Apparently the position has to count up, and count should run clockwise.
-    - Implementation is done via difference of 32bit signed numbers, which can overflow (being legal).
+    - Implementation is done via difference of 32bit signed numbers, which can overflow (being legit).
     - The calculation is then:
 			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
 	- But 4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
