@@ -10,88 +10,85 @@
 #include <stdio.h>
 #endif
 
-// upm implementation is dropped from 0.29 onwards
+// In FastAccelStepper there is seldom the need for adding or
+// subtracting floats, but multiplication/division/square and power
+// are often in use. Negative numbers and even zero are not needed.
+// Consequently, a purely logarithmic representation is completely
+// sufficient and the necessary range can be achieved by 16 bit signed integers.
+// The interpretation of a signed integer xi is:
 //
-// upm representation is:
+//      x = 2^(xi/512)
 //
-//     76543210: 76543210
-//     XXXXXXXX:1XXXXXXXX
-//     exponent mantissa
+// The signed integer range xi (-32768..32767) is mapped to the
+// range (5e-20, 1.8e19). Please note: zero is not included.
+// The greatest constant in use is 2.2e14. So the range is sufficient.
 //
-// The mantissa encodes 256..511 and interpreted as 1.0 to ~2.0.
-// The exponent uses an offset 128 to encode negative values and base 2
+// In order to map x to xi, log2(x) needs to be calculated.
+// For this we rewrite x to:
+//     x = (1 + r) * 2^e
 //
-// 0x8000 => is 1
+// With r being in the range 0 <= r < 1.
+// This means e is the largest integer value with 2^e < x.
+// Consequently, e can be derived by counting the leading numbers in
+// the integer x.
 //
-// Negative numbers and zero are not available
+// So xi = 512*log2(x) = 512 * (e + log(1+r))
 //
+// The first 7 bits is plain e with sign and the lower 9 bits is log(1+r)*512
+//     xi  = eeee_eeem_mmmm_mmmm
 //
-// I want to expound on the original comment, and include an example to make
-// this less tedious for someone else.  You probably need to go lookup/refresh
-// your memory on floating point formats to make this make sense.  In this
-// format we will use an 8 bit exponent, and 8 bits of the data type as
-// the mantissa, but as the diagram above shows, the first bit will always be 1
-// So lets walk through an example.  For the Due, I needed the PWM clock in
-// this format, so 21,000,000.
-// First off, remember that floating point wants the entire number in the range
-// of the mantissa, so we right shift the value until it is within the range of
-// 256-511.  So for 21,000,000, thats 21000000 >> 16 = 0x140.  Remember that the
-// leading one is hidden.  so the low byte is 0x40.  You'd be wrong to assume
-// the exponent is simply 16.  again, in floating point, we want the mantissa
-// to be treated as less than 1, so we shift past the bits.  This means we want
-// it to look like 0.0x140, or 0.101000000.  Thats what mantissa means.  So, to
-// get the correct value for the exponent, we need the exponent that makes this
-// (as close to) the original value as we can get, that is 20,971,520 or
-// 0001 0100 0000 0000 0000 0000 0000.  So again, we need to shift past our
-// number, all the way to the above, so 0.101000000 << 25 is what we want.  Or
-// 0x19, (remember we had 16 shifts, but 9 bits of mantissa including the
-// hidden bit 16+9=25).  Now, we get a bit tricky.  We know the hidden bit is
-// always there, so we don't include it in our exponent!  Thus, our exponent
-// becomes 0x18 or 24.  So the almost final value is 0x1840, but we forgot
-// about the sign bit.  We need to or 0x80 to the exponent to get the sign bit
-// making for a final value of 0x9840 as seen in PoorManFloat.h.  To reverse
-// this, we take our value of the mantissa enter it in calculator.  We take
-// the exponent and subtract 8 from it.  Enter the mantissa with the added 1
-// into a "programmer calculator", 0x140 and use the LSH operator to do 0x140
-// << 16, and you should get 20,971,520.  There, now there's no need to be
-// afraid of making new constants for the system to use different clock rates!
-// I had to do this for the Due because the PWM clock could be divisions of 2
-// off the main system clock of 84MHz.  I'd need a 5.25 divider to get 16 MHz.
-// Thats not an even number, so even with the arbitrary clock divider, the best
-// I could have managed was 16.8 MHz.  Easier to just use the modulo 4 divider
-// and add the constants.
+// Example for 16 bit integer:
+//    x = 15373 = 0b0011_1100_0000_1101
 //
+//    log2(15373)*512 = 7121 (rounded)
+//                    = 0b0001_1011_1101_0001
 //
-// In order to support cubic functions, more tables would be necessary.
-// Using logarithmic/exponential functions the number of tables can be limited.
-// For example:
-//    square/cubic root would be simply: exp(log(x) * a), with a = 1/2 for
-//    square and 1/3 for cubic
+//    two leading zeros => e = 15 - 2 = 13 = 0b1101
+//    2^e = 8192
 //
-// In addition, within FastAccelStepper there is no need for adding or
-// subtracting floats. Even negative numbers are not needed and not supported by
-// upm_float. Consequently, a purely logarithmic representation is completely
-// sufficient.
+//    => x = 8192 * 1.1_1100_0000_1101
+//    r is the decimal part without the leading 1
+//    r = 1_1100_0000 / 512
+//    log2(1+r) * 512 = 464 = 0b1_1101_0001
 //
-// As base for exp/log we will use 2 (not 10 or e). This way the exponent of an
-// upm float being 2^n needs no calculation, as log2(2^n) = n. Still the offset
-// by 128 needs to be considered
+//    xi = eeee_eeem_mmmm_mmmm
+//       = 0001_1011_1101_0001
+//       = 0x1bd1
 //
-// The mantissa of an upm float with the leading 1 is in the range 1 <= m < 2.
+// The remaining task is to calculate log2(1+f).
 //
-// As log2(1) = 0 and log2(2) = 1 is at the corners identical to x - 1. So it is
-// interesting to look at function f(x) = log2(x) - x + 1. This function is 0
-// for x at 1 and 2, positive over the range inbetween and reaches max value of
-// 0.08607 at x = 1.442695. This max value is at x = 1/ln(2)
+// log2(1+r) is at the corners identical to r:
+//      log2(1+0) = 0 and log2(1+1) = 1
+// So it is interesting to look at function 
+//      f(1+r) = log2(1+r) - r
 //
-// The upm mantissa is in total nine bits:
-//       m = 1_xxxx_xxxx
+// This function is 0 for r at 0 and 1, positive over the range inbetween
+// and reaches max value of 0.08607 at r = 0.442695.
+// This max value is at r = 1/ln(2)-1
+// 
+// As we need actually 512*log2(1+r), then the max value is 44.
+// This allows to multiply with up to 8 to improve the resolution
 //
-// So the log2 of the mantissa can be calculated by:
-//       m    = 1_xxxx_xxxx
-//     - 1    = 1_0000_0000
-//     + f(m) = 0_000y_yyyy
-//     yields = 0_zzzz_zzzz
+// So the log2 can be calculated for e.g.:
+//       x    = 0001_mmmm_mmmm_mmmm    three leading zeros
+// 
+// Shift left by leading zeros+1 (removing leading 1) and then right by 4:
+//       x    = 0001_mmmm_mmmm_mmmm    three leading zeros
+//              mmmm_mmmm_mmmm_m000    shift left (3+1)
+//              0000_mmmm_mmmm_mmmm    shift right (4)
+//            +      0000_tttt_tttt    add table value for mmmm_mmmm
+//                                     if ninth bit is 0:
+//            +      0000_tttt_tttt    add table value for mmmm_mmmm again
+//                                     else:
+//            +      0000_tttt_tttt    add table value for mmmm_mmmm+1
+//
+//            + 0000_0000_0000_0100    round
+//     result:       mmmm_mmmm_mx00
+//     final:   000e_eeem_mmmm_mmmm    For up to 32bits (e = 31)
+//
+// We are using a table of length 256, so first 8 bits are the index.
+// In order to improve the resolution, the ninth bit is used to interpolate
+// with the next table entry.
 //
 // Using python3 this can be calculated by:
 //     [round(math.log2(i/256) * 256 - (i-256)) for i in range(256,512)]

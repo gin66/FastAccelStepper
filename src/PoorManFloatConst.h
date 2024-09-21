@@ -18,4 +18,7 @@
 #define PMF_CONST_42000 ((pmf_logarithmic)0x1eb7)
 #define PMF_CONST_21E6_DIV_SQRT_OF_2 ((pmf_logarithmic)0x2fa5)
 #define PMF_CONST_2205E11 ((pmf_logarithmic)0x5f4a)
+
+// used in PoorManFloat.cpp as example
+// #define PMF_CONST_15373 ((pmf_logarithmic)0x1bd1)
 #endif

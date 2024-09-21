@@ -57,6 +57,12 @@ int main() {
 	x = pmfl_shr(x, 1);
 	out("PMF_CONST_2205E11", x);
 
+	puts("");
+	puts("// used in PoorManFloat.cpp as example");
+        printf("// ");
+	x = pmfl_from((uint16_t)15373);
+	out("PMF_CONST_15373", x);
+	
 	puts("#endif");
 	
 	return 0;
