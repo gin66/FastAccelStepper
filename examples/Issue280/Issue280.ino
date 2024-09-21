@@ -30,7 +30,7 @@ void setup() {
 void loop() {
   // Run the motor
   stepper->runForward();
-  
+
   // Wait till the motor is coasting
   while ((stepper->rampState() & RAMP_STATE_MASK) != RAMP_STATE_COAST) {
   }
@@ -44,7 +44,7 @@ void loop() {
   bool err = false;
   if (!stepper->isStopping()) {
     Serial.println("Stepper is not stopping");
-     err = true;
+    err = true;
   }
 
   // Then update speed
@@ -72,16 +72,17 @@ void loop() {
     Serial.println("Test failed");
   }
 #ifdef SIMULATOR
-    Serial.print("Reached Position=");
+  Serial.print("Reached Position=");
+  Serial.println(stepper->getCurrentPosition());
+  if (!err) {
+    // Test has passed, so run to position 0, so that the test environment
+    // detects pass
+    stepper->moveTo(0, true);
+    Serial.print("Position=");
     Serial.println(stepper->getCurrentPosition());
-    if (!err) {
-      // Test has passed, so run to position 0, so that the test environment detects pass
-      stepper->moveTo(0, true);
-      Serial.print("Position=");
-      Serial.println(stepper->getCurrentPosition());
-    }
-    delay(100);
-    noInterrupts();
-    sleep_cpu();
+  }
+  delay(100);
+  noInterrupts();
+  sleep_cpu();
 #endif
 }

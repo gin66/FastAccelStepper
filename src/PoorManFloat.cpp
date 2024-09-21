@@ -59,19 +59,19 @@
 //
 // log2(1+r) is at the corners identical to r:
 //      log2(1+0) = 0 and log2(1+1) = 1
-// So it is interesting to look at function 
+// So it is interesting to look at function
 //      f(1+r) = log2(1+r) - r
 //
 // This function is 0 for r at 0 and 1, positive over the range inbetween
 // and reaches max value of 0.08607 at r = 0.442695.
 // This max value is at r = 1/ln(2)-1
-// 
+//
 // As we need actually 512*log2(1+r), then the max value is 44.
 // This allows to multiply with up to 8 to improve the resolution
 //
 // So the log2 can be calculated for e.g.:
 //       x    = 0001_mmmm_mmmm_mmmm    three leading zeros
-// 
+//
 // Shift left by leading zeros+1 (removing leading 1) and then right by 5:
 //       x    = 0001_mmmm_mmmm_mmmm    three leading zeros
 //              mmmm_mmmm_mmmm_m000    shift left (3+1)
@@ -187,8 +187,7 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   }
   x <<= leading + 1;
   uint8_t e = 7 - leading;
-  uint8_t offset =
-      pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[x]);
+  uint8_t offset = pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[x]);
   uint16_t res = (((uint16_t)e) << 8) | x;
   res <<= 1;
   offset += 1;
@@ -210,11 +209,10 @@ pmf_logarithmic pmfl_from(uint16_t x) {
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
   // only with x & 7 > 2, the calculated constants are correct...
   if ((x & 7) > 2) {
-    index++; // overflow to 0 is ok. index is an uint8_t
+    index++;  // overflow to 0 is ok. index is an uint8_t
     offset += pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
     offset += 1;
-  }
-  else {
+  } else {
     offset <<= 1;
     // offset += 1;
   }
@@ -230,21 +228,17 @@ pmf_logarithmic pmfl_from(uint32_t x) {
     if ((x & 0x00ff0000) == 0) {
       w = (uint16_t)x;
       exp_offset = 0;
-    }
-    else if ((x & 0x00f00000) == 0) {
+    } else if ((x & 0x00f00000) == 0) {
       w = x >> 4;
       exp_offset = 0x0800;
-    }
-    else {
+    } else {
       w = x >> 8;
       exp_offset = 0x1000;
     }
-  }
-  else if ((x & 0xf0000000) == 0) {
+  } else if ((x & 0xf0000000) == 0) {
     w = x >> 12;
     exp_offset = 0x1800;
-  }
-  else {
+  } else {
     w = x >> 16;
     exp_offset = 0x2000;
   }

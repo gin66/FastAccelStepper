@@ -275,7 +275,7 @@ void StepperQueue::startQueue_rmt() {
   delay(1);
 #endif
 
-//#define TRACE
+// #define TRACE
 #ifdef TRACE
   printf("Queue: %d/%d %s\n", read_idx, next_write_idx,
          _isRunning ? "Running" : "Stopped");

@@ -8,18 +8,18 @@
 //==========================================================================
 
 #if CONFIG_IDF_TARGET_ESP32
-//#define SUPPORT_ESP32_MCPWM_PCNT
+// #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_PULSE_COUNTER 8
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 64
 
-//#define QUEUES_MCPWM_PCNT 6
+// #define QUEUES_MCPWM_PCNT 6
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 8
 
 #define NEED_RMT_HEADERS
-//#define NEED_MCPWM_HEADERS
+// #define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
 //==========================================================================
@@ -44,18 +44,18 @@
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S3
-//#define SUPPORT_ESP32_MCPWM_PCNT
+// #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_PULSE_COUNTER 8
 #define HAVE_ESP32S3_PULSE_COUNTER
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 
-//#define QUEUES_MCPWM_PCNT 4
+// #define QUEUES_MCPWM_PCNT 4
 #define QUEUES_MCPWM_PCNT 0
 #define QUEUES_RMT 4
 #define NEED_RMT_HEADERS
-//#define NEED_MCPWM_HEADERS
+// #define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
 //==========================================================================
@@ -110,7 +110,7 @@
 #error "Unsupported derivate"
 #endif
 
-//#include <driver/periph_ctrl.h>
+// #include <driver/periph_ctrl.h>
 #include <soc/periph_defs.h>
 #include <soc/gpio_sig_map.h>
 
@@ -122,8 +122,8 @@
 
 #ifdef NEED_PCNT_HEADERS
 #include <driver/pulse_cnt.h>
-//#include <soc/pcnt_reg.h>
-//#include <soc/pcnt_struct.h>
+// #include <soc/pcnt_reg.h>
+// #include <soc/pcnt_struct.h>
 #include <soc/pcnt_periph.h>
 #include <driver/gpio.h>
 #include <rom/gpio.h>

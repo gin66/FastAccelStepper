@@ -58,7 +58,7 @@
 // => converted back => 220601734135808.00
 
 // used in PoorManFloat.cpp as example
-// 
+//
 // PMF_CONST_15373 = 7120.953125  7121 = 0x1bd1
 #define PMF_CONST_15373 ((pmf_logarithmic)0x1bd1)
 // => converted back => 15373.98
