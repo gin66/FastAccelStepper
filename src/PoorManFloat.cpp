@@ -208,7 +208,9 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   uint8_t index = x >> 3;
   uint8_t offset =
       pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
-  if (((x & 2) != 0) && (index++ != 255)) {
+  // only with x & 7 > 2, the calculated constants are correct...
+  if ((x & 7) > 2) {
+    index++; // overflow to 0 is ok. index is an uint8_t
     offset += pgm_read_byte_near(&log2_minus_x_plus_one_shifted_by_2[index]);
     offset += 1;
   }
