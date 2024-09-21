@@ -250,7 +250,7 @@ uint16_t pmfl_to_u16(pmf_logarithmic x) {
     return 0;
   }
   if (x >= PMF_CONST_UINT16_MAX) {
-    return 0xffff;
+    return __UINT16_MAX__;
   }
   uint8_t exponent = ((uint16_t)x) >> 9;
   x &= 0x01ff;
@@ -279,7 +279,7 @@ uint32_t pmfl_to_u32(pmf_logarithmic x) {
     return 0;
   }
   if (x >= PMF_CONST_UINT32_MAX) {
-    return 0xffffffff;
+    return __UINT32_MAX__;
   }
   uint8_t exponent = ((uint16_t)x) >> 9;
   if (exponent < 0x10) {
@@ -293,7 +293,7 @@ uint32_t pmfl_to_u32(pmf_logarithmic x) {
 }
 pmf_logarithmic pmfl_square(pmf_logarithmic x) {
   if (x > 0x4000) {
-    return 0x7fff;
+    return PMF_CONST_MAX;
   }
   if (x <= -0x4000) {
     return PMF_CONST_MIN;
