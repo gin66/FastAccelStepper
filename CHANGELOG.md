@@ -5,7 +5,7 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - for esp-idf 5 make use of espressif resource management of rmt channels
 
-pre-0.31.2:
+0.31.2:
 - Move constants out of PoorManFloat.h and autogenerate these
 - Fix pmfl constant used by SAM Due aka 21MHz
 - Update doc in PoorManFloat.cpp
