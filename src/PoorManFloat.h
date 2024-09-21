@@ -2,10 +2,13 @@
 #define POORMANFLOAT_H
 #include <stdint.h>
 
+#include <PoorManFloatConst.h>
+
 typedef int16_t pmf_logarithmic;
 
 #define PMF_CONST_INVALID ((pmf_logarithmic)0x8000)
 #define PMF_CONST_MAX ((pmf_logarithmic)0x7fff)
+#define PMF_CONST_MIN ((pmf_logarithmic)0x8001)
 
 pmf_logarithmic pmfl_from(uint8_t x);
 pmf_logarithmic pmfl_from(uint16_t x);

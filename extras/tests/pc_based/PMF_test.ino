@@ -1,7 +1,6 @@
 #include <stdint.h>
 
 #include "PoorManFloat.h"
-#include "PoorManFloatConst.h"
 
 //
 // This file can be renamed to a .ino and compiled as sketch to be run on the

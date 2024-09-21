@@ -57,8 +57,16 @@
 #define PMF_CONST_2205E11 ((pmf_logarithmic)0x5f4c)
 // => converted back => 220601734135808.00
 
+// PMF_CONST_UINT32_MAX = 16384.000000  16384 = 0x4000
+#define PMF_CONST_UINT32_MAX ((pmf_logarithmic)0x4000)
+// => converted back => 4294967296.00
+
+// PMF_CONST_UINT16_MAX = 8191.988770  8192 = 0x2000
+#define PMF_CONST_UINT16_MAX ((pmf_logarithmic)0x2000)
+// => converted back => 65536.00
+
 // used in PoorManFloat.cpp as example
-//
+// 
 // PMF_CONST_15373 = 7120.953125  7121 = 0x1bd1
 #define PMF_CONST_15373 ((pmf_logarithmic)0x1bd1)
 // => converted back => 15373.98

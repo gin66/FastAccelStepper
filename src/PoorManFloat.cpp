@@ -67,7 +67,8 @@
 // This max value is at r = 1/ln(2)-1
 //
 // As we need actually 512*log2(1+r), then the max value is 44.
-// This allows to multiply with up to 8 to improve the resolution
+// This allows to multiply with up to 8 to improve the resolution.
+// Here we use factor 4, so two table values can be summed up without overflow.
 //
 // So the log2 can be calculated for e.g.:
 //       x    = 0001_mmmm_mmmm_mmmm    three leading zeros
@@ -248,7 +249,7 @@ uint16_t pmfl_to_u16(pmf_logarithmic x) {
   if (x < 0) {
     return 0;
   }
-  if (x >= 0x2000) {
+  if (x >= PMF_CONST_UINT16_MAX) {
     return 0xffff;
   }
   uint8_t exponent = ((uint16_t)x) >> 9;
@@ -258,7 +259,8 @@ uint16_t pmfl_to_u16(pmf_logarithmic x) {
   x <<= 1;
   uint8_t offset =
       pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_2[index]);
-  if (((x & 2) != 0) && (index++ != 255)) {
+  if ((x & 2) != 0) {
+    index++;  // overflow to 0 is ok. index is an uint8_t
     offset +=
         pgm_read_byte_near(&x_minus_pow2_of_x_minus_one_shifted_by_2[index]);
     offset >>= 1;
@@ -276,7 +278,7 @@ uint32_t pmfl_to_u32(pmf_logarithmic x) {
   if (x < 0) {
     return 0;
   }
-  if (x >= 0x4000) {
+  if (x >= PMF_CONST_UINT32_MAX) {
     return 0xffffffff;
   }
   uint8_t exponent = ((uint16_t)x) >> 9;
@@ -290,11 +292,11 @@ uint32_t pmfl_to_u32(pmf_logarithmic x) {
   return res;
 }
 pmf_logarithmic pmfl_square(pmf_logarithmic x) {
-  if (x >= 0x4000) {
+  if (x > 0x4000) {
     return 0x7fff;
   }
   if (x <= -0x4000) {
-    return (int16_t)0x8001;
+    return PMF_CONST_MIN;
   }
   return x + x;
 }

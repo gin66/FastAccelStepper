@@ -68,6 +68,12 @@ int main() {
   x = pmfl_shr(x, 1);
   out("PMF_CONST_2205E11", 2.205e14, x);
 
+  x = pmfl_from(__UINT32_MAX__);
+  out("PMF_CONST_UINT32_MAX", __UINT32_MAX__, x);
+
+  x = pmfl_from((uint16_t)__UINT16_MAX__);
+  out("PMF_CONST_UINT16_MAX", __UINT16_MAX__, x);
+
   puts("");
   puts("// used in PoorManFloat.cpp as example");
   printf("// ");

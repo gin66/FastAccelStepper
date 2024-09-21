@@ -4,7 +4,6 @@
 #include <stdint.h>
 
 #include "PoorManFloat.h"
-#include "PoorManFloatConst.h"
 #include "fas_arch/common.h"
 
 #if (TICKS_PER_S == 16000000L)
