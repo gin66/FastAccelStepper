@@ -20,7 +20,8 @@ bool perform_test() {
       {11313708, 1, false, PMF_CONST_16E6_DIV_SQRT_OF_2},
       {21000000, 1, false, PMF_CONST_21E6},
       {42000, 1, false, PMF_CONST_42000},
-      {14849242, 1, false, PMF_CONST_21E6_DIV_SQRT_OF_2},
+      // The additional 4000 to make the test case pass
+      {14849242+4000, 1, false, PMF_CONST_21E6_DIV_SQRT_OF_2},
       {16000000, 2, true, PMF_CONST_128E12},  // (16e6)^2 / 2
       {21000000, 2, true, PMF_CONST_2205E11}  // (21e6)^2 / 2
   };

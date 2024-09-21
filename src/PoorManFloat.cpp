@@ -222,15 +222,31 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   return x;
 }
 pmf_logarithmic pmfl_from(uint32_t x) {
-  if ((x & 0xffff0000) == 0) {
-    return pmfl_from((uint16_t)x);
-  }
+  int16_t exp_offset;
+  uint16_t w;
   if ((x & 0xff000000) == 0) {
-    uint16_t w = x >> 8;
-    return pmfl_from(w) + 0x1000;
+    if ((x & 0x00ff0000) == 0) {
+      w = (uint16_t)x;
+      exp_offset = 0;
+    }
+    else if ((x & 0x00f00000) == 0) {
+      w = x >> 4;
+      exp_offset = 0x0800;
+    }
+    else {
+      w = x >> 8;
+      exp_offset = 0x1000;
+    }
   }
-  uint16_t w = x >> 16;
-  return pmfl_from(w) + 0x2000;
+  else if ((x & 0xf0000000) == 0) {
+    w = x >> 12;
+    exp_offset = 0x1800;
+  }
+  else {
+    w = x >> 16;
+    exp_offset = 0x2000;
+  }
+  return pmfl_from(w) + exp_offset;
 }
 uint16_t pmfl_to_u16(pmf_logarithmic x) {
   if (x < 0) {

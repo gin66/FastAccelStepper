@@ -13,6 +13,8 @@ void out(const char *name, float x, pmf_logarithmic value) {
 		printf("// %s should be 0x%04x\n", name, pmf_int);
 	}
 	printf("#define %s ((pmf_logarithmic)0x%04x)\n", name, value);
+	float back = pow(2.0, float(pmf_int) / 512);
+	printf("// => converted back => %.2f\n", back);
 }
 
 int main() {
