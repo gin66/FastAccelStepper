@@ -383,7 +383,7 @@ void FastAccelStepper::fill_queue() {
   uint32_t ticksPrepared = q->ticksInQueue();
   while (!isQueueFull() &&
          ((ticksPrepared < _forward_planning_in_ticks) ||
-          q->queueEntries() <= 1) &&
+          (q->queueEntries() <= 1)) &&
          _rg.isRampGeneratorActive()) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
     // For run time measurement
