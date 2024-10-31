@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <string.h>
 
 class RampChecker {
  public:
@@ -18,6 +19,7 @@ class RampChecker {
   uint32_t ticks_since_last_step;
   float avg_accel;
   FILE *gp_file;
+  char filename[100];
 
   void next_ramp() {
     increase_ok = true;
@@ -40,13 +42,17 @@ class RampChecker {
     next_ramp();
   }
   void start_plot(char *fname) {
+    int n = strlen(fname) - 8; // remove .gnuplot
+    strncpy(filename, fname, n);
+    filename[n] = 0;
     gp_file = fopen(fname, "w");
     fprintf(gp_file, "$data <<EOF\n");
   }
   void finish_plot() {
     if (gp_file != NULL) {
       fprintf(gp_file, "EOF\n");
-      fprintf(gp_file, "set term x11 size 1600, 800\n");
+      fprintf(gp_file, "set term pngcairo size 1600, 800\n");
+      fprintf(gp_file, "set output \"%s.png\"\n", filename);
       fprintf(gp_file, "set multiplot layout 2,2\n");
       fprintf(gp_file, "set title \"speed [steps/s] over time [s]\"\n");
       fprintf(gp_file, "plot $data using 1:2 with lines notitle\n");
@@ -58,7 +64,7 @@ class RampChecker {
               "set title \"averaged (!) acceleration [steps/s*s] over time "
               "[s]\"\n");
       fprintf(gp_file, "plot $data using 1:5 with lines notitle\n");
-      fprintf(gp_file, "pause -1\n");
+      //fprintf(gp_file, "pause -1\n");
       fclose(gp_file);
       gp_file = NULL;
     }
