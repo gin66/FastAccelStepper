@@ -106,8 +106,6 @@ int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 //*************************************************************************************************
 void StepperTask(void *parameter) {
   FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
-  const TickType_t delay_4ms =
-      (DELAY_MS_BASE + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
   while (true) {
     engine->manageSteppers();
 #if ESP_IDF_VERSION_MAJOR == 4
@@ -115,7 +113,8 @@ void StepperTask(void *parameter) {
     // causes an issue.
     esp_task_wdt_reset();
 #endif
-    vTaskDelay(delay_4ms);
+    const TickType_t delay_time = (engine->_delay_ms + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
+    vTaskDelay(delay_time);
   }
 }
 
@@ -131,6 +130,7 @@ void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
 #define STACK_SIZE 3000
 #define PRIORITY (configMAX_PRIORITIES - 1)
 #endif
+  engine->_delay_ms = DELAY_MS_BASE;
   if (cpu_core > 1) {
     xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
   } else {

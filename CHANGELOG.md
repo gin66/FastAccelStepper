@@ -5,6 +5,9 @@ TODO:
 - rename RampConstAcceleration to e.g. RampControl
 - for esp-idf 5 make use of espressif resource management of rmt channels
 
+0.31.3:
+- esp32: add `engine->task_rate(uint8_t delay_ms)` function to adjust the stepper task rate to e.g. 1ms (see #288 for reference)
+
 0.31.2:
 - Move constants out of PoorManFloat.h and autogenerate these
 - Fix pmfl constant used by SAM Due aka 21MHz

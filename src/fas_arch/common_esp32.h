@@ -45,6 +45,9 @@
 // have more than one core
 #define SUPPORT_CPU_AFFINITY
 
+// have adjustable stepper task rate
+#define SUPPORT_TASK_RATE_CHANGE
+
 #define LL_TOGGLE_PIN(dirPin)                  \
   gpio_ll_set_level(&GPIO, (gpio_num_t)dirPin, \
                     gpio_ll_get_level(&GPIO, (gpio_num_t)dirPin) ^ 1)
