@@ -1,10 +1,3 @@
-# BE AWARE: ARDUINO LIBRARY MANAGER IS BROKEN AND 0.29.x/0.30.x with x>0 do not show.
-
-No issue with platformio. Check the [related issue](https://github.com/arduino/library-registry/issues/2829) for the arduino library manager
-
-[![arduino-library-badge](https://www.ardu-badge.com/badge/FastAccelStepper.svg?)](https://www.ardu-badge.com/FastAccelStepper)
-
-
 # FastAccelStepper 
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.28.1)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/gin66/library/FastAccelStepper.svg)](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
