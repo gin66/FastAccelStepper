@@ -1,6 +1,6 @@
 idf_component_register(
     SRC_DIRS "src"
     INCLUDE_DIRS "src"
-    REQUIRES arduino
+    REQUIRES arduino-esp32
     PRIV_REQUIRES driver soc 
 )
