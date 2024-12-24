@@ -713,7 +713,7 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   max_speed_in_ticks = 420;  // This equals 50kHz @ 21MHz
 }
 
-void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {
+void fas_init_engine(FastAccelStepperEngine* engine) {
   fas_engine = engine;
 }
 #endif

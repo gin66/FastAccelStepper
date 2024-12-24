@@ -63,14 +63,14 @@ class FastAccelStepperEngine {
   // }
   // ```
 
-  void init();
-
 #if defined(SUPPORT_CPU_AFFINITY)
   // In a multitasking and multicore system like ESP32, the steppers are
   // controlled by a continuously running task. This task can be fixed to one
   // CPU core with this modified init()-call. ESP32 implementation detail: For
   // values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
-  void init(uint8_t cpu_core);
+  void init(uint8_t cpu_core = 255);
+#else
+  void init();
 #endif
 
   // ### Creation of FastAccelStepper

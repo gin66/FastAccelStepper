@@ -199,4 +199,8 @@ class StepperQueue {
 
 extern StepperQueue fas_queue[NUM_QUEUES];
 
+#if defined(SUPPORT_CPU_AFFINITY)
 void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core);
+#else
+void fas_init_engine(FastAccelStepperEngine* engine);
+#endif

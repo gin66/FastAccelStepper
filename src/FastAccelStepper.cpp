@@ -18,15 +18,6 @@ FastAccelStepper fas_stepper[MAX_STEPPER];
 
 //*************************************************************************************************
 //*************************************************************************************************
-void FastAccelStepperEngine::init() {
-  _externalCallForPin = NULL;
-  _stepper_cnt = 0;
-  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    _stepper[i] = NULL;
-  }
-  fas_init_engine(this, 255);
-}
-
 #if defined(SUPPORT_CPU_AFFINITY)
 void FastAccelStepperEngine::init(uint8_t cpu_core) {
   _externalCallForPin = NULL;
@@ -36,7 +27,17 @@ void FastAccelStepperEngine::init(uint8_t cpu_core) {
   }
   fas_init_engine(this, cpu_core);
 }
+#else
+void FastAccelStepperEngine::init() {
+  _externalCallForPin = NULL;
+  _stepper_cnt = 0;
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    _stepper[i] = NULL;
+  }
+  fas_init_engine(this);
+}
 #endif
+
 void FastAccelStepperEngine::setExternalCallForPin(
     bool (*func)(uint8_t pin, uint8_t value)) {
   _externalCallForPin = func;
