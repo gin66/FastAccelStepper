@@ -111,7 +111,8 @@ int main() {
   FastAccelStepperTest test;
   // run the ramp twice with 20 and with 5ms planning time.
   // the ramp will change speed after half of the loops.
-  // The 5ms ramp will not have 20ms coasting in the buffer and as such runs much shorter.
+  // The 5ms ramp will not have 20ms coasting in the buffer and as such runs
+  // much shorter.
   test.ramp(20, 76936);
   test.ramp(5, 11273);
   printf("TEST_15 PASSED\n");

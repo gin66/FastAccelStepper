@@ -21,9 +21,11 @@ void inject_fill_interrupt(int mark);
 #define max(a, b) ((a) > (b) ? (a) : (b))
 
 #define digitalWrite(a, b) \
-  {}
+  {                        \
+  }
 #define pinMode(a, b) \
-  {}
+  {                   \
+  }
 
 extern char TCCR1A;
 extern char TCCR1B;

@@ -42,7 +42,7 @@ class RampChecker {
     next_ramp();
   }
   void start_plot(char *fname) {
-    int n = strlen(fname) - 8; // remove .gnuplot
+    int n = strlen(fname) - 8;  // remove .gnuplot
     strncpy(filename, fname, n);
     filename[n] = 0;
     gp_file = fopen(fname, "w");
@@ -64,7 +64,7 @@ class RampChecker {
               "set title \"averaged (!) acceleration [steps/s*s] over time "
               "[s]\"\n");
       fprintf(gp_file, "plot $data using 1:5 with lines notitle\n");
-      //fprintf(gp_file, "pause -1\n");
+      // fprintf(gp_file, "pause -1\n");
       fclose(gp_file);
       gp_file = NULL;
     }

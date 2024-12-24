@@ -44,8 +44,10 @@
     RMT.int_clr.val |= 0x101 << channel;               \
     RMT.int_ena.val |= 0x101 << channel;               \
   }
-#define disable_rmt_interrupts(channel) \
-  { RMT.int_ena.val &= ~(0x101 << channel); }
+#define disable_rmt_interrupts(channel)     \
+  {                                         \
+    RMT.int_ena.val &= ~(0x101 << channel); \
+  }
 
 void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   // We are stopping the rmt by letting it run into the end at high speed.

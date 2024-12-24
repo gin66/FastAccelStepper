@@ -45,22 +45,29 @@
 #elif defined(SIMAVR_TIME_MEASUREMENT_QUEUE)
 #define prepareISRtimeMeasurement() DDRB |= 0x10
 #define enterStepperISR() \
-  {}
+  {                       \
+  }
 #define exitStepperISR() \
-  {}
+  {                      \
+  }
 #define enterFillQueueISR() PORTB |= 0x10
 #define exitFillQueueISR() PORTB ^= 0x10
 #else
 #define prepareISRtimeMeasurement() \
-  {}
+  {                                 \
+  }
 #define enterStepperISR() \
-  {}
+  {                       \
+  }
 #define exitStepperISR() \
-  {}
+  {                      \
+  }
 #define enterFillQueueISR() \
-  {}
+  {                         \
+  }
 #define exitFillQueueISR() \
-  {}
+  {                        \
+  }
 #endif
 
 #ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
@@ -353,7 +360,5 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   }
 }
 
-void fas_init_engine(FastAccelStepperEngine* engine) {
-  fas_engine = engine;
-}
+void fas_init_engine(FastAccelStepperEngine* engine) { fas_engine = engine; }
 #endif

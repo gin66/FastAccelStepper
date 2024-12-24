@@ -103,22 +103,23 @@ class FastAccelStepperEngine {
   //       wdt_reset()
   //       delay()
   //
-  // The actual repetition rate of the stepper task is delay + execution time of manageSteppers()
+  // The actual repetition rate of the stepper task is delay + execution time of
+  // manageSteppers()
   //
-  // This function is primary of interest in conjunction with setForwardPlanningTimeInMs().
-  // If the delay is larger then forward planning time, then the stepper queue will always
-  // run out of commands, which lead to a sudden stop of the motor. If the delay is 0,
-  // then the stepper task will constantly looping, which may lead to the task blocking other
-  // tasks. Consequently, this function is intended for advanced users.
+  // This function is primary of interest in conjunction with
+  // setForwardPlanningTimeInMs(). If the delay is larger then forward planning
+  // time, then the stepper queue will always run out of commands, which lead to
+  // a sudden stop of the motor. If the delay is 0, then the stepper task will
+  // constantly looping, which may lead to the task blocking other tasks.
+  // Consequently, this function is intended for advanced users.
   //
-  // There is not planned to test this functionality, because automatic testing is only
-  // available for avr devices and those continue to use fixed 4ms rate.
+  // There is not planned to test this functionality, because automatic testing
+  // is only available for avr devices and those continue to use fixed 4ms rate.
   //
-  // Please be aware, that the configured tick rate aka portTICK_PERIOD_MS is relevant.
-  // Apparently, arduino-esp32 has FreeRTOS configured to have a tick-rate of 1000Hz
-  inline void task_rate(uint8_t delay_ms) {
-    _delay_ms = delay_ms;
-  };
+  // Please be aware, that the configured tick rate aka portTICK_PERIOD_MS is
+  // relevant. Apparently, arduino-esp32 has FreeRTOS configured to have a
+  // tick-rate of 1000Hz
+  inline void task_rate(uint8_t delay_ms) { _delay_ms = delay_ms; };
   uint8_t _delay_ms;
 #endif
 

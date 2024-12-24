@@ -113,7 +113,8 @@ void StepperTask(void *parameter) {
     // causes an issue.
     esp_task_wdt_reset();
 #endif
-    const TickType_t delay_time = (engine->_delay_ms + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
+    const TickType_t delay_time =
+        (engine->_delay_ms + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
     vTaskDelay(delay_time);
   }
 }
