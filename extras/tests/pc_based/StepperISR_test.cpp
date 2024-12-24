@@ -5,7 +5,7 @@
 // Here are the global variables to interface with the interrupts
 // StepperQueue fas_queue[NUM_QUEUES];
 
-void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {}
+void fas_init_engine(FastAccelStepperEngine* engine) {}
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) { _initVars(); }
 void StepperQueue::startQueue() { _isRunning = true; }
