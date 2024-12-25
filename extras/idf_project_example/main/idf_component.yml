@@ -1,0 +1,5 @@
+dependencies:
+  FastAccelStepper:
+    path: ../../..
+    # Alternatively you can point this directly at the GitHub repository:
+    # git: https://github.com/gin66/FastAccelStepper.git
