@@ -24,17 +24,22 @@ jobs:
           # - esp32_idf_V6_7_0 fails due to missing simple encoder
           - esp32_idf_V6_8_1
           - esp32_idf_V6_9_0
+          - esp32_idf_V6_10_0
           #- esp32c3_idf_V5_3_0 
           - esp32c3_idf_V6_8_1
           - esp32c3_idf_V6_9_0
+          - esp32c3_idf_V6_10_0
           - esp32c6_idf_V6_8_1
           - esp32c6_idf_V6_9_0
+          - esp32c6_idf_V6_10_0
           #- esp32s2_idf_V5_3_0
           - esp32s2_idf_V6_8_1
           - esp32s2_idf_V6_9_0
+          - esp32s2_idf_V6_10_0
           #- esp32s3_idf_V5_3_0
           - esp32s3_idf_V6_8_1
           - esp32s3_idf_V6_9_0
+          - esp32s3_idf_V6_10_0
 
     runs-on: ubuntu-latest
 

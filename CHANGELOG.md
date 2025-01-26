@@ -3,7 +3,6 @@ TODO:
 - #include-file structure needs to be cleaned up
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
-- for esp-idf 5 make use of espressif resource management of rmt channels
 
 0.31.4:
 - fix race condition in engine.init. Only applicable for esp32 (#300)
