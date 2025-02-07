@@ -6,7 +6,7 @@ Supported are avr (ATmega 168/328/P, ATmega2560), esp32 and atmelsam due.
 
 Here is a basic example to run a stepper from position 0 to 1000 and back
 again to 0.
-```
+```cpp
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
