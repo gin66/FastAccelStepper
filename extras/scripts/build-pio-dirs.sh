@@ -58,4 +58,5 @@ ln -s ../../../extras/tests/pc_based/PMF_test.ino PMF_test.ino
 cd ../../..
 
 ls -al pio_*
+find pio_*
 
