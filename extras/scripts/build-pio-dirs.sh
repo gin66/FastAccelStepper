@@ -52,6 +52,8 @@ mkdir -p pio_espidf/StepperDemo/src
 mkdir pio_dirs/PMF_test
 mkdir pio_dirs/PMF_test/src
 cd pio_dirs/PMF_test
+mkdir FastAccelStepper
+ln -s $ROOT/src FastAccelStepper
 ln -s ../../extras/ci/platformio.ini .
 cd src
 #sed  -e 's/%d/%ld/g' <../../../tests/test_03.h >test_03.h
