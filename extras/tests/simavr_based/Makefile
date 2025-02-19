@@ -28,7 +28,7 @@ fas: $(addsuffix /FastAccelStepper,$(TESTS))
 	touch .fas
 
 %/FastAccelStepper:
-	cd $(dir $@); ln -s ../../../../FastAccelStepper FastAccelStepper
+	cd $(dir $@); ln -s ../../../../../FastAccelStepper .
 
 .makefiles: makefiles
 
