@@ -4,6 +4,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+pre-0.31.5:
+- initial and untested version of `moveTimed()`
+
 0.31.4:
 - fix race condition in engine.init. Only applicable for esp32 (#300)
 - fix name of arduino component in CMakeLists.txt for espidf compilation (#300)
