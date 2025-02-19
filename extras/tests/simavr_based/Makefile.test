@@ -123,8 +123,5 @@ x.vcd: $(SRC) ../run_avr platformio.ini FastAccelStepper
 	env pio run -e $(DUT) || ~/.platformio/penv/bin/pio run -e $(DUT) || ~/.local/bin/pio run -e $(DUT)
 	../run_avr $(FIRMWARE) -m $(DEVICE) -o x.vcd $(TRACES)
 
-FastAccelStepper:
-	ln -s ../../../../../FastAccelStepper .
-
 clean:
 	rm -fR .pio .tested x.vcd result.txt

@@ -19,7 +19,7 @@ pmf:
 externalCall:
 	make -C test_externalCall
 
-%/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini .makefiles .links
+%/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini .makefiles .links .fas
 	make SILENCE=$(SILENCE)  -C $(dir $@)
 
 .fas:	fas
