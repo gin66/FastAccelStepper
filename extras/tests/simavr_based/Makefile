@@ -22,12 +22,21 @@ externalCall:
 %/.tested:	$(SRC) run_avr %/expect.txt %/platformio.ini .makefiles .links
 	make SILENCE=$(SILENCE)  -C $(dir $@)
 
+.fas:	fas
+
+fas: $(addsuffix /FastAccelStepper,$(TESTS))
+	touch .fas
+
+%/FastAccelStepper:
+	cd $(dir $@); ln -s ../../.. FastAccelStepper
+
 .makefiles: makefiles
 
 makefiles: $(addsuffix /Makefile,$(TESTS))
 	touch .makefiles
 
 %/Makefile:
+	# Creates makefile only for those dirs, where no Makefile is present
 	cd $(dir $@); ln -s ../Makefile.test Makefile
 
 .links: links

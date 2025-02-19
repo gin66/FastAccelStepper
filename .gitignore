@@ -25,6 +25,7 @@ extras/tests/pc_based/*.gnuplot
 extras/tests/pc_based/*_test
 extras/tests/pc_based/test.log
 extras/tests/pc_based/*.png
+extras/tests/simavr_based/*/FastAccelStepper
 extras/tests/simavr_based/*/result.txt
 extras/tests/simavr_based/*/x.vcd
 extras/tests/simavr_based/test*sd*/src
@@ -36,3 +37,4 @@ library.properties
 examples
 extras/gen_pmf_const/PoorManFloat.cpp
 extras/gen_pmf_const/main
+extras/tests/simavr_based/.fas

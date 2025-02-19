@@ -21,6 +21,7 @@ for i in `ls examples`
 do
 	mkdir -p pio_dirs/$i/src
 	cd pio_dirs/$i
+        ln -s $ROOT .
 	ln -s ../../extras/ci/platformio.ini .
 	cd src
 	FILES=`cd ../../../examples/$i;find . -type f`
@@ -35,6 +36,7 @@ for i in `cd extras;ls idf_examples`
 do
 	mkdir -p pio_espidf/$i/src
 	cd pio_espidf/$i
+        ln -s $ROOT .
 	ln -s ../../extras/ci/platformio.ini .
 	cd src
 	FILES=`cd ../../../extras/idf_examples/$i;find . -type f`
