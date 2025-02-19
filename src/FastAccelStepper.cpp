@@ -960,7 +960,8 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
   rate /= steps;
   if (rate > 65535) {
     // we need pauses, so only few steps can be executed
-    uint16_t cmds_per_step = rate >> 16;  // bit too small
+    uint16_t cmds_per_step = (rate >> 16)+1;  // bit too small
+    printf("cmd_per_step=%d\n", cmds_per_step);
     if (cmds_per_step >= QUEUE_LEN) {
       return MOVE_TIMED_TOO_LARGE_ERROR;
     }

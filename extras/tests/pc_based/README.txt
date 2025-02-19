@@ -44,3 +44,9 @@ Tests;
 
 - test 14
   test case for issue #178: Speed jump instead of decrease
+
+- test 15
+  test case for setForwardPlanningTimeInMs()
+
+- test 16
+  tests for moveTimed()
