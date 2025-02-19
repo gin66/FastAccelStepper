@@ -617,42 +617,46 @@ class FastAccelStepper {
     _forward_planning_in_ticks *= TICKS_PER_S / 1000;  // ticks per ms
   }
 
-  // ## Intermediate Level Stepper Control for Advanced Users
-  //
-  // The main purpose is to bypass the ramp generator as mentioned in 
-  // [#299](https://github.com/gin66/FastAccelStepper/issues/299).
-  // This shall allow to run consecutive small moves with fixed speed.
-  // The parameters are distance (which can be 0) and duration in ticks.
-  // Distance 0 makes sense in order to keep the time running and not
-  // getting out of sync.
-  // Due to integer arithmetics the actual duration may be off by a small value.
-  // That's why the actual_duration in TICKS is returned.
-  // The application should consider this for the next runTimed move.
-  //
-  // In order to not have another lightweight ramp generator running in
-  // background interrupt, the expecation to the application is, that this
-  // function is frequently enough called without the queue being emptied.
-  //
-  // The current implementation immediately starts with a step, if there should be one.
-  // Perhaps performing the step in the middle of the duration is more appropriate ?
-  //
-  // Meaning of the return values - which are in addtion to AQE from below
-  // - OK:        Move has been successfully appended to the queue
-  // - BUSY:      Queue does not have sufficient entries to append this timed move.
-  // - EMPTY:     The queue has run out of commands, but the move has been appended.
-  // - TOO_LARGE: The move request does not fit into the queue.
-  //              Reasons: The queue depth is (32/16) for SAM+ESP32/AVR.
-  //                       Each queue entry can emit 255 steps => (8160/4080) steps
-  //                       If the time between steps is >65535 ticks, then pauses
-  //                       have to be generated. In this case only (16/8) steps 
-  //                       can be generated...but the queue shall not be empty
-  //                       => so even less steps can be done.
-  //              Recommendation: keep the duration in the range of ms.
-  #define MOVE_TIMED_OK              ((int8_t)0)
-  #define MOVE_TIMED_BUSY            ((int8_t)5)
-  #define MOVE_TIMED_EMPTY           ((int8_t)6)
-  #define MOVE_TIMED_TOO_LARGE_ERROR ((int8_t)-4)
-  int8_t moveTimed(int16_t steps, uint32_t duration, uint32_t &actual_duration);
+// ## Intermediate Level Stepper Control for Advanced Users
+//
+// The main purpose is to bypass the ramp generator as mentioned in
+// [#299](https://github.com/gin66/FastAccelStepper/issues/299).
+// This shall allow to run consecutive small moves with fixed speed.
+// The parameters are distance (which can be 0) and duration in ticks.
+// Distance 0 makes sense in order to keep the time running and not
+// getting out of sync.
+// Due to integer arithmetics the actual duration may be off by a small value.
+// That's why the actual_duration in TICKS is returned.
+// The application should consider this for the next runTimed move.
+//
+// In order to not have another lightweight ramp generator running in
+// background interrupt, the expecation to the application is, that this
+// function is frequently enough called without the queue being emptied.
+//
+// The current implementation immediately starts with a step, if there should be
+// one. Perhaps performing the step in the middle of the duration is more
+// appropriate ?
+//
+// Meaning of the return values - which are in addtion to AQE from below
+// - OK:        Move has been successfully appended to the queue
+// - BUSY:      Queue does not have sufficient entries to append this timed
+// move.
+// - EMPTY:     The queue has run out of commands, but the move has been
+// appended.
+// - TOO_LARGE: The move request does not fit into the queue.
+//              Reasons: The queue depth is (32/16) for SAM+ESP32/AVR.
+//                       Each queue entry can emit 255 steps => (8160/4080)
+//                       steps If the time between steps is >65535 ticks, then
+//                       pauses have to be generated. In this case only (16/8)
+//                       steps can be generated...but the queue shall not be
+//                       empty
+//                       => so even less steps can be done.
+//              Recommendation: keep the duration in the range of ms.
+#define MOVE_TIMED_OK ((int8_t)0)
+#define MOVE_TIMED_BUSY ((int8_t)5)
+#define MOVE_TIMED_EMPTY ((int8_t)6)
+#define MOVE_TIMED_TOO_LARGE_ERROR ((int8_t)-4)
+  int8_t moveTimed(int16_t steps, uint32_t duration, uint32_t& actual_duration);
 
   // ## Low Level Stepper Queue Management (low level access)
   //
