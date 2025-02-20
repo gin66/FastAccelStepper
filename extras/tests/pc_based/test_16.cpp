@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <inttypes.h>
 
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
@@ -152,12 +153,12 @@ char fname[100];
           rc.finish_plot();
 
     uint64_t expected_ticks = QUEUE_LEN/2*100000 + 200000;
-    printf("current position = %d,  total_ticks=%llu\n", s.getCurrentPosition(), rc.total_ticks);
+    printf("current position = %d,  total_ticks=%" PRIu64 "\n", s.getCurrentPosition(), rc.total_ticks);
     test(s.getCurrentPosition() == QUEUE_LEN/2+1, "TC2_S5: step mismatch");
-    printf("expected ticks=%llu, actual=%llu\n", expected_ticks, actual_sum);
+    printf("expected ticks=%" PRIu64 ", actual=%" PRIu64 "\n", expected_ticks, actual_sum);
     test(rc.total_ticks == actual_sum, "TC2_S6: time algnment");
     int64_t drift = actual_sum - expected_ticks;
-    printf("drift=%lld\n", abs(drift));
+    printf("drift=%" PRId64 "\n", abs(drift));
     test(abs(drift) < 10, "accepted drift");
 }
 
