@@ -1053,7 +1053,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
     uint32_t cmd_duration = cmd.ticks;
     cmd_duration *= cmd.steps;
     if (actual_duration) {
-       *actual_duration += cmd.ticks;
+       uint32_t d = cmd.ticks;
+       d *= steps;
+       *actual_duration += d;
     }
     steps -= cmd.steps;
   }
