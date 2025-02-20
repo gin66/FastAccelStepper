@@ -122,7 +122,7 @@ char fname[100];
     rc.start_plot(fname);
  
   ret = s.moveTimed(QUEUE_LEN/2-1, QUEUE_LEN/2*100000, actual);
-  test(ret == MOVE_TIMED_OK, "TC2_S1: valid pars");
+  test(ret == MOVE_TIMED_EMPTY, "TC2_S1: valid pars");
   actual_sum += actual;
 
   ret = s.moveTimed(2, 200000, actual);
@@ -139,7 +139,7 @@ char fname[100];
         fas_queue[0].read_idx++;
       }
   ret = s.moveTimed(2, 200000, actual);
-  test(ret == MOVE_TIMED_OK, "TC2_S4: valid pars");
+  test(ret == MOVE_TIMED_EMPTY, "TC2_S4: valid pars");
   actual_sum += actual;
 
     // process commands

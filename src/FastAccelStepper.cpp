@@ -914,11 +914,12 @@ int32_t FastAccelStepper::getCurrentPosition() {
 int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
                                    uint32_t& actual_duration,
 				   bool start) {
+  uint8_t ret_ok = isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
       if (start) {
          addQueueEntry(NULL, true); // start the queue
       }
-      return MOVE_TIMED_OK;
+      return ret_ok;
   }
   uint8_t freeEntries = QUEUE_LEN - queueEntries();
   actual_duration = 0;
@@ -951,7 +952,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
       actual_duration += cmd.ticks;
       duration -= cmd.ticks;
     }
-    return MOVE_TIMED_OK;
+    return ret_ok;
   }
 
   // let's evaluate the direction
@@ -1004,7 +1005,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         cmd.steps = 0;
       }
     }
-    return MOVE_TIMED_OK;
+    return ret_ok;
   }
   // Now we need to run steps at "high" speed.
   if (steps > QUEUE_LEN * 255) {
@@ -1048,7 +1049,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
     actual_duration += cmd_duration;
     steps -= cmd.steps;
   }
-  return MOVE_TIMED_OK;
+  return ret_ok;
 }
 void FastAccelStepper::detachFromPin() { fas_queue[_queue_num].disconnect(); }
 void FastAccelStepper::reAttachToPin() { fas_queue[_queue_num].connect(); }
