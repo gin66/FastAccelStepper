@@ -1,6 +1,9 @@
 #if defined(ARDUINO_ARCH_AVR)
 #include "AVRStepperPins.h"
 #include "FastAccelStepper.h"
+#ifdef SIMULATOR
+#include <avr/sleep.h>
+#endif
 
 // As in StepperDemo for Motor 1 on AVR
 #define dirPinStepperX    5
@@ -19,14 +22,13 @@ FastAccelStepper *stepperY = NULL;
 struct control_s {
   uint64_t time;
   uint16_t phi;
-  bool is_running;
   uint16_t drift;  // time delta in ticks
 };
 struct control_s controlX = {
-  .time = 0, .phi = 0, .is_running = false, .drift = 0
+  .time = 0, .phi = 0, .drift = 0
 };
 struct control_s controlY = {
-  .time = 0, .phi = 90, .is_running = false, .drift = 0
+  .time = 0, .phi = 90, .drift = 0
 };
 
 // This means, the circle is executed in 360*4ms = 1440ms
@@ -57,6 +59,8 @@ void setup() {
   stepperY->setEnablePin(enablePinStepperY);
   stepperY->setAutoEnable(false);
 
+  stepperY->setCurrentPosition(steps[90]);
+
   // Without auto enable, need to enable manually both steppers
   stepperX->enableOutputs();
   stepperY->enableOutputs();
@@ -71,12 +75,10 @@ void setup() {
 }
 
 void moveStepper(FastAccelStepper *stepper, struct control_s *control) {
-   if (control->phi == 360) {
-      control->phi = 0;
-   }
+   uint16_t phi = control->phi % 360;
 
    // The table contains only one quadrant
-   uint16_t index = control->phi;
+   uint16_t index = phi;
    bool negate = false;
    if (index > 180) {
       negate = true;
@@ -90,16 +92,6 @@ void moveStepper(FastAccelStepper *stepper, struct control_s *control) {
       position = -position;
    }
    int32_t current_position = stepper->getPositionAfterCommandsCompleted();
-   if (!control->is_running) {
-      // we need to wait until current_position and position match
-      if (position != current_position) {
-         // just advance time and phi
-         control->time += TIMESTEP_TICKS;
-         control->phi += 1;
-         return;
-      }
-      control->is_running = true;
-   }
    int32_t steps = position - current_position;
    uint32_t actual;
    int8_t rc;
@@ -141,6 +133,8 @@ void loop() {
     Serial.print(' ');
     Serial.print(stepperX->getPositionAfterCommandsCompleted());
     Serial.print(' ');
+    Serial.print(stepperY->getPositionAfterCommandsCompleted());
+    Serial.print(' ');
     Serial.println(millis());
     last_millis = millis();
   }
@@ -151,6 +145,15 @@ void loop() {
   else {
     moveStepper(stepperY, &controlY);
   }
+  if ((controlX.phi != 361) && (controlY.phi != 451)) {
+     return;
+  }
+  // Full round should be completed
+#ifdef SIMULATOR
+  delay(1000);
+  noInterrupts();
+  sleep_cpu();
+#endif
 }
 #else
 void setup() {}
