@@ -912,8 +912,14 @@ int32_t FastAccelStepper::getCurrentPosition() {
   return fas_queue[_queue_num].getCurrentPosition();
 }
 int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
-                                   uint32_t& actual_duration) {
-  // For now only a very crude implementation
+                                   uint32_t& actual_duration,
+				   bool start) {
+  if ((steps == 0) && (duration == 0)) {
+      if (start) {
+         addQueueEntry(NULL, true); // start the queue
+      }
+      return MOVE_TIMED_OK;
+  }
   uint8_t freeEntries = QUEUE_LEN - queueEntries();
   actual_duration = 0;
   struct stepper_command_s cmd = {.ticks = 0, .steps = 0, .count_up = true};
@@ -937,7 +943,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         // cmd.
         cmd.ticks = duration >> 1;
       }
-      uint8_t ret = addQueueEntry(&cmd);
+      uint8_t ret = addQueueEntry(&cmd,start);
       if (ret != 0) {
         // unexpected
         return ret;
@@ -988,7 +994,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         }
         this_duration -= cmd.ticks;
 
-        uint8_t ret = addQueueEntry(&cmd);
+        uint8_t ret = addQueueEntry(&cmd,start);
         if (ret != 0) {
           // unexpected
           return ret;
@@ -1032,7 +1038,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
          printf("increase ticks for %d steps\n", steps);
       #endif
     }
-    uint8_t ret = addQueueEntry(&cmd);
+    uint8_t ret = addQueueEntry(&cmd,start);
     if (ret != 0) {
       // unexpected
       return ret;
