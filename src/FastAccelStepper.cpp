@@ -912,7 +912,7 @@ int32_t FastAccelStepper::getCurrentPosition() {
   return fas_queue[_queue_num].getCurrentPosition();
 }
 int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
-                                   uint32_t& actual_duration,
+                                   uint32_t *actual_duration,
 				   bool start) {
   uint8_t ret_ok = isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
@@ -922,7 +922,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
       return ret_ok;
   }
   uint8_t freeEntries = QUEUE_LEN - queueEntries();
-  actual_duration = 0;
+  if (actual_duration) {
+    *actual_duration = 0;
+  }
   struct stepper_command_s cmd = {.ticks = 0, .steps = 0, .count_up = true};
   if (steps == 0) {
     if ((duration >> 16) >= QUEUE_LEN) {
@@ -949,7 +951,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         // unexpected
         return ret;
       }
-      actual_duration += cmd.ticks;
+      if (actual_duration) {
+        *actual_duration += cmd.ticks;
+      }
       duration -= cmd.ticks;
     }
     return ret_ok;
@@ -1000,7 +1004,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
           // unexpected
           return ret;
         }
-        actual_duration += cmd.ticks;
+        if (actual_duration) {
+          *actual_duration += cmd.ticks;
+        }
         // remaining are pauses
         cmd.steps = 0;
       }
@@ -1019,7 +1025,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
   uint32_t expected_duration = rate;
   expected_duration *= steps;
   // duration must be larger than expected_duration
-  uint16_t missing = duration - expected_duration;
+  int16_t missing = duration - expected_duration;
   #ifdef TEST
     assert(duration >= expected_duration);
   #endif
@@ -1046,7 +1052,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
     }
     uint32_t cmd_duration = cmd.ticks;
     cmd_duration *= cmd.steps;
-    actual_duration += cmd_duration;
+    if (actual_duration) {
+       *actual_duration += cmd.ticks;
+    }
     steps -= cmd.steps;
   }
   return ret_ok;

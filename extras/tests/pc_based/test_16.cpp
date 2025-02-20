@@ -121,11 +121,11 @@ char fname[100];
     snprintf(fname, 100, "test_16_tc_2.gnuplot");
     rc.start_plot(fname);
  
-  ret = s.moveTimed(QUEUE_LEN/2-1, QUEUE_LEN/2*100000, actual);
+  ret = s.moveTimed(QUEUE_LEN/2-1, QUEUE_LEN/2*100000, &actual);
   test(ret == MOVE_TIMED_EMPTY, "TC2_S1: valid pars");
   actual_sum += actual;
 
-  ret = s.moveTimed(2, 200000, actual);
+  ret = s.moveTimed(2, 200000, &actual);
   printf("queue = %d\n", s.queueEntries());
   test(ret != MOVE_TIMED_OK, "TC2_S2: move should be rejected"); 
   test(ret == MOVE_TIMED_BUSY, "TC2_S3: queue should be full");
@@ -138,7 +138,7 @@ char fname[100];
             &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
         fas_queue[0].read_idx++;
       }
-  ret = s.moveTimed(2, 200000, actual);
+  ret = s.moveTimed(2, 200000, &actual);
   test(ret == MOVE_TIMED_EMPTY, "TC2_S4: valid pars");
   actual_sum += actual;
 
@@ -172,19 +172,19 @@ int main() {
   FastAccelStepper s = FastAccelStepper();
   s.init(NULL, 0, 0);
 
-  ret = s.moveTimed(QUEUE_LEN * 255 + 1, 1000, actual);
+  ret = s.moveTimed(QUEUE_LEN * 255 + 1, 1000, &actual);
   test(ret == MOVE_TIMED_TOO_LARGE_ERROR, "TC1_1: too many steps for the queue");
 
-  ret = s.moveTimed(QUEUE_LEN + 1, 65536 * (QUEUE_LEN+1), actual);
+  ret = s.moveTimed(QUEUE_LEN + 1, 65536 * (QUEUE_LEN+1), &actual);
   test(ret == MOVE_TIMED_TOO_LARGE_ERROR, "TC1_2: too many steps for the queue");
 
-  ret = s.moveTimed(1, MIN_CMD_TICKS-1, actual);
+  ret = s.moveTimed(1, MIN_CMD_TICKS-1, &actual);
   test(ret == AQE_ERROR_TICKS_TOO_LOW, "TC1_3: too short duration");
 
-  ret = s.moveTimed(100, 100*(s.getMaxSpeedInTicks() - 1), actual);
+  ret = s.moveTimed(100, 100*(s.getMaxSpeedInTicks() - 1), &actual);
   test(ret == AQE_ERROR_TICKS_TOO_LOW, "TC1_4: still too short duration");
 
-  ret = s.moveTimed(QUEUE_LEN/2+1, (QUEUE_LEN/2)*100000, actual);
+  ret = s.moveTimed(QUEUE_LEN/2+1, (QUEUE_LEN/2)*100000, &actual);
   test(ret == MOVE_TIMED_TOO_LARGE_ERROR, "TC1_S5: too many commands");
 
   tc_2();
