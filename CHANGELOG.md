@@ -6,6 +6,7 @@ TODO:
 
 pre-0.31.5:
 - initial and untested version of `moveTimed()`
+- add esp32p4
 
 0.31.4:
 - fix race condition in engine.init. Only applicable for esp32 (#300)

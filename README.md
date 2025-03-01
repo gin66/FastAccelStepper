@@ -24,7 +24,7 @@ Arduino core 3.1.0 will support ESP-IDF V5.3.0 (based on RC1)
 ## Overview
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3, esp32c6 and atmelsam due.
+Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4 and atmelsam due.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
@@ -335,6 +335,10 @@ This stepper driver uses rmt modules. Can drive up to 4 motors.
 ### ESP32C3
 
 This stepper driver uses rmt module and can drive up to 2 motors. Not thoroughly tested, so only experimental support.
+
+### ESP32P4
+
+This stepper driver uses rmt module and can drive up to 4 motors. Not thoroughly tested, so only experimental support.
 
 ### ESP32-MINI-1
 
