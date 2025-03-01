@@ -47,6 +47,7 @@ jobs:
           - esp32s3_V6_8_1
           - esp32s3_V6_9_0
           - esp32s3_V6_10_0
+          - esp32p4
           - nanoatmega168
           - nanoatmega328
           - atmega2560

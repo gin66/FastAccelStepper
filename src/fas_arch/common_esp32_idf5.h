@@ -103,6 +103,21 @@
 
 //==========================================================================
 //
+// ESP32 derivate - ESP32P4
+//
+//==========================================================================
+#elif CONFIG_IDF_TARGET_ESP32P4
+#define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32_PULSE_COUNTER 4
+#define HAVE_ESP32_RMT
+#define RMT_SIZE 64 
+#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_RMT 4
+#define NEED_RMT_HEADERS
+#define NEED_PCNT_HEADERS
+
+//==========================================================================
+//
 // For all unsupported ESP32 derivates
 //
 //==========================================================================
