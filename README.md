@@ -507,4 +507,4 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks SHWotever for avr patch to fix missing direction pin toggle (https://github.com/gin66/FastAccelStepper/pull/252)
 - Thanks HalfVoxel for pull requests (https://github.com/gin66/FastAccelStepper/pull/270) and (https://github.com/gin66/FastAccelStepper/pull/271): improved doc and missing parenthesis in preprocessor macros
 - Thanks pvginkel for pull request (https://github.com/gin66/FastAccelStepper/pull/300): fix race condition in engine init
-
+- Thanks freelancer1845 for instructions to resolve stray link to arduino-esp32 for espidf only projects (https://github.com/gin66/FastAccelStepper/discussions/217). 
