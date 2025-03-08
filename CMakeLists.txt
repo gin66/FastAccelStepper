@@ -1,5 +1,8 @@
 idf_component_register(
     SRC_DIRS "src"
     INCLUDE_DIRS "src"
-    PRIV_REQUIRES driver soc 
+    REQUIRES 
+        esp_driver_gpio
+        esp_driver_rmt
+        esp_driver_pcnt
 )
