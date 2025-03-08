@@ -54,7 +54,9 @@ controlled by a continuously running task. This task can be fixed to one
 CPU core with this modified init()-call. ESP32 implementation detail: For
 values 0 and 1, xTaskCreatePinnedToCore() is used, or else xTaskCreate()
 ```cpp
-  void init(uint8_t cpu_core);
+  void init(uint8_t cpu_core = 255);
+#else
+  void init();
 #endif
 ```
 ### Creation of FastAccelStepper
@@ -79,6 +81,35 @@ This call allows to select the respective driver
 #define DRIVER_DONT_CARE 2
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin,
                                         uint8_t driver_type = DRIVER_DONT_CARE);
+#endif
+```
+For e.g. esp32 the repetition rate of the stepper task can be changed.
+The default delay is 4ms.
+
+The steppertask is looping with:
+      manageSteppers()
+      wdt_reset()
+      delay()
+
+The actual repetition rate of the stepper task is delay + execution time of
+manageSteppers()
+
+This function is primary of interest in conjunction with
+setForwardPlanningTimeInMs(). If the delay is larger then forward planning
+time, then the stepper queue will always run out of commands, which lead to
+a sudden stop of the motor. If the delay is 0, then the stepper task will
+constantly looping, which may lead to the task blocking other tasks.
+Consequently, this function is intended for advanced users.
+
+There is not planned to test this functionality, because automatic testing
+is only available for avr devices and those continue to use fixed 4ms rate.
+
+Please be aware, that the configured tick rate aka portTICK_PERIOD_MS is
+relevant. Apparently, arduino-esp32 has FreeRTOS configured to have a
+tick-rate of 1000Hz
+```cpp
+  void task_rate(uint8_t delay_ms) { _delay_ms = delay_ms; };
+  uint8_t _delay_ms;
 #endif
 ```
 Comments to valid pins:
@@ -571,6 +602,54 @@ suddenly stopping
     _forward_planning_in_ticks *= TICKS_PER_S / 1000;ticks per ms
 ```cpp
   }
+```
+## Intermediate Level Stepper Control for Advanced Users
+
+The main purpose is to bypass the ramp generator as mentioned in
+[#299](https:github.com/gin66/FastAccelStepper/issues/299).
+This shall allow to run consecutive small moves with fixed speed.
+The parameters are steps (which can be 0) and duration in ticks.
+steps=0 makes sense in order to keep the time running and not
+getting out of sync.
+Due to integer arithmetics the actual duration may be off by a small value.
+That's why the actual_duration in TICKS is returned.
+The application should consider this for the next runTimed move.
+
+The optional parameter is a boolean called start. This allows for the first
+invocation to not start the queue yet. This is for managing steppers in
+parallel. It allows to fill all steppers' queues and then kick it off by a
+call to `moveTimed(0,0,NULL,true)`. Successive invocations can keep true.
+
+In order to not have another lightweight ramp generator running in
+background interrupt, the expecation to the application is, that this
+function is frequently enough called without the queue being emptied.
+
+The current implementation immediately starts with a step, if there should be
+one. Perhaps performing the step in the middle of the duration is more
+appropriate ?
+
+Meaning of the return values - which are in addtion to AQE from below
+- OK:        Move has been successfully appended to the queue
+- BUSY:      Queue does not have sufficient entries to append this timed
+move.
+- EMPTY:     The queue has run out of commands, but the move has been
+appended.
+- TOO_LARGE: The move request does not fit into the queue.
+             Reasons: The queue depth is (32/16) for SAM+ESP32/AVR.
+                      Each queue entry can emit 255 steps => (8160/4080)
+                      steps If the time between steps is >65535 ticks, then
+                      pauses have to be generated. In this case only (16/8)
+                      steps can be generated...but the queue shall not be
+                      empty
+                      => so even less steps can be done.
+             Recommendation: keep the duration in the range of ms.
+```cpp
+#define MOVE_TIMED_OK ((int8_t)0)
+#define MOVE_TIMED_BUSY ((int8_t)5)
+#define MOVE_TIMED_EMPTY ((int8_t)6)
+#define MOVE_TIMED_TOO_LARGE_ERROR ((int8_t)-4)
+  int8_t moveTimed(int16_t steps, uint32_t duration, uint32_t* actual_duration,
+                   bool start = true);
 ```
 ## Low Level Stepper Queue Management (low level access)
 

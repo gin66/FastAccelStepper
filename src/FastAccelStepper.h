@@ -630,9 +630,9 @@ class FastAccelStepper {
 // The application should consider this for the next runTimed move.
 //
 // The optional parameter is a boolean called start. This allows for the first
-// invocation to not start the queue yet. This is for managing steppers in parallel.
-// It allows to fill all steppers' queues and then kick it off by a call to
-// `moveTimed(0,0,NULL,true)`. Successive invocations can keep true.
+// invocation to not start the queue yet. This is for managing steppers in
+// parallel. It allows to fill all steppers' queues and then kick it off by a
+// call to `moveTimed(0,0,NULL,true)`. Successive invocations can keep true.
 //
 // In order to not have another lightweight ramp generator running in
 // background interrupt, the expecation to the application is, that this
@@ -661,7 +661,8 @@ class FastAccelStepper {
 #define MOVE_TIMED_BUSY ((int8_t)5)
 #define MOVE_TIMED_EMPTY ((int8_t)6)
 #define MOVE_TIMED_TOO_LARGE_ERROR ((int8_t)-4)
-  int8_t moveTimed(int16_t steps, uint32_t duration, uint32_t *actual_duration, bool start = true);
+  int8_t moveTimed(int16_t steps, uint32_t duration, uint32_t* actual_duration,
+                   bool start = true);
 
   // ## Low Level Stepper Queue Management (low level access)
   //

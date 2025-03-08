@@ -912,14 +912,13 @@ int32_t FastAccelStepper::getCurrentPosition() {
   return fas_queue[_queue_num].getCurrentPosition();
 }
 int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
-                                   uint32_t *actual_duration,
-				   bool start) {
+                                   uint32_t* actual_duration, bool start) {
   uint8_t ret_ok = isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
-      if (start) {
-         addQueueEntry(NULL, true); // start the queue
-      }
-      return ret_ok;
+    if (start) {
+      addQueueEntry(NULL, true);  // start the queue
+    }
+    return ret_ok;
   }
   uint8_t freeEntries = QUEUE_LEN - queueEntries();
   if (actual_duration) {
@@ -946,7 +945,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         // cmd.
         cmd.ticks = duration >> 1;
       }
-      uint8_t ret = addQueueEntry(&cmd,start);
+      uint8_t ret = addQueueEntry(&cmd, start);
       if (ret != 0) {
         // unexpected
         return ret;
@@ -971,7 +970,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
   rate /= steps;
   if (rate > 65535) {
     // we need pauses, so only few steps can be executed
-    uint16_t cmds_per_step = (rate >> 16)+1;  // bit too small
+    uint16_t cmds_per_step = (rate >> 16) + 1;  // bit too small
     if (cmds_per_step >= QUEUE_LEN) {
       return MOVE_TIMED_TOO_LARGE_ERROR;
     }
@@ -999,7 +998,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         }
         this_duration -= cmd.ticks;
 
-        uint8_t ret = addQueueEntry(&cmd,start);
+        uint8_t ret = addQueueEntry(&cmd, start);
         if (ret != 0) {
           // unexpected
           return ret;
@@ -1026,9 +1025,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
   expected_duration *= steps;
   // duration must be larger than expected_duration
   int16_t missing = duration - expected_duration;
-  #ifdef TEST
-    assert(duration >= expected_duration);
-  #endif
+#ifdef TEST
+  assert(duration >= expected_duration);
+#endif
   while (steps > 0) {
     if (steps > 510) {
       cmd.steps = 255;
@@ -1040,12 +1039,12 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
     if (steps <= missing) {
       // run the remaining steps bit slower to adjust for missing ticks
       cmd.ticks++;
-      missing = 0; // only increase once
-      #ifdef TEST
-         printf("increase ticks for %d steps\n", steps);
-      #endif
+      missing = 0;  // only increase once
+#ifdef TEST
+      printf("increase ticks for %d steps\n", steps);
+#endif
     }
-    uint8_t ret = addQueueEntry(&cmd,start);
+    uint8_t ret = addQueueEntry(&cmd, start);
     if (ret != 0) {
       // unexpected
       return ret;
@@ -1053,9 +1052,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
     uint32_t cmd_duration = cmd.ticks;
     cmd_duration *= cmd.steps;
     if (actual_duration) {
-       uint32_t d = cmd.ticks;
-       d *= steps;
-       *actual_duration += d;
+      uint32_t d = cmd.ticks;
+      d *= steps;
+      *actual_duration += d;
     }
     steps -= cmd.steps;
   }

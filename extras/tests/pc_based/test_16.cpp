@@ -113,53 +113,55 @@ void tc_2() {
   int8_t ret;
   uint32_t actual;
   int64_t actual_sum = 0;
-char fname[100];
+  char fname[100];
 
   FastAccelStepper s = FastAccelStepper();
   s.init(NULL, 0, 0);
   RampChecker rc = RampChecker();
-    snprintf(fname, 100, "test_16_tc_2.gnuplot");
-    rc.start_plot(fname);
- 
-  ret = s.moveTimed(QUEUE_LEN/2-1, QUEUE_LEN/2*100000, &actual);
+  snprintf(fname, 100, "test_16_tc_2.gnuplot");
+  rc.start_plot(fname);
+
+  ret = s.moveTimed(QUEUE_LEN / 2 - 1, QUEUE_LEN / 2 * 100000, &actual);
   test(ret == MOVE_TIMED_EMPTY, "TC2_S1: valid pars");
   actual_sum += actual;
 
   ret = s.moveTimed(2, 200000, &actual);
   printf("queue = %d\n", s.queueEntries());
-  test(ret != MOVE_TIMED_OK, "TC2_S2: move should be rejected"); 
+  test(ret != MOVE_TIMED_OK, "TC2_S2: move should be rejected");
   test(ret == MOVE_TIMED_BUSY, "TC2_S3: queue should be full");
 
   // process commands
-      while (!s.isQueueEmpty()) {
-        rc.increase_ok = true;
-        rc.decrease_ok = true;
-        rc.check_section(
-            &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
-        fas_queue[0].read_idx++;
-      }
+  while (!s.isQueueEmpty()) {
+    rc.increase_ok = true;
+    rc.decrease_ok = true;
+    rc.check_section(
+        &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+    fas_queue[0].read_idx++;
+  }
   ret = s.moveTimed(2, 200000, &actual);
   test(ret == MOVE_TIMED_EMPTY, "TC2_S4: valid pars");
   actual_sum += actual;
 
-    // process commands
-      while (!s.isQueueEmpty()) {
-        rc.increase_ok = true;
-        rc.decrease_ok = true;
-        rc.check_section(
-            &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
-        fas_queue[0].read_idx++;
-      }
-          rc.finish_plot();
+  // process commands
+  while (!s.isQueueEmpty()) {
+    rc.increase_ok = true;
+    rc.decrease_ok = true;
+    rc.check_section(
+        &fas_queue[0].entry[fas_queue[0].read_idx & QUEUE_LEN_MASK]);
+    fas_queue[0].read_idx++;
+  }
+  rc.finish_plot();
 
-    uint64_t expected_ticks = QUEUE_LEN/2*100000 + 200000;
-    printf("current position = %d,  total_ticks=%" PRIu64 "\n", s.getCurrentPosition(), rc.total_ticks);
-    test(s.getCurrentPosition() == QUEUE_LEN/2+1, "TC2_S5: step mismatch");
-    printf("expected ticks=%" PRIu64 ", actual=%" PRIu64 "\n", expected_ticks, actual_sum);
-    test(rc.total_ticks == actual_sum, "TC2_S6: time algnment");
-    int64_t drift = actual_sum - expected_ticks;
-    printf("drift=%" PRId64 "\n", abs(drift));
-    test(abs(drift) < 10, "accepted drift");
+  uint64_t expected_ticks = QUEUE_LEN / 2 * 100000 + 200000;
+  printf("current position = %d,  total_ticks=%" PRIu64 "\n",
+         s.getCurrentPosition(), rc.total_ticks);
+  test(s.getCurrentPosition() == QUEUE_LEN / 2 + 1, "TC2_S5: step mismatch");
+  printf("expected ticks=%" PRIu64 ", actual=%" PRIu64 "\n", expected_ticks,
+         actual_sum);
+  test(rc.total_ticks == actual_sum, "TC2_S6: time algnment");
+  int64_t drift = actual_sum - expected_ticks;
+  printf("drift=%" PRId64 "\n", abs(drift));
+  test(abs(drift) < 10, "accepted drift");
 }
 
 int main() {
@@ -173,18 +175,20 @@ int main() {
   s.init(NULL, 0, 0);
 
   ret = s.moveTimed(QUEUE_LEN * 255 + 1, 1000, &actual);
-  test(ret == MOVE_TIMED_TOO_LARGE_ERROR, "TC1_1: too many steps for the queue");
+  test(ret == MOVE_TIMED_TOO_LARGE_ERROR,
+       "TC1_1: too many steps for the queue");
 
-  ret = s.moveTimed(QUEUE_LEN + 1, 65536 * (QUEUE_LEN+1), &actual);
-  test(ret == MOVE_TIMED_TOO_LARGE_ERROR, "TC1_2: too many steps for the queue");
+  ret = s.moveTimed(QUEUE_LEN + 1, 65536 * (QUEUE_LEN + 1), &actual);
+  test(ret == MOVE_TIMED_TOO_LARGE_ERROR,
+       "TC1_2: too many steps for the queue");
 
-  ret = s.moveTimed(1, MIN_CMD_TICKS-1, &actual);
+  ret = s.moveTimed(1, MIN_CMD_TICKS - 1, &actual);
   test(ret == AQE_ERROR_TICKS_TOO_LOW, "TC1_3: too short duration");
 
-  ret = s.moveTimed(100, 100*(s.getMaxSpeedInTicks() - 1), &actual);
+  ret = s.moveTimed(100, 100 * (s.getMaxSpeedInTicks() - 1), &actual);
   test(ret == AQE_ERROR_TICKS_TOO_LOW, "TC1_4: still too short duration");
 
-  ret = s.moveTimed(QUEUE_LEN/2+1, (QUEUE_LEN/2)*100000, &actual);
+  ret = s.moveTimed(QUEUE_LEN / 2 + 1, (QUEUE_LEN / 2) * 100000, &actual);
   test(ret == MOVE_TIMED_TOO_LARGE_ERROR, "TC1_S5: too many commands");
 
   tc_2();
