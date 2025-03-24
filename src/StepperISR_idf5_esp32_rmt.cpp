@@ -226,7 +226,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect_rmt() {
-  rmt_tx_channel_config_t config;
+  rmt_tx_channel_config_t config{};
   config.gpio_num = (gpio_num_t)_step_pin;
   config.clk_src = RMT_CLK_SRC_DEFAULT;
   config.resolution_hz = TICKS_PER_S;
