@@ -16,7 +16,7 @@
 #define OUTPUT GPIO_MODE_OUTPUT
 #define pinMode(pin, mode)            \
   gpio_set_direction((gpio_num_t)pin, \
-                     (mode) == OUTPUT ? GPIO_MODE_OUTPUT : GPIO_MODE_INPUT)
+                     (mode) == OUTPUT ? GPIO_MODE_INPUT_OUTPUT : GPIO_MODE_INPUT)
 #define digitalWrite(pin, level) gpio_set_level((gpio_num_t)pin, level)
 #define digitalRead(pin) gpio_get_level((gpio_num_t)pin)
 
