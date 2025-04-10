@@ -4,6 +4,9 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+0.31.6:
+- esp32: fix for direction toggle issue as reported in (#316)
+
 0.31.5:
 - initial and untested version of `moveTimed()`
 - add esp32p4
