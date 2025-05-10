@@ -14,6 +14,9 @@
 #elif defined(ESP_PLATFORM)
 #define get_char(x) *x
 #define MSG_TYPE const char*
+#elif defined(PICO_RP2040) || defined(PICO_RP2350)
+#define get_char(x) *x
+#define MSG_TYPE const char*
 #else
 #error "Unsupported derivate"
 #endif

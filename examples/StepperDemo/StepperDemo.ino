@@ -416,6 +416,33 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     }};
+#elif defined(PICO_RP2040) || defined(PICO_RP2350)
+const uint8_t led_pin = LED_BUILTIN;
+const struct stepper_config_s stepper_config[12] = {
+    {
+      step : 14,
+      enable_low_active : 13,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 15,
+      dir_change_delay : 100,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 500000,
+      off_delay_ms : 5000
+    },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED },
+    { step: PIN_UNDEFINED }
+};
+
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -840,9 +867,10 @@ void do3200Steps(uint8_t step) {
   }
 }
 void setDirectionPin(uint8_t direction, bool polarity) {
+  // Pico resets the I/O-Port on pinMode(pin, OUTPUT)... feature ?
+  // so we move it to test_direct_drive
   if (direction != PIN_UNDEFINED) {
     digitalWrite(direction, polarity);
-    pinMode(direction, OUTPUT);
     delay10us();
     if (digitalRead(direction) != polarity) {
       output_msg(MSG_CANNOT_SET_DIRECTION_PIN);
@@ -878,6 +906,7 @@ void test_direct_drive(const struct stepper_config_s *stepper) {
     }
   }
   if (direction != PIN_UNDEFINED) {
+    pinMode(direction, OUTPUT);
     setDirectionPin(direction, direction_high_count_up);
     do3200Steps(step);
     setDirectionPin(direction, !direction_high_count_up);
