@@ -53,6 +53,8 @@ jobs:
           - atmega2560
           - atmega32u4
           - atmelsam
+          - rpipico
+          - rpipico2
 
     runs-on: ubuntu-latest
 
