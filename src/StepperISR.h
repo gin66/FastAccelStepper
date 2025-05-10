@@ -54,7 +54,15 @@ class StepperQueue {
   // provide information, that device is not yet ready for new commands.
   // This has been called isReadyForCommands().
   //
-
+#if defined(SUPPORT_RP_PICO)
+  volatile bool _isRunning;
+  bool _nextCommandIsPrepared;
+  inline bool isRunning() { return _isRunning; }
+  bool isReadyForCommands();
+  bool use_rmt;
+  uint8_t _step_pin;
+  uint16_t _getPerformedPulses();
+#endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;

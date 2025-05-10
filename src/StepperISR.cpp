@@ -168,6 +168,11 @@ int32_t StepperQueue::getCurrentPosition() {
   // this conversion is safe
   int16_t done_p = (int16_t)_getPerformedPulses();
 #endif
+#if defined(SUPPORT_RP_PICO)
+  // pulse counter should go max up to 255 with perhaps few pulses overrun, so
+  // this conversion is safe
+  int16_t done_p = (int16_t)_getPerformedPulses();
+#endif
   fasEnableInterrupts();
 #if defined(SUPPORT_ESP32)
   if (done_p == 0) {

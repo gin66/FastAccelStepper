@@ -83,6 +83,10 @@ struct queue_end_s {
 // AVR family
 #include "fas_arch/arduino_avr.h"
 
+#elif defined(PICO_RP2040) || defined(PICO_RP2350)
+// Raspberry Pico and Pico 2
+#include "fas_arch/arduino_rp_pico.h"
+
 #else
 #error "Unsupported devices"
 #endif
