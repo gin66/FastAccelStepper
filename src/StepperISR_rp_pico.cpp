@@ -25,7 +25,7 @@ void StepperQueue::startQueue() {
 }
 void StepperQueue::forceStop() {
 }
-uint16_t StepperQueue::_getPerformedPulses() {
+int32_t StepperQueue::getCurrentPosition() {
   return 0;
 }
 

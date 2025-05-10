@@ -59,9 +59,7 @@ class StepperQueue {
   bool _nextCommandIsPrepared;
   inline bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
-  bool use_rmt;
   uint8_t _step_pin;
-  uint16_t _getPerformedPulses();
 #endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;

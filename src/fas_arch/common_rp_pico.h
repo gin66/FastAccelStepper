@@ -7,6 +7,7 @@
 #define SUPPORT_RP_PICO
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
+//#define SUPPORT_QUEUE_ENTRY_START_POS_U16
 
 // pico queue definitions
 #if defined(PICO_RP2040) 
@@ -24,7 +25,6 @@
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
 #define DELAY_MS_BASE 4
 
-#define SUPPORT_QUEUE_ENTRY_START_POS_U16
 
 // debug led timing
 #define DEBUG_LED_HALF_PERIOD 50

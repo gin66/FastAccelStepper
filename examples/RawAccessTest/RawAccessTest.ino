@@ -22,6 +22,10 @@ const uint8_t dirPinStepper = 18;
 const uint8_t stepPinStepper = 1;  // only defined to satisfy compiler
 const uint8_t enablePinStepper = 2;
 const uint8_t dirPinStepper = 3;
+#elif defined(PICO_RP2040)||defined(PICO_RP2350)
+const uint8_t stepPinStepper = 15;  // only defined to satisfy compiler
+const uint8_t enablePinStepper = 13;
+const uint8_t dirPinStepper = 14;
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
