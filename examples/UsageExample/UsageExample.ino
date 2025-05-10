@@ -10,6 +10,15 @@
 #define enablePinStepper 26
 #define stepPinStepper 17
 
+#ifdef PICO_RP2350
+#undef dirPinStepper
+#undef enablePinStepper
+#undef stepPinStepper
+#define dirPinStepper 15
+#define enablePinStepper 13
+#define stepPinStepper 14
+#endif
+
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
 
