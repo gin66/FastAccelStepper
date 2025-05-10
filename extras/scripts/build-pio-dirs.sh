@@ -39,6 +39,7 @@ do
 	cd pio_espidf/$i
         mkdir FastAccelStepper
         ln -s $ROOT/src FastAccelStepper
+        ln -s $ROOT/CMakeLists.txt FastAccelStepper
 	ln -s ../../extras/ci/platformio.ini .
 	cd src
 	FILES=`cd ../../../extras/idf_examples/$i;find . -type f`
