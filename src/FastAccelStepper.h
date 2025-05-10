@@ -179,7 +179,13 @@ class FastAccelStepperEngine {
   bool _isValidStepPin(uint8_t step_pin);
   bool (*_externalCallForPin)(uint8_t pin, uint8_t value);
 
+#if defined(SUPPORT_RP_PICO)
+  uint8_t claimed_pios;
+  PIO pio[NUM_PIOS];
+#endif
+
   friend class FastAccelStepper;
+  friend class StepperQueue;
 };
 
 // ### Return codes of calls to `move()` and `moveTo()`

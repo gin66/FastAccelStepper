@@ -60,6 +60,10 @@ class StepperQueue {
   inline bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
   uint8_t _step_pin;
+  PIO pio;
+  uint sm;
+  bool claim_pio_sm(FastAccelStepperEngine *engine);
+  void setupSM();
 #endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;

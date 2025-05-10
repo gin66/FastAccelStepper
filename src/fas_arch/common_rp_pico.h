@@ -8,13 +8,10 @@
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
 //#define SUPPORT_QUEUE_ENTRY_START_POS_U16
+#define SUPPORT_STEPPER_CONNECT_BY_DRIVER
 
 // pico queue definitions
-#if defined(PICO_RP2040) 
-#define NUM_QUEUES 8 
-#elif defined(PICO_RP2350)
-#define NUM_QUEUES 12
-#endif
+#define NUM_QUEUES 4*NUM_PIOS
 #define MAX_STEPPER (NUM_QUEUES)
 #define QUEUE_LEN 32
 
@@ -32,13 +29,13 @@
 #define noop_or_wait vTaskDelay(1)
 
 // have more than one core
-#define SUPPORT_CPU_AFFINITY
+//#define SUPPORT_CPU_AFFINITY
 
 // have adjustable stepper task rate
 #define SUPPORT_TASK_RATE_CHANGE
 
-#define LL_TOGGLE_PIN(dirPin)                  \
-  gpio_ll_set_level(&GPIO, (gpio_num_t)dirPin, \
-                    gpio_ll_get_level(&GPIO, (gpio_num_t)dirPin) ^ 1)
+//#define LL_TOGGLE_PIN(dirPin)                  \
+//  gpio_ll_set_level(&GPIO, (gpio_num_t)dirPin, \
+//                    gpio_ll_get_level(&GPIO, (gpio_num_t)dirPin) ^ 1)
 
 #endif /* FAS_ARCH_COMMON_RP_PICO_H */

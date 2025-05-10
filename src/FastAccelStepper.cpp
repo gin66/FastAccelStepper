@@ -14,7 +14,9 @@ static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 
 // dynamic allocation seems to not work so well on avr
+#if !defined(SUPPORT_STEPPER_CONNECT_BY_DRIVER)
 FastAccelStepper fas_stepper[MAX_STEPPER];
+#endif
 
 //*************************************************************************************************
 //*************************************************************************************************
@@ -34,6 +36,9 @@ void FastAccelStepperEngine::init() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
   }
+  #if defined(SUPPORT_RP_PICO)
+  claimed_pios = 0;
+  #endif
   fas_init_engine(this);
 }
 #endif
@@ -64,6 +69,7 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
   return false;
 }
 //*************************************************************************************************
+#if !defined(SUPPORT_STEPPER_CONNECT_BY_DRIVER)
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
 #else
@@ -124,6 +130,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
   return s;
 }
+#endif
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
@@ -518,6 +525,13 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 
   _queue_num = num;
   fas_queue[_queue_num].init(_queue_num, step_pin);
+#if defined(SUPPORT_RP_PICO)
+  bool ok = fas_queue[_queue_num].claim_pio_sm(engine);
+  if (ok) {
+    fas_queue[_queue_num].setupSM();
+    fas_queue[_queue_num].connect();
+  }
+#endif
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
   _attached_pulse_unit = NULL;
 #endif
