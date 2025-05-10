@@ -424,7 +424,7 @@ const struct stepper_config_s stepper_config[12] = {
       enable_low_active : 13,
       enable_high_active : PIN_UNDEFINED,
       direction : 15,
-      dir_change_delay : 100,
+      dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 500000,

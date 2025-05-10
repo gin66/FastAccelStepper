@@ -67,12 +67,10 @@ void StepperQueue::connect() {
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
     pio_gpio_init(pio, dirPin);
   }
-  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
-  pio_sm_clear_fifos(pio, sm);
-  pio_sm_restart(pio, sm);
 }
 
 void StepperQueue::disconnect() {
+  pio_sm_set_enabled(pio, sm, false);
   gpio_init(_step_pin);
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
     gpio_init(dirPin);
@@ -80,12 +78,44 @@ void StepperQueue::disconnect() {
 }
 
 bool StepperQueue::isReadyForCommands() {
-  return false;
+  return true;
+}
+
+static void push_command(StepperQueue *q) {
+  Serial.println("PUSH");
+  uint8_t rp = q->read_idx;
+  if (rp == q->next_write_idx) {
+    // no command in queue
+    return;
+  }
+  if (pio_sm_is_tx_fifo_full(q->pio,q->sm)) {
+    return;
+  }
+  // Process command
+  struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+  uint8_t steps = e_curr->steps;
+  uint16_t ticks = e_curr->ticks;
+ 
+  bool forward = true;
+  uint32_t period = stepper_calc_period(forward, steps, 64000); // 4ms
+  uint32_t entry = (period<<9) | (forward ? 0:256) | steps;
+  pio_sm_put(q->pio, q->sm, entry);
+  Serial.println(entry);
+  rp++;
 }
 
 void StepperQueue::startQueue() {
+  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
+  pio_sm_clear_fifos(pio, sm);
+  pio_sm_restart(pio, sm);
+  push_command(this);
+  push_command(this);
+  push_command(this);
+  push_command(this);
+  push_command(this);
 }
 void StepperQueue::forceStop() {
+  pio_sm_set_enabled(pio, sm, false);
 }
 int32_t StepperQueue::getCurrentPosition() {
   return 0;
