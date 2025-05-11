@@ -7,7 +7,7 @@
 
 void fas_init_engine(FastAccelStepperEngine* engine) {}
 
-void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) { _initVars(); }
+bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num, uint8_t step_pin) { _initVars(); return true; }
 void StepperQueue::startQueue() { _isRunning = true; }
 void StepperQueue::forceStop() {}
 void StepperQueue::connect() {}
