@@ -69,7 +69,6 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
   return false;
 }
 //*************************************************************************************************
-#if !defined(SUPPORT_STEPPER_CONNECT_BY_DRIVER)
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
 #else
@@ -130,7 +129,6 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
   return s;
 }
-#endif
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;

@@ -172,41 +172,4 @@ void fas_init_engine(FastAccelStepperEngine *engine) {
 
   program = stepper_make_program();
 }
-
-FastAccelStepper fas_stepper[MAX_STEPPER];
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
-{
-  // Check if already connected
-  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper* s = _stepper[i];
-    if (s) {
-      if (s->getStepPin() == step_pin) {
-        return NULL;
-      }
-    }
-  }
-  if (!_isValidStepPin(step_pin)) {
-    return NULL;
-  }
-  int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
-  if (fas_stepper_num < 0) {  // flexible, so just choose next
-    if (_stepper_cnt >= MAX_STEPPER) {
-      return NULL;
-    }
-    fas_stepper_num = _stepper_cnt;
-  }
-
-  FastAccelStepper* s = &fas_stepper[fas_stepper_num];
-  s->init(this, fas_stepper_num, step_pin);
-
-  _stepper_cnt++;
-  _stepper[fas_stepper_num] = s;
-  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper* sx = _stepper[i];
-    if (sx) {
-      fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
-    }
-  }
-  return s;
-}
 #endif
