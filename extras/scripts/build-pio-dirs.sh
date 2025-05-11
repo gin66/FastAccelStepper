@@ -19,7 +19,7 @@ rm -fR pio_dirs
 mkdir pio_dirs
 for i in `ls examples`
 do
-	mkdir -p pio_dirs/$i/src
+	(mkdir -p pio_dirs/$i/src
 	cd pio_dirs/$i
         mkdir FastAccelStepper
         ln -s $ROOT/src FastAccelStepper
@@ -27,7 +27,7 @@ do
 	cd src
 	FILES=`cd ../../../examples/$i;find . -type f`
 	for f in $FILES;do ln -s ../../../examples/$i/$f .;done
-	cd ../../..
+	)
 done
 
 # for espidf as of now, the src/* files need to be linked into the example build directory
@@ -35,19 +35,25 @@ rm -fR pio_espidf
 mkdir pio_espidf
 for i in `cd extras;ls idf_examples`
 do
-	mkdir -p pio_espidf/$i/src
+	(mkdir -p pio_espidf/$i/src
 	cd pio_espidf/$i
-        mkdir FastAccelStepper
-        ln -s $ROOT/src FastAccelStepper
-        ln -s $ROOT/CMakeLists.txt FastAccelStepper
 	ln -s ../../extras/ci/platformio.ini .
 	cd src
 	FILES=`cd ../../../extras/idf_examples/$i;find . -type f`
 	for f in $FILES;do ln -s ../../../extras/idf_examples/$i/$f .;done
-	cd ../../..
+	)
 done
 mkdir -p pio_espidf/StepperDemo/src
 (cd pio_espidf/StepperDemo;ln -s ../../extras/ci/platformio.ini;cd src;cp ../../../examples/StepperDemo/* .;mv StepperDemo.ino StepperDemo.cpp)
+
+for i in `cd pio_espidf;ls`
+do
+	(cd pio_espidf/$i
+    mkdir FastAccelStepper
+    ln -s $ROOT/src FastAccelStepper
+    ln -s $ROOT/CMakeLists.txt FastAccelStepper
+	)
+done
 
 # Make one directory to test PoorManFloat on simulator
 mkdir pio_dirs/PMF_test
@@ -64,4 +70,3 @@ cd ../../..
 
 ls -al pio_*
 find pio_*
-
