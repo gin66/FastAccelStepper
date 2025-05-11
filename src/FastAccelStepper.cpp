@@ -36,9 +36,9 @@ void FastAccelStepperEngine::init() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
   }
-  #if defined(SUPPORT_RP_PICO)
+#if defined(SUPPORT_RP_PICO)
   claimed_pios = 0;
-  #endif
+#endif
   fas_init_engine(this);
 }
 #endif

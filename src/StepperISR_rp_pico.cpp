@@ -10,7 +10,8 @@
 StepperQueue fas_queue[NUM_QUEUES];
 static stepper_pio_program *program;
 
-bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num, uint8_t step_pin) {
+bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
+                        uint8_t step_pin) {
   uint8_t channel = queue_num;
   _step_pin = step_pin;
   bool ok = claim_pio_sm(engine);
@@ -26,7 +27,7 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
   // the whole PIO need to be claimed due to the size of our pio code.
   // Let's check first, if there is any PIO claimed.
   // If yes, check if we can claim a sm from that PIO.
-  for (uint8_t i = 0;i < engine->claimed_pios;i++) {
+  for (uint8_t i = 0; i < engine->claimed_pios; i++) {
     // pio has been claimed, so our program is valid
     int claimed_sm = pio_claim_unused_sm(engine->pio[i], false);
     if (claimed_sm >= 0) {
@@ -41,11 +42,12 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
   pio_program.length = program->pc;
   pio_program.origin = 0;
   pio_program.pio_version = 0;
-  #if defined(PICO_RP_2350)
-    pio_program.used_gpio_ranges = 0;
-  #endif
+#if defined(PICO_RP_2350)
+  pio_program.used_gpio_ranges = 0;
+#endif
   uint offset;
-  bool rc = pio_claim_free_sm_and_add_program_for_gpio_range(&pio_program, &pio, &sm, &offset, _step_pin, 1, true);
+  bool rc = pio_claim_free_sm_and_add_program_for_gpio_range(
+      &pio_program, &pio, &sm, &offset, _step_pin, 1, true);
   return rc;
 }
 
@@ -53,11 +55,11 @@ void StepperQueue::setupSM() {
   pio_sm_config c = pio_get_default_sm_config();
   // Map the state machine's OUT pin group to one pin, namely the `pin`
   // parameter to this function.
-  sm_config_set_jmp_pin(&c, _step_pin);    // Step pin read back for double period
+  sm_config_set_jmp_pin(&c, _step_pin);  // Step pin read back for double period
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
-    sm_config_set_out_pins(&c, dirPin, 1);// Direction pin via out
+    sm_config_set_out_pins(&c, dirPin, 1);  // Direction pin via out
   }
-  sm_config_set_set_pins(&c, _step_pin, 1);// Step pin via set
+  sm_config_set_set_pins(&c, _step_pin, 1);  // Step pin via set
   sm_config_set_wrap(&c, program->wrap_target, program->wrap_at);
 
   // Load our configuration, and jump to the start of the program
@@ -68,7 +70,7 @@ void StepperQueue::setupSM() {
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
     pio_sm_set_consecutive_pindirs(pio, sm, dirPin, 1, true);
   }
-  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
+  pio_sm_set_enabled(pio, sm, true);  // sm is running, otherwise loop() stops
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
 }
@@ -88,9 +90,7 @@ void StepperQueue::disconnect() {
   }
 }
 
-bool StepperQueue::isReadyForCommands() {
-  return true;
-}
+bool StepperQueue::isReadyForCommands() { return true; }
 
 static bool push_command(StepperQueue *q) {
   uint8_t rp = q->read_idx;
@@ -98,7 +98,7 @@ static bool push_command(StepperQueue *q) {
     // no command in queue
     return false;
   }
-  if (pio_sm_is_tx_fifo_full(q->pio,q->sm)) {
+  if (pio_sm_is_tx_fifo_full(q->pio, q->sm)) {
     return false;
   }
   // Process command
@@ -115,17 +115,18 @@ static bool push_command(StepperQueue *q) {
 }
 
 void StepperQueue::startQueue() {
-// These commands would clear isr and consequently the sm state's position is lost
-//  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
-//  pio_sm_clear_fifos(pio, sm);
-//  pio_sm_restart(pio, sm);
-  while(push_command(this)) {};
+  // These commands would clear isr and consequently the sm state's position is
+  // lost
+  //  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop()
+  //  stops pio_sm_clear_fifos(pio, sm); pio_sm_restart(pio, sm);
+  while (push_command(this)) {
+  };
 }
 void StepperQueue::forceStop() {
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
   // ensure step is zero
-  uint32_t entry = (1<<10) | (0) | 0;
+  uint32_t entry = (1 << 10) | (0) | 0;
   pio_sm_put(pio, sm, entry);
 }
 bool StepperQueue::isRunning() {
@@ -139,21 +140,21 @@ bool StepperQueue::isRunning() {
 }
 int32_t StepperQueue::getCurrentPosition() {
   // Drop old values in fifo
-  for (uint8_t i = 0;i <= 4;i++) {
+  for (uint8_t i = 0; i <= 4; i++) {
     pio_sm_get(pio, sm);
   }
   if (!isRunning()) {
     // kick off loop to probe position
-    uint32_t entry = (1<<10) | (0) | 0;
+    uint32_t entry = (1 << 10) | (0) | 0;
     pio_sm_put(pio, sm, entry);
-  }  
-  // just need to wait a while for next value
-  for (uint8_t i = 0;i <= 100;i++) {
-     if (!pio_sm_is_rx_fifo_empty(pio,sm)) {
-       break;
-     }
   }
-  uint32_t pos = pio_sm_get(pio,sm);
+  // just need to wait a while for next value
+  for (uint8_t i = 0; i <= 100; i++) {
+    if (!pio_sm_is_rx_fifo_empty(pio, sm)) {
+      break;
+    }
+  }
+  uint32_t pos = pio_sm_get(pio, sm);
   return (int32_t)pos;
 }
 
@@ -176,13 +177,14 @@ void StepperTask(void *parameter) {
   }
 }
 void FastAccelStepperEngine::pushCommands() {
-    for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-      FastAccelStepper* s = _stepper[i];
-      if (s) {
-        StepperQueue* q = &fas_queue[s->_queue_num];
-        while(push_command(q)) {};
-      }
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    FastAccelStepper *s = _stepper[i];
+    if (s) {
+      StepperQueue *q = &fas_queue[s->_queue_num];
+      while (push_command(q)) {
+      };
     }
+  }
 }
 void StepperTaskQueue(void *parameter) {
   FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
@@ -203,7 +205,8 @@ void fas_init_engine(FastAccelStepperEngine *engine) {
   engine->_delay_ms = DELAY_MS_BASE;
   xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
 
-  xTaskCreate(StepperTaskQueue, "StepperTaskQueue", STACK_SIZE, engine, PRIORITY, NULL);
+  xTaskCreate(StepperTaskQueue, "StepperTaskQueue", STACK_SIZE, engine,
+              PRIORITY, NULL);
 
   program = stepper_make_program();
 }

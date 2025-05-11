@@ -126,7 +126,8 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   return AQE_OK;
 }
 
-#if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16) || defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)
+#if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16) || \
+    defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)
 int32_t StepperQueue::getCurrentPosition() {
   fasDisableInterrupts();
   uint32_t pos = (uint32_t)queue_end.pos;

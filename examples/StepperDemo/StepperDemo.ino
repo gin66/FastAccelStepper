@@ -430,18 +430,17 @@ const struct stepper_config_s stepper_config[12] = {
       on_delay_us : 500000,
       off_delay_ms : 5000
     },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED },
-    { step: PIN_UNDEFINED }
-};
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED},
+    {step : PIN_UNDEFINED}};
 
 #endif
 

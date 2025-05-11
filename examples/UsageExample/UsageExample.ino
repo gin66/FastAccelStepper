@@ -10,7 +10,7 @@
 #define enablePinStepper 26
 #define stepPinStepper 17
 
-#if defined(PICO_RP2040)||defined(PICO_RP2350)
+#if defined(PICO_RP2040) || defined(PICO_RP2350)
 #undef dirPinStepper
 #undef enablePinStepper
 #undef stepPinStepper

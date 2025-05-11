@@ -6,7 +6,7 @@
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.28.1)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.28.1)
 
-## Matrix build for arduino using platformio (esp32, esp32c3, atmega328,...)
+## Matrix build for arduino using platformio (esp32, esp32c3, atmega328, pico2,...)
 [![Build examples](https://github.com/gin66/FastAccelStepper/actions/workflows/build_arduino_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_arduino_examples_matrix.yml)
 
 ## Matrix build for espidf using platformio
@@ -24,26 +24,29 @@ Arduino core 3.1.0 will support ESP-IDF V5.3.0 (based on RC1)
 ## Overview
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4 and atmelsam due.
+Supported are avr (ATmega 168/328/P, ATmega2560,  ATmega32u4), atmelsam due, esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4, Raspberry pi pico and pico2.
 
 The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
 * Step Signal
-	- avr atmega168/328/p: only Pin 9 and 10.
-	- avr atmega32u4: only Pin 9, 10 and 11.
-	- avr atmega2560: only Pin 6, 7 and 8.
+  - avr atmega168/328/p: only Pin 9 and 10.
+  - avr atmega32u4: only Pin 9, 10 and 11.
+  - avr atmega2560: only Pin 6, 7 and 8.
       On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 5 with FAS_TIMER_MODULE setting.
-	- esp32: This can be any output capable port pin.
-    - atmel sam due: This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6
-	- Step should be done on transition Low to High. High time will be only a few us.
-      On esp32 the high time is for slow speed fixed to ~2ms and high speed to 50% duty cycle
+  - esp32: This can be any output capable port pin.
+  - pico: Any GPIO up to 31
+  - atmel sam due: This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6
+  - Step should be done on transition Low to High. High time will be only a few us.
+  On esp32 the high time is for slow speed fixed to ~2ms and high speed to 50% duty cycle.
+  For pico direction delay is recommended
 * Direction Signal (optional)
-	- This can be any output capable port pin.
-    - Position counting up on direction pin high or low, as per optional parameter to setDirectionPin(). Default is high.
-    - With external callback on esp32 derivates, even shift register outputs can be used
+  - This can be any output capable port pin.
+  - pico: Any GPIO up to 31 (not verified !)
+  - Position counting up on direction pin high or low, as per optional parameter to setDirectionPin(). Default is high.
+  - With external callback on esp32 derivates, even shift register outputs can be used
 * Enable Signal (optional)
-	- This can be any output capable port pin.
-    - Stepper will be enabled on pin high or low, as per optional parameter to setEnablePin(). Default is low.
-    - With external callback, even shift register outputs can be used
+  - This can be any output capable port pin.
+  - Stepper will be enabled on pin high or low, as per optional parameter to setEnablePin(). Default is low.
+  - With external callback, even shift register outputs can be used
 
 FastAccelStepper offers the following features:
 * 1-pin operation for e.g. peristaltic pump => only positive move
@@ -175,6 +178,14 @@ Comments to pin sharing:
 * supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
 * untested
+
+### Raspberry pi pico/pico 2
+
+* allows up to 200000 generated steps per second
+* supports up to eight stepper motors for pico and twelve stepper motors for pico 2
+* Steppers' command queue depth: 32
+* beta status !!!!
+* untested and currently only one stepper tried
 
 ### Atmel SAM Due
 
@@ -343,6 +354,12 @@ This stepper driver uses rmt module and can drive up to 4 motors. Not thoroughly
 ### ESP32-MINI-1
 
 Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are listed in the datasheet. So there are chances, that this lib works.
+
+### Raspberry pi pico/pico 2
+
+Uses the pio module. Pico offers two pios and pico 2 offers three pios. Each pio contains four state machines and every state machine can drive one stepper.
+
+Integration with our sw using pio: FastAccelStepper claims always a complete pio. This means all four state machines are not available for the app. The second pio will be claimed, when allocating a fifth stepper. The third - on pico 2, when allocating the nineth stepper. Unused state machines of a pio cannot be used, because FastAccelStepper's pio code needs 100% of the available program space (32 words - none left).
 
 ### Atmel SAM Due
 

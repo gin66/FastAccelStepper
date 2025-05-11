@@ -60,7 +60,7 @@ class StepperQueue {
   uint8_t _step_pin;
   PIO pio;
   uint sm;
-  bool claim_pio_sm(FastAccelStepperEngine *engine);
+  bool claim_pio_sm(FastAccelStepperEngine* engine);
   void setupSM();
 #endif
 #if defined(SUPPORT_ESP32)
@@ -120,7 +120,8 @@ class StepperQueue {
   struct queue_end_s queue_end;
   uint16_t max_speed_in_ticks;
 
-  bool init(FastAccelStepperEngine *engine, uint8_t queue_num, uint8_t step_pin);
+  bool init(FastAccelStepperEngine* engine, uint8_t queue_num,
+            uint8_t step_pin);
   inline uint8_t queueEntries() {
     fasDisableInterrupts();
     uint8_t rp = read_idx;
