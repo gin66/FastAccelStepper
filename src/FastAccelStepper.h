@@ -182,6 +182,8 @@ class FastAccelStepperEngine {
 #if defined(SUPPORT_RP_PICO)
   uint8_t claimed_pios;
   PIO pio[NUM_PIOS];
+public:
+  void pushCommands();
 #endif
 
   friend class FastAccelStepper;

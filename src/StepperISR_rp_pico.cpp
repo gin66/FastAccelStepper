@@ -82,7 +82,6 @@ bool StepperQueue::isReadyForCommands() {
 }
 
 static void push_command(StepperQueue *q) {
-  Serial.println("PUSH");
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
     // no command in queue
@@ -100,8 +99,8 @@ static void push_command(StepperQueue *q) {
   uint32_t period = stepper_calc_period(forward, steps, 64000); // 4ms
   uint32_t entry = (period<<9) | (forward ? 0:256) | steps;
   pio_sm_put(q->pio, q->sm, entry);
-  Serial.println(entry);
   rp++;
+  q->read_idx = rp;
 }
 
 void StepperQueue::startQueue() {
@@ -139,6 +138,23 @@ void StepperTask(void *parameter) {
     vTaskDelay(delay_time);
   }
 }
+void FastAccelStepperEngine::pushCommands() {
+    for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+      FastAccelStepper* s = _stepper[i];
+      if (s) {
+        StepperQueue* q = &fas_queue[s->_queue_num];
+        push_command(q);
+      }
+    }
+}
+void StepperTaskQueue(void *parameter) {
+  FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
+  while (true) {
+    engine->pushCommands();
+    const TickType_t delay_time = 1;
+    vTaskDelay(delay_time);
+  }
+}
 
 void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
@@ -149,6 +165,8 @@ void fas_init_engine(FastAccelStepperEngine *engine) {
 #define PRIORITY (configMAX_PRIORITIES - 1)
   engine->_delay_ms = DELAY_MS_BASE;
   xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
+
+  xTaskCreate(StepperTaskQueue, "StepperTaskQueue", STACK_SIZE, engine, PRIORITY, NULL);
 
   program = stepper_make_program();
 }
