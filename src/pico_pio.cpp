@@ -17,9 +17,9 @@ static void add_step(uint instruction) {
 
 // fifo data is
 //   FEDCBA9876543210fedcba9876543210 = 32bits
-//           <- period   ->| |steps |
-//                          ^------------Dir pin value 0 means count up
-//
+//          <- period   ->|  |steps |
+//                          ^------------Dir pin value
+//                         ^-------------Count up if 1
 // For a pause the period is executed once and for a step: steps*2*period
 //
 //  6 cycles from start to including first jump for pause
@@ -55,6 +55,11 @@ uint32_t stepper_calc_period(bool dir_high, uint8_t steps, uint16_t cycles_16th_
     return target_cycles;
   }
 }
+uint32_t stepper_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps, uint16_t cycles_16th_us) {
+  uint32_t period = stepper_calc_period(dir_high, steps, cycles_16th_us);
+  uint32_t entry = (period<<10) | (count_up ? 512:0) | (dir_high ? 256:0) | steps;
+  return entry;
+}
 
 //
 stepper_pio_program *stepper_make_program() {
@@ -66,35 +71,36 @@ stepper_pio_program *stepper_make_program() {
   // ISR=position, X=invalid, Y=invalid, OSR=invalid
   // Blocking load of next command
   add_step(pio_encode_pull(false, true));
-  // ISR=position, X=invalid, Y=invalid, OSR=period:dir:steps_to_do
+  // ISR=position, X=invalid, Y=invalid, OSR=period:up:dir:steps_to_do
   // copy osr to x
   add_step(pio_encode_mov(pio_x, pio_osr));
-  // ISR=position, X=period:dir:steps_to_do, Y=invalid, OSR=period:dir:steps_to_do
+  // ISR=position, X=period:up:dir:steps_to_do, Y=invalid, OSR=period:up:dir:steps_to_do
   // get steps_to_do into y (8 bits)
   add_step(pio_encode_out(pio_y, 8));
-  // ISR=position, X=period:dir:steps_to_do, Y=invalid, OSR=period:dir
+  // ISR=position, X=period:up:dir:steps_to_do, Y=steps_to_do, OSR=period:up:dir
   // Move the dir pin value in lsb to pins
   add_step(pio_encode_out(pio_pins, 1));
-  // ISR=position, X=period:dir:steps_to_do, Y=steps_to_do, OSR=period
+  // ISR=position, X=period:up:dir:steps_to_do, Y=steps_to_do, OSR=[period:up]
   uint8_t label_loop_one_step = program.pc;
+  // ISR=position, X=period:up:dir:steps_to_do, Y=steps_to_do, OSR=undefined
   // store period:remaining_steps_to_do:dir in osr
   add_step(pio_encode_mov(pio_osr, pio_x));
-  // ISR=position, X=period:dir:steps_to_do, Y=steps_to_do, OSR=period:dir:steps_to_do
+  // ISR=position, X=period:up:dir:steps_to_do, Y=steps_to_do, OSR=period:up:dir:steps_to_do
   // Forward jump, if steps_to_do is zero, which clears step and enters loop
   uint8_t forward_jump_1 = program.pc;
   add_step(pio_encode_jmp_not_y(0)); 
-  // ISR=position, X=period:dir:steps_to_do, Y=[steps_to_do], OSR=period:dir:steps_to_do
-  // Get the direction into Y for position update below
-  add_step(pio_encode_out(pio_null,8));
-  // ISR=position, X=period:dir:steps_to_do, Y=[steps_to_do], OSR=period:dir
+  // ISR=position, X=period:up:dir:steps_to_do, Y=[steps_to_do], OSR=period:up:dir:steps_to_do
+  // Get the up flag into Y for position update below
+  add_step(pio_encode_out(pio_null,9));
+  // ISR=position, X=period:up:dir:steps_to_do, Y=[steps_to_do], OSR=period:up
   add_step(pio_encode_out(pio_y,1));
-  // ISR=position, X=period:dir:steps_to_do, Y=dir, OSR=[period]
+  // ISR=position, X=period:up:dir:steps_to_do, Y=up, OSR=[period]
   // decrement X in order to reduce steps_to_do by 1
   add_step(pio_encode_jmp_x_dec(program.pc+1));
-  // ISR=position, X=period:dir:steps_to_do-1, Y=dir, OSR=[period]
+  // ISR=position, X=period:up:dir:steps_to_do-1, Y=up, OSR=[period]
   // store updated period:remaining_steps_to_do:dir in osr
   add_step(pio_encode_mov(pio_osr, pio_x));
-  // ISR=position, X=period:dir:steps_to_do-1, Y=dir, OSR=period:dir:steps_to_do-1
+  // ISR=position, X=period:up:dir:steps_to_do-1, Y=up, OSR=period:up:dir:steps_to_do-1
   // set step output to 1 aka HIGH
   add_step(pio_encode_set(pio_pins, 1));
   // Step will be performed, so modify position using x
@@ -106,19 +112,19 @@ stepper_pio_program *stepper_make_program() {
   //     invert    1 2 3 .. e f 0 f0
   //
   // Load from isr the position into x and use inverted position, if dir=0
-  add_step(pio_encode_mov_not(pio_x, pio_isr));
-  add_step(pio_encode_jmp_not_y(program.pc+2));       // jump if y = 0
   add_step(pio_encode_mov(pio_x, pio_isr));
-  // ISR=position, X=position/-position, Y=dir, OSR=period:dir:steps_to_do-1
+  add_step(pio_encode_jmp_not_y(program.pc+2));       // jump if y = 0
+  add_step(pio_encode_mov_not(pio_x, pio_isr));
+  // ISR=position, X=position/-position, Y=up, OSR=period:up:dir:steps_to_do-1
   add_step(pio_encode_jmp_x_dec(program.pc+1));         // decrement x 
   // Store updated position in isr and invert, if dir=0
-  add_step(pio_encode_mov_not(pio_isr, pio_x));
-  add_step(pio_encode_jmp_not_y(program.pc+2));       // jump if y = 0
   add_step(pio_encode_mov(pio_isr, pio_x));
-  // ISR=position+/-1, X=[position+/-1], Y=[dir], OSR=period:dir:steps_to_do-1
+  add_step(pio_encode_jmp_not_y(program.pc+2));       // jump if y = 0
+  add_step(pio_encode_mov_not(pio_isr, pio_x));
+  // ISR=position+/-1, X=[position+/-1], Y=[up], OSR=period:up:dir:steps_to_do-1
   // restore x to osr
   add_step(pio_encode_mov(pio_x, pio_osr));
-  // ISR=position+1, X=period:dir:steps_to_do, Y=[dir], OSR=period:dir:steps_to_do
+  // ISR=position+1, X=period:up:dir:steps_to_do, Y=[up], OSR=period:up:dir:steps_to_do
   // Jump to the start of the loop
   uint8_t forward_jump_2 = program.pc;
   add_step(pio_encode_jmp(0));
@@ -130,40 +136,40 @@ stepper_pio_program *stepper_make_program() {
   // Now we combine the pause/steps_to_do command and perform the delay
   // After one time period, we set step pin to 0, which is no-op for a pause
   uint8_t label_no_steps = program.pc;
-  // ISR=position, X=period:dir:steps_to_do, Y=undefined, OSR=period:dir:steps_to_do
+  // ISR=position, X=period:up:dir:steps_to_do, Y=undefined, OSR=period:up:dir:steps_to_do
   // isolate period into osr
-  add_step(pio_encode_out(pio_null, 9));
-  // ISR=position, X=period:dir:steps_to_do, Y=undefined, OSR=period
+  add_step(pio_encode_out(pio_null, 10));
+  // ISR=position, X=period:up:dir:steps_to_do, Y=undefined, OSR=period
   // copy period to y
   add_step(pio_encode_mov(pio_y, pio_osr));
-  // ISR=position, X=period:dir:steps_to_do, Y=period, OSR=period
+  // ISR=position, X=period:up:dir:steps_to_do, Y=period, OSR=period
   // store period/remaining_steps_to_do in osr
   add_step(pio_encode_mov(pio_osr, pio_x));
-  // ISR=position, X=[period:dir:steps_to_do], Y=period, OSR=period:dir:steps_to_do
+  // ISR=position, X=[period:up:dir:steps_to_do], Y=period, OSR=period:up:dir:steps_to_do
   // move position into x
   add_step(pio_encode_mov(pio_x, pio_isr));
   uint8_t label_period_loop = program.pc;
-  // ISR=position, X=position, Y=period, OSR=period:dir:steps_to_do
+  // ISR=position, X=position, Y=period, OSR=period:up:dir:steps_to_do
   // output position in fifo
   add_step(pio_encode_push(false,false));
-  // ISR=0, X=position, Y=period, OSR=period:dir:steps_to_do
+  // ISR=0, X=position, Y=period, OSR=period:up:dir:steps_to_do
   // restore position in ISR
   add_step(pio_encode_mov(pio_isr, pio_x));
-  // ISR=position, X=position, Y=period, OSR=period:dir:steps_to_do
+  // ISR=position, X=position, Y=period, OSR=period:up:dir:steps_to_do
   // loop until period in y is 0
   add_step(pio_encode_jmp_y_dec(label_period_loop));
-  // ISR=position, X=[position], Y=[0], OSR=period:dir:steps_to_do
-  // store period:dir:steps_to_do in x
+  // ISR=position, X=[position], Y=[0], OSR=period:up:dir:steps_to_do
+  // store period:up:dir:steps_to_do in x
   add_step(pio_encode_mov(pio_x, pio_osr));
-  // ISR=position, X=period:dir:steps_to_do, Y=0, OSR=period:dir:steps_to_do
+  // ISR=position, X=period:up:dir:steps_to_do, Y=0, OSR=period:up:dir:steps_to_do
   // If step pin is still one, we need to perform another loop
   add_step(pio_encode_jmp_pin(label_loop_with_clear_step));
   // Step or Pause is completed
 
-  // ISR=position, X=period:dir:steps_to_do, Y=0, OSR=period:dir:steps_to_do
+  // ISR=position, X=period:up:dir:steps_to_do, Y=0, OSR=period:up:dir:steps_to_do
   // get steps_to_do into y (8 bits)
   add_step(pio_encode_out(pio_y, 8));
-  // ISR=position, X=period:dir:steps_to_do, Y=steps_to_do, OSR=period:dir
+  // ISR=position, X=period:up:dir:steps_to_do, Y=steps_to_do, OSR=[period:up:dir]
   // if steps_to_do is zero go to main loop
   add_step(pio_encode_jmp_not_y(label_main_loop));
   // Otherwise continue loop using wrap around

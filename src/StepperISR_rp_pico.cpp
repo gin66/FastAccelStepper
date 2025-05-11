@@ -70,6 +70,7 @@ void StepperQueue::setupSM() {
   }
   pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
   pio_sm_clear_fifos(pio, sm);
+  pio_sm_restart(pio, sm);
 }
 
 void StepperQueue::connect() {
@@ -105,8 +106,8 @@ static bool push_command(StepperQueue *q) {
   uint8_t steps = e_curr->steps;
   uint16_t ticks = e_curr->ticks;
   bool dirHigh = e_curr->dirPinState == 1;
-  uint32_t period = stepper_calc_period(dirHigh, steps, 64000); // 4ms
-  uint32_t entry = (period<<9) | (dirHigh ? 256:0) | steps;
+  bool countUp = e_curr->countUp == 1;
+  uint32_t entry = stepper_make_fifo_entry(dirHigh, countUp, steps, ticks);
   pio_sm_put(q->pio, q->sm, entry);
   rp++;
   q->read_idx = rp;
@@ -114,16 +115,17 @@ static bool push_command(StepperQueue *q) {
 }
 
 void StepperQueue::startQueue() {
-  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
-  pio_sm_clear_fifos(pio, sm);
-  pio_sm_restart(pio, sm);
+// These commands would clear isr and consequently the sm state's position is lost
+//  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
+//  pio_sm_clear_fifos(pio, sm);
+//  pio_sm_restart(pio, sm);
   while(push_command(this)) {};
 }
 void StepperQueue::forceStop() {
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
   // ensure step is zero
-  uint32_t entry = (1<<9) | (0) | 0;
+  uint32_t entry = (1<<10) | (0) | 0;
   pio_sm_put(pio, sm, entry);
 }
 bool StepperQueue::isRunning() {
@@ -142,7 +144,7 @@ int32_t StepperQueue::getCurrentPosition() {
   }
   if (!isRunning()) {
     // kick off loop to probe position
-    uint32_t entry = (1<<9) | (0) | 0;
+    uint32_t entry = (1<<10) | (0) | 0;
     pio_sm_put(pio, sm, entry);
   }  
   // just need to wait a while for next value

@@ -8,3 +8,4 @@ typedef struct pio_program_s {
 stepper_pio_program *stepper_make_program();
 
 uint32_t stepper_calc_period(bool dir_high, uint8_t steps, uint16_t cycles_16th_us);
+uint32_t stepper_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps, uint16_t cycles_16th_us);
