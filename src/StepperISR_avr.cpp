@@ -115,7 +115,7 @@ StepperQueue fas_queue[NUM_QUEUES];
     /* ensure cyclic interrupt is running */       \
     EnableOverflowInterrupt(T);                    \
   }
-void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num, uint8_t step_pin) {
   prepareISRtimeMeasurement();
   _initVars();
   digitalWrite(step_pin, LOW);
@@ -124,16 +124,20 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     channel = channelA;
     AVR_INIT(FAS_TIMER_MODULE, A)
   }
-  if (step_pin == stepPinStepperB) {
+  else if (step_pin == stepPinStepperB) {
     channel = channelB;
     AVR_INIT(FAS_TIMER_MODULE, B)
   }
 #ifdef stepPinStepperC
-  if (step_pin == stepPinStepperC) {
+  else if (step_pin == stepPinStepperC) {
     channel = channelC;
     AVR_INIT(FAS_TIMER_MODULE, C)
   }
 #endif
+  else {
+    return false;
+  }
+  return true;
 }
 
 // The interrupt is called on compare event, which eventually

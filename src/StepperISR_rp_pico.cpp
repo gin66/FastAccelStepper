@@ -10,9 +10,15 @@
 StepperQueue fas_queue[NUM_QUEUES];
 static stepper_pio_program *program;
 
-void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num, uint8_t step_pin) {
   uint8_t channel = queue_num;
   _step_pin = step_pin;
+  bool ok = claim_pio_sm(engine);
+  if (ok) {
+    setupSM();
+    connect();
+  }
+  return ok;
 }
 
 bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
@@ -83,14 +89,14 @@ bool StepperQueue::isReadyForCommands() {
   return true;
 }
 
-static void push_command(StepperQueue *q) {
+static bool push_command(StepperQueue *q) {
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
     // no command in queue
-    return;
+    return false;
   }
   if (pio_sm_is_tx_fifo_full(q->pio,q->sm)) {
-    return;
+    return false;
   }
   // Process command
   struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
@@ -103,17 +109,14 @@ static void push_command(StepperQueue *q) {
   pio_sm_put(q->pio, q->sm, entry);
   rp++;
   q->read_idx = rp;
+  return true;
 }
 
 void StepperQueue::startQueue() {
   pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
-  push_command(this);
-  push_command(this);
-  push_command(this);
-  push_command(this);
-  push_command(this);
+  while(push_command(this)) {};
 }
 void StepperQueue::forceStop() {
   pio_sm_set_enabled(pio, sm, false);
@@ -145,7 +148,7 @@ void FastAccelStepperEngine::pushCommands() {
       FastAccelStepper* s = _stepper[i];
       if (s) {
         StepperQueue* q = &fas_queue[s->_queue_num];
-        push_command(q);
+        while(push_command(q)) {};
       }
     }
 }

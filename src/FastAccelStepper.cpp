@@ -119,8 +119,11 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   _stepper_cnt++;
 
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
+  bool success = s->init(this, fas_stepper_num, step_pin);
+  if (!success) {
+    return NULL;
+  }
   _stepper[fas_stepper_num] = s;
-  s->init(this, fas_stepper_num, step_pin);
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* sx = _stepper[i];
     if (sx) {
@@ -501,7 +504,7 @@ bool FastAccelStepper::usesAutoEnablePin(uint8_t pin) {
   return false;
 }
 
-void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
+bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
                             uint8_t step_pin) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
@@ -522,20 +525,14 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _rg.init();
 
   _queue_num = num;
-  fas_queue[_queue_num].init(_queue_num, step_pin);
-#if defined(SUPPORT_RP_PICO)
-  bool ok = fas_queue[_queue_num].claim_pio_sm(engine);
-  if (ok) {
-    fas_queue[_queue_num].setupSM();
-    fas_queue[_queue_num].connect();
-  }
-#endif
+  bool success = fas_queue[_queue_num].init(engine, _queue_num, step_pin);
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
   _attached_pulse_unit = NULL;
 #endif
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
   _attached_pulse_cnt_unit = -1;
 #endif
+  return success;
 }
 uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,

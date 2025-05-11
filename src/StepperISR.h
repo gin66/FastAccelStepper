@@ -122,7 +122,7 @@ class StepperQueue {
   struct queue_end_s queue_end;
   uint16_t max_speed_in_ticks;
 
-  void init(uint8_t queue_num, uint8_t step_pin);
+  bool init(FastAccelStepperEngine *engine, uint8_t queue_num, uint8_t step_pin);
   inline uint8_t queueEntries() {
     fasDisableInterrupts();
     uint8_t rp = read_idx;
@@ -162,7 +162,7 @@ class StepperQueue {
 
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   bool isReadyForCommands_mcpwm_pcnt();
-  void init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
+  bool init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_mcpwm_pcnt();
   void forceStop_mcpwm_pcnt();
   uint16_t _getPerformedPulses_mcpwm_pcnt();
@@ -171,7 +171,7 @@ class StepperQueue {
 #endif
 #ifdef SUPPORT_ESP32_RMT
   bool isReadyForCommands_rmt();
-  void init_rmt(uint8_t channel_num, uint8_t step_pin);
+  bool init_rmt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_rmt();
 #if ESP_IDF_VERSION_MAJOR == 4
   void stop_rmt(bool both);

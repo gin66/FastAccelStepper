@@ -344,7 +344,7 @@ static void IRAM_ATTR mcpwm1_isr_service(void *arg) {
 #endif
 }
 
-void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
+bool StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 #ifdef TEST_PROBE
   pinMode(TEST_PROBE, OUTPUT);
 #endif
@@ -474,6 +474,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 
   // at last, link mcpwm to output pin and back into pcnt input
   connect();
+  return true;
 }
 
 void StepperQueue::connect_mcpwm_pcnt() {

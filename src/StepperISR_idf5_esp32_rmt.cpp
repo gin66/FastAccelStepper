@@ -186,7 +186,7 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
   return PART_SIZE;
 }
 
-void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
+bool StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 #ifdef TEST_PROBE_1
   if (channel_num == 0) {
     pinMode(TEST_PROBE_1, OUTPUT);
@@ -223,6 +223,7 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   connect_rmt();
   _isRunning = false;
   _rmtStopped = true;
+  return true;
 }
 
 void StepperQueue::connect_rmt() {

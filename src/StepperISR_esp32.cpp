@@ -5,20 +5,20 @@
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
-void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num, uint8_t step_pin) {
   uint8_t channel = queue_num;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   if (channel < QUEUES_MCPWM_PCNT) {
     use_rmt = false;
-    init_mcpwm_pcnt(channel, step_pin);
-    return;
+    return init_mcpwm_pcnt(channel, step_pin);
   }
   channel -= QUEUES_MCPWM_PCNT;
 #endif
 #ifdef SUPPORT_ESP32_RMT
   use_rmt = true;
-  init_rmt(channel, step_pin);
+  return init_rmt(channel, step_pin);
 #endif
+  return false;
 }
 
 void StepperQueue::connect() {
