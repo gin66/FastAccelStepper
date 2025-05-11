@@ -35,7 +35,9 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
   pio_program.length = program->pc;
   pio_program.origin = 0;
   pio_program.pio_version = 0;
-  pio_program.used_gpio_ranges = 0;
+  #if defined(PICO_RP_2350)
+    pio_program.used_gpio_ranges = 0;
+  #endif
   uint offset;
   bool rc = pio_claim_free_sm_and_add_program_for_gpio_range(&pio_program, &pio, &sm, &offset, _step_pin, 1, true);
   return rc;
