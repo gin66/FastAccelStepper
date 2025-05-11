@@ -32,14 +32,14 @@ static void add_step(uint instruction) {
 //  2 cycles including jump for per step repeat
 //
 // Cycles:
-//   Pause: 6+4+3*period+2+2=14+3*period
+//   Pause: 6+1+4+3*period+2+2=15+3*period
 //   Steps: 6+(12+2*DIR+(4+3*period+2)*2+2)*steps+2=8+6*period*steps+26*steps+2*DIR*steps
 //
 uint32_t stepper_calc_period(bool dir_high, uint8_t steps, uint16_t cycles_16th_us) {
   float cmd_time_s = float(cycles_16th_us)/16000000.0;
   if (steps == 0) {
     uint32_t target_cycles = uint32_t(cmd_time_s*program.sys_clk);
-    target_cycles -= 14;
+    target_cycles -= 15;
     target_cycles /= 3;
     return target_cycles;
   }
@@ -80,7 +80,7 @@ stepper_pio_program *stepper_make_program() {
   // store period:remaining_steps_to_do:dir in osr
   add_step(pio_encode_mov(pio_osr, pio_x));
   // ISR=position, X=period:dir:steps_to_do, Y=steps_to_do, OSR=period:dir:steps_to_do
-  // Forward jump, if steps_to_do is zero
+  // Forward jump, if steps_to_do is zero, which clears step and enters loop
   uint8_t forward_jump_1 = program.pc;
   add_step(pio_encode_jmp_not_y(0)); 
   // ISR=position, X=period:dir:steps_to_do, Y=[steps_to_do], OSR=period:dir:steps_to_do
@@ -169,7 +169,7 @@ stepper_pio_program *stepper_make_program() {
   // Otherwise continue loop using wrap around
 
   // patch forward jump address
-  program.code[forward_jump_1] |= label_no_steps;
+  program.code[forward_jump_1] |= label_loop_with_clear_step;
   program.code[forward_jump_2] |= label_no_steps;
 
   program.wrap_at = program.pc-1;

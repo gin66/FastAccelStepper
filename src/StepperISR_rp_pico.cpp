@@ -68,6 +68,8 @@ void StepperQueue::setupSM() {
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
     pio_sm_set_consecutive_pindirs(pio, sm, dirPin, 1, true);
   }
+  pio_sm_set_enabled(pio, sm, true); // sm is running, otherwise loop() stops
+  pio_sm_clear_fifos(pio, sm);
 }
 
 void StepperQueue::connect() {
@@ -102,10 +104,9 @@ static bool push_command(StepperQueue *q) {
   struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
   uint8_t steps = e_curr->steps;
   uint16_t ticks = e_curr->ticks;
- 
-  bool forward = true;
-  uint32_t period = stepper_calc_period(forward, steps, 64000); // 4ms
-  uint32_t entry = (period<<9) | (forward ? 0:256) | steps;
+  bool dirHigh = e_curr->dirPinState == 1;
+  uint32_t period = stepper_calc_period(dirHigh, steps, 64000); // 4ms
+  uint32_t entry = (period<<9) | (dirHigh ? 256:0) | steps;
   pio_sm_put(q->pio, q->sm, entry);
   rp++;
   q->read_idx = rp;
@@ -119,10 +120,39 @@ void StepperQueue::startQueue() {
   while(push_command(this)) {};
 }
 void StepperQueue::forceStop() {
-  pio_sm_set_enabled(pio, sm, false);
+  pio_sm_clear_fifos(pio, sm);
+  pio_sm_restart(pio, sm);
+  // ensure step is zero
+  uint32_t entry = (1<<9) | (0) | 0;
+  pio_sm_put(pio, sm, entry);
+}
+bool StepperQueue::isRunning() {
+  if (!pio_sm_is_tx_fifo_empty(pio, sm)) {
+    return true;
+  }
+  // Still the sm can process a command
+  uint8_t pc = pio_sm_get_pc(pio, sm);
+  // if pc > 0, then sm is not waiting for fifo entry
+  return (pc != 0);
 }
 int32_t StepperQueue::getCurrentPosition() {
-  return 0;
+  // Drop old values in fifo
+  for (uint8_t i = 0;i <= 4;i++) {
+    pio_sm_get(pio, sm);
+  }
+  if (!isRunning()) {
+    // kick off loop to probe position
+    uint32_t entry = (1<<9) | (0) | 0;
+    pio_sm_put(pio, sm, entry);
+  }  
+  // just need to wait a while for next value
+  for (uint8_t i = 0;i <= 100;i++) {
+     if (!pio_sm_is_rx_fifo_empty(pio,sm)) {
+       break;
+     }
+  }
+  uint32_t pos = pio_sm_get(pio,sm);
+  return (int32_t)pos;
 }
 
 //*************************************************************************************************

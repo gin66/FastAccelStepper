@@ -55,9 +55,7 @@ class StepperQueue {
   // This has been called isReadyForCommands().
   //
 #if defined(SUPPORT_RP_PICO)
-  volatile bool _isRunning;
-  bool _nextCommandIsPrepared;
-  inline bool isRunning() { return _isRunning; }
+  bool isRunning();
   bool isReadyForCommands();
   uint8_t _step_pin;
   PIO pio;
