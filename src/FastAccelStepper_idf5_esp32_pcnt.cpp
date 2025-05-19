@@ -44,7 +44,7 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
 
   pcnt_channel_level_action_t level_high = PCNT_CHANNEL_LEVEL_ACTION_KEEP;
   pcnt_channel_level_action_t level_low = PCNT_CHANNEL_LEVEL_ACTION_KEEP;
-  uint8_t dir_pin = getDirectionPin();
+  uint8_t dir_pin = getDirectionPin() & ~PIN_EXTERNAL_FLAG;
   if (dir_pin != PIN_UNDEFINED) {
     chan_config.level_gpio_num = dir_pin;
     if (directionPinHighCountsUp()) {

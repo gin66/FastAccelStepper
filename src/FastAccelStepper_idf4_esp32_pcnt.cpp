@@ -26,7 +26,7 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
   }
 
   pcnt_config_t cfg;
-  uint8_t dir_pin = getDirectionPin();
+  uint8_t dir_pin = getDirectionPin() & ~PIN_EXTERNAL_FLAG;;
   uint8_t step_pin = getStepPin();
   cfg.pulse_gpio_num = PCNT_PIN_NOT_USED;
   if (dir_pin == PIN_UNDEFINED) {
