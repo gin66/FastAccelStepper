@@ -20,7 +20,8 @@ struct pcnt_chan_t {
 
 bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
                                             int16_t low_value,
-                                            int16_t high_value) {
+                                            int16_t high_value,
+                                            uint8_t dir_pin) {
   pcnt_unit_config_t config = {.low_limit = low_value,
                                .high_limit = high_value,
                                .intr_priority = 0,
@@ -44,7 +45,7 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
 
   pcnt_channel_level_action_t level_high = PCNT_CHANNEL_LEVEL_ACTION_KEEP;
   pcnt_channel_level_action_t level_low = PCNT_CHANNEL_LEVEL_ACTION_KEEP;
-  uint8_t dir_pin = getDirectionPin() & ~PIN_EXTERNAL_FLAG;
+
   if (dir_pin != PIN_UNDEFINED) {
     chan_config.level_gpio_num = dir_pin;
     if (directionPinHighCountsUp()) {

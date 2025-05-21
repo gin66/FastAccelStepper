@@ -20,13 +20,13 @@ uint32_t ctrl_idx[SUPPORT_ESP32_PULSE_COUNTER] = {
 
 bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
                                             int16_t low_value,
-                                            int16_t high_value) {
+                                            int16_t high_value,
+                                            uint8_t dir_pin) {
   if (pcnt_unit >= SUPPORT_ESP32_PULSE_COUNTER) {
     return false;
   }
 
   pcnt_config_t cfg;
-  uint8_t dir_pin = getDirectionPin() & ~PIN_EXTERNAL_FLAG;;
   uint8_t step_pin = getStepPin();
   cfg.pulse_gpio_num = PCNT_PIN_NOT_USED;
   if (dir_pin == PIN_UNDEFINED) {
