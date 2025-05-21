@@ -131,6 +131,7 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
 
       uint16_t ticks_l = ticks >> 1;
       uint16_t ticks_r = ticks - ticks_l;
+      // ticks_l <= ticks_r
       uint32_t rmt_entry = ticks_l;
       rmt_entry <<= 16;
       rmt_entry |= ticks_r | 0x8000;  // with step
@@ -138,13 +139,18 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
         (*symbols++).val = rmt_entry;
       }
       // the last step needs to be stretched to fill PART_SIZE entries
+      // now generate the last step for this entry
+      // at worst case there are PART_SIZE-1 pauses.
+      // At 200kHz there are 80 ticks, but
+      // PART_SIZE-1=30 * (2+2) on each entry is already 160
+      // => only 1+1 is allowed
       uint32_t delta = PART_SIZE - steps_to_do;
-      delta <<= 18;  // shift in upper 16bit and multiply with 4
+      delta <<= 17;  // shift in upper 16bit and multiply with 2 (for 1+1 ticks pause)
       (*symbols++).val = rmt_entry - delta;
       for (uint8_t i = steps_to_do; i < PART_SIZE - 1; i++) {
-        (*symbols++).val = 0x00020002;
+        (*symbols++).val = 0x00010001;
       }
-      last_entry = 0x00020002;
+      last_entry = 0x00010001;
       steps -= steps_to_do;
     } else {
       // either >= 2*PART_SIZE or = PART_SIZE
