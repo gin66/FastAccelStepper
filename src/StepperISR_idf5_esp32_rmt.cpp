@@ -146,17 +146,17 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
         uint16_t ticks_low = ticks - ticks_high;
         while (ticks_high > 0) {
           if ((ticks_high > 4) && (extend_to > 2)) {
-            *data++ = 0x80018001;
+            (*symbols++).val = 0x80018001;
             ticks_high -= 2;
             extend_to--;
           } else {
-            *data++ = 0x80018000 | (ticks_high - 1);
+            (*symbols++).val = 0x80018000 | (ticks_high - 1);
             ticks_high = 0;
             extend_to--;
           }
         }
         while (extend_to > 1) {
-          *data++ = 0x00010001;
+          (*symbols++).val = 0x00010001;
           ticks_low -= 2;
           extend_to--;
         }
@@ -170,7 +170,7 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
           rmt_entry <<= 16;
           rmt_entry |= ticks_r | 0x8000;  // with step
           for (uint8_t i = 2; i <= steps_to_do; i++) {
-            *data++ = last_entry;
+            (*symbols++).val = last_entry;
             last_entry = rmt_entry;
           }
           last_entry = rmt_entry;
@@ -184,7 +184,7 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
         rmt_entry <<= 16;
         rmt_entry |= ticks_r | 0x8000;  // with step
         for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
-          *data++ = rmt_entry;
+          (*symbols++).val = rmt_entry;
         }
         last_entry = rmt_entry;
       }
