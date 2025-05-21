@@ -138,47 +138,71 @@ static void IRAM_ATTR apply_command(StepperQueue *q, bool fill_part_one,
         *data++ = 0x40007fff | 0x8000;
         last_entry = 0x20002000;
       }
-    } else if ((steps < 2 * PART_SIZE) && (steps != PART_SIZE)) {
+    } else {
       uint8_t steps_to_do = steps;
       if (steps > PART_SIZE) {
-        steps_to_do /= 2;
+        steps_to_do = PART_SIZE;
+        if (steps_to_do > PART_SIZE) {
+          steps_to_do >>= 1;
+        }
       }
-
-      uint16_t ticks_l = ticks >> 1;
-      uint16_t ticks_r = ticks - ticks_l;
-      // ticks_l <= ticks_r
-      uint32_t rmt_entry = ticks_l;
-      rmt_entry <<= 16;
-      rmt_entry |= ticks_r | 0x8000;  // with step
-      for (uint8_t i = 1; i < steps_to_do; i++) {
-        *data++ = rmt_entry;
-      }
-      // now generate the last step for this entry
-      // at worst case there are PART_SIZE-1 pauses.
-      // At 200kHz there are 80 ticks, but
-      // PART_SIZE-1=30 * (2+2) on each entry is already 160
-      // => only 1+1 is allowed
-      uint32_t delta = PART_SIZE - steps_to_do;
-      delta <<= 17;  // shift in upper 16bit and multiply with 2 (for 1+1 ticks pause)
-      *data++ = rmt_entry - delta;
-      for (uint8_t i = steps_to_do; i < PART_SIZE - 1; i++) {
-        *data++ = 0x00010001;
-      }
-      last_entry = 0x00010001;
+      // deduct this buffer's step from total
       steps -= steps_to_do;
-    } else {
-      // either >= 2*PART_SIZE or = PART_SIZE
-      // every entry one step
-      uint16_t ticks_l = ticks >> 1;
-      uint16_t ticks_r = ticks - ticks_l;
-      uint32_t rmt_entry = ticks_l;
-      rmt_entry <<= 16;
-      rmt_entry |= ticks_r | 0x8000;  // with step
-      for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
-        *data++ = rmt_entry;
+      if (steps_to_do < PART_SIZE) {
+        // We need to fill up the partition.
+        // Worst case would be one step in the buffer.
+        // In order to get threshold interrupt early enough,
+        // the first step should be stretched to maximum
+        // The minimum period is 80ticks @200kHz
+        // For PART_SIZE <= 31. This is possible, but high _and_ low
+        // may need stretching.
+        uint8_t extend_to = PART_SIZE - steps_to_do + 1;  // extend_to >= 2
+        uint16_t ticks_high = ticks >> 1;
+        uint16_t ticks_low = ticks - ticks_high;
+        while (ticks_high > 0) {
+          if ((ticks_high > 4) && (extend_to > 2)) {
+            *data++ = 0x80018001;
+            ticks_high -= 2;
+            extend_to--;
+          } else {
+            *data++ = 0x80018000 | (ticks_high - 1);
+            ticks_high = 0;
+            extend_to--;
+          }
+        }
+        while (extend_to > 1) {
+          *data++ = 0x00010001;
+          ticks_low -= 2;
+          extend_to--;
+        }
+        last_entry = 0x00010000 | (ticks_low - 1);
+        // Now add remaining steps, if any
+        if (steps_to_do > 1) {
+          uint16_t ticks_l = ticks >> 1;
+          uint16_t ticks_r = ticks - ticks_l;
+          // ticks_l <= ticks_r
+          uint32_t rmt_entry = ticks_l;
+          rmt_entry <<= 16;
+          rmt_entry |= ticks_r | 0x8000;  // with step
+          for (uint8_t i = 2; i <= steps_to_do; i++) {
+            *data++ = last_entry;
+            last_entry = rmt_entry;
+          }
+          last_entry = rmt_entry;
+        }
+      } else {
+        // either >= 2*PART_SIZE or = PART_SIZE
+        // every entry one step
+        uint16_t ticks_l = ticks >> 1;
+        uint16_t ticks_r = ticks - ticks_l;
+        uint32_t rmt_entry = ticks_l;
+        rmt_entry <<= 16;
+        rmt_entry |= ticks_r | 0x8000;  // with step
+        for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
+          *data++ = rmt_entry;
+        }
+        last_entry = rmt_entry;
       }
-      last_entry = rmt_entry;
-      steps -= PART_SIZE;
     }
   }
   if (!fill_part_one) {
