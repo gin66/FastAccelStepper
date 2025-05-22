@@ -2,6 +2,11 @@ BEGIN {
 	pass = 1
 }
 
+/ @0 acceleration/ {
+  # ignore lines, if pulse counter not set
+  next
+}
+
 # This is for running motor
 /^M[17]:/ {
 	api = substr($2,2)

@@ -1,6 +1,9 @@
 all: compile test
 
-DEV=ttyUSB0
+# grabserial is a python tool.
+
+# macos:
+DEV=cu.usbserial-0001
 
 test: M1.test M7.test
 
