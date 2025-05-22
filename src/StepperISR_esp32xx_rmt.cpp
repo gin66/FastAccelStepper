@@ -19,6 +19,21 @@
 // Every 16 bit entry defines with MSB the output level and the lower 15 bits
 // the ticks.
 #define PART_SIZE (RMT_SIZE / 2 - 1)
+//
+// Important difference of esp32s3 (compared to esp32):
+// Esp32s3 technical reference manual states for relation 1:
+//    3*T_APB + 5*T_RMT_CLK < period*T_CLK_DIV
+// and relation 2, if period[14:0] == 0:
+//    6*T_APB + 12*T_RMT_CLK < period*T_CLK_DIV
+//
+// Relation 2 is not applicable, because our end marker is 0x00000000
+//
+// Relation 1 means:
+//    T_APB = 1/80MHz = 12.5ns
+//    T_CLK_DIV = 1/16MHz = 62.5ns
+//    T_RMT_CLK = 1/80MHz = 12.5ns
+//    => period > (3*12.5ns + 5*12.5ns)/(62.5ns) = 1.6
+//
 
 void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
                                     uint32_t *data) {
@@ -183,7 +198,6 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
     }
   }
   #if defined(SUPPORT_ESP32_RMT_TICK_LOST)
-  // No tick lost mentioned for esp32c3
   if (!fill_part_one) {
     // Note: When enabling the continuous transmission mode by setting
     // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
@@ -194,6 +208,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
     last_entry -= 1;
   }
   #endif
+  // No tick lost mentioned for esp32s3 and esp32c3
   *data = last_entry;
 
   // Data is complete
