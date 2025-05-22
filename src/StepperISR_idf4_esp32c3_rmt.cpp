@@ -26,15 +26,6 @@
 // - minimum periods as per relation 1 and 2 to be adhered to
 //
 //
-#ifdef HAVE_ESP32C3_RMT
-#define PART_SIZE 23
-#define RMT_MEM_SIZE 48
-#else
-#error
-#define PART_SIZE 31
-#define RMT_MEM_SIZE 64
-#endif
-
 // In order to avoid threshold/end interrupt on end, add one
 #define enable_rmt_interrupts(channel)             \
   {                                                \

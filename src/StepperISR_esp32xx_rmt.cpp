@@ -18,10 +18,9 @@
 // second.
 // Every 16 bit entry defines with MSB the output level and the lower 15 bits
 // the ticks.
-#define PART_SIZE (RMT_SIZE / 2 - 1)
 //
-// Important difference of esp32s3 (compared to esp32):
-// Esp32s3 technical reference manual states for relation 1:
+// Important difference of esp32c3/esp32s3 (compared to esp32):
+// Esp32c3 and Esp32s3 technical reference manuals state for relation 1:
 //    3*T_APB + 5*T_RMT_CLK < period*T_CLK_DIV
 // and relation 2, if period[14:0] == 0:
 //    6*T_APB + 12*T_RMT_CLK < period*T_CLK_DIV
@@ -49,7 +48,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
         // make a pause with approx. 1ms
         //    258 ticks * 2 * 31 = 15996 @ 16MHz
         //    347 ticks * 2 * 23 = 15962 @ 16MHz
-        *data++ = 0x010001 * (16000 / 2 / PART_SIZE);
+        *data++ = 0x00010001 * (16000 / 2 / PART_SIZE);
       }
     } else {
       q->stop_rmt(false);
@@ -85,19 +84,20 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
   //  if (steps != 0) {
   //  	PROBE_1_TOGGLE;
   //}
-  uint32_t last_entry;
   if (steps == 0) {
+    uint32_t last_entry;
     q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
     for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
-      // two pauses à 3 ticks. the 2 for debugging
-      *data++ = 0x00010002;
-      ticks -= 3;
+      // two pauses à 4 ticks
+      *data++ = 0x00020002;
+      ticks -= 4;
     }
     uint16_t ticks_l = ticks >> 1;
     uint16_t ticks_r = ticks - ticks_l;
     last_entry = ticks_l;
     last_entry <<= 16;
     last_entry |= ticks_r;
+    *data++ = last_entry;
   } else {
     q->bufferContainsSteps[fill_part_one ? 0 : 1] = true;
     if (ticks == 0xffff) {
@@ -116,19 +116,16 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
         *data++ = 0x20002000 - delta;
         // 2*(steps - 1) + 1 already stored => 2*steps - 1
         // and after this for loop one entry added => 2*steps
-        for (uint8_t i = 2 * steps; i < PART_SIZE - 1; i++) {
+        for (uint8_t i = 2 * steps; i < PART_SIZE; i++) {
           *data++ = 0x00100010;
         }
-        last_entry = 0x00100010;
         steps = 0;
       } else {
         steps -= PART_SIZE / 2;
-        for (uint8_t i = 0; i < PART_SIZE / 2 - 1; i++) {
+        for (uint8_t i = 0; i < PART_SIZE / 2; i++) {
           *data++ = 0x40007fff | 0x8000;
           *data++ = 0x20002000;
         }
-        *data++ = 0x40007fff | 0x8000;
-        last_entry = 0x20002000;
       }
     } else {
       uint8_t steps_to_do = steps;
@@ -144,43 +141,60 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
         // We need to fill up the partition.
         // Worst case would be one step in the buffer.
         // In order to get threshold interrupt early enough,
-        // the first step should be stretched to maximum
-        // The minimum period is 80ticks @200kHz
-        // For PART_SIZE <= 31. This is possible, but high _and_ low
-        // may need stretching.
-        uint8_t extend_to = PART_SIZE - steps_to_do + 1;  // extend_to >= 2
-        uint16_t ticks_high = ticks >> 1;
-        uint16_t ticks_low = ticks - ticks_high;
-        while (ticks_high > 0) {
-          if ((ticks_high > 4) && (extend_to > 2)) {
-            *data++ = 0x80018001;
-            ticks_high -= 2;
-            extend_to--;
-          } else {
-            *data++ = 0x80018000 | (ticks_high - 1);
-            ticks_high = 0;
-            extend_to--;
+        // the first step should be stretched to maximum.
+        // The minimum period is 80ticks @200kHz.
+        // Minimum command time is 3200 ticks.
+        // Consequently, 80 ticks will come with minimum 40 steps.
+        // Split into two rmt parts, so 20 steps each.
+        // For PART_SIZE 23 or 31, minimum period is 2*2*PART_SIZE = 92 or 124ticks.
+        // A single step with 80ticks cannot be stretched to PART_SIZE.
+        // => we need to stretch eventually two steps.
+        uint8_t i = 0;
+        while (true) {
+          uint8_t extend_to_i = PART_SIZE - steps_to_do;  // extend_to_i >= 1
+          // if steps_to_do = PART_SIZE-1, then extend_to_i = 1
+          if (i >= extend_to_i) {
+            // we have already extended enough
+            break;
           }
-        }
-        while (extend_to > 1) {
-          *data++ = 0x00010001;
-          ticks_low -= 2;
-          extend_to--;
-        }
-        last_entry = 0x00010000 | (ticks_low - 1);
+          steps_to_do--; // one step less to do
+          uint16_t ticks_high = ticks >> 1;
+          uint16_t ticks_low = ticks - ticks_high;
+          while (true) {
+            // need i+1, because low entry is still needed
+            if ((ticks_high >= 8) && (i+1 < extend_to_i)) {
+              *data++ = 0x80028002;
+              i++;
+              ticks_high -= 4;
+            } else {
+              *data++ = 0x80028000 | (ticks_high - 2);
+              i++;
+              break;
+            }
+          }
+          while (true) {
+            if ((ticks_low >= 8) && (i < extend_to_i)) {
+              *data++ = 0x00020002;
+              i++;
+              ticks_low -= 4;
+            } else {
+              *data++ = 0x00020000 | (ticks_low - 2);
+              i++;
+              break;
+            }
+          }
+        } 
         // Now add remaining steps, if any
-        if (steps_to_do > 1) {
+        if (steps_to_do > 0) {
           uint16_t ticks_l = ticks >> 1;
           uint16_t ticks_r = ticks - ticks_l;
           // ticks_l <= ticks_r
           uint32_t rmt_entry = ticks_l;
           rmt_entry <<= 16;
           rmt_entry |= ticks_r | 0x8000;  // with step
-          for (uint8_t i = 2; i <= steps_to_do; i++) {
-            *data++ = last_entry;
-            last_entry = rmt_entry;
+          for (uint8_t i = 1; i <= steps_to_do; i++) {
+            *data++ = rmt_entry;
           }
-          last_entry = rmt_entry;
         }
       } else {
         // either >= 2*PART_SIZE or = PART_SIZE
@@ -190,14 +204,14 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
         uint32_t rmt_entry = ticks_l;
         rmt_entry <<= 16;
         rmt_entry |= ticks_r | 0x8000;  // with step
-        for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
+        for (uint8_t i = 0; i < PART_SIZE; i++) {
           *data++ = rmt_entry;
         }
-        last_entry = rmt_entry;
       }
     }
   }
   #if defined(SUPPORT_ESP32_RMT_TICK_LOST)
+  // No tick lost mentioned for esp32s3 and esp32c3
   if (!fill_part_one) {
     // Note: When enabling the continuous transmission mode by setting
     // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
@@ -205,11 +219,10 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
     // then from the first to the last again, and so on. In this mode, there
     // will be an idle level lasting one clk_div cycle between N and N+1
     // transmissions.
-    last_entry -= 1;
+    data--;
+    *data -= 1;
   }
   #endif
-  // No tick lost mentioned for esp32s3 and esp32c3
-  *data = last_entry;
 
   // Data is complete
   if (steps == 0) {

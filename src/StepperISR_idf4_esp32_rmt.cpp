@@ -19,7 +19,6 @@
 // second.
 // Every 16 bit entry defines with MSB the output level and the lower 15 bits
 // the ticks.
-#define PART_SIZE 31
 
 void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   // We are stopping the rmt by letting it run into the end at high speed.
