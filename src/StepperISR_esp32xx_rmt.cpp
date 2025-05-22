@@ -7,13 +7,12 @@
 
 // The following concept is in use:
 //
-//    The buffer of 64Bytes is split into two parts à 31 words.
+//    The rmt buffer is split into two parts.
 //    Each part will hold one command (or part of).
-//    After the 2*31 words an end marker is placed.
-//    The threshold is set to 31.
 //
 //    This way, the threshold interrupt occurs after the first part
 //    and the end interrupt after the second part.
+//    After the two parts an end marker is placed.
 //
 // Of these 32 bits, the low 16-bit entry is sent first and the high entry
 // second.
@@ -34,7 +33,8 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         // make a pause with approx. 1ms
         //    258 ticks * 2 * 31 = 15996 @ 16MHz
-        *data++ = 0x01020102;
+        //    347 ticks * 2 * 23 = 15962 @ 16MHz
+        *data++ = 0x010001 * (16000 / 2 / PART_SIZE);
       }
     } else {
       q->stop_rmt(false);
@@ -52,7 +52,8 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
       q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         // two pauses à n ticks to achieve MIN_CMD_TICKS
-        *data++ = 0x00010001 * ((MIN_CMD_TICKS + 61) / 62);
+        *data++ = 0x00010001 *
+                  ((MIN_CMD_TICKS + 2 * PART_SIZE - 1) / (2 * PART_SIZE));
       }
       return;
     }
@@ -67,7 +68,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
   uint8_t steps = e_curr->steps;
   uint16_t ticks = e_curr->ticks;
   //  if (steps != 0) {
-  //  	PROBE_2_TOGGLE;
+  //  	PROBE_1_TOGGLE;
   //}
   uint32_t last_entry;
   if (steps == 0) {
@@ -181,6 +182,8 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
       }
     }
   }
+  #if defined(SUPPORT_ESP32_RMT_TICK_LOST)
+  // No tick lost mentioned for esp32c3
   if (!fill_part_one) {
     // Note: When enabling the continuous transmission mode by setting
     // RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
@@ -190,6 +193,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
     // transmissions.
     last_entry -= 1;
   }
+  #endif
   *data = last_entry;
 
   // Data is complete
