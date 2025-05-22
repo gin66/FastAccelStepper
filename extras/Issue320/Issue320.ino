@@ -1,4 +1,5 @@
 #include "FastAccelStepper.h"
+#if defined(SUPPORT_ESP32_RMT) && (ESP_IDF_VERSION_MAJOR == 4)
 #include "esp32/clk.h"
 
 // Tests done with esp32
@@ -132,3 +133,7 @@ void loop() {
 
   delay(20);
 }
+#else
+void setup() {}
+void loop() {}
+#endif
