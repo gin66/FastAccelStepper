@@ -28,8 +28,11 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
 
   pcnt_config_t cfg;
   uint8_t step_pin = getStepPin();
-  cfg.pulse_gpio_num = PCNT_PIN_NOT_USED;
   if (dir_pin == PIN_UNDEFINED) {
+    dir_pin = getDirectionPin();
+  }
+  cfg.pulse_gpio_num = PCNT_PIN_NOT_USED;
+  if (dir_pin == PIN_UNDEFINED || (dir_pin & PIN_EXTERNAL_FLAG) != 0) {
     cfg.ctrl_gpio_num = PCNT_PIN_NOT_USED;
     cfg.hctrl_mode = PCNT_MODE_KEEP;
     cfg.lctrl_mode = PCNT_MODE_KEEP;
@@ -64,7 +67,7 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
   gpio_matrix_in(step_pin, sig_idx[pcnt_unit], 0);
   gpio_iomux_in(step_pin,
                 sig_idx[pcnt_unit]);  // test failure without this call
-  if (dir_pin != PIN_UNDEFINED) {
+  if (dir_pin != PIN_UNDEFINED && (dir_pin & PIN_EXTERNAL_FLAG) == 0) {
     pinMode(dir_pin, OUTPUT);
     gpio_matrix_out(dir_pin, 0x100, false, false);
     gpio_matrix_in(dir_pin, ctrl_idx[pcnt_unit], 0);

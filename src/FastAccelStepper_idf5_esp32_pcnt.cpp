@@ -46,7 +46,11 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
   pcnt_channel_level_action_t level_high = PCNT_CHANNEL_LEVEL_ACTION_KEEP;
   pcnt_channel_level_action_t level_low = PCNT_CHANNEL_LEVEL_ACTION_KEEP;
 
-  if (dir_pin != PIN_UNDEFINED) {
+  if (dir_pin == PIN_UNDEFINED) {
+    dir_pin = getDirectionPin();
+  }
+
+  if (dir_pin != PIN_UNDEFINED && (dir_pin & PIN_EXTERNAL_FLAG) == 0) {
     chan_config.level_gpio_num = dir_pin;
     if (directionPinHighCountsUp()) {
       level_low = PCNT_CHANNEL_LEVEL_ACTION_INVERSE;
@@ -106,7 +110,7 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
                    .pulse_sig;
   gpio_matrix_in(step_pin, signal, 0);
   gpio_iomux_in(step_pin, signal);
-  if (dir_pin != PIN_UNDEFINED) {
+  if (dir_pin != PIN_UNDEFINED && (dir_pin & PIN_EXTERNAL_FLAG) == 0) {
     pinMode(dir_pin, OUTPUT);
     int control = pcnt_periph_signals.groups[0]
                       .units[unit_id]
