@@ -51,8 +51,11 @@ void setup() {
   //   RMT and MCPWM need both ~1020ms
   // stepperSpeed 20000:
   //   RMT and MCPWM both need 4540ms
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   stepper = engine.stepperConnectToPin(stepPinStepper, DRIVER_RMT);
-  //stepper = engine.stepperConnectToPin(stepPinStepper);
+#else
+  stepper = engine.stepperConnectToPin(stepPinStepper);
+#endif
 
   if (!stepper) {
      while(true) {

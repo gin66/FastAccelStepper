@@ -208,6 +208,11 @@ class StepperQueue {
 
 extern StepperQueue fas_queue[NUM_QUEUES];
 
+#if defined(SUPPORT_ESP32_RMT)
+void rmt_apply_command(StepperQueue *q, bool fill_part_one,
+                                    uint32_t *data);
+#endif
+
 #if defined(SUPPORT_CPU_AFFINITY)
 void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core);
 #else
