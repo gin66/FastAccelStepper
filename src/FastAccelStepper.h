@@ -788,6 +788,10 @@ class FastAccelStepper {
   // stepper (at exact this moment) can be retrieved just by reading the pulse
   // counter. If the value is negative, then just add 3200.
   //
+  // In case external direction pin is used and the dir pin is available on one
+  // of the GPIOs, then the additional dir_pin_readback parameter informs
+  // about this pin.
+  //
   // Update for idf5 version:
   // The pcnt_unit value is not used, because the available units are managed
   // by the system. The parameter is kept for compatibility.
