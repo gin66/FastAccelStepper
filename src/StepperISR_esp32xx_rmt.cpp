@@ -43,7 +43,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
   if (rp == q->next_write_idx) {
     // no command in queue
     if (fill_part_one) {
-      q->bufferContainsSteps[0] = false;
+      q->lastChunkContainsSteps = false;
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         // make a pause with approx. 1ms
         //    258 ticks * 2 * 31 = 15996 @ 16MHz
@@ -61,9 +61,9 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
   if (e_curr->toggle_dir) {
     // the command requests dir pin toggle
     // This is ok only, if the ongoing command does not contain steps
-    if (q->bufferContainsSteps[fill_part_one ? 1 : 0]) {
+    if (q->lastChunkContainsSteps) {
       // So we need a pause. change the finished read entry into a pause
-      q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
+      q->lastChunkContainsSteps = false;
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         // two pauses à n ticks to achieve MIN_CMD_TICKS
         *data++ = 0x00010001 *
@@ -86,7 +86,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
   //}
   if (steps == 0) {
     uint32_t last_entry;
-    q->bufferContainsSteps[fill_part_one ? 0 : 1] = false;
+    q->lastChunkContainsSteps = false;
     for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
       // two pauses à 4 ticks
       *data++ = 0x00020002;
@@ -99,7 +99,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
     last_entry |= ticks_r;
     *data++ = last_entry;
   } else {
-    q->bufferContainsSteps[fill_part_one ? 0 : 1] = true;
+    q->lastChunkContainsSteps = true;
     if (ticks == 0xffff) {
       // special treatment for this case, because an rmt entry can only cover up
       // to 0xfffe ticks every step must be minimum split into two rmt entries,

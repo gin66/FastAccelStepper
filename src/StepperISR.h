@@ -78,10 +78,8 @@ class StepperQueue {
 #ifdef SUPPORT_ESP32_RMT
   RMT_CHANNEL_T channel;
   bool _rmtStopped;
-#if ESP_IDF_VERSION_MAJOR == 4
-  bool bufferContainsSteps[2];
-#else
   bool lastChunkContainsSteps;
+#if ESP_IDF_VERSION_MAJOR == 5 
   rmt_encoder_handle_t _tx_encoder;
 #endif
 #endif
