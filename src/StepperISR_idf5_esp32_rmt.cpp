@@ -24,7 +24,7 @@ static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
     remaining_ticks -= 2 * (PART_SIZE - 1) * half_ticks_per_symbol; \
     uint16_t first_ticks = remaining_ticks / 2;                     \
     remaining_ticks -= first_ticks;                                 \
-    last_entry = 0x00010000 * first_ticks + remaining_ticks;        \
+    symbols->val = 0x00010000 * first_ticks + remaining_ticks;      \
   }
 
 static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
@@ -51,164 +51,10 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
     // if we return done already here, then single stepping fails
     q->_rmtStopped = true;
     // Not sure if this pause is really needed
-    uint16_t last_entry;
     ENTER_PAUSE(MIN_CMD_TICKS);
-    symbols->val = last_entry;
     return PART_SIZE;
   }
-
-  // Process command
-  struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
-
-  if (e_curr->toggle_dir) {
-    // the command requests dir pin toggle
-    // This is ok only, if the ongoing command does not contain steps
-    if (q->lastChunkContainsSteps) {
-      // So we need a pause. change the finished read entry into a pause
-      q->lastChunkContainsSteps = false;
-      uint16_t last_entry;
-      ENTER_PAUSE(MIN_CMD_TICKS);
-      symbols->val = last_entry;
-      return PART_SIZE;
-    }
-    // The ongoing command does not contain steps, so change dir here should be
-    // ok
-    LL_TOGGLE_PIN(q->dirPin);
-    // and delete the request
-    e_curr->toggle_dir = 0;
-  }
-
-  uint8_t steps = e_curr->steps;
-  uint16_t ticks = e_curr->ticks;
-  //  if (steps != 0) {
-  //  	PROBE_2_TOGGLE;
-  //}
-  uint32_t last_entry;
-  if (steps == 0) {
-    q->lastChunkContainsSteps = false;
-    ENTER_PAUSE(ticks);
-  } else {
-    q->lastChunkContainsSteps = true;
-    if (ticks == 0xffff) {
-      // special treatment for this case, because an rmt entry can only cover up
-      // to 0xfffe ticks every step must be minimum split into two rmt entries,
-      // so at max PART/2 steps can be done.
-      if (steps < PART_SIZE / 2) {
-        for (uint8_t i = 1; i < steps; i++) {
-          // steps-1 iterations
-          (*symbols++).val = 0x40007fff | 0x8000;
-          (*symbols++).val = 0x20002000;
-        }
-        // the last step needs to be stretched to fill PART_SIZE entries
-        (*symbols++).val = 0x40007fff | 0x8000;
-        uint16_t delta = PART_SIZE - 2 * steps;
-        delta <<= 5;
-        (*symbols++).val = 0x20002000 - delta;
-        // 2*(steps - 1) + 1 already stored => 2*steps - 1
-        // and after this for loop one entry added => 2*steps
-        for (uint8_t i = 2 * steps; i < PART_SIZE - 1; i++) {
-          (*symbols++).val = 0x00100010;
-        }
-        last_entry = 0x00100010;
-        steps = 0;
-      } else {
-        steps -= PART_SIZE / 2;
-        for (uint8_t i = 0; i < PART_SIZE / 2 - 1; i++) {
-          (*symbols++).val = 0x40007fff | 0x8000;
-          (*symbols++).val = 0x20002000;
-        }
-        (*symbols++).val = 0x40007fff | 0x8000;
-        last_entry = 0x20002000;
-      }
-    } else {
-      uint8_t steps_to_do = steps;
-      if (steps > PART_SIZE) {
-        steps_to_do = PART_SIZE;
-        if (steps_to_do > PART_SIZE) {
-          steps_to_do >>= 1;
-        }
-      }
-      // deduct this buffer's step from total
-      steps -= steps_to_do;
-      if (steps_to_do < PART_SIZE) {
-        // We need to fill up the partition.
-        // Worst case would be one step in the buffer.
-        // In order to get threshold interrupt early enough,
-        // the first step should be stretched to maximum
-        // The minimum period is 80ticks @200kHz
-        // For PART_SIZE <= 31. This is possible, but high _and_ low
-        // may need stretching.
-        uint8_t extend_to = PART_SIZE - steps_to_do + 1;  // extend_to >= 2
-        uint16_t ticks_high = ticks >> 1;
-        uint16_t ticks_low = ticks - ticks_high;
-        while (ticks_high > 0) {
-          if ((ticks_high > 4) && (extend_to > 2)) {
-            (*symbols++).val = 0x80018001;
-            ticks_high -= 2;
-            extend_to--;
-          } else {
-            (*symbols++).val = 0x80018000 | (ticks_high - 1);
-            ticks_high = 0;
-            extend_to--;
-          }
-        }
-        while (extend_to > 1) {
-          (*symbols++).val = 0x00010001;
-          ticks_low -= 2;
-          extend_to--;
-        }
-        last_entry = 0x00010000 | (ticks_low - 1);
-        // Now add remaining steps, if any
-        if (steps_to_do > 1) {
-          uint16_t ticks_l = ticks >> 1;
-          uint16_t ticks_r = ticks - ticks_l;
-          // ticks_l <= ticks_r
-          uint32_t rmt_entry = ticks_l;
-          rmt_entry <<= 16;
-          rmt_entry |= ticks_r | 0x8000;  // with step
-          for (uint8_t i = 2; i <= steps_to_do; i++) {
-            (*symbols++).val = last_entry;
-            last_entry = rmt_entry;
-          }
-          last_entry = rmt_entry;
-        }
-      } else {
-        // either >= 2*PART_SIZE or = PART_SIZE
-        // every entry one step
-        uint16_t ticks_l = ticks >> 1;
-        uint16_t ticks_r = ticks - ticks_l;
-        uint32_t rmt_entry = ticks_l;
-        rmt_entry <<= 16;
-        rmt_entry |= ticks_r | 0x8000;  // with step
-        for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
-          (*symbols++).val = rmt_entry;
-        }
-        last_entry = rmt_entry;
-      }
-    }
-  }
-
-  // if (!fill_part_one) {
-  //  Note: When enabling the continuous transmission mode by setting
-  //  RMT_REG_TX_CONTI_MODE, the transmitter will transmit the data on the
-  //  channel continuously, that is, from the first byte to the last one,
-  //  then from the first to the last again, and so on. In this mode, there
-  //  will be an idle level lasting one clk_div cycle between N and N+1
-  //  transmissions.
-  // last_entry -= 1;
-  //}
-  symbols->val = last_entry;
-
-  // Data is complete
-  if (steps == 0) {
-    // The command has been completed
-    if (e_curr->repeat_entry == 0) {
-      q->read_idx = rp + 1;
-    }
-  } else {
-    e_curr->steps = steps;
-  }
-
+  rmt_fill_buffer(q, true, &symbols[0].val);
   return PART_SIZE;
 }
 

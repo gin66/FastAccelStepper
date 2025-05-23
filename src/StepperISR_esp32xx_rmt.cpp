@@ -33,29 +33,11 @@
 //    T_RMT_CLK = 1/80MHz = 12.5ns
 //    => period > (3*12.5ns + 5*12.5ns)/(62.5ns) = 1.6
 //
-bool IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
+void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
                                     uint32_t *data) {
-  if (!fill_part_one) {
-    data += PART_SIZE;
-  }
-  uint8_t rp = q->read_idx;
-  if (rp == q->next_write_idx) {
-    // no command in queue
-    if (fill_part_one) {
-      q->lastChunkContainsSteps = false;
-      for (uint8_t i = 0; i < PART_SIZE; i++) {
-        // make a pause with approx. 1ms
-        //    258 ticks * 2 * 31 = 15996 @ 16MHz
-        //    347 ticks * 2 * 23 = 15962 @ 16MHz
-        *data++ = 0x00010001 * (16000 / 2 / PART_SIZE);
-      }
-      return true;
-    } 
-    return false;
-  }
   // Process command
+  uint8_t rp = q->read_idx;
   struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
-
   if (e_curr->toggle_dir) {
     // the command requests dir pin toggle
     // This is ok only, if the ongoing command does not contain steps
@@ -67,7 +49,7 @@ bool IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
         *data++ = 0x00010001 *
                   ((MIN_CMD_TICKS + 2 * PART_SIZE - 1) / (2 * PART_SIZE));
       }
-      return true;
+      return;
     }
     // The ongoing command does not contain steps, so change dir here should be
     // ok. But we need the gpio_ll functions, which are always
@@ -232,14 +214,32 @@ bool IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
   } else {
     e_curr->steps = steps;
   }
-  return true;
+  return;
 }
 #if (ESP_IDF_VERSION_MAJOR == 4)
 void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
                                     uint32_t *data) {
-  if (!rmt_fill_buffer(q, fill_part_one, data)) {
-      q->stop_rmt(false);
+  if (!fill_part_one) {
+    data += PART_SIZE;
   }
+  uint8_t rp = q->read_idx;
+  if (rp == q->next_write_idx) {
+    // no command in queue
+    if (fill_part_one) {
+      q->lastChunkContainsSteps = false;
+      for (uint8_t i = 0; i < PART_SIZE; i++) {
+        // make a pause with approx. 1ms
+        //    258 ticks * 2 * 31 = 15996 @ 16MHz
+        //    347 ticks * 2 * 23 = 15962 @ 16MHz
+        *data++ = 0x00010001 * (16000 / 2 / PART_SIZE);
+      }
+    }
+    else {
+      q->stop_rmt(false);
+    }
+    return;
+  }
+  rmt_fill_buffer(q, fill_part_one, data);
 }
 #endif
 
