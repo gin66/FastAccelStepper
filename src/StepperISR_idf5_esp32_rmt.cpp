@@ -5,8 +5,6 @@
 
 #include "fas_arch/test_probe.h"
 
-#define PART_SIZE (RMT_SIZE / 2)
-
 static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
                                  const rmt_tx_done_event_data_t *edata,
                                  void *user_ctx) {
@@ -44,12 +42,11 @@ static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
     // not sufficient space for the symbols
     return 0;
   }
-
-  uint8_t rp = q->read_idx;
   if (q->_rmtStopped) {
     *done = true;
     return 0;
   }
+  uint8_t rp = q->read_idx;
   if ((rp == q->next_write_idx) || q->_rmtStopped) {
     // if we return done already here, then single stepping fails
     q->_rmtStopped = true;

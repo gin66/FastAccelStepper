@@ -1,5 +1,5 @@
 #include "StepperISR.h"
-#if defined(SUPPORT_ESP32_RMT) && (ESP_IDF_VERSION_MAJOR == 4)
+#if defined(SUPPORT_ESP32_RMT)
 
 // #define TEST_MODE
 
@@ -33,8 +33,7 @@
 //    T_RMT_CLK = 1/80MHz = 12.5ns
 //    => period > (3*12.5ns + 5*12.5ns)/(62.5ns) = 1.6
 //
-
-void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
+bool IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
                                     uint32_t *data) {
   if (!fill_part_one) {
     data += PART_SIZE;
@@ -50,10 +49,9 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
         //    347 ticks * 2 * 23 = 15962 @ 16MHz
         *data++ = 0x00010001 * (16000 / 2 / PART_SIZE);
       }
-    } else {
-      q->stop_rmt(false);
-    }
-    return;
+      return true;
+    } 
+    return false;
   }
   // Process command
   struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
@@ -69,7 +67,7 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
         *data++ = 0x00010001 *
                   ((MIN_CMD_TICKS + 2 * PART_SIZE - 1) / (2 * PART_SIZE));
       }
-      return;
+      return true;
     }
     // The ongoing command does not contain steps, so change dir here should be
     // ok. But we need the gpio_ll functions, which are always
@@ -234,5 +232,15 @@ void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
   } else {
     e_curr->steps = steps;
   }
+  return true;
 }
+#if (ESP_IDF_VERSION_MAJOR == 4)
+void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
+                                    uint32_t *data) {
+  if (!rmt_fill_buffer(q, fill_part_one, data)) {
+      q->stop_rmt(false);
+  }
+}
+#endif
+
 #endif
