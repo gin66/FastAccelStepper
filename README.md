@@ -74,6 +74,12 @@ FastAccelStepper offers the following features:
 [![Star History Chart](https://api.star-history.com/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.com/#gin66/FastAccelStepper&Date)
 
 
+## AI generated documentation
+
+I have stumbled over an excellent AI-generated description of FastAccelStepper, which provides surprisingly deep and (mostly) correct implementation details.
+It would have costed me many days to write an equally good description with so many details and diagrams.
+This docu can be found [here](https://deepwiki.com/gin66/FastAccelStepper).
+
 ## General behaviour of Moves
 * The desired end position to move to is set by calls to moveTo() and move()
 * The desired end position is in case of moveTo() given as absolute position
