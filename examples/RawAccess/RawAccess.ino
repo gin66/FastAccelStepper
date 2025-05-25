@@ -53,7 +53,7 @@ void loop() {
     struct stepper_command_s cmd = {
         .ticks = curr_ticks, .steps = steps, .count_up = direction};
     while (true) {
-      int rc = stepper->addQueueEntry(&cmd);
+      AqeResultCode rc = stepper->addQueueEntry(&cmd);
       if (rc == AQE_OK) {
         break;
       }
@@ -70,7 +70,7 @@ void loop() {
       struct stepper_command_s cmd2 = {
           .ticks = curr_ticks, .steps = 0, .count_up = direction};
       while (true) {
-        int rc = stepper->addQueueEntry(&cmd2);
+        AqeResultCode rc = stepper->addQueueEntry(&cmd2);
         if (rc == AQE_OK) {
           break;
         }
