@@ -87,11 +87,6 @@ class FastAccelStepperEngine {
   // One using mcpwm and pcnt module. And another using rmt module.
   // This call allows to select the respective driver
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-enum class FasDriver : uint8_t {
-  MCPWM_PCNT = 0,
-  RMT = 1,
-  DONT_CARE = 255
-};
 #define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT 
 #define DRIVER_RMT FasDriver::RMT
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
