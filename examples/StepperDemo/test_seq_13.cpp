@@ -6,7 +6,6 @@
 #if !defined(__AVR_ATmega32U4__)
 bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
-  uint8_t res;
   AqeResultCode aqe;
   struct stepper_command_s cmd_step = {
       .ticks = 50000, .steps = 1, .count_up = true};
