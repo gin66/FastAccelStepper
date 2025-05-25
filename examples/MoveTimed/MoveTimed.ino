@@ -97,7 +97,7 @@ void moveStepper(FastAccelStepper *stepper, struct control_s *control) {
   int32_t current_position = stepper->getPositionAfterCommandsCompleted();
   int32_t steps = position - current_position;
   uint32_t actual;
-  int8_t rc;
+  MoveTimedResultCode rc;
   uint32_t duration = TIMESTEP_TICKS + control->drift;
   rc = stepper->moveTimed(steps, duration, &actual, true);
   switch (rc) {
@@ -116,13 +116,13 @@ void moveStepper(FastAccelStepper *stepper, struct control_s *control) {
     case MOVE_TIMED_TOO_LARGE_ERROR:
       Serial.println("Too large");
       break;
-    case static_cast<int8_t>(AQE_ERROR_TICKS_TOO_LOW):
+    case MoveTimedResultCode::ErrorTicksTooLow:
       Serial.print("Ticks too low:");
       Serial.print(duration / steps);
       Serial.print(" steps:");
       Serial.println(steps);
     default:
-      Serial.println(rc);
+      Serial.println(toString(rc));
   }
 }
 
