@@ -99,11 +99,7 @@ struct queue_end_s {
 #endif
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-enum class FasDriver : uint8_t {
-  MCPWM_PCNT = 0,
-  RMT = 1,
-  DONT_CARE = 255
-};
+enum class FasDriver : uint8_t { MCPWM_PCNT = 0, RMT = 1, DONT_CARE = 255 };
 #endif
 
 // disable inject_fill_interrupt() for all real devices. Only defined in TEST

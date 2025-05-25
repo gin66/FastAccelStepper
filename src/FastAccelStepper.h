@@ -87,11 +87,11 @@ class FastAccelStepperEngine {
   // One using mcpwm and pcnt module. And another using rmt module.
   // This call allows to select the respective driver
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-#define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT 
+#define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT
 #define DRIVER_RMT FasDriver::RMT
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin,
-                                        FasDriver driver_type = DRIVER_DONT_CARE);
+  FastAccelStepper* stepperConnectToPin(
+      uint8_t step_pin, FasDriver driver_type = DRIVER_DONT_CARE);
 #endif
 
 #if defined(SUPPORT_TASK_RATE_CHANGE)
@@ -543,7 +543,8 @@ class FastAccelStepper {
   //        => accelerate towards negative maximum speed if allow_reverse
   //        => decelerate towards motor stop if allow_reverse = false
   // return value as with move/moveTo
-  MoveResultCode moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
+  MoveResultCode moveByAcceleration(int32_t acceleration,
+                                    bool allow_reverse = true);
 
   // ### stopMove()
   // Stop the running stepper with normal deceleration.
@@ -623,48 +624,48 @@ class FastAccelStepper {
     _forward_planning_in_ticks *= TICKS_PER_S / 1000;  // ticks per ms
   }
 
-// ## Intermediate Level Stepper Control for Advanced Users
-//
-// The main purpose is to bypass the ramp generator as mentioned in
-// [#299](https://github.com/gin66/FastAccelStepper/issues/299).
-// This shall allow to run consecutive small moves with fixed speed.
-// The parameters are steps (which can be 0) and duration in ticks.
-// steps=0 makes sense in order to keep the time running and not
-// getting out of sync.
-// Due to integer arithmetics the actual duration may be off by a small value.
-// That's why the actual_duration in TICKS is returned.
-// The application should consider this for the next runTimed move.
-//
-// The optional parameter is a boolean called start. This allows for the first
-// invocation to not start the queue yet. This is for managing steppers in
-// parallel. It allows to fill all steppers' queues and then kick it off by a
-// call to `moveTimed(0,0,NULL,true)`. Successive invocations can keep true.
-//
-// In order to not have another lightweight ramp generator running in
-// background interrupt, the expecation to the application is, that this
-// function is frequently enough called without the queue being emptied.
-//
-// The current implementation immediately starts with a step, if there should be
-// one. Perhaps performing the step in the middle of the duration is more
-// appropriate ?
-//
-// Meaning of the return values - which are in addtion to AQE from below
-// - OK:        Move has been successfully appended to the queue
-// - BUSY:      Queue does not have sufficient entries to append this timed
-// move.
-// - EMPTY:     The queue has run out of commands, but the move has been
-// appended.
-// - TOO_LARGE: The move request does not fit into the queue.
-//              Reasons: The queue depth is (32/16) for SAM+ESP32/AVR.
-//                       Each queue entry can emit 255 steps => (8160/4080)
-//                       steps If the time between steps is >65535 ticks, then
-//                       pauses have to be generated. In this case only (16/8)
-//                       steps can be generated...but the queue shall not be
-//                       empty
-//                       => so even less steps can be done.
-//              Recommendation: keep the duration in the range of ms.
-  MoveTimedResultCode moveTimed(int16_t steps, uint32_t duration, uint32_t* actual_duration,
-                   bool start = true);
+  // ## Intermediate Level Stepper Control for Advanced Users
+  //
+  // The main purpose is to bypass the ramp generator as mentioned in
+  // [#299](https://github.com/gin66/FastAccelStepper/issues/299).
+  // This shall allow to run consecutive small moves with fixed speed.
+  // The parameters are steps (which can be 0) and duration in ticks.
+  // steps=0 makes sense in order to keep the time running and not
+  // getting out of sync.
+  // Due to integer arithmetics the actual duration may be off by a small value.
+  // That's why the actual_duration in TICKS is returned.
+  // The application should consider this for the next runTimed move.
+  //
+  // The optional parameter is a boolean called start. This allows for the first
+  // invocation to not start the queue yet. This is for managing steppers in
+  // parallel. It allows to fill all steppers' queues and then kick it off by a
+  // call to `moveTimed(0,0,NULL,true)`. Successive invocations can keep true.
+  //
+  // In order to not have another lightweight ramp generator running in
+  // background interrupt, the expecation to the application is, that this
+  // function is frequently enough called without the queue being emptied.
+  //
+  // The current implementation immediately starts with a step, if there should
+  // be one. Perhaps performing the step in the middle of the duration is more
+  // appropriate ?
+  //
+  // Meaning of the return values - which are in addtion to AQE from below
+  // - OK:        Move has been successfully appended to the queue
+  // - BUSY:      Queue does not have sufficient entries to append this timed
+  // move.
+  // - EMPTY:     The queue has run out of commands, but the move has been
+  // appended.
+  // - TOO_LARGE: The move request does not fit into the queue.
+  //              Reasons: The queue depth is (32/16) for SAM+ESP32/AVR.
+  //                       Each queue entry can emit 255 steps => (8160/4080)
+  //                       steps If the time between steps is >65535 ticks, then
+  //                       pauses have to be generated. In this case only (16/8)
+  //                       steps can be generated...but the queue shall not be
+  //                       empty
+  //                       => so even less steps can be done.
+  //              Recommendation: keep the duration in the range of ms.
+  MoveTimedResultCode moveTimed(int16_t steps, uint32_t duration,
+                                uint32_t* actual_duration, bool start = true);
 
   // ## Low Level Stepper Queue Management (low level access)
   //

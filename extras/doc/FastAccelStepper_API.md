@@ -76,11 +76,11 @@ One using mcpwm and pcnt module. And another using rmt module.
 This call allows to select the respective driver
 ```cpp
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-#define DRIVER_MCPWM_PCNT 0
-#define DRIVER_RMT 1
-#define DRIVER_DONT_CARE 2
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin,
-                                        uint8_t driver_type = DRIVER_DONT_CARE);
+#define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT
+#define DRIVER_RMT FasDriver::RMT
+#define DRIVER_DONT_CARE FasDriver::DONT_CARE
+  FastAccelStepper* stepperConnectToPin(
+      uint8_t step_pin, FasDriver driver_type = DRIVER_DONT_CARE);
 #endif
 ```
 For e.g. esp32 the repetition rate of the stepper task can be changed.
@@ -154,52 +154,6 @@ still running, then the port. to which the LED is connected, can be told to
 the engine. The periodic task will let the associated LED blink with 1 Hz
 ```cpp
   void setDebugLed(uint8_t ledPin);
-```
-### Result codes for addQueueEntry() function of FastAccelStepper
-```cpp
-enum class AqeResultCode : int8_t {
-  OK = 0,
-  QueueFull = 1,
-  DirPinIsBusy = 2,
-  WaitForEnablePinActive = 3,
-  DeviceNotReady = 4,
-  ErrorTicksTooLow = -1,
-  ErrorEmptyQueueToStart = -2,
-  ErrorNoDirPinToToggle = -3
-};
-static bool aqeRetry(AqeResultCode code) {
-  return (static_cast<int8_t>(code)) > 0;
-}
-static const char* aqeToString(AqeResultCode code) {
-  switch (code) {
-    case AqeResultCode::OK:
-      return "OK";
-    case AqeResultCode::QueueFull:
-      return "Queue Full";
-    case AqeResultCode::DirPinIsBusy:
-      return "Direction Pin is Busy";
-    case AqeResultCode::WaitForEnablePinActive:
-      return "Waiting for Enable Pin Active";
-    case AqeResultCode::DeviceNotReady:
-      return "Device Not Ready";
-    case AqeResultCode::ErrorTicksTooLow:
-      return "Error: Ticks Too Low";
-    case AqeResultCode::ErrorEmptyQueueToStart:
-      return "Error: Empty Queue to Start";
-    case AqeResultCode::ErrorNoDirPinToToggle:
-      return "Error: No Direction Pin to Toggle";
-    default:
-      return "Unknown Error";
-  }
-}
-#define AQE_OK AqeResultCode::OK
-#define AQE_QUEUE_FULL AqeResultCode::QueueFull
-#define AQE_DIR_PIN_IS_BUSY AqeResultCode::DirPinIsBusy
-#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE AqeResultCode::WaitForEnablePinActive
-#define AQE_DEVICE_NOT_READY AqeResultCode::DeviceNotReady
-#define AQE_ERROR_TICKS_TOO_LOW AqeResultCode::ErrorTicksTooLow
-#define AQE_ERROR_EMPTY_QUEUE_TO_START AqeResultCode::ErrorEmptyQueueToStart
-#define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE AqeResultCode::ErrorNoDirPinToToggle
 ```
 ### Return codes of calls to `move()` and `moveTo()`
 
@@ -327,11 +281,8 @@ interrupt/task with 4 or 10 ms repetition rate and as such is with several
 ms jitter.
 ```cpp
   void setAutoEnable(bool auto_enable);
-  int8_t setDelayToEnable(uint32_t delay_us);
+  DelayResultCode setDelayToEnable(uint32_t delay_us);
   void setDelayToDisable(uint16_t delay_ms);
-#define DELAY_OK 0
-#define DELAY_TOO_LOW -1
-#define DELAY_TOO_HIGH -2
 ```
 ## Stepper Position
 Retrieve the current position of the stepper
@@ -518,8 +469,8 @@ move/moveTo for an ongoing command would reverse the direction, then the
 command is silently ignored.
 return values are the MOVE_... constants
 ```cpp
-  int8_t move(int32_t move, bool blocking = false);
-  int8_t moveTo(int32_t position, bool blocking = false);
+  MoveResultCode move(int32_t move, bool blocking = false);
+  MoveResultCode moveTo(int32_t position, bool blocking = false);
 ```
 ### keepRunning()
 This command flags the stepper to keep run continuously into current
@@ -536,8 +487,8 @@ These commands just let the motor run continuously in one direction.
 If the motor is running in the opposite direction, it will reverse
 return value as with move/moveTo
 ```cpp
-  int8_t runForward();
-  int8_t runBackward();
+  MoveResultCode runForward();
+  MoveResultCode runBackward();
 ```
 ### forwardStep() and backwardStep()
 forwardStep()/backwardstep() can be called, while stepper is not moving
@@ -561,7 +512,8 @@ The behaviour will be:
        => decelerate towards motor stop if allow_reverse = false
 return value as with move/moveTo
 ```cpp
-  int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
+  MoveResultCode moveByAcceleration(int32_t acceleration,
+                                    bool allow_reverse = true);
 ```
 ### stopMove()
 Stop the running stepper with normal deceleration.
@@ -670,8 +622,8 @@ In order to not have another lightweight ramp generator running in
 background interrupt, the expecation to the application is, that this
 function is frequently enough called without the queue being emptied.
 
-The current implementation immediately starts with a step, if there should be
-one. Perhaps performing the step in the middle of the duration is more
+The current implementation immediately starts with a step, if there should
+be one. Perhaps performing the step in the middle of the duration is more
 appropriate ?
 
 Meaning of the return values - which are in addtion to AQE from below
@@ -690,12 +642,8 @@ appended.
                       => so even less steps can be done.
              Recommendation: keep the duration in the range of ms.
 ```cpp
-#define MOVE_TIMED_OK ((int8_t)0)
-#define MOVE_TIMED_BUSY ((int8_t)5)
-#define MOVE_TIMED_EMPTY ((int8_t)6)
-#define MOVE_TIMED_TOO_LARGE_ERROR ((int8_t)-4)
-  int8_t moveTimed(int16_t steps, uint32_t duration, uint32_t* actual_duration,
-                   bool start = true);
+  MoveTimedResultCode moveTimed(int16_t steps, uint32_t duration,
+                                uint32_t* actual_duration, bool start = true);
 ```
 ## Low Level Stepper Queue Management (low level access)
 

@@ -73,7 +73,7 @@ void RampGenerator::_startMove(bool position_changed) {
 }
 
 MoveResultCode RampGenerator::moveTo(int32_t position,
-                             const struct queue_end_s *queue_end) {
+                                     const struct queue_end_s *queue_end) {
   MoveResultCode res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
@@ -90,7 +90,8 @@ MoveResultCode RampGenerator::moveTo(int32_t position,
   inject_fill_interrupt(2);
   return MOVE_OK;
 }
-MoveResultCode RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
+MoveResultCode RampGenerator::move(int32_t move,
+                                   const struct queue_end_s *queue_end) {
   MoveResultCode res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;

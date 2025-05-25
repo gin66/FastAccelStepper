@@ -17,7 +17,7 @@ static inline bool aqeRetry(AqeResultCode code) {
   return (static_cast<int8_t>(code)) > 0;
 }
 static inline bool aqeIsOk(AqeResultCode status) {
-    return status == AqeResultCode::OK;
+  return status == AqeResultCode::OK;
 }
 
 static inline const char* toString(AqeResultCode code) {
@@ -54,15 +54,15 @@ static inline const char* toString(AqeResultCode code) {
 // Define the MoveResultCode enum with equivalent values
 enum class MoveResultCode : int8_t {
   OK = 0,
-  ErrorNoDirectionPin = -1,          // Equivalent to MOVE_ERR_NO_DIRECTION_PIN
-  ErrorSpeedIsUndefined = -2,        // Equivalent to MOVE_ERR_SPEED_IS_UNDEFINED
-  ErrorAccelerationIsUndefined = -3  // Equivalent to MOVE_ERR_ACCELERATION_IS_UNDEFINED
+  ErrorNoDirectionPin = -1,    // Equivalent to MOVE_ERR_NO_DIRECTION_PIN
+  ErrorSpeedIsUndefined = -2,  // Equivalent to MOVE_ERR_SPEED_IS_UNDEFINED
+  ErrorAccelerationIsUndefined =
+      -3  // Equivalent to MOVE_ERR_ACCELERATION_IS_UNDEFINED
 };
 
 static inline bool moveIsOk(MoveResultCode status) {
-    return status == MoveResultCode::OK;
+  return status == MoveResultCode::OK;
 }
-
 
 // Function to convert MoveResultCode to string for debugging/errors
 static inline const char* toString(MoveResultCode code) {
@@ -84,7 +84,8 @@ static inline const char* toString(MoveResultCode code) {
 #define MOVE_OK MoveResultCode::OK
 #define MOVE_ERR_NO_DIRECTION_PIN MoveResultCode::ErrorNoDirectionPin
 #define MOVE_ERR_SPEED_IS_UNDEFINED MoveResultCode::ErrorSpeedIsUndefined
-#define MOVE_ERR_ACCELERATION_IS_UNDEFINED MoveResultCode::ErrorAccelerationIsUndefined
+#define MOVE_ERR_ACCELERATION_IS_UNDEFINED \
+  MoveResultCode::ErrorAccelerationIsUndefined
 
 // Define the MoveResultCode enum with equivalent values
 enum class MoveTimedResultCode : int8_t {
@@ -102,7 +103,7 @@ enum class MoveTimedResultCode : int8_t {
 };
 
 static inline bool moveTimedIsOk(MoveTimedResultCode status) {
-    return status == MoveTimedResultCode::OK;
+  return status == MoveTimedResultCode::OK;
 }
 
 static inline MoveTimedResultCode tmrFrom(AqeResultCode res) {
@@ -143,27 +144,23 @@ static inline const char* toString(MoveTimedResultCode code) {
 #define MOVE_TIMED_EMPTY MoveTimedResultCode::MoveEmpty
 #define MOVE_TIMED_TOO_LARGE_ERROR MoveTimedResultCode::ErrorMoveTooLarge
 
-enum class DelayResultCode : int8_t {
-    OK = 0,
-    TOO_LOW = -1,
-    TOO_HIGH = -2
-};
+enum class DelayResultCode : int8_t { OK = 0, TOO_LOW = -1, TOO_HIGH = -2 };
 
 static inline bool delayIsValid(DelayResultCode status) {
-    return status == DelayResultCode::OK;
+  return status == DelayResultCode::OK;
 }
 
 static inline const char* toString(DelayResultCode status) {
-    switch (status) {
-        case DelayResultCode::OK:
-            return "OK";
-        case DelayResultCode::TOO_LOW:
-            return "Delay Too Low";
-        case DelayResultCode::TOO_HIGH:
-            return "Delay Too High";
-        default:
-            return "Unknown Delay Status";
-    }
+  switch (status) {
+    case DelayResultCode::OK:
+      return "OK";
+    case DelayResultCode::TOO_LOW:
+      return "Delay Too Low";
+    case DelayResultCode::TOO_HIGH:
+      return "Delay Too High";
+    default:
+      return "Unknown Delay Status";
+  }
 }
 
 // Macros for simpler usage if needed

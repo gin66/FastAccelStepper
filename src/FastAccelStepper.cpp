@@ -649,7 +649,7 @@ void FastAccelStepper::applySpeedAcceleration() {
   _rg.applySpeedAcceleration();
 }
 MoveResultCode FastAccelStepper::moveByAcceleration(int32_t acceleration,
-                                            bool allow_reverse) {
+                                                    bool allow_reverse) {
   MoveResultCode res = MOVE_OK;
   if (acceleration > 0) {
     setAcceleration(acceleration);
@@ -920,9 +920,12 @@ void FastAccelStepper::backwardStep(bool blocking) {
 int32_t FastAccelStepper::getCurrentPosition() {
   return fas_queue[_queue_num].getCurrentPosition();
 }
-MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
-                                   uint32_t* actual_duration, bool start) {
-  MoveTimedResultCode ret_ok = isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
+MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
+                                                uint32_t duration,
+                                                uint32_t* actual_duration,
+                                                bool start) {
+  MoveTimedResultCode ret_ok =
+      isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
     if (start) {
       addQueueEntry(NULL, true);  // start the queue
