@@ -93,7 +93,7 @@ class RampGenerator {
   inline bool isRunningContinuously() { return _ro.isRunningContinuously(); }
   void getNextCommand(const struct queue_end_s *queue_end,
                       NextCommand *cmd_out);
-  void afterCommandEnqueued(NextCommand *cmd_in);
+  void afterCommandEnqueued(const NextCommand *cmd_in);
   void getCurrentSpeedInTicks(struct actual_ticks_s *speed) {
     fasDisableInterrupts();
     speed->ticks = _rw.curr_ticks;
