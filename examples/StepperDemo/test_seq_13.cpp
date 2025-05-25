@@ -20,7 +20,7 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 3:
       aqe = stepper->addQueueEntry(&cmd_step);
       if (aqeRetry(aqe)) {
-        PRINTU8(static_cast<int8_t>(res));
+        PRINTU8(static_cast<int8_t>(aqe));
         PRINTCH(' ');
       } else {
         seq->u32_1 = time_ms;
