@@ -51,7 +51,7 @@ void setup() {
       // just issue a step with 1ms pause
       struct stepper_command_s cmd = {
           .ticks = 16000, .steps = 2, .count_up = true};
-      int rc = stepper->addQueueEntry(&cmd);
+      AqeResultCode rc = stepper->addQueueEntry(&cmd);
       if (rc != AQE_OK) {
         Serial.print("Queue error:");
         Serial.println(rc);

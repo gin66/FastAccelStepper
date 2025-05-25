@@ -54,7 +54,7 @@ void loop() {
   for (uint16_t i = 0; i < 24; i++) {
     // This loop repeats a command, in case the queue is full
     while (true) {
-      int rc = stepper->addQueueEntry(&cmd_pause);
+      AqeResultCode rc = stepper->addQueueEntry(&cmd_pause);
       // Serial.println(rc);
       if (rc == AQE_OK) {
         Serial.print(".");
