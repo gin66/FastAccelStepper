@@ -1365,7 +1365,7 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_SET_ACCELERATION_TO);
         PRINTI32(val_n[0]);
         PRINTLN("");
-        res = stepper_selected->moveByAcceleration(val_n[0]);
+        res = static_cast<int8_t>(stepper_selected->moveByAcceleration(val_n[0]));
         output_msg(MSG_MOVE_OK + res);
         return true;
       }
@@ -1376,7 +1376,7 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_MOVE_STEPS);
         PRINTI32(val_n[0]);
         PRINTLN("");
-        res = stepper_selected->move(val_n[0]);
+        res = static_cast<int8_t>(stepper_selected->move(val_n[0]));
         output_msg(MSG_MOVE_OK + res);
         return true;
       }
@@ -1387,7 +1387,7 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_MOVE_TO_POSITION);
         PRINTI32(val_n[0]);
         PRINTLN("");
-        res = stepper_selected->moveTo(val_n[0]);
+        res = static_cast<int8_t>(stepper_selected->moveTo(val_n[0]));
         output_msg(MSG_MOVE_OK + res);
         return true;
       }
@@ -1516,7 +1516,7 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'f'):
       if (*cmd == 0) {
         output_msg(MSG_RUN_FORWARD);
-        res = stepper_selected->runForward();
+        res = static_cast<int8_t>(stepper_selected->runForward());
         output_msg(MSG_RETURN_CODE);
         PRINTU8(res);
         PRINTLN("");
@@ -1526,7 +1526,7 @@ bool process_cmd(char *cmd) {
     case MODE(normal, 'b'):
       if (*cmd == 0) {
         output_msg(MSG_RUN_BACKWARD);
-        res = stepper_selected->runBackward();
+        res = static_cast<int8_t>(stepper_selected->runBackward());
         output_msg(MSG_RETURN_CODE);
         PRINTU8(res);
         PRINTLN("");

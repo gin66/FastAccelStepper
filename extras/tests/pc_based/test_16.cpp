@@ -110,7 +110,7 @@ class FastAccelStepperTest {
 };
 
 void tc_2() {
-  int8_t ret;
+  MoveTimedResultCode ret;
   uint32_t actual;
   int64_t actual_sum = 0;
   char fname[100];
@@ -165,7 +165,7 @@ void tc_2() {
 }
 
 int main() {
-  int8_t ret;
+  MoveTimedResultCode ret;
   uint32_t actual;
 
   FastAccelStepperTest test;
@@ -183,7 +183,7 @@ int main() {
        "TC1_2: too many steps for the queue");
 
   ret = s.moveTimed(1, MIN_CMD_TICKS - 1, &actual);
-  int8_t ttl = static_cast<int8_t>(AQE_ERROR_TICKS_TOO_LOW);
+  MoveTimedResultCode ttl = MoveTimedResultCode::ErrorTicksTooLow;
   test(ret == ttl, "TC1_3: too short duration");
 
   ret = s.moveTimed(100, 100 * (s.getMaxSpeedInTicks() - 1), &actual);

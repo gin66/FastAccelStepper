@@ -920,9 +920,9 @@ void FastAccelStepper::backwardStep(bool blocking) {
 int32_t FastAccelStepper::getCurrentPosition() {
   return fas_queue[_queue_num].getCurrentPosition();
 }
-int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
+MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
                                    uint32_t* actual_duration, bool start) {
-  uint8_t ret_ok = isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
+  MoveTimedResultCode ret_ok = isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
     if (start) {
       addQueueEntry(NULL, true);  // start the queue
@@ -957,7 +957,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
       AqeResultCode ret = addQueueEntry(&cmd, start);
       if (ret != AQE_OK) {
         // unexpected
-        return static_cast<int8_t>(ret);
+        return tmrFrom(ret);
       }
       if (actual_duration) {
         *actual_duration += cmd.ticks;
@@ -1010,7 +1010,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         AqeResultCode ret = addQueueEntry(&cmd, start);
         if (ret != AQE_OK) {
           // unexpected
-          return static_cast<uint8_t>(ret);
+          return tmrFrom(ret);
         }
         if (actual_duration) {
           *actual_duration += cmd.ticks;
@@ -1056,7 +1056,7 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
     AqeResultCode ret = addQueueEntry(&cmd, start);
     if (ret != AQE_OK) {
       // unexpected
-      return static_cast<uint8_t>(ret);
+      return tmrFrom(ret);
     }
     // Why has this been calculated before and actual_duration is used ?
     // uint32_t cmd_duration = cmd.ticks;

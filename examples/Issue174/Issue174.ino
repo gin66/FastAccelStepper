@@ -93,7 +93,7 @@ void loop() {
     Serial.print(" ramp state=");
     Serial.print(stepper->rampState());
     Serial.print(' ');
-    int res = stepper->moveTo(loopCnt);
+    MoveResultCode res = stepper->moveTo(loopCnt);
     if (!stepper->isRunning()) {
       Serial.println();
       Serial.println("stepper is not running !!!");
@@ -101,7 +101,7 @@ void loop() {
     if (res != MOVE_OK) {
       Serial.println();
       Serial.print("Error return from move: ");
-      Serial.println(res);
+      Serial.println(moveToString(res));
     }
     while (stepper->isRunning()) {
     }

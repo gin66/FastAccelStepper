@@ -76,4 +76,56 @@ static inline const char* moveToString(MoveResultCode code) {
 #define MOVE_ERR_SPEED_IS_UNDEFINED MoveResultCode::ErrorSpeedIsUndefined
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED MoveResultCode::ErrorAccelerationIsUndefined
 
+// Define the MoveResultCode enum with equivalent values
+enum class MoveTimedResultCode : int8_t {
+  OK = 0,
+  QueueFull = 1,
+  DirPinIsBusy = 2,
+  WaitForEnablePinActive = 3,
+  DeviceNotReady = 4,
+  ErrorTicksTooLow = -1,
+  ErrorEmptyQueueToStart = -2,
+  ErrorNoDirPinToToggle = -3,
+  MoveBusy = 5,
+  MoveEmpty = 6,
+  ErrorMoveTooLarge = -4,
+};
+
+static inline MoveTimedResultCode tmrFrom(AqeResultCode res) {
+  return static_cast<MoveTimedResultCode>(res);
+}
+
+// Function to convert MoveResultCode to string for debugging/errors
+static inline const char* moveToString(MoveTimedResultCode code) {
+  switch (code) {
+    case MoveTimedResultCode::OK:
+      return "OK";
+    case MoveTimedResultCode::QueueFull:
+      return "Queue Full";
+    case MoveTimedResultCode::DirPinIsBusy:
+      return "Direction Pin is Busy";
+    case MoveTimedResultCode::WaitForEnablePinActive:
+      return "Waiting for Enable Pin Active";
+    case MoveTimedResultCode::DeviceNotReady:
+      return "Device Not Ready";
+    case MoveTimedResultCode::ErrorTicksTooLow:
+      return "Error: Ticks Too Low";
+    case MoveTimedResultCode::ErrorEmptyQueueToStart:
+      return "Error: Empty Queue to Start";
+    case MoveTimedResultCode::ErrorNoDirPinToToggle:
+      return "Error: No Direction Pin to Toggle";
+    case MoveTimedResultCode::MoveBusy:
+      return "Move still ongoing";
+    case MoveTimedResultCode::MoveEmpty:
+      return "Queue has been empty";
+    case MoveTimedResultCode::ErrorMoveTooLarge:
+      return "Error: Move too large";
+    default:
+      return "Unknown Error";
+  }
+}
+#define MOVE_TIMED_OK MoveTimedResultCode::OK
+#define MOVE_TIMED_BUSY MoveTimedResultCode::MoveBusy
+#define MOVE_TIMED_EMPTY MoveTimedResultCode::MoveEmpty
+#define MOVE_TIMED_TOO_LARGE_ERROR MoveTimedResultCode::ErrorMoveTooLarge
 #endif /* FAS_RESULT_CODES_H */

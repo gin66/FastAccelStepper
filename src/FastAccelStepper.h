@@ -666,11 +666,7 @@ class FastAccelStepper {
 //                       empty
 //                       => so even less steps can be done.
 //              Recommendation: keep the duration in the range of ms.
-#define MOVE_TIMED_OK ((int8_t)0)
-#define MOVE_TIMED_BUSY ((int8_t)5)
-#define MOVE_TIMED_EMPTY ((int8_t)6)
-#define MOVE_TIMED_TOO_LARGE_ERROR ((int8_t)-4)
-  int8_t moveTimed(int16_t steps, uint32_t duration, uint32_t* actual_duration,
+  MoveTimedResultCode moveTimed(int16_t steps, uint32_t duration, uint32_t* actual_duration,
                    bool start = true);
 
   // ## Low Level Stepper Queue Management (low level access)
