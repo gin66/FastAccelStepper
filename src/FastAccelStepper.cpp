@@ -233,7 +233,7 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
+AqeResultCode FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
                                        bool start) {
   StepperQueue* q = &fas_queue[_queue_num];
   if (cmd == NULL) {
@@ -257,7 +257,7 @@ int8_t FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
     }
   }
 
-  int res = AQE_OK;
+  AqeResultCode res = AQE_OK;
   if (_autoEnable) {
     fasDisableInterrupts();
     uint16_t delay_counter = _auto_disable_delay_counter;
@@ -401,7 +401,7 @@ void FastAccelStepper::fill_queue() {
     // For run time measurement
     uint32_t runtime_us = micros();
 #endif
-    int8_t res = AQE_OK;
+    AqeResultCode res = AQE_OK;
     _rg.getNextCommand(&q->queue_end, &cmd);
     if (cmd.command.ticks != 0) {
       res = addQueueEntry(&cmd.command, !delayed_start);
@@ -427,13 +427,13 @@ void FastAccelStepper::fill_queue() {
       break;
     }
     if (res != AQE_OK) {
-      if (res > 0) {
+      if (aqeRetry(res)) {
         // try later again
         break;
       } else {
 #ifdef SIM_TEST_INPUT
         Serial.println("Abort ramp due to queue error res=");
-        Serial.print(res);
+        Serial.print(static_cast<int8_t>(res));
         Serial.print(" Steps=");
         Serial.print(cmd.command.steps);
         Serial.print(" ticks=");
@@ -954,10 +954,10 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         // cmd.
         cmd.ticks = duration >> 1;
       }
-      uint8_t ret = addQueueEntry(&cmd, start);
-      if (ret != 0) {
+      AqeResultCode ret = addQueueEntry(&cmd, start);
+      if (ret != AQE_OK) {
         // unexpected
-        return ret;
+        return static_cast<int8_t>(ret);
       }
       if (actual_duration) {
         *actual_duration += cmd.ticks;
@@ -1007,10 +1007,10 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
         }
         this_duration -= cmd.ticks;
 
-        uint8_t ret = addQueueEntry(&cmd, start);
-        if (ret != 0) {
+        AqeResultCode ret = addQueueEntry(&cmd, start);
+        if (ret != AQE_OK) {
           // unexpected
-          return ret;
+          return static_cast<uint8_t>(ret);
         }
         if (actual_duration) {
           *actual_duration += cmd.ticks;
@@ -1053,10 +1053,10 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
       printf("increase ticks for %d steps\n", steps);
 #endif
     }
-    uint8_t ret = addQueueEntry(&cmd, start);
-    if (ret != 0) {
+    AqeResultCode ret = addQueueEntry(&cmd, start);
+    if (ret != AQE_OK) {
       // unexpected
-      return ret;
+      return static_cast<uint8_t>(ret);
     }
     // Why has this been calculated before and actual_duration is used ?
     // uint32_t cmd_duration = cmd.ticks;

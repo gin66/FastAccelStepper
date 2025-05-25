@@ -7,6 +7,7 @@
 bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
                  uint32_t time_ms) {
   uint8_t res;
+  AqeResultCode aqe;
   struct stepper_command_s cmd_step = {
       .ticks = 50000, .steps = 1, .count_up = true};
   switch (seq->state) {
@@ -17,9 +18,9 @@ bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
     case 1:
     case 2:
     case 3:
-      res = stepper->addQueueEntry(&cmd_step);
-      if (res > 1) {
-        PRINTU8(res);
+      aqe = stepper->addQueueEntry(&cmd_step);
+      if (aqeRetry(aqe)) {
+        PRINTU8(static_cast<int8_t>(res));
         PRINTCH(' ');
       } else {
         seq->u32_1 = time_ms;

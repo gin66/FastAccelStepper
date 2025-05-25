@@ -116,7 +116,7 @@ void moveStepper(FastAccelStepper *stepper, struct control_s *control) {
     case MOVE_TIMED_TOO_LARGE_ERROR:
       Serial.println("Too large");
       break;
-    case AQE_ERROR_TICKS_TOO_LOW:
+    case static_cast<int8_t>(AQE_ERROR_TICKS_TOO_LOW):
       Serial.print("Ticks too low:");
       Serial.print(duration / steps);
       Serial.print(" steps:");

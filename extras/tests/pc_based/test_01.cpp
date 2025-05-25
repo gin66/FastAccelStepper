@@ -35,7 +35,7 @@ void basic_test() {
   assert(s.isQueueEmpty());
   struct stepper_command_s cmd = {
       .ticks = 10000, .steps = 100, .count_up = true};
-  int res = s.addQueueEntry(&cmd);
+  AqeResultCode res = s.addQueueEntry(&cmd);
   assert(res == AQE_OK);
   assert(!s.isQueueEmpty());
 }
@@ -68,7 +68,7 @@ void queue_full() {
 }
 
 void queue_out_of_range() {
-  int8_t res;
+  AqeResultCode res;
 
   puts("queue_out_of_range...");
   init_queue();

@@ -191,6 +191,42 @@ class FastAccelStepperEngine {
   friend class StepperQueue;
 };
 
+// ### Result codes for addQueueEntry() function of FastAccelStepper
+enum class AqeResultCode : int8_t {
+    OK = 0,
+    QueueFull = 1,
+    DirPinIsBusy = 2,
+    WaitForEnablePinActive = 3,
+    DeviceNotReady = 4,
+    ErrorTicksTooLow = -1,
+    ErrorEmptyQueueToStart = -2,
+    ErrorNoDirPinToToggle = -3
+};
+static inline bool aqeRetry(AqeResultCode code) {
+    return (static_cast<int8_t>(code)) > 0;
+}
+static inline const char* aqeToString(AqeResultCode code) {
+    switch (code) {
+        case AqeResultCode::OK: return "OK";
+        case AqeResultCode::QueueFull: return "Queue Full";
+        case AqeResultCode::DirPinIsBusy: return "Direction Pin is Busy";
+        case AqeResultCode::WaitForEnablePinActive: return "Waiting for Enable Pin Active";
+        case AqeResultCode::DeviceNotReady: return "Device Not Ready";
+        case AqeResultCode::ErrorTicksTooLow: return "Error: Ticks Too Low";
+        case AqeResultCode::ErrorEmptyQueueToStart: return "Error: Empty Queue to Start";
+        case AqeResultCode::ErrorNoDirPinToToggle: return "Error: No Direction Pin to Toggle";
+        default: return "Unknown Error";
+    }
+}
+#define AQE_OK AqeResultCode::OK 
+#define AQE_QUEUE_FULL AqeResultCode::QueueFull
+#define AQE_DIR_PIN_IS_BUSY AqeResultCode::DirPinIsBusy
+#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE AqeResultCode::WaitForEnablePinActive
+#define AQE_DEVICE_NOT_READY AqeResultCode::DeviceNotReady
+#define AQE_ERROR_TICKS_TOO_LOW AqeResultCode::ErrorTicksTooLow
+#define AQE_ERROR_EMPTY_QUEUE_TO_START AqeResultCode::ErrorEmptyQueueToStart
+#define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE AqeResultCode::ErrorNoDirPinToToggle
+
 // ### Return codes of calls to `move()` and `moveTo()`
 //
 // The defined preprocessor macros are MOVE_xxx:
@@ -689,18 +725,10 @@ class FastAccelStepper {
   // should be called with interrupts disabled and return very fast.
   // Actually this is necessary, too, in case the queue is full and not
   // started.
-  int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start = true);
-
   // Return codes for addQueueEntry
   //    positive values mean, that caller should retry later
-#define AQE_OK 0
-#define AQE_QUEUE_FULL 1
-#define AQE_DIR_PIN_IS_BUSY 2
-#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
-#define AQE_DEVICE_NOT_READY 4
-#define AQE_ERROR_TICKS_TOO_LOW -1
-#define AQE_ERROR_EMPTY_QUEUE_TO_START -2
-#define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE -3
+  AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start = true);
+
 
   // ### check functions for command queue being empty, full or running.
   bool isQueueEmpty();

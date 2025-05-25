@@ -183,10 +183,11 @@ int main() {
        "TC1_2: too many steps for the queue");
 
   ret = s.moveTimed(1, MIN_CMD_TICKS - 1, &actual);
-  test(ret == AQE_ERROR_TICKS_TOO_LOW, "TC1_3: too short duration");
+  int8_t ttl = static_cast<int8_t>(AQE_ERROR_TICKS_TOO_LOW);
+  test(ret == ttl, "TC1_3: too short duration");
 
   ret = s.moveTimed(100, 100 * (s.getMaxSpeedInTicks() - 1), &actual);
-  test(ret == AQE_ERROR_TICKS_TOO_LOW, "TC1_4: still too short duration");
+  test(ret == ttl, "TC1_4: still too short duration");
 
   ret = s.moveTimed(QUEUE_LEN / 2 + 1, (QUEUE_LEN / 2) * 100000, &actual);
   test(ret == MOVE_TIMED_TOO_LARGE_ERROR, "TC1_S5: too many commands");

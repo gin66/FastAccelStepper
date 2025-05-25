@@ -4,6 +4,10 @@ TODO:
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
+pre-0.32.0:
+- replace result codes to enum Class for better type safety with convenience function to convert to string
+	- AQE results from addQueueEntry are now AqeResultCode
+
 0.31.8:
 - esp32 rmt: Fix rmt driver implementation for high speeds (#320) and unify implementation across all esp32 variants with rmt.
 - esp32: attachToPulseCounter() extended by another parameter to specify `dir_pin_readback` (#319)

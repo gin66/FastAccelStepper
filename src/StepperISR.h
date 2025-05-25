@@ -142,7 +142,7 @@ class StepperQueue {
   }
 #endif
 
-  int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start);
+  AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
   int32_t getCurrentPosition();
   uint32_t ticksInQueue();
   bool hasTicksInQueue(uint32_t min_ticks);
