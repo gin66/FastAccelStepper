@@ -125,7 +125,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
   _stepper[fas_stepper_num] = s;
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper* sx = _stepper[i];
+    const FastAccelStepper* sx = _stepper[i];
     if (sx) {
       fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
     }
@@ -1058,8 +1058,9 @@ int8_t FastAccelStepper::moveTimed(int16_t steps, uint32_t duration,
       // unexpected
       return ret;
     }
-    uint32_t cmd_duration = cmd.ticks;
-    cmd_duration *= cmd.steps;
+    // Why has this been calculated before and actual_duration is used ?
+    // uint32_t cmd_duration = cmd.ticks;
+    // cmd_duration *= cmd.steps;
     if (actual_duration) {
       uint32_t d = cmd.ticks;
       d *= steps;

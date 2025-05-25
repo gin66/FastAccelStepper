@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<rule-list>
+  <!-- Rule for variables: enforce camelCase -->
+  <rule>
+    <pattern>^[a-z][a-z0-9]*[A-Z][a-zA-Z0-9]*$</pattern>
+    <context>variable</context>
+    <message>
+      <id>variable-camelcase</id>
+      <severity>style</severity>
+      <summary>Variable '%s' does not follow camelCase convention.</summary>
+    </message>
+  </rule>
+  <!-- Rule for functions: enforce snake_case -->
+  <rule>
+    <pattern>^[a-z][a-z0-9_]*$</pattern>
+    <context>function</context>
+    <message>
+      <id>function-snake-case</id>
+      <severity>style</severity>
+      <summary>Function '%s' does not follow snake_case convention.</summary>
+    </message>
+  </rule>
+  <!-- Rule for classes: enforce PascalCase -->
+  <rule>
+    <pattern>^[A-Z][a-zA-Z0-9]*$</pattern>
+    <context>class</context>
+    <message>
+      <id>class-pascalcase</id>
+      <severity>style</severity>
+      <summary>Class '%s' does not follow PascalCase convention.</summary>
+    </message>
+  </rule>
+  <!-- Rule for preprocessor macros: enforce ALL_CAPS_WITH_UNDERSCORES -->
+  <rule>
+    <pattern>^[A-Z][A-Z0-9_]*$</pattern>
+    <context>define</context>
+    <message>
+      <id>macro-allcaps</id>
+      <severity>style</severity>
+      <summary>Preprocessor macro '%s' does not follow ALL_CAPS_WITH_UNDERSCORES convention.</summary>
+    </message>
+  </rule>
+</rule-list>

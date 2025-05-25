@@ -264,7 +264,7 @@ AVR_CYCLIC_ISR_GEN(FAS_TIMER_MODULE)
 
 void StepperQueue::startQueue() {
   uint8_t rp;
-  struct queue_entry* e;
+  const struct queue_entry* e;
 
   _isRunning = true;
   switch (channel) {

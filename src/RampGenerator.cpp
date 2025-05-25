@@ -105,7 +105,7 @@ void RampGenerator::advanceTargetPosition(int32_t delta,
   _ro.target_pos += delta;
 }
 
-void RampGenerator::afterCommandEnqueued(NextCommand *command) {
+void RampGenerator::afterCommandEnqueued(const NextCommand *command) {
 #ifdef TEST
   printf(
       "after Command Enqueued: performed ramp up steps = %u, pause left = %u, "

@@ -8,9 +8,11 @@ int8_t StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   // if (sizeof(entry) != 6 * QUEUE_LEN) {
   //  return -1;
   //}
+#ifndef TEST
   if (!isReadyForCommands()) {
     return AQE_DEVICE_NOT_READY;
   }
+#endif
   if (cmd == NULL) {
     if (start && !isRunning()) {
       if (next_write_idx == read_idx) {
@@ -225,7 +227,7 @@ uint32_t StepperQueue::ticksInQueue() {
   uint32_t ticks = 0;
   rp++;  // ignore currently processed entry
   while (wp != rp) {
-    struct queue_entry* e = &entry[rp++ & QUEUE_LEN_MASK];
+    const struct queue_entry* e = &entry[rp++ & QUEUE_LEN_MASK];
     ticks += e->ticks;
     uint8_t steps = e->steps;
     if (steps > 1) {
@@ -272,7 +274,7 @@ bool StepperQueue::getActualTicksWithDirection(struct actual_ticks_s* speed) {
     speed->ticks = 0;
     return true;
   }
-  struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+  const struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
   if (e->hasSteps) {
     speed->count_up = e->countUp;
     speed->ticks = e->ticks;

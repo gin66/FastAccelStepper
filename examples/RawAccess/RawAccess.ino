@@ -61,17 +61,16 @@ void loop() {
       delayMicroseconds(1000);
     }
     while (ticks > 0) {
-      uint16_t curr_ticks;
       if (ticks > 65535) {
         curr_ticks = 32768;
       } else {
         curr_ticks = ticks;
       }
       ticks -= curr_ticks;
-      struct stepper_command_s cmd = {
+      struct stepper_command_s cmd2 = {
           .ticks = curr_ticks, .steps = 0, .count_up = direction};
       while (true) {
-        int rc = stepper->addQueueEntry(&cmd);
+        int rc = stepper->addQueueEntry(&cmd2);
         if (rc == AQE_OK) {
           break;
         }

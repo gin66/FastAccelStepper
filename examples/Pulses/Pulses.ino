@@ -87,7 +87,7 @@ void loop() {
   if (stepper) {
     min_ticks = stepper->getMaxSpeedInTicks();
   }
-  min_ticks = 30000;
+  //min_ticks = 30000;
   const struct stepper_command_s cmd_step2 = {
       .ticks = MIN_CMD_TICKS, .steps = 2, .count_up = true};
   const struct stepper_command_s cmd_step10 = {
