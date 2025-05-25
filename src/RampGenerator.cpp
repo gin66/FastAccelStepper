@@ -29,8 +29,8 @@ void RampGenerator::applySpeedAcceleration() {
     _parameters.applyParameters();
   }
 }
-int8_t RampGenerator::startRun(bool countUp) {
-  uint8_t res = _parameters.checkValidConfig();
+MoveResultCode RampGenerator::startRun(bool countUp) {
+  MoveResultCode res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }
@@ -72,9 +72,9 @@ void RampGenerator::_startMove(bool position_changed) {
 #endif
 }
 
-int8_t RampGenerator::moveTo(int32_t position,
+MoveResultCode RampGenerator::moveTo(int32_t position,
                              const struct queue_end_s *queue_end) {
-  uint8_t res = _parameters.checkValidConfig();
+  MoveResultCode res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }
@@ -90,8 +90,8 @@ int8_t RampGenerator::moveTo(int32_t position,
   inject_fill_interrupt(2);
   return MOVE_OK;
 }
-int8_t RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
-  uint8_t res = _parameters.checkValidConfig();
+MoveResultCode RampGenerator::move(int32_t move, const struct queue_end_s *queue_end) {
+  MoveResultCode res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
   }

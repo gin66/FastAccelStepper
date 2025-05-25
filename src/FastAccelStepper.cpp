@@ -620,10 +620,10 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
   }
   _off_delay_count = fas_max(delay_count, (uint16_t)1);
 }
-int8_t FastAccelStepper::runForward() { return _rg.startRun(true); }
-int8_t FastAccelStepper::runBackward() { return _rg.startRun(false); }
-int8_t FastAccelStepper::moveTo(int32_t position, bool blocking) {
-  int8_t res = _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
+MoveResultCode FastAccelStepper::runForward() { return _rg.startRun(true); }
+MoveResultCode FastAccelStepper::runBackward() { return _rg.startRun(false); }
+MoveResultCode FastAccelStepper::moveTo(int32_t position, bool blocking) {
+  MoveResultCode res = _rg.moveTo(position, &fas_queue[_queue_num].queue_end);
   if ((res == MOVE_OK) && blocking) {
     while (isRunning()) {
       noop_or_wait;
@@ -631,11 +631,11 @@ int8_t FastAccelStepper::moveTo(int32_t position, bool blocking) {
   }
   return res;
 }
-int8_t FastAccelStepper::move(int32_t move, bool blocking) {
+MoveResultCode FastAccelStepper::move(int32_t move, bool blocking) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  int8_t res = _rg.move(move, &fas_queue[_queue_num].queue_end);
+  MoveResultCode res = _rg.move(move, &fas_queue[_queue_num].queue_end);
   if ((res == MOVE_OK) && blocking) {
     while (isRunning()) {
       noop_or_wait;
@@ -648,9 +648,9 @@ void FastAccelStepper::stopMove() { _rg.initiateStop(); }
 void FastAccelStepper::applySpeedAcceleration() {
   _rg.applySpeedAcceleration();
 }
-int8_t FastAccelStepper::moveByAcceleration(int32_t acceleration,
+MoveResultCode FastAccelStepper::moveByAcceleration(int32_t acceleration,
                                             bool allow_reverse) {
-  int8_t res = MOVE_OK;
+  MoveResultCode res = MOVE_OK;
   if (acceleration > 0) {
     setAcceleration(acceleration);
     res = runForward();

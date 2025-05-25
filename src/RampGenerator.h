@@ -73,9 +73,9 @@ class RampGenerator {
     return _parameters.checkValidConfig() == MOVE_OK;
   }
   void applySpeedAcceleration();
-  int8_t move(int32_t move, const struct queue_end_s *queue);
-  int8_t moveTo(int32_t position, const struct queue_end_s *queue);
-  int8_t startRun(bool countUp);
+  MoveResultCode move(int32_t move, const struct queue_end_s *queue);
+  MoveResultCode moveTo(int32_t position, const struct queue_end_s *queue);
+  MoveResultCode startRun(bool countUp);
   inline void forceStop() { _ro.immediateStop(); }
   inline void initiateStop() { _ro.initiateStop(); }
   inline bool isStopping() {

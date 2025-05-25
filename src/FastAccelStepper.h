@@ -191,51 +191,6 @@ class FastAccelStepperEngine {
   friend class StepperQueue;
 };
 
-// ### Result codes for addQueueEntry() function of FastAccelStepper
-enum class AqeResultCode : int8_t {
-  OK = 0,
-  QueueFull = 1,
-  DirPinIsBusy = 2,
-  WaitForEnablePinActive = 3,
-  DeviceNotReady = 4,
-  ErrorTicksTooLow = -1,
-  ErrorEmptyQueueToStart = -2,
-  ErrorNoDirPinToToggle = -3
-};
-static inline bool aqeRetry(AqeResultCode code) {
-  return (static_cast<int8_t>(code)) > 0;
-}
-static inline const char* aqeToString(AqeResultCode code) {
-  switch (code) {
-    case AqeResultCode::OK:
-      return "OK";
-    case AqeResultCode::QueueFull:
-      return "Queue Full";
-    case AqeResultCode::DirPinIsBusy:
-      return "Direction Pin is Busy";
-    case AqeResultCode::WaitForEnablePinActive:
-      return "Waiting for Enable Pin Active";
-    case AqeResultCode::DeviceNotReady:
-      return "Device Not Ready";
-    case AqeResultCode::ErrorTicksTooLow:
-      return "Error: Ticks Too Low";
-    case AqeResultCode::ErrorEmptyQueueToStart:
-      return "Error: Empty Queue to Start";
-    case AqeResultCode::ErrorNoDirPinToToggle:
-      return "Error: No Direction Pin to Toggle";
-    default:
-      return "Unknown Error";
-  }
-}
-#define AQE_OK AqeResultCode::OK
-#define AQE_QUEUE_FULL AqeResultCode::QueueFull
-#define AQE_DIR_PIN_IS_BUSY AqeResultCode::DirPinIsBusy
-#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE AqeResultCode::WaitForEnablePinActive
-#define AQE_DEVICE_NOT_READY AqeResultCode::DeviceNotReady
-#define AQE_ERROR_TICKS_TOO_LOW AqeResultCode::ErrorTicksTooLow
-#define AQE_ERROR_EMPTY_QUEUE_TO_START AqeResultCode::ErrorEmptyQueueToStart
-#define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE AqeResultCode::ErrorNoDirPinToToggle
-
 // ### Return codes of calls to `move()` and `moveTo()`
 //
 // The defined preprocessor macros are MOVE_xxx:
@@ -552,8 +507,8 @@ class FastAccelStepper {
   // move/moveTo for an ongoing command would reverse the direction, then the
   // command is silently ignored.
   // return values are the MOVE_... constants
-  int8_t move(int32_t move, bool blocking = false);
-  int8_t moveTo(int32_t position, bool blocking = false);
+  MoveResultCode move(int32_t move, bool blocking = false);
+  MoveResultCode moveTo(int32_t position, bool blocking = false);
 
   // ### keepRunning()
   // This command flags the stepper to keep run continuously into current
@@ -568,8 +523,8 @@ class FastAccelStepper {
   // These commands just let the motor run continuously in one direction.
   // If the motor is running in the opposite direction, it will reverse
   // return value as with move/moveTo
-  int8_t runForward();
-  int8_t runBackward();
+  MoveResultCode runForward();
+  MoveResultCode runBackward();
 
   // ### forwardStep() and backwardStep()
   // forwardStep()/backwardstep() can be called, while stepper is not moving
@@ -591,7 +546,7 @@ class FastAccelStepper {
   //        => accelerate towards negative maximum speed if allow_reverse
   //        => decelerate towards motor stop if allow_reverse = false
   // return value as with move/moveTo
-  int8_t moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
+  MoveResultCode moveByAcceleration(int32_t acceleration, bool allow_reverse = true);
 
   // ### stopMove()
   // Stop the running stepper with normal deceleration.

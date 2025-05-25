@@ -1,12 +1,9 @@
 #ifndef FAS_COMMON_H
 #define FAS_COMMON_H
 
-#define TICKS_FOR_STOPPED_MOTOR 0xffffffff
+#include "fas_arch/result_codes.h"
 
-#define MOVE_OK 0
-#define MOVE_ERR_NO_DIRECTION_PIN -1
-#define MOVE_ERR_SPEED_IS_UNDEFINED -2
-#define MOVE_ERR_ACCELERATION_IS_UNDEFINED -3
+#define TICKS_FOR_STOPPED_MOTOR 0xffffffff
 
 // Low level stepper motor command.
 //
