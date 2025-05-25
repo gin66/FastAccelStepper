@@ -96,8 +96,8 @@ void loop() {
   //      .ticks = 45000, .steps = 5, .count_up = true};
   //  const struct stepper_command_s cmd_pause = {
   //      .ticks = 5000, .steps = 0, .count_up = true};
-  uint8_t res[20];
-  uint8_t *r = res;
+  AqeResultCode res[20];
+  AqeResultCode *r = res;
   if (stepper) {
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
     stepper->clearPulseCounter();
@@ -114,11 +114,11 @@ void loop() {
     //*r++ = stepper->addQueueEntry(&cmd_step10, false);
     //*r++ = stepper->addQueueEntry(&cmd_pause);
     *r++ = stepper->addQueueEntry(NULL);
-    Serial.print(res[0]);
+    Serial.print(aqeToString(res[0]));
     Serial.print('-');
-    Serial.print(res[1]);
+    Serial.print(aqeToString(res[1]));
     Serial.print('-');
-    Serial.println(res[2]);
+    Serial.println(aqeToString(res[2]));
   }
   while (stepper->isRunning()) {
   }
