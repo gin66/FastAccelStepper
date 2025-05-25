@@ -106,7 +106,7 @@
 #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 
 // PART_SIZE shall be even.
-#define PART_SIZE (((RMT_SIZE - 1) / 4)<<1)
+#define PART_SIZE (((RMT_SIZE - 1) / 4) << 1)
 
 #endif
 

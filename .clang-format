@@ -1,0 +1,10 @@
+# .clang-format  
+---  
+Language: Cpp  
+BasedOnStyle: Google  
+ColumnLimit: 80  
+  
+# Naming conventions  
+IncludeBlocks: Regroup  
+SortIncludes: false  
+

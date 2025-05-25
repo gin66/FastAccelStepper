@@ -79,7 +79,7 @@ class StepperQueue {
   RMT_CHANNEL_T channel;
   bool _rmtStopped;
   bool lastChunkContainsSteps;
-#if ESP_IDF_VERSION_MAJOR == 5 
+#if ESP_IDF_VERSION_MAJOR == 5
   rmt_encoder_handle_t _tx_encoder;
 #endif
 #endif
@@ -207,8 +207,8 @@ class StepperQueue {
 extern StepperQueue fas_queue[NUM_QUEUES];
 
 #if defined(SUPPORT_ESP32_RMT)
-void rmt_fill_buffer(StepperQueue *q, bool fill_part_one, uint32_t *data);
-void rmt_apply_command(StepperQueue *q, bool fill_part_one, uint32_t *data);
+void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
+void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
 #endif
 
 #if defined(SUPPORT_CPU_AFFINITY)

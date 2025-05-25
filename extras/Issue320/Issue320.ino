@@ -4,13 +4,13 @@
 
 // Tests done with esp32
 
-#define dirPinStepper 17 // 3,8 will cause watchdog reset loop
-#define enablePinStepper 16 
-#define stepPinStepper 18 // 6 does not work
+#define dirPinStepper 17  // 3,8 will cause watchdog reset loop
+#define enablePinStepper 16
+#define stepPinStepper 18  // 6 does not work
 
-//#define stepperSpeed 200000
-//#define stepperAcceleration 1000000
-//#define stepperSteps 90000
+// #define stepperSpeed 200000
+// #define stepperAcceleration 1000000
+// #define stepperSteps 90000
 #define stepperSpeed 200000
 #define stepperAcceleration 1000000
 #define stepperSteps 90000
@@ -30,7 +30,6 @@ void setup() {
   Serial.println(esp_get_idf_version());
   Serial.printf("APB Base Clock: %d Hz\n", esp_clk_apb_freq());
 
-
   engine.init();
   // with v0.31.7:
   // stepperSpeed 200000:
@@ -40,7 +39,8 @@ void setup() {
   //   RMT needs 1680ms
   // stepperSpeed 170000:
   //   RMT needs 1700ms
-  // stepperSpeed 168000: => Number of steps 89861 instead of 90000. Steps are interrupted with pauses
+  // stepperSpeed 168000: => Number of steps 89861 instead of 90000. Steps are
+  // interrupted with pauses
   //   RMT needs 1720ms
   // stepperSpeed 165000:
   //   RMT needs 680ms
@@ -59,10 +59,10 @@ void setup() {
 #endif
 
   if (!stepper) {
-     while(true) {
-       Serial.println("error connecting to stepper pin");
-       delay(1000);
-     }
+    while (true) {
+      Serial.println("error connecting to stepper pin");
+      delay(1000);
+    }
   }
 
   stepper->setDirectionPin(dirPinStepper);
@@ -95,7 +95,8 @@ void loop() {
         Serial.println(" (Stalled for " + String(stall_time) + "ms)");
         if (stall_time > 2000) {
           int32_t new_position = direction > 0 ? stepperSteps : 0;
-          Serial.println("Stopping stepper and moving to " + String(new_position));
+          Serial.println("Stopping stepper and moving to " +
+                         String(new_position));
           stepper->forceStopAndNewPosition(new_position);
           millis_stalled = 0;
         }
@@ -109,9 +110,9 @@ void loop() {
       Serial.print("@");
       Serial.print(stepper_position);
       if (start_move_ms != 0) {
-         Serial.print(" in ");
-         Serial.print(end_move_ms - start_move_ms);
-         Serial.print("ms");
+        Serial.print(" in ");
+        Serial.print(end_move_ms - start_move_ms);
+        Serial.print("ms");
       }
       Serial.println();
       delay(1000);

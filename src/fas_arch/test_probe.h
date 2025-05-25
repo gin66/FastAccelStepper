@@ -8,10 +8,12 @@
 // #define ESP32C3_TEST_PROBE
 
 // in rmt:
-//   TEST_PROBE_1: on startQueue and queue stop, with double toggle at startQueue 
-//   TEST_PROBE_2: end interrupt, when rmt transmission hits buffer end 
-//   TEST_PROBE_3: threshold interrupt, after first buffer half transmission is complete
-//   TEST_PROBE_4: on command completed, read pointer advanced
+// - TEST_PROBE_1: on startQueue and queue stop, with double toggle at
+// startQueue
+// - TEST_PROBE_2: end interrupt, when rmt transmission hits buffer end
+// - TEST_PROBE_3: threshold interrupt, after first buffer half transmission is
+// complete
+// - TEST_PROBE_4: on command completed, read pointer advanced
 
 #ifdef ESP32_TEST_PROBE
 #define TEST_PROBE_1 18
