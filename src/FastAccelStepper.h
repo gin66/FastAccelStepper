@@ -193,32 +193,41 @@ class FastAccelStepperEngine {
 
 // ### Result codes for addQueueEntry() function of FastAccelStepper
 enum class AqeResultCode : int8_t {
-    OK = 0,
-    QueueFull = 1,
-    DirPinIsBusy = 2,
-    WaitForEnablePinActive = 3,
-    DeviceNotReady = 4,
-    ErrorTicksTooLow = -1,
-    ErrorEmptyQueueToStart = -2,
-    ErrorNoDirPinToToggle = -3
+  OK = 0,
+  QueueFull = 1,
+  DirPinIsBusy = 2,
+  WaitForEnablePinActive = 3,
+  DeviceNotReady = 4,
+  ErrorTicksTooLow = -1,
+  ErrorEmptyQueueToStart = -2,
+  ErrorNoDirPinToToggle = -3
 };
 static inline bool aqeRetry(AqeResultCode code) {
-    return (static_cast<int8_t>(code)) > 0;
+  return (static_cast<int8_t>(code)) > 0;
 }
 static inline const char* aqeToString(AqeResultCode code) {
-    switch (code) {
-        case AqeResultCode::OK: return "OK";
-        case AqeResultCode::QueueFull: return "Queue Full";
-        case AqeResultCode::DirPinIsBusy: return "Direction Pin is Busy";
-        case AqeResultCode::WaitForEnablePinActive: return "Waiting for Enable Pin Active";
-        case AqeResultCode::DeviceNotReady: return "Device Not Ready";
-        case AqeResultCode::ErrorTicksTooLow: return "Error: Ticks Too Low";
-        case AqeResultCode::ErrorEmptyQueueToStart: return "Error: Empty Queue to Start";
-        case AqeResultCode::ErrorNoDirPinToToggle: return "Error: No Direction Pin to Toggle";
-        default: return "Unknown Error";
-    }
+  switch (code) {
+    case AqeResultCode::OK:
+      return "OK";
+    case AqeResultCode::QueueFull:
+      return "Queue Full";
+    case AqeResultCode::DirPinIsBusy:
+      return "Direction Pin is Busy";
+    case AqeResultCode::WaitForEnablePinActive:
+      return "Waiting for Enable Pin Active";
+    case AqeResultCode::DeviceNotReady:
+      return "Device Not Ready";
+    case AqeResultCode::ErrorTicksTooLow:
+      return "Error: Ticks Too Low";
+    case AqeResultCode::ErrorEmptyQueueToStart:
+      return "Error: Empty Queue to Start";
+    case AqeResultCode::ErrorNoDirPinToToggle:
+      return "Error: No Direction Pin to Toggle";
+    default:
+      return "Unknown Error";
+  }
 }
-#define AQE_OK AqeResultCode::OK 
+#define AQE_OK AqeResultCode::OK
 #define AQE_QUEUE_FULL AqeResultCode::QueueFull
 #define AQE_DIR_PIN_IS_BUSY AqeResultCode::DirPinIsBusy
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE AqeResultCode::WaitForEnablePinActive
@@ -727,8 +736,8 @@ class FastAccelStepper {
   // started.
   // Return codes for addQueueEntry
   //    positive values mean, that caller should retry later
-  AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start = true);
-
+  AqeResultCode addQueueEntry(const struct stepper_command_s* cmd,
+                              bool start = true);
 
   // ### check functions for command queue being empty, full or running.
   bool isQueueEmpty();

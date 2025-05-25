@@ -233,8 +233,8 @@ void FastAccelStepperEngine::manageSteppers() {
 //*************************************************************************************************
 
 //*************************************************************************************************
-AqeResultCode FastAccelStepper::addQueueEntry(const struct stepper_command_s* cmd,
-                                       bool start) {
+AqeResultCode FastAccelStepper::addQueueEntry(
+    const struct stepper_command_s* cmd, bool start) {
   StepperQueue* q = &fas_queue[_queue_num];
   if (cmd == NULL) {
     return q->addQueueEntry(NULL, start);

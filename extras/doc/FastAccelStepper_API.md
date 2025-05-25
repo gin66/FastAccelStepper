@@ -155,6 +155,52 @@ the engine. The periodic task will let the associated LED blink with 1 Hz
 ```cpp
   void setDebugLed(uint8_t ledPin);
 ```
+### Result codes for addQueueEntry() function of FastAccelStepper
+```cpp
+enum class AqeResultCode : int8_t {
+  OK = 0,
+  QueueFull = 1,
+  DirPinIsBusy = 2,
+  WaitForEnablePinActive = 3,
+  DeviceNotReady = 4,
+  ErrorTicksTooLow = -1,
+  ErrorEmptyQueueToStart = -2,
+  ErrorNoDirPinToToggle = -3
+};
+static bool aqeRetry(AqeResultCode code) {
+  return (static_cast<int8_t>(code)) > 0;
+}
+static const char* aqeToString(AqeResultCode code) {
+  switch (code) {
+    case AqeResultCode::OK:
+      return "OK";
+    case AqeResultCode::QueueFull:
+      return "Queue Full";
+    case AqeResultCode::DirPinIsBusy:
+      return "Direction Pin is Busy";
+    case AqeResultCode::WaitForEnablePinActive:
+      return "Waiting for Enable Pin Active";
+    case AqeResultCode::DeviceNotReady:
+      return "Device Not Ready";
+    case AqeResultCode::ErrorTicksTooLow:
+      return "Error: Ticks Too Low";
+    case AqeResultCode::ErrorEmptyQueueToStart:
+      return "Error: Empty Queue to Start";
+    case AqeResultCode::ErrorNoDirPinToToggle:
+      return "Error: No Direction Pin to Toggle";
+    default:
+      return "Unknown Error";
+  }
+}
+#define AQE_OK AqeResultCode::OK
+#define AQE_QUEUE_FULL AqeResultCode::QueueFull
+#define AQE_DIR_PIN_IS_BUSY AqeResultCode::DirPinIsBusy
+#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE AqeResultCode::WaitForEnablePinActive
+#define AQE_DEVICE_NOT_READY AqeResultCode::DeviceNotReady
+#define AQE_ERROR_TICKS_TOO_LOW AqeResultCode::ErrorTicksTooLow
+#define AQE_ERROR_EMPTY_QUEUE_TO_START AqeResultCode::ErrorEmptyQueueToStart
+#define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE AqeResultCode::ErrorNoDirPinToToggle
+```
 ### Return codes of calls to `move()` and `moveTo()`
 
 The defined preprocessor macros are MOVE_xxx:
@@ -667,20 +713,11 @@ to achieve a near synchronous start of several steppers. Consequently it
 should be called with interrupts disabled and return very fast.
 Actually this is necessary, too, in case the queue is full and not
 started.
-```cpp
-  int8_t addQueueEntry(const struct stepper_command_s* cmd, bool start = true);
-```
 Return codes for addQueueEntry
    positive values mean, that caller should retry later
 ```cpp
-#define AQE_OK 0
-#define AQE_QUEUE_FULL 1
-#define AQE_DIR_PIN_IS_BUSY 2
-#define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE 3
-#define AQE_DEVICE_NOT_READY 4
-#define AQE_ERROR_TICKS_TOO_LOW -1
-#define AQE_ERROR_EMPTY_QUEUE_TO_START -2
-#define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE -3
+  AqeResultCode addQueueEntry(const struct stepper_command_s* cmd,
+                              bool start = true);
 ```
 ### check functions for command queue being empty, full or running.
 ```cpp
@@ -778,6 +815,10 @@ for the low and high values respectively, then the momentary angle of the
 stepper (at exact this moment) can be retrieved just by reading the pulse
 counter. If the value is negative, then just add 3200.
 
+In case external direction pin is used and the dir pin is available on one
+of the GPIOs, then the additional dir_pin_readback parameter informs
+about this pin.
+
 Update for idf5 version:
 The pcnt_unit value is not used, because the available units are managed
 by the system. The parameter is kept for compatibility.
@@ -786,14 +827,16 @@ by the system. The parameter is kept for compatibility.
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
   bool attachToPulseCounter(uint8_t unused_pcnt_unit = 0,
                             int16_t low_value = -16384,
-                            int16_t high_value = 16384);
+                            int16_t high_value = 16384,
+                            uint8_t dir_pin_readback = PIN_UNDEFINED);
   int16_t readPulseCounter();
   void clearPulseCounter();
   bool pulseCounterAttached() { return _attached_pulse_unit != NULL; }
 #endif
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
   bool attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value = -16384,
-                            int16_t high_value = 16384);
+                            int16_t high_value = 16384,
+                            uint8_t dir_pin_readback = PIN_UNDEFINED);
   int16_t readPulseCounter();
   void clearPulseCounter();
   bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }

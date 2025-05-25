@@ -3,7 +3,7 @@
 #include "StepperISR.h"
 
 AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
-                                   bool start) {
+                                          bool start) {
   // Just to check if, if the struct has the correct size
   // if (sizeof(entry) != 6 * QUEUE_LEN) {
   //  return -1;
