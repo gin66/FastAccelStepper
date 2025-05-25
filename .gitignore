@@ -35,6 +35,6 @@ extras/tests/simavr_based/test_seq*/Makefile
 extras/tests/esp32_hw_based/*.log
 library.properties
 examples
-extras/gen_pmf_const/Log2Representation.cpp
-extras/gen_pmf_const/main
+extras/gen_log2_const/Log2Representation.cpp
+extras/gen_log2_const/main
 extras/tests/simavr_based/.fas
