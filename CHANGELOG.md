@@ -10,6 +10,7 @@ pre-0.32.0:
 	- Move results from move, moveTo,... are now MoveResultCode
 	- Timed move results from moveTimed are now MoveTimedResultCode
         - setDelayToEnable returns DelayResultCode
+- esp32: stepperConnectToPin() expects a FasDriver constant and not just an `uint8_t`
 
 0.31.8:
 - esp32 rmt: Fix rmt driver implementation for high speeds (#320) and unify implementation across all esp32 variants with rmt.
