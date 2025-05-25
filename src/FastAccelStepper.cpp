@@ -442,7 +442,7 @@ void FastAccelStepper::fill_queue() {
         Serial.println(MIN_CMD_TICKS);
 #endif
 #ifdef TEST
-        printf("ERROR: Abort ramp due to queue error (%d)\n", res);
+        printf("ERROR: Abort ramp due to queue error: %s\n", aqeToString(res));
         printf("steps=%d ticks=%d limit=%ld state=%d\n", cmd.command.steps,
                cmd.command.ticks, MIN_CMD_TICKS, cmd.rw.ramp_state);
         assert(false);
