@@ -54,7 +54,7 @@ void setup() {
       AqeResultCode rc = stepper->addQueueEntry(&cmd);
       if (rc != AQE_OK) {
         Serial.print("Queue error:");
-        Serial.println(rc);
+        Serial.println(aqeToString(rc));
       } else {
         cnt++;
         while (stepper->isRunning()) {

@@ -40,7 +40,7 @@ void loop() {
   // create one step + 4 ms pause
   while (true) {
     // This loop repeats a command, in case the queue is full
-    int rc = stepper->addQueueEntry(&cmd_step);
+    AqeResultCode rc = stepper->addQueueEntry(&cmd_step);
     // Serial.println(rc);
     if (rc == AQE_OK) {
       Serial.println("STEP");

@@ -52,15 +52,15 @@ void setup() {
                                              .count_up = true};
 
         // add command to the queue
-        int rc;
+        AqeResultCode rc;
         do {
           rc = stepper->addQueueEntry(&cmd_step);
-          if (rc > 0) {
+          if (aqeRetry(rc)) {
             // so the queue is busy => put the task to sleep for
             // portTICK_PERIOD_MS
             vTaskDelay(1);
           }
-        } while (rc > 0);  // repeat addQueueEntry, if queue is busy
+        } while (aqeRetry(rc));  // repeat addQueueEntry, if queue is busy
 
         // sum up the generated steps
         this_frame_steps += this_cmd_steps;
@@ -76,15 +76,15 @@ void setup() {
             .ticks = 16384, .steps = 1, .count_up = true};
 
         // add command to the queue
-        int rc;
+        AqeResultCode rc;
         do {
           rc = stepper->addQueueEntry(&cmd_step);
-          if (rc > 0) {
+          if (aqeRetry(rc)) {
             // so the queue is busy => put the task to sleep for
             // portTICK_PERIOD_MS
             vTaskDelay(1);
           }
-        } while (rc > 0);  // repeat addQueueEntry, if queue is busy
+        } while (aqeRetry(rc));  // repeat addQueueEntry, if queue is busy
 
         // sum up this one step
         this_frame_steps += 1;
@@ -110,15 +110,15 @@ void setup() {
               .ticks = this_cmd_ticks, .steps = 0, .count_up = true};
 
           // and add it to the queue
-          int rc;
+          AqeResultCode rc;
           do {
             rc = stepper->addQueueEntry(&cmd_pause);
-            if (rc > 0) {
+            if (aqeRetry(rc)) {
               // so the queue is busy => put the task to sleep for
               // portTICK_PERIOD_MS
               vTaskDelay(1);
             }
-          } while (rc > 0);  // repeat addQueueEntry, if queue is busy
+          } while (aqeRetry(rc));  // repeat addQueueEntry, if queue is busy
 
           // reduce the remaining ticks
           remaining_ticks -= this_cmd_ticks;
