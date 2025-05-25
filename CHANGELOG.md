@@ -1,10 +1,8 @@
 TODO:
-- Different behavior avr vs pc-based testgis to be analyzed
-- #include-file structure needs to be cleaned up
 - rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
 
-pre-0.32.0:
+0.32.0:
 - replace result codes to enum Class for better type safety with convenience function to convert to string
 	- AQE results from addQueueEntry are now AqeResultCode
 	- Move results from move, moveTo,... are now MoveResultCode
