@@ -1,7 +1,5 @@
-TODO:
-- rename RampConstAcceleration to e.g. RampControl
-
 pre-0.33.0:
+- rename RampConstAcceleration to RampControl
 - rename PoorManFloat to Log2Representation
 
 0.32.0:

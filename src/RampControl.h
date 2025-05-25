@@ -1,5 +1,5 @@
-#ifndef RAMP_CONST_ACCELERATION_H
-#define RAMP_CONST_ACCELERATION_H
+#ifndef RAMP_CONTROL_H
+#define RAMP_CONTROL_H
 
 #include "fas_arch/common.h"
 

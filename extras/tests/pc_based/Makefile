@@ -6,17 +6,17 @@ LDLIBS=-lm -lc
 
 TESTS=$(basename $(wildcard test_??.cpp))
 
-test: $(TESTS) Log2_test rmc_test
+test: $(TESTS) log2_test rmc_test
 	./rmc_test
-	./Log2_test
+	./log2_test
 	rm -f test.log
 	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
 
 LIB_H=FastAccelStepper.h Log2Representation.h StepperISR.h \
-	  RampGenerator.h RampConstAcceleration.h RampCalculator.h \
+	  RampGenerator.h RampControl.h RampCalculator.h \
 	  fas_arch/common.h
 LIB_O=FastAccelStepper.o Log2Representation.o StepperISR_test.o \
-	  RampGenerator.o RampConstAcceleration.o RampCalculator.o StepperISR.o
+	  RampGenerator.o RampControl.o RampCalculator.o StepperISR.o
 
 SRC_LIB_H=$(addprefix $(PRJ_ROOT)/src/,$(LIB_H))
 
@@ -26,8 +26,8 @@ test_%: test_%.o $(LIB_O)
 test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h stubs.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
-Log2_test: Log2_test.o Log2Representation.o
-Log2_test.o: Log2_test.cpp $(PRJ_ROOT)/src/Log2Representation.h stubs.h test_03.h
+log2_test: log2_test.o Log2Representation.o
+log2_test.o: log2_test.cpp $(PRJ_ROOT)/src/Log2Representation.h stubs.h test_03.h
 
 rmc_test: rmc_test.o Log2Representation.o RampCalculator.o
 rmc_test.o: rmc_test.cpp $(PRJ_ROOT)/src/Log2Representation.h $(PRJ_ROOT)/src/RampCalculator.h stubs.h test_03.h
@@ -41,7 +41,7 @@ Log2Representation.o: $(PRJ_ROOT)/src/Log2Representation.cpp $(PRJ_ROOT)/src/Log
 RampGenerator.o: $(PRJ_ROOT)/src/RampGenerator.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
-RampConstAcceleration.o: $(PRJ_ROOT)/src/RampConstAcceleration.cpp $(SRC_LIB_H)
+RampControl.o: $(PRJ_ROOT)/src/RampControl.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 RampCalculator.o: $(PRJ_ROOT)/src/RampCalculator.cpp $(SRC_LIB_H)
@@ -55,4 +55,4 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 VERSION=$(shell git rev-parse --short HEAD)
 
 clean:
-	rm -f *.o test_[0-9][0-9] *.gnuplot Log2_test rmc_test test.log
+	rm -f *.o test_[0-9][0-9] *.gnuplot log2_test rmc_test test.log

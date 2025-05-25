@@ -3,7 +3,7 @@
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
 
-#include "RampConstAcceleration.h"
+#include "RampControl.h"
 #include "fas_arch/common.h"
 
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
