@@ -114,11 +114,11 @@ void loop() {
     //*r++ = stepper->addQueueEntry(&cmd_step10, false);
     //*r++ = stepper->addQueueEntry(&cmd_pause);
     *r++ = stepper->addQueueEntry(NULL);
-    Serial.print(aqeToString(res[0]));
+    Serial.print(toString(res[0]));
     Serial.print('-');
-    Serial.print(aqeToString(res[1]));
+    Serial.print(toString(res[1]));
     Serial.print('-');
-    Serial.println(aqeToString(res[2]));
+    Serial.println(toString(res[2]));
   }
   while (stepper->isRunning()) {
   }

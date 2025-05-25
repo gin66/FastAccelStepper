@@ -9,6 +9,7 @@ pre-0.32.0:
 	- AQE results from addQueueEntry are now AqeResultCode
 	- Move results from move, moveTo,... are now MoveResultCode
 	- Timed move results from moveTimed are now MoveTimedResultCode
+        - setDelayToEnable returns DelayResultCode
 
 0.31.8:
 - esp32 rmt: Fix rmt driver implementation for high speeds (#320) and unify implementation across all esp32 variants with rmt.

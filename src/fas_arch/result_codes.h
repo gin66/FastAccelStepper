@@ -12,10 +12,15 @@ enum class AqeResultCode : int8_t {
   ErrorEmptyQueueToStart = -2,
   ErrorNoDirPinToToggle = -3
 };
+
 static inline bool aqeRetry(AqeResultCode code) {
   return (static_cast<int8_t>(code)) > 0;
 }
-static inline const char* aqeToString(AqeResultCode code) {
+static inline bool aqeIsOk(AqeResultCode status) {
+    return status == AqeResultCode::OK;
+}
+
+static inline const char* toString(AqeResultCode code) {
   switch (code) {
     case AqeResultCode::OK:
       return "OK";
@@ -54,8 +59,13 @@ enum class MoveResultCode : int8_t {
   ErrorAccelerationIsUndefined = -3  // Equivalent to MOVE_ERR_ACCELERATION_IS_UNDEFINED
 };
 
+static inline bool moveIsOk(MoveResultCode status) {
+    return status == MoveResultCode::OK;
+}
+
+
 // Function to convert MoveResultCode to string for debugging/errors
-static inline const char* moveToString(MoveResultCode code) {
+static inline const char* toString(MoveResultCode code) {
   switch (code) {
     case MoveResultCode::OK:
       return "OK";
@@ -91,12 +101,16 @@ enum class MoveTimedResultCode : int8_t {
   ErrorMoveTooLarge = -4,
 };
 
+static inline bool moveTimedIsOk(MoveTimedResultCode status) {
+    return status == MoveTimedResultCode::OK;
+}
+
 static inline MoveTimedResultCode tmrFrom(AqeResultCode res) {
   return static_cast<MoveTimedResultCode>(res);
 }
 
 // Function to convert MoveResultCode to string for debugging/errors
-static inline const char* moveToString(MoveTimedResultCode code) {
+static inline const char* toString(MoveTimedResultCode code) {
   switch (code) {
     case MoveTimedResultCode::OK:
       return "OK";
@@ -128,4 +142,33 @@ static inline const char* moveToString(MoveTimedResultCode code) {
 #define MOVE_TIMED_BUSY MoveTimedResultCode::MoveBusy
 #define MOVE_TIMED_EMPTY MoveTimedResultCode::MoveEmpty
 #define MOVE_TIMED_TOO_LARGE_ERROR MoveTimedResultCode::ErrorMoveTooLarge
+
+enum class DelayResultCode : int8_t {
+    OK = 0,
+    TOO_LOW = -1,
+    TOO_HIGH = -2
+};
+
+static inline bool delayIsValid(DelayResultCode status) {
+    return status == DelayResultCode::OK;
+}
+
+static inline const char* toString(DelayResultCode status) {
+    switch (status) {
+        case DelayResultCode::OK:
+            return "OK";
+        case DelayResultCode::TOO_LOW:
+            return "Delay Too Low";
+        case DelayResultCode::TOO_HIGH:
+            return "Delay Too High";
+        default:
+            return "Unknown Delay Status";
+    }
+}
+
+// Macros for simpler usage if needed
+#define DELAY_OK DelayResultCode::OK
+#define DELAY_TOO_LOW DelayResultCode::TOO_LOW
+#define DELAY_TOO_HIGH DelayResultCode::TOO_HIGH
+
 #endif /* FAS_RESULT_CODES_H */

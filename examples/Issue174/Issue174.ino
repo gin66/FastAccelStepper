@@ -101,7 +101,7 @@ void loop() {
     if (res != MOVE_OK) {
       Serial.println();
       Serial.print("Error return from move: ");
-      Serial.println(moveToString(res));
+      Serial.println(toString(res));
     }
     while (stepper->isRunning()) {
     }

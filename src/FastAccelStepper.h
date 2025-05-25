@@ -330,11 +330,8 @@ class FastAccelStepper {
   // interrupt/task with 4 or 10 ms repetition rate and as such is with several
   // ms jitter.
   void setAutoEnable(bool auto_enable);
-  int8_t setDelayToEnable(uint32_t delay_us);
+  DelayResultCode setDelayToEnable(uint32_t delay_us);
   void setDelayToDisable(uint16_t delay_ms);
-#define DELAY_OK 0
-#define DELAY_TOO_LOW -1
-#define DELAY_TOO_HIGH -2
 
   // ## Stepper Position
   // Retrieve the current position of the stepper

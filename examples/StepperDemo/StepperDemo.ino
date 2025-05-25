@@ -1408,7 +1408,7 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_SET_ENABLE_TIME);
         PRINTI32(val_n[0]);
         PRINTLN("");
-        res = stepper_selected->setDelayToEnable(val_n[0]);
+        res = static_cast<int8_t>(stepper_selected->setDelayToEnable(val_n[0]));
         output_msg(MSG_RETURN_CODE);
         PRINTU8(res);
         PRINTLN("");

@@ -599,7 +599,7 @@ void FastAccelStepper::setAutoEnable(bool auto_enable) {
     _off_delay_count = 1;
   }
 }
-int8_t FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
+DelayResultCode FastAccelStepper::setDelayToEnable(uint32_t delay_us) {
   uint32_t delay_ticks = US_TO_TICKS(delay_us);
   if (delay_ticks > 0) {
     if (delay_ticks < MIN_CMD_TICKS) {
