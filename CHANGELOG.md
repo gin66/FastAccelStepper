@@ -1,6 +1,8 @@
 TODO:
-- rename PoorManFloat to e.g. Log2Representation
 - rename RampConstAcceleration to e.g. RampControl
+
+pre-0.33.0:
+- rename PoorManFloat to Log2Representation
 
 0.32.0:
 - replace result codes to enum Class for better type safety with convenience function to convert to string

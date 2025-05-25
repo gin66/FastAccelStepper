@@ -5,7 +5,7 @@
 #define PROGMEM
 #define pgm_read_byte_near(x) (*(x))
 #endif
-#include "PoorManFloat.h"
+#include "Log2Representation.h"
 #ifdef TEST
 #include <stdio.h>
 #endif
@@ -165,7 +165,7 @@ uint8_t leading_zeros(uint8_t x) {
   return res;
 }
 
-pmf_logarithmic pmfl_from(uint8_t x) {
+pmf_logarithmic log2_from(uint8_t x) {
   // calling with x == 0 is considered an error.
   //
   // In a first step convert to
@@ -184,7 +184,7 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   //    3. add the value from the log2_minus_x_plus_one_shifted_by_1 table
   uint8_t leading = leading_zeros(x);
   if (leading == 8) {
-    return PMF_CONST_INVALID;
+    return LOG2_CONST_INVALID;
   }
   x <<= leading + 1;
   uint8_t e = 7 - leading;
@@ -196,10 +196,10 @@ pmf_logarithmic pmfl_from(uint8_t x) {
   return res;
 }
 
-pmf_logarithmic pmfl_from(uint16_t x) {
+pmf_logarithmic log2_from(uint16_t x) {
   uint8_t leading = leading_zeros(x >> 8);
   if (leading == 8) {
-    return pmfl_from((uint8_t)x);
+    return log2_from((uint8_t)x);
   }
   // shift msb out
   x <<= leading + 1;
@@ -222,7 +222,7 @@ pmf_logarithmic pmfl_from(uint16_t x) {
   x += ((uint16_t)exponent) << 9;
   return x;
 }
-pmf_logarithmic pmfl_from(uint32_t x) {
+pmf_logarithmic log2_from(uint32_t x) {
   int16_t exp_offset;
   uint16_t w;
   if ((x & 0xff000000) == 0) {
@@ -243,13 +243,13 @@ pmf_logarithmic pmfl_from(uint32_t x) {
     w = x >> 16;
     exp_offset = 0x2000;
   }
-  return pmfl_from(w) + exp_offset;
+  return log2_from(w) + exp_offset;
 }
-uint16_t pmfl_to_u16(pmf_logarithmic x) {
+uint16_t log2_to_u16(pmf_logarithmic x) {
   if (x < 0) {
     return 0;
   }
-  if (x >= PMF_CONST_UINT16_MAX) {
+  if (x >= LOG2_CONST_UINT16_MAX) {
     return __UINT16_MAX__;
   }
   uint8_t exponent = ((uint16_t)x) >> 9;
@@ -274,29 +274,29 @@ uint16_t pmfl_to_u16(pmf_logarithmic x) {
   }
   return x;
 }
-uint32_t pmfl_to_u32(pmf_logarithmic x) {
+uint32_t log2_to_u32(pmf_logarithmic x) {
   if (x < 0) {
     return 0;
   }
-  if (x >= PMF_CONST_UINT32_MAX) {
+  if (x >= LOG2_CONST_UINT32_MAX) {
     return __UINT32_MAX__;
   }
   uint8_t exponent = ((uint16_t)x) >> 9;
   if (exponent < 0x10) {
-    return pmfl_to_u16(x);
+    return log2_to_u16(x);
   }
   uint8_t shift = exponent - 0x0f;
-  x = pmfl_shr(x, shift);
-  uint32_t res = pmfl_to_u16(x);
+  x = log2_shr(x, shift);
+  uint32_t res = log2_to_u16(x);
   res <<= shift;
   return res;
 }
-pmf_logarithmic pmfl_square(pmf_logarithmic x) {
+pmf_logarithmic log2_square(pmf_logarithmic x) {
   if (x > 0x4000) {
-    return PMF_CONST_MAX;
+    return LOG2_CONST_MAX;
   }
   if (x <= -0x4000) {
-    return PMF_CONST_MIN;
+    return LOG2_CONST_MIN;
   }
   return x + x;
 }

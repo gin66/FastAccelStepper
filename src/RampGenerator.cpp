@@ -155,7 +155,7 @@ void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
     }
     if (_ro.config.parameters.valid_acceleration) {
       Serial.print(" a=");
-      Serial.print(pmfl_to_u32(_ro.config.parameters.pmfl_accel));
+      Serial.print(log2_to_u32(_ro.config.parameters.log2_accel));
     }
     if (_ro.config.parameters.recalc_ramp_steps) {
       Serial.print(" recalc");

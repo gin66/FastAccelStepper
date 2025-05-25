@@ -55,17 +55,17 @@ do
 	)
 done
 
-# Make one directory to test PoorManFloat on simulator
-mkdir pio_dirs/PMF_test
-mkdir pio_dirs/PMF_test/src
-cd pio_dirs/PMF_test
+# Make one directory to test Log2Representation on simulator
+mkdir pio_dirs/LOG2_test
+mkdir pio_dirs/LOG2_test/src
+cd pio_dirs/LOG2_test
 mkdir FastAccelStepper
 ln -s $ROOT/src FastAccelStepper
 ln -s ../../extras/ci/platformio.ini .
 cd src
 #sed  -e 's/%d/%ld/g' <../../../tests/test_03.h >test_03.h
 ln -s ../../../extras/tests/pc_based/test_03.h .
-ln -s ../../../extras/tests/pc_based/PMF_test.ino PMF_test.ino
+ln -s ../../../extras/tests/pc_based/LOG2_test.ino LOG2_test.ino
 cd ../../..
 
 ls -al pio_*

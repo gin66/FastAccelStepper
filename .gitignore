@@ -14,8 +14,8 @@ examples/*/*.cpp
 extras/tests/pc_based/test_[0-9][0-9]
 extras/tests/pc_based/FastAccelStepper.cpp
 extras/tests/pc_based/FastAccelStepper.h
-extras/tests/pc_based/PoorManFloat.cpp
-extras/tests/pc_based/PoorManFloat.h
+extras/tests/pc_based/Log2Representation.cpp
+extras/tests/pc_based/Log2Representation.h
 extras/tests/pc_based/RampGenerator.cpp
 extras/tests/pc_based/RampGenerator.h
 extras/tests/pc_based/StepperISR*.cpp
@@ -35,6 +35,6 @@ extras/tests/simavr_based/test_seq*/Makefile
 extras/tests/esp32_hw_based/*.log
 library.properties
 examples
-extras/gen_pmf_const/PoorManFloat.cpp
+extras/gen_pmf_const/Log2Representation.cpp
 extras/gen_pmf_const/main
 extras/tests/simavr_based/.fas

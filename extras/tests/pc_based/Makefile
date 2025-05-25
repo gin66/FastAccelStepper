@@ -6,16 +6,16 @@ LDLIBS=-lm -lc
 
 TESTS=$(basename $(wildcard test_??.cpp))
 
-test: $(TESTS) pmf_test rmc_test
+test: $(TESTS) Log2_test rmc_test
 	./rmc_test
-	./pmf_test
+	./Log2_test
 	rm -f test.log
 	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
 
-LIB_H=FastAccelStepper.h PoorManFloat.h StepperISR.h \
+LIB_H=FastAccelStepper.h Log2Representation.h StepperISR.h \
 	  RampGenerator.h RampConstAcceleration.h RampCalculator.h \
 	  fas_arch/common.h
-LIB_O=FastAccelStepper.o PoorManFloat.o StepperISR_test.o \
+LIB_O=FastAccelStepper.o Log2Representation.o StepperISR_test.o \
 	  RampGenerator.o RampConstAcceleration.o RampCalculator.o StepperISR.o
 
 SRC_LIB_H=$(addprefix $(PRJ_ROOT)/src/,$(LIB_H))
@@ -26,16 +26,16 @@ test_%: test_%.o $(LIB_O)
 test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h stubs.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
-pmf_test: pmf_test.o PoorManFloat.o
-pmf_test.o: pmf_test.cpp $(PRJ_ROOT)/src/PoorManFloat.h stubs.h test_03.h
+Log2_test: Log2_test.o Log2Representation.o
+Log2_test.o: Log2_test.cpp $(PRJ_ROOT)/src/Log2Representation.h stubs.h test_03.h
 
-rmc_test: rmc_test.o PoorManFloat.o RampCalculator.o
-rmc_test.o: rmc_test.cpp $(PRJ_ROOT)/src/PoorManFloat.h $(PRJ_ROOT)/src/RampCalculator.h stubs.h test_03.h
+rmc_test: rmc_test.o Log2Representation.o RampCalculator.o
+rmc_test.o: rmc_test.cpp $(PRJ_ROOT)/src/Log2Representation.h $(PRJ_ROOT)/src/RampCalculator.h stubs.h test_03.h
 
 FastAccelStepper.o: $(PRJ_ROOT)/src/FastAccelStepper.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
-PoorManFloat.o: $(PRJ_ROOT)/src/PoorManFloat.cpp $(PRJ_ROOT)/src/PoorManFloat.h
+Log2Representation.o: $(PRJ_ROOT)/src/Log2Representation.cpp $(PRJ_ROOT)/src/Log2Representation.h
 	$(COMPILE.cpp) $< -o $@
 
 RampGenerator.o: $(PRJ_ROOT)/src/RampGenerator.cpp $(SRC_LIB_H)
@@ -55,4 +55,4 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 VERSION=$(shell git rev-parse --short HEAD)
 
 clean:
-	rm -f *.o test_[0-9][0-9] *.gnuplot pmf_test rmc_test test.log
+	rm -f *.o test_[0-9][0-9] *.gnuplot Log2_test rmc_test test.log

@@ -6,18 +6,18 @@
 #include "RampConstAcceleration.h"
 #include "fas_arch/common.h"
 
-#ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
-static pmf_logarithmic pmfl_timer_freq;
-static pmf_logarithmic pmfl_timer_freq_div_sqrt_of_2;
-static pmf_logarithmic pmfl_timer_freq_square_div_2;
+#ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
+static pmf_logarithmic log2_timer_freq;
+static pmf_logarithmic log2_timer_freq_div_sqrt_of_2;
+static pmf_logarithmic log2_timer_freq_square_div_2;
 #endif
 
 void init_ramp_module() {
-#ifdef SUPPORT_PMF_TIMER_FREQ_VARIABLES
-  pmfl_timer_freq = pmfl_from((uint32_t)TICKS_PER_S);
-  pmfl_timer_freq_div_sqrt_of_2 =
-      pmfl_shr(pmfl_multiply(pmfl_timer_freq, pmfl_timer_freq), 1);
-  pmfl_timer_freq_square_div_2 = pmfl_shr(pmfl_square(pmfl_timer_freq), 1);
+#ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
+  log2_timer_freq = log2_from((uint32_t)TICKS_PER_S);
+  log2_timer_freq_div_sqrt_of_2 =
+      log2_shr(log2_multiply(log2_timer_freq, log2_timer_freq), 1);
+  log2_timer_freq_square_div_2 = log2_shr(log2_square(log2_timer_freq), 1);
 #endif
 }
 

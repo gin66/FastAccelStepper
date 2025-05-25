@@ -49,11 +49,11 @@ uint32_t calculate_ticks_v3(uint32_t steps, float pre_calc) {
 //
 // Using pmf_logarithmic improves to 22-4 = 18us, but less precision
 uint32_t calculate_ticks_v4(uint32_t steps, uint32_t acceleration) {
-  pmf_logarithmic pmfl_a = pmfl_from(acceleration);
-  pmf_logarithmic pmfl_s = pmfl_from(steps);
-  pmf_logarithmic pmfl_res =
-      pmfl_divide(PMF_TICKS_PER_S, pmfl_sqrt(pmfl_multiply(pmfl_s, pmfl_a)));
-  uint32_t res = pmfl_to_u32(pmfl_res);
+  pmf_logarithmic log2_a = log2_from(acceleration);
+  pmf_logarithmic log2_s = log2_from(steps);
+  pmf_logarithmic log2_res =
+      log2_divide(LOG2_TICKS_PER_S, log2_sqrt(log2_multiply(log2_s, log2_a)));
+  uint32_t res = log2_to_u32(log2_res);
   return res;
 }
 //
@@ -62,17 +62,17 @@ uint32_t calculate_ticks_v4(uint32_t steps, uint32_t acceleration) {
 // So this routine does not fit to that measurement anymore
 //
 uint32_t calculate_ticks_v5(uint32_t steps, pmf_logarithmic pre_calc) {
-  pmf_logarithmic pmfl_s = pmfl_from(steps);
-  pmf_logarithmic pmfl_res = pmfl_divide(pre_calc, pmfl_sqrt(pmfl_s));
-  uint32_t res = pmfl_to_u32(pmfl_res);
+  pmf_logarithmic log2_s = log2_from(steps);
+  pmf_logarithmic log2_res = log2_divide(pre_calc, log2_sqrt(log2_s));
+  uint32_t res = log2_to_u32(log2_res);
   return res;
 }
 //
 // using the combined function yields actually no measureable improvement
 uint32_t calculate_ticks_v6(uint32_t steps, pmf_logarithmic pre_calc) {
-  //  pmf_logarithmic pmfl_s = pmfl_from(steps);
-  //  pmf_logarithmic pmfl_res = pmfl_sqrt_after_divide(pre_calc, pmfl_s);
-  //  uint32_t res = pmfl_to_u32(pmfl_res);
+  //  pmf_logarithmic log2_s = log2_from(steps);
+  //  pmf_logarithmic log2_res = log2_sqrt_after_divide(pre_calc, log2_s);
+  //  uint32_t res = log2_to_u32(log2_res);
   //  return res;
   return calculate_ticks_v5(steps, pre_calc);
 }
@@ -172,10 +172,10 @@ uint32_t calculate_ticks_v7(uint32_t steps, pmf_logarithmic pre_calc) {
 //   make -C off_test_timing
 //   From the results subtract port B from port A measurement
 uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc) {
-  pmf_logarithmic pmfl_steps = pmfl_from(steps);
-  pmf_logarithmic pmfl_sqrt_steps = pmfl_sqrt(pmfl_steps);
-  pmf_logarithmic pmfl_res = pmfl_divide(pre_calc, pmfl_sqrt_steps);
-  uint32_t res = pmfl_to_u32(pmfl_res);
+  pmf_logarithmic log2_steps = log2_from(steps);
+  pmf_logarithmic log2_sqrt_steps = log2_sqrt(log2_steps);
+  pmf_logarithmic log2_res = log2_divide(pre_calc, log2_sqrt_steps);
+  uint32_t res = log2_to_u32(log2_res);
   return res;
 }
 #endif

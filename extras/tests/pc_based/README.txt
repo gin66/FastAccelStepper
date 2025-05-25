@@ -7,7 +7,7 @@ Tests;
   checks ramp timing
 
 - pmf_test
-  checks PoorManFloat implementation
+  checks Log2Representation implementation
 
 - test_04
   one test case with speed change during ramp

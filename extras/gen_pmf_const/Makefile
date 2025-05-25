@@ -1,17 +1,17 @@
 CPPFLAGS=-I../../src
 
-../../src/PoorManFloatConst.h: main
-	./main >../../src/PoorManFloatConst.h
+../../src/Log2RepresentationConst.h: main
+	./main >../../src/Log2RepresentationConst.h
 
-main: main.o PoorManFloat.o
+main: main.o Log2Representation.o
 
 main.o:	main.cpp
 
-PoorManFloat.o: PoorManFloat.cpp
+Log2Representation.o: Log2Representation.cpp
 
-PoorManFloat.cpp: ../../src/PoorManFloat.cpp
-	cp ../../src/PoorManFloat.cpp PoorManFloat.cpp
+Log2Representation.cpp: ../../src/Log2Representation.cpp
+	cp ../../src/Log2Representation.cpp Log2Representation.cpp
 
 clean:
-	rm -f PoorManFloat.cpp
-	rm -f main main.o PoorManFloat.o
+	rm -f Log2Representation.cpp
+	rm -f main main.o Log2Representation.o

@@ -119,13 +119,13 @@ result.txt: x.vcd
 	gawk -v SILENCE=$(SILENCE) -f ../eval.awk x.vcd
 	cat expect.txt
 
-x.vcd: $(SRC) ../run_avr platformio.ini src/PMF_test.ino src/test_03.h
+x.vcd: $(SRC) ../run_avr platformio.ini src/LOG2_test.ino src/test_03.h
 	~/.platformio/penv/bin/pio run -e $(DUT) || ~/.local/bin/pio run -e $(DUT) || env pio run -e $(DUT)
 	../run_avr $(FIRMWARE) -m $(DEVICE) -o x.vcd $(TRACES)
 
-src/PMF_test.ino:
+src/LOG2_test.ino:
 	mkdir -p src
-	cd src; ln -s ../../../pc_based/PMF_test.ino .
+	cd src; ln -s ../../../pc_based/LOG2_test.ino .
 
 src/test_03.h:
 	mkdir -p src
