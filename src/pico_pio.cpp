@@ -1,3 +1,4 @@
+// Analyze the following code for raspberry pi pico to create a pio program. Understand the register changes and cycle count of the instructions. Based on your understanding create a mermaid diagram with states describing the current cycle count and register content. The transitions shall give info about the executed instructions and their respecive instruction cycles. Instructions without jump inbetween can be intelligently combined. Any cycle mismatch of parallel paths shall be highlighted. In the dir parallel path two cycle info may be needed. Important to note,that wrap is not in use. The code is:
 #if defined(PICO_RP2040) || defined(PICO_RP2350)
 #include <Arduino.h>
 
