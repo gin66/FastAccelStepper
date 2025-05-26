@@ -171,9 +171,9 @@ stepper_pio_program *stepper_make_program() {
   program.wrap_target = label_step_loop;
 
   // delay(2000);
-   Serial.println("stepper_make_program: pc: " + String(program.pc) +
-               ", wrap_at: " + String(program.wrap_at) +
-               ", wrap_target: " + String(program.wrap_target));
+  // Serial.println("stepper_make_program: pc: " + String(program.pc) +
+  //             ", wrap_at: " + String(program.wrap_at) +
+  //             ", wrap_target: " + String(program.wrap_target));
   return &program;
 }
 // clang-format on
