@@ -40,7 +40,7 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
   For pico direction delay is recommended
 * Direction Signal (optional)
   - This can be any output capable port pin.
-  - pico: Any GPIO up to 31 (not verified !)
+  - pico: Any GPIO up to 31
   - Position counting up on direction pin high or low, as per optional parameter to setDirectionPin(). Default is high.
   - With external callback on esp32 derivates, even shift register outputs can be used
 * Enable Signal (optional)
@@ -318,7 +318,7 @@ For the other stepper motors, the rmt module comes into use.
 
 Only rmt module is supported.
 
-#### All
+#### Both ESP-IDF versions
 A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
 
 What are the differences between mcpwm/pcnt and rmt ?
@@ -365,7 +365,9 @@ Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are li
 
 Uses the pio module. Pico offers two pios and pico 2 offers three pios. Each pio contains four state machines and every state machine can drive one stepper.
 
-Integration with our sw using pio: FastAccelStepper claims always a complete pio. This means all four state machines are not available for the app. The second pio will be claimed, when allocating a fifth stepper. The third - on pico 2, when allocating the nineth stepper. Unused state machines of a pio cannot be used, because FastAccelStepper's pio code needs 100% of the available program space (32 words - none left).
+Integration with applications using pio: FastAccelStepper claims always a complete pio. This means all four state machines are not available for the app. The second pio will be claimed, when allocating a fifth stepper. The third - on pico 2, when allocating the nineth stepper. Unused state machines of a pio cannot be used, because FastAccelStepper's pio code needs 100% of the available program space (32 words - none left).
+
+Important: Without direction delay set up, the time between a direction transition to step low to high transition can be 50ns @ 80 MHz. Best to call `setDirectionPin()` with time parameter for delay.
 
 ### Atmel SAM Due
 
