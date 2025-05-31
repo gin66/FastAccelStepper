@@ -13,7 +13,6 @@ void interrupts() {}
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define IRAM_ATTR
-#define PART_SIZE 32
 #define RMT_CHANNEL_T int
 #define LL_TOGGLE_PIN(dirPin)
 #include "StepperISR_esp32xx_rmt.cpp"

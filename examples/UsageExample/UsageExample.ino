@@ -14,9 +14,9 @@
 #undef dirPinStepper
 #undef enablePinStepper
 #undef stepPinStepper
-#define dirPinStepper 15
-#define enablePinStepper 13
-#define stepPinStepper 14
+#define dirPinStepper 16
+#define enablePinStepper 7
+#define stepPinStepper 17
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -27,7 +27,7 @@ void setup() {
   stepper = engine.stepperConnectToPin(stepPinStepper);
   if (stepper) {
     stepper->setDirectionPin(dirPinStepper);
-    stepper->setEnablePin(enablePinStepper);
+    // stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
 
     // If auto enable/disable need delays, just add (one or both):
@@ -40,4 +40,7 @@ void setup() {
   }
 }
 
-void loop() {}
+void loop() {
+    stepper->move(1000);
+    delay(1000);
+}

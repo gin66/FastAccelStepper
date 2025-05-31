@@ -167,12 +167,12 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
         }
         // Now add remaining steps, if any
         if (steps_to_do > 0) {
-          uint16_t ticks_l = ticks >> 1;
-          uint16_t ticks_r = ticks - ticks_l;
+          uint16_t ticks_high = ticks >> 1;
+          uint16_t ticks_low = ticks - ticks_high;
           // ticks_l <= ticks_r
-          uint32_t rmt_entry = ticks_l;
+          uint32_t rmt_entry = ticks_low;
           rmt_entry <<= 16;
-          rmt_entry |= ticks_r | 0x8000;  // with step
+          rmt_entry |= ticks_high | 0x8000;  // with step
           for (uint8_t i = 1; i <= steps_to_do; i++) {
             *data++ = rmt_entry;
           }
@@ -180,11 +180,11 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
       } else {
         // either >= 2*PART_SIZE or = PART_SIZE
         // every entry one step
-        uint16_t ticks_l = ticks >> 1;
-        uint16_t ticks_r = ticks - ticks_l;
-        uint32_t rmt_entry = ticks_l;
+        uint16_t ticks_high = ticks >> 1;
+        uint16_t ticks_low = ticks - ticks_high;
+        uint32_t rmt_entry = ticks_low;
         rmt_entry <<= 16;
-        rmt_entry |= ticks_r | 0x8000;  // with step
+        rmt_entry |= ticks_high | 0x8000;  // with step
         for (uint8_t i = 0; i < PART_SIZE; i++) {
           *data++ = rmt_entry;
         }
