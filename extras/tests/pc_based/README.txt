@@ -50,3 +50,6 @@ Tests;
 
 - test 16
   tests for moveTimed()
+
+- test 17
+  test to specifically test for esp32 rmt implementation
