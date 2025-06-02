@@ -1,5 +1,5 @@
 #include "StepperISR.h"
-#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 6)
 
 // Why the hell, does espressif think, that the unit and channel id are not
 // needed ? Without unit/channel ID, the needed parameter for
@@ -40,7 +40,6 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
                                         .invert_level_input = 0,
                                         .virt_edge_io_level = 0,
                                         .virt_level_io_level = 0,
-                                        .io_loop_back = 0,
                                     }};
 
   pcnt_channel_level_action_t level_high = PCNT_CHANNEL_LEVEL_ACTION_KEEP;
@@ -109,16 +108,16 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
                    .channels[channel_id]
                    .pulse_sig;
   gpio_matrix_in(step_pin, signal, 0);
-  gpio_iomux_in(step_pin, signal);
+  gpio_iomux_input(step_pin, signal);
   if (dir_pin != PIN_UNDEFINED && (dir_pin & PIN_EXTERNAL_FLAG) == 0) {
     pinMode(dir_pin, OUTPUT);
     int control = pcnt_periph_signals.groups[0]
                       .units[unit_id]
                       .channels[channel_id]
                       .control_sig;
-    gpio_iomux_out(dir_pin, 0x100, false);
+    gpio_iomux_output(dir_pin, 0x100, false);
     gpio_matrix_in(dir_pin, control, 0);
-    gpio_iomux_in(dir_pin, control);
+    gpio_iomux_input(dir_pin, control);
   }
 
   _attached_pulse_unit = punit;
