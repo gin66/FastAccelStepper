@@ -108,8 +108,8 @@ void StepperQueue::connect_rmt() {
   config.intr_priority = 0;
   config.flags.invert_out = 0;
   config.flags.with_dma = 0;
-  config.flags.io_loop_back = 0;
-  config.flags.io_od_mode = 0;
+  //config.flags.io_loop_back = 0;
+  //config.flags.io_od_mode = 0;
   esp_err_t rc = rmt_new_tx_channel(&config, &channel);
   ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
 
