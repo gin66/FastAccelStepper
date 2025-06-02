@@ -1,5 +1,5 @@
 #include "StepperISR.h"
-#if defined(HAVE_ESP32_RMT) && (ESP_IDF_VERSION_MAJOR == 5)
+#if defined(SUPPORT_ESP32_RMT_V2)
 
 // #define TEST_MODE
 

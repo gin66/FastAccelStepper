@@ -1,5 +1,5 @@
-#ifndef FAS_ARCH_COMMON_ESP32_IDF5_H
-#define FAS_ARCH_COMMON_ESP32_IDF5_H
+#ifndef FAS_ARCH_COMMON_ESP32_IDF6_H
+#define FAS_ARCH_COMMON_ESP32_IDF6_H
 
 //==========================================================================
 //
@@ -173,4 +173,4 @@
     digitalWrite(pin, (value)); \
   }
 
-#endif /* FAS_ARCH_COMMON_ESP32_IDF5_H */
+#endif /* FAS_ARCH_COMMON_ESP32_IDF6_H */

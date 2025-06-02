@@ -526,7 +526,7 @@ bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 
   _queue_num = num;
   bool success = fas_queue[_queue_num].init(engine, _queue_num, step_pin);
-#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR >= 5)
   _attached_pulse_unit = NULL;
 #endif
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)

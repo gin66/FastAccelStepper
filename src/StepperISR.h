@@ -80,7 +80,7 @@ class StepperQueue {
   RMT_CHANNEL_T channel;
   bool _rmtStopped;
   bool lastChunkContainsSteps;
-#if ESP_IDF_VERSION_MAJOR == 5
+#if defined(SUPPORT_ESP32_RMT_V2)
   rmt_encoder_handle_t _tx_encoder;
 #endif
 #endif

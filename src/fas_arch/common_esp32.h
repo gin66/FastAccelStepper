@@ -12,7 +12,9 @@
 #include <driver/gpio.h>
 #include <esp_task_wdt.h>
 
-#if ESP_IDF_VERSION_MAJOR == 5
+#if ESP_IDF_VERSION_MAJOR == 6
+#include "fas_arch/common_esp32_idf6.h"
+#elif ESP_IDF_VERSION_MAJOR == 5
 #if ESP_IDF_VERSION_MINOR < 3
 #error "FastAccelStepper requires esp-idf >= 5.3.0"
 #endif
