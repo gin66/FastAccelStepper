@@ -11,9 +11,10 @@ jobs:
     strategy:
       matrix:
         version:
+          # version from https://hub.docker.com/r/espressif/idf/tags
           - v5.3.2
           - v5.4.1
-          - v6.0-dev
+          - latest
 
     runs-on: ubuntu-latest
 
