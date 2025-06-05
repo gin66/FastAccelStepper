@@ -165,6 +165,10 @@
 #define PART_SIZE (RMT_SIZE >> 1)
 #endif
 
+#if (ESP_IDF_VERSION_MINOR >= 5) && defined(SUPPORT_ESP32_PULSE_COUNTER)
+#undef SUPPORT_ESP32_PULSE_COUNTER
+#endif
+
 // in order to avoid spikes, first set the value and then make an output
 // esp32 idf5 does not like this approach => output first, then value
 #define PIN_OUTPUT(pin, value)  \
