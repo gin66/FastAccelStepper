@@ -109,16 +109,28 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
                    .channels[channel_id]
                    .pulse_sig;
   gpio_matrix_in(step_pin, signal, 0);
+#if (ESP_IDF_VERSION_MINOR >= 5)
+  gpio_iomux_input(step_pin, signal);
+#else
   gpio_iomux_in(step_pin, signal);
+#endif
   if (dir_pin != PIN_UNDEFINED && (dir_pin & PIN_EXTERNAL_FLAG) == 0) {
     pinMode(dir_pin, OUTPUT);
     int control = pcnt_periph_signals.groups[0]
                       .units[unit_id]
                       .channels[channel_id]
                       .control_sig;
+#if (ESP_IDF_VERSION_MINOR >= 5)
+    gpio_iomux_output(dir_pin, 0x100, false);
+#else
     gpio_iomux_out(dir_pin, 0x100, false);
+#endif
     gpio_matrix_in(dir_pin, control, 0);
+#if (ESP_IDF_VERSION_MINOR >= 5)
+    gpio_iomux_input(dir_pin, control);
+#else
     gpio_iomux_in(dir_pin, control);
+#endif
   }
 
   _attached_pulse_unit = punit;
