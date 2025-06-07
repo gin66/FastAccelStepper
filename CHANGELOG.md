@@ -1,3 +1,6 @@
+0.33.1:
+- esp32 rmt: Fix freeze on esp32c3 (#325)
+
 0.33.0:
 - rename RampConstAcceleration to RampControl
 - rename PoorManFloat to Log2Representation
