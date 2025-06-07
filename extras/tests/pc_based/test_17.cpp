@@ -163,6 +163,8 @@ int main() {
         .check_step_rate=true, .from_step=1600, .to_step=3400, .period_ticks=16000},
       {.forward_planning = 5, .position=5000, .speed_us = 5, .acceleration = 10000000,
         .check_step_rate=true, .from_step=2000, .to_step=3000, .period_ticks=80},
+      // issue #325: This freezes with StepperDemo on esp32c3
+      {.forward_planning = 20, .position=1000, .speed_us = 533, .acceleration = 1000},
   };
   for (int i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++) {
     test.ramp(test_cases[i]);

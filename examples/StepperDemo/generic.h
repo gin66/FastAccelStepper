@@ -21,30 +21,7 @@
 #error "Unsupported derivate"
 #endif
 
-#if defined(ARDUINO_ARCH_ESP32) && defined(CONFIG_IDF_TARGET_ESP32C3) && \
-    (ARDUINO_USB_MODE == 1)
-
-#define PRINT_INIT()                          \
-  USBSerial.begin(115200);                    \
-  while (!Serial) {                           \
-    /* wait for USB serial port to connect */ \
-  }
-#define PRINTLN USBSerial.println
-#define PRINTCH USBSerial.print
-#define PRINTU8 USBSerial.print
-#define PRINTU16 USBSerial.print
-#define PRINTI16 USBSerial.print
-#define PRINTU32 USBSerial.print
-#define PRINTI32 USBSerial.print
-#define PRINT USBSerial.print
-#define POLL_CHAR_IF_ANY(ch)   \
-  if (USBSerial.available()) { \
-    ch = USBSerial.read();     \
-  }
-#define MILLIS() millis()
-#define DELAY_US(v) delayMicroseconds(v)
-
-#elif !defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_ESP32)
+#if !defined(ESP_PLATFORM) || defined(ARDUINO_ARCH_ESP32)
 
 #define PRINT_INIT() Serial.begin(115200);
 #define PRINTLN Serial.println

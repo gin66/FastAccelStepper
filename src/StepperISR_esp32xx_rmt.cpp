@@ -148,7 +148,10 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
               i++;
               ticks_high -= 4;
             } else {
-              *data++ = 0x80028000 | (ticks_high - 2);
+              uint32_t entry = ticks_high>>1;
+              entry <<= 16;
+              entry |= ticks_high - (ticks_high>>1);
+              *data++ = 0x80008000 | entry;
               i++;
               break;
             }
@@ -159,7 +162,12 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
               i++;
               ticks_low -= 4;
             } else {
-              *data++ = 0x00020000 | (ticks_low - 2);
+              // #325: esp32c3 has frozen with one step and ticks ~38600
+              //       now the last entry is balanced instead of long pause and then 2 ticks
+              uint32_t entry = ticks_low>>1;
+              entry <<= 16;
+              entry |= ticks_low - (ticks_low>>1);
+              *data++ = entry;
               i++;
               break;
             }
