@@ -134,7 +134,7 @@ void StepperQueue::forceStop() {
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
   // ensure step is zero
-  uint32_t entry = (1 << 10) | (0) | 0;
+  uint32_t entry = stepper_make_fifo_entry(queue_end.dir, 0, 0, 1); // no steps and 1us cycleAA
   pio_sm_put(pio, sm, entry);
 }
 bool StepperQueue::isRunning() {
@@ -153,7 +153,7 @@ int32_t StepperQueue::getCurrentPosition() {
   }
   if (!isRunning()) {
     // kick off loop to probe position
-    uint32_t entry = (1 << 10) | (0) | 0;
+    uint32_t entry = stepper_make_fifo_entry(queue_end.dir, 0, 0, 1); // no steps and 1us cycleAA
     pio_sm_put(pio, sm, entry);
   }
   // just need to wait a while for next value
