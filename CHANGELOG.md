@@ -1,3 +1,6 @@
+0.33.2:
+- pico: Update forceStop & getCurrentPosition to use `stepper_make_fifo_entry` instead of hardcoded shift (#327)
+
 0.33.1:
 - esp32 rmt: Fix freeze on esp32c3 (#325)
 
