@@ -859,6 +859,9 @@ int8_t FastAccelStepper::setSpeedInMilliHz(uint32_t speed_mhz) {
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   if (delta != 0) {
+#if defined(SUPPORT_RP_PICO)
+    fas_queue[_queue_num].pos_offset += delta;
+#endif
     struct queue_end_s* queue_end = &fas_queue[_queue_num].queue_end;
     fasDisableInterrupts();
     queue_end->pos = queue_end->pos + delta;
@@ -872,6 +875,9 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   int32_t delta = new_pos - fas_queue[_queue_num].queue_end.pos;
   queue_end->pos = new_pos;
   if (delta != 0) {
+#if defined(SUPPORT_RP_PICO)
+    fas_queue[_queue_num].pos_offset += delta;
+#endif
     _rg.advanceTargetPosition(delta, queue_end);
   }
   fasEnableInterrupts();

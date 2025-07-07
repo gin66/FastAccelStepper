@@ -56,6 +56,12 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 #if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
   bool repeat_entry = false;
 #endif
+#if defined(SUPPORT_RP_PICO)
+  if (isQueueEmpty() && !isRunning()) {
+    // store the offset from pico sm's step count and position
+    pos_offset = queue_end.pos - getCurrentStepCount();
+  }
+#endif
   if (dirPin != PIN_UNDEFINED) {
     if ((isQueueEmpty() && !isRunning()) &&
         ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
@@ -127,6 +133,12 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 #endif
   return AQE_OK;
 }
+
+#if defined(SUPPORT_RP_PICO)
+int32_t StepperQueue::getCurrentPosition() {
+   return getCurrentStepCount() + pos_offset;
+}
+#endif
 
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16) || \
     defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)

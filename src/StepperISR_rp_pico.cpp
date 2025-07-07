@@ -146,7 +146,7 @@ bool StepperQueue::isRunning() {
   // if pc > 0, then sm is not waiting for fifo entry
   return (pc != 0);
 }
-int32_t StepperQueue::getCurrentPosition() {
+int32_t StepperQueue::getCurrentStepCount() {
   bool running = isRunning();
   uint32_t pos;
   if (!running) {

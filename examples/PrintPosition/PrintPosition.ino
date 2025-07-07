@@ -1,9 +1,9 @@
 #include "FastAccelStepper.h"
 
 // As in StepperDemo for Motor 1 on AVR
-#define dirPinStepper 5
+#define dirPinStepper 17
 #define enablePinStepper 25
-#define stepPinStepper 7
+#define stepPinStepper 16
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
@@ -26,10 +26,11 @@ void setup() {
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
 
-    stepper->setSpeedInUs(1000);  // the parameter is us/step !!!
-    stepper->setAcceleration(10000);
+    stepper->setSpeedInUs(5);  // the parameter is us/step !!!
+    stepper->setAcceleration(1000);
+  delay(5000);
     // stepper->move(7000);
-    stepper->runForward();
+    stepper->runBackward();
   } else {
     Serial.println("Stepper Not initialized!");
     delay(1000);

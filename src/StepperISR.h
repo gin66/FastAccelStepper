@@ -63,6 +63,8 @@ class StepperQueue {
   uint sm;
   bool claim_pio_sm(FastAccelStepperEngine* engine);
   void setupSM();
+  int32_t pos_offset; // offset between pico step count and position
+  int32_t getCurrentStepCount();
 #endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;

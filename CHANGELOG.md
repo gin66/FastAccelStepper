@@ -1,3 +1,6 @@
+0.33.3:
+- pico: Improve `getCurrentPosition()` and make `setCurrentPosition()` functional
+
 0.33.2:
 - pico: Update forceStop & getCurrentPosition to use `stepper_make_fifo_entry` instead of hardcoded shift (#327)
 
