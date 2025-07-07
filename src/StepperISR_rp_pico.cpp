@@ -147,22 +147,34 @@ bool StepperQueue::isRunning() {
   return (pc != 0);
 }
 int32_t StepperQueue::getCurrentPosition() {
-  // Drop old values in fifo
-  for (uint8_t i = 0; i <= 4; i++) {
-    pio_sm_get(pio, sm);
-  }
-  if (!isRunning()) {
+  bool running = isRunning();
+  uint32_t pos;
+  if (!running) {
+    // Empty queue
+    for (uint8_t i = 0; i <= 4; i++) {
+      if (pio_sm_is_rx_fifo_empty(pio, sm)) {
+         break;
+      }
+      pio_sm_get(pio,sm);
+    }
     // kick off loop to probe position
-    uint32_t entry = stepper_make_fifo_entry(queue_end.dir, 0, 0, 1); // no steps and 1us cycleAA
+    uint32_t entry = stepper_make_fifo_entry(queue_end.dir, 0, 0, 1); // no steps and 1us cycle
     pio_sm_put(pio, sm, entry);
-  }
-  // just need to wait a while for next value
-  for (uint8_t i = 0; i <= 100; i++) {
-    if (!pio_sm_is_rx_fifo_empty(pio, sm)) {
-      break;
+  
+    // wait for pc reaching 0 again to ensure isRunning() returns false
+    while(isRunning()) {
+       if (!pio_sm_is_tx_fifo_empty(pio, sm)) {
+          break; // apparently the stepper is now getting commands
+       }
     }
   }
-  uint32_t pos = pio_sm_get(pio, sm);
+  // use last value
+  for (uint8_t i = 0; i <= 4; i++) {
+    pos = pio_sm_get(pio,sm);
+    if (pio_sm_is_rx_fifo_empty(pio, sm)) {
+       break;
+    }
+  }
   return (int32_t)pos;
 }
 
