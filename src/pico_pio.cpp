@@ -102,7 +102,8 @@ stepper_pio_program *stepper_make_program() {
   add_step(pio_encode_jmp_pin(program.pc + 2));
   // Step or Pause is completed
   uint8_t forward_jump_1 = program.pc;
-  add_step(pio_encode_jmp(0) | pio_encode_delay(7));
+  // same cycle count as the branch for the position update
+  add_step(pio_encode_jmp(0) | pio_encode_delay(6));
   //
   // Perform increment by one with only invert and decrement:
   //     position  0 1 2 .. d e f ef
