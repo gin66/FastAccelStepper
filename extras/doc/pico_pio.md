@@ -1,49 +1,22 @@
-This flow is Claude generated, minor error present. but result is better than from grok/chatGPT/copilot/gemini2.5 and all open source llms available to me like gemma3, deepseek:70b, phi4-reasoning:plus, Hunyuan T1, devstral,...
+This flow is grok4 generated, after correction and guiding comments. Best result compared to claude/grok/chatGPT/copilot/gemini2.5 and all open source llms available to me like gemma3, deepseek:70b, phi4-reasoning:plus, Hunyuan T1, devstral,...
 ```mermaid
-stateDiagram-v2
-    [*] --> S0
-    S0 --> S1: pull T=1
-    S1 --> S3: mov_X_OSR_out_null_9 T=3
-    S3 --> S4: out_Y_1 T=4
-    S4 --> S5: jmp_not_Y T=5
-    S4 --> S6: set_pins_1 T=5
-    S5 --> S7: set_pins_0_delay1 T=7
-    S6 --> S7: jmp T=6
-    S7 --> S8: out_Y_1 T=8
-    S8 --> S9: jmp_X_dec T=9
-    S9 --> S10: mov_pins_X T=10
-    S10 --> S11: mov_OSR_X T=11
-    S11 --> S12: jmp_pin T=12
-    S11 --> S19: mov_X_ISR T=12
-    S12 --> S20: jmp_delay7 T=20
-    S19 --> S13: jmp_not_Y T=13
-    S19 --> S14: mov_X_not_ISR T=13
-    S13 --> S15: jmp_X_dec T=14
-    S14 --> S15: jmp_X_dec T=15
-    S15 --> S16: mov_ISR_not_X T=16
-    S16 --> S17: jmp_Y_dec T=17
-    S17 --> S18: mov_ISR_X T=18
-    S17 --> S18: continue T=18
-    S18 --> S20: mov_X_OSR T=20
-    S20 --> S21: out_null_11 T=21
-    S21 --> S22: mov_Y_OSR T=22
-    S22 --> S23: mov_OSR_X T=23
-    S23 --> S24: mov_X_ISR T=24
-    S24 --> S25: push T=25
-    S25 --> S26: mov_ISR_X T=26
-    S26 --> S27: jmp_Y_dec T=27
-    S27 --> S24: loop_back T=24
-    S27 --> S28: mov_X_OSR T=28
-    S28 --> S29: out_Y_9 T=29
-    S29 --> S0: jmp_not_Y T=30
-    S29 --> S30: jmp_delay2 T=32
-    S30 --> S3: wrap_to_step_loop T=3
-
-    state "Timing Analysis" as TA {
-        state "Base loop 27 cycles plus 3N period cycles" as T1
-        state "Step HIGH path cycles 0-12-20-30" as T2  
-        state "Step LOW path cycles 0-12-19-20-30" as T3
-        state "Position update always 7 cycles" as T4
-        state "Period loop 3 cycles per iteration" as T5
-    }
+graph TD
+    Main["Main Loop<br>ISR: P<br>X: ?<br>Y: ?<br>OSR: ?"] -->|"pull (block, no autopull); mov x, osr; out null, 9<br>Cycles: 3"| StepStart["Step Loop Start<br>ISR: P<br>X: R<<11 | U<<10 | D<<9 | C<br>Y: ?<br>OSR: R<<2 | U<<1 | D"]
+    StepStart -->|"out y, 1 (dir to y)<br>Cycles: 1"| DirBranch["Dir Branch<br>ISR: P<br>X: R<<11 | U<<10 | D<<9 | C<br>Y: D<br>OSR: R<<1 | U"]
+    DirBranch -->|"D=1: jmp !y (no jump); set pins, 1; jmp after<br>Cycles: 3"| AfterDir["After Dir<br>ISR: P<br>X: R<<11 | U<<10 | D<<9 | C<br>Y: D<br>OSR: R<<1 | U<br>Dir Pin: 1"]
+    DirBranch -->|"D=0: jmp !y (jump); set pins, 0 [delay 1]<br>Cycles: 3"| AfterDir
+    AfterDir -->|"out y, 1 (up to y); jmp x-- +1 (dec always); mov pins, x; mov osr, x; jmp pin +2<br>Cycles: 5"| StepBranch["Step Branch<br>ISR: P<br>X: R<<11 | U<<10 | D<<9 | (C-1)<br>Y: U<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)<br>Step Pin: LSB(C-1)"]
+    StepBranch -->|"Step=0: jmp !pin (no jump); jmp target [delay 6]<br>Cycles: 7"| AfterUpdate["After Update<br>ISR: P<br>X: R<<11 | U<<10 | D<<9 | (C-1)<br>Y: U<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)"]
+    StepBranch -->|"Step=1: jmp pin (jump)<br>Cycles: 1"| UpdateStart["Update Start<br>ISR: P<br>X: R<<11 | U<<10 | D<<9 | (C-1)<br>Y: U<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)"]
+    UpdateStart -->|"U=1: mov x, isr; jmp !y (no); mov x, ~isr; jmp x-- +1 (dec always); mov isr, ~x; jmp y-- +2 (no); mov isr, x; mov x, osr<br>Cycles: 8 (mismatch)"| AfterUpdateU1["After Update (U=1)<br>ISR: ~(~P -1) then ~P -1 (overwritten)<br>X: R<<11 | U<<10 | D<<9 | (C-1)<br>Y: 0<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)<br>Note: Logic may have issue; cycles mismatch with other paths"]
+    UpdateStart -->|"U=0: mov x, isr; jmp !y (yes); jmp x-- +1 (dec always); mov isr, ~x; jmp y-- +2 (yes); mov x, osr<br>Cycles: 6 (mismatch)"| AfterUpdateU0["After Update (U=0)<br>ISR: ~(P -1)<br>X: R<<11 | U<<10 | D<<9 | (C-1)<br>Y: -1<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)<br>Note: Logic may have issue; cycles mismatch with other paths"]
+    AfterUpdateU1 --> AfterUpdateCombined["After Update Combined<br>ISR: P' (per path)<br>X: R<<11 | U<<10 | D<<9 | (C-1)<br>Y: U'<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)<br>Note: Mismatch with Step=0 (8/6 vs 7)"]
+    AfterUpdateU0 --> AfterUpdateCombined
+    AfterUpdate --> AfterUpdateCombined
+    AfterUpdateCombined -->|"out null, 11; mov y, osr; mov osr, x; mov x, isr<br>Cycles: 4"| PeriodStart["Period Loop Start<br>ISR: P'<br>X: P'<br>Y: R<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)"]
+    PeriodStart -->|"Loop Body: push (from ISR); mov isr, x; jmp y-- (jump if !=0)<br>Cycles: 3 * (R - 1)"| PeriodStart
+    PeriodStart -->|"Final: push (from ISR); mov isr, x; jmp y-- (no jump)<br>Cycles: 3"| AfterPeriod["After Period<br>ISR: P'<br>X: P'<br>Y: 0<br>OSR: R<<11 | U<<10 | D<<9 | (C-1)"]
+    AfterPeriod -->|"mov x, osr; out y, 9<br>Cycles: 2"| EndBranch["End Branch<br>ISR: P'<br>X: R<<11 | U<<10 | D<<9 | (C-1)<br>Y: (C-1)<br>OSR: R<<2 | U<<1 | D"]
+    EndBranch -->|"(C-1)=0: jmp !y (jump to Main)<br>Cycles: 1 (but +3 from Main to next StepStart if ready)"| Main
+    EndBranch -->|"(C-1)!=0: jmp !y (no); jmp Step Loop [delay 2]<br>Cycles: 4"| StepStart
 ```
