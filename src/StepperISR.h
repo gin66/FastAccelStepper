@@ -59,12 +59,13 @@ class StepperQueue {
   bool isRunning();
   bool isReadyForCommands();
   uint8_t _step_pin;
-  PIO pio;
-  uint sm;
+  PIO pio; /* not set in init */
+  uint sm; /* not set in init */
   bool claim_pio_sm(FastAccelStepperEngine* engine);
   void setupSM();
   int32_t pos_offset; // offset between pico step count and position
   int32_t getCurrentStepCount();
+  void attachDirPinToStatemachine(uint8_t dirPin);
 #endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;
@@ -197,6 +198,9 @@ class StepperQueue {
       _dirTogglePinPort = portInputRegister(digitalPinToPort(dir_pin));
       _dirTogglePinMask = digitalPinToBitMask(dir_pin);
     }
+#endif
+#if defined(SUPPORT_RP_PICO)
+    attachDirPinToStatemachine(dirPin);
 #endif
   }
 #if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1

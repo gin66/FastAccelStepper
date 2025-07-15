@@ -1,3 +1,6 @@
+0.33.4:
+- pico: Fix direction pin handling (#329)
+
 0.33.3:
 - pico: Improve `getCurrentPosition()` and make `setCurrentPosition()` functional
 

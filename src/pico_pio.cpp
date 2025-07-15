@@ -159,10 +159,9 @@ stepper_pio_program *stepper_make_program() {
   // ISR=position, X=period:up:dir:loop_cnt, Y=loop_cnt, OSR=period:up:dir
   // if loop_cnt is zero go to main loop
   add_step(pio_encode_jmp_not_y(label_main_loop)); // T=27+3*N
-  // Otherwise continue loop using wrap around
-  // restore x to osr
+  // Otherwise continue loop at label_step_loop
   add_step(pio_encode_jmp(label_step_loop) | pio_encode_delay(2));
-  // ISR=position, X=[period:up:dir:loop_cnt], Y=loop_cnt, OSR=period:up:dir:loop_cnt
+  // ISR=position, X=period:up:dir:loop_cnt, Y=[loop_cnt], OSR=period:up:dir
   // wrap around does not need a cycle
   
   // patch forward jump address

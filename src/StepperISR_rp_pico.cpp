@@ -15,12 +15,22 @@ bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
   uint8_t channel = queue_num;
   _step_pin = step_pin;
   _isStarting = false;
+  dirPin = PIN_UNDEFINED;
+  pos_offset = 0;
   bool ok = claim_pio_sm(engine);
   if (ok) {
     setupSM();
     connect();
   }
   return ok;
+}
+
+void StepperQueue::attachDirPinToStatemachine(uint8_t dir_pin) {
+  if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
+    pio_sm_set_set_pins(pio, sm, dirPin, 1);  // Direction pin via set
+    pio_sm_set_consecutive_pindirs(pio, sm, dirPin, 1, true);
+    pio_gpio_init(pio, dirPin);
+  }
 }
 
 bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
@@ -57,9 +67,6 @@ void StepperQueue::setupSM() {
   // Map the state machine's OUT pin group to one pin, namely the `pin`
   // parameter to this function.
   sm_config_set_jmp_pin(&c, _step_pin);  // Step pin read back 
-  if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
-    sm_config_set_set_pins(&c, dirPin, 1);  // Direction pin via set
-  }
   sm_config_set_out_pins(&c, _step_pin, 1);  // Step pin via out
   sm_config_set_wrap(&c, program->wrap_target, program->wrap_at);
 
@@ -68,9 +75,6 @@ void StepperQueue::setupSM() {
   pio_sm_init(pio, sm, offset, &c);
   // Set the pin direction to output at the PIO
   pio_sm_set_consecutive_pindirs(pio, sm, _step_pin, 1, true);
-  if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
-    pio_sm_set_consecutive_pindirs(pio, sm, dirPin, 1, true);
-  }
   pio_sm_set_enabled(pio, sm, true);  // sm is running, otherwise loop() stops
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
@@ -115,6 +119,7 @@ static bool push_command(StepperQueue *q) {
   //Serial.println(out);
   uint32_t entry = stepper_make_fifo_entry(dirHigh, countUp, steps, ticks);
   pio_sm_put(q->pio, q->sm, entry);
+  //Serial.println((entry & 512) != 0 ? "HIGH":"LOW");
   rp++;
   q->read_idx = rp;
   return true;
