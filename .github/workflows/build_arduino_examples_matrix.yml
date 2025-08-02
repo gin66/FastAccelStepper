@@ -30,6 +30,7 @@ jobs:
           - esp32_V6_9_0
           - esp32_V6_10_0
           - esp32_V6_11_0
+          - esp32_V6_12_0
           - esp32c3_V6_5_0
           - esp32c3_V6_6_0
           - esp32c3_V6_7_0
@@ -37,6 +38,7 @@ jobs:
           - esp32c3_V6_9_0
           - esp32c3_V6_10_0
           - esp32c3_V6_11_0
+          - esp32c3_V6_12_0
           - esp32s2_V6_5_0
           - esp32s2_V6_6_0
           - esp32s2_V6_7_0
@@ -44,6 +46,7 @@ jobs:
           - esp32s2_V6_9_0
           - esp32s2_V6_10_0
           - esp32s2_V6_11_0
+          - esp32s2_V6_12_0
           - esp32s3_V6_5_0
           - esp32s3_V6_6_0
           - esp32s3_V6_7_0
@@ -51,6 +54,7 @@ jobs:
           - esp32s3_V6_9_0
           - esp32s3_V6_10_0
           - esp32s3_V6_11_0
+          - esp32s3_V6_12_0
           - esp32p4
           - nanoatmega168
           - nanoatmega328
