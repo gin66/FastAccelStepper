@@ -188,7 +188,7 @@ Comments to pin sharing:
 ### Raspberry pi pico/pico 2
 
 * allows up to 200000 generated steps per second
-* In theory supports up to eight stepper motors for pico and twelve stepper motors for pico 2. Using arduino framework on four for pico and eight for pico 2 can be allocated
+* In theory supports up to eight stepper motors for pico and twelve stepper motors for pico 2. Using arduino framework and arm core, only four for pico and eight for pico 2 can be allocated. riscv should be able to allocate all steppers.
 * Steppers' command queue depth: 32
 * beta status !!!!
 * untested and currently only one stepper tried
@@ -363,8 +363,9 @@ Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are li
 
 ### Raspberry pi pico/pico 2
 
-Uses the pio module. Pico (rp2040) offers two pios and pico 2 (rp2350) offers three pios. Each pio contains four state machines and every state machine can drive one stepper. So in theory can allocate 8 steppers for pico and 12 steppers for pico 2, but allocation tests stop with 4 resp. 8 steppers.
-TODO: To be investigated. Perhaps arduino framework consumes a pio ?
+Uses the pio module. Pico (rp2040) offers two pios and pico 2 (rp2350) offers three pios. Each pio contains four state machines and every state machine can drive one stepper. So in theory can allocate 8 steppers for pico and 12 steppers for pico 2.
+
+Arduino framework allocates one pio module, if not compiled for [riscv](https://github.com/earlephilhower/arduino-pico/blob/b8864711cd7801b7062c10f6b84d67f90284723b/cores/rp2040/RP2040Support.h#L206). Then only 4 resp. 8 steppers are available. SoftwareSerial is implemented via pio, too. So the number of available steppers depends on the sw configuration.
 
 Integration with applications using pio: FastAccelStepper claims always a complete pio. This means all four state machines are not available for the app. The second pio will be claimed, when allocating a fifth stepper. The third - on pico 2, when allocating the nineth stepper. Unused state machines of a pio cannot be used, because FastAccelStepper's pio code needs 100% of the available program space (32 words - none left).
 

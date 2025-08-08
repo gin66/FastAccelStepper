@@ -1,5 +1,5 @@
-pre-0.33.5:
-- pico: Fix pio/sm allocation scheme. On rp2350 can still only allocate 8 steppers and not 12. (#331)
+0.33.5:
+- pico: Fix pio/sm allocation scheme (#331)
 
 0.33.4:
 - pico: Fix direction pin handling (#329)
