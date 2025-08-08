@@ -31,7 +31,7 @@ The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 
   - avr atmega168/328/p: only Pin 9 and 10.
   - avr atmega32u4: only Pin 9, 10 and 11.
   - avr atmega2560: only Pin 6, 7 and 8.
-      On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 5 with FAS_TIMER_MODULE setting.
+      On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 5 with `FAS_TIMER_MODULE` setting.
   - esp32: This can be any output capable port pin.
   - pico: Any GPIO up to 31
   - atmel sam due: This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6
@@ -188,7 +188,7 @@ Comments to pin sharing:
 ### Raspberry pi pico/pico 2
 
 * allows up to 200000 generated steps per second
-* supports up to eight stepper motors for pico and twelve stepper motors for pico 2
+* supports up to eight (?) stepper motors for pico and twelve (currently 8) stepper motors for pico 2
 * Steppers' command queue depth: 32
 * beta status !!!!
 * untested and currently only one stepper tried
@@ -363,7 +363,8 @@ Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are li
 
 ### Raspberry pi pico/pico 2
 
-Uses the pio module. Pico offers two pios and pico 2 offers three pios. Each pio contains four state machines and every state machine can drive one stepper.
+Uses the pio module. Pico offers two pios and pico 2 offers three pios. Each pio contains four state machines and every state machine can drive one stepper. So in theory can allocate 12 steppers for pico 2, but allocation tests stop with 8 steppers.
+TODO: To be investigated
 
 Integration with applications using pio: FastAccelStepper claims always a complete pio. This means all four state machines are not available for the app. The second pio will be claimed, when allocating a fifth stepper. The third - on pico 2, when allocating the nineth stepper. Unused state machines of a pio cannot be used, because FastAccelStepper's pio code needs 100% of the available program space (32 words - none left).
 

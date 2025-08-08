@@ -45,9 +45,14 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
       // successfully claimed
       pio = engine->pio[i];
       sm = claimed_sm;
+      //Serial.print("claim pio=");
+      //Serial.print(i);
+      //Serial.print(" sm=");
+      //Serial.println(sm);
       return true;
     }
   }
+  // claim a new pio
   pio_program_t pio_program;
   pio_program.instructions = program->code;
   pio_program.length = program->pc;
@@ -57,8 +62,20 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
   pio_program.used_gpio_ranges = 0;
 #endif
   uint offset;
+  uint8_t pio_index = engine->claimed_pios;
+  if (pio_index == NUM_PIOS) {
+      return false;
+  }
   bool rc = pio_claim_free_sm_and_add_program_for_gpio_range(
       &pio_program, &pio, &sm, &offset, _step_pin, 1, true);
+      //Serial.print("claim new pio=");
+      //Serial.print(engine->claimed_pios);
+      //Serial.print(" sm=");
+      //Serial.println(sm);
+  if (rc) {
+    engine->pio[pio_index] = pio;
+    engine->claimed_pios = pio_index+1;
+  }
   return rc;
 }
 
