@@ -188,7 +188,7 @@ Comments to pin sharing:
 ### Raspberry pi pico/pico 2
 
 * allows up to 200000 generated steps per second
-* supports up to eight (?) stepper motors for pico and twelve (currently 8) stepper motors for pico 2
+* In theory supports up to eight stepper motors for pico and twelve stepper motors for pico 2. Using arduino framework on four for pico and eight for pico 2 can be allocated
 * Steppers' command queue depth: 32
 * beta status !!!!
 * untested and currently only one stepper tried
@@ -363,8 +363,8 @@ Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are li
 
 ### Raspberry pi pico/pico 2
 
-Uses the pio module. Pico offers two pios and pico 2 offers three pios. Each pio contains four state machines and every state machine can drive one stepper. So in theory can allocate 12 steppers for pico 2, but allocation tests stop with 8 steppers.
-TODO: To be investigated
+Uses the pio module. Pico (rp2040) offers two pios and pico 2 (rp2350) offers three pios. Each pio contains four state machines and every state machine can drive one stepper. So in theory can allocate 8 steppers for pico and 12 steppers for pico 2, but allocation tests stop with 4 resp. 8 steppers.
+TODO: To be investigated. Perhaps arduino framework consumes a pio ?
 
 Integration with applications using pio: FastAccelStepper claims always a complete pio. This means all four state machines are not available for the app. The second pio will be claimed, when allocating a fifth stepper. The third - on pico 2, when allocating the nineth stepper. Unused state machines of a pio cannot be used, because FastAccelStepper's pio code needs 100% of the available program space (32 words - none left).
 
