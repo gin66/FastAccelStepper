@@ -710,7 +710,5 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 
 bool StepperQueue::isRunning() { return _hasISRactive; }
 
-int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
-
 void fas_init_engine(FastAccelStepperEngine* engine) { fas_engine = engine; }
 #endif

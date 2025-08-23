@@ -207,7 +207,6 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
   // for now we do only support lower 32 gpios
   return (step_pin < 32);
 }
-int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 
 //*************************************************************************************************
 void StepperTask(void *parameter) {

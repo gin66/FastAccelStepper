@@ -34,6 +34,7 @@
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
 
 #define NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT
+#define NEED_FIXED_QUEUE_TO_PIN_MAPPING
 
 //==========================================================================
 //

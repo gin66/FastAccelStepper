@@ -89,11 +89,13 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     return NULL;
   }
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
+#if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
   int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
   if (fas_stepper_num < 0) {  // flexible, so just choose next
     if (_stepper_cnt >= MAX_STEPPER) {
       return NULL;
     }
+#endif
     fas_stepper_num = _stepper_cnt;
   }
 #else

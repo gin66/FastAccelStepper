@@ -210,7 +210,9 @@ class StepperQueue {
   void adjustSpeedToStepperCount(uint8_t steppers);
 #endif
   static bool isValidStepPin(uint8_t step_pin);
+#if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
   static int8_t queueNumForStepPin(uint8_t step_pin);
+#endif
 };
 
 extern StepperQueue fas_queue[NUM_QUEUES];

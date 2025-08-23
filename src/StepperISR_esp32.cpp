@@ -103,7 +103,6 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
   esp_err_t res = gpio_get_drive_capability((gpio_num_t)step_pin, &strength);
   return res == ESP_OK;
 }
-int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
 
 //*************************************************************************************************
 void StepperTask(void *parameter) {
