@@ -1,3 +1,6 @@
+pre-0.33.6:
+- pico2: support for PICO 2350 SDK (#334)
+
 0.33.5:
 - pico: Fix pio/sm allocation scheme (#331)
 
