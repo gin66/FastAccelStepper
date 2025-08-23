@@ -65,7 +65,7 @@ class StepperQueue {
   void setupSM();
   int32_t pos_offset; // offset between pico step count and position
   int32_t getCurrentStepCount();
-  void attachDirPinToStatemachine(uint8_t dirPin);
+  void attachDirPinToStatemachine();
 #endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;
@@ -200,7 +200,7 @@ class StepperQueue {
     }
 #endif
 #if defined(SUPPORT_RP_PICO)
-    attachDirPinToStatemachine(dirPin);
+    attachDirPinToStatemachine();
 #endif
   }
 #if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1

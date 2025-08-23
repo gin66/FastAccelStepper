@@ -25,7 +25,7 @@ bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
   return ok;
 }
 
-void StepperQueue::attachDirPinToStatemachine(uint8_t dir_pin) {
+void StepperQueue::attachDirPinToStatemachine() {
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
     pio_sm_set_set_pins(pio, sm, dirPin, 1);  // Direction pin via set
     pio_sm_set_consecutive_pindirs(pio, sm, dirPin, 1, true);
