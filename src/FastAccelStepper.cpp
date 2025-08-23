@@ -88,17 +88,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (!_isValidStepPin(step_pin)) {
     return NULL;
   }
-#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
-#if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
-  int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
-  if (fas_stepper_num < 0) {  // flexible, so just choose next
-    if (_stepper_cnt >= MAX_STEPPER) {
-      return NULL;
-    }
-#endif
-    fas_stepper_num = _stepper_cnt;
-  }
-#else
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   uint8_t queue_from = 0;
   uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT;
   if (driver_type == DRIVER_MCPWM_PCNT) {
@@ -117,6 +107,18 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (fas_stepper_num < 0) {
     return NULL;
   }
+#else
+#if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
+  int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
+  if (fas_stepper_num < 0) {
+    if (_stepper_cnt >= MAX_STEPPER) {
+      return NULL;
+    }
+    fas_stepper_num = _stepper_cnt;
+  }
+#else
+  int8_t fas_stepper_num = _stepper_cnt;
+#endif
 #endif
   _stepper_cnt++;
 
