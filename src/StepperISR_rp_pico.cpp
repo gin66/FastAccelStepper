@@ -12,7 +12,7 @@ static stepper_pio_program *program;
 
 bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
                         uint8_t step_pin) {
-  uint8_t channel = queue_num;
+  (void)queue_num; // silence compiler for unused parameter
   _step_pin = step_pin;
   _isStarting = false;
   dirPin = PIN_UNDEFINED;
