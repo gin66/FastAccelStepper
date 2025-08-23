@@ -17,6 +17,7 @@ bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
   _isStarting = false;
   dirPin = PIN_UNDEFINED;
   pos_offset = 0;
+  max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
   bool ok = claim_pio_sm(engine);
   if (ok) {
     setupSM();
@@ -242,10 +243,6 @@ void StepperTaskQueue(void *parameter) {
     const TickType_t delay_time = 1;
     vTaskDelay(delay_time);
   }
-}
-
-void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
-  max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
 }
 
 void fas_init_engine(FastAccelStepperEngine *engine) {

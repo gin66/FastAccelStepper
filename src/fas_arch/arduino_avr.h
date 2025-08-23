@@ -2,7 +2,7 @@
 #define FAS_ARCH_ARDUINO_AVR_H
 
 #define SUPPORT_AVR
-#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING
 
 // this is an arduino platform, so include the Arduino.h header file
 #include <Arduino.h>
@@ -32,6 +32,8 @@
 #define SUPPORT_DIR_TOGGLE_PIN_MASK uint8_t
 
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
+
+#define NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT
 
 //==========================================================================
 //

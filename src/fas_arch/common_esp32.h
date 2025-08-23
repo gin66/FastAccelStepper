@@ -5,7 +5,7 @@
 
 #define SUPPORT_ESP32
 #define SUPPORT_EXTERNAL_DIRECTION_PIN
-#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING 1
+#define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING
 
 // Some more esp32 specific includes
 #include <hal/gpio_ll.h>

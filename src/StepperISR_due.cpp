@@ -460,6 +460,7 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
   _step_pin = step_pin;
   channelsUsed[pinToChannel(step_pin)] = true;
   numChannels++;
+  max_speed_in_ticks = 420;  // This equals 50kHz @ 21MHz
 #if defined(KEEP_SCORE)
   totalPulsesDetected[queue_num] = 0;
   totalSteps[queue_num] = 0;
@@ -710,10 +711,6 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 bool StepperQueue::isRunning() { return _hasISRactive; }
 
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) { return -1; }
-
-void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
-  max_speed_in_ticks = 420;  // This equals 50kHz @ 21MHz
-}
 
 void fas_init_engine(FastAccelStepperEngine* engine) { fas_engine = engine; }
 #endif

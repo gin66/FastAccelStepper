@@ -203,13 +203,15 @@ class StepperQueue {
     attachDirPinToStatemachine();
 #endif
   }
-#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+#if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
   void setAbsoluteSpeedLimit(uint16_t ticks) { max_speed_in_ticks = ticks; }
 #endif
+#if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   void adjustSpeedToStepperCount(uint8_t steppers);
   static bool isValidStepPin(uint8_t step_pin);
   static int8_t queueNumForStepPin(uint8_t step_pin);
 };
+#endif
 
 extern StepperQueue fas_queue[NUM_QUEUES];
 

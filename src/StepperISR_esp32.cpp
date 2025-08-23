@@ -8,6 +8,7 @@ StepperQueue fas_queue[NUM_QUEUES];
 bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
                         uint8_t step_pin) {
   uint8_t channel = queue_num;
+  max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   if (channel < QUEUES_MCPWM_PCNT) {
     use_rmt = false;
@@ -118,10 +119,6 @@ void StepperTask(void *parameter) {
         (engine->_delay_ms + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
     vTaskDelay(delay_time);
   }
-}
-
-void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
-  max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
 }
 
 void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {

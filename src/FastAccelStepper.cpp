@@ -124,12 +124,14 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     return NULL;
   }
   _stepper[fas_stepper_num] = s;
+  #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     const FastAccelStepper* sx = _stepper[i];
     if (sx) {
       fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
     }
   }
+  #endif
   return s;
 }
 //*************************************************************************************************
@@ -820,7 +822,7 @@ uint32_t FastAccelStepper::getMaxSpeedInMilliHz() {
   uint32_t speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
   return speed_in_milli_hz;
 }
-#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+#if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
 void FastAccelStepper::setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks) {
   fas_queue[_queue_num].setAbsoluteSpeedLimit(max_speed_in_ticks);
 }

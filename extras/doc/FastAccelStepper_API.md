@@ -327,7 +327,7 @@ Allocating a new stepper will override any absolute speed limit.
 This is absolutely untested, no error checking implemented.
 Use at your own risk !
 ```cpp
-#if SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING == 1
+#if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
   void setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks);
 #endif
 ```
