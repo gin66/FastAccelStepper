@@ -30,7 +30,7 @@ class RampGenerator {
   void init();
   inline int32_t targetPosition() { return _ro.targetPosition(); }
   inline void setTargetPosition(int32_t pos) { _ro.setTargetPosition(pos); }
-  void advanceTargetPosition(int32_t delta, const struct queue_end_s *queue);
+  void advanceTargetPosition(int32_t delta);
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
     _parameters.setSpeedInTicks(min_step_ticks);
   }

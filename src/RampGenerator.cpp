@@ -99,8 +99,7 @@ MoveResultCode RampGenerator::move(int32_t move) {
   _startMove(move != 0);
   return MOVE_OK;
 }
-void RampGenerator::advanceTargetPosition(int32_t delta,
-                                          const struct queue_end_s *queue) {
+void RampGenerator::advanceTargetPosition(int32_t delta) {
   // called with interrupts disabled
   _ro.target_pos += delta;
 }

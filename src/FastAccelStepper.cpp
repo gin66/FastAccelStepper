@@ -865,7 +865,7 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
     struct queue_end_s* queue_end = &fas_queue[_queue_num].queue_end;
     fasDisableInterrupts();
     queue_end->pos = queue_end->pos + delta;
-    _rg.advanceTargetPosition(delta, queue_end);
+    _rg.advanceTargetPosition(delta);
     fasEnableInterrupts();
   }
 }
@@ -878,7 +878,7 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
 #if defined(SUPPORT_RP_PICO)
     fas_queue[_queue_num].pos_offset += delta;
 #endif
-    _rg.advanceTargetPosition(delta, queue_end);
+    _rg.advanceTargetPosition(delta);
   }
   fasEnableInterrupts();
 }
