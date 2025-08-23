@@ -208,10 +208,10 @@ class StepperQueue {
 #endif
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   void adjustSpeedToStepperCount(uint8_t steppers);
+#endif
   static bool isValidStepPin(uint8_t step_pin);
   static int8_t queueNumForStepPin(uint8_t step_pin);
 };
-#endif
 
 extern StepperQueue fas_queue[NUM_QUEUES];
 
