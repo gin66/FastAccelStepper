@@ -90,8 +90,7 @@ MoveResultCode RampGenerator::moveTo(int32_t position,
   inject_fill_interrupt(2);
   return MOVE_OK;
 }
-MoveResultCode RampGenerator::move(int32_t move,
-                                   const struct queue_end_s *queue_end) {
+MoveResultCode RampGenerator::move(int32_t move) {
   MoveResultCode res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;

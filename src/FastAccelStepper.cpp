@@ -635,7 +635,7 @@ MoveResultCode FastAccelStepper::move(int32_t move, bool blocking) {
   if ((move < 0) && (_dirPin == PIN_UNDEFINED)) {
     return MOVE_ERR_NO_DIRECTION_PIN;
   }
-  MoveResultCode res = _rg.move(move, &fas_queue[_queue_num].queue_end);
+  MoveResultCode res = _rg.move(move);
   if ((res == MOVE_OK) && blocking) {
     while (isRunning()) {
       noop_or_wait;
