@@ -36,7 +36,7 @@ MoveResultCode RampGenerator::startRun(bool countUp) {
   }
   _ro.force_stop = false;
   _parameters.setRunning(countUp);
-  _rw.startRampIfNotRunning(_parameters.s_jump);
+  _rw.startRampIfNotRunning();
 #ifdef DEBUG
   char buf[256];
   sprintf(buf, "Ramp data: curr_ticks = %lu travel_ticks = %lu\n",
@@ -51,7 +51,7 @@ void RampGenerator::_startMove(bool position_changed) {
 
   if (position_changed) {
     // Only start the ramp generator, if the target position is different
-    _rw.startRampIfNotRunning(_parameters.s_jump);
+    _rw.startRampIfNotRunning();
   }
 
 #ifdef TEST

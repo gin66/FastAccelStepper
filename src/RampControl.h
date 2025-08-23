@@ -53,9 +53,9 @@ struct ramp_rw_s {
     // reading one byte is atomic
     return ramp_state;
   }
-  inline void startRampIfNotRunning(uint32_t s_jump) {
+  inline void startRampIfNotRunning() {
 #ifdef TEST
-    printf("startRampIfNotRunning(%d) called\n", s_jump);
+    printf("startRampIfNotRunning() called\n");
 #endif
     // called with interrupts disabled
     if (ramp_state == RAMP_STATE_IDLE) {
