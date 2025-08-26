@@ -304,9 +304,7 @@ bool StepperQueue::getActualTicksWithDirection(struct actual_ticks_s* speed) {
 
 void StepperQueue::_initVars() {
   dirPin = PIN_UNDEFINED;
-#ifndef TEST
-  max_speed_in_ticks = TICKS_PER_S / 1000;  // use a default value 1_000 steps/s
-#else
+#ifdef TEST
   max_speed_in_ticks =
       TICKS_PER_S / 50000;  // use a default value 50_000 steps/s
 #endif

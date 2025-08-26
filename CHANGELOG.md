@@ -1,3 +1,6 @@
+0.33.7:
+- esp32: Fix overwriting of max speed with 1kstep/s. esp32 issue reported in #335
+
 0.33.6:
 - pico2: support for PICO 2350 SDK (#334)
 

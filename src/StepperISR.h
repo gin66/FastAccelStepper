@@ -120,7 +120,7 @@ class StepperQueue {
 #endif
 
   struct queue_end_s queue_end;
-  uint16_t max_speed_in_ticks;
+  uint16_t max_speed_in_ticks = TICKS_PER_S / 1000;  // use a default value 1_000 steps/s
 
   bool init(FastAccelStepperEngine* engine, uint8_t queue_num,
             uint8_t step_pin);
