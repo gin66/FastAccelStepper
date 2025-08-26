@@ -85,6 +85,9 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
       }
     }
   }
+  if (_stepper_cnt >= MAX_STEPPER) {
+    return NULL;
+  }
   if (!_isValidStepPin(step_pin)) {
     return NULL;
   }
@@ -111,9 +114,6 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 #if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
   int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
   if (fas_stepper_num < 0) {
-    if (_stepper_cnt >= MAX_STEPPER) {
-      return NULL;
-    }
     fas_stepper_num = _stepper_cnt;
   }
 #else
