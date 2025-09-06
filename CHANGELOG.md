@@ -1,3 +1,6 @@
+0.33.8:
+- esp32: Avoid calling `rmt_disable()` on an already disabled channel in `forceStopAndNewPosition()` (#337)
+
 0.33.7:
 - esp32: Fix overwriting of max speed with 1kstep/s. esp32 issue reported in #335
 

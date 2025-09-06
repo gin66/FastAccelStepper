@@ -176,10 +176,10 @@ void StepperQueue::startQueue_rmt() {
          e->countUp ? "up" : "down", e->toggle_dir ? "toggle" : "");
 #endif
 
-  if (_channel_enabled) {
+  //if (_channel_enabled) {
     //	rmt_disable(channel);
     //	_channel_enabled = false;
-  }
+  //}
 
   lastChunkContainsSteps = false;
   _isRunning = true;
@@ -205,7 +205,9 @@ void StepperQueue::startQueue_rmt() {
 #endif
 }
 void StepperQueue::forceStop_rmt() {
-  rmt_disable(channel);
+  if (_channel_enabled) {
+    rmt_disable(channel);
+  }
   _channel_enabled = false;
   _isRunning = false;
   _rmtStopped = true;
