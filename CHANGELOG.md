@@ -1,3 +1,7 @@
+0.33.9:
+- pico: stabilize stepper frequency by time compensation and fix calculation
+- pico: retry claiming of new state machine on failure
+
 0.33.8:
 - esp32: Avoid calling `rmt_disable()` on an already disabled channel in `forceStopAndNewPosition()` (#337)
 
