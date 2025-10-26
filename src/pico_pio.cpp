@@ -33,6 +33,10 @@ static void add_step(uint instruction) {
 //
 //         Combined: (27+3*period)*loop_cnt = cycles per cmd
 //
+// from test on rp2040 loop overhead is 26 and not 27
+// 
+#define LOOP_OVERHEAD 26
+#define LOOP_CYCLES   3
 //
 uint32_t pio_calc_loops(uint8_t steps,
                              uint16_t cycles_in_16th_us,
@@ -48,11 +52,11 @@ uint32_t pio_calc_loops(uint8_t steps,
   uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
   uint32_t loops = cycles_in_80MHz;
   loops /= loop_cnt;
-  loops -= 27; // 27 cycles for the loop overhead
-  loops /= 3;
+  loops -= LOOP_OVERHEAD;
+  loops /= LOOP_CYCLES;
   uint32_t actual_cycles = loops;
-  actual_cycles *= 3;
-  actual_cycles += 27;
+  actual_cycles *= LOOP_CYCLES;
+  actual_cycles += LOOP_OVERHEAD;
   actual_cycles *= loop_cnt;
   // calculate new adjustment value for being too fast
   *adjust_80MHz = cycles_in_80MHz - actual_cycles;
