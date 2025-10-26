@@ -33,7 +33,7 @@ static void add_step(uint instruction) {
 //
 //         Combined: (27+3*period)*loop_cnt = cycles per cmd
 //
-// from test on rp2040 loop overhead is 26 and not 27
+// from test on rp2040 and rp2350 hw the loop overhead is 26 and not 27
 // 
 #define LOOP_OVERHEAD 26
 #define LOOP_CYCLES   3

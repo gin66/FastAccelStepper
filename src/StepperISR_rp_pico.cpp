@@ -69,10 +69,18 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
   }
   bool rc = pio_claim_free_sm_and_add_program_for_gpio_range(
       &pio_program, &pio, &sm, &offset, _step_pin, 1, true);
+  if (!rc) {
+      // try again. for whatever reason this may fail on first attempt
+      // Serial.println("retry claim");
+      rc = pio_claim_free_sm_and_add_program_for_gpio_range(
+      	&pio_program, &pio, &sm, &offset, _step_pin, 1, true);
+  }
       // Serial.print("claim new pio=");
       // Serial.print(engine->claimed_pios);
       // Serial.print(" sm=");
-      // Serial.println(sm);
+      // Serial.print(sm);
+      // Serial.print(" result=");
+      // Serial.println(rc);
   if (rc) {
     engine->pio[pio_index] = pio;
     engine->claimed_pios = pio_index+1;
