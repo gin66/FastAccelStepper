@@ -59,6 +59,7 @@ class StepperQueue {
   bool isRunning();
   bool isReadyForCommands();
   uint8_t _step_pin;
+  uint16_t adjust_80MHz;
   PIO pio; /* not set in init */
   uint sm; /* not set in init */
   bool claim_pio_sm(FastAccelStepperEngine* engine);

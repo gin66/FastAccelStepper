@@ -330,6 +330,9 @@ void StepperQueue::_initVars() {
   _pauseCommanded = false;
   timePWMInterruptEnabled = 0;
 #endif
+#if defined(SUPPORT_RP_PICO)
+  adjust_80MHz = 0;
+#endif
 #if defined(TEST)
   _isRunning = false;
 #endif
