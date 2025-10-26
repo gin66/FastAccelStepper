@@ -35,7 +35,8 @@ static void add_step(uint instruction) {
 //
 //
 uint32_t pio_calc_loops(uint8_t steps,
-                             uint16_t cycles_in_16th_us) {
+                             uint16_t cycles_in_16th_us,
+                            uint16_t *adjust_80MHz) {
   uint32_t cycles_in_80MHz = cycles_in_16th_us;
   // should be yielding multiplication with 5
   cycles_in_80MHz *= program.sys_clk/1000000;

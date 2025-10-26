@@ -135,7 +135,7 @@ static bool push_command(StepperQueue *q) {
   //sprintf(out, "push_command %d: dirHigh: %d, countUp: %d, steps: %d, ticks: %d",
   //        rp, dirHigh, countUp, steps, ticks);
   //Serial.println(out);
-  uint32_t loops = pio_calc_loops(steps, ticks);
+  uint32_t loops = pio_calc_loops(steps, ticks, &q->adjust_80MHz);
   uint32_t entry = stepper_make_fifo_entry(dirHigh, countUp, steps, ticks);
   pio_sm_put(q->pio, q->sm, entry);
   // Serial.println((entry & 512) != 0 ? "HIGH":"LOW");
