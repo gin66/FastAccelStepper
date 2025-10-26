@@ -50,7 +50,9 @@ uint32_t pio_calc_loops(uint8_t steps,
   loops /= loop_cnt;
   loops -= 27; // 27 cycles for the loop overhead
   loops /= 3;
-  uint32_t actual_cycles = loops * 3 + 27;
+  uint32_t actual_cycles = loops;
+  actual_cycles *= 3;
+  actual_cycles += 27;
   actual_cycles *= loop_cnt;
   // calculate new adjustment value for being too fast
   *adjust_80MHz = cycles_in_80MHz - actual_cycles;
