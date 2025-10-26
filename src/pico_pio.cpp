@@ -40,11 +40,15 @@ uint32_t stepper_calc_period(uint8_t steps,
   // should be yielding multiplication with 5
   cycles_in_80MHz *= program.sys_clk/1000000;
   cycles_in_80MHz /= 16000000/1000000;
+  // old code is replaced by conditional division by 2
+  // if (steps > 1) {
+  //   cycles_in_80MHz *= steps;
+  // }
+  // uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
+  // cycles_in_80MHz /= loop_cnt;
   if (steps > 1) {
-    cycles_in_80MHz *= steps;
+     cycles_in_80MHz /= 2;
   }
-  uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
-  cycles_in_80MHz /= loop_cnt;
   cycles_in_80MHz -= 27; // 27 cycles for the loop overhead
   cycles_in_80MHz /= 3;
   return cycles_in_80MHz;
