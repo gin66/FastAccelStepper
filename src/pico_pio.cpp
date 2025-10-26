@@ -41,18 +41,20 @@ uint32_t pio_calc_loops(uint8_t steps,
   // should be yielding multiplication with 5
   cycles_in_80MHz *= program.sys_clk/1000000;
   cycles_in_80MHz /= 16000000/1000000;
-  // old code is replaced by conditional division by 2
-  // if (steps > 1) {
-  //   cycles_in_80MHz *= steps;
-  // }
-  // uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
-  // cycles_in_80MHz /= loop_cnt;
   if (steps > 1) {
-     cycles_in_80MHz /= 2;
+    cycles_in_80MHz *= steps;
   }
-  cycles_in_80MHz -= 27; // 27 cycles for the loop overhead
-  cycles_in_80MHz /= 3;
-  return cycles_in_80MHz;
+  cycles_in_80MHz += *adjust_80MHz;
+  uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
+  uint32_t loops = cycles_in_80MHz;
+  loops /= loop_cnt;
+  loops -= 27; // 27 cycles for the loop overhead
+  loops /= 3;
+  uint32_t actual_cycles = loops * 3 + 27;
+  actual_cycles *= loop_cnt;
+  // calculate new adjustment value for being too fast
+  *adjust_80MHz = cycles_in_80MHz - actual_cycles;
+  return loops;
 }
 uint32_t pio_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps,
                                  uint32_t loops) {
