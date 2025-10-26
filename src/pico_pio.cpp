@@ -34,7 +34,7 @@ static void add_step(uint instruction) {
 //         Combined: (27+3*period)*loop_cnt = cycles per cmd
 //
 //
-uint32_t stepper_calc_period(uint8_t steps,
+uint32_t pio_calc_loops(uint8_t steps,
                              uint16_t cycles_in_16th_us) {
   uint32_t cycles_in_80MHz = cycles_in_16th_us;
   // should be yielding multiplication with 5
@@ -53,12 +53,12 @@ uint32_t stepper_calc_period(uint8_t steps,
   cycles_in_80MHz /= 3;
   return cycles_in_80MHz;
 }
-uint32_t stepper_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps,
-                                 uint16_t cycles_16th_us) {
-  uint32_t period = stepper_calc_period(steps, cycles_16th_us);
+uint32_t pio_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps,
+                                 uint32_t loops) {
+  //uint32_t period = stepper_calc_period(steps, cycles_16th_us);
   uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
   uint32_t entry =
-      (period << 11) | (count_up ? 1024 : 0) | (dir_high ? 512 : 0) | loop_cnt;
+      (loops << 11) | (count_up ? 1024 : 0) | (dir_high ? 512 : 0) | loop_cnt;
   //char out[200];
   //sprintf(out, "stepper_make_fifo_entry: dir_high: %d, count_up: %d, steps: %d, cycles_16th_us: %d, period: %d, loop_cnt: %d, entry: 0x%08X",
   //       dir_high, count_up, steps, cycles_16th_us, period, loop_cnt, entry);

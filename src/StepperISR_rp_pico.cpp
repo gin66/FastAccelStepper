@@ -135,6 +135,7 @@ static bool push_command(StepperQueue *q) {
   //sprintf(out, "push_command %d: dirHigh: %d, countUp: %d, steps: %d, ticks: %d",
   //        rp, dirHigh, countUp, steps, ticks);
   //Serial.println(out);
+  uint32_t loops = pio_calc_loops(steps, ticks);
   uint32_t entry = stepper_make_fifo_entry(dirHigh, countUp, steps, ticks);
   pio_sm_put(q->pio, q->sm, entry);
   // Serial.println((entry & 512) != 0 ? "HIGH":"LOW");
@@ -157,7 +158,7 @@ void StepperQueue::forceStop() {
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
   // ensure step is zero
-  uint32_t entry = stepper_make_fifo_entry(queue_end.dir, 0, 0, 1); // no steps and 1us cycleAA
+  uint32_t entry = pio_make_fifo_entry(queue_end.dir, 0, 0, LOOPS_FOR_1US); // no steps and 1us cycle
   pio_sm_put(pio, sm, entry);
 }
 bool StepperQueue::isRunning() {
@@ -181,7 +182,7 @@ int32_t StepperQueue::getCurrentStepCount() {
       pio_sm_get(pio,sm);
     }
     // kick off loop to probe position
-    uint32_t entry = stepper_make_fifo_entry(queue_end.dir, 0, 0, 1); // no steps and 1us cycle
+    uint32_t entry = pio_make_fifo_entry(queue_end.dir, 0, 0, LOOPS_FOR_1US); // no steps and 1us cycle
     pio_sm_put(pio, sm, entry);
   
     // wait for pc reaching 0 again to ensure isRunning() returns false
