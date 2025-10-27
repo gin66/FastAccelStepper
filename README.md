@@ -371,6 +371,26 @@ Integration with applications using pio: FastAccelStepper claims always a comple
 
 Important: Without direction delay set up, the time between a direction transition to step low to high transition can be 50ns @ 80 MHz. Best to call `setDirectionPin()` with time parameter for delay.
 
+Important to note: The standard pico platform appears to not work with pio (#339). So please use an alternative platform for rp2040 like:
+
+```
+[env:rpipico]
+platform = https://github.com/maxgerhardt/platform-raspberrypi.git
+framework = arduino
+board = rpipico
+build_flags = -Wall -Wextra -D__FREERTOS=1
+```
+
+and for rp2350:
+
+```
+[env:rpipico2]
+platform = https://github.com/maxgerhardt/platform-raspberrypi.git
+framework = arduino
+board = rpipico2
+build_flags = -Wall -Wextra -D__FREERTOS=1
+```
+
 ### Atmel SAM Due
 
 This is supported by clazarowitz
