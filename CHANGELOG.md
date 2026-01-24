@@ -1,3 +1,6 @@
+0.33.11:
+- pico: introduce setDirPinState() for #343 avoiding gpio writes to direction pin altogether.
+
 0.33.10:
 - pico: fix issue as reported in #343. Apparently digitalRead()-library implementation has changed.
 

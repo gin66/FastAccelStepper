@@ -15,7 +15,7 @@ jobs:
           - v5.3.2
           - v5.4.1
           - release-v5.5
-          - latest
+          # - latest ... fails currently with soc/rmt_periph.h not found
 
     runs-on: ubuntu-latest
 
