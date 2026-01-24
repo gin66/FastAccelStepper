@@ -66,7 +66,7 @@
 // => converted back => 65536.00
 
 // used in Log2Representation.cpp as example
-// 
+//
 // LOG2_CONST_15373 = 7120.953125  7121 = 0x1bd1
 #define LOG2_CONST_15373 ((pmf_logarithmic)0x1bd1)
 // => converted back => 15373.98

@@ -5,7 +5,7 @@
 // Perform 800 times a single step and then 800 steps back in one command.
 
 #define DT 200
-bool test_seq_05(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_05(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   switch (seq->state & 15) {
     case 0:  // INIT

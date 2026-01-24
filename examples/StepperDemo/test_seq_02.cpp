@@ -2,7 +2,7 @@
 
 // u32_1 shall be number of steps
 
-bool test_seq_02(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_02(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   int32_t steps = seq->u32_1;
   switch (seq->state) {

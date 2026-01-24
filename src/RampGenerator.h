@@ -74,7 +74,7 @@ class RampGenerator {
   }
   void applySpeedAcceleration();
   MoveResultCode move(int32_t move);
-  MoveResultCode moveTo(int32_t position, const struct queue_end_s *queue);
+  MoveResultCode moveTo(int32_t position, const struct queue_end_s* queue);
   MoveResultCode startRun(bool countUp);
   inline void forceStop() { _ro.immediateStop(); }
   inline void initiateStop() { _ro.initiateStop(); }
@@ -91,10 +91,10 @@ class RampGenerator {
   inline void stopRamp() { _rw.stopRamp(); }
   inline void setKeepRunning() { _ro.setKeepRunning(); }
   inline bool isRunningContinuously() { return _ro.isRunningContinuously(); }
-  void getNextCommand(const struct queue_end_s *queue_end,
-                      NextCommand *cmd_out);
-  void afterCommandEnqueued(const NextCommand *cmd_in);
-  void getCurrentSpeedInTicks(struct actual_ticks_s *speed) {
+  void getNextCommand(const struct queue_end_s* queue_end,
+                      NextCommand* cmd_out);
+  void afterCommandEnqueued(const NextCommand* cmd_in);
+  void getCurrentSpeedInTicks(struct actual_ticks_s* speed) {
     fasDisableInterrupts();
     speed->ticks = _rw.curr_ticks;
     uint8_t rs = _rw.rampState();

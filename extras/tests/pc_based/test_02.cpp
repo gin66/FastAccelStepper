@@ -70,7 +70,7 @@ class FastAccelStepperTest {
     test(rc.min_dt == 160000, "max speed not reached");
   }
 
-  void with_pars(const char *name, int32_t steps, uint32_t travel_dt,
+  void with_pars(const char* name, int32_t steps, uint32_t travel_dt,
                  uint32_t accel, bool reach_max_speed, float min_time,
                  float max_time, float allowed_ramp_time_delta,
                  bool call_moveTo_repeatedly = false,

@@ -8,11 +8,11 @@
 
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
-static stepper_pio_program *program;
+static stepper_pio_program* program;
 
-bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
+bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
                         uint8_t step_pin) {
-  (void)queue_num; // silence compiler for unused parameter
+  (void)queue_num;  // silence compiler for unused parameter
   _step_pin = step_pin;
   _isStarting = false;
   dirPin = PIN_UNDEFINED;
@@ -36,17 +36,16 @@ void StepperQueue::attachDirPinToStatemachine() {
 }
 
 void StepperQueue::setDirPinState(bool high) {
-
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
-    //Serial.print("Set dir pin ");
-    //Serial.print(dirPin);
-    //Serial.print(" to ");
-    //Serial.println(high ? "HIGH" : "LOW");
+    // Serial.print("Set dir pin ");
+    // Serial.print(dirPin);
+    // Serial.print(" to ");
+    // Serial.println(high ? "HIGH" : "LOW");
     pio_sm_exec(pio, sm, pio_encode_set(pio_pins, high ? 1 : 0));
   }
 }
 
-bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
+bool StepperQueue::claim_pio_sm(FastAccelStepperEngine* engine) {
   // We have two or three PIO modules. If we need one sm from a pio,
   // the whole PIO need to be claimed due to the size of our pio code.
   // Let's check first, if there is any PIO claimed.
@@ -77,25 +76,25 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine *engine) {
   uint offset;
   uint8_t pio_index = engine->claimed_pios;
   if (pio_index == NUM_PIOS) {
-      return false;
+    return false;
   }
   bool rc = pio_claim_free_sm_and_add_program_for_gpio_range(
       &pio_program, &pio, &sm, &offset, _step_pin, 1, true);
   if (!rc) {
-      // try again. for whatever reason this may fail on first attempt
-      // Serial.println("retry claim");
-      rc = pio_claim_free_sm_and_add_program_for_gpio_range(
-      	&pio_program, &pio, &sm, &offset, _step_pin, 1, true);
+    // try again. for whatever reason this may fail on first attempt
+    // Serial.println("retry claim");
+    rc = pio_claim_free_sm_and_add_program_for_gpio_range(
+        &pio_program, &pio, &sm, &offset, _step_pin, 1, true);
   }
-      // Serial.print("claim new pio=");
-      // Serial.print(engine->claimed_pios);
-      // Serial.print(" sm=");
-      // Serial.print(sm);
-      // Serial.print(" result=");
-      // Serial.println(rc);
+  // Serial.print("claim new pio=");
+  // Serial.print(engine->claimed_pios);
+  // Serial.print(" sm=");
+  // Serial.print(sm);
+  // Serial.print(" result=");
+  // Serial.println(rc);
   if (rc) {
     engine->pio[pio_index] = pio;
-    engine->claimed_pios = pio_index+1;
+    engine->claimed_pios = pio_index + 1;
   }
   return rc;
 }
@@ -104,7 +103,7 @@ void StepperQueue::setupSM() {
   pio_sm_config c = pio_get_default_sm_config();
   // Map the state machine's OUT pin group to one pin, namely the `pin`
   // parameter to this function.
-  sm_config_set_jmp_pin(&c, _step_pin);  // Step pin read back 
+  sm_config_set_jmp_pin(&c, _step_pin);      // Step pin read back
   sm_config_set_out_pins(&c, _step_pin, 1);  // Step pin via out
   sm_config_set_wrap(&c, program->wrap_target, program->wrap_at);
 
@@ -135,7 +134,7 @@ void StepperQueue::disconnect() {
 
 bool StepperQueue::isReadyForCommands() { return true; }
 
-static bool push_command(StepperQueue *q) {
+static bool push_command(StepperQueue* q) {
   uint8_t rp = q->read_idx;
   if (rp == q->next_write_idx) {
     // no command in queue
@@ -146,15 +145,16 @@ static bool push_command(StepperQueue *q) {
     return false;
   }
   // Process command
-  struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+  struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
   uint8_t steps = e_curr->steps;
   uint16_t ticks = e_curr->ticks;
   bool dirHigh = e_curr->dirPinState == 1;
   bool countUp = e_curr->countUp == 1;
-  //char out[200];
-  //sprintf(out, "push_command %d: dirHigh: %d, countUp: %d, steps: %d, ticks: %d",
-  //        rp, dirHigh, countUp, steps, ticks);
-  //Serial.println(out);
+  // char out[200];
+  // sprintf(out, "push_command %d: dirHigh: %d, countUp: %d, steps: %d, ticks:
+  // %d",
+  //         rp, dirHigh, countUp, steps, ticks);
+  // Serial.println(out);
   uint32_t loops = pio_calc_loops(steps, ticks, &q->adjust_80MHz);
   uint32_t entry = pio_make_fifo_entry(dirHigh, countUp, steps, loops);
   pio_sm_put(q->pio, q->sm, entry);
@@ -178,7 +178,8 @@ void StepperQueue::forceStop() {
   pio_sm_clear_fifos(pio, sm);
   pio_sm_restart(pio, sm);
   // ensure step is zero
-  uint32_t entry = pio_make_fifo_entry(queue_end.dir, 0, 0, LOOPS_FOR_1US); // no steps and 1us cycle
+  uint32_t entry = pio_make_fifo_entry(
+      queue_end.dir, 0, 0, LOOPS_FOR_1US);  // no steps and 1us cycle
   pio_sm_put(pio, sm, entry);
 }
 bool StepperQueue::isRunning() {
@@ -197,26 +198,27 @@ int32_t StepperQueue::getCurrentStepCount() {
     // Empty queue
     for (uint8_t i = 0; i <= 4; i++) {
       if (pio_sm_is_rx_fifo_empty(pio, sm)) {
-         break;
+        break;
       }
-      pio_sm_get(pio,sm);
+      pio_sm_get(pio, sm);
     }
     // kick off loop to probe position
-    uint32_t entry = pio_make_fifo_entry(queue_end.dir, 0, 0, LOOPS_FOR_1US); // no steps and 1us cycle
+    uint32_t entry = pio_make_fifo_entry(
+        queue_end.dir, 0, 0, LOOPS_FOR_1US);  // no steps and 1us cycle
     pio_sm_put(pio, sm, entry);
-  
+
     // wait for pc reaching 0 again to ensure isRunning() returns false
-    while(isRunning()) {
-       if (!pio_sm_is_tx_fifo_empty(pio, sm)) {
-          break; // apparently the stepper is now getting commands
-       }
+    while (isRunning()) {
+      if (!pio_sm_is_tx_fifo_empty(pio, sm)) {
+        break;  // apparently the stepper is now getting commands
+      }
     }
   }
   // use last value
   for (uint8_t i = 0; i <= 4; i++) {
-    pos = pio_sm_get(pio,sm);
+    pos = pio_sm_get(pio, sm);
     if (pio_sm_is_rx_fifo_empty(pio, sm)) {
-       break;
+      break;
     }
   }
   return (int32_t)pos;
@@ -230,8 +232,8 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 }
 
 //*************************************************************************************************
-void StepperTask(void *parameter) {
-  FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
+void StepperTask(void* parameter) {
+  FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
   while (true) {
     engine->manageSteppers();
     const TickType_t delay_time =
@@ -241,9 +243,9 @@ void StepperTask(void *parameter) {
 }
 void FastAccelStepperEngine::pushCommands() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper *s = _stepper[i];
+    FastAccelStepper* s = _stepper[i];
     if (s) {
-      StepperQueue *q = &fas_queue[s->_queue_num];
+      StepperQueue* q = &fas_queue[s->_queue_num];
       if (q->_isStarting) {
         continue;
       }
@@ -256,8 +258,8 @@ void FastAccelStepperEngine::pushCommands() {
     }
   }
 }
-void StepperTaskQueue(void *parameter) {
-  FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
+void StepperTaskQueue(void* parameter) {
+  FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
   while (true) {
     engine->pushCommands();
     const TickType_t delay_time = 1;
@@ -265,7 +267,7 @@ void StepperTaskQueue(void *parameter) {
   }
 }
 
-void fas_init_engine(FastAccelStepperEngine *engine) {
+void fas_init_engine(FastAccelStepperEngine* engine) {
 #define STACK_SIZE 3000
 #define PRIORITY (configMAX_PRIORITIES - 1)
   engine->_delay_ms = DELAY_MS_BASE;

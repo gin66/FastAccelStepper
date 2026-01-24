@@ -240,7 +240,7 @@ bool perform_test() {
   trace("Check pmf constants");
   bool error = false;
   for (uint8_t i = 0; i < NR_OF_CONSTANTS; i++) {
-    const struct const_tab *dut = &constants[i];
+    const struct const_tab* dut = &constants[i];
     pmf_logarithmic val = log2_from(dut->val_nom);
     if (dut->squared) {
       val += val;

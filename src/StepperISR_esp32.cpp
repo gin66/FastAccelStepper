@@ -5,7 +5,7 @@
 // Here are the global variables to interface with the interrupts
 StepperQueue fas_queue[NUM_QUEUES];
 
-bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
+bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
                         uint8_t step_pin) {
   uint8_t channel = queue_num;
   max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
@@ -105,8 +105,8 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 }
 
 //*************************************************************************************************
-void StepperTask(void *parameter) {
-  FastAccelStepperEngine *engine = (FastAccelStepperEngine *)parameter;
+void StepperTask(void* parameter) {
+  FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
   while (true) {
     engine->manageSteppers();
 #if ESP_IDF_VERSION_MAJOR == 4
@@ -120,7 +120,7 @@ void StepperTask(void *parameter) {
   }
 }
 
-void fas_init_engine(FastAccelStepperEngine *engine, uint8_t cpu_core) {
+void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {
 #if ESP_IDF_VERSION_MAJOR == 4
 #define STACK_SIZE 2000
 #define PRIORITY configMAX_PRIORITIES

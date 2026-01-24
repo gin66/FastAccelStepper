@@ -128,14 +128,14 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     return NULL;
   }
   _stepper[fas_stepper_num] = s;
-  #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
+#if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     const FastAccelStepper* sx = _stepper[i];
     if (sx) {
       fas_queue[sx->_queue_num].adjustSpeedToStepperCount(_stepper_cnt);
     }
   }
-  #endif
+#endif
   return s;
 }
 //*************************************************************************************************

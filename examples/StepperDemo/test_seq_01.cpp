@@ -2,7 +2,7 @@
 
 // u32_1 shall be milliseconds from last tick
 
-bool test_seq_01(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_01(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   switch (seq->state & 15) {
     case 0:  // INIT

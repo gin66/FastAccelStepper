@@ -30,7 +30,7 @@ void setup() {
   // initialize the digital pin as an output.
   // pinMode(LED_BUILTIN, OUTPUT);
 
-  stepper_pio_program *program = stepper_make_program();
+  stepper_pio_program* program = stepper_make_program();
   Serial.print("Program length at most 32: ");
   Serial.println(program->pc);
 

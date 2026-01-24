@@ -7,13 +7,13 @@
 //
 // Here we declare the private pcnt_chan_t structure, which is not save.
 struct pcnt_unit_t {
-  /*pcnt_group_t*/ void *group;
+  /*pcnt_group_t*/ void* group;
   portMUX_TYPE spinlock;
   int unit_id;
   // remainder of struct not needed
 };
 struct pcnt_chan_t {
-  pcnt_unit_t *unit;
+  pcnt_unit_t* unit;
   int channel_id;
   // remainder of struct not needed
 };

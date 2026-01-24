@@ -9,7 +9,7 @@ struct command_s {
 
 int16_t old = 0;
 
-bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_08(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   switch (seq->state) {
     case 0:  // INIT
@@ -88,7 +88,7 @@ bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
 }
 
 #else
-bool test_seq_08(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_08(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   return true;  // finished
 }

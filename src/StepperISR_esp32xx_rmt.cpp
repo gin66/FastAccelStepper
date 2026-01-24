@@ -33,11 +33,11 @@
 //    T_RMT_CLK = 1/80MHz = 12.5ns
 //    => period > (3*12.5ns + 5*12.5ns)/(62.5ns) = 1.6
 //
-void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
-                               uint32_t *data) {
+void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
+                               uint32_t* data) {
   // Process command
   uint8_t rp = q->read_idx;
-  struct queue_entry *e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+  struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
   if (e_curr->toggle_dir) {
     // the command requests dir pin toggle
     // This is ok only, if the ongoing command does not contain steps
@@ -148,9 +148,9 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
               i++;
               ticks_high -= 4;
             } else {
-              uint32_t entry = ticks_high>>1;
+              uint32_t entry = ticks_high >> 1;
               entry <<= 16;
-              entry |= ticks_high - (ticks_high>>1);
+              entry |= ticks_high - (ticks_high >> 1);
               *data++ = 0x80008000 | entry;
               i++;
               break;
@@ -163,10 +163,11 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
               ticks_low -= 4;
             } else {
               // #325: esp32c3 has frozen with one step and ticks ~38600
-              //       now the last entry is balanced instead of long pause and then 2 ticks
-              uint32_t entry = ticks_low>>1;
+              //       now the last entry is balanced instead of long pause and
+              //       then 2 ticks
+              uint32_t entry = ticks_low >> 1;
               entry <<= 16;
-              entry |= ticks_low - (ticks_low>>1);
+              entry |= ticks_low - (ticks_low >> 1);
               *data++ = entry;
               i++;
               break;
@@ -226,8 +227,8 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue *q, bool fill_part_one,
   return;
 }
 #if (ESP_IDF_VERSION_MAJOR == 4)
-void IRAM_ATTR rmt_apply_command(StepperQueue *q, bool fill_part_one,
-                                 uint32_t *data) {
+void IRAM_ATTR rmt_apply_command(StepperQueue* q, bool fill_part_one,
+                                 uint32_t* data) {
   if (!fill_part_one) {
     data += PART_SIZE;
   }

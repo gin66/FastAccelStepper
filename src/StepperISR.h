@@ -64,7 +64,7 @@ class StepperQueue {
   uint sm; /* not set in init */
   bool claim_pio_sm(FastAccelStepperEngine* engine);
   void setupSM();
-  int32_t pos_offset; // offset between pico step count and position
+  int32_t pos_offset;  // offset between pico step count and position
   int32_t getCurrentStepCount();
   void attachDirPinToStatemachine();
   void setDirPinState(bool high);
@@ -127,7 +127,8 @@ class StepperQueue {
   uint16_t max_speed_in_ticks =
       TICKS_PER_S / 50000;  // use a default value 50_000 steps/s
 #else
-  uint16_t max_speed_in_ticks = TICKS_PER_S / 1000;  // use a default value 1_000 steps/s
+  uint16_t max_speed_in_ticks =
+      TICKS_PER_S / 1000;  // use a default value 1_000 steps/s
 #endif
   bool init(FastAccelStepperEngine* engine, uint8_t queue_num,
             uint8_t step_pin);

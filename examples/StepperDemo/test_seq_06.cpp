@@ -9,7 +9,7 @@
 #define SPEED_2_US 90
 #define SPEED_HOME_US 100
 
-bool test_seq_06(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_06(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   if (stepper->getPositionAfterCommandsCompleted() > 32000) {
     seq->state = TEST_STATE_ERROR;

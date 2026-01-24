@@ -4,7 +4,7 @@
 // This test sequence is to reproduce issue #103
 
 #if !defined(__AVR_ATmega32U4__)
-bool test_seq_13(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_13(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   AqeResultCode aqe;
   struct stepper_command_s cmd_step = {

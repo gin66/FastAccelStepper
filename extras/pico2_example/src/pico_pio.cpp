@@ -58,7 +58,7 @@ uint32_t stepper_calc_period(bool dir_high, uint8_t steps,
 }
 
 //
-stepper_pio_program *stepper_make_program() {
+stepper_pio_program* stepper_make_program() {
   program.sys_clk = clock_get_hz(clk_sys);
   program.pc = 0;
   // We assume, that isr is cleared on sm start !

@@ -54,7 +54,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   RMT.chnconf0[channel].conf_update_n = 0;
 
   // replace second part of buffer with pauses
-  uint32_t *data = FAS_RMT_MEM(channel);
+  uint32_t* data = FAS_RMT_MEM(channel);
   uint8_t start = both ? 0 : PART_SIZE;
   data = &data[start];
   for (uint8_t i = start; i < 2 * PART_SIZE; i++) {
@@ -94,7 +94,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
       /* second half of buffer sent */                \
       PROBE_2_TOGGLE;                                 \
       /* demonstrate modification of RAM */           \
-      uint32_t *mem = FAS_RMT_MEM(ch);                \
+      uint32_t* mem = FAS_RMT_MEM(ch);                \
       mem[PART_SIZE] = 0x33ff33ff;                    \
       RMT.chn_tx_lim[ch].RMT_LIMIT = PART_SIZE;       \
     } else {                                          \
@@ -108,7 +108,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
 #else
 #define PROCESS_CHANNEL(ch)                               \
   if (mask & RMT_CH##ch##_TX_END_INT_ST) {                \
-    StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch]; \
+    StepperQueue* q = &fas_queue[QUEUES_MCPWM_PCNT + ch]; \
     disable_rmt_interrupts(q->channel);                   \
     q->_isRunning = false;                                \
     PROBE_1_TOGGLE;                                       \
@@ -117,8 +117,8 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   }                                                       \
   if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {          \
     uint8_t old_limit = RMT.chn_tx_lim[ch].RMT_LIMIT;     \
-    StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch]; \
-    uint32_t *mem = FAS_RMT_MEM(ch);                      \
+    StepperQueue* q = &fas_queue[QUEUES_MCPWM_PCNT + ch]; \
+    uint32_t* mem = FAS_RMT_MEM(ch);                      \
     if (old_limit == PART_SIZE + 1) {                     \
       /* second half of buffer sent */                    \
       PROBE_2_TOGGLE;                                     \
@@ -137,7 +137,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   }
 #endif
 
-static void IRAM_ATTR tx_intr_handler(void *arg) {
+static void IRAM_ATTR tx_intr_handler(void* arg) {
   uint32_t mask = RMT.int_st.val;
   RMT.int_clr.val = mask;
   PROCESS_CHANNEL(0);
@@ -227,7 +227,7 @@ bool StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   if (channel == 0) {
     RMT.chnconf0[channel].mem_rd_rst_n = 1;
     RMT.chnconf0[channel].mem_rd_rst_n = 0;
-    uint32_t *mem = FAS_RMT_MEM(channel);
+    uint32_t* mem = FAS_RMT_MEM(channel);
     // Fill the buffer with a significant pattern for debugging
     for (uint8_t i = 0; i < PART_SIZE; i++) {
       *mem++ = 0x7fffffff;
@@ -376,7 +376,7 @@ void StepperQueue::startQueue_rmt() {
   // rmt_rx_stop(channel);
   RMT.chnconf0[channel].mem_rd_rst_n = 1;
   RMT.chnconf0[channel].mem_rd_rst_n = 0;
-  uint32_t *mem = FAS_RMT_MEM(channel);
+  uint32_t* mem = FAS_RMT_MEM(channel);
 // #define TRACE
 #ifdef TRACE
   // Fill the buffer with a significant pattern for debugging

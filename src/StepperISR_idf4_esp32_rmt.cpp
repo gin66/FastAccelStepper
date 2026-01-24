@@ -31,7 +31,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   RMT.conf_ch[channel].conf1.tx_conti_mode = 0;
 
   // replace second part of buffer with pauses
-  uint32_t *data = FAS_RMT_MEM(channel);
+  uint32_t* data = FAS_RMT_MEM(channel);
   uint8_t start = both ? 0 : PART_SIZE;
   data = &data[start];
   for (uint8_t i = start; i < 2 * PART_SIZE; i++) {
@@ -66,7 +66,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
 #define PROCESS_CHANNEL(ch)                                      \
   if (mask & RMT_CH##ch##_TX_END_INT_ST) {                       \
     PROBE_2_TOGGLE;                                              \
-    StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch];        \
+    StepperQueue* q = &fas_queue[QUEUES_MCPWM_PCNT + ch];        \
     if (q->_rmtStopped) {                                        \
       rmt_set_tx_intr_en(q->channel, false);                     \
       rmt_set_tx_thr_intr_en(q->channel, false, PART_SIZE + 1);  \
@@ -78,7 +78,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   }                                                              \
   if (mask & RMT_CH##ch##_TX_THR_EVENT_INT_ST) {                 \
     PROBE_3_TOGGLE;                                              \
-    StepperQueue *q = &fas_queue[QUEUES_MCPWM_PCNT + ch];        \
+    StepperQueue* q = &fas_queue[QUEUES_MCPWM_PCNT + ch];        \
     if (!q->_rmtStopped) {                                       \
       rmt_apply_command(q, true, FAS_RMT_MEM(ch));               \
       /* now repeat the interrupt at buffer size + end marker */ \
@@ -87,7 +87,7 @@ void IRAM_ATTR StepperQueue::stop_rmt(bool both) {
   }
 #endif
 
-static void IRAM_ATTR tx_intr_handler(void *arg) {
+static void IRAM_ATTR tx_intr_handler(void* arg) {
   uint32_t mask = RMT.int_st.val;
   RMT.int_clr.val = mask;
   PROCESS_CHANNEL(0);
@@ -162,7 +162,7 @@ bool StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 
 #ifdef TEST_MODE
   if (channel == 0) {
-    uint32_t *mem = FAS_RMT_MEM(channel);
+    uint32_t* mem = FAS_RMT_MEM(channel);
     // Fill the buffer with a significant pattern for debugging
     for (uint8_t i = 0; i < 32; i += 2) {
       *mem++ = 0x7fffffff;
@@ -257,7 +257,7 @@ void StepperQueue::startQueue_rmt() {
   // rmt_tx_memory_reset(channel);
   // the following assignment should not be needed;
   // RMT.data_ch[channel] = 0;
-  uint32_t *mem = FAS_RMT_MEM(channel);
+  uint32_t* mem = FAS_RMT_MEM(channel);
   // Fill the buffer with a significant pattern for debugging
   // Keep it for now
   for (uint8_t i = 0; i < 2 * PART_SIZE; i += 2) {

@@ -199,8 +199,8 @@ struct ramp_config_s {
           log2_multiply(log2_steps, parameters.log2_accel);
       pmf_logarithmic log2_sqrt_steps_mul_accel =
           log2_sqrt(log2_steps_mul_accel);
-      pmf_logarithmic log2_res =
-          log2_divide(LOG2_TICKS_PER_S_DIV_SQRT_OF_2, log2_sqrt_steps_mul_accel);
+      pmf_logarithmic log2_res = log2_divide(LOG2_TICKS_PER_S_DIV_SQRT_OF_2,
+                                             log2_sqrt_steps_mul_accel);
       uint32_t res = log2_to_u32(log2_res);
       return res;
     }

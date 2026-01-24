@@ -8,7 +8,7 @@
 #define stepPinStepper 17
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper = NULL;
+FastAccelStepper* stepper = NULL;
 
 void setup() {
   printf("START\n");

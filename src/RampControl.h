@@ -74,6 +74,6 @@ class NextCommand {
 };
 
 void init_ramp_module();
-void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
-                     const struct queue_end_s *queue_end, NextCommand *command);
+void _getNextCommand(const struct ramp_ro_s* ramp, const struct ramp_rw_s* rw,
+                     const struct queue_end_s* queue_end, NextCommand* command);
 #endif

@@ -34,22 +34,21 @@ static void add_step(uint instruction) {
 //         Combined: (27+3*period)*loop_cnt = cycles per cmd
 //
 // from test on rp2040 and rp2350 hw the loop overhead is 26 and not 27
-// 
-#define LOOP_OVERHEAD 26
-#define LOOP_CYCLES   3
 //
-uint32_t pio_calc_loops(uint8_t steps,
-                             uint16_t cycles_in_16th_us,
-                            uint16_t *adjust_80MHz) {
+#define LOOP_OVERHEAD 26
+#define LOOP_CYCLES 3
+//
+uint32_t pio_calc_loops(uint8_t steps, uint16_t cycles_in_16th_us,
+                        uint16_t* adjust_80MHz) {
   uint32_t cycles_in_80MHz = cycles_in_16th_us;
   // should be yielding multiplication with 5
-  cycles_in_80MHz *= program.sys_clk/1000000;
-  cycles_in_80MHz /= 16000000/1000000;
+  cycles_in_80MHz *= program.sys_clk / 1000000;
+  cycles_in_80MHz /= 16000000 / 1000000;
   if (steps > 1) {
     cycles_in_80MHz *= steps;
   }
   cycles_in_80MHz += *adjust_80MHz;
-  uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
+  uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps;  // pause or steps
   uint32_t loops = cycles_in_80MHz;
   loops /= loop_cnt;
   loops -= LOOP_OVERHEAD;
@@ -63,15 +62,16 @@ uint32_t pio_calc_loops(uint8_t steps,
   return loops;
 }
 uint32_t pio_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps,
-                                 uint32_t loops) {
-  //uint32_t period = stepper_calc_period(steps, cycles_16th_us);
-  uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps; // pause or steps
+                             uint32_t loops) {
+  // uint32_t period = stepper_calc_period(steps, cycles_16th_us);
+  uint16_t loop_cnt = steps == 0 ? 1 : 2 * (uint16_t)steps;  // pause or steps
   uint32_t entry =
       (loops << 11) | (count_up ? 1024 : 0) | (dir_high ? 512 : 0) | loop_cnt;
-  //char out[200];
-  //sprintf(out, "stepper_make_fifo_entry: dir_high: %d, count_up: %d, steps: %d, loop_cnt: %d, entry: 0x%08X",
-  //       dir_high, count_up, steps, loop_cnt, entry);
-  //Serial.println(out);
+  // char out[200];
+  // sprintf(out, "stepper_make_fifo_entry: dir_high: %d, count_up: %d, steps:
+  // %d, loop_cnt: %d, entry: 0x%08X",
+  //        dir_high, count_up, steps, loop_cnt, entry);
+  // Serial.println(out);
   return entry;
 }
 

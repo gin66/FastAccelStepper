@@ -1,6 +1,6 @@
 #include "test_seq.h"
 
-bool test_seq_09(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_09(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   switch (seq->state) {
     case 0:  // INIT

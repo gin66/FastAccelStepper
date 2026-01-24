@@ -73,7 +73,7 @@ void RampGenerator::_startMove(bool position_changed) {
 }
 
 MoveResultCode RampGenerator::moveTo(int32_t position,
-                                     const struct queue_end_s *queue_end) {
+                                     const struct queue_end_s* queue_end) {
   MoveResultCode res = _parameters.checkValidConfig();
   if (res != MOVE_OK) {
     return res;
@@ -104,7 +104,7 @@ void RampGenerator::advanceTargetPosition(int32_t delta) {
   _ro.target_pos += delta;
 }
 
-void RampGenerator::afterCommandEnqueued(const NextCommand *command) {
+void RampGenerator::afterCommandEnqueued(const NextCommand* command) {
 #ifdef TEST
   printf(
       "after Command Enqueued: performed ramp up steps = %u, pause left = %u, "
@@ -114,8 +114,8 @@ void RampGenerator::afterCommandEnqueued(const NextCommand *command) {
 #endif
   _rw = command->rw;
 }
-void RampGenerator::getNextCommand(const struct queue_end_s *queue_end,
-                                   NextCommand *command) {
+void RampGenerator::getNextCommand(const struct queue_end_s* queue_end,
+                                   NextCommand* command) {
   // we are running in higher priority than the application
   // so we can just read the config without disable interrupts
   // copy consistent ramp state

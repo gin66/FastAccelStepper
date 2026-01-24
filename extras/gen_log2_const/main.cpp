@@ -3,7 +3,7 @@
 
 #include <Log2Representation.h>
 
-void out(const char *name, float x, pmf_logarithmic value) {
+void out(const char* name, float x, pmf_logarithmic value) {
   float ld2 = log2(x);
   float pmf = ld2 * 512;
   int16_t pmf_int = (uint16_t)round(pmf);

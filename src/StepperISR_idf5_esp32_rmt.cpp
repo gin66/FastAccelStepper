@@ -6,9 +6,9 @@
 #include "fas_arch/test_probe.h"
 
 static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
-                                 const rmt_tx_done_event_data_t *edata,
-                                 void *user_ctx) {
-  StepperQueue *q = (StepperQueue *)user_ctx;
+                                 const rmt_tx_done_event_data_t* edata,
+                                 void* user_ctx) {
+  StepperQueue* q = (StepperQueue*)user_ctx;
   q->_isRunning = false;
   return false;
 }
@@ -27,15 +27,15 @@ static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
     symbols->val = 0x00010000 * first_ticks + remaining_ticks;      \
   }
 
-static size_t IRAM_ATTR encode_commands(const void *data, size_t data_size,
+static size_t IRAM_ATTR encode_commands(const void* data, size_t data_size,
                                         size_t symbols_written,
                                         size_t symbols_free,
-                                        rmt_symbol_word_t *symbols, bool *done,
-                                        void *arg) {
+                                        rmt_symbol_word_t* symbols, bool* done,
+                                        void* arg) {
   // this printf causes Guru Meditation
   // printf("encode commands\n");
 
-  StepperQueue *q = (StepperQueue *)arg;
+  StepperQueue* q = (StepperQueue*)arg;
 
   *done = false;
   if (symbols_free < PART_SIZE) {
@@ -108,8 +108,8 @@ void StepperQueue::connect_rmt() {
   config.intr_priority = 0;
   config.flags.invert_out = 0;
   config.flags.with_dma = 0;
-  //config.flags.io_loop_back = 0;
-  //config.flags.io_od_mode = 0;
+  // config.flags.io_loop_back = 0;
+  // config.flags.io_od_mode = 0;
   esp_err_t rc = rmt_new_tx_channel(&config, &channel);
   ESP_ERROR_CHECK_WITHOUT_ABORT(rc);
 
@@ -171,14 +171,14 @@ void StepperQueue::startQueue_rmt() {
   }
 
 #ifdef TRACE
-  queue_entry *e = &entry[rp & QUEUE_LEN_MASK];
+  queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
   printf("first command: ticks=%u steps=%u %s %s\n", e->ticks, e->steps,
          e->countUp ? "up" : "down", e->toggle_dir ? "toggle" : "");
 #endif
 
-  //if (_channel_enabled) {
-    //	rmt_disable(channel);
-    //	_channel_enabled = false;
+  // if (_channel_enabled) {
+  //	rmt_disable(channel);
+  //	_channel_enabled = false;
   //}
 
   lastChunkContainsSteps = false;

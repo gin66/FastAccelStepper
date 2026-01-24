@@ -18,7 +18,7 @@ class RampChecker {
   uint32_t pos;
   uint32_t ticks_since_last_step;
   float avg_accel;
-  FILE *gp_file;
+  FILE* gp_file;
   char filename[100];
 
   void next_ramp() {
@@ -41,7 +41,7 @@ class RampChecker {
     pos = 0;
     next_ramp();
   }
-  void start_plot(char *fname) {
+  void start_plot(char* fname) {
     int n = strlen(fname) - 8;  // remove .gnuplot
     strncpy(filename, fname, n);
     filename[n] = 0;
@@ -69,7 +69,7 @@ class RampChecker {
       gp_file = NULL;
     }
   }
-  void check_section(struct queue_entry *e) {
+  void check_section(struct queue_entry* e) {
     uint8_t steps = e->steps;
     if (steps == 0) {
       // Just a pause

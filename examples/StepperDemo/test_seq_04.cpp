@@ -2,7 +2,7 @@
 
 // u32_1 shall be number of steps
 
-bool test_seq_04(FastAccelStepper *stepper, struct test_seq_s *seq,
+bool test_seq_04(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
   stepper->setSpeedInUs(40);
   stepper->setAcceleration(100000);

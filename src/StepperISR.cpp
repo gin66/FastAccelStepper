@@ -140,7 +140,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 
 #if defined(SUPPORT_RP_PICO)
 int32_t StepperQueue::getCurrentPosition() {
-   return getCurrentStepCount() + pos_offset;
+  return getCurrentStepCount() + pos_offset;
 }
 #endif
 

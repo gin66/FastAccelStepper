@@ -58,9 +58,9 @@ void print_ramp_state(uint8_t this_state) {
 #endif
 
 //*************************************************************************************************
-void _getNextCommand(const struct ramp_ro_s *ramp, const struct ramp_rw_s *rw,
-                     const struct queue_end_s *queue_end,
-                     NextCommand *command) {
+void _getNextCommand(const struct ramp_ro_s* ramp, const struct ramp_rw_s* rw,
+                     const struct queue_end_s* queue_end,
+                     NextCommand* command) {
   {
     // If there is a pause from last step, then just output a pause
     uint32_t pause_ticks = rw->pause_ticks_left;

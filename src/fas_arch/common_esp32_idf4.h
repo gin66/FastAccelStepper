@@ -103,7 +103,7 @@
 #include <soc/rmt_struct.h>
 
 #define RMT_CHANNEL_T rmt_channel_t
-#define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
+#define FAS_RMT_MEM(channel) ((uint32_t*)RMTMEM.chan[channel].data32)
 
 // PART_SIZE shall be even.
 #define PART_SIZE (((RMT_SIZE - 1) / 4) << 1)

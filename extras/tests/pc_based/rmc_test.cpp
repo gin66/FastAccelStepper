@@ -22,7 +22,7 @@ int main() {
 
   char fname[100];
   snprintf(fname, 100, "ramp.gnuplot");
-  FILE *gp_file = fopen(fname, "w");
+  FILE* gp_file = fopen(fname, "w");
   fprintf(gp_file, "$data <<EOF\n");
 
   uint64_t sum_ticks = 0;
