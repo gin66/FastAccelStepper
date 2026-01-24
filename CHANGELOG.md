@@ -1,3 +1,6 @@
+0.33.10:
+- pico: fix issue as reported in #343. Apparently digitalRead()-library implementation has changed.
+
 0.33.9:
 - pico: stabilize stepper frequency by time compensation and fix calculation
 - pico: retry claiming of new state machine on failure

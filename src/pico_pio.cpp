@@ -69,8 +69,8 @@ uint32_t pio_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps,
   uint32_t entry =
       (loops << 11) | (count_up ? 1024 : 0) | (dir_high ? 512 : 0) | loop_cnt;
   //char out[200];
-  //sprintf(out, "stepper_make_fifo_entry: dir_high: %d, count_up: %d, steps: %d, cycles_16th_us: %d, period: %d, loop_cnt: %d, entry: 0x%08X",
-  //       dir_high, count_up, steps, cycles_16th_us, period, loop_cnt, entry);
+  //sprintf(out, "stepper_make_fifo_entry: dir_high: %d, count_up: %d, steps: %d, loop_cnt: %d, entry: 0x%08X",
+  //       dir_high, count_up, steps, loop_cnt, entry);
   //Serial.println(out);
   return entry;
 }

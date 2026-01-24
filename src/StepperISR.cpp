@@ -66,7 +66,11 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
     if ((isQueueEmpty() && !isRunning()) &&
         ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
       // set the dirPin here. Necessary with shared direction pins
+#if defined(SUPPORT_RP_PICO)
+      gpio_put(dirPin, dir);
+#else
       digitalWrite(dirPin, dir);
+#endif
 #ifdef ARDUINO_ARCH_SAM
       delayMicroseconds(30);  // Make sure the driver has enough time to see
                               // the dir pin change
