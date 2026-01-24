@@ -28,9 +28,21 @@ bool StepperQueue::init(FastAccelStepperEngine *engine, uint8_t queue_num,
 
 void StepperQueue::attachDirPinToStatemachine() {
   if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
+    // according to (some) documentation state machine should not be enabled
     pio_sm_set_set_pins(pio, sm, dirPin, 1);  // Direction pin via set
     pio_sm_set_consecutive_pindirs(pio, sm, dirPin, 1, true);
     pio_gpio_init(pio, dirPin);
+  }
+}
+
+void StepperQueue::setDirPinState(bool high) {
+
+  if ((dirPin != PIN_UNDEFINED) && ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
+    //Serial.print("Set dir pin ");
+    //Serial.print(dirPin);
+    //Serial.print(" to ");
+    //Serial.println(high ? "HIGH" : "LOW");
+    pio_sm_exec(pio, sm, pio_encode_set(pio_pins, high ? 1 : 0));
   }
 }
 

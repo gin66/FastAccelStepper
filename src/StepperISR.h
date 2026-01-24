@@ -67,6 +67,7 @@ class StepperQueue {
   int32_t pos_offset; // offset between pico step count and position
   int32_t getCurrentStepCount();
   void attachDirPinToStatemachine();
+  void setDirPinState(bool high);
 #endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;

@@ -67,7 +67,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
         ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
       // set the dirPin here. Necessary with shared direction pins
 #if defined(SUPPORT_RP_PICO)
-      gpio_put(dirPin, dir);
+      setDirPinState(dir);
 #else
       digitalWrite(dirPin, dir);
 #endif
