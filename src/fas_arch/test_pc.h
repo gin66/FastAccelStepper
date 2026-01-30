@@ -26,7 +26,9 @@
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define QUEUE_LEN 16
-#define PART_SIZE 31
+#ifndef PART_SIZE
+#define PART_SIZE debug_part_size
+#endif
 
 // timing definitions for pc-based testing
 #define TICKS_PER_S 16000000L

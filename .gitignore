@@ -38,3 +38,4 @@ examples
 extras/gen_log2_const/Log2Representation.cpp
 extras/gen_log2_const/main
 extras/tests/simavr_based/.fas
+extras/tests/pc_based/ramp_helper

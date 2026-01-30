@@ -3,6 +3,9 @@
 #include <stdlib.h>
 #include <inttypes.h>
 
+// Define debug_part_size before including any headers
+uint16_t debug_part_size = 31;  // Default for PC tests
+
 #include "FastAccelStepper.h"
 // #include "StepperISR.h"
 

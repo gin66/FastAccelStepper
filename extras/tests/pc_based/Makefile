@@ -12,6 +12,12 @@ test: $(TESTS) log2_test rmc_test
 	rm -f test.log
 	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
 
+ramp_helper: ramp_helper.o $(LIB_O)
+	gcc -o $@ $< $(LIB_O) $(LDLIBS)
+
+ramp_helper.o: ramp_helper.cpp $(SRC_LIB_H) stubs.h
+	g++ -c $(CXXFLAGS) -o $@ $<
+
 LIB_H=FastAccelStepper.h Log2Representation.h StepperISR.h \
 	  RampGenerator.h RampControl.h RampCalculator.h \
 	  fas_arch/common.h
