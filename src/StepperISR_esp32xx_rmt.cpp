@@ -111,7 +111,7 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
       uint8_t steps_to_do = steps;
       if (steps > PART_SIZE) {
         steps_to_do = PART_SIZE;
-        if (steps_to_do > PART_SIZE) {
+        if (steps > PART_SIZE) {
           steps_to_do >>= 1;
         }
       }
