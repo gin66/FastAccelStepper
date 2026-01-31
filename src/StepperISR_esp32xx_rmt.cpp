@@ -72,9 +72,9 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
     uint32_t last_entry;
     q->lastChunkContainsSteps = false;
     for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
-      // two pauses à 4 ticks
-      *data++ = 0x00020002;
-      ticks -= 4;
+      // two pauses à 8 ticks
+      *data++ = 0x00040004;
+      ticks -= 8;
     }
     uint16_t ticks_l = ticks >> 1;
     uint16_t ticks_r = ticks - ticks_l;
@@ -147,10 +147,10 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
           uint16_t ticks_low = ticks - ticks_high;
           while (true) {
             // need i+1, because low entry is still needed
-            if ((ticks_high >= 8) && (i + 1 < extend_to_i)) {
-              *data++ = 0x80028002;
+            if ((ticks_high >= 12) && (i + 1 < extend_to_i)) {
+              *data++ = 0x80048004;
               i++;
-              ticks_high -= 4;
+              ticks_high -= 8;
             } else {
               uint32_t entry = ticks_high >> 1;
               entry <<= 16;
@@ -161,10 +161,10 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
             }
           }
           while (true) {
-            if ((ticks_low >= 8) && (i < extend_to_i)) {
-              *data++ = 0x00020002;
+            if ((ticks_low >= 12) && (i < extend_to_i)) {
+              *data++ = 0x00040004;
               i++;
-              ticks_low -= 4;
+              ticks_low -= 8;
             } else {
               // #325: esp32c3 has frozen with one step and ticks ~38600
               //       now the last entry is balanced instead of long pause and
