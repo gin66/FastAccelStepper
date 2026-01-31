@@ -43,23 +43,30 @@
 
 #include <thread>
 #include <driver/uart.h>
+#include <driver/uart_vfs.h>
 #include <esp_timer.h>
 #include <cstring>
 #include <cinttypes>
 
 const uart_port_t uart_num = UART_NUM_0;
 
-#define PRINT_INIT()
-#ifdef OLD
-uart_config_t config;
-config.baud_rate = 115200;
-config.data_bits = UART_DATA_8_BITS;
-config.parity = UART_PARITY_DISABLE;
-config.stop_bits = UART_STOP_BITS_1;
-config.flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS;
-config.rx_flow_ctrl_thresh = 122;
-uart_param_config(uart_num, &config);
-#endif
+#define PRINT_INIT()                                     \
+  {                                                      \
+    if (!uart_is_driver_installed(uart_num)) {           \
+      uart_config_t config = {                           \
+          .baud_rate = 115200,                           \
+          .data_bits = UART_DATA_8_BITS,                 \
+          .parity = UART_PARITY_DISABLE,                 \
+          .stop_bits = UART_STOP_BITS_1,                 \
+          .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,         \
+          .rx_flow_ctrl_thresh = 0,                      \
+          .source_clk = UART_SCLK_DEFAULT,               \
+      };                                                 \
+      uart_param_config(uart_num, &config);              \
+      uart_driver_install(uart_num, 256, 0, 0, NULL, 0); \
+    }                                                    \
+    uart_vfs_dev_use_driver(uart_num);                   \
+  }
 
 #define PRINTLN puts
 #define PRINTU8(v) printf("%u", v)
@@ -69,21 +76,14 @@ uart_param_config(uart_num, &config);
 #define PRINTI32(v) printf("%" PRIi32, v)
 #define PRINTCH(ch) printf("%c", ch)
 #define PRINT(s) printf("%s", s)
-#define POLL_CHAR_IF_ANY(ch) \
-  {                          \
-    uint8_t _ch = getchar(); \
-    if (_ch != 255) {        \
-      ch = _ch;              \
-    }                        \
+#define POLL_CHAR_IF_ANY(ch)                       \
+  {                                                \
+    uint8_t _ch;                                   \
+    int n = uart_read_bytes(uart_num, &_ch, 1, 0); \
+    if (n == 1) {                                  \
+      ch = _ch;                                    \
+    }                                              \
   }
-#ifdef OLD
-#define POLL_CHAR_IF_ANY(ch)                     \
-  uint8_t _ch;                                   \
-  int n = uart_read_bytes(uart_num, &_ch, 1, 0); \
-  if (n == 1) {                                  \
-    ch = _ch;                                    \
-  }
-#endif
 #define MILLIS() (esp_timer_get_time() / 1000)
 #define DELAY_US(v) std::this_thread::sleep_for(std::chrono::microseconds(v))
 #define DELAY_MS(v) vTaskDelay(pdMS_TO_TICKS(v))

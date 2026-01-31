@@ -125,7 +125,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
 #elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 // Example hardware configuration for esp32 board.
 // Please adapt to your configuration
-#ifdef CONFIG_IDF_TARGET_ESP32C3
+#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
 const uint8_t led_pin = 8;
 #else
 const uint8_t led_pin = PIN_UNDEFINED;
@@ -143,7 +143,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
     //                          ALL Enable: Right Pin 1 GPIO23
     // Left Pin 15: +5V
 // clang-format on
-#ifdef CONFIG_IDF_TARGET_ESP32C3
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
     {
       step : 6,
       enable_low_active : PIN_UNDEFINED,
@@ -160,6 +160,29 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
       direction : PIN_UNDEFINED,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 500,
+      off_delay_ms : 1000
+    }
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+    {
+      step : 6,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 7,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 50,
+      off_delay_ms : 1000
+    },
+    {
+      step : 15,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
@@ -465,7 +488,7 @@ const struct stepper_config_s stepper_config[12] = {
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper *stepper[MAX_STEPPER];
+FastAccelStepper* stepper[MAX_STEPPER];
 
 enum { normal, test, config } mode = normal;
 bool test_ongoing = false;
@@ -897,7 +920,7 @@ void setDirectionPin(uint8_t direction, bool polarity) {
     }
   }
 }
-void test_direct_drive(const struct stepper_config_s *stepper) {
+void test_direct_drive(const struct stepper_config_s* stepper) {
   // Check stepper motor+driver is operational
   // This is not done via FastAccelStepper-Library for test purpose only
   uint8_t step = stepper->step;
@@ -989,14 +1012,15 @@ void setup() {
   // Alternatively use e.g. M1 T by serial command
   // test_direct_drive(&stepper_config[0]);
 
+  // delay(10000);
   engine.init();
   if (led_pin != PIN_UNDEFINED) {
     engine.setDebugLed(led_pin);
   }
 
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper *s = NULL;
-    const struct stepper_config_s *config = &stepper_config[i];
+    FastAccelStepper* s = NULL;
+    const struct stepper_config_s* config = &stepper_config[i];
     if (config->step != PIN_UNDEFINED) {
       s = engine.stepperConnectToPin(config->step);
       if (s) {
@@ -1016,10 +1040,10 @@ void setup() {
 }
 
 #ifdef SIM_TEST_INPUT
-const char *input = SIM_TEST_INPUT
+const char* input = SIM_TEST_INPUT
     " ";  // final space is too easy forgotten in platformio.ini test
 #else
-const char *input = NULL;
+const char* input = NULL;
 #endif
 uint8_t write_ptr = 0;
 uint8_t read_ptr = 0;
@@ -1039,7 +1063,7 @@ bool simulate_digitalRead_error = false;
 #endif
 bool simulate_blocked_ISR = false;
 
-void info(FastAccelStepper *s, bool long_info) {
+void info(FastAccelStepper* s, bool long_info) {
   PRINTCH('@');
 #if defined(SUPPORT_ESP32_PULSE_COUNTER)
   if (s->pulseCounterAttached()) {
@@ -1196,8 +1220,8 @@ void esp_reset() {
 #define MODE(mode, CMD) ((mode << 8) + CMD)
 
 int32_t val_n[3];
-int8_t get_val1_val2_val3(char *cmd) {
-  char *endptr;
+int8_t get_val1_val2_val3(char* cmd) {
+  char* endptr;
   for (uint8_t i = 0; i < 3; i++) {
     val_n[i] = strtol(cmd, &endptr, 10);
     if (endptr == cmd) {
@@ -1214,10 +1238,10 @@ int8_t get_val1_val2_val3(char *cmd) {
   return -1;
 }
 
-bool process_cmd(char *cmd) {
-  FastAccelStepper *stepper_selected = stepper[selected];
+bool process_cmd(char* cmd) {
+  FastAccelStepper* stepper_selected = stepper[selected];
   uint16_t s = *cmd++;
-  char *endptr;
+  char* endptr;
   int8_t res;
   int8_t gv;
   switch (MODE(mode, s)) {
@@ -1385,7 +1409,8 @@ bool process_cmd(char *cmd) {
         output_msg(MSG_SET_ACCELERATION_TO);
         PRINTI32(val_n[0]);
         PRINTLN("");
-        res = static_cast<int8_t>(stepper_selected->moveByAcceleration(val_n[0]));
+        res =
+            static_cast<int8_t>(stepper_selected->moveByAcceleration(val_n[0]));
         output_msg(MSG_MOVE_OK + res);
         return true;
       }
@@ -1674,7 +1699,7 @@ bool process_cmd(char *cmd) {
     case MODE(test, '0'):
     case MODE(test, '1'):
       for (uint8_t i = 0; i < NUM_TEST_SEQUENCE; i++) {
-        const struct test_seq_def_s *ts = &test_sequence[i];
+        const struct test_seq_def_s* ts = &test_sequence[i];
         if (strcmp(out_buffer, ts->code) == 0) {
           output_msg(MSG_SELECT_TEST_SEQUENCE);
           PRINTLN(out_buffer);
@@ -1763,7 +1788,7 @@ void loop() {
     if (test_ongoing) {
       bool finished = true;
       for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-        struct test_seq_s *s = &test_seq[i];
+        struct test_seq_s* s = &test_seq[i];
         if ((s->test != NULL) && (s->state != TEST_STATE_ERROR)) {
           bool res = s->test(stepper[i], &test_seq[i], ms);
           if (res) {
@@ -1777,7 +1802,7 @@ void loop() {
         bool test_failed = false;
         stepper_info();
         for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-          struct test_seq_s *s = &test_seq[i];
+          struct test_seq_s* s = &test_seq[i];
           s->test = NULL;
           if (s->state == TEST_STATE_ERROR) {
             test_failed = true;
