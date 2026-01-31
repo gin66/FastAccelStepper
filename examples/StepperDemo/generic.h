@@ -61,6 +61,7 @@ const uart_port_t uart_num = UART_NUM_0;
           .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,         \
           .rx_flow_ctrl_thresh = 0,                      \
           .source_clk = UART_SCLK_DEFAULT,               \
+          .flags = 0,                                    \
       };                                                 \
       uart_param_config(uart_num, &config);              \
       uart_driver_install(uart_num, 256, 0, 0, NULL, 0); \

@@ -1,3 +1,9 @@
+0.33.12:
+- esp32: change minimum period to 4 from 2 in order to fix #306
+- esp32: fix error in esp32xx_rmt
+- StepperDemo: modify for esp32C6 using espidf
+- test_18: add command line switch for RMT symbol dumping
+
 0.33.11:
 - pico: introduce setDirPinState() for #343 avoiding gpio writes to direction pin altogether.
 

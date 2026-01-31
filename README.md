@@ -183,7 +183,6 @@ Comments to pin sharing:
 * allows up to 200000 generated steps per second ?
 * supports up to four stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
 * Steppers' command queue depth: 32
-* untested
 
 ### Raspberry pi pico/pico 2
 
@@ -191,7 +190,6 @@ Comments to pin sharing:
 * In theory supports up to eight stepper motors for pico and twelve stepper motors for pico 2. Using arduino framework and arm core, only four for pico and eight for pico 2 can be allocated. riscv should be able to allocate all steppers.
 * Steppers' command queue depth: 32
 * beta status !!!!
-* untested and currently only one stepper tried
 
 ### Atmel SAM Due
 
