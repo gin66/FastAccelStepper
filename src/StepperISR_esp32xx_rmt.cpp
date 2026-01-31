@@ -1,6 +1,10 @@
 #include "StepperISR.h"
 #if defined(SUPPORT_ESP32_RMT)
 
+#if (PART_SIZE & 1) != 0
+#error "PART_SIZE must be even"
+#endif
+
 // #define TEST_MODE
 
 #include "fas_arch/test_probe.h"

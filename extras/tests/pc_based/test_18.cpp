@@ -190,12 +190,16 @@ QueueCommand cmd_ramp_500us_step_pause[] = {
 QueueCommand cmd_single_step_8000[] = {{1, 8000}};
 QueueCommand cmd_multi_step_8000[] = {{10, 8000}};
 
+QueueCommand cmd_1000us_period[] = {{1, 16000}};
+QueueCommand cmd_999us_period[] = {{1, 15984}};
+
 bool run_tests() {
   printf("\n=== Testing with PART_SIZE=%u ===\n", debug_part_size);
   printf("MIN_CMD_TICKS=%ld, TICKS_PER_S=%ld\n\n", MIN_CMD_TICKS, TICKS_PER_S);
 
   RmtBufferTest test;
   bool all_passed = true;
+  int fail_count = 0;
 
   TestCase cases[] = {
       {"Single step 16000 ticks (1000us)", cmd_single_step_16000, 1, 1, 16000},
@@ -212,6 +216,8 @@ bool run_tests() {
       {"Ramp 2000us (from ramp_helper)", cmd_ramp_2000us, 5, 5, 171424},
       {"Ramp 500us step+pause (from ramp_helper)", cmd_ramp_500us_step_pause,
        15, 10, 794304},
+      {"1000us period (16000 ticks)", cmd_1000us_period, 1, 1, 16000},
+      {"999us period (15984 ticks)", cmd_999us_period, 1, 1, 15984},
   };
 
   int num_cases = sizeof(cases) / sizeof(cases[0]);
@@ -254,11 +260,55 @@ bool run_tests() {
     printf("\n");
   }
 
+  printf("\n=== Detailed Analysis: 1000us vs 999us Period Issue ===\n\n");
+
+  // Test 1000us (16000 ticks) vs 999us (15984 ticks)
+  uint16_t period_ticks[] = {16000, 15984};
+  const char* period_names[] = {"1000us (16000 ticks)", "999us (15984 ticks)"};
+
+  for (int p = 0; p < 2; p++) {
+    uint16_t ticks = period_ticks[p];
+    printf("Testing %s:\n", period_names[p]);
+    printf("  Command: steps=1, ticks=%u\n", ticks);
+
+    test.init_queue();
+    test.add_command(1, ticks);
+
+    // Print queue state before processing
+    printf("  Queue before processing:\n");
+    printf("    read_idx=%u, next_write_idx=%u\n", fas_queue[0].read_idx,
+           fas_queue[0].next_write_idx);
+    printf("    entry[0]: steps=%u, ticks=%u\n", fas_queue[0].entry[0].steps,
+           fas_queue[0].entry[0].ticks);
+
+    test.process_all();
+
+    // Print RMT symbols
+    printf("  RMT symbols generated:\n");
+    test.dump_rmt(50);
+
+    RmtAnalysis result = test.analyze();
+
+    printf("  Analysis:\n");
+    printf("    Steps: %" PRIu32 " (expected 1) %s\n", result.step_count,
+           result.step_count == 1 ? "OK" : "FAIL");
+    printf("    Ticks: %" PRIu64 " (expected %u) %s\n", result.total_ticks,
+           ticks, result.total_ticks == ticks ? "OK" : "FAIL");
+    printf("    High/Low: %" PRIu32 "/%" PRIu32 " ticks\n",
+           result.total_high_ticks, result.total_low_ticks);
+    printf("    Min symbol: %u ticks\n", result.min_symbol_period);
+
+    if (result.step_count != 1 || result.total_ticks != ticks) {
+      all_passed = false;
+      fail_count++;
+    }
+    printf("\n");
+  }
+
   printf("=== Part 2: Step count limits (0-255 steps) ===\n\n");
 
   uint16_t test_ticks[] = {MIN_CMD_TICKS, 16000, 32000, 65535};
   int num_ticks = sizeof(test_ticks) / sizeof(test_ticks[0]);
-  int fail_count = 0;
 
   for (int t = 0; t < num_ticks; t++) {
     uint16_t ticks = test_ticks[t];
@@ -408,7 +458,7 @@ bool run_tests() {
 int main() {
   printf("=== RMT Fill Buffer Test with Multiple PART_SIZE Values ===\n");
 
-  uint16_t part_sizes[] = {22, 23, 24, 30, 31, 32};
+  uint16_t part_sizes[] = {22, 24, 30, 32};
   int num_part_sizes = sizeof(part_sizes) / sizeof(part_sizes[0]);
 
   bool all_passed = true;
