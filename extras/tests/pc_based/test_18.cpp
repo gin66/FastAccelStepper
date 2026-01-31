@@ -1,10 +1,9 @@
 #include <assert.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <inttypes.h>
 
-// Define debug_part_size before including any headers
-uint16_t debug_part_size = 31;  // Default for PC tests
+uint16_t debug_part_size = 24;
 
 #include "FastAccelStepper.h"
 
@@ -21,230 +20,422 @@ void interrupts() {}
 
 StepperQueue fas_queue[NUM_QUEUES];
 
-struct Esp32C6TestCase {
-  uint32_t speed_us;
-  uint32_t steps;
-  const char* description;
-  bool expect_pulses;
-  uint32_t expected_min_period_ticks;
-  uint32_t expected_max_period_ticks;
+#define QUEUE_SIZE 32
+#define MAX_RMT_ENTRIES 8192
+
+struct QueueCommand {
+  uint8_t steps;
+  uint16_t ticks;
 };
 
-class FastAccelStepperEsp32C6Test {
+struct RmtAnalysis {
+  uint32_t step_count;
+  uint64_t total_ticks;
+  uint16_t min_symbol_period;
+  uint32_t total_high_ticks;
+  uint32_t total_low_ticks;
+};
+
+static uint32_t global_rmt_entries[MAX_RMT_ENTRIES];
+
+class RmtBufferTest {
  public:
-  uint32_t offset;
-  uint32_t rmt_entries[100000];
+  uint32_t* rmt_entries;
+  uint32_t rmt_offset;
+
+  RmtBufferTest() : rmt_entries(global_rmt_entries), rmt_offset(0) {}
 
   void init_queue() {
     fas_queue[0].read_idx = 0;
     fas_queue[0].next_write_idx = 0;
+    fas_queue[0].lastChunkContainsSteps = false;
+    rmt_offset = 0;
   }
 
-  bool test_speed_range(Esp32C6TestCase tc) {
-    printf("Testing ESP32-C6 timing: %s (%" PRIu32 "us speed, %" PRIu32
-           " steps)\n",
-           tc.description, tc.speed_us, tc.steps);
-    init_queue();
-    offset = 0;
-    FastAccelStepper s = FastAccelStepper();
-    s.init(NULL, 0, 0);
-    assert(0 == s.getCurrentPosition());
-
-    s.setSpeedInUs(tc.speed_us);
-    s.setAcceleration(10000000);  // High acceleration for immediate speed
-
-    // Generate steps
-    for (uint32_t i = 0; i < tc.steps; i++) {
-      if (!s.isQueueEmpty()) {
-        if (offset + PART_SIZE > sizeof(rmt_entries) / sizeof(rmt_entries[0])) {
-          printf("RMT buffer overflow\n");
-          return false;
-        }
-        rmt_fill_buffer(&fas_queue[0], true, &rmt_entries[offset]);
-        offset += PART_SIZE;
-      }
-
-      // Add a single step command
-      struct queue_entry* e =
-          &fas_queue[0].entry[fas_queue[0].next_write_idx & QUEUE_LEN_MASK];
-      e->steps = 1;
-      e->ticks = (TICKS_PER_S * tc.speed_us) / 1000000;
-      e->toggle_dir = 0;
-      fas_queue[0].next_write_idx++;
-    }
-
-    // Flush remaining buffer
-    while (!s.isQueueEmpty()) {
-      if (offset + PART_SIZE > sizeof(rmt_entries) / sizeof(rmt_entries[0])) {
-        printf("RMT buffer overflow\n");
-        return false;
-      }
-      rmt_fill_buffer(&fas_queue[0], true, &rmt_entries[offset]);
-      offset += PART_SIZE;
-    }
-
-    return analyze_rmt_output(tc);
+  void add_command(uint8_t steps, uint16_t ticks) {
+    uint8_t idx = fas_queue[0].next_write_idx & QUEUE_LEN_MASK;
+    fas_queue[0].entry[idx].steps = steps;
+    fas_queue[0].entry[idx].ticks = ticks;
+    fas_queue[0].entry[idx].toggle_dir = 0;
+    fas_queue[0].entry[idx].repeat_entry = 0;
+    fas_queue[0].next_write_idx++;
   }
 
-  bool analyze_rmt_output(Esp32C6TestCase tc) {
-    printf("RMT entries generated: %d\n", offset);
-    uint64_t total_ticks = 0;
-    uint32_t steps_found = 0;
-    uint32_t last_step_tick = 0;
-    uint32_t min_period = UINT32_MAX;
-    uint32_t max_period = 0;
+  void fill_commands(const QueueCommand* commands, uint32_t count) {
+    for (uint32_t i = 0; i < count; i++) {
+      add_command(commands[i].steps, commands[i].ticks);
+    }
+  }
+
+  void process_all() {
+    int iterations = 0;
+    while (fas_queue[0].read_idx != fas_queue[0].next_write_idx) {
+      if (rmt_offset + PART_SIZE > MAX_RMT_ENTRIES) {
+        break;
+      }
+      rmt_fill_buffer(&fas_queue[0], true, &rmt_entries[rmt_offset]);
+      rmt_offset += PART_SIZE;
+      iterations++;
+      if (iterations > 100) {
+        break;
+      }
+    }
+  }
+
+  RmtAnalysis analyze() {
+    RmtAnalysis result = {0, 0, 0xffff, 0, 0};
     bool step_high = false;
 
-    for (uint32_t i = 0; i < offset; i++) {
+    for (uint32_t i = 0; i < rmt_offset; i++) {
       uint32_t entry = rmt_entries[i];
-      for (int j = 0; j < 2; j++) {
-        uint16_t subentry = (j == 0) ? entry & 0xffff : entry >> 16;
-        if (((subentry & 0x8000) != 0) && !step_high) {
-          // Step transition detected
-          step_high = true;
-          steps_found++;
-          if (last_step_tick > 0) {
-            uint32_t period = total_ticks - last_step_tick;
-            if (period < min_period) min_period = period;
-            if (period > max_period) max_period = period;
-          }
-          last_step_tick = total_ticks;
-        } else if ((subentry & 0x8000) == 0) {
-          step_high = false;
-        }
-        total_ticks += subentry & 0x7fff;
+      uint16_t low = entry & 0xffff;
+      uint16_t high = entry >> 16;
+
+      uint16_t low_ticks = low & 0x7fff;
+      uint16_t high_ticks = high & 0x7fff;
+
+      if (low_ticks > 0 && low_ticks < result.min_symbol_period) {
+        result.min_symbol_period = low_ticks;
+      }
+      if (high_ticks > 0 && high_ticks < result.min_symbol_period) {
+        result.min_symbol_period = high_ticks;
+      }
+
+      if ((low & 0x8000) && !step_high) {
+        result.step_count++;
+        step_high = true;
+      } else if (!(low & 0x8000) && step_high) {
+        step_high = false;
+      }
+      result.total_ticks += low_ticks;
+      if (step_high) {
+        result.total_high_ticks += low_ticks;
+      } else {
+        result.total_low_ticks += low_ticks;
+      }
+
+      if ((high & 0x8000) && !step_high) {
+        result.step_count++;
+        step_high = true;
+      } else if (!(high & 0x8000) && step_high) {
+        step_high = false;
+      }
+      result.total_ticks += high_ticks;
+      if (step_high) {
+        result.total_high_ticks += high_ticks;
+      } else {
+        result.total_low_ticks += high_ticks;
       }
     }
+    return result;
+  }
 
-    printf("Steps expected: %" PRIu32 ", found: %" PRIu32 "\n", tc.steps,
-           steps_found);
-    printf("Period range: min=%" PRIu32 " ticks, max=%" PRIu32 " ticks\n",
-           min_period, max_period);
-
-    if (tc.expected_min_period_ticks > 0) {
-      if (min_period < tc.expected_min_period_ticks) {
-        printf("ERROR: Minimum period too small: %" PRIu32 " < %" PRIu32 "\n",
-               min_period, tc.expected_min_period_ticks);
-        return false;
+  void dump_rmt(uint32_t max_entries = 0) {
+    uint32_t count = (max_entries > 0 && max_entries < rmt_offset) ? max_entries
+                                                                   : rmt_offset;
+    printf("RMT entries (showing %u of %u):\n", count, rmt_offset);
+    uint32_t i = 0;
+    while (i < count) {
+      uint32_t entry = rmt_entries[i];
+      uint32_t repeat = 1;
+      while (i + repeat < count && rmt_entries[i + repeat] == entry) {
+        repeat++;
       }
-      if (max_period > tc.expected_max_period_ticks) {
-        printf("ERROR: Maximum period too large: %" PRIu32 " > %" PRIu32 "\n",
-               max_period, tc.expected_max_period_ticks);
-        return false;
+      uint16_t low = entry & 0xffff;
+      uint16_t high = entry >> 16;
+      if (repeat > 1) {
+        printf("  [%3u-%3u] 0x%08x  L=%u%s H=%u%s x%u\n", i, i + repeat - 1,
+               entry, low & 0x7fff, (low & 0x8000) ? "(S)" : "", high & 0x7fff,
+               (high & 0x8000) ? "(S)" : "", repeat);
+      } else {
+        printf("  [%3u] 0x%08x  L=%u%s H=%u%s\n", i, entry, low & 0x7fff,
+               (low & 0x8000) ? "(S)" : "", high & 0x7fff,
+               (high & 0x8000) ? "(S)" : "");
       }
+      i += repeat;
     }
-
-    // Check if pulses were generated when expected
-    bool pulses_ok = (tc.expect_pulses && steps_found > 0) ||
-                     (!tc.expect_pulses && steps_found == 0);
-    if (!pulses_ok) {
-      printf("ERROR: Expected %s, got %" PRIu32 " steps\n",
-             tc.expect_pulses ? "pulses" : "no pulses", steps_found);
-      return false;
-    }
-
-    if (tc.expect_pulses && steps_found != tc.steps) {
-      printf("ERROR: Expected %" PRIu32 " steps, got %" PRIu32 "\n", tc.steps,
-             steps_found);
-      return false;
-    }
-
-    printf("PASS: %s\n", tc.description);
-    return true;
   }
 };
 
-int main() {
-  FastAccelStepperEsp32C6Test test;
+struct TestCase {
+  const char* name;
+  const QueueCommand* commands;
+  uint32_t command_count;
+  uint32_t expected_steps;
+  uint64_t expected_ticks;
+};
 
-  // Test cases specifically targeting ESP32-C6 timing gaps
-  Esp32C6TestCase test_cases[] = {
-      // Working range: <=990us (should work)
-      {.speed_us = 500,
-       .steps = 100,
-       .description = "Fast speed (500us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 8000,
-       .expected_max_period_ticks = 8000},
-      {.speed_us = 990,
-       .steps = 100,
-       .description = "Edge fast speed (990us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 15840,
-       .expected_max_period_ticks = 15840},
+QueueCommand cmd_single_step_16000[] = {{1, 16000}};
+QueueCommand cmd_single_step_32000[] = {{1, 32000}};
+QueueCommand cmd_single_step_65535[] = {{1, 65535}};
 
-      // Problematic range: 1000-4000us (dead zone in original)
-      {.speed_us = 1000,
-       .steps = 100,
-       .description = "Dead zone start (1000us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 16000,
-       .expected_max_period_ticks = 16000},
-      {.speed_us = 2000,
-       .steps = 50,
-       .description = "Mid dead zone (2000us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 32000,
-       .expected_max_period_ticks = 32000},
-      {.speed_us = 4000,
-       .steps = 25,
-       .description = "Dead zone end (4000us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 64000,
-       .expected_max_period_ticks = 64000},
+QueueCommand cmd_multi_step_1000[] = {{10, 1000}};
+QueueCommand cmd_multi_step_500[] = {{20, 500}};
 
-      // Working range: 4100-8500us (should work)
-      {.speed_us = 5000,
-       .steps = 20,
-       .description = "Mid working range (5000us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 80000,
-       .expected_max_period_ticks = 80000},
-      {.speed_us = 8500,
-       .steps = 12,
-       .description = "Edge slow working (8500us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 136000,
-       .expected_max_period_ticks = 136000},
+QueueCommand cmd_pause_step[] = {{0, 10000}, {1, 16000}, {0, 5000}};
 
-      // Problematic range: >8500us (another dead zone)
-      {.speed_us = 10000,
-       .steps = 10,
-       .description = "Slow speed start (10000us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 160000,
-       .expected_max_period_ticks = 160000},
-      {.speed_us = 20000,
-       .steps = 5,
-       .description = "Very slow speed (20000us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 320000,
-       .expected_max_period_ticks = 320000},
+QueueCommand cmd_step_pause_step[] = {{1, 16000}, {0, 32000}, {1, 16000}};
 
-      // Edge cases for timing calculation
-      {.speed_us = 80,
-       .steps = 200,
-       .description = "Minimum possible speed (80us)",
-       .expect_pulses = true,
-       .expected_min_period_ticks = 1280,
-       .expected_max_period_ticks = 1280},
+QueueCommand cmd_many_steps[] = {{5, 8000}, {10, 4000}, {3, 12000}};
+
+QueueCommand cmd_ramp_1000us[] = {
+    {1, 35808}, {1, 25312}, {1, 25312}, {1, 35808}, {1, 35808}};
+QueueCommand cmd_ramp_2000us[] = {
+    {1, 35808}, {1, 32000}, {1, 32000}, {1, 35808}, {1, 35808}};
+QueueCommand cmd_ramp_500us_step_pause[] = {
+    {1, 56608}, {0, 56608}, {1, 40032}, {0, 40032}, {1, 65344},
+    {1, 56608}, {1, 50624}, {1, 56608}, {1, 65344}, {1, 40032},
+    {0, 40032}, {1, 56608}, {0, 56608}, {1, 56608}, {0, 56608}};
+
+QueueCommand cmd_single_step_8000[] = {{1, 8000}};
+QueueCommand cmd_multi_step_8000[] = {{10, 8000}};
+
+bool run_tests() {
+  printf("\n=== Testing with PART_SIZE=%u ===\n", debug_part_size);
+  printf("MIN_CMD_TICKS=%ld, TICKS_PER_S=%ld\n\n", MIN_CMD_TICKS, TICKS_PER_S);
+
+  RmtBufferTest test;
+  bool all_passed = true;
+
+  TestCase cases[] = {
+      {"Single step 16000 ticks (1000us)", cmd_single_step_16000, 1, 1, 16000},
+      {"Single step 32000 ticks (2000us)", cmd_single_step_32000, 1, 1, 32000},
+      {"Single step 65535 ticks (4095us)", cmd_single_step_65535, 1, 1, 65535},
+      {"Single step 8000 ticks (500us)", cmd_single_step_8000, 1, 1, 8000},
+      {"10 steps @ 1000 ticks each", cmd_multi_step_1000, 1, 10, 10000},
+      {"20 steps @ 500 ticks each", cmd_multi_step_500, 1, 20, 10000},
+      {"10 steps @ 8000 ticks each (500us)", cmd_multi_step_8000, 1, 10, 80000},
+      {"Pause + Step + Pause", cmd_pause_step, 3, 1, 31000},
+      {"Step + Pause + Step", cmd_step_pause_step, 3, 2, 64000},
+      {"Mixed: 5@8000 + 10@4000 + 3@12000", cmd_many_steps, 3, 18, 116000},
+      {"Ramp 1000us (from ramp_helper)", cmd_ramp_1000us, 5, 5, 158048},
+      {"Ramp 2000us (from ramp_helper)", cmd_ramp_2000us, 5, 5, 171424},
+      {"Ramp 500us step+pause (from ramp_helper)", cmd_ramp_500us_step_pause,
+       15, 10, 794304},
   };
 
-  bool all_passed = true;
-  for (int i = 0; i < sizeof(test_cases) / sizeof(test_cases[0]); i++) {
-    printf("\n=== Test Case %d ===\n", i + 1);
-    bool passed = test.test_speed_range(test_cases[i]);
-    if (!passed) {
+  int num_cases = sizeof(cases) / sizeof(cases[0]);
+
+  for (int i = 0; i < num_cases; i++) {
+    TestCase* tc = &cases[i];
+    printf("Test %d: %s\n", i + 1, tc->name);
+
+    test.init_queue();
+    test.fill_commands(tc->commands, tc->command_count);
+    test.process_all();
+
+    RmtAnalysis result = test.analyze();
+
+    bool steps_ok = (result.step_count == tc->expected_steps);
+    bool ticks_ok = (result.total_ticks == tc->expected_ticks);
+
+    uint32_t high_low_ratio = 0;
+    if (result.total_low_ticks > 0) {
+      high_low_ratio = (result.total_high_ticks * 100) / result.total_low_ticks;
+    }
+
+    printf("  Steps: %" PRIu32 " (expected %" PRIu32 ") %s\n",
+           result.step_count, tc->expected_steps, steps_ok ? "OK" : "FAIL");
+    printf("  Ticks: %" PRIu64 " (expected %" PRIu64 ") %s\n",
+           result.total_ticks, tc->expected_ticks, ticks_ok ? "OK" : "FAIL");
+    printf("  High/Low: %" PRIu32 "/%" PRIu32 " ticks (ratio %u%%)\n",
+           result.total_high_ticks, result.total_low_ticks, high_low_ratio);
+    printf("  Min symbol: %u ticks\n", result.min_symbol_period);
+
+    bool ratio_ok = (high_low_ratio >= 30 && high_low_ratio <= 200);
+    if (!ratio_ok && result.step_count > 0) {
+      printf("  WARNING: High/Low ratio outside 30-200%% range\n");
+    }
+
+    if (!steps_ok || !ticks_ok) {
       all_passed = false;
-      printf("FAILED: %s\n", test_cases[i].description);
+      test.dump_rmt(50);
+    }
+    printf("\n");
+  }
+
+  printf("=== Part 2: Step count limits (0-255 steps) ===\n\n");
+
+  uint16_t test_ticks[] = {MIN_CMD_TICKS, 16000, 32000, 65535};
+  int num_ticks = sizeof(test_ticks) / sizeof(test_ticks[0]);
+  int fail_count = 0;
+
+  for (int t = 0; t < num_ticks; t++) {
+    uint16_t ticks = test_ticks[t];
+    int round_fails = 0;
+
+    printf("Testing %u ticks with 0-255 steps: ", ticks);
+    fflush(stdout);
+
+    for (int steps = 0; steps <= 255; steps++) {
+      test.init_queue();
+      test.add_command(steps, ticks);
+      test.process_all();
+
+      RmtAnalysis result = test.analyze();
+
+      uint32_t expected_steps = steps;
+      uint64_t expected_ticks = (uint64_t)steps * ticks;
+      if (steps == 0) {
+        expected_ticks = ticks;
+      }
+
+      bool steps_ok = (result.step_count == expected_steps);
+      bool ticks_ok = (result.total_ticks == expected_ticks);
+
+      if (!steps_ok || !ticks_ok) {
+        if (round_fails == 0) {
+          printf("\n");
+        }
+        printf("  FAIL steps=%d: got %" PRIu32 " steps, %" PRIu64
+               " ticks (expected %" PRIu32 ", %" PRIu64 ")\n",
+               steps, result.step_count, result.total_ticks, expected_steps,
+               expected_ticks);
+        round_fails++;
+        all_passed = false;
+        if (round_fails <= 2) {
+          test.dump_rmt(30);
+        }
+      }
+    }
+
+    if (round_fails == 0) {
+      printf("OK\n");
+    } else {
+      printf("  %d failures for ticks=%u\n", round_fails, ticks);
+    }
+    fail_count += round_fails;
+  }
+
+  printf("\n=== Part 3: High/Low ratio check ===\n\n");
+
+  uint16_t ratio_test_ticks[] = {1000, 5000, 8000, 10000, 16000, 32000, 65535};
+  int num_ratio_tests = sizeof(ratio_test_ticks) / sizeof(ratio_test_ticks[0]);
+
+  for (int t = 0; t < num_ratio_tests; t++) {
+    uint16_t ticks = ratio_test_ticks[t];
+    test.init_queue();
+    test.add_command(1, ticks);
+    test.process_all();
+
+    RmtAnalysis result = test.analyze();
+
+    uint32_t high_low_ratio = 0;
+    if (result.total_low_ticks > 0) {
+      high_low_ratio = (result.total_high_ticks * 100) / result.total_low_ticks;
+    }
+
+    bool ratio_ok = (high_low_ratio >= 30 && high_low_ratio <= 200);
+    printf("Period %5u ticks: high=%" PRIu32 " low=%" PRIu32
+           " ratio=%u%% min_sym=%u %s\n",
+           ticks, result.total_high_ticks, result.total_low_ticks,
+           high_low_ratio, result.min_symbol_period, ratio_ok ? "OK" : "FAIL");
+
+    if (!ratio_ok) {
+      all_passed = false;
+      fail_count++;
+      test.dump_rmt(30);
     }
   }
 
+  printf("\n=== Part 4: Reported Hardware Failure Analysis ===\n\n");
+  printf("Testing reported hardware issues:\n");
+  printf("1. v=1000us (16000 ticks) => no pulses on real hardware\n");
+  printf("2. v=2000us (32000 ticks) => no pulses on real hardware\n");
+  printf(
+      "3. v=500us (8000 ticks) => pulses but incorrect pattern (2:1 high:low "
+      "ratio)\n\n");
+
+  uint16_t hw_failure_ticks[] = {16000, 32000, 8000};
+  const char* hw_failure_desc[] = {
+      "1000us (16000 ticks)", "2000us (32000 ticks)", "500us (8000 ticks)"};
+  int num_hw_tests = sizeof(hw_failure_ticks) / sizeof(hw_failure_ticks[0]);
+
+  for (int t = 0; t < num_hw_tests; t++) {
+    uint16_t ticks = hw_failure_ticks[t];
+    printf("HW Failure Test: %s\n", hw_failure_desc[t]);
+
+    test.init_queue();
+    test.add_command(1, ticks);
+    test.process_all();
+
+    RmtAnalysis result = test.analyze();
+
+    uint32_t high_low_ratio = 0;
+    if (result.total_low_ticks > 0) {
+      high_low_ratio = (result.total_high_ticks * 100) / result.total_low_ticks;
+    }
+
+    printf("  Steps: %" PRIu32 " (expected 1) %s\n", result.step_count,
+           result.step_count == 1 ? "OK" : "FAIL");
+    printf("  Ticks: %" PRIu64 " (expected %u) %s\n", result.total_ticks, ticks,
+           result.total_ticks == ticks ? "OK" : "FAIL");
+    printf("  High/Low: %" PRIu32 "/%" PRIu32 " ticks (ratio %u%%)\n",
+           result.total_high_ticks, result.total_low_ticks, high_low_ratio);
+    printf("  Min symbol: %u ticks (must be >= 2) %s\n",
+           result.min_symbol_period,
+           result.min_symbol_period >= 2 ? "OK" : "FAIL");
+
+    bool ratio_ok = (high_low_ratio >= 30 && high_low_ratio <= 200);
+    if (!ratio_ok) {
+      printf("  WARNING: High/Low ratio outside 30-200%% range\n");
+    }
+
+    if (ticks == 8000) {
+      printf("  Expected issue: 2:1 high:low ratio (200%%) on real hardware\n");
+      printf("  Simulated ratio: %u%%\n", high_low_ratio);
+    }
+
+    if (result.step_count != 1 || result.total_ticks != ticks ||
+        result.min_symbol_period < 2) {
+      all_passed = false;
+      fail_count++;
+      test.dump_rmt(30);
+    }
+    printf("\n");
+  }
+
   if (all_passed) {
-    printf("\nTEST_18 PASSED - All ESP32-C6 timing ranges work correctly\n");
+    printf("ALL TESTS PASSED for PART_SIZE=%u\n", debug_part_size);
+    return true;
+  } else {
+    printf("TESTS FAILED for PART_SIZE=%u (%d failures)\n", debug_part_size,
+           fail_count);
+    return false;
+  }
+}
+
+int main() {
+  printf("=== RMT Fill Buffer Test with Multiple PART_SIZE Values ===\n");
+
+  uint16_t part_sizes[] = {22, 23, 24, 30, 31, 32};
+  int num_part_sizes = sizeof(part_sizes) / sizeof(part_sizes[0]);
+
+  bool all_passed = true;
+  int total_failures = 0;
+
+  for (int i = 0; i < num_part_sizes; i++) {
+    debug_part_size = part_sizes[i];
+    bool passed = run_tests();
+
+    if (!passed) {
+      all_passed = false;
+      total_failures++;
+    }
+
+    if (i < num_part_sizes - 1) {
+      printf(
+          "\n============================================================\n");
+    }
+  }
+
+  printf("\n=== Summary ===\n");
+  if (all_passed) {
+    printf("ALL TESTS PASSED for all PART_SIZE values\n");
     return 0;
   } else {
-    printf("\nTEST_18 FAILED - ESP32-C6 timing issues detected\n");
+    printf("TESTS FAILED for %d out of %d PART_SIZE values\n", total_failures,
+           num_part_sizes);
     return 1;
   }
 }
