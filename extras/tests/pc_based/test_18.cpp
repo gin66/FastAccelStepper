@@ -2,6 +2,9 @@
 #include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
+bool dump_rmt_symbols = false;
 
 uint16_t debug_part_size = 24;
 
@@ -256,6 +259,9 @@ bool run_tests() {
     if (!steps_ok || !ticks_ok) {
       all_passed = false;
       test.dump_rmt(50);
+    } else if (dump_rmt_symbols) {
+      printf("  RMT symbols for this test:\n");
+      test.dump_rmt(20);
     }
     printf("\n");
   }
@@ -346,6 +352,11 @@ bool run_tests() {
         if (round_fails <= 2) {
           test.dump_rmt(30);
         }
+      } else if (dump_rmt_symbols &&
+                 (steps == 0 || steps == 1 || steps == 255)) {
+        // Dump for edge cases when dump_rmt_symbols is enabled
+        printf("    steps=%d: ", steps);
+        test.dump_rmt(5);
       }
     }
 
@@ -385,6 +396,9 @@ bool run_tests() {
       all_passed = false;
       fail_count++;
       test.dump_rmt(30);
+    } else if (dump_rmt_symbols) {
+      printf("    RMT symbols: ");
+      test.dump_rmt(5);
     }
   }
 
@@ -441,6 +455,9 @@ bool run_tests() {
       all_passed = false;
       fail_count++;
       test.dump_rmt(30);
+    } else if (dump_rmt_symbols) {
+      printf("  RMT symbols: ");
+      test.dump_rmt(10);
     }
     printf("\n");
   }
@@ -455,8 +472,29 @@ bool run_tests() {
   }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  // Parse command line arguments
+  for (int i = 1; i < argc; i++) {
+    if (strcmp(argv[i], "-d") == 0) {
+      dump_rmt_symbols = true;
+    } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+      fprintf(stderr, "Usage: %s [options]\n", argv[0]);
+      fprintf(stderr, "Options:\n");
+      fprintf(stderr,
+              "  -d          Enable dumping of RMT symbols for all tests\n");
+      fprintf(stderr, "  -h, --help  Show this help message\n");
+      return 0;
+    } else {
+      fprintf(stderr, "Unknown option: %s\n", argv[i]);
+      fprintf(stderr, "Use -h for help\n");
+      return 1;
+    }
+  }
+
   printf("=== RMT Fill Buffer Test with Multiple PART_SIZE Values ===\n");
+  if (dump_rmt_symbols) {
+    printf("RMT symbol dumping enabled (-d flag)\n");
+  }
 
   uint16_t part_sizes[] = {22, 24, 30, 32};
   int num_part_sizes = sizeof(part_sizes) / sizeof(part_sizes[0]);

@@ -90,10 +90,14 @@ Tests;
   - 200 kHz (80 ticks) with steps 1-255 - max frequency test
     Note: 80 ticks may be below stretching threshold for some PART_SIZE values
   
-  Test runs with multiple PART_SIZE values: 22, 23, 24, 30, 31, 32
-  - ESP32C6 uses PART_SIZE=24
-  - Other variants use 23 or 31
-  - Tests validate behavior across different hardware configurations
+  Test runs with multiple even PART_SIZE values: 22, 24, 30, 32
+  - ESP32C6 uses PART_SIZE=24 (RMT_SIZE=48)
+  - ESP32/ESP32S3 use PART_SIZE=32 (RMT_SIZE=64)
+  - PART_SIZE must be even (enforced by preprocessor check)
+  
+  Preprocessor options:
+  - DUMP_RMT_SYMBOLS: Set to true/false to enable/disable condensed RMT symbol
+    dumps for each test (default: true)
   
   Key validation criteria:
   1. Step count must match command steps
@@ -112,5 +116,6 @@ Tests;
   * queue_entry.ticks is uint16_t, max value 65535 ticks (4095us at 16MHz)
   * For periods >65535 ticks, ramp generator uses pause commands
   * ticks=65535 is special case in rmt_fill_buffer (uses 2 entries per step)
-  * ESP32C6 has PART_SIZE=24, other variants use 23 or 31
+  * ESP32C6 has PART_SIZE=24, ESP32/ESP32S3 use PART_SIZE=32
+  * PART_SIZE must be even (enforced by preprocessor check)
   * Minimum RMT symbol period is 2 ticks (hardware limit)
