@@ -480,6 +480,15 @@ void _getNextCommand(const struct ramp_ro_s* ramp, const struct ramp_rw_s* rw,
 #endif
         performed_ramp_up_steps = max_ramp_up_steps;
         next_ticks = ramp->config.parameters.min_travel_ticks;
+        if (next_ticks > 65535) {
+          steps = 1;
+          pause_ticks_left = next_ticks;
+          next_ticks >>= 1;
+          next_ticks = fas_min(next_ticks, (uint32_t)65535);
+          pause_ticks_left -= next_ticks;
+        } else {
+          pause_ticks_left = 0;
+        }
       } else {
         if (remaining_steps > performed_ramp_up_steps) {
           if (remaining_steps - performed_ramp_up_steps < steps) {
