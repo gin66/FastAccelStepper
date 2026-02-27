@@ -1,3 +1,6 @@
+0.33.14:
+- #348: Fix for unexpected motor stop at slow speed
+
 0.33.13:
 - pico: Fill pio-TX-queue by interrupt and not by a RTOS-Task (#345)
 - #347: fix ramp control to avoid overflow in multiplication
