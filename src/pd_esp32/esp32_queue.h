@@ -75,4 +75,9 @@ class StepperQueue : public StepperQueueBase {
   }
 };
 
+#if defined(SUPPORT_ESP32_RMT)
+void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
+void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
+#endif
+
 #endif
