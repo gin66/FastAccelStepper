@@ -2,7 +2,7 @@
 
 #include "FastAccelStepper.h"
 #include "fas_arch/common.h"
-#include "fas_queue/base.h"
+#include "fas_queue/queue.h"
 
 #if defined(SUPPORT_AVR)
 #include "pd_avr/avr_queue.h"
@@ -17,8 +17,6 @@
 #else
 #error "Unsupported architecture"
 #endif
-
-extern StepperQueue fas_queue[NUM_QUEUES];
 
 #if defined(SUPPORT_CPU_AFFINITY)
 void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core);
