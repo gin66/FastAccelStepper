@@ -2,46 +2,12 @@
 
 #include "FastAccelStepper.h"
 #include "fas_arch/common.h"
+#include "fas_queue/base.h"
 
 // Here are the global variables to interface with the interrupts
 
-// These variables control the stepper timing behaviour
-#define QUEUE_LEN_MASK (QUEUE_LEN - 1)
-
-struct queue_entry {
-  uint8_t steps;  // if 0,  then the command only adds a delay
-  uint8_t toggle_dir : 1;
-  uint8_t countUp : 1;
-  uint8_t moreThanOneStep : 1;
-  uint8_t hasSteps : 1;
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
-  // if repeat_entry==1, then this entry shall be repeated.
-  // This mechanism only works for pauses (steps == 0)
-  // Used for external direction pin
-  uint8_t repeat_entry : 1;
-  uint8_t dirPinState : 1;
-#endif
-  uint16_t ticks;
-#if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
-  uint16_t end_pos_last16;
-#endif
-#if defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)
-  uint16_t start_pos_last16;
-#endif
-};
-
-class StepperQueue {
+class StepperQueue : public StepperQueueBase {
  public:
-  struct queue_entry entry[QUEUE_LEN];
-
-  // In case of forceStopAndNewPosition() the adding of commands has to be
-  // temporarily suspended
-  volatile bool ignore_commands;
-  volatile uint8_t read_idx;  // ISR stops if readptr == next_writeptr
-  volatile uint8_t next_write_idx;
-  bool dirHighCountsUp;
-  uint8_t dirPin;
-
   // a word to isRunning():
   //    if isRunning() is false, then the _QUEUE_ is not running.
   //
@@ -55,7 +21,7 @@ class StepperQueue {
   // This has been called isReadyForCommands().
   //
 #if defined(SUPPORT_RP_PICO)
-  bool _isActive; // indicates that the sm should be serviced by the ISR
+  bool _isActive;  // indicates that the sm should be serviced by the ISR
   bool isRunning();
   bool isReadyForCommands();
   uint8_t _step_pin;
@@ -89,14 +55,6 @@ class StepperQueue {
   rmt_encoder_handle_t _tx_encoder;
 #endif
 #endif
-#if defined(SUPPORT_DIR_PIN_MASK)
-  volatile SUPPORT_DIR_PIN_MASK* _dirPinPort;
-  SUPPORT_DIR_PIN_MASK _dirPinMask;
-#endif
-#if defined(SUPPORT_DIR_TOGGLE_PIN_MASK)
-  volatile SUPPORT_DIR_TOGGLE_PIN_MASK* _dirTogglePinPort;
-  SUPPORT_DIR_TOGGLE_PIN_MASK _dirTogglePinMask;
-#endif
 #if defined(SUPPORT_AVR)
   volatile bool _noMoreCommands;
   volatile bool _isRunning;
@@ -121,47 +79,14 @@ class StepperQueue {
   inline bool isRunning() { return _isRunning; }
 #endif
 
-  struct queue_end_s queue_end;
-
-#ifdef TEST
-  uint16_t max_speed_in_ticks =
-      TICKS_PER_S / 50000;  // use a default value 50_000 steps/s
-#else
-  uint16_t max_speed_in_ticks =
-      TICKS_PER_S / 1000;  // use a default value 1_000 steps/s
-#endif
-  bool init(FastAccelStepperEngine* engine, uint8_t queue_num,
-            uint8_t step_pin);
-  inline uint8_t queueEntries() {
-    fasDisableInterrupts();
-    uint8_t rp = read_idx;
-    uint8_t wp = next_write_idx;
-    fasEnableInterrupts();
-    inject_fill_interrupt(0);
-    return (uint8_t)(wp - rp);
-  }
-  inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
-  inline bool isQueueEmpty() { return queueEntries() == 0; }
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
-  inline bool isOnRepeatingEntry() {
-    return entry[read_idx & QUEUE_LEN_MASK].repeat_entry == 1;
-  }
-  inline uint8_t dirPinState() {
-    return entry[read_idx & QUEUE_LEN_MASK].dirPinState;
-  }
-  inline void clearRepeatingFlag() {
-    entry[read_idx & QUEUE_LEN_MASK].repeat_entry = 0;
-  }
-#endif
-
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
   int32_t getCurrentPosition();
   uint32_t ticksInQueue();
   bool hasTicksInQueue(uint32_t min_ticks);
   bool getActualTicksWithDirection(struct actual_ticks_s* speed);
 
-  inline uint16_t getMaxSpeedInTicks() { return max_speed_in_ticks; }
-
+  bool init(FastAccelStepperEngine* engine, uint8_t queue_num,
+            uint8_t step_pin);
   // startQueue is always called
   void startQueue();
   void forceStop();
@@ -211,9 +136,6 @@ class StepperQueue {
     attachDirPinToStatemachine();
 #endif
   }
-#if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
-  void setAbsoluteSpeedLimit(uint16_t ticks) { max_speed_in_ticks = ticks; }
-#endif
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   void adjustSpeedToStepperCount(uint8_t steppers);
 #endif
