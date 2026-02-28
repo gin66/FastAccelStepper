@@ -12,6 +12,8 @@
 #include "pd_test/test_queue.h"
 #elif defined(SUPPORT_SAM)
 #include "pd_sam/sam_queue.h"
+#elif defined(SUPPORT_RP_PICO)
+#include "pd_pico/pico_queue.h"
 #else
 
 class StepperQueue : public StepperQueueBase {
@@ -28,21 +30,6 @@ class StepperQueue : public StepperQueueBase {
   // provide information, that device is not yet ready for new commands.
   // This has been called isReadyForCommands().
   //
-#if defined(SUPPORT_RP_PICO)
-  bool _isActive;  // indicates that the sm should be serviced by the ISR
-  bool isRunning();
-  bool isReadyForCommands();
-  uint8_t _step_pin;
-  uint16_t adjust_80MHz;
-  PIO pio; /* not set in init */
-  uint sm; /* not set in init */
-  bool claim_pio_sm(FastAccelStepperEngine* engine);
-  void setupSM();
-  int32_t pos_offset;  // offset between pico step count and position
-  int32_t getCurrentStepCount();
-  void attachDirPinToStatemachine();
-  void setDirPinState(bool high);
-#endif
 #if defined(SUPPORT_ESP32)
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
@@ -115,9 +102,6 @@ class StepperQueue : public StepperQueueBase {
       _dirTogglePinPort = portInputRegister(digitalPinToPort(dir_pin));
       _dirTogglePinMask = digitalPinToBitMask(dir_pin);
     }
-#endif
-#if defined(SUPPORT_RP_PICO)
-    attachDirPinToStatemachine();
 #endif
   }
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
