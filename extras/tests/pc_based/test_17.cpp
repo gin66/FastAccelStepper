@@ -7,7 +7,7 @@
 uint16_t debug_part_size = 31;  // Default for PC tests
 
 #include "FastAccelStepper.h"
-// #include "StepperISR.h"
+// #include "fas_queue/stepper_queue.h"
 
 void inject_fill_interrupt(int mark) {}
 void noInterrupts() {}

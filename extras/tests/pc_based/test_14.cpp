@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 #include "FastAccelStepper.h"
-#include "StepperISR.h"
+#include "fas_queue/stepper_queue.h"
 
 char TCCR1A;
 char TCCR1B;

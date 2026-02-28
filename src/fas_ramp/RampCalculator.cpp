@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-#include "StepperISR.h"
+#include "fas_queue/stepper_queue.h"
 
 #ifdef TEST_TIMING
 // This module has only one purpose:

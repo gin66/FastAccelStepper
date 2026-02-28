@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
-#include "StepperISR.h"
+#include "fas_queue/stepper_queue.h"
 
 #include "fas_ramp/RampControl.h"
 #include "fas_arch/common.h"

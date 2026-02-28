@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#include "StepperISR.h"
+#include "fas_queue/stepper_queue.h"
 
 AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
                                           bool start) {

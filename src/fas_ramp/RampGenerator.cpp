@@ -2,7 +2,7 @@
 
 #include "FastAccelStepper.h"
 #include "fas_ramp/RampGenerator.h"
-#include "StepperISR.h"
+#include "fas_queue/stepper_queue.h"
 
 // This define in order to not shoot myself.
 #ifndef TEST

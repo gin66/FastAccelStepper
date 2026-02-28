@@ -1,4 +1,4 @@
-#include "StepperISR.h"
+#include "fas_queue/stepper_queue.h"
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
 
 uint32_t sig_idx[SUPPORT_ESP32_PULSE_COUNTER] = {

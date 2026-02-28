@@ -1,5 +1,5 @@
 #if defined(ARDUINO_ARCH_AVR)
-#include "StepperISR.h"
+#include "fas_queue/stepper_queue.h"
 
 // T is the timer module number 0,1,2,3...
 // X is the Channel name A or B
