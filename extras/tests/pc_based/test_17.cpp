@@ -18,7 +18,7 @@ void interrupts() {}
 #define IRAM_ATTR
 #define RMT_CHANNEL_T int
 #define LL_TOGGLE_PIN(dirPin)
-#include "StepperISR_esp32xx_rmt.cpp"
+#include "pd_esp32/StepperISR_esp32xx_rmt.cpp"
 
 StepperQueue fas_queue[NUM_QUEUES];
 
