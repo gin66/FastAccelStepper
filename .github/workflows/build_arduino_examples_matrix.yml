@@ -2,9 +2,9 @@ name: Build examples
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, refactor ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, refactor ]
 
 jobs:
   build:

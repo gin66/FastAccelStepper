@@ -2,9 +2,9 @@ name: Run pc-based tests
 
 on:
   push:
-    branches: [ master, esp32 ]
+    branches: [ master, esp32, refactor ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, refactor ]
 
 jobs:
   build:
