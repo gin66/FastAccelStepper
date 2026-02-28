@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 
-#include "Log2Representation.h"
+#include "log2/Log2Representation.h"
 #include "fas_arch/common.h"
 
 #if (TICKS_PER_S == 16000000L)

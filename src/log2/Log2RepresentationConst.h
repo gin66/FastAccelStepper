@@ -3,7 +3,7 @@
 #ifndef LOG2REPRESENTATIONCONST_H
 #define LOG2REPRESENTATIONCONST_H
 
-#include <Log2Representation.h>
+// pmf_logarithmic must be defined before including this file
 
 // LOG2_CONST_1 = 0.000000  0 = 0x0000
 #define LOG2_CONST_1 ((pmf_logarithmic)0x0000)

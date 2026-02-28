@@ -5,7 +5,7 @@
 #define PROGMEM
 #define pgm_read_byte_near(x) (*(x))
 #endif
-#include "Log2Representation.h"
+#include "log2/Log2Representation.h"
 #ifdef TEST
 #include <stdio.h>
 #endif

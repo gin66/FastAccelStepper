@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "log2/Log2Representation.h"
 #include "fas_ramp/RampCalculator.h"
 
 // Not a real test case

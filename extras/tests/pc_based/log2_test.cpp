@@ -1,6 +1,6 @@
 #include <stdint.h>
 
-#include "Log2Representation.h"
+#include "log2/Log2Representation.h"
 
 //
 // This file can be renamed to a .ino and compiled as sketch to be run on the

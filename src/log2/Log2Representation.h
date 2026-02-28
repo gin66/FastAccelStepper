@@ -2,7 +2,7 @@
 #define LOG2REPRESENTATION_H
 #include <stdint.h>
 
-#include <Log2RepresentationConst.h>
+#include "log2/Log2RepresentationConst.h"
 
 typedef int16_t pmf_logarithmic;
 
