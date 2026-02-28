@@ -1,7 +1,7 @@
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
-#include "RampGenerator.h"
+#include "fas_ramp/RampGenerator.h"
 #include "StepperISR.h"
 
 // This define in order to not shoot myself.

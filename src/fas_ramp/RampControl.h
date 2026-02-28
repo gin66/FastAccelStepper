@@ -1,6 +1,7 @@
 #ifndef RAMP_CONTROL_H
 #define RAMP_CONTROL_H
 
+#include "fas_ramp/RampCalculator.h"
 #include "fas_arch/common.h"
 
 struct ramp_ro_s {

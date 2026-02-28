@@ -225,7 +225,7 @@ class FastAccelStepperEngine {
 // and until the stepper task is serviced. The stepper task will then
 // control the direction flags
 
-#include "RampGenerator.h"
+#include "fas_ramp/RampGenerator.h"
 
 //
 // ## Timing values - Architecture dependent

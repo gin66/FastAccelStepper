@@ -1,8 +1,8 @@
 #ifndef RAMP_GENERATOR_H
 #define RAMP_GENERATOR_H
 
-#include "RampCalculator.h"
-#include "RampControl.h"
+#include "fas_ramp/RampCalculator.h"
+#include "fas_ramp/RampControl.h"
 #include "fas_arch/common.h"
 
 class FastAccelStepper;

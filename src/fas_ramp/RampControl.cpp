@@ -3,7 +3,7 @@
 #include "FastAccelStepper.h"
 #include "StepperISR.h"
 
-#include "RampControl.h"
+#include "fas_ramp/RampControl.h"
 #include "fas_arch/common.h"
 
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
@@ -26,7 +26,7 @@ void init_ramp_module() {
 // #define TRACE
 #ifdef TRACE
 #ifdef TEST
-#define TRACE_OUTPUT(x) printf(": %c \n",x)
+#define TRACE_OUTPUT(x) printf(": %c \n", x)
 #endif
 #else
 #define TRACE_OUTPUT(x)
@@ -182,8 +182,8 @@ void _getNextCommand(const struct ramp_ro_s* ramp, const struct ramp_rw_s* rw,
         uint32_t possible_coast_steps =
             (remaining_steps - performed_ramp_up_steps) >> 2;
 #ifdef TEST
-            printf("possible coast steps %d, prus=%d\n", possible_coast_steps,
-                   performed_ramp_up_steps);
+        printf("possible coast steps %d, prus=%d\n", possible_coast_steps,
+               performed_ramp_up_steps);
 #endif
         if ((possible_coast_steps > 0) && (possible_coast_steps <= 510)) {
           // curr_ticks is not necessarily correct due to speed increase
@@ -192,7 +192,8 @@ void _getNextCommand(const struct ramp_ro_s* ramp, const struct ramp_rw_s* rw,
             TRACE_OUTPUT('l');
             this_state = RAMP_STATE_COAST;
 #ifdef TEST
-            printf("high speed coast %d %d coast_time=%d\n", possible_coast_steps,
+            printf("high speed coast %d %d coast_time=%d\n",
+                   possible_coast_steps,
                    remaining_steps - performed_ramp_up_steps, coast_time);
 #endif
           }

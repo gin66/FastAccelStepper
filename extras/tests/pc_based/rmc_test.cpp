@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "RampCalculator.h"
+#include "fas_ramp/RampCalculator.h"
 
 // Not a real test case
 
