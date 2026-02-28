@@ -1,5 +1,4 @@
 #if defined(ARDUINO_ARCH_AVR)
-#include "AVRStepperPins.h"
 #include "StepperISR.h"
 
 // T is the timer module number 0,1,2,3...

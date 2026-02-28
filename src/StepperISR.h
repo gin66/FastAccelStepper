@@ -6,6 +6,10 @@
 
 // Here are the global variables to interface with the interrupts
 
+#if defined(SUPPORT_AVR)
+#include "pd_avr/avr_queue.h"
+#else
+
 class StepperQueue : public StepperQueueBase {
  public:
   // a word to isRunning():
@@ -54,13 +58,6 @@ class StepperQueue : public StepperQueueBase {
 #if defined(SUPPORT_ESP32_RMT_V2)
   rmt_encoder_handle_t _tx_encoder;
 #endif
-#endif
-#if defined(SUPPORT_AVR)
-  volatile bool _noMoreCommands;
-  volatile bool _isRunning;
-  inline bool isRunning() { return _isRunning; }
-  inline bool isReadyForCommands() { return true; }
-  enum channels channel;
 #endif
 #if defined(SUPPORT_SAM)
   uint8_t _step_pin;
@@ -144,6 +141,8 @@ class StepperQueue : public StepperQueueBase {
   static int8_t queueNumForStepPin(uint8_t step_pin);
 #endif
 };
+
+#endif  // !defined(SUPPORT_AVR)
 
 extern StepperQueue fas_queue[NUM_QUEUES];
 
