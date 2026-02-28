@@ -8,6 +8,8 @@
 
 #if defined(SUPPORT_AVR)
 #include "pd_avr/avr_queue.h"
+#elif defined(TEST)
+#include "pd_test/test_queue.h"
 #else
 
 class StepperQueue : public StepperQueueBase {
@@ -70,12 +72,6 @@ class StepperQueue : public StepperQueueBase {
   volatile bool _pauseCommanded;
   volatile uint32_t timePWMInterruptEnabled;
 #endif
-#if defined(TEST)
-  volatile bool _isRunning;
-  inline bool isReadyForCommands() { return true; }
-  inline bool isRunning() { return _isRunning; }
-#endif
-
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
   int32_t getCurrentPosition();
   uint32_t ticksInQueue();

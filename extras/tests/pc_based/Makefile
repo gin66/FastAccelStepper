@@ -20,7 +20,7 @@ ramp_helper.o: ramp_helper.cpp $(SRC_LIB_H) stubs.h
 
 LIB_H=FastAccelStepper.h Log2Representation.h StepperISR.h \
 	  RampGenerator.h RampControl.h RampCalculator.h \
-	  fas_arch/common.h fas_queue/base.h
+	  fas_arch/common.h fas_queue/base.h pd_test/test_queue.h
 LIB_O=FastAccelStepper.o Log2Representation.o StepperISR_test.o \
 	  RampGenerator.o RampControl.o RampCalculator.o StepperISR.o
 
