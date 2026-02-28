@@ -2,7 +2,7 @@ name: Run pc-based tests
 
 on:
   push:
-    branches: [ master, esp32, refactor ]
+    branches: [ master, refactor ]
   pull_request:
     branches: [ master, refactor ]
 
