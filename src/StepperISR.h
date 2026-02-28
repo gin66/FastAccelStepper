@@ -10,6 +10,8 @@
 #include "pd_avr/avr_queue.h"
 #elif defined(TEST)
 #include "pd_test/test_queue.h"
+#elif defined(SUPPORT_SAM)
+#include "pd_sam/sam_queue.h"
 #else
 
 class StepperQueue : public StepperQueueBase {
@@ -60,17 +62,6 @@ class StepperQueue : public StepperQueueBase {
 #if defined(SUPPORT_ESP32_RMT_V2)
   rmt_encoder_handle_t _tx_encoder;
 #endif
-#endif
-#if defined(SUPPORT_SAM)
-  uint8_t _step_pin;
-  uint8_t _queue_num;
-  void* driver_data;
-  volatile bool _hasISRactive;
-  bool isRunning();
-  bool _connected;
-  inline bool isReadyForCommands() { return true; }
-  volatile bool _pauseCommanded;
-  volatile uint32_t timePWMInterruptEnabled;
 #endif
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
   int32_t getCurrentPosition();
