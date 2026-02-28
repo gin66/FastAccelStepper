@@ -1,7 +1,6 @@
 #ifndef FASTACCELSTEPPER_H
 #define FASTACCELSTEPPER_H
 #include <stdint.h>
-#include "Log2Representation.h"
 #include "fas_arch/common.h"
 
 // # FastAccelStepper

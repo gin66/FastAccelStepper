@@ -27,7 +27,7 @@ uint32_t log2_to_u32(pmf_logarithmic x);
 #define log2_rsqrt(x) (-(x) / 2)
 #define log2_rsquare(x) log2_reciprocal(log2_square(x))
 
-inline pmf_logarithmic log2_pow_div_3(pmf_logarithmic x) {
+static inline pmf_logarithmic log2_pow_div_3(pmf_logarithmic x) {
   // 1/3 ~ (1/4+1/16+1/64+1/256+1/1024+1/4096+1/16384)
   x /= 2;        // x/2
   x += x / 4;    // x/2 + x/8
