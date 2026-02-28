@@ -4,8 +4,6 @@
 #include "fas_arch/common.h"
 #include "fas_queue/base.h"
 
-// Here are the global variables to interface with the interrupts
-
 #if defined(SUPPORT_AVR)
 #include "pd_avr/avr_queue.h"
 #elif defined(TEST)
