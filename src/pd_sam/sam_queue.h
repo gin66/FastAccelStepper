@@ -4,13 +4,6 @@
 #include "FastAccelStepper.h"
 #include "fas_queue/base.h"
 
-typedef struct _PWMCHANNELMAPPING {
-  uint8_t pin;
-  uint32_t channel;
-  Pio* port;
-  uint32_t channelMask;
-} PWMCHANNELMAPPING;
-
 class StepperQueue : public StepperQueueBase {
  public:
   uint8_t _step_pin;
