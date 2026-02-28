@@ -4,7 +4,7 @@
  EnableB:        0*L->H,        0*H->L
    StepA:   234999*L->H,   234999*H->L, Max High=9us Total High=923929us
    StepB:        2*L->H,        2*H->L, Max High=4us Total High=9us
-Position[A]=37271
+Position[A]=37271~200
 
 Position[B]=2
 

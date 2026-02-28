@@ -6,6 +6,38 @@ BEGIN {
 	}
 }
 
+# Compare one line using range syntax: ~N at end of expect line means
+# the result value must be within ±N of the expected value.
+#
+# Example: "Position[A]=50536~300" accepts any value in [50236, 50836].
+#
+# Returns 1 if the line matches within the specified range, 0 otherwise.
+function compare_range(r, e,
+		tpos, tol, e_base, e_val, e_prefix, r_sub, r_val, diff) {
+	tpos = index(e, "~")
+	tol = substr(e, tpos + 1) + 0
+	e_base = substr(e, 1, tpos - 1)
+
+	# Find the last (possibly negative) number in e_base
+	match(e_base, /[-]?[0-9]+$/)
+	if (RSTART == 0) return 0
+	e_val = substr(e_base, RSTART, RLENGTH) + 0
+	e_prefix = substr(e_base, 1, RSTART - 1)
+
+	# Prefix must match exactly
+	if (substr(r, 1, length(e_prefix)) != e_prefix) return 0
+
+	# Extract the corresponding number from result
+	r_sub = substr(r, length(e_prefix) + 1)
+	match(r_sub, /^[-]?[0-9]+/)
+	if (RSTART == 0) return 0
+	r_val = substr(r_sub, 1, RLENGTH) + 0
+
+	diff = r_val - e_val
+	if (diff < 0) diff = -diff
+	return diff <= tol
+}
+
 # Compare one line from result.txt (r) against one line from expect.txt (e),
 # supporting the "<=" upper-bound operator in timing values.
 #
@@ -68,7 +100,14 @@ FNR != NR {
 	r_test = r
 	e_test = e
 
-	if (timing == 0) {
+	if (e ~ /~[0-9]+$/) {
+		# Range comparison: ~N at end of expect line
+		if (!compare_range(r, e)) {
+			print("result:",r)
+			print("expect:",e)
+			ok = 0
+		}
+	} else if (timing == 0) {
 		gsub(/[0-9 ]*us/,"", r_test)
 		gsub(/[0-9 ]*us/,"", e_test)
 		if (e_test != r_test) {

@@ -4,7 +4,7 @@
  EnableB:        1*L->H,        0*H->L
    StepA:    99808*L->H,    99808*H->L, Max High=11us Total High=385248us
    StepB:        0*L->H,        0*H->L, Max High=0us Total High=0us
-Position[A]=50536
+Position[A]=50536~300
 
 Time in EnableA  max=225395 us, total=225395 us
 
