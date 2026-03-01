@@ -3,7 +3,7 @@
 #
 # 	make -C test_sd_01b_328p -f ../Makefile.test
 
-SRC=$(shell find ../../../src -type f) $(wildcard src/*)
+SRC=$(shell find ../../../../src -type f) $(wildcard src/*)
 
 # platformio should contain only one env section.
 # This section states the dut name
