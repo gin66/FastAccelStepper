@@ -11,7 +11,9 @@ These documents describe ongoing refactoring efforts. The primary reference is [
 #### Per-Architecture StepperQueue (ROADMAP.md)
 **Status: Steps 1-5 Complete, Step 6 Partial**
 
-The codebase has been restructured with `StepperQueueBase` in `fas_queue/base.h` and per-architecture queue implementations:
+The codebase has been restructured with `StepperQueueBase` in `fas_queue/base.h` and per-architecture queue implementations.
+
+The `pd_` prefix in directory names stands for "pulse driver" (though "platform driver" is also suitable).
 
 ```
 src/

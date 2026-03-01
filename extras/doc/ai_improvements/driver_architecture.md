@@ -70,6 +70,8 @@ All architecture drivers inherit from `StepperQueueBase` (defined in `fas_queue/
 
 ### Directory Structure
 
+The `pd_` prefix in directory names stands for "pulse driver" (though "platform driver" is also suitable).
+
 ```
 src/
   fas_queue/
