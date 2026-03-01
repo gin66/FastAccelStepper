@@ -2,9 +2,7 @@
 
 ## Problem Statement
 
-`StepperISR.h` currently defines `StepperQueue` as a single class containing
-fields and methods for **all** supported architectures behind a wall of
-`#ifdef` guards:
+`StepperQueue` previously defined all fields and methods for all supported architectures behind a wall of `#ifdef` guards in a single header:
 
 ```cpp
 class StepperQueue {
@@ -29,14 +27,10 @@ class StepperQueue {
 };
 ```
 
-This has several drawbacks:
+**Drawbacks:**
 - Hard to read: understanding one architecture requires mentally filtering out all others
 - Hard to extend: adding a new architecture means touching the shared header
-- Coupling problem: arch-specific methods like `startQueue()` need both
-  hardware state (arch-specific fields) and queue state (common fields),
-  making it hard to separate responsibilities cleanly
-- The `.cpp` files (`StepperISR_avr.cpp`, `StepperISR_rp_pico.cpp`, etc.)
-  implement methods of this monolithic class
+- Coupling problem: arch-specific methods need both hardware state and queue state
 
 ---
 
@@ -44,9 +38,7 @@ This has several drawbacks:
 
 ### Core Idea
 
-Define `StepperQueue` **per architecture** in the respective `pd_*/` directory.
-A common base struct holds all shared fields. Each architecture extends it with
-its own hardware-specific fields and method implementations.
+Define `StepperQueue` **per architecture** in the respective `pd_*/` directory. A common base struct holds all shared fields. Each architecture extends it with its own hardware-specific fields and method implementations.
 
 ```
 src/
@@ -64,8 +56,11 @@ src/
   pd_sam/
     sam_queue.h     ← class StepperQueue : public StepperQueueBase (SAM)
     sam_queue.cpp   ← SAM-specific method implementations
-  StepperISR.h      ← thin header: includes base + correct pd_*/ header
-  StepperISR.cpp    ← pure common code, zero #ifdefs
+  pd_test/
+    test_queue.h    ← class StepperQueue : public StepperQueueBase (PC tests)
+  fas_queue/
+    stepper_queue.h ← thin header: includes base + correct pd_*/ header
+    stepper_queue.cpp ← pure common code, zero #ifdefs
 ```
 
 ### Shape of the Common Base
@@ -113,32 +108,14 @@ class StepperQueue : public StepperQueueBase {
 
 ### Why This Solves the Coupling Problem
 
-Previously `startQueue()` needed both queue fields (`read_idx`, `entry[]`)
-and hardware fields (`channel`, `pio`, `_isRunning`). As a method of a mixed
-class this was messy but worked. Any attempt to move logic into a separate
-`DriverData` struct hit the problem that the struct didn't own the queue fields.
+Previously `startQueue()` needed both queue fields (`read_idx`, `entry[]`) and hardware fields (`channel`, `pio`, `_isRunning`). As a method of a mixed class this was messy but worked. Any attempt to move logic into a separate `DriverData` struct hit the problem that the struct didn't own the queue fields.
 
-With the per-arch `StepperQueue`, **all fields are in scope naturally** —
-there is no coupling problem. `startQueue()` is just a regular method of the
-class that happens to own both the hardware and queue state.
+With the per-arch `StepperQueue`, **all fields are in scope naturally** — there is no coupling problem. `startQueue()` is just a regular method of the class that happens to own both the hardware and queue state.
 
-### Why Not a Pure Driver Struct Approach
-
-An earlier attempt moved hardware fields into a nested `driver` struct:
-```cpp
-class StepperQueue {
-  AvrDriverData driver;  // hardware fields
-  // + common fields
-};
-```
-This forced every access like `driver._isRunning`, `driver.channel`, etc., and
-methods that needed both sides (most of them) still had to reach across the
-boundary. It also left `StepperISR.h` full of `#ifdefs`. Abandoned.
-
-### StepperISR.h Becomes a Thin Dispatcher
+### stepper_queue.h Becomes a Thin Dispatcher
 
 ```cpp
-// StepperISR.h
+// fas_queue/stepper_queue.h
 #include "fas_arch/common.h"
 #include "fas_queue/base.h"
 
@@ -157,57 +134,51 @@ boundary. It also left `StepperISR.h` full of `#ifdefs`. Abandoned.
 extern StepperQueue fas_queue[NUM_QUEUES];
 ```
 
-### StepperISR.cpp Becomes Truly Common
-
-```cpp
-// StepperISR.cpp — no architecture #ifdefs
-#include "StepperISR.h"
-
-AqeResultCode StepperQueue::addQueueEntry(...) { ... }
-int32_t StepperQueue::getCurrentPosition() { ... }
-uint32_t StepperQueue::ticksInQueue() { ... }
-// etc.
-```
-
 ---
 
-## Implementation Steps
+## Implementation Status
 
-### Step 1 — Define StepperQueueBase
-- Extract all architecture-independent fields from `StepperQueue` into
-  `fas_queue/base.h` as `StepperQueueBase`
-- Keep common method declarations here
+### Step 1 — Define StepperQueueBase ✅ COMPLETE
+- `fas_queue/base.h` defines `StepperQueueBase` with all common fields
+- Common method declarations present
 - No `#ifdef` inside the base
 
-### Step 2 — AVR (simplest architecture, proof of concept)
-- Create `pd_avr/avr_queue.h` with `class StepperQueue : public StepperQueueBase`
-- Move AVR-specific fields and method declarations into it
-- Rename `StepperISR_avr.cpp` → `pd_avr/avr_queue.cpp`
-- Verify AVR builds (simavr tests)
+### Step 2 — AVR ✅ COMPLETE
+- `pd_avr/avr_queue.h` with `class StepperQueue : public StepperQueueBase`
+- `pd_avr/avr_queue.cpp` contains AVR-specific implementations
+- AVR builds and tests pass
 
-### Step 3 — TEST stub
-- Create `pd_test/test_queue.h` for PC-based tests
-- Migrate `StepperISR_test.cpp`
-- Run PC tests to validate the base + derived structure works
+### Step 3 — TEST stub ✅ COMPLETE
+- `pd_test/test_queue.h` for PC-based tests
+- PC tests validate the base + derived structure
 
-### Step 4 — SAM
-- Create `pd_sam/sam_queue.h` + `pd_sam/sam_queue.cpp`
-- Migrate from `StepperISR_due.cpp`
+### Step 4 — SAM ✅ COMPLETE
+- `pd_sam/sam_queue.h` + `pd_sam/sam_queue.cpp`
+- Migrated from legacy `StepperISR_due.cpp`
 
-### Step 5 — Pico
-- Create `pd_pico/pico_queue.h` + `pd_pico/pico_queue.cpp`
-- Migrate from `StepperISR_rp_pico.cpp`
+### Step 5 — Pico ✅ COMPLETE
+- `pd_pico/pico_queue.h` + `pd_pico/pico_queue.cpp`
+- Migrated from legacy `StepperISR_rp_pico.cpp`
 
-### Step 6 — ESP32
-- Most complex: multiple sub-drivers (MCPWM/PCNT, RMT V1, RMT V2)
-- Create `pd_esp32/esp32_queue.h` + per-variant `.cpp` files
-- Migrate from `StepperISR_esp32.cpp`, `StepperISR_idf4_*.cpp`,
-  `StepperISR_idf5_*.cpp`, `StepperISR_esp32xx_rmt.cpp`
+### Step 6 — ESP32 ⚠️ PARTIAL
+Queue structure migrated:
+- `pd_esp32/esp32_queue.h` + `pd_esp32/esp32_queue.cpp`
 
-### Step 7 — Clean up StepperISR.h and StepperISR.cpp
-- `StepperISR.h` becomes the thin dispatcher (see above)
-- `StepperISR.cpp` has zero `#ifdef` guards for architectures
-- Remove `pd_avr/avr_driver.h`, `pd_esp32/esp32_driver.h` etc. if superseded
+Driver files NOT unified (7 files remain in `pd_esp32/`):
+- `StepperISR_esp32xx_rmt.cpp` — Common RMT buffer fill
+- `StepperISR_idf4_esp32_mcpwm_pcnt.cpp` — IDF4 MCPWM/PCNT
+- `StepperISR_idf4_esp32_rmt.cpp` — IDF4 ESP32 RMT
+- `StepperISR_idf4_esp32c3_rmt.cpp` — IDF4 ESP32-C3 RMT
+- `StepperISR_idf4_esp32s3_rmt.cpp` — IDF4 ESP32-S3 RMT
+- `StepperISR_idf5_esp32_rmt.cpp` — IDF5 RMT
+
+**Rationale for not unifying:** Each driver file handles specific IDF version and chip variant combinations. Template-based unification was deemed too complex for the marginal benefit. The current structure works and is tested.
+
+### Step 7 — Clean up ✅ MOSTLY COMPLETE
+- `fas_queue/stepper_queue.h` is the thin dispatcher
+- Common queue code in `fas_queue/stepper_queue.cpp`
+- Legacy `StepperISR.h` removed
+- Platform-specific conditionals removed from common code
 
 ---
 
@@ -216,3 +187,4 @@ uint32_t StepperQueue::ticksInQueue() { ... }
 - No runtime polymorphism / virtual functions (embedded, overhead unacceptable)
 - No change to the external `FastAccelStepper` API
 - No change to `queue_entry` layout or timing semantics
+- No dynamic memory allocation in critical paths
