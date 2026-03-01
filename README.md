@@ -67,7 +67,7 @@ FastAccelStepper offers the following features:
 * Direction pins can be shared between motors
 * Configurable delay between direction change and following step
 * External callback function can be used to drive the enable pins (e.g. connected to shift register) and, only esp32 derivates: the direction pins
-* No float calculation (poor man float: use log2 representation in range -64..64 with 16bit integer representation and 1/512th resolution)
+* No float calculation (log2 representation in range -64..64 with 16bit integer representation and 1/512th resolution)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
 

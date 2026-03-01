@@ -8,9 +8,9 @@
 class FastAccelStepper;
 
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-extern pmf_logarithmic log2_timer_freq;
-extern pmf_logarithmic log2_timer_freq_div_sqrt_of_2;
-extern pmf_logarithmic log2_timer_freq_square_div_2;
+extern log2_value_t log2_timer_freq;
+extern log2_value_t log2_timer_freq_div_sqrt_of_2;
+extern log2_value_t log2_timer_freq_square_div_2;
 #endif
 
 class RampGenerator {

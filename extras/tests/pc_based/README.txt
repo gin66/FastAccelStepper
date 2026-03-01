@@ -6,7 +6,7 @@ Tests;
 - test_02
   checks ramp timing
 
-- pmf_test
+- log2_test
   checks Log2Representation implementation
 
 - test_04

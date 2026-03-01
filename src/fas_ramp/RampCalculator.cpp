@@ -47,11 +47,11 @@ uint32_t calculate_ticks_v3(uint32_t steps, float pre_calc) {
   return n;
 }
 //
-// Using pmf_logarithmic improves to 22-4 = 18us, but less precision
+// Using log2_value_t improves to 22-4 = 18us, but less precision
 uint32_t calculate_ticks_v4(uint32_t steps, uint32_t acceleration) {
-  pmf_logarithmic log2_a = log2_from(acceleration);
-  pmf_logarithmic log2_s = log2_from(steps);
-  pmf_logarithmic log2_res =
+  log2_value_t log2_a = log2_from(acceleration);
+  log2_value_t log2_s = log2_from(steps);
+  log2_value_t log2_res =
       log2_divide(LOG2_TICKS_PER_S, log2_sqrt(log2_multiply(log2_s, log2_a)));
   uint32_t res = log2_to_u32(log2_res);
   return res;
@@ -61,17 +61,17 @@ uint32_t calculate_ticks_v4(uint32_t steps, uint32_t acceleration) {
 // 8us. This measurement was actually done with ump_float.
 // So this routine does not fit to that measurement anymore
 //
-uint32_t calculate_ticks_v5(uint32_t steps, pmf_logarithmic pre_calc) {
-  pmf_logarithmic log2_s = log2_from(steps);
-  pmf_logarithmic log2_res = log2_divide(pre_calc, log2_sqrt(log2_s));
+uint32_t calculate_ticks_v5(uint32_t steps, log2_value_t pre_calc) {
+  log2_value_t log2_s = log2_from(steps);
+  log2_value_t log2_res = log2_divide(pre_calc, log2_sqrt(log2_s));
   uint32_t res = log2_to_u32(log2_res);
   return res;
 }
 //
 // using the combined function yields actually no measureable improvement
-uint32_t calculate_ticks_v6(uint32_t steps, pmf_logarithmic pre_calc) {
-  //  pmf_logarithmic log2_s = log2_from(steps);
-  //  pmf_logarithmic log2_res = log2_sqrt_after_divide(pre_calc, log2_s);
+uint32_t calculate_ticks_v6(uint32_t steps, log2_value_t pre_calc) {
+  //  log2_value_t log2_s = log2_from(steps);
+  //  log2_value_t log2_res = log2_sqrt_after_divide(pre_calc, log2_s);
   //  uint32_t res = log2_to_u32(log2_res);
   //  return res;
   return calculate_ticks_v5(steps, pre_calc);
@@ -137,7 +137,7 @@ uint32_t calculate_ticks_v6(uint32_t steps, pmf_logarithmic pre_calc) {
 //
 // Actually this is a dead end, because below routines already needs 35us,
 // while several variables below ought to be 32bit
-uint32_t calculate_ticks_v7(uint32_t steps, pmf_logarithmic pre_calc) {
+uint32_t calculate_ticks_v7(uint32_t steps, log2_value_t pre_calc) {
   // initial values for i = 0
   uint16_t mask_i = 0x800;
   uint16_t n_i = 0;
@@ -171,10 +171,10 @@ uint32_t calculate_ticks_v7(uint32_t steps, pmf_logarithmic pre_calc) {
 //   cd extras/tests/simavr_based
 //   make -C off_test_timing
 //   From the results subtract port B from port A measurement
-uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc) {
-  pmf_logarithmic log2_steps = log2_from(steps);
-  pmf_logarithmic log2_sqrt_steps = log2_sqrt(log2_steps);
-  pmf_logarithmic log2_res = log2_divide(pre_calc, log2_sqrt_steps);
+uint32_t calculate_ticks_v8(uint32_t steps, log2_value_t pre_calc) {
+  log2_value_t log2_steps = log2_from(steps);
+  log2_value_t log2_sqrt_steps = log2_sqrt(log2_steps);
+  log2_value_t log2_res = log2_divide(pre_calc, log2_sqrt_steps);
   uint32_t res = log2_to_u32(log2_res);
   return res;
 }

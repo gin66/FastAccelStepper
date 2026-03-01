@@ -38,10 +38,10 @@ uint32_t calculate_ticks_v1(uint32_t steps, float acceleration);
 uint32_t calculate_ticks_v2(uint32_t steps, float acceleration);
 uint32_t calculate_ticks_v3(uint32_t steps, float pre_calc);
 uint32_t calculate_ticks_v4(uint32_t steps, uint32_t acceleration);
-uint32_t calculate_ticks_v5(uint32_t steps, pmf_logarithmic pre_calc);
-uint32_t calculate_ticks_v6(uint32_t steps, pmf_logarithmic pre_calc);
-uint32_t calculate_ticks_v7(uint32_t steps, pmf_logarithmic pre_calc);
-uint32_t calculate_ticks_v8(uint32_t steps, pmf_logarithmic pre_calc);
+uint32_t calculate_ticks_v5(uint32_t steps, log2_value_t pre_calc);
+uint32_t calculate_ticks_v6(uint32_t steps, log2_value_t pre_calc);
+uint32_t calculate_ticks_v7(uint32_t steps, log2_value_t pre_calc);
+uint32_t calculate_ticks_v8(uint32_t steps, log2_value_t pre_calc);
 #endif
 
 struct ramp_parameters_s {
@@ -49,7 +49,7 @@ struct ramp_parameters_s {
   uint32_t min_travel_ticks;
   uint32_t s_h;
   uint32_t s_jump;
-  pmf_logarithmic log2_accel;
+  log2_value_t log2_accel;
   bool apply : 1;              // clear on read by stepper task. Triggers read !
   bool any_change : 1;         // clear on read by stepper task
   bool recalc_ramp_steps : 1;  // clear on read by stepper task
@@ -131,7 +131,7 @@ struct ramp_parameters_s {
     }
   }
   inline void setAcceleration(int32_t accel) {
-    pmf_logarithmic new_log2_accel = log2_from((uint32_t)accel);
+    log2_value_t new_log2_accel = log2_from((uint32_t)accel);
     if (!valid_acceleration || (log2_accel != new_log2_accel)) {
       fasDisableInterrupts();
       valid_acceleration = true;
@@ -158,13 +158,13 @@ struct ramp_config_s {
 
   // These three variables are derived
   uint32_t max_ramp_up_steps;
-  pmf_logarithmic log2_ticks_h;
-  pmf_logarithmic cubic;
+  log2_value_t log2_ticks_h;
+  log2_value_t cubic;
 
   void init() { parameters.init(); }
   inline void update() {
     if (parameters.s_h > 0) {
-      pmf_logarithmic log2_s_h = log2_from(parameters.s_h);
+      log2_value_t log2_s_h = log2_from(parameters.s_h);
       // 1/cubic = sqrt(3/2 * a) / s_h^(1/6) / TICKS_PER_S
       //         = sqrt(3/2 * a / s_h^(1/3)) / TICKS_PER_S
       // cubic = TICKS_PER_S / sqrt(s_h^(1/3) / (3/2 * a))
@@ -194,19 +194,18 @@ struct ramp_config_s {
     // ticks = TICKS_PER_S/sqrt(2) / sqrt(a*s)
     if (steps >= parameters.s_h) {
       steps -= (parameters.s_h + 2) >> 2;
-      pmf_logarithmic log2_steps = log2_from(steps);
-      pmf_logarithmic log2_steps_mul_accel =
+      log2_value_t log2_steps = log2_from(steps);
+      log2_value_t log2_steps_mul_accel =
           log2_multiply(log2_steps, parameters.log2_accel);
-      pmf_logarithmic log2_sqrt_steps_mul_accel =
-          log2_sqrt(log2_steps_mul_accel);
-      pmf_logarithmic log2_res = log2_divide(LOG2_TICKS_PER_S_DIV_SQRT_OF_2,
-                                             log2_sqrt_steps_mul_accel);
+      log2_value_t log2_sqrt_steps_mul_accel = log2_sqrt(log2_steps_mul_accel);
+      log2_value_t log2_res = log2_divide(LOG2_TICKS_PER_S_DIV_SQRT_OF_2,
+                                          log2_sqrt_steps_mul_accel);
       uint32_t res = log2_to_u32(log2_res);
       return res;
     }
     // ticks = cubic / s^(2/3)
-    pmf_logarithmic log2_steps = log2_from(steps);
-    pmf_logarithmic log2_res = log2_divide(cubic, log2_pow_2_div_3(log2_steps));
+    log2_value_t log2_steps = log2_from(steps);
+    log2_value_t log2_res = log2_divide(cubic, log2_pow_2_div_3(log2_steps));
     uint32_t res = log2_to_u32(log2_res);
     return res;
   }
@@ -216,9 +215,9 @@ struct ramp_config_s {
     // log2_accel is in range 0..<32
     // LOG2_ACCEL_FACTOR is approx. 47 for 16 Mticks/s
     // log2_ticks squared is in range 0..<64
-    pmf_logarithmic log2_ticks = log2_from(ticks);
+    log2_value_t log2_ticks = log2_from(ticks);
     if (log2_ticks <= log2_ticks_h) {
-      pmf_logarithmic log2_inv_accel2 =
+      log2_value_t log2_inv_accel2 =
           log2_divide(LOG2_ACCEL_FACTOR, parameters.log2_accel);
       uint32_t steps =
           log2_to_u32(log2_divide(log2_inv_accel2, log2_square(log2_ticks)));
@@ -226,7 +225,7 @@ struct ramp_config_s {
       return steps;
     }
     // s = (cubic/ticks)^(3/2)
-    pmf_logarithmic log2_res = log2_divide(cubic, log2_ticks);
+    log2_value_t log2_res = log2_divide(cubic, log2_ticks);
     log2_res = log2_pow_3_div_2(log2_res);
     uint32_t steps = log2_to_u32(log2_res);
     return steps;

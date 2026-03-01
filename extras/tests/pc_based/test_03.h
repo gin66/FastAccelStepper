@@ -4,7 +4,7 @@ struct const_tab {
   uint32_t val_nom;
   uint32_t val_denom;
   bool squared;
-  pmf_logarithmic c;
+  log2_value_t c;
 };
 
 bool perform_test() {
@@ -26,7 +26,7 @@ bool perform_test() {
       {21000000, 2, true, LOG2_CONST_2205E11}  // (21e6)^2 / 2
   };
   uint16_t l1;
-  pmf_logarithmic p1;
+  log2_value_t p1;
 
   trace("Check leading_zeros()");
   for (int16_t x_8 = 0; x_8 <= 255; x_8++) {
@@ -132,7 +132,7 @@ bool perform_test() {
       limit >>= 1;
       trigger_16 >>= 1;
     }
-    pmf_logarithmic p = log2_from((uint16_t)x_16);
+    log2_value_t p = log2_from((uint16_t)x_16);
     uint16_t res_16 = log2_to_u16(p);
     uint16_t delta = x_16 - res_16;
     if (res_16 > x_16) {
@@ -188,7 +188,7 @@ bool perform_test() {
         delta_32 = 1;
       }
     }
-    pmf_logarithmic px = log2_from((uint32_t)x_32);
+    log2_value_t px = log2_from((uint32_t)x_32);
     uint32_t res_32 = log2_to_u32(px);
     uint32_t delta = x_32 - res_32;
     if (res_32 > x_32) {
@@ -207,13 +207,13 @@ bool perform_test() {
     for (uint32_t a_32 = 1; a_32 <= 0x1ff; a_32++) {
       for (uint32_t b_32 = 1; b_32 <= 0x1ff; b_32++) {
         p1 = log2_from(a_32);
-        pmf_logarithmic p2 = log2_from(b_32);
+        log2_value_t p2 = log2_from(b_32);
         if (sa > 0) {
           p1 = log2_shl(p1, sa);
         } else if (sa < 0) {
           p1 = log2_shr(p1, -sa);
         }
-        pmf_logarithmic p = log2_multiply(p1, p2);
+        log2_value_t p = log2_multiply(p1, p2);
         if (sa > 0) {
           p = log2_shr(p, sa);
         } else if (sa < 0) {
@@ -237,19 +237,19 @@ bool perform_test() {
   }
 #endif
 
-  trace("Check pmf constants");
+  trace("Check log2 constants");
   bool error = false;
   for (uint8_t i = 0; i < NR_OF_CONSTANTS; i++) {
     const struct const_tab* dut = &constants[i];
-    pmf_logarithmic val = log2_from(dut->val_nom);
+    log2_value_t val = log2_from(dut->val_nom);
     if (dut->squared) {
       val += val;
     }
     if (dut->val_denom > 1) {
-      pmf_logarithmic val_denom = log2_from(dut->val_denom);
+      log2_value_t val_denom = log2_from(dut->val_denom);
       val -= val_denom;
     }
-    pmf_logarithmic c = dut->c;
+    log2_value_t c = dut->c;
     if (c != val) {
       xprintf("(%d/%d)^%d => %x != %x\n", dut->val_nom, dut->val_denom,
               dut->squared ? 2 : 1, val, c);
@@ -267,8 +267,8 @@ bool perform_test() {
       } else if (sa < 0) {
         p1 = log2_shr(p1, -sa);
       }
-      pmf_logarithmic p = log2_rsqrt(p1);
-      pmf_logarithmic pe =
+      log2_value_t p = log2_rsqrt(p1);
+      log2_value_t pe =
           log2_multiply(p1, log2_multiply(p, p));  // sqrt not yet tested
       // pe should be approximately 1
       uint32_t res = log2_to_u32(log2_shl(pe, 16));
@@ -292,8 +292,8 @@ bool perform_test() {
       } else if (sa < 0) {
         p1 = log2_shr(p1, -sa);
       }
-      pmf_logarithmic p = log2_square(p1);
-      pmf_logarithmic pe = log2_multiply(p1, p1);
+      log2_value_t p = log2_square(p1);
+      log2_value_t pe = log2_multiply(p1, p1);
       int32_t diff = (int32_t)p - (int32_t)pe;
       if (diff > 1) {  // square has better precision than multiply
         xprintf("a=%d log2(x)=%x  log2(square(x))=%x log2(x*x)=%x ", a_32, p1,
@@ -313,9 +313,9 @@ bool perform_test() {
       } else if (sa < 0) {
         p1 = log2_shr(p1, -sa);
       }
-      pmf_logarithmic p = log2_rsquare(p1);
+      log2_value_t p = log2_rsquare(p1);
 
-      pmf_logarithmic pe = log2_multiply(p, log2_square(p1));
+      log2_value_t pe = log2_multiply(p, log2_square(p1));
       // pe should be approximately 1
       uint32_t res = log2_to_u32(log2_shl(pe, 16));
       int32_t diff = (int32_t)res - 0x10000;
@@ -338,9 +338,9 @@ bool perform_test() {
       } else if (sa < 0) {
         p1 = log2_shr(p1, -sa);
       }
-      pmf_logarithmic p = log2_reciprocal(p1);
+      log2_value_t p = log2_reciprocal(p1);
 
-      pmf_logarithmic pe = log2_multiply(p, p1);
+      log2_value_t pe = log2_multiply(p, p1);
       // xe should be approximately 1
       uint32_t res = log2_to_u32(log2_shl(pe, 16));
       int32_t diff = (int32_t)res - 0x10000;
@@ -356,7 +356,7 @@ bool perform_test() {
   }
 
   trace("Check specific use cases");
-  pmf_logarithmic x, x1, x2;
+  log2_value_t x, x1, x2;
   x1 = log2_from((uint32_t)0x0ffff);
   x2 = log2_from((uint32_t)0x10100);
   x = log2_multiply(x1, x2);
@@ -428,7 +428,7 @@ bool perform_test() {
   xprintf("log2_shr(log2_shl(%x/%x,20),20)=%x (%ld)\n", x1, x2, x, back);
   test(back == 0, "log2_divide/log2_shl");
 
-  x1 = pmf_logarithmic((uint32_t)1500);
+  x1 = log2_value_t((uint32_t)1500);
   x = log2_pow_div_3(x1);
   xprintf("%d/3=%d\n", x1, x);
   // +1 is deviation

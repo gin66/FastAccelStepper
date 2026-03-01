@@ -4,18 +4,18 @@
 
 #include "log2/Log2RepresentationConst.h"
 
-typedef int16_t pmf_logarithmic;
+typedef int16_t log2_value_t;
 
-#define LOG2_CONST_INVALID ((pmf_logarithmic)0x8000)
-#define LOG2_CONST_MAX ((pmf_logarithmic)0x7fff)
-#define LOG2_CONST_MIN ((pmf_logarithmic)0x8001)
+#define LOG2_CONST_INVALID ((log2_value_t)0x8000)
+#define LOG2_CONST_MAX ((log2_value_t)0x7fff)
+#define LOG2_CONST_MIN ((log2_value_t)0x8001)
 
-pmf_logarithmic log2_from(uint8_t x);
-pmf_logarithmic log2_from(uint16_t x);
-pmf_logarithmic log2_from(uint32_t x);
+log2_value_t log2_from(uint8_t x);
+log2_value_t log2_from(uint16_t x);
+log2_value_t log2_from(uint32_t x);
 
-uint16_t log2_to_u16(pmf_logarithmic x);
-uint32_t log2_to_u32(pmf_logarithmic x);
+uint16_t log2_to_u16(log2_value_t x);
+uint32_t log2_to_u32(log2_value_t x);
 
 #define log2_shl(x, n) ((x) + (((int16_t)(n)) << 9))
 #define log2_shr(x, n) ((x) - (((int16_t)(n)) << 9))
@@ -27,7 +27,7 @@ uint32_t log2_to_u32(pmf_logarithmic x);
 #define log2_rsqrt(x) (-(x) / 2)
 #define log2_rsquare(x) log2_reciprocal(log2_square(x))
 
-static inline pmf_logarithmic log2_pow_div_3(pmf_logarithmic x) {
+static inline log2_value_t log2_pow_div_3(log2_value_t x) {
   // 1/3 ~ (1/4+1/16+1/64+1/256+1/1024+1/4096+1/16384)
   x /= 2;        // x/2
   x += x / 4;    // x/2 + x/8
@@ -39,7 +39,7 @@ static inline pmf_logarithmic log2_pow_div_3(pmf_logarithmic x) {
 #define log2_pow_2_div_3(x) ((x) - log2_pow_div_3(x))
 #define log2_pow_3_div_2(x) ((x) + (x) / 2)
 
-pmf_logarithmic log2_square(pmf_logarithmic x);
+log2_value_t log2_square(log2_value_t x);
 
 uint8_t leading_zeros(uint8_t x);
 #endif

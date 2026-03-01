@@ -7,9 +7,9 @@
 #include "fas_arch/common.h"
 
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-static pmf_logarithmic log2_timer_freq;
-static pmf_logarithmic log2_timer_freq_div_sqrt_of_2;
-static pmf_logarithmic log2_timer_freq_square_div_2;
+static log2_value_t log2_timer_freq;
+static log2_value_t log2_timer_freq_div_sqrt_of_2;
+static log2_value_t log2_timer_freq_square_div_2;
 #endif
 
 void init_ramp_module() {

@@ -165,7 +165,7 @@ uint8_t leading_zeros(uint8_t x) {
   return res;
 }
 
-pmf_logarithmic log2_from(uint8_t x) {
+log2_value_t log2_from(uint8_t x) {
   // calling with x == 0 is considered an error.
   //
   // In a first step convert to
@@ -196,7 +196,7 @@ pmf_logarithmic log2_from(uint8_t x) {
   return res;
 }
 
-pmf_logarithmic log2_from(uint16_t x) {
+log2_value_t log2_from(uint16_t x) {
   uint8_t leading = leading_zeros(x >> 8);
   if (leading == 8) {
     return log2_from((uint8_t)x);
@@ -222,7 +222,7 @@ pmf_logarithmic log2_from(uint16_t x) {
   x += ((uint16_t)exponent) << 9;
   return x;
 }
-pmf_logarithmic log2_from(uint32_t x) {
+log2_value_t log2_from(uint32_t x) {
   int16_t exp_offset;
   uint16_t w;
   if ((x & 0xff000000) == 0) {
@@ -245,7 +245,7 @@ pmf_logarithmic log2_from(uint32_t x) {
   }
   return log2_from(w) + exp_offset;
 }
-uint16_t log2_to_u16(pmf_logarithmic x) {
+uint16_t log2_to_u16(log2_value_t x) {
   if (x < 0) {
     return 0;
   }
@@ -274,7 +274,7 @@ uint16_t log2_to_u16(pmf_logarithmic x) {
   }
   return x;
 }
-uint32_t log2_to_u32(pmf_logarithmic x) {
+uint32_t log2_to_u32(log2_value_t x) {
   if (x < 0) {
     return 0;
   }
@@ -291,7 +291,7 @@ uint32_t log2_to_u32(pmf_logarithmic x) {
   res <<= shift;
   return res;
 }
-pmf_logarithmic log2_square(pmf_logarithmic x) {
+log2_value_t log2_square(log2_value_t x) {
   if (x > 0x4000) {
     return LOG2_CONST_MAX;
   }
