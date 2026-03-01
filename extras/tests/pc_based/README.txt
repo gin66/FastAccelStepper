@@ -129,49 +129,35 @@ Tests;
   - Verifies motor reaches target with reduced acceleration
 
 - test 21
-  test case for ESP32 I2S stepper implementation with 2µs pulse generation
-  
-  Part 1: I2S init
-  - Tests I2sManager initialization and work buffer allocation
-  
-  Part 2: Direct write
-  - Tests writing and verifying 2µs pulses (both L and R bytes = 0xFF)
-  
-  Part 3: Queue fill
-  - Tests filling I2S buffer from stepper queue commands
-  - Validates pulse positions match expected frames
-  
-  Part 4: Ring buffer clear
-  - Tests old pulse clearing when new pulses are added
-  - Verifies ring buffer tracking of pulse positions
-  
-  Part 5: Frame boundary
-  - Tests pulses near buffer boundary (frames 1990, 1995, 1998)
-  - Validates no off-by-one errors in frame calculation
-  
-  Part 6: Empty queue handling
-  - Tests _isRunning and _i2s_drain state when queue empties
-  - Verifies drain counter decrements correctly
-  
-  Part 7: Ring buffer wrap
-  - Tests ring buffer wrap-around at I2S_TEST_PULSE_MAX capacity
-  
-  Part 8: Edge Cases
-  - 1 pulse at 65535 ticks (max uint16_t)
-    * Tests pulse beyond buffer boundary (2047 frames > 1000 frame limit)
-    * Verifies no pulse written when frame_pos exceeds buffer
-  - 1 pulse at MIN_CMD_TICKS (3200 ticks)
-    * Tests minimum command period
-    * Validates frame calculation: 3200/32 = 100 frames
-  - 255 pulses at 65535 ticks
-    * Tests partial entry processing when pulses don't fit
-    * Validates remaining steps tracked correctly
-  - 255 pulses at 200kHz (80 ticks each)
-    * Tests high-frequency pulse generation
-    * Validates tick carry accumulation for sub-frame periods
-  - Pulses at ticks < I2S_TEST_TICKS_PER_FRAME (16 ticks)
-    * Tests carry accumulation when ticks < 32
-    * Validates multiple pulses per frame handling
+  ESP32 I2S low-level DMA simulation test
+   
+  Focus: Pure DMA infrastructure tests - callbacks, triple buffering, 
+  bit stream analysis. No driver code involved.
+   
+  Part 1: DMA Callback Tests
+  - Callback invocation on consume
+   
+  Part 2: DMA Block Management
+  - Block rotation (0 -> 1 -> 2 -> 0)
+  - Write block advance
+  - Buffer clearing on consume
+  - Write block availability with DMA synchronization
+   
+  Part 3: Bit Stream Analysis
+  - Single pulse detection (rising/falling edges)
+  - Multiple pulses (7 pulses at constant period)
+  - Total ticks per block verification
+   
+  Part 4: DMA Round Tests
+  - 10 rounds with 7 pulses each (70 total pulses)
+  - Buffer content verification
+   
+  Key validation criteria:
+  1. Callbacks must be invoked on each DMA consume
+  2. Triple buffer must rotate correctly (0->1->2->0)
+  3. Write block availability depends on DMA position
+  4. Bit stream analyzer must correctly detect pulses
+  5. Buffer must be cleared after DMA consume
 
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration

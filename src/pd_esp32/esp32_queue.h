@@ -72,11 +72,8 @@ class StepperQueue : public StepperQueueBase {
   int8_t _i2s_step_slot;
   uint32_t _i2s_tick_carry;
   uint8_t _i2s_drain;
-  // Pulse tracking for I2S (per-instance ring buffer)
-  #define I2S_MAX_PULSES 100
-  uint16_t _i2s_pulse_positions[I2S_MAX_PULSES];  // Frame indices with pulses
-  uint16_t _i2s_pulse_write_idx;  // Ring buffer write index
-  uint16_t _i2s_pulse_read_idx;  // Ring buffer read index (for clearing)
+  uint8_t _i2s_pulse_count;
+  uint16_t _i2s_pulse_positions[I2S_MAX_PULSES_PER_BLOCK];
 
   bool init_i2s(uint8_t channel_num, uint8_t step_pin);
   void startQueue_i2s();

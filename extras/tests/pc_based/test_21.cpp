@@ -1,925 +1,444 @@
+// test_21: ESP32 I2S low-level DMA simulation test.
+//
+// Focus: Pure DMA infrastructure tests - callbacks, triple buffering,
+// bit stream analysis. No driver code involved.
+//
+
+#define SUPPORT_ESP32_I2S
+
 #include <assert.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "FastAccelStepper.h"
-#include "fas_queue/stepper_queue.h"
-
-char TCCR1A;
-char TCCR1B;
-char TCCR1C;
-char TIMSK1;
-char TIFR1;
-unsigned short OCR1A;
-unsigned short OCR1B;
-
-StepperQueue fas_queue[NUM_QUEUES];
-
-void inject_fill_interrupt(int mark) {}
-void noInterrupts() {}
-void interrupts() {}
-
-#define I2S_TEST_SAMPLE_RATE_HZ 500000UL
-#define I2S_TEST_TICKS_PER_FRAME 32
-#define I2S_TEST_BYTES_PER_FRAME 2
-#define I2S_TEST_FRAMES_PER_TASK 2000
-#define I2S_TEST_MAX_FRAMES_PER_FILL (I2S_TEST_FRAMES_PER_TASK / 2)
-#define I2S_TEST_BYTES_PER_TASK \
-  (I2S_TEST_FRAMES_PER_TASK * I2S_TEST_BYTES_PER_FRAME)
-#define I2S_TEST_PULSE_MAX 100
-#define I2S_TEST_DRAIN_TASKS 2
-#define I2S_TEST_MIN_SPEED_TICKS 64
-#define I2S_TEST_GPIO_UNUSED 255
-
-typedef struct {
-  bool initialized;
-  int step_pin;
-  int bclk_gpio;
-  int ws_gpio;
-  uint8_t work_buf[I2S_TEST_BYTES_PER_TASK];
-} I2sManagerMock;
-
-static I2sManagerMock g_i2s_mgr = {false, 32, 33, I2S_TEST_GPIO_UNUSED, {0}};
-
-static void i2s_mgr_init(int step_pin, int bclk_gpio, int ws_gpio) {
-  g_i2s_mgr.step_pin = step_pin;
-  g_i2s_mgr.bclk_gpio = bclk_gpio;
-  g_i2s_mgr.ws_gpio = ws_gpio;
-  g_i2s_mgr.initialized = true;
-  memset(g_i2s_mgr.work_buf, 0x00, I2S_TEST_BYTES_PER_TASK);
-}
-
-static uint8_t* i2s_mgr_work_buf() { return g_i2s_mgr.work_buf; }
-
-static void i2s_mgr_clear_work_buf() {
-  memset(g_i2s_mgr.work_buf, 0x00, I2S_TEST_BYTES_PER_TASK);
-}
-
-typedef struct {
-  bool use_i2s;
-  bool _isRunning;
-  uint8_t read_idx;
-  uint8_t next_write_idx;
-  uint32_t _i2s_tick_carry;
-  uint8_t _i2s_drain;
-  uint16_t _i2s_pulse_positions[I2S_TEST_PULSE_MAX];
-  uint16_t _i2s_pulse_write_idx;
-  uint16_t _i2s_pulse_read_idx;
-  struct queue_entry entry[QUEUE_LEN];
-} TestStepperQueue;
-
-static void test_queue_init(TestStepperQueue* q) {
-  q->use_i2s = true;
-  q->_isRunning = false;
-  q->read_idx = 0;
-  q->next_write_idx = 0;
-  q->_i2s_tick_carry = 0;
-  q->_i2s_drain = 0;
-  q->_i2s_pulse_write_idx = 0;
-  q->_i2s_pulse_read_idx = 0;
-  memset(q->_i2s_pulse_positions, 0, sizeof(q->_i2s_pulse_positions));
-  memset(q->entry, 0, sizeof(q->entry));
-}
-
-static void test_queue_add_entry(TestStepperQueue* q, uint16_t ticks,
-                                 uint8_t steps) {
-  if (q->next_write_idx - q->read_idx < QUEUE_LEN) {
-    q->entry[q->next_write_idx & QUEUE_LEN_MASK].ticks = ticks;
-    q->entry[q->next_write_idx & QUEUE_LEN_MASK].steps = steps;
-    q->entry[q->next_write_idx & QUEUE_LEN_MASK].toggle_dir = 0;
-    q->next_write_idx++;
-  }
-}
-
-static void test_queue_fill_i2s_buffer(TestStepperQueue* q) {
-  if (!q->use_i2s) {
-    return;
-  }
-  if (!q->_isRunning && (q->_i2s_drain == 0)) {
-    return;
-  }
-
-  uint8_t* buf = i2s_mgr_work_buf();
-  uint32_t frame_pos = 0;
-  uint32_t tick_carry = q->_i2s_tick_carry;
-
-  uint8_t rp = q->read_idx;
-  const uint8_t wp = q->next_write_idx;
-
-  while (q->_i2s_pulse_read_idx != q->_i2s_pulse_write_idx) {
-    uint16_t frame_idx = q->_i2s_pulse_positions[q->_i2s_pulse_read_idx];
-    buf[frame_idx * I2S_TEST_BYTES_PER_FRAME] = 0x00;
-    buf[frame_idx * I2S_TEST_BYTES_PER_FRAME + 1] = 0x00;
-    q->_i2s_pulse_read_idx = (q->_i2s_pulse_read_idx + 1) % I2S_TEST_PULSE_MAX;
-  }
-
-  while (frame_pos < I2S_TEST_MAX_FRAMES_PER_FILL) {
-    if (rp == wp) {
-      if (q->_isRunning) {
-        q->_isRunning = false;
-        q->_i2s_drain = I2S_TEST_DRAIN_TASKS;
-      }
-      break;
-    }
-
-    struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];
-
-    if (e->steps == 0) {
-      uint32_t total = (uint32_t)e->ticks + tick_carry;
-      uint32_t frames = total / I2S_TEST_TICKS_PER_FRAME;
-      tick_carry = total % I2S_TEST_TICKS_PER_FRAME;
-      frame_pos += frames;
-      rp++;
-    } else {
-      uint8_t steps = e->steps;
-      const uint16_t ticks = e->ticks;
-      uint8_t s = 0;
-
-      while (s < steps) {
-        uint32_t total = (uint32_t)ticks + tick_carry;
-        uint32_t frames = total / I2S_TEST_TICKS_PER_FRAME;
-        tick_carry = total % I2S_TEST_TICKS_PER_FRAME;
-        frame_pos += frames;
-
-        if (frame_pos >= I2S_TEST_MAX_FRAMES_PER_FILL) {
-          break;
-        }
-
-        buf[frame_pos * I2S_TEST_BYTES_PER_FRAME] = 0xFF;
-        buf[frame_pos * I2S_TEST_BYTES_PER_FRAME + 1] = 0xFF;
-
-        q->_i2s_pulse_positions[q->_i2s_pulse_write_idx] = (uint16_t)frame_pos;
-        q->_i2s_pulse_write_idx =
-            (q->_i2s_pulse_write_idx + 1) % I2S_TEST_PULSE_MAX;
-        s++;
-      }
-
-      if (s == steps) {
-        rp++;
-      } else {
-        e->steps -= s;
-        break;
-      }
-    }
-  }
-
-  q->_i2s_tick_carry = tick_carry;
-  q->read_idx = rp;
-
-  if (q->_i2s_drain > 0) {
-    q->_i2s_drain--;
-  }
-}
+#include "pd_esp32/i2s_constants.h"
 
 static int test_passed = 0;
 static int test_failed = 0;
 
-static void test_result(const char* test_name, bool passed) {
+static void test_result(const char* name, bool passed) {
   if (passed) {
-    printf("PASS: %s\n", test_name);
+    printf("PASS: %s\n", name);
     test_passed++;
   } else {
-    printf("FAIL: %s\n", test_name);
+    printf("FAIL: %s\n", name);
     test_failed++;
   }
 }
 
-static bool verify_pulse_at_frame(uint8_t* buf, uint16_t frame) {
-  if (buf[frame * I2S_TEST_BYTES_PER_FRAME] != 0xFF) {
-    printf("  FAIL at frame %d: L-byte = 0x%02X, expected 0xFF\n", frame,
-           buf[frame * I2S_TEST_BYTES_PER_FRAME]);
-    return false;
-  }
-  if (buf[frame * I2S_TEST_BYTES_PER_FRAME + 1] != 0xFF) {
-    printf("  FAIL at frame %d: R-byte = 0x%02X, expected 0xFF\n", frame,
-           buf[frame * I2S_TEST_BYTES_PER_FRAME + 1]);
-    return false;
-  }
-  return true;
-}
+// ---------------------------------------------------------------------------
+// Mock I2sManager with callback support
+// ---------------------------------------------------------------------------
 
-static bool verify_no_pulse_at_frame(uint8_t* buf, uint16_t frame) {
-  if (buf[frame * I2S_TEST_BYTES_PER_FRAME] != 0x00 ||
-      buf[frame * I2S_TEST_BYTES_PER_FRAME + 1] != 0x00) {
-    printf("  FAIL at frame %d: expected 0x00, got L=0x%02X R=0x%02X\n", frame,
-           buf[frame * I2S_TEST_BYTES_PER_FRAME],
-           buf[frame * I2S_TEST_BYTES_PER_FRAME + 1]);
-    return false;
-  }
-  return true;
-}
+typedef void (*i2s_dma_callback_t)(uint8_t block);
 
-static void test_i2s_init() {
-  printf("Running: I2S init\n");
+class I2sManager {
+ public:
+  static I2sManager& instance();
 
-  i2s_mgr_init(32, 33, I2S_TEST_GPIO_UNUSED);
-
-  if (!g_i2s_mgr.initialized) {
-    printf("  I2S init: FAILED\n");
-    test_result("I2S init", false);
-    return;
+  bool init(int, int, int) {
+    _initialized = true;
+    for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
+      memset(_bufs[i], 0, I2S_BYTES_PER_BLOCK);
+    }
+    _dma_block = 0;
+    _write_block = 0;
+    _callback_count = 0;
+    return true;
   }
 
-  printf("  I2S init: OK\n");
+  bool isInitialized() const { return _initialized; }
 
-  uint8_t* work_buf = i2s_mgr_work_buf();
-  if (work_buf == NULL) {
-    printf("  Work buffer: FAILED (NULL)\n");
-    test_result("I2S init", false);
-    return;
-  }
+  uint8_t* blockBuf(uint8_t block) { return _bufs[block % I2S_BLOCK_COUNT]; }
 
-  printf("  Work buffer: OK (size=%d)\n", I2S_TEST_BYTES_PER_TASK);
-  test_result("I2S init", true);
-}
-
-static void test_i2s_direct_write() {
-  printf("Running: I2S direct write\n");
-
-  i2s_mgr_clear_work_buf();
-
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  uint16_t pulse_frames[4] = {500, 1000, 1500, 2000};
-  for (int i = 0; i < 4; i++) {
-    uint16_t frame = pulse_frames[i];
-    buf[frame * I2S_TEST_BYTES_PER_FRAME] = 0xFF;
-    buf[frame * I2S_TEST_BYTES_PER_FRAME + 1] = 0xFF;
-  }
-
-  for (int i = 0; i < 4; i++) {
-    if (!verify_pulse_at_frame(buf, pulse_frames[i])) {
-      test_result("I2S direct write", false);
-      return;
+  void clearBlock(uint8_t block) {
+    if (block < I2S_BLOCK_COUNT) {
+      memset(_bufs[block], 0x00, I2S_BYTES_PER_BLOCK);
     }
   }
 
-  printf("  Wrote and verified 4 pulses at frames 500, 1000, 1500, 2000\n");
-  test_result("I2S direct write", true);
-}
+  uint8_t dmaBlock() const { return _dma_block; }
+  uint8_t writeBlock() const { return _write_block; }
 
-static void test_i2s_queue_fill() {
-  printf("Running: I2S queue fill\n");
+  bool isWriteBlockAvailable() const {
+    uint8_t next_write = (_write_block + 1) % I2S_BLOCK_COUNT;
+    return next_write != _dma_block;
+  }
 
-  i2s_mgr_clear_work_buf();
+  void markWriteBlockPrepared() {
+    _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
+  }
 
-  TestStepperQueue q;
-  test_queue_init(&q);
+  void registerDmaCallback(i2s_dma_callback_t cb) { _dma_callback = cb; }
 
-  q._isRunning = true;
-  test_queue_add_entry(&q, 1000, 1);
-  test_queue_add_entry(&q, 1000, 1);
-  test_queue_add_entry(&q, 1000, 1);
-  test_queue_add_entry(&q, 1000, 1);
+  void dmaConsumeBlock() {
+    if (_dma_callback) {
+      _dma_callback(_dma_block);
+      _callback_count++;
+    }
+    memset(_bufs[_dma_block], 0, I2S_BYTES_PER_BLOCK);
+    _dma_block = (_dma_block + 1) % I2S_BLOCK_COUNT;
+  }
 
-  test_queue_fill_i2s_buffer(&q);
+  uint32_t callbackCount() const { return _callback_count; }
 
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  printf("  Checking pulse positions from ring buffer:\n");
-  for (int i = 0; i < 4; i++) {
-    uint16_t frame = q._i2s_pulse_positions[i];
-    printf("    Pulse %d at frame %d\n", i, frame);
-
-    if (!verify_pulse_at_frame(buf, frame)) {
-      test_result("I2S queue fill", false);
-      return;
+  I2sManager()
+      : _initialized(false),
+        _dma_block(0),
+        _write_block(0),
+        _callback_count(0),
+        _dma_callback(nullptr) {
+    for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
+      memset(_bufs[i], 0, I2S_BYTES_PER_BLOCK);
     }
   }
 
-  printf("  Verified 4 pulses written from queue\n");
-  test_result("I2S queue fill", true);
-}
+ private:
+  bool _initialized;
+  uint8_t _bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
+  uint8_t _dma_block;
+  uint8_t _write_block;
+  uint32_t _callback_count;
+  i2s_dma_callback_t _dma_callback;
+};
 
-static void test_i2s_ring_buffer_clear() {
-  printf("Running: I2S ring buffer clear\n");
+static I2sManager s_i2s_mgr;
+inline I2sManager& I2sManager::instance() { return s_i2s_mgr; }
 
-  i2s_mgr_clear_work_buf();
+// ---------------------------------------------------------------------------
+// Bit stream analyzer - receives tick-level pin states
+// ---------------------------------------------------------------------------
+// Bit stream analyzer - receives tick-level pin states
+// ---------------------------------------------------------------------------
+// Bit stream analyzer - receives tick-level pin states
+// ---------------------------------------------------------------------------
 
-  TestStepperQueue q;
-  test_queue_init(&q);
+class BitStreamAnalyzer {
+ public:
+  uint32_t rising_edges;
+  uint32_t falling_edges;
+  uint32_t total_ticks;
+  uint32_t last_rising_tick;
+  uint32_t last_falling_tick;
+  bool last_level;
 
-  q._isRunning = true;
-  test_queue_add_entry(&q, 1000, 4);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-  uint16_t first_pulse_frame = q._i2s_pulse_positions[0];
-  uint16_t second_pulse_frame = q._i2s_pulse_positions[1];
-
-  if (!verify_pulse_at_frame(buf, first_pulse_frame)) {
-    printf("  FAIL: First pulse not found\n");
-    test_result("I2S ring buffer clear", false);
-    return;
+  void reset() {
+    rising_edges = 0;
+    falling_edges = 0;
+    total_ticks = 0;
+    last_rising_tick = 0;
+    last_falling_tick = 0;
+    last_level = false;
   }
 
-  printf(
-      "  First fill: 4 pulses written, first at frame %d, second at frame %d\n",
-      first_pulse_frame, second_pulse_frame);
-  printf("  Pulse ring: write_idx=%d, read_idx=%d\n", q._i2s_pulse_write_idx,
-         q._i2s_pulse_read_idx);
-
-  test_queue_add_entry(&q, 800, 4);
-  q._isRunning = true;
-
-  test_queue_fill_i2s_buffer(&q);
-
-  printf("  After second fill (800 ticks): write_idx=%d, read_idx=%d\n",
-         q._i2s_pulse_write_idx, q._i2s_pulse_read_idx);
-
-  if (!verify_no_pulse_at_frame(buf, first_pulse_frame)) {
-    printf("  FAIL: Old pulse at frame %d not cleared\n", first_pulse_frame);
-    test_result("I2S ring buffer clear", false);
-    return;
-  }
-  if (!verify_no_pulse_at_frame(buf, second_pulse_frame)) {
-    printf("  FAIL: Old pulse at frame %d not cleared\n", second_pulse_frame);
-    test_result("I2S ring buffer clear", false);
-    return;
-  }
-
-  uint16_t new_first_pulse_frame = q._i2s_pulse_positions[4];
-  printf("  Old pulses at frames %d, %d were cleared\n", first_pulse_frame,
-         second_pulse_frame);
-  printf("  New pulses start at frame %d\n", new_first_pulse_frame);
-
-  test_result("I2S ring buffer clear", true);
-}
-
-static void test_i2s_frame_boundary() {
-  printf("Running: I2S frame boundary\n");
-
-  i2s_mgr_clear_work_buf();
-
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  q._isRunning = true;
-
-  uint16_t frames[] = {490, 495, 498};
-  uint16_t ticks = 0;
-  for (int i = 0; i < 3; i++) {
-    uint16_t frame = frames[i];
-    uint16_t frames_needed = frame - ticks;
-    uint16_t ticks_needed = frames_needed * I2S_TEST_TICKS_PER_FRAME;
-    test_queue_add_entry(&q, ticks_needed, 1);
-    ticks = frame;
-  }
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  for (int i = 0; i < 3; i++) {
-    uint16_t frame = q._i2s_pulse_positions[i];
-    printf("  Pulse %d at frame %d\n", i, frame);
-
-    if (frame >= I2S_TEST_MAX_FRAMES_PER_FILL) {
-      printf("  FAIL: Pulse at frame %d beyond buffer boundary\n", frame);
-      test_result("I2S frame boundary", false);
-      return;
+  void processTick(bool level) {
+    if (level && !last_level) {
+      last_rising_tick = total_ticks;
+      rising_edges++;
+    } else if (!level && last_level) {
+      last_falling_tick = total_ticks;
+      falling_edges++;
     }
+    last_level = level;
+    total_ticks++;
+  }
 
-    if (!verify_pulse_at_frame(buf, frame)) {
-      test_result("I2S frame boundary", false);
-      return;
+  uint32_t pulseCount() const { return rising_edges; }
+};
+
+static BitStreamAnalyzer s_analyzer;
+
+// ---------------------------------------------------------------------------
+// DMA callback - processes buffer and sends to bit stream analyzer
+//
+// TODO: For driver integration tests (test_22), this callback should invoke
+// the driver's fill_i2s_buffer() function to simulate real hardware behavior.
+// For these low-level infrastructure tests, we only analyze the buffer content.
+// ---------------------------------------------------------------------------
+
+static void dmaCallback(uint8_t block) {
+  I2sManager& mgr = I2sManager::instance();
+  const uint8_t* buf = mgr.blockBuf(block);
+
+  for (uint16_t frame = 0; frame < I2S_FRAMES_PER_BLOCK; frame++) {
+    uint8_t byte_val = buf[frame * I2S_BYTES_PER_FRAME];
+    bool pin_level = (byte_val & 0x80) != 0;
+
+    for (uint16_t tick = 0; tick < I2S_TICKS_PER_FRAME; tick++) {
+      s_analyzer.processTick(pin_level);
     }
   }
-
-  printf("  Verified frame boundary handling - no off-by-one errors\n");
-  test_result("I2S frame boundary", true);
 }
 
-static void test_i2s_empty_queue() {
-  printf("Running: I2S empty queue\n");
+// ---------------------------------------------------------------------------
+// Helper to write pulses to buffer
+// ---------------------------------------------------------------------------
 
-  i2s_mgr_clear_work_buf();
-
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  q._isRunning = true;
-  test_queue_add_entry(&q, 1000, 1);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint16_t pulse_frame = q._i2s_pulse_positions[0];
-  printf("  First pass: pulse at frame %d\n", pulse_frame);
-
-  if (q._isRunning) {
-    printf("  FAIL: _isRunning should be false after queue emptied\n");
-    test_result("I2S empty queue", false);
-    return;
-  }
-
-  uint8_t expected_drain = I2S_TEST_DRAIN_TASKS - 1;
-  if (q._i2s_drain != expected_drain) {
-    printf("  FAIL: _i2s_drain = %d, expected %d\n", q._i2s_drain,
-           expected_drain);
-    test_result("I2S empty queue", false);
-    return;
-  }
-
-  printf(
-      "  Queue emptied, _isRunning=false, _i2s_drain=%d (decremented in same "
-      "cycle)\n",
-      q._i2s_drain);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  if (q._i2s_drain != expected_drain - 1) {
-    printf("  FAIL: Drain counter not decremented on second fill\n");
-    test_result("I2S empty queue", false);
-    return;
-  }
-
-  printf("  Drain counter decremented to %d\n", expected_drain - 1);
-
-  test_result("I2S empty queue", true);
+static void write_pulse_to_buffer(uint8_t* buf, uint16_t frame) {
+  buf[frame * I2S_BYTES_PER_FRAME] = 0x80;
 }
 
-static void test_i2s_ring_buffer_wrap() {
-  printf("Running: I2S ring buffer wrap\n");
+// ---------------------------------------------------------------------------
+// Low-level DMA tests
+// ---------------------------------------------------------------------------
 
-  i2s_mgr_clear_work_buf();
+static void test_dma_callback_invoked() {
+  printf("Running: DMA callback invoked on consume\n");
 
-  TestStepperQueue q;
-  test_queue_init(&q);
+  s_analyzer.reset();
+  I2sManager::instance().init(32, 33, -1);
+  I2sManager::instance().registerDmaCallback(dmaCallback);
 
-  q._isRunning = true;
+  I2sManager::instance().dmaConsumeBlock();
+  I2sManager::instance().dmaConsumeBlock();
+  I2sManager::instance().dmaConsumeBlock();
 
-  int entries_added = 0;
-  for (int i = 0; i < QUEUE_LEN; i++) {
-    test_queue_add_entry(&q, 32, 1);
-    entries_added++;
-  }
+  uint32_t callbacks = I2sManager::instance().callbackCount();
+  printf("  Callbacks: %u (expected 3)\n", callbacks);
 
-  test_queue_fill_i2s_buffer(&q);
-
-  printf("  Added %d entries at 32 ticks each, write_idx=%d, read_idx=%d\n",
-         entries_added, q._i2s_pulse_write_idx, q._i2s_pulse_read_idx);
-
-  uint16_t pulses_first_fill = q._i2s_pulse_write_idx;
-  printf("  First fill wrote %d pulses\n", pulses_first_fill);
-
-  q._i2s_pulse_read_idx = q._i2s_pulse_write_idx;
-
-  for (int i = 0; i < QUEUE_LEN; i++) {
-    test_queue_add_entry(&q, 32, 1);
-  }
-  test_queue_fill_i2s_buffer(&q);
-
-  printf("  After second fill: write_idx=%d, read_idx=%d\n",
-         q._i2s_pulse_write_idx, q._i2s_pulse_read_idx);
-
-  uint16_t total_pulses =
-      pulses_first_fill + (QUEUE_LEN > I2S_TEST_PULSE_MAX ? 0 : QUEUE_LEN);
-  bool wrap_occurred = (q._i2s_pulse_write_idx < pulses_first_fill);
-
-  printf("  Wrap occurred: %s\n", wrap_occurred ? "yes" : "no");
-
-  if (q._i2s_pulse_write_idx >= I2S_TEST_PULSE_MAX) {
-    printf("  FAIL: write_idx should wrap, got %d\n", q._i2s_pulse_write_idx);
-    test_result("I2S ring buffer wrap", false);
-    return;
-  }
-
-  test_result("I2S ring buffer wrap", true);
+  test_result("DMA callback invoked", callbacks == 3);
 }
 
-static void test_i2s_multi_step_entry() {
-  printf("Running: I2S multi-step entry\n");
+static void test_dma_block_rotation() {
+  printf("Running: DMA block rotation\n");
 
-  i2s_mgr_clear_work_buf();
+  I2sManager::instance().init(32, 33, -1);
 
-  TestStepperQueue q;
-  test_queue_init(&q);
+  uint8_t b0 = I2sManager::instance().dmaBlock();
+  I2sManager::instance().dmaConsumeBlock();
+  uint8_t b1 = I2sManager::instance().dmaBlock();
+  I2sManager::instance().dmaConsumeBlock();
+  uint8_t b2 = I2sManager::instance().dmaBlock();
+  I2sManager::instance().dmaConsumeBlock();
+  uint8_t b3 = I2sManager::instance().dmaBlock();
 
-  q._isRunning = true;
-  test_queue_add_entry(&q, 320, 10);
+  printf("  Blocks: %u -> %u -> %u -> %u\n", b0, b1, b2, b3);
+  printf("  Expected: 0 -> 1 -> 2 -> 0 (modulo 3)\n");
 
-  test_queue_fill_i2s_buffer(&q);
+  bool correct = (b0 == 0) && (b1 == 1) && (b2 == 2) && (b3 == 0);
+  test_result("DMA block rotation", correct);
+}
 
-  uint8_t* buf = i2s_mgr_work_buf();
+static void test_dma_write_block_advance() {
+  printf("Running: DMA write block advance\n");
 
-  printf("  Checking 10 pulses from single multi-step entry:\n");
-  for (int i = 0; i < 10; i++) {
-    uint16_t frame = q._i2s_pulse_positions[i];
-    printf("    Pulse %d at frame %d\n", i, frame);
+  I2sManager::instance().init(32, 33, -1);
 
-    if (frame >= I2S_TEST_MAX_FRAMES_PER_FILL) {
-      printf("  FAIL: Pulse %d at frame %d beyond boundary\n", i, frame);
-      test_result("I2S multi-step entry", false);
-      return;
-    }
+  uint8_t w0 = I2sManager::instance().writeBlock();
+  I2sManager::instance().markWriteBlockPrepared();
+  uint8_t w1 = I2sManager::instance().writeBlock();
+  I2sManager::instance().markWriteBlockPrepared();
+  uint8_t w2 = I2sManager::instance().writeBlock();
+  I2sManager::instance().markWriteBlockPrepared();
+  uint8_t w3 = I2sManager::instance().writeBlock();
 
-    if (!verify_pulse_at_frame(buf, frame)) {
-      test_result("I2S multi-step entry", false);
-      return;
+  printf("  Write blocks: %u -> %u -> %u -> %u\n", w0, w1, w2, w3);
+  printf("  Expected: 0 -> 1 -> 2 -> 0 (modulo 3)\n");
+
+  bool correct = (w0 == 0) && (w1 == 1) && (w2 == 2) && (w3 == 0);
+  test_result("DMA write block advance", correct);
+}
+
+static void test_dma_buffer_clearing() {
+  printf("Running: DMA buffer clearing on consume\n");
+
+  I2sManager::instance().init(32, 33, -1);
+  uint8_t* buf = I2sManager::instance().blockBuf(0);
+
+  memset(buf, 0xFF, I2S_BYTES_PER_BLOCK);
+  printf("  Buffer 0 filled with 0xFF\n");
+
+  I2sManager::instance().dmaConsumeBlock();
+
+  buf = I2sManager::instance().blockBuf(0);
+
+  bool all_zero = true;
+  for (uint16_t i = 0; i < I2S_BYTES_PER_BLOCK; i++) {
+    if (buf[i] != 0x00) {
+      all_zero = false;
+      break;
     }
   }
 
-  printf("  Verified 10 pulses from single queue entry\n");
-  test_result("I2S multi-step entry", true);
+  printf("  After consume, block 0 all zeros: %s\n", all_zero ? "yes" : "no");
+  test_result("DMA buffer clearing", all_zero);
 }
 
-static void test_i2s_tick_carry() {
-  printf("Running: I2S tick carry\n");
+static void test_dma_block_availability() {
+  printf("Running: DMA write block availability\n");
 
-  i2s_mgr_clear_work_buf();
+  I2sManager::instance().init(32, 33, -1);
 
-  TestStepperQueue q;
-  test_queue_init(&q);
+  bool avail0 = I2sManager::instance().isWriteBlockAvailable();
+  printf("  Initial (dma=0, write=0): available=%s\n", avail0 ? "yes" : "no");
 
-  q._isRunning = true;
-  test_queue_add_entry(&q, 33, 1);
-  test_queue_add_entry(&q, 33, 1);
-  test_queue_add_entry(&q, 33, 1);
+  I2sManager::instance().markWriteBlockPrepared();
+  bool avail1 = I2sManager::instance().isWriteBlockAvailable();
+  printf("  After 1 prepare (dma=0, write=1): available=%s\n",
+         avail1 ? "yes" : "no");
 
-  test_queue_fill_i2s_buffer(&q);
+  I2sManager::instance().markWriteBlockPrepared();
+  bool avail2 = I2sManager::instance().isWriteBlockAvailable();
+  printf("  After 2 prepares (dma=0, write=2): available=%s\n",
+         avail2 ? "yes" : "no");
 
-  printf("  3 pulses with 33 ticks each (1 tick carry per step):\n");
-  for (int i = 0; i < 3; i++) {
-    uint16_t frame = q._i2s_pulse_positions[i];
-    printf("    Pulse %d at frame %d\n", i, frame);
-  }
+  I2sManager::instance().dmaConsumeBlock();
+  bool avail3 = I2sManager::instance().isWriteBlockAvailable();
+  printf("  After 1 consume (dma=1, write=2): available=%s\n",
+         avail3 ? "yes" : "no");
 
-  uint16_t frame0 = q._i2s_pulse_positions[0];
-  uint16_t frame1 = q._i2s_pulse_positions[1];
-  uint16_t frame2 = q._i2s_pulse_positions[2];
-
-  uint16_t delta01 = frame1 - frame0;
-  uint16_t delta12 = frame2 - frame1;
-
-  printf("  Frame deltas: %d, %d (should be 1 each due to carry)\n", delta01,
-         delta12);
-
-  if (delta01 != 1 || delta12 != 1) {
-    printf("  FAIL: Tick carry not accumulated correctly\n");
-    test_result("I2S tick carry", false);
-    return;
-  }
-
-  test_result("I2S tick carry", true);
+  bool correct = avail0 && avail1 && !avail2 && avail3;
+  test_result("DMA write block availability", correct);
 }
 
-static void test_i2s_pause_entry() {
-  printf("Running: I2S pause entry\n");
+static void test_bit_stream_single_pulse() {
+  printf("Running: Bit stream single pulse detection\n");
 
-  i2s_mgr_clear_work_buf();
+  s_analyzer.reset();
 
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  q._isRunning = true;
-  test_queue_add_entry(&q, 1000, 1);
-  test_queue_add_entry(&q, 3200, 0);
-  test_queue_add_entry(&q, 1000, 1);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  uint16_t frame0 = q._i2s_pulse_positions[0];
-  uint16_t frame1 = q._i2s_pulse_positions[1];
-
-  printf("  Pulse 0 at frame %d, Pulse 1 at frame %d\n", frame0, frame1);
-
-  uint16_t pause_frames = 3200 / I2S_TEST_TICKS_PER_FRAME;
-  uint16_t step_frames = 1000 / I2S_TEST_TICKS_PER_FRAME;
-  uint16_t expected_gap = pause_frames + step_frames;
-  uint16_t actual_gap = frame1 - frame0;
-
-  printf("  Expected gap: %d frames (pause:%d + step2:%d)\n", expected_gap,
-         pause_frames, step_frames);
-  printf("  Actual gap: %d frames\n", actual_gap);
-
-  int16_t diff = (int16_t)actual_gap - (int16_t)expected_gap;
-  if (diff < -2 || diff > 2) {
-    printf("  FAIL: Pause entry gap incorrect (diff=%d)\n", diff);
-    test_result("I2S pause entry", false);
-    return;
+  for (int i = 0; i < 100; i++) {
+    s_analyzer.processTick(false);
+  }
+  for (int i = 0; i < 64; i++) {
+    s_analyzer.processTick(true);
+  }
+  for (int i = 0; i < 100; i++) {
+    s_analyzer.processTick(false);
   }
 
-  if (!verify_pulse_at_frame(buf, frame0) ||
-      !verify_pulse_at_frame(buf, frame1)) {
-    printf("  FAIL: Pulses not written correctly\n");
-    test_result("I2S pause entry", false);
-    return;
-  }
+  printf("  Rising edges: %u (expected 1)\n", s_analyzer.rising_edges);
+  printf("  Falling edges: %u (expected 1)\n", s_analyzer.falling_edges);
+  printf("  Total ticks: %u (expected 264)\n", s_analyzer.total_ticks);
 
-  test_result("I2S pause entry", true);
+  bool correct = (s_analyzer.rising_edges == 1) &&
+                 (s_analyzer.falling_edges == 1) &&
+                 (s_analyzer.total_ticks == 264);
+  test_result("Bit stream single pulse", correct);
 }
 
-static void test_i2s_buffer_overflow_protection() {
-  printf("Running: I2S buffer overflow protection\n");
+static void test_bit_stream_multiple_pulses() {
+  printf("Running: Bit stream 7 pulses detection\n");
 
-  i2s_mgr_clear_work_buf();
+  s_analyzer.reset();
 
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  q._isRunning = true;
-
-  for (int i = 0; i < I2S_TEST_PULSE_MAX + 10; i++) {
-    test_queue_add_entry(&q, 32, 1);
-  }
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint16_t pulses_written = q._i2s_pulse_write_idx;
-  uint16_t write_wrap_count = (I2S_TEST_PULSE_MAX + 10) / I2S_TEST_PULSE_MAX;
-
-  printf("  Added %d entries, write_idx=%d (wrapped %d time(s))\n",
-         I2S_TEST_PULSE_MAX + 10, pulses_written, write_wrap_count);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-  int valid_pulses = 0;
-  for (int i = 0; i < I2S_TEST_PULSE_MAX; i++) {
-    uint16_t frame = q._i2s_pulse_positions[i];
-    if (frame < I2S_TEST_MAX_FRAMES_PER_FILL &&
-        buf[frame * I2S_TEST_BYTES_PER_FRAME] == 0xFF) {
-      valid_pulses++;
+  for (int pulse = 0; pulse < 7; pulse++) {
+    for (int i = 0; i < 64; i++) {
+      s_analyzer.processTick(true);
+    }
+    for (int i = 0; i < 64 * 49; i++) {
+      s_analyzer.processTick(false);
     }
   }
 
-  printf("  Valid pulses in ring: %d (ring size: %d)\n", valid_pulses,
-         I2S_TEST_PULSE_MAX);
+  printf("  Pulses detected: %u (expected 7)\n", s_analyzer.pulseCount());
+  printf("  Total ticks: %u (expected %u)\n", s_analyzer.total_ticks,
+         7 * 64 * 50);
 
-  if (pulses_written >= I2S_TEST_PULSE_MAX) {
-    printf("  Ring buffer wrapped correctly\n");
-  }
-
-  test_result("I2S buffer overflow protection", true);
+  bool correct =
+      (s_analyzer.pulseCount() == 7) && (s_analyzer.total_ticks == 7 * 64 * 50);
+  test_result("Bit stream 7 pulses", correct);
 }
 
-static void test_i2s_partial_entry_processing() {
-  printf("Running: I2S partial entry processing\n");
+static void test_dma_10_rounds_7_pulses() {
+  printf("Running: DMA 10 rounds with 7 pulses each\n");
 
-  i2s_mgr_clear_work_buf();
+  s_analyzer.reset();
+  I2sManager::instance().init(32, 33, -1);
+  I2sManager::instance().registerDmaCallback(dmaCallback);
 
-  TestStepperQueue q;
-  test_queue_init(&q);
+  for (int round = 0; round < 10; round++) {
+    uint8_t blk = I2sManager::instance().dmaBlock();
+    uint8_t* buf = I2sManager::instance().blockBuf(blk);
 
-  q._isRunning = true;
+    for (int pulse = 0; pulse < 7; pulse++) {
+      uint16_t frame = (pulse * 35) % I2S_FRAMES_PER_BLOCK;
+      write_pulse_to_buffer(buf, frame);
+    }
 
-  test_queue_add_entry(&q, 500, 5);
+    I2sManager::instance().dmaConsumeBlock();
+  }
 
-  test_queue_fill_i2s_buffer(&q);
+  printf("  DMA rounds: %u (expected 10)\n",
+         I2sManager::instance().callbackCount());
+  printf("  Total pulses detected: %u (expected 70)\n",
+         s_analyzer.pulseCount());
 
-  printf("  First fill: wrote pulses at frames:\n");
-  for (int i = 0; i < 5; i++) {
-    if (q._i2s_pulse_positions[i] != 0 || i == 0) {
-      printf("    Pulse %d at frame %d\n", i, q._i2s_pulse_positions[i]);
+  bool correct = (I2sManager::instance().callbackCount() == 10) &&
+                 (s_analyzer.pulseCount() == 70);
+  test_result("DMA 10 rounds 7 pulses", correct);
+}
+
+static void test_dma_buffer_content() {
+  printf("Running: DMA buffer content verification\n");
+
+  I2sManager::instance().init(32, 33, -1);
+  uint8_t* buf = I2sManager::instance().blockBuf(0);
+
+  write_pulse_to_buffer(buf, 0);
+  write_pulse_to_buffer(buf, 50);
+  write_pulse_to_buffer(buf, 100);
+  write_pulse_to_buffer(buf, 150);
+  write_pulse_to_buffer(buf, 200);
+  write_pulse_to_buffer(buf, 249);
+
+  uint32_t pulse_frames = 0;
+  for (uint16_t f = 0; f < I2S_FRAMES_PER_BLOCK; f++) {
+    if (buf[f * I2S_BYTES_PER_FRAME] & 0x80) {
+      pulse_frames++;
     }
   }
 
-  bool entry_consumed = (q.read_idx == q.next_write_idx);
-  printf("  Entry consumed: %s (read_idx=%d, write_idx=%d)\n",
-         entry_consumed ? "yes" : "no", q.read_idx, q.next_write_idx);
+  printf("  Wrote 6 pulse frames\n");
+  printf("  Detected pulse frames: %u\n", pulse_frames);
 
-  test_queue_add_entry(&q, 500, 5);
-  test_queue_fill_i2s_buffer(&q);
-
-  printf("  Second fill: read_idx=%d, write_idx=%d\n", q.read_idx,
-         q.next_write_idx);
-
-  printf("  Partial processing works correctly\n");
-  test_result("I2S partial entry processing", true);
+  test_result("DMA buffer content", pulse_frames == 6);
 }
 
-static void test_edge_1_pulse_65535_ticks() {
-  printf("Running: Edge case - 1 pulse at 65535 ticks (max uint16_t)\n");
+static void test_dma_total_ticks_per_block() {
+  printf("Running: DMA total ticks per block\n");
 
-  i2s_mgr_clear_work_buf();
+  s_analyzer.reset();
+  I2sManager::instance().init(32, 33, -1);
+  I2sManager::instance().registerDmaCallback(dmaCallback);
 
-  TestStepperQueue q;
-  test_queue_init(&q);
+  uint8_t* buf =
+      I2sManager::instance().blockBuf(I2sManager::instance().dmaBlock());
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
 
-  q._isRunning = true;
-  test_queue_add_entry(&q, 65535, 1);
+  I2sManager::instance().dmaConsumeBlock();
 
-  test_queue_fill_i2s_buffer(&q);
+  uint32_t expected_ticks = I2S_FRAMES_PER_BLOCK * I2S_TICKS_PER_FRAME;
+  printf("  Ticks per block: %u (expected %u)\n", s_analyzer.total_ticks,
+         expected_ticks);
 
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  uint32_t expected_frame = 65535 / I2S_TEST_TICKS_PER_FRAME;
-  printf("  Expected frame: %u (65535 / %d)\n", expected_frame,
-         I2S_TEST_TICKS_PER_FRAME);
-
-  if (expected_frame >= I2S_TEST_MAX_FRAMES_PER_FILL) {
-    printf("  Pulse exceeds buffer, checking no pulse written\n");
-    for (uint32_t f = 0; f < 10; f++) {
-      if (buf[f * I2S_TEST_BYTES_PER_FRAME] != 0x00 ||
-          buf[f * I2S_TEST_BYTES_PER_FRAME + 1] != 0x00) {
-        printf("  FAIL: Unexpected pulse at frame %u\n", f);
-        test_result("Edge 1 pulse 65535 ticks", false);
-        return;
-      }
-    }
-    printf("  Correctly handled - pulse beyond buffer, none written\n");
-  } else {
-    uint16_t pulse_frame = q._i2s_pulse_positions[0];
-    printf("  Pulse at frame %d\n", pulse_frame);
-
-    if (pulse_frame != expected_frame) {
-      printf("  FAIL: Expected frame %u, got %d\n", expected_frame,
-             pulse_frame);
-      test_result("Edge 1 pulse 65535 ticks", false);
-      return;
-    }
-    if (!verify_pulse_at_frame(buf, pulse_frame)) {
-      test_result("Edge 1 pulse 65535 ticks", false);
-      return;
-    }
-  }
-
-  test_result("Edge 1 pulse 65535 ticks", true);
-}
-
-static void test_edge_1_pulse_min_ticks() {
-  printf("Running: Edge case - 1 pulse at MIN_CMD_TICKS\n");
-
-  i2s_mgr_clear_work_buf();
-
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  q._isRunning = true;
-  test_queue_add_entry(&q, MIN_CMD_TICKS, 1);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  uint32_t expected_frame = MIN_CMD_TICKS / I2S_TEST_TICKS_PER_FRAME;
-  printf("  MIN_CMD_TICKS=%ld, expected frame: %u\n", (long)MIN_CMD_TICKS,
-         expected_frame);
-
-  uint16_t pulse_frame = q._i2s_pulse_positions[0];
-  printf("  Pulse at frame %d\n", pulse_frame);
-
-  if (pulse_frame != expected_frame) {
-    printf("  FAIL: Expected frame %u, got %d\n", expected_frame, pulse_frame);
-    test_result("Edge 1 pulse MIN_CMD_TICKS", false);
-    return;
-  }
-
-  if (!verify_pulse_at_frame(buf, pulse_frame)) {
-    test_result("Edge 1 pulse MIN_CMD_TICKS", false);
-    return;
-  }
-
-  test_result("Edge 1 pulse MIN_CMD_TICKS", true);
-}
-
-static void test_edge_255_pulses_65535_ticks() {
-  printf("Running: Edge case - 255 pulses at 65535 ticks\n");
-
-  i2s_mgr_clear_work_buf();
-
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  q._isRunning = true;
-  test_queue_add_entry(&q, 65535, 255);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint32_t frames_per_pulse = 65535 / I2S_TEST_TICKS_PER_FRAME;
-  uint32_t pulses_that_fit = I2S_TEST_MAX_FRAMES_PER_FILL / frames_per_pulse;
-
-  printf("  Frames per pulse: %u\n", frames_per_pulse);
-  printf("  Pulses that fit in buffer: %u\n", pulses_that_fit);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  uint16_t pulses_written = q._i2s_pulse_write_idx;
-  printf("  Pulses written: %d\n", pulses_written);
-
-  if (pulses_written > pulses_that_fit + 1) {
-    printf("  FAIL: Wrote %d pulses, expected <= %u\n", pulses_written,
-           pulses_that_fit + 1);
-    test_result("Edge 255 pulses 65535 ticks", false);
-    return;
-  }
-
-  printf("  Entry partially processed correctly\n");
-  printf("  Remaining steps in entry: %d\n",
-         q.entry[q.read_idx & QUEUE_LEN_MASK].steps);
-
-  test_result("Edge 255 pulses 65535 ticks", true);
-}
-
-static void test_edge_255_pulses_200khz() {
-  printf("Running: Edge case - 255 pulses at 200kHz (80 ticks each)\n");
-
-  i2s_mgr_clear_work_buf();
-
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  uint16_t ticks_200khz = TICKS_PER_S / 200000;
-  printf("  Ticks for 200kHz: %d (TICKS_PER_S/200000)\n", ticks_200khz);
-
-  q._isRunning = true;
-  test_queue_add_entry(&q, ticks_200khz, 255);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  uint16_t pulses_written = q._i2s_pulse_write_idx;
-  printf("  Pulses written: %d, final carry: %u\n", pulses_written,
-         q._i2s_tick_carry);
-
-  printf("  First 5 pulse positions:\n");
-  for (int i = 0; i < pulses_written && i < 5; i++) {
-    uint16_t frame = q._i2s_pulse_positions[i];
-    printf("    Pulse %d at frame %d\n", i, frame);
-
-    if (frame >= I2S_TEST_MAX_FRAMES_PER_FILL) {
-      printf("  FAIL: Pulse %d at frame %d exceeds buffer\n", i, frame);
-      test_result("Edge 255 pulses 200kHz", false);
-      return;
-    }
-
-    if (!verify_pulse_at_frame(buf, frame)) {
-      test_result("Edge 255 pulses 200kHz", false);
-      return;
-    }
-  }
-
-  if (pulses_written > 5) {
-    printf("  ... and %d more pulses\n", pulses_written - 5);
-  }
-
-  uint16_t first_pulse = q._i2s_pulse_positions[0];
-  uint16_t expected_first = ticks_200khz / I2S_TEST_TICKS_PER_FRAME;
-  if (first_pulse != expected_first) {
-    printf("  WARNING: First pulse at frame %d, expected frame %d\n",
-           first_pulse, expected_first);
-  }
-
-  printf("  High-frequency pulse generation works correctly\n");
-  test_result("Edge 255 pulses 200kHz", true);
-}
-
-static void test_edge_min_ticks_no_division() {
-  printf("Running: Edge case - pulses at ticks < I2S_TEST_TICKS_PER_FRAME\n");
-
-  i2s_mgr_clear_work_buf();
-
-  TestStepperQueue q;
-  test_queue_init(&q);
-
-  q._isRunning = true;
-
-  test_queue_add_entry(&q, 16, 10);
-
-  test_queue_fill_i2s_buffer(&q);
-
-  uint8_t* buf = i2s_mgr_work_buf();
-
-  printf("  10 pulses at 16 ticks each (half a frame):\n");
-  for (int i = 0; i < q._i2s_pulse_write_idx && i < 10; i++) {
-    uint16_t frame = q._i2s_pulse_positions[i];
-    printf("    Pulse %d at frame %d\n", i, frame);
-  }
-
-  printf("  Pulses written: %d\n", q._i2s_pulse_write_idx);
-
-  printf("  Tick carry accumulates correctly for sub-frame periods\n");
-  test_result("Edge min ticks no division", true);
+  test_result("DMA total ticks per block",
+              s_analyzer.total_ticks == expected_ticks);
 }
 
 void basic_test() {
-  puts("basic_test...");
+  puts("=== I2S Low-Level DMA Tests ===\n");
 
-  test_i2s_init();
-  test_i2s_direct_write();
-  test_i2s_queue_fill();
-  test_i2s_ring_buffer_clear();
-  test_i2s_frame_boundary();
-  test_i2s_empty_queue();
-  test_i2s_ring_buffer_wrap();
-  test_i2s_multi_step_entry();
-  test_i2s_tick_carry();
-  test_i2s_pause_entry();
-  test_i2s_buffer_overflow_protection();
-  test_i2s_partial_entry_processing();
+  puts("=== DMA Callback Tests ===");
+  test_dma_callback_invoked();
 
-  puts("\n=== Edge Cases ===");
-  test_edge_1_pulse_65535_ticks();
-  test_edge_1_pulse_min_ticks();
-  test_edge_255_pulses_65535_ticks();
-  test_edge_255_pulses_200khz();
-  test_edge_min_ticks_no_division();
+  puts("\n=== DMA Block Management ===");
+  test_dma_block_rotation();
+  test_dma_write_block_advance();
+  test_dma_buffer_clearing();
+  test_dma_block_availability();
+
+  puts("\n=== Bit Stream Analysis ===");
+  test_bit_stream_single_pulse();
+  test_bit_stream_multiple_pulses();
+  test_dma_total_ticks_per_block();
+
+  puts("\n=== DMA Round Tests ===");
+  test_dma_10_rounds_7_pulses();
+  test_dma_buffer_content();
 
   printf("\n=== Test Summary ===\n");
-  printf("Total: %d, Passed: %d, Failed: %d\n", test_passed + test_failed,
+  printf("Total: %d  Passed: %d  Failed: %d\n", test_passed + test_failed,
          test_passed, test_failed);
   if (test_failed == 0) {
     puts("All tests PASSED");
@@ -930,5 +449,5 @@ void basic_test() {
 
 int main() {
   basic_test();
-  return 0;
+  return test_failed ? 1 : 0;
 }

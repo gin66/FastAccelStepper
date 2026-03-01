@@ -163,7 +163,12 @@ void StepperTask(void* parameter) {
         for (uint8_t i = 0; i < NUM_QUEUES; i++) {
           fas_queue[i].fill_i2s_buffer();
         }
-        mgr.flush();
+        // flush() blocks until the DMA consumes enough space (~I2S_TASK_MS).
+        // That blocking already provides the inter-iteration delay, so skip
+        // vTaskDelay to avoid producing data at half the DMA consumption rate.
+        if (mgr.flush()) {
+          continue;
+        }
       }
     }
 #endif
@@ -178,7 +183,9 @@ void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core) {
 #define STACK_SIZE 2000
 #define PRIORITY configMAX_PRIORITIES
 #else
-#define STACK_SIZE 3000
+// I2S adds i2s_channel_write() to StepperTask; that IDF blocking call
+// consumes ~3 KB of stack by itself.  Use 6 KB to be safe.
+#define STACK_SIZE 6000
 #define PRIORITY (configMAX_PRIORITIES - 1)
 #endif
   engine->_delay_ms = DELAY_MS_BASE;
