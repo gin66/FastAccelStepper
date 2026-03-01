@@ -4,6 +4,8 @@
 #include "fas_arch/common.h"
 #include "fas_queue/queue.h"
 
+// The pd_ prefix in directory names stands for "pulse driver" (though "platform
+// driver" is also suitable).
 #if defined(SUPPORT_AVR)
 #include "pd_avr/avr_queue.h"
 #elif defined(TEST)
