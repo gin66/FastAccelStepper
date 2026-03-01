@@ -1,6 +1,5 @@
 *.swp
 *.o
-*.py
 .pio
 .dir
 .tested

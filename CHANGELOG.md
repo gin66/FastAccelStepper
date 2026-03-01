@@ -1,6 +1,7 @@
 pre-0.34.1:
 - add memory report script
 - rename old pmf/PMF to log2/LOG2 representation and define type `log2_value_t`
+- add timing plot `to extras/tests/simavr_based`
 
 0.34.0:
 - Major internal refactoring: reorganize code into subdirectories

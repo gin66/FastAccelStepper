@@ -1,0 +1,7 @@
+# expected actual label
+35 29 "2560:StepA"
+35 30 "2560:StepB"
+40 34 "2560:StepC"
+20 13 "328p:StepA"
+25 18 "328p:StepB"
+15 10 "328p_37k:StepA"

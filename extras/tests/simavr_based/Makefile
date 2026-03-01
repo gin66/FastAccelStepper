@@ -68,4 +68,11 @@ clean:
 	find . -type l -delete
 	find . -type d -empty -delete
 	rm -f .links .makefiles
+	rm -f timing_analysis/scatter_*.dat timing_analysis/timing_*.csv timing_analysis/timing_gnuplot.dat timing_analysis/timing_comparison.png
+
+timing: timing_analysis/summarize_timing.py
+	cd timing_analysis && python3 summarize_timing.py
+
+timing-plot: timing timing_analysis/plot_timing.gp
+	cd timing_analysis && gnuplot plot_timing.gp 2>/dev/null || echo "gnuplot not available"
 

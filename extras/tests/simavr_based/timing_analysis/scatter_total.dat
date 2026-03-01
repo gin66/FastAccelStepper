@@ -1,0 +1,7 @@
+# expected actual label
+350000 314627 "2560:StepA"
+400000 360837 "2560:StepB"
+510000 463190 "2560:StepC"
+4500 4196 "328p:StepA"
+5300 5005 "328p:StepB"
+4200 3934 "328p_37k:StepA"
