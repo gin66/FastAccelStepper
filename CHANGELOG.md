@@ -1,3 +1,12 @@
+0.34.0:
+- Major internal refactoring: reorganize code into subdirectories
+  - `fas_queue/` - queue implementation
+  - `fas_ramp/` - ramp calculation
+  - `log2/` - Log2Representation
+  - `pd_avr/`, `pd_esp32/`, `pd_pico/`, `pd_sam/` - platform drivers
+- Remove circular dependencies between headers
+- No API changes, fully backwards compatible
+
 0.33.14:
 - #348: Fix for unexpected motor stop at slow speed
 

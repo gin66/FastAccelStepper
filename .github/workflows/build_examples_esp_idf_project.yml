@@ -2,9 +2,9 @@ name: Build examples for an ESP-IDF project
 
 on:
   push:
-    branches: [ master, refactor ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, refactor ]
+    branches: [ master ]
 
 jobs:
   build:

@@ -3,9 +3,9 @@ name: Build examples for esp32 @ esp32_tasmota 2.0.15
 
 on:
   push:
-    branches: [ master, refactor ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, refactor ]
+    branches: [ master ]
 
 jobs:
   build:

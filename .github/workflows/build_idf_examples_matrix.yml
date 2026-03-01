@@ -7,9 +7,9 @@ name: Build idf examples
 
 on:
   push:
-    branches: [ master, refactor ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, refactor ]
+    branches: [ master ]
 
 jobs:
   build:

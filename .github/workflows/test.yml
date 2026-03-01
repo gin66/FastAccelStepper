@@ -2,9 +2,9 @@ name: Run pc-based tests
 
 on:
   push:
-    branches: [ master, refactor ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, refactor ]
+    branches: [ master ]
 
 jobs:
   build:
