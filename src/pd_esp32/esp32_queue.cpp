@@ -1,4 +1,7 @@
 #include "fas_queue/stepper_queue.h"
+#if defined(SUPPORT_ESP32_I2S)
+#include "pd_esp32/i2s_manager.h"
+#endif
 
 #if defined(SUPPORT_ESP32)
 
@@ -8,21 +11,36 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
                         uint8_t step_pin) {
   uint8_t channel = queue_num;
   max_speed_in_ticks = 80;
+  use_rmt = false;
+  use_i2s = false;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   if (channel < QUEUES_MCPWM_PCNT) {
-    use_rmt = false;
     return init_mcpwm_pcnt(channel, step_pin);
   }
   channel -= QUEUES_MCPWM_PCNT;
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  use_rmt = true;
-  return init_rmt(channel, step_pin);
+  if (channel < QUEUES_RMT) {
+    use_rmt = true;
+    return init_rmt(channel, step_pin);
+  }
+  channel -= QUEUES_RMT;
+#endif
+#ifdef SUPPORT_ESP32_I2S
+  if (channel < QUEUES_I2S) {
+    use_i2s = true;
+    return init_i2s(channel, step_pin);
+  }
 #endif
   return false;
 }
 
 void StepperQueue::connect() {
+#ifdef SUPPORT_ESP32_I2S
+  if (use_i2s) {
+    return;
+  }
+#endif
 #ifdef SUPPORT_ESP32_RMT
   if (use_rmt) {
     connect_rmt();
@@ -35,6 +53,11 @@ void StepperQueue::connect() {
 }
 
 void StepperQueue::disconnect() {
+#ifdef SUPPORT_ESP32_I2S
+  if (use_i2s) {
+    return;
+  }
+#endif
 #ifdef SUPPORT_ESP32_RMT
   if (use_rmt) {
     disconnect_rmt();
@@ -47,6 +70,11 @@ void StepperQueue::disconnect() {
 }
 
 bool StepperQueue::isReadyForCommands() {
+#ifdef SUPPORT_ESP32_I2S
+  if (use_i2s) {
+    return isReadyForCommands_i2s();
+  }
+#endif
 #if defined(SUPPORT_ESP32_RMT) && defined(SUPPORT_ESP32_MCPWM_PCNT)
   if (use_rmt) {
     return isReadyForCommands_rmt();
@@ -62,6 +90,12 @@ bool StepperQueue::isReadyForCommands() {
 }
 
 void StepperQueue::startQueue() {
+#ifdef SUPPORT_ESP32_I2S
+  if (use_i2s) {
+    startQueue_i2s();
+    return;
+  }
+#endif
 #ifdef SUPPORT_ESP32_RMT
   if (use_rmt) {
     startQueue_rmt();
@@ -74,6 +108,12 @@ void StepperQueue::startQueue() {
 }
 
 void StepperQueue::forceStop() {
+#ifdef SUPPORT_ESP32_I2S
+  if (use_i2s) {
+    forceStop_i2s();
+    return;
+  }
+#endif
 #ifdef SUPPORT_ESP32_RMT
   if (use_rmt) {
     forceStop_rmt();
@@ -86,6 +126,11 @@ void StepperQueue::forceStop() {
 }
 
 uint16_t StepperQueue::_getPerformedPulses() {
+#ifdef SUPPORT_ESP32_I2S
+  if (use_i2s) {
+    return _getPerformedPulses_i2s();
+  }
+#endif
 #ifdef SUPPORT_ESP32_RMT
   if (use_rmt) {
     return _getPerformedPulses_rmt();
@@ -109,6 +154,18 @@ void StepperTask(void* parameter) {
     engine->manageSteppers();
 #if ESP_IDF_VERSION_MAJOR == 4
     esp_task_wdt_reset();
+#endif
+#ifdef SUPPORT_ESP32_I2S
+    {
+      I2sManager& mgr = I2sManager::instance();
+      if (mgr.isInitialized()) {
+        mgr.clearWorkBuf();
+        for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+          fas_queue[i].fill_i2s_buffer();
+        }
+        mgr.flush();
+      }
+    }
 #endif
     const TickType_t delay_time =
         (engine->_delay_ms + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;

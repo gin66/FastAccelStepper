@@ -60,6 +60,7 @@ The 7 ESP32 driver files could potentially be consolidated, but this requires ca
 | [driver_architecture.md](driver_architecture.md) | StepperISR driver abstraction and interface analysis |
 | [02_esp32_driver_unification.md](02_esp32_driver_unification.md) | ESP32 driver consolidation proposal |
 | [03_configuration_system.md](03_configuration_system.md) | Configuration system modernization proposal |
+| [04_esp32_i2s_driver.md](04_esp32_i2s_driver.md) | ESP32 I2S output driver (single-pin and serial demux modes) |
 
 ## Contributing
 

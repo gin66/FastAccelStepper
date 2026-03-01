@@ -26,7 +26,10 @@
 #endif
 
 // Esp32 queue definitions
-#define NUM_QUEUES (QUEUES_MCPWM_PCNT + QUEUES_RMT)
+#ifndef QUEUES_I2S
+#define QUEUES_I2S 0
+#endif
+#define NUM_QUEUES (QUEUES_MCPWM_PCNT + QUEUES_RMT + QUEUES_I2S)
 #define MAX_STEPPER (NUM_QUEUES)
 #define QUEUE_LEN 32
 

@@ -9,6 +9,7 @@ class StepperQueue : public StepperQueueBase {
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
   bool use_rmt;
+  bool use_i2s;
   uint8_t _step_pin;
 
   inline bool isRunning() { return _isRunning; }
@@ -65,6 +66,24 @@ class StepperQueue : public StepperQueueBase {
   uint16_t _getPerformedPulses_rmt();
   void connect_rmt();
   void disconnect_rmt();
+#endif
+
+#ifdef SUPPORT_ESP32_I2S
+  int8_t _i2s_step_slot;
+  uint32_t _i2s_tick_carry;
+  uint8_t _i2s_drain;
+  // Pulse tracking for I2S (per-instance ring buffer)
+  #define I2S_MAX_PULSES 100
+  uint16_t _i2s_pulse_positions[I2S_MAX_PULSES];  // Frame indices with pulses
+  uint16_t _i2s_pulse_write_idx;  // Ring buffer write index
+  uint16_t _i2s_pulse_read_idx;  // Ring buffer read index (for clearing)
+
+  bool init_i2s(uint8_t channel_num, uint8_t step_pin);
+  void startQueue_i2s();
+  void forceStop_i2s();
+  bool isReadyForCommands_i2s();
+  uint16_t _getPerformedPulses_i2s();
+  void fill_i2s_buffer();
 #endif
 
   static bool isValidStepPin(uint8_t step_pin);
