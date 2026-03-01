@@ -3,7 +3,7 @@
   - `fas_queue/` - queue implementation
   - `fas_ramp/` - ramp calculation
   - `log2/` - Log2Representation
-  - `pd_avr/`, `pd_esp32/`, `pd_pico/`, `pd_sam/` - platform drivers
+  - `pd_avr/`, `pd_esp32/`, `pd_pico/`, `pd_sam/` - pulse drivers (pd = pulse driver, platform driver fits too)
 - Remove circular dependencies between headers
 - No API changes, fully backwards compatible
 
