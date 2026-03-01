@@ -829,7 +829,7 @@ const static char messages[] PROGMEM =
 
 
     /* USAGE TEST */
-#if !defined(SIM_TEST_INPUT)
+#if !defined(SIM_TEST_INPUT) && !defined(__AVR_ATmega32U4__)
     _Enter_command_separated_by_space_carriage_return_or_newline_NL
 	_m1_m2_to_select_stepper_
     ____ "R" ________ _ooo_ "start all " _select "ed tests" _NL_
@@ -997,9 +997,11 @@ void setup() {
   PRINTLN("");
 #endif
 
+#ifndef __AVR_ATmega32U4__
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     test_seq[i].test = NULL;
   }
+#endif
 
   output_msg(MSG_STEPPER_VERSION);
 #ifdef F_CPU
