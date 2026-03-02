@@ -1,8 +1,9 @@
-// test_21: ESP32 I2S low-level DMA simulation test.
+// test_21: ESP32 I2S tests.
 //
-// Focus: Pure DMA infrastructure tests - callbacks, triple buffering,
+// Part 1: Pure DMA infrastructure tests - callbacks, triple buffering,
 // bit stream analysis. No driver code involved.
 //
+// Part 2: Driver fill function tests - i2s_fill_buffer() with queue commands.
 
 #define SUPPORT_ESP32_I2S
 
@@ -416,6 +417,53 @@ static void test_dma_total_ticks_per_block() {
               s_analyzer.total_ticks == expected_ticks);
 }
 
+// ---------------------------------------------------------------------------
+// Part 2: Driver fill function tests
+// ---------------------------------------------------------------------------
+
+#define IRAM_ATTR
+#include "pd_esp32/i2s_fill.cpp"
+
+static uint32_t countPulsesInBuffer(const uint8_t* buf) {
+  uint32_t count = 0;
+  for (uint16_t f = 0; f < I2S_FRAMES_PER_BLOCK; f++) {
+    if (buf[f * I2S_BYTES_PER_FRAME] == 0xFF) {
+      count++;
+    }
+  }
+  return count;
+}
+
+static void test_fill_single_step() {
+  printf("Running: Fill single step at 256 ticks\n");
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
+
+  struct i2s_stepper_queue q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = 255;
+
+  uint8_t idx = q.next_write_idx & QUEUE_LEN_MASK;
+  q.entry[idx].steps = 1;
+  q.entry[idx].ticks = 256;
+  q.entry[idx].toggle_dir = 0;
+  q.next_write_idx++;
+
+  struct i2s_fill_state state = {0, 0, 0, 0, {0}, 0};
+
+  i2s_fill_buffer(&q, buf, &state);
+
+  uint32_t pulses = countPulsesInBuffer(buf);
+  bool consumed = (q.read_idx == q.next_write_idx);
+
+  printf("  Pulses: %u (expected 1)\n", pulses);
+  printf("  Queue consumed: %s\n", consumed ? "yes" : "no");
+
+  test_result("Fill single step", pulses == 1 && consumed);
+}
+
 void basic_test() {
   puts("=== I2S Low-Level DMA Tests ===\n");
 
@@ -436,6 +484,9 @@ void basic_test() {
   puts("\n=== DMA Round Tests ===");
   test_dma_10_rounds_7_pulses();
   test_dma_buffer_content();
+
+  puts("\n=== Part 2: Driver Fill Function ===");
+  test_fill_single_step();
 
   printf("\n=== Test Summary ===\n");
   printf("Total: %d  Passed: %d  Failed: %d\n", test_passed + test_failed,

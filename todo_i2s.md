@@ -9,8 +9,9 @@
 
 - **BCLK = 4 MHz, stereo 8-bit**
 - **Frame = L-byte + R-byte = 4µs = 64 ticks**
-- **I2S_FRAMES_PER_TASK = 1000** (4ms buffer per task)
-- **I2S_BYTES_PER_TASK = 2000** (1000 frames × 2 bytes)
+- **I2S_BLOCK_COUNT = 3** (triple buffer)
+- **I2S_FRAMES_PER_BLOCK = 250** (~1ms per block)
+- **I2S_BLOCK_TICKS = 16000** (250 frames × 64 ticks)
 - **DATA_OUT (GPIO32):** Serial pin, transmits bits one at a time
 - **Step pulse:** 4µs HIGH (both L and R bytes = 0xFF = full frame HIGH)
 
@@ -23,87 +24,123 @@
 | `src/pd_esp32/esp32_queue.h` | ✅ I2S fields + _i2s_pulse_positions |
 | `src/pd_esp32/esp32_queue.cpp` | ✅ I2S dispatch + StepperTask I2S block |
 | `src/pd_esp32/i2s_manager.h` | ✅ Singleton I2sManager |
-| `src/pd_esp32/i2s_manager.cpp` | ✅ init, clearWorkBuf, flush |
+| `src/pd_esp32/i2s_manager.cpp` | 🔄 Needs DMA callback integration |
 | `src/pd_esp32/i2s_constants.h` | ✅ Shared timing constants |
-| `src/pd_esp32/StepperISR_esp32_i2s.cpp` | ✅ 4µs pulse implementation |
+| `src/pd_esp32/StepperISR_esp32_i2s.cpp` | 🔄 Needs block boundary handling |
+| `src/pd_test/test_queue.h` | ✅ Added _i2s_tick_pos field |
 | `CMakeLists.txt` | ✅ esp_driver_i2s dependency |
 | `pio_espidf/StepperDemo/src/StepperDemo.cpp` | ✅ M9 config (GPIO32) |
 
-## Critical Issues to Fix
+## Test Infrastructure
 
-### 1. **DMA Buffer Tracking (Critical)**
+### test_21: DMA Tests (IN PROGRESS)
+
+**Part 1: Low-Level Infrastructure Tests ✅ COMPLETE**
+- Pure DMA infrastructure tests (no driver code)
+- DMA callback invocation
+- Triple buffer rotation (0→1→2→0)
+- Write block availability
+- Buffer clearing on consume
+- Bit stream pulse detection
+- 10 rounds × 7 pulses test
+- **DMA callback only analyzes buffer content (no driver invocation)**
+
+**Part 2: Driver Integration Tests (TODO)**
+- DMA callback must invoke driver's `fill_i2s_buffer()`
+- Process commands through queue
+- Verify pulse timing from DMA buffers
+- Test multi-block pulse sequences
+- Test edge cases:
+  - 255 pulses at 65535 ticks
+  - 100 pulses at 5000 ticks
+  - Slow pulses across block boundaries
+  - Acceleration/deceleration ramps
+- Verify:
+  - Correct pulse positions in buffer
+  - All pulses eventually processed
+  - `_i2s_tick_pos` correctly carried across blocks
+
+## Next Steps
+
+### 1. **Driver: Block Boundary Handling (High Priority)**
+**Status:** Partially implemented
+**Issue:** When a pulse's tick position exceeds `I2S_BLOCK_TICKS`, the driver needs to:
+- Track remaining position in `_i2s_tick_pos` for next fill
+- Handle the 3 cases correctly:
+  1. HIGH phase doesn't fit → wait for next block
+  2. HIGH phase fits, steps > 1 → write pulse, decrement steps, save tick_pos, wait
+  3. HIGH phase fits, steps = 1 → write pulse, consume entry
+
+**Files to update:**
+- `src/pd_esp32/StepperISR_esp32_i2s.cpp`: Implement tick-based tracking
+- `src/pd_test/test_queue.h`: Already has `_i2s_tick_pos`
+
+### 2. **Driver: DMA Callback Integration (High Priority)**
 **Status:** Not implemented
-**Guidance:**
-- The I2S driver needs a `write_pointer` to track how far the DMA has read
-- When DMA read pointer meets write_pointer, there are no more commands
-- Write pointer can be half-buffer pointer
-- If DMA reads from unprepared buffer, all step bits must be 0 (to prevent unwanted movement)
-- **All bits for the step pin in the I2S buffer must be 0 when idle**
+**Requirement:**
+- Register I2S DMA TX_DONE callback using `i2s_channel_register_event_callback()`
+- On callback: advance `_dma_block`, signal buffer free
+- Coordinate with `fill_i2s_buffer()` for block availability
 
-**Implementation needed:**
-- Add `_i2s_write_pointer` field to track DMA read position
-- On each `fill_i2s_buffer()` call, clear old pulses up to write_pointer
-- Ensure buffer beyond write_pointer is all zeros
+**Files to update:**
+- `src/pd_esp32/i2s_manager.h`: Add callback registration
+- `src/pd_esp32/i2s_manager.cpp`: Implement callback handler
 
-### 2. **Command Processing Loop (Critical)**
-**Status:** test_21 hangs, process_all loop missing
-**Guidance:**
-- Follow test_18 pattern: loop until all commands are done
-- `process_all()` should keep calling `fill_i2s_buffer()` until queue empty AND drain complete
+### 3. **Driver: Integration Tests (Medium Priority)**
+Create test_22 for driver-level tests:
+- Process commands through queue
+- Verify pulse timing from DMA buffers
+- Test multi-block pulse sequences
+- Test edge cases (65535 ticks, 255 steps)
 
-**Implementation needed:**
-- In test_21: implement `process_all()` similar to test_18
-- Loop condition: `read_idx != next_write_idx || _i2s_drain > 0`
-
-### 3. **Pause Entry Insertion for Long Pulse Periods**
-**Status:** Implemented but test hangs
-**Guidance:**
-- When a pulse doesn't fit in buffer, add a PAUSE entry for remaining ticks
-- Then continue with remaining steps on next fill
-- For 255 pulses at 65535 ticks (~1s total):
-  - Pulse at frame 0
-  - Next pulse at frame 1023 (beyond buffer)
-  - Insert pause for remaining ticks to buffer end
-  - Continue with remaining steps on next fill
-
-**Current implementation issues:**
-- Pause insertion code exists but needs verification
-- Queue shifting logic needs testing
-- Need to ensure wp (next_write_idx) is properly updated
-
-### 4. **Test Hang Issue**
-**Status:** test_21 hangs on execution
-**Possible causes:**
-- Infinite loop in DMA simulation
-- Queue entry corruption
-- Missing termination condition
+### 4. **Driver: Multi-Motor Support (Future)**
+**Status:** Architecture defined, not implemented
+- Each motor uses different bit position in buffer
+- `write_pulse_to_buffer()` sets specific bit based on motor slot
+- All motors share same triple buffer
 
 ## Known Issues
 
-1. **Watchdog timeout on CPU1:** Not yet addressed - need to optimize `fill_i2s_buffer()` further or use IDF5 watchdog API
-2. **~2 second delay after `f`:** Needs investigation - queue filling or drain timing issue
-3. **PCNT = 0:** `gpio_iomux_in()` override not yet fixed
+1. **Watchdog timeout on CPU1:** Need to optimize `fill_i2s_buffer()` or use IDF5 watchdog API
+2. **~2 second delay after `f`:** Needs investigation
+3. **PCNT = 0:** `gpio_iomux_in()` override not fixed
 
-## Test Requirements
+## Multi-Motor Triple Buffer Architecture
 
-### test_21: I2S Driver Tests
-- **Process all commands loop:** Implement `process_all()` following test_18 pattern
-- **DMA simulation:** Simulate DMA read pointer advancing
-- **Edge cases:**
-  - 255 pulses at 65535 ticks (pulse at start + pause pattern)
-  - 100 pulses at 5000 ticks (~12 pulses/buffer)
-  - Ramps from slow to fast
-- **Verification:**
-  - Correct pulse positions in buffer
-  - All pulses eventually processed
-  - Buffer is cleared after each fill
+For multiple motors sharing one I2S peripheral:
 
-## Future Work
+### Fixed Triple Buffer Layout
+- **Buffer (n):** Currently being read by DMA
+- **Buffer (n+1):** Prepared (ready for DMA)
+- **Buffer (n+2):** Currently being filled by motor drivers
 
-1. **Hardware testing:** Test on real ESP32 to verify:
-   - No watchdog timeouts
-   - Correct pulse timing
-   - No 2-second delay issue
-2. **Multi-stepper (demux mode):** Design bit-slot system for multiple steppers per I2S peripheral
-3. **Performance optimization:** Reduce buffer processing time to prevent WDT
-4. **GPIO fix:** Implement correct gpio_iomux_in() for PCNT
+### Buffer Filling Sequence
+1. Engine tells I2S driver which buffer (n) is currently read by DMA
+2. Buffer (n+1) is prepared (already filled)
+3. Buffer (n+2) is being filled by all motors
+4. Some motors may **hang** if remaining space insufficient for step pulse
+5. DMA finishes buffer (n), advances to buffer (n+1)
+6. Old buffer (n) becomes free = new (n+3) = (n) modulo 3
+7. Motors that were hanging can now **spill over** into free buffer
+8. After spill-over, buffer (n+2) is marked as prepared
+
+### Key Implementation Points
+- Three fixed buffers (not ring buffer per motor)
+- Motor drivers track own fill position across boundaries
+- Spill-over handling: if pulse doesn't fit, wait for next buffer
+- Engine coordinates buffer state transitions
+- All motors fill same shared buffer (different GPIO bits)
+
+## Hardware Testing Checklist
+
+Before hardware testing:
+- [ ] Block boundary handling verified in tests
+- [ ] DMA callback integration working
+- [ ] Multi-block pulse sequences correct
+- [ ] Edge cases (65535 ticks, slow pulses) working
+
+Hardware test plan:
+- [ ] Single motor at various speeds (1kHz - 200kHz)
+- [ ] Acceleration/deceleration ramps
+- [ ] Long-running stability (no WDT)
+- [ ] Verify no 2-second delay issue
