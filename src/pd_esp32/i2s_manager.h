@@ -20,14 +20,18 @@ class I2sManager {
   bool flushBlock(uint8_t block);
 
   uint8_t dmaBlock() const { return _dma_block; }
-  uint8_t preparedBlock() const { return _prepared_block; }
   uint8_t writeBlock() const { return _write_block; }
-  bool isBlockPrepared(uint8_t block) const {
-    return _block_prepared[block % I2S_BLOCK_COUNT];
+
+  bool isWriteBlockAvailable() const {
+    uint8_t next_write = (_write_block + 1) % I2S_BLOCK_COUNT;
+    return next_write != _dma_block;
   }
 
-  void markWriteBlockPrepared();
-  void advanceDmaBlock();
+  void markWriteBlockPrepared() {
+    _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
+  }
+
+  void advanceDmaBlock() { _dma_block = (_dma_block + 1) % I2S_BLOCK_COUNT; }
 
   void registerDmaCallback(i2s_dma_callback_t cb, void* user_data);
   bool startDma();
@@ -43,10 +47,8 @@ class I2sManager {
   bool _dma_started = false;
   i2s_chan_handle_t _chan = nullptr;
   uint8_t _bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
-  bool _block_prepared[I2S_BLOCK_COUNT] = {false, false, false};
   uint8_t _dma_block = 0;
-  uint8_t _prepared_block = 1;
-  uint8_t _write_block = 2;
+  uint8_t _write_block = 0;
   i2s_dma_callback_t _dma_callback = nullptr;
   void* _dma_callback_data = nullptr;
 };

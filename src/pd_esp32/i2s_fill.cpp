@@ -23,8 +23,10 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
     uint16_t pending_pos = state->remaining_high_ticks - 1;
     uint16_t byte_idx = pending_pos / I2S_TICKS_PER_FRAME;
     if (byte_idx < I2S_FRAMES_PER_BLOCK) {
-      buf[byte_idx * I2S_BYTES_PER_FRAME] = 0xFF;
+      buf[byte_idx * I2S_BYTES_PER_FRAME + 0] = 0xFF;
       buf[byte_idx * I2S_BYTES_PER_FRAME + 1] = 0xFF;
+      buf[byte_idx * I2S_BYTES_PER_FRAME + 2] = 0xFF;
+      buf[byte_idx * I2S_BYTES_PER_FRAME + 3] = 0xFF;
       state->pulse_positions[state->pulse_count++] = byte_idx;
     }
     tick_pos = pending_pos;
@@ -105,8 +107,10 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
         tick_pos = (uint16_t)new_tick_pos;
 
         uint16_t byte_idx = (uint16_t)(tick_pos / I2S_TICKS_PER_FRAME);
-        buf[byte_idx * I2S_BYTES_PER_FRAME] = 0xFF;
+        buf[byte_idx * I2S_BYTES_PER_FRAME + 0] = 0xFF;
         buf[byte_idx * I2S_BYTES_PER_FRAME + 1] = 0xFF;
+        buf[byte_idx * I2S_BYTES_PER_FRAME + 2] = 0xFF;
+        buf[byte_idx * I2S_BYTES_PER_FRAME + 3] = 0xFF;
 
         if (state->pulse_count < I2S_MAX_PULSES_PER_BLOCK) {
           state->pulse_positions[state->pulse_count] = byte_idx;

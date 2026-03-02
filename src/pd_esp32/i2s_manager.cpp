@@ -93,20 +93,11 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
     return false;
   }
 
-  // Test patterns: Fill all bytes with 16-bit patterns
-  // Each frame = [L_MSB, L_LSB, R_MSB, R_LSB], all same for continuous output
-  memset(_bufs[0], 0x55, I2S_BYTES_PER_BLOCK);  // 0x5555 pattern → 2MHz
-  memset(_bufs[1], 0x0F,
-         I2S_BYTES_PER_BLOCK);  // 0x0F0F pattern → 4 HIGH, 4 LOW
-  memset(_bufs[2], 0xFF, I2S_BYTES_PER_BLOCK);  // 0xFFFF pattern → DC HIGH
-  Serial.printf("I2S init: Testing 16-bit stereo, bytes_per_block=%d\n",
-                I2S_BYTES_PER_BLOCK);
   for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-    _block_prepared[i] = true;
+    memset(_bufs[i], 0, I2S_BYTES_PER_BLOCK);
   }
   _dma_block = 0;
-  _prepared_block = 1;
-  _write_block = 2;
+  _write_block = 0;
   _initialized = true;
   return true;
 }
@@ -114,7 +105,6 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
 void I2sManager::clearBlock(uint8_t block) {
   if (block < I2S_BLOCK_COUNT) {
     memset(_bufs[block], 0x00, I2S_BYTES_PER_BLOCK);
-    _block_prepared[block] = false;
   }
 }
 
@@ -126,20 +116,6 @@ bool I2sManager::flushBlock(uint8_t block) {
   esp_err_t rc =
       i2s_channel_write(_chan, _bufs[block], I2S_BYTES_PER_BLOCK, &written, 0);
   return (rc == ESP_OK) && (written == I2S_BYTES_PER_BLOCK);
-}
-
-void I2sManager::markWriteBlockPrepared() {
-  _block_prepared[_write_block] = true;
-  _prepared_block = _write_block;
-  _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
-}
-
-void I2sManager::advanceDmaBlock() {
-  _block_prepared[_dma_block] = false;
-  if (_block_prepared[_prepared_block]) {
-    _dma_block = _prepared_block;
-    _prepared_block = (_prepared_block + 1) % I2S_BLOCK_COUNT;
-  }
 }
 
 void I2sManager::registerDmaCallback(i2s_dma_callback_t cb, void* user_data) {
