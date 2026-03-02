@@ -33,6 +33,9 @@ class I2sManager {
   bool startDma();
   bool isDmaStarted() const { return _dma_started; }
   void handleTxDone();
+  volatile uint32_t _callback_count = 0;
+
+  i2s_chan_handle_t channel() const { return _chan; }
 
  private:
   I2sManager() {}

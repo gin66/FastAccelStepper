@@ -123,6 +123,7 @@ class BitStreamAnalyzer {
   uint32_t last_rising_tick;
   uint32_t last_falling_tick;
   bool last_level;
+  uint8_t ticks_per_bit;
 
   void reset() {
     rising_edges = 0;
@@ -131,6 +132,12 @@ class BitStreamAnalyzer {
     last_rising_tick = 0;
     last_falling_tick = 0;
     last_level = false;
+  }
+
+  void processBit(bool level) {
+    for (uint8_t i = 0; i < ticks_per_bit; i++) {
+      processTick(level);
+    }
   }
 
   void processTick(bool level) {
@@ -163,11 +170,22 @@ static void dmaCallback(uint8_t block) {
   const uint8_t* buf = mgr.blockBuf(block);
 
   for (uint16_t frame = 0; frame < I2S_FRAMES_PER_BLOCK; frame++) {
-    uint8_t byte_val = buf[frame * I2S_BYTES_PER_FRAME];
-    bool pin_level = (byte_val & 0x80) != 0;
+    uint8_t l_msb = buf[frame * I2S_BYTES_PER_FRAME + 0];
+    uint8_t l_lsb = buf[frame * I2S_BYTES_PER_FRAME + 1];
+    uint8_t r_msb = buf[frame * I2S_BYTES_PER_FRAME + 2];
+    uint8_t r_lsb = buf[frame * I2S_BYTES_PER_FRAME + 3];
 
-    for (uint16_t tick = 0; tick < I2S_TICKS_PER_FRAME; tick++) {
-      s_analyzer.processTick(pin_level);
+    for (int8_t bit = 7; bit >= 0; bit--) {
+      s_analyzer.processBit((l_msb & (1 << bit)) != 0);
+    }
+    for (int8_t bit = 7; bit >= 0; bit--) {
+      s_analyzer.processBit((l_lsb & (1 << bit)) != 0);
+    }
+    for (int8_t bit = 7; bit >= 0; bit--) {
+      s_analyzer.processBit((r_msb & (1 << bit)) != 0);
+    }
+    for (int8_t bit = 7; bit >= 0; bit--) {
+      s_analyzer.processBit((r_lsb & (1 << bit)) != 0);
     }
   }
 }
@@ -177,7 +195,8 @@ static void dmaCallback(uint8_t block) {
 // ---------------------------------------------------------------------------
 
 static void write_pulse_to_buffer(uint8_t* buf, uint16_t frame) {
-  buf[frame * I2S_BYTES_PER_FRAME] = 0x80;
+  buf[frame * I2S_BYTES_PER_FRAME + 0] = 0xFF;
+  buf[frame * I2S_BYTES_PER_FRAME + 1] = 0xFF;
 }
 
 // ---------------------------------------------------------------------------
@@ -400,6 +419,7 @@ static void test_dma_total_ticks_per_block() {
   printf("Running: DMA total ticks per block\n");
 
   s_analyzer.reset();
+  s_analyzer.ticks_per_bit = 2;  // 8MHz BCLK = 2 ticks at 16MHz per bit
   I2sManager::instance().init(32, 33, -1);
   I2sManager::instance().registerDmaCallback(dmaCallback);
 
@@ -429,7 +449,8 @@ static void test_dma_total_ticks_per_block() {
 static uint32_t countPulsesInBuffer(const uint8_t* buf) {
   uint32_t count = 0;
   for (uint16_t f = 0; f < I2S_FRAMES_PER_BLOCK; f++) {
-    if (buf[f * I2S_BYTES_PER_FRAME] == 0xFF) {
+    if (buf[f * I2S_BYTES_PER_FRAME + 0] == 0xFF &&
+        buf[f * I2S_BYTES_PER_FRAME + 1] == 0xFF) {
       count++;
     }
   }

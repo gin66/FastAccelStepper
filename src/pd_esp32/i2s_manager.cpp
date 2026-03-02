@@ -23,6 +23,27 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
     return true;
   }
 
+  // ESP32 I2S 16-bit stereo mode - VERIFIED CONFIGURATION (measured on scope):
+  //
+  // Buffer layout (16-bit slots, all bytes transmitted):
+  //   Bytes 0-1: L channel (16 bits MSB-first: byte 0 = MSB, byte 1 = LSB)
+  //   Bytes 2-3: R channel (16 bits MSB-first: byte 2 = MSB, byte 3 = LSB)
+  //
+  // Timing (measured):
+  //   BCLK: 8MHz (32 bits × 250kHz sample rate)
+  //   Frame: 32 bits = 4µs (L: 16 bits + R: 16 bits)
+  //   Block: 250 frames × 4µs = 1ms (I2S_BYTES_PER_BLOCK = 1000)
+  //
+  // Test patterns verified:
+  //   0x55 → 4MHz output (01010101 at 8MHz bit rate)
+  //   0x0F → 1MHz output (00001111 = 4 HIGH + 4 LOW bits)
+  //   0xFF → DC HIGH
+  //
+  // For stepper pulse generation:
+  // - Single stepper: Fill all 16 bits of L channel (or both L+R same pattern)
+  // - Multi-stepper: L channel for stepper 1, R channel for stepper 2
+  // - Each bit = 125ns (1/8MHz), provides fine-grained pulse timing
+
   Serial.printf("I2S init: data=%d, bclk=%d, ws=%d\n", data_pin, bclk_pin,
                 ws_pin);
 
@@ -41,11 +62,11 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
       .clk_cfg = {.sample_rate_hz = I2S_SAMPLE_RATE_HZ,
                   .clk_src = I2S_CLK_SRC_DEFAULT,
                   .mclk_multiple = I2S_MCLK_MULTIPLE_128},
-      .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_8BIT,
+      .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                   I2S_SLOT_MODE_STEREO),
       .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,
                    .bclk = (gpio_num_t)bclk_pin,
-                   .ws = (gpio_num_t)ws_pin,
+                   .ws = I2S_GPIO_UNUSED,
                    .dout = (gpio_num_t)data_pin,
                    .din = I2S_GPIO_UNUSED,
                    .invert_flags =
@@ -72,10 +93,15 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
     return false;
   }
 
+  // Test patterns: Fill all bytes with 16-bit patterns
+  // Each frame = [L_MSB, L_LSB, R_MSB, R_LSB], all same for continuous output
+  memset(_bufs[0], 0x55, I2S_BYTES_PER_BLOCK);  // 0x5555 pattern → 2MHz
+  memset(_bufs[1], 0x0F,
+         I2S_BYTES_PER_BLOCK);  // 0x0F0F pattern → 4 HIGH, 4 LOW
+  memset(_bufs[2], 0xFF, I2S_BYTES_PER_BLOCK);  // 0xFFFF pattern → DC HIGH
+  Serial.printf("I2S init: Testing 16-bit stereo, bytes_per_block=%d\n",
+                I2S_BYTES_PER_BLOCK);
   for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-    for (int j = 0; j < I2S_BYTES_PER_BLOCK; j++) {
-      _bufs[i][j] = ((j / 4) % 2) ? 0xFF : 0x00;
-    }
     _block_prepared[i] = true;
   }
   _dma_block = 0;
@@ -131,7 +157,11 @@ bool I2sManager::startDma() {
     return false;
   }
   _dma_started = true;
-  Serial.printf("I2S startDma: writing %d blocks\n", I2S_BLOCK_COUNT);
+
+  vTaskDelay(1);
+
+  Serial.printf("I2S startDma: writing %d blocks with timeout=100\n",
+                I2S_BLOCK_COUNT);
   for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
     size_t written = 0;
     esp_err_t rc =
@@ -139,10 +169,24 @@ bool I2sManager::startDma() {
     Serial.printf("I2S startDma: block %d written=%d rc=%d\n", i, (int)written,
                   rc);
   }
+  Serial.printf("I2S startDma: filling remaining DMA buffer\n");
+  int total_written = 0;
+  for (int j = 0; j < 100; j++) {
+    for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
+      size_t written = 0;
+      esp_err_t rc =
+          i2s_channel_write(_chan, _bufs[i], I2S_BYTES_PER_BLOCK, &written, 0);
+      if (rc == ESP_OK && written > 0) {
+        total_written += written;
+      }
+    }
+  }
+  Serial.printf("I2S startDma: filled %d bytes\n", total_written);
   return true;
 }
 
 void IRAM_ATTR I2sManager::handleTxDone() {
+  _callback_count++;
   advanceDmaBlock();
   if (_dma_callback) {
     _dma_callback(_dma_callback_data);

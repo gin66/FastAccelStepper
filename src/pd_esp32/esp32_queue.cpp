@@ -1,6 +1,7 @@
 #include "fas_queue/stepper_queue.h"
 #if defined(SUPPORT_ESP32_I2S)
 #include "pd_esp32/i2s_manager.h"
+#include <driver/i2s_std.h>
 #endif
 
 #if defined(SUPPORT_ESP32)
@@ -164,13 +165,22 @@ void StepperTask(void* parameter) {
         if (!mgr.isDmaStarted()) {
           mgr.startDma();
         }
-        uint8_t blk = mgr.writeBlock();
-        mgr.clearBlock(blk);
-        for (uint8_t i = 0; i < NUM_QUEUES; i++) {
-          fas_queue[i].fill_i2s_buffer();
+        static uint8_t blk = 0;
+        static uint32_t total = 0;
+        while (true) {
+          size_t written = 0;
+          esp_err_t rc = i2s_channel_write(mgr.channel(), mgr.blockBuf(blk),
+                                           I2S_BYTES_PER_BLOCK, &written, 0);
+          if (rc != ESP_OK || written == 0) break;
+          total += written;
+          blk = (blk + 1) % I2S_BLOCK_COUNT;
         }
-        mgr.flushBlock(blk);
-        mgr.markWriteBlockPrepared();
+        static uint32_t last_total = 0;
+        if (total != last_total) {
+          Serial.printf("DMA written: %d bytes, last_block=%d\n",
+                        (int)(total - last_total), (blk + 2) % I2S_BLOCK_COUNT);
+          last_total = total;
+        }
       }
     }
 #endif

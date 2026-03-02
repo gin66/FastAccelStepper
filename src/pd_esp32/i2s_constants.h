@@ -2,16 +2,19 @@
 #define PD_ESP32_I2S_CONSTANTS_H
 #if defined(SUPPORT_ESP32_I2S)
 
-// I2S timing: BCLK=4MHz, stereo 8-bit
-// 250 kHz sample rate keeps MCLK=32 MHz (with mclk_multiple=128) below APB/2=40
-// MHz. Frame = L-byte (8 BCLK) + R-byte (8 BCLK) = 4µs = 64 ticks at 16MHz Step
-// pulse: both bytes 0xFF → full frame HIGH = 4µs pulse
+// I2S timing: 16-bit stereo mode
+// Sample rate: 250kHz
+// Bits per frame: 16-bit L + 16-bit R = 32 bits
+// BCLK = 250kHz × 32 bits = 8MHz
+// Frame duration = 32 bits / 8MHz = 4µs
+// At 16MHz stepper reference: 4µs × 16 = 64 ticks per frame
 #define I2S_SAMPLE_RATE_HZ 250000UL
-#define I2S_TICKS_PER_FRAME 64
-#define I2S_BYTES_PER_FRAME 2
+#define I2S_TICKS_PER_FRAME 64  // Frame duration in 16MHz ticks (4µs)
+#define I2S_BITS_PER_FRAME 32   // 16-bit L + 16-bit R
+#define I2S_BYTES_PER_FRAME 4   // 16-bit stereo: 2 bytes L + 2 bytes R
 
 // Triple buffering: 3 blocks of ~1ms each
-// 1ms / 4µs = 250 frames per block
+// 1ms / 4µs = 250 frames per block = 1000 bytes per block
 #define I2S_BLOCK_COUNT 3
 #define I2S_FRAMES_PER_BLOCK 250
 #define I2S_BYTES_PER_BLOCK (I2S_FRAMES_PER_BLOCK * I2S_BYTES_PER_FRAME)
