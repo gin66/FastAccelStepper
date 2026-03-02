@@ -141,6 +141,79 @@ src/
 
 ---
 
+## Driver Contract
+
+All pulse drivers must adhere to these contracts regardless of architecture.
+
+### Command Queue Ownership
+
+The command queue uses single-producer / single-consumer semantics with two
+index variables:
+
+| Index | Type | Owner (writer) | Reader |
+|-------|------|----------------|--------|
+| `read_idx` | `volatile uint8_t` | Driver (ISR / fill routine) | Both |
+| `next_write_idx` | `volatile uint8_t` | Ramp generator (`manageSteppers()`) | Both |
+
+Both indices are single bytes, which are atomically safe to read and write on
+all supported architectures (AVR, ESP32, SAM, Pico). No mutex or spinlock is
+required.
+
+**Invariant**: `read_idx` is only advanced by the driver after a command has
+been fully consumed (all steps emitted or pause duration elapsed). The ramp
+generator only advances `next_write_idx` after writing a new queue entry.
+The queue is empty when `read_idx == next_write_idx`.
+
+### Driver Responsibilities
+
+Each pulse driver must:
+
+1. **Execute commands exactly as specified** — emit the correct number of
+   step pulses with the correct tick spacing
+2. **Advance `read_idx`** — after each command is fully consumed
+3. **Maintain time synchronicity** — the driver's output timing must match
+   the `TICKS_PER_S` timebase. If the driver's hardware clock differs from
+   the command queue's tick rate, the driver must compensate (e.g., via
+   Bresenham-style fractional-tick correction)
+
+The driver does **not**:
+- Feed back position or step counts to the ramp generator
+- Interpret command semantics beyond steps/ticks/direction
+- Manage acceleration or deceleration
+
+Position tracking is handled by `queue_end.pos` updates in the common queue
+code (`addQueueEntry()`), not by the driver.
+
+### Direction Setup Time
+
+The time delta between a direction pin change and the next step pulse may be
+influenced by driver properties (e.g., DMA buffer granularity, timer resolution),
+but is **not guaranteed by the driver**. The driver outputs commands as given —
+it does not insert additional delays between direction changes and step pulses.
+
+It is the responsibility of command generation (ramp generator / `addQueueEntry()`)
+to insert sufficient pause commands between a direction change and the next step
+to meet the stepper driver's minimum direction setup time (`MIN_DIR_DELAY_US`).
+
+### forceStop() Contract
+
+`forceStop()` immediately halts pulse generation for the stepper. The
+contract is:
+
+- **Best effort stop**: The driver stops as quickly as hardware allows.
+  For DMA-based drivers (I2S, potentially RMT), pulses already committed to
+  hardware buffers may still be physically output.
+- **Position not guaranteed**: `forceStop()` does not guarantee that the
+  reported position exactly matches the number of physically output pulses.
+  The position error is bounded by the driver's buffering depth (e.g., for
+  I2S: up to `(BLOCK_COUNT - 1) × max_steps_per_block` steps).
+- **Queue is cleared**: After `forceStop()`, the queue is logically empty.
+  Any remaining commands are discarded.
+- **State reset**: The driver resets its internal state (`_isRunning = false`,
+  fill state cleared, etc.) so the stepper can accept new commands.
+
+---
+
 ## Key Implementation Differences
 
 ### Position Tracking
