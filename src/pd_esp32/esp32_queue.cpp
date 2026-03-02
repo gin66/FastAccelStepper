@@ -160,19 +160,8 @@ void StepperTask(void* parameter) {
 #ifdef SUPPORT_ESP32_I2S
     {
       I2sManager& mgr = I2sManager::instance();
-      if (mgr.isInitialized()) {
-        if (!mgr.isDmaStarted()) {
-          mgr.startDma();
-        }
-        if (mgr.isWriteBlockAvailable()) {
-          uint8_t blk = mgr.writeBlock();
-          mgr.clearBlock(blk);
-          for (uint8_t i = 0; i < NUM_QUEUES; i++) {
-            fas_queue[i].fill_i2s_buffer();
-          }
-          mgr.flushBlock(blk);
-          mgr.markWriteBlockPrepared();
-        }
+      if (mgr.isInitialized() && !mgr.isDmaStarted()) {
+        mgr.startDma();
       }
     }
 #endif

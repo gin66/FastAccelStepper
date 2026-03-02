@@ -44,7 +44,6 @@ class I2sManager {
       memset(_bufs[i], 0, I2S_BYTES_PER_BLOCK);
     }
     _dma_block = 0;
-    _write_block = 0;
     _callback_count = 0;
     return true;
   }
@@ -53,23 +52,7 @@ class I2sManager {
 
   uint8_t* blockBuf(uint8_t block) { return _bufs[block % I2S_BLOCK_COUNT]; }
 
-  void clearBlock(uint8_t block) {
-    if (block < I2S_BLOCK_COUNT) {
-      memset(_bufs[block], 0x00, I2S_BYTES_PER_BLOCK);
-    }
-  }
-
   uint8_t dmaBlock() const { return _dma_block; }
-  uint8_t writeBlock() const { return _write_block; }
-
-  bool isWriteBlockAvailable() const {
-    uint8_t next_write = (_write_block + 1) % I2S_BLOCK_COUNT;
-    return next_write != _dma_block;
-  }
-
-  void markWriteBlockPrepared() {
-    _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
-  }
 
   void registerDmaCallback(i2s_dma_callback_t cb) { _dma_callback = cb; }
 
@@ -78,7 +61,6 @@ class I2sManager {
       _dma_callback(_dma_block);
       _callback_count++;
     }
-    memset(_bufs[_dma_block], 0, I2S_BYTES_PER_BLOCK);
     _dma_block = (_dma_block + 1) % I2S_BLOCK_COUNT;
   }
 
@@ -87,7 +69,6 @@ class I2sManager {
   I2sManager()
       : _initialized(false),
         _dma_block(0),
-        _write_block(0),
         _callback_count(0),
         _dma_callback(nullptr) {
     for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
@@ -99,7 +80,6 @@ class I2sManager {
   bool _initialized;
   uint8_t _bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
   uint8_t _dma_block;
-  uint8_t _write_block;
   uint32_t _callback_count;
   i2s_dma_callback_t _dma_callback;
 };
@@ -240,28 +220,8 @@ static void test_dma_block_rotation() {
   test_result("DMA block rotation", correct);
 }
 
-static void test_dma_write_block_advance() {
-  printf("Running: DMA write block advance\n");
-
-  I2sManager::instance().init(32, 33, -1);
-
-  uint8_t w0 = I2sManager::instance().writeBlock();
-  I2sManager::instance().markWriteBlockPrepared();
-  uint8_t w1 = I2sManager::instance().writeBlock();
-  I2sManager::instance().markWriteBlockPrepared();
-  uint8_t w2 = I2sManager::instance().writeBlock();
-  I2sManager::instance().markWriteBlockPrepared();
-  uint8_t w3 = I2sManager::instance().writeBlock();
-
-  printf("  Write blocks: %u -> %u -> %u -> %u\n", w0, w1, w2, w3);
-  printf("  Expected: 0 -> 1 -> 2 -> 0 (modulo 3)\n");
-
-  bool correct = (w0 == 0) && (w1 == 1) && (w2 == 2) && (w3 == 0);
-  test_result("DMA write block advance", correct);
-}
-
-static void test_dma_buffer_clearing() {
-  printf("Running: DMA buffer clearing on consume\n");
+static void test_dma_buffer_not_cleared_on_consume() {
+  printf("Running: DMA buffer NOT cleared on consume (HW behavior)\n");
 
   I2sManager::instance().init(32, 33, -1);
   uint8_t* buf = I2sManager::instance().blockBuf(0);
@@ -273,43 +233,17 @@ static void test_dma_buffer_clearing() {
 
   buf = I2sManager::instance().blockBuf(0);
 
-  bool all_zero = true;
+  bool still_has_data = true;
   for (uint16_t i = 0; i < I2S_BYTES_PER_BLOCK; i++) {
-    if (buf[i] != 0x00) {
-      all_zero = false;
+    if (buf[i] != 0xFF) {
+      still_has_data = false;
       break;
     }
   }
 
-  printf("  After consume, block 0 all zeros: %s\n", all_zero ? "yes" : "no");
-  test_result("DMA buffer clearing", all_zero);
-}
-
-static void test_dma_block_availability() {
-  printf("Running: DMA write block availability\n");
-
-  I2sManager::instance().init(32, 33, -1);
-
-  bool avail0 = I2sManager::instance().isWriteBlockAvailable();
-  printf("  Initial (dma=0, write=0): available=%s\n", avail0 ? "yes" : "no");
-
-  I2sManager::instance().markWriteBlockPrepared();
-  bool avail1 = I2sManager::instance().isWriteBlockAvailable();
-  printf("  After 1 prepare (dma=0, write=1): available=%s\n",
-         avail1 ? "yes" : "no");
-
-  I2sManager::instance().markWriteBlockPrepared();
-  bool avail2 = I2sManager::instance().isWriteBlockAvailable();
-  printf("  After 2 prepares (dma=0, write=2): available=%s\n",
-         avail2 ? "yes" : "no");
-
-  I2sManager::instance().dmaConsumeBlock();
-  bool avail3 = I2sManager::instance().isWriteBlockAvailable();
-  printf("  After 1 consume (dma=1, write=2): available=%s\n",
-         avail3 ? "yes" : "no");
-
-  bool correct = avail0 && avail1 && !avail2 && avail3;
-  test_result("DMA write block availability", correct);
+  printf("  After consume, block 0 still has old data: %s\n",
+         still_has_data ? "yes" : "no");
+  test_result("DMA buffer not cleared on consume", still_has_data);
 }
 
 static void test_bit_stream_single_pulse() {
@@ -463,6 +397,289 @@ static void add_command(StepperQueueBase* q, uint8_t steps, uint16_t ticks) {
   q->entry[idx].ticks = ticks;
   q->entry[idx].toggle_dir = 0;
   q->next_write_idx++;
+}
+
+static void test_fill_skips_busy_block() {
+  printf("Running: Fill skips busy block, fills others\n");
+
+  I2sManager::instance().init(32, 33, -1);
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+  add_command(&q, 10, 200);
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+  uint8_t write_block = 0;
+  uint8_t busy_block = 1;
+
+  for (uint8_t blk = 0; blk < I2S_BLOCK_COUNT; blk++) {
+    memset(I2sManager::instance().blockBuf(blk), 0, I2S_BYTES_PER_BLOCK);
+  }
+
+  while (write_block != busy_block) {
+    memset(buf, 0, I2S_BYTES_PER_BLOCK);
+    bool full = i2s_fill_buffer(&q, buf, &state);
+    memcpy(I2sManager::instance().blockBuf(write_block), buf,
+           I2S_BYTES_PER_BLOCK);
+    if (full) {
+      write_block = (write_block + 1) % I2S_BLOCK_COUNT;
+    } else {
+      break;
+    }
+  }
+
+  uint32_t pulses_busy =
+      countPulsesInBuffer(I2sManager::instance().blockBuf(busy_block));
+  uint32_t pulses_0 = countPulsesInBuffer(I2sManager::instance().blockBuf(0));
+  uint32_t pulses_2 = countPulsesInBuffer(I2sManager::instance().blockBuf(2));
+
+  printf("  Busy block %u pulses: %u (expected 0)\n", busy_block, pulses_busy);
+  printf("  Block 0 pulses: %u\n", pulses_0);
+  printf("  Block 2 pulses: %u\n", pulses_2);
+  printf("  Write block stopped at: %u\n", write_block);
+
+  test_result("Fill skips busy block",
+              pulses_busy == 0 && (pulses_0 > 0 || pulses_2 > 0));
+}
+
+static void test_write_pointer_resets_on_busy_match() {
+  printf("Running: Write pointer resets when matches busy block\n");
+
+  uint8_t write_block = 0;
+  uint8_t busy_block = 0;
+
+  if (write_block == busy_block) {
+    write_block = (busy_block + 1) % I2S_BLOCK_COUNT;
+  }
+  bool ok1 = (write_block == 1);
+  printf("  After reset: write=%u (expected 1)\n", write_block);
+
+  busy_block = 1;
+  if (write_block == busy_block) {
+    write_block = (busy_block + 1) % I2S_BLOCK_COUNT;
+  }
+  bool ok2 = (write_block == 2);
+  printf("  After another reset: write=%u (expected 2)\n", write_block);
+
+  test_result("Write pointer resets on busy match", ok1 && ok2);
+}
+
+static void test_fill_multiple_blocks_avoiding_busy() {
+  printf("Running: Fill multiple blocks avoiding busy block\n");
+
+  I2sManager::instance().init(32, 33, -1);
+
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+  add_command(&q, 100, 200);
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+  uint8_t write_block = 0;
+  uint8_t busy_block = 1;
+
+  if (write_block == busy_block) {
+    write_block = (busy_block + 1) % I2S_BLOCK_COUNT;
+  }
+
+  for (uint8_t blk = 0; blk < I2S_BLOCK_COUNT; blk++) {
+    memset(I2sManager::instance().blockBuf(blk), 0, I2S_BYTES_PER_BLOCK);
+  }
+
+  int filled_count = 0;
+  while (write_block != busy_block && filled_count < 5) {
+    uint8_t* buf = I2sManager::instance().blockBuf(write_block);
+    bool full = i2s_fill_buffer(&q, buf, &state);
+    if (full) {
+      write_block = (write_block + 1) % I2S_BLOCK_COUNT;
+      filled_count++;
+    } else {
+      break;
+    }
+  }
+
+  uint32_t pulses_busy =
+      countPulsesInBuffer(I2sManager::instance().blockBuf(busy_block));
+  uint32_t total_other = 0;
+  for (uint8_t blk = 0; blk < I2S_BLOCK_COUNT; blk++) {
+    if (blk != busy_block) {
+      total_other += countPulsesInBuffer(I2sManager::instance().blockBuf(blk));
+    }
+  }
+
+  printf("  Busy block %u pulses: %u (expected 0)\n", busy_block, pulses_busy);
+  printf("  Total other blocks pulses: %u (expected > 0)\n", total_other);
+  printf("  Blocks filled: %d\n", filled_count);
+
+  test_result("Fill multiple blocks avoiding busy",
+              pulses_busy == 0 && total_other > 0);
+}
+
+static void test_fill_clears_old_pulses() {
+  printf("Running: Fill clears old pulses via overwrite\n");
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+
+  memset(buf, 0xFF, I2S_BYTES_PER_BLOCK);
+  printf("  Buffer pre-filled with 0xFF (simulating old pulses)\n");
+
+  uint32_t old_pulses = countPulsesInBuffer(buf);
+  printf("  Old pulses in buffer: %u\n", old_pulses);
+
+  i2s_fill_buffer(&q, buf, &state);
+
+  uint32_t new_pulses = countPulsesInBuffer(buf);
+  bool consumed = (q.read_idx == q.next_write_idx);
+
+  printf("  After fill with empty queue, pulses: %u (expected 0)\n",
+         new_pulses);
+  printf("  Queue consumed: %s\n", consumed ? "yes" : "no");
+  printf("  Buffer full: no (empty queue)\n");
+
+  test_result("Fill clears old pulses", new_pulses == 0 && consumed);
+}
+
+static void test_fill_return_value_empty() {
+  printf("Running: Fill return value - empty queue returns false\n");
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+  memset(buf, 0xFF, I2S_BYTES_PER_BLOCK);
+
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+
+  bool buffer_full = i2s_fill_buffer(&q, buf, &state);
+
+  printf("  Empty queue: buffer_full=%s (expected false)\n",
+         buffer_full ? "true" : "false");
+
+  test_result("Fill return value empty", !buffer_full);
+}
+
+static void test_fill_return_value_partial() {
+  printf("Running: Fill return value - partial fill returns false\n");
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
+
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+
+  add_command(&q, 3, 200);
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+
+  bool buffer_full = i2s_fill_buffer(&q, buf, &state);
+
+  printf("  3 steps @ 200 ticks: buffer_full=%s (expected false)\n",
+         buffer_full ? "true" : "false");
+
+  test_result("Fill return value partial", !buffer_full);
+}
+
+static void test_fill_return_value_full() {
+  printf("Running: Fill return value - full block returns true\n");
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
+
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+
+  add_command(&q, 200, 150);
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+
+  bool buffer_full = i2s_fill_buffer(&q, buf, &state);
+
+  printf("  200 steps @ 150 ticks: buffer_full=%s (expected true)\n",
+         buffer_full ? "true" : "false");
+
+  test_result("Fill return value full", buffer_full);
+}
+
+static void test_fill_return_value_pause_spans_block() {
+  printf("Running: Fill return value - pause spanning block returns true\n");
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
+
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+
+  add_command(&q, 0, 20000);
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+
+  bool buffer_full = i2s_fill_buffer(&q, buf, &state);
+
+  printf("  Pause 20000 ticks: buffer_full=%s (expected true)\n",
+         buffer_full ? "true" : "false");
+
+  test_result("Fill return value pause spans block", buffer_full);
+}
+
+static void test_fill_overwrites_old_data() {
+  printf("Running: Fill overwrites old data, preserves only new pulses\n");
+
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+
+  StepperQueueBase q;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  q.dirPin = NO_PIN;
+
+  add_command(&q, 3, 200);
+
+  struct i2s_fill_state state = {0, 0, 0, {0}, 0};
+
+  memset(buf, 0xFF, I2S_BYTES_PER_BLOCK);
+  printf("  Buffer pre-filled with 0xFF (simulating old pulses everywhere)\n");
+
+  i2s_fill_buffer(&q, buf, &state);
+
+  uint32_t new_pulses = countPulsesInBuffer(buf);
+  bool consumed = (q.read_idx == q.next_write_idx);
+
+  printf("  After fill with 3 steps, pulses: %u (expected 3)\n", new_pulses);
+  printf("  Queue consumed: %s\n", consumed ? "yes" : "no");
+
+  uint16_t block_ticks = I2S_FRAMES_PER_BLOCK * I2S_TICKS_PER_FRAME;
+  uint16_t last_pulse_tick = 3 * 200;
+  uint16_t last_pulse_frame = last_pulse_tick / I2S_TICKS_PER_FRAME;
+
+  bool cleared_after_pulses = true;
+  for (uint16_t f = last_pulse_frame + 1; f < I2S_FRAMES_PER_BLOCK; f++) {
+    if (buf[f * I2S_BYTES_PER_FRAME] == 0xFF) {
+      cleared_after_pulses = false;
+      printf("  Old data still present at frame %u\n", f);
+      break;
+    }
+  }
+
+  test_result("Fill overwrites old data",
+              new_pulses == 3 && consumed && cleared_after_pulses);
 }
 
 static void test_fill_single_step() {
@@ -1042,9 +1259,7 @@ void basic_test() {
 
   puts("\n=== DMA Block Management ===");
   test_dma_block_rotation();
-  test_dma_write_block_advance();
-  test_dma_buffer_clearing();
-  test_dma_block_availability();
+  test_dma_buffer_not_cleared_on_consume();
 
   puts("\n=== Bit Stream Analysis ===");
   test_bit_stream_single_pulse();
@@ -1056,6 +1271,15 @@ void basic_test() {
   test_dma_buffer_content();
 
   puts("\n=== Part 2: Driver Fill Function ===");
+  test_fill_clears_old_pulses();
+  test_fill_overwrites_old_data();
+  test_fill_return_value_empty();
+  test_fill_return_value_partial();
+  test_fill_return_value_full();
+  test_fill_return_value_pause_spans_block();
+  test_fill_skips_busy_block();
+  test_write_pointer_resets_on_busy_match();
+  test_fill_multiple_blocks_avoiding_busy();
   test_fill_single_step();
   test_fill_multi_step();
   test_fill_pause();

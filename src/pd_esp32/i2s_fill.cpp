@@ -5,8 +5,10 @@
 
 #define I2S_BLOCK_TICKS ((uint16_t)(I2S_FRAMES_PER_BLOCK * I2S_TICKS_PER_FRAME))
 
-void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
+bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
                                struct i2s_fill_state* state) {
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
+
   uint16_t tick_pos = state->tick_pos;
   state->pulse_count = 0;
 
@@ -16,7 +18,7 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
     state->remaining_high_ticks -= I2S_BLOCK_TICKS;
     state->tick_pos = 0;
     q->read_idx = rp;
-    return;
+    return true;
   }
 
   if (state->remaining_high_ticks > 0) {
@@ -46,7 +48,7 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
     state->remaining_low_ticks -= I2S_BLOCK_TICKS;
     state->tick_pos = 0;
     q->read_idx = rp;
-    return;
+    return true;
   }
 
   if (state->remaining_low_ticks > 0) {
@@ -55,7 +57,7 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
           tick_pos + state->remaining_low_ticks - I2S_BLOCK_TICKS;
       state->tick_pos = 0;
       q->read_idx = rp;
-      return;
+      return true;
     }
     tick_pos += state->remaining_low_ticks;
     state->remaining_low_ticks = 0;
@@ -83,7 +85,7 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
         state->remaining_low_ticks =
             (uint16_t)((uint32_t)tick_pos + total - I2S_BLOCK_TICKS);
         q->read_idx = rp;
-        return;
+        return true;
       }
       tick_pos += (uint16_t)total;
       rp++;
@@ -101,7 +103,7 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
               (uint16_t)(new_tick_pos - I2S_BLOCK_TICKS) + 1;
           state->tick_pos = 0;
           q->read_idx = rp;
-          return;
+          return true;
         }
 
         tick_pos = (uint16_t)new_tick_pos;
@@ -127,6 +129,7 @@ void IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
 
   state->tick_pos = tick_pos;
   q->read_idx = rp;
+  return (tick_pos >= I2S_BLOCK_TICKS);
 }
 
 #endif

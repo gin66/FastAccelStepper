@@ -15,6 +15,7 @@ bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
   _step_pin = step_pin;
   _i2s_step_slot = 0;
   _i2s_drain = 0;
+  _write_block = 0;
   _fill_state = {};
   _isRunning = false;
 
@@ -47,7 +48,7 @@ bool StepperQueue::isReadyForCommands_i2s() {
 
 uint16_t StepperQueue::_getPerformedPulses_i2s() { return 0; }
 
-void StepperQueue::fill_i2s_buffer() {
+void StepperQueue::fill_i2s_buffer(uint8_t busy_block) {
   if (!use_i2s) {
     return;
   }
@@ -55,11 +56,27 @@ void StepperQueue::fill_i2s_buffer() {
     return;
   }
 
-  I2sManager& mgr = I2sManager::instance();
-  uint8_t blk = mgr.writeBlock();
-  uint8_t* buf = mgr.blockBuf(blk);
+  if (_write_block == busy_block) {
+    _write_block = (busy_block + 1) % I2S_BLOCK_COUNT;
+    _fill_state.tick_pos = 0;
+  }
 
-  i2s_fill_buffer(this, buf, &_fill_state);
+  I2sManager& mgr = I2sManager::instance();
+
+  for (int i = 0; i < I2S_BLOCK_COUNT - 1; i++) {
+    if (_write_block == busy_block) {
+      _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
+    }
+
+    uint8_t* buf = mgr.blockBuf(_write_block);
+    bool buffer_full = i2s_fill_buffer(this, buf, &_fill_state);
+
+    if (buffer_full) {
+      _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
+    } else {
+      break;
+    }
+  }
 
   if (isQueueEmpty()) {
     if (_isRunning) {

@@ -23,27 +23,6 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
     return true;
   }
 
-  // ESP32 I2S 16-bit stereo mode - VERIFIED CONFIGURATION (measured on scope):
-  //
-  // Buffer layout (16-bit slots, all bytes transmitted):
-  //   Bytes 0-1: L channel (16 bits MSB-first: byte 0 = MSB, byte 1 = LSB)
-  //   Bytes 2-3: R channel (16 bits MSB-first: byte 2 = MSB, byte 3 = LSB)
-  //
-  // Timing (measured):
-  //   BCLK: 8MHz (32 bits × 250kHz sample rate)
-  //   Frame: 32 bits = 4µs (L: 16 bits + R: 16 bits)
-  //   Block: 250 frames × 4µs = 1ms (I2S_BYTES_PER_BLOCK = 1000)
-  //
-  // Test patterns verified:
-  //   0x55 → 4MHz output (01010101 at 8MHz bit rate)
-  //   0x0F → 1MHz output (00001111 = 4 HIGH + 4 LOW bits)
-  //   0xFF → DC HIGH
-  //
-  // For stepper pulse generation:
-  // - Single stepper: Fill all 16 bits of L channel (or both L+R same pattern)
-  // - Multi-stepper: L channel for stepper 1, R channel for stepper 2
-  // - Each bit = 125ns (1/8MHz), provides fine-grained pulse timing
-
   Serial.printf("I2S init: data=%d, bclk=%d, ws=%d\n", data_pin, bclk_pin,
                 ws_pin);
 
@@ -61,7 +40,7 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
   i2s_std_config_t std_cfg = {
       .clk_cfg = {.sample_rate_hz = I2S_SAMPLE_RATE_HZ,
                   .clk_src = I2S_CLK_SRC_DEFAULT,
-                  .mclk_multiple = I2S_MCLK_MULTIPLE_128},
+                  .mclk_multiple = I2S_MCLK_MULTIPLE_128}, // lowest multiplier
       .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                   I2S_SLOT_MODE_STEREO),
       .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,
@@ -97,30 +76,17 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
     memset(_bufs[i], 0, I2S_BYTES_PER_BLOCK);
   }
   _dma_block = 0;
-  _write_block = 0;
   _initialized = true;
   return true;
 }
 
-void I2sManager::clearBlock(uint8_t block) {
-  if (block < I2S_BLOCK_COUNT) {
-    memset(_bufs[block], 0x00, I2S_BYTES_PER_BLOCK);
-  }
-}
-
-bool I2sManager::flushBlock(uint8_t block) {
-  if (!_initialized || block >= I2S_BLOCK_COUNT) {
-    return false;
+void IRAM_ATTR I2sManager::queueBlockToDma(uint8_t block) {
+  if (!_initialized || !_chan) {
+    return;
   }
   size_t written = 0;
-  esp_err_t rc =
-      i2s_channel_write(_chan, _bufs[block], I2S_BYTES_PER_BLOCK, &written, 0);
-  return (rc == ESP_OK) && (written == I2S_BYTES_PER_BLOCK);
-}
-
-void I2sManager::registerDmaCallback(i2s_dma_callback_t cb, void* user_data) {
-  _dma_callback = cb;
-  _dma_callback_data = user_data;
+  i2s_channel_write(_chan, _bufs[block % I2S_BLOCK_COUNT], I2S_BYTES_PER_BLOCK,
+                    &written, 0);
 }
 
 bool I2sManager::startDma() {
@@ -136,36 +102,27 @@ bool I2sManager::startDma() {
 
   vTaskDelay(1);
 
-  Serial.printf("I2S startDma: writing %d blocks with timeout=100\n",
-                I2S_BLOCK_COUNT);
+  Serial.printf("I2S startDma: writing %d blocks\n", I2S_BLOCK_COUNT);
   for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-    size_t written = 0;
-    esp_err_t rc =
-        i2s_channel_write(_chan, _bufs[i], I2S_BYTES_PER_BLOCK, &written, 0);
-    Serial.printf("I2S startDma: block %d written=%d rc=%d\n", i, (int)written,
-                  rc);
+    queueBlockToDma(i);
   }
-  Serial.printf("I2S startDma: filling remaining DMA buffer\n");
-  int total_written = 0;
-  for (int j = 0; j < 100; j++) {
-    for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-      size_t written = 0;
-      esp_err_t rc =
-          i2s_channel_write(_chan, _bufs[i], I2S_BYTES_PER_BLOCK, &written, 0);
-      if (rc == ESP_OK && written > 0) {
-        total_written += written;
-      }
-    }
-  }
-  Serial.printf("I2S startDma: filled %d bytes\n", total_written);
+  Serial.printf("I2S startDma: DMA started\n");
   return true;
 }
 
 void IRAM_ATTR I2sManager::handleTxDone() {
   _callback_count++;
-  advanceDmaBlock();
-  if (_dma_callback) {
-    _dma_callback(_dma_callback_data);
+
+  uint8_t completed_block = _dma_block;
+  uint8_t busy_block = (completed_block + 1) % I2S_BLOCK_COUNT;
+  _dma_block = busy_block;
+
+  queueBlockToDma(completed_block);
+
+  extern StepperQueue fas_queue[];
+  for (uint8_t i = 0; i < QUEUES_I2S; i++) {
+    uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
+    fas_queue[queue_idx].fill_i2s_buffer(busy_block);
   }
 }
 
