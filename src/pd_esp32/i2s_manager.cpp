@@ -4,6 +4,14 @@
 #include <string.h>
 #include "pd_esp32/i2s_manager.h"
 
+static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
+                                           i2s_event_data_t* event,
+                                           void* user_ctx) {
+  I2sManager* mgr = static_cast<I2sManager*>(user_ctx);
+  mgr->handleTxDone();
+  return false;
+}
+
 I2sManager& I2sManager::instance() {
   static I2sManager mgr;
   return mgr;
@@ -18,6 +26,7 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
   chan_cfg.dma_desc_num = I2S_DMA_DESC_NUM;
   chan_cfg.dma_frame_num = I2S_DMA_FRAME_NUM;
+  chan_cfg.auto_clear = true;
 
   esp_err_t rc = i2s_new_channel(&chan_cfg, &_chan, NULL);
   if (rc != ESP_OK) {
@@ -50,7 +59,9 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
     return false;
   }
 
-  rc = i2s_channel_enable(_chan);
+  i2s_event_callbacks_t cbs = {};
+  cbs.on_sent = i2s_tx_done_callback;
+  rc = i2s_channel_register_event_callback(_chan, &cbs, this);
   if (rc != ESP_OK) {
     i2s_del_channel(_chan);
     _chan = nullptr;
@@ -80,8 +91,8 @@ bool I2sManager::flushBlock(uint8_t block) {
     return false;
   }
   size_t written = 0;
-  esp_err_t rc = i2s_channel_write(_chan, _bufs[block], I2S_BYTES_PER_BLOCK,
-                                   &written, portMAX_DELAY);
+  esp_err_t rc =
+      i2s_channel_write(_chan, _bufs[block], I2S_BYTES_PER_BLOCK, &written, 0);
   return (rc == ESP_OK) && (written == I2S_BYTES_PER_BLOCK);
 }
 
@@ -96,6 +107,33 @@ void I2sManager::advanceDmaBlock() {
   if (_block_prepared[_prepared_block]) {
     _dma_block = _prepared_block;
     _prepared_block = (_prepared_block + 1) % I2S_BLOCK_COUNT;
+  }
+}
+
+void I2sManager::registerDmaCallback(i2s_dma_callback_t cb, void* user_data) {
+  _dma_callback = cb;
+  _dma_callback_data = user_data;
+}
+
+bool I2sManager::startDma() {
+  if (!_initialized || _dma_started) {
+    return _dma_started;
+  }
+  if (i2s_channel_enable(_chan) != ESP_OK) {
+    return false;
+  }
+  _dma_started = true;
+  for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
+    size_t written = 0;
+    i2s_channel_write(_chan, _bufs[i], I2S_BYTES_PER_BLOCK, &written, 0);
+  }
+  return true;
+}
+
+void IRAM_ATTR I2sManager::handleTxDone() {
+  advanceDmaBlock();
+  if (_dma_callback) {
+    _dma_callback(_dma_callback_data);
   }
 }
 

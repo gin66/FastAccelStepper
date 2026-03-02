@@ -6,6 +6,8 @@
 #include "i2s_constants.h"
 #include <driver/i2s_std.h>
 
+typedef void (*i2s_dma_callback_t)(void* user_data);
+
 class I2sManager {
  public:
   static I2sManager& instance();
@@ -27,15 +29,23 @@ class I2sManager {
   void markWriteBlockPrepared();
   void advanceDmaBlock();
 
+  void registerDmaCallback(i2s_dma_callback_t cb, void* user_data);
+  bool startDma();
+  bool isDmaStarted() const { return _dma_started; }
+  void handleTxDone();
+
  private:
   I2sManager() {}
   bool _initialized = false;
+  bool _dma_started = false;
   i2s_chan_handle_t _chan = nullptr;
   uint8_t _bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
   bool _block_prepared[I2S_BLOCK_COUNT] = {false, false, false};
   uint8_t _dma_block = 0;
   uint8_t _prepared_block = 1;
   uint8_t _write_block = 2;
+  i2s_dma_callback_t _dma_callback = nullptr;
+  void* _dma_callback_data = nullptr;
 };
 
 #endif  // SUPPORT_ESP32_I2S

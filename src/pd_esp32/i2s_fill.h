@@ -4,27 +4,11 @@
 
 #include <stdint.h>
 #include "pd_esp32/i2s_constants.h"
-
-#ifndef QUEUE_LEN_MASK
-#define QUEUE_LEN_MASK 63
-#endif
+#include "fas_queue/base.h"
 
 #ifndef LL_TOGGLE_PIN
 #define LL_TOGGLE_PIN(dirPin)
 #endif
-
-struct i2s_queue_entry {
-  uint8_t steps;
-  uint8_t toggle_dir : 1;
-  uint16_t ticks;
-};
-
-struct i2s_stepper_queue {
-  struct i2s_queue_entry entry[64];
-  volatile uint8_t read_idx;
-  uint8_t next_write_idx;
-  uint8_t dirPin;
-};
 
 struct i2s_fill_state {
   uint16_t tick_pos;
@@ -34,7 +18,7 @@ struct i2s_fill_state {
   uint8_t pulse_count;
 };
 
-void i2s_fill_buffer(struct i2s_stepper_queue* q, uint8_t* buf,
+void i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
                      struct i2s_fill_state* state);
 
 #endif

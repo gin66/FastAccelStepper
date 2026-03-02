@@ -13,10 +13,8 @@ bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
   _i2s_step_slot = 0;
-  _i2s_tick_carry = 0;
-  _i2s_tick_pos = 0;
   _i2s_drain = 0;
-  _i2s_pulse_count = 0;
+  _fill_state = {};
   _isRunning = false;
 
   I2sManager& mgr = I2sManager::instance();
@@ -35,9 +33,7 @@ void StepperQueue::startQueue_i2s() { _isRunning = true; }
 void StepperQueue::forceStop_i2s() {
   _isRunning = false;
   _i2s_drain = 0;
-  _i2s_tick_carry = 0;
-  _i2s_tick_pos = 0;
-  _i2s_pulse_count = 0;
+  _fill_state = {};
 }
 
 bool StepperQueue::isReadyForCommands_i2s() {
@@ -60,22 +56,8 @@ void StepperQueue::fill_i2s_buffer() {
   I2sManager& mgr = I2sManager::instance();
   uint8_t blk = mgr.writeBlock();
   uint8_t* buf = mgr.blockBuf(blk);
-  mgr.clearBlock(blk);
 
-  struct i2s_fill_state state;
-  state.tick_pos = _i2s_tick_pos;
-  state.tick_carry = _i2s_tick_carry;
-
-  i2s_fill_buffer(this, buf, &state);
-
-  _i2s_tick_pos = state.tick_pos;
-  _i2s_tick_carry = state.tick_carry;
-  _i2s_pulse_count = state.pulse_count;
-  memcpy(_i2s_pulse_positions, state.pulse_positions,
-         state.pulse_count * sizeof(uint16_t));
-
-  mgr.flushBlock(blk);
-  mgr.markWriteBlockPrepared();
+  i2s_fill_buffer(this, buf, &_fill_state);
 
   if (isQueueEmpty()) {
     if (_isRunning) {

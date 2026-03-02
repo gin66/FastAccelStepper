@@ -986,7 +986,6 @@ void setup() {
   esp_log_level_set("*", ESP_LOG_INFO);
   esp_log_level_set("rmt", ESP_LOG_INFO);
   ESP_LOGI("StepperDemo", "Started INFO");
-  ESP_LOGE("*", "Started ERROR");
   PRINTLN("");
 #endif
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)

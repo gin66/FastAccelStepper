@@ -159,16 +159,16 @@ void StepperTask(void* parameter) {
     {
       I2sManager& mgr = I2sManager::instance();
       if (mgr.isInitialized()) {
-        mgr.clearWorkBuf();
+        if (!mgr.isDmaStarted()) {
+          mgr.startDma();
+        }
+        uint8_t blk = mgr.writeBlock();
+        mgr.clearBlock(blk);
         for (uint8_t i = 0; i < NUM_QUEUES; i++) {
           fas_queue[i].fill_i2s_buffer();
         }
-        // flush() blocks until the DMA consumes enough space (~I2S_TASK_MS).
-        // That blocking already provides the inter-iteration delay, so skip
-        // vTaskDelay to avoid producing data at half the DMA consumption rate.
-        if (mgr.flush()) {
-          continue;
-        }
+        mgr.flushBlock(blk);
+        mgr.markWriteBlockPrepared();
       }
     }
 #endif

@@ -4,6 +4,10 @@
 #include "FastAccelStepper.h"
 #include "fas_queue/base.h"
 
+#if defined(SUPPORT_ESP32_I2S)
+#include "pd_esp32/i2s_fill.h"
+#endif
+
 class StepperQueue : public StepperQueueBase {
  public:
   volatile bool _isRunning;
@@ -70,10 +74,8 @@ class StepperQueue : public StepperQueueBase {
 
 #ifdef SUPPORT_ESP32_I2S
   int8_t _i2s_step_slot;
-  uint32_t _i2s_tick_carry;
   uint8_t _i2s_drain;
-  uint8_t _i2s_pulse_count;
-  uint16_t _i2s_pulse_positions[I2S_MAX_PULSES_PER_BLOCK];
+  struct i2s_fill_state _fill_state;
 
   bool init_i2s(uint8_t channel_num, uint8_t step_pin);
   void startQueue_i2s();
