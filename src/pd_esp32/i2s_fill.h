@@ -28,7 +28,6 @@ struct i2s_stepper_queue {
 
 struct i2s_fill_state {
   uint16_t tick_pos;
-  uint16_t tick_carry;
   uint16_t remaining_high_ticks;
   uint16_t remaining_low_ticks;
   uint16_t pulse_positions[I2S_MAX_PULSES_PER_BLOCK];
