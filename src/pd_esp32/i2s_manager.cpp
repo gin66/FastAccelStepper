@@ -2,6 +2,7 @@
 #if defined(SUPPORT_ESP32_I2S)
 
 #include <string.h>
+#include <Arduino.h>
 #include "pd_esp32/i2s_manager.h"
 
 static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
@@ -21,6 +22,9 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
   if (_initialized) {
     return true;
   }
+
+  Serial.printf("I2S init: data=%d, bclk=%d, ws=%d\n", data_pin, bclk_pin,
+                ws_pin);
 
   i2s_chan_config_t chan_cfg =
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
@@ -69,8 +73,10 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
   }
 
   for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-    memset(_bufs[i], 0, I2S_BYTES_PER_BLOCK);
-    _block_prepared[i] = false;
+    for (int j = 0; j < I2S_BYTES_PER_BLOCK; j++) {
+      _bufs[i][j] = ((j / 4) % 2) ? 0xFF : 0x00;
+    }
+    _block_prepared[i] = true;
   }
   _dma_block = 0;
   _prepared_block = 1;
@@ -119,13 +125,19 @@ bool I2sManager::startDma() {
   if (!_initialized || _dma_started) {
     return _dma_started;
   }
+  Serial.printf("I2S startDma: enabling channel\n");
   if (i2s_channel_enable(_chan) != ESP_OK) {
+    Serial.printf("I2S startDma: channel enable FAILED\n");
     return false;
   }
   _dma_started = true;
+  Serial.printf("I2S startDma: writing %d blocks\n", I2S_BLOCK_COUNT);
   for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
     size_t written = 0;
-    i2s_channel_write(_chan, _bufs[i], I2S_BYTES_PER_BLOCK, &written, 0);
+    esp_err_t rc =
+        i2s_channel_write(_chan, _bufs[i], I2S_BYTES_PER_BLOCK, &written, 0);
+    Serial.printf("I2S startDma: block %d written=%d rc=%d\n", i, (int)written,
+                  rc);
   }
   return true;
 }

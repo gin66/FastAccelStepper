@@ -8,6 +8,7 @@
 
 #define I2S_DEFAULT_BCLK_GPIO 33
 #define I2S_DEFAULT_WS_GPIO -1
+#define I2S_DEFAULT_DATA_GPIO 32
 
 bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
   _initVars();
@@ -19,7 +20,8 @@ bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
 
   I2sManager& mgr = I2sManager::instance();
   if (!mgr.isInitialized()) {
-    if (!mgr.init((int)step_pin, I2S_DEFAULT_BCLK_GPIO, I2S_DEFAULT_WS_GPIO)) {
+    if (!mgr.init(I2S_DEFAULT_DATA_GPIO, I2S_DEFAULT_BCLK_GPIO,
+                  I2S_DEFAULT_WS_GPIO)) {
       return false;
     }
   }

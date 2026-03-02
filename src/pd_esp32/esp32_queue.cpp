@@ -4,6 +4,7 @@
 #endif
 
 #if defined(SUPPORT_ESP32)
+#include <Arduino.h>
 
 StepperQueue fas_queue[NUM_QUEUES];
 
@@ -13,6 +14,7 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
   max_speed_in_ticks = 80;
   use_rmt = false;
   use_i2s = false;
+  Serial.printf("init: queue_num=%d step_pin=%d\n", queue_num, step_pin);
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   if (channel < QUEUES_MCPWM_PCNT) {
     return init_mcpwm_pcnt(channel, step_pin);
