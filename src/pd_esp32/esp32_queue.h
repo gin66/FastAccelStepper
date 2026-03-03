@@ -82,8 +82,8 @@ class StepperQueue : public StepperQueueBase {
   void forceStop_i2s();
   bool isReadyForCommands_i2s();
   uint16_t _getPerformedPulses_i2s();
-  void fill_i2s_buffer(uint8_t *buf,bool first);
-  void clear_i2s_block(uint8_t *buf, bool first);
+  void fill_i2s_buffer(uint8_t* buf, bool first);
+  void clear_i2s_block(uint8_t* buf, bool first);
 #endif
 
   static bool isValidStepPin(uint8_t step_pin);

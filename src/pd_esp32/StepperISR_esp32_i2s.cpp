@@ -44,7 +44,7 @@ bool StepperQueue::isReadyForCommands_i2s() {
 
 uint16_t StepperQueue::_getPerformedPulses_i2s() { return 0; }
 
-void StepperQueue::clear_i2s_block(uint8_t *buf, bool first) {
+void StepperQueue::clear_i2s_block(uint8_t* buf, bool first) {
   if (!use_i2s) {
     return;
   }
@@ -54,7 +54,7 @@ void StepperQueue::clear_i2s_block(uint8_t *buf, bool first) {
   i2s_clear_block(buf, &_fill_state, first ? 1 : 0, pulse_width);
 }
 
-void StepperQueue::fill_i2s_buffer(uint8_t *buf, bool first) {
+void StepperQueue::fill_i2s_buffer(uint8_t* buf, bool first) {
   if (!use_i2s) {
     return;
   }
@@ -62,8 +62,8 @@ void StepperQueue::fill_i2s_buffer(uint8_t *buf, bool first) {
     return;
   }
 
-  //if (_write_block == busy_block) {
-    // we were overrun
+  // if (_write_block == busy_block) {
+  //  we were overrun
   //  _write_block = (busy_block + 2) % I2S_BLOCK_COUNT;
   //  _fill_state.tick_pos = _write_block * I2S_BLOCK_TICKS;
   //}
@@ -72,9 +72,8 @@ void StepperQueue::fill_i2s_buffer(uint8_t *buf, bool first) {
   uint8_t pulse_width = mgr.pulseWidthBits();
   if (pulse_width == 0) pulse_width = 32;
 
-
   bool buffer_full =
-        i2s_fill_buffer(this, buf, first ? 1 : 0, &_fill_state, pulse_width);
+      i2s_fill_buffer(this, buf, first ? 1 : 0, &_fill_state, pulse_width);
 
   // This is problematic
   if (isQueueEmpty()) {

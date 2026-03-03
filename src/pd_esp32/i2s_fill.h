@@ -11,7 +11,7 @@
 #endif
 
 struct i2s_fill_state {
-  uint32_t tick_pos; // tick position along the three blocks
+  uint32_t tick_pos;  // tick position along the three blocks
   uint16_t remaining_high_ticks;
   uint16_t remaining_low_ticks;
   uint16_t pulse_positions[I2S_BLOCK_COUNT][I2S_MAX_PULSES_PER_BLOCK];

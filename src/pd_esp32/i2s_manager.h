@@ -15,7 +15,7 @@ class I2sManager {
 
   bool startDma();
   bool isDmaStarted() const { return _dma_started; }
-  void handleTxDone(uint8_t *buf);
+  void handleTxDone(uint8_t* buf);
 
   void setPulseWidthBits(uint8_t bits) { _pulse_width_bits = bits; }
   uint8_t pulseWidthBits() const { return _pulse_width_bits; }

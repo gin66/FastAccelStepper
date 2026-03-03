@@ -11,7 +11,7 @@ static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
   I2sManager* mgr = static_cast<I2sManager*>(user_ctx);
   uint8_t* buf = (uint8_t*)event->dma_buf;
   mgr->handleTxDone(buf);
-  return false; 
+  return false;
 }
 
 I2sManager& I2sManager::instance() {
@@ -98,7 +98,7 @@ bool I2sManager::startDma() {
   return true;
 }
 
-void IRAM_ATTR I2sManager::handleTxDone(uint8_t *buf) {
+void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
   _callback_count++;
   bool first = (_callback_count & 1) == 0;
 

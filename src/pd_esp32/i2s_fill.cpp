@@ -48,13 +48,13 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf, uint8_t blk,
   uint32_t tick_pos = state->tick_pos;
   uint8_t tick_block = tick_pos / I2S_BLOCK_TICKS;
 
-  //buf[2] = 255;
+  // buf[2] = 255;
 
   if (tick_block != blk) {
     return true;
   }
 
-  //buf[4] = 255;
+  // buf[4] = 255;
 
   const uint32_t block_end = I2S_BLOCK_TICKS * (blk + 1) - 1;
   if (pulse_width_bits == 0) pulse_width_bits = 32;
@@ -64,8 +64,8 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf, uint8_t blk,
   do {
     bool new_pulse = true;
     while (state->remaining_high_ticks > 0) {
-//   buf[6] = 255;
-     // Write high bits for the current pulse
+      //   buf[6] = 255;
+      // Write high bits for the current pulse
       uint16_t bit_pos = tick_pos % I2S_BLOCK_TICKS;
       uint8_t ticks_per_bit = I2S_TICKS_PER_FRAME / I2S_BITS_PER_FRAME;
       bit_pos /= ticks_per_bit;
