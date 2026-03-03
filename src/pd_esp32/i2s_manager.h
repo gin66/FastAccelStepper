@@ -13,14 +13,9 @@ class I2sManager {
   bool init(int data_pin, int bclk_pin, int ws_pin);
   bool isInitialized() const { return _initialized; }
 
-  uint8_t* blockBuf(uint8_t block) { return _bufs[block % I2S_BLOCK_COUNT]; }
-
-  uint8_t dmaBlock() const { return _dma_block; }
-
   bool startDma();
   bool isDmaStarted() const { return _dma_started; }
-  void handleTxDone();
-  void queueBlockToDma(uint8_t block);
+  void handleTxDone(uint8_t *buf);
 
   void setPulseWidthBits(uint8_t bits) { _pulse_width_bits = bits; }
   uint8_t pulseWidthBits() const { return _pulse_width_bits; }

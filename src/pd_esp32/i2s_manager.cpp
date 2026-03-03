@@ -9,8 +9,9 @@ static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
                                            i2s_event_data_t* event,
                                            void* user_ctx) {
   I2sManager* mgr = static_cast<I2sManager*>(user_ctx);
-  mgr->handleTxDone();
-  return false;
+  uint8_t* buf = (uint8_t*)event->dma_buf;
+  mgr->handleTxDone(buf);
+  return false; 
 }
 
 I2sManager& I2sManager::instance() {
@@ -30,7 +31,7 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
   chan_cfg.dma_desc_num = I2S_DMA_DESC_NUM;
   chan_cfg.dma_frame_num = I2S_DMA_FRAME_NUM;
-  chan_cfg.auto_clear = true;
+  chan_cfg.auto_clear = false;
 
   esp_err_t rc = i2s_new_channel(&chan_cfg, &_chan, NULL);
   if (rc != ESP_OK) {
@@ -80,15 +81,6 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
   return true;
 }
 
-void IRAM_ATTR I2sManager::queueBlockToDma(uint8_t block) {
-  if (!_initialized || !_chan) {
-    return;
-  }
-  size_t written = 0;
-  i2s_channel_write(_chan, _bufs[block % I2S_BLOCK_COUNT], I2S_BYTES_PER_BLOCK,
-                    &written, 0);
-}
-
 bool I2sManager::startDma() {
   if (!_initialized || _dma_started) {
     return _dma_started;
@@ -102,32 +94,23 @@ bool I2sManager::startDma() {
 
   vTaskDelay(1);
 
-  Serial.printf("I2S startDma: writing %d blocks\n", I2S_BLOCK_COUNT);
-  for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-    queueBlockToDma(i);
-  }
   Serial.printf("I2S startDma: DMA started\n");
   return true;
 }
 
-void IRAM_ATTR I2sManager::handleTxDone() {
+void IRAM_ATTR I2sManager::handleTxDone(uint8_t *buf) {
   _callback_count++;
-
-  uint8_t completed_block = _dma_block;
-  uint8_t busy_block = (completed_block + 1) % I2S_BLOCK_COUNT;
-  _dma_block = busy_block;
+  bool first = (_callback_count & 1) == 0;
 
   extern StepperQueue fas_queue[];
   for (uint8_t i = 0; i < QUEUES_I2S; i++) {
     uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
-    fas_queue[queue_idx].clear_i2s_block(completed_block);
+    fas_queue[queue_idx].clear_i2s_block(buf, first);
   }
-
-  queueBlockToDma(completed_block);
 
   for (uint8_t i = 0; i < QUEUES_I2S; i++) {
     uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
-    fas_queue[queue_idx].fill_i2s_buffer(busy_block);
+    fas_queue[queue_idx].fill_i2s_buffer(buf, first);
   }
 }
 

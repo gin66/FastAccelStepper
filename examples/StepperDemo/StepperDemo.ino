@@ -1024,6 +1024,13 @@ void setup() {
   engine.init();
 
 #if defined(SUPPORT_ESP32_I2S)
+  pinMode(32, OUTPUT);
+  digitalWrite(32, LOW);
+  delay(100);
+  digitalWrite(32, HIGH);
+  delay(100);
+  digitalWrite(32, LOW);
+
   FastAccelStepperEngine::I2sSingleStepperConfig i2s_cfg = {
       .data_pin = 32, .bclk_pin = 33, .cpu_core = 0, .pulse_width_ticks = 64};
   engine.initI2sSingleStepper(i2s_cfg);
