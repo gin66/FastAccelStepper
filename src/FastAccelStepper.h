@@ -166,6 +166,22 @@ class FastAccelStepperEngine {
   // the engine. The periodic task will let the associated LED blink with 1 Hz
   void setDebugLed(uint8_t ledPin);
 
+#if defined(SUPPORT_ESP32_I2S)
+  // ### I2S Single-Stepper Mode
+  //
+  // Initialize I2S for single-stepper mode (one I2S channel = one stepper).
+  // This enables bit-level resolution for step rates up to ~200kHz.
+  // Must be called before stepperConnectToPin().
+  struct I2sSingleStepperConfig {
+    uint8_t data_pin;
+    uint8_t bclk_pin;
+    uint8_t cpu_core;
+    uint16_t pulse_width_ticks;
+  };
+  bool initI2sSingleStepper(const I2sSingleStepperConfig& cfg);
+  bool isI2sInitialized() const;
+#endif
+
   /* This should be only called from ISR or stepper task. So do not call it */
   void manageSteppers();
 

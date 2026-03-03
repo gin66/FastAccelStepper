@@ -43,6 +43,25 @@ void FastAccelStepperEngine::init() {
 }
 #endif
 
+#if defined(SUPPORT_ESP32_I2S)
+#include "pd_esp32/i2s_manager.h"
+#include "pd_esp32/i2s_constants.h"
+
+bool FastAccelStepperEngine::initI2sSingleStepper(
+    const I2sSingleStepperConfig& cfg) {
+  I2sManager& mgr = I2sManager::instance();
+  if (!mgr.init(cfg.data_pin, cfg.bclk_pin, -1)) {
+    return false;
+  }
+  mgr.setPulseWidthBits(cfg.pulse_width_ticks / 2);
+  return mgr.startDma();
+}
+
+bool FastAccelStepperEngine::isI2sInitialized() const {
+  return I2sManager::instance().isInitialized();
+}
+#endif
+
 void FastAccelStepperEngine::setExternalCallForPin(
     bool (*func)(uint8_t pin, uint8_t value)) {
   _externalCallForPin = func;

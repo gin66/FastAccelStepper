@@ -22,17 +22,21 @@ class I2sManager {
   void handleTxDone();
   void queueBlockToDma(uint8_t block);
 
+  void setPulseWidthBits(uint8_t bits) { _pulse_width_bits = bits; }
+  uint8_t pulseWidthBits() const { return _pulse_width_bits; }
+
   volatile uint32_t _callback_count = 0;
 
   i2s_chan_handle_t channel() const { return _chan; }
 
  private:
-  I2sManager() {}
+  I2sManager() : _pulse_width_bits(32) {}
   bool _initialized = false;
   bool _dma_started = false;
   i2s_chan_handle_t _chan = nullptr;
   uint8_t _bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
   uint8_t _dma_block = 0;
+  uint8_t _pulse_width_bits;
 };
 
 #endif  // SUPPORT_ESP32_I2S

@@ -40,7 +40,7 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
   i2s_std_config_t std_cfg = {
       .clk_cfg = {.sample_rate_hz = I2S_SAMPLE_RATE_HZ,
                   .clk_src = I2S_CLK_SRC_DEFAULT,
-                  .mclk_multiple = I2S_MCLK_MULTIPLE_128}, // lowest multiplier
+                  .mclk_multiple = I2S_MCLK_MULTIPLE_128},  // lowest multiplier
       .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                   I2S_SLOT_MODE_STEREO),
       .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,
@@ -117,9 +117,14 @@ void IRAM_ATTR I2sManager::handleTxDone() {
   uint8_t busy_block = (completed_block + 1) % I2S_BLOCK_COUNT;
   _dma_block = busy_block;
 
+  extern StepperQueue fas_queue[];
+  for (uint8_t i = 0; i < QUEUES_I2S; i++) {
+    uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
+    fas_queue[queue_idx].clear_i2s_block(completed_block);
+  }
+
   queueBlockToDma(completed_block);
 
-  extern StepperQueue fas_queue[];
   for (uint8_t i = 0; i < QUEUES_I2S; i++) {
     uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
     fas_queue[queue_idx].fill_i2s_buffer(busy_block);

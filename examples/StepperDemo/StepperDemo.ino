@@ -975,10 +975,10 @@ void test_direct_drive(const struct stepper_config_s* stepper) {
 void setup() {
   PRINT_INIT();
 #if defined(PICO_RP2040) || defined(PICO_RP2350)
-  for(uint8_t i = 0;i < 5;i++) {
-     Serial.print("Start pause (5s): ");
-     Serial.println(i);
-     delay(1000);
+  for (uint8_t i = 0; i < 5; i++) {
+    Serial.print("Start pause (5s): ");
+    Serial.println(i);
+    delay(1000);
   }
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
@@ -1022,6 +1022,13 @@ void setup() {
 
   // delay(10000);
   engine.init();
+
+#if defined(SUPPORT_ESP32_I2S)
+  FastAccelStepperEngine::I2sSingleStepperConfig i2s_cfg = {
+      .data_pin = 32, .bclk_pin = 33, .cpu_core = 0, .pulse_width_ticks = 64};
+  engine.initI2sSingleStepper(i2s_cfg);
+#endif
+
   if (led_pin != PIN_UNDEFINED) {
     engine.setDebugLed(led_pin);
   }

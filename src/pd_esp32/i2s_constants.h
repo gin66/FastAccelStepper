@@ -40,8 +40,5 @@
 #define I2S_DMA_DESC_NUM 2
 #define I2S_DMA_FRAME_NUM I2S_FRAMES_PER_BLOCK
 
-// Extra task cycles to stream after queue empties (ensures DMA flushes)
-#define I2S_DRAIN_TASKS 4
-
 #endif  // SUPPORT_ESP32_I2S
 #endif  // PD_ESP32_I2S_CONSTANTS_H

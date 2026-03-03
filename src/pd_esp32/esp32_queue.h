@@ -74,7 +74,6 @@ class StepperQueue : public StepperQueueBase {
 
 #ifdef SUPPORT_ESP32_I2S
   int8_t _i2s_step_slot;
-  uint8_t _i2s_drain;
   uint8_t _write_block;
   struct i2s_fill_state _fill_state;
 
@@ -84,6 +83,7 @@ class StepperQueue : public StepperQueueBase {
   bool isReadyForCommands_i2s();
   uint16_t _getPerformedPulses_i2s();
   void fill_i2s_buffer(uint8_t busy_block);
+  void clear_i2s_block(uint8_t block);
 #endif
 
   static bool isValidStepPin(uint8_t step_pin);

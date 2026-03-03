@@ -6,25 +6,22 @@
 #include "pd_esp32/i2s_fill.h"
 #include "pd_esp32/i2s_constants.h"
 
-#define I2S_DEFAULT_BCLK_GPIO 33
-#define I2S_DEFAULT_WS_GPIO -1
-#define I2S_DEFAULT_DATA_GPIO 32
-
 bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
   _i2s_step_slot = 0;
-  _i2s_drain = 0;
   _write_block = 0;
   _fill_state = {};
   _isRunning = false;
 
   I2sManager& mgr = I2sManager::instance();
   if (!mgr.isInitialized()) {
-    if (!mgr.init(I2S_DEFAULT_DATA_GPIO, I2S_DEFAULT_BCLK_GPIO,
-                  I2S_DEFAULT_WS_GPIO)) {
-      return false;
-    }
+    return false;
+  }
+
+  uint8_t pulse_width = mgr.pulseWidthBits();
+  if (pulse_width == 0) {
+    pulse_width = 32;
   }
 
   max_speed_in_ticks = I2S_MIN_SPEED_TICKS;
@@ -35,7 +32,6 @@ void StepperQueue::startQueue_i2s() { _isRunning = true; }
 
 void StepperQueue::forceStop_i2s() {
   _isRunning = false;
-  _i2s_drain = 0;
   _fill_state = {};
 }
 
@@ -48,11 +44,22 @@ bool StepperQueue::isReadyForCommands_i2s() {
 
 uint16_t StepperQueue::_getPerformedPulses_i2s() { return 0; }
 
+void StepperQueue::clear_i2s_block(uint8_t block) {
+  if (!use_i2s) {
+    return;
+  }
+  I2sManager& mgr = I2sManager::instance();
+  uint8_t* buf = mgr.blockBuf(block);
+  uint8_t pulse_width = mgr.pulseWidthBits();
+  if (pulse_width == 0) pulse_width = 32;
+  i2s_clear_block(buf, &_fill_state, block, pulse_width);
+}
+
 void StepperQueue::fill_i2s_buffer(uint8_t busy_block) {
   if (!use_i2s) {
     return;
   }
-  if (!_isRunning && (_i2s_drain == 0)) {
+  if (!_isRunning) {
     return;
   }
 
@@ -62,6 +69,8 @@ void StepperQueue::fill_i2s_buffer(uint8_t busy_block) {
   }
 
   I2sManager& mgr = I2sManager::instance();
+  uint8_t pulse_width = mgr.pulseWidthBits();
+  if (pulse_width == 0) pulse_width = 32;
 
   for (int i = 0; i < I2S_BLOCK_COUNT - 1; i++) {
     if (_write_block == busy_block) {
@@ -69,7 +78,8 @@ void StepperQueue::fill_i2s_buffer(uint8_t busy_block) {
     }
 
     uint8_t* buf = mgr.blockBuf(_write_block);
-    bool buffer_full = i2s_fill_buffer(this, buf, _write_block, &_fill_state);
+    bool buffer_full =
+        i2s_fill_buffer(this, buf, _write_block, &_fill_state, pulse_width);
 
     if (buffer_full) {
       _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
@@ -81,12 +91,7 @@ void StepperQueue::fill_i2s_buffer(uint8_t busy_block) {
   if (isQueueEmpty()) {
     if (_isRunning) {
       _isRunning = false;
-      _i2s_drain = I2S_DRAIN_TASKS;
     }
-  }
-
-  if (_i2s_drain > 0) {
-    _i2s_drain--;
   }
 }
 
