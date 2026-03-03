@@ -69,7 +69,7 @@ void StepperQueue::fill_i2s_buffer(uint8_t busy_block) {
     }
 
     uint8_t* buf = mgr.blockBuf(_write_block);
-    bool buffer_full = i2s_fill_buffer(this, buf, &_fill_state);
+    bool buffer_full = i2s_fill_buffer(this, buf, _write_block, &_fill_state);
 
     if (buffer_full) {
       _write_block = (_write_block + 1) % I2S_BLOCK_COUNT;
