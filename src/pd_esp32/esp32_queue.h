@@ -19,20 +19,32 @@ class StepperQueue : public StepperQueueBase {
   inline bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
 
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  const void* driver_data;
-#endif
-#ifdef SUPPORT_ESP32_RMT
-  RMT_CHANNEL_T channel;
-  bool _rmtStopped;
-  bool lastChunkContainsSteps;
-#if defined(SUPPORT_ESP32_RMT_V2)
-  rmt_encoder_handle_t _tx_encoder;
-#if ESP_IDF_VERSION_MAJOR >= 5
-  bool _channel_enabled;
-#endif
-#endif
-#endif
+  // module specific variables
+  union {
+    #ifdef SUPPORT_ESP32_MCPWM_PCNT
+      const void* driver_data;
+    #endif
+    #ifdef SUPPORT_ESP32_RMT
+      struct {
+        RMT_CHANNEL_T channel;
+        bool _rmtStopped;
+        bool lastChunkContainsSteps;
+        if defined(SUPPORT_ESP32_RMT_V2)
+          rmt_encoder_handle_t _tx_encoder;
+        #if ESP_IDF_VERSION_MAJOR >= 5
+          bool _channel_enabled;
+        #endif
+        #endif
+      };
+    #endif
+    #ifdef SUPPORT_ESP32_I2S
+      struct {
+        int8_t _i2s_step_slot;
+        struct i2s_fill_state _fill_state;
+      };
+    #endif
+  };
+
 
   uint16_t _getPerformedPulses();
 
@@ -50,6 +62,7 @@ class StepperQueue : public StepperQueueBase {
   void connect();
   void disconnect();
 
+// module specific functions
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   bool isReadyForCommands_mcpwm_pcnt();
   bool init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
@@ -71,11 +84,7 @@ class StepperQueue : public StepperQueueBase {
   void connect_rmt();
   void disconnect_rmt();
 #endif
-
 #ifdef SUPPORT_ESP32_I2S
-  int8_t _i2s_step_slot;
-  struct i2s_fill_state _fill_state;
-
   bool init_i2s(uint8_t channel_num, uint8_t step_pin);
   void startQueue_i2s();
   void forceStop_i2s();
