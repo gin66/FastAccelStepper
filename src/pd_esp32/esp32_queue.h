@@ -74,7 +74,6 @@ class StepperQueue : public StepperQueueBase {
 
 #ifdef SUPPORT_ESP32_I2S
   int8_t _i2s_step_slot;
-  uint8_t _write_block;
   struct i2s_fill_state _fill_state;
 
   bool init_i2s(uint8_t channel_num, uint8_t step_pin);

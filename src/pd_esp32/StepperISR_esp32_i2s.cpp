@@ -10,7 +10,6 @@ bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
   _i2s_step_slot = 0;
-  _write_block = 0;
   _fill_state = {};
   _isRunning = false;
 
@@ -21,7 +20,7 @@ bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
 
   uint8_t pulse_width = mgr.pulseWidthBits();
   if (pulse_width == 0) {
-    pulse_width = 32;
+    pulse_width = I2S_DEFAULT_PULSE_WIDTH_TICKS / 2;
   }
 
   max_speed_in_ticks = I2S_MIN_SPEED_TICKS;
@@ -50,7 +49,7 @@ void StepperQueue::clear_i2s_block(uint8_t* buf, bool first) {
   }
   I2sManager& mgr = I2sManager::instance();
   uint8_t pulse_width = mgr.pulseWidthBits();
-  if (pulse_width == 0) pulse_width = 32;
+  if (pulse_width == 0) pulse_width = I2S_DEFAULT_PULSE_WIDTH_TICKS / 2;
   i2s_clear_block(buf, &_fill_state, first ? 1 : 0, pulse_width);
 }
 
@@ -62,15 +61,9 @@ void StepperQueue::fill_i2s_buffer(uint8_t* buf, bool first) {
     return;
   }
 
-  // if (_write_block == busy_block) {
-  //  we were overrun
-  //  _write_block = (busy_block + 2) % I2S_BLOCK_COUNT;
-  //  _fill_state.tick_pos = _write_block * I2S_BLOCK_TICKS;
-  //}
-
   I2sManager& mgr = I2sManager::instance();
   uint8_t pulse_width = mgr.pulseWidthBits();
-  if (pulse_width == 0) pulse_width = 32;
+  if (pulse_width == 0) pulse_width = I2S_DEFAULT_PULSE_WIDTH_TICKS / 2;
 
   bool buffer_full =
       i2s_fill_buffer(this, buf, first ? 1 : 0, &_fill_state, pulse_width);
