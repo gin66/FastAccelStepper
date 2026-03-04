@@ -45,7 +45,7 @@ void StepperQueue::fill_i2s_buffer(uint8_t* buf, bool first) {
     return;
   }
 
-  bool buffer_full = i2s_fill_buffer(this, buf, first ? 1 : 0, &_fill_state);
+  bool buffer_full = i2s_fill_buffer(this, buf, &_fill_state);
 
   // This is problematic
   if (isQueueEmpty()) {
