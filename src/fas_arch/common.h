@@ -102,7 +102,21 @@ struct queue_end_s {
 #endif
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-enum class FasDriver : uint8_t { MCPWM_PCNT = 0, RMT = 1, DONT_CARE = 255 };
+enum class FasDriver : uint8_t {
+  MCPWM_PCNT = 0,
+  RMT = 1,
+#if defined(SUPPORT_ESP32_I2S)
+  RMT_I2S_DIRECT = 2,
+  RMT_I2S0_MUX = 3,
+#if SOC_I2S_NUM >= 2
+  RMT_I2S1_MUX = 4,
+#endif
+#if SOC_I2S_NUM >= 3
+  RMT_I2S2_MUX = 5,
+#endif
+#endif  // SUPPORT_ESP32_I2S
+  DONT_CARE = 255
+};
 #endif
 
 // disable inject_fill_interrupt() for all real devices. Only defined in TEST

@@ -88,6 +88,16 @@ class FastAccelStepperEngine {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT
 #define DRIVER_RMT FasDriver::RMT
+#if defined(SUPPORT_ESP32_I2S)
+#define DRIVER_RMT_I2S_DIRECT FasDriver::RMT_I2S_DIRECT
+#define DRIVER_RMT_I2S0_MUX FasDriver::RMT_I2S0_MUX
+#if SOC_I2S_NUM >= 2
+#define DRIVER_RMT_I2S1_MUX FasDriver::RMT_I2S1_MUX
+#endif
+#if SOC_I2S_NUM >= 3
+#define DRIVER_RMT_I2S2_MUX FasDriver::RMT_I2S2_MUX
+#endif
+#endif  // SUPPORT_ESP32_I2S
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
   FastAccelStepper* stepperConnectToPin(
       uint8_t step_pin, FasDriver driver_type = DRIVER_DONT_CARE);

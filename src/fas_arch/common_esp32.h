@@ -11,6 +11,7 @@
 #include <hal/gpio_ll.h>
 #include <driver/gpio.h>
 #include <esp_task_wdt.h>
+#include <soc/soc_caps.h>
 
 #if ESP_IDF_VERSION_MAJOR == 6
 #include "fas_arch/common_esp32_idf6.h"
@@ -59,8 +60,11 @@
 
 //==========================================================================
 // determine, if driver type selection should be supported
-#if defined(QUEUES_MCPWM_PCNT) && defined(QUEUES_RMT)
-#if (QUEUES_MCPWM_PCNT > 0) && (QUEUES_RMT > 0)
+// Enable if at least two different driver types have queues
+#if (defined(QUEUES_MCPWM_PCNT) && defined(QUEUES_RMT)) || \
+    (defined(QUEUES_RMT) && defined(QUEUES_I2S))
+#if ((QUEUES_MCPWM_PCNT > 0) && (QUEUES_RMT > 0)) || \
+    ((QUEUES_RMT > 0) && (QUEUES_I2S > 0))
 #define SUPPORT_SELECT_DRIVER_TYPE
 #endif
 #endif

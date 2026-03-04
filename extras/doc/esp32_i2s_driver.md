@@ -192,10 +192,11 @@ The mode (single-stepper vs multi-stepper) is configured at Engine initializatio
 
 ```cpp
 // Planned FasDriver enum extension for I2S support
-// Uses SOC_I2S_NUM to conditionally include I2S module support
+// COMPILE-TIME validation with SOC_I2S_NUM
 enum class FasDriver : uint8_t { 
     MCPWM_PCNT = 0, 
     RMT = 1, 
+#if SUPPORT_I2S
     RMT_I2S_DIRECT = 2,      // Single-stepper I2S mode
 #if SOC_I2S_NUM >= 1
     RMT_I2S0_MUX = 3,        // Multi-stepper I2S mode using I2S0
@@ -206,8 +207,14 @@ enum class FasDriver : uint8_t {
 #if SOC_I2S_NUM >= 3
     RMT_I2S2_MUX = 5,        // Multi-stepper I2S mode using I2S2 (ESP32-P4)
 #endif
+#endif // SUPPORT_I2S
     DONT_CARE = 255 
 };
+
+// I2S support conditional on SOC_I2S_NUM
+#if SOC_I2S_NUM >= 1
+#define SUPPORT_I2S 1
+#endif
 
 // Single-stepper mode: one I2S peripheral = one stepper
 // Uses RMT_I2S_DIRECT driver type
@@ -234,15 +241,21 @@ uint8_t i2s_pin = physical_pin_number | PIN_I2S_FLAG;
 
 1. **Single-stepper mode**:
    - User calls `connectToStepperPin(pin, RMT_I2S_DIRECT)`
-   - System automatically allocates available I2S module (I2S0, I2S1, or I2S2) and initializes DMA
+   - System automatically allocates available I2S module (based on `SOC_I2S_NUM`) and initializes DMA
    - No engine initialization required
 
 2. **Multi-stepper mode**:
-   - User must first call `engine.initI2sMultiStepper()` for the desired I2S module (I2S0, I2S1, or I2S2)
+   - User must first call `engine.initI2sMultiStepper()` for the desired I2S module
    - Then call `connectToStepperPin(pin | PIN_I2S_FLAG, RMT_I2S0_MUX)`, `RMT_I2S1_MUX`, or `RMT_I2S2_MUX`
+   - Only I2S modules defined by `SOC_I2S_NUM` are available
    - Engine manages shared I2S peripheral and demux timing
 
-**Note**: The number of I2S modules varies across ESP32 variants:
+**Note**: The driver uses **compile-time validation** with `SOC_I2S_NUM`:
+- `FasDriver` enum only includes I2S modules that exist on the target
+- Code trying to use non-existent I2S modules won't compile
+- Clean API: users only see available I2S driver options
+
+The number of I2S modules varies across ESP32 variants:
 
 | ESP32 Variant | I2S Modules | Notes |
 |---------------|-------------|-------|
@@ -256,9 +269,80 @@ uint8_t i2s_pin = physical_pin_number | PIN_I2S_FLAG;
 | ESP32-H2      | 1 (I2S0) | Single I2S module |
 | ESP32-P4      | 3 (I2S0, I2S1, I2S2) | Triple I2S modules |
 
-The driver architecture uses `SOC_I2S_NUM` (defined in ESP-IDF) to conditionally
-compile I2S module support. This ensures only available I2S modules are exposed
-in the `FasDriver` enum for each ESP32 variant.
+The driver architecture uses `SOC_I2S_NUM` (defined in ESP-IDF) for **compile-time
+validation** of I2S module availability:
+
+1. **Conditional I2S Support**: If `SOC_I2S_NUM >= 1`, `SUPPORT_I2S` is defined
+2. **Conditional Enum Values**: I2S driver values only in `FasDriver` if `SUPPORT_I2S`
+3. **Module-specific Values**: `RMT_I2S1_MUX` only if `SOC_I2S_NUM >= 2`, etc.
+
+**API Design Principle**: Compile-time validation > runtime validation
+- Code that tries to use `RMT_I2S1_MUX` on ESP32-S2 (1 I2S module) won't compile
+- ESP32 variants without I2S (`SOC_I2S_NUM < 1`) compile without I2S support
+- Cleaner API: users only see available options
+- No runtime error handling needed for invalid I2S module requests
+
+### Runtime I2S Module Handling
+
+The driver needs to work with any of the available I2S modules (I2S0, I2S1, I2S2)
+dynamically. The implementation approach:
+
+1. **I2S Port Mapping**: Convert `FasDriver` to `i2s_port_t` (ESP-IDF I2S port identifier)
+   ```cpp
+    static i2s_port_t fasDriverToI2sPort(FasDriver driver) {
+        switch (driver) {
+    #if SUPPORT_I2S
+            case FasDriver::RMT_I2S_DIRECT:
+            case FasDriver::RMT_I2S0_MUX: return I2S_NUM_0;
+    #if SOC_I2S_NUM >= 2
+            case FasDriver::RMT_I2S1_MUX: return I2S_NUM_1;
+    #endif
+    #if SOC_I2S_NUM >= 3
+            case FasDriver::RMT_I2S2_MUX: return I2S_NUM_2;
+    #endif
+    #endif // SUPPORT_I2S
+            default: return I2S_NUM_MAX; // Invalid (non-I2S driver)
+        }
+    }
+   ```
+
+2. **Per-I2S State Management**: Each I2S module needs its own state:
+   ```cpp
+   struct I2sModuleState {
+       i2s_port_t port;
+       bool initialized;
+       bool in_use;
+       uint8_t stepper_count;
+       // DMA buffers, ISR state, etc.
+   };
+   
+   // Array of all possible I2S modules
+   I2sModuleState i2s_modules[SOC_I2S_NUM];
+   ```
+
+3. **Dynamic Initialization**: Initialize I2S peripheral when first stepper connects:
+   ```cpp
+   bool initializeI2sModule(i2s_port_t port) {
+       if (port >= SOC_I2S_NUM) return false;
+       if (i2s_modules[port].initialized) return true;
+       
+       // ESP-IDF I2S configuration
+       i2s_config_t i2s_config = { ... };
+       i2s_pin_config_t pin_config = { ... };
+       
+       i2s_driver_install(port, &i2s_config, 0, NULL);
+       i2s_set_pin(port, &pin_config);
+       
+       i2s_modules[port].initialized = true;
+       return true;
+   }
+   ```
+
+4. **Resource Management**: Track which I2S modules are in use:
+   - Single-stepper mode (`RMT_I2S_DIRECT`): Auto-select available I2S module
+   - Multi-stepper mode (`RMT_I2Sx_MUX`): Use specified I2S module
+   - Prevent double-initialization of same I2S module
+   - Handle module exhaustion (all I2S modules in use)
 
 ### Constants (Current Implementation)
 
@@ -737,7 +821,8 @@ bool initI2sMultiStepper(const I2sMultiStepperConfig& cfg);
 
 ```cpp
 // Planned driver type constants for I2S
-// Conditionally defined based on SOC_I2S_NUM
+// COMPILE-TIME validation with SOC_I2S_NUM
+#if SUPPORT_I2S
 #define DRIVER_RMT_I2S_DIRECT FasDriver::RMT_I2S_DIRECT
 #if SOC_I2S_NUM >= 1
 #define DRIVER_RMT_I2S0_MUX   FasDriver::RMT_I2S0_MUX
@@ -748,6 +833,7 @@ bool initI2sMultiStepper(const I2sMultiStepperConfig& cfg);
 #if SOC_I2S_NUM >= 3
 #define DRIVER_RMT_I2S2_MUX   FasDriver::RMT_I2S2_MUX
 #endif
+#endif // SUPPORT_I2S
 
 // Single-stepper mode: uses RMT_I2S_DIRECT driver type
 // No PIN_I2S_FLAG needed for single-stepper mode
