@@ -53,7 +53,6 @@ bool FastAccelStepperEngine::initI2sSingleStepper(
   if (!mgr.init(cfg.data_pin, cfg.bclk_pin, -1)) {
     return false;
   }
-  mgr.setPulseWidthBits(cfg.pulse_width_ticks / 2);
   return mgr.startDma();
 }
 

@@ -37,7 +37,7 @@ bool StepperQueue::isReadyForCommands_i2s() {
 
 uint16_t StepperQueue::_getPerformedPulses_i2s() { return 0; }
 
-void StepperQueue::fill_i2s_buffer(uint8_t* buf, bool first) {
+void StepperQueue::fill_i2s_buffer(uint8_t* buf) {
   if (!use_i2s) {
     return;
   }
@@ -47,11 +47,8 @@ void StepperQueue::fill_i2s_buffer(uint8_t* buf, bool first) {
 
   bool buffer_full = i2s_fill_buffer(this, buf, &_fill_state);
 
-  // This is problematic
-  if (isQueueEmpty()) {
-    if (_isRunning) {
-      _isRunning = false;
-    }
+  if (!buffer_full) {
+    _isRunning = false;
   }
 }
 
