@@ -198,15 +198,7 @@ enum class FasDriver : uint8_t {
     RMT = 1, 
 #if SUPPORT_I2S
     RMT_I2S_DIRECT = 2,      // Single-stepper I2S mode
-#if SOC_I2S_NUM >= 1
-    RMT_I2S0_MUX = 3,        // Multi-stepper I2S mode using I2S0
-#endif
-#if SOC_I2S_NUM >= 2
-    RMT_I2S1_MUX = 4,        // Multi-stepper I2S mode using I2S1
-#endif
-#if SOC_I2S_NUM >= 3
-    RMT_I2S2_MUX = 5,        // Multi-stepper I2S mode using I2S2 (ESP32-P4)
-#endif
+    RMT_I2S_MUX = 3,         // Multi-stepper I2S mode
 #endif // SUPPORT_I2S
     DONT_CARE = 255 
 };
@@ -293,13 +285,7 @@ dynamically. The implementation approach:
         switch (driver) {
     #if SUPPORT_I2S
             case FasDriver::RMT_I2S_DIRECT:
-            case FasDriver::RMT_I2S0_MUX: return I2S_NUM_0;
-    #if SOC_I2S_NUM >= 2
-            case FasDriver::RMT_I2S1_MUX: return I2S_NUM_1;
-    #endif
-    #if SOC_I2S_NUM >= 3
-            case FasDriver::RMT_I2S2_MUX: return I2S_NUM_2;
-    #endif
+            case FasDriver::RMT_I2S_MUX: return I2S_NUM_0;
     #endif // SUPPORT_I2S
             default: return I2S_NUM_MAX; // Invalid (non-I2S driver)
         }
@@ -824,15 +810,7 @@ bool initI2sMultiStepper(const I2sMultiStepperConfig& cfg);
 // COMPILE-TIME validation with SOC_I2S_NUM
 #if SUPPORT_I2S
 #define DRIVER_RMT_I2S_DIRECT FasDriver::RMT_I2S_DIRECT
-#if SOC_I2S_NUM >= 1
-#define DRIVER_RMT_I2S0_MUX   FasDriver::RMT_I2S0_MUX
-#endif
-#if SOC_I2S_NUM >= 2
-#define DRIVER_RMT_I2S1_MUX   FasDriver::RMT_I2S1_MUX
-#endif
-#if SOC_I2S_NUM >= 3
-#define DRIVER_RMT_I2S2_MUX   FasDriver::RMT_I2S2_MUX
-#endif
+#define DRIVER_RMT_I2S0_MUX   FasDriver::RMT_I2S_MUX
 #endif // SUPPORT_I2S
 
 // Single-stepper mode: uses RMT_I2S_DIRECT driver type

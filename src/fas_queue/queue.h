@@ -6,6 +6,10 @@
 
 class StepperQueue;
 
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
+extern StepperQueue* fas_queue[NUM_QUEUES];
+#else
 extern StepperQueue fas_queue[NUM_QUEUES];
+#endif
 
 #endif

@@ -32,7 +32,6 @@ inline void AddToTotalSteps(int queue, uint32_t steps) {
 #define AddToTotalSteps(Q, N)
 #endif
 bool channelsUsed[8] = {false, false, false, false, false, false, false, false};
-StepperQueue fas_queue[NUM_QUEUES];
 PWMCHANNELMAPPING gChannelMap[NUM_QUEUES];
 
 void TC5_Handler() {

@@ -7,7 +7,6 @@
 #include "hardware/irq.h"
 #include "pico_pio.h"
 
-StepperQueue fas_queue[NUM_QUEUES];
 static stepper_pio_program* program;
 
 static void pio0_fifo_irq_handler();

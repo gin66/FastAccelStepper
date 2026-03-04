@@ -66,10 +66,6 @@ void FastAccelStepperEngine::setExternalCallForPin(
   _externalCallForPin = func;
 }
 //*************************************************************************************************
-bool FastAccelStepperEngine::_isValidStepPin(uint8_t step_pin) {
-  return StepperQueue::isValidStepPin(step_pin);
-}
-//*************************************************************************************************
 bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
                                           uint8_t except_stepper) {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
@@ -106,12 +102,15 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (_stepper_cnt >= MAX_STEPPER) {
     return NULL;
   }
-  if (!_isValidStepPin(step_pin)) {
+  if (!StepperQueue::isValidStepPin(step_pin)) {
     return NULL;
   }
+  #if defined(SUPPORT_DYNAMIC_ALLOCATION)
+    return NULL;
+  #else
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   uint8_t queue_from = 0;
-  uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT;
+  uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT + QUEUES_I2S;
   if (driver_type == DRIVER_MCPWM_PCNT) {
     queue_to = QUEUES_MCPWM_PCNT;
   } else if (driver_type == DRIVER_RMT) {
@@ -155,6 +154,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
 #endif
   return s;
+  #endif
 }
 //*************************************************************************************************
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {

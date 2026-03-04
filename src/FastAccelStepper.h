@@ -90,13 +90,7 @@ class FastAccelStepperEngine {
 #define DRIVER_RMT FasDriver::RMT
 #if defined(SUPPORT_ESP32_I2S)
 #define DRIVER_RMT_I2S_DIRECT FasDriver::RMT_I2S_DIRECT
-#define DRIVER_RMT_I2S0_MUX FasDriver::RMT_I2S0_MUX
-#if SOC_I2S_NUM >= 2
-#define DRIVER_RMT_I2S1_MUX FasDriver::RMT_I2S1_MUX
-#endif
-#if SOC_I2S_NUM >= 3
-#define DRIVER_RMT_I2S2_MUX FasDriver::RMT_I2S2_MUX
-#endif
+#define DRIVER_RMT_I2S_MUX FasDriver::RMT_I2S_MUX
 #endif  // SUPPORT_ESP32_I2S
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
   FastAccelStepper* stepperConnectToPin(
@@ -200,8 +194,7 @@ class FastAccelStepperEngine {
 
   uint8_t _stepper_cnt;
   FastAccelStepper* _stepper[MAX_STEPPER];
-
-  bool _isValidStepPin(uint8_t step_pin);
+  
   bool (*_externalCallForPin)(uint8_t pin, uint8_t value);
 
 #if defined(SUPPORT_RP_PICO)

@@ -16,6 +16,7 @@
 #if ESP_IDF_VERSION_MAJOR == 6
 #include "fas_arch/common_esp32_idf6.h"
 #elif ESP_IDF_VERSION_MAJOR == 5
+//#define SUPPORT_DYNAMIC_ALLOCATION
 #if ESP_IDF_VERSION_MINOR < 3
 #error "FastAccelStepper requires esp-idf >= 5.3.0"
 #endif
@@ -27,9 +28,16 @@
 #endif
 
 // Esp32 queue definitions
-#ifndef QUEUES_I2S
+#if defined(SUPPORT_ESP32_I2S)
+#if SOC_I2S_NUM >= 2
+#define QUEUES_I2S 64
+#else
+#define QUEUES_I2S 32
+#endif
+#else
 #define QUEUES_I2S 0
 #endif
+
 #define NUM_QUEUES (QUEUES_MCPWM_PCNT + QUEUES_RMT + QUEUES_I2S)
 #define MAX_STEPPER (NUM_QUEUES)
 #define QUEUE_LEN 32
@@ -53,6 +61,13 @@
 
 // have adjustable stepper task rate
 #define SUPPORT_TASK_RATE_CHANGE
+
+#if defined(SUPPORT_ESP32_I2S)
+#define PIN_I2S0_FLAG 0x40  // Bitmask for I2S-controlled pins I2S0
+#if SOC_I2S_NUM >= 2
+#define PIN_I2S1_FLAG 0x60  // Bitmask for I2S-controlled pins I2S1
+#endif
+#endif
 
 #define LL_TOGGLE_PIN(dirPin)                  \
   gpio_ll_set_level(&GPIO, (gpio_num_t)dirPin, \

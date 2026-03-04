@@ -2,6 +2,13 @@
 
 #include "fas_queue/stepper_queue.h"
 
+// Here are the global variables to interface with the interrupts
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
+StepperQueue* fas_queue[NUM_QUEUES];
+#else
+StepperQueue fas_queue[NUM_QUEUES];
+#endif
+
 AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
                                           bool start) {
   // Just to check if, if the struct has the correct size
