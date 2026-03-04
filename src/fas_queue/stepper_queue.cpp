@@ -4,7 +4,7 @@
 
 // Here are the global variables to interface with the interrupts
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
-StepperQueue* fas_queue[NUM_QUEUES];
+StepperQueue* fas_queue[NUM_QUEUES] = {nullptr};
 #else
 StepperQueue fas_queue[NUM_QUEUES];
 #endif

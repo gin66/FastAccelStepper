@@ -14,7 +14,6 @@ unsigned short OCR1A;
 unsigned short OCR1B;
 
 FastAccelStepper* stepper;
-StepperQueue fas_queue[NUM_QUEUES];
 
 int enable_inject_on_mark = -1;
 bool enable_stepper_manage_on_interrupts = false;

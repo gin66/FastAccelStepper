@@ -14,7 +14,6 @@ char TIFR1;
 unsigned short OCR1A;
 unsigned short OCR1B;
 
-StepperQueue fas_queue[NUM_QUEUES];
 
 void inject_fill_interrupt(int mark) {}
 void noInterrupts() {}
