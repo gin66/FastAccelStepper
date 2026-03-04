@@ -102,12 +102,9 @@ void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
   _callback_count++;
   bool first = (_callback_count & 1) == 0;
 
-  extern StepperQueue fas_queue[];
-  for (uint8_t i = 0; i < QUEUES_I2S; i++) {
-    uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
-    fas_queue[queue_idx].clear_i2s_block(buf, first);
-  }
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
 
+  extern StepperQueue fas_queue[];
   for (uint8_t i = 0; i < QUEUES_I2S; i++) {
     uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
     fas_queue[queue_idx].fill_i2s_buffer(buf, first);

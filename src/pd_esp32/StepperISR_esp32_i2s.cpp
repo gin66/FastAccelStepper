@@ -1,7 +1,6 @@
 #include "fas_queue/stepper_queue.h"
 #if defined(SUPPORT_ESP32_I2S)
 
-#include <string.h>
 #include "pd_esp32/i2s_manager.h"
 #include "pd_esp32/i2s_fill.h"
 #include "pd_esp32/i2s_constants.h"
@@ -16,11 +15,6 @@ bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
   I2sManager& mgr = I2sManager::instance();
   if (!mgr.isInitialized()) {
     return false;
-  }
-
-  uint8_t pulse_width = mgr.pulseWidthBits();
-  if (pulse_width == 0) {
-    pulse_width = I2S_DEFAULT_PULSE_WIDTH_TICKS / 2;
   }
 
   max_speed_in_ticks = I2S_MIN_SPEED_TICKS;
@@ -43,16 +37,6 @@ bool StepperQueue::isReadyForCommands_i2s() {
 
 uint16_t StepperQueue::_getPerformedPulses_i2s() { return 0; }
 
-void StepperQueue::clear_i2s_block(uint8_t* buf, bool first) {
-  if (!use_i2s) {
-    return;
-  }
-  I2sManager& mgr = I2sManager::instance();
-  uint8_t pulse_width = mgr.pulseWidthBits();
-  if (pulse_width == 0) pulse_width = I2S_DEFAULT_PULSE_WIDTH_TICKS / 2;
-  i2s_clear_block(buf, &_fill_state, first ? 1 : 0, pulse_width);
-}
-
 void StepperQueue::fill_i2s_buffer(uint8_t* buf, bool first) {
   if (!use_i2s) {
     return;
@@ -61,12 +45,7 @@ void StepperQueue::fill_i2s_buffer(uint8_t* buf, bool first) {
     return;
   }
 
-  I2sManager& mgr = I2sManager::instance();
-  uint8_t pulse_width = mgr.pulseWidthBits();
-  if (pulse_width == 0) pulse_width = I2S_DEFAULT_PULSE_WIDTH_TICKS / 2;
-
-  bool buffer_full =
-      i2s_fill_buffer(this, buf, first ? 1 : 0, &_fill_state, pulse_width);
+  bool buffer_full = i2s_fill_buffer(this, buf, first ? 1 : 0, &_fill_state);
 
   // This is problematic
   if (isQueueEmpty()) {

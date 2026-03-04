@@ -11,18 +11,13 @@
 #endif
 
 struct i2s_fill_state {
-  uint32_t tick_pos;  // tick position along the three blocks
+  uint32_t tick_pos;
   uint16_t remaining_high_ticks;
   uint16_t remaining_low_ticks;
-  uint16_t pulse_positions[I2S_BLOCK_COUNT][I2S_MAX_PULSES_PER_BLOCK];
-  uint8_t pulse_count[I2S_BLOCK_COUNT];
 };
 
-void i2s_clear_block(uint8_t* buf, struct i2s_fill_state* state, uint8_t block,
-                     uint8_t pulse_width_bits);
-
 bool i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf, uint8_t block,
-                     struct i2s_fill_state* state, uint8_t pulse_width_bits);
+                     struct i2s_fill_state* state);
 
 #endif
 #endif

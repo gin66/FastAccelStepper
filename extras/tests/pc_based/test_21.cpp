@@ -418,7 +418,7 @@ static void test_fill_skips_busy_block() {
   q.dirPin = NO_PIN;
   add_command(&q, 10, 200);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
   uint8_t write_block = 0;
   uint8_t busy_block = 1;
 
@@ -428,7 +428,7 @@ static void test_fill_skips_busy_block() {
 
   while (write_block != busy_block) {
     memset(buf, 0, I2S_BYTES_PER_BLOCK);
-    bool full = i2s_fill_buffer(&q, buf, 0, &state, 32);
+    bool full = i2s_fill_buffer(&q, buf, 0, &state);
     memcpy(I2sManager::instance().blockBuf(write_block), buf,
            I2S_BYTES_PER_BLOCK);
     if (full) {
@@ -483,7 +483,7 @@ static void test_fill_multiple_blocks_avoiding_busy() {
   q.dirPin = NO_PIN;
   add_command(&q, 100, 200);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
   uint8_t write_block = 0;
   uint8_t busy_block = 1;
 
@@ -498,7 +498,7 @@ static void test_fill_multiple_blocks_avoiding_busy() {
   int filled_count = 0;
   while (write_block != busy_block && filled_count < 5) {
     uint8_t* buf = I2sManager::instance().blockBuf(write_block);
-    bool full = i2s_fill_buffer(&q, buf, 0, &state, 32);
+    bool full = i2s_fill_buffer(&q, buf, 0, &state);
     if (full) {
       write_block = (write_block + 1) % I2S_BLOCK_COUNT;
       filled_count++;
@@ -524,8 +524,8 @@ static void test_fill_multiple_blocks_avoiding_busy() {
               pulses_busy == 0 && total_other > 0);
 }
 
-static void test_fill_clears_old_pulses() {
-  printf("Running: Clear then fill clears old pulses via tracked positions\n");
+static void test_fill_after_memset() {
+  printf("Running: Fill after memset clears old pulses\n");
 
   uint8_t buf[I2S_BYTES_PER_BLOCK];
   memset(buf, 0, I2S_BYTES_PER_BLOCK);
@@ -535,26 +535,32 @@ static void test_fill_clears_old_pulses() {
   q.next_write_idx = 0;
   q.dirPin = NO_PIN;
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   add_command(&q, 3, 200);
 
   printf("  Filling buffer with 3 steps...\n");
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
   uint32_t pulses_after_first = countPulsesInBuffer(buf);
   printf("  First fill with 3 steps: %u pulses\n", pulses_after_first);
 
-  i2s_clear_block(buf, &state, 0, 32);
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
+  state.tick_pos = 0;
+  state.remaining_high_ticks = 0;
+  state.remaining_low_ticks = 0;
+  q.read_idx = 0;
+  q.next_write_idx = 0;
+  add_command(&q, 2, 300);
+  i2s_fill_buffer(&q, buf, 0, &state);
   uint32_t pulses_after_second = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
 
-  printf("  After clear and refill with empty queue: %u pulses (expected 0)\n",
+  printf("  After memset and refill with 2 steps: %u pulses (expected 2)\n",
          pulses_after_second);
   printf("  Queue consumed: %s\n", consumed ? "yes" : "no");
 
-  test_result("Clear then fill clears old pulses",
-              pulses_after_first == 3 && pulses_after_second == 0 && consumed);
+  test_result("Fill after memset clears old pulses",
+              pulses_after_first == 3 && pulses_after_second == 2 && consumed);
 }
 
 static void test_fill_return_value_empty() {
@@ -568,9 +574,9 @@ static void test_fill_return_value_empty() {
   q.next_write_idx = 0;
   q.dirPin = NO_PIN;
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state, 32);
+  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state);
 
   printf("  Empty queue: buffer_full=%s (expected false)\n",
          buffer_full ? "true" : "false");
@@ -591,9 +597,9 @@ static void test_fill_return_value_partial() {
 
   add_command(&q, 3, 200);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state, 32);
+  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state);
 
   printf("  3 steps @ 200 ticks: buffer_full=%s (expected false)\n",
          buffer_full ? "true" : "false");
@@ -614,9 +620,9 @@ static void test_fill_return_value_full() {
 
   add_command(&q, 200, 150);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state, 32);
+  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state);
 
   printf("  200 steps @ 150 ticks: buffer_full=%s (expected true)\n",
          buffer_full ? "true" : "false");
@@ -637,9 +643,9 @@ static void test_fill_return_value_pause_spans_block() {
 
   add_command(&q, 0, 20000);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state, 32);
+  bool buffer_full = i2s_fill_buffer(&q, buf, 0, &state);
 
   printf("  Pause 20000 ticks: buffer_full=%s (expected true)\n",
          buffer_full ? "true" : "false");
@@ -658,10 +664,10 @@ static void test_fill_overwrites_old_data() {
   q.next_write_idx = 0;
   q.dirPin = NO_PIN;
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   add_command(&q, 5, 200);
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
   uint32_t pulses_after_first = countPulsesInBuffer(buf);
   printf("  First fill with 5 steps: %u pulses\n", pulses_after_first);
 
@@ -670,7 +676,7 @@ static void test_fill_overwrites_old_data() {
   q.next_write_idx = 0;
   add_command(&q, 3, 300);
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
   uint32_t pulses_after_second = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
 
@@ -694,17 +700,17 @@ static void test_fill_partial_then_add_more() {
   q.next_write_idx = 0;
   q.dirPin = NO_PIN;
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   add_command(&q, 2, 200);
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
   uint32_t pulses_after_first = countPulsesInBuffer(buf);
   printf("  First fill with 2 steps: %u pulses\n", pulses_after_first);
 
   add_command(&q, 1, 200);
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
   uint32_t pulses_after_second = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
 
@@ -729,9 +735,9 @@ static void test_fill_single_step() {
 
   add_command(&q, 1, 256);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -755,9 +761,9 @@ static void test_fill_multi_step() {
 
   add_command(&q, 5, 128);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -781,9 +787,9 @@ static void test_fill_pause() {
 
   add_command(&q, 0, 5000);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -809,23 +815,15 @@ static void test_fill_step_pause_step() {
   add_command(&q, 0, 512);
   add_command(&q, 1, 256);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
 
   printf("  Pulses: %u (expected 2)\n", pulses);
   printf("  Queue consumed: %s\n", consumed ? "yes" : "no");
-
-  if (state.pulse_count[0] >= 2) {
-    uint16_t tick0 = state.pulse_positions[0][0] * I2S_TICKS_PER_FRAME;
-    uint16_t tick1 = state.pulse_positions[0][1] * I2S_TICKS_PER_FRAME;
-    printf("  Pulse 0 at tick: %u\n", tick0);
-    printf("  Pulse 1 at tick: %u\n", tick1);
-    printf("  Tick diff: %u (expected %u)\n", tick1 - tick0, 256 + 512 + 256);
-  }
 
   test_result("Fill step+pause+step", pulses == 2 && consumed);
 }
@@ -843,9 +841,9 @@ static void test_fill_block_boundary() {
 
   add_command(&q, 1, 16000);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -873,13 +871,13 @@ static void test_fill_two_blocks() {
 
   add_command(&q, 1, 16000);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, bufs[0], 0, &state, 32);
+  i2s_fill_buffer(&q, bufs[0], 0, &state);
   uint32_t pulses1 = countPulsesInBuffer(bufs[0]);
   printf("  Block 0: pulses=%u (expected 1)\n", pulses1);
 
-  i2s_fill_buffer(&q, bufs[1], 1, &state, 32);
+  i2s_fill_buffer(&q, bufs[1], 1, &state);
   uint32_t pulses2 = countPulsesInBuffer(bufs[1]);
   bool consumed = (q.read_idx == q.next_write_idx);
   printf("  Block 1: pulses=%u (expected 0), consumed=%s\n", pulses2,
@@ -903,9 +901,9 @@ static void test_fill_partial_steps() {
 
   add_command(&q, 100, 200);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, bufs[0], 0, &state, 32);
+  i2s_fill_buffer(&q, bufs[0], 0, &state);
 
   uint32_t pulses1 = countPulsesInBuffer(bufs[0]);
   uint8_t remaining = q.entry[q.read_idx & QUEUE_LEN_MASK].steps;
@@ -916,7 +914,7 @@ static void test_fill_partial_steps() {
   printf("  Remaining steps: %u (expected %u)\n", remaining,
          expected_remaining);
 
-  i2s_fill_buffer(&q, bufs[1], 1, &state, 32);
+  i2s_fill_buffer(&q, bufs[1], 1, &state);
 
   uint32_t pulses2 = countPulsesInBuffer(bufs[1]);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -946,13 +944,13 @@ static void test_fill_carry_ticks() {
   add_command(&q, 0, 12000);
   add_command(&q, 1, 1000);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, bufs[0], 0, &state, 32);
+  i2s_fill_buffer(&q, bufs[0], 0, &state);
   uint32_t pulses1 = countPulsesInBuffer(bufs[0]);
   printf("  Block 0: pulses=%u (expected 1)\n", pulses1);
 
-  i2s_fill_buffer(&q, bufs[1], 1, &state, 32);
+  i2s_fill_buffer(&q, bufs[1], 1, &state);
   uint32_t pulses2 = countPulsesInBuffer(bufs[1]);
   bool consumed = (q.read_idx == q.next_write_idx);
   printf("  Block 1: pulses=%u (expected 1: remaining pause + step)\n",
@@ -973,9 +971,9 @@ static void test_fill_empty_queue() {
   q.next_write_idx = 0;
   q.dirPin = NO_PIN;
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -999,9 +997,9 @@ static void test_fill_min_speed() {
 
   add_command(&q, 3, I2S_MIN_SPEED_TICKS);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -1027,14 +1025,14 @@ static void test_fill_max_steps() {
 
   add_command(&q, 255, 128);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, bufs[0], 0, &state, 32);
+  i2s_fill_buffer(&q, bufs[0], 0, &state);
   uint32_t pulses1 = countPulsesInBuffer(bufs[0]);
   uint8_t remaining1 = q.entry[q.read_idx & QUEUE_LEN_MASK].steps;
   printf("  Block 0: pulses=%u, remaining=%u\n", pulses1, remaining1);
 
-  i2s_fill_buffer(&q, bufs[1], 1, &state, 32);
+  i2s_fill_buffer(&q, bufs[1], 1, &state);
   uint32_t pulses2 = countPulsesInBuffer(bufs[1]);
   uint8_t remaining2 = q.entry[q.read_idx & QUEUE_LEN_MASK].steps;
   printf("  Block 1: pulses=%u, remaining=%u\n", pulses2, remaining2);
@@ -1044,7 +1042,7 @@ static void test_fill_max_steps() {
   while (q.read_idx != q.next_write_idx) {
     uint8_t blk = blk_idx % I2S_BLOCK_COUNT;
     memset(bufs[blk], 0, I2S_BYTES_PER_BLOCK);
-    i2s_fill_buffer(&q, bufs[blk], blk_idx, &state, 32);
+    i2s_fill_buffer(&q, bufs[blk], blk_idx, &state);
     total += countPulsesInBuffer(bufs[blk]);
     blk_idx = (blk_idx + 1) % I2S_BLOCK_COUNT;
   }
@@ -1069,14 +1067,14 @@ static void test_fill_long_pause() {
   add_command(&q, 0, 50000);
   add_command(&q, 1, 256);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   uint32_t total_pulses = 0;
   int blocks = 0;
   while (q.read_idx != q.next_write_idx && blocks < 10) {
     uint8_t blk = blocks % I2S_BLOCK_COUNT;
     memset(bufs[blk], 0, I2S_BYTES_PER_BLOCK);
-    i2s_fill_buffer(&q, bufs[blk], blk, &state, 32);
+    i2s_fill_buffer(&q, bufs[blk], blk, &state);
     total_pulses += countPulsesInBuffer(bufs[blk]);
     blocks++;
   }
@@ -1106,13 +1104,13 @@ static void test_fill_pulse_at_exact_boundary() {
   add_command(&q, 1, block_ticks);
   add_command(&q, 1, 256);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
-  i2s_fill_buffer(&q, bufs[0], 0, &state, 32);
+  i2s_fill_buffer(&q, bufs[0], 0, &state);
   uint32_t pulses1 = countPulsesInBuffer(bufs[0]);
   printf("  Block 0: pulses=%u (expected 1, pulse at boundary)\n", pulses1);
 
-  i2s_fill_buffer(&q, bufs[1], 1, &state, 32);
+  i2s_fill_buffer(&q, bufs[1], 1, &state);
   uint32_t pulses2 = countPulsesInBuffer(bufs[1]);
   printf("  Block 1: pulses=%u (expected 1, pending pulse)\n", pulses2);
 
@@ -1138,10 +1136,10 @@ static void test_fill_multiple_commands() {
   add_command(&q, 0, 500);
   add_command(&q, 1, 150);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   memset(buf, 0, I2S_BYTES_PER_BLOCK);
-  i2s_fill_buffer(&q, buf, 0, &state, 32);
+  i2s_fill_buffer(&q, buf, 0, &state);
 
   uint32_t pulses = countPulsesInBuffer(buf);
   bool consumed = (q.read_idx == q.next_write_idx);
@@ -1167,14 +1165,14 @@ static void test_fill_consecutive_partial() {
 
   add_command(&q, 200, 150);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   uint32_t total_pulses = 0;
   int blocks = 0;
   while (q.read_idx != q.next_write_idx && blocks < 10) {
     uint8_t blk = blocks % I2S_BLOCK_COUNT;
     memset(bufs[blk], 0, I2S_BYTES_PER_BLOCK);
-    i2s_fill_buffer(&q, bufs[blk], blk, &state, 32);
+    i2s_fill_buffer(&q, bufs[blk], blk, &state);
     total_pulses += countPulsesInBuffer(bufs[blk]);
     blocks++;
   }
@@ -1203,7 +1201,7 @@ static void test_fill_max_ticks_single_step() {
 
   add_command(&q, 2, 65535);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   uint32_t total_pulses = 0;
   int blocks = 0;
@@ -1211,7 +1209,7 @@ static void test_fill_max_ticks_single_step() {
   while (q.read_idx != q.next_write_idx && blocks < 20) {
     uint8_t blk = blocks % I2S_BLOCK_COUNT;
     memset(bufs[blk], 0, I2S_BYTES_PER_BLOCK);
-    i2s_fill_buffer(&q, bufs[blk], blk, &state, 32);
+    i2s_fill_buffer(&q, bufs[blk], blk, &state);
     total_pulses += countPulsesInBuffer(bufs[blk]);
     blocks++;
   }
@@ -1239,14 +1237,14 @@ static void test_fill_max_ticks_max_steps() {
 
   add_command(&q, 4, 65535);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   uint32_t total_pulses = 0;
   int blocks = 0;
   while (q.read_idx != q.next_write_idx && blocks < 50) {
     uint8_t blk = blocks % I2S_BLOCK_COUNT;
     memset(bufs[blk], 0, I2S_BYTES_PER_BLOCK);
-    i2s_fill_buffer(&q, bufs[blk], blk, &state, 32);
+    i2s_fill_buffer(&q, bufs[blk], blk, &state);
     total_pulses += countPulsesInBuffer(bufs[blk]);
     blocks++;
   }
@@ -1276,7 +1274,7 @@ static void test_fill_max_pause() {
   add_command(&q, 0, 65535);
   add_command(&q, 1, 1000);
 
-  struct i2s_fill_state state = {0, 0, 0, {{0}}, {0}};
+  struct i2s_fill_state state = {0, 0, 0};
 
   uint32_t total_pulses = 0;
   int blocks = 0;
@@ -1287,7 +1285,7 @@ static void test_fill_max_pause() {
   while (q.read_idx != q.next_write_idx && blocks < 20) {
     uint8_t blk = blocks % I2S_BLOCK_COUNT;
     memset(bufs[blk], 0, I2S_BYTES_PER_BLOCK);
-    i2s_fill_buffer(&q, bufs[blk], blk, &state, 32);
+    i2s_fill_buffer(&q, bufs[blk], blk, &state);
     total_pulses += countPulsesInBuffer(bufs[blk]);
     blocks++;
   }
@@ -1321,7 +1319,7 @@ void basic_test() {
   test_dma_buffer_content();
 
   puts("\n=== Part 2: Driver Fill Function ===");
-  test_fill_clears_old_pulses();
+  test_fill_after_memset();
   test_fill_overwrites_old_data();
   test_fill_return_value_empty();
   test_fill_return_value_partial();
