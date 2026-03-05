@@ -93,6 +93,7 @@ void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
         pinMode(14, OUTPUT);
         digitalWrite(14, HIGH);
   // clear the buffer for the next round
+  // around 18us
   memset(buf, 0, I2S_BYTES_PER_BLOCK);
 
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
@@ -102,7 +103,7 @@ void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
         if (q->i2s_mgr == this) {
           pinMode(33, OUTPUT);
           digitalWrite(33, HIGH);
-          // 12us for 100us speed
+          // 138us @ 10us speed
           q->fill_i2s_buffer(buf);
           digitalWrite(33, LOW);
         }

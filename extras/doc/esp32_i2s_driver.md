@@ -475,7 +475,6 @@ When connecting a stepper in multi-stepper mode, bit-slots are allocated:
 
 ```
 base_slot = I2sManager::allocateSlots(claim_count)
-stepper._i2s_step_slot   = base_slot
 stepper._i2s_dir_slot    = (claim >= STEP_DIR) ? base_slot + 1 : -1
 stepper._i2s_enable_slot = (claim == STEP_DIR_ENABLE) ? base_slot + 2 : -1
 ```

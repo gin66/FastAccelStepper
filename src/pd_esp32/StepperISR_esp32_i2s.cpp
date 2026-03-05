@@ -8,7 +8,6 @@
 bool StepperQueue::init_i2s(uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
-  _i2s_step_slot = 0;
   _fill_state = {};
   _isRunning = false;
 
