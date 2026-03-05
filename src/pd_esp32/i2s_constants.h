@@ -36,8 +36,8 @@
 // Min step period: 2 frames = 8µs = 128 ticks (for multi-stepper mode)
 #define I2S_MIN_SPEED_TICKS 128
 
-// 200kHz step frequency corresponds to 5µs period, so 2.5µs pulse width is 50%
-#define I2S_DEFAULT_PULSE_WIDTH_TICKS 40
+// 100kHz step frequency corresponds to 10µs period, so 2µs pulse width is 20%
+#define I2S_DEFAULT_PULSE_WIDTH_TICKS 32
 
 // DMA: minimum for continuous streaming (per design doc)
 #define I2S_DMA_DESC_NUM 2

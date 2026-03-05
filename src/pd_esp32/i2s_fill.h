@@ -11,8 +11,8 @@
 #endif
 
 struct i2s_fill_state {
-  uint16_t remaining_high_ticks;
   uint16_t remaining_low_ticks;
+  uint8_t remaining_high_ticks;
 };
 
 bool i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,

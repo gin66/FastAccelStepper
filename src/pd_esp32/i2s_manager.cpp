@@ -103,7 +103,7 @@ void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
         if (q->i2s_mgr == this) {
           pinMode(33, OUTPUT);
           digitalWrite(33, HIGH);
-          // 87us @ 10us speed
+          // 32us @ 10us speed
           q->fill_i2s_buffer(buf);
           digitalWrite(33, LOW);
         }
