@@ -6,6 +6,8 @@
 
 class StepperQueue : public StepperQueueBase {
  public:
+#include "../fas_queue/protocol.h"
+
   bool _isActive;
   uint8_t _step_pin;
   uint16_t adjust_80MHz;
@@ -40,8 +42,6 @@ class StepperQueue : public StepperQueueBase {
     dirHighCountsUp = _dirHighCountsUp;
     attachDirPinToStatemachine();
   }
-
-  static bool isValidStepPin(uint8_t step_pin);
 };
 
 #endif

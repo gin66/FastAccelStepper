@@ -6,6 +6,8 @@
 
 class StepperQueue : public StepperQueueBase {
  public:
+#include "../fas_queue/protocol.h"
+
   volatile bool _isRunning;
   inline bool isReadyForCommands() { return true; }
   inline bool isRunning() { return _isRunning; }
@@ -33,8 +35,6 @@ class StepperQueue : public StepperQueueBase {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
   }
-
-  static bool isValidStepPin(uint8_t step_pin);
 };
 
 #endif  // PD_TEST_QUEUE_H

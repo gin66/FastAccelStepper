@@ -6,6 +6,8 @@
 
 class StepperQueue : public StepperQueueBase {
  public:
+#include "../fas_queue/protocol.h"
+
   uint8_t _step_pin;
   uint8_t _queue_num;
   void* driver_data;
@@ -41,8 +43,6 @@ class StepperQueue : public StepperQueueBase {
     }
 #endif
   }
-
-  static bool isValidStepPin(uint8_t step_pin);
 };
 
 #endif

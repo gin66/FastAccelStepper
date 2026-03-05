@@ -10,6 +10,8 @@
 
 class StepperQueue : public StepperQueueBase {
  public:
+#include "../fas_queue/protocol.h"
+
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
   uint8_t _step_pin;
@@ -94,8 +96,6 @@ class StepperQueue : public StepperQueueBase {
   uint16_t _getPerformedPulses_i2s();
   void fill_i2s_buffer(uint8_t* buf);
 #endif
-
-  static bool isValidStepPin(uint8_t step_pin);
 
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;

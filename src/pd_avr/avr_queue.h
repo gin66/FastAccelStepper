@@ -6,6 +6,8 @@
 
 class StepperQueue : public StepperQueueBase {
  public:
+#include "../fas_queue/protocol.h"
+
   volatile bool _noMoreCommands;
   volatile bool _isRunning;
   inline bool isRunning() { return _isRunning; }
@@ -46,7 +48,6 @@ class StepperQueue : public StepperQueueBase {
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   void adjustSpeedToStepperCount(uint8_t steppers);
 #endif
-  static bool isValidStepPin(uint8_t step_pin);
 #if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
   static int8_t queueNumForStepPin(uint8_t step_pin);
 #endif
