@@ -77,6 +77,17 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
   return false;
 }
 
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
+#else
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin, FasDriver driver_type)
+#endif
+{
+  return NULL;
+}
+#else
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
 #else
@@ -98,9 +109,6 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   if (!StepperQueue::isValidStepPin(step_pin)) {
     return NULL;
   }
-#if defined(SUPPORT_DYNAMIC_ALLOCATION)
-  return NULL;
-#else
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   uint8_t queue_from = 0;
   uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT + QUEUES_I2S;
@@ -147,8 +155,8 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   }
 #endif
   return s;
-#endif
 }
+#endif
 
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
