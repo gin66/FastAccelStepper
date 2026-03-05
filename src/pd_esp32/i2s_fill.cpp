@@ -13,7 +13,8 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
 #endif
 
   static const uint8_t ticks_per_bit = I2S_TICKS_PER_FRAME / I2S_BITS_PER_FRAME;
-  static const uint8_t pulse_width_bits = I2S_DEFAULT_PULSE_WIDTH_TICKS / ticks_per_bit;
+  static const uint8_t pulse_width_bits =
+      I2S_DEFAULT_PULSE_WIDTH_TICKS / ticks_per_bit;
 
   uint32_t tick_pos = 0;
 

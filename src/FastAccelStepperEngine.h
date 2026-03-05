@@ -17,13 +17,13 @@ class FastAccelStepperEngine {
 #define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT
 #define DRIVER_RMT FasDriver::RMT
 #if defined(SUPPORT_ESP32_I2S)
-#define DRIVER_RMT_I2S_DIRECT FasDriver::RMT_I2S_DIRECT
-#define DRIVER_RMT_I2S_MUX FasDriver::RMT_I2S_MUX
+#define DRIVER_I2S_DIRECT FasDriver::I2S_DIRECT
+#define DRIVER_I2S_MUX FasDriver::I2S_MUX
 #endif
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
   FastAccelStepper* stepperConnectToPin(
       uint8_t step_pin, FasDriver driver_type = DRIVER_DONT_CARE);
-#else 
+#else
   FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 #endif
 
@@ -53,7 +53,7 @@ class FastAccelStepperEngine {
 
   uint8_t _stepper_cnt;
   FastAccelStepper* _stepper[MAX_STEPPER];
-  
+
   bool (*_externalCallForPin)(uint8_t pin, uint8_t value);
 
 #if defined(SUPPORT_RP_PICO)

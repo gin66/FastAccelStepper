@@ -106,8 +106,8 @@ enum class FasDriver : uint8_t {
   MCPWM_PCNT = 0,
   RMT = 1,
 #if defined(SUPPORT_ESP32_I2S)
-  RMT_I2S_DIRECT = 2,
-  RMT_I2S_MUX = 3,
+  I2S_DIRECT = 2,
+  I2S_MUX = 3,
 #endif  // SUPPORT_ESP32_I2S
   DONT_CARE = 255
 };

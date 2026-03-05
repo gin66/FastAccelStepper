@@ -12,6 +12,32 @@ class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
 
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  static FasDriver tryAllocateDriver(FasDriver driver);
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+  static uint8_t _mcpwm_pcnt_allocated;
+#endif
+#ifdef SUPPORT_ESP32_RMT
+  static uint8_t _rmt_allocated;
+#endif
+#if defined(SUPPORT_ESP32_I2S)
+  static uint8_t _i2s0_mode;
+#if SOC_I2S_NUM >= 2
+  static uint8_t _i2s1_mode;
+#endif
+#if SOC_I2S_NUM >= 3
+  static uint8_t _i2s2_mode;
+#endif
+  static uint32_t _i2s0_mux_allocated;
+#if SOC_I2S_NUM >= 2
+  static uint32_t _i2s1_mux_allocated;
+#endif
+#if SOC_I2S_NUM >= 3
+  static uint32_t _i2s2_mux_allocated;
+#endif
+#endif  // SUPPORT_ESP32_I2S
+#endif  // SUPPORT_SELECT_DRIVER_TYPE
+
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
   uint8_t _step_pin;
@@ -21,33 +47,33 @@ class StepperQueue : public StepperQueueBase {
 
   // module specific variables
   union {
-    #ifdef SUPPORT_ESP32_MCPWM_PCNT
-      struct {
-        bool use_mcpwm_pcnt;
-        const void* driver_data;
-      };
-    #endif
-    #ifdef SUPPORT_ESP32_RMT
-      struct {
-        bool use_rmt;
-        RMT_CHANNEL_T channel;
-        bool _rmtStopped;
-        bool lastChunkContainsSteps;
-        #if defined(SUPPORT_ESP32_RMT_V2)
-          rmt_encoder_handle_t _tx_encoder;
-        #if ESP_IDF_VERSION_MAJOR >= 5
-          bool _channel_enabled;
-        #endif
-        #endif
-      };
-    #endif
-    #ifdef SUPPORT_ESP32_I2S
-      struct {
-        bool use_i2s;
-        int8_t _i2s_step_slot;
-        struct i2s_fill_state _fill_state;
-      };
-    #endif
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+    struct {
+      bool use_mcpwm_pcnt;
+      const void* driver_data;
+    };
+#endif
+#ifdef SUPPORT_ESP32_RMT
+    struct {
+      bool use_rmt;
+      RMT_CHANNEL_T channel;
+      bool _rmtStopped;
+      bool lastChunkContainsSteps;
+#if defined(SUPPORT_ESP32_RMT_V2)
+      rmt_encoder_handle_t _tx_encoder;
+#if ESP_IDF_VERSION_MAJOR >= 5
+      bool _channel_enabled;
+#endif
+#endif
+    };
+#endif
+#ifdef SUPPORT_ESP32_I2S
+    struct {
+      bool use_i2s;
+      int8_t _i2s_step_slot;
+      struct i2s_fill_state _fill_state;
+    };
+#endif
   };
 
   uint16_t _getPerformedPulses();
