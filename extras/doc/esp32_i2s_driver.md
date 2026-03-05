@@ -2,74 +2,46 @@
 
 ## Overview
 
-This document describes the architecture, design, implementation, and testing plan for a
-new ESP32 stepper output driver based on the I2S peripheral with DMA. The driver targets
+This document describes the architecture, design, implementation, and testing plan for the
+ESP32 stepper output driver based on the I2S peripheral with DMA. The driver targets
 two distinct use-cases:
 
-- **Single-stepper mode**: One stepper using one I2S DATA_OUT GPIO. The bitstream provides
+- **I2S_DIRECT mode**: One stepper using one I2S DATA_OUT GPIO. The bitstream provides
   32× higher time resolution within each frame, enabling step rates up to ~200kHz.
-- **Multi-stepper mode**: One I2S DATA_OUT line feeds an external serial-to-parallel demux IC
-  (e.g., a chain of 74HC595 shift registers). Up to 16 steppers (or 8 with step+dir, or 5
-  with step+dir+enable) share the same bitstream at frame-level resolution.
+- **I2S_MUX mode**: One I2S DATA_OUT line feeds an external serial-to-parallel demux IC
+  (e.g., a chain of 74HC595 shift registers). Up to 32 steppers share the same bitstream
+  at frame-level resolution. DIR and ENABLE signals are controlled via bitmask
+  configuration (supporting inverted/non-inverted polarity).
 
 An existing RMT implementation already serves the ESP32 well. The I2S driver is an
 **additive** option, not a replacement. Its main value is enabling serial-bus expansion
 via a demux IC.
 
-**Target**: ESP32 (original) initially. Will be rolled out to all ESP32 variants with
-I2S and the same IDF API once validated.
+**Target**: ESP32 (original) on IDF ≥5.3. Will be rolled out to other ESP32 variants with
+I2S once validated.
 
-## Executive Summary
+## Implementation Status
 
-The ESP32 I2S driver provides a high-resolution stepper output using the I2S peripheral with DMA. The current implementation supports **single-stepper mode** with comprehensive PC-based testing. **Multi-stepper mode** (for serial demux expansion) is designed but not yet implemented.
+### ✅ I2S_DIRECT Mode — Complete & Working
 
-### Key Achievements
-- ✅ **Single-stepper mode** operational with bit-level resolution (2 ticks/bit)
-- ✅ **28 comprehensive tests** in `test_21.cpp` covering all edge cases
-- ✅ **DMA integration** with double buffering (ping-pong)
-- ✅ **Correct queue management** with block boundary handling
-- ✅ **Constants aligned** with design document specifications
-
-### Current Limitations
-- ⚠️ **Multi-stepper mode not implemented** (single-stepper only)
-- ⚠️ **Basic forceStop** (doesn't stop DMA or clear buffer)
-- ⚠️ **Fixed pulse width** (64 ticks, not configurable)
-
-### Next Steps
-1. **Driver architecture implementation**: Extend `FasDriver` enum with I2S driver types
-2. **Multi-stepper foundation**: Per-stepper bit tracking, slot allocation
-3. **Enhanced forceStop**: DMA control, buffer clearing
-4. **Hardware validation**: PCNT tests, logic analyzer verification
-5. **Feature completion**: Configurable pulse width, WS pin support
-
-## Current Implementation Status (March 2025)
-
-### ✅ Implemented Features
-- **Single-stepper mode** with bit-level resolution (2 ticks per bit)
+- **Single-stepper mode** with bit-level resolution (2 ticks/bit)
 - **DMA double buffering** with 2 blocks (ping-pong)
 - **I2S configuration**: 250kHz sample rate, 16-bit stereo, 8MHz BCLK
 - **Block duration**: 500µs (125 frames × 4µs per frame)
-- **Pulse width**: 64 ticks (4µs = 32 bits = one full frame)
-- **PC-based tests**: `test_21.cpp` with 28 comprehensive tests
-- **Fill algorithm**: Handles block boundaries, carry-over ticks, and queue management
-- **DMA callback integration**: ISR-driven buffer rotation
+- **Pulse width**: 32 ticks (2µs = 16 bits)
+- **ISR-driven fill**: `on_sent` callback fills buffers directly
+- **`memset` clearing**: Buffer cleared before fill in callback
+- **PC-based tests**: `test_21.cpp` with comprehensive test coverage
+- **Hardware validated**: Working on ESP32
 
-### ⚠️ Partially Implemented
-- **Multi-stepper mode**: Not yet implemented (single-stepper only)
-- **Engine API**: Basic initialization exists, needs expansion for multi-stepper
-- **ForceStop**: Basic implementation, needs DMA stop/restart for single-stepper
+### ⬜ I2S_MUX Mode — Not Yet Implemented
 
-### ❌ Not Implemented
-- **Multi-stepper slot management**: Allocation, bit-slot mapping
-- **DIR/ENABLE bit service**: Functions for multi-stepper signal control
-- **Configurable pulse width**: Currently fixed at 64 ticks
-- **WS pin support**: Currently hardcoded to `I2S_GPIO_UNUSED`
-- **Hardware validation**: PCNT, logic analyzer, 74HC595 tests
-
-### Recent Fixes
-- **Test failures**: Fixed incorrect use of `fillAndDetectPulses()` return value
-- **Constants**: Updated to match design doc (`I2S_BLOCK_COUNT=2`, derived from `I2S_BLOCK_DURATION_US`)
-- **Fill algorithm**: Correct block boundary handling and queue pointer advancement
+- Multi-stepper slot management
+- DIR/ENABLE bitmask support
+- Frame-level fill algorithm
+- Engine-level initialization API
+- WS pin output for demux latch
+- Hardware validation with 74HC595
 
 ---
 
@@ -96,12 +68,12 @@ Frame duration = 32 bits / 8 MHz = 4 µs = 64 ticks (@16 MHz)
 
 | Mode | Resolution | Max Practical Freq | Notes |
 |------|------------|---------------------|-------|
-| Single-stepper | 2 ticks (bit-level) | ~200 kHz | 32× resolution within frame |
-| Multi-stepper | 64 ticks (frame-level) | ~40 kHz | Limited by frequency granularity |
+| I2S_DIRECT | 2 ticks (bit-level) | ~200 kHz | 32× resolution within frame |
+| I2S_MUX | 64 ticks (frame-level) | ~40 kHz | Limited by frequency granularity |
 
-### Frequency Granularity in Multi-Stepper Mode
+### Frequency Granularity in I2S_MUX Mode
 
-In multi-stepper mode, steps are frame-aligned. To emit a step, you need HIGH followed by LOW:
+In I2S_MUX mode, steps are frame-aligned. To emit a step, you need HIGH followed by LOW:
 
 | Step Period | Frequency | Notes |
 |-------------|-----------|-------|
@@ -112,9 +84,9 @@ In multi-stepper mode, steps are frame-aligned. To emit a step, you need HIGH fo
 | 6 frames (24µs) | 41.7 kHz | Practical max |
 
 The jump from 125 kHz to 83 kHz is 33%. For acceptable frequency granularity,
-practical max frequency in multi-stepper mode is ~40 kHz.
+practical max frequency in I2S_MUX mode is ~40 kHz.
 
-### Demux IC (Multi-Stepper Mode)
+### Demux IC (I2S_MUX Mode)
 
 A shift-register chain (e.g., two 74HC595 in series = 16 outputs) receives:
 - DATA_OUT → SER input
@@ -124,19 +96,19 @@ A shift-register chain (e.g., two 74HC595 in series = 16 outputs) receives:
 Each WS edge latches the last 32 bits from DATA_OUT to the parallel output. The
 parallel outputs drive individual step, direction, and enable signals of stepper drivers.
 
-### Single-Stepper Mode
+### I2S_DIRECT Mode
 
-In single-stepper mode, the entire 32-bit frame is used for one stepper's step signal.
+In I2S_DIRECT mode, the entire 32-bit frame is used for one stepper's step signal.
 The effective bit rate is 2 × 16 × frame_rate = 8 Mbit/s. Each bit represents 2 ticks
 (125 ns).
 
 A single bit HIGH (125 ns) is too short for a step pulse. A step pulse consists of
-N consecutive 1-bits, where N = pulse_width_ticks / 2. For example, a 4 µs pulse =
-32 consecutive 1-bits = one full frame of all-ones. Sub-frame edge placement provides
-positioning resolution of 2 ticks.
+N consecutive 1-bits, where N = pulse_width_ticks / 2. For example, a 2 µs pulse =
+16 consecutive 1-bits. Sub-frame edge placement provides positioning resolution of
+2 ticks.
 
-WS and BCLK should not be output on GPIOs in single-stepper mode (only the DATA_OUT
-bitstream is needed). Set WS to `I2S_GPIO_UNUSED` to avoid consuming a GPIO.
+WS and BCLK should not be output on GPIOs in I2S_DIRECT mode (only the DATA_OUT
+bitstream is needed). Set WS and BCLK to `I2S_GPIO_UNUSED` to avoid consuming GPIOs.
 
 ---
 
@@ -156,11 +128,7 @@ in the common queue code.
 
 `TICKS_PER_S = 16 000 000` and I2S frame rate = 250 000 → 64 ticks/frame. This
 is an exact integer ratio, so no drift accumulates if the I2S clock is derived from
-the same PLL as the CPU clock. Verify this on hardware.
-
-If a small discrepancy exists (e.g., due to PLL configuration or crystal tolerance),
-a Bresenham-style correction can accumulate fractional-tick error per frame and
-insert/skip a tick when the error exceeds ±1 tick. The adjustment range is 1–64 ticks.
+the same PLL as the CPU clock.
 
 ### Step Counting
 
@@ -175,178 +143,115 @@ guarantee maintaining exact position.
 `read_idx` and `next_write_idx` are single bytes (uint8_t), which are atomically
 safe to read and write on ESP32. The contract is:
 
-- `read_idx` is updated **only** by the driver (fill routine in I2S task context)
+- `read_idx` is updated **only** by the driver (fill routine in I2S callback context)
 - `next_write_idx` is updated **only** by the ramp generator (StepperTask context)
 
 No additional synchronization (mutex/spinlock) is needed.
 
 ---
 
-## Architecture Design
+## Architecture
 
-### Mode Selection via Engine
+### Driver Types
 
-The mode (single-stepper vs multi-stepper) is configured at Engine initialization,
-**before** any steppers are connected. The planned architecture extends the existing
-`FasDriver` enum to support I2S modes:
+The `FasDriver` enum provides two I2S modes:
 
 ```cpp
-// Planned FasDriver enum extension for I2S support
-// COMPILE-TIME validation with SOC_I2S_NUM
-enum class FasDriver : uint8_t { 
-    MCPWM_PCNT = 0, 
-    RMT = 1, 
-#if SUPPORT_I2S
-    RMT_I2S_DIRECT = 2,      // Single-stepper I2S mode
-    RMT_I2S_MUX = 3,         // Multi-stepper I2S mode
-#endif // SUPPORT_I2S
-    DONT_CARE = 255 
-};
-
-// I2S support conditional on SOC_I2S_NUM
-#if SOC_I2S_NUM >= 1
-#define SUPPORT_I2S 1
+enum class FasDriver : uint8_t {
+  MCPWM_PCNT = 0,
+  RMT = 1,
+#if defined(SUPPORT_ESP32_I2S)
+  I2S_DIRECT = 2,   // One stepper per I2S peripheral
+  I2S_MUX = 3,      // Multiple steppers via demux IC
 #endif
-
-// Single-stepper mode: one I2S peripheral = one stepper
-// Uses RMT_I2S_DIRECT driver type
-engine.initI2sSingleStepper(data_pin, bclk_pin);
-
-// Multi-stepper mode: one I2S peripheral = many steppers via demux
-// Uses RMT_I2S0_MUX, RMT_I2S1_MUX, or RMT_I2S2_MUX driver type
-engine.initI2sMultiStepper(data_pin, bclk_pin, ws_pin, signals_per_stepper);
+  DONT_CARE = 255
+};
 ```
 
-#### Pin Flag for I2S Control
+Macros for user code:
+```cpp
+#define DRIVER_I2S_DIRECT FasDriver::I2S_DIRECT
+#define DRIVER_I2S_MUX    FasDriver::I2S_MUX
+```
 
-Similar to `PIN_EXTERNAL_FLAG` (0x80) used for externally controlled pins,
-I2S-controlled pins will use `PIN_I2S_FLAG` (0x40):
+### I2S_DIRECT Mode — Stepper Connection
+
+No engine initialization needed. Each `stepperConnectToPin()` call creates its
+own `I2sManager` with a dedicated I2S peripheral:
 
 ```cpp
-#define PIN_I2S_FLAG 0x40  // Bitmask for I2S-controlled pins
-
-// Usage in multi-stepper mode:
-uint8_t i2s_pin = physical_pin_number | PIN_I2S_FLAG;
+FastAccelStepper* s = engine.stepperConnectToPin(step_pin, DRIVER_I2S_DIRECT);
 ```
 
-#### Driver Selection Flow
+Internally, `tryAllocateQueue()` calls `I2sManager::create(data_pin, I2S_GPIO_UNUSED, I2S_GPIO_UNUSED)`,
+allocates a `StepperQueue`, and stores the manager pointer in `q->i2s_mgr`.
 
-1. **Single-stepper mode**:
-   - User calls `connectToStepperPin(pin, RMT_I2S_DIRECT)`
-   - System automatically allocates available I2S module (based on `SOC_I2S_NUM`) and initializes DMA
-   - No engine initialization required
+### I2S_MUX Mode — Engine Initialization
 
-2. **Multi-stepper mode**:
-   - User must first call `engine.initI2sMultiStepper()` for the desired I2S module
-   - Then call `connectToStepperPin(pin | PIN_I2S_FLAG, RMT_I2S0_MUX)`, `RMT_I2S1_MUX`, or `RMT_I2S2_MUX`
-   - Only I2S modules defined by `SOC_I2S_NUM` are available
-   - Engine manages shared I2S peripheral and demux timing
+I2S_MUX mode requires explicit engine initialization **before** connecting steppers.
+This is an engine member function that creates the shared `I2sManager` and stores it
+as a static member of `StepperQueue`:
 
-**Note**: The driver uses **compile-time validation** with `SOC_I2S_NUM`:
-- `FasDriver` enum only includes I2S modules that exist on the target
-- Code trying to use non-existent I2S modules won't compile
-- Clean API: users only see available I2S driver options
+```cpp
+// Engine member function
+bool FastAccelStepperEngine::initI2sMux(
+    uint8_t data_pin, uint8_t bclk_pin, uint8_t ws_pin,
+    uint32_t dir_bitmask, uint32_t dir_inverted_bitmask,
+    uint32_t enable_bitmask, uint32_t enable_inverted_bitmask);
+```
 
-The number of I2S modules varies across ESP32 variants:
+**Bitmask parameters**: Each bit position (0–31) in the 32-bit frame corresponds to
+a slot on the shift register output. The bitmasks define which slots carry DIR or
+ENABLE signals and their polarity:
 
-| ESP32 Variant | I2S Modules | Notes |
-|---------------|-------------|-------|
-| ESP32         | 2 (I2S0, I2S1) | Original ESP32 |
-| ESP32-S2      | 1 (I2S0) | Single I2S module |
-| ESP32-S3      | 2 (I2S0, I2S1) | Dual I2S modules |
-| ESP32-C2      | 1 (I2S0) | Single I2S module |
-| ESP32-C3      | 1 (I2S0) | Single I2S module |
-| ESP32-C5      | 1 (I2S0) | Single I2S module |
-| ESP32-C6      | 1 (I2S0) | Single I2S module |
-| ESP32-H2      | 1 (I2S0) | Single I2S module |
-| ESP32-P4      | 3 (I2S0, I2S1, I2S2) | Triple I2S modules |
+- `dir_bitmask`: Bits that are direction outputs (active-high)
+- `dir_inverted_bitmask`: Bits that are direction outputs (active-low / inverted)
+- `enable_bitmask`: Bits that are enable outputs (active-high)
+- `enable_inverted_bitmask`: Bits that are enable outputs (active-low / inverted)
 
-The driver architecture uses `SOC_I2S_NUM` (defined in ESP-IDF) for **compile-time
-validation** of I2S module availability:
+Bits not set in any bitmask are available as STEP outputs.
 
-1. **Conditional I2S Support**: If `SOC_I2S_NUM >= 1`, `SUPPORT_I2S` is defined
-2. **Conditional Enum Values**: I2S driver values only in `FasDriver` if `SUPPORT_I2S`
-3. **Module-specific Values**: `RMT_I2S1_MUX` only if `SOC_I2S_NUM >= 2`, etc.
+**Example**: Two steppers with step+dir+enable on 74HC595:
+```cpp
+// Slot layout: [STEP0, DIR0, EN0, STEP1, DIR1, EN1, ...]
+// Slots 0,3 = STEP; Slots 1,4 = DIR (active-high); Slots 2,5 = ENABLE (active-low)
+engine.initI2sMux(
+    DATA_PIN, BCLK_PIN, WS_PIN,
+    0b00010010,   // dir_bitmask: slots 1,4
+    0b00000000,   // dir_inverted_bitmask: none
+    0b00000000,   // enable_bitmask: none
+    0b00100100    // enable_inverted_bitmask: slots 2,5 (active-low)
+);
+```
 
-**API Design Principle**: Compile-time validation > runtime validation
-- Code that tries to use `RMT_I2S1_MUX` on ESP32-S2 (1 I2S module) won't compile
-- ESP32 variants without I2S (`SOC_I2S_NUM < 1`) compile without I2S support
-- Cleaner API: users only see available options
-- No runtime error handling needed for invalid I2S module requests
+The function:
+1. Creates a shared `I2sManager` with WS pin enabled
+2. Stores it in `StepperQueue::_i2s_mux_manager` (static)
+3. Stores the bitmasks for DIR/ENABLE signal handling
+4. Sets `StepperQueue::_i2s_mux_initialized = true`
 
-### Runtime I2S Module Handling
+### I2S_MUX Mode — Stepper Connection
 
-The driver needs to work with any of the available I2S modules (I2S0, I2S1, I2S2)
-dynamically. The implementation approach:
+After engine initialization, connect steppers using slot indices with `PIN_I2S_FLAG`:
 
-1. **I2S Port Mapping**: Convert `FasDriver` to `i2s_port_t` (ESP-IDF I2S port identifier)
-   ```cpp
-    static i2s_port_t fasDriverToI2sPort(FasDriver driver) {
-        switch (driver) {
-    #if SUPPORT_I2S
-            case FasDriver::RMT_I2S_DIRECT:
-            case FasDriver::RMT_I2S_MUX: return I2S_NUM_0;
-    #endif // SUPPORT_I2S
-            default: return I2S_NUM_MAX; // Invalid (non-I2S driver)
-        }
-    }
-   ```
+```cpp
+uint8_t i2s_pin = slot_index | PIN_I2S_FLAG;  // PIN_I2S_FLAG = 0x40
+FastAccelStepper* s = engine.stepperConnectToPin(i2s_pin, DRIVER_I2S_MUX);
+```
 
-2. **Per-I2S State Management**: Each I2S module needs its own state:
-   ```cpp
-   struct I2sModuleState {
-       i2s_port_t port;
-       bool initialized;
-       bool in_use;
-       uint8_t stepper_count;
-       // DMA buffers, ISR state, etc.
-   };
-   
-   // Array of all possible I2S modules
-   I2sModuleState i2s_modules[SOC_I2S_NUM];
-   ```
+`tryAllocateQueue()` validates that the slot is not a DIR/ENABLE slot, not already
+allocated, and assigns the shared `I2sManager` pointer to `q->i2s_mgr`.
 
-3. **Dynamic Initialization**: Initialize I2S peripheral when first stepper connects:
-   ```cpp
-   bool initializeI2sModule(i2s_port_t port) {
-       if (port >= SOC_I2S_NUM) return false;
-       if (i2s_modules[port].initialized) return true;
-       
-       // ESP-IDF I2S configuration
-       i2s_config_t i2s_config = { ... };
-       i2s_pin_config_t pin_config = { ... };
-       
-       i2s_driver_install(port, &i2s_config, 0, NULL);
-       i2s_set_pin(port, &pin_config);
-       
-       i2s_modules[port].initialized = true;
-       return true;
-   }
-   ```
+### Constants (i2s_constants.h)
 
-4. **Resource Management**: Track which I2S modules are in use:
-   - Single-stepper mode (`RMT_I2S_DIRECT`): Auto-select available I2S module
-   - Multi-stepper mode (`RMT_I2Sx_MUX`): Use specified I2S module
-   - Prevent double-initialization of same I2S module
-   - Handle module exhaustion (all I2S modules in use)
-
-### Constants (Current Implementation)
-
-All constants are derived from `I2S_BLOCK_DURATION_US` as per design:
+All constants are derived from `I2S_BLOCK_DURATION_US`:
 
 ```c
-// I2S timing: 16-bit stereo mode
-// Sample rate: 250kHz
-// Bits per frame: 16-bit L + 16-bit R = 32 bits
-// BCLK = 250kHz × 32 bits = 8MHz
-// Frame duration = 32 bits / 8MHz = 4µs
-// At 16MHz stepper reference: 4µs × 16 = 64 ticks per frame
 #define I2S_SAMPLE_RATE_HZ 250000UL
 #define I2S_TICKS_PER_FRAME 64
 #define I2S_BITS_PER_FRAME 32
 #define I2S_BYTES_PER_FRAME 4
 
-// All constants derived from I2S_BLOCK_DURATION_US (per design doc)
 #define I2S_BLOCK_DURATION_US 500
 #define I2S_BLOCK_COUNT 2
 #define I2S_FRAMES_PER_BLOCK \
@@ -354,37 +259,17 @@ All constants are derived from `I2S_BLOCK_DURATION_US` as per design:
 #define I2S_BLOCK_TICKS (I2S_FRAMES_PER_BLOCK * I2S_TICKS_PER_FRAME)
 #define I2S_BYTES_PER_BLOCK (I2S_FRAMES_PER_BLOCK * I2S_BYTES_PER_FRAME)
 
-// Total buffer (all 2 blocks combined)
-#define I2S_TOTAL_FRAMES (I2S_BLOCK_COUNT * I2S_FRAMES_PER_BLOCK)
-#define I2S_TOTAL_BYTES (I2S_BLOCK_COUNT * I2S_BYTES_PER_BLOCK)
-
-// Max frequency enforced by addQueueEntry(), not by I2S driver
-#define MAX_STEP_FREQ_HZ 200000UL
-
-// Max pulses per block (for tracking array size)
-// 500µs × 200kHz = 100, +1 for safety
-#define I2S_MAX_PULSES_PER_BLOCK \
-  ((I2S_BLOCK_DURATION_US * MAX_STEP_FREQ_HZ / 1000000UL) + 1)
-
-// Min step period: 2 frames = 8µs = 128 ticks (for multi-stepper mode)
-#define I2S_MIN_SPEED_TICKS 128
-
-// Default pulse width: 32 bits = 1 frame = 4µs = 64 ticks
-#define I2S_DEFAULT_PULSE_WIDTH_TICKS 64
-
-// DMA: minimum for continuous streaming (per design doc)
 #define I2S_DMA_DESC_NUM 2
 #define I2S_DMA_FRAME_NUM I2S_FRAMES_PER_BLOCK
+
+#define I2S_DIRECT_MIN_SPEED_TICKS 80
+#define I2S_MUX_MIN_SPEED_TICKS 400
+#define I2S_DEFAULT_PULSE_WIDTH_TICKS 32
 ```
 
-**Note**: Current implementation uses `I2S_BLOCK_COUNT = 2` (ping-pong) instead of 3 (triple buffer) as originally designed. This simplifies the implementation while maintaining functionality.
+### Double Buffering (Ping-Pong)
 
-Maximum frequency (200 kHz) is enforced by `addQueueEntry()`, not by the I2S driver.
-The pulse tracking array is sized to this guaranteed maximum.
-
-### Double Buffering (Current Implementation)
-
-The I2S driver uses double buffering (ping-pong) with 2 blocks of 500 µs each:
+The I2S driver uses double buffering with 2 DMA descriptors of 500 µs each:
 
 ```
 Block 0    Block 1    Block 0    Block 1
@@ -393,93 +278,60 @@ Block 0    Block 1    Block 0    Block 1
 DMA continuously streams blocks in rotation
 ```
 
-**Design vs Implementation**: The original design specified triple buffering (3 blocks), but the current implementation uses double buffering (2 blocks). This simplifies the implementation while maintaining functionality:
-- **Block 0**: Currently being transmitted by DMA (busy)
-- **Block 1**: Available for filling
-- When DMA finishes Block 0, it becomes available for filling while Block 1 is transmitted
+- **Block N**: Currently being transmitted by DMA (busy)
+- **Block (N+1)%2**: Available for filling
 
-### DMA Architecture: ISR-Driven (Current Implementation)
+### DMA Architecture: ISR-Driven
 
-The current implementation uses a simplified ISR-driven architecture:
+The `on_sent` callback fires when DMA finishes transmitting a block. The callback:
 
-**DMA Callback (IRAM_ATTR)**:
-1. Update `busy_block = (busy_block + 1) % 2`
-2. Call `fill_i2s_buffer()` for all steppers directly from ISR
-3. The fill function writes to the available buffer (not the busy one)
-
-**Simplification**: Since `fill_i2s_buffer()` only writes to memory (no mutexes or blocking calls), it can run safely in ISR context. This avoids the complexity of a separate FreeRTOS task.
-
-**Limitation**: The fill computation must complete within the DMA block period (500µs). At 240 MHz ESP32, this is 120k CPU cycles — sufficient for the fill algorithm.
-
-**Future Enhancement**: For multi-stepper mode with many steppers, a two-stage architecture (ISR + task) may be needed to avoid ISR overrun.
-
-### DMA Configuration
-
-The IDF I2S driver is used (preference over register-level access for
-forward-compatibility with new IDF releases). Configuration:
-
-```c
-#define I2S_DMA_DESC_NUM    2    // minimum for continuous streaming
-#define I2S_DMA_FRAME_NUM   I2S_FRAMES_PER_BLOCK  // one block per descriptor
-```
-
-The application queues the same three buffer addresses (blocks 0, 1, 2) to
-`i2s_channel_write()` in rotation. The blocking write naturally paces the fill
-task to the DMA consumption rate.
-
-**Zero-copy assumption**: `i2s_channel_write()` with blocking timeout passes
-the buffer pointer to the DMA engine without copying. This must be verified on
-hardware (see §Verification Sketch).
-
-### DMA ↔ Fill ↔ StepperTask Sequence (Current Implementation)
+1. Receives a pointer to the just-transmitted buffer (now available for reuse)
+2. Clears the buffer with `memset`
+3. Iterates all queues, calling the appropriate fill function for each I2S stepper
+   whose `i2s_mgr` matches this manager
 
 ```
-Time →
-         Block 0 plays    Block 1 plays    Block 0 plays    Block 1 plays
-DMA:     ████████████████  ████████████████  ████████████████  ████████████████
-                        ↑                 ↑                 ↑
-ISR:                    │ on_sent         │ on_sent         │ on_sent
-                        │ busy=1          │ busy=0          │ busy=1
-                        │ fill Block 0    │ fill Block 1    │ fill Block 0
-                        ↓                 ↓                 ↓
-Fill:              ┌──────────┐      ┌──────────┐      ┌──────────┐
-                   │B1 = busy │      │B0 = busy │      │B1 = busy │
-                   │fill B0   │      │fill B1   │      │fill B0   │
-                   └──────────┘      └──────────┘      └──────────┘
+DMA:  ████ Block 0 ████  ████ Block 1 ████  ████ Block 0 ████
+                       ↑                  ↑
+ISR:                   │ on_sent          │ on_sent
+                       │ memset buf       │ memset buf
+                       │ fill(buf)        │ fill(buf)
+                       ↓                  ↓
 
 StepperTask:  ─── manageSteppers() ──── manageSteppers() ────
                   (adds cmds to queue)   (adds cmds to queue)
 ```
 
-When ISR fires with busy = N:
-- Block N is currently being transmitted by DMA (do not touch)
-- Block (N+1)%2 is free and available for filling
+**Timing budget**: Fill must complete within 500 µs. At 240 MHz ESP32 that is
+120k CPU cycles — sufficient for the fill algorithm.
 
-**Timing budget**: The fill computation must complete within one block period
-(500 µs). At 240 MHz ESP32 that is 120k CPU cycles — sufficient for single-stepper
-fill algorithm.
+**Callback fill dispatch**: The callback selects the appropriate fill function
+based on mode. I2S_DIRECT queues call `i2s_fill_buffer()` (bit-level).
+I2S_MUX queues call a separate optimized `i2s_fill_buffer_mux()` (frame-level).
+The selection is made in `StepperQueue::fill_i2s_buffer()`.
 
-**Queue**: The StepperTask adds commands to the queue, and the fill function
-advances `read_idx` as it consumes commands. The fill function correctly handles
-block boundaries and carry-over ticks.
+### I2sManager
 
-### Slot Assignment (Multi-Stepper Mode)
+```cpp
+class I2sManager {
+ public:
+  static I2sManager* create(gpio_num_t data_pin, gpio_num_t bclk_pin,
+                            gpio_num_t ws_pin);
+  void handleTxDone(uint8_t* buf);
 
-When connecting a stepper in multi-stepper mode, bit-slots are allocated:
-
-| Claim Mode | Slots | Signals |
-|------------|-------|---------|
-| `STEP_ONLY` | 1 | STEP |
-| `STEP_DIR` | 2 | STEP, DIR |
-| `STEP_DIR_ENABLE` | 3 | STEP, DIR, ENABLE |
-
-```
-base_slot = I2sManager::allocateSlots(claim_count)
-stepper._i2s_dir_slot    = (claim >= STEP_DIR) ? base_slot + 1 : -1
-stepper._i2s_enable_slot = (claim == STEP_DIR_ENABLE) ? base_slot + 2 : -1
+ private:
+  i2s_chan_handle_t _chan;
+};
 ```
 
-Slot = -1 means the signal uses conventional GPIO.
+- `create()`: Configures I2S channel, registers `on_sent` callback, enables channel
+- `handleTxDone()`: ISR callback — clears buffer, iterates queues, calls fill
+- For I2S_DIRECT: `ws_pin = I2S_GPIO_UNUSED`, `bclk_pin = I2S_GPIO_UNUSED`
+- For I2S_MUX: all three pins connected to 74HC595
+
+**Storage**: For I2S_MUX, the shared manager is stored in
+`StepperQueue::_i2s_mux_manager` (static member). For I2S_DIRECT, each queue has
+its own manager in `q->i2s_mgr`.
 
 ---
 
@@ -497,7 +349,7 @@ I2S outputs in time order:
   R_hi[7], R_hi[6], ..., R_hi[0],  R_lo[7], ..., R_lo[0]
 ```
 
-### Multi-Stepper Mode: Slot-to-Bit Mapping
+### I2S_MUX Mode: Slot-to-Bit Mapping
 
 Each slot (0..31) maps to a fixed bit position in the frame:
 
@@ -508,18 +360,17 @@ byte_in_buf   = frame_index * 4 + byte_in_frame;
 bit_mask      = 1 << bit_in_byte;
 ```
 
-**Worked example**: Slot 5 (6th stepper bit)
+**Worked example**: Slot 5 (6th output bit)
 - `byte_in_frame = 5 / 8 = 0` → L_hi
 - `bit_in_byte = 7 - (5 % 8) = 2`
 - `bit_mask = 0x04`
 - To set: `buf[frame_index * 4 + 0] |= 0x04;`
 - To clear: `buf[frame_index * 4 + 0] &= ~0x04;`
 
-### Single-Stepper Mode: Tick-to-Bit Mapping
+### I2S_DIRECT Mode: Tick-to-Bit Mapping
 
-In single-stepper mode, the bit index represents a temporal position within the frame
-(0..31 → first bit out to last bit out). The same formula applies, but `slot` is
-replaced by `bit_time_index = tick_pos_within_frame / 2`:
+In I2S_DIRECT mode, the bit index represents a temporal position within the frame
+(0..31 → first bit out to last bit out):
 
 ```c
 bit_time_index = (tick_pos % I2S_TICKS_PER_FRAME) / 2;  // 0..31
@@ -529,233 +380,211 @@ byte_in_buf    = frame_index * 4 + byte_in_frame;
 bit_mask       = 1 << bit_in_byte;
 ```
 
+Note: I2S byte order is little-endian but bits are MSB-first, so byte index is
+XORed with 1 in the implementation (`byte_index = (bit_pos >> 3) ^ 1`).
+
 ---
 
 ## Buffer Fill Algorithm
 
-### Fill State (Current Implementation)
+### Fill State
 
 Each stepper maintains its own fill state:
 
 ```c
 struct i2s_fill_state {
-  uint16_t remaining_high_ticks;  // Remaining HIGH time for current pulse
-  uint16_t remaining_low_ticks;   // Remaining LOW time before next step
+  uint16_t remaining_low_ticks;
+  uint8_t  remaining_high_ticks;
+  uint8_t  off_ticks;             // sub-bit fractional tick remainder
 };
 ```
 
-**Simplification**: The current implementation does not track `tick_pos` or `pulse_positions`. Instead:
-- `tick_pos` is implicit: the fill function starts at the beginning of each block
-- Pulse positions are not tracked for clearing (simplified single-stepper mode)
-- The fill function handles block boundaries by returning `true` when block is full
+The fill state carries over between blocks. When a pulse or pause spans a block
+boundary, the remaining ticks are preserved and consumed in the next block.
 
-**Limitation**: Without `pulse_positions` tracking, the implementation cannot support:
-- Multi-stepper mode (needs per-stepper bit clearing)
-- Efficient forceStop (needs to clear only stepper's bits)
-- No-memset optimization (currently uses memset for simplicity)
+### I2S_DIRECT Fill: i2s_fill_buffer()
 
-**Future Enhancement**: For multi-stepper mode, the struct should be expanded to:
-```c
-struct i2s_fill_state {
-  uint32_t tick_pos;              // Current position in 16MHz ticks
-  uint16_t remaining_high_ticks;  // Remaining HIGH time for current pulse
-  uint16_t remaining_low_ticks;   // Remaining LOW time before next step
-  uint16_t pulse_positions[I2S_BLOCK_COUNT][I2S_MAX_PULSES_PER_BLOCK];
-  uint8_t  pulse_count[I2S_BLOCK_COUNT];
-};
-```
-
-### Buffer Clearing (Current Implementation)
-
-**Single-stepper mode**: The buffer is cleared with `memset()` before filling.
-This is acceptable for single-stepper mode since only one stepper uses the buffer.
-
-**Multi-stepper mode (future)**: The buffer should **never** be bulk-zeroed.
-Each stepper must track its own generated pulses and individually clear them
-before writing new ones. This is essential for multi-stepper mode where multiple
-steppers share the same DMA buffer.
-
-At low step rates (e.g., 1 kHz), only 1 byte needs to be touched per block.
-This is far more efficient than clearing 500 bytes.
-
-**Current Limitation**: The implementation uses memset for simplicity in
-single-stepper mode. This must be changed for multi-stepper support.
-
-### fill_i2s_buffer() Algorithm (Current Implementation)
-
-Called once per stepper per block fill cycle. The function receives the buffer
-to fill and updates the fill state.
-
-**Key characteristics**:
-- Returns `true` if block is full, `false` if queue is empty or partially filled
-- Advances `read_idx` as commands are consumed
-- Handles block boundaries by returning early when block is full
-- Carries over `remaining_high_ticks` and `remaining_low_ticks` across blocks
-- Uses bit-level resolution (2 ticks per bit) for single-stepper mode
+Called once per stepper per block. Operates at bit-level granularity (2 ticks/bit).
 
 **Algorithm**:
 ```
-fill_i2s_buffer(stepper, buf, state):
+i2s_fill_buffer(queue, buf, state):
+  bit_pos = 0
 
-  1. Initialize tick_pos = 0 (implicit start of block)
+  loop:
+    1. Emit remaining HIGH bits:
+       While remaining_high_ticks > 0:
+         Set bits in buf at bit_pos (byte-aligned writes: buf[byte] = 0xff >> offset)
+         Advance bit_pos, decrement remaining_high_ticks
+         If block full: save state, return true
 
-  2. CARRY-OVER remaining HIGH phase:
-     if state->remaining_high_ticks > 0:
-       Write 1-bits from tick_pos for state->remaining_high_ticks
-       Advance tick_pos by state->remaining_high_ticks
-       state->remaining_high_ticks = 0
-       If block full: update read_idx, return true
+    2. Skip remaining LOW ticks:
+       If remaining_low_ticks > 0:
+         Advance bit_pos by remaining_low_ticks / ticks_per_bit
+         Track sub-bit remainder in off_ticks
+         If block full: save state, return true
 
-  3. CARRY-OVER remaining LOW phase:
-     if state->remaining_low_ticks > 0:
-       Advance tick_pos by min(state->remaining_low_ticks, ticks_to_block_end)
-       state->remaining_low_ticks -= ticks_advanced
-       If block full: update read_idx, return true
-
-  4. MAIN LOOP while tick_pos < block_end AND queue not empty:
-
-     4a. Read next command from queue:
-         if cmd.steps == 0:
-           Pause: state->remaining_low_ticks = cmd.ticks
-           Advance read_idx
-         if cmd.steps >= 1:
-           if toggle_dir: toggle direction pin
-           state->remaining_high_ticks = PULSE_WIDTH_TICKS (64)
-           state->remaining_low_ticks = cmd.ticks - PULSE_WIDTH_TICKS
-           Decrement cmd.steps
-           if cmd.steps == 0: advance read_idx
-
-     4b. Emit HIGH phase (if any):
-         if state->remaining_high_ticks > 0:
-           Write 1-bits from tick_pos for state->remaining_high_ticks
-           Advance tick_pos by state->remaining_high_ticks
-           state->remaining_high_ticks = 0
-           If block full: update read_idx, return true
-
-     4c. Emit LOW phase (if any):
-         if state->remaining_low_ticks > 0:
-           Advance tick_pos by min(state->remaining_low_ticks, ticks_to_block_end)
-           state->remaining_low_ticks -= ticks_advanced
-           If block full: update read_idx, return true
-
-     4d. Loop to 4a
-
-  5. Save state (remaining_high_ticks, remaining_low_ticks)
-  6. Update read_idx if queue consumed
-  7. Return false (block not full)
+    3. Read next queue entry:
+       If queue empty: save state, return false
+       Handle toggle_dir
+       Set remaining_low_ticks = entry.ticks (+ off_ticks carry)
+       If entry has steps:
+         remaining_high_ticks = PULSE_WIDTH_TICKS
+         remaining_low_ticks -= PULSE_WIDTH_TICKS
+         Decrement entry.steps
+       If entry.steps == 0: advance read_idx
 ```
 
-### Single-Stepper vs. Multi-Stepper Fill Differences
+Returns `true` if block is full, `false` if queue is empty.
 
-| Aspect | Single-Stepper (Current) | Multi-Stepper (Future) |
-|--------|----------------|---------------|
-| Bit granularity | Per-bit (2 ticks) | Per-frame (64 ticks) |
-| HIGH phase | N consecutive 1-bits across frame boundaries | Set bit-slot in frame byte |
-| Pulse width | Fixed 64 ticks (4µs) | Integer frames × 64 ticks (configurable) |
-| Clear operation | memset entire buffer | Clear specific bit in recorded frames |
-| Buffer sharing | Exclusive (one stepper) | Shared (multiple steppers) |
-| State tracking | Simple (remaining ticks) | Complex (tick_pos, pulse_positions) |
+### I2S_MUX Fill: i2s_fill_buffer_mux() — To Be Implemented
 
-### Handling Queue Empty
+Called once per stepper per block. Operates at frame-level granularity (64 ticks/frame).
+Each stepper owns one bit slot in the 32-bit frame. This is a separate, optimized
+fill function — not a mode branch inside `i2s_fill_buffer()`.
 
-If the queue is empty, `fill_i2s_buffer()` clears previously set bits
-(step 1) and returns. No new pulses are emitted. The stepper's fill state
-retains `tick_pos` for correct timing when new commands arrive.
+**Key differences from I2S_DIRECT**:
+- Writes single bits per frame instead of contiguous byte regions
+- Resolution is 64 ticks (1 frame) instead of 2 ticks (1 bit)
+- Uses OR operations (`buf[offset] |= mask`) to set bits without disturbing other steppers
+- DIR/ENABLE bits are pre-filled by `init_mux_buffer()` before step fill runs
+- `max_speed_in_ticks` is set to `I2S_MUX_MIN_SPEED_TICKS` (400)
 
----
+**Algorithm**:
+```
+i2s_fill_buffer_mux(queue, buf, state, slot, byte_offset, bit_mask):
+  frame_pos = 0
 
-## ForceStop Algorithm
+  loop:
+    1. Emit remaining HIGH frames:
+       While remaining_high_frames > 0:
+         buf[frame_pos * 4 + byte_offset] |= bit_mask
+         frame_pos++, remaining_high_frames--
+         If block full: save state, return true
 
-### Current Implementation
+    2. Skip remaining LOW frames:
+       If remaining_low_frames > 0:
+         Advance frame_pos
+         If block full: save state, return true
 
-The current implementation has basic forceStop support:
+    3. Read next queue entry (same as I2S_DIRECT)
+```
+
+Note: DIR/ENABLE bits are already present in the buffer from `init_mux_buffer()`.
+The MUX fill function only writes STEP bits.
+
+### Buffer Initialization & Clearing
+
+The buffer initialization differs between modes:
+
+- **I2S_DIRECT**: `memset(buf, 0, I2S_BYTES_PER_BLOCK)` — simple zero fill,
+  then the single stepper writes its step pulses.
+- **I2S_MUX**: A per-I2S-module initialization function replaces `memset`.
+  It writes the current DIR/ENABLE state into every frame of the buffer,
+  propagating the static signal levels across all 125 frames. Step bits
+  are left clear. The MUX fill functions then only OR in step pulses.
+
+This approach avoids a separate DIR/ENABLE pass after filling — the buffer
+is already correct for DIR/ENABLE before any step fill runs.
+
+### Callback Fill Dispatch
 
 ```cpp
-void StepperQueue::forceStop_i2s() {
-  // Clear fill state
-  _fill_state.remaining_high_ticks = 0;
-  _fill_state.remaining_low_ticks = 0;
-  
-  // Reset queue pointers
-  read_idx = next_write_idx;
+void I2sManager::handleTxDone(uint8_t* buf) {
+  if (is_mux) {
+    // Pre-fill buffer with DIR/ENABLE bits for all frames,
+    // step bits cleared — replaces memset(0)
+    init_mux_buffer(buf);
+  } else {
+    memset(buf, 0, I2S_BYTES_PER_BLOCK);
+  }
+
+  for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+    StepperQueue* q = fas_queue[i];
+    if (q && q->use_i2s && q->i2s_mgr == this) {
+      q->fill_i2s_buffer(buf);  // dispatches to direct or mux fill
+    }
+  }
 }
 ```
 
-**Limitations**:
-- Does not stop DMA (pulses in buffer continue to output)
-- Does not clear buffer (existing pulses still output)
-- Simple but incomplete
+`StepperQueue::fill_i2s_buffer()` selects the appropriate optimized fill function
+based on whether this is an I2S_DIRECT or I2S_MUX queue.
 
-### Future Enhancement
-
-#### Single-Stepper Mode
-```
-forceStop_single():
-  Stop I2S DMA
-  memset(all blocks, 0)
-  Clear fill_state (tick_pos, remaining ticks, all pulse_positions)
-  Restart I2S DMA
-```
-
-Memset is acceptable here because only one stepper owns the entire buffer.
-
-#### Multi-Stepper Mode
-```
-forceStop_multi(stepper):
-  for each block b in 0..I2S_BLOCK_COUNT-1:
-    for each pos in stepper.pulse_positions[b][0..pulse_count[b]-1]:
-      clear stepper's bit-slot at buf[b][pos]
-    stepper.pulse_positions[b].count = 0
-  Clear stepper.fill_state (tick_pos, remaining ticks)
-```
-
-Other steppers are not affected. Clearing bits in the currently-transmitting
-block is a benign race — worst case, one extra pulse is physically output.
-This is consistent with the contract that forceStop does not guarantee
-exact position.
+`init_mux_buffer()` builds a 4-byte frame template from the current DIR/ENABLE
+state of all connected MUX steppers and replicates it across all frames in the
+block. This is a per-I2S-module operation — it reads the bitmasks and each
+stepper's current direction/enable state to compute the template once, then
+fills the buffer with it (e.g., via `memset`-style 4-byte pattern fill).
 
 ---
 
-## Multi-Stepper Signal Service
+## DIR/ENABLE Signal Handling (I2S_MUX Mode)
 
-In multi-stepper mode, the DMA buffer carries no inherent semantics — only
-the stepper knows which bit-slot is STEP vs DIR vs ENABLE. The I2S driver
-provides low-level service functions for DIR/ENABLE manipulation:
+In I2S_MUX mode, DIR and ENABLE signals are carried as bits in the I2S frame,
+controlled by the bitmasks provided at `initI2sMux()` time.
+
+### Bitmask Configuration
+
+Four bitmasks define signal routing and polarity:
+
+| Bitmask | Meaning |
+|---------|---------|
+| `dir_bitmask` | Slots that carry direction signal (active-high) |
+| `dir_inverted_bitmask` | Slots that carry direction signal (active-low) |
+| `enable_bitmask` | Slots that carry enable signal (active-high) |
+| `enable_inverted_bitmask` | Slots that carry enable signal (active-low) |
+
+### DIR Handling
+
+DIR bits are propagated by `init_mux_buffer()` before any step fill runs.
+The function reads each stepper's current direction state and sets/clears
+the corresponding DIR slot bits across all frames in the block. Direction
+changes take effect at the next block boundary (worst case 500 µs latency).
+
+### ENABLE Handling
+
+ENABLE bits are propagated by `init_mux_buffer()` alongside DIR bits.
+The function reads each stepper's auto-enable state and applies the
+correct polarity (inverted bitmask bits output the logical complement).
+
+### Association
+
+Each MUX stepper's STEP slot implicitly identifies which DIR/ENABLE slots
+belong to it. The mapping is defined by the user's physical wiring and
+bitmask configuration. The library does not enforce a specific slot ordering.
+
+---
+
+## ForceStop
+
+### Current Implementation (I2S_DIRECT)
 
 ```cpp
-void setSlotBit(uint8_t block, uint16_t frame, uint8_t slot, bool value);
-bool getSlotBit(uint8_t block, uint16_t frame, uint8_t slot);
+void StepperQueue::forceStop_i2s() {
+  _isRunning = false;
+  _fill_state = {};
+}
 ```
 
-These use the bit serialization mapping from §Bit Serialization Order.
-
-**Direction and enable timing is not in scope of the pulse driver.** The
-caller (stepper logic / ramp generator) is responsible for:
-
-- Asserting DIR with sufficient setup time before STEP frames
-- Not changing DIR or ENABLE during frames where STEP is asserted
-
-The service functions do not enforce these constraints. Care must be taken
-at the caller level to avoid direction changes during active step pulses.
-This interaction is non-trivial and may require a dedicated sequencing layer
-above the raw service functions.
+When `_isRunning` is false, `fill_i2s_buffer()` returns immediately. The buffer
+is cleared by `memset` at the next callback. Pulses already in the DMA buffer
+will still be output (up to 500 µs of stale data).
 
 ---
 
 ## Pulse Width Constraints
 
-### Single-Stepper Mode
+### I2S_DIRECT Mode
 
-Pulse width = N consecutive 1-bits. Configurable via `setI2sPulseWidth(ticks)`.
-Default: 64 ticks (4 µs = 32 bits = one full frame).
+Pulse width = N consecutive 1-bits. Currently fixed at 32 ticks (2 µs = 16 bits).
 
 Minimum practical pulse width depends on the stepper driver (typically ≥1 µs
 = 8 bits = 16 ticks).
 
-### Multi-Stepper Mode
+### I2S_MUX Mode
 
-Pulse width is quantized to frame multiples. `setI2sPulseWidth(ticks)` rounds
-up to the next frame boundary. Minimum = 1 frame (4 µs).
+Pulse width is quantized to frame multiples (64 ticks). Minimum = 1 frame (4 µs).
 
 | Pulse Width | Min Period | Max Freq |
 |-------------|-----------|----------|
@@ -766,280 +595,157 @@ Practical max with acceptable granularity remains ~40 kHz.
 
 ### Minimum cmd.ticks
 
-| Mode | Min ticks | Reason |
-|------|-----------|--------|
-| Single-stepper | 80 (5µs) | 200 kHz max, PULSE_WIDTH=64 ticks |
-| Multi-stepper | 128 (8µs) | 2 frames minimum for HIGH+LOW |
+| Mode | Min ticks | Constant | Reason |
+|------|-----------|----------|--------|
+| I2S_DIRECT | 80 (5µs) | `I2S_DIRECT_MIN_SPEED_TICKS` | 200 kHz max, PULSE_WIDTH=32 ticks |
+| I2S_MUX | 400 (25µs) | `I2S_MUX_MIN_SPEED_TICKS` | 40 kHz max, frame-level granularity |
 
-Enforced by `addQueueEntry()`.
+Enforced by `max_speed_in_ticks` per queue.
 
 ---
 
-## API Design
+## StepperQueue Union Layout
 
-### Engine-Level Configuration
-
-```cpp
-// src/FastAccelStepper.h
-
-struct I2sSingleStepperConfig {
-  uint8_t  data_pin;
-  uint8_t  bclk_pin;
-  uint8_t  cpu_core;             // CPU core for I2S fill task (0 or 1)
-  uint16_t pulse_width_ticks;    // Default: 64
-};
-
-struct I2sMultiStepperConfig {
-  uint8_t  data_pin;
-  uint8_t  bclk_pin;
-  uint8_t  ws_pin;
-  uint8_t  signals_per_stepper;  // 1, 2, or 3
-  uint8_t  cpu_core;             // CPU core for I2S fill task (0 or 1)
-  uint16_t pulse_width_ticks;    // Default: 64
-};
-
-bool initI2sSingleStepper(const I2sSingleStepperConfig& cfg);
-bool initI2sMultiStepper(const I2sMultiStepperConfig& cfg);
-```
-
-### Stepper Connection
+The I2S fields share a union with RMT fields in `StepperQueue`:
 
 ```cpp
-// Planned driver type constants for I2S
-// COMPILE-TIME validation with SOC_I2S_NUM
-#if SUPPORT_I2S
-#define DRIVER_RMT_I2S_DIRECT FasDriver::RMT_I2S_DIRECT
-#define DRIVER_RMT_I2S0_MUX   FasDriver::RMT_I2S_MUX
-#endif // SUPPORT_I2S
-
-// Single-stepper mode: uses RMT_I2S_DIRECT driver type
-// No PIN_I2S_FLAG needed for single-stepper mode
-FastAccelStepper* s = engine.stepperConnectToPin(step_pin, DRIVER_RMT_I2S_DIRECT);
-
-// Multi-stepper mode: uses RMT_I2S0_MUX, RMT_I2S1_MUX, or RMT_I2S2_MUX driver type
-// PIN_I2S_FLAG (0x40) indicates I2S-controlled pin
-uint8_t i2s_pin = slot_index | PIN_I2S_FLAG;
-FastAccelStepper* s = engine.stepperConnectToPin(i2s_pin, DRIVER_RMT_I2S0_MUX);
+union {
+#ifdef SUPPORT_ESP32_RMT
+  struct {
+    RMT_CHANNEL_T channel;
+    bool _rmtStopped;
+    bool lastChunkContainsSteps;
+    rmt_encoder_handle_t _tx_encoder;
+    bool _channel_enabled;
+  };
+#endif
+#ifdef SUPPORT_ESP32_I2S
+  struct {
+    struct i2s_fill_state _fill_state;
+    I2sManager* i2s_mgr;
+  };
+#endif
+};
 ```
 
-The driver selection is based on the `FasDriver` enum value passed to `stepperConnectToPin()`.
-For multi-stepper mode, the `PIN_I2S_FLAG` bitmask indicates that the pin number is actually
-a slot index for I2S-controlled output.
+**Important**: Since both `SUPPORT_ESP32_RMT` and `SUPPORT_ESP32_I2S` are defined,
+`_initVars()` must NOT write to RMT-specific union members unconditionally.
+`_rmtStopped = true` is set only in the RMT-specific `init_rmt()` functions,
+not in the shared `_initVars()`.
 
 ---
 
 ## Memory Budget
 
-| Component | Single-Stepper | Multi-Stepper (16×) |
-|-----------|---------------|---------------------|
-| Triple buffer (3 × 500 B) | 1500 bytes | 1500 bytes (shared) |
+| Component | I2S_DIRECT | I2S_MUX (16 steppers) |
+|-----------|-----------|---------------------|
+| DMA buffers (2 × 500 B) | 1000 bytes | 1000 bytes (shared) |
 | DMA descriptors (2×) | ~32 bytes | ~32 bytes |
-| Per-stepper fill state | ~650 bytes × 1 | ~650 bytes × 16 |
-| I2sManager singleton | ~50 bytes | ~50 bytes |
-| **Total** | **~2200 bytes** | **~12000 bytes** |
-
-Per-stepper fill state breakdown:
-- `tick_pos` + remaining ticks: 8 bytes
-- `pulse_positions[3][101]`: 606 bytes
-- `pulse_count[3]`: 3 bytes
-- Padding: ~33 bytes
-
----
-
-## Error Handling
-
-- **`i2s_channel_write()` failure**: Retry once, then log warning. DMA continues
-  with stale buffer content.
-- **DMA underrun** (fill can't keep up): Accepted risk. Log warning. Stale pulses
-  may repeat or silence may occur.
-- **Stepper disconnect while DMA runs**: No-op for I2S driver. Stepper's bit-slots
-  remain zero (no pulses emitted).
-- **`init()` called after DMA started**: Undefined behavior (application bug).
+| Per-stepper fill state | 4 bytes × 1 | 4 bytes × 16 |
+| I2sManager | ~16 bytes | ~16 bytes (shared) |
+| **Total** | **~1050 bytes** | **~1110 bytes** |
 
 ---
 
 ## File Structure
 
-### New Files
+### I2S Files
 
 ```
 src/pd_esp32/
   i2s_constants.h           — I2S timing constants (derived from BLOCK_DURATION_US)
   i2s_manager.h             — I2sManager class declaration
-  i2s_manager.cpp           — I2sManager implementation (DMA, ISR, task)
-  i2s_fill.h                — i2s_fill_state struct, fill_i2s_buffer() declaration
-  i2s_fill.cpp              — fill_i2s_buffer() implementation
-  StepperISR_esp32_i2s.cpp  — StepperQueue I2S methods
-
-extras/tests/pc_based/
-  test_21.cpp               — PC-based test bed for fill function
+  i2s_manager.cpp           — I2sManager implementation (DMA, callback, fill dispatch)
+  i2s_fill.h                — i2s_fill_state struct, fill function declarations
+  i2s_fill.cpp              — i2s_fill_buffer() (I2S_DIRECT) implementation
+  StepperISR_esp32_i2s.cpp  — StepperQueue I2S methods (init, start, stop, fill dispatch)
 ```
 
 ### Modified Files
 
 ```
-src/fas_arch/common.h               — add I2S to FasDriver enum
-src/fas_arch/common_esp32_idf5.h    — add SUPPORT_ESP32_I2S, QUEUES_I2S
-src/pd_esp32/esp32_queue.h          — add I2S-specific members
-src/pd_esp32/esp32_queue.cpp        — add I2S dispatch branches
-src/FastAccelStepper.h              — add I2S config structs
-src/FastAccelStepper.cpp            — implement initI2sXxx()
+src/fas_arch/common.h               — I2S_DIRECT/I2S_MUX in FasDriver enum
+src/fas_arch/common_esp32.h         — QUEUES_I2S_MUX, QUEUES_I2S_DIRECT, PIN_I2S_FLAG
+src/fas_arch/common_esp32_idf5.h    — SUPPORT_ESP32_I2S conditional on SOC_I2S_NUM
+src/pd_esp32/esp32_queue.h          — I2S union members, static MUX manager
+src/pd_esp32/esp32_queue.cpp        — I2S dispatch, tryAllocateQueue(), initI2sMux()
+src/FastAccelStepperEngine.h        — initI2sMux() declaration
+```
+
+### Test Files
+
+```
+extras/tests/pc_based/
+  test_21.cpp               — PC-based tests for I2S_DIRECT fill function
 ```
 
 ---
 
 ## Testing Strategy
 
-### PC-Based Tests (test_21.cpp) ✅ COMPLETE
+### PC-Based Tests (test_21.cpp) ✅ I2S_DIRECT Complete
 
 The fill function is testable on PC without I2S hardware. `test_21.cpp` provides:
 
-- **Part 1**: DMA infrastructure simulation (callbacks, block rotation, bit stream
-  analysis via `BitStreamAnalyzer`)
-- **Part 2**: Fill function tests with queue commands (single step, multi step,
+- DMA infrastructure simulation (callbacks, block rotation, bit stream analysis)
+- Fill function tests with queue commands (single step, multi step,
   pause, block boundary, carry-over, max values)
-- **28 comprehensive tests** covering edge cases and boundary conditions
+- Comprehensive edge case coverage
 
-**Recent Fix**: Tests incorrectly used `fillAndDetectPulses()` return value to check
-if queue was consumed. Fixed to use `q.read_idx == q.next_write_idx` instead.
+### Future Test Needs — I2S_MUX
 
-### Test Coverage
+- MUX fill: frame-level bit placement for single stepper
+- Multi-stepper shared buffer: different slots, no interference
+- DIR/ENABLE bitmask: correct polarity, static across block
+- Slot allocation: validation of PIN_I2S_FLAG, reject DIR/ENABLE slots
+- Hardware validation: logic analyzer on DATA_OUT/BCLK/WS
+- End-to-end: 74HC595 chain + PCNT step count verification
 
-| Test Category | Count | Status |
-|---------------|-------|--------|
-| DMA callback infrastructure | 6 | ✅ |
-| Fill function basic | 12 | ✅ |
-| Fill function edge cases | 10 | ✅ |
-| **Total** | **28** | **✅** |
+---
 
-### Test Categories:
-1. **DMA Infrastructure**: Callback invocation, block rotation, buffer clearing
-2. **Basic Fill**: Single/multi steps, pauses, step+pause+step sequences
-3. **Block Boundaries**: Partial fills, carry-over ticks, exact boundaries
-4. **Edge Cases**: Empty queue, min speed, max steps (255), long pauses
-5. **Maximum Values**: 65535 ticks, max pause, consecutive partial steps
+## I2S_MUX Implementation Plan
 
-### Future Test Needs
-- Multi-stepper shared buffer tests (different slots, no interference)
-- ForceStop tests with DMA control
-- Per-stepper bit clearing verification (no memset)
-- Hardware validation tests (PCNT, logic analyzer)
+### Phase 1: Engine Initialization
 
-### Stage 1 — Single-Stepper Mode, PCNT Validation
+1. Add `initI2sMux()` to `FastAccelStepperEngine`
+2. Add static members to `StepperQueue`: `_i2s_mux_manager`, DIR/ENABLE bitmasks
+3. `initI2sMux()` creates shared `I2sManager` with WS pin, stores bitmasks,
+   sets `_i2s_mux_initialized = true`
 
-Hardware: I2S DATA_OUT → PCNT input + oscilloscope
+### Phase 2: Queue Allocation
 
-Tests:
-- Verify step count matches commanded steps
-- Test max frequency (~200 kHz)
-- Verify pulse width timing
-- Verify `i2s_channel_write()` zero-copy behavior (see §Verification Sketch)
+1. Extend `tryAllocateQueue()` for `DRIVER_I2S_MUX`:
+   - Validate slot not in DIR/ENABLE bitmasks
+   - Validate slot not already allocated (`_i2s_mux_allocated_bitmask`)
+   - Set `q->i2s_mgr = StepperQueue::_i2s_mux_manager`
+   - Set `q->_i2s_mux_slot` to slot index
+   - Set `max_speed_in_ticks = I2S_MUX_MIN_SPEED_TICKS`
+2. Store slot's precomputed `byte_offset` and `bit_mask` for fast fill
 
-### Stage 2 — Multi-Stepper Mode, Logic Analyzer
+### Phase 3: MUX Fill Algorithm
 
-Hardware: I2S DATA_OUT, BCLK, WS → logic analyzer
+1. Implement `i2s_fill_buffer_mux()` as separate optimized function
+2. Frame-level iteration: one bit per frame per stepper
+3. OR bits into shared buffer (`buf[offset] |= mask`)
+4. Set DIR/ENABLE bits statically for entire block
+5. `StepperQueue::fill_i2s_buffer()` dispatches to correct fill function
 
-Tests:
-- Decode I2S stream, verify bit-slot timing
-- Verify multiple steppers interleaved correctly
-- Verify DIR/ENABLE bit stability during STEP pulses
+### Phase 4: Testing & Validation
 
-### Stage 3 — Multi-Stepper Mode, 74HC595 + PCNT
-
-Hardware: Full demux chain → PCNT
-
-Tests:
-- End-to-end step count validation
-- Multiple simultaneous steppers
-
-### Verification Sketch: i2s_channel_write() Zero-Copy
-
-Create a minimal Arduino sketch:
-1. Init I2S with 2 DMA descriptors
-2. Write 3 rotating buffers via `i2s_channel_write(blocking)`
-3. Modify a buffer after write returns and before the next write
-4. Observe on logic analyzer whether the modification appears in output
-
-If modification appears → zero-copy confirmed. If not → copy semantics,
-and direct DMA descriptor approach should be reconsidered.
+1. PC-based tests for MUX fill in `test_21.cpp`
+2. Hardware validation with logic analyzer
+3. End-to-end test with 74HC595 + PCNT
 
 ---
 
 ## Known Limitations
 
-### Current Implementation (Single-Stepper Only)
-
-| Aspect | Current | Future (Multi-Stepper) |
-|--------|---------|------------------------|
+| Aspect | I2S_DIRECT | I2S_MUX |
+|--------|-----------|---------|
 | Max frequency | ~200 kHz | ~40 kHz (granularity) |
 | Resolution | 2 ticks (125 ns) | 64 ticks (4 µs) |
-| Steppers per I2S | 1 | Up to 16 |
+| Steppers per I2S | 1 | Up to 32 |
 | External hardware | None | Demux IC required |
-| ForceStop | Basic (no DMA control) | DMA stop + restart |
-| Buffer clearing | memset | Per-stepper bit tracking |
-| Pulse width | Fixed 64 ticks | Configurable |
+| Pulse width | Fixed 32 ticks | Fixed 64 ticks (1 frame) |
 | WS pin | Unused | Required for demux |
-
-### Implementation Gaps
-
-1. **Multi-stepper mode not implemented**: Single-stepper only
-2. **No per-stepper bit tracking**: Uses memset for simplicity
-3. **Fixed pulse width**: 64 ticks (4µs), not configurable
-4. **Simple forceStop**: Doesn't stop DMA or clear buffer
-5. **No WS pin support**: Hardcoded to `I2S_GPIO_UNUSED`
-6. **No hardware validation**: PC-based tests only
-
-### Design vs Implementation Differences
-
-| Design Specification | Current Implementation |
-|----------------------|------------------------|
-| Triple buffering (3 blocks) | Double buffering (2 blocks) |
-| ISR + FreeRTOS task | ISR-only |
-| Per-stepper bit tracking | memset clearing |
-| Configurable pulse width | Fixed 64 ticks |
-| Multi-stepper support | Single-stepper only |
-| ForceStop with DMA control | Basic forceStop |
-
----
-
-## Open Items & Future Work
-
-### High Priority
-1. **Multi-stepper mode implementation**: Slot allocation, bit-slot mapping, shared buffer
-2. **Per-stepper bit tracking**: Replace memset with targeted bit clearing
-3. **Enhanced forceStop**: Stop DMA, clear buffer, restart DMA
-4. **Hardware validation**: PCNT tests, logic analyzer verification
-
-### Medium Priority
-5. **Configurable pulse width**: `setI2sPulseWidth(ticks)` API
-6. **WS pin support**: Required for multi-stepper demux IC
-7. **Engine API expansion**: `initI2sMultiStepper()` with configuration struct
-8. **DIR/ENABLE service functions**: For multi-stepper signal control
-
-### Low Priority
-9. **8-bit mode**: Halve frame duration (32 ticks/frame) for higher multi-stepper resolution
-10. **Triple buffering**: Upgrade from double to triple buffering (3 blocks)
-11. **ISR + Task architecture**: For multi-stepper with many steppers
-12. **Zero-copy verification**: Verify `i2s_channel_write()` doesn't copy buffers
-
-### Implementation Plan
-
-**Phase 1 (Core)**: Multi-stepper foundation
-- Expand `i2s_fill_state` with `tick_pos` and `pulse_positions`
-- Implement per-stepper bit tracking (no memset)
-- Add slot allocation and bit-slot mapping
-
-**Phase 2 (Features)**: Multi-stepper functionality
-- Implement `initI2sMultiStepper()` API
-- Add WS pin support for demux IC
-- Implement DIR/ENABLE service functions
-
-**Phase 3 (Polish)**: Enhancements
-- Configurable pulse width
-- Enhanced forceStop with DMA control
-- Hardware validation tests
-
-**Phase 4 (Optimization)**: Performance
-- Triple buffering (3 blocks)
-- ISR + Task architecture if needed
-- Zero-copy verification and optimization
+| Min speed ticks | 80 | 400 |
