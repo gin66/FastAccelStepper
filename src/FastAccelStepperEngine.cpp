@@ -37,24 +37,6 @@ void FastAccelStepperEngine::init() {
 }
 #endif
 
-#if defined(SUPPORT_ESP32_I2S)
-#include "pd_esp32/i2s_manager.h"
-#include "pd_esp32/i2s_constants.h"
-
-bool FastAccelStepperEngine::initI2sSingleStepper(
-    const I2sSingleStepperConfig& cfg) {
-  I2sManager& mgr = I2sManager::instance();
-  if (!mgr.init(cfg.data_pin, cfg.bclk_pin, -1)) {
-    return false;
-  }
-  return mgr.startDma();
-}
-
-bool FastAccelStepperEngine::isI2sInitialized() const {
-  return I2sManager::instance().isInitialized();
-}
-#endif
-
 void FastAccelStepperEngine::setExternalCallForPin(
     bool (*func)(uint8_t pin, uint8_t value)) {
   _externalCallForPin = func;
@@ -81,7 +63,8 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
 // dynamic allocation is currently only supported for esp32
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, FasDriver driver_type) {
-  return NULL;
+  StepperQueue* q = StepperQueue::tryAllocateQueue(driver_type, step_pin);
+  return nullptr;
 }
 #else
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
@@ -95,15 +78,15 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     FastAccelStepper* s = _stepper[i];
     if (s) {
       if (s->getStepPin() == step_pin) {
-        return NULL;
+        return nullptr;
       }
     }
   }
   if (_stepper_cnt >= MAX_STEPPER) {
-    return NULL;
+    return nullptr;
   }
   if (!StepperQueue::isValidStepPin(step_pin)) {
-    return NULL;
+    return nullptr;
   }
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   uint8_t queue_from = 0;

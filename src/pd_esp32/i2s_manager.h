@@ -8,10 +8,8 @@
 
 class I2sManager {
  public:
-  static I2sManager& instance();
-
-  bool init(int data_pin, int bclk_pin, int ws_pin);
-  bool isInitialized() const { return _initialized; }
+  static I2sManager* create(gpio_num_t data_pin, gpio_num_t bclk_pin,
+                            gpio_num_t ws_pin);
 
   bool startDma();
   bool isDmaStarted() const { return _dma_started; }
@@ -23,10 +21,9 @@ class I2sManager {
 
  private:
   I2sManager() {}
-  bool _initialized = false;
+  bool init();
   bool _dma_started = false;
   i2s_chan_handle_t _chan = nullptr;
-  uint8_t _bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
   uint8_t _dma_block = 0;
 };
 

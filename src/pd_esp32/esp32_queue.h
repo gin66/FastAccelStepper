@@ -6,6 +6,7 @@
 
 #if defined(SUPPORT_ESP32_I2S)
 #include "pd_esp32/i2s_fill.h"
+#include "pd_esp32/i2s_manager.h"
 #endif
 
 class StepperQueue : public StepperQueueBase {
@@ -15,29 +16,28 @@ class StepperQueue : public StepperQueueBase {
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 #error "SUPPORT_SELECT_DRIVER_TYPE is supported for esp32"
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
-  static FasDriver tryAllocateDriver(FasDriver driver);
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  static uint8_t _mcpwm_pcnt_allocated;
-#endif
+
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
+// dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
+static uint8_t queues_allocated;
 #ifdef SUPPORT_ESP32_RMT
   static uint8_t _rmt_allocated;
 #endif
 #if defined(SUPPORT_ESP32_I2S)
-  static uint8_t _i2s0_mode;
-#if SOC_I2S_NUM >= 2
-  static uint8_t _i2s1_mode;
+  static bool _i2s_mux_initialized;
+  static uint32_t _i2s_mux_allocated_bitmask;
 #endif
-#if SOC_I2S_NUM >= 3
-  static uint8_t _i2s2_mode;
+static void initVars() {
+  StepperQueue::queues_allocated = 0;
+  #ifdef SUPPORT_ESP32_RMT
+  StepperQueue::_rmt_allocated = 0;
 #endif
-  static uint32_t _i2s0_mux_allocated_bitmask;
-#if SOC_I2S_NUM >= 2
-  static uint32_t _i2s1_mux_allocated_bitmask;
+#if defined(SUPPORT_ESP32_I2S)
+  StepperQueue::_i2s_mux_initialized = false;
+  StepperQueue::_i2s_mux_allocated_bitmask = 0;
 #endif
-#if SOC_I2S_NUM >= 3
-  static uint32_t _i2s2_mux_allocated_bitmask;
+}
 #endif
-#endif  // SUPPORT_ESP32_I2S
 
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
@@ -73,6 +73,7 @@ class StepperQueue : public StepperQueueBase {
       bool use_i2s;
       int8_t _i2s_step_slot;
       struct i2s_fill_state _fill_state;
+      I2sManager* i2s_mgr_direct;
     };
 #endif
   };

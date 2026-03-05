@@ -14,17 +14,9 @@ static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
   return false;
 }
 
-I2sManager& I2sManager::instance() {
-  static I2sManager mgr;
-  return mgr;
-}
-
-bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
-  if (_initialized) {
-    return true;
-  }
-
-  Serial.printf("I2S init: data=%d, bclk=%d, ws=%d\n", data_pin, bclk_pin,
+I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
+                               gpio_num_t ws_pin) {
+  Serial.printf("I2S create: data=%d, bclk=%d, ws=%d\n", data_pin, bclk_pin,
                 ws_pin);
 
   i2s_chan_config_t chan_cfg =
@@ -33,21 +25,22 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
   chan_cfg.dma_frame_num = I2S_DMA_FRAME_NUM;
   chan_cfg.auto_clear = false;
 
-  esp_err_t rc = i2s_new_channel(&chan_cfg, &_chan, NULL);
+  i2s_chan_handle_t chan = nullptr;
+  esp_err_t rc = i2s_new_channel(&chan_cfg, &chan, NULL);
   if (rc != ESP_OK) {
-    return false;
+    return nullptr;
   }
 
   i2s_std_config_t std_cfg = {
       .clk_cfg = {.sample_rate_hz = I2S_SAMPLE_RATE_HZ,
                   .clk_src = I2S_CLK_SRC_DEFAULT,
-                  .mclk_multiple = I2S_MCLK_MULTIPLE_128},  // lowest multiplier
+                  .mclk_multiple = I2S_MCLK_MULTIPLE_128},
       .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                   I2S_SLOT_MODE_STEREO),
       .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,
-                   .bclk = (gpio_num_t)bclk_pin,
-                   .ws = I2S_GPIO_UNUSED,
-                   .dout = (gpio_num_t)data_pin,
+                   .bclk = bclk_pin,
+                   .ws = ws_pin,
+                   .dout = data_pin,
                    .din = I2S_GPIO_UNUSED,
                    .invert_flags =
                        {
@@ -57,32 +50,38 @@ bool I2sManager::init(int data_pin, int bclk_pin, int ws_pin) {
                        }},
   };
 
-  rc = i2s_channel_init_std_mode(_chan, &std_cfg);
+  rc = i2s_channel_init_std_mode(chan, &std_cfg);
   if (rc != ESP_OK) {
-    i2s_del_channel(_chan);
-    _chan = nullptr;
-    return false;
+    i2s_del_channel(chan);
+    return nullptr;
   }
 
+  I2sManager* mgr = new I2sManager();
+  mgr->_chan = chan;
+  if (!mgr->init()) {
+    i2s_del_channel(mgr->_chan);
+    mgr->_chan = nullptr;
+    delete mgr;
+    return nullptr;
+  }
+  mgr->startDma();
+  return mgr;
+}
+
+bool I2sManager::init() {
   i2s_event_callbacks_t cbs = {};
   cbs.on_sent = i2s_tx_done_callback;
-  rc = i2s_channel_register_event_callback(_chan, &cbs, this);
+  esp_err_t rc = i2s_channel_register_event_callback(_chan, &cbs, this);
   if (rc != ESP_OK) {
-    i2s_del_channel(_chan);
-    _chan = nullptr;
     return false;
   }
 
-  for (int i = 0; i < I2S_BLOCK_COUNT; i++) {
-    memset(_bufs[i], 0, I2S_BYTES_PER_BLOCK);
-  }
   _dma_block = 0;
-  _initialized = true;
   return true;
 }
 
 bool I2sManager::startDma() {
-  if (!_initialized || _dma_started) {
+  if (_dma_started) {
     return _dma_started;
   }
   Serial.printf("I2S startDma: enabling channel\n");
@@ -101,6 +100,7 @@ bool I2sManager::startDma() {
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
   _callback_count++;
 
+  // clear the buffer for the next round
   memset(buf, 0, I2S_BYTES_PER_BLOCK);
 
   for (uint8_t i = 0; i < QUEUES_I2S; i++) {

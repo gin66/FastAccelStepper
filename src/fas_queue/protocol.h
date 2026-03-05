@@ -12,8 +12,7 @@
 // No includes in this file - types are provided by the including class.
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-static FasDriver selectAvailableDriverForPin(uint8_t step_pin,
-                                             FasDriver preferred_driver);
+static StepperQueue* tryAllocateQueue(FasDriver driver, uint8_t step_pin);
 #endif
 
 static bool isValidStepPin(uint8_t step_pin);

@@ -75,10 +75,7 @@
 #define SUPPORT_TASK_RATE_CHANGE
 
 #if defined(SUPPORT_ESP32_I2S)
-#define PIN_I2S0_FLAG 0x40  // Bitmask for I2S-controlled pins I2S0
-#if SOC_I2S_NUM >= 2
-#define PIN_I2S1_FLAG 0x60  // Bitmask for I2S-controlled pins I2S1
-#endif
+#define PIN_I2S_FLAG 0x40  // Bitmask for I2S-controlled pins
 #endif
 
 #define LL_TOGGLE_PIN(dirPin)                  \

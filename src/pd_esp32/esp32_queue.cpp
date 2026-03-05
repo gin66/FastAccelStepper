@@ -6,36 +6,21 @@
 #if defined(SUPPORT_ESP32)
 #include <Arduino.h>
 
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
+uint8_t StepperQueue::queues_allocated = 0;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_ESP32_I2S)
-#define I2S_MODE_FREE 0
-#define I2S_MODE_DIRECT 1
-#define I2S_MODE_MUX 2
+bool StepperQueue::_i2s_mux_initialized = false;
+uint32_t StepperQueue::_i2s_mux_allocated_bitmask = 0;
 #endif
-
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 uint8_t StepperQueue::_mcpwm_pcnt_allocated = 0;
 #endif
 #ifdef SUPPORT_ESP32_RMT
 uint8_t StepperQueue::_rmt_allocated = 0;
 #endif
-#if defined(SUPPORT_ESP32_I2S)
-uint8_t StepperQueue::_i2s0_mode = I2S_MODE_FREE;
-#if SOC_I2S_NUM >= 2
-uint8_t StepperQueue::_i2s1_mode = I2S_MODE_FREE;
-#endif
-#if SOC_I2S_NUM >= 3
-uint8_t StepperQueue::_i2s2_mode = I2S_MODE_FREE;
-#endif
-uint32_t StepperQueue::_i2s0_mux_allocated_bitmask = 0;
-#if SOC_I2S_NUM >= 2
-uint32_t StepperQueue::_i2s1_mux_allocated_bitmask = 0;
-#endif
-#if SOC_I2S_NUM >= 3
-uint32_t StepperQueue::_i2s2_mux_allocated_bitmask = 0;
-#endif
-#endif  // SUPPORT_ESP32_I2S
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
+#endif
 
 bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
                         uint8_t step_pin) {
@@ -186,96 +171,72 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
   return res == ESP_OK;
 }
 
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-
-FasDriver StepperQueue::tryAllocateDriver(FasDriver driver) {
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  if (driver == FasDriver::MCPWM_PCNT) {
-    if (_mcpwm_pcnt_allocated < QUEUES_MCPWM_PCNT) {
-      return FasDriver::MCPWM_PCNT;
-    }
-  }
-#endif
-
-#ifdef SUPPORT_ESP32_RMT
-  if (driver == FasDriver::RMT) {
-    if (_rmt_allocated < QUEUES_RMT) {
-      return FasDriver::RMT;
-    }
-  }
-#endif
-
-#if defined(SUPPORT_ESP32_I2S)
-  if (driver == FasDriver::I2S_DIRECT) {
-    if (_i2s0_mode == I2S_MODE_FREE) return FasDriver::I2S_DIRECT;
-#if SOC_I2S_NUM >= 2
-    if (_i2s1_mode == I2S_MODE_FREE) return FasDriver::I2S_DIRECT;
-#endif
-#if SOC_I2S_NUM >= 3
-    if (_i2s2_mode == I2S_MODE_FREE) return FasDriver::I2S_DIRECT;
-#endif
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_DYNAMIC_ALLOCATION)
+// dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
+StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
+                                             uint8_t step_pin) {
+  if (StepperQueue::queues_allocated >= MAX_STEPPER) {
+    return nullptr;
   }
 
-  if (driver == FasDriver::I2S_MUX) {
-    if (_i2s0_mode == I2S_MODE_MUX &&
-        _i2s0_mux_allocated_bitmask != 0xFFFFFFFF) {
-      return FasDriver::I2S_MUX;
-    }
-#if SOC_I2S_NUM >= 2
-    if (_i2s1_mode == I2S_MODE_MUX &&
-        _i2s1_mux_allocated_bitmask != 0xFFFFFFFF) {
-      return FasDriver::I2S_MUX;
-    }
-#endif
-#if SOC_I2S_NUM >= 3
-    if (_i2s2_mode == I2S_MODE_MUX &&
-        _i2s2_mux_allocated_bitmask != 0xFFFFFFFF) {
-      return FasDriver::I2S_MUX;
-    }
-#endif
+  if (step_pin & PIN_EXTERNAL_FLAG) {
+    return nullptr;
   }
-#endif  // SUPPORT_ESP32_I2S
+  if (step_pin & PIN_I2S_FLAG) {
+    #if !defined(SUPPORT_ESP32_I2S)
+    return nullptr;
+    #endif
+    if (!StepperQueue::_i2s_mux_initialized) {
+      return nullptr;
+    }
+    uint32_t bit = 1UL << (step_pin & 0x1F);
+    if (StepperQueue::_i2s_mux_allocated_bitmask & bit) {
+      return nullptr;
+    }
+    StepperQueue::_i2s_mux_allocated_bitmask |= bit;
+    StepperQueue* q = new StepperQueue();
+    q->use_i2s = true;
+    return q;
+  }
 
-  return FasDriver::DONT_CARE;
+  if (!StepperQueue::isValidStepPin(step_pin)) {
+    return nullptr;
+  }
+  
+  #if defined(SUPPORT_ESP32_RMT)
+  if (driver == DRIVER_RMT) {
+    if (StepperQueue::_rmt_allocated >= QUEUES_RMT) {
+      return nullptr;
+    }
+    StepperQueue* q = new StepperQueue();
+    q->use_rmt = true;
+    StepperQueue::_rmt_allocated++;
+    return q;
+  }
+  #endif
+  #if defined(SUPPORT_ESP32_I2S)
+  if (driver == DRIVER_I2S_DIRECT) {
+    I2sManager* mgr = I2sManager::create((gpio_num_t)step_pin, I2S_GPIO_UNUSED, I2S_GPIO_UNUSED);
+    if (mgr != nullptr) {
+      StepperQueue* q = new StepperQueue();
+      q->use_i2s = true;
+      q->i2s_mgr_direct = mgr;
+      return q;
+    }
+  }
+  #endif
+
+  // Just use the next possible one
+  if (driver != DRIVER_DONT_CARE) {
+    return nullptr;
+  }
+  StepperQueue* q = tryAllocateQueue(DRIVER_RMT, step_pin);
+  if (q == nullptr) {
+    q = tryAllocateQueue(DRIVER_I2S_DIRECT, step_pin);
+  }
+  return q;
 }
-
-FasDriver StepperQueue::selectAvailableDriverForPin(
-    uint8_t step_pin, FasDriver preferred_driver) {
-  if (!isValidStepPin(step_pin)) {
-    return FasDriver::DONT_CARE;
-  }
-
-#if defined(SUPPORT_ESP32_I2S)
-  if (step_pin & PIN_I2S0_FLAG) {
-    return tryAllocateDriver(FasDriver::I2S_MUX);
-  }
-#endif
-
-  if (preferred_driver != FasDriver::DONT_CARE) {
-    FasDriver result = tryAllocateDriver(preferred_driver);
-    if (result != FasDriver::DONT_CARE) {
-      return result;
-    }
-    return FasDriver::DONT_CARE;
-  }
-
-#ifdef SUPPORT_ESP32_RMT
-  FasDriver result = tryAllocateDriver(FasDriver::RMT);
-  if (result != FasDriver::DONT_CARE) return result;
-#endif
-
-#if defined(SUPPORT_ESP32_I2S)
-  result = tryAllocateDriver(FasDriver::I2S_DIRECT);
-  if (result != FasDriver::DONT_CARE) return result;
-
-  result = tryAllocateDriver(FasDriver::I2S_MUX);
-  if (result != FasDriver::DONT_CARE) return result;
-#endif
-
-  return FasDriver::DONT_CARE;
-}
-
-#endif  // SUPPORT_SELECT_DRIVER_TYPE
+#endif  // SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
 
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
@@ -283,14 +244,6 @@ void StepperTask(void* parameter) {
     engine->manageSteppers();
 #if ESP_IDF_VERSION_MAJOR == 4
     esp_task_wdt_reset();
-#endif
-#ifdef SUPPORT_ESP32_I2S
-    {
-      I2sManager& mgr = I2sManager::instance();
-      if (mgr.isInitialized() && !mgr.isDmaStarted()) {
-        mgr.startDma();
-      }
-    }
 #endif
     const TickType_t delay_time =
         (engine->_delay_ms + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;

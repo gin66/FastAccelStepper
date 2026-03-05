@@ -12,11 +12,6 @@ bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
   _fill_state = {};
   _isRunning = false;
 
-  I2sManager& mgr = I2sManager::instance();
-  if (!mgr.isInitialized()) {
-    return false;
-  }
-
   max_speed_in_ticks = I2S_MIN_SPEED_TICKS;
   return true;
 }

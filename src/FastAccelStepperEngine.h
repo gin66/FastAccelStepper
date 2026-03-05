@@ -35,17 +35,6 @@ class FastAccelStepperEngine {
   void setExternalCallForPin(bool (*func)(uint8_t pin, uint8_t value));
   void setDebugLed(uint8_t ledPin);
 
-#if defined(SUPPORT_ESP32_I2S)
-  struct I2sSingleStepperConfig {
-    uint8_t data_pin;
-    uint8_t bclk_pin;
-    uint8_t cpu_core;
-    uint16_t pulse_width_ticks;
-  };
-  bool initI2sSingleStepper(const I2sSingleStepperConfig& cfg);
-  bool isI2sInitialized() const;
-#endif
-
   void manageSteppers();
 
  private:
