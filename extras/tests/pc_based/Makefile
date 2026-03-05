@@ -18,11 +18,11 @@ ramp_helper: ramp_helper.o $(LIB_O)
 ramp_helper.o: ramp_helper.cpp $(SRC_LIB_H) stubs.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
-LIB_H=FastAccelStepper.h log2/Log2Representation.h log2/Log2RepresentationConst.h \
+LIB_H=FastAccelStepper.h FastAccelStepperEngine.h log2/Log2Representation.h log2/Log2RepresentationConst.h \
 	  fas_queue/stepper_queue.h fas_queue/queue.h fas_queue/base.h \
 	  fas_ramp/RampGenerator.h fas_ramp/RampControl.h fas_ramp/RampCalculator.h \
 	  fas_arch/common.h pd_test/test_queue.h
-LIB_O=FastAccelStepper.o Log2Representation.o StepperISR_test.o \
+LIB_O=FastAccelStepper.o FastAccelStepperEngine.o Log2Representation.o StepperISR_test.o \
 	  RampGenerator.o RampControl.o RampCalculator.o stepper_queue.o
 
 SRC_LIB_H=$(addprefix $(PRJ_ROOT)/src/,$(LIB_H))
@@ -46,6 +46,9 @@ rmc_test: rmc_test.o Log2Representation.o RampCalculator.o
 rmc_test.o: rmc_test.cpp $(PRJ_ROOT)/src/log2/Log2Representation.h $(PRJ_ROOT)/src/fas_ramp/RampCalculator.h stubs.h test_03.h
 
 FastAccelStepper.o: $(PRJ_ROOT)/src/FastAccelStepper.cpp $(SRC_LIB_H)
+	$(COMPILE.cpp) $< -o $@
+
+FastAccelStepperEngine.o: $(PRJ_ROOT)/src/FastAccelStepperEngine.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 Log2Representation.o: $(PRJ_ROOT)/src/log2/Log2Representation.cpp $(PRJ_ROOT)/src/log2/Log2Representation.h
