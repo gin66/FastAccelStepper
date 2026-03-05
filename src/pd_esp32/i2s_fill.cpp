@@ -55,6 +55,7 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
 #endif
       if (local_state.remaining_low_ticks < ticks_in_block) {
         bit_pos += local_state.remaining_low_ticks / ticks_per_bit;
+        local_state.off_ticks = local_state.remaining_low_ticks % ticks_per_bit;
         local_state.remaining_low_ticks = 0;
       } else {
         local_state.remaining_low_ticks -= ticks_in_block;
@@ -75,6 +76,10 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
     }
     uint8_t steps = e->steps;
     local_state.remaining_low_ticks = e->ticks;
+    if (local_state.remaining_low_ticks < 65535-ticks_per_bit) {
+      local_state.remaining_low_ticks += local_state.off_ticks;
+      local_state.off_ticks = 0;
+    }
     if (steps > 0) {
       local_state.remaining_low_ticks -= I2S_DEFAULT_PULSE_WIDTH_TICKS;
       local_state.remaining_high_ticks = I2S_DEFAULT_PULSE_WIDTH_TICKS;

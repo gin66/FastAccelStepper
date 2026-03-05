@@ -35,6 +35,7 @@ static void initVars() {
   #if defined(SUPPORT_ESP32_I2S)
     StepperQueue::_i2s_mux_initialized = false;
     StepperQueue::_i2s_mux_allocated_bitmask = 0;
+    _fill_state = {0,0,0};
   #endif
 }
 #endif
