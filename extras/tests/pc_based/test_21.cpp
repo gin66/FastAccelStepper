@@ -387,17 +387,15 @@ static bool fillAndDetectPulses(StepperQueueBase* q, uint8_t num_blocks,
 static uint32_t countPulsesInBuffer(const uint8_t* buf) {
   uint32_t count = 0;
   bool last_bit = false;
-  for (uint16_t f = 0; f < I2S_FRAMES_PER_BLOCK; f++) {
-    for (int8_t b = 0; b < 4; b++) {
-      uint8_t byte = buf[f * I2S_BYTES_PER_FRAME + b];
-      for (int8_t bit = 7; bit >= 0; bit--) {
-        bool current = (byte >> bit) & 1;
-        if (current && !last_bit) {
-          count++;
-        }
-        last_bit = current;
-      }
+  uint16_t total_bits = I2S_FRAMES_PER_BLOCK * I2S_BITS_PER_FRAME;
+  for (uint16_t bit_pos = 0; bit_pos < total_bits; bit_pos++) {
+    uint16_t byte_pos = (bit_pos >> 3) ^ 1;
+    uint8_t bit_offset = bit_pos & 7;
+    bool current = (buf[byte_pos] >> (7 - bit_offset)) & 1;
+    if (current && !last_bit) {
+      count++;
     }
+    last_bit = current;
   }
   return count;
 }
@@ -975,15 +973,16 @@ static uint32_t detectPulsePositions(const uint8_t* buf, uint32_t buf_size,
                                      uint32_t* positions) {
   uint32_t count = 0;
   uint8_t prev_bit = 0;
+  uint32_t total_bits = buf_size * 8;
 
-  for (uint32_t i = 0; i < buf_size; i++) {
-    for (int8_t bit = 7; bit >= 0; bit--) {
-      uint8_t curr_bit = (buf[i] >> bit) & 1;
-      if (curr_bit == 1 && prev_bit == 0) {
-        positions[count++] = i * 8 + (7 - bit);
-      }
-      prev_bit = curr_bit;
+  for (uint32_t bit_pos = 0; bit_pos < total_bits; bit_pos++) {
+    uint32_t byte_pos = (bit_pos >> 3) ^ 1;
+    uint8_t bit_offset = bit_pos & 7;
+    uint8_t curr_bit = (buf[byte_pos] >> (7 - bit_offset)) & 1;
+    if (curr_bit == 1 && prev_bit == 0) {
+      positions[count++] = bit_pos;
     }
+    prev_bit = curr_bit;
   }
   return count;
 }

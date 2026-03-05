@@ -28,6 +28,8 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
       printf("  Writing pulse at tick_pos=%u remaining_ticks=%u bit_pos=%u\n",
              tick_pos, state->remaining_high_ticks, bit_pos);
 #endif
+      // Byte order in I2S buffer is little-endian, but bits are sent MSB first,
+      // so we need to XOR the byte index with 1.
       buf[(bit_pos >> 3)^1] |= (0x80 >> (bit_pos & 7));
       if (state->remaining_high_ticks >= ticks_per_bit) {
         state->remaining_high_ticks -= ticks_per_bit;
