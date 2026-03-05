@@ -51,14 +51,14 @@ static void initVars() {
 #ifdef SUPPORT_ESP32_I2S
       bool use_i2s;
 #endif
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+      bool use_mcpwm_pcnt;
+#endif
 
   // module specific variables
   union {
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-    struct {
-      bool use_mcpwm_pcnt;
-      const void* driver_data;
-    };
+    const void* driver_data;
 #endif
 #ifdef SUPPORT_ESP32_RMT
     struct {
@@ -75,6 +75,7 @@ static void initVars() {
 #endif
 #ifdef SUPPORT_ESP32_I2S
     struct {
+      int8_t _i2s_step_slot; // TODO: only works if this variable is defined 
       struct i2s_fill_state _fill_state;
       I2sManager* i2s_mgr;
     };
