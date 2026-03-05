@@ -27,12 +27,12 @@ uint8_t StepperQueue::_i2s1_mode = I2S_MODE_FREE;
 #if SOC_I2S_NUM >= 3
 uint8_t StepperQueue::_i2s2_mode = I2S_MODE_FREE;
 #endif
-uint32_t StepperQueue::_i2s0_mux_allocated = 0;
+uint32_t StepperQueue::_i2s0_mux_allocated_bitmask = 0;
 #if SOC_I2S_NUM >= 2
-uint32_t StepperQueue::_i2s1_mux_allocated = 0;
+uint32_t StepperQueue::_i2s1_mux_allocated_bitmask = 0;
 #endif
 #if SOC_I2S_NUM >= 3
-uint32_t StepperQueue::_i2s2_mux_allocated = 0;
+uint32_t StepperQueue::_i2s2_mux_allocated_bitmask = 0;
 #endif
 #endif  // SUPPORT_ESP32_I2S
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
@@ -217,16 +217,19 @@ FasDriver StepperQueue::tryAllocateDriver(FasDriver driver) {
   }
 
   if (driver == FasDriver::I2S_MUX) {
-    if (_i2s0_mode == I2S_MODE_MUX && _i2s0_mux_allocated != 0xFFFFFFFF) {
+    if (_i2s0_mode == I2S_MODE_MUX &&
+        _i2s0_mux_allocated_bitmask != 0xFFFFFFFF) {
       return FasDriver::I2S_MUX;
     }
 #if SOC_I2S_NUM >= 2
-    if (_i2s1_mode == I2S_MODE_MUX && _i2s1_mux_allocated != 0xFFFFFFFF) {
+    if (_i2s1_mode == I2S_MODE_MUX &&
+        _i2s1_mux_allocated_bitmask != 0xFFFFFFFF) {
       return FasDriver::I2S_MUX;
     }
 #endif
 #if SOC_I2S_NUM >= 3
-    if (_i2s2_mode == I2S_MODE_MUX && _i2s2_mux_allocated != 0xFFFFFFFF) {
+    if (_i2s2_mode == I2S_MODE_MUX &&
+        _i2s2_mux_allocated_bitmask != 0xFFFFFFFF) {
       return FasDriver::I2S_MUX;
     }
 #endif

@@ -12,7 +12,7 @@ class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
 
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+//#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   static FasDriver tryAllocateDriver(FasDriver driver);
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   static uint8_t _mcpwm_pcnt_allocated;
@@ -28,15 +28,15 @@ class StepperQueue : public StepperQueueBase {
 #if SOC_I2S_NUM >= 3
   static uint8_t _i2s2_mode;
 #endif
-  static uint32_t _i2s0_mux_allocated;
+  static uint32_t _i2s0_mux_allocated_bitmask;
 #if SOC_I2S_NUM >= 2
-  static uint32_t _i2s1_mux_allocated;
+  static uint32_t _i2s1_mux_allocated_bitmask;
 #endif
 #if SOC_I2S_NUM >= 3
-  static uint32_t _i2s2_mux_allocated;
+  static uint32_t _i2s2_mux_allocated_bitmask;
 #endif
 #endif  // SUPPORT_ESP32_I2S
-#endif  // SUPPORT_SELECT_DRIVER_TYPE
+//#endif  // SUPPORT_SELECT_DRIVER_TYPE
 
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
