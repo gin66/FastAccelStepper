@@ -33,8 +33,7 @@
 #define I2S_MAX_PULSES_PER_BLOCK \
   ((I2S_BLOCK_DURATION_US * MAX_STEP_FREQ_HZ / 1000000UL) + 1)
 
-// Min step period: 2 frames = 8µs = 128 ticks (for multi-stepper mode)
-#define I2S_MIN_SPEED_TICKS 128
+#define I2S_DIRECT_MIN_SPEED_TICKS 80
 
 // 100kHz step frequency corresponds to 10µs period, so 2µs pulse width is 20%
 #define I2S_DEFAULT_PULSE_WIDTH_TICKS 32

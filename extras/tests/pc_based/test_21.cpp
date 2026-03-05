@@ -954,7 +954,7 @@ static void test_fill_min_speed() {
   q.next_write_idx = 0;
   q.dirPin = NO_PIN;
 
-  add_command(&q, 3, I2S_MIN_SPEED_TICKS);
+  add_command(&q, 3, I2S_DIRECT_MIN_SPEED_TICKS);
 
   struct i2s_fill_state state = {0, 0};
 

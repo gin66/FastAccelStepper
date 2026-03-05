@@ -11,7 +11,7 @@ bool StepperQueue::init_i2s(uint8_t step_pin) {
   _fill_state = {};
   _isRunning = false;
 
-  max_speed_in_ticks = I2S_MIN_SPEED_TICKS;
+  max_speed_in_ticks = I2S_DIRECT_MIN_SPEED_TICKS;
   return true;
 }
 

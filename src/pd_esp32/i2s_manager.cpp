@@ -1,8 +1,6 @@
 #include "fas_queue/stepper_queue.h"
 #if defined(SUPPORT_ESP32_I2S)
 
-#include <string.h>
-#include <Arduino.h>
 #include "pd_esp32/i2s_manager.h"
 
 static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
@@ -23,7 +21,7 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
   chan_cfg.dma_desc_num = I2S_DMA_DESC_NUM;
   chan_cfg.dma_frame_num = I2S_DMA_FRAME_NUM;
-  chan_cfg.auto_clear = false;
+  chan_cfg.auto_clear = false; // buf is cleared _after_ the callback...
 
   i2s_chan_handle_t chan = nullptr;
   esp_err_t rc = i2s_new_channel(&chan_cfg, &chan, NULL);
@@ -92,9 +90,19 @@ void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
 
         pinMode(14, OUTPUT);
         digitalWrite(14, HIGH);
+
   // clear the buffer for the next round
+  // using a triple buffer scheme with auto_clear perhaps can avoid this
+
   // around 18us
   memset(buf, 0, I2S_BYTES_PER_BLOCK);
+
+  // around 21us
+  // uint32_t *b = (uint32_t*)buf;
+  // uint8_t i = I2S_BYTES_PER_BLOCK/4;
+  // do {
+  //   b[--i] = 0;
+  // } while(i);
 
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
     StepperQueue* q = fas_queue[i];
@@ -103,7 +111,8 @@ void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
         if (q->i2s_mgr == this) {
           pinMode(33, OUTPUT);
           digitalWrite(33, HIGH);
-          // 32us @ 10us speed
+          // 32us..44us @ v=10us
+          // ~63us @ v=5us
           q->fill_i2s_buffer(buf);
           digitalWrite(33, LOW);
         }
