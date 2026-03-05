@@ -30,6 +30,12 @@ void FastAccelStepperEngine::init() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
   }
+  #if defined(SUPPORT_DYNAMIC_ALLOCATION)
+  for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+    fas_queue[i] = NULL;
+  }
+  #endif
+
 #if defined(SUPPORT_RP_PICO)
   claimed_pios = 0;
 #endif

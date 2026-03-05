@@ -5,7 +5,7 @@
 #include "pd_esp32/i2s_fill.h"
 #include "pd_esp32/i2s_constants.h"
 
-bool StepperQueue::init_i2s(uint8_t channel_num, uint8_t step_pin) {
+bool StepperQueue::init_i2s(uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
   _i2s_step_slot = 0;
@@ -33,9 +33,6 @@ bool StepperQueue::isReadyForCommands_i2s() {
 uint16_t StepperQueue::_getPerformedPulses_i2s() { return 0; }
 
 void StepperQueue::fill_i2s_buffer(uint8_t* buf) {
-  if (!use_i2s) {
-    return;
-  }
   if (!_isRunning) {
     return;
   }

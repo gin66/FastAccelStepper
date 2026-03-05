@@ -130,7 +130,7 @@ const uint8_t led_pin = 8;
 #else
 const uint8_t led_pin = PIN_UNDEFINED;
 #endif
-const struct stepper_config_s stepper_config[MAX_STEPPER] = {
+const struct stepper_config_s stepper_config[MAX_STEPPER+1] = {
 // clang-format off
     // Test-HW
     // Position 01 linked to atmega nano
@@ -165,7 +165,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 500,
       off_delay_ms : 1000
-    }
+    },
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)
     {
       step : 6,
@@ -188,7 +188,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 500,
       off_delay_ms : 1000
-    }
+    },
 #else
     {
       // position 01.234567 => 2
@@ -214,10 +214,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 500,
       off_delay_ms : 1000
-    }
+    },
 #endif
 #if MAX_STEPPER > 2
-    ,
     {
       // position 01.234567 => 4, step is linked to blue LED
       step : 2,
@@ -241,10 +240,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
+    },
 #endif
 #if MAX_STEPPER > 4
-    ,
     {
       // position 01.234567 => 6
       step : 16,
@@ -269,10 +267,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
+    },
 #endif
 #if MAX_STEPPER > 6
-    ,
     {
       step : 14,  // direction pin of M3
       enable_low_active : 26,
@@ -294,10 +291,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
+    },
 #endif
 #if MAX_STEPPER > 8
-    ,
     {
       step : 32,
       enable_low_active : PIN_UNDEFINED,
@@ -308,10 +304,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
+    },
 #endif
 #if MAX_STEPPER == 14
-    ,
     {
       step : 33,
       enable_low_active : PIN_UNDEFINED,
@@ -366,8 +361,9 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    }
+    },
 #endif
+    {step : PIN_UNDEFINED}
 };
 #elif defined(ARDUINO_ARCH_SAM)
 // Hardware configuration copied from esp32 board. Not used on due board

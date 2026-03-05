@@ -26,35 +26,38 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
                         uint8_t step_pin) {
   uint8_t channel = queue_num;
   max_speed_in_ticks = 80;
+  Serial.printf("init: queue_num=%d step_pin=%d\n", queue_num, step_pin);
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
+#else
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   use_mcpwm_pcnt = false;
+  if (channel < QUEUES_MCPWM_PCNT) {
+    use_mcpwm_pcnt = true;
+  }
 #endif
 #ifdef SUPPORT_ESP32_RMT
   use_rmt = false;
+  if ((queue_num >= QUEUES_MCPWM_PCNT) && (queue_num < QUEUES_RMT+QUEUES_MCPWM_PCNT)) {
+    use_rmt = true;
+    channel = queue_num - QUEUES_MCPWM_PCNT;
+  }
 #endif
-#ifdef SUPPORT_ESP32_I2S
-  use_i2s = false;
 #endif
-  Serial.printf("init: queue_num=%d step_pin=%d\n", queue_num, step_pin);
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-  if (channel < QUEUES_MCPWM_PCNT) {
+  if (use_mcpwm_pcnt) {
     return init_mcpwm_pcnt(channel, step_pin);
   }
-  channel -= QUEUES_MCPWM_PCNT;
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  if (channel < QUEUES_RMT) {
-    use_rmt = true;
+  if (use_rmt) {
     return init_rmt(channel, step_pin);
   }
-  channel -= QUEUES_RMT;
 #endif
-#ifdef SUPPORT_ESP32_I2S
-  if (channel < QUEUES_I2S) {
-    use_i2s = true;
-    return init_i2s(channel, step_pin);
+#if defined(SUPPORT_ESP32_I2S)
+  if (use_i2s) {
+    return init_i2s(step_pin);
   }
-#endif
+  #endif
   return false;
 }
 
@@ -217,11 +220,11 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
 #if defined(SUPPORT_ESP32_I2S)
   if (driver == DRIVER_I2S_DIRECT) {
     I2sManager* mgr =
-        I2sManager::create((gpio_num_t)step_pin, GPIO_NUM_26, GPIO_NUM_25);
+        I2sManager::create((gpio_num_t)step_pin, I2S_GPIO_UNUSED, I2S_GPIO_UNUSED);
     if (mgr != nullptr) {
       StepperQueue* q = new StepperQueue();
       q->use_i2s = true;
-      q->i2s_mgr_direct = mgr;
+      q->i2s_mgr = mgr;
       return q;
     }
   }

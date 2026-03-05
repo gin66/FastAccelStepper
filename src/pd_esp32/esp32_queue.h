@@ -45,6 +45,12 @@ static void initVars() {
 
   inline bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
+#ifdef SUPPORT_ESP32_RMT
+      bool use_rmt;
+#endif
+#ifdef SUPPORT_ESP32_I2S
+      bool use_i2s;
+#endif
 
   // module specific variables
   union {
@@ -56,7 +62,6 @@ static void initVars() {
 #endif
 #ifdef SUPPORT_ESP32_RMT
     struct {
-      bool use_rmt;
       RMT_CHANNEL_T channel;
       bool _rmtStopped;
       bool lastChunkContainsSteps;
@@ -70,10 +75,9 @@ static void initVars() {
 #endif
 #ifdef SUPPORT_ESP32_I2S
     struct {
-      bool use_i2s;
       int8_t _i2s_step_slot;
       struct i2s_fill_state _fill_state;
-      I2sManager* i2s_mgr_direct;
+      I2sManager* i2s_mgr;
     };
 #endif
   };
@@ -103,7 +107,7 @@ static void initVars() {
   void disconnect_rmt();
 #endif
 #ifdef SUPPORT_ESP32_I2S
-  bool init_i2s(uint8_t channel_num, uint8_t step_pin);
+  bool init_i2s(uint8_t step_pin);
   void startQueue_i2s();
   void forceStop_i2s();
   bool isReadyForCommands_i2s();

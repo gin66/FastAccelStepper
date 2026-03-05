@@ -39,7 +39,7 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
                                                   I2S_SLOT_MODE_STEREO),
       .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,
                    .bclk = bclk_pin,
-                   .ws = ws_pin,
+                   .ws = I2S_GPIO_UNUSED,
                    .dout = data_pin,
                    .din = I2S_GPIO_UNUSED,
                    .invert_flags =
@@ -64,7 +64,16 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
     delete mgr;
     return nullptr;
   }
-  mgr->startDma();
+
+  Serial.printf("I2S startDma: enabling channel\n");
+  if (i2s_channel_enable(mgr->_chan) != ESP_OK) {
+    Serial.printf("I2S startDma: channel enable FAILED\n");
+    i2s_del_channel(mgr->_chan);
+    mgr->_chan = nullptr;
+    delete mgr;
+    return nullptr;
+  }
+  
   return mgr;
 }
 
@@ -75,38 +84,32 @@ bool I2sManager::init() {
   if (rc != ESP_OK) {
     return false;
   }
-
-  _dma_block = 0;
-  return true;
-}
-
-bool I2sManager::startDma() {
-  if (_dma_started) {
-    return _dma_started;
-  }
-  Serial.printf("I2S startDma: enabling channel\n");
-  if (i2s_channel_enable(_chan) != ESP_OK) {
-    Serial.printf("I2S startDma: channel enable FAILED\n");
-    return false;
-  }
-  _dma_started = true;
-
-  vTaskDelay(1);
-
-  Serial.printf("I2S startDma: DMA started\n");
   return true;
 }
 
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
   _callback_count++;
 
+        pinMode(14, OUTPUT);
+        digitalWrite(14, HIGH);
   // clear the buffer for the next round
   memset(buf, 0, I2S_BYTES_PER_BLOCK);
 
-  for (uint8_t i = 0; i < QUEUES_I2S; i++) {
-    uint8_t queue_idx = QUEUES_MCPWM_PCNT + QUEUES_RMT + i;
-    FAS_QUEUE(queue_idx).fill_i2s_buffer(buf);
+  for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+    StepperQueue* q = fas_queue[i];
+    if (q) {
+      if (q->use_i2s) {
+        if (q->i2s_mgr == this) {
+          pinMode(33, OUTPUT);
+          digitalWrite(33, HIGH);
+          // 12us for 100us speed
+          q->fill_i2s_buffer(buf);
+          digitalWrite(33, LOW);
+        }
+      }
+    }
   }
+        digitalWrite(14, LOW);
 }
 
 #endif  // SUPPORT_ESP32_I2S

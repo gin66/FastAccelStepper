@@ -16,7 +16,7 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
   static const uint8_t pulse_width_bits =
       I2S_DEFAULT_PULSE_WIDTH_TICKS / ticks_per_bit;
 
-  uint32_t tick_pos = 0;
+  uint16_t tick_pos = 0;
 
   uint8_t rp = q->read_idx;
 
@@ -28,7 +28,7 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
       printf("  Writing pulse at tick_pos=%u remaining_ticks=%u bit_pos=%u\n",
              tick_pos, state->remaining_high_ticks, bit_pos);
 #endif
-      buf[bit_pos >> 3] |= (0x80 >> (bit_pos & 7));
+      buf[(bit_pos >> 3)^1] |= (0x80 >> (bit_pos & 7));
       if (state->remaining_high_ticks >= ticks_per_bit) {
         state->remaining_high_ticks -= ticks_per_bit;
       } else {
