@@ -334,9 +334,7 @@ void StepperQueue::_initVars() {
   _isRunning = false;
   _nextCommandIsPrepared = false;
 #endif
-#if defined(SUPPORT_ESP32_RMT)
-  _rmtStopped = true;
-#endif
+
 #if defined(ARDUINO_ARCH_SAM)
   _hasISRactive = false;
   // we cannot clear the PWM interrupt when switching to a pause, but we'll

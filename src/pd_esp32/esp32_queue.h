@@ -75,7 +75,6 @@ static void initVars() {
 #endif
 #ifdef SUPPORT_ESP32_I2S
     struct {
-      int8_t _i2s_step_slot; // TODO: only works if this variable is defined 
       struct i2s_fill_state _fill_state;
       I2sManager* i2s_mgr;
     };
