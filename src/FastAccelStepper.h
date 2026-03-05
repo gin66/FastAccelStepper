@@ -41,7 +41,6 @@
 
 class FastAccelStepper;
 
-
 // ### Return codes of calls to `move()` and `moveTo()`
 //
 // The defined preprocessor macros are MOVE_xxx:

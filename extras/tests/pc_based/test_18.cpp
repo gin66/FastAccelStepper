@@ -21,7 +21,6 @@ void interrupts() {}
 #define LL_TOGGLE_PIN(dirPin)
 #include "pd_esp32/StepperISR_esp32xx_rmt.cpp"
 
-
 #define QUEUE_SIZE 32
 #define MAX_RMT_ENTRIES 8192
 

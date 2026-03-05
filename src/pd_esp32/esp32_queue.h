@@ -12,7 +12,9 @@ class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
 
-//#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
+#error "SUPPORT_SELECT_DRIVER_TYPE is supported for esp32"
+#endif  // SUPPORT_SELECT_DRIVER_TYPE
   static FasDriver tryAllocateDriver(FasDriver driver);
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   static uint8_t _mcpwm_pcnt_allocated;
@@ -36,7 +38,6 @@ class StepperQueue : public StepperQueueBase {
   static uint32_t _i2s2_mux_allocated_bitmask;
 #endif
 #endif  // SUPPORT_ESP32_I2S
-//#endif  // SUPPORT_SELECT_DRIVER_TYPE
 
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
@@ -78,21 +79,7 @@ class StepperQueue : public StepperQueueBase {
 
   uint16_t _getPerformedPulses();
 
-  AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
-  int32_t getCurrentPosition();
-  uint32_t ticksInQueue();
-  bool hasTicksInQueue(uint32_t min_ticks);
-  bool getActualTicksWithDirection(struct actual_ticks_s* speed);
-
-  bool init(FastAccelStepperEngine* engine, uint8_t queue_num,
-            uint8_t step_pin);
-  void startQueue();
-  void forceStop();
-  void _initVars();
-  void connect();
-  void disconnect();
-
-// module specific functions
+  // Module specific functions
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   bool isReadyForCommands_mcpwm_pcnt();
   bool init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);

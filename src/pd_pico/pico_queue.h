@@ -23,20 +23,6 @@ class StepperQueue : public StepperQueueBase {
   void attachDirPinToStatemachine();
   void setDirPinState(bool high);
 
-  AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
-  int32_t getCurrentPosition();
-  uint32_t ticksInQueue();
-  bool hasTicksInQueue(uint32_t min_ticks);
-  bool getActualTicksWithDirection(struct actual_ticks_s* speed);
-
-  bool init(FastAccelStepperEngine* engine, uint8_t queue_num,
-            uint8_t step_pin);
-  void startQueue();
-  void forceStop();
-  void _initVars();
-  void connect();
-  void disconnect();
-
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;

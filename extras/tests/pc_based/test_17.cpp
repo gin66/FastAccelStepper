@@ -20,7 +20,6 @@ void interrupts() {}
 #define LL_TOGGLE_PIN(dirPin)
 #include "pd_esp32/StepperISR_esp32xx_rmt.cpp"
 
-
 struct TestCase {
   uint8_t forward_planning;
   int32_t position;
