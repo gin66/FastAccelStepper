@@ -64,6 +64,19 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, FasDriver driver_type) {
   StepperQueue* q = StepperQueue::tryAllocateQueue(driver_type, step_pin);
+  if (q != nullptr) {
+    uint8_t fas_stepper_num = _stepper_cnt;
+    _stepper_cnt++;
+    fas_queue[fas_stepper_num] = q;
+
+    FastAccelStepper* s = new FastAccelStepper();
+    bool success = s->init(this, fas_stepper_num, step_pin);
+    if (!success) {
+      return NULL;
+    }
+    _stepper[fas_stepper_num] = s;
+    return s;
+  }
   return nullptr;
 }
 #else

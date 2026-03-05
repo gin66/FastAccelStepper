@@ -296,7 +296,7 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       off_delay_ms : 10
     }
 #endif
-#if MAX_STEPPER == 14
+#if MAX_STEPPER > 8
     ,
     {
       step : 32,
@@ -308,7 +308,10 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
-    },
+    }
+#endif
+#if MAX_STEPPER == 14
+    ,
     {
       step : 33,
       enable_low_active : PIN_UNDEFINED,
@@ -1031,6 +1034,8 @@ void setup() {
     FastAccelStepper* s = NULL;
     const struct stepper_config_s* config = &stepper_config[i];
     if (config->step != PIN_UNDEFINED) {
+      Serial.print("Connect stepper to pin ");
+      Serial.println(config->step);
       s = engine.stepperConnectToPin(config->step);
       if (s) {
         s->setDirectionPin(config->direction, config->direction_high_count_up,

@@ -213,10 +213,11 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
     StepperQueue::_rmt_allocated++;
     return q;
   }
-  #endif
-  #if defined(SUPPORT_ESP32_I2S)
+#endif
+#if defined(SUPPORT_ESP32_I2S)
   if (driver == DRIVER_I2S_DIRECT) {
-    I2sManager* mgr = I2sManager::create((gpio_num_t)step_pin, I2S_GPIO_UNUSED, I2S_GPIO_UNUSED);
+    I2sManager* mgr =
+        I2sManager::create((gpio_num_t)step_pin, GPIO_NUM_26, GPIO_NUM_25);
     if (mgr != nullptr) {
       StepperQueue* q = new StepperQueue();
       q->use_i2s = true;
@@ -224,7 +225,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
       return q;
     }
   }
-  #endif
+#endif
 
   // Just use the next possible one
   if (driver != DRIVER_DONT_CARE) {
