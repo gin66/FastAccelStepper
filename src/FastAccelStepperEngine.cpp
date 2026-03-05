@@ -10,9 +10,7 @@
 static uint8_t fas_ledPin = PIN_UNDEFINED;
 static uint16_t fas_debug_led_cnt = 0;
 
-#if !defined(SUPPORT_STEPPER_CONNECT_BY_DRIVER)
 FastAccelStepper fas_stepper[MAX_STEPPER];
-#endif
 
 #if defined(SUPPORT_CPU_AFFINITY)
 void FastAccelStepperEngine::init(uint8_t cpu_core) {
@@ -78,13 +76,12 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
 }
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
-#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
-#else
+// dynamic allocation is currently only supported for esp32
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin) {
+  return stepperConnectToPin(step_pin, DRIVER_DONT_CARE);
+}
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin, FasDriver driver_type)
-#endif
-{
+    uint8_t step_pin, FasDriver driver_type) {
   return NULL;
 }
 #else

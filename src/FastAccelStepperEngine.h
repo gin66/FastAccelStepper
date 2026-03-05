@@ -13,9 +13,6 @@ class FastAccelStepperEngine {
   void init();
 #endif
 
-#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
-#endif
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT
 #define DRIVER_RMT FasDriver::RMT
@@ -26,6 +23,8 @@ class FastAccelStepperEngine {
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
   FastAccelStepper* stepperConnectToPin(
       uint8_t step_pin, FasDriver driver_type = DRIVER_DONT_CARE);
+#else 
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 #endif
 
 #if defined(SUPPORT_TASK_RATE_CHANGE)
