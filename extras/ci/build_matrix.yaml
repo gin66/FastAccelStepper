@@ -1,0 +1,462 @@
+# Build Matrix Database
+# Single source of truth for platformio.ini and GitHub workflow configurations
+#
+# Usage: ./extras/scripts/generate_build_configs.py [--platformio] [--workflows] [--dry-run]
+
+templates:
+  esp32_arduino:
+    platform: espressif32
+    board: esp32dev
+    framework: arduino
+    build_flags: ["-Wall"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32_arduino_werror:
+    platform: espressif32
+    board: esp32dev
+    framework: arduino
+    build_flags: ["-Werror", "-Wall"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32_idf:
+    platform: espressif32
+    board: esp32dev
+    framework: espidf
+    build_flags:
+      - "-Werror"
+      - "-Wall"
+      - "-Wno-deprecated-declarations"
+      - "-Wno-error=incompatible-pointer-types"
+      - "-Wno-unused-function"
+      - "-Wno-error=attributes"
+      - "-Wno-error=missing-field-initializers"
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32c3_arduino:
+    platform: espressif32
+    board: esp32-c3-devkitm-1
+    framework: arduino
+    build_flags: ["-Wall", "-DARDUINO_USB_CDC_ON_BOOT=1", "-DARDUINO_USB_MODE=1"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32s2_arduino:
+    platform: espressif32
+    board: esp32-s2-saola-1
+    framework: arduino
+    build_flags: ["-Wall"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32s3_arduino:
+    platform: espressif32
+    board: esp32-s3-devkitc-1
+    framework: arduino
+    build_flags: ["-Wall"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32c3_idf:
+    platform: espressif32
+    board: esp32-c3-devkitm-1
+    framework: espidf
+    build_flags:
+      - "-Werror"
+      - "-Wall"
+      - "-Wno-deprecated-declarations"
+      - "-Wno-error=incompatible-pointer-types"
+      - "-Wno-unused-function"
+      - "-Wno-error=attributes"
+      - "-Wno-error=missing-field-initializers"
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32s2_idf:
+    platform: espressif32
+    board: esp32-s2-saola-1
+    framework: espidf
+    build_flags:
+      - "-Werror"
+      - "-Wall"
+      - "-Wno-deprecated-declarations"
+      - "-Wno-error=incompatible-pointer-types"
+      - "-Wno-unused-function"
+      - "-Wno-error=attributes"
+      - "-Wno-error=missing-field-initializers"
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32s3_idf:
+    platform: espressif32
+    board: esp32-s3-devkitc-1
+    framework: espidf
+    build_flags:
+      - "-Werror"
+      - "-Wall"
+      - "-Wno-deprecated-declarations"
+      - "-Wno-error=incompatible-pointer-types"
+      - "-Wno-unused-function"
+      - "-Wno-error=attributes"
+      - "-Wno-error=missing-field-initializers"
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32c6_idf:
+    platform: espressif32
+    board: esp32-c6-devkitm-1
+    framework: espidf
+    build_flags:
+      - "-Werror"
+      - "-Wall"
+      - "-Wno-deprecated-declarations"
+      - "-Wno-error=incompatible-pointer-types"
+      - "-Wno-unused-function"
+      - "-Wno-error=attributes"
+      - "-Wno-error=missing-field-initializers"
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32h2_idf:
+    platform: espressif32
+    board: esp32-h2-devkitm-1
+    framework: espidf
+    build_flags:
+      - "-Werror"
+      - "-Wall"
+      - "-Wno-deprecated-declarations"
+      - "-Wno-error=incompatible-pointer-types"
+      - "-Wno-unused-function"
+      - "-Wno-error=attributes"
+      - "-Wno-error=missing-field-initializers"
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  avr:
+    platform: atmelavr
+    framework: arduino
+    build_flags: ["-Werror", "-Wall", "-Wno-deprecated-declarations"]
+    lib_extra_dirs: .
+
+  sam:
+    platform: atmelsam
+    board: due
+    framework: arduino
+    build_flags: ["-Wall", "-Wno-deprecated-declarations"]
+    lib_extra_dirs: .
+
+  rp2040:
+    platform: https://github.com/maxgerhardt/platform-raspberrypi.git
+    framework: arduino
+    lib_extra_dirs: .
+
+environments:
+  esp32_tasmota_3_0_0:
+    platform: https://github.com/tasmota/platform-espressif32/releases/download/2024.05.12/platform-espressif32.zip
+    board: esp32dev
+    framework: arduino
+    build_flags: ["-Wall", "-DCORE_DEBUG_LEVEL=6", "-DLOG_LOCAL_LEVEL=6"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32_tasmota_2_0_15:
+    platform: https://github.com/tasmota/platform-espressif32/releases/download/2024.04.00/platform-espressif32.zip
+    board: esp32dev
+    framework: arduino
+    build_flags: ["-Wall", "-DCORE_DEBUG_LEVEL=5"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32:
+    template: esp32_arduino
+
+  esp32_pioarduino_V53_03_11:
+    platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
+    board: esp32dev
+    framework: arduino
+    build_flags: ["-Wall"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  esp32p4:
+    platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
+    board: esp32-p4-evboard
+    framework: arduino
+    build_flags: ["-Wall"]
+    board_build_f_cpu: 240000000L
+    lib_extra_dirs: .
+
+  nanoatmega168:
+    template: avr
+    board: nanoatmega168
+
+  nanoatmega328:
+    template: avr
+    board: nanoatmega328
+
+  atmega2560:
+    template: avr
+    board: megaatmega2560
+
+  atmega32u4:
+    template: avr
+    board: leonardo
+    build_flags_extra: ["-Wno-error=incompatible-pointer-types"]
+
+  atmelsam:
+    template: sam
+
+  pico:
+    template: rp2040
+    board: pico
+
+  nanorp2040connect:
+    template: rp2040
+    board: nanorp2040connect
+
+  pico_earle:
+    template: rp2040
+    board: pico
+    board_build_core: earlephilhower
+
+  nanorp2040connect_earle:
+    template: rp2040
+    board: nanorp2040connect
+    board_build_core: earlephilhower
+
+  rpipico:
+    template: rp2040
+    board: rpipico
+    build_flags: ["-Wall", "-Wextra", "-D__FREERTOS=1", "-Wno-missing-field-initializers", "-Wno-unused-parameter"]
+
+  adafruit_feather:
+    template: rp2040
+    board: adafruit_feather
+
+  seeed_xiao_rp2040:
+    template: rp2040
+    board: seeed_xiao_rp2040
+
+  sparkfun_thingplusrp2040:
+    template: rp2040
+    board: sparkfun_thingplusrp2040
+
+  pimoroni_pga2040:
+    template: rp2040
+    board: pimoroni_pga2040
+
+  rpipicow:
+    template: rp2040
+    board: rpipicow
+    build_flags: ["-D__FREERTOS=1"]
+
+  rpipico2:
+    template: rp2040
+    board: rpipico2
+    build_flags: ["-D__FREERTOS=1"]
+
+  rpipico2-riscv:
+    template: rp2040
+    board: rpipico2
+    board_build_mcu: rp2350-riscv
+    build_flags: ["-D__FREERTOS=1"]
+
+  rpipico2-psram:
+    template: rp2040
+    board: rpipico2
+    board_upload_psram_length: 1048576
+    build_flags: ["-D__FREERTOS=1"]
+
+versioned_environments:
+  esp32:
+    prefix: esp32
+    template: esp32_arduino
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
+
+  esp32_werror:
+    prefix: esp32
+    template: esp32_arduino_werror
+    versions: ["6.4.0", "6.3.2", "6.2.0", "6.1.0", "6.0.1", "5.3.0", "5.2.0", "5.1.1"]
+
+  esp32_werror_unused_var:
+    prefix: esp32
+    template: esp32_arduino_werror
+    build_flags_extra: ["-Wno-unused-variable"]
+    versions: ["5.0.0", "4.4.0", "4.3.0", "4.2.0"]
+
+  esp32_werror_deprecated:
+    prefix: esp32
+    template: esp32_arduino_werror
+    build_flags_extra: ["-Wno-unused-variable", "-Wno-deprecated-declarations"]
+    versions: ["4.1.0"]
+
+  esp32s2:
+    prefix: esp32s2
+    template: esp32s2_arduino
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
+
+  esp32s3:
+    prefix: esp32s3
+    template: esp32s3_arduino
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
+
+  esp32c3:
+    prefix: esp32c3
+    template: esp32c3_arduino
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
+
+  esp32_idf:
+    prefix: esp32_idf
+    template: esp32_idf
+    build_flags_extra: ["-DCONFIG_RMT_ENABLE_DEBUG_LOG=5"]
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.7.0"]
+
+  esp32_idf_old:
+    prefix: esp32_idf
+    template: esp32_idf
+    versions: ["5.3.0", "5.2.0", "5.1.0", "5.0.0"]
+
+  esp32c3_idf:
+    prefix: esp32c3_idf
+    template: esp32c3_idf
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
+
+  esp32s2_idf:
+    prefix: esp32s2_idf
+    template: esp32s2_idf
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
+
+  esp32s3_idf:
+    prefix: esp32s3_idf
+    template: esp32s3_idf
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
+
+  esp32c6_idf:
+    prefix: esp32c6_idf
+    template: esp32c6_idf
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1"]
+
+  esp32h2_idf:
+    prefix: esp32h2_idf
+    template: esp32h2_idf
+    versions: ["6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1"]
+
+workflows:
+  arduino:
+    name: Build examples
+    "on":
+      push:
+        branches: [master]
+      pull_request:
+        branches: [master]
+    matrix:
+      - esp32_V4_1_0
+      - esp32_V4_2_0
+      - esp32_V4_3_0
+      - esp32_V4_4_0
+      - esp32_V5_0_0
+      - esp32_V5_1_1
+      - esp32_V5_2_0
+      - esp32_V5_3_0
+      - esp32_V6_0_1
+      - esp32_V6_2_0
+      - esp32_V6_3_2
+      - esp32_V6_4_0
+      - esp32_V6_5_0
+      - esp32_V6_6_0
+      - esp32_V6_7_0
+      - esp32_V6_8_1
+      - esp32_V6_9_0
+      - esp32_V6_10_0
+      - esp32_V6_11_0
+      - esp32_V6_12_0
+      - esp32_V6_13_0
+      - esp32_pioarduino_V53_03_11
+      - esp32c3_V6_5_0
+      - esp32c3_V6_6_0
+      - esp32c3_V6_7_0
+      - esp32c3_V6_8_1
+      - esp32c3_V6_9_0
+      - esp32c3_V6_10_0
+      - esp32c3_V6_11_0
+      - esp32c3_V6_12_0
+      - esp32c3_V6_13_0
+      - esp32s2_V6_5_0
+      - esp32s2_V6_6_0
+      - esp32s2_V6_7_0
+      - esp32s2_V6_8_1
+      - esp32s2_V6_9_0
+      - esp32s2_V6_10_0
+      - esp32s2_V6_11_0
+      - esp32s2_V6_12_0
+      - esp32s2_V6_13_0
+      - esp32s3_V6_5_0
+      - esp32s3_V6_6_0
+      - esp32s3_V6_7_0
+      - esp32s3_V6_8_1
+      - esp32s3_V6_9_0
+      - esp32s3_V6_10_0
+      - esp32s3_V6_11_0
+      - esp32s3_V6_12_0
+      - esp32s3_V6_13_0
+      - esp32p4
+      - nanoatmega168
+      - nanoatmega328
+      - atmega2560
+      - atmega32u4
+      - atmelsam
+      - rpipico
+      - rpipico2
+    script: build-platformio.sh
+
+  idf:
+    name: Build idf examples
+    "on":
+      push:
+        branches: [master]
+      pull_request:
+        branches: [master]
+    comments:
+      - "The versions here are defined by platformio:"
+      - "   https://github.com/platformio/platform-espressif32/releases"
+      - "For determining the underlying ESP-IDF-version, check for Supported Frameworks"
+      - "under each release on github"
+    matrix:
+      - esp32_idf_V5_0_0
+      - esp32_idf_V5_1_0
+      - esp32_idf_V5_2_0
+      - esp32_idf_V5_3_0
+      - "# esp32_idf_V6_7_0 fails due to missing simple encoder"
+      - esp32_idf_V6_8_1
+      - esp32_idf_V6_9_0
+      - esp32_idf_V6_10_0
+      - esp32_idf_V6_11_0
+      - esp32_idf_V6_12_0
+      - esp32_idf_V6_13_0
+      - esp32c3_idf_V6_8_1
+      - esp32c3_idf_V6_9_0
+      - esp32c3_idf_V6_10_0
+      - esp32c3_idf_V6_11_0
+      - esp32c3_idf_V6_12_0
+      - esp32c3_idf_V6_13_0
+      - esp32c6_idf_V6_8_1
+      - esp32c6_idf_V6_9_0
+      - esp32c6_idf_V6_10_0
+      - esp32c6_idf_V6_11_0
+      - esp32c6_idf_V6_12_0
+      - esp32c6_idf_V6_13_0
+      - esp32s2_idf_V6_8_1
+      - esp32s2_idf_V6_9_0
+      - esp32s2_idf_V6_10_0
+      - esp32s2_idf_V6_11_0
+      - esp32s2_idf_V6_12_0
+      - esp32s2_idf_V6_13_0
+      - esp32s3_idf_V6_8_1
+      - esp32s3_idf_V6_9_0
+      - esp32s3_idf_V6_10_0
+      - esp32s3_idf_V6_11_0
+      - esp32s3_idf_V6_12_0
+      - esp32s3_idf_V6_13_0
+    script: build-idf-platformio.sh
