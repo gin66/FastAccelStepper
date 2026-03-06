@@ -17,11 +17,15 @@ class I2sManager {
 
   volatile uint32_t _callback_count = 0;
 
+  void i2sMuxSetBit(uint8_t slot, bool value);
+  bool i2sMuxGetBit(uint8_t slot);
+
  private:
   I2sManager() {}
   bool init();
   void init_mux_buffer(uint8_t* buf);
   i2s_chan_handle_t _chan = nullptr;
+  uint32_t _mux_state = 0;
 };
 
 #endif  // SUPPORT_ESP32_I2S

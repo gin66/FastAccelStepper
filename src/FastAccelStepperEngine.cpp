@@ -85,6 +85,19 @@ bool FastAccelStepperEngine::initI2sMux(uint8_t data_pin, uint8_t bclk_pin,
   StepperQueue::_i2s_mux_initialized = true;
   return true;
 }
+
+void FastAccelStepperEngine::i2sMuxSetBit(uint8_t slot, bool value) {
+  if (StepperQueue::_i2s_mux_manager != nullptr) {
+    StepperQueue::_i2s_mux_manager->i2sMuxSetBit(slot, value);
+  }
+}
+
+bool FastAccelStepperEngine::i2sMuxGetBit(uint8_t slot) {
+  if (StepperQueue::_i2s_mux_manager != nullptr) {
+    return StepperQueue::_i2s_mux_manager->i2sMuxGetBit(slot);
+  }
+  return false;
+}
 #endif
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)

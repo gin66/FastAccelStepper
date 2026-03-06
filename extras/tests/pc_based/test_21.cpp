@@ -897,11 +897,11 @@ static void test_fill_partial_steps() {
   printf("  Remaining after block 2: %u (expected %u)\n", remaining2,
          expected_remaining2);
 
-  test_result(
-      "Fill partial steps",
-      pulses1 == expected_in_block && remaining1 == expected_remaining1 &&
-          pulses2 == expected_in_block && !consumed &&
-          remaining2 == expected_remaining2);
+  test_result("Fill partial steps", pulses1 == expected_in_block &&
+                                        remaining1 == expected_remaining1 &&
+                                        pulses2 == expected_in_block &&
+                                        !consumed &&
+                                        remaining2 == expected_remaining2);
 }
 
 static void test_fill_carry_ticks() {

@@ -71,7 +71,7 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
     delete mgr;
     return nullptr;
   }
-  
+
   return mgr;
 }
 
@@ -86,13 +86,30 @@ bool I2sManager::init() {
 }
 
 void IRAM_ATTR I2sManager::init_mux_buffer(uint8_t* buf) {
-  // TODO: build frame template from DIR/ENABLE state of connected steppers
-  // around 21us
   uint32_t* b = (uint32_t*)buf;
   uint8_t i = I2S_BYTES_PER_BLOCK / 4;
   do {
-    b[--i] = 0;
+    b[--i] = _mux_state;
   } while (i);
+}
+
+void I2sManager::i2sMuxSetBit(uint8_t slot, bool value) {
+  if (slot >= 32) {
+    return;
+  }
+  uint32_t bit = 1UL << slot;
+  if (value) {
+    _mux_state |= bit;
+  } else {
+    _mux_state &= ~bit;
+  }
+}
+
+bool I2sManager::i2sMuxGetBit(uint8_t slot) {
+  if (slot >= 32) {
+    return false;
+  }
+  return (_mux_state & (1UL << slot)) != 0;
 }
 
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
