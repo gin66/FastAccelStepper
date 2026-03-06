@@ -2,6 +2,7 @@
 #if defined(SUPPORT_ESP32_I2S)
 
 #include "pd_esp32/i2s_manager.h"
+#include <string.h>
 
 static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
                                            i2s_event_data_t* event,
@@ -119,7 +120,7 @@ bool I2sManager::i2sMuxGetBit(uint8_t slot) {
 }
 
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
-  _callback_count++;
+  _callback_count += 1;
 
   if (_is_mux) {
     init_mux_buffer(buf);
