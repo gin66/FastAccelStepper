@@ -1,6 +1,6 @@
 # FastAccelStepper Memory Footprint
 
-Generated: 2026-03-01 12:03:44
+Generated: 2026-03-06 19:46:29
 
 Library size measured using the difference method:
 - Baseline: Empty Arduino sketch (setup/loop only)
@@ -11,13 +11,13 @@ Library size measured using the difference method:
 | ATmega2560 | 361 | 9590 |
 | ATmega328P | 243 | 8756 |
 | ATmega32U4 | 361 | 9026 |
-| ESP32 | 5360 | 30200 |
-| ESP32-C3 | 952 | 29434 |
-| ESP32-S2 | 1664 | 28304 |
-| ESP32-S3 | 3496 | 37784 |
+| ESP32 | 5656 | 42908 |
+| ESP32-C3 | 1024 | 34698 |
+| ESP32-S2 | 1896 | 40356 |
+| ESP32-S3 | 3816 | 50348 |
 | RP2040 | 2348 | 8548 |
-| RP2350 | 3424 | 8228 |
-| SAM3X8E | 2380 | 21716 |
+| RP2350 | 3424 | 8260 |
+| SAM3X8E | 2380 | 21756 |
 
 **Notes:**
 - RAM = .data + .bss (static allocation)

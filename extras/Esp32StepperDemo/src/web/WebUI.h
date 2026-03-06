@@ -9,8 +9,10 @@ const char index_html[] PROGMEM = R"rawliteral(
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: Arial, sans-serif; background: #1a1a1a; color: #fff; padding: 20px; }
         .container { max-width: 1200px; margin: 0 auto; }
-        h1 { margin-bottom: 20px; color: #4CAF50; }
-        .card { background: #2a2a2a; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+        h1 { color: #4CAF50; font-size: 20px; }
+        .header-row { display: flex; align-items: center; gap: 30px; margin-bottom: 15px; }
+        .header-row h1 { margin: 0; }
+        .card { background: #2a2a2a; padding: 15px; margin-bottom: 15px; border-radius: 8px; }
         .card h2 { margin-bottom: 15px; color: #4CAF50; font-size: 18px; }
         .stepper-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px; }
         .pin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; max-height: 400px; overflow-y: auto; }
@@ -64,14 +66,13 @@ const char index_html[] PROGMEM = R"rawliteral(
 </head>
 <body>
     <div class="container">
-        <h1>ESP32 Stepper Control</h1>
-        
-        <div class="card">
-            <h2>System Status <span class="connection-status" id="wsStatus"></span></h2>
-            <div class="system-info">
-                <div>IP: <span id="ip">-</span></div>
-                <div>Free Heap: <span id="heap">-</span> bytes</div>
-                <div>Uptime: <span id="uptime">-</span></div>
+        <div class="header-row">
+            <h1>ESP32 Stepper Control</h1>
+            <div class="system-info" style="display:flex;gap:20px;align-items:center">
+                <span class="connection-status" id="wsStatus"></span>
+                <span>IP: <strong id="ip">-</strong></span>
+                <span>Heap: <strong id="heap">-</strong></span>
+                <span>Up: <strong id="uptime">-</strong></span>
             </div>
         </div>
         
@@ -105,24 +106,8 @@ const char index_html[] PROGMEM = R"rawliteral(
         </div>
         
         <div class="card">
-            <h2>Quick Commands</h2>
-            <div class="controls">
-                <input type="number" id="stepperId" placeholder="Stepper ID" value="0" min="0">
-                <input type="number" id="moveValue" placeholder="Steps" value="1000">
-                <button class="btn-primary" onclick="sendCommand('move')">Move</button>
-                <button class="btn-primary" onclick="sendCommand('move_to')">Move To</button>
-                <button class="btn-secondary" onclick="sendCommand('stop')">Stop</button>
-                <button class="btn-danger" onclick="sendCommand('force_stop')">Force Stop</button>
-            </div>
-        </div>
-        
-        <div class="card">
-            <h2>GPIO Pins</h2>
-            <div class="controls" style="margin-bottom:15px">
-                <button class="btn-secondary" onclick="loadPins()">Refresh Pins</button>
-                <button class="btn-secondary" id="togglePinBtn" onclick="togglePinView()">Show All Pins</button>
-            </div>
-            <div id="pins" class="pin-grid">Loading...</div>
+            <h2>GPIO Pins <span style="font-weight:normal;color:#888;font-size:12px">(click IN/OUT to toggle mode, click value to toggle 0/1)</span></h2>
+            <div id="pins" style="display:grid;grid-template-columns:repeat(8,1fr);gap:5px;font-size:11px">Loading...</div>
         </div>
         
         <div class="card">
@@ -375,12 +360,6 @@ const char index_html[] PROGMEM = R"rawliteral(
             }
         }
         
-        async function sendCommand(command) {
-            const stepperId = parseInt(document.getElementById('stepperId').value);
-            const value = parseInt(document.getElementById('moveValue').value);
-            await sendStepperCommand(stepperId, command, value);
-        }
-        
         async function updateSystemStatus() {
             try {
                 const response = await fetch('/api/status');
@@ -405,14 +384,6 @@ const char index_html[] PROGMEM = R"rawliteral(
         loadPins();
         updateSystemStatus();
         setInterval(updateSystemStatus, 5000);
-        
-        let pinViewExpanded = false;
-        
-        function togglePinView() {
-            pinViewExpanded = !pinViewExpanded;
-            document.getElementById('pins').classList.toggle('expanded', pinViewExpanded);
-            document.getElementById('togglePinBtn').textContent = pinViewExpanded ? 'Hide All Pins' : 'Show All Pins';
-        }
         
         async function loadPins() {
             try {
@@ -492,39 +463,43 @@ const char index_html[] PROGMEM = R"rawliteral(
                 return;
             }
             
-            container.innerHTML = usablePins.map(p => {
-                const typeStr = p.type === 1 ? 'IN' : p.type === 2 ? 'OUT' : '-';
-                const valueClass = p.value === 1 ? 'high' : 'low';
-                const valueStr = p.value === -1 ? '-' : p.value.toString();
-                const assignedStr = p.is_assigned ? ` (S${p.assigned_to})` : '';
-                const itemClass = p.is_reserved ? 'pin-item reserved' : (p.is_assigned ? 'pin-item assigned' : 'pin-item');
+            let html = '';
+            for (const p of usablePins) {
+                const canOutput = p.capabilities & 2;
+                const isOutput = p.type === 2;
+                const modeStr = isOutput ? 'OUT' : 'IN';
+                const value = p.value === -1 ? '-' : p.value;
+                const isAssigned = p.is_assigned;
+                const bgColor = isOutput && value === 1 ? '#4CAF50' : '#333';
+                const opacity = isAssigned ? '0.5' : '1';
+                const modeCursor = (isAssigned || !canOutput) ? 'default' : 'pointer';
+                const assignedTitle = isAssigned ? ` (S${p.assigned_to})` : '';
+                const inputOnly = !canOutput ? ' (IN only)' : '';
                 
-                return `
-                    <div class="${itemClass}">
-                        <div class="pin-header">
-                            <span class="pin-num">GPIO${p.pin}</span>
-                            <span class="pin-value ${valueClass}">${valueStr}</span>
-                        </div>
-                        <div style="color:#888;font-size:11px">${p.name}${assignedStr}</div>
-                        <div class="pin-actions">
-                            <select id="mode-${p.pin}" onchange="setPinMode(${p.pin})">
-                                <option value="none" ${p.type === 0 ? 'selected' : ''}>-</option>
-                                <option value="input" ${p.type === 1 ? 'selected' : ''}>IN</option>
-                                <option value="output" ${p.type === 2 ? 'selected' : ''}>OUT</option>
-                            </select>
-                            <button class="btn-secondary" onclick="togglePin(${p.pin})" ${p.type !== 2 ? 'disabled' : ''}>Toggle</button>
+                html += `
+                    <div style="background:${bgColor};padding:5px;border-radius:3px;text-align:center;opacity:${opacity}"
+                         title="GPIO${p.pin}${assignedTitle}${inputOnly}">
+                        <div style="font-weight:bold;font-size:10px;color:#888">${p.pin}</div>
+                        <div style="display:flex;justify-content:center;gap:8px;font-weight:bold">
+                            <span style="cursor:${modeCursor};color:${canOutput ? '#fff' : '#888'}" 
+                                  onclick="${isAssigned || !canOutput ? '' : `cyclePinMode(${p.pin})`}">${modeStr}</span>
+                            <span style="cursor:${isOutput && !isAssigned ? 'pointer' : 'default'};color:${isOutput && value === 1 ? '#fff' : '#888'}" 
+                                  onclick="${isOutput && !isAssigned ? `togglePin(${p.pin})` : ''}">${value}</span>
                         </div>
                     </div>
                 `;
-            }).join('');
+            }
+            container.innerHTML = html;
         }
         
-        async function setPinMode(pin) {
-            const mode = document.getElementById(`mode-${pin}`).value;
-            if (mode === 'none') return;
+        async function cyclePinMode(pin) {
+            const pinData = gpioPins.find(p => p.pin === pin);
+            if (!pinData) return;
+            
+            const newMode = pinData.type === 2 ? 'input' : 'output';
             
             try {
-                const params = new URLSearchParams({ mode: mode, value: '0' });
+                const params = new URLSearchParams({ mode: newMode, value: '0' });
                 await fetch(`/api/pins/${pin}`, {
                     method: 'POST',
                     headers: {'Content-Type': 'application/x-www-form-urlencoded'},

@@ -1253,7 +1253,9 @@ bool process_cmd(char* cmd) {
   uint16_t s = *cmd++;
   char* endptr;
   int8_t res;
+#if !defined(__AVR_ATmega32U4__)
   int8_t gv;
+#endif
   switch (MODE(mode, s)) {
     case MODE(normal, 'M'):
     case MODE(test, 'M'):
@@ -1490,6 +1492,7 @@ bool process_cmd(char* cmd) {
         return true;
       }
       break;
+#if !defined(__AVR_ATmega32U4__)
     case MODE(config, 'd'):
       if (strcmp(cmd, "c") == 0) {
         output_msg(MSG_DISABLED);
@@ -1531,6 +1534,7 @@ bool process_cmd(char* cmd) {
           break;
       }
       break;
+  #endif
     case MODE(normal, 'N'):
       if (*cmd == 0) {
         output_msg(MSG_OUTPUT_DRIVER_ON);

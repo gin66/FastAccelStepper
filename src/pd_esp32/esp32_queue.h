@@ -13,10 +13,7 @@ class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
 
-#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
-#error "SUPPORT_SELECT_DRIVER_TYPE is supported for esp32"
-#endif  // SUPPORT_SELECT_DRIVER_TYPE
-
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
   // dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
   static uint8_t queues_allocated;
@@ -40,6 +37,7 @@ class StepperQueue : public StepperQueueBase {
 #endif
   }
 #endif
+#endif  // SUPPORT_SELECT_DRIVER_TYPE
 
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;

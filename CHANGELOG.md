@@ -1,7 +1,12 @@
-pre-0.34.1:
+pre-1.0.0:
 - add memory report script
 - rename old pmf/PMF to log2/LOG2 representation and define type `log2_value_t`
 - add timing plot `to extras/tests/simavr_based`
+- major refactoring of the code
+- esp32: new platformio project in extras/Esp32StepperDemo for esp32 stepper configuration
+- esp32-idf5: implement I2S-module in DIRECT mode to drive one stepper up to 200 kHz (1-3 modules depending on esp32 variant)
+- esp32-idf5: use I2S-module in MUX mode (16bit/stereo) to drive up to 32 steppers (or less if direction/enable on mux) (#338)
+    ATTENTION: WORK IN PROGRESS - DIR/ENABLE not yet functional. using Esp32StepperDemo manual dir/enable setting is possible
 
 0.34.0:
 - Major internal refactoring: reorganize code into subdirectories
