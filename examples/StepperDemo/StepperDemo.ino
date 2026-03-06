@@ -363,7 +363,17 @@ const struct stepper_config_s stepper_config[MAX_STEPPER+1] = {
       off_delay_ms : 10
     },
 #endif
-    {step : PIN_UNDEFINED}
+    {
+      step : PIN_UNDEFINED,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : PIN_UNDEFINED,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : true,
+      on_delay_us : 5000,
+      off_delay_ms : 10
+    }
 };
 #elif defined(ARDUINO_ARCH_SAM)
 // Hardware configuration copied from esp32 board. Not used on due board
