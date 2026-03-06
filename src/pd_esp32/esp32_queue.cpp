@@ -4,7 +4,6 @@
 #endif
 
 #if defined(SUPPORT_ESP32)
-#include <Arduino.h>
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
