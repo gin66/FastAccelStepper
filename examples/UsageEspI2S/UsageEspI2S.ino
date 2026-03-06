@@ -1,5 +1,7 @@
 #include "FastAccelStepper.h"
 
+#ifdef SUPPORT_ESP32_I2S
+
 // I2S_DIRECT example: one stepper per I2S peripheral, bit-level resolution
 #define i2sDirectStepPin 15
 
@@ -20,18 +22,19 @@
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 
 // I2S_DIRECT stepper
-FastAccelStepper *stepperDirect = NULL;
+FastAccelStepper* stepperDirect = NULL;
 
 // I2S_MUX steppers
-FastAccelStepper *stepperMux0 = NULL;
-FastAccelStepper *stepperMux1 = NULL;
+FastAccelStepper* stepperMux0 = NULL;
+FastAccelStepper* stepperMux1 = NULL;
 
 void setup() {
   Serial.begin(115200);
   engine.init();
 
   // --- I2S_DIRECT: one stepper, bit-level resolution (up to ~200kHz) ---
-  stepperDirect = engine.stepperConnectToPin(i2sDirectStepPin, DRIVER_I2S_DIRECT);
+  stepperDirect =
+      engine.stepperConnectToPin(i2sDirectStepPin, DRIVER_I2S_DIRECT);
   if (stepperDirect) {
     stepperDirect->setDirectionPin(18);
     stepperDirect->setAutoEnable(true);
@@ -73,3 +76,10 @@ void setup() {
 }
 
 void loop() {}
+
+#else
+
+void setup() {}
+void loop() {}
+
+#endif

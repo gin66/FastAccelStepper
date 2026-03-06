@@ -11,9 +11,6 @@
 // #define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
-#if SOC_I2S_NUM >= 1
-#define SUPPORT_ESP32_I2S
-#endif
 #define SUPPORT_ESP32_PULSE_COUNTER 8
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 64
@@ -170,6 +167,10 @@
 
 #if (ESP_IDF_VERSION_MINOR >= 5) && defined(SUPPORT_ESP32_PULSE_COUNTER)
 #undef SUPPORT_ESP32_PULSE_COUNTER
+#endif
+
+#if SOC_I2S_NUM >= 1
+#define SUPPORT_ESP32_I2S
 #endif
 
 // in order to avoid spikes, first set the value and then make an output
