@@ -313,6 +313,23 @@ static void test_mux_off_ticks_compensation() {
               num_pulses == 255 && consumed);
 }
 
+static bool onlyTargetSlotUsed(const uint8_t* buf, uint8_t byte_offset,
+                               uint8_t bit_mask) {
+  for (uint16_t frame = 0; frame < I2S_FRAMES_PER_BLOCK; frame++) {
+    for (uint8_t b = 0; b < I2S_BYTES_PER_FRAME; b++) {
+      uint8_t v = buf[frame * I2S_BYTES_PER_FRAME + b];
+      if (b == byte_offset) {
+        if (v & ~bit_mask) {
+          return false;
+        }
+      } else if (v != 0) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 static void test_mux_slot_0_isolation() {
   printf("Running: MUX slot 0 isolation\n");
 
@@ -327,16 +344,14 @@ static void test_mux_slot_0_isolation() {
   struct i2s_fill_state state = {0, 0, 0};
   i2s_fill_buffer_mux(&q, buf, &state, getByteOffset(0), getBitMask(0));
 
-  uint8_t other_byte = 1;
-  uint8_t other_mask = 0xFF;
   uint32_t pulses_in_slot =
       countPulsesInSlot(buf, getByteOffset(0), getBitMask(0));
-  uint32_t pulses_other = countPulsesInSlot(buf, other_byte, other_mask);
+  bool isolated = onlyTargetSlotUsed(buf, getByteOffset(0), getBitMask(0));
 
   printf("  Slot 0 pulses: %u (expected 3)\n", pulses_in_slot);
-  printf("  Other slots: %u (expected 0)\n", pulses_other);
+  printf("  Isolated: %s\n", isolated ? "yes" : "no");
 
-  test_result("MUX slot 0 isolation", pulses_in_slot == 3 && pulses_other == 0);
+  test_result("MUX slot 0 isolation", pulses_in_slot == 3 && isolated);
 }
 
 static void test_mux_slot_7_isolation() {
@@ -355,12 +370,12 @@ static void test_mux_slot_7_isolation() {
 
   uint32_t pulses_in_slot =
       countPulsesInSlot(buf, getByteOffset(7), getBitMask(7));
-  uint32_t pulses_other = countPulsesInSlot(buf, 0, 0xFE);
+  bool isolated = onlyTargetSlotUsed(buf, getByteOffset(7), getBitMask(7));
 
   printf("  Slot 7 pulses: %u (expected 3)\n", pulses_in_slot);
-  printf("  Other slots: %u (expected 0)\n", pulses_other);
+  printf("  Isolated: %s\n", isolated ? "yes" : "no");
 
-  test_result("MUX slot 7 isolation", pulses_in_slot == 3 && pulses_other == 0);
+  test_result("MUX slot 7 isolation", pulses_in_slot == 3 && isolated);
 }
 
 static void test_mux_slot_15_isolation() {
@@ -379,14 +394,12 @@ static void test_mux_slot_15_isolation() {
 
   uint32_t pulses_in_slot =
       countPulsesInSlot(buf, getByteOffset(15), getBitMask(15));
-  uint32_t pulses_byte0 = countPulsesInSlot(buf, 0, 0xFF);
-  uint32_t pulses_byte2 = countPulsesInSlot(buf, 2, 0xFF);
+  bool isolated = onlyTargetSlotUsed(buf, getByteOffset(15), getBitMask(15));
 
   printf("  Slot 15 pulses: %u (expected 2)\n", pulses_in_slot);
-  printf("  Byte 0: %u, Byte 2: %u (expected 0)\n", pulses_byte0, pulses_byte2);
+  printf("  Isolated: %s\n", isolated ? "yes" : "no");
 
-  test_result("MUX slot 15 isolation",
-              pulses_in_slot == 2 && pulses_byte0 == 0 && pulses_byte2 == 0);
+  test_result("MUX slot 15 isolation", pulses_in_slot == 2 && isolated);
 }
 
 static void test_mux_slot_31_isolation() {
@@ -405,13 +418,12 @@ static void test_mux_slot_31_isolation() {
 
   uint32_t pulses_in_slot =
       countPulsesInSlot(buf, getByteOffset(31), getBitMask(31));
-  uint32_t pulses_other = countPulsesInSlot(buf, 0, 0xFF);
+  bool isolated = onlyTargetSlotUsed(buf, getByteOffset(31), getBitMask(31));
 
   printf("  Slot 31 pulses: %u (expected 2)\n", pulses_in_slot);
-  printf("  Other: %u (expected 0)\n", pulses_other);
+  printf("  Isolated: %s\n", isolated ? "yes" : "no");
 
-  test_result("MUX slot 31 isolation",
-              pulses_in_slot == 2 && pulses_other == 0);
+  test_result("MUX slot 31 isolation", pulses_in_slot == 2 && isolated);
 }
 
 static void test_mux_two_steppers_same_buffer() {

@@ -645,6 +645,7 @@ static void test_fill_overwrites_old_data() {
   printf("  First fill with 5 steps: %u pulses\n", pulses_after_first);
 
   memset(buf, 0, I2S_BYTES_PER_BLOCK);
+  state = {0, 0, 0};
   q.read_idx = 0;
   q.next_write_idx = 0;
   add_command(&q, 3, 300);
@@ -876,25 +877,31 @@ static void test_fill_partial_steps() {
   i2s_fill_buffer_direct(&q, bufs[0], &state);
 
   uint32_t pulses1 = countPulsesInBuffer(bufs[0]);
-  uint8_t remaining = q.entry[q.read_idx & QUEUE_LEN_MASK].steps;
+  uint8_t remaining1 = q.entry[q.read_idx & QUEUE_LEN_MASK].steps;
   uint16_t block_ticks = I2S_FRAMES_PER_BLOCK * I2S_TICKS_PER_FRAME;
   uint8_t expected_in_block = block_ticks / 200;
-  uint8_t expected_remaining = 100 - expected_in_block;
+  uint8_t expected_remaining1 = 100 - expected_in_block;
   printf("  Block 1: pulses=%u (expected %u)\n", pulses1, expected_in_block);
-  printf("  Remaining steps: %u (expected %u)\n", remaining,
-         expected_remaining);
+  printf("  Remaining steps: %u (expected %u)\n", remaining1,
+         expected_remaining1);
 
   i2s_fill_buffer_direct(&q, bufs[1], &state);
 
   uint32_t pulses2 = countPulsesInBuffer(bufs[1]);
   bool consumed = (q.read_idx == q.next_write_idx);
-  uint8_t expected_block2 = 1 + (block_ticks - 1) / 200;
+  uint8_t remaining2 =
+      consumed ? 0 : q.entry[q.read_idx & QUEUE_LEN_MASK].steps;
+  uint8_t expected_remaining2 = 100 - expected_in_block - expected_in_block;
   printf("  Block 2: pulses=%u (expected %u), consumed=%s\n", pulses2,
-         expected_block2, consumed ? "yes" : "no");
+         expected_in_block, consumed ? "yes" : "no");
+  printf("  Remaining after block 2: %u (expected %u)\n", remaining2,
+         expected_remaining2);
 
-  test_result("Fill partial steps",
-              pulses1 == expected_in_block && remaining == expected_remaining &&
-                  pulses2 == expected_block2 && !consumed);
+  test_result(
+      "Fill partial steps",
+      pulses1 == expected_in_block && remaining1 == expected_remaining1 &&
+          pulses2 == expected_in_block && !consumed &&
+          remaining2 == expected_remaining2);
 }
 
 static void test_fill_carry_ticks() {
@@ -1040,12 +1047,26 @@ static void test_fill_255_steps_83_ticks() {
   uint16_t num_pulses = 0;
   fillAndDetectPulses(&q, 3, pulse_ticks, &num_pulses);
 
+  printf("  Total pulses: %u (expected 255)\n", num_pulses);
+
+  if (num_pulses < 2) {
+    printf("  Not enough pulses for frequency calculation\n");
+    test_result("Fill 255 steps @ 83 ticks freq", false);
+    return;
+  }
+
   uint32_t first_tick = pulse_ticks[0];
   uint32_t last_tick = pulse_ticks[num_pulses - 1];
   uint32_t time_diff = last_tick - first_tick;
+
+  if (time_diff == 0) {
+    printf("  Time diff is zero, cannot calculate frequency\n");
+    test_result("Fill 255 steps @ 83 ticks freq", false);
+    return;
+  }
+
   uint32_t freq = (num_pulses - 1) * 16000000UL / time_diff;
 
-  printf("  Total pulses: %u (expected 255)\n", num_pulses);
   printf("  First pulse tick: %u\n", first_tick);
   printf("  Last pulse tick: %u\n", last_tick);
   printf("  Time diff: %u ticks\n", time_diff);
