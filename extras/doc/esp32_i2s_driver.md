@@ -34,14 +34,14 @@ I2S once validated.
 - **PC-based tests**: `test_21.cpp` with comprehensive test coverage
 - **Hardware validated**: Working on ESP32
 
-### ⬜ I2S_MUX Mode — Not Yet Implemented
+### ⬜ I2S_MUX Mode — Implementation In Progress
 
-- Multi-stepper slot management
-- DIR/ENABLE bitmask support
-- Frame-level fill algorithm
-- Engine-level initialization API
-- WS pin output for demux latch
-- Hardware validation with 74HC595
+- ✅ Multi-stepper slot management
+- ✅ Engine-level initialization API (`initI2sMux()`)
+- ✅ Queue allocation with slot precomputation
+- ✅ Frame-level fill algorithm (`i2s_fill_buffer_mux()`)
+- ⬜ PC-based tests for MUX fill
+- ⬜ Hardware validation with 74HC595
 
 ---
 
@@ -657,12 +657,12 @@ The fill function is testable on PC without I2S hardware. `test_21.cpp` provides
    - Precompute and store `q->_i2s_mux_byte_offset` and `q->_i2s_mux_bit_mask`
 2. `max_speed_in_ticks = I2S_MUX_MIN_SPEED_TICKS` is set in `init_i2s()`
 
-### Phase 3: MUX Fill Algorithm
+### Phase 3: MUX Fill Algorithm ✅ Complete
 
 1. Implement `i2s_fill_buffer_mux()` as separate optimized function
 2. Frame-level iteration: one bit per frame per stepper
 3. OR bits into shared buffer (`buf[offset] |= mask`)
-4. Set DIR/ENABLE bits statically for entire block
+4. Pulse width fixed at 1 frame (64 ticks)
 5. `StepperQueue::fill_i2s_buffer()` dispatches to correct fill function
 
 ### Phase 4: Testing & Validation

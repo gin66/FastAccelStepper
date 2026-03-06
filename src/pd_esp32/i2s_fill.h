@@ -16,8 +16,12 @@ struct i2s_fill_state {
   uint8_t off_ticks;
 };
 
-bool i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
-                     struct i2s_fill_state* state);
+bool i2s_fill_buffer_direct(StepperQueueBase* q, uint8_t* buf,
+                            struct i2s_fill_state* state);
+
+bool i2s_fill_buffer_mux(StepperQueue* q, uint8_t* buf,
+                         struct i2s_fill_state* state, uint8_t byte_offset,
+                         uint8_t bit_mask);
 
 #endif
 #endif
