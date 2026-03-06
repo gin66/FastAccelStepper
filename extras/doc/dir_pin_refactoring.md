@@ -210,8 +210,8 @@ been emitted. This means:
   • I2S-MUX: BEFORE (drain) + AFTER (dir change alone in buffer) = deterministic
 
 Special case for I2S-MUX:
-  • BEFORE: 500us pause ensures buffer fully drained
-  • AFTER: dir change command 500us ensures it's alone in new buffer
+  • BEFORE: I2S_BLOCK_TICKS pause ensures buffer fully drained
+  • AFTER: dir change command >= I2S_BLOCK_TICKS ensures it's alone in new buffer
   • Bit mask change happens at clean buffer boundary
 ```
 
@@ -250,12 +250,12 @@ public:
     // Return required pause ticks BEFORE direction change
     // Used by addQueueEntry to insert sufficient pause for buffered platforms
     // Returns 0 for non-buffered platforms (AVR, SAM, MCPWM)
-    // Returns ~500us for I2S-MUX (buffer must be empty before mask change)
+    // Returns I2S_BLOCK_TICKS for I2S-MUX (buffer must be empty before mask change)
     uint16_t getDrainPauseTicksForDirChange();
     
     // Return minimum ticks for direction change command itself (I2S-MUX only)
     // This is the AFTER pause - ensures dir change is alone in buffer
-    // Returns 0 for all platforms except I2S-MUX
+    // Returns 0 for all platforms except I2S-MUX (returns I2S_BLOCK_TICKS)
     uint16_t getDirChangeMinTicks();
     
     // Optional: Check if pulses are still being emitted
@@ -303,10 +303,10 @@ FastAccelStepper::addQueueEntry(cmd, start):
         
      b. Else if I2S-MUX direction pin (I2S controls both step and dir):
         - Query: pause_ticks = getDrainPauseTicksForDirChange()
-        - Insert pause command with pause_ticks (BEFORE: 500us to drain buffer)
+        - Insert pause command with pause_ticks (BEFORE: I2S_BLOCK_TICKS to drain buffer)
         - If queue too full: return AQE_DIR_PIN_IS_BUSY
         - Set toggle_dir = 1 in entry
-        - Override entry.ticks = max(entry.ticks, DIR_CHANGE_MIN_TICKS) (AFTER: 500us ensures dir change is alone in buffer)
+        - Override entry.ticks = max(entry.ticks, getDirChangeMinTicks()) (AFTER: ensures dir change alone in buffer)
         
      c. Else (GPIO direction pin, RMT/MCPWM/AVR/SAM):
         - Query: pause_ticks = getDrainPauseTicksForDirChange()
@@ -352,16 +352,16 @@ uint16_t StepperQueue::getDrainPauseTicksForDirChange() {
 }
 
 // ESP32 I2S-MUX (I2S controls both step and dir) - need BEFORE and AFTER pauses
-// BEFORE: 500us pause to drain buffer completely
-// AFTER: dir change command itself needs 500us to ensure it's alone in new buffer
+// BEFORE: I2S_BLOCK_TICKS pause to drain buffer completely
+// AFTER: dir change command itself needs >= I2S_BLOCK_TICKS to be alone in new buffer
 // The bit mask for direction is only applied when buffer is empty
 uint16_t StepperQueue::getDrainPauseTicksForDirChange() {
-    return I2S_MUX_DIR_CHANGE_PAUSE_TICKS;  // ~500us
+    return I2S_BLOCK_TICKS;
 }
 
 // Minimum ticks for a direction change command in I2S-MUX mode
 uint16_t StepperQueue::getDirChangeMinTicks() {
-    return I2S_MUX_DIR_CHANGE_MIN_TICKS;  // ~500us
+    return I2S_BLOCK_TICKS;
 }
 ```
 
@@ -387,9 +387,9 @@ uint16_t StepperQueue::getDrainPauseTicksForDirChange() {
     // RMT: one command fills one buffer half
     return MIN_CMD_TICKS;
 #elif defined(USE_I2S)
-    // I2S-MUX: 500us BEFORE pause to drain buffer
+    // I2S-MUX: I2S_BLOCK_TICKS BEFORE pause to drain buffer
     // Direction bit mask is only applied when buffer is empty
-    return usToTicks(I2S_MUX_DIR_CHANGE_PAUSE_US);  // 500us
+    return I2S_BLOCK_TICKS;
 #else
     // MCPWM: no buffer, no pause needed
     return 0;
@@ -398,9 +398,9 @@ uint16_t StepperQueue::getDrainPauseTicksForDirChange() {
 
 uint16_t StepperQueue::getDirChangeMinTicks() {
 #if defined(USE_I2S)
-    // I2S-MUX: dir change command needs 500us to be alone in buffer
+    // I2S-MUX: dir change command needs I2S_BLOCK_TICKS to be alone in buffer
     // This is the AFTER pause, combined with the direction change
-    return usToTicks(I2S_MUX_DIR_CHANGE_MIN_US);  // 500us
+    return I2S_BLOCK_TICKS;
 #else
     return 0;
 #endif
@@ -416,17 +416,17 @@ Timeline for I2S-MUX direction change:
 ┌─────────────────────────────────────────────────────────────────┐
 │ Buffer N:   [Step A][Step A][Step A][Step A] (old direction)    │
 │                                                                 │
-│             ─── BEFORE pause (500us) ───                        │
+│             ─── BEFORE pause (I2S_BLOCK_TICKS) ───              │
 │                                                                 │
-│ Buffer N+1: [Dir Change Only - 500us] ← new bit mask applied    │
-│             (no steps, just direction change)                   │
+│ Buffer N+1: [Dir Change Only] ← new bit mask applied            │
+│             (>= I2S_BLOCK_TICKS, no steps, just direction)      │
 │                                                                 │
 │ Buffer N+2: [Step B][Step B][Step B] (new direction)            │
 └─────────────────────────────────────────────────────────────────┘
 
 Requirements:
-1. BEFORE: 500us pause ensures Buffer N is fully transmitted
-2. AFTER: Dir change command is 500us, ensuring it fills Buffer N+1 alone
+1. BEFORE: I2S_BLOCK_TICKS pause ensures Buffer N is fully transmitted
+2. AFTER: Dir change command >= I2S_BLOCK_TICKS, ensuring it fills Buffer N+1 alone
 3. New bit mask (direction) is applied at Buffer N+1 boundary
 4. Next steps (Buffer N+2) use the new direction
 ```
@@ -659,8 +659,8 @@ if (toggle_dir) {
 ```
 
 With the new approach:
-- `addQueueEntry()` inserts **BEFORE pause** (500us) to drain buffer completely
-- Direction change command has **AFTER duration** (500us) ensuring it's alone in new buffer
+- `addQueueEntry()` inserts **BEFORE pause** (I2S_BLOCK_TICKS) to drain buffer completely
+- Direction change command has **AFTER duration** (>= I2S_BLOCK_TICKS) ensuring it's alone in new buffer
 - Bit mask change happens at buffer boundary - deterministic
 - **No synchronization logic needed**
 - **I2S driver code unchanged**
@@ -671,9 +671,9 @@ Before (ambiguous):
                            ↑ When does mask change?
 
 After (deterministic):
-  [Step][Step][Step] | PAUSE | [DIR_CHANGE] | [Step][Step]
-                      ↑ 500us   ↑ 500us
-                   buffer empty  mask applied at boundary
+  [Step][Step][Step] | PAUSE (I2S_BLOCK_TICKS) | [DIR_CHANGE] | [Step][Step]
+                      ← buffer empty →            ← alone →
+                   mask applied at buffer boundary
 ```
 
 ### 8.5 Clear Processing Model
