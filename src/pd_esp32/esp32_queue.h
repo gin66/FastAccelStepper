@@ -26,6 +26,7 @@ static uint8_t queues_allocated;
 #if defined(SUPPORT_ESP32_I2S)
   static bool _i2s_mux_initialized;
   static uint32_t _i2s_mux_allocated_bitmask;
+  static I2sManager* _i2s_mux_manager;
 #endif
 static void initVars() {
   StepperQueue::queues_allocated = 0;
@@ -35,6 +36,7 @@ static void initVars() {
   #if defined(SUPPORT_ESP32_I2S)
     StepperQueue::_i2s_mux_initialized = false;
     StepperQueue::_i2s_mux_allocated_bitmask = 0;
+    StepperQueue::_i2s_mux_manager = nullptr;
   #endif
 }
 #endif

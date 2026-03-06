@@ -13,11 +13,14 @@ class I2sManager {
 
   void handleTxDone(uint8_t* buf);
 
+  bool _is_mux = false;
+
   volatile uint32_t _callback_count = 0;
 
  private:
   I2sManager() {}
   bool init();
+  void init_mux_buffer(uint8_t* buf);
   i2s_chan_handle_t _chan = nullptr;
 };
 

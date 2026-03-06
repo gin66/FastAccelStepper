@@ -12,6 +12,7 @@ uint8_t StepperQueue::queues_allocated = 0;
 #if defined(SUPPORT_ESP32_I2S)
 bool StepperQueue::_i2s_mux_initialized = false;
 uint32_t StepperQueue::_i2s_mux_allocated_bitmask = 0;
+I2sManager* StepperQueue::_i2s_mux_manager = nullptr;
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 uint8_t StepperQueue::_mcpwm_pcnt_allocated = 0;
@@ -199,6 +200,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
     StepperQueue::_i2s_mux_allocated_bitmask |= bit;
     StepperQueue* q = new StepperQueue();
     q->use_i2s = true;
+    q->i2s_mgr = StepperQueue::_i2s_mux_manager;
     return q;
   }
 

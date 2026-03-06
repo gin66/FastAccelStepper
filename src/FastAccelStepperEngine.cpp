@@ -1,6 +1,9 @@
 #include "FastAccelStepperEngine.h"
 #include "FastAccelStepper.h"
 #include "fas_queue/stepper_queue.h"
+#if defined(SUPPORT_ESP32_I2S)
+#include "pd_esp32/i2s_manager.h"
+#endif
 
 #ifndef TEST
 #define printf DO_NOT_USE_PRINTF
@@ -64,6 +67,25 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
   }
   return false;
 }
+
+#if defined(SUPPORT_ESP32_I2S) && defined(SUPPORT_DYNAMIC_ALLOCATION)
+bool FastAccelStepperEngine::initI2sMux(uint8_t data_pin, uint8_t bclk_pin,
+                                        uint8_t ws_pin) {
+  if (StepperQueue::_i2s_mux_initialized) {
+    return false;
+  }
+  I2sManager* mgr = I2sManager::create((gpio_num_t)data_pin,
+                                        (gpio_num_t)bclk_pin,
+                                        (gpio_num_t)ws_pin);
+  if (mgr == nullptr) {
+    return false;
+  }
+  mgr->_is_mux = true;
+  StepperQueue::_i2s_mux_manager = mgr;
+  StepperQueue::_i2s_mux_initialized = true;
+  return true;
+}
+#endif
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
 // dynamic allocation is currently only supported for esp32

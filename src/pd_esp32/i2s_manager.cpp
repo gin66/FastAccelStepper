@@ -37,7 +37,7 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
                                                   I2S_SLOT_MODE_STEREO),
       .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,
                    .bclk = bclk_pin,
-                   .ws = I2S_GPIO_UNUSED,
+                   .ws = ws_pin,
                    .dout = data_pin,
                    .din = I2S_GPIO_UNUSED,
                    .invert_flags =
@@ -85,41 +85,34 @@ bool I2sManager::init() {
   return true;
 }
 
+void IRAM_ATTR I2sManager::init_mux_buffer(uint8_t* buf) {
+  // TODO: build frame template from DIR/ENABLE state of connected steppers
+  // around 21us
+  uint32_t *b = (uint32_t*)buf;
+  uint8_t i = I2S_BYTES_PER_BLOCK/4;
+  do {
+    b[--i] = 0;
+  } while(i);
+}
+
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
   _callback_count++;
 
-        pinMode(14, OUTPUT);
-        digitalWrite(14, HIGH);
-
-  // clear the buffer for the next round
-  // using a triple buffer scheme with auto_clear perhaps can avoid this
-
-  // around 18us
-  memset(buf, 0, I2S_BYTES_PER_BLOCK);
-
-  // around 21us
-  // uint32_t *b = (uint32_t*)buf;
-  // uint8_t i = I2S_BYTES_PER_BLOCK/4;
-  // do {
-  //   b[--i] = 0;
-  // } while(i);
+  if (_is_mux) {
+    init_mux_buffer(buf);
+  } else {
+    // around 18us
+    memset(buf, 0, I2S_BYTES_PER_BLOCK);
+  }
 
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
     StepperQueue* q = fas_queue[i];
-    if (q) {
-      if (q->use_i2s) {
-        if (q->i2s_mgr == this) {
-          pinMode(33, OUTPUT);
-          digitalWrite(33, HIGH);
-          // 32us..44us @ v=10us
-          // ~63us @ v=5us
-          q->fill_i2s_buffer(buf);
-          digitalWrite(33, LOW);
-        }
-      }
+    if (q && q->use_i2s && q->i2s_mgr == this) {
+      // 32us..44us @ v=10us
+      // ~63us @ v=5us
+      q->fill_i2s_buffer(buf);
     }
   }
-        digitalWrite(14, LOW);
 }
 
 #endif  // SUPPORT_ESP32_I2S

@@ -19,6 +19,7 @@ class FastAccelStepperEngine {
 #if defined(SUPPORT_ESP32_I2S)
 #define DRIVER_I2S_DIRECT FasDriver::I2S_DIRECT
 #define DRIVER_I2S_MUX FasDriver::I2S_MUX
+  bool initI2sMux(uint8_t data_pin, uint8_t bclk_pin, uint8_t ws_pin);
 #endif
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
   FastAccelStepper* stepperConnectToPin(
