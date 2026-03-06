@@ -33,6 +33,12 @@ test_21: test_21.o
 test_21.o: test_21.cpp $(PRJ_ROOT)/src/pd_esp32/i2s_fill.cpp $(PRJ_ROOT)/src/pd_esp32/i2s_fill.h $(PRJ_ROOT)/src/pd_esp32/i2s_constants.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
+test_22: test_22.o
+	g++ -o $@ $< $(LDLIBS)
+
+test_22.o: test_22.cpp i2s_test_common.h $(PRJ_ROOT)/src/pd_esp32/i2s_fill.cpp $(PRJ_ROOT)/src/pd_esp32/i2s_fill.h $(PRJ_ROOT)/src/pd_esp32/i2s_constants.h
+	g++ -c $(CXXFLAGS) -o $@ $<
+
 test_%: test_%.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
 
