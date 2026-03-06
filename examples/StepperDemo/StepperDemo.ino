@@ -1030,8 +1030,6 @@ void setup() {
     FastAccelStepper* s = NULL;
     const struct stepper_config_s* config = &stepper_config[i];
     if (config->step != PIN_UNDEFINED) {
-      Serial.print("Connect stepper to pin ");
-      Serial.println(config->step);
       s = engine.stepperConnectToPin(config->step);
       if (s) {
         s->setDirectionPin(config->direction, config->direction_high_count_up,
