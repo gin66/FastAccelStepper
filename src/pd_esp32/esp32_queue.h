@@ -37,6 +37,9 @@ class StepperQueue : public StepperQueueBase {
 #endif
   }
 #endif
+#elif defined(SUPPORT_DYNAMIC_ALLOCATION)
+  static uint8_t queues_allocated;
+  static void initVars() { StepperQueue::queues_allocated = 0; }
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 
   volatile bool _isRunning;

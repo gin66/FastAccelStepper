@@ -33,11 +33,11 @@ void FastAccelStepperEngine::init() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
   }
-  #if defined(SUPPORT_DYNAMIC_ALLOCATION)
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
     fas_queue[i] = NULL;
   }
-  #endif
+#endif
 
 #if defined(SUPPORT_RP_PICO)
   claimed_pios = 0;
@@ -74,9 +74,8 @@ bool FastAccelStepperEngine::initI2sMux(uint8_t data_pin, uint8_t bclk_pin,
   if (StepperQueue::_i2s_mux_initialized) {
     return false;
   }
-  I2sManager* mgr = I2sManager::create((gpio_num_t)data_pin,
-                                        (gpio_num_t)bclk_pin,
-                                        (gpio_num_t)ws_pin);
+  I2sManager* mgr = I2sManager::create(
+      (gpio_num_t)data_pin, (gpio_num_t)bclk_pin, (gpio_num_t)ws_pin);
   if (mgr == nullptr) {
     return false;
   }
@@ -102,9 +101,15 @@ bool FastAccelStepperEngine::i2sMuxGetBit(uint8_t slot) {
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
 // dynamic allocation is currently only supported for esp32
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, FasDriver driver_type) {
   StepperQueue* q = StepperQueue::tryAllocateQueue(driver_type, step_pin);
+#else
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin) {
+  StepperQueue* q = StepperQueue::tryAllocateQueue(step_pin);
+#endif
   if (q != nullptr) {
     uint8_t fas_stepper_num = _stepper_cnt;
     _stepper_cnt++;

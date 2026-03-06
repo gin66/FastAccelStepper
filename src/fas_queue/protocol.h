@@ -13,6 +13,8 @@
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 static StepperQueue* tryAllocateQueue(FasDriver driver, uint8_t step_pin);
+#elif defined(SUPPORT_DYNAMIC_ALLOCATION)
+static StepperQueue* tryAllocateQueue(uint8_t step_pin);
 #endif
 
 static bool isValidStepPin(uint8_t step_pin);

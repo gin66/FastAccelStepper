@@ -7,8 +7,8 @@
 #include <Arduino.h>
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
-uint8_t StepperQueue::queues_allocated = 0;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
+uint8_t StepperQueue::queues_allocated = 0;
 #if defined(SUPPORT_ESP32_I2S)
 bool StepperQueue::_i2s_mux_initialized = false;
 uint32_t StepperQueue::_i2s_mux_allocated_bitmask = 0;
@@ -20,6 +20,8 @@ uint8_t StepperQueue::_mcpwm_pcnt_allocated = 0;
 #ifdef SUPPORT_ESP32_RMT
 uint8_t StepperQueue::_rmt_allocated = 0;
 #endif
+#else
+uint8_t StepperQueue::queues_allocated = 0;
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 #endif
 
@@ -253,6 +255,29 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
   return q;
 }
 #endif  // SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
+
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_DYNAMIC_ALLOCATION)
+StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+  if (StepperQueue::queues_allocated >= MAX_STEPPER) {
+    return nullptr;
+  }
+
+  if (step_pin & PIN_EXTERNAL_FLAG) {
+    return nullptr;
+  }
+
+  if (!StepperQueue::isValidStepPin(step_pin)) {
+    return nullptr;
+  }
+
+  StepperQueue* q = new StepperQueue();
+#if defined(SUPPORT_ESP32_RMT)
+  q->use_rmt = true;
+#endif
+  StepperQueue::queues_allocated++;
+  return q;
+}
+#endif  // !SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
 
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
