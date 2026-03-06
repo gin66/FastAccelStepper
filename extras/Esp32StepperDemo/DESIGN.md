@@ -10,14 +10,14 @@ A modern, web-based interface for controlling stepper motors on ESP32 platforms.
 - **Web Interface**: Browser-based UI accessible via WiFi
 - **Extended Pin Support**: Native GPIO + I2S expander (32 additional outputs)
 - **Multiple Driver Types**: RMT, I2S_DIRECT, I2S_MUX
-- **Persistent Configuration**: Save/load to SPIFFS/LittleFS
+- **Persistent Configuration**: Save/load to LittleFS
 - **Real-time Monitoring**: Live status updates via WebSocket
 - **Move Sequences**: Load and execute pre-defined move sequences
 
 ### 1.3 Target Platform
 - ESP32, ESP32-S2, ESP32-S3, ESP32-C3, ESP32-C6
-- ESP-IDF v4.4+ or Arduino ESP32 Core v2.0+
-- Minimum 4MB Flash (with SPIFFS partition)
+- **ESP-IDF v5.3+** (uses latest RMT driver with improved performance)
+- Minimum 4MB Flash (with LittleFS partition)
 
 ---
 
@@ -52,8 +52,8 @@ A modern, web-based interface for controlling stepper motors on ESP32 platforms.
 │  └──────────────────────────────────────────────────────┘  │
 │                                                              │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ GPIO Manager │  │ I2S Expander │  │  File System │      │
-│  │              │  │   Manager    │  │  (SPIFFS)    │      │
+  │  │ GPIO Manager │  │ I2S Expander │  │  File System │      │
+│  │              │  │   Manager    │  │  (LittleFS)  │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -64,7 +64,7 @@ A modern, web-based interface for controlling stepper motors on ESP32 platforms.
    ```
    Web UI → REST API → Config Manager → FAS Engine → Hardware
                     ↓
-                SPIFFS (persistent)
+                LittleFS (persistent)
    ```
 
 2. **Real-time Status Flow**:
@@ -87,8 +87,8 @@ A modern, web-based interface for controlling stepper motors on ESP32 platforms.
 ```
 GET  /api/config                    - Get full configuration
 POST /api/config                    - Update configuration
-POST /api/config/save               - Save to SPIFFS
-GET  /api/config/load               - Load from SPIFFS
+POST /api/config/save               - Save to LittleFS
+GET  /api/config/load               - Load from LittleFS
 DELETE /api/config                  - Reset to defaults
 
 GET  /api/pins                      - Get all pin states
@@ -956,20 +956,24 @@ examples/Esp32StepperDemo/
 ### Arduino Libraries
 - **ESPAsyncWebServer** - Async HTTP and WebSocket server
 - **ArduinoJson** - JSON parsing and creation
-- **SPIFFS** or **LittleFS** - File system for configuration storage
+- **LittleFS** - File system for configuration storage (SPIFFS deprecated in ESP-IDF v5.x)
 
 ### PlatformIO Configuration
 ```ini
 [env:esp32]
 platform = espressif32
 board = esp32dev
-framework = arduino
+framework = arduino, espidf
+platform_packages = 
+    framework-espidf @ https://github.com/espressif/esp-idf.git#v5.3
 lib_deps = 
     espressif/esp32-camera
     me-no-dev/ESP Async WebServer
     bblanchon/ArduinoJson
 monitor_speed = 115200
 board_build.partitions = huge_app.csv
+build_flags = 
+    -DCORE_DEBUG_LEVEL=ARDUHAL_LOG_LEVEL_INFO
 ```
 
 ---
@@ -978,7 +982,7 @@ board_build.partitions = huge_app.csv
 
 ### Phase 1: Core Infrastructure (Week 1-2)
 - [ ] Basic web server setup
-- [ ] SPIFFS file system integration
+- [ ] LittleFS file system integration
 - [ ] Configuration manager skeleton
 - [ ] JSON serialization/deserialization
 - [ ] Basic REST API framework
@@ -1052,7 +1056,7 @@ board_build.partitions = huge_app.csv
 
 ### 12.2 Resource Usage
 - Heap usage: < 100KB (leaving > 200KB free on ESP32)
-- SPIFFS usage: < 64KB for configuration
+- LittleFS usage: < 64KB for configuration
 - Flash usage: < 2MB total
 
 ### 12.3 Concurrency
@@ -1093,12 +1097,11 @@ board_build.partitions = huge_app.csv
 - **ESP32-C6**: Limited (RMT only)
 
 ### 14.2 IDF Version Compatibility
-- **ESP-IDF v4.4**: MCPWM/PCNT or RMT
-- **ESP-IDF v5.x**: RMT only (I2S direct via new API)
+- **ESP-IDF v5.3+**: RMT only (recommended, with improved driver)
+- **I2S Support**: Via new I2S driver API in v5.3+
 
 ### 14.3 Arduino ESP32 Core
-- **v2.0.x**: Full support
-- **v3.0.x**: TBD (may require updates)
+- **v3.0+**: Required (for ESP-IDF v5.3 support)
 
 ---
 
@@ -1125,7 +1128,7 @@ board_build.partitions = huge_app.csv
 - Ensure AP mode is off (or configured correctly)
 
 #### Configuration Not Saving
-- Check SPIFFS is mounted
+- Check LittleFS is mounted
 - Verify sufficient space available
 - Check file permissions
 - Look for JSON syntax errors

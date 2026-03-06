@@ -1,0 +1,168 @@
+src/main.cpp:25:1: error: 'FastAccelStepperEngine' does not name a type
+   25 | FastAccelStepperEngine engine = FastAccelStepperEngine();
+      | ^~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp:25:1: error: 'FastAccelStepperEngine' does not name a type
+   25 | FastAccelStepperEngine engine = FastAccelStepperEngine();
+      | ^~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp: In function 'String readStringUntilTerminator(String&, size_t, char)':
+src/main.cpp:47:1: error: no return statement in function returning non-void [-Werror=return-type]
+   47 | }
+      | ^
+src/main.cpp: In function 'void saveWiFiConfig(const String&, const String&, const String&)':
+src/main.cpp:51:14: error: expected unqualified-id before '.' token
+src/main.cpp: In function 'String readStringUntilTerminator(String&, size_t, char)':
+src/main.cpp:47:1: error: no return statement in function returning non-void [-Werror=return-type]
+   47 | }
+      | ^
+src/main.cpp: In function 'void saveWiFiConfig(const String&, const String&, const String&)':
+src/main.cpp:51:14: error: expected unqualified-id before '.' token
+   51 |   Preferences.begin(NAMESPACE, false);
+      |              ^
+src/main.cpp:52:14: error: expected unqualified-id before '.' token
+   52 |   Preferences.putString(PREF_SSID, ssid.c_str());
+      |              ^
+src/main.cpp:53:14: error: expected unqualified-id before '.' token
+   53 |   Preferences.putString(PREF_PASSWORD, password.c_str());
+      |              ^
+src/main.cpp:54:14: error: expected unqualified-id before '.' token
+   54 |   Preferences.putString(PREF_HOSTNAME, host.c_str());
+      |              ^
+src/main.cpp:55:14: error: expected unqualified-id before '.' token
+   55 |   Preferences.end();
+      |              ^
+src/main.cpp: In function 'bool loadWiFiConfig()':
+src/main.cpp:61:14: error: expected unqualified-id before '.' token
+   61 |   Preferences.begin(NAMESPACE, true);
+      |              ^
+src/main.cpp:62:25: error: expected primary-expression before '.' token
+   62 |   wifiSSID = Preferences.getString(PREF_SSID, "");
+      |                         ^
+src/main.cpp:63:29: error: expected primary-expression before '.' token
+   63 |   wifiPassword = Preferences.getString(PREF_PASSWORD, "");
+      |                             ^
+src/main.cpp:64:25: error: expected primary-expression before '.' token
+   64 |   hostname = Preferences.getString(PREF_HOSTNAME, "");
+      |                         ^
+src/main.cpp:65:14: error: expected unqualified-id before '.' token
+   65 |   Preferences.end();
+      |              ^
+   51 |   Preferences.begin(NAMESPACE, false);
+      |              ^
+src/main.cpp:52:14: error: expected unqualified-id before '.' token
+   52 |   Preferences.putString(PREF_SSID, ssid.c_str());
+      |              ^
+src/main.cpp:53:14: error: expected unqualified-id before '.' token
+   53 |   Preferences.putString(PREF_PASSWORD, password.c_str());
+      |              ^
+src/main.cpp:54:14: error: expected unqualified-id before '.' token
+   54 |   Preferences.putString(PREF_HOSTNAME, host.c_str());
+      |              ^
+src/main.cpp:55:14: error: expected unqualified-id before '.' token
+   55 |   Preferences.end();
+      |              ^
+src/main.cpp: In function 'bool loadWiFiConfig()':
+src/main.cpp:61:14: error: expected unqualified-id before '.' token
+   61 |   Preferences.begin(NAMESPACE, true);
+      |              ^
+src/main.cpp:62:25: error: expected primary-expression before '.' token
+   62 |   wifiSSID = Preferences.getString(PREF_SSID, "");
+      |                         ^
+src/main.cpp:63:29: error: expected primary-expression before '.' token
+   63 |   wifiPassword = Preferences.getString(PREF_PASSWORD, "");
+      |                             ^
+src/main.cpp:64:25: error: expected primary-expression before '.' token
+   64 |   hostname = Preferences.getString(PREF_HOSTNAME, "");
+      |                         ^
+src/main.cpp:65:14: error: expected unqualified-id before '.' token
+   65 |   Preferences.end();
+      |              ^
+src/main.cpp: In function 'void configureWiFiViaSerial()':
+src/main.cpp:78:39: error: too few arguments to function 'String readStringUntilTerminator(String&, size_t, char)'
+   78 |   wifiSSID = readStringUntilTerminator();
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/main.cpp:39:8: note: declared here
+   39 | String readStringUntilTerminator(String& buffer, size_t maxSize,
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp:81:32: error: no matching function for call to 'String::equalsIgnoreCase(const char [5], bool)'
+   81 |   if (wifiSSID.equalsIgnoreCase("skip", wifiSSID.length() == 0)) {
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp: In function 'void configureWiFiViaSerial()':
+src/main.cpp:78:39: error: too few arguments to function 'String readStringUntilTerminator(String&, size_t, char)'
+   78 |   wifiSSID = readStringUntilTerminator();
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/main.cpp:39:8: note: declared here
+   39 | String readStringUntilTerminator(String& buffer, size_t maxSize,
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp:81:32: error: no matching function for call to 'String::equalsIgnoreCase(const char [5], bool)'
+   81 |   if (wifiSSID.equalsIgnoreCase("skip", wifiSSID.length() == 0)) {
+      |       ~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /Users/jochen/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/Arduino.h:192,
+                 from src/main.cpp:10:
+/Users/jochen/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/WString.h:227:8: note: candidate: 'bool String::equalsIgnoreCase(const String&) const'
+  227 |   bool equalsIgnoreCase(const String &s) const;
+      |        ^~~~~~~~~~~~~~~~
+In file included from /Users/jochen/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/Arduino.h:192,
+                 from src/main.cpp:10:
+/Users/jochen/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/WString.h:227:8: note: candidate: 'bool String::equalsIgnoreCase(const String&) const'
+  227 |   bool equalsIgnoreCase(const String &s) const;
+      |        ^~~~~~~~~~~~~~~~
+/Users/jochen/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/WString.h:227:8: note:   candidate expects 1 argument, 2 provided
+/Users/jochen/.platformio/packages/framework-arduinoespressif32@src-77c8e93767360b28deee4aedf5d0a1ab/cores/esp32/WString.h:227:8: note:   candidate expects 1 argument, 2 provided
+src/main.cpp:88:43: error: too few arguments to function 'String readStringUntilTerminator(String&, size_t, char)'
+   88 |   wifiPassword = readStringUntilTerminator();
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/main.cpp:39:8: note: declared here
+   39 | String readStringUntilTerminator(String& buffer, size_t maxSize,
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp:92:39: error: too few arguments to function 'String readStringUntilTerminator(String&, size_t, char)'
+   92 |   hostname = readStringUntilTerminator();
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/main.cpp:39:8: note: declared here
+   39 | String readStringUntilTerminator(String& buffer, size_t maxSize,
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp: In function 'void checkWiFiConnection()':
+src/main.cpp:157:27: error: 'class WiFiClass' has no member named 'softAPIPaddress'; did you mean 'softAPmacAddress'?
+  157 |       Serial.println(WiFi.softAPIPaddress());
+      |                           ^~~~~~~~~~~~~~~
+      |                           softAPmacAddress
+src/main.cpp:88:43: error: too few arguments to function 'String readStringUntilTerminator(String&, size_t, char)'
+   88 |   wifiPassword = readStringUntilTerminator();
+      |                  ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/main.cpp:39:8: note: declared here
+   39 | String readStringUntilTerminator(String& buffer, size_t maxSize,
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp:92:39: error: too few arguments to function 'String readStringUntilTerminator(String&, size_t, char)'
+   92 |   hostname = readStringUntilTerminator();
+      |              ~~~~~~~~~~~~~~~~~~~~~~~~~^~
+src/main.cpp:39:8: note: declared here
+   39 | String readStringUntilTerminator(String& buffer, size_t maxSize,
+      |        ^~~~~~~~~~~~~~~~~~~~~~~~~
+src/main.cpp: In function 'void checkWiFiConnection()':
+src/main.cpp:157:27: error: 'class WiFiClass' has no member named 'softAPIPaddress'; did you mean 'softAPmacAddress'?
+  157 |       Serial.println(WiFi.softAPIPaddress());
+      |                           ^~~~~~~~~~~~~~~
+      |                           softAPmacAddress
+src/main.cpp: In function 'void setup()':
+src/main.cpp:187:3: error: 'engine' was not declared in this scope; did you mean 'inline'?
+  187 |   engine.init();
+      |   ^~~~~~
+      |   inline
+src/main.cpp: In function 'void setup()':
+src/main.cpp:187:3: error: 'engine' was not declared in this scope; did you mean 'inline'?
+  187 |   engine.init();
+      |   ^~~~~~
+      |   inline
+cc1plus: some warnings being treated as errors
+cc1plus: some warnings being treated as errors
+*** [.pio/build/esp32_pioarduino_V53_03_11/src/main.cpp.o] Error 1
+*** [.pio/build/esp32_pioarduino_V53_03_11/src/main.cpp.o] Error 1
+========================== [FAILED] Took 3.38 seconds ==========================
+========================== [FAILED] Took 3.38 seconds ==========================
+Environment                 Status    Duration
+--------------------------  --------  ------------
+esp32_pioarduino_V53_03_11  FAILED    00:00:03.378
+Environment                 Status    Duration
+--------------------------  --------  ------------
+esp32_pioarduino_V53_03_11  FAILED    00:00:03.378
+==================== 1 failed, 0 succeeded in 00:00:03.378 ====================
+==================== 1 failed, 0 succeeded in 00:00:03.378 ====================
