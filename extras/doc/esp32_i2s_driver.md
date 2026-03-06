@@ -195,40 +195,18 @@ as a static member of `StepperQueue`:
 ```cpp
 // Engine member function
 bool FastAccelStepperEngine::initI2sMux(
-    uint8_t data_pin, uint8_t bclk_pin, uint8_t ws_pin,
-    uint32_t dir_bitmask, uint32_t dir_inverted_bitmask,
-    uint32_t enable_bitmask, uint32_t enable_inverted_bitmask);
-```
-
-**Bitmask parameters**: Each bit position (0–31) in the 32-bit frame corresponds to
-a slot on the shift register output. The bitmasks define which slots carry DIR or
-ENABLE signals and their polarity:
-
-- `dir_bitmask`: Bits that are direction outputs (active-high)
-- `dir_inverted_bitmask`: Bits that are direction outputs (active-low / inverted)
-- `enable_bitmask`: Bits that are enable outputs (active-high)
-- `enable_inverted_bitmask`: Bits that are enable outputs (active-low / inverted)
-
-Bits not set in any bitmask are available as STEP outputs.
-
-**Example**: Two steppers with step+dir+enable on 74HC595:
-```cpp
-// Slot layout: [STEP0, DIR0, EN0, STEP1, DIR1, EN1, ...]
-// Slots 0,3 = STEP; Slots 1,4 = DIR (active-high); Slots 2,5 = ENABLE (active-low)
-engine.initI2sMux(
-    DATA_PIN, BCLK_PIN, WS_PIN,
-    0b00010010,   // dir_bitmask: slots 1,4
-    0b00000000,   // dir_inverted_bitmask: none
-    0b00000000,   // enable_bitmask: none
-    0b00100100    // enable_inverted_bitmask: slots 2,5 (active-low)
-);
+    uint8_t data_pin, uint8_t bclk_pin, uint8_t ws_pin);
 ```
 
 The function:
 1. Creates a shared `I2sManager` with WS pin enabled
 2. Stores it in `StepperQueue::_i2s_mux_manager` (static)
-3. Stores the bitmasks for DIR/ENABLE signal handling
-4. Sets `StepperQueue::_i2s_mux_initialized = true`
+3. Sets `StepperQueue::_i2s_mux_initialized = true`
+
+**DIR/ENABLE signals**: In I2S_MUX mode, DIR and ENABLE pins are controlled via
+standard GPIO (not through the I2S bitstream). Use `setDirectionPin()` and
+`setAutoEnable()` as with other driver types. The I2S bitstream only carries
+STEP signals.
 
 ### I2S_MUX Mode — Stepper Connection
 
@@ -239,8 +217,9 @@ uint8_t i2s_pin = slot_index | PIN_I2S_FLAG;  // PIN_I2S_FLAG = 0x40
 FastAccelStepper* s = engine.stepperConnectToPin(i2s_pin, DRIVER_I2S_MUX);
 ```
 
-`tryAllocateQueue()` validates that the slot is not a DIR/ENABLE slot, not already
-allocated, and assigns the shared `I2sManager` pointer to `q->i2s_mgr`.
+`tryAllocateQueue()` validates that the slot is not already allocated and assigns
+the shared `I2sManager` pointer to `q->i2s_mgr`. It also precomputes and stores
+the slot's byte offset and bit mask for fast fill operations.
 
 ### Constants (i2s_constants.h)
 
@@ -447,8 +426,7 @@ fill function — not a mode branch inside `i2s_fill_buffer()`.
 - Writes single bits per frame instead of contiguous byte regions
 - Resolution is 64 ticks (1 frame) instead of 2 ticks (1 bit)
 - Uses OR operations (`buf[offset] |= mask`) to set bits without disturbing other steppers
-- DIR/ENABLE bits are pre-filled by `init_mux_buffer()` before step fill runs
-- `max_speed_in_ticks` is set to `I2S_MUX_MIN_SPEED_TICKS` (400)
+- Uses precomputed `_i2s_mux_byte_offset` and `_i2s_mux_bit_mask` for fast bit manipulation
 
 **Algorithm**:
 ```
@@ -475,29 +453,19 @@ The MUX fill function only writes STEP bits.
 
 ### Buffer Initialization & Clearing
 
-The buffer initialization differs between modes:
+The buffer initialization is the same for both modes:
 
-- **I2S_DIRECT**: `memset(buf, 0, I2S_BYTES_PER_BLOCK)` — simple zero fill,
-  then the single stepper writes its step pulses.
-- **I2S_MUX**: A per-I2S-module initialization function replaces `memset`.
-  It writes the current DIR/ENABLE state into every frame of the buffer,
-  propagating the static signal levels across all 125 frames. Step bits
-  are left clear. The MUX fill functions then only OR in step pulses.
+- `memset(buf, 0, I2S_BYTES_PER_BLOCK)` — simple zero fill
+- Each stepper's fill function ORs in step pulses for its slot
 
-This approach avoids a separate DIR/ENABLE pass after filling — the buffer
-is already correct for DIR/ENABLE before any step fill runs.
+For I2S_MUX, multiple steppers share the buffer and each writes to its
+assigned slot bit using OR operations.
 
 ### Callback Fill Dispatch
 
 ```cpp
 void I2sManager::handleTxDone(uint8_t* buf) {
-  if (is_mux) {
-    // Pre-fill buffer with DIR/ENABLE bits for all frames,
-    // step bits cleared — replaces memset(0)
-    init_mux_buffer(buf);
-  } else {
-    memset(buf, 0, I2S_BYTES_PER_BLOCK);
-  }
+  memset(buf, 0, I2S_BYTES_PER_BLOCK);
 
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
     StepperQueue* q = fas_queue[i];
@@ -511,48 +479,18 @@ void I2sManager::handleTxDone(uint8_t* buf) {
 `StepperQueue::fill_i2s_buffer()` selects the appropriate optimized fill function
 based on whether this is an I2S_DIRECT or I2S_MUX queue.
 
-`init_mux_buffer()` builds a 4-byte frame template from the current DIR/ENABLE
-state of all connected MUX steppers and replicates it across all frames in the
-block. This is a per-I2S-module operation — it reads the bitmasks and each
-stepper's current direction/enable state to compute the template once, then
-fills the buffer with it (e.g., via `memset`-style 4-byte pattern fill).
-
 ---
 
 ## DIR/ENABLE Signal Handling (I2S_MUX Mode)
 
-In I2S_MUX mode, DIR and ENABLE signals are carried as bits in the I2S frame,
-controlled by the bitmasks provided at `initI2sMux()` time.
+In I2S_MUX mode, DIR and ENABLE signals are controlled via standard GPIO pins,
+not through the I2S bitstream. This simplifies the design and avoids the need
+for bitmask configuration.
 
-### Bitmask Configuration
+- **DIR**: Use `setDirectionPin()` as with other driver types
+- **ENABLE**: Use `setAutoEnable()` or manual enable control via GPIO
 
-Four bitmasks define signal routing and polarity:
-
-| Bitmask | Meaning |
-|---------|---------|
-| `dir_bitmask` | Slots that carry direction signal (active-high) |
-| `dir_inverted_bitmask` | Slots that carry direction signal (active-low) |
-| `enable_bitmask` | Slots that carry enable signal (active-high) |
-| `enable_inverted_bitmask` | Slots that carry enable signal (active-low) |
-
-### DIR Handling
-
-DIR bits are propagated by `init_mux_buffer()` before any step fill runs.
-The function reads each stepper's current direction state and sets/clears
-the corresponding DIR slot bits across all frames in the block. Direction
-changes take effect at the next block boundary (worst case 500 µs latency).
-
-### ENABLE Handling
-
-ENABLE bits are propagated by `init_mux_buffer()` alongside DIR bits.
-The function reads each stepper's auto-enable state and applies the
-correct polarity (inverted bitmask bits output the logical complement).
-
-### Association
-
-Each MUX stepper's STEP slot implicitly identifies which DIR/ENABLE slots
-belong to it. The mapping is defined by the user's physical wiring and
-bitmask configuration. The library does not enforce a specific slot ordering.
+The I2S bitstream only carries STEP signals for each slot.
 
 ---
 
@@ -696,8 +634,7 @@ The fill function is testable on PC without I2S hardware. `test_21.cpp` provides
 
 - MUX fill: frame-level bit placement for single stepper
 - Multi-stepper shared buffer: different slots, no interference
-- DIR/ENABLE bitmask: correct polarity, static across block
-- Slot allocation: validation of PIN_I2S_FLAG, reject DIR/ENABLE slots
+- Slot allocation: validation of PIN_I2S_FLAG, reject duplicate slots
 - Hardware validation: logic analyzer on DATA_OUT/BCLK/WS
 - End-to-end: 74HC595 chain + PCNT step count verification
 
@@ -705,22 +642,20 @@ The fill function is testable on PC without I2S hardware. `test_21.cpp` provides
 
 ## I2S_MUX Implementation Plan
 
-### Phase 1: Engine Initialization
+### Phase 1: Engine Initialization ✅ Complete
 
 1. Add `initI2sMux()` to `FastAccelStepperEngine`
-2. Add static members to `StepperQueue`: `_i2s_mux_manager`, DIR/ENABLE bitmasks
-3. `initI2sMux()` creates shared `I2sManager` with WS pin, stores bitmasks,
-   sets `_i2s_mux_initialized = true`
+2. Add static members to `StepperQueue`: `_i2s_mux_manager`, `_i2s_mux_initialized`
+3. `initI2sMux()` creates shared `I2sManager` with WS pin
 
-### Phase 2: Queue Allocation
+### Phase 2: Queue Allocation ✅ Complete
 
 1. Extend `tryAllocateQueue()` for `DRIVER_I2S_MUX`:
-   - Validate slot not in DIR/ENABLE bitmasks
    - Validate slot not already allocated (`_i2s_mux_allocated_bitmask`)
    - Set `q->i2s_mgr = StepperQueue::_i2s_mux_manager`
-   - Set `q->_i2s_mux_slot` to slot index
-   - Set `max_speed_in_ticks = I2S_MUX_MIN_SPEED_TICKS`
-2. Store slot's precomputed `byte_offset` and `bit_mask` for fast fill
+   - Store slot index in `q->_i2s_mux_slot`
+   - Precompute and store `q->_i2s_mux_byte_offset` and `q->_i2s_mux_bit_mask`
+2. `max_speed_in_ticks = I2S_MUX_MIN_SPEED_TICKS` is set in `init_i2s()`
 
 ### Phase 3: MUX Fill Algorithm
 

@@ -26,7 +26,7 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
 #endif
       // Byte order in I2S buffer is little-endian, but bits are sent MSB first,
       // so we need to XOR the byte index with 1.
-      uint16_t byte_index = (bit_pos >> 3)^1;
+      uint16_t byte_index = (bit_pos >> 3) ^ 1;
       // always fill the full byte
       buf[byte_index] = 0xff >> (bit_pos & 7);
       uint8_t bits = 8 - (bit_pos & 7);
@@ -34,13 +34,13 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
       if (local_state.remaining_high_ticks >= ticks) {
         local_state.remaining_high_ticks -= ticks;
       } else {
-        local_state.remaining_low_ticks -= 
+        local_state.remaining_low_ticks -=
             (ticks - local_state.remaining_high_ticks);
         local_state.remaining_high_ticks = 0;
       }
 
       bit_pos += bits;
-      if (bit_pos >= I2S_BYTES_PER_BLOCK*8) {
+      if (bit_pos >= I2S_BYTES_PER_BLOCK * 8) {
         *state = local_state;
         return true;
       }
@@ -76,7 +76,7 @@ bool IRAM_ATTR i2s_fill_buffer(StepperQueueBase* q, uint8_t* buf,
     }
     uint8_t steps = e->steps;
     local_state.remaining_low_ticks = e->ticks;
-    if (local_state.remaining_low_ticks < 65535-ticks_per_bit) {
+    if (local_state.remaining_low_ticks < 65535 - ticks_per_bit) {
       local_state.remaining_low_ticks += local_state.off_ticks;
       local_state.off_ticks = 0;
     }

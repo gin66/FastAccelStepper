@@ -18,8 +18,8 @@ class StepperQueue : public StepperQueueBase {
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
-// dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
-static uint8_t queues_allocated;
+  // dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
+  static uint8_t queues_allocated;
 #ifdef SUPPORT_ESP32_RMT
   static uint8_t _rmt_allocated;
 #endif
@@ -28,17 +28,17 @@ static uint8_t queues_allocated;
   static uint32_t _i2s_mux_allocated_bitmask;
   static I2sManager* _i2s_mux_manager;
 #endif
-static void initVars() {
-  StepperQueue::queues_allocated = 0;
-  #ifdef SUPPORT_ESP32_RMT
+  static void initVars() {
+    StepperQueue::queues_allocated = 0;
+#ifdef SUPPORT_ESP32_RMT
     StepperQueue::_rmt_allocated = 0;
-  #endif
-  #if defined(SUPPORT_ESP32_I2S)
+#endif
+#if defined(SUPPORT_ESP32_I2S)
     StepperQueue::_i2s_mux_initialized = false;
     StepperQueue::_i2s_mux_allocated_bitmask = 0;
     StepperQueue::_i2s_mux_manager = nullptr;
-  #endif
-}
+#endif
+  }
 #endif
 
   volatile bool _isRunning;
@@ -48,13 +48,13 @@ static void initVars() {
   inline bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
 #ifdef SUPPORT_ESP32_RMT
-      bool use_rmt;
+  bool use_rmt;
 #endif
 #ifdef SUPPORT_ESP32_I2S
-      bool use_i2s;
+  bool use_i2s;
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
-      bool use_mcpwm_pcnt;
+  bool use_mcpwm_pcnt;
 #endif
 
   // module specific variables
@@ -79,6 +79,9 @@ static void initVars() {
     struct {
       struct i2s_fill_state _fill_state;
       I2sManager* i2s_mgr;
+      uint8_t _i2s_mux_slot;
+      uint8_t _i2s_mux_byte_offset;
+      uint8_t _i2s_mux_bit_mask;
     };
 #endif
   };

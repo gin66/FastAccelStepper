@@ -38,7 +38,8 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
 #endif
 #ifdef SUPPORT_ESP32_RMT
   use_rmt = false;
-  if ((queue_num >= QUEUES_MCPWM_PCNT) && (queue_num < QUEUES_RMT+QUEUES_MCPWM_PCNT)) {
+  if ((queue_num >= QUEUES_MCPWM_PCNT) &&
+      (queue_num < QUEUES_RMT + QUEUES_MCPWM_PCNT)) {
     use_rmt = true;
     channel = queue_num - QUEUES_MCPWM_PCNT;
   }
@@ -58,7 +59,7 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
   if (use_i2s) {
     return init_i2s(step_pin);
   }
-  #endif
+#endif
   return false;
 }
 
@@ -187,13 +188,17 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
     return nullptr;
   }
   if (step_pin & PIN_I2S_FLAG) {
-    #if !defined(SUPPORT_ESP32_I2S)
+#if !defined(SUPPORT_ESP32_I2S)
     return nullptr;
-    #endif
+#endif
     if (!StepperQueue::_i2s_mux_initialized) {
       return nullptr;
     }
-    uint32_t bit = 1UL << (step_pin & 0x1F);
+    uint8_t slot = step_pin & 0x1F;
+    if (slot >= 32) {
+      return nullptr;
+    }
+    uint32_t bit = 1UL << slot;
     if (StepperQueue::_i2s_mux_allocated_bitmask & bit) {
       return nullptr;
     }
@@ -201,14 +206,17 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
     StepperQueue* q = new StepperQueue();
     q->use_i2s = true;
     q->i2s_mgr = StepperQueue::_i2s_mux_manager;
+    q->_i2s_mux_slot = slot;
+    q->_i2s_mux_byte_offset = slot / 8;
+    q->_i2s_mux_bit_mask = 1 << (7 - (slot % 8));
     return q;
   }
 
   if (!StepperQueue::isValidStepPin(step_pin)) {
     return nullptr;
   }
-  
-  #if defined(SUPPORT_ESP32_RMT)
+
+#if defined(SUPPORT_ESP32_RMT)
   if (driver == DRIVER_RMT) {
     if (StepperQueue::_rmt_allocated >= QUEUES_RMT) {
       return nullptr;
@@ -221,8 +229,8 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
 #endif
 #if defined(SUPPORT_ESP32_I2S)
   if (driver == DRIVER_I2S_DIRECT) {
-    I2sManager* mgr =
-        I2sManager::create((gpio_num_t)step_pin, I2S_GPIO_UNUSED, I2S_GPIO_UNUSED);
+    I2sManager* mgr = I2sManager::create((gpio_num_t)step_pin, I2S_GPIO_UNUSED,
+                                         I2S_GPIO_UNUSED);
     if (mgr != nullptr) {
       StepperQueue* q = new StepperQueue();
       q->use_i2s = true;

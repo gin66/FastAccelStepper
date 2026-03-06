@@ -21,7 +21,7 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
   chan_cfg.dma_desc_num = I2S_DMA_DESC_NUM;
   chan_cfg.dma_frame_num = I2S_DMA_FRAME_NUM;
-  chan_cfg.auto_clear = false; // buf is cleared _after_ the callback...
+  chan_cfg.auto_clear = false;  // buf is cleared _after_ the callback...
 
   i2s_chan_handle_t chan = nullptr;
   esp_err_t rc = i2s_new_channel(&chan_cfg, &chan, NULL);
@@ -88,11 +88,11 @@ bool I2sManager::init() {
 void IRAM_ATTR I2sManager::init_mux_buffer(uint8_t* buf) {
   // TODO: build frame template from DIR/ENABLE state of connected steppers
   // around 21us
-  uint32_t *b = (uint32_t*)buf;
-  uint8_t i = I2S_BYTES_PER_BLOCK/4;
+  uint32_t* b = (uint32_t*)buf;
+  uint8_t i = I2S_BYTES_PER_BLOCK / 4;
   do {
     b[--i] = 0;
-  } while(i);
+  } while (i);
 }
 
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
