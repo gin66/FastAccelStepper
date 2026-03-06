@@ -27,7 +27,9 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
                         uint8_t step_pin) {
   uint8_t channel = queue_num;
   max_speed_in_ticks = 80;
+#ifdef DEBUG
   Serial.printf("init: queue_num=%d step_pin=%d\n", queue_num, step_pin);
+#endif
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
 #else
 #ifdef SUPPORT_ESP32_MCPWM_PCNT

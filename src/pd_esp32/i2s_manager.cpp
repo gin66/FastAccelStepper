@@ -14,8 +14,10 @@ static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
 
 I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
                                gpio_num_t ws_pin) {
+#ifdef DEBUG
   Serial.printf("I2S create: data=%d, bclk=%d, ws=%d\n", data_pin, bclk_pin,
                 ws_pin);
+#endif
 
   i2s_chan_config_t chan_cfg =
       I2S_CHANNEL_DEFAULT_CONFIG(I2S_NUM_AUTO, I2S_ROLE_MASTER);
@@ -63,9 +65,13 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
     return nullptr;
   }
 
+#ifdef DEBUG
   Serial.printf("I2S startDma: enabling channel\n");
+#endif
   if (i2s_channel_enable(mgr->_chan) != ESP_OK) {
+#ifdef DEBUG
     Serial.printf("I2S startDma: channel enable FAILED\n");
+#endif
     i2s_del_channel(mgr->_chan);
     mgr->_chan = nullptr;
     delete mgr;
