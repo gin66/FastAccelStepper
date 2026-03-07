@@ -81,6 +81,39 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 #endif
     }
   }
+
+  if (toggle_dir) {
+    uint16_t before_delay = BEFORE_DIR_CHANGE_DELAY(this);
+    if (before_delay > 0) {
+      if (queueEntries() >= QUEUE_LEN - 1) {
+        return AQE_DIR_PIN_IS_BUSY;
+      }
+      struct queue_entry* pe = &entry[wp & QUEUE_LEN_MASK];
+      pe->steps = 0;
+      pe->toggle_dir = 0;
+      pe->countUp = cmd->count_up ? 1 : 0;
+      pe->moreThanOneStep = 0;
+      pe->hasSteps = 0;
+      pe->ticks = before_delay;
+#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
+      pe->repeat_entry = 0;
+      pe->dirPinState = dir;
+#endif
+#if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
+      pe->end_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
+#endif
+#if defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)
+      pe->start_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
+#endif
+      wp = wp + 1;
+    }
+    uint16_t after_delay = AFTER_DIR_CHANGE_DELAY(this);
+    if (after_delay > 0 && period < after_delay) {
+      period = after_delay;
+    }
+  }
+
+  e = &entry[wp & QUEUE_LEN_MASK];
   e->steps = steps;
 #if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
   e->repeat_entry = repeat_entry;
@@ -102,11 +135,11 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   next_queue_end.dir = dir;
   next_queue_end.count_up = cmd->count_up;
 
-  // Advance write pointer
+  // Advance write pointer (wp may have been incremented for a pause entry)
   fasDisableInterrupts();
   if (!ignore_commands) {
     if (isReadyForCommands()) {
-      next_write_idx = next_write_idx + 1;
+      next_write_idx = wp + 1;
       queue_end = next_queue_end;
     } else {
       fasEnableInterrupts();
