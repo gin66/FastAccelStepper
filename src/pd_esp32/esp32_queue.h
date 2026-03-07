@@ -46,6 +46,11 @@ class StepperQueue : public StepperQueueBase {
   bool _nextCommandIsPrepared;
   uint8_t _step_pin;
 
+  inline void _pd_initVars() {
+    _isRunning = false;
+    _nextCommandIsPrepared = false;
+  }
+
   inline bool isRunning() { return _isRunning; }
   bool isReadyForCommands();
 #ifdef SUPPORT_ESP32_RMT

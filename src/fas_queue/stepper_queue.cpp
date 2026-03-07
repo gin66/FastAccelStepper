@@ -321,27 +321,5 @@ void StepperQueue::_initVars() {
   queue_end.count_up = true;
   queue_end.pos = 0;
   dirHighCountsUp = true;
-#if defined(ARDUINO_ARCH_AVR)
-  _isRunning = false;
-  _noMoreCommands = false;
-#endif
-#if defined(SUPPORT_ESP32)
-  _isRunning = false;
-  _nextCommandIsPrepared = false;
-#endif
-
-#if defined(ARDUINO_ARCH_SAM)
-  _hasISRactive = false;
-  // we cannot clear the PWM interrupt when switching to a pause, but we'll
-  // get a double interrupt if we do nothing.  So this tells us that on a
-  // transition from a pulse to a pause to skip the next interrupt.
-  _pauseCommanded = false;
-  timePWMInterruptEnabled = 0;
-#endif
-#if defined(SUPPORT_RP_PICO)
-  adjust_80MHz = 0;
-#endif
-#if defined(TEST)
-  _isRunning = false;
-#endif
+  _pd_initVars();
 }

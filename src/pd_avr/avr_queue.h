@@ -14,6 +14,11 @@ class StepperQueue : public StepperQueueBase {
   inline bool isReadyForCommands() { return true; }
   enum channels channel;
 
+  inline void _pd_initVars() {
+    _isRunning = false;
+    _noMoreCommands = false;
+  }
+
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;

@@ -80,7 +80,7 @@ void disconnect();
 //   Set direction pin to absolute HIGH or LOW state.
 //   PRECONDITION: NOT called for CONTROLLED_EXTERNAL pins (PIN_EXTERNAL_FLAG)
 //   Used by addQueueEntry() when queue is not running.
-//   If undefined, use digitalWrite()
+//   Must be defined
 //
 // AFTER_SET_DIR_PIN_DELAY_US
 //   Microseconds to delay after directly setting direction pin state.

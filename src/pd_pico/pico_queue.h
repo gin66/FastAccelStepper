@@ -15,6 +15,8 @@ class StepperQueue : public StepperQueueBase {
   uint sm;
   int32_t pos_offset;
 
+  inline void _pd_initVars() { adjust_80MHz = 0; }
+
   bool isRunning();
   bool isReadyForCommands();
   bool claim_pio_sm(FastAccelStepperEngine* engine);

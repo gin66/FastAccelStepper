@@ -16,6 +16,12 @@ class StepperQueue : public StepperQueueBase {
   volatile bool _pauseCommanded;
   volatile uint32_t timePWMInterruptEnabled;
 
+  inline void _pd_initVars() {
+    _hasISRactive = false;
+    _pauseCommanded = false;
+    timePWMInterruptEnabled = 0;
+  }
+
   inline bool isRunning() { return _hasISRactive; }
   inline bool isReadyForCommands() { return true; }
 

@@ -9,6 +9,9 @@ class StepperQueue : public StepperQueueBase {
 #include "../fas_queue/protocol.h"
 
   volatile bool _isRunning;
+
+  inline void _pd_initVars() { _isRunning = false; }
+
   inline bool isReadyForCommands() { return true; }
   inline bool isRunning() { return _isRunning; }
 #ifdef SUPPORT_ESP32_RMT
