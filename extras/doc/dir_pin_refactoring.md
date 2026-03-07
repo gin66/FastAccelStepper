@@ -131,12 +131,10 @@ This toggle happens when pulling a new command, but RMT may still be outputting 
 External direction pins (controlled via callbacks to external hardware like I/O expanders) require special handling:
 
 ```cpp
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
 if (toggle_dir && (dirPin & PIN_EXTERNAL_FLAG)) {
     repeat_entry = toggle_dir;  // Defer to task context
     toggle_dir = false;
 }
-#endif
 ```
 
 This adds conditional logic in multiple places and the `repeat_entry` mechanism is tightly coupled to `toggle_dir`.
@@ -276,9 +274,7 @@ struct queue_entry {
   uint8_t countUp : 1;
   uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
   uint8_t repeat_entry : 1;
-#endif
   uint16_t ticks;
   // ...
 };
@@ -518,14 +514,12 @@ External direction pins are handled in `addQueueEntry()` context using the exist
 
 ```cpp
 // In addQueueEntry()
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
 bool dir = (cmd->count_up == dirHighCountsUp);
 if ((dir != queue_end.dir) && (dirPin & PIN_EXTERNAL_FLAG)) {
     e->repeat_entry = 1;
     // toggle_dir stays 0 (not used for external pins)
 }
 e->countUp = cmd->count_up;
-#endif
 ```
 
 The callback happens in task context via `externalDirPinChangeCompletedIfNeeded()`.

@@ -274,7 +274,6 @@ bool isRunning() {
 | `SUPPORT_ESP32_RMT` | | | ✓ | | |
 | `SUPPORT_SAM` | | | | ✓ | |
 | `SUPPORT_RP_PICO` | | | | | ✓ |
-| `SUPPORT_EXTERNAL_DIRECTION_PIN` | ✓ | ✓ | ✓ | | |
 
 ---
 
@@ -326,7 +325,6 @@ Create `fas_arch/your_arch.h` defining all required constants and macros:
 #define MAX_STEPPER NUM_QUEUES  // usually same as NUM_QUEUES
 
 // 6. Optional features (define if supported)
-#define SUPPORT_EXTERNAL_DIRECTION_PIN  // external pin callback
 // #define SUPPORT_DIR_PIN_MASK uint8_t  // direct port access
 
 // 7. Task management (if using RTOS)

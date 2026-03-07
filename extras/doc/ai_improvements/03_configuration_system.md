@@ -9,7 +9,6 @@ FastAccelStepper uses complex preprocessor macros for platform configuration, ma
 ```cpp
 // Examples from fas_arch/common_esp32.h
 #define SUPPORT_ESP32
-#define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING
 #define QUEUE_LEN 32
 #define TICKS_PER_S 16000000L

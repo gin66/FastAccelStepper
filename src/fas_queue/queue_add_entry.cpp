@@ -8,11 +8,9 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   // if (sizeof(entry) != 6 * QUEUE_LEN) {
   //  return -1;
   //}
-#ifndef TEST
   if (!isReadyForCommands()) {
     return AQE_DEVICE_NOT_READY;
   }
-#endif
   if (cmd == NULL) {
     if (start && !isRunning()) {
       if (next_write_idx == read_idx) {
@@ -53,9 +51,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
   bool dir = (cmd->count_up == dirHighCountsUp);
   bool toggle_dir = false;
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
   bool repeat_entry = false;
-#endif
 #if defined(SUPPORT_RP_PICO)
   if (isQueueEmpty() && !isRunning()) {
     // store the offset from pico sm's step count and position
@@ -73,12 +69,10 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
       queue_end.dir = dir;
     } else {
       toggle_dir = (dir != queue_end.dir);
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
       if (toggle_dir && (dirPin & PIN_EXTERNAL_FLAG)) {
         repeat_entry = toggle_dir;
         toggle_dir = false;
       }
-#endif
     }
   }
 
@@ -95,10 +89,8 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
       pe->moreThanOneStep = 0;
       pe->hasSteps = 0;
       pe->ticks = before_delay;
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
       pe->repeat_entry = 0;
       pe->dirPinState = dir;
-#endif
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
       pe->end_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
 #endif
@@ -115,10 +107,8 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 
   e = &entry[wp & QUEUE_LEN_MASK];
   e->steps = steps;
-#if defined(SUPPORT_EXTERNAL_DIRECTION_PIN)
   e->repeat_entry = repeat_entry;
   e->dirPinState = dir;
-#endif
   e->toggle_dir = toggle_dir;
   e->countUp = cmd->count_up ? 1 : 0;
   e->moreThanOneStep = steps > 1 ? 1 : 0;

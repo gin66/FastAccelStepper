@@ -133,7 +133,6 @@ AqeResultCode FastAccelStepper::addQueueEntry(
   return res;
 }
 
-#ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
 bool FastAccelStepper::externalDirPinChangeCompletedIfNeeded() {
   StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
   if ((_dirPin != PIN_UNDEFINED) && ((_dirPin & PIN_EXTERNAL_FLAG) != 0)) {
@@ -150,7 +149,6 @@ bool FastAccelStepper::externalDirPinChangeCompletedIfNeeded() {
   }
   return true;
 }
-#endif
 
 //*************************************************************************************************
 // fill_queue generates commands to the stepper for executing a ramp

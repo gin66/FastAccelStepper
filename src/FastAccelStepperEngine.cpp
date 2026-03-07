@@ -217,13 +217,9 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-#ifdef SUPPORT_EXTERNAL_DIRECTION_PIN
       if (s->externalDirPinChangeCompletedIfNeeded()) {
         s->fill_queue();
       }
-#else
-      s->fill_queue();
-#endif
     }
   }
 

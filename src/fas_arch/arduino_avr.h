@@ -43,7 +43,6 @@
 //==========================================================================
 #if (defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
      defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__))
-#define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define MAX_STEPPER 2
 #define NUM_QUEUES 2
 #define fas_queue_A fas_queue[0]
@@ -55,7 +54,6 @@ enum channels { channelA, channelB };
 //
 //==========================================================================
 #elif defined(__AVR_ATmega2560__)
-#define SUPPORT_EXTERNAL_DIRECTION_PIN
 #define MAX_STEPPER 3
 #define NUM_QUEUES 3
 #define fas_queue_A fas_queue[0]
