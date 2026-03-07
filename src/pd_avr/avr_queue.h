@@ -14,6 +14,9 @@ class StepperQueue : public StepperQueueBase {
   inline bool isReadyForCommands() { return true; }
   enum channels channel;
 
+  volatile uint8_t* _dirTogglePinPort;
+  uint8_t _dirTogglePinMask;
+
   inline void _pd_initVars() {
     _isRunning = false;
     _noMoreCommands = false;
@@ -22,12 +25,12 @@ class StepperQueue : public StepperQueueBase {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
-#if defined(SUPPORT_DIR_PIN_MASK)
     if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);
+      _dirTogglePinPort = portInputRegister(digitalPinToPort(dir_pin));
+      _dirTogglePinMask = digitalPinToBitMask(dir_pin);
     }
-#endif
   }
 
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)

@@ -23,7 +23,7 @@ LIB_H=FastAccelStepper.h FastAccelStepperEngine.h log2/Log2Representation.h log2
 	  fas_ramp/RampGenerator.h fas_ramp/RampControl.h fas_ramp/RampCalculator.h \
 	  fas_arch/common.h pd_test/test_queue.h
 LIB_O=FastAccelStepper.o FastAccelStepperEngine.o Log2Representation.o StepperISR_test.o \
-	  RampGenerator.o RampControl.o RampCalculator.o stepper_queue.o
+	  RampGenerator.o RampControl.o RampCalculator.o stepper_queue.o queue_init.o queue_utils.o
 
 SRC_LIB_H=$(addprefix $(PRJ_ROOT)/src/,$(LIB_H))
 
@@ -70,6 +70,12 @@ RampCalculator.o: $(PRJ_ROOT)/src/fas_ramp/RampCalculator.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 stepper_queue.o: $(PRJ_ROOT)/src/fas_queue/stepper_queue.cpp $(SRC_LIB_H)
+	$(COMPILE.cpp) $< -o $@
+
+queue_init.o: $(PRJ_ROOT)/src/fas_queue/queue_init.cpp $(SRC_LIB_H)
+	$(COMPILE.cpp) $< -o $@
+
+queue_utils.o: $(PRJ_ROOT)/src/fas_queue/queue_utils.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
 
 StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)

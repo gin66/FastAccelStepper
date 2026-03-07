@@ -38,6 +38,58 @@ function compare_range(r, e,
 	return diff <= tol
 }
 
+# Compare all numbers in a line with tolerance
+# Tolerance can be a single value or slash-separated values like ~~5 or ~~1/1/5/5
+# Returns 1 if all numbers match within tolerance, 0 otherwise
+function compare_all_numbers(r, e, tol_str,
+		r_parts, e_parts, tol_parts, r_copy, e_copy, i, n, diff, tol, num_tols) {
+	# Split tolerance string into array
+	n = split(tol_str, tol_parts, "/")
+	
+	# Extract numbers from both lines
+	r_copy = r
+	e_copy = e
+	delete r_parts
+	delete e_parts
+	i = 0
+	while (match(r_copy, /[-]?[0-9]+/)) {
+		r_parts[i] = substr(r_copy, RSTART, RLENGTH) + 0
+		r_copy = substr(r_copy, RSTART + RLENGTH)
+		i++
+	}
+	num_tols = i
+	i = 0
+	while (match(e_copy, /[-]?[0-9]+/)) {
+		e_parts[i] = substr(e_copy, RSTART, RLENGTH) + 0
+		e_copy = substr(e_copy, RSTART + RLENGTH)
+		i++
+	}
+
+	# Must have same number of numeric values
+	if (length(r_parts) != length(e_parts)) return 0
+
+	# Compare all numbers with corresponding tolerance
+	for (i in r_parts) {
+		# Get tolerance for this position (use last value if fewer tols than numbers)
+		if (n == 1) {
+			tol = tol_parts[1] + 0
+		} else if (i < n) {
+			tol = tol_parts[i + 1] + 0
+		} else {
+			tol = tol_parts[n] + 0
+		}
+		
+		diff = r_parts[i] - e_parts[i]
+		if (diff < 0) diff = -diff
+		if (diff > tol) return 0
+	}
+
+	# Compare non-numeric parts exactly
+	gsub(/[-]?[0-9]+/, "#", r)
+	gsub(/[-]?[0-9]+/, "#", e)
+	return r == e
+}
+
 # Compare one line from result.txt (r) against one line from expect.txt (e),
 # supporting the "<=" upper-bound operator in timing values.
 #
@@ -100,7 +152,17 @@ FNR != NR {
 	r_test = r
 	e_test = e
 
-	if (e ~ /~[0-9]+$/) {
+	if (e ~ /~~[0-9/]+$/) {
+		# All-numbers tolerance: ~~N or ~~1/2/3 at end of expect line applies tolerance to all numbers
+		match(e, /~~[0-9/]+$/)
+		tol_str = substr(e, RSTART + 2)
+		e_base = substr(e, 1, RSTART - 1)
+		if (!compare_all_numbers(r, e_base, tol_str)) {
+			print("result:",r)
+			print("expect:",e)
+			ok = 0
+		}
+	} else if (e ~ /~[0-9]+$/) {
 		# Range comparison: ~N at end of expect line
 		if (!compare_range(r, e)) {
 			print("result:",r)
