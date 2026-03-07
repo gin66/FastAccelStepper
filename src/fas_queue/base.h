@@ -51,10 +51,6 @@ class StepperQueueBase {
   volatile SUPPORT_DIR_PIN_MASK* _dirPinPort;
   SUPPORT_DIR_PIN_MASK _dirPinMask;
 #endif
-#if defined(SUPPORT_DIR_TOGGLE_PIN_MASK)
-  volatile SUPPORT_DIR_TOGGLE_PIN_MASK* _dirTogglePinPort;
-  SUPPORT_DIR_TOGGLE_PIN_MASK _dirTogglePinMask;
-#endif
 
   struct queue_end_s queue_end;
 

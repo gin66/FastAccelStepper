@@ -275,7 +275,6 @@ bool isRunning() {
 | `SUPPORT_SAM` | | | | ✓ | |
 | `SUPPORT_RP_PICO` | | | | | ✓ |
 | `SUPPORT_EXTERNAL_DIRECTION_PIN` | ✓ | ✓ | ✓ | | |
-| `SUPPORT_DIR_TOGGLE_PIN_MASK` | ✓ | | | | |
 
 ---
 
@@ -329,7 +328,6 @@ Create `fas_arch/your_arch.h` defining all required constants and macros:
 // 6. Optional features (define if supported)
 #define SUPPORT_EXTERNAL_DIRECTION_PIN  // external pin callback
 // #define SUPPORT_DIR_PIN_MASK uint8_t  // direct port access
-// #define SUPPORT_DIR_TOGGLE_PIN_MASK uint8_t  // toggle via port
 
 // 7. Task management (if using RTOS)
 #define noop_or_wait vTaskDelay(1)  // or your idle function

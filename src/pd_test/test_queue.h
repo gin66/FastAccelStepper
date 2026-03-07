@@ -23,4 +23,9 @@ class StepperQueue : public StepperQueueBase {
   }
 };
 
+#define SET_DIRECTION_PIN_STATE(q, high) ((void)0)
+
+#define BEFORE_DIR_CHANGE_DELAY(q) ((uint16_t)0)
+#define AFTER_DIR_CHANGE_DELAY(q) ((uint16_t)0)
+
 #endif  // PD_TEST_QUEUE_H

@@ -31,4 +31,20 @@ class StepperQueue : public StepperQueueBase {
   }
 };
 
+#define SET_DIRECTION_PIN_STATE(q, high)          \
+  do {                                            \
+    if ((q)->_dirPinPort != NULL) {               \
+      if (high) {                                 \
+        *((q)->_dirPinPort) |= (q)->_dirPinMask;  \
+      } else {                                    \
+        *((q)->_dirPinPort) &= ~(q)->_dirPinMask; \
+      }                                           \
+    }                                             \
+  } while (0)
+
+#define AFTER_SET_DIR_PIN_DELAY_US 30
+
+#define BEFORE_DIR_CHANGE_DELAY(q) ((uint16_t)0)
+#define AFTER_DIR_CHANGE_DELAY(q) ((uint16_t)0)
+
 #endif

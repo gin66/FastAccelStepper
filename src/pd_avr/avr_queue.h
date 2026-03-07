@@ -23,12 +23,6 @@ class StepperQueue : public StepperQueueBase {
       _dirPinMask = digitalPinToBitMask(dir_pin);
     }
 #endif
-#if defined(SUPPORT_DIR_TOGGLE_PIN_MASK)
-    if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
-      _dirTogglePinPort = portInputRegister(digitalPinToPort(dir_pin));
-      _dirTogglePinMask = digitalPinToBitMask(dir_pin);
-    }
-#endif
   }
 
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
@@ -38,5 +32,17 @@ class StepperQueue : public StepperQueueBase {
   static int8_t queueNumForStepPin(uint8_t step_pin);
 #endif
 };
+
+#define SET_DIRECTION_PIN_STATE(q, high)        \
+  do {                                          \
+    if (high) {                                 \
+      *((q)->_dirPinPort) |= (q)->_dirPinMask;  \
+    } else {                                    \
+      *((q)->_dirPinPort) &= ~(q)->_dirPinMask; \
+    }                                           \
+  } while (0)
+
+#define BEFORE_DIR_CHANGE_DELAY(q) ((uint16_t)0)
+#define AFTER_DIR_CHANGE_DELAY(q) ((uint16_t)0)
 
 #endif  // PD_AVR_QUEUE_H

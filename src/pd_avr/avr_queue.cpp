@@ -29,7 +29,7 @@
   ((TCCR##T##A & (_BV(COM##T##X##0) | _BV(COM##T##X##1))) == 0)
 #define Stepper_IsOneIfOutput(T, X) ((TCCR##T##A & _BV(COM##T##X##0)) != 0)
 #define Stepper_ToggleDirection(CHANNEL) \
-  *fas_queue_##CHANNEL._dirTogglePinPort = fas_queue_##CHANNEL._dirTogglePinMask
+  *fas_queue_##CHANNEL._dirPinPort = fas_queue_##CHANNEL._dirPinMask
 #define PREPARE_DIRECTION_PIN(CHANNEL) \
   if (e->toggle_dir) {                 \
     Stepper_ToggleDirection(CHANNEL);  \
