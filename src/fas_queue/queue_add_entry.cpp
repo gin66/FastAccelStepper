@@ -76,19 +76,50 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
     }
   }
 
+#if defined(BEFORE_DIR_CHANGE_DELAY_TICKS) || defined(AFTER_DIR_CHANGE_DELAY_TICKS)
   if (toggle_dir) {
-    uint16_t before_delay = BEFORE_DIR_CHANGE_DELAY(this);
+    uint16_t before_delay = 0;
+    uint16_t after_delay = 0;
+#if defined(BEFORE_DIR_CHANGE_DELAY_TICKS)
+    before_delay = BEFORE_DIR_CHANGE_DELAY_TICKS(this);
+#endif
+#if defined(AFTER_DIR_CHANGE_DELAY_TICKS)
+    after_delay = AFTER_DIR_CHANGE_DELAY_TICKS(this);
+#endif
     if (before_delay > 0) {
-      if (queueEntries() >= QUEUE_LEN - 1) {
-        return AQE_DIR_PIN_IS_BUSY;
+      // This is a bit tricky. We need to look at the previous command.
+      // If the previous command is a pause, then this may be sufficient.
+      struct queue_entry* prev = &entry[(wp - 1) & QUEUE_LEN_MASK];
+      if (prev->steps == 0) {
+        if (prev-> ticks >= before_delay) {
+          before_delay = 0;
+        }
       }
+    }
+    if (after_delay > 0) {
+      if (steps == 0) {
+        period = fas_max(after_delay, MIN_CMD_TICKS);
+        after_delay = 0;
+      }
+    }
+    uint8_t commands_needed = 1;
+    if(before_delay > 0) {
+      commands_needed++;
+    }
+    if(after_delay > 0) {
+      commands_needed++;
+    }
+    if (queueEntries() >= QUEUE_LEN - commands_needed) {
+      return AQE_DIR_PIN_IS_BUSY;
+    }
+    if (before_delay > 0) {
       struct queue_entry* pe = &entry[wp & QUEUE_LEN_MASK];
       pe->steps = 0;
       pe->toggle_dir = 0;
       pe->countUp = cmd->count_up ? 1 : 0;
       pe->moreThanOneStep = 0;
       pe->hasSteps = 0;
-      pe->ticks = before_delay;
+      pe->ticks = fas_max(before_delay, MIN_CMD_TICKS);
       pe->repeat_entry = 0;
       pe->dirPinState = dir;
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
@@ -99,11 +130,29 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 #endif
       wp = wp + 1;
     }
-    uint16_t after_delay = AFTER_DIR_CHANGE_DELAY(this);
-    if (after_delay > 0 && period < after_delay) {
-      period = after_delay;
+
+    if (after_delay > 0) {
+      struct queue_entry* pe = &entry[wp & QUEUE_LEN_MASK];
+      pe->steps = 0;
+      pe->toggle_dir = 1;
+      pe->countUp = cmd->count_up ? 1 : 0;
+      pe->moreThanOneStep = 0;
+      pe->hasSteps = 0;
+      pe->ticks = fas_max(after_delay, MIN_CMD_TICKS);
+      pe->repeat_entry = 0;
+      pe->dirPinState = dir;
+#if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
+      pe->end_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
+#endif
+#if defined(SUPPORT_QUEUE_ENTRY_START_POS_U16)
+      pe->start_pos_last16 = (uint32_t)queue_end.pos & 0xffff;
+#endif
+      wp = wp + 1;
+
+      toggle_dir = false;
     }
   }
+#endif
 
   e = &entry[wp & QUEUE_LEN_MASK];
   e->steps = steps;

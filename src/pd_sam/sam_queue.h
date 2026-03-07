@@ -50,7 +50,4 @@ class StepperQueue : public StepperQueueBase {
 
 #define AFTER_SET_DIR_PIN_DELAY_US 30
 
-#define BEFORE_DIR_CHANGE_DELAY(q) ((uint16_t)0)
-#define AFTER_DIR_CHANGE_DELAY(q) ((uint16_t)0)
-
 #endif

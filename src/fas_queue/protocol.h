@@ -58,7 +58,7 @@ void disconnect();
 //    - I2S-MUX: direction pin can be either in I2S bitstream or GPIO (same
 //    situation)
 //    - time delays depending on buffer size/buffer mechanism
-//      BEFORE/AFTER_DIR_CHANGE_DELAY
+//      BEFORE/AFTER_DIR_CHANGE_DELAY_TICKS
 //
 // 3. Queue controlled
 //    - addQueueEntry() controls the pin directly as GPIO
@@ -88,7 +88,7 @@ void disconnect();
 //   Only used when queue is empty and not running.
 //   If undefined, no delay.
 //
-// BEFORE_DIR_CHANGE_DELAY(q)
+// BEFORE_DIR_CHANGE_DELAY_TICKS(q)
 //   Ticks to pause BEFORE direction change entry appears in output.
 //   Used by addQueueEntry() to insert pause for buffered drivers.
 //   - Synchronized with commands: 0
@@ -97,7 +97,7 @@ void disconnect();
 //   - Externally controlled: 0
 //   If undefined, assume 0
 //
-// AFTER_DIR_CHANGE_DELAY(q)
+// AFTER_DIR_CHANGE_DELAY_TICKS(q)
 //   Minimum ticks for the direction change command itself.
 //   Ensures dir change is alone in buffer for synchronized-with-buffer case.
 //   - Synchronized with buffer (I2S-MUX): I2S_BLOCK_TICKS

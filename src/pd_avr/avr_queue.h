@@ -50,7 +50,4 @@ class StepperQueue : public StepperQueueBase {
     }                                           \
   } while (0)
 
-#define BEFORE_DIR_CHANGE_DELAY(q) ((uint16_t)0)
-#define AFTER_DIR_CHANGE_DELAY(q) ((uint16_t)0)
-
 #endif  // PD_AVR_QUEUE_H

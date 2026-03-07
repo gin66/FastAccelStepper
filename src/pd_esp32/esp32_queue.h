@@ -164,7 +164,7 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
   }
 }
 
-static inline uint16_t esp32_before_dir_change_delay(StepperQueue* q) {
+static inline uint16_t esp32_before_dir_change_delay_ticks(StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (q->use_rmt) return MIN_CMD_TICKS;
   if (q->use_i2s) return I2S_BLOCK_TICKS;
@@ -178,7 +178,7 @@ static inline uint16_t esp32_before_dir_change_delay(StepperQueue* q) {
 #endif
 }
 
-static inline uint16_t esp32_after_dir_change_delay(StepperQueue* q) {
+static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
 #if defined(SUPPORT_ESP32_I2S)
   return q->use_i2s ? I2S_BLOCK_TICKS : 0;
 #else
@@ -191,8 +191,9 @@ static inline uint16_t esp32_after_dir_change_delay(StepperQueue* q) {
 
 #define SET_ENABLE_PIN_STATE(q, pin, high) \
   esp32_set_enable_pin_state((q), (pin), (high))
-#define BEFORE_DIR_CHANGE_DELAY(q) esp32_before_dir_change_delay((q))
-#define AFTER_DIR_CHANGE_DELAY(q) esp32_after_dir_change_delay((q))
+#define BEFORE_DIR_CHANGE_DELAY_TICKS(q) \
+  esp32_before_dir_change_delay_ticks((q))
+#define AFTER_DIR_CHANGE_DELAY_TICKS(q) esp32_after_dir_change_delay_ticks((q))
 
 #else
 
@@ -209,12 +210,8 @@ static inline uint16_t esp32_after_dir_change_delay(StepperQueue* q) {
   } while (0)
 
 #if defined(SUPPORT_ESP32_RMT)
-#define BEFORE_DIR_CHANGE_DELAY(q) (MIN_CMD_TICKS)
-#else
-#define BEFORE_DIR_CHANGE_DELAY(q) ((uint16_t)0)
+#define BEFORE_DIR_CHANGE_DELAY_TICKS(q) (MIN_CMD_TICKS)
 #endif
-
-#define AFTER_DIR_CHANGE_DELAY(q) ((uint16_t)0)
 
 #endif  // SUPPORT_ESP32_I2S
 

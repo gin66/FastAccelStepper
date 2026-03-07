@@ -34,7 +34,4 @@ class StepperQueue : public StepperQueueBase {
 
 #define SET_DIRECTION_PIN_STATE(q, high) (q)->setDirPinState(high)
 
-#define BEFORE_DIR_CHANGE_DELAY(q) ((uint16_t)0)
-#define AFTER_DIR_CHANGE_DELAY(q) ((uint16_t)0)
-
 #endif
