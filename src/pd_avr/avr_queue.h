@@ -50,4 +50,7 @@ class StepperQueue : public StepperQueueBase {
     }                                           \
   } while (0)
 
+#define SET_ENABLE_PIN_STATE(q, pin, high) \
+  digitalWrite((pin), (high) ? HIGH : LOW)
+
 #endif  // PD_AVR_QUEUE_H

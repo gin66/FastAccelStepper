@@ -28,4 +28,6 @@ class StepperQueue : public StepperQueueBase {
 
 #define SET_DIRECTION_PIN_STATE(q, high) ((void)0)
 
+#define SET_ENABLE_PIN_STATE(q, pin, high) ((void)0)
+
 #endif  // PD_TEST_QUEUE_H

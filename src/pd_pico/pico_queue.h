@@ -34,4 +34,7 @@ class StepperQueue : public StepperQueueBase {
 
 #define SET_DIRECTION_PIN_STATE(q, high) (q)->setDirPinState(high)
 
+#define SET_ENABLE_PIN_STATE(q, pin, high) \
+  digitalWrite((pin), (high) ? HIGH : LOW)
+
 #endif

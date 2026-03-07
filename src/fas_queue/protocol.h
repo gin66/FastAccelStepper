@@ -112,6 +112,6 @@ void disconnect();
 // SET_ENABLE_PIN_STATE(q, pin, high)
 //   Set enable pin to HIGH or LOW state.
 //   PRECONDITION: NOT called for CONTROLLED_EXTERNAL pins (PIN_EXTERNAL_FLAG)
-//   If undefined, use digitalWrite()
+//   Must be defined
 
 #endif

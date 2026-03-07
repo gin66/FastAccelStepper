@@ -48,6 +48,9 @@ class StepperQueue : public StepperQueueBase {
     }                                             \
   } while (0)
 
+#define SET_ENABLE_PIN_STATE(q, pin, high) \
+  digitalWrite((pin), (high) ? HIGH : LOW)
+
 #define AFTER_SET_DIR_PIN_DELAY_US 30
 
 #endif

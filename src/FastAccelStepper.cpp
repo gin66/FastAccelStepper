@@ -491,9 +491,7 @@ bool FastAccelStepper::disableOutputs() {
   if (isRunning() && _autoEnable) {
     return false;
   }
-#if defined(SET_ENABLE_PIN_STATE)
   StepperQueue* queue = FAS_QUEUE_PTR(_queue_num);
-#endif
   bool disabled = true;
   if (_enablePinLowActive != PIN_UNDEFINED) {
     if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
@@ -502,11 +500,7 @@ bool FastAccelStepper::disableOutputs() {
             (_engine->_externalCallForPin(_enablePinLowActive, HIGH) == HIGH);
       }
     } else {
-#if defined(SET_ENABLE_PIN_STATE)
       SET_ENABLE_PIN_STATE(queue, _enablePinLowActive, HIGH);
-#else
-      digitalWrite(_enablePinLowActive, HIGH);
-#endif
     }
   }
   if (_enablePinHighActive != PIN_UNDEFINED) {
@@ -516,11 +510,7 @@ bool FastAccelStepper::disableOutputs() {
             (_engine->_externalCallForPin(_enablePinHighActive, LOW) == LOW);
       }
     } else {
-#if defined(SET_ENABLE_PIN_STATE)
       SET_ENABLE_PIN_STATE(queue, _enablePinHighActive, LOW);
-#else
-      digitalWrite(_enablePinHighActive, LOW);
-#endif
     }
   }
   if (disabled) {
@@ -529,9 +519,7 @@ bool FastAccelStepper::disableOutputs() {
   return disabled;
 }
 bool FastAccelStepper::enableOutputs() {
-#if defined(SET_ENABLE_PIN_STATE)
   StepperQueue* queue = FAS_QUEUE_PTR(_queue_num);
-#endif
   bool enabled = true;
   if (_enablePinLowActive != PIN_UNDEFINED) {
     if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
@@ -540,11 +528,7 @@ bool FastAccelStepper::enableOutputs() {
             (_engine->_externalCallForPin(_enablePinLowActive, LOW) == LOW);
       }
     } else {
-#if defined(SET_ENABLE_PIN_STATE)
       SET_ENABLE_PIN_STATE(queue, _enablePinLowActive, LOW);
-#else
-      digitalWrite(_enablePinLowActive, LOW);
-#endif
     }
   }
   if (_enablePinHighActive != PIN_UNDEFINED) {
@@ -554,11 +538,7 @@ bool FastAccelStepper::enableOutputs() {
             (_engine->_externalCallForPin(_enablePinHighActive, HIGH) == HIGH);
       }
     } else {
-#if defined(SET_ENABLE_PIN_STATE)
       SET_ENABLE_PIN_STATE(queue, _enablePinHighActive, HIGH);
-#else
-      digitalWrite(_enablePinHighActive, HIGH);
-#endif
     }
   }
   return enabled;
