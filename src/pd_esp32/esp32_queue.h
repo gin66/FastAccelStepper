@@ -85,9 +85,8 @@ class StepperQueue : public StepperQueueBase {
     struct {
       struct i2s_fill_state _fill_state;
       I2sManager* i2s_mgr;
-      uint8_t _i2s_mux_slot;
-      uint8_t _i2s_mux_byte_offset;
-      uint8_t _i2s_mux_bit_mask;
+      uint8_t _i2s_mux_step_byte_offset;
+      uint8_t _i2s_mux_step_bit_mask;
     };
 #endif
   };
@@ -128,6 +127,22 @@ class StepperQueue : public StepperQueueBase {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
+#ifdef SUPPORT_ESP32_I2S
+    if ((dirPin & PIN_I2S_FLAG) && use_i2s && i2s_mgr->_is_mux) {
+      uint8_t slot = dirPin & 0x1F;
+      if (slot >= 32) {
+        return;
+      }
+      uint32_t bit = 1UL << slot;
+      if (_i2s_mux_allocated_bitmask & bit) {
+        return;
+      }
+      _i2s_mux_allocated_bitmask |= bit;
+      if (_i2s_mux_manager != nullptr) {
+        _i2s_mux_manager->i2sMuxSetBit(slot, _dirHighCountsUp);
+      }
+    }
+#endif
   }
 };
 
@@ -189,6 +204,7 @@ static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
 #define SET_DIRECTION_PIN_STATE(q, high) \
   esp32_set_direction_pin_state((q), (high))
 
+#define SET_ENABLE_PIN_STATE_NEED_QUEUE
 #define SET_ENABLE_PIN_STATE(q, pin, high) \
   esp32_set_enable_pin_state((q), (pin), (high))
 #define BEFORE_DIR_CHANGE_DELAY_TICKS(q) \
@@ -199,13 +215,11 @@ static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
 
 #define SET_DIRECTION_PIN_STATE(q, high)                               \
   do {                                                                 \
-    (void)(q);                                                         \
     gpio_ll_set_level(&GPIO, (gpio_num_t)(q)->dirPin, (high) ? 1 : 0); \
   } while (0)
 
 #define SET_ENABLE_PIN_STATE(q, pin, high)                       \
   do {                                                           \
-    (void)(q);                                                   \
     gpio_ll_set_level(&GPIO, (gpio_num_t)(pin), (high) ? 1 : 0); \
   } while (0)
 

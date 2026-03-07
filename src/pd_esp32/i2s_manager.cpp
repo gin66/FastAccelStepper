@@ -2,6 +2,7 @@
 #if defined(SUPPORT_ESP32_I2S)
 
 #include "pd_esp32/i2s_manager.h"
+#include "pd_esp32/esp32_queue.h"
 #include <string.h>
 
 static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
@@ -104,7 +105,9 @@ void I2sManager::i2sMuxSetBit(uint8_t slot, bool value) {
   if (slot >= 32) {
     return;
   }
-  uint32_t bit = 1UL << slot;
+  uint8_t byte_offset = slot / 8;
+  uint8_t bit_within_byte = 7 - (slot % 8);
+  uint32_t bit = 1UL << (byte_offset * 8 + bit_within_byte);
   if (value) {
     _mux_state |= bit;
   } else {
@@ -116,7 +119,9 @@ bool I2sManager::i2sMuxGetBit(uint8_t slot) {
   if (slot >= 32) {
     return false;
   }
-  return (_mux_state & (1UL << slot)) != 0;
+  uint8_t byte_offset = slot / 8;
+  uint8_t bit_within_byte = 7 - (slot % 8);
+  return (_mux_state & (1UL << (byte_offset * 8 + bit_within_byte))) != 0;
 }
 
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {

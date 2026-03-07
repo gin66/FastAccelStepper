@@ -102,15 +102,14 @@ void initializeSteppers() {
     }
 
     if (cfg.dir_pin.pin != 255) {
+      uint8_t dirPin = cfg.dir_pin.pin;
       if (isI2SDir) {
-        s->setDirectionPin(cfg.dir_pin.pin, cfg.dir_high_counts_up,
-                           cfg.dir_pin.delay_us);
+        dirPin |= PIN_I2S_FLAG;
         i2sManager->assignPinToStepper(cfg.dir_pin.pin, cfg.id);
       } else {
-        s->setDirectionPin(cfg.dir_pin.pin, cfg.dir_high_counts_up,
-                           cfg.dir_pin.delay_us);
         gpioManager->assignPinToStepper(cfg.dir_pin.pin, cfg.id);
       }
+      s->setDirectionPin(dirPin, cfg.dir_high_counts_up, cfg.dir_pin.delay_us);
     }
 
     if (isI2SStep) {
@@ -130,7 +129,7 @@ void initializeSteppers() {
 
     if (cfg.enable_pin_low.pin != 255) {
       if (isI2SEnableLow) {
-        s->setEnablePin(cfg.enable_pin_low.pin, true);
+        s->setEnablePin(cfg.enable_pin_low.pin | PIN_I2S_FLAG, true);
         i2sManager->assignPinToStepper(cfg.enable_pin_low.pin, cfg.id);
       } else {
         s->setEnablePin(cfg.enable_pin_low.pin, true);
@@ -140,7 +139,7 @@ void initializeSteppers() {
 
     if (cfg.enable_pin_high.pin != 255) {
       if (isI2SEnableHigh) {
-        s->setEnablePin(cfg.enable_pin_high.pin, false);
+        s->setEnablePin(cfg.enable_pin_high.pin | PIN_I2S_FLAG, false);
         i2sManager->assignPinToStepper(cfg.enable_pin_high.pin, cfg.id);
       } else {
         s->setEnablePin(cfg.enable_pin_high.pin, false);

@@ -23,6 +23,7 @@ class WebServerManager {
   uint32_t lastCleanup;
   uint16_t statusUpdateInterval;
   bool prevRunningState[MAX_STEPPER];
+  bool enabledState[MAX_STEPPER];
 
   void setupStaticFiles();
   void setupApiRoutes();

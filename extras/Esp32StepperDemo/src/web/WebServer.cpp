@@ -19,6 +19,9 @@ WebServerManager::WebServerManager(ConfigManager* cfgMgr,
       lastCleanup(0),
       statusUpdateInterval(500) {
   memset(prevRunningState, 0, sizeof(prevRunningState));
+  for (int i = 0; i < MAX_STEPPER; i++) {
+    enabledState[i] = true;
+  }
 }
 
 WebServerManager::~WebServerManager() {
@@ -543,8 +546,10 @@ void WebServerManager::handleStepperCommand(AsyncWebServerRequest* request) {
     s->setAcceleration(value1);
   } else if (cmd == "enable") {
     s->enableOutputs();
+    enabledState[id] = true;
   } else if (cmd == "disable") {
     s->disableOutputs();
+    enabledState[id] = false;
   } else {
     sendErrorResponse(request, 400, "Unknown command");
     return;
@@ -711,6 +716,7 @@ void WebServerManager::broadcastStatus() {
       p["position"] = steppers[i]->getCurrentPosition();
       p["running"] = steppers[i]->isRunning();
       p["speed"] = steppers[i]->getCurrentSpeedInUs();
+      p["enabled"] = enabledState[i];
     }
   }
 

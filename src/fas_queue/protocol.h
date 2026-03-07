@@ -109,6 +109,7 @@ void disconnect();
 // Enable pin control always happens in addQueueEntry() context (not ISR).
 // The ~4ms processing delay is acceptable for enable/disable operations.
 //
+// SET_ENABLE_PIN_STATE_NEED_QUEUE
 // SET_ENABLE_PIN_STATE(q, pin, high)
 //   Set enable pin to HIGH or LOW state.
 //   PRECONDITION: NOT called for CONTROLLED_EXTERNAL pins (PIN_EXTERNAL_FLAG)

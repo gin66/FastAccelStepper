@@ -235,6 +235,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         let statusInterval;
         let i2sEnabled = false;
         let gpioPins = [];
+        let stepperEnabledStates = {};
         
         function connectWebSocket() {
             ws = new WebSocket(`ws://${location.host}/ws`);
@@ -267,11 +268,23 @@ const char index_html[] PROGMEM = R"rawliteral(
                 const posEl = document.getElementById(`pos-${pos.id}`);
                 const runningEl = document.getElementById(`running-${pos.id}`);
                 const speedEl = document.getElementById(`speed-${pos.id}`);
+                const enableBtn = document.getElementById(`enable-btn-${pos.id}`);
                 
                 if (posEl) posEl.textContent = pos.position;
                 if (runningEl) runningEl.textContent = pos.running ? 'Running' : 'Stopped';
                 if (speedEl) speedEl.textContent = pos.speed || '-';
+                
+                stepperEnabledStates[pos.id] = pos.enabled;
+                if (enableBtn) {
+                    enableBtn.textContent = pos.enabled ? 'Disable' : 'Enable';
+                }
             });
+        }
+        
+        function toggleEnable(stepperId) {
+            const enabled = stepperEnabledStates[stepperId];
+            const cmd = enabled ? 'disable' : 'enable';
+            sendStepperCommand(stepperId, cmd);
         }
         
         async function loadSteppers() {
@@ -329,7 +342,7 @@ const char index_html[] PROGMEM = R"rawliteral(
                         <button class="btn-primary" onclick="sendStepperCommand(${s.id}, 'run_forward')">Fwd</button>
                         <button class="btn-primary" onclick="sendStepperCommand(${s.id}, 'run_backward')">Rev</button>
                         <button class="btn-danger" onclick="sendStepperCommand(${s.id}, 'stop')">Stop</button>
-                        <button class="btn-secondary" onclick="sendStepperCommand(${s.id}, 'disable')">Disable</button>
+                        <button class="btn-secondary" id="enable-btn-${s.id}" onclick="toggleEnable(${s.id})">Disable</button>
                     </div>
                 </div>
                 `;

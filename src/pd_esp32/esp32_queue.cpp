@@ -209,9 +209,8 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
     StepperQueue* q = new StepperQueue();
     q->use_i2s = true;
     q->i2s_mgr = StepperQueue::_i2s_mux_manager;
-    q->_i2s_mux_slot = slot;
-    q->_i2s_mux_byte_offset = slot / 8;
-    q->_i2s_mux_bit_mask = 1 << (7 - (slot % 8));
+    q->_i2s_mux_step_byte_offset = slot / 8;
+    q->_i2s_mux_step_bit_mask = 1 << (7 - (slot % 8));
     return q;
   }
 
