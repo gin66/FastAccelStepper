@@ -49,7 +49,7 @@ bool IRAM_ATTR i2s_fill_buffer_mux(StepperQueue* q, uint8_t* buf,
 
     struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];
     if (e->toggle_dir) {
-      LL_TOGGLE_PIN(q->dirPin);
+      SET_DIRECTION_PIN_STATE(q, e->dirPinState);
       e->toggle_dir = 0;
     }
 
@@ -135,6 +135,7 @@ bool IRAM_ATTR i2s_fill_buffer_direct(StepperQueueBase* q, uint8_t* buf,
 
     struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];
     if (e->toggle_dir) {
+      // Cannot be an I2S mux pin, so directly toggle the pin level.
       LL_TOGGLE_PIN(q->dirPin);
       e->toggle_dir = 0;
     }
