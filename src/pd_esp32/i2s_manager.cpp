@@ -105,9 +105,7 @@ void I2sManager::i2sMuxSetBit(uint8_t slot, bool value) {
   if (slot >= 32) {
     return;
   }
-  uint8_t byte_offset = slot / 8;
-  uint8_t bit_within_byte = 7 - (slot % 8);
-  uint32_t bit = 1UL << (byte_offset * 8 + bit_within_byte);
+  uint32_t bit = i2s_mux_bit_mask_u32(slot);
   if (value) {
     _mux_state |= bit;
   } else {
@@ -119,9 +117,7 @@ bool I2sManager::i2sMuxGetBit(uint8_t slot) {
   if (slot >= 32) {
     return false;
   }
-  uint8_t byte_offset = slot / 8;
-  uint8_t bit_within_byte = 7 - (slot % 8);
-  return (_mux_state & (1UL << (byte_offset * 8 + bit_within_byte))) != 0;
+  return (_mux_state & i2s_mux_bit_mask_u32(slot)) != 0;
 }
 
 void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {

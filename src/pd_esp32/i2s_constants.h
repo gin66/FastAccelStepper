@@ -43,5 +43,22 @@
 #define I2S_DMA_DESC_NUM 2
 #define I2S_DMA_FRAME_NUM I2S_FRAMES_PER_BLOCK
 
+// Convert I2S mux slot (0-31) to 32-bit bit position.
+// Matches byte/bit access: slot S → byte S/8, bit (7 - S%8)
+// slot 0 -> bit 7, slot 7 -> bit 0, slot 8 -> bit 15, slot 15 -> bit 8
+static inline uint8_t i2s_mux_slot_to_bit_pos(uint8_t slot) { return slot ^ 7; }
+
+static inline uint8_t i2s_mux_byte_offset(uint8_t slot) {
+  return i2s_mux_slot_to_bit_pos(slot) >> 3;
+}
+
+static inline uint8_t i2s_mux_bit_mask(uint8_t slot) {
+  return 1 << (i2s_mux_slot_to_bit_pos(slot) & 7);
+}
+
+static inline uint32_t i2s_mux_bit_mask_u32(uint8_t slot) {
+  return 1UL << i2s_mux_slot_to_bit_pos(slot);
+}
+
 #endif  // SUPPORT_ESP32_I2S
 #endif  // PD_ESP32_I2S_CONSTANTS_H
