@@ -4,6 +4,8 @@
 #include "FastAccelStepper.h"
 #include "fas_queue/base.h"
 
+#include <hal/gpio_ll.h>
+
 #if defined(SUPPORT_ESP32_I2S)
 #include "pd_esp32/i2s_fill.h"
 #include "pd_esp32/i2s_manager.h"

@@ -3,7 +3,7 @@
 
 // #define TEST_MODE
 
-#include "fas_arch/test_probe.h"
+#include "pd_esp32/test_probe.h"
 
 static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
                                  const rmt_tx_done_event_data_t* edata,

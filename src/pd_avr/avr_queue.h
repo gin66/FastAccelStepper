@@ -4,6 +4,38 @@
 #include "FastAccelStepper.h"
 #include "fas_queue/base.h"
 
+//==========================================================================
+//
+// AVR derivate ATmega 168/328/P
+//
+//==========================================================================
+#if (defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
+     defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__))
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+enum channels { channelA, channelB };
+//==========================================================================
+//
+// AVR derivate ATmega 2560
+//
+//==========================================================================
+#elif defined(__AVR_ATmega2560__)
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define fas_queue_C fas_queue[2]
+enum channels { channelA, channelB, channelC };
+//==========================================================================
+//
+// AVR derivate ATmega 32U4
+//
+//==========================================================================
+#elif defined(__AVR_ATmega32U4__)
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+#define fas_queue_C fas_queue[2]
+enum channels { channelA, channelB, channelC };
+#endif
+
 class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
@@ -33,12 +65,8 @@ class StepperQueue : public StepperQueueBase {
     }
   }
 
-#if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   void adjustSpeedToStepperCount(uint8_t steppers);
-#endif
-#if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
   static int8_t queueNumForStepPin(uint8_t step_pin);
-#endif
 };
 
 #define SET_DIRECTION_PIN_STATE(q, high)        \

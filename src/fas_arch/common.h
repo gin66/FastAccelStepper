@@ -63,29 +63,36 @@ struct queue_end_s {
 #if defined(TEST)
 // TEST "architecture" is in use with pc_based testing.
 #include "fas_arch/test_pc.h"
+#include "pd_test/pd_config.h"
 
 #elif defined(ARDUINO_ARCH_ESP32)
 // ESP32 derivates using arduino core
 #include "fas_arch/arduino_esp32.h"
+#include "pd_esp32/pd_config.h"
 
 #elif defined(ESP_PLATFORM)
 // ESP32 derivates using espidf
 #include "fas_arch/espidf_esp32.h"
+#include "pd_esp32/pd_config.h"
 
 #elif defined(ARDUINO_ARCH_SAM)
 // SAM-architecture
 #include "fas_arch/arduino_sam.h"
+#include "pd_sam/pd_config.h"
 
 #elif defined(ARDUINO_ARCH_AVR)
 // AVR family
 #include "fas_arch/arduino_avr.h"
+#include "pd_avr/pd_config.h"
 
 #elif defined(PICO_SDK_RP2350)
 #include "fas_arch/pico_sdk_rp_pico.h"
+#include "pd_pico/pd_config.h"
 
 #elif defined(PICO_RP2040) || defined(PICO_RP2350)
 // Raspberry Pico and Pico 2
 #include "fas_arch/arduino_rp_pico.h"
+#include "pd_pico/pd_config.h"
 
 #else
 #error "Unsupported devices"
@@ -99,18 +106,6 @@ struct queue_end_s {
     digitalWrite(pin, (value)); \
     pinMode(pin, OUTPUT);       \
   }
-#endif
-
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-enum class FasDriver : uint8_t {
-  MCPWM_PCNT = 0,
-  RMT = 1,
-#if defined(SUPPORT_ESP32_I2S)
-  I2S_DIRECT = 2,
-  I2S_MUX = 3,
-#endif  // SUPPORT_ESP32_I2S
-  DONT_CARE = 255
-};
 #endif
 
 // disable inject_fill_interrupt() for all real devices. Only defined in TEST

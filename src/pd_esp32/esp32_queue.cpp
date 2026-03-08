@@ -1,9 +1,12 @@
 #include "fas_queue/stepper_queue.h"
+
 #if defined(SUPPORT_ESP32_I2S)
 #include "pd_esp32/i2s_manager.h"
 #endif
 
 #if defined(SUPPORT_ESP32)
+
+#include <esp_task_wdt.h>
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)

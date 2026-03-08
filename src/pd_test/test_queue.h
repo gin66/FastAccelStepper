@@ -4,6 +4,9 @@
 #include "FastAccelStepper.h"
 #include "fas_queue/base.h"
 
+#define fas_queue_A fas_queue[0]
+#define fas_queue_B fas_queue[1]
+
 class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
