@@ -1,3 +1,12 @@
+// pd_test/pd_config.h - Test platform configuration
+//
+// This file defines test-specific constants for the FastAccelStepper library:
+// - Queue topology (MAX_STEPPER, NUM_QUEUES, QUEUE_LEN)
+// - Timing constants (TICKS_PER_S, MIN_CMD_TICKS, delays)
+// - Feature flags for PC-based testing
+//
+// Included by fas_arch/common.h during platform dispatch.
+
 #ifndef PD_TEST_CONFIG_H
 #define PD_TEST_CONFIG_H
 

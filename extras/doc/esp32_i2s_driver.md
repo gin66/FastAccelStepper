@@ -603,8 +603,8 @@ src/pd_esp32/
 
 ```
 src/fas_arch/common.h               — I2S_DIRECT/I2S_MUX in FasDriver enum
-src/fas_arch/common_esp32.h         — QUEUES_I2S_MUX, QUEUES_I2S_DIRECT, PIN_I2S_FLAG
-src/fas_arch/common_esp32_idf5.h    — SUPPORT_ESP32_I2S conditional on SOC_I2S_NUM
+src/pd_esp32/pd_config.h            — QUEUES_I2S_MUX, QUEUES_I2S_DIRECT, PIN_I2S_FLAG, SUPPORT_ESP32_I2S
+src/pd_esp32/pd_config_idf5.h       — Chip-specific I2S support determination
 src/pd_esp32/esp32_queue.h          — I2S union members, static MUX manager
 src/pd_esp32/esp32_queue.cpp        — I2S dispatch, tryAllocateQueue(), initI2sMux()
 src/FastAccelStepperEngine.h        — initI2sMux() declaration

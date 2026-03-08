@@ -1,3 +1,14 @@
+// pd_esp32/pd_config.h - ESP32 platform configuration
+//
+// This file defines ESP32-specific constants for the FastAccelStepper library:
+// - Queue topology (MAX_STEPPER, NUM_QUEUES, QUEUE_LEN)
+// - Timing constants (TICKS_PER_S, MIN_CMD_TICKS, delays)
+// - Driver type selection (RMT, MCPWM/PCNT, I2S)
+// - Feature flags for ESP32-specific behavior
+//
+// Includes pd_config_idfX.h for IDF version-specific chip configurations.
+// Included by fas_arch/common.h during platform dispatch.
+
 #ifndef PD_ESP32_CONFIG_H
 #define PD_ESP32_CONFIG_H
 

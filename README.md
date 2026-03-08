@@ -86,6 +86,24 @@ I have stumbled over an excellent AI-generated description of FastAccelStepper, 
 It would have costed me many days to write an equally good description with so many details and diagrams.
 This docu can be found [here](https://deepwiki.com/gin66/FastAccelStepper).
 
+## Source Code Structure
+
+The `src/` directory is organized into the following subdirectories:
+
+| Directory | Purpose |
+|-----------|---------|
+| `fas_arch/` | Platform abstraction: compiler/framework detection, interrupt macros, Arduino-like polyfills |
+| `pd_avr/` | AVR pulse driver: timer-based stepper control for ATmega chips |
+| `pd_esp32/` | ESP32 pulse driver: RMT, MCPWM/PCNT, and I2S-based stepper control |
+| `pd_pico/` | RP2040/RP2350 pulse driver: PIO-based stepper control |
+| `pd_sam/` | SAM Due pulse driver: timer-based stepper control |
+| `pd_test/` | Test platform pulse driver: PC-based testing simulation |
+| `fas_queue/` | Queue implementation: command queue management |
+| `fas_ramp/` | Ramp calculation: acceleration/deceleration curves |
+| `log2/` | Log2 representation: fixed-point arithmetic for speed calculations |
+
+Platform-specific configuration constants (queue sizes, timing, feature flags) are defined in `pd_*/pd_config.h` files, which are included by `fas_arch/common.h` during the platform dispatch.
+
 ## General behaviour of Moves
 * The desired end position to move to is set by calls to moveTo() and move()
 * The desired end position is in case of moveTo() given as absolute position

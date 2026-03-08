@@ -1,3 +1,12 @@
+// pd_pico/pd_config.h - RP2040/RP2350 platform configuration
+//
+// This file defines Pico-specific constants for the FastAccelStepper library:
+// - Queue topology (MAX_STEPPER, NUM_QUEUES, QUEUE_LEN)
+// - Timing constants (TICKS_PER_S, MIN_CMD_TICKS, delays)
+// - Feature flags for Pico-specific behavior
+//
+// Included by fas_arch/common.h during platform dispatch.
+
 #ifndef PD_PICO_CONFIG_H
 #define PD_PICO_CONFIG_H
 

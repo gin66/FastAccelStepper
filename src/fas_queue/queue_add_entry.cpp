@@ -76,7 +76,8 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
     }
   }
 
-#if defined(BEFORE_DIR_CHANGE_DELAY_TICKS) || defined(AFTER_DIR_CHANGE_DELAY_TICKS)
+#if defined(BEFORE_DIR_CHANGE_DELAY_TICKS) || \
+    defined(AFTER_DIR_CHANGE_DELAY_TICKS)
   if (toggle_dir) {
     uint16_t before_delay = 0;
     uint16_t after_delay = 0;
@@ -91,7 +92,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
       // If the previous command is a pause, then this may be sufficient.
       struct queue_entry* prev = &entry[(wp - 1) & QUEUE_LEN_MASK];
       if (prev->steps == 0) {
-        if (prev-> ticks >= before_delay) {
+        if (prev->ticks >= before_delay) {
           before_delay = 0;
         }
       }
@@ -103,10 +104,10 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
       }
     }
     uint8_t commands_needed = 1;
-    if(before_delay > 0) {
+    if (before_delay > 0) {
       commands_needed++;
     }
-    if(after_delay > 0) {
+    if (after_delay > 0) {
       commands_needed++;
     }
     if (queueEntries() >= QUEUE_LEN - commands_needed) {

@@ -1,3 +1,12 @@
+// pd_avr/pd_config.h - AVR platform configuration
+//
+// This file defines AVR-specific constants for the FastAccelStepper library:
+// - Queue topology (MAX_STEPPER, NUM_QUEUES, QUEUE_LEN)
+// - Timing constants (TICKS_PER_S, MIN_CMD_TICKS, delays)
+// - Feature flags for AVR-specific behavior
+//
+// Included by fas_arch/common.h during platform dispatch.
+
 #ifndef PD_AVR_CONFIG_H
 #define PD_AVR_CONFIG_H
 

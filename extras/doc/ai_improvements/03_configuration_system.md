@@ -26,11 +26,13 @@ FastAccelStepper uses complex preprocessor macros for platform configuration, ma
 ### Configuration Complexity
 
 **Platform-specific configuration files:**
-- `fas_arch/arduino_avr.h` (80+ lines of macros)
-- `fas_arch/common_esp32.h` (50+ lines of macros)
-- `fas_arch/common_esp32_idf4.h` (separate file)
-- `fas_arch/common_esp32_idf5.h` (separate file)
-- `fas_arch/common_esp32_idf6.h` (separate file)
+- `pd_avr/pd_config.h` — AVR timing, queue sizes, feature flags
+- `pd_esp32/pd_config.h` — ESP32 timing, queue sizes, driver selection
+- `pd_esp32/pd_config_idf4.h`, `pd_config_idf5.h`, `pd_config_idf6.h` — IDF version-specific chip configs
+- `pd_pico/pd_config.h` — Pico timing, queue sizes
+- `pd_sam/pd_config.h` — SAM timing, queue sizes
+- `pd_test/pd_config.h` — Test platform configuration
+- `fas_arch/arduino_avr.h` (now minimal — only platform identity and interrupt macros)
 
 **Configuration propagation:**
 ```cpp

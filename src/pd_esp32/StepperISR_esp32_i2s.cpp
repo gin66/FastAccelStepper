@@ -42,8 +42,9 @@ void StepperQueue::fill_i2s_buffer(uint8_t* buf) {
 
   bool buffer_full;
   if (i2s_mgr->_is_mux) {
-    buffer_full = i2s_fill_buffer_mux(this, buf, &_fill_state,
-                                      _i2s_mux_step_byte_offset, _i2s_mux_step_bit_mask);
+    buffer_full =
+        i2s_fill_buffer_mux(this, buf, &_fill_state, _i2s_mux_step_byte_offset,
+                            _i2s_mux_step_bit_mask);
   } else {
     buffer_full = i2s_fill_buffer_direct(this, buf, &_fill_state);
   }

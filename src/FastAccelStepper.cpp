@@ -491,9 +491,9 @@ bool FastAccelStepper::disableOutputs() {
   if (isRunning() && _autoEnable) {
     return false;
   }
-  #if defined(SET_ENABLE_PIN_STATE_NEED_QUEUE)
+#if defined(SET_ENABLE_PIN_STATE_NEED_QUEUE)
   StepperQueue* queue = FAS_QUEUE_PTR(_queue_num);
-  #endif
+#endif
   bool disabled = true;
   if (_enablePinLowActive != PIN_UNDEFINED) {
     if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
@@ -521,9 +521,9 @@ bool FastAccelStepper::disableOutputs() {
   return disabled;
 }
 bool FastAccelStepper::enableOutputs() {
-  #if defined(SET_ENABLE_PIN_STATE_NEED_QUEUE)
+#if defined(SET_ENABLE_PIN_STATE_NEED_QUEUE)
   StepperQueue* queue = FAS_QUEUE_PTR(_queue_num);
-  #endif
+#endif
   bool enabled = true;
   if (_enablePinLowActive != PIN_UNDEFINED) {
     if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
