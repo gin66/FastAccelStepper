@@ -24,6 +24,9 @@ void StepperQueue::startQueue_i2s() { _isRunning = true; }
 void StepperQueue::forceStop_i2s() {
   _isRunning = false;
   _fill_state = {};
+
+  // and empty the buffer
+  read_idx = next_write_idx;
 }
 
 bool StepperQueue::isReadyForCommands_i2s() {
