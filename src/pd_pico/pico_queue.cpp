@@ -276,6 +276,10 @@ void StepperTask(void* parameter) {
   }
 }
 
+int32_t StepperQueue::getCurrentPosition() {
+  return getCurrentStepCount() + pos_offset;
+}
+
 void fas_init_engine(FastAccelStepperEngine* engine) {
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
     fas_queue[i]._step_pin = PIN_UNDEFINED;
