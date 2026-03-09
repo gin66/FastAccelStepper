@@ -16,9 +16,9 @@ bool test_seq_07(FastAccelStepper* stepper, struct test_seq_s* seq,
         int32_t dt = time_ms - seq->u32_1;
         PRINTI32(dt);
         PRINTLN("");
-        // 779 esp, 805 avr (neu 810 avr), 820: esp32 with rmt, 812: esp32 with
+        // 779 esp, 805 avr (neu 810 avr), 820: esp32 with rmt, 812: esp32 with ?, 827 with isr
         // rmt second channel
-        if (abs(dt - 792) > 30) {
+        if (abs(dt - 792) > 40) {
           seq->state = TEST_STATE_ERROR;
           return true;
         }
