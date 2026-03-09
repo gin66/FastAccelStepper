@@ -305,19 +305,19 @@ const struct stepper_config_s stepper_config[MAX_STEPPER+1] = {
       on_delay_us : 5000,
       off_delay_ms : 10
     },
-#endif
-#if MAX_STEPPER == 14
     {
       step : 33,
       enable_low_active : PIN_UNDEFINED,
       enable_high_active : PIN_UNDEFINED,
-      direction : 18,
+      direction : PIN_UNDEFINED,
       dir_change_delay : 0,
       direction_high_count_up : true,
       auto_enable : true,
       on_delay_us : 5000,
       off_delay_ms : 10
     },
+#endif
+#if MAX_STEPPER == 14
     {
       step : 25,  // enable pin of M6
       enable_low_active : PIN_UNDEFINED,
@@ -1641,7 +1641,7 @@ bool process_cmd(char* cmd) {
           // Wait for stepper stop
           while (stepper_selected->isRunning()) {
             // do nothing
-#ifdef ESP_PLATFORM
+#if !defined(ARDUINO_ARCH_ESP32) && defined(ESP_PLATFORM)
             esp_task_wdt_reset();
             DELAY_MS(2);
 #endif

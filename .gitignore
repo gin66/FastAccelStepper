@@ -42,3 +42,4 @@ extras/tests/pc_based/ramp_helper
 AGENTS.md
 extras/tests/pc_based/AGENTS.md
 extras/Esp32StepperDemo/lib/FastAccelStepper/src
+extras/tests/esp32_hw_based/.test_*

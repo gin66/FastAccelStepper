@@ -21,6 +21,21 @@ test: M1.test M9.test
 	MOTOR=$* ./seq_07c.sh $(DEV)
 	MOTOR=$* ./seq_03.sh $(DEV)
 
+test_all: .test_espidf4 .test_espidf5 .test_idf5
+
+.test_espidf4:
+	make compile_arduino_espidf4 && make test && touch .test_espidf4
+
+.test_espidf5:
+	make compile_arduino_espidf5 && make test && touch .test_espidf5
+
+# Cannot install/run
+#.test_idf4:
+#	make compile_idf4 && make test && touch .test_idf4
+
+.test_idf5:
+	make compile_idf5 && make test && touch .test_idf5
+
 compile: compile_arduino_espidf4
 
 compile_arduino_espidf4:
@@ -38,4 +53,4 @@ compile_idf5:
 	(cd ../../../pio_espidf/StepperDemo;rm -fR .pio; pio run -e esp32_idf_V6_8_1 -t upload --upload-port /dev/$(DEV))
 
 clean:
-	rm -f seq*.log
+	rm -f seq*.log .test_*
