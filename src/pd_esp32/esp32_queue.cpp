@@ -280,6 +280,35 @@ StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
 }
 #endif  // !SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
 
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE) && !defined(SUPPORT_DYNAMIC_ALLOCATION)
+StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+  if (step_pin & PIN_EXTERNAL_FLAG) {
+    return nullptr;
+  }
+
+  if (!StepperQueue::isValidStepPin(step_pin)) {
+    return nullptr;
+  }
+
+  for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+    if (fas_queue[i]._step_pin == step_pin) {
+      return nullptr;
+    }
+  }
+
+  for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+    if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
+      StepperQueue* q = &fas_queue[i];
+#ifdef SUPPORT_ESP32_RMT
+      q->use_rmt = true;
+#endif
+      return q;
+    }
+  }
+  return nullptr;
+}
+#endif  // !SUPPORT_SELECT_DRIVER_TYPE && !SUPPORT_DYNAMIC_ALLOCATION
+
 #if defined(SUPPORT_SELECT_DRIVER_TYPE) && !defined(SUPPORT_DYNAMIC_ALLOCATION)
 // Static allocation with driver selection (ESP-IDF 4.x)
 // Queue ranges: [0..QUEUES_MCPWM_PCNT-1] = MCPWM/PCNT
