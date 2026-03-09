@@ -269,7 +269,6 @@ This test application was AI crafted....
 * allows up to 200000 generated steps per second
 * In theory supports up to eight stepper motors for pico and twelve stepper motors for pico 2. Using arduino framework and arm core, only four for pico and eight for pico 2 can be allocated. riscv should be able to allocate all steppers.
 * Steppers' command queue depth: 32
-* beta status !!!!
 
 ### Atmel SAM Due
 
