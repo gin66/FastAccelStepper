@@ -395,5 +395,29 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
   return false;
 }
 
+static uint8_t stepper_allocated_count = 0;
+
+StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+  if (!isValidStepPin(step_pin)) {
+    return nullptr;
+  }
+
+  if (stepper_allocated_count >= MAX_STEPPER) {
+    return nullptr;
+  }
+
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
+      if (!fas_queue[i].init(nullptr, i, step_pin)) {
+        return nullptr;
+      }
+      stepper_allocated_count++;
+      return &fas_queue[i];
+    }
+  }
+
+  return nullptr;
+}
+
 void fas_init_engine(FastAccelStepperEngine* engine) { fas_engine = engine; }
 #endif

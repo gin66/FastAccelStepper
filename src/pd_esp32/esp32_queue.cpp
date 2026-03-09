@@ -280,6 +280,94 @@ StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
 }
 #endif  // !SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
 
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && !defined(SUPPORT_DYNAMIC_ALLOCATION)
+// Static allocation with driver selection (ESP-IDF 4.x)
+// Queue ranges: [0..QUEUES_MCPWM_PCNT-1] = MCPWM/PCNT
+//               [QUEUES_MCPWM_PCNT..QUEUES_MCPWM_PCNT+QUEUES_RMT-1] = RMT
+//               [QUEUES_MCPWM_PCNT+QUEUES_RMT..] = I2S
+#if defined(SUPPORT_ESP32_MCPWM_PCNT) && (QUEUES_MCPWM_PCNT > 0)
+static uint8_t mcpwm_pcnt_allocated = 0;
+#endif
+#if defined(SUPPORT_ESP32_RMT) && (QUEUES_RMT > 0)
+static uint8_t rmt_allocated = 0;
+#endif
+#if defined(SUPPORT_ESP32_I2S) && (QUEUES_I2S > 0)
+static uint8_t i2s_allocated = 0;
+#endif
+
+StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
+                                             uint8_t step_pin) {
+  if (step_pin & PIN_EXTERNAL_FLAG) {
+    return nullptr;
+  }
+
+  if (!StepperQueue::isValidStepPin(step_pin)) {
+    return nullptr;
+  }
+
+  for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+    if (fas_queue[i]._step_pin == step_pin) {
+      return nullptr;
+    }
+  }
+
+#if defined(SUPPORT_ESP32_MCPWM_PCNT) && (QUEUES_MCPWM_PCNT > 0)
+  if (driver == FasDriver::MCPWM_PCNT) {
+    if (mcpwm_pcnt_allocated >= QUEUES_MCPWM_PCNT) {
+      return nullptr;
+    }
+    StepperQueue* q = &fas_queue[mcpwm_pcnt_allocated];
+    q->use_mcpwm_pcnt = true;
+    mcpwm_pcnt_allocated++;
+    return q;
+  }
+#endif
+
+#if defined(SUPPORT_ESP32_RMT) && (QUEUES_RMT > 0)
+  if (driver == FasDriver::RMT) {
+    if (rmt_allocated >= QUEUES_RMT) {
+      return nullptr;
+    }
+    StepperQueue* q = &fas_queue[QUEUES_MCPWM_PCNT + rmt_allocated];
+    q->use_rmt = true;
+    rmt_allocated++;
+    return q;
+  }
+#endif
+
+#if defined(SUPPORT_ESP32_I2S) && (QUEUES_I2S > 0)
+  if (driver == FasDriver::I2S_DIRECT) {
+    uint8_t i2s_start = QUEUES_MCPWM_PCNT + QUEUES_RMT;
+    if (i2s_allocated >= QUEUES_I2S) {
+      return nullptr;
+    }
+    StepperQueue* q = &fas_queue[i2s_start + i2s_allocated];
+    q->use_i2s = true;
+    i2s_allocated++;
+    return q;
+  }
+#endif
+
+  if (driver == FasDriver::DONT_CARE) {
+    StepperQueue* q = nullptr;
+#if defined(SUPPORT_ESP32_MCPWM_PCNT) && (QUEUES_MCPWM_PCNT > 0)
+    q = tryAllocateQueue(FasDriver::MCPWM_PCNT, step_pin);
+    if (q != nullptr) return q;
+#endif
+#if defined(SUPPORT_ESP32_RMT) && (QUEUES_RMT > 0)
+    q = tryAllocateQueue(FasDriver::RMT, step_pin);
+    if (q != nullptr) return q;
+#endif
+#if defined(SUPPORT_ESP32_I2S) && (QUEUES_I2S > 0)
+    q = tryAllocateQueue(FasDriver::I2S_DIRECT, step_pin);
+    if (q != nullptr) return q;
+#endif
+  }
+
+  return nullptr;
+}
+#endif  // SUPPORT_SELECT_DRIVER_TYPE && !SUPPORT_DYNAMIC_ALLOCATION
+
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
   while (true) {

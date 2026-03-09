@@ -146,6 +146,9 @@ class StepperQueue : public StepperQueueBase {
     }
 #endif
   }
+
+ private:
+  static bool isValidStepPin(uint8_t step_pin);
 };
 
 #if defined(SUPPORT_ESP32_RMT)

@@ -5,7 +5,7 @@
 #ifdef SIM_TEST_INPUT
 #include <avr/sleep.h>
 #endif
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(ARDUINO_ARCH_ESP32)||defined(ESP_PLATFORM)
 #include <esp_task_wdt.h>
 #include <esp_log.h>
 #endif
@@ -1050,6 +1050,12 @@ void setup() {
         s->setDelayToEnable(config->on_delay_us);
         s->setDelayToDisable(config->off_delay_ms);
       }
+      else {
+        break;
+      }
+    }
+    else {
+      break;
     }
     stepper[i] = s;
   }
@@ -1635,6 +1641,10 @@ bool process_cmd(char* cmd) {
           // Wait for stepper stop
           while (stepper_selected->isRunning()) {
             // do nothing
+#ifdef ESP_PLATFORM
+            esp_task_wdt_reset();
+            DELAY_MS(2);
+#endif
           }
           PRINTLN("STOPPED");
         }

@@ -8,11 +8,11 @@ Position[A]=1000
 
 Position[B]=1000
 
-Time in EnableA  max=225399 us, total=225399 us~~10/10
+Time in EnableA  max=225399 us, total=225399 us~~50/50
 
-Time in EnableB  max=238120 us, total=238120 us~~10/10
+Time in EnableB  max=238120 us, total=238120 us~~4000/4000
 
-Time in FillISR  max=2673 us, total=48001 us~~20/150
+Time in FillISR  max=2673 us, total=48001 us~~200/150
 
 Time in StepA  max=13 us, total=4196 us~~5/30
 

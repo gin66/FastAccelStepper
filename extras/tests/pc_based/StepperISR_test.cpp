@@ -2,8 +2,7 @@
 
 #include "FastAccelStepper.h"
 
-// Here are the global variables to interface with the interrupts
-// StepperQueue fas_queue[NUM_QUEUES];
+static uint8_t stepper_allocated_mask = 0;
 
 void fas_init_engine(FastAccelStepperEngine* engine) {}
 
@@ -17,4 +16,16 @@ void StepperQueue::startQueue() { _isRunning = true; }
 void StepperQueue::forceStop() {}
 void StepperQueue::connect() {}
 void StepperQueue::disconnect() {}
-bool StepperQueue::isValidStepPin(uint8_t step_pin) { return true; }
+
+StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    if ((stepper_allocated_mask & (1 << i)) == 0) {
+      if (!fas_queue[i].init(nullptr, i, step_pin)) {
+        return nullptr;
+      }
+      stepper_allocated_mask |= (1 << i);
+      return &fas_queue[i];
+    }
+  }
+  return nullptr;
+}

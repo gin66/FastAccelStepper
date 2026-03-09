@@ -2,7 +2,7 @@
     DirB:        1*L->H,        0*H->L
  EnableA:        0*L->H,        0*H->L
  EnableB:        0*L->H,        0*H->L
-   StepA:   234999*L->H,   234999*H->L, Max High=9us Total High=923929us~~1/1/5/200
+   StepA:   234999*L->H,   234999*H->L, Max High=9us Total High=923729us~~1/1/5/300
    StepB:        2*L->H,        2*H->L, Max High=4us Total High=9us
 Position[A]=37271~200
 

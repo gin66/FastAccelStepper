@@ -219,6 +219,7 @@ The I2S transmitter outputs a 32-bit data word at 250kHz. Each bit corresponds t
 * Step pulse width is 2.5us for I2S Direct and 4us for I2S MUX
 * I2S Direct: stepper speed adjustable in 1/8us deltas.
 * I2S MUX: stepper speed adjustable in 4us deltas e.g. speed 50us will be 52/48/52/48...
+* `forceStop()` will still emit commands already in the DMA buffer (up to ~500µs latency)
 
 **I2S Direct vs I2S Mux:**
 * **I2S Mux**: Single I2S transmitter drives up to 32 pins. All pins share the same timing.

@@ -66,6 +66,8 @@ class StepperQueue : public StepperQueueBase {
   }
 
   void adjustSpeedToStepperCount(uint8_t steppers);
+
+ private:
   static int8_t queueNumForStepPin(uint8_t step_pin);
 };
 

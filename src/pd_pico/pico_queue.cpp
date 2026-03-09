@@ -212,6 +212,30 @@ int32_t StepperQueue::getCurrentStepCount() {
 
 bool StepperQueue::isValidStepPin(uint8_t step_pin) { return (step_pin < 32); }
 
+static uint8_t stepper_allocated_count = 0;
+
+StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+  if (!isValidStepPin(step_pin)) {
+    return nullptr;
+  }
+
+  if (stepper_allocated_count >= MAX_STEPPER) {
+    return nullptr;
+  }
+
+  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
+    if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
+      if (!fas_queue[i].init(nullptr, i, step_pin)) {
+        return nullptr;
+      }
+      stepper_allocated_count++;
+      return &fas_queue[i];
+    }
+  }
+
+  return nullptr;
+}
+
 static void pio_fifo_irq_handler(PIO pio) {
   uint32_t ints = pio->ints0;
 

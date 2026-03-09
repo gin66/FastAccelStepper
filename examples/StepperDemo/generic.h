@@ -86,13 +86,13 @@ uart_param_config(uart_num, &config);
 #endif
 #define MILLIS() (esp_timer_get_time() / 1000)
 #define DELAY_US(v) std::this_thread::sleep_for(std::chrono::microseconds(v))
-#define DELAY_MS(v) vTaskDelay(pdMS_TO_TICKS(v))
 #define NEED_APP_MAIN
 
 #endif
 
 #if defined(ESP_PLATFORM)
 #define PROGMEM
+#define DELAY_MS(v) vTaskDelay(pdMS_TO_TICKS(v))
 #endif
 
 #endif

@@ -11,13 +11,23 @@
 //
 // No includes in this file - types are provided by the including class.
 
+//==========================================================================
+// QUEUE ALLOCATION
+//==========================================================================
+// Unified allocation interface - all platforms must implement.
+// Validates the step pin and returns an allocated queue, or nullptr on failure.
+// - For SUPPORT_DYNAMIC_ALLOCATION: allocates queue dynamically
+// - For static allocation: returns pointer to pre-allocated queue slot
+// - For SUPPORT_SELECT_DRIVER_TYPE (ESP32): allows choosing driver type
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 static StepperQueue* tryAllocateQueue(FasDriver driver, uint8_t step_pin);
-#elif defined(SUPPORT_DYNAMIC_ALLOCATION)
+#else
 static StepperQueue* tryAllocateQueue(uint8_t step_pin);
 #endif
 
-static bool isValidStepPin(uint8_t step_pin);
+//==========================================================================
+// QUEUE PROTOCOL METHODS
+//==========================================================================
 
 AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
 int32_t getCurrentPosition();

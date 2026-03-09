@@ -310,20 +310,6 @@ void StepperQueue::forceStop() {
 }
 void StepperQueue::connect() {}
 void StepperQueue::disconnect() {}
-bool StepperQueue::isValidStepPin(uint8_t step_pin) {
-  if (step_pin == stepPinStepperA) {
-    return true;
-  }
-  if (step_pin == stepPinStepperB) {
-    return true;
-  }
-#ifdef stepPinStepperC
-  if (step_pin == stepPinStepperC) {
-    return true;
-  }
-#endif
-  return false;
-}
 
 int8_t StepperQueue::queueNumForStepPin(uint8_t step_pin) {
   if (step_pin == stepPinStepperA) {
@@ -354,6 +340,26 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
   } else {
     max_speed_in_ticks = TICKS_PER_S / 20000;
   }
+}
+
+static uint8_t stepper_allocated_mask = 0;
+
+StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+  int8_t idx = queueNumForStepPin(step_pin);
+  if (idx < 0) {
+    return nullptr;
+  }
+
+  if (stepper_allocated_mask & (1 << idx)) {
+    return nullptr;
+  }
+
+  if (!fas_queue[idx].init(nullptr, idx, step_pin)) {
+    return nullptr;
+  }
+
+  stepper_allocated_mask |= (1 << idx);
+  return &fas_queue[idx];
 }
 
 void fas_init_engine(FastAccelStepperEngine* engine) { fas_engine = engine; }

@@ -35,6 +35,9 @@ class StepperQueue : public StepperQueueBase {
     }
 #endif
   }
+
+ private:
+  static bool isValidStepPin(uint8_t step_pin);
 };
 
 #define SET_DIRECTION_PIN_STATE(q, high)          \

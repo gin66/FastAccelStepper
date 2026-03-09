@@ -30,6 +30,9 @@ class StepperQueue : public StepperQueueBase {
     dirHighCountsUp = _dirHighCountsUp;
     attachDirPinToStatemachine();
   }
+
+ private:
+  static bool isValidStepPin(uint8_t step_pin);
 };
 
 #define SET_DIRECTION_PIN_STATE(q, high) (q)->setDirPinState(high)

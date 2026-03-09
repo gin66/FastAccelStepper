@@ -100,7 +100,7 @@ bool FastAccelStepperEngine::i2sMuxGetBit(uint8_t slot) {
 #endif
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
-// dynamic allocation is currently only supported for esp32
+// Dynamic allocation (ESP32 with IDF >= 5.3)
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, FasDriver driver_type) {
@@ -110,80 +110,46 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
   StepperQueue* q = StepperQueue::tryAllocateQueue(step_pin);
 #endif
-  if (q != nullptr) {
-    uint8_t fas_stepper_num = _stepper_cnt;
-    _stepper_cnt++;
-    fas_queue[fas_stepper_num] = q;
+  if (q == nullptr) {
+    return nullptr;
+  }
 
-    FastAccelStepper* s = new FastAccelStepper();
-    bool success = s->init(this, fas_stepper_num, step_pin);
-    if (!success) {
-      return NULL;
-    }
-    _stepper[fas_stepper_num] = s;
-    return s;
-  }
-  return nullptr;
-}
-#else
-#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(uint8_t step_pin)
-#else
-FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
-    uint8_t step_pin, FasDriver driver_type)
-#endif
-{
-  for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    FastAccelStepper* s = _stepper[i];
-    if (s) {
-      if (s->getStepPin() == step_pin) {
-        return nullptr;
-      }
-    }
-  }
-  if (_stepper_cnt >= MAX_STEPPER) {
-    return nullptr;
-  }
-  if (!StepperQueue::isValidStepPin(step_pin)) {
-    return nullptr;
-  }
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  uint8_t queue_from = 0;
-  uint8_t queue_to = QUEUES_MCPWM_PCNT + QUEUES_RMT + QUEUES_I2S;
-  if (driver_type == DRIVER_MCPWM_PCNT) {
-    queue_to = QUEUES_MCPWM_PCNT;
-  } else if (driver_type == DRIVER_RMT) {
-    queue_from = QUEUES_MCPWM_PCNT;
-  }
-  int8_t fas_stepper_num = -1;
-  for (uint8_t i = queue_from; i < queue_to; i++) {
-    FastAccelStepper* s = _stepper[i];
-    if (s == NULL) {
-      fas_stepper_num = i;
-      break;
-    }
-  }
-  if (fas_stepper_num < 0) {
-    return NULL;
-  }
-#else
-#if defined(NEED_FIXED_QUEUE_TO_PIN_MAPPING)
-  int8_t fas_stepper_num = StepperQueue::queueNumForStepPin(step_pin);
-  if (fas_stepper_num < 0) {
-    fas_stepper_num = _stepper_cnt;
-  }
-#else
-  int8_t fas_stepper_num = _stepper_cnt;
-#endif
-#endif
+  uint8_t fas_stepper_num = _stepper_cnt;
   _stepper_cnt++;
+  fas_queue[fas_stepper_num] = q;
 
-  FastAccelStepper* s = &fas_stepper[fas_stepper_num];
-  bool success = s->init(this, fas_stepper_num, step_pin);
-  if (!success) {
-    return NULL;
+  FastAccelStepper* s = new FastAccelStepper();
+  if (!s->init(this, fas_stepper_num, step_pin)) {
+    return nullptr;
   }
   _stepper[fas_stepper_num] = s;
+  return s;
+}
+#else
+// Static allocation (AVR, SAM, Pico, TEST, ESP32 IDF 4.x)
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin, FasDriver driver_type) {
+  StepperQueue* q = StepperQueue::tryAllocateQueue(driver_type, step_pin);
+#else
+FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
+    uint8_t step_pin) {
+  StepperQueue* q = StepperQueue::tryAllocateQueue(step_pin);
+#endif
+  if (q == nullptr) {
+    return nullptr;
+  }
+
+  uint8_t fas_stepper_num = (uint8_t)(q - fas_queue);
+  _stepper_cnt++;
+
+  static FastAccelStepper fas_stepper[MAX_STEPPER];
+  FastAccelStepper* s = &fas_stepper[fas_stepper_num];
+  if (!s->init(this, fas_stepper_num, step_pin)) {
+    return nullptr;
+  }
+  _stepper[fas_stepper_num] = s;
+
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     const FastAccelStepper* sx = _stepper[i];
@@ -192,6 +158,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     }
   }
 #endif
+
   return s;
 }
 #endif
