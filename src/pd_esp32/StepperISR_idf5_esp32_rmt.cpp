@@ -221,5 +221,5 @@ bool StepperQueue::isReadyForCommands_rmt() {
   }
   return true;
 }
-uint16_t StepperQueue::_getPerformedPulses_rmt() { return 0; }
+uint16_t StepperQueue::_getPerformedPulses_rmt() const { return 0; }
 #endif

@@ -103,7 +103,7 @@ void StepperQueue::disconnect() {
 #endif
 }
 
-bool StepperQueue::isReadyForCommands() {
+bool StepperQueue::isReadyForCommands() const {
 #ifdef SUPPORT_ESP32_I2S
   if (use_i2s) {
     return isReadyForCommands_i2s();
@@ -159,7 +159,7 @@ void StepperQueue::forceStop() {
 #endif
 }
 
-uint16_t StepperQueue::_getPerformedPulses() {
+uint16_t StepperQueue::_getPerformedPulses() const {
 #ifdef SUPPORT_ESP32_I2S
   if (use_i2s) {
     return _getPerformedPulses_i2s();
@@ -410,12 +410,12 @@ void StepperTask(void* parameter) {
   }
 }
 
-int32_t StepperQueue::getCurrentPosition() {
+int32_t StepperQueue::getCurrentPosition() const {
   fasDisableInterrupts();
   uint32_t pos = (uint32_t)queue_end.pos;
   uint8_t rp = read_idx;
   bool is_empty = (rp == next_write_idx);
-  struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+  const struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
   uint16_t pos_last16 = e->start_pos_last16;
   uint8_t steps = e->steps;
   int16_t done_p = (int16_t)_getPerformedPulses();

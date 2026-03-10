@@ -17,11 +17,11 @@ class StepperQueue : public StepperQueueBase {
 
   inline void _pd_initVars() { adjust_80MHz = 0; }
 
-  bool isRunning();
-  bool isReadyForCommands();
+  bool isRunning() const;
+  bool isReadyForCommands() const;
   bool claim_pio_sm(FastAccelStepperEngine* engine);
   void setupSM();
-  int32_t getCurrentStepCount();
+  int32_t getCurrentStepCount() const;
   void attachDirPinToStatemachine();
   void setDirPinState(bool high);
 

@@ -53,8 +53,8 @@ class StepperQueue : public StepperQueueBase {
     _nextCommandIsPrepared = false;
   }
 
-  inline bool isRunning() { return _isRunning; }
-  bool isReadyForCommands();
+  inline bool isRunning() const { return _isRunning; }
+  bool isReadyForCommands() const;
 #ifdef SUPPORT_ESP32_RMT
   bool use_rmt;
 #endif
@@ -93,7 +93,7 @@ class StepperQueue : public StepperQueueBase {
 #endif
   };
 
-  uint16_t _getPerformedPulses();
+  uint16_t _getPerformedPulses() const;
 
   // Module specific functions
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
@@ -101,7 +101,7 @@ class StepperQueue : public StepperQueueBase {
   bool init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_mcpwm_pcnt();
   void forceStop_mcpwm_pcnt();
-  uint16_t _getPerformedPulses_mcpwm_pcnt();
+  uint16_t _getPerformedPulses_mcpwm_pcnt() const;
   void connect_mcpwm_pcnt();
   void disconnect_mcpwm_pcnt();
 #endif
@@ -113,7 +113,7 @@ class StepperQueue : public StepperQueueBase {
   void stop_rmt(bool both);
 #endif
   void forceStop_rmt();
-  uint16_t _getPerformedPulses_rmt();
+  uint16_t _getPerformedPulses_rmt() const;
   void connect_rmt();
   void disconnect_rmt();
 #endif
@@ -122,7 +122,7 @@ class StepperQueue : public StepperQueueBase {
   void startQueue_i2s();
   void forceStop_i2s();
   bool isReadyForCommands_i2s();
-  uint16_t _getPerformedPulses_i2s();
+  uint16_t _getPerformedPulses_i2s() const;
   void fill_i2s_buffer(uint8_t* buf);
 #endif
 

@@ -142,7 +142,7 @@ struct ramp_parameters_s {
     }
   }
   inline void setJumpStart(uint32_t jump_step) { s_jump = jump_step; }
-  inline MoveResultCode checkValidConfig() {
+  inline MoveResultCode checkValidConfig() const {
     if (!valid_speed) {
       return MOVE_ERR_SPEED_IS_UNDEFINED;
     }

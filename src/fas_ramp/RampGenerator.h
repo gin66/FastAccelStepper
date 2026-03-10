@@ -25,19 +25,19 @@ class RampGenerator {
 
  public:
   uint32_t acceleration;
-  inline uint8_t rampState() { return _rw.rampState(); }
+  inline uint8_t rampState() const { return _rw.rampState(); }
   void init();
-  inline int32_t targetPosition() { return _ro.targetPosition(); }
+  inline int32_t targetPosition() const { return _ro.targetPosition(); }
   inline void setTargetPosition(int32_t pos) { _ro.setTargetPosition(pos); }
   void advanceTargetPosition(int32_t delta);
   inline void setSpeedInTicks(uint32_t min_step_ticks) {
     _parameters.setSpeedInTicks(min_step_ticks);
   }
-  inline uint32_t getSpeedInUs() {
+  inline uint32_t getSpeedInUs() const {
     return _parameters.min_travel_ticks / (TICKS_PER_S / 1000000);
   }
-  inline uint32_t getSpeedInTicks() { return _parameters.min_travel_ticks; }
-  uint32_t divForMilliHz(uint32_t f) {
+  inline uint32_t getSpeedInTicks() const { return _parameters.min_travel_ticks; }
+  uint32_t divForMilliHz(uint32_t f) const {
     uint32_t base = (uint32_t)250 * TICKS_PER_S;
     uint32_t res = base / f;
     base -= res * f;
@@ -47,28 +47,28 @@ class RampGenerator {
     res += base / f;
     return res;
   }
-  uint32_t divForHz(uint32_t f) {
+  uint32_t divForHz(uint32_t f) const {
     uint32_t base = TICKS_PER_S;
     base += f / 2;  // add rounding
     uint32_t res = base / f;
     return res;
   }
-  inline uint32_t getSpeedInMilliHz() {
+  inline uint32_t getSpeedInMilliHz() const {
     if (_parameters.min_travel_ticks == 0) {
       return 0;
     }
     return divForMilliHz(getSpeedInTicks());
   }
   int8_t setAcceleration(int32_t accel);
-  inline uint32_t getAcceleration() { return acceleration; }
+  inline uint32_t getAcceleration() const { return acceleration; }
   inline void setLinearAcceleration(uint32_t linear_acceleration_steps) {
     _parameters.setCubicAccelerationSteps(linear_acceleration_steps);
   }
   inline void setJumpStart(uint32_t jump_step) {
     _parameters.setJumpStart(jump_step);
   }
-  int32_t getCurrentAcceleration();
-  inline bool hasValidConfig() {
+  int32_t getCurrentAcceleration() const;
+  inline bool hasValidConfig() const {
     return _parameters.checkValidConfig() == MOVE_OK;
   }
   void applySpeedAcceleration();
@@ -77,11 +77,11 @@ class RampGenerator {
   MoveResultCode startRun(bool countUp);
   inline void forceStop() { _ro.immediateStop(); }
   inline void initiateStop() { _ro.initiateStop(); }
-  inline bool isStopping() {
+  inline bool isStopping() const {
     return _ro.isStopInitiated() && isRampGeneratorActive();
   }
-  inline bool isRampGeneratorActive() { return rampState() != RAMP_STATE_IDLE; }
-  inline uint32_t stepsToStop() {
+  inline bool isRampGeneratorActive() const { return rampState() != RAMP_STATE_IDLE; }
+  inline uint32_t stepsToStop() const {
     fasDisableInterrupts();
     uint32_t v = _rw.performed_ramp_up_steps;
     fasEnableInterrupts();
@@ -89,24 +89,24 @@ class RampGenerator {
   }
   inline void stopRamp() { _rw.stopRamp(); }
   inline void setKeepRunning() { _ro.setKeepRunning(); }
-  inline bool isRunningContinuously() { return _ro.isRunningContinuously(); }
+  inline bool isRunningContinuously() const { return _ro.isRunningContinuously(); }
   void getNextCommand(const struct queue_end_s* queue_end,
                       NextCommand* cmd_out);
   void afterCommandEnqueued(const NextCommand* cmd_in);
-  void getCurrentSpeedInTicks(struct actual_ticks_s* speed) {
+  void getCurrentSpeedInTicks(struct actual_ticks_s* speed) const {
     fasDisableInterrupts();
     speed->ticks = _rw.curr_ticks;
     uint8_t rs = _rw.rampState();
     fasEnableInterrupts();
     speed->count_up = ((rs & RAMP_DIRECTION_COUNT_UP) != 0);
   }
-  uint32_t getCurrentPeriodInTicks() {
+  uint32_t getCurrentPeriodInTicks() const {
     fasDisableInterrupts();
     uint32_t ticks = _rw.curr_ticks;
     fasEnableInterrupts();
     return ticks;
   }
-  inline uint32_t getCurrentPeriodInUs() {
+  inline uint32_t getCurrentPeriodInUs() const {
     return TICKS_TO_US(getCurrentPeriodInTicks());
   }
 

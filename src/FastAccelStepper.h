@@ -126,7 +126,7 @@ class FastAccelStepper {
  public:
   // ## Step Pin
   // step pin is defined at creation. Here can retrieve the pin
-  uint8_t getStepPin();
+  uint8_t getStepPin() const;
 
   // ## Direction Pin
   // if direction pin is connected, call this function.
@@ -147,8 +147,8 @@ class FastAccelStepper {
   // in the range of ms or more.
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
-  inline uint8_t getDirectionPin() { return _dirPin; }
-  inline bool directionPinHighCountsUp() { return _dirHighCountsUp; }
+  inline uint8_t getDirectionPin() const { return _dirPin; }
+  inline bool directionPinHighCountsUp() const { return _dirHighCountsUp; }
 
   // ## Enable Pin
   // if enable pin is connected, then use this function.
@@ -163,8 +163,8 @@ class FastAccelStepper {
   //    setEnablePin(pin2, false);
   // If pin1 and pin2 are same, then the last call will be used.
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
-  inline uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
-  inline uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
+  inline uint8_t getEnablePinHighActive() const { return _enablePinHighActive; }
+  inline uint8_t getEnablePinLowActive() const { return _enablePinLowActive; }
 
   // using enableOutputs/disableOutputs the stepper can be enabled and disabled
   // For a running motor with autoEnable set, disableOutputs() will return false
@@ -190,7 +190,7 @@ class FastAccelStepper {
   // The actual position may be off by the number of steps in the ongoing
   // command. If precise real time position is needed, attaching a pulse counter
   // may be of help.
-  int32_t getCurrentPosition();
+  int32_t getCurrentPosition() const;
 
   // Set the current position of the stepper - either in standstill or while
   // moving.
@@ -201,7 +201,7 @@ class FastAccelStepper {
 
   // ## Stepper running status
   // is true while the stepper is running or ramp generation is active
-  bool isRunning();
+  bool isRunning() const;
 
   // ## Speed
   // For stepper movement control by FastAccelStepper's ramp generator
@@ -212,10 +212,10 @@ class FastAccelStepper {
   // - In us: This means in us/step
   //
   // For the device's maximum allowed speed, the following calls can be used.
-  uint16_t getMaxSpeedInUs();
-  uint16_t getMaxSpeedInTicks();
-  uint32_t getMaxSpeedInHz();
-  uint32_t getMaxSpeedInMilliHz();
+  uint16_t getMaxSpeedInUs() const;
+  uint16_t getMaxSpeedInTicks() const;
+  uint32_t getMaxSpeedInHz() const;
+  uint32_t getMaxSpeedInMilliHz() const;
 
   // For esp32 and avr, the device's maximum allowed speed can be overridden.
   // Allocating a new stepper will override any absolute speed limit.
@@ -246,9 +246,9 @@ class FastAccelStepper {
 
   // To retrieve current set speed. This means, while accelerating and/or
   // decelerating, this is NOT the actual speed !
-  inline uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
-  inline uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
-  inline uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
+  inline uint32_t getSpeedInUs() const { return _rg.getSpeedInUs(); }
+  inline uint32_t getSpeedInTicks() const { return _rg.getSpeedInTicks(); }
+  inline uint32_t getSpeedInMilliHz() const { return _rg.getSpeedInMilliHz(); }
 
   // If the current speed is needed, then use `getCurrentSpeed...()`. This
   // retrieves the actual speed.
@@ -272,8 +272,8 @@ class FastAccelStepper {
   // acceleration/deceleration.
   //
   // For backward compatibility, the default is true.
-  int32_t getCurrentSpeedInUs(bool realtime = true);
-  int32_t getCurrentSpeedInMilliHz(bool realtime = true);
+  int32_t getCurrentSpeedInUs(bool realtime = true) const;
+  int32_t getCurrentSpeedInMilliHz(bool realtime = true) const;
 
   // ## Acceleration
   //  setAcceleration() expects as parameter the change of speed
@@ -290,13 +290,13 @@ class FastAccelStepper {
   inline int8_t setAcceleration(int32_t step_s_s) {
     return _rg.setAcceleration(step_s_s);
   }
-  inline uint32_t getAcceleration() { return _rg.getAcceleration(); }
+  inline uint32_t getAcceleration() const { return _rg.getAcceleration(); }
 
   // getCurrentAcceleration() retrieves the actual acceleration.
   //    = 0 while idle or coasting
   //    > 0 while speed is changing towards positive values
   //    < 0 while speed is changeing towards negative values
-  inline int32_t getCurrentAcceleration() {
+  inline int32_t getCurrentAcceleration() const {
     return _rg.getCurrentAcceleration();
   }
 
@@ -364,7 +364,7 @@ class FastAccelStepper {
   // direction, then keepRunning() will speed up again and not finish direction
   // reversal first.
   void keepRunning();
-  bool isRunningContinuously() { return _rg.isRunningContinuously(); }
+  bool isRunningContinuously() const { return _rg.isRunningContinuously(); }
 
   // ### runForward() and runBackwards()
   // These commands just let the motor run continuously in one direction.
@@ -400,7 +400,7 @@ class FastAccelStepper {
   // Stop the running stepper with normal deceleration.
   // This only sets a flag and can be called from an interrupt !
   void stopMove();
-  inline bool isStopping() { return _rg.isStopping(); }
+  inline bool isStopping() const { return _rg.isStopping(); }
 
   // ### stepsToStop()
   // This returns the current step value of the ramp.
@@ -414,7 +414,7 @@ class FastAccelStepper {
   // The stop position is:
   //    getCurrentPosition() + stepsToStop()
   // in case of a motor running in positive direction.
-  uint32_t stepsToStop() { return _rg.stepsToStop(); }
+  uint32_t stepsToStop() const { return _rg.stepsToStop(); }
 
   // ### forceStop()
   // Abruptly stop the running stepper without deceleration.
@@ -439,7 +439,7 @@ class FastAccelStepper {
   // This means, the value will stay unchanged after a move/moveTo until the
   // stepper task is executed.
   // In keep running mode, the targetPos() is not updated
-  inline int32_t targetPos() { return _rg.targetPosition(); }
+  inline int32_t targetPos() const { return _rg.targetPosition(); }
 
   // ### Task planning
   // The stepper task adds commands to the stepper queue until
@@ -539,9 +539,9 @@ class FastAccelStepper {
                               bool start = true);
 
   // ### check functions for command queue being empty, full or running.
-  bool isQueueEmpty();
-  bool isQueueFull();
-  bool isQueueRunning();
+  bool isQueueEmpty() const;
+  bool isQueueFull() const;
+  bool isQueueRunning() const;
 
   // ### functions to get the fill level of the queue
   //
@@ -549,20 +549,20 @@ class FastAccelStepper {
   // can be used. It sums up all ticks of the not yet processed commands.
   // For commands defining pauses, the summed up value is entry.ticks.
   // For commands with steps, the summed up value is entry.steps*entry.ticks
-  uint32_t ticksInQueue();
+  uint32_t ticksInQueue() const;
 
   // This function can be used to check, if the commands in the queue
   // will last for <min_ticks> ticks. This is again without the
   // currently processed command.
-  bool hasTicksInQueue(uint32_t min_ticks);
+  bool hasTicksInQueue(uint32_t min_ticks) const;
 
   // This function allows to check the number of commands in the queue.
   // This is including the currently processed command.
-  uint8_t queueEntries();
+  uint8_t queueEntries() const;
 
   // Get the future position of the stepper after all commands in queue are
   // completed
-  int32_t getPositionAfterCommandsCompleted();
+  int32_t getPositionAfterCommandsCompleted() const;
 
   // Get the future speed of the stepper after all commands in queue are
   // completed. This is in µs. Returns 0 for stopped motor
@@ -570,8 +570,8 @@ class FastAccelStepper {
   // This value comes from the ramp generator and is not valid for raw command
   // queue
   // ==> Will be renamed in future release
-  uint32_t getPeriodInUsAfterCommandsCompleted();
-  uint32_t getPeriodInTicksAfterCommandsCompleted();
+  uint32_t getPeriodInUsAfterCommandsCompleted() const;
+  uint32_t getPeriodInTicksAfterCommandsCompleted() const;
 
   // Set the future position of the stepper after all commands in queue are
   // completed. This has immediate effect to getCurrentPosition().
@@ -580,10 +580,10 @@ class FastAccelStepper {
   // This function provides info, in which state the high level stepper control
   // is operating. The return value is an `or` of RAMP_STATE_... and
   // RAMP_DIRECTION_... flags. Definitions are above
-  inline uint8_t rampState() { return _rg.rampState(); }
+  inline uint8_t rampState() const { return _rg.rampState(); }
 
   // returns true, if the ramp generation is active
-  inline bool isRampGeneratorActive() { return _rg.isRampGeneratorActive(); }
+  inline bool isRampGeneratorActive() const { return _rg.isRampGeneratorActive(); }
 
   // These functions allow to detach and reAttach a step pin for other use.
   // Pretty low level, use with care or not at all
@@ -659,7 +659,7 @@ class FastAccelStepper {
   bool needAutoDisable();
   bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
-  void getCurrentSpeedInTicks(struct actual_ticks_s* speed, bool realtime);
+  void getCurrentSpeedInTicks(struct actual_ticks_s* speed, bool realtime) const;
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;

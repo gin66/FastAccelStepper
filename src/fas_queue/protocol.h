@@ -30,10 +30,10 @@ static StepperQueue* tryAllocateQueue(uint8_t step_pin);
 //==========================================================================
 
 AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
-int32_t getCurrentPosition();
-uint32_t ticksInQueue();
-bool hasTicksInQueue(uint32_t min_ticks);
-bool getActualTicksWithDirection(struct actual_ticks_s* speed);
+int32_t getCurrentPosition() const;
+uint32_t ticksInQueue() const;
+bool hasTicksInQueue(uint32_t min_ticks) const;
+bool getActualTicksWithDirection(struct actual_ticks_s* speed) const;
 
 bool init(FastAccelStepperEngine* engine, uint8_t queue_num, uint8_t step_pin);
 void startQueue();

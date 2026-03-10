@@ -42,8 +42,8 @@ class StepperQueue : public StepperQueueBase {
 
   volatile bool _noMoreCommands;
   volatile bool _isRunning;
-  inline bool isRunning() { return _isRunning; }
-  inline bool isReadyForCommands() { return true; }
+  inline bool isRunning() const { return _isRunning; }
+  inline bool isReadyForCommands() const { return true; }
   enum channels channel;
 
   volatile uint8_t* _dirTogglePinPort;

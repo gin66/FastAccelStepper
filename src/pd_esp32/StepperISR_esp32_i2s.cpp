@@ -36,7 +36,7 @@ bool StepperQueue::isReadyForCommands_i2s() {
   return true;
 }
 
-uint16_t StepperQueue::_getPerformedPulses_i2s() { return 0; }
+uint16_t StepperQueue::_getPerformedPulses_i2s() const { return 0; }
 
 void StepperQueue::fill_i2s_buffer(uint8_t* buf) {
   if (!_isRunning) {

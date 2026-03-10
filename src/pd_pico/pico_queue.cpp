@@ -120,7 +120,7 @@ void StepperQueue::disconnect() {
   }
 }
 
-bool StepperQueue::isReadyForCommands() { return true; }
+bool StepperQueue::isReadyForCommands() const { return true; }
 
 static bool push_command(StepperQueue* q) {
   uint8_t rp = q->read_idx;
@@ -174,7 +174,7 @@ void StepperQueue::forceStop() {
   pos_offset = 0;
 }
 
-bool StepperQueue::isRunning() {
+bool StepperQueue::isRunning() const {
   if (!pio_sm_is_tx_fifo_empty(pio, sm)) {
     return true;
   }
@@ -182,7 +182,7 @@ bool StepperQueue::isRunning() {
   return (pc != 0);
 }
 
-int32_t StepperQueue::getCurrentStepCount() {
+int32_t StepperQueue::getCurrentStepCount() const {
   bool running = isRunning();
   uint32_t pos;
   if (!running) {
@@ -276,7 +276,7 @@ void StepperTask(void* parameter) {
   }
 }
 
-int32_t StepperQueue::getCurrentPosition() {
+int32_t StepperQueue::getCurrentPosition() const {
   return getCurrentStepCount() + pos_offset;
 }
 

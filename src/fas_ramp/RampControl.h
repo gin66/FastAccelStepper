@@ -15,18 +15,18 @@ struct ramp_ro_s {
     force_stop = false;
     force_immediate_stop = false;
   }
-  inline int32_t targetPosition() { return target_pos; }
+  inline int32_t targetPosition() const { return target_pos; }
   inline void setTargetPosition(int32_t pos) { target_pos = pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
     target_pos += delta;
   }
   inline void immediateStop() { force_immediate_stop = true; }
-  inline bool isImmediateStopInitiated() { return force_immediate_stop; }
+  inline bool isImmediateStopInitiated() const { return force_immediate_stop; }
   inline void clearImmediateStop() { force_immediate_stop = false; }
   inline void initiateStop() { force_stop = true; }
-  inline bool isStopInitiated() { return force_stop; }
+  inline bool isStopInitiated() const { return force_stop; }
   inline void setKeepRunning() { config.parameters.keep_running = true; }
-  inline bool isRunningContinuously() { return config.parameters.keep_running; }
+  inline bool isRunningContinuously() const { return config.parameters.keep_running; }
 };
 
 struct ramp_rw_s {
@@ -50,7 +50,7 @@ struct ramp_rw_s {
 #endif
   }
   inline void init() { stopRamp(); }
-  inline uint8_t rampState() {
+  inline uint8_t rampState() const {
     // reading one byte is atomic
     return ramp_state;
   }

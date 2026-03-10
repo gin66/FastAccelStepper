@@ -15,8 +15,8 @@ class StepperQueue : public StepperQueueBase {
 
   inline void _pd_initVars() { _isRunning = false; }
 
-  inline bool isReadyForCommands() { return true; }
-  inline bool isRunning() { return _isRunning; }
+  inline bool isReadyForCommands() const { return true; }
+  inline bool isRunning() const { return _isRunning; }
 #ifdef SUPPORT_ESP32_RMT
   RMT_CHANNEL_T channel;
   bool _rmtStopped;

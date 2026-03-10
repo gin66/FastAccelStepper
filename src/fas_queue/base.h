@@ -55,7 +55,7 @@ class StepperQueueBase {
   uint16_t max_speed_in_ticks = TICKS_PER_S / 1000;  // default: 1_000 steps/s
 #endif
 
-  inline uint8_t queueEntries() {
+  inline uint8_t queueEntries() const {
     fasDisableInterrupts();
     uint8_t rp = read_idx;
     uint8_t wp = next_write_idx;
@@ -63,19 +63,19 @@ class StepperQueueBase {
     inject_fill_interrupt(0);
     return (uint8_t)(wp - rp);
   }
-  inline bool isQueueFull() { return queueEntries() == QUEUE_LEN; }
-  inline bool isQueueEmpty() { return queueEntries() == 0; }
-  inline bool isOnRepeatingEntry() {
+  inline bool isQueueFull() const { return queueEntries() == QUEUE_LEN; }
+  inline bool isQueueEmpty() const { return queueEntries() == 0; }
+  inline bool isOnRepeatingEntry() const {
     return entry[read_idx & QUEUE_LEN_MASK].repeat_entry == 1;
   }
-  inline uint8_t dirPinState() {
+  inline uint8_t dirPinState() const {
     return entry[read_idx & QUEUE_LEN_MASK].dirPinState;
   }
   inline void clearRepeatingFlag() {
     entry[read_idx & QUEUE_LEN_MASK].repeat_entry = 0;
   }
 
-  inline uint16_t getMaxSpeedInTicks() { return max_speed_in_ticks; }
+  inline uint16_t getMaxSpeedInTicks() const { return max_speed_in_ticks; }
 
 #if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
   void setAbsoluteSpeedLimit(uint16_t ticks) { max_speed_in_ticks = ticks; }

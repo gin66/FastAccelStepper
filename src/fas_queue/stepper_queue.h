@@ -1,3 +1,6 @@
+#ifndef FAS_QUEUE_STEPPER_QUEUE_H
+#define FAS_QUEUE_STEPPER_QUEUE_H
+
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
@@ -25,3 +28,5 @@ void fas_init_engine(FastAccelStepperEngine* engine, uint8_t cpu_core);
 #else
 void fas_init_engine(FastAccelStepperEngine* engine);
 #endif
+
+#endif  // FAS_QUEUE_STEPPER_QUEUE_H

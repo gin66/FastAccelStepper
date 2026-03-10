@@ -258,7 +258,7 @@ void RampGenerator::getNextCommand(const struct queue_end_s* queue_end,
   }
   _getNextCommand(&_ro, &_rw, &qe, command);
 }
-int32_t RampGenerator::getCurrentAcceleration() {
+int32_t RampGenerator::getCurrentAcceleration() const {
   switch (_rw.rampState() &
           (RAMP_STATE_ACCELERATING_FLAG | RAMP_STATE_DECELERATING_FLAG |
            RAMP_DIRECTION_MASK)) {

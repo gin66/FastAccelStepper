@@ -22,8 +22,8 @@ class StepperQueue : public StepperQueueBase {
     timePWMInterruptEnabled = 0;
   }
 
-  inline bool isRunning() { return _hasISRactive; }
-  inline bool isReadyForCommands() { return true; }
+  inline bool isRunning() const { return _hasISRactive; }
+  inline bool isReadyForCommands() const { return true; }
 
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;

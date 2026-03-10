@@ -3,12 +3,12 @@
 #include "fas_queue/stepper_queue.h"
 
 #if defined(NEED_GENERIC_GET_CURRENT_POSITION)
-int32_t StepperQueue::getCurrentPosition() {
+int32_t StepperQueue::getCurrentPosition() const {
   fasDisableInterrupts();
   uint32_t pos = (uint32_t)queue_end.pos;
   uint8_t rp = read_idx;
   bool is_empty = (rp == next_write_idx);
-  struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
+  const struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
   uint16_t pos_last16 = e->end_pos_last16;
   uint8_t steps = e->steps;
   fasEnableInterrupts();

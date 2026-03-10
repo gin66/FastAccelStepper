@@ -325,7 +325,7 @@ bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 #endif
   return success;
 }
-uint8_t FastAccelStepper::getStepPin() { return _stepPin; }
+uint8_t FastAccelStepper::getStepPin() const { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
                                        uint16_t dir_change_delay_us) {
   _dirPin = dirPin;
@@ -547,23 +547,23 @@ bool FastAccelStepper::enableOutputs() {
   }
   return enabled;
 }
-int32_t FastAccelStepper::getPositionAfterCommandsCompleted() {
+int32_t FastAccelStepper::getPositionAfterCommandsCompleted() const {
   return FAS_QUEUE(_queue_num).queue_end.pos;
 }
-uint32_t FastAccelStepper::getPeriodInTicksAfterCommandsCompleted() {
+uint32_t FastAccelStepper::getPeriodInTicksAfterCommandsCompleted() const {
   if (_rg.isRampGeneratorActive()) {
     return _rg.getCurrentPeriodInTicks();
   }
   return 0;
 }
-uint32_t FastAccelStepper::getPeriodInUsAfterCommandsCompleted() {
+uint32_t FastAccelStepper::getPeriodInUsAfterCommandsCompleted() const {
   if (_rg.isRampGeneratorActive()) {
     return _rg.getCurrentPeriodInUs();
   }
   return 0;
 }
 void FastAccelStepper::getCurrentSpeedInTicks(struct actual_ticks_s* speed,
-                                              bool realtime) {
+                                              bool realtime) const {
   bool valid;
   if (realtime) {
     valid = FAS_QUEUE(_queue_num).getActualTicksWithDirection(speed);
@@ -578,7 +578,7 @@ void FastAccelStepper::getCurrentSpeedInTicks(struct actual_ticks_s* speed,
     }
   }
 }
-int32_t FastAccelStepper::getCurrentSpeedInUs(bool realtime) {
+int32_t FastAccelStepper::getCurrentSpeedInUs(bool realtime) const {
   struct actual_ticks_s speed;
   getCurrentSpeedInTicks(&speed, realtime);
   int32_t speed_in_us = speed.ticks / (TICKS_PER_S / 1000000);
@@ -587,7 +587,7 @@ int32_t FastAccelStepper::getCurrentSpeedInUs(bool realtime) {
   }
   return -speed_in_us;
 }
-int32_t FastAccelStepper::getCurrentSpeedInMilliHz(bool realtime) {
+int32_t FastAccelStepper::getCurrentSpeedInMilliHz(bool realtime) const {
   struct actual_ticks_s speed;
   getCurrentSpeedInTicks(&speed, realtime);
   if (speed.ticks > 0) {
@@ -599,20 +599,20 @@ int32_t FastAccelStepper::getCurrentSpeedInMilliHz(bool realtime) {
   }
   return 0;
 }
-uint16_t FastAccelStepper::getMaxSpeedInTicks() {
+uint16_t FastAccelStepper::getMaxSpeedInTicks() const {
   return FAS_QUEUE(_queue_num).getMaxSpeedInTicks();
 }
-uint16_t FastAccelStepper::getMaxSpeedInUs() {
+uint16_t FastAccelStepper::getMaxSpeedInUs() const {
   uint16_t ticks = getMaxSpeedInTicks();
   uint16_t speed_in_us = ticks / (TICKS_PER_S / 1000000);
   return speed_in_us;
 }
-uint32_t FastAccelStepper::getMaxSpeedInHz() {
+uint32_t FastAccelStepper::getMaxSpeedInHz() const {
   uint16_t ticks = getMaxSpeedInTicks();
   uint32_t speed_in_hz = TICKS_PER_S / ticks;
   return speed_in_hz;
 }
-uint32_t FastAccelStepper::getMaxSpeedInMilliHz() {
+uint32_t FastAccelStepper::getMaxSpeedInMilliHz() const {
   uint16_t ticks = getMaxSpeedInTicks();
   uint32_t speed_in_milli_hz = ((uint32_t)250 * TICKS_PER_S) / ticks * 4;
   return speed_in_milli_hz;
@@ -679,25 +679,25 @@ void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
   }
   fasEnableInterrupts();
 }
-uint8_t FastAccelStepper::queueEntries() {
+uint8_t FastAccelStepper::queueEntries() const {
   return FAS_QUEUE(_queue_num).queueEntries();
 }
-uint32_t FastAccelStepper::ticksInQueue() {
+uint32_t FastAccelStepper::ticksInQueue() const {
   return FAS_QUEUE(_queue_num).ticksInQueue();
 }
-bool FastAccelStepper::hasTicksInQueue(uint32_t min_ticks) {
+bool FastAccelStepper::hasTicksInQueue(uint32_t min_ticks) const {
   return FAS_QUEUE(_queue_num).hasTicksInQueue(min_ticks);
 }
-bool FastAccelStepper::isQueueFull() {
+bool FastAccelStepper::isQueueFull() const {
   return FAS_QUEUE(_queue_num).isQueueFull();
 }
-bool FastAccelStepper::isQueueEmpty() {
+bool FastAccelStepper::isQueueEmpty() const {
   return FAS_QUEUE(_queue_num).isQueueEmpty();
 }
-bool FastAccelStepper::isQueueRunning() {
+bool FastAccelStepper::isQueueRunning() const {
   return FAS_QUEUE(_queue_num).isRunning();
 }
-bool FastAccelStepper::isRunning() {
+bool FastAccelStepper::isRunning() const {
   StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
   return q->isRunning() || _rg.isRampGeneratorActive() || !isQueueEmpty();
 }
@@ -722,7 +722,7 @@ void FastAccelStepper::forwardStep(bool blocking) {
 void FastAccelStepper::backwardStep(bool blocking) {
   performOneStep(false, blocking);
 }
-int32_t FastAccelStepper::getCurrentPosition() {
+int32_t FastAccelStepper::getCurrentPosition() const {
   return FAS_QUEUE(_queue_num).getCurrentPosition();
 }
 MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,

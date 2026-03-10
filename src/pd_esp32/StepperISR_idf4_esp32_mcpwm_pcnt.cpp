@@ -562,7 +562,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
   //   continuous
   // #endif                                           /* __ESP32_IDF_V44__ */
 }
-uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() {
+uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() const {
   const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
 #ifndef HAVE_ESP32S3_PULSE_COUNTER
   return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
