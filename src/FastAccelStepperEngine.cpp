@@ -120,6 +120,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 
   FastAccelStepper* s = new FastAccelStepper();
   if (!s->init(this, fas_stepper_num, step_pin)) {
+    delete s;
     return nullptr;
   }
   _stepper[fas_stepper_num] = s;
