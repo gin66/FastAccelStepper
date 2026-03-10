@@ -67,22 +67,44 @@ hardware may have limitations - e.g. no stepper resources anymore, or the
 step pin cannot be used, then NULL is returned. So it is advised to check
 the return value of this call.
 ```cpp
-#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
-  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
-#endif
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 ```
 For e.g. esp32, there are two types of driver.
 One using mcpwm and pcnt module. And another using rmt module.
 This call allows to select the respective driver
 ```cpp
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #define DRIVER_MCPWM_PCNT FasDriver::MCPWM_PCNT
 #define DRIVER_RMT FasDriver::RMT
+#if defined(SUPPORT_ESP32_I2S)
+```
+For esp32, there is also an I2S based driver available.
+DRIVER_I2S_DIRECT uses the I2S module directly.
+DRIVER_I2S_MUX uses the I2S module with a multiplexer.
+initI2sMux() must be called before using DRIVER_I2S_MUX.
+```cpp
+#define DRIVER_I2S_DIRECT FasDriver::I2S_DIRECT
+#define DRIVER_I2S_MUX FasDriver::I2S_MUX
+  bool initI2sMux(uint8_t data_pin, uint8_t bclk_pin, uint8_t ws_pin);
+  void i2sMuxSetBit(uint8_t slot, bool value);
+  bool i2sMuxGetBit(uint8_t slot);
+#endif
 #define DRIVER_DONT_CARE FasDriver::DONT_CARE
   FastAccelStepper* stepperConnectToPin(
       uint8_t step_pin, FasDriver driver_type = DRIVER_DONT_CARE);
+#else
+  FastAccelStepper* stepperConnectToPin(uint8_t step_pin);
 #endif
 ```
+Comments to valid pins:
+
+| Device          | Comment                                                                                           |
+|:----------------|:--------------------------------------------------------------------------------------------------|
+| ESP32           | Every output capable GPIO can be used                                                             |
+| ESP32S2         | Every output capable GPIO can be used                                                             |
+| Atmega168/328/p | Only the pins connected to OC1A and OC1B are allowed                                              |
+| Atmega2560      | Only the pins connected to OC4A, OC4B and OC4C are allowed.                                       |
+| Atmega32u4      | Only the pins connected to OC1A, OC1B and OC1C are allowed                                        |
+| Atmel SAM       | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
 For e.g. esp32 the repetition rate of the stepper task can be changed.
 The default delay is 4ms.
 
@@ -112,16 +134,6 @@ tick-rate of 1000Hz
   uint8_t _delay_ms;
 #endif
 ```
-Comments to valid pins:
-
-| Device          | Comment                                                                                           |
-|:----------------|:--------------------------------------------------------------------------------------------------|
-| ESP32           | Every output capable GPIO can be used                                                             |
-| ESP32S2         | Every output capable GPIO can be used                                                             |
-| Atmega168/328/p | Only the pins connected to OC1A and OC1B are allowed                                              |
-| Atmega2560      | Only the pins connected to OC4A, OC4B and OC4C are allowed.                                       |
-| Atmega32u4      | Only the pins connected to OC1A, OC1B and OC1C are allowed                                        |
-| Atmel SAM       | This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6 |
 ## External Pins
 
 If the direction/enable pins are e.g. connected via external HW (shift
@@ -225,7 +237,7 @@ control the direction flags
 ## Step Pin
 step pin is defined at creation. Here can retrieve the pin
 ```cpp
-  uint8_t getStepPin();
+  uint8_t getStepPin() const;
 ```
 ## Direction Pin
 if direction pin is connected, call this function.
@@ -247,8 +259,8 @@ in the range of ms or more.
 ```cpp
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
-  uint8_t getDirectionPin() { return _dirPin; }
-  bool directionPinHighCountsUp() { return _dirHighCountsUp; }
+  uint8_t getDirectionPin() const { return _dirPin; }
+  bool directionPinHighCountsUp() const { return _dirHighCountsUp; }
 ```
 ## Enable Pin
 if enable pin is connected, then use this function.
@@ -264,8 +276,8 @@ these calls are valid and both pins will be operated:
 If pin1 and pin2 are same, then the last call will be used.
 ```cpp
   void setEnablePin(uint8_t enablePin, bool low_active_enables_stepper = true);
-  uint8_t getEnablePinHighActive() { return _enablePinHighActive; }
-  uint8_t getEnablePinLowActive() { return _enablePinLowActive; }
+  uint8_t getEnablePinHighActive() const { return _enablePinHighActive; }
+  uint8_t getEnablePinLowActive() const { return _enablePinLowActive; }
 ```
 using enableOutputs/disableOutputs the stepper can be enabled and disabled
 For a running motor with autoEnable set, disableOutputs() will return false
@@ -292,7 +304,7 @@ The actual position may be off by the number of steps in the ongoing
 command. If precise real time position is needed, attaching a pulse counter
 may be of help.
 ```cpp
-  int32_t getCurrentPosition();
+  int32_t getCurrentPosition() const;
 ```
 Set the current position of the stepper - either in standstill or while
 moving.
@@ -305,7 +317,7 @@ moving.
 ## Stepper running status
 is true while the stepper is running or ramp generation is active
 ```cpp
-  bool isRunning();
+  bool isRunning() const;
 ```
 ## Speed
 For stepper movement control by FastAccelStepper's ramp generator
@@ -317,10 +329,10 @@ Speed can be defined in four different units:
 
 For the device's maximum allowed speed, the following calls can be used.
 ```cpp
-  uint16_t getMaxSpeedInUs();
-  uint16_t getMaxSpeedInTicks();
-  uint32_t getMaxSpeedInHz();
-  uint32_t getMaxSpeedInMilliHz();
+  uint16_t getMaxSpeedInUs() const;
+  uint16_t getMaxSpeedInTicks() const;
+  uint32_t getMaxSpeedInHz() const;
+  uint32_t getMaxSpeedInMilliHz() const;
 ```
 For esp32 and avr, the device's maximum allowed speed can be overridden.
 Allocating a new stepper will override any absolute speed limit.
@@ -354,9 +366,9 @@ Invalid is faster than MaxSpeed or slower than ~250 Mio ticks/step.
 To retrieve current set speed. This means, while accelerating and/or
 decelerating, this is NOT the actual speed !
 ```cpp
-  uint32_t getSpeedInUs() { return _rg.getSpeedInUs(); }
-  uint32_t getSpeedInTicks() { return _rg.getSpeedInTicks(); }
-  uint32_t getSpeedInMilliHz() { return _rg.getSpeedInMilliHz(); }
+  uint32_t getSpeedInUs() const { return _rg.getSpeedInUs(); }
+  uint32_t getSpeedInTicks() const { return _rg.getSpeedInTicks(); }
+  uint32_t getSpeedInMilliHz() const { return _rg.getSpeedInMilliHz(); }
 ```
 If the current speed is needed, then use `getCurrentSpeed...()`. This
 retrieves the actual speed.
@@ -381,8 +393,8 @@ acceleration/deceleration.
 
 For backward compatibility, the default is true.
 ```cpp
-  int32_t getCurrentSpeedInUs(bool realtime = true);
-  int32_t getCurrentSpeedInMilliHz(bool realtime = true);
+  int32_t getCurrentSpeedInUs(bool realtime = true) const;
+  int32_t getCurrentSpeedInMilliHz(bool realtime = true) const;
 ```
 ## Acceleration
  setAcceleration() expects as parameter the change of speed
@@ -400,14 +412,14 @@ Returns 0 on success, or -1 on invalid value (<=0)
   int8_t setAcceleration(int32_t step_s_s) {
     return _rg.setAcceleration(step_s_s);
   }
-  uint32_t getAcceleration() { return _rg.getAcceleration(); }
+  uint32_t getAcceleration() const { return _rg.getAcceleration(); }
 ```
 getCurrentAcceleration() retrieves the actual acceleration.
    = 0 while idle or coasting
    > 0 while speed is changing towards positive values
    < 0 while speed is changeing towards negative values
 ```cpp
-  int32_t getCurrentAcceleration() {
+  int32_t getCurrentAcceleration() const {
     return _rg.getCurrentAcceleration();
   }
 ```
@@ -480,7 +492,7 @@ direction, then keepRunning() will speed up again and not finish direction
 reversal first.
 ```cpp
   void keepRunning();
-  bool isRunningContinuously() { return _rg.isRunningContinuously(); }
+  bool isRunningContinuously() const { return _rg.isRunningContinuously(); }
 ```
 ### runForward() and runBackwards()
 These commands just let the motor run continuously in one direction.
@@ -520,7 +532,7 @@ Stop the running stepper with normal deceleration.
 This only sets a flag and can be called from an interrupt !
 ```cpp
   void stopMove();
-  bool isStopping() { return _rg.isStopping(); }
+  bool isStopping() const { return _rg.isStopping(); }
 ```
 ### stepsToStop()
 This returns the current step value of the ramp.
@@ -535,7 +547,7 @@ The stop position is:
    getCurrentPosition() + stepsToStop()
 in case of a motor running in positive direction.
 ```cpp
-  uint32_t stepsToStop() { return _rg.stepsToStop(); }
+  uint32_t stepsToStop() const { return _rg.stepsToStop(); }
 ```
 ### forceStop()
 Abruptly stop the running stepper without deceleration.
@@ -563,7 +575,7 @@ This means, the value will stay unchanged after a move/moveTo until the
 stepper task is executed.
 In keep running mode, the targetPos() is not updated
 ```cpp
-  int32_t targetPos() { return _rg.targetPosition(); }
+  int32_t targetPos() const { return _rg.targetPosition(); }
 ```
 ### Task planning
 The stepper task adds commands to the stepper queue until
@@ -669,9 +681,9 @@ Return codes for addQueueEntry
 ```
 ### check functions for command queue being empty, full or running.
 ```cpp
-  bool isQueueEmpty();
-  bool isQueueFull();
-  bool isQueueRunning();
+  bool isQueueEmpty() const;
+  bool isQueueFull() const;
+  bool isQueueRunning() const;
 ```
 ### functions to get the fill level of the queue
 
@@ -680,23 +692,23 @@ can be used. It sums up all ticks of the not yet processed commands.
 For commands defining pauses, the summed up value is entry.ticks.
 For commands with steps, the summed up value is entry.steps*entry.ticks
 ```cpp
-  uint32_t ticksInQueue();
+  uint32_t ticksInQueue() const;
 ```
 This function can be used to check, if the commands in the queue
 will last for <min_ticks> ticks. This is again without the
 currently processed command.
 ```cpp
-  bool hasTicksInQueue(uint32_t min_ticks);
+  bool hasTicksInQueue(uint32_t min_ticks) const;
 ```
 This function allows to check the number of commands in the queue.
 This is including the currently processed command.
 ```cpp
-  uint8_t queueEntries();
+  uint8_t queueEntries() const;
 ```
 Get the future position of the stepper after all commands in queue are
 completed
 ```cpp
-  int32_t getPositionAfterCommandsCompleted();
+  int32_t getPositionAfterCommandsCompleted() const;
 ```
 Get the future speed of the stepper after all commands in queue are
 completed. This is in µs. Returns 0 for stopped motor
@@ -705,8 +717,8 @@ This value comes from the ramp generator and is not valid for raw command
 queue
 ==> Will be renamed in future release
 ```cpp
-  uint32_t getPeriodInUsAfterCommandsCompleted();
-  uint32_t getPeriodInTicksAfterCommandsCompleted();
+  uint32_t getPeriodInUsAfterCommandsCompleted() const;
+  uint32_t getPeriodInTicksAfterCommandsCompleted() const;
 ```
 Set the future position of the stepper after all commands in queue are
 completed. This has immediate effect to getCurrentPosition().
@@ -717,11 +729,13 @@ This function provides info, in which state the high level stepper control
 is operating. The return value is an `or` of RAMP_STATE_... and
 RAMP_DIRECTION_... flags. Definitions are above
 ```cpp
-  uint8_t rampState() { return _rg.rampState(); }
+  uint8_t rampState() const { return _rg.rampState(); }
 ```
 returns true, if the ramp generation is active
 ```cpp
-  bool isRampGeneratorActive() { return _rg.isRampGeneratorActive(); }
+  bool isRampGeneratorActive() const {
+    return _rg.isRampGeneratorActive();
+  }
 ```
 These functions allow to detach and reAttach a step pin for other use.
 Pretty low level, use with care or not at all

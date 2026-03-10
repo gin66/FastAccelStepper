@@ -36,7 +36,9 @@ class RampGenerator {
   inline uint32_t getSpeedInUs() const {
     return _parameters.min_travel_ticks / (TICKS_PER_S / 1000000);
   }
-  inline uint32_t getSpeedInTicks() const { return _parameters.min_travel_ticks; }
+  inline uint32_t getSpeedInTicks() const {
+    return _parameters.min_travel_ticks;
+  }
   uint32_t divForMilliHz(uint32_t f) const {
     uint32_t base = (uint32_t)250 * TICKS_PER_S;
     uint32_t res = base / f;
@@ -80,7 +82,9 @@ class RampGenerator {
   inline bool isStopping() const {
     return _ro.isStopInitiated() && isRampGeneratorActive();
   }
-  inline bool isRampGeneratorActive() const { return rampState() != RAMP_STATE_IDLE; }
+  inline bool isRampGeneratorActive() const {
+    return rampState() != RAMP_STATE_IDLE;
+  }
   inline uint32_t stepsToStop() const {
     fasDisableInterrupts();
     uint32_t v = _rw.performed_ramp_up_steps;
@@ -89,7 +93,9 @@ class RampGenerator {
   }
   inline void stopRamp() { _rw.stopRamp(); }
   inline void setKeepRunning() { _ro.setKeepRunning(); }
-  inline bool isRunningContinuously() const { return _ro.isRunningContinuously(); }
+  inline bool isRunningContinuously() const {
+    return _ro.isRunningContinuously();
+  }
   void getNextCommand(const struct queue_end_s* queue_end,
                       NextCommand* cmd_out);
   void afterCommandEnqueued(const NextCommand* cmd_in);

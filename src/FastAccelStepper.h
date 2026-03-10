@@ -4,41 +4,6 @@
 #include "fas_arch/common.h"
 #include "FastAccelStepperEngine.h"
 
-// # FastAccelStepper
-//
-// FastAccelStepper is a high speed alternative for the
-// [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-// Supported are avr (ATmega 168/328/P, ATmega2560), esp32 and atmelsam due.
-//
-// Here is a basic example to run a stepper from position 0 to 1000 and back
-// again to 0.
-// ```
-// #include <FastAccelStepper.h>
-//
-// FastAccelStepperEngine engine = FastAccelStepperEngine();
-// FastAccelStepper *stepper = NULL;
-//
-// #define dirPinStepper    5
-// #define enablePinStepper 6
-// #define stepPinStepper   9
-// void setup() {
-//    engine.init();
-//    stepper = engine.stepperConnectToPin(stepPinStepper);
-//    if (stepper) {
-//       stepper->setDirectionPin(dirPinStepper);
-//       stepper->setEnablePin(enablePinStepper);
-//       stepper->setAutoEnable(true);
-//
-//       stepper->setSpeedInHz(500);
-//       stepper->setAcceleration(100);
-//       stepper->moveTo(1000, true);
-//       stepper->moveTo(0, true);
-//    }
-// }
-//
-// void loop() {}
-// ```
-
 class FastAccelStepper;
 
 // ### Return codes of calls to `move()` and `moveTo()`
@@ -583,7 +548,9 @@ class FastAccelStepper {
   inline uint8_t rampState() const { return _rg.rampState(); }
 
   // returns true, if the ramp generation is active
-  inline bool isRampGeneratorActive() const { return _rg.isRampGeneratorActive(); }
+  inline bool isRampGeneratorActive() const {
+    return _rg.isRampGeneratorActive();
+  }
 
   // These functions allow to detach and reAttach a step pin for other use.
   // Pretty low level, use with care or not at all
@@ -659,7 +626,8 @@ class FastAccelStepper {
   bool needAutoDisable();
   bool agreeWithAutoDisable();
   bool usesAutoEnablePin(uint8_t pin);
-  void getCurrentSpeedInTicks(struct actual_ticks_s* speed, bool realtime) const;
+  void getCurrentSpeedInTicks(struct actual_ticks_s* speed,
+                              bool realtime) const;
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;

@@ -26,7 +26,9 @@ struct ramp_ro_s {
   inline void initiateStop() { force_stop = true; }
   inline bool isStopInitiated() const { return force_stop; }
   inline void setKeepRunning() { config.parameters.keep_running = true; }
-  inline bool isRunningContinuously() const { return config.parameters.keep_running; }
+  inline bool isRunningContinuously() const {
+    return config.parameters.keep_running;
+  }
 };
 
 struct ramp_rw_s {

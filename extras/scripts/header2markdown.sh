@@ -47,4 +47,4 @@ in_code == 1 {
 	gsub("inline ","")
 	print
 }
-' ../../src/FastAccelStepper.h >../doc/FastAccelStepper_API.md
+' ../../src/FastAccelStepperEngine.h ../../src/FastAccelStepper.h >../doc/FastAccelStepper_API.md

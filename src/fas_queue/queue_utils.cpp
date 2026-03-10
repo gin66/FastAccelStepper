@@ -48,7 +48,8 @@ bool StepperQueue::hasTicksInQueue(uint32_t min_ticks) const {
   return false;
 }
 
-bool StepperQueue::getActualTicksWithDirection(struct actual_ticks_s* speed) const {
+bool StepperQueue::getActualTicksWithDirection(
+    struct actual_ticks_s* speed) const {
   // Retrieve current step rate from the current command.
   // This is valid only, if the command describes more than one step,
   // or if the next command contains one step, too.
