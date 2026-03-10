@@ -121,7 +121,7 @@ class StepperQueue : public StepperQueueBase {
   bool init_i2s(uint8_t step_pin);
   void startQueue_i2s();
   void forceStop_i2s();
-  bool isReadyForCommands_i2s();
+  bool isReadyForCommands_i2s() const;
   uint16_t _getPerformedPulses_i2s() const;
   void fill_i2s_buffer(uint8_t* buf);
 #endif

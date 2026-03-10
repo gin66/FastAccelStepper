@@ -29,7 +29,7 @@ void StepperQueue::forceStop_i2s() {
   read_idx = next_write_idx;
 }
 
-bool StepperQueue::isReadyForCommands_i2s() {
+bool StepperQueue::isReadyForCommands_i2s() const {
   if (_isRunning) {
     return !isQueueFull();
   }
