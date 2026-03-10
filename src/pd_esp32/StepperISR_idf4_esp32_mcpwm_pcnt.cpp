@@ -539,7 +539,7 @@ void StepperQueue::forceStop_mcpwm_pcnt() {
   init_stop(this);
   read_idx = next_write_idx;
 }
-bool StepperQueue::isReadyForCommands_mcpwm_pcnt() {
+bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   if (isRunning()) {
     return true;
   }

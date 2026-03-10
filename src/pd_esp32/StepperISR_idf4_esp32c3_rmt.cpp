@@ -479,7 +479,7 @@ void StepperQueue::forceStop_rmt() {
   // and empty the buffer
   read_idx = next_write_idx;
 }
-bool StepperQueue::isReadyForCommands_rmt() {
+bool StepperQueue::isReadyForCommands_rmt() const {
   if (_isRunning) {
     return !_rmtStopped;
   }
