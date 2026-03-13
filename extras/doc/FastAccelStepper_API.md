@@ -691,14 +691,17 @@ If the new command's direction differs from the previous command,
 addQueueEntry() will automatically insert pause commands to ensure
 sufficient delay before the first step in the new direction:
 
-- For external direction pins (pin >= 128): Two pause commands of 500µs
-  each are inserted. This requires two free queue entries; otherwise
-  AQE_QUEUE_FULL is returned.
+- For external direction pins (pin >= 128): The direction pin is controlled
+  via an external callback (e.g., to an I/O expander). To avoid steps in
+  the wrong direction, the queue must be empty of steps before the
+  direction change. If steps are present or the external callback is still
+  pending, a 2ms pause is inserted and AQE_DIR_PIN_2MS_PAUSE_ADDED is
+  returned. The caller should retry until the queue drains and the callback
+  completes.
 
 - For regular direction pins: If setDirectionPin() was called with
   dir_change_delay_us > 0, a pause command of that duration is inserted
-  before the first step. Pure pause commands (steps=0) do not trigger
-  this delay.
+  before the first step in the new direction.
 
 - For autoEnable mode: The enable-on delay is extended to at least
   dir_change_delay_ticks if a direction change occurs.
