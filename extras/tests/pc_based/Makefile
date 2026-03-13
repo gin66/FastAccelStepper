@@ -15,7 +15,7 @@ test: $(TESTS) log2_test rmc_test
 ramp_helper: ramp_helper.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
 
-ramp_helper.o: ramp_helper.cpp $(SRC_LIB_H) stubs.h
+ramp_helper.o: ramp_helper.cpp $(SRC_LIB_H)
 	g++ -c $(CXXFLAGS) -o $@ $<
 
 LIB_H=FastAccelStepper.h FastAccelStepperEngine.h log2/Log2Representation.h log2/Log2RepresentationConst.h \
@@ -42,14 +42,14 @@ test_22.o: test_22.cpp i2s_test_common.h $(PRJ_ROOT)/src/pd_esp32/i2s_fill.cpp $
 test_%: test_%.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
 
-test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h stubs.h
+test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
 log2_test: log2_test.o Log2Representation.o
-log2_test.o: log2_test.cpp $(PRJ_ROOT)/src/log2/Log2Representation.h stubs.h test_03.h
+log2_test.o: log2_test.cpp $(PRJ_ROOT)/src/log2/Log2Representation.h test_03.h
 
 rmc_test: rmc_test.o Log2Representation.o RampCalculator.o
-rmc_test.o: rmc_test.cpp $(PRJ_ROOT)/src/log2/Log2Representation.h $(PRJ_ROOT)/src/fas_ramp/RampCalculator.h stubs.h test_03.h
+rmc_test.o: rmc_test.cpp $(PRJ_ROOT)/src/log2/Log2Representation.h $(PRJ_ROOT)/src/fas_ramp/RampCalculator.h test_03.h
 
 FastAccelStepper.o: $(PRJ_ROOT)/src/FastAccelStepper.cpp $(SRC_LIB_H)
 	$(COMPILE.cpp) $< -o $@
