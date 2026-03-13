@@ -185,9 +185,7 @@ void FastAccelStepperEngine::manageSteppers() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = _stepper[i];
     if (s) {
-      if (s->externalDirPinChangeCompletedIfNeeded()) {
-        s->fill_queue();
-      }
+      s->fill_queue();
     }
   }
 

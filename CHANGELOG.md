@@ -1,3 +1,14 @@
+pre-1.1.0:
+- Refactor external direction pin handling:
+  - Remove `repeat_entry` mechanism from queue (queue no longer knows about external pins)
+  - Remove `externalDirPinChangeCompletedIfNeeded()` function
+  - Remove `isOnRepeatingEntry()`, `clearRepeatingFlag()`, `dirPinState()` queue methods
+  - Add `ExtDirPendingState` enum to track pending external dir pin changes
+  - External dir pin changes now handled entirely in `addQueueEntry()`
+  - Return `AQE_DIR_PIN_2MS_PAUSE_ADDED` for external pin waits (vs `AQE_DIR_PIN_IS_BUSY` for shared pins)
+  - Simplified engine task loop - just calls `fill_queue()` directly
+- Add `hasStepsInQueue()` method to check if queue contains entries with steps
+
 1.0.0:
 - add memory report script
 - rename old pmf/PMF to log2/LOG2 representation and define type `log2_value_t`

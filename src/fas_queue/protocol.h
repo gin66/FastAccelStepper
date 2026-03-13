@@ -77,7 +77,7 @@ void disconnect();
 //
 // 4. Externally controlled
 //    - Pin controlled via callback by application (e.g. using I/O expander)
-//    - Uses repeat_entry mechanism until pin change was applied by application
+//    - addQueueEntry() manages callback completion with 4ms pause mechanism
 //    - Pin has PIN_EXTERNAL_FLAG set
 //
 // addQueueEntry() will use only these macros to control the direction pin,

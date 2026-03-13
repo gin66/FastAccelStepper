@@ -14,7 +14,6 @@ struct queue_entry {
   uint8_t countUp : 1;
   uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
-  uint8_t repeat_entry : 1;
   uint8_t dirPinState : 1;
   uint16_t ticks;
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
@@ -54,6 +53,7 @@ class StepperQueueBase {
 #else
   uint16_t max_speed_in_ticks = TICKS_PER_S / 1000;  // default: 1_000 steps/s
 #endif
+  uint16_t _last_command_ticks;
 
   inline uint8_t queueEntries() const {
     fasDisableInterrupts();
@@ -65,14 +65,18 @@ class StepperQueueBase {
   }
   inline bool isQueueFull() const { return queueEntries() == QUEUE_LEN; }
   inline bool isQueueEmpty() const { return queueEntries() == 0; }
-  inline bool isOnRepeatingEntry() const {
-    return entry[read_idx & QUEUE_LEN_MASK].repeat_entry == 1;
-  }
-  inline uint8_t dirPinState() const {
-    return entry[read_idx & QUEUE_LEN_MASK].dirPinState;
-  }
-  inline void clearRepeatingFlag() {
-    entry[read_idx & QUEUE_LEN_MASK].repeat_entry = 0;
+  inline bool hasStepsInQueue() const {
+    fasDisableInterrupts();
+    uint8_t rp = read_idx;
+    uint8_t wp = next_write_idx;
+    fasEnableInterrupts();
+    while (rp != wp) {
+      if (entry[rp & QUEUE_LEN_MASK].steps > 0) {
+        return true;
+      }
+      rp++;
+    }
+    return false;
   }
 
   inline uint16_t getMaxSpeedInTicks() const { return max_speed_in_ticks; }

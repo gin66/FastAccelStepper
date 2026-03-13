@@ -268,12 +268,8 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
   q->_nextCommandIsPrepared = false;
   uint8_t rp = q->read_idx;
   if (rp != q->next_write_idx) {
-    struct queue_entry* e_completed = &q->entry[rp & QUEUE_LEN_MASK];
-    bool repeat_entry = e_completed->repeat_entry != 0;
-    if (!repeat_entry) {
-      rp++;
-      q->read_idx = rp;
-    }
+    rp++;
+    q->read_idx = rp;
     if (rp != q->next_write_idx) {
       struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
       if (!isPrepared) {
@@ -283,15 +279,11 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
         isr_pcnt_counter_clear(mapping->pcnt_unit);
       }
       apply_command(q, e_curr);
-      if (!repeat_entry) {
-        rp++;
-        if (rp != q->next_write_idx) {
-          struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
-          q->_nextCommandIsPrepared = true;
-          prepare_for_next_command(q, e_next);  // a no-op for pause command
-        }
-      } else {
-        q->_nextCommandIsPrepared = false;
+      rp++;
+      if (rp != q->next_write_idx) {
+        struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
+        q->_nextCommandIsPrepared = true;
+        prepare_for_next_command(q, e_next);  // a no-op for pause command
       }
       return;
     }

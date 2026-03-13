@@ -6,6 +6,8 @@ static uint8_t stepper_allocated_mask = 0;
 
 void fas_init_engine(FastAccelStepperEngine* engine) {}
 
+void fas_reset_stepper_allocation() { stepper_allocated_mask = 0; }
+
 bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
                         uint8_t step_pin) {
   _initVars();

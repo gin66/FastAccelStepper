@@ -20,7 +20,7 @@ This document describes a refactoring of direction and enable pin handling in Fa
 | Pin Type | Processing Context | Mechanism |
 |----------|-------------------|-----------|
 | **Enable pins** | `addQueueEntry()` | 4ms delay acceptable, `setEnablePinState()` or callback |
-| **Direction (External)** | `addQueueEntry()` ONLY | `repeat_entry` mechanism, callback to external hardware |
+| **Direction (External)** | `addQueueEntry()` ONLY | `ExtDirPendingState` enum + callback, returns `AQE_DIR_PIN_2MS_PAUSE_ADDED` |
 | **Direction (I2S/GPIO)** | `addQueueEntry()` inserts pause, Queue/ISR applies | `toggle_dir` + pause ensures safe timing |
 
 **Forbidden Combination**: RMT step pin + I2S direction pin (independent hardware blocks, no synchronization).
@@ -171,9 +171,9 @@ The `toggle_dir` mechanism remains unchanged. The key improvement is that `addQu
 ├─────────────────────────────────────────────────────────────────┤
 │  Direction - External pins (ONLY HERE - NEVER in Queue/ISR)      │
 │  - Callback to external hardware (I/O expanders)                │
-│  - Uses repeat_entry mechanism                                  │
-│  - External hardware timing managed externally                   │
-│  - toggle_dir cleared, repeat_entry set instead                 │
+│  - Uses ExtDirPendingState enum to track pending state          │
+│  - Returns AQE_DIR_PIN_2MS_PAUSE_ADDED if callback pending      │
+│  - toggle_dir NOT used for external pins                        │
 ├─────────────────────────────────────────────────────────────────┤
 │  Direction - I2S/GPIO (PAUSE INSERTION)                          │
 │  - Query platform for required pause duration via               │
@@ -264,28 +264,101 @@ public:
 
 ### 3.4 Direction State in Queue Entry
 
-The `toggle_dir` field remains unchanged:
+The `toggle_dir` field remains unchanged. The `repeat_entry` field has been **removed**:
 
 ```cpp
-// In base.h - queue_entry structure (UNCHANGED)
+// In base.h - queue_entry structure
 struct queue_entry {
   uint8_t steps;
   uint8_t toggle_dir : 1;      // Flag: toggle direction pin before this entry
   uint8_t countUp : 1;
   uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
-  uint8_t repeat_entry : 1;
+  uint8_t dirPinState : 1;     // Direction pin state for this entry
   uint16_t ticks;
   // ...
 };
 ```
 
-**For external direction pins**: `toggle_dir` is not used and stays off, `repeat_entry` is set instead. The callback handles the direction change in task context.
+**For external direction pins**: `toggle_dir` is NOT used. The direction change is handled entirely in `addQueueEntry()` using callbacks. The `ExtDirPendingState` enum tracks whether a callback is pending.
 
-**For GPIO/I2S direction pins**: `toggle_dir` is set as before, but now `addQueueEntry()` has already inserted a pause to ensure safe timing.
+**For GPIO/I2S direction pins**: `toggle_dir` is set as before, and `addQueueEntry()` has already inserted a pause to ensure safe timing.
+
+### 3.5 External Direction Pin State Tracking
+
+External direction pins are tracked in `FastAccelStepper` using an enum:
+
+```cpp
+enum class ExtDirPendingState : uint8_t {
+  None = 0xff,   // No pending callback
+  Low = 0,       // Waiting for pin to go LOW
+  High = 1       // Waiting for pin to go HIGH
+};
+```
+
+This allows `addQueueEntry()` to:
+1. Check if a previous callback is still pending (regardless of current direction)
+2. Retry the callback on each call until it completes
+3. Return `AQE_DIR_PIN_2MS_PAUSE_ADDED` to indicate the caller should retry later
 
 ### 3.5 Updated Code Flow
 
+```
+FastAccelStepper::addQueueEntry(cmd, start):
+  1. Existing checks (ticks, dir pin defined)
+  
+  2. Handle external direction pin - check pending callback FIRST
+     (This happens BEFORE direction change check, because if a callback
+      is pending from a previous direction change, it must complete first)
+     
+     a. If _pendingExternalDirState != ExtDirPendingState::None:
+        - Call _externalCallForPin() with pending state
+        - If callback returns success: _pendingExternalDirState = None
+        - If still pending:
+          * Insert 2ms pause
+          * Return AQE_DIR_PIN_2MS_PAUSE_ADDED
+  
+  3. If direction change detected:
+     
+     a. If EXTERNAL direction pin:
+         - If queue has steps: insert 2ms pause, return AQE_DIR_PIN_2MS_PAUSE_ADDED
+        - Call _externalCallForPin() with desired state
+        - If callback fails:
+          * Set _pendingExternalDirState = High or Low
+          * Insert 2ms pause
+          * Return AQE_DIR_PIN_2MS_PAUSE_ADDED
+        - (Success: callback completed, proceed normally)
+        
+     b. Else if I2S-MUX direction pin (I2S controls both step and dir):
+        - Query: pause_ticks = getDrainPauseTicksForDirChange()
+        - Insert pause command with pause_ticks (BEFORE: I2S_BLOCK_TICKS to drain buffer)
+        - If queue too full: return AQE_DIR_PIN_IS_BUSY
+        - Set toggle_dir = 1 in entry
+        - Override entry.ticks = max(entry.ticks, getDirChangeMinTicks()) (AFTER: ensures dir change alone in buffer)
+        
+     c. Else (GPIO direction pin, RMT/MCPWM/AVR/SAM):
+        - Query: pause_ticks = getDrainPauseTicksForDirChange()
+        - If pause_ticks > 0:
+          * Insert pause command with pause_ticks
+          * If queue too full: return AQE_DIR_PIN_IS_BUSY
+        - Set toggle_dir = 1 in entry (as before)
+  
+  4. If enable pin change needed (auto-enable):
+     - If hasPulsesInFlight(): return AQE_WAIT_FOR_ENABLE
+     - If EXTERNAL: use callback
+     - Else: setEnablePinState(...)
+  
+  5. StepperQueue::addQueueEntry(cmd, start)
+     - Stores toggle_dir in entry
+     - No change to toggle logic
+
+Queue/ISR (UNCHANGED for I2S/GPIO direction):
+  1. Check entry.toggle_dir
+  2. If set: toggle direction pin
+  3. Process steps
+  
+  Note: For buffered platforms (RMT/I2S), the pause inserted by
+        addQueueEntry() ensures toggle happens at a safe point.
 ```
 FastAccelStepper::addQueueEntry(cmd, start):
   1. Existing checks (ticks, dir pin defined)
@@ -510,19 +583,78 @@ bool StepperQueue::hasPulsesInFlight() {
 
 ## 5. Handling External Direction Pins
 
-External direction pins are handled in `addQueueEntry()` context using the existing `repeat_entry` mechanism:
+External direction pins are handled entirely in `addQueueEntry()` context using the `ExtDirPendingState` enum:
 
 ```cpp
-// In addQueueEntry()
-bool dir = (cmd->count_up == dirHighCountsUp);
-if ((dir != queue_end.dir) && (dirPin & PIN_EXTERNAL_FLAG)) {
-    e->repeat_entry = 1;
-    // toggle_dir stays 0 (not used for external pins)
-}
-e->countUp = cmd->count_up;
+// In FastAccelStepper.h
+enum class ExtDirPendingState : uint8_t {
+  None = 0xff,   // No pending callback
+  Low = 0,       // Waiting for pin to go LOW
+  High = 1       // Waiting for pin to go HIGH
+};
+
+// Member variable in FastAccelStepper
+ExtDirPendingState _pendingExternalDirState = ExtDirPendingState::None;
 ```
 
-The callback happens in task context via `externalDirPinChangeCompletedIfNeeded()`.
+### 5.1 Implementation in addQueueEntry()
+
+```cpp
+// In addQueueEntry() - check pending callback FIRST
+if ((_dirPin & PIN_EXTERNAL_FLAG) && 
+    (_pendingExternalDirState != ExtDirPendingState::None)) {
+  if (_engine->_externalCallForPin) {
+    uint8_t desiredPinState = 
+        (_pendingExternalDirState == ExtDirPendingState::High) ? HIGH : LOW;
+    bool newState = _engine->_externalCallForPin(_dirPin, desiredPinState);
+    if (newState == (desiredPinState == HIGH)) {
+      _pendingExternalDirState = ExtDirPendingState::None;
+    }
+  }
+  if (_pendingExternalDirState != ExtDirPendingState::None) {
+    // Callback still not complete - insert 2ms pause and retry
+    stepper_command_s pause = {.ticks = US_TO_TICKS(2000), .steps = 0, .count_up = cmd->count_up};
+    q->addQueueEntry(&pause, start);
+    return AQE_DIR_PIN_2MS_PAUSE_ADDED;
+  }
+}
+
+// On direction change with external pin
+if (dir_change && (_dirPin & PIN_EXTERNAL_FLAG)) {
+  if (q->hasStepsInQueue()) {
+    // Queue not empty - can't change direction safely
+    stepper_command_s pause = {.ticks = US_TO_TICKS(2000), .steps = 0, .count_up = cmd->count_up};
+    q->addQueueEntry(&pause, start);
+    return AQE_DIR_PIN_2MS_PAUSE_ADDED;
+  }
+  // Queue is empty - try callback now
+  if (_engine->_externalCallForPin) {
+    uint8_t desiredPinState = (cmd->count_up == _dirHighCountsUp) ? HIGH : LOW;
+    bool newState = _engine->_externalCallForPin(_dirPin, desiredPinState);
+    if (newState != (desiredPinState == HIGH)) {
+      // Callback not complete - track pending state
+      _pendingExternalDirState = (desiredPinState == HIGH) 
+          ? ExtDirPendingState::High 
+          : ExtDirPendingState::Low;
+      stepper_command_s pause = {.ticks = US_TO_TICKS(2000), .steps = 0, .count_up = cmd->count_up};
+      q->addQueueEntry(&pause, start);
+      return AQE_DIR_PIN_2MS_PAUSE_ADDED;
+    }
+  }
+}
+```
+
+### 5.2 Key Design Points
+
+1. **Pending state checked FIRST** - before direction change detection, because if a callback is pending from a previous change, it must complete before any new command can proceed.
+
+2. **State encodes target direction** - `ExtDirPendingState::High` means waiting for pin to go HIGH, `Low` means waiting for LOW. This allows proper retry even if application changes direction back before callback completes.
+
+3. **Queue must be empty of steps** - external callbacks can be slow, so we ensure no steps are in the queue before calling.
+
+4. **2ms pause mechanism** - gives the external hardware (I/O expander, etc.) time to process the callback.
+
+5. **Removed**: `repeat_entry` field, `isOnRepeatingEntry()`, `clearRepeatingFlag()`, `externalDirPinChangeCompletedIfNeeded()` - all no longer needed.
 
 ---
 
@@ -695,28 +827,43 @@ After (deterministic):
 
 ### 9.1 AQE_DIR_PIN_IS_BUSY
 
-Returned when queue is too full to insert the required drain pause:
+Returned in two cases:
 
+**Case 1: Shared direction pin busy**
 ```cpp
-// In addQueueEntry()
-if (pause_ticks > 0) {
-    if (queueEntries() > QUEUE_LEN - 1) {
-        return AQE_DIR_PIN_IS_BUSY;  // Retry later
-    }
-    insertPauseCommand(pause_ticks);
+// In addQueueEntry() - shared pin check
+if (!isQueueRunning()) {
+  if (_engine->isDirPinBusy(_dirPin, _queue_num)) {
+    return AQE_DIR_PIN_IS_BUSY;  // Another stepper using shared dir pin
+  }
 }
 ```
 
-The existing retry logic handles this:
-
+**Case 2: Queue too full for delay insertion**
 ```cpp
-// In fill_queue()
-if (aqeRetry(res)) {
-    break;  // Retry on next fill_queue() call
+// In queue_add_entry.cpp - BEFORE/AFTER_DIR_CHANGE_DELAY_TICKS
+if (queueEntries() >= QUEUE_LEN - commands_needed) {
+  return AQE_DIR_PIN_IS_BUSY;  // Cannot insert delay commands
 }
 ```
 
-### 9.2 AQE_WAIT_FOR_ENABLE_PIN_ACTIVE
+### 9.2 AQE_DIR_PIN_2MS_PAUSE_ADDED
+
+Returned when a 2ms pause has been successfully inserted for external direction pin handling:
+
+```cpp
+// In addQueueEntry() - external dir pin
+if (hasStepsInQueue() || _pendingExternalDirState != ExtDirPendingState::None) {
+  insertPause(2000us);
+  return AQE_DIR_PIN_2MS_PAUSE_ADDED;
+}
+```
+
+**Key difference**: 
+- `AQE_DIR_PIN_IS_BUSY` = cannot proceed, retry later
+- `AQE_DIR_PIN_2MS_PAUSE_ADDED` = pause inserted, retry to continue
+
+### 9.3 AQE_WAIT_FOR_ENABLE_PIN_ACTIVE
 
 Returned when auto-enable cannot proceed due to pulses in flight.
 
@@ -747,8 +894,9 @@ Returned when auto-enable cannot proceed due to pulses in flight.
 #### Phase 2: Update addQueueEntry Logic
 
 1. Implement pause insertion using `getDrainPauseTicksForDirChange()`
-2. Handle DIR-external pins (set `repeat_entry`, don't set `toggle_dir`)
-3. Run tests — behavior unchanged for non-buffered platforms
+2. Implement external dir pin handling with `ExtDirPendingState` enum
+3. Return `AQE_DIR_PIN_2MS_PAUSE_ADDED` instead of `AQE_DIR_PIN_IS_BUSY`
+4. Run tests — behavior unchanged for non-buffered platforms
 
 #### Phase 3: Remove Workarounds (RMT only)
 

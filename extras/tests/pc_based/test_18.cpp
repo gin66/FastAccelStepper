@@ -57,7 +57,6 @@ class RmtBufferTest {
     fas_queue[0].entry[idx].steps = steps;
     fas_queue[0].entry[idx].ticks = ticks;
     fas_queue[0].entry[idx].toggle_dir = 0;
-    fas_queue[0].entry[idx].repeat_entry = 0;
     fas_queue[0].next_write_idx++;
   }
 

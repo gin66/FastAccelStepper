@@ -8,6 +8,7 @@ enum class AqeResultCode : int8_t {
   DirPinIsBusy = 2,
   WaitForEnablePinActive = 3,
   DeviceNotReady = 4,
+  DirPin2msPauseAdded = 5,
   ErrorTicksTooLow = -1,
   ErrorEmptyQueueToStart = -2,
   ErrorNoDirPinToToggle = -3
@@ -26,6 +27,8 @@ static inline const char* toString(AqeResultCode code) {
       return "OK";
     case AqeResultCode::QueueFull:
       return "Queue Full";
+    case AqeResultCode::DirPin2msPauseAdded:
+      return "Dir Pin 2ms Pause Added";
     case AqeResultCode::DirPinIsBusy:
       return "Direction Pin is Busy";
     case AqeResultCode::WaitForEnablePinActive:
@@ -44,6 +47,7 @@ static inline const char* toString(AqeResultCode code) {
 }
 #define AQE_OK AqeResultCode::OK
 #define AQE_QUEUE_FULL AqeResultCode::QueueFull
+#define AQE_DIR_PIN_2MS_PAUSE_ADDED AqeResultCode::DirPin2msPauseAdded
 #define AQE_DIR_PIN_IS_BUSY AqeResultCode::DirPinIsBusy
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE AqeResultCode::WaitForEnablePinActive
 #define AQE_DEVICE_NOT_READY AqeResultCode::DeviceNotReady
@@ -94,11 +98,12 @@ enum class MoveTimedResultCode : int8_t {
   DirPinIsBusy = 2,
   WaitForEnablePinActive = 3,
   DeviceNotReady = 4,
+  DirPin2msPauseAdded = 5,
+  MoveBusy = 6,
+  MoveEmpty = 7,
   ErrorTicksTooLow = -1,
   ErrorEmptyQueueToStart = -2,
   ErrorNoDirPinToToggle = -3,
-  MoveBusy = 5,
-  MoveEmpty = 6,
   ErrorMoveTooLarge = -4,
 };
 
@@ -123,16 +128,18 @@ static inline const char* toString(MoveTimedResultCode code) {
       return "Waiting for Enable Pin Active";
     case MoveTimedResultCode::DeviceNotReady:
       return "Device Not Ready";
+    case MoveTimedResultCode::DirPin2msPauseAdded:
+      return "Dir Pin 2ms Pause Added";
+    case MoveTimedResultCode::MoveBusy:
+      return "Move still ongoing";
+    case MoveTimedResultCode::MoveEmpty:
+      return "Queue has been empty";
     case MoveTimedResultCode::ErrorTicksTooLow:
       return "Error: Ticks Too Low";
     case MoveTimedResultCode::ErrorEmptyQueueToStart:
       return "Error: Empty Queue to Start";
     case MoveTimedResultCode::ErrorNoDirPinToToggle:
       return "Error: No Direction Pin to Toggle";
-    case MoveTimedResultCode::MoveBusy:
-      return "Move still ongoing";
-    case MoveTimedResultCode::MoveEmpty:
-      return "Queue has been empty";
     case MoveTimedResultCode::ErrorMoveTooLarge:
       return "Error: Move too large";
     default:

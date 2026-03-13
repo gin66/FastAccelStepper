@@ -69,8 +69,6 @@
   }
 #endif
 
-#define TEST_NOT_REPEATING_ENTRY (e->repeat_entry == 0)
-
 #define ForceCompare(T, X) TCCR##T##C = _BV(FOC##T##X)
 #define DisableCompareInterrupt(T, X) TIMSK##T &= ~_BV(OCIE##T##X)
 #define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE##T##X)
@@ -177,7 +175,7 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
           /* New command needs steps, so do it immediately */                  \
           ticks = 10;                                                          \
         }                                                                      \
-      } else if (TEST_NOT_REPEATING_ENTRY) {                                   \
+      } else {                                                                 \
         rp++;                                                                  \
         fas_queue_##CHANNEL.read_idx = rp;                                     \
         if (rp == wp) {                                                        \

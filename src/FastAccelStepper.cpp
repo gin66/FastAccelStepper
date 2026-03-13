@@ -26,6 +26,40 @@
 //*************************************************************************************************
 
 //*************************************************************************************************
+bool FastAccelStepper::handleExternalDirectionPin(StepperQueue* q,
+                                                  bool count_up) {
+  if (_pendingExternalDirState != ExtDirPendingState::None) {
+    if (_engine->_externalCallForPin) {
+      uint8_t desiredPinState =
+          (_pendingExternalDirState == ExtDirPendingState::High) ? HIGH : LOW;
+      bool newState = _engine->_externalCallForPin(_dirPin, desiredPinState);
+      if (newState == (desiredPinState == HIGH)) {
+        _pendingExternalDirState = ExtDirPendingState::None;
+      }
+    }
+    if (_pendingExternalDirState != ExtDirPendingState::None) {
+      return false;
+    }
+  }
+  if (q->queue_end.count_up != count_up) {
+    if (q->hasStepsInQueue()) {
+      return false;
+    }
+    if (_engine->_externalCallForPin) {
+      uint8_t desiredPinState = (count_up == _dirHighCountsUp) ? HIGH : LOW;
+      bool newState = _engine->_externalCallForPin(_dirPin, desiredPinState);
+      if (newState != (desiredPinState == HIGH)) {
+        _pendingExternalDirState = (desiredPinState == HIGH)
+                                       ? ExtDirPendingState::High
+                                       : ExtDirPendingState::Low;
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+//*************************************************************************************************
 AqeResultCode FastAccelStepper::addQueueEntry(
     const struct stepper_command_s* cmd, bool start) {
   StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
@@ -90,40 +124,75 @@ AqeResultCode FastAccelStepper::addQueueEntry(
       }
     }
   }
-  if (q->queue_end.count_up != cmd->count_up) {
-    // Change of direction has been detected.
-    if (_dirPin & PIN_EXTERNAL_FLAG) {
-      // for external pins, two pause commands need to be added. The first one
-      // with the dir pin change. The second one just a pause.
-      // The queue's addQueueEntry() will set repeat_entry for the command entry
-      if (q->queueEntries() > QUEUE_LEN - 2) {
-        // no space for two commands => do nothing and return QUEUE_FULL
-        return AQE_QUEUE_FULL;
+  bool dir_change_needed =
+      (_dirPin != PIN_UNDEFINED) && (q->queue_end.count_up != cmd->count_up);
+
+  if (_dirPin & PIN_EXTERNAL_FLAG) {
+    if (dir_change_needed) {
+      if (!handleExternalDirectionPin(q, cmd->count_up)) {
+        struct stepper_command_s pause_cmd = {
+            .ticks = US_TO_TICKS((uint16_t)2000),
+            .steps = 0,
+            .count_up = cmd->count_up};
+        res = q->addQueueEntry(&pause_cmd, start);
+        if (res == AQE_OK) {
+          res = AQE_DIR_PIN_2MS_PAUSE_ADDED;
+        }
+        return res;
       }
-      struct stepper_command_s start_cmd = {
-          .ticks = US_TO_TICKS(500), .steps = 0, .count_up = cmd->count_up};
-      res = q->addQueueEntry(&start_cmd, start);
+    }
+  } else if (dir_change_needed && (cmd->steps != 0)) {
+#if defined(BEFORE_DIR_CHANGE_DELAY_TICKS)
+    uint16_t before_delay = BEFORE_DIR_CHANGE_DELAY_TICKS(q);
+#else
+    uint16_t before_delay = 0;
+#endif
+    uint16_t after_delay = _dir_change_delay_ticks;
+
+#if defined(AFTER_DIR_CHANGE_DELAY_TICKS)
+    after_delay = fas_max(AFTER_DIR_CHANGE_DELAY_TICKS(q), after_delay);
+#endif
+
+    if (q->_last_command_ticks >= before_delay) {
+      before_delay = 0;
+    }
+
+    uint8_t commands_needed = 1;
+    if (before_delay > 0) {
+      commands_needed++;
+    }
+    if (after_delay > 0) {
+      commands_needed++;
+    }
+    if (q->queueEntries() >= QUEUE_LEN - commands_needed) {
+      return AQE_DIR_PIN_IS_BUSY;
+    }
+
+    if (before_delay > 0) {
+      struct stepper_command_s before_cmd = {
+          .ticks = (uint16_t)fas_max(before_delay, MIN_CMD_TICKS),
+          .steps = 0,
+          .count_up = cmd->count_up};
+      res = q->addQueueEntry(&before_cmd, start);
       if (res != AQE_OK) {
         return res;
       }
-      res = q->addQueueEntry(&start_cmd, start);
-      if (res != AQE_OK) {
-        return res;
-      }
-    } else if ((_dir_change_delay_ticks != 0) && (cmd->steps != 0)) {
-      // add pause command to delay dir pin change to first step
-      struct stepper_command_s start_cmd = {.ticks = _dir_change_delay_ticks,
-                                            .steps = 0,
-                                            .count_up = cmd->count_up};
-      res = q->addQueueEntry(&start_cmd, start);
+    }
+
+    if (after_delay > 0) {
+      struct stepper_command_s after_cmd = {
+          .ticks = (uint16_t)fas_max(after_delay, MIN_CMD_TICKS),
+          .steps = 0,
+          .count_up = cmd->count_up};
+      res = q->addQueueEntry(&after_cmd, start);
       if (res != AQE_OK) {
         return res;
       }
     }
   }
   res = q->addQueueEntry(cmd, start);
-  if (_autoEnable) {
-    if (res == AQE_OK) {
+  if (res == AQE_OK) {
+    if (_autoEnable) {
       fasDisableInterrupts();
       _auto_disable_delay_counter = _off_delay_count;
       fasEnableInterrupts();
@@ -131,23 +200,6 @@ AqeResultCode FastAccelStepper::addQueueEntry(
   }
 
   return res;
-}
-
-bool FastAccelStepper::externalDirPinChangeCompletedIfNeeded() {
-  StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
-  if ((_dirPin != PIN_UNDEFINED) && ((_dirPin & PIN_EXTERNAL_FLAG) != 0)) {
-    if (q->isOnRepeatingEntry()) {
-      if (_engine->_externalCallForPin) {
-        uint8_t state = q->dirPinState();
-        bool newState = _engine->_externalCallForPin(_dirPin, state);
-        if (newState != state) {
-          return false;
-        }
-        q->clearRepeatingFlag();
-      }
-    }
-  }
-  return true;
 }
 
 //*************************************************************************************************
@@ -313,6 +365,7 @@ bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _enablePinHighActive = PIN_UNDEFINED;
   _enablePinLowActive = PIN_UNDEFINED;
   _forward_planning_in_ticks = TICKS_PER_S / 50;
+  _pendingExternalDirState = ExtDirPendingState::None;
   _rg.init();
 
   _queue_num = num;

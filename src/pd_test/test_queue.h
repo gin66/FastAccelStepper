@@ -12,8 +12,14 @@ class StepperQueue : public StepperQueueBase {
 #include "../fas_queue/protocol.h"
 
   volatile bool _isRunning;
+  uint16_t _before_dir_change_delay_ticks;
+  uint16_t _after_dir_change_delay_ticks;
 
-  inline void _pd_initVars() { _isRunning = false; }
+  inline void _pd_initVars() {
+    _isRunning = false;
+    _before_dir_change_delay_ticks = 0;
+    _after_dir_change_delay_ticks = 0;
+  }
 
   inline bool isReadyForCommands() const { return true; }
   inline bool isRunning() const { return _isRunning; }
@@ -32,5 +38,8 @@ class StepperQueue : public StepperQueueBase {
 #define SET_DIRECTION_PIN_STATE(q, high) ((void)0)
 
 #define SET_ENABLE_PIN_STATE(q, pin, high) ((void)0)
+
+#define BEFORE_DIR_CHANGE_DELAY_TICKS(q) ((q)->_before_dir_change_delay_ticks)
+#define AFTER_DIR_CHANGE_DELAY_TICKS(q) ((q)->_after_dir_change_delay_ticks)
 
 #endif  // PD_TEST_QUEUE_H

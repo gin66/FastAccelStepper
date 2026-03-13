@@ -18,5 +18,6 @@ void StepperQueue::_initVars() {
   queue_end.count_up = true;
   queue_end.pos = 0;
   dirHighCountsUp = true;
+  _last_command_ticks = 65535;
   _pd_initVars();
 }

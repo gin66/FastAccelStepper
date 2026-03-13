@@ -221,10 +221,8 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
   // Data is complete
   if (steps == 0) {
     // The command has been completed
-    if (e_curr->repeat_entry == 0) {
-      q->read_idx = rp + 1;
-      PROBE_4_TOGGLE;
-    }
+    q->read_idx = rp + 1;
+    PROBE_4_TOGGLE;
   } else {
     e_curr->steps = steps;
   }

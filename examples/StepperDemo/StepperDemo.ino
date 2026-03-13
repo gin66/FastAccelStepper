@@ -826,8 +826,10 @@ const static char messages[] PROGMEM =
     ____ "p<n>,l,h " _ooo_ _attach " " _pulse_counter_ "n<=7 with low,high limits" _NL_
     ____ "pc   " ____ _ooo_ _clear_ _pulse_counter_ _NL_
 #endif
+#if !defined(__AVR_ATmega32U4__)
     ____ "t" ________ _ooo_ _Enter_ _test_ _mode _NL_
     ____ "u" ________ _ooo_ "Unidirectional " _mode " (need reset " _to_ "restore)" _NL_
+#endif
 #if defined(ARDUINO_ARCH_AVR)
     ____ "r" ________ _ooo_ _Toggle_ _erroneous_ _digitalRead_ __of_the_ _stepper " pin" _NL_
 #endif

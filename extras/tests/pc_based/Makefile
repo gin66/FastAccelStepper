@@ -10,7 +10,7 @@ test: $(TESTS) log2_test rmc_test
 	./rmc_test
 	./log2_test
 	rm -f test.log
-	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed"
+	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed" && rm test.log
 
 ramp_helper: ramp_helper.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)

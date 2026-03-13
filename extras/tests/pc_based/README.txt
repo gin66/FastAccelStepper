@@ -159,6 +159,44 @@ Tests;
   4. Bit stream analyzer must correctly detect pulses
   5. Buffer must be cleared after DMA consume
 
+- test_23
+  Direction pin and external pin handling tests
+  
+  Part 1: MIN_DIR_DELAY_US / MAX_DIR_DELAY_US tests
+  - MIN_DIR_DELAY_US value verification (platform-specific minimum)
+  - MAX_DIR_DELAY_US value verification (4095us max delay)
+  - Clamping of delays below minimum to MIN_DIR_DELAY_US
+  - Clamping of delays above maximum to MAX_DIR_DELAY_US
+  
+  Part 2: dir_change_delay_us tests for regular direction pins
+  - Pause insertion on direction change with delay configured
+  - No pause on pause-only commands (steps=0)
+  - Behavior with/without delay configured
+  - No extra delay if prior pause has sufficient ticks
+  - No extra delay if prior single step has sufficient ticks
+  
+  Part 3: External direction pin behavior tests
+  - External dir pin (pin >= 128) with empty queue succeeds
+  - External dir pin with steps in queue returns AQE_DIR_PIN_2MS_PAUSE_ADDED
+  - Queue drain and retry mechanism for external pins
+  - 2ms pause insertion allows queue to drain
+  
+  Part 4: External enable pin behavior tests
+  - External enable pin callback invocation
+  - External enable pin disable callback
+  
+  Part 5: Integration tests
+  - Queue ticks tracking across multiple commands
+  - hasStepsInQueue() detection (steps vs pause commands)
+  - Realistic direction change scenario with delays
+  
+  Key validation criteria:
+  1. Direction delays must be clamped to valid range
+  2. Pause commands inserted on direction change (non-external pins)
+  3. External pins return AQE_DIR_PIN_2MS_PAUSE_ADDED if queue has steps
+  4. External pins succeed when queue is empty of steps
+  5. Callback mechanism works for external enable/disable
+
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration
   Usage: make ramp_helper && ./ramp_helper <speed_us> <acceleration> <steps>

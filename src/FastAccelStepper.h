@@ -4,6 +4,8 @@
 #include "fas_arch/common.h"
 #include "FastAccelStepperEngine.h"
 
+enum class ExtDirPendingState : uint8_t { None = 0xff, Low = 0, High = 1 };
+
 class FastAccelStepper;
 
 // ### Return codes of calls to `move()` and `moveTo()`
@@ -510,8 +512,66 @@ class FastAccelStepper {
   // should be called with interrupts disabled and return very fast.
   // Actually this is necessary, too, in case the queue is full and not
   // started.
-  // Return codes for addQueueEntry
-  //    positive values mean, that caller should retry later
+  // ### Direction Change Delay Enforcement
+  //
+  // If the new command's direction differs from the previous command,
+  // addQueueEntry() will automatically insert pause commands to ensure
+  // sufficient delay before the first step in the new direction:
+  //
+  // - For external direction pins (pin >= 128): The direction pin is controlled
+  //   via an external callback (e.g., to an I/O expander). To avoid steps in
+  //   the wrong direction, the queue must be empty of steps before the
+  //   direction change. If steps are present or the external callback is still
+  //   pending, a 2ms pause is inserted and AQE_DIR_PIN_2MS_PAUSE_ADDED is
+  //   returned. The caller should retry until the queue drains and the callback
+  //   completes.
+  //
+  // - For regular direction pins: If setDirectionPin() was called with
+  //   dir_change_delay_us > 0, a pause command of that duration is inserted
+  //   before the first step in the new direction.
+  //
+  // - For autoEnable mode: The enable-on delay is extended to at least
+  //   dir_change_delay_ticks if a direction change occurs.
+  //
+  // ### stepper_command_s structure
+  //
+  // This structure defines a low-level stepper motor command for
+  // addQueueEntry():
+  //
+  // - `ticks`: Number of ticks between each step. Must be >=
+  // getMaxSpeedInTicks().
+  //   There are TICKS_PER_S ticks per second (platform dependent).
+  //
+  // - `steps`: Number of steps to send. If 0, this is a pause command lasting
+  //   for `ticks` ticks.
+  //
+  // - `count_up`: Direction. True = direction pin HIGH, False = direction pin
+  // LOW.
+  //
+  // Constraint: `ticks * steps` must be >= MIN_CMD_TICKS.
+  //
+  // Example: ticks=TICKS_PER_S/1000, steps=3, count_up=true means:
+  // 1. Direction pin set to HIGH
+  // 2. One step is generated
+  // 3. Exactly 1ms after the first step, the second step
+  // 4. Exactly 1ms after the second step, the third step
+  // 5. The stepper waits for 1ms
+  // 6. The next command is processed
+  //
+  // ### AqeResultCode - Return codes for addQueueEntry()
+  //
+  // Positive values indicate the caller should retry later:
+  // - AQE_OK (0):              Command added successfully
+  // - AQE_QUEUE_FULL (1):      Queue is full, retry later
+  // - AQE_DIR_PIN_IS_BUSY (2): External dir pin change in progress, retry later
+  // - AQE_WAIT_FOR_ENABLE_PIN_ACTIVE (3): Waiting for enable delay, retry later
+  // - AQE_DEVICE_NOT_READY (4): Device not ready, retry later
+  //
+  // Negative values indicate errors (do not retry):
+  // - AQE_ERROR_TICKS_TOO_LOW (-1):        ticks < getMaxSpeedInTicks()
+  // - AQE_ERROR_EMPTY_QUEUE_TO_START (-2): Empty command with start=true, but
+  // queue empty
+  // - AQE_ERROR_NO_DIR_PIN_TO_TOGGLE (-3): count_up=false without direction pin
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd,
                               bool start = true);
 
@@ -631,7 +691,6 @@ class FastAccelStepper {
 
  private:
   void performOneStep(bool count_up, bool blocking = false);
-  bool externalDirPinChangeCompletedIfNeeded();
   void fill_queue();
   void updateAutoDisable();
   void blockingWaitForForceStopComplete();
@@ -640,6 +699,7 @@ class FastAccelStepper {
   bool usesAutoEnablePin(uint8_t pin);
   void getCurrentSpeedInTicks(struct actual_ticks_s* speed,
                               bool realtime) const;
+  bool handleExternalDirectionPin(class StepperQueue* q, bool count_up);
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;
@@ -657,6 +717,8 @@ class FastAccelStepper {
   uint16_t _auto_disable_delay_counter;
 
   uint32_t _forward_planning_in_ticks;
+
+  ExtDirPendingState _pendingExternalDirState;
 
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
   pcnt_unit_handle_t _attached_pulse_unit;
