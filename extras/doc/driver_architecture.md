@@ -260,20 +260,21 @@ bool isRunning() {
 | AVR | 16,000,000 | 640 | 40 µs |
 | ESP32 | 16,000,000 | 3200 | 200 µs |
 | SAM Due | 21,000,000 | 4200 | 200 µs |
-| Pico | System clock | 125 | - |
+| Pico | 16,000,000 | 3200 | 200 µs |
 
 ---
 
 ## Preprocessor Defines by Architecture
 
-| Define | AVR | ESP32 MCPWM | ESP32 RMT | SAM | Pico |
-|--------|-----|-------------|-----------|-----|------|
-| `SUPPORT_AVR` | ✓ | | | | |
-| `SUPPORT_ESP32` | | ✓ | ✓ | | |
-| `SUPPORT_ESP32_MCPWM_PCNT` | | ✓ | | | |
-| `SUPPORT_ESP32_RMT` | | | ✓ | | |
-| `SUPPORT_SAM` | | | | ✓ | |
-| `SUPPORT_RP_PICO` | | | | | ✓ |
+| Define | AVR | ESP32 MCPWM | ESP32 RMT | ESP32 I2S | SAM | Pico |
+|--------|-----|-------------|-----------|-----------|-----|------|
+| `SUPPORT_AVR` | ✓ | | | | | |
+| `SUPPORT_ESP32` | | ✓ | ✓ | ✓ | | |
+| `SUPPORT_ESP32_MCPWM_PCNT` | | ✓ | | | | |
+| `SUPPORT_ESP32_RMT` | | | ✓ | | | |
+| `SUPPORT_ESP32_I2S` | | | | ✓ | | |
+| `SUPPORT_SAM` | | | | | ✓ | |
+| `SUPPORT_RP_PICO` | | | | | | ✓ |
 
 ---
 

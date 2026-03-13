@@ -286,11 +286,17 @@ For a running motor with autoEnable set, disableOutputs() will return false
 In auto enable mode, the stepper is enabled before stepping and disabled
 afterwards. The delay from stepper enabled till first step and from
 last step to stepper disabled can be separately adjusted.
-The delay from enable to first step is done in ticks and as such is limited
-to MAX_ON_DELAY_TICKS, which translates approximately to 120ms for
-esp32 and 60ms for avr at 16 MHz). The delay till disable is done in period
-interrupt/task with 4 or 10 ms repetition rate and as such is with several
-ms jitter.
+
+setDelayToEnable() sets the delay from enable to first step.
+Return values:
+  - DelayResultCode::OK:       Delay accepted
+  - DelayResultCode::TOO_LOW:  Delay is 0 (minimum is 1µs)
+  - DelayResultCode::TOO_HIGH: Delay exceeds MAX_ON_DELAY_TICKS
+                               (~120ms ESP32, ~60ms AVR @ 16MHz)
+
+setDelayToDisable() sets the delay from last step to disable.
+This is executed in the periodic stepper task (~4-10ms rate) and thus
+has several ms of jitter.
 ```cpp
   void setAutoEnable(bool auto_enable);
   DelayResultCode setDelayToEnable(uint32_t delay_us);
@@ -638,21 +644,27 @@ The current implementation immediately starts with a step, if there should
 be one. Perhaps performing the step in the middle of the duration is more
 appropriate ?
 
-Meaning of the return values - which are in addtion to AQE from below
-- OK:        Move has been successfully appended to the queue
-- BUSY:      Queue does not have sufficient entries to append this timed
-move.
-- EMPTY:     The queue has run out of commands, but the move has been
-appended.
-- TOO_LARGE: The move request does not fit into the queue.
-             Reasons: The queue depth is (32/16) for SAM+ESP32/AVR.
-                      Each queue entry can emit 255 steps => (8160/4080)
-                      steps If the time between steps is >65535 ticks, then
-                      pauses have to be generated. In this case only (16/8)
-                      steps can be generated...but the queue shall not be
-                      empty
-                      => so even less steps can be done.
-             Recommendation: keep the duration in the range of ms.
+### MoveTimedResultCode - Return codes for moveTimed()
+
+This enum extends AqeResultCode with additional codes:
+
+Positive values (retry later):
+- MOVE_TIMED_BUSY (5):      Queue too full to append this timed move
+- MOVE_TIMED_EMPTY (6):     Queue ran empty, but move was appended
+- (plus AQE_QUEUE_FULL, AQE_DIR_PIN_IS_BUSY,
+AQE_WAIT_FOR_ENABLE_PIN_ACTIVE,
+   AQE_DEVICE_NOT_READY from AqeResultCode)
+
+Zero:
+- MOVE_TIMED_OK (0):        Move successfully appended
+
+Negative values (errors):
+- MOVE_TIMED_TOO_LARGE_ERROR (-4): Move exceeds queue capacity.
+  Queue depth is 32 (ESP32/SAM) or 16 (AVR). Each entry emits max 255
+  steps. For slow speeds (>65535 ticks/step), pauses are needed, reducing
+  capacity. Recommendation: keep duration in the range of milliseconds.
+- (plus AQE_ERROR_TICKS_TOO_LOW, AQE_ERROR_EMPTY_QUEUE_TO_START,
+   AQE_ERROR_NO_DIR_PIN_TO_TOGGLE from AqeResultCode)
 ```cpp
   MoveTimedResultCode moveTimed(int16_t steps, uint32_t duration,
                                 uint32_t* actual_duration, bool start = true);
@@ -673,8 +685,63 @@ to achieve a near synchronous start of several steppers. Consequently it
 should be called with interrupts disabled and return very fast.
 Actually this is necessary, too, in case the queue is full and not
 started.
-Return codes for addQueueEntry
-   positive values mean, that caller should retry later
+### Direction Change Delay Enforcement
+
+If the new command's direction differs from the previous command,
+addQueueEntry() will automatically insert pause commands to ensure
+sufficient delay before the first step in the new direction:
+
+- For external direction pins (pin >= 128): Two pause commands of 500µs
+  each are inserted. This requires two free queue entries; otherwise
+  AQE_QUEUE_FULL is returned.
+
+- For regular direction pins: If setDirectionPin() was called with
+  dir_change_delay_us > 0, a pause command of that duration is inserted
+  before the first step. Pure pause commands (steps=0) do not trigger
+  this delay.
+
+- For autoEnable mode: The enable-on delay is extended to at least
+  dir_change_delay_ticks if a direction change occurs.
+
+### stepper_command_s structure
+
+This structure defines a low-level stepper motor command for
+addQueueEntry():
+
+- `ticks`: Number of ticks between each step. Must be >=
+getMaxSpeedInTicks().
+  There are TICKS_PER_S ticks per second (platform dependent).
+
+- `steps`: Number of steps to send. If 0, this is a pause command lasting
+  for `ticks` ticks.
+
+- `count_up`: Direction. True = direction pin HIGH, False = direction pin
+LOW.
+
+Constraint: `ticks * steps` must be >= MIN_CMD_TICKS.
+
+Example: ticks=TICKS_PER_S/1000, steps=3, count_up=true means:
+1. Direction pin set to HIGH
+2. One step is generated
+3. Exactly 1ms after the first step, the second step
+4. Exactly 1ms after the second step, the third step
+5. The stepper waits for 1ms
+6. The next command is processed
+
+### AqeResultCode - Return codes for addQueueEntry()
+
+Positive values indicate the caller should retry later:
+- AQE_OK (0):              Command added successfully
+- AQE_QUEUE_FULL (1):      Queue is full, retry later
+- AQE_DIR_PIN_IS_BUSY (2): External dir pin change in progress, retry later
+- AQE_WAIT_FOR_ENABLE_PIN_ACTIVE (3): Waiting for enable delay, retry later
+- AQE_DEVICE_NOT_READY (4): Device not ready, retry later
+
+Negative values indicate errors (do not retry):
+- AQE_ERROR_TICKS_TOO_LOW (-1):        ticks < getMaxSpeedInTicks()
+- AQE_ERROR_EMPTY_QUEUE_TO_START (-2): Empty command with start=true, but
+queue empty
+- AQE_ERROR_NO_DIR_PIN_TO_TOGGLE (-3): count_up=false without direction pin
 ```cpp
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd,
                               bool start = true);

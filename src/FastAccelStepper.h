@@ -139,11 +139,17 @@ class FastAccelStepper {
   // In auto enable mode, the stepper is enabled before stepping and disabled
   // afterwards. The delay from stepper enabled till first step and from
   // last step to stepper disabled can be separately adjusted.
-  // The delay from enable to first step is done in ticks and as such is limited
-  // to MAX_ON_DELAY_TICKS, which translates approximately to 120ms for
-  // esp32 and 60ms for avr at 16 MHz). The delay till disable is done in period
-  // interrupt/task with 4 or 10 ms repetition rate and as such is with several
-  // ms jitter.
+  //
+  // setDelayToEnable() sets the delay from enable to first step.
+  // Return values:
+  //   - DelayResultCode::OK:       Delay accepted
+  //   - DelayResultCode::TOO_LOW:  Delay is 0 (minimum is 1µs)
+  //   - DelayResultCode::TOO_HIGH: Delay exceeds MAX_ON_DELAY_TICKS
+  //                                (~120ms ESP32, ~60ms AVR @ 16MHz)
+  //
+  // setDelayToDisable() sets the delay from last step to disable.
+  // This is executed in the periodic stepper task (~4-10ms rate) and thus
+  // has several ms of jitter.
   void setAutoEnable(bool auto_enable);
   DelayResultCode setDelayToEnable(uint32_t delay_us);
   void setDelayToDisable(uint16_t delay_ms);
@@ -464,21 +470,27 @@ class FastAccelStepper {
   // be one. Perhaps performing the step in the middle of the duration is more
   // appropriate ?
   //
-  // Meaning of the return values - which are in addtion to AQE from below
-  // - OK:        Move has been successfully appended to the queue
-  // - BUSY:      Queue does not have sufficient entries to append this timed
-  // move.
-  // - EMPTY:     The queue has run out of commands, but the move has been
-  // appended.
-  // - TOO_LARGE: The move request does not fit into the queue.
-  //              Reasons: The queue depth is (32/16) for SAM+ESP32/AVR.
-  //                       Each queue entry can emit 255 steps => (8160/4080)
-  //                       steps If the time between steps is >65535 ticks, then
-  //                       pauses have to be generated. In this case only (16/8)
-  //                       steps can be generated...but the queue shall not be
-  //                       empty
-  //                       => so even less steps can be done.
-  //              Recommendation: keep the duration in the range of ms.
+  // ### MoveTimedResultCode - Return codes for moveTimed()
+  //
+  // This enum extends AqeResultCode with additional codes:
+  //
+  // Positive values (retry later):
+  // - MOVE_TIMED_BUSY (5):      Queue too full to append this timed move
+  // - MOVE_TIMED_EMPTY (6):     Queue ran empty, but move was appended
+  // - (plus AQE_QUEUE_FULL, AQE_DIR_PIN_IS_BUSY,
+  // AQE_WAIT_FOR_ENABLE_PIN_ACTIVE,
+  //    AQE_DEVICE_NOT_READY from AqeResultCode)
+  //
+  // Zero:
+  // - MOVE_TIMED_OK (0):        Move successfully appended
+  //
+  // Negative values (errors):
+  // - MOVE_TIMED_TOO_LARGE_ERROR (-4): Move exceeds queue capacity.
+  //   Queue depth is 32 (ESP32/SAM) or 16 (AVR). Each entry emits max 255
+  //   steps. For slow speeds (>65535 ticks/step), pauses are needed, reducing
+  //   capacity. Recommendation: keep duration in the range of milliseconds.
+  // - (plus AQE_ERROR_TICKS_TOO_LOW, AQE_ERROR_EMPTY_QUEUE_TO_START,
+  //    AQE_ERROR_NO_DIR_PIN_TO_TOGGLE from AqeResultCode)
   MoveTimedResultCode moveTimed(int16_t steps, uint32_t duration,
                                 uint32_t* actual_duration, bool start = true);
 
