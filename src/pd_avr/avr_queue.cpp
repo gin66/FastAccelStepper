@@ -114,15 +114,15 @@ bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
   if (step_pin == stepPinStepperA) {
-    channel = channelA;
+    channel = channels::channelA;
     AVR_INIT(FAS_TIMER_MODULE, A)
   } else if (step_pin == stepPinStepperB) {
-    channel = channelB;
+    channel = channels::channelB;
     AVR_INIT(FAS_TIMER_MODULE, B)
   }
 #ifdef stepPinStepperC
   else if (step_pin == stepPinStepperC) {
-    channel = channelC;
+    channel = channels::channelC;
     AVR_INIT(FAS_TIMER_MODULE, C)
   }
 #endif
@@ -260,18 +260,18 @@ void StepperQueue::startQueue() {
 
   _isRunning = true;
   switch (channel) {
-    case channelA:
+    case channels::channelA:
       GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
       PREPARE_DIRECTION_PIN(A)
       AVR_START_QUEUE(FAS_TIMER_MODULE, A)
       break;
-    case channelB:
+    case channels::channelB:
       GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
       PREPARE_DIRECTION_PIN(B)
       AVR_START_QUEUE(FAS_TIMER_MODULE, B)
       break;
 #ifdef stepPinStepperC
-    case channelC:
+    case channels::channelC:
       GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
       PREPARE_DIRECTION_PIN(C)
       AVR_START_QUEUE(FAS_TIMER_MODULE, C)
@@ -291,14 +291,14 @@ void StepperQueue::startQueue() {
   }
 void StepperQueue::forceStop() {
   switch (channel) {
-    case channelA:
+    case channels::channelA:
       FORCE_STOP(FAS_TIMER_MODULE, A)
       break;
-    case channelB:
+    case channels::channelB:
       FORCE_STOP(FAS_TIMER_MODULE, B)
       break;
 #ifdef stepPinStepperC
-    case channelC:
+    case channels::channelC:
       FORCE_STOP(FAS_TIMER_MODULE, C)
       break;
 #endif

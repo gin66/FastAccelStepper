@@ -13,7 +13,7 @@
      defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__))
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
-enum channels { channelA, channelB };
+enum class channels : uint8_t { channelA, channelB };
 //==========================================================================
 //
 // AVR derivate ATmega 2560
@@ -23,7 +23,7 @@ enum channels { channelA, channelB };
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
-enum channels { channelA, channelB, channelC };
+enum class channels : uint8_t { channelA, channelB, channelC };
 //==========================================================================
 //
 // AVR derivate ATmega 32U4
@@ -33,7 +33,7 @@ enum channels { channelA, channelB, channelC };
 #define fas_queue_A fas_queue[0]
 #define fas_queue_B fas_queue[1]
 #define fas_queue_C fas_queue[2]
-enum channels { channelA, channelB, channelC };
+enum class channels : uint8_t { channelA, channelB, channelC };
 #endif
 
 class StepperQueue : public StepperQueueBase {
@@ -44,7 +44,7 @@ class StepperQueue : public StepperQueueBase {
   volatile bool _isRunning;
   inline bool isRunning() const { return _isRunning; }
   inline bool isReadyForCommands() const { return true; }
-  enum channels channel;
+  channels channel;
 
   volatile uint8_t* _dirTogglePinPort;
   uint8_t _dirTogglePinMask;
