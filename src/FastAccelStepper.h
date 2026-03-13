@@ -700,6 +700,8 @@ class FastAccelStepper {
   void getCurrentSpeedInTicks(struct actual_ticks_s* speed,
                               bool realtime) const;
   bool handleExternalDirectionPin(class StepperQueue* q, bool count_up);
+  class StepperQueue* _queue() const;
+  bool setEnablePinState(uint8_t pin, uint8_t active_state);
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;

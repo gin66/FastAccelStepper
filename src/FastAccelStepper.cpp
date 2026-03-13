@@ -9,6 +9,10 @@
 
 // Here are the global variables to interface with the interrupts
 
+StepperQueue* FastAccelStepper::_queue() const {
+  return FAS_QUEUE_PTR(_queue_num);
+}
+
 // To realize the 1 Hz debug led
 
 //*************************************************************************************************
@@ -62,7 +66,7 @@ bool FastAccelStepper::handleExternalDirectionPin(StepperQueue* q,
 //*************************************************************************************************
 AqeResultCode FastAccelStepper::addQueueEntry(
     const struct stepper_command_s* cmd, bool start) {
-  StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
+  StepperQueue* q = _queue();
   if (cmd == NULL) {
     return q->addQueueEntry(NULL, start);
   }
@@ -223,7 +227,7 @@ void FastAccelStepper::fill_queue() {
     return;
   }
   // check if addition of commands is suspended (due to forceStopAndNewPosition)
-  StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
+  StepperQueue* q = _queue();
   // if force stop has been called, then ignore_commands is true and ramp
   // stopped. So the ramp generator will not create a new command, unless new
   // move command has been given after forceStop..(). So we just clear the flag
@@ -369,7 +373,7 @@ bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _rg.init();
 
   _queue_num = num;
-  bool success = FAS_QUEUE(_queue_num).init(engine, _queue_num, step_pin);
+  bool success = _queue()->init(engine, _queue_num, step_pin);
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
   _attached_pulse_unit = NULL;
 #endif
@@ -392,7 +396,7 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
       PIN_OUTPUT(dirPin, dirHighCountsUp ? HIGH : LOW);
     }
   }
-  FAS_QUEUE(_queue_num).setDirPin(dirPin, dirHighCountsUp);
+  _queue()->setDirPin(dirPin, dirHighCountsUp);
   if (dir_change_delay_us != 0) {
     if (dir_change_delay_us > MAX_DIR_DELAY_US) {
       dir_change_delay_us = MAX_DIR_DELAY_US;
@@ -467,7 +471,7 @@ void FastAccelStepper::setDelayToDisable(uint16_t delay_ms) {
 MoveResultCode FastAccelStepper::runForward() { return _rg.startRun(true); }
 MoveResultCode FastAccelStepper::runBackward() { return _rg.startRun(false); }
 MoveResultCode FastAccelStepper::moveTo(int32_t position, bool blocking) {
-  MoveResultCode res = _rg.moveTo(position, &FAS_QUEUE(_queue_num).queue_end);
+  MoveResultCode res = _rg.moveTo(position, &_queue()->queue_end);
   if ((res == MOVE_OK) && blocking) {
     while (isRunning()) {
       noop_or_wait;
@@ -516,7 +520,7 @@ MoveResultCode FastAccelStepper::moveByAcceleration(int32_t acceleration,
   return res;
 }
 void FastAccelStepper::forceStop() {
-  StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
+  StepperQueue* q = _queue();
 
   // ensure no more commands are added to the queue
   q->ignore_commands = true;
@@ -525,7 +529,7 @@ void FastAccelStepper::forceStop() {
   _rg.forceStop();
 }
 void FastAccelStepper::forceStopAndNewPosition(int32_t new_pos) {
-  StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
+  StepperQueue* q = _queue();
 
   // ensure no more commands are added to the queue
   q->ignore_commands = true;
@@ -540,68 +544,36 @@ void FastAccelStepper::forceStopAndNewPosition(int32_t new_pos) {
   q->queue_end.pos = new_pos;
   _rg.setTargetPosition(new_pos);
 }
+bool FastAccelStepper::setEnablePinState(uint8_t pin, uint8_t active_state) {
+  if (pin == PIN_UNDEFINED) {
+    return true;
+  }
+  if (pin & PIN_EXTERNAL_FLAG) {
+    if (_engine->_externalCallForPin != NULL) {
+      return _engine->_externalCallForPin(pin, active_state) == active_state;
+    }
+    return true;
+  }
+  SET_ENABLE_PIN_STATE(_queue(), pin, active_state);
+  return true;
+}
 bool FastAccelStepper::disableOutputs() {
   if (isRunning() && _autoEnable) {
     return false;
   }
-#if defined(SET_ENABLE_PIN_STATE_NEED_QUEUE)
-  StepperQueue* queue = FAS_QUEUE_PTR(_queue_num);
-#endif
-  bool disabled = true;
-  if (_enablePinLowActive != PIN_UNDEFINED) {
-    if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
-      if (_engine->_externalCallForPin != NULL) {
-        disabled &=
-            (_engine->_externalCallForPin(_enablePinLowActive, HIGH) == HIGH);
-      }
-    } else {
-      SET_ENABLE_PIN_STATE(queue, _enablePinLowActive, HIGH);
-    }
-  }
-  if (_enablePinHighActive != PIN_UNDEFINED) {
-    if (_enablePinHighActive & PIN_EXTERNAL_FLAG) {
-      if (_engine->_externalCallForPin != NULL) {
-        disabled &=
-            (_engine->_externalCallForPin(_enablePinHighActive, LOW) == LOW);
-      }
-    } else {
-      SET_ENABLE_PIN_STATE(queue, _enablePinHighActive, LOW);
-    }
-  }
+  bool disabled = setEnablePinState(_enablePinLowActive, HIGH) &
+                  setEnablePinState(_enablePinHighActive, LOW);
   if (disabled) {
     _auto_disable_delay_counter = 0;
   }
   return disabled;
 }
 bool FastAccelStepper::enableOutputs() {
-#if defined(SET_ENABLE_PIN_STATE_NEED_QUEUE)
-  StepperQueue* queue = FAS_QUEUE_PTR(_queue_num);
-#endif
-  bool enabled = true;
-  if (_enablePinLowActive != PIN_UNDEFINED) {
-    if (_enablePinLowActive & PIN_EXTERNAL_FLAG) {
-      if (_engine->_externalCallForPin != NULL) {
-        enabled &=
-            (_engine->_externalCallForPin(_enablePinLowActive, LOW) == LOW);
-      }
-    } else {
-      SET_ENABLE_PIN_STATE(queue, _enablePinLowActive, LOW);
-    }
-  }
-  if (_enablePinHighActive != PIN_UNDEFINED) {
-    if (_enablePinHighActive & PIN_EXTERNAL_FLAG) {
-      if (_engine->_externalCallForPin != NULL) {
-        enabled &=
-            (_engine->_externalCallForPin(_enablePinHighActive, HIGH) == HIGH);
-      }
-    } else {
-      SET_ENABLE_PIN_STATE(queue, _enablePinHighActive, HIGH);
-    }
-  }
-  return enabled;
+  return setEnablePinState(_enablePinLowActive, LOW) &
+         setEnablePinState(_enablePinHighActive, HIGH);
 }
 int32_t FastAccelStepper::getPositionAfterCommandsCompleted() const {
-  return FAS_QUEUE(_queue_num).queue_end.pos;
+  return _queue()->queue_end.pos;
 }
 uint32_t FastAccelStepper::getPeriodInTicksAfterCommandsCompleted() const {
   if (_rg.isRampGeneratorActive()) {
@@ -619,7 +591,7 @@ void FastAccelStepper::getCurrentSpeedInTicks(struct actual_ticks_s* speed,
                                               bool realtime) const {
   bool valid;
   if (realtime) {
-    valid = FAS_QUEUE(_queue_num).getActualTicksWithDirection(speed);
+    valid = _queue()->getActualTicksWithDirection(speed);
   } else {
     valid = false;
   }
@@ -653,7 +625,7 @@ int32_t FastAccelStepper::getCurrentSpeedInMilliHz(bool realtime) const {
   return 0;
 }
 uint16_t FastAccelStepper::getMaxSpeedInTicks() const {
-  return FAS_QUEUE(_queue_num).getMaxSpeedInTicks();
+  return _queue()->getMaxSpeedInTicks();
 }
 uint16_t FastAccelStepper::getMaxSpeedInUs() const {
   uint16_t ticks = getMaxSpeedInTicks();
@@ -672,7 +644,7 @@ uint32_t FastAccelStepper::getMaxSpeedInMilliHz() const {
 }
 #if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
 void FastAccelStepper::setAbsoluteSpeedLimit(uint16_t max_speed_in_ticks) {
-  FAS_QUEUE(_queue_num).setAbsoluteSpeedLimit(max_speed_in_ticks);
+  _queue()->setAbsoluteSpeedLimit(max_speed_in_ticks);
 }
 #endif
 int8_t FastAccelStepper::setSpeedInTicks(uint32_t min_step_ticks) {
@@ -709,10 +681,11 @@ int8_t FastAccelStepper::setSpeedInMilliHz(uint32_t speed_mhz) {
 void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   int32_t delta = new_pos - getCurrentPosition();
   if (delta != 0) {
+    StepperQueue* q = _queue();
 #if defined(SUPPORT_RP_PICO)
-    FAS_QUEUE(_queue_num).pos_offset += delta;
+    q->pos_offset += delta;
 #endif
-    struct queue_end_s* queue_end = &FAS_QUEUE(_queue_num).queue_end;
+    struct queue_end_s* queue_end = &q->queue_end;
     fasDisableInterrupts();
     queue_end->pos = queue_end->pos + delta;
     _rg.advanceTargetPosition(delta);
@@ -720,44 +693,45 @@ void FastAccelStepper::setCurrentPosition(int32_t new_pos) {
   }
 }
 void FastAccelStepper::setPositionAfterCommandsCompleted(int32_t new_pos) {
-  struct queue_end_s* queue_end = &FAS_QUEUE(_queue_num).queue_end;
+  StepperQueue* q = _queue();
+  struct queue_end_s* queue_end = &q->queue_end;
   fasDisableInterrupts();
-  int32_t delta = new_pos - FAS_QUEUE(_queue_num).queue_end.pos;
+  int32_t delta = new_pos - q->queue_end.pos;
   queue_end->pos = new_pos;
   if (delta != 0) {
 #if defined(SUPPORT_RP_PICO)
-    FAS_QUEUE(_queue_num).pos_offset += delta;
+    q->pos_offset += delta;
 #endif
     _rg.advanceTargetPosition(delta);
   }
   fasEnableInterrupts();
 }
 uint8_t FastAccelStepper::queueEntries() const {
-  return FAS_QUEUE(_queue_num).queueEntries();
+  return _queue()->queueEntries();
 }
 uint32_t FastAccelStepper::ticksInQueue() const {
-  return FAS_QUEUE(_queue_num).ticksInQueue();
+  return _queue()->ticksInQueue();
 }
 bool FastAccelStepper::hasTicksInQueue(uint32_t min_ticks) const {
-  return FAS_QUEUE(_queue_num).hasTicksInQueue(min_ticks);
+  return _queue()->hasTicksInQueue(min_ticks);
 }
 bool FastAccelStepper::isQueueFull() const {
-  return FAS_QUEUE(_queue_num).isQueueFull();
+  return _queue()->isQueueFull();
 }
 bool FastAccelStepper::isQueueEmpty() const {
-  return FAS_QUEUE(_queue_num).isQueueEmpty();
+  return _queue()->isQueueEmpty();
 }
 bool FastAccelStepper::isQueueRunning() const {
-  return FAS_QUEUE(_queue_num).isRunning();
+  return _queue()->isRunning();
 }
 bool FastAccelStepper::isRunning() const {
-  StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
+  StepperQueue* q = _queue();
   return q->isRunning() || _rg.isRampGeneratorActive() || !isQueueEmpty();
 }
 void FastAccelStepper::performOneStep(bool count_up, bool blocking) {
   if (!isRunning()) {
     if (count_up || (_dirPin != PIN_UNDEFINED)) {
-      StepperQueue* q = FAS_QUEUE_PTR(_queue_num);
+      StepperQueue* q = _queue();
       q->ignore_commands = false;
       struct stepper_command_s cmd = {
           .ticks = MIN_CMD_TICKS, .steps = 1, .count_up = count_up};
@@ -776,7 +750,7 @@ void FastAccelStepper::backwardStep(bool blocking) {
   performOneStep(false, blocking);
 }
 int32_t FastAccelStepper::getCurrentPosition() const {
-  return FAS_QUEUE(_queue_num).getCurrentPosition();
+  return _queue()->getCurrentPosition();
 }
 MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
                                                 uint32_t duration,
@@ -931,5 +905,5 @@ MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
   }
   return ret_ok;
 }
-void FastAccelStepper::detachFromPin() { FAS_QUEUE(_queue_num).disconnect(); }
-void FastAccelStepper::reAttachToPin() { FAS_QUEUE(_queue_num).connect(); }
+void FastAccelStepper::detachFromPin() { _queue()->disconnect(); }
+void FastAccelStepper::reAttachToPin() { _queue()->connect(); }

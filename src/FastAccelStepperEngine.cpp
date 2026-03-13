@@ -155,7 +155,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     const FastAccelStepper* sx = _stepper[i];
     if (sx) {
-      FAS_QUEUE(sx->_queue_num).adjustSpeedToStepperCount(_stepper_cnt);
+      sx->_queue()->adjustSpeedToStepperCount(_stepper_cnt);
     }
   }
 #endif
