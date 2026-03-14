@@ -1,4 +1,4 @@
-pre-1.1.0:
+1.1.0:
 - Refactor external direction pin handling:
   - Remove `repeat_entry` mechanism from queue (queue no longer knows about external pins)
   - Remove `externalDirPinChangeCompletedIfNeeded()` function
