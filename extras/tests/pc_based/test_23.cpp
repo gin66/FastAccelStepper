@@ -181,7 +181,8 @@ static void test_dir_change_delay_not_on_pause_command() {
       .ticks = 10000, .steps = 0, .count_up = true};
   AqeResultCode res = s.addQueueEntry(&pause_cmd, true);
 
-  printf("  Pause command result: %d (expected %d)\n", res, AQE_OK);
+  printf("  Pause command result: %s (expected %s)\n", toString(res),
+         toString(AQE_OK));
 
   test_result("dir_change_delay not on pause", res == AQE_OK);
 }
@@ -229,7 +230,7 @@ static void test_no_delay_if_prior_pause_sufficient() {
       .steps = 0,
       .count_up = true};
   AqeResultCode res = s.addQueueEntry(&pause_cmd, true);
-  printf("  Pause command result: %d\n", res);
+  printf("  Pause command result: %s\n", toString(res));
 
   uint8_t entries_after_pause =
       fas_queue[0].next_write_idx - fas_queue[0].read_idx;
@@ -268,7 +269,7 @@ static void test_no_delay_if_prior_step_sufficient() {
       .steps = 1,
       .count_up = true};
   AqeResultCode res = s.addQueueEntry(&step_cmd, true);
-  printf("  Step command result: %d\n", res);
+  printf("  Step command result: %s\n", toString(res));
 
   uint8_t entries_after_step =
       fas_queue[0].next_write_idx - fas_queue[0].read_idx;
@@ -307,7 +308,7 @@ static void test_external_dir_pin_with_empty_queue() {
       .ticks = 16000, .steps = 10, .count_up = true};
   AqeResultCode res = s->addQueueEntry(&cmd, true);
 
-  printf("  Result: %d (expected %d)\n", res, AQE_OK);
+  printf("  Result: %s (expected %s)\n", toString(res), toString(AQE_OK));
   printf("  Queue entries: %d\n",
          fas_queue[0].next_write_idx - fas_queue[0].read_idx);
 
@@ -343,12 +344,12 @@ static void test_external_dir_pin_with_steps_in_queue() {
       .ticks = 16000, .steps = 10, .count_up = false};
   AqeResultCode res = s->addQueueEntry(&cmd, true);
 
-  printf("  Result: %d (expected %d = AQE_DIR_PIN_2MS_PAUSE_ADDED)\n", res,
-         AQE_DIR_PIN_2MS_PAUSE_ADDED);
+  printf("  Result: %s (expected %s = AQE_DIR_PIN_2MS_PAUSE_ADDED)\n",
+         toString(res), toString(AQE_DIR_PIN_2MS_PAUSE_ADDED));
 
   if (res != AQE_DIR_PIN_2MS_PAUSE_ADDED) {
-    printf("  BUG DETECTED: Current impl returns %d, should return %d\n", res,
-           AQE_DIR_PIN_2MS_PAUSE_ADDED);
+    printf("  BUG DETECTED: Current impl returns %s, should return %s\n",
+           toString(res), toString(AQE_DIR_PIN_2MS_PAUSE_ADDED));
     printf("  Two 500us pauses = 1ms is insufficient for %.2fms queue\n",
            ticks_in_queue * 1000.0 / TICKS_PER_S);
   }
@@ -407,7 +408,7 @@ static void test_external_dir_pin_queue_drain_and_retry() {
     }
   }
 
-  printf("  Final result after %d retries: %d\n", retry_count, res);
+  printf("  Final result after %d retries: %s\n", retry_count, toString(res));
 
   test_result("External dir pin queue drain retry",
               retry_count > 0 && res == AQE_OK);
@@ -541,7 +542,7 @@ static void test_realistic_direction_change_scenario() {
       .ticks = 16000, .steps = 10, .count_up = false};
   AqeResultCode res = s->addQueueEntry(&rev_cmd, true);
 
-  printf("  addQueueEntry result: %d\n", res);
+  printf("  addQueueEntry result: %s\n", toString(res));
 
   bool correct = (ticks_before > TASK_CYCLE_TICKS)
                      ? (res == AQE_DIR_PIN_2MS_PAUSE_ADDED)
