@@ -12,6 +12,30 @@ test: $(TESTS) log2_test rmc_test
 	rm -f test.log
 	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed" && rm test.log
 
+COV_DIR=coverage_report
+COV_FLAGS=-fprofile-instr-generate -fcoverage-mapping
+PROFDATA=coverage.profdata
+COV_IGNORE=-ignore-filename-regex='(pd_test|StepperISR_test|test_[0-9]|log2_test|rmc_test|ramp_helper|RampChecker|i2s_constants|Log2RepresentationConst|common\.h|test_pc\.h|queue\.h)'
+COV_BINS=$(word 1,$(TESTS)) $(addprefix -object ,$(wordlist 2,99,$(TESTS))) -object log2_test -object rmc_test
+
+coverage:
+	$(MAKE) clean_coverage
+	LLVM_PROFILE_FILE="%p-%m.profraw" $(MAKE) CFLAGS="$(CFLAGS) $(COV_FLAGS)" CXXFLAGS="$(CXXFLAGS) $(COV_FLAGS)" LDLIBS="$(LDLIBS) $(COV_FLAGS)" test
+	xcrun llvm-profdata merge -sparse *.profraw -o $(PROFDATA)
+	xcrun llvm-cov show $(COV_BINS) \
+	     -instr-profile=$(PROFDATA) \
+	     -format=html -output-dir=$(COV_DIR) \
+	     -show-branches=count -show-branch-summary $(COV_IGNORE)
+	xcrun llvm-cov report $(COV_BINS) \
+	     -instr-profile=$(PROFDATA) \
+	     -show-branch-summary $(COV_IGNORE)
+	@echo ""
+	@echo "Branch coverage report: $(COV_DIR)/index.html"
+
+clean_coverage:
+	rm -f *.profraw *.profdata
+	rm -rf $(COV_DIR)
+
 ramp_helper: ramp_helper.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
 
@@ -85,5 +109,5 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 
 VERSION=$(shell git rev-parse --short HEAD)
 
-clean:
+clean: clean_coverage
 	rm -f *.o test_[0-9][0-9] *.gnuplot log2_test rmc_test test.log
