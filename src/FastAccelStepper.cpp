@@ -715,15 +715,9 @@ uint32_t FastAccelStepper::ticksInQueue() const {
 bool FastAccelStepper::hasTicksInQueue(uint32_t min_ticks) const {
   return _queue()->hasTicksInQueue(min_ticks);
 }
-bool FastAccelStepper::isQueueFull() const {
-  return _queue()->isQueueFull();
-}
-bool FastAccelStepper::isQueueEmpty() const {
-  return _queue()->isQueueEmpty();
-}
-bool FastAccelStepper::isQueueRunning() const {
-  return _queue()->isRunning();
-}
+bool FastAccelStepper::isQueueFull() const { return _queue()->isQueueFull(); }
+bool FastAccelStepper::isQueueEmpty() const { return _queue()->isQueueEmpty(); }
+bool FastAccelStepper::isQueueRunning() const { return _queue()->isRunning(); }
 bool FastAccelStepper::isRunning() const {
   StepperQueue* q = _queue();
   return q->isRunning() || _rg.isRampGeneratorActive() || !isQueueEmpty();

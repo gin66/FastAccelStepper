@@ -44,9 +44,9 @@
 #define I2S_DMA_FRAME_NUM I2S_FRAMES_PER_BLOCK
 
 // Convert I2S mux slot (0-31) to 32-bit bit position.
-// Matches byte/bit access: slot S → byte S/8, bit (7 - S%8)
-// slot 0 -> bit 7, slot 7 -> bit 0, slot 8 -> bit 15, slot 15 -> bit 8
-static inline uint8_t i2s_mux_slot_to_bit_pos(uint8_t slot) { return slot ^ 7; }
+// Direct mapping: slot S → byte S/8, bit S%8
+// slot 0 -> bit 0, slot 7 -> bit 7, slot 8 -> bit 8, slot 15 -> bit 15
+static inline uint8_t i2s_mux_slot_to_bit_pos(uint8_t slot) { return slot; }
 
 static inline uint8_t i2s_mux_byte_offset(uint8_t slot) {
   return i2s_mux_slot_to_bit_pos(slot) >> 3;

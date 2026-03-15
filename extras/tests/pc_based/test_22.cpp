@@ -53,8 +53,8 @@ static uint32_t countPulsesInSlot(const uint8_t* buf, uint8_t byte_offset,
   return count;
 }
 
-static uint8_t getByteOffset(uint8_t slot) { return slot / 8; }
-static uint8_t getBitMask(uint8_t slot) { return 1 << (7 - (slot % 8)); }
+static uint8_t getByteOffset(uint8_t slot) { return i2s_mux_byte_offset(slot); }
+static uint8_t getBitMask(uint8_t slot) { return i2s_mux_bit_mask(slot); }
 
 static void setupMuxQueue(StepperQueue* q, uint8_t slot) {
   q->read_idx = 0;

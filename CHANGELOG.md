@@ -1,3 +1,6 @@
+1.2.0:
+- esp32: Fix I2S MUX slot-to-bit mapping to use direct (non-mirrored) assignment (#338)
+
 1.1.0:
 - Refactor external direction pin handling:
   - Remove `repeat_entry` mechanism from queue (queue no longer knows about external pins)
