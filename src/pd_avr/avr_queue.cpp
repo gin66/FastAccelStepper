@@ -105,8 +105,7 @@ static FastAccelStepperEngine* fas_engine = NULL;
     /* ensure cyclic interrupt is running */       \
     EnableOverflowInterrupt(T);                    \
   }
-bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
-                        uint8_t step_pin) {
+bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   prepareISRtimeMeasurement();
   _initVars();
   digitalWrite(step_pin, LOW);
@@ -342,7 +341,9 @@ void StepperQueue::adjustSpeedToStepperCount(uint8_t steppers) {
 
 static uint8_t stepper_allocated_mask = 0;
 
-StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
+                                             uint8_t step_pin) {
+  (void)engine;
   int8_t idx = queueNumForStepPin(step_pin);
   if (idx < 0) {
     return nullptr;
@@ -352,7 +353,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
     return nullptr;
   }
 
-  if (!fas_queue[idx].init(nullptr, idx, step_pin)) {
+  if (!fas_queue[idx].init(idx, step_pin)) {
     return nullptr;
   }
 

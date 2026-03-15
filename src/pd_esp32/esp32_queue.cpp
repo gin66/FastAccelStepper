@@ -27,8 +27,7 @@ uint8_t StepperQueue::queues_allocated = 0;
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 #endif
 
-bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
-                        uint8_t step_pin) {
+bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   uint8_t channel = queue_num;
   max_speed_in_ticks = 80;
 #ifdef DEBUG
@@ -184,8 +183,10 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_DYNAMIC_ALLOCATION)
 // dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
-StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
+StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
+                                             FasDriver driver,
                                              uint8_t step_pin) {
+  (void)engine;
   if (StepperQueue::queues_allocated >= MAX_STEPPER) {
     return nullptr;
   }
@@ -249,16 +250,18 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
   if (driver != DRIVER_DONT_CARE) {
     return nullptr;
   }
-  StepperQueue* q = tryAllocateQueue(DRIVER_RMT, step_pin);
+  StepperQueue* q = tryAllocateQueue(engine, DRIVER_RMT, step_pin);
   if (q == nullptr) {
-    q = tryAllocateQueue(DRIVER_I2S_DIRECT, step_pin);
+    q = tryAllocateQueue(engine, DRIVER_I2S_DIRECT, step_pin);
   }
   return q;
 }
 #endif  // SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
 
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_DYNAMIC_ALLOCATION)
-StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
+                                             uint8_t step_pin) {
+  (void)engine;
   if (StepperQueue::queues_allocated >= MAX_STEPPER) {
     return nullptr;
   }
@@ -281,7 +284,9 @@ StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
 #endif  // !SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
 
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE) && !defined(SUPPORT_DYNAMIC_ALLOCATION)
-StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
+                                             uint8_t step_pin) {
+  (void)engine;
   if (step_pin & PIN_EXTERNAL_FLAG) {
     return nullptr;
   }
@@ -324,8 +329,10 @@ static uint8_t rmt_allocated = 0;
 static uint8_t i2s_allocated = 0;
 #endif
 
-StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
+StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
+                                             FasDriver driver,
                                              uint8_t step_pin) {
+  (void)engine;
   if (step_pin & PIN_EXTERNAL_FLAG) {
     return nullptr;
   }
@@ -380,15 +387,15 @@ StepperQueue* StepperQueue::tryAllocateQueue(FasDriver driver,
   if (driver == FasDriver::DONT_CARE) {
     StepperQueue* q = nullptr;
 #if defined(SUPPORT_ESP32_MCPWM_PCNT) && (QUEUES_MCPWM_PCNT > 0)
-    q = tryAllocateQueue(FasDriver::MCPWM_PCNT, step_pin);
+    q = tryAllocateQueue(engine, FasDriver::MCPWM_PCNT, step_pin);
     if (q != nullptr) return q;
 #endif
 #if defined(SUPPORT_ESP32_RMT) && (QUEUES_RMT > 0)
-    q = tryAllocateQueue(FasDriver::RMT, step_pin);
+    q = tryAllocateQueue(engine, FasDriver::RMT, step_pin);
     if (q != nullptr) return q;
 #endif
 #if defined(SUPPORT_ESP32_I2S) && (QUEUES_I2S > 0)
-    q = tryAllocateQueue(FasDriver::I2S_DIRECT, step_pin);
+    q = tryAllocateQueue(engine, FasDriver::I2S_DIRECT, step_pin);
     if (q != nullptr) return q;
 #endif
   }

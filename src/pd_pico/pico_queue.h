@@ -17,9 +17,17 @@ class StepperQueue : public StepperQueueBase {
 
   inline void _pd_initVars() { adjust_80MHz = 0; }
 
+  struct PioResources {
+    PIO pio;
+    uint sm;
+  };
+  static bool claim_pio_resources(FastAccelStepperEngine* engine,
+                                  uint8_t step_pin, PioResources* out);
+  static uint8_t s_claimed_pios;
+  static PIO s_pio[NUM_PIOS];
+
   bool isRunning() const;
   bool isReadyForCommands() const;
-  bool claim_pio_sm(FastAccelStepperEngine* engine);
   void setupSM();
   int32_t getCurrentStepCount() const;
   void attachDirPinToStatemachine();

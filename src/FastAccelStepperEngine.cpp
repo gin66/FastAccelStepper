@@ -39,9 +39,6 @@ void FastAccelStepperEngine::init() {
   }
 #endif
 
-#if defined(SUPPORT_RP_PICO)
-  claimed_pios = 0;
-#endif
   fas_init_engine(this);
 }
 #endif
@@ -104,11 +101,11 @@ bool FastAccelStepperEngine::i2sMuxGetBit(uint8_t slot) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, FasDriver driver_type) {
-  StepperQueue* q = StepperQueue::tryAllocateQueue(driver_type, step_pin);
+  StepperQueue* q = StepperQueue::tryAllocateQueue(this, driver_type, step_pin);
 #else
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
-  StepperQueue* q = StepperQueue::tryAllocateQueue(step_pin);
+  StepperQueue* q = StepperQueue::tryAllocateQueue(this, step_pin);
 #endif
   if (q == nullptr) {
     return nullptr;
@@ -131,11 +128,11 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin, FasDriver driver_type) {
-  StepperQueue* q = StepperQueue::tryAllocateQueue(driver_type, step_pin);
+  StepperQueue* q = StepperQueue::tryAllocateQueue(this, driver_type, step_pin);
 #else
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
-  StepperQueue* q = StepperQueue::tryAllocateQueue(step_pin);
+  StepperQueue* q = StepperQueue::tryAllocateQueue(this, step_pin);
 #endif
   if (q == nullptr) {
     return nullptr;

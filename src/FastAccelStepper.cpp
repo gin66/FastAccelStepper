@@ -373,14 +373,14 @@ bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _rg.init();
 
   _queue_num = num;
-  bool success = _queue()->init(engine, _queue_num, step_pin);
+  _queue()->init(_queue_num, step_pin);
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
   _attached_pulse_unit = NULL;
 #endif
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
   _attached_pulse_cnt_unit = -1;
 #endif
-  return success;
+  return true;
 }
 uint8_t FastAccelStepper::getStepPin() const { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,

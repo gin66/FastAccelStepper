@@ -237,8 +237,7 @@ inline uint32_t pinToChannel(uint32_t pin) {
   return 0xFFFFFFFF;
 }
 
-bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
-                        uint8_t step_pin) {
+bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _queue_num = queue_num;
   driver_data = (void*)&gChannelMap[queue_num];
   _initVars();
@@ -397,7 +396,9 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 
 static uint8_t stepper_allocated_count = 0;
 
-StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
+                                             uint8_t step_pin) {
+  (void)engine;
   if (!isValidStepPin(step_pin)) {
     return nullptr;
   }
@@ -408,7 +409,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
 
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
-      if (!fas_queue[i].init(nullptr, i, step_pin)) {
+      if (!fas_queue[i].init(i, step_pin)) {
         return nullptr;
       }
       stepper_allocated_count++;

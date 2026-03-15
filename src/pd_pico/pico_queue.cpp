@@ -23,20 +23,15 @@ static const irq_handler_t pio_fifo_irq_handlers[] = {
 #endif
 };
 
-bool StepperQueue::init(FastAccelStepperEngine* engine, uint8_t queue_num,
-                        uint8_t step_pin) {
+bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   (void)queue_num;
   _step_pin = step_pin;
   _isActive = false;
   dirPin = PIN_UNDEFINED;
   pos_offset = 0;
   max_speed_in_ticks = 80;
-  bool ok = claim_pio_sm(engine);
-  if (ok) {
-    setupSM();
-    connect();
-  }
-  return ok;
+  _initVars();
+  return true;
 }
 
 void StepperQueue::attachDirPinToStatemachine() {
@@ -53,12 +48,17 @@ void StepperQueue::setDirPinState(bool high) {
   }
 }
 
-bool StepperQueue::claim_pio_sm(FastAccelStepperEngine* engine) {
-  for (uint8_t i = 0; i < engine->claimed_pios; i++) {
-    int claimed_sm = pio_claim_unused_sm(engine->pio[i], false);
+uint8_t StepperQueue::s_claimed_pios = 0;
+PIO StepperQueue::s_pio[NUM_PIOS];
+
+bool StepperQueue::claim_pio_resources(FastAccelStepperEngine* engine,
+                                       uint8_t step_pin, PioResources* out) {
+  (void)engine;
+  for (uint8_t i = 0; i < s_claimed_pios; i++) {
+    int claimed_sm = pio_claim_unused_sm(s_pio[i], false);
     if (claimed_sm >= 0) {
-      pio = engine->pio[i];
-      sm = claimed_sm;
+      out->pio = s_pio[i];
+      out->sm = claimed_sm;
       return true;
     }
   }
@@ -71,23 +71,23 @@ bool StepperQueue::claim_pio_sm(FastAccelStepperEngine* engine) {
   pio_program.used_gpio_ranges = 0;
 #endif
   uint offset;
-  uint8_t pio_index = engine->claimed_pios;
+  uint8_t pio_index = s_claimed_pios;
   if (pio_index == NUM_PIOS) {
     return false;
   }
   bool rc = pio_claim_free_sm_and_add_program_for_gpio_range(
-      &pio_program, &pio, &sm, &offset, _step_pin, 1, true);
+      &pio_program, &out->pio, &out->sm, &offset, step_pin, 1, true);
   if (!rc) {
     rc = pio_claim_free_sm_and_add_program_for_gpio_range(
-        &pio_program, &pio, &sm, &offset, _step_pin, 1, true);
+        &pio_program, &out->pio, &out->sm, &offset, step_pin, 1, true);
   }
   if (rc) {
-    engine->pio[pio_index] = pio;
-    engine->claimed_pios = pio_index + 1;
-    uint pio_idx = pio_get_index(pio);
-    irq_set_exclusive_handler(PIO_IRQ_NUM(pio, 0),
+    s_pio[pio_index] = out->pio;
+    s_claimed_pios = pio_index + 1;
+    uint pio_idx = pio_get_index(out->pio);
+    irq_set_exclusive_handler(PIO_IRQ_NUM(out->pio, 0),
                               pio_fifo_irq_handlers[pio_idx]);
-    irq_set_enabled(PIO_IRQ_NUM(pio, 0), true);
+    irq_set_enabled(PIO_IRQ_NUM(out->pio, 0), true);
   }
   return rc;
 }
@@ -214,7 +214,8 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) { return (step_pin < 32); }
 
 static uint8_t stepper_allocated_count = 0;
 
-StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
+StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
+                                             uint8_t step_pin) {
   if (!isValidStepPin(step_pin)) {
     return nullptr;
   }
@@ -223,11 +224,18 @@ StepperQueue* StepperQueue::tryAllocateQueue(uint8_t step_pin) {
     return nullptr;
   }
 
+  PioResources res;
+  if (!claim_pio_resources(engine, step_pin, &res)) {
+    return nullptr;
+  }
+
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
-      if (!fas_queue[i].init(nullptr, i, step_pin)) {
-        return nullptr;
-      }
+      fas_queue[i].pio = res.pio;
+      fas_queue[i].sm = res.sm;
+      fas_queue[i].init(i, step_pin);
+      fas_queue[i].setupSM();
+      fas_queue[i].connect();
       stepper_allocated_count++;
       return &fas_queue[i];
     }
@@ -285,6 +293,7 @@ void fas_init_engine(FastAccelStepperEngine* engine) {
     fas_queue[i]._step_pin = PIN_UNDEFINED;
     fas_queue[i]._isActive = true;
   }
+  StepperQueue::s_claimed_pios = 0;
 #define STACK_SIZE 3000
 #define PRIORITY (configMAX_PRIORITIES - 1)
   engine->_delay_ms = DELAY_MS_BASE;

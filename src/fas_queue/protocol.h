@@ -20,9 +20,11 @@
 // - For static allocation: returns pointer to pre-allocated queue slot
 // - For SUPPORT_SELECT_DRIVER_TYPE (ESP32): allows choosing driver type
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-static StepperQueue* tryAllocateQueue(FasDriver driver, uint8_t step_pin);
+static StepperQueue* tryAllocateQueue(FastAccelStepperEngine* engine,
+                                      FasDriver driver, uint8_t step_pin);
 #else
-static StepperQueue* tryAllocateQueue(uint8_t step_pin);
+static StepperQueue* tryAllocateQueue(FastAccelStepperEngine* engine,
+                                      uint8_t step_pin);
 #endif
 
 //==========================================================================
@@ -35,7 +37,7 @@ uint32_t ticksInQueue() const;
 bool hasTicksInQueue(uint32_t min_ticks) const;
 bool getActualTicksWithDirection(struct actual_ticks_s* speed) const;
 
-bool init(FastAccelStepperEngine* engine, uint8_t queue_num, uint8_t step_pin);
+bool init(uint8_t queue_num, uint8_t step_pin);
 void startQueue();
 void forceStop();
 void _initVars();
