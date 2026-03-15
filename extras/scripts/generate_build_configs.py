@@ -203,7 +203,7 @@ def generate_workflow_yml(workflow_name: str, workflow_config: dict[str, Any]) -
             "",
             "    steps:",
             "    - name: Checkout",
-            "      uses: actions/checkout@v4",
+            "      uses: actions/checkout@v5",
             "    - name: Make directories",
             "      run: bash extras/scripts/build-pio-dirs.sh",
             "    - name: Build on PlatformIO",
