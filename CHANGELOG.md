@@ -1,3 +1,6 @@
+1.2.1:
+- pico: Fix crash in stepperConnectToPin() due to null pointer dereference in PIO resource claiming (#350)
+
 1.2.0:
 - esp32: Fix I2S MUX slot-to-bit mapping to use direct (non-mirrored) assignment (#338)
 

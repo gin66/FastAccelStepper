@@ -371,7 +371,7 @@ class StepperQueue : public StepperQueueBase {
   bool hasTicksInQueue(uint32_t min_ticks);
   bool getActualTicksWithDirection(struct actual_ticks_s* speed);
 
-  bool init(FastAccelStepperEngine* engine, uint8_t queue_num, uint8_t step_pin);
+  bool init(uint8_t queue_num, uint8_t step_pin);
   void startQueue();
   void forceStop();
   void _initVars();
