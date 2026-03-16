@@ -1,3 +1,6 @@
+1.2.2:
+- samx3-due: Fix null result from `tryAllocateQueue()` (#351)
+
 1.2.1:
 - pico: Fix crash in stepperConnectToPin() due to null pointer dereference in PIO resource claiming (#350)
 

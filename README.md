@@ -651,6 +651,7 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks HalfVoxel for pull requests (https://github.com/gin66/FastAccelStepper/pull/270) and (https://github.com/gin66/FastAccelStepper/pull/271): improved doc and missing parenthesis in preprocessor macros
 - Thanks pvginkel for pull request (https://github.com/gin66/FastAccelStepper/pull/300): fix race condition in engine init
 - Thanks freelancer1845 for instructions to resolve stray link to arduino-esp32 for espidf only projects (https://github.com/gin66/FastAccelStepper/discussions/217). 
-- Thanks viteo for pull request (https://github.com/gin66/FastAccelStepper/pull/319): add dir pin input to attachToPulseCounter()
+- Thanks viteo for pull request (https://github.com/gin66/FastAccelStepper/pull/319): add dir pin input to `attachToPulseCounter()`
 - Thanks Magnus for pico sdk support and code improvement hints (#334)
+- Thanks Sam W for pull request (https://github.com/gin66/FastAccelStepper/pull/351) samx3-due: Fix null result from `tryAllocateQueue()`
 
