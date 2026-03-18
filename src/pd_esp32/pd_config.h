@@ -95,9 +95,13 @@
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 enum class FasDriver : uint8_t {
+#if (defined(QUEUES_MCPWM_PCNT) && (QUEUES_MCPWM_PCNT > 0))
   MCPWM_PCNT = 0,
+#endif
+#if (defined(QUEUES_RMT) && (QUEUES_RMT > 0))
   RMT = 1,
-#if defined(SUPPORT_ESP32_I2S)
+#endif
+#if defined(SUPPORT_ESP32_I2S) && (defined(QUEUES_I2S) && (QUEUES_I2S > 0))
   I2S_DIRECT = 2,
   I2S_MUX = 3,
 #endif
