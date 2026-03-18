@@ -1,3 +1,6 @@
+1.2.3:
+- esp32: Fix null result from `stepperConnectToPin()` due to `_step_pin` not initialized to `PIN_UNDEFINED` (#352)
+
 1.2.2:
 - samx3-due: Fix null result from `tryAllocateQueue()` (#351)
 
