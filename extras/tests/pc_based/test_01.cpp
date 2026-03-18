@@ -28,6 +28,7 @@ void basic_test() {
   puts("basic_test...");
   init_queue();
   FastAccelStepper s = FastAccelStepper();
+  s.init(NULL, 0, 0);
   assert(0 == s.getCurrentPosition());
   assert(s.isQueueEmpty());
   assert(s.isQueueEmpty());

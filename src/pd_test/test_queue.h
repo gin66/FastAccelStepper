@@ -19,6 +19,9 @@ class StepperQueue : public StepperQueueBase {
     _isRunning = false;
     _before_dir_change_delay_ticks = 0;
     _after_dir_change_delay_ticks = 0;
+
+    // actually does not belong here
+    max_speed_in_ticks = TICKS_PER_S / 50000;
   }
 
   inline bool isReadyForCommands() const { return true; }

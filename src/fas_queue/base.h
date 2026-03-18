@@ -43,11 +43,7 @@ class StepperQueueBase {
 
   struct queue_end_s queue_end;
 
-#ifdef TEST
-  uint16_t max_speed_in_ticks = TICKS_PER_S / 50000;  // default: 50_000 steps/s
-#else
   uint16_t max_speed_in_ticks = TICKS_PER_S / 1000;  // default: 1_000 steps/s
-#endif
   uint16_t _last_command_ticks;
 
   inline uint8_t queueEntries() const {
