@@ -27,21 +27,9 @@ class StepperQueue : public StepperQueueBase {
   static uint32_t _i2s_mux_allocated_bitmask;
   static I2sManager* _i2s_mux_manager;
 #endif
-  static void initVars() {
-    StepperQueue::queues_allocated = 0;
-#ifdef SUPPORT_ESP32_RMT
-    StepperQueue::_rmt_allocated = 0;
-#endif
-#if defined(SUPPORT_ESP32_I2S)
-    StepperQueue::_i2s_mux_initialized = false;
-    StepperQueue::_i2s_mux_allocated_bitmask = 0;
-    StepperQueue::_i2s_mux_manager = nullptr;
-#endif
-  }
 #endif
 #elif defined(SUPPORT_DYNAMIC_ALLOCATION)
   static uint8_t queues_allocated;
-  static void initVars() { StepperQueue::queues_allocated = 0; }
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 
   volatile bool _isRunning;
