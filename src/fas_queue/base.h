@@ -32,19 +32,34 @@ struct queue_entry {
 // StepperISR.cpp and declared here so the compiler sees them on all arches.
 class StepperQueueBase {
  public:
+  // initialization of this array is not necessary
+  // volatile is not needed, too.
   struct queue_entry entry[QUEUE_LEN];
+  // not sure, if volatile is needed for these two indices. Leave it for now
+  volatile uint8_t read_idx;  // ISR stops if read_idx == next_write_idx
+  volatile uint8_t next_write_idx;
+  struct queue_end_s queue_end;
 
   // Commands are suspended during forceStopAndNewPosition()
   volatile bool ignore_commands;
-  volatile uint8_t read_idx;  // ISR stops if read_idx == next_write_idx
-  volatile uint8_t next_write_idx;
   bool dirHighCountsUp;
   uint8_t dirPin;
-
-  struct queue_end_s queue_end;
-
-  uint16_t max_speed_in_ticks = TICKS_PER_S / 1000;  // default: 1_000 steps/s
+  uint16_t max_speed_in_ticks;
   uint16_t _last_command_ticks;
+
+  void _base_initVars() {
+    read_idx = 0;
+    next_write_idx = 0;
+    queue_end.dir = true;
+    queue_end.count_up = true;
+    queue_end.pos = 0;
+    ignore_commands = false;
+    dirHighCountsUp = true;
+    dirPin = PIN_UNDEFINED;
+    // intentionally slow speed to make missing initialization detectable
+    max_speed_in_ticks = TICKS_PER_S / 1000;  // default: 1_000 steps/s
+    _last_command_ticks = 65535;
+  }
 
   inline uint8_t queueEntries() const {
     fasDisableInterrupts();
@@ -69,24 +84,11 @@ class StepperQueueBase {
     }
     return false;
   }
-
   inline uint16_t getMaxSpeedInTicks() const { return max_speed_in_ticks; }
 
 #if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
   void setAbsoluteSpeedLimit(uint16_t ticks) { max_speed_in_ticks = ticks; }
 #endif
-
-  void _base_initVars() {
-    dirPin = PIN_UNDEFINED;
-    ignore_commands = false;
-    read_idx = 0;
-    next_write_idx = 0;
-    queue_end.dir = true;
-    queue_end.count_up = true;
-    queue_end.pos = 0;
-    dirHighCountsUp = true;
-    _last_command_ticks = 65535;
-  }
 };
 
 #endif  // FAS_QUEUE_BASE_H
