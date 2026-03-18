@@ -75,6 +75,18 @@ class StepperQueueBase {
 #if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
   void setAbsoluteSpeedLimit(uint16_t ticks) { max_speed_in_ticks = ticks; }
 #endif
+
+  void _base_initVars() {
+    dirPin = PIN_UNDEFINED;
+    ignore_commands = false;
+    read_idx = 0;
+    next_write_idx = 0;
+    queue_end.dir = true;
+    queue_end.count_up = true;
+    queue_end.pos = 0;
+    dirHighCountsUp = true;
+    _last_command_ticks = 65535;
+  }
 };
 
 #endif  // FAS_QUEUE_BASE_H

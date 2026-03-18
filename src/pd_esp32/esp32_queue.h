@@ -34,9 +34,10 @@ class StepperQueue : public StepperQueueBase {
 
   volatile bool _isRunning;
   bool _nextCommandIsPrepared;
-  uint8_t _step_pin = PIN_UNDEFINED;
+  uint8_t _step_pin;
 
   inline void _pd_initVars() {
+    _step_pin = PIN_UNDEFINED;
     _isRunning = false;
     _nextCommandIsPrepared = false;
   }

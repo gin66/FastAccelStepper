@@ -24,6 +24,13 @@ void FastAccelStepperEngine::init(uint8_t cpu_core) {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
   }
+  for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
+    fas_queue[i] = NULL;
+#else
+    fas_queue[i]._initVars();
+#endif
+  }
   fas_init_engine(this, cpu_core);
 }
 #else
@@ -33,11 +40,13 @@ void FastAccelStepperEngine::init() {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     _stepper[i] = NULL;
   }
-#if defined(SUPPORT_DYNAMIC_ALLOCATION)
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
+#if defined(SUPPORT_DYNAMIC_ALLOCATION)
     fas_queue[i] = NULL;
-  }
+#else
+    fas_queue[i]._initVars();
 #endif
+  }
 
   fas_init_engine(this);
 }

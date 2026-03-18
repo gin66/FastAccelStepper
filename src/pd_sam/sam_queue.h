@@ -8,7 +8,7 @@ class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
 
-  uint8_t _step_pin = PIN_UNDEFINED;
+  uint8_t _step_pin;
   uint8_t _queue_num;
   void* driver_data;
   volatile bool _hasISRactive;
@@ -19,6 +19,7 @@ class StepperQueue : public StepperQueueBase {
   uint32_t _dirPinMask;
 
   inline void _pd_initVars() {
+    _step_pin = PIN_UNDEFINED;
     _hasISRactive = false;
     _pauseCommanded = false;
     timePWMInterruptEnabled = 0;
