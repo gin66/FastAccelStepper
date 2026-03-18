@@ -142,7 +142,12 @@ class FastAccelStepperEngine {
   // relevant. Apparently, arduino-esp32 has FreeRTOS configured to have a
   // tick-rate of 1000Hz
   inline void task_rate(uint8_t delay_ms) { _delay_ms = delay_ms; };
+  inline uint8_t _task_rate() const { return _delay_ms; };
+
+ private:
   uint8_t _delay_ms;
+
+ public:
 #endif
 
   // ## External Pins

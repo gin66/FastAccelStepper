@@ -274,7 +274,7 @@ void StepperTask(void* parameter) {
   while (true) {
     engine->manageSteppers();
     const TickType_t delay_time =
-        (engine->_delay_ms + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
+        (engine->_task_rate() + portTICK_PERIOD_MS - 1) / portTICK_PERIOD_MS;
     vTaskDelay(delay_time);
   }
 }
@@ -291,7 +291,7 @@ void fas_init_engine(FastAccelStepperEngine* engine) {
   StepperQueue::s_claimed_pios = 0;
 #define STACK_SIZE 3000
 #define PRIORITY (configMAX_PRIORITIES - 1)
-  engine->_delay_ms = DELAY_MS_BASE;
+  engine->task_rate(DELAY_MS_BASE);
   xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
 
   program = stepper_make_program();

@@ -1,5 +1,5 @@
-#ifndef PD_PICO_PICO_PIO_H
-#define PD_PICO_PICO_PIO_H
+#ifndef PD_PICO_PIO_H
+#define PD_PICO_PIO_H
 
 typedef struct pio_program_s {
   uint16_t code[32];  // at max 32 instructions
@@ -16,4 +16,4 @@ uint32_t pio_calc_loops(uint8_t steps, uint16_t cycles_16th_us,
 uint32_t pio_make_fifo_entry(bool dir_high, bool count_up, uint8_t steps,
                              uint32_t loops);
 
-#endif  // PD_PICO_PICO_PIO_H
+#endif  // PD_PICO_PIO_H

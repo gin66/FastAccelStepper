@@ -32,7 +32,7 @@
 
 //==========================================================================
 //
-// AVR derivate ATmega 168/328/P
+// AVR derivative ATmega 168/328/P
 //
 //==========================================================================
 #if (defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
@@ -41,7 +41,7 @@
 #define NUM_QUEUES 2
 //==========================================================================
 //
-// AVR derivate ATmega 2560
+// AVR derivative ATmega 2560
 //
 //==========================================================================
 #elif defined(__AVR_ATmega2560__)
@@ -49,7 +49,7 @@
 #define NUM_QUEUES 3
 //==========================================================================
 //
-// AVR derivate ATmega 32U4
+// AVR derivative ATmega 32U4
 //
 //==========================================================================
 #elif defined(__AVR_ATmega32U4__)
@@ -57,11 +57,11 @@
 #define NUM_QUEUES 3
 //==========================================================================
 //
-// For all unsupported AVR derivates
+// For all unsupported AVR derivatives
 //
 //==========================================================================
 #else
-#error "Unsupported AVR derivate"
+#error "Unsupported AVR derivative"
 #endif
 
 #endif /* PD_AVR_CONFIG_H */

@@ -4,7 +4,8 @@
 const bool enabled = false;
 uint32_t junk = 0;
 
-inline void disconnectPWMPeriphal(Pio* port, uint8_t pin, uint32_t channelMask);
+inline void disconnectPWMPeripheral(Pio* port, uint8_t pin,
+                                    uint32_t channelMask);
 
 typedef struct _PWMCHANNELMAPPING {
   uint8_t pin;
@@ -62,7 +63,7 @@ void PWM_Handler(void) {
     if (channelsUsed[channel] == false) continue;
     StepperQueue* q = &fas_queue[queue_num];
     uint32_t t = micros();
-    uint32_t timeElapsed = micros() - q->timePWMInterruptEnabled;
+    uint32_t timeElapsed = t - q->timePWMInterruptEnabled;
     if (t < q->timePWMInterruptEnabled) {
       timeElapsed = 0xFFFFFFFF - q->timePWMInterruptEnabled;
       timeElapsed += t;
@@ -90,7 +91,7 @@ void PWM_Handler(void) {
       q->_pauseCommanded = false;
       PWM_INTERFACE->PWM_IDR1 = mask;
       PWM_INTERFACE->PWM_DIS = mask;
-      disconnectPWMPeriphal(port, mapping->pin, mapping->channelMask);
+      disconnectPWMPeripheral(port, mapping->pin, mapping->channelMask);
       PWM_INTERFACE->PWM_IDR1 = mask;
       q->read_idx = rp;
       pinMode(mapping->pin, OUTPUT);
@@ -116,8 +117,8 @@ void PWM_Handler(void) {
   }
 }
 
-inline void disconnectPWMPeriphal(Pio* port, uint8_t pin,
-                                  uint32_t channelMask) {
+inline void disconnectPWMPeripheral(Pio* port, uint8_t pin,
+                                    uint32_t channelMask) {
   PWM_INTERFACE->PWM_DIS = channelMask;
   PIO_SetOutput(port, g_APinDescription[pin].ulPin, 0, 0, 0);
 }
@@ -161,8 +162,8 @@ inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask) {
       rp++;                                                         \
       if (rp == q->next_write_idx) {                                \
         delayMicroseconds(10);                                      \
-        disconnectPWMPeriphal(mapping->port, mapping->pin,          \
-                              mapping->channelMask);                \
+        disconnectPWMPeripheral(mapping->port, mapping->pin,        \
+                                mapping->channelMask);              \
         q->_hasISRactive = false;                                   \
         q->_connected = false;                                      \
         q->read_idx = rp;                                           \

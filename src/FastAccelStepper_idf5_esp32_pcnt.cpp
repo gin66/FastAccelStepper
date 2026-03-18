@@ -5,7 +5,7 @@
 // needed ? Without unit/channel ID, the needed parameter for
 // gpio_matrix_in/gpio_iomux_in cannot be derived.
 //
-// Here we declare the private pcnt_chan_t structure, which is not save.
+// Here we declare the private pcnt_chan_t structure, which is not safe.
 struct pcnt_unit_t {
   /*pcnt_group_t*/ void* group;
   portMUX_TYPE spinlock;

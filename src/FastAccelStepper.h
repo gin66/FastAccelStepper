@@ -268,7 +268,7 @@ class FastAccelStepper {
   // getCurrentAcceleration() retrieves the actual acceleration.
   //    = 0 while idle or coasting
   //    > 0 while speed is changing towards positive values
-  //    < 0 while speed is changeing towards negative values
+  //    < 0 while speed is changing towards negative values
   inline int32_t getCurrentAcceleration() const {
     return _rg.getCurrentAcceleration();
   }
@@ -498,7 +498,7 @@ class FastAccelStepper {
 
   // ## Low Level Stepper Queue Management (low level access)
   //
-  // If the queue is already running, then the start parameter is obsolote.
+  // If the queue is already running, then the start parameter is obsolete.
   // But the queue may run out of commands while executing addQueueEntry,
   // so it is better to set start=true to automatically restart/continue
   // a running queue.

@@ -147,7 +147,6 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   uint8_t fas_stepper_num = (uint8_t)(q - fas_queue);
   _stepper_cnt++;
 
-  static FastAccelStepper fas_stepper[MAX_STEPPER];
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
   s->init(this, fas_stepper_num, step_pin);
   _stepper[fas_stepper_num] = s;

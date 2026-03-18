@@ -66,6 +66,7 @@ The SAM (Arduino Due) platform has **6 open issues** identified in [05_sam_platf
 | [03_configuration_system.md](03_configuration_system.md) | Configuration system modernization proposal |
 | [04_esp32_i2s_driver.md](04_esp32_i2s_driver.md) | ESP32 I2S output driver (single-pin and serial demux modes) |
 | [05_sam_platform_audit.md](05_sam_platform_audit.md) | SAM platform audit against SAM3X8E datasheet (6 open issues) |
+| [06_full_src_audit.md](06_full_src_audit.md) | Full `src/` audit: 12 bugs, 15 dead code items, 11 duplication patterns, 13 inconsistencies |
 
 ## Contributing
 

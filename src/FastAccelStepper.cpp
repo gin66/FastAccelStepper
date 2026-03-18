@@ -882,7 +882,7 @@ MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
     // cmd_duration *= cmd.steps;
     if (actual_duration) {
       uint32_t d = cmd.ticks;
-      d *= steps;
+      d *= cmd.steps;
       *actual_duration += d;
     }
     steps -= cmd.steps;
