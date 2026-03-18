@@ -408,9 +408,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
 
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
-      if (!fas_queue[i].init(i, step_pin)) {
-        return nullptr;
-      }
+      fas_queue[i].init(i, step_pin);
       stepper_allocated_count++;
       return &fas_queue[i];
     }

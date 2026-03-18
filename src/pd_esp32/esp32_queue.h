@@ -16,8 +16,8 @@ class StepperQueue : public StepperQueueBase {
 #include "../fas_queue/protocol.h"
 
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   static uint8_t queues_allocated;
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #ifdef SUPPORT_ESP32_RMT
   static uint8_t _rmt_allocated;
 #endif
@@ -29,12 +29,9 @@ class StepperQueue : public StepperQueueBase {
   static uint32_t _i2s_mux_allocated_bitmask;
   static I2sManager* _i2s_mux_manager;
 #endif
-#else
-  static uint8_t queues_allocated;
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 #endif  // SUPPORT_DYNAMIC_ALLOCATION
 
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #ifdef SUPPORT_ESP32_RMT
   bool use_rmt;
 #endif
@@ -43,7 +40,6 @@ class StepperQueue : public StepperQueueBase {
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   bool use_mcpwm_pcnt;
-#endif
 #endif
 
   volatile bool _isRunning;
@@ -54,7 +50,6 @@ class StepperQueue : public StepperQueueBase {
     _step_pin = PIN_UNDEFINED;
     _isRunning = false;
     _nextCommandIsPrepared = false;
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #ifdef SUPPORT_ESP32_RMT
     use_rmt = false;
 #endif
@@ -63,7 +58,6 @@ class StepperQueue : public StepperQueueBase {
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
     use_mcpwm_pcnt = false;
-#endif
 #endif
   }
 
