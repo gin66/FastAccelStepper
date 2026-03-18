@@ -15,35 +15,26 @@ class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
 
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
-  // dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   static uint8_t queues_allocated;
 #ifdef SUPPORT_ESP32_RMT
   static uint8_t _rmt_allocated;
+#endif
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+  static uint8_t _mcpwm_pcnt_allocated;
 #endif
 #if defined(SUPPORT_ESP32_I2S)
   static bool _i2s_mux_initialized;
   static uint32_t _i2s_mux_allocated_bitmask;
   static I2sManager* _i2s_mux_manager;
 #endif
-#endif
-#elif defined(SUPPORT_DYNAMIC_ALLOCATION)
+#else
   static uint8_t queues_allocated;
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
+#endif  // SUPPORT_DYNAMIC_ALLOCATION
 
-  volatile bool _isRunning;
-  bool _nextCommandIsPrepared;
-  uint8_t _step_pin;
-
-  inline void _pd_initVars() {
-    _step_pin = PIN_UNDEFINED;
-    _isRunning = false;
-    _nextCommandIsPrepared = false;
-  }
-
-  inline bool isRunning() const { return _isRunning; }
-  bool isReadyForCommands() const;
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #ifdef SUPPORT_ESP32_RMT
   bool use_rmt;
 #endif
@@ -53,6 +44,31 @@ class StepperQueue : public StepperQueueBase {
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   bool use_mcpwm_pcnt;
 #endif
+#endif
+
+  volatile bool _isRunning;
+  bool _nextCommandIsPrepared;
+  uint8_t _step_pin;
+
+  inline void _pd_initVars() {
+    _step_pin = PIN_UNDEFINED;
+    _isRunning = false;
+    _nextCommandIsPrepared = false;
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#ifdef SUPPORT_ESP32_RMT
+    use_rmt = false;
+#endif
+#ifdef SUPPORT_ESP32_I2S
+    use_i2s = false;
+#endif
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+    use_mcpwm_pcnt = false;
+#endif
+#endif
+  }
+
+  inline bool isRunning() const { return _isRunning; }
+  bool isReadyForCommands() const;
 
   // module specific variables
   union {

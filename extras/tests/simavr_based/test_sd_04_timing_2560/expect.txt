@@ -17,7 +17,7 @@ Time in EnableA  max=233599 us, total=233599 us~~80/80
 
 Time in EnableB  max=246089 us, total=246089 us~~80/80
 
-Time in EnableC  max=254246 us, total=254246 us~~110/110
+Time in EnableC  max=254246 us, total=254246 us~~140/140
 
 Time in FillISR  max=3183 us, total=2109276 us~~450/40000
 

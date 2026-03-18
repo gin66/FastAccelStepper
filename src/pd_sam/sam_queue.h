@@ -20,9 +20,14 @@ class StepperQueue : public StepperQueueBase {
 
   inline void _pd_initVars() {
     _step_pin = PIN_UNDEFINED;
+    _queue_num = 0;
+    driver_data = NULL;
+    _connected = false;
     _hasISRactive = false;
     _pauseCommanded = false;
     timePWMInterruptEnabled = 0;
+    _dirPinPort = NULL;
+    _dirPinMask = 0;
   }
 
   inline bool isRunning() const { return _hasISRactive; }

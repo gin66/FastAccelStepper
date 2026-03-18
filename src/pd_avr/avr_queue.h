@@ -54,6 +54,10 @@ class StepperQueue : public StepperQueueBase {
   inline void _pd_initVars() {
     _isRunning = false;
     _noMoreCommands = false;
+    _dirPinPort = NULL;
+    _dirPinMask = 0;
+    _dirTogglePinPort = NULL;
+    _dirTogglePinMask = 0;
   }
 
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
