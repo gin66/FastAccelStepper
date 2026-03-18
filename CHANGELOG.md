@@ -1,3 +1,23 @@
+1.2.4:
+- Rework of the complete init system across all platforms:
+  - `StepperQueue::init()` and `FastAccelStepper::init()` return type changed from `bool` to `void`
+  - `_initVars()` moved from `init()` to `tryAllocateQueue()` for all platform drivers
+  - Static queue arrays initialized in engine `init()` via `_initVars()`
+  - All member initialization consolidated into `_pd_initVars()` and `_base_initVars()`
+  - `__builtin_memset` used for zeroing structures instead of manual field-by-field init
+  - `_dirPinPort`/`_dirPinMask` moved from base class to AVR and SAM drivers
+  - `max_speed_in_ticks` default moved from in-class initializer to `_pd_initVars()`
+  - ESP32: remove unused static `initVars()` method
+- avr: fix init() along with SAM
+- sam: fix init() regression from init system rework
+- pico: fix init issue and initVars()
+- esp32: guard `FasDriver` enum members against zero queue counts
+- avr: store result code strings in PROGMEM via `FAS_PSTR()` macro to save RAM
+- optimize `queue_end_s`: use bitfields for `count_up` and `dir`
+- fix `log2_pow_div_3()` for negative input values
+- simplify `ramp_rw_s::init()`/`stopRamp()` and `ramp_parameters_s::init()`
+- various code optimizations and simavr timing expectation adjustments
+
 1.2.3:
 - esp32: Fix null result from `stepperConnectToPin()` due to `_step_pin` not initialized to `PIN_UNDEFINED` (#352)
 
