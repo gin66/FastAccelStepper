@@ -15,6 +15,8 @@ class StepperQueue : public StepperQueueBase {
   bool _connected;
   volatile bool _pauseCommanded;
   volatile uint32_t timePWMInterruptEnabled;
+  volatile uint32_t* _dirPinPort;
+  uint32_t _dirPinMask;
 
   inline void _pd_initVars() {
     _hasISRactive = false;
@@ -28,12 +30,10 @@ class StepperQueue : public StepperQueueBase {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
-#if defined(SUPPORT_DIR_PIN_MASK)
     if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
       _dirPinPort = portOutputRegister(digitalPinToPort(dir_pin));
       _dirPinMask = digitalPinToBitMask(dir_pin);
     }
-#endif
   }
 
  private:

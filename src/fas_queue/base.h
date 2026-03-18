@@ -41,11 +41,6 @@ class StepperQueueBase {
   bool dirHighCountsUp;
   uint8_t dirPin;
 
-#if defined(SUPPORT_DIR_PIN_MASK)
-  volatile SUPPORT_DIR_PIN_MASK* _dirPinPort;
-  SUPPORT_DIR_PIN_MASK _dirPinMask;
-#endif
-
   struct queue_end_s queue_end;
 
 #ifdef TEST

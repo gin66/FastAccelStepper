@@ -24,8 +24,6 @@
 
 #define noop_or_wait
 
-#define SUPPORT_DIR_PIN_MASK uint32_t
-
 // TO BE CHECKED
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
 

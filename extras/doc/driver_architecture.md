@@ -326,7 +326,8 @@ Create `fas_arch/your_arch.h` defining all required constants and macros:
 #define MAX_STEPPER NUM_QUEUES  // usually same as NUM_QUEUES
 
 // 6. Optional features (define if supported)
-// #define SUPPORT_DIR_PIN_MASK uint8_t  // direct port access
+//   - Direct port access for dir pin (if needed, declare
+//     _dirPinPort/_dirPinMask in your StepperQueue subclass)
 
 // 7. Task management (if using RTOS)
 #define noop_or_wait vTaskDelay(1)  // or your idle function

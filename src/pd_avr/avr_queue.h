@@ -46,6 +46,8 @@ class StepperQueue : public StepperQueueBase {
   inline bool isReadyForCommands() const { return true; }
   channels channel;
 
+  volatile uint8_t* _dirPinPort;
+  uint8_t _dirPinMask;
   volatile uint8_t* _dirTogglePinPort;
   uint8_t _dirTogglePinMask;
 

@@ -21,8 +21,6 @@
 
 #define noop_or_wait
 
-#define SUPPORT_DIR_PIN_MASK uint8_t
-
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
 
 #define NEED_GENERIC_GET_CURRENT_POSITION
