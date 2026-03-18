@@ -1,3 +1,7 @@
+.PHONY: all test test_all clean compile compile_arduino_espidf4 compile_arduino_espidf5 \
+	compile_arduino_espidf_V6_13_0 compile_idf4 compile_idf5 compile_idf5_V6_13_0 \
+	.test_espidf4 .test_espidf5 .test_arduino_espidf_V6_13_0 .test_idf5 .test_idf5_V6_13_0
+
 all: compile test
 
 # grabserial is a python tool.
@@ -21,7 +25,8 @@ test: M1.test M9.test
 	MOTOR=$* ./seq_07c.sh $(DEV)
 	MOTOR=$* ./seq_03.sh $(DEV)
 
-test_all: .test_espidf4 .test_espidf5 .test_idf5
+#test_all: .test_espidf4 .test_espidf5 .test_idf5 .test_idf5_V6_13_0 .test_arduino_espidf_V6_13_0
+test_all: .test_espidf4 .test_espidf5 .test_idf5 .test_arduino_espidf_V6_13_0
 
 .test_espidf4:
 	make compile_arduino_espidf4 && make test && touch .test_espidf4
@@ -33,8 +38,14 @@ test_all: .test_espidf4 .test_espidf5 .test_idf5
 #.test_idf4:
 #	make compile_idf4 && make test && touch .test_idf4
 
+.test_arduino_espidf_V6_13_0:
+	make compile_arduino_espidf_V6_13_0 && make test && touch .test_arduino_espidf_V6_13_0
+
 .test_idf5:
 	make compile_idf5 && make test && touch .test_idf5
+
+.test_idf5_V6_13_0:
+	make compile_idf5_V6_13_0 && make test && touch .test_idf5_V6_13_0
 
 compile: compile_arduino_espidf4
 
@@ -44,6 +55,9 @@ compile_arduino_espidf4:
 compile_arduino_espidf5:
 	(cd ../../../pio_dirs/StepperDemo;rm -fR .pio; pio run -e esp32_pioarduino_V53_03_11 -t upload --upload-port /dev/$(DEV))
 
+compile_arduino_espidf_V6_13_0:
+	(cd ../../../pio_dirs/StepperDemo;rm -fR .pio; pio run -e esp32_V6_13_0 -t upload --upload-port /dev/$(DEV))
+
 compile_idf4:
 	(cd ../../scripts;./build-pio-dirs.sh)
 	(cd ../../../pio_espidf/StepperDemo;rm -fR .pio; pio run -e esp32_idf_V5_3_0 -t upload --upload-port /dev/$(DEV))
@@ -51,6 +65,10 @@ compile_idf4:
 compile_idf5:
 	(cd ../../scripts;./build-pio-dirs.sh)
 	(cd ../../../pio_espidf/StepperDemo;rm -fR .pio; pio run -e esp32_idf_V6_8_1 -t upload --upload-port /dev/$(DEV))
+
+compile_idf5_V6_13_0:
+	(cd ../../scripts;./build-pio-dirs.sh)
+	(cd ../../../pio_espidf/StepperDemo;rm -fR .pio; pio run -e esp32_idf_V6_13_0 -t upload --upload-port /dev/$(DEV))
 
 clean:
 	rm -f seq*.log .test_*
