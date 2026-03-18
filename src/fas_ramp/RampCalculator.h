@@ -60,18 +60,9 @@ struct ramp_parameters_s {
   bool keep_running_count_up : 1;
 
   void init() {
-    move_value = 0;
-    valid_acceleration = false;
-    valid_speed = false;
-    apply = false;
-    any_change = false;
-    recalc_ramp_steps = false;
+    __builtin_memset(this, 0, sizeof(*this));
     move_absolute = true;
-    keep_running = false;
     keep_running_count_up = true;
-    s_h = 0;
-    s_jump = 0;
-    min_travel_ticks = 0;
   }
   inline void applyParameters() {
     if (any_change) {

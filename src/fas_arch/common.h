@@ -45,9 +45,9 @@ struct actual_ticks_s {
 
 // I doubt, volatile is needed.
 struct queue_end_s {
-  volatile int32_t pos;  // in steps
-  volatile bool count_up;
-  volatile bool dir;
+  volatile int32_t pos;
+  bool count_up : 1;
+  bool dir : 1;
 };
 
 // use own min/max/abs function, because the lib versions are messed up

@@ -10,11 +10,7 @@ struct ramp_ro_s {
   bool force_stop : 1;
   bool force_immediate_stop : 1;
   bool incomplete_immediate_stop : 1;
-  inline void init() {
-    config.init();
-    force_stop = false;
-    force_immediate_stop = false;
-  }
+  inline void init() { config.init(); }
   inline int32_t targetPosition() const { return target_pos; }
   inline void setTargetPosition(int32_t pos) { target_pos = pos; }
   inline void advanceTargetPositionWithinInterruptDisabledScope(int32_t delta) {
@@ -42,16 +38,8 @@ struct ramp_rw_s {
   uint32_t pause_ticks_left;
   // Current ticks for ongoing step
   uint32_t curr_ticks;
-  inline void stopRamp() {
-    ramp_state = RAMP_STATE_IDLE;  // this prevents fill_queue to be executed
-    pause_ticks_left = 0;
-    performed_ramp_up_steps = 0;
-    curr_ticks = TICKS_FOR_STOPPED_MOTOR;
-#ifdef TEST
-    printf("stopRamp() called\n");
-#endif
-  }
-  inline void init() { stopRamp(); }
+  void init();
+  inline void stopRamp() { init(); }
   inline uint8_t rampState() const {
     // reading one byte is atomic
     return ramp_state;

@@ -48,8 +48,6 @@ class StepperQueue : public StepperQueueBase {
 
   inline void _pd_initVars() {
     _step_pin = PIN_UNDEFINED;
-    _isRunning = false;
-    _nextCommandIsPrepared = false;
 #ifdef SUPPORT_ESP32_RMT
     use_rmt = false;
 #endif

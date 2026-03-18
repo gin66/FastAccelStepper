@@ -10,6 +10,7 @@ StepperQueue fas_queue[NUM_QUEUES];
 #endif
 
 void StepperQueue::_initVars() {
+  __builtin_memset(this, 0, sizeof(*this));
   _base_initVars();
   _pd_initVars();
 }

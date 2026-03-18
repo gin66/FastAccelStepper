@@ -48,16 +48,12 @@ class StepperQueueBase {
   uint16_t _last_command_ticks;
 
   void _base_initVars() {
-    read_idx = 0;
-    next_write_idx = 0;
     queue_end.dir = true;
     queue_end.count_up = true;
-    queue_end.pos = 0;
-    ignore_commands = false;
     dirHighCountsUp = true;
     dirPin = PIN_UNDEFINED;
     // intentionally slow speed to make missing initialization detectable
-    max_speed_in_ticks = TICKS_PER_S / 1000;  // default: 1_000 steps/s
+    max_speed_in_ticks = TICKS_PER_S / 1000;
     _last_command_ticks = 65535;
   }
 

@@ -1,6 +1,13 @@
 #ifndef FAS_RESULT_CODES_H
 #define FAS_RESULT_CODES_H
 
+#if defined(__AVR__)
+#include <avr/pgmspace.h>
+#define FAS_PSTR(s) (reinterpret_cast<const char*>(PSTR(s)))
+#else
+#define FAS_PSTR(s) (s)
+#endif
+
 // ### Result codes for addQueueEntry() function of FastAccelStepper
 enum class AqeResultCode : int8_t {
   OK = 0,
@@ -24,25 +31,25 @@ static inline bool aqeIsOk(AqeResultCode status) {
 static inline const char* toString(AqeResultCode code) {
   switch (code) {
     case AqeResultCode::OK:
-      return "OK";
+      return FAS_PSTR("OK");
     case AqeResultCode::QueueFull:
-      return "Queue Full";
+      return FAS_PSTR("Queue Full");
     case AqeResultCode::DirPin2msPauseAdded:
-      return "Dir Pin 2ms Pause Added";
+      return FAS_PSTR("Dir Pin 2ms Pause Added");
     case AqeResultCode::DirPinIsBusy:
-      return "Direction Pin is Busy";
+      return FAS_PSTR("Direction Pin is Busy");
     case AqeResultCode::WaitForEnablePinActive:
-      return "Waiting for Enable Pin Active";
+      return FAS_PSTR("Waiting for Enable Pin Active");
     case AqeResultCode::DeviceNotReady:
-      return "Device Not Ready";
+      return FAS_PSTR("Device Not Ready");
     case AqeResultCode::ErrorTicksTooLow:
-      return "Error: Ticks Too Low";
+      return FAS_PSTR("Error: Ticks Too Low");
     case AqeResultCode::ErrorEmptyQueueToStart:
-      return "Error: Empty Queue to Start";
+      return FAS_PSTR("Error: Empty Queue to Start");
     case AqeResultCode::ErrorNoDirPinToToggle:
-      return "Error: No Direction Pin to Toggle";
+      return FAS_PSTR("Error: No Direction Pin to Toggle");
     default:
-      return "Unknown Error";
+      return FAS_PSTR("Unknown Error");
   }
 }
 #define AQE_OK AqeResultCode::OK
@@ -68,19 +75,18 @@ static inline bool moveIsOk(MoveResultCode status) {
   return status == MoveResultCode::OK;
 }
 
-// Function to convert MoveResultCode to string for debugging/errors
 static inline const char* toString(MoveResultCode code) {
   switch (code) {
     case MoveResultCode::OK:
-      return "OK";
+      return toString(AqeResultCode::OK);
     case MoveResultCode::ErrorNoDirectionPin:
-      return "Error: No Direction Pin";
+      return FAS_PSTR("Error: No Direction Pin");
     case MoveResultCode::ErrorSpeedIsUndefined:
-      return "Error: Speed is Undefined";
+      return FAS_PSTR("Error: Speed is Undefined");
     case MoveResultCode::ErrorAccelerationIsUndefined:
-      return "Error: Acceleration is Undefined";
+      return FAS_PSTR("Error: Acceleration is Undefined");
     default:
-      return "Unknown Error";
+      return FAS_PSTR("Unknown Error");
   }
 }
 
@@ -115,35 +121,34 @@ static inline MoveTimedResultCode tmrFrom(AqeResultCode res) {
   return static_cast<MoveTimedResultCode>(res);
 }
 
-// Function to convert MoveResultCode to string for debugging/errors
 static inline const char* toString(MoveTimedResultCode code) {
   switch (code) {
     case MoveTimedResultCode::OK:
-      return "OK";
+      return toString(AqeResultCode::OK);
     case MoveTimedResultCode::QueueFull:
-      return "Queue Full";
+      return toString(AqeResultCode::QueueFull);
     case MoveTimedResultCode::DirPinIsBusy:
-      return "Direction Pin is Busy";
+      return toString(AqeResultCode::DirPinIsBusy);
     case MoveTimedResultCode::WaitForEnablePinActive:
-      return "Waiting for Enable Pin Active";
+      return toString(AqeResultCode::WaitForEnablePinActive);
     case MoveTimedResultCode::DeviceNotReady:
-      return "Device Not Ready";
+      return toString(AqeResultCode::DeviceNotReady);
     case MoveTimedResultCode::DirPin2msPauseAdded:
-      return "Dir Pin 2ms Pause Added";
+      return toString(AqeResultCode::DirPin2msPauseAdded);
     case MoveTimedResultCode::MoveBusy:
-      return "Move still ongoing";
+      return FAS_PSTR("Move still ongoing");
     case MoveTimedResultCode::MoveEmpty:
-      return "Queue has been empty";
+      return FAS_PSTR("Queue has been empty");
     case MoveTimedResultCode::ErrorTicksTooLow:
-      return "Error: Ticks Too Low";
+      return toString(AqeResultCode::ErrorTicksTooLow);
     case MoveTimedResultCode::ErrorEmptyQueueToStart:
-      return "Error: Empty Queue to Start";
+      return toString(AqeResultCode::ErrorEmptyQueueToStart);
     case MoveTimedResultCode::ErrorNoDirPinToToggle:
-      return "Error: No Direction Pin to Toggle";
+      return toString(AqeResultCode::ErrorNoDirPinToToggle);
     case MoveTimedResultCode::ErrorMoveTooLarge:
-      return "Error: Move too large";
+      return FAS_PSTR("Error: Move too large");
     default:
-      return "Unknown Error";
+      return FAS_PSTR("Unknown Error");
   }
 }
 #define MOVE_TIMED_OK MoveTimedResultCode::OK
@@ -160,13 +165,13 @@ static inline bool delayIsValid(DelayResultCode status) {
 static inline const char* toString(DelayResultCode status) {
   switch (status) {
     case DelayResultCode::OK:
-      return "OK";
+      return toString(AqeResultCode::OK);
     case DelayResultCode::TOO_LOW:
-      return "Delay Too Low";
+      return FAS_PSTR("Delay Too Low");
     case DelayResultCode::TOO_HIGH:
-      return "Delay Too High";
+      return FAS_PSTR("Delay Too High");
     default:
-      return "Unknown Delay Status";
+      return FAS_PSTR("Unknown Delay Status");
   }
 }
 

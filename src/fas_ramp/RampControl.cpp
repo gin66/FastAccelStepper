@@ -12,6 +12,11 @@ static log2_value_t log2_timer_freq_div_sqrt_of_2;
 static log2_value_t log2_timer_freq_square_div_2;
 #endif
 
+void ramp_rw_s::init() {
+  __builtin_memset(this, 0, sizeof(*this));
+  curr_ticks = TICKS_FOR_STOPPED_MOTOR;
+}
+
 void init_ramp_module() {
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
   log2_timer_freq = log2_from((uint32_t)TICKS_PER_S);

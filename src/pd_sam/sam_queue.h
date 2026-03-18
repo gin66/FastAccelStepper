@@ -18,17 +18,7 @@ class StepperQueue : public StepperQueueBase {
   volatile uint32_t* _dirPinPort;
   uint32_t _dirPinMask;
 
-  inline void _pd_initVars() {
-    _step_pin = PIN_UNDEFINED;
-    _queue_num = 0;
-    driver_data = NULL;
-    _connected = false;
-    _hasISRactive = false;
-    _pauseCommanded = false;
-    timePWMInterruptEnabled = 0;
-    _dirPinPort = NULL;
-    _dirPinMask = 0;
-  }
+  inline void _pd_initVars() { _step_pin = PIN_UNDEFINED; }
 
   inline bool isRunning() const { return _hasISRactive; }
   inline bool isReadyForCommands() const { return true; }

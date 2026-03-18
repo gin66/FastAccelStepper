@@ -353,16 +353,9 @@ bool FastAccelStepper::usesAutoEnablePin(uint8_t pin) {
 
 void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
                             uint8_t step_pin) {
-#if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
-  // For run time measurement
-  max_micros = 0;
-#endif
+  __builtin_memset(this, 0, sizeof(*this));
   _engine = engine;
-  _autoEnable = false;
-  _dir_change_delay_ticks = 0;
-  _on_delay_ticks = 0;
   _off_delay_count = 1;
-  _auto_disable_delay_counter = 0;
   _stepPin = step_pin;
   _dirHighCountsUp = true;
   _dirPin = PIN_UNDEFINED;
@@ -371,7 +364,6 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _forward_planning_in_ticks = TICKS_PER_S / 50;
   _pendingExternalDirState = ExtDirPendingState::None;
   _rg.init();
-
   _queue_num = num;
   _queue()->init(_queue_num, step_pin);
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
