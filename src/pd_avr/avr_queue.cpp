@@ -105,7 +105,7 @@ static FastAccelStepperEngine* fas_engine = NULL;
     /* ensure cyclic interrupt is running */       \
     EnableOverflowInterrupt(T);                    \
   }
-bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   prepareISRtimeMeasurement();
   _initVars();
   digitalWrite(step_pin, LOW);
@@ -123,10 +123,6 @@ bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     AVR_INIT(FAS_TIMER_MODULE, C)
   }
 #endif
-  else {
-    return false;
-  }
-  return true;
 }
 
 // The interrupt is called on compare event, which eventually
@@ -353,9 +349,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     return nullptr;
   }
 
-  if (!fas_queue[idx].init(idx, step_pin)) {
-    return nullptr;
-  }
+  fas_queue[idx].init(idx, step_pin);
 
   stepper_allocated_mask |= (1 << idx);
   return &fas_queue[idx];

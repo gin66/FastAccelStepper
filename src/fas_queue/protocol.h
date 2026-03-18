@@ -37,7 +37,7 @@ uint32_t ticksInQueue() const;
 bool hasTicksInQueue(uint32_t min_ticks) const;
 bool getActualTicksWithDirection(struct actual_ticks_s* speed) const;
 
-bool init(uint8_t queue_num, uint8_t step_pin);
+void init(uint8_t queue_num, uint8_t step_pin);
 void startQueue();
 void forceStop();
 void _initVars();

@@ -104,7 +104,7 @@ static void IRAM_ATTR tx_intr_handler(void* arg) {
 #endif
 }
 
-bool StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
+void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
 #ifdef TEST_PROBE_1
   if (channel_num == 0) {
     pinMode(TEST_PROBE_1, OUTPUT);
@@ -206,7 +206,6 @@ bool StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
     }
   }
 #endif
-  return true;
 }
 
 void StepperQueue::connect_rmt() {

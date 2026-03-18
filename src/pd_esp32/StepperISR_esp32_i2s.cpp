@@ -5,7 +5,7 @@
 #include "pd_esp32/i2s_fill.h"
 #include "pd_esp32/i2s_constants.h"
 
-bool StepperQueue::init_i2s(uint8_t step_pin) {
+void StepperQueue::init_i2s(uint8_t step_pin) {
   _initVars();
   _step_pin = step_pin;
   _fill_state = {0, 0, 0};
@@ -16,7 +16,6 @@ bool StepperQueue::init_i2s(uint8_t step_pin) {
   } else {
     max_speed_in_ticks = I2S_DIRECT_MIN_SPEED_TICKS;
   }
-  return true;
 }
 
 void StepperQueue::startQueue_i2s() { _isRunning = true; }

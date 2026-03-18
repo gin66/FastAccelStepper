@@ -237,7 +237,7 @@ inline uint32_t pinToChannel(uint32_t pin) {
   return 0xFFFFFFFF;
 }
 
-bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _queue_num = queue_num;
   driver_data = (void*)&gChannelMap[queue_num];
   _initVars();
@@ -288,7 +288,6 @@ bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   PWM_INTERFACE->PWM_IDR1 = 0x00FFFF0F;
 
   connect();
-  return true;
 }
 
 void StepperQueue::connect() {

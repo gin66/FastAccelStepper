@@ -27,7 +27,7 @@ uint8_t StepperQueue::queues_allocated = 0;
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 #endif
 
-bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   uint8_t channel = queue_num;
   max_speed_in_ticks = 80;
 #ifdef DEBUG
@@ -52,20 +52,21 @@ bool StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   if (use_mcpwm_pcnt) {
-    return init_mcpwm_pcnt(channel, step_pin);
+    init_mcpwm_pcnt(channel, step_pin);
+    return;
   }
 #endif
 #ifdef SUPPORT_ESP32_RMT
   if (use_rmt) {
-    return init_rmt(channel, step_pin);
+    init_rmt(channel, step_pin);
+    return;
   }
 #endif
 #if defined(SUPPORT_ESP32_I2S)
   if (use_i2s) {
-    return init_i2s(step_pin);
+    init_i2s(step_pin);
   }
 #endif
-  return false;
 }
 
 void StepperQueue::connect() {

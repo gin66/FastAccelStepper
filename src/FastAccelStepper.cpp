@@ -351,7 +351,7 @@ bool FastAccelStepper::usesAutoEnablePin(uint8_t pin) {
   return false;
 }
 
-bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
+void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
                             uint8_t step_pin) {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   // For run time measurement
@@ -380,7 +380,6 @@ bool FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
   _attached_pulse_cnt_unit = -1;
 #endif
-  return true;
 }
 uint8_t FastAccelStepper::getStepPin() const { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,

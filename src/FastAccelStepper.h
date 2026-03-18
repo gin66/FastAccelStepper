@@ -88,7 +88,7 @@ class FastAccelStepper {
 #else
  private:
 #endif
-  bool init(FastAccelStepperEngine* engine, uint8_t num, uint8_t step_pin);
+  void init(FastAccelStepperEngine* engine, uint8_t num, uint8_t step_pin);
 
  public:
   // ## Step Pin

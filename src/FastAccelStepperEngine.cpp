@@ -116,10 +116,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
   fas_queue[fas_stepper_num] = q;
 
   FastAccelStepper* s = new FastAccelStepper();
-  if (!s->init(this, fas_stepper_num, step_pin)) {
-    delete s;
-    return nullptr;
-  }
+  s->init(this, fas_stepper_num, step_pin);
   _stepper[fas_stepper_num] = s;
   return s;
 }
@@ -143,9 +140,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 
   static FastAccelStepper fas_stepper[MAX_STEPPER];
   FastAccelStepper* s = &fas_stepper[fas_stepper_num];
-  if (!s->init(this, fas_stepper_num, step_pin)) {
-    return nullptr;
-  }
+  s->init(this, fas_stepper_num, step_pin);
   _stepper[fas_stepper_num] = s;
 
 #if defined(NEED_ADJUSTABLE_MAX_SPEED_DEPENDING_ON_STEPPER_COUNT)
