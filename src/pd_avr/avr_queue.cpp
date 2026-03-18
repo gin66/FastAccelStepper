@@ -348,6 +348,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     return nullptr;
   }
 
+  fas_queue[idx]._initVars();
   fas_queue[idx].init(idx, step_pin);
 
   stepper_allocated_mask |= (1 << idx);

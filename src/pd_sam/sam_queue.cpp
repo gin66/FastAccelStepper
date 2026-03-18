@@ -243,7 +243,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _step_pin = step_pin;
   channelsUsed[pinToChannel(step_pin)] = true;
   numChannels++;
-  max_speed_in_ticks = 420;
 #if defined(KEEP_SCORE)
   totalPulsesDetected[queue_num] = 0;
   totalSteps[queue_num] = 0;
@@ -407,6 +406,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
 
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
+      fas_queue[i]._initVars();
       fas_queue[i].init(i, step_pin);
       stepper_allocated_count++;
       return &fas_queue[i];

@@ -18,7 +18,10 @@ class StepperQueue : public StepperQueueBase {
   volatile uint32_t* _dirPinPort;
   uint32_t _dirPinMask;
 
-  inline void _pd_initVars() { _step_pin = PIN_UNDEFINED; }
+  inline void _pd_initVars() {
+    _step_pin = PIN_UNDEFINED;
+    max_speed_in_ticks = 420;
+  }
 
   inline bool isRunning() const { return _hasISRactive; }
   inline bool isReadyForCommands() const { return true; }
