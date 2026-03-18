@@ -340,7 +340,6 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   pinMode(TEST_PROBE, OUTPUT);
 #endif
 
-  _initVars();
   _step_pin = step_pin;
 
   const struct mapping_s* mapping = &channel2mapping[channel_num];

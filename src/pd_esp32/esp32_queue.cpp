@@ -212,6 +212,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     }
     StepperQueue::_i2s_mux_allocated_bitmask |= bit;
     StepperQueue* q = new StepperQueue();
+    q->_initVars();
     q->use_i2s = true;
     q->i2s_mgr = StepperQueue::_i2s_mux_manager;
     q->_i2s_mux_step_byte_offset = i2s_mux_byte_offset(slot);
@@ -229,6 +230,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
       return nullptr;
     }
     StepperQueue* q = new StepperQueue();
+    q->_initVars();
     q->use_rmt = true;
     StepperQueue::_rmt_allocated++;
     return q;
@@ -240,6 +242,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
                                          I2S_GPIO_UNUSED);
     if (mgr != nullptr) {
       StepperQueue* q = new StepperQueue();
+      q->_initVars();
       q->use_i2s = true;
       q->i2s_mgr = mgr;
       return q;
@@ -276,6 +279,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   }
 
   StepperQueue* q = new StepperQueue();
+  q->_initVars();
 #if defined(SUPPORT_ESP32_RMT)
   q->use_rmt = true;
 #endif
@@ -305,6 +309,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
     if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
       StepperQueue* q = &fas_queue[i];
+      q->_initVars();
 #ifdef SUPPORT_ESP32_RMT
       q->use_rmt = true;
 #endif
@@ -354,6 +359,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
       return nullptr;
     }
     StepperQueue* q = &fas_queue[mcpwm_pcnt_allocated];
+    q->_initVars();
     q->use_mcpwm_pcnt = true;
     mcpwm_pcnt_allocated++;
     return q;
@@ -366,6 +372,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
       return nullptr;
     }
     StepperQueue* q = &fas_queue[QUEUES_MCPWM_PCNT + rmt_allocated];
+    q->_initVars();
     q->use_rmt = true;
     rmt_allocated++;
     return q;
@@ -379,6 +386,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
       return nullptr;
     }
     StepperQueue* q = &fas_queue[i2s_start + i2s_allocated];
+    q->_initVars();
     q->use_i2s = true;
     i2s_allocated++;
     return q;

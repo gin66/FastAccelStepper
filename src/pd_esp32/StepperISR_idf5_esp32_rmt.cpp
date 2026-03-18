@@ -81,7 +81,6 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   PROBE_3(LOW);
 #endif
 
-  _initVars();
   _step_pin = step_pin;
   pinMode(step_pin, OUTPUT);
   digitalWrite(step_pin, LOW);
