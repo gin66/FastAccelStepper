@@ -30,7 +30,6 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   dirPin = PIN_UNDEFINED;
   pos_offset = 0;
   max_speed_in_ticks = 80;
-  _initVars();
 }
 
 void StepperQueue::attachDirPinToStatemachine() {
