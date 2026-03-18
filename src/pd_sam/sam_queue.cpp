@@ -240,7 +240,6 @@ inline uint32_t pinToChannel(uint32_t pin) {
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _queue_num = queue_num;
   driver_data = (void*)&gChannelMap[queue_num];
-  _initVars();
   _step_pin = step_pin;
   channelsUsed[pinToChannel(step_pin)] = true;
   numChannels++;

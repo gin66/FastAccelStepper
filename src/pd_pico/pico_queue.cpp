@@ -26,10 +26,6 @@ static const irq_handler_t pio_fifo_irq_handlers[] = {
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   (void)queue_num;
   _step_pin = step_pin;
-  _isActive = false;
-  dirPin = PIN_UNDEFINED;
-  pos_offset = 0;
-  max_speed_in_ticks = 80;
 }
 
 void StepperQueue::attachDirPinToStatemachine() {

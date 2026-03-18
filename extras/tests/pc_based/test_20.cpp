@@ -33,10 +33,8 @@ void test_handler(bool condition, const char* msg) {
 class FastAccelStepperTest {
  public:
   void init_queue() {
-    fas_queue[0].read_idx = 0;
-    fas_queue[1].read_idx = 0;
-    fas_queue[0].next_write_idx = 0;
-    fas_queue[1].next_write_idx = 0;
+    fas_queue[0]._initVars();
+    fas_queue[1]._initVars();
   }
 
   void test_issue_motor_stops_at_low_speed() {

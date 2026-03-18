@@ -28,45 +28,8 @@ uint8_t StepperQueue::queues_allocated = 0;
 #endif
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
-  uint8_t channel = queue_num;
-  max_speed_in_ticks = 80;
-#ifdef DEBUG
-  Serial.printf("init: queue_num=%d step_pin=%d\n", queue_num, step_pin);
-#endif
-#if defined(SUPPORT_DYNAMIC_ALLOCATION)
-#else
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  use_mcpwm_pcnt = false;
-  if (channel < QUEUES_MCPWM_PCNT) {
-    use_mcpwm_pcnt = true;
-  }
-#endif
-#ifdef SUPPORT_ESP32_RMT
-  use_rmt = false;
-  if ((queue_num >= QUEUES_MCPWM_PCNT) &&
-      (queue_num < QUEUES_RMT + QUEUES_MCPWM_PCNT)) {
-    use_rmt = true;
-    channel = queue_num - QUEUES_MCPWM_PCNT;
-  }
-#endif
-#endif
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  if (use_mcpwm_pcnt) {
-    init_mcpwm_pcnt(channel, step_pin);
-    return;
-  }
-#endif
-#ifdef SUPPORT_ESP32_RMT
-  if (use_rmt) {
-    init_rmt(channel, step_pin);
-    return;
-  }
-#endif
-#if defined(SUPPORT_ESP32_I2S)
-  if (use_i2s) {
-    init_i2s(step_pin);
-  }
-#endif
+  (void)queue_num;
+  (void)step_pin;
 }
 
 void StepperQueue::connect() {
@@ -217,6 +180,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     q->i2s_mgr = StepperQueue::_i2s_mux_manager;
     q->_i2s_mux_step_byte_offset = i2s_mux_byte_offset(slot);
     q->_i2s_mux_step_bit_mask = i2s_mux_bit_mask(slot);
+    q->init_i2s(step_pin);
     return q;
   }
 
@@ -233,6 +197,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     q->_initVars();
     q->use_rmt = true;
     StepperQueue::_rmt_allocated++;
+    q->init_rmt(0, step_pin);
     return q;
   }
 #endif
@@ -245,6 +210,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
       q->_initVars();
       q->use_i2s = true;
       q->i2s_mgr = mgr;
+      q->init_i2s(step_pin);
       return q;
     }
   }
@@ -282,6 +248,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   q->_initVars();
 #if defined(SUPPORT_ESP32_RMT)
   q->use_rmt = true;
+  q->init_rmt(0, step_pin);
 #endif
   StepperQueue::queues_allocated++;
   return q;
@@ -310,9 +277,22 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
       StepperQueue* q = &fas_queue[i];
       q->_initVars();
-#ifdef SUPPORT_ESP32_RMT
-      q->use_rmt = true;
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+      if (i < QUEUES_MCPWM_PCNT) {
+        q->use_mcpwm_pcnt = true;
+        q->init_mcpwm_pcnt(i, step_pin);
+      } else
 #endif
+      {
+        q->use_rmt = true;
+        q->init_rmt(
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+            i - QUEUES_MCPWM_PCNT,
+#else
+            i,
+#endif
+            step_pin);
+      }
       return q;
     }
   }
@@ -361,6 +341,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     StepperQueue* q = &fas_queue[mcpwm_pcnt_allocated];
     q->_initVars();
     q->use_mcpwm_pcnt = true;
+    q->init_mcpwm_pcnt(mcpwm_pcnt_allocated, step_pin);
     mcpwm_pcnt_allocated++;
     return q;
   }
@@ -371,9 +352,11 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     if (rmt_allocated >= QUEUES_RMT) {
       return nullptr;
     }
-    StepperQueue* q = &fas_queue[QUEUES_MCPWM_PCNT + rmt_allocated];
+    uint8_t idx = QUEUES_MCPWM_PCNT + rmt_allocated;
+    StepperQueue* q = &fas_queue[idx];
     q->_initVars();
     q->use_rmt = true;
+    q->init_rmt(rmt_allocated, step_pin);
     rmt_allocated++;
     return q;
   }
@@ -385,9 +368,11 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     if (i2s_allocated >= QUEUES_I2S) {
       return nullptr;
     }
-    StepperQueue* q = &fas_queue[i2s_start + i2s_allocated];
+    uint8_t idx = i2s_start + i2s_allocated;
+    StepperQueue* q = &fas_queue[idx];
     q->_initVars();
     q->use_i2s = true;
+    q->init_i2s(step_pin);
     i2s_allocated++;
     return q;
   }

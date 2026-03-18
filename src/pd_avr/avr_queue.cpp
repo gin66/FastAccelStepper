@@ -107,7 +107,6 @@ static FastAccelStepperEngine* fas_engine = NULL;
   }
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   prepareISRtimeMeasurement();
-  _initVars();
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);
   if (step_pin == stepPinStepperA) {

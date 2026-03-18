@@ -48,6 +48,7 @@ class StepperQueue : public StepperQueueBase {
 
   inline void _pd_initVars() {
     _step_pin = PIN_UNDEFINED;
+    max_speed_in_ticks = 80;
 #ifdef SUPPORT_ESP32_RMT
     use_rmt = false;
 #endif

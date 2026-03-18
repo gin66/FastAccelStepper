@@ -184,7 +184,8 @@ FastAccelStepper* s = engine.stepperConnectToPin(step_pin, DRIVER_I2S_DIRECT);
 ```
 
 Internally, `tryAllocateQueue()` calls `I2sManager::create(data_pin, I2S_GPIO_UNUSED, I2S_GPIO_UNUSED)`,
-allocates a `StepperQueue`, and stores the manager pointer in `q->i2s_mgr`.
+allocates a `StepperQueue`, calls `_initVars()`, sets `use_i2s = true`, stores the manager
+pointer in `q->i2s_mgr`, and calls `init_i2s(step_pin)`.
 
 ### I2S_MUX Mode — Engine Initialization
 
@@ -217,9 +218,10 @@ uint8_t i2s_pin = slot_index | PIN_I2S_FLAG;  // PIN_I2S_FLAG = 0x40
 FastAccelStepper* s = engine.stepperConnectToPin(i2s_pin, DRIVER_I2S_MUX);
 ```
 
-`tryAllocateQueue()` validates that the slot is not already allocated and assigns
-the shared `I2sManager` pointer to `q->i2s_mgr`. It also precomputes and stores
-the slot's byte offset and bit mask for fast fill operations.
+`tryAllocateQueue()` validates that the slot is not already allocated, calls `_initVars()`,
+sets `use_i2s = true`, assigns the shared `I2sManager` pointer to `q->i2s_mgr`,
+precomputes and stores the slot's byte offset and bit mask for fast fill operations,
+and calls `init_i2s(step_pin)`.
 
 ### Constants (i2s_constants.h)
 
@@ -566,10 +568,9 @@ union {
 };
 ```
 
-**Important**: Since both `SUPPORT_ESP32_RMT` and `SUPPORT_ESP32_I2S` are defined,
-`_initVars()` must NOT write to RMT-specific union members unconditionally.
-`_rmtStopped = true` is set only in the RMT-specific `init_rmt()` functions,
-not in the shared `_initVars()`.
+**Important**: `_initVars()` must NOT write to driver-specific union members unconditionally,
+since the union is shared between RMT, I2S, and MCPWM/PCNT fields. Each driver-specific
+init function (`init_rmt()`, `init_i2s()`) sets its own union members.
 
 ---
 

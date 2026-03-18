@@ -15,7 +15,12 @@ class StepperQueue : public StepperQueueBase {
   uint sm;
   int32_t pos_offset;
 
-  inline void _pd_initVars() { _step_pin = PIN_UNDEFINED; }
+  inline void _pd_initVars() {
+    _step_pin = PIN_UNDEFINED;
+    _isActive = false;
+    pos_offset = 0;
+    max_speed_in_ticks = 80;
+  }
 
   struct PioResources {
     PIO pio;

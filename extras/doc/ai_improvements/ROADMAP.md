@@ -98,7 +98,8 @@ class StepperQueue : public StepperQueueBase {
   inline bool isReadyForCommands() const { return true; }
   void startQueue();    // can freely access read_idx, entry[], channel
   void forceStop();
-  bool init(uint8_t queue_num, uint8_t step_pin);
+  void init(uint8_t queue_num, uint8_t step_pin);  // hardware setup only, called by tryAllocateQueue()
+  void _initVars();     // zero fields + set defaults, no hardware access
   void connect();
   void disconnect();
   static bool isValidStepPin(uint8_t step_pin);

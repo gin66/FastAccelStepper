@@ -52,7 +52,7 @@ All architecture drivers inherit from `StepperQueueBase` (defined in `fas_queue/
 
 | Method | Description |
 |--------|-------------|
-| `init(queue_num, step_pin)` | Initialize hardware, return false if pin invalid |
+| `init(queue_num, step_pin)` | One-time hardware setup (called by `tryAllocateQueue()`) |
 | `startQueue()` | Begin pulse generation from queue head |
 | `forceStop()` | Immediately stop and clear queue |
 | `connect()` | Attach pulse generator to GPIO |
@@ -63,6 +63,7 @@ All architecture drivers inherit from `StepperQueueBase` (defined in `fas_queue/
 | `isValidStepPin(pin)` | Check if pin can generate pulses (static) |
 | `getCurrentPosition()` | Return current step count |
 | `addQueueEntry(cmd, start)` | Add command to queue (common implementation) |
+| `_initVars()` | Zero all fields and set platform defaults (no hardware access) |
 
 ---
 
@@ -124,7 +125,7 @@ src/
 
 | Interface | AVR | ESP32 | SAM Due | Pico |
 |-----------|-----|-------|---------|------|
-| `init()` | Timer + compare config | MCPWM/PCNT or RMT config | PWM + GPIO config | Claim PIO SM |
+| `init()` | Timer + compare config | No-op (driver inits called by `tryAllocateQueue()`) | PWM + GPIO config | Set `_step_pin` |
 | `startQueue()` | Enable compare interrupt | Apply command + run | Attach PWM peripheral | Push to FIFO |
 | `forceStop()` | Disable interrupt | Stop peripheral | Disable PWM channel | Disable SM |
 | `connect()` | no-op | GPIO matrix | GPIO config | `pio_gpio_init()` |
@@ -372,7 +373,7 @@ class StepperQueue : public StepperQueueBase {
   bool hasTicksInQueue(uint32_t min_ticks);
   bool getActualTicksWithDirection(struct actual_ticks_s* speed);
 
-  bool init(uint8_t queue_num, uint8_t step_pin);
+  void init(uint8_t queue_num, uint8_t step_pin);
   void startQueue();
   void forceStop();
   void _initVars();
@@ -398,7 +399,8 @@ Create `pd_yourarch/yourarch_queue.cpp` implementing all methods:
 
 | Method | Purpose | Notes |
 |--------|---------|-------|
-| `init()` | Initialize hardware, allocate resources | Return false if pin invalid or no resources |
+| `_initVars()` | Zero all fields, set platform defaults | No hardware access, called by `tryAllocateQueue()` and `engine.init()` |
+| `init()` | One-time hardware setup | Called by `tryAllocateQueue()` only; must not call `_initVars()` |
 | `isRunning()` | Check if pulses are being generated | Can use flag or hardware state |
 | `isReadyForCommands()` | Check if queue can accept commands | Usually `true`, may check hardware state |
 | `startQueue()` | Begin pulse generation from queue head | Configure and enable timer/peripheral |

@@ -9,8 +9,8 @@ void fas_init_engine(FastAccelStepperEngine* engine) {}
 void fas_reset_stepper_allocation() { stepper_allocated_mask = 0; }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
-  _initVars();
-  max_speed_in_ticks = 80;  // This equals 200kHz @ 16MHz
+  (void)queue_num;
+  (void)step_pin;
 }
 void StepperQueue::startQueue() { _isRunning = true; }
 void StepperQueue::forceStop() {}

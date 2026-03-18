@@ -46,9 +46,7 @@ class RmtBufferTest {
   RmtBufferTest() : rmt_entries(global_rmt_entries), rmt_offset(0) {}
 
   void init_queue() {
-    fas_queue[0].read_idx = 0;
-    fas_queue[0].next_write_idx = 0;
-    fas_queue[0].lastChunkContainsSteps = false;
+    fas_queue[0]._initVars();
     rmt_offset = 0;
   }
 

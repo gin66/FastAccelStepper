@@ -16,7 +16,7 @@ class StepperQueue : public StepperQueueBase {
   uint16_t _after_dir_change_delay_ticks;
 
   inline void _pd_initVars() {
-    max_speed_in_ticks = TICKS_PER_S / 50000;
+    max_speed_in_ticks = 80;
 #ifdef SUPPORT_ESP32_RMT
     channel = RMT_CHANNEL_T();
     _rmtStopped = true;

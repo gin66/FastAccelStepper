@@ -36,10 +36,7 @@ class FastAccelStepperTest {
   uint32_t offset;
   uint32_t rmt_entries[1000000];
 
-  void init_queue() {
-    fas_queue[0].read_idx = 0;
-    fas_queue[0].next_write_idx = 0;
-  }
+  void init_queue() { fas_queue[0]._initVars(); }
 
   void ramp(TestCase tc) {
     printf(

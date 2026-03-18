@@ -365,7 +365,6 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
   _pendingExternalDirState = ExtDirPendingState::None;
   _rg.init();
   _queue_num = num;
-  _queue()->init(_queue_num, step_pin);
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
   _attached_pulse_unit = NULL;
 #endif

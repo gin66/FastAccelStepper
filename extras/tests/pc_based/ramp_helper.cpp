@@ -23,10 +23,8 @@ void interrupts() {}
 class FastAccelStepperTest {
  public:
   void init_queue() {
-    fas_queue[0].read_idx = 0;
-    fas_queue[1].read_idx = 0;
-    fas_queue[0].next_write_idx = 0;
-    fas_queue[1].next_write_idx = 0;
+    fas_queue[0]._initVars();
+    fas_queue[1]._initVars();
   }
 
   void dump_ramp_commands(uint32_t speed_us, uint32_t acceleration,
