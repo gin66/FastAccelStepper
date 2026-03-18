@@ -225,6 +225,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
 
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (fas_queue[i]._step_pin == PIN_UNDEFINED) {
+      fas_queue[i]._initVars();
       fas_queue[i].pio = res.pio;
       fas_queue[i].sm = res.sm;
       fas_queue[i].init(i, step_pin);
