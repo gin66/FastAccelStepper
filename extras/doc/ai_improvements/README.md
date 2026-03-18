@@ -52,6 +52,10 @@ The macro-based configuration system could be improved with `constexpr`, but thi
 #### ESP32 Driver Unification (02_esp32_driver_unification.md)
 The 7 ESP32 driver files could potentially be consolidated, but this requires careful testing across IDF versions.
 
+## SAM Platform: Unverified
+
+The SAM (Arduino Due) platform has **6 open issues** identified in [05_sam_platform_audit.md](05_sam_platform_audit.md), including 4 critical bugs. This platform cannot be tested in CI and has not been verified on hardware. Any changes to SAM code must be cross-checked against that document.
+
 ## Document Index
 
 | Document | Purpose |
@@ -61,6 +65,7 @@ The 7 ESP32 driver files could potentially be consolidated, but this requires ca
 | [02_esp32_driver_unification.md](02_esp32_driver_unification.md) | ESP32 driver consolidation proposal |
 | [03_configuration_system.md](03_configuration_system.md) | Configuration system modernization proposal |
 | [04_esp32_i2s_driver.md](04_esp32_i2s_driver.md) | ESP32 I2S output driver (single-pin and serial demux modes) |
+| [05_sam_platform_audit.md](05_sam_platform_audit.md) | SAM platform audit against SAM3X8E datasheet (6 open issues) |
 
 ## Contributing
 

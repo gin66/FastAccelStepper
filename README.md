@@ -491,6 +491,8 @@ build_flags = -Wall -Wextra -D__FREERTOS=1
 
 This is supported by clazarowitz
 
+**Note:** The SAM platform cannot be tested in CI. An audit against the SAM3X8E datasheet has identified [6 open issues](https://github.com/gin66/FastAccelStepper/blob/master/extras/doc/ai_improvements/05_sam_platform_audit.md) (4 critical, 2 minor), including invalid pin mappings and a wrong timer register value. Any changes to the SAM code must be cross-checked against that document.
+
 ### ALL
 
 The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup using log2/pow2. Sufficient exact for this purpose.
