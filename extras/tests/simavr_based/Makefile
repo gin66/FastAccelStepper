@@ -28,7 +28,8 @@ fas: $(addsuffix /FastAccelStepper,$(TESTS))
 	touch .fas
 
 %/FastAccelStepper:
-	cd $(dir $@); ln -s ../../../../../FastAccelStepper .
+	mkdir -p $(dir $@)FastAccelStepper
+	cd $(dir $@)FastAccelStepper; ln -sf $(PRJ_ROOT)/src .
 
 .makefiles: makefiles
 
