@@ -71,7 +71,6 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
     }
   }
 
-  e = &entry[wp & QUEUE_LEN_MASK];
   e->steps = steps;
   e->dirPinState = dir;
   e->toggle_dir = toggle_dir;
