@@ -891,3 +891,27 @@ MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
 }
 void FastAccelStepper::detachFromPin() { _queue()->disconnect(); }
 void FastAccelStepper::reAttachToPin() { _queue()->connect(); }
+
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+FasDriver FastAccelStepper::driverType() const {
+  return _queue()->_driver_type;
+}
+const char* FastAccelStepper::driverTypeString() const {
+  switch (_queue()->_driver_type) {
+#if defined(SUPPORT_ESP32_MCPWM_PCNT)
+    case FasDriver::MCPWM_PCNT:
+      return "MCPWM_PCNT";
+#endif
+    case FasDriver::RMT:
+      return "RMT";
+#if defined(SUPPORT_ESP32_I2S)
+    case FasDriver::I2S_DIRECT:
+      return "I2S_DIRECT";
+    case FasDriver::I2S_MUX:
+      return "I2S_MUX";
+#endif
+    default:
+      return "UNSPECIFIED";
+  }
+}
+#endif

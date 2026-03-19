@@ -32,14 +32,8 @@ class StepperQueue : public StepperQueueBase {
 #endif  // SUPPORT_SELECT_DRIVER_TYPE
 #endif  // SUPPORT_DYNAMIC_ALLOCATION
 
-#ifdef SUPPORT_ESP32_RMT
-  bool use_rmt;
-#endif
-#ifdef SUPPORT_ESP32_I2S
-  bool use_i2s;
-#endif
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-  bool use_mcpwm_pcnt;
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  FasDriver _driver_type;
 #endif
 
   volatile bool _isRunning;
@@ -49,14 +43,8 @@ class StepperQueue : public StepperQueueBase {
   inline void _pd_initVars() {
     _step_pin = PIN_UNDEFINED;
     max_speed_in_ticks = 80;
-#ifdef SUPPORT_ESP32_RMT
-    use_rmt = false;
-#endif
-#ifdef SUPPORT_ESP32_I2S
-    use_i2s = false;
-#endif
-#ifdef SUPPORT_ESP32_MCPWM_PCNT
-    use_mcpwm_pcnt = false;
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+    _driver_type = FasDriver::DONT_CARE;
 #endif
   }
 
@@ -127,82 +115,82 @@ class StepperQueue : public StepperQueueBase {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
-#ifdef SUPPORT_ESP32_I2S
-    if ((dirPin & PIN_I2S_FLAG) && use_i2s && i2s_mgr->_is_mux) {
-      uint8_t slot = dirPin & 0x1F;
-      if (slot >= 32) {
-        return;
-      }
-      uint32_t bit = 1UL << slot;
-      if (_i2s_mux_allocated_bitmask & bit) {
-        return;
-      }
-      _i2s_mux_allocated_bitmask |= bit;
-      if (_i2s_mux_manager != nullptr) {
-        _i2s_mux_manager->i2sMuxSetBit(slot, _dirHighCountsUp);
-      }
-    }
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
+    if ((dirPin & PIN_I2S_FLAG) && _driver_type == FasDriver::I2S_MUX) {
+#elif defined(SUPPORT_ESP32_I2S)
+    if ((dirPin & PIN_I2S_FLAG) && i2s_mgr && i2s_mgr->_is_mux) {
 #endif
-  }
+    }
 
- private:
-  static bool isValidStepPin(uint8_t step_pin);
-};
+   private:
+    static bool isValidStepPin(uint8_t step_pin);
+  };
 
 #if defined(SUPPORT_ESP32_RMT)
-void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
-void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
+  void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
+  void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
 #endif
 
-//==========================================================================
-// ESP32 PROTOCOL MACROS AND HELPER FUNCTIONS
-//==========================================================================
+  //==========================================================================
+  // ESP32 PROTOCOL MACROS AND HELPER FUNCTIONS
+  //==========================================================================
 
 #if defined(SUPPORT_ESP32_I2S)
-static inline void esp32_set_enable_pin_state(StepperQueue* q, uint8_t pin,
-                                              bool high) {
-  if (pin & PIN_I2S_FLAG) {
-    uint8_t slot = pin & 0x1F;
-    if (StepperQueue::_i2s_mux_manager != nullptr) {
-      StepperQueue::_i2s_mux_manager->i2sMuxSetBit(slot, high);
+  static inline void esp32_set_enable_pin_state(StepperQueue* q, uint8_t pin,
+                                                bool high) {
+    if (pin & PIN_I2S_FLAG) {
+      uint8_t slot = pin & 0x1F;
+      if (StepperQueue::_i2s_mux_manager != nullptr) {
+        StepperQueue::_i2s_mux_manager->i2sMuxSetBit(slot, high);
+      }
+    } else {
+      gpio_ll_set_level(&GPIO, (gpio_num_t)pin, high ? 1 : 0);
     }
-  } else {
-    gpio_ll_set_level(&GPIO, (gpio_num_t)pin, high ? 1 : 0);
   }
-}
 
-static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
-  if (q->dirPin & PIN_I2S_FLAG) {
-    uint8_t slot = q->dirPin & 0x1F;
-    if (StepperQueue::_i2s_mux_manager != nullptr) {
-      StepperQueue::_i2s_mux_manager->i2sMuxSetBit(slot, high);
+  static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
+    if (q->dirPin & PIN_I2S_FLAG) {
+      uint8_t slot = q->dirPin & 0x1F;
+      if (StepperQueue::_i2s_mux_manager != nullptr) {
+        StepperQueue::_i2s_mux_manager->i2sMuxSetBit(slot, high);
+      }
+    } else {
+      gpio_ll_set_level(&GPIO, (gpio_num_t)q->dirPin, high ? 1 : 0);
     }
-  } else {
-    gpio_ll_set_level(&GPIO, (gpio_num_t)q->dirPin, high ? 1 : 0);
   }
-}
 
-static inline uint16_t esp32_before_dir_change_delay_ticks(StepperQueue* q) {
+  static inline uint16_t esp32_before_dir_change_delay_ticks(StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  if (q->use_rmt) return MIN_CMD_TICKS;
-  if (q->use_i2s) return I2S_BLOCK_TICKS;
-  return 0;
+#ifdef SUPPORT_ESP32_RMT
+    if (q->_driver_type == FasDriver::RMT) return MIN_CMD_TICKS;
+#endif
+#ifdef SUPPORT_ESP32_I2S
+    if (q->_driver_type == FasDriver::I2S_DIRECT ||
+        q->_driver_type == FasDriver::I2S_MUX)
+      return I2S_BLOCK_TICKS;
+#endif
+    return 0;
 #elif defined(SUPPORT_ESP32_RMT)
-  return MIN_CMD_TICKS;
+    return MIN_CMD_TICKS;
 #elif defined(SUPPORT_ESP32_I2S)
-  return I2S_BLOCK_TICKS;
+    return I2S_BLOCK_TICKS;
 #else
-  return 0;
+    return 0;
 #endif
-}
+  }
 
-static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
-#if defined(SUPPORT_ESP32_I2S)
-  return q->use_i2s ? I2S_BLOCK_TICKS : 0;
+  static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
+    return (q->_driver_type == FasDriver::I2S_DIRECT ||
+            q->_driver_type == FasDriver::I2S_MUX)
+               ? I2S_BLOCK_TICKS
+               : 0;
+#elif defined(SUPPORT_ESP32_I2S)
+    return I2S_BLOCK_TICKS;
 #else
-  return 0;
+    return 0;
 #endif
-}
+  }
 
 #define SET_DIRECTION_PIN_STATE(q, high) \
   esp32_set_direction_pin_state((q), (high))

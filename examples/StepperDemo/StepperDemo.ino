@@ -743,6 +743,12 @@ void output_info(bool only_running) {
         PRINTU8(i + 1);
         PRINT(": ");
         info(stepper[i], !only_running);
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+        if (!stepper[i]->isRunning()) {
+          PRINT(" ");
+          PRINT(stepper[i]->driverTypeString());
+        }
+#endif
         if (!only_running) {
           PRINTLN("");
         } else {

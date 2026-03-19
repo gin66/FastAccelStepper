@@ -33,13 +33,17 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect() {
-#ifdef SUPPORT_ESP32_I2S
-  if (use_i2s) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
+  if (_driver_type == FasDriver::I2S_DIRECT ||
+      _driver_type == FasDriver::I2S_MUX) {
     return;
   }
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  if (use_rmt) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_driver_type == FasDriver::RMT)
+#endif
+  {
     connect_rmt();
     return;
   }
@@ -50,13 +54,17 @@ void StepperQueue::connect() {
 }
 
 void StepperQueue::disconnect() {
-#ifdef SUPPORT_ESP32_I2S
-  if (use_i2s) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
+  if (_driver_type == FasDriver::I2S_DIRECT ||
+      _driver_type == FasDriver::I2S_MUX) {
     return;
   }
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  if (use_rmt) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_driver_type == FasDriver::RMT)
+#endif
+  {
     disconnect_rmt();
     return;
   }
@@ -67,13 +75,17 @@ void StepperQueue::disconnect() {
 }
 
 bool StepperQueue::isReadyForCommands() const {
-#ifdef SUPPORT_ESP32_I2S
-  if (use_i2s) {
+#if defined(SUPPORT_ESP32_I2S)
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_driver_type == FasDriver::I2S_DIRECT ||
+      _driver_type == FasDriver::I2S_MUX)
+#endif
+  {
     return isReadyForCommands_i2s();
   }
 #endif
 #if defined(SUPPORT_ESP32_RMT) && defined(SUPPORT_ESP32_MCPWM_PCNT)
-  if (use_rmt) {
+  if (_driver_type == FasDriver::RMT) {
     return isReadyForCommands_rmt();
   }
   return isReadyForCommands_mcpwm_pcnt();
@@ -87,14 +99,18 @@ bool StepperQueue::isReadyForCommands() const {
 }
 
 void StepperQueue::startQueue() {
-#ifdef SUPPORT_ESP32_I2S
-  if (use_i2s) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
+  if (_driver_type == FasDriver::I2S_DIRECT ||
+      _driver_type == FasDriver::I2S_MUX) {
     startQueue_i2s();
     return;
   }
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  if (use_rmt) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_driver_type == FasDriver::RMT)
+#endif
+  {
     startQueue_rmt();
     return;
   }
@@ -105,14 +121,18 @@ void StepperQueue::startQueue() {
 }
 
 void StepperQueue::forceStop() {
-#ifdef SUPPORT_ESP32_I2S
-  if (use_i2s) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
+  if (_driver_type == FasDriver::I2S_DIRECT ||
+      _driver_type == FasDriver::I2S_MUX) {
     forceStop_i2s();
     return;
   }
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  if (use_rmt) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_driver_type == FasDriver::RMT)
+#endif
+  {
     forceStop_rmt();
     return;
   }
@@ -123,13 +143,20 @@ void StepperQueue::forceStop() {
 }
 
 uint16_t StepperQueue::_getPerformedPulses() const {
-#ifdef SUPPORT_ESP32_I2S
-  if (use_i2s) {
+#if defined(SUPPORT_ESP32_I2S)
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_driver_type == FasDriver::I2S_DIRECT ||
+      _driver_type == FasDriver::I2S_MUX)
+#endif
+  {
     return _getPerformedPulses_i2s();
   }
 #endif
 #ifdef SUPPORT_ESP32_RMT
-  if (use_rmt) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_driver_type == FasDriver::RMT)
+#endif
+  {
     return _getPerformedPulses_rmt();
   }
 #endif
@@ -176,7 +203,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     StepperQueue::_i2s_mux_allocated_bitmask |= bit;
     StepperQueue* q = new StepperQueue();
     q->_initVars();
-    q->use_i2s = true;
+    q->_driver_type = FasDriver::I2S_MUX;
     q->i2s_mgr = StepperQueue::_i2s_mux_manager;
     q->_i2s_mux_step_byte_offset = i2s_mux_byte_offset(slot);
     q->_i2s_mux_step_bit_mask = i2s_mux_bit_mask(slot);
@@ -195,7 +222,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     }
     StepperQueue* q = new StepperQueue();
     q->_initVars();
-    q->use_mcpwm_pcnt = true;
+    q->_driver_type = FasDriver::MCPWM_PCNT;
     q->init_mcpwm_pcnt(StepperQueue::_mcpwm_pcnt_allocated, step_pin);
     StepperQueue::_mcpwm_pcnt_allocated++;
     return q;
@@ -209,7 +236,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     }
     StepperQueue* q = new StepperQueue();
     q->_initVars();
-    q->use_rmt = true;
+    q->_driver_type = FasDriver::RMT;
     StepperQueue::_rmt_allocated++;
     q->init_rmt(0, step_pin);
     return q;
@@ -222,7 +249,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     if (mgr != nullptr) {
       StepperQueue* q = new StepperQueue();
       q->_initVars();
-      q->use_i2s = true;
+      q->_driver_type = FasDriver::I2S_DIRECT;
       q->i2s_mgr = mgr;
       q->init_i2s(step_pin);
       return q;
@@ -265,7 +292,6 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   StepperQueue* q = new StepperQueue();
   q->_initVars();
 #if defined(SUPPORT_ESP32_RMT)
-  q->use_rmt = true;
   q->init_rmt(0, step_pin);
 #endif
   StepperQueue::queues_allocated++;
@@ -297,12 +323,10 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
       q->_initVars();
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
       if (i < QUEUES_MCPWM_PCNT) {
-        q->use_mcpwm_pcnt = true;
         q->init_mcpwm_pcnt(i, step_pin);
       } else
 #endif
       {
-        q->use_rmt = true;
         q->init_rmt(
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
             i - QUEUES_MCPWM_PCNT,
@@ -358,7 +382,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     }
     StepperQueue* q = &fas_queue[mcpwm_pcnt_allocated];
     q->_initVars();
-    q->use_mcpwm_pcnt = true;
+    q->_driver_type = FasDriver::MCPWM_PCNT;
     q->init_mcpwm_pcnt(mcpwm_pcnt_allocated, step_pin);
     mcpwm_pcnt_allocated++;
     return q;
@@ -373,7 +397,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     uint8_t idx = QUEUES_MCPWM_PCNT + rmt_allocated;
     StepperQueue* q = &fas_queue[idx];
     q->_initVars();
-    q->use_rmt = true;
+    q->_driver_type = FasDriver::RMT;
     q->init_rmt(rmt_allocated, step_pin);
     rmt_allocated++;
     return q;
@@ -389,7 +413,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     uint8_t idx = i2s_start + i2s_allocated;
     StepperQueue* q = &fas_queue[idx];
     q->_initVars();
-    q->use_i2s = true;
+    q->_driver_type = FasDriver::I2S_DIRECT;
     q->init_i2s(step_pin);
     i2s_allocated++;
     return q;

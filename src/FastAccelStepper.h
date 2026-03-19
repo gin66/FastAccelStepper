@@ -689,6 +689,13 @@ class FastAccelStepper {
   inline bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
 #endif
 
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  // Get the driver type (RMT, MCPWM_PCNT, I2S_DIRECT, I2S_MUX) used by this
+  // stepper. Only available on ESP32 when multiple driver types are supported.
+  FasDriver driverType() const;
+  const char* driverTypeString() const;
+#endif
+
  private:
   void performOneStep(bool count_up, bool blocking = false);
   void fill_queue();

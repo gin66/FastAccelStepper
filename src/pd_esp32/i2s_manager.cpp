@@ -132,7 +132,10 @@ void IRAM_ATTR I2sManager::handleTxDone(uint8_t* buf) {
 
   for (uint8_t i = 0; i < NUM_QUEUES; i++) {
     StepperQueue* q = fas_queue[i];
-    if (q && q->use_i2s && q->i2s_mgr == this) {
+    if (q &&
+        (q->_driver_type == FasDriver::I2S_DIRECT ||
+         q->_driver_type == FasDriver::I2S_MUX) &&
+        q->i2s_mgr == this) {
       // 32us..44us @ v=10us
       // ~63us @ v=5us
       q->fill_i2s_buffer(buf);
