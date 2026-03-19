@@ -25,6 +25,7 @@
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper* stepper[MAX_STEPPER];
+const struct stepper_config_s* active_stepper_config = NULL;
 
 enum { normal, test, config } mode = normal;
 bool test_ongoing = false;
@@ -512,12 +513,41 @@ void test_direct_drive(const struct stepper_config_s* stepper) {
 
 void setup() {
   PRINT_INIT();
-#if defined(PICO_RP2040) || defined(PICO_RP2350)
-  for (uint8_t i = 0; i < 5; i++) {
-    Serial.print("Start pause (5s): ");
-    Serial.println(i);
-    delay(1000);
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM) || \
+    defined(PICO_RP2040) || defined(PICO_RP2350)
+  PRINTLN("Select pin configuration:");
+  for (uint8_t i = 0; i < NUM_CONFIGS; i++) {
+    PRINT("  ");
+    PRINTU8(i);
+    PRINT(": ");
+    PRINTLN(stepper_configs[i].name);
   }
+  PRINTLN("Press number to select, else 0");
+  uint8_t selected_config = 0;
+  uint32_t start = MILLIS();
+  while (MILLIS() - start < 5000) {
+    char ch = 0;
+    POLL_CHAR_IF_ANY(ch);
+    if (ch >= '0' && ch <= '9') {
+      uint8_t n = ch - '0';
+      if (n < NUM_CONFIGS) {
+        selected_config = n;
+      }
+      break;
+    }
+#if defined(ESP_PLATFORM) && !defined(ARDUINO_ARCH_ESP32)
+    DELAY_MS(10);
+#else
+    delay(10);
+#endif
+  }
+  active_stepper_config = stepper_configs[selected_config].config;
+  PRINT("Using config ");
+  PRINTU8(selected_config);
+  PRINT(": ");
+  PRINTLN(stepper_configs[selected_config].name);
+#else
+  active_stepper_config = stepper_config;
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
   printf("LOG start\n");
@@ -556,7 +586,7 @@ void setup() {
   // If you are not sure, that the stepper hardware is working,
   // then try first direct port manipulation and uncomment the next line.
   // Alternatively use e.g. M1 T by serial command
-  // test_direct_drive(&stepper_config[0]);
+  // test_direct_drive(&active_stepper_config[0]);
 
   // delay(10000);
   engine.init();
@@ -567,7 +597,7 @@ void setup() {
 
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     FastAccelStepper* s = NULL;
-    const struct stepper_config_s* config = &stepper_config[i];
+    const struct stepper_config_s* config = &active_stepper_config[i];
     if (config->step != PIN_UNDEFINED) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
       s = engine.stepperConnectToPin(config->step, config->driver_type);
@@ -1195,7 +1225,7 @@ bool process_cmd(char* cmd) {
         if (!stepper_selected->isRunning()) {
           output_msg(MSG_TEST_DIRECT_DRIVE);
           stepper_selected->detachFromPin();
-          test_direct_drive(&stepper_config[selected]);
+          test_direct_drive(&active_stepper_config[selected]);
           stepper_selected->reAttachToPin();
         }
         return true;

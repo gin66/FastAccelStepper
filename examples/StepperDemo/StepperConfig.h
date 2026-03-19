@@ -18,4 +18,9 @@ struct stepper_config_s {
 #endif
 };
 
+struct stepper_config_set_s {
+  const char* name;
+  const struct stepper_config_s* config;
+};
+
 #endif
