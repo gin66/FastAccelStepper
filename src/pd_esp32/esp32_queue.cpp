@@ -181,7 +181,7 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 }
 
 #if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_DYNAMIC_ALLOCATION)
-// dynamic allocation only for espidf >=5.3, so no mcpwm/pcnt
+// dynamic allocation for espidf >=5.3 with support for mcpwm/pcnt, rmt, and i2s
 StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
                                              FasDriver driver,
                                              uint8_t step_pin) {

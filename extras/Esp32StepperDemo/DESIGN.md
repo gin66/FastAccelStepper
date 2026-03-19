@@ -1097,7 +1097,8 @@ build_flags =
 - **ESP32-C6**: Limited (RMT only)
 
 ### 14.2 IDF Version Compatibility
-- **ESP-IDF v5.3+**: RMT only (recommended, with improved driver)
+- **ESP-IDF v4.x**: MCPWM/PCNT + RMT (ESP32, ESP32-S3), RMT only (ESP32-S2, ESP32-C3)
+- **ESP-IDF v5.3+**: MCPWM/PCNT (ESP32 classic only) + RMT + I2S
 - **I2S Support**: Via new I2S driver API in v5.3+
 
 ### 14.3 Arduino ESP32 Core

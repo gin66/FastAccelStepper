@@ -166,24 +166,25 @@ Comments to pin sharing:
 
 ### ESP32 Variants Overview
 
-| Variant     | IDF 4.x Driver     | IDF 4.x Max | IDF 5.3+ Driver  | IDF 5.3+ Max (RMT+I2S) | I2S Ctrl | I2S Mux | I2S Direct |
-|-------------|--------------------|-------------|------------------|------------------------|----------|---------|------------|
-| ESP32       | MCPWM/PCNT + RMT   | 14 (6+8)    | RMT + I2S        | 8 + 32                 | 2        | 32 pins | 2 ch       |
-| ESP32-S2    | RMT                | 4           | RMT + I2S        | 4 + 32                 | 2        | 32 pins | 2 ch       |
-| ESP32-S3    | MCPWM/PCNT + RMT   | 8           | RMT + I2S        | 4 + 32                 | 2        | 32 pins | 2 ch       |
-| ESP32-C3    | RMT                | 2           | RMT + I2S        | 2 + 32                 | 1        | 32 pins | 1 ch       |
-| ESP32-C6    | -                  | -           | RMT + I2S        | 4 + 32                 | 1        | 32 pins | 1 ch       |
-| ESP32-P4    | -                  | -           | RMT + I2S        | 4 + 32                 | 3        | 32 pins | 3 ch       |
+| Variant     | IDF 4.x Driver     | IDF 4.x Max | IDF 5.3+ Driver            | IDF 5.3+ Max               | I2S Ctrl | I2S Mux | I2S Direct |
+|-------------|--------------------|-------------|---------------------------|----------------------------|----------|---------|------------|
+| ESP32       | MCPWM/PCNT + RMT   | 14 (6+8)    | MCPWM/PCNT + RMT + I2S    | 14 (6+8) + 32              | 2        | 32 pins | 2 ch       |
+| ESP32-S2    | RMT                | 4           | RMT + I2S                 | 4 + 32                     | 2        | 32 pins | 2 ch       |
+| ESP32-S3    | MCPWM/PCNT + RMT   | 8           | RMT + I2S                 | 4 + 32                     | 2        | 32 pins | 2 ch       |
+| ESP32-C3    | RMT                | 2           | RMT + I2S                 | 2 + 32                     | 1        | 32 pins | 1 ch       |
+| ESP32-C6    | -                  | -           | RMT + I2S                 | 4 + 32                     | 1        | 32 pins | 1 ch       |
+| ESP32-P4    | -                  | -           | RMT + I2S                 | 4 + 32                     | 3        | 32 pins | 3 ch       |
 
 **Notes:**
-- IDF 5.3+ Max = RMT channels + I2S Mux slots (can be combined)
-- I2S Mux requires ESP-IDF ≥5.3 and uses one I2S controller
+- IDF 5.3+ Max = MCPWM/PCNT + RMT channels + I2S Mux slots (can be combined)
+- MCPWM/PCNT is available on IDF 5.3+ for ESP32 (classic) only
+- I2S Mux requires ESP-IDF >=5.3 and uses one I2S controller
 - I2S Mux slots are shared: if step/dir/enable all use I2S Mux, each stepper consumes 1-3 slots
   - Step only: up to 32 steppers
   - Step + Dir: up to 16 steppers
   - Step + Dir + Enable: up to 10 steppers
 - I2S Direct channels = number of I2S controllers (experimental)
-- C6 and P4 require IDF ≥5.3 (no IDF 4.x support)
+- C6 and P4 require IDF >=5.3 (no IDF 4.x support)
 
 #### ESP-IDF version 4.x.y:
 * allows up to 200000 generated steps per second
@@ -393,7 +394,7 @@ For the other stepper motors, the rmt module comes into use.
 
 #### ESP-IDF version >=5.3.0:
 
-RMT and I2S Mux/Direct drivers are supported. MCPWM/PCNT is not available in ESP-IDF 5.3+.
+RMT, I2S Mux/Direct, and MCPWM/PCNT (ESP32 classic only) drivers are supported.
 
 #### I2S Mux Driver Implementation
 
@@ -443,6 +444,7 @@ The ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels and 
 This stepper driver uses mcpwm/pcnt + rmt modules. Can drive up to 8 motors. Tested with 6 motors (not by me). 
 #### ESP-IDF version >=5.3.0:
 This stepper driver uses rmt modules. Can drive up to 4 motors.
+MCPWM/PCNT is not available on ESP32-S3 with IDF 5.3+.
 I2S Mux driver is also available with same capabilities as ESP32 (see ESP32 I2S Mux section above). 
 
 ### ESP32C3

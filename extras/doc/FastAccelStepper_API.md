@@ -131,8 +131,7 @@ relevant. Apparently, arduino-esp32 has FreeRTOS configured to have a
 tick-rate of 1000Hz
 ```cpp
   void task_rate(uint8_t delay_ms) { _delay_ms = delay_ms; };
-  uint8_t _delay_ms;
-#endif
+  uint8_t _task_rate() const { return _delay_ms; };
 ```
 ## External Pins
 
@@ -423,7 +422,7 @@ Returns 0 on success, or -1 on invalid value (<=0)
 getCurrentAcceleration() retrieves the actual acceleration.
    = 0 while idle or coasting
    > 0 while speed is changing towards positive values
-   < 0 while speed is changeing towards negative values
+   < 0 while speed is changing towards negative values
 ```cpp
   int32_t getCurrentAcceleration() const {
     return _rg.getCurrentAcceleration();
@@ -671,7 +670,7 @@ Negative values (errors):
 ```
 ## Low Level Stepper Queue Management (low level access)
 
-If the queue is already running, then the start parameter is obsolote.
+If the queue is already running, then the start parameter is obsolete.
 But the queue may run out of commands while executing addQueueEntry,
 so it is better to set start=true to automatically restart/continue
 a running queue.
@@ -872,5 +871,12 @@ by the system. The parameter is kept for compatibility.
   int16_t readPulseCounter();
   void clearPulseCounter();
   bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }
+#endif
+```
+Get the driver type (RMT, MCPWM_PCNT, I2S_DIRECT, I2S_MUX) used by this
+stepper. Only available on ESP32 when multiple driver types are supported.
+```cpp
+  FasDriver driverType() const;
+  const char* driverTypeString() const;
 #endif
 ```

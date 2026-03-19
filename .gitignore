@@ -32,7 +32,6 @@ extras/tests/simavr_based/simavr
 extras/tests/simavr_based/test_sd*/Makefile
 extras/tests/simavr_based/test_seq*/Makefile
 extras/tests/esp32_hw_based/*.log
-library.properties
 examples
 extras/gen_log2_const/Log2Representation.cpp
 extras/gen_log2_const/main
@@ -46,3 +45,5 @@ AGENTS.md
 extras/tests/pc_based/AGENTS.md
 extras/Esp32StepperDemo/lib/FastAccelStepper/src
 extras/tests/esp32_hw_based/.test_*
+extras/tests/esp32_hw_based/__pycache__
+examples/StepperDemo/StepperDemo.ino-e

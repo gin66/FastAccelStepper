@@ -1,13 +1,14 @@
 # ESP32 MCPWM/PCNT Migration to ESP-IDF v5.3+
 
-## Status: SINGLE STEPPER WORKING ON HARDWARE
+## Status: COMPLETE - Working on hardware with pulse counter verification
 
 ## Context
 
 The MCPWM/PCNT stepper driver (the most accurate pulse generation mode) was disabled
 for ESP-IDF 5.x because the legacy direct-register APIs were completely redesigned.
-Only RMT and I2S drivers are available on IDF 5.3+, losing the MCPWM/PCNT advantages
-(dedicated hardware, no DMA contention, higher precision).
+It has been restored for ESP32 classic using the new MCPWM driver API for
+initialization and ISR registration, while keeping direct register access in the ISR
+for maximum speed.
 
 ## Approach
 

@@ -848,7 +848,8 @@ bool process_cmd(char* cmd) {
     case MODE(test, 'M'):
     case MODE(config, 'M'):
       if (get_val1_val2_val3(cmd) == 1) {
-        if ((val_n[0] > 0) && (val_n[0] <= (int32_t)MAX_STEPPER)) {
+        if ((val_n[0] > 0) && (val_n[0] <= (int32_t)MAX_STEPPER) &&
+            stepper[val_n[0] - 1] != NULL) {
           output_msg(MSG_SELECT_STEPPER);
           selected = val_n[0] - 1;
           PRINTI16(selected + 1);

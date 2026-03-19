@@ -1,3 +1,9 @@
+1.2.5:
+- ESP32: Restore MCPWM/PCNT driver for IDF 5.3+ (classic ESP32 only)
+- StepperDemo: guard against selecting unconnected stepper motors
+- ESP32: Convert hardware test scripts from grabserial to Python (single serial session)
+- Update documentation for IDF 5.3+ MCPWM/PCNT support
+
 1.2.4:
 - Rework of the complete init system across all platforms:
   - `StepperQueue::init()` and `FastAccelStepper::init()` return type changed from `bool` to `void`
