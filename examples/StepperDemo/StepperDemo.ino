@@ -16,7 +16,13 @@
 #if defined(ARDUINO_ARCH_AVR)
 #include "StepperPins_avr.h"
 #elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#if defined(CONFIG_IDF_TARGET_ESP32C3)
+#include "StepperPins_esp32C3.h"
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+#include "StepperPins_esp32C6.h"
+#else
 #include "StepperPins_esp32.h"
+#endif
 #elif defined(ARDUINO_ARCH_SAM)
 #include "StepperPins_sam.h"
 #elif defined(PICO_RP2040) || defined(PICO_RP2350)

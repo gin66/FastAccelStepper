@@ -3,85 +3,8 @@
 
 #include "StepperConfig.h"
 
-// Example hardware configuration for esp32 board.
-// Please adapt to your configuration
-#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
-const uint8_t led_pin = 8;
-#else
 const uint8_t led_pin = PIN_UNDEFINED;
-#endif
 
-#if defined(CONFIG_IDF_TARGET_ESP32C3)
-const struct stepper_config_s esp32_config_0[] = {
-    {
-      step : 6,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 50,
-      off_delay_ms : 1000,
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-      driver_type : DRIVER_DONT_CARE,
-#endif
-    },
-    {
-      step : 7,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000,
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-      driver_type : DRIVER_DONT_CARE,
-#endif
-    },
-    {step : PIN_UNDEFINED}};
-#define NUM_CONFIGS 1
-const struct stepper_config_set_s stepper_configs[NUM_CONFIGS] = {
-    {"C3-Test", esp32_config_0},
-};
-#elif defined(CONFIG_IDF_TARGET_ESP32C6)
-const struct stepper_config_s esp32_config_0[] = {
-    {
-      step : 6,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 7,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 50,
-      off_delay_ms : 1000,
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-      driver_type : DRIVER_DONT_CARE,
-#endif
-    },
-    {
-      step : 15,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000,
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-      driver_type : DRIVER_DONT_CARE,
-#endif
-    },
-    {step : PIN_UNDEFINED}};
-#define NUM_CONFIGS 1
-const struct stepper_config_set_s stepper_configs[NUM_CONFIGS] = {
-    {"C6-Test", esp32_config_0},
-};
-#else
 // clang-format off
     // Test-HW
     // Position 01 linked to atmega nano
@@ -302,10 +225,57 @@ const struct stepper_config_s esp32_config_0[] = {
     },
 #endif
     {step : PIN_UNDEFINED}};
-#define NUM_CONFIGS 1
+const struct stepper_config_s esp32_config_1[] = {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(QUEUES_RMT) && \
+    (QUEUES_RMT > 0)
+    {
+      step : 17,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : false,
+      on_delay_us : 0,
+      off_delay_ms : 0,
+      driver_type : DRIVER_RMT,
+    },
+#endif
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S) && \
+    defined(QUEUES_I2S_DIRECT) && (QUEUES_I2S_DIRECT > 0)
+    {
+      step : 15,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 18,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : false,
+      on_delay_us : 0,
+      off_delay_ms : 0,
+      driver_type : DRIVER_I2S_DIRECT,
+    },
+#endif
+#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(QUEUES_MCPWM_PCNT) && \
+    (QUEUES_MCPWM_PCNT > 0)
+    {
+      step : 2,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : 19,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : false,
+      on_delay_us : 0,
+      off_delay_ms : 0,
+      driver_type : DRIVER_MCPWM_PCNT,
+    },
+#endif
+    {step : PIN_UNDEFINED}};
+#define NUM_CONFIGS 2
 const struct stepper_config_set_s stepper_configs[NUM_CONFIGS] = {
     {"Test-HW", esp32_config_0},
+    {"Driver-Types", esp32_config_1},
 };
-#endif
 
 #endif
