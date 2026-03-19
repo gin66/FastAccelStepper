@@ -1,7 +1,9 @@
 1.2.5:
 - ESP32: Restore MCPWM/PCNT driver for IDF 5.3+ (classic ESP32 only)
+- Add driverType()/driverTypeString() API to query ESP32 driver at runtime
 - StepperDemo: guard against selecting unconnected stepper motors
 - ESP32: Convert hardware test scripts from grabserial to Python (single serial session)
+- Fix moveTimed() using wrong variable in actual_duration calculation
 - Update documentation for IDF 5.3+ MCPWM/PCNT support
 
 1.2.4:
