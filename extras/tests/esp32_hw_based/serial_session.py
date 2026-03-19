@@ -168,7 +168,7 @@ class SerialSession:
         1. **Hardware reset on open** -- the ESP32 reboots automatically
            when the serial port is opened.  We wait for the pin
            configuration prompt, send the config number, and wait for
-           ``LOG start`` to confirm full boot.
+           ``StepperDemo`` to confirm full boot.
         2. **No hardware reset** -- the ESP32 is already running.
            We fall back to a software reset via the ``reset`` command
            and then proceed as in case 1.
@@ -183,7 +183,7 @@ class SerialSession:
         time.sleep(0.05)
         self.send(self.config)
 
-        self.wait_for("LOG start")
+        self.wait_for("StepperDemo")
         time.sleep(0.1)
 
     def send(self, command):
