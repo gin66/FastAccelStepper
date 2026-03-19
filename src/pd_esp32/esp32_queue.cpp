@@ -41,12 +41,14 @@ void StepperQueue::connect() {
 #endif
 #ifdef SUPPORT_ESP32_RMT
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  if (_driver_type == FasDriver::RMT)
-#endif
-  {
+  if (_driver_type == FasDriver::RMT) {
     connect_rmt();
     return;
   }
+#elif !defined(SUPPORT_ESP32_MCPWM_PCNT)
+  connect_rmt();
+  return;
+#endif
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   connect_mcpwm_pcnt();
@@ -62,12 +64,14 @@ void StepperQueue::disconnect() {
 #endif
 #ifdef SUPPORT_ESP32_RMT
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  if (_driver_type == FasDriver::RMT)
-#endif
-  {
+  if (_driver_type == FasDriver::RMT) {
     disconnect_rmt();
     return;
   }
+#elif !defined(SUPPORT_ESP32_MCPWM_PCNT)
+  disconnect_rmt();
+  return;
+#endif
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
   disconnect_mcpwm_pcnt();
@@ -85,10 +89,14 @@ bool StepperQueue::isReadyForCommands() const {
   }
 #endif
 #if defined(SUPPORT_ESP32_RMT) && defined(SUPPORT_ESP32_MCPWM_PCNT)
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (_driver_type == FasDriver::RMT) {
     return isReadyForCommands_rmt();
   }
   return isReadyForCommands_mcpwm_pcnt();
+#else
+#error "RMT + MCPWM_PCNT requires SUPPORT_SELECT_DRIVER_TYPE"
+#endif
 #elif defined(SUPPORT_ESP32_MCPWM_PCNT)
   return isReadyForCommands_mcpwm_pcnt();
 #elif defined(SUPPORT_ESP32_RMT)

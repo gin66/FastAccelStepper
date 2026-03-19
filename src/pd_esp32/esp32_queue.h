@@ -115,6 +115,27 @@ class StepperQueue : public StepperQueueBase {
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
+#ifdef SUPPORT_ESP32_I2S
+    if ((dirPin & PIN_I2S_FLAG)) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+      if (_driver_type == FasDriver::I2S_MUX)
+#endif
+      {
+        uint8_t slot = dirPin & 0x1F;
+        if (slot >= 32) {
+          return;
+        }
+        uint32_t bit = 1UL << slot;
+        if (_i2s_mux_allocated_bitmask & bit) {
+          return;
+        }
+        _i2s_mux_allocated_bitmask |= bit;
+        if (_i2s_mux_manager != nullptr) {
+          _i2s_mux_manager->i2sMuxSetBit(slot, _dirHighCountsUp);
+        }
+      }
+    }
+#endif
   }
 
  private:
