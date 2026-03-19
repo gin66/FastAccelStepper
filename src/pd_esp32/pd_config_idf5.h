@@ -45,7 +45,7 @@
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S3
-// #define SUPPORT_ESP32_MCPWM_PCNT
+#define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 8
@@ -53,11 +53,10 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 
-// #define QUEUES_MCPWM_PCNT 4
-#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_MCPWM_PCNT 4
 #define QUEUES_RMT 4
 #define NEED_RMT_HEADERS
-// #define NEED_MCPWM_HEADERS
+#define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
 //==========================================================================
@@ -80,14 +79,16 @@
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C6
+#define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 4
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
-#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_MCPWM_PCNT 2
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
+#define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
 //==========================================================================
@@ -96,14 +97,16 @@
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32H2
+#define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 4
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
-#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_MCPWM_PCNT 2
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
+#define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
 //==========================================================================

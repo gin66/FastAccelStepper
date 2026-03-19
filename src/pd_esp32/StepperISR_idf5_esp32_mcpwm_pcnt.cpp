@@ -5,6 +5,43 @@
 
 #define TIMER_BIT(timer) (1 << (timer + 15))
 
+#if defined(CONFIG_IDF_TARGET_ESP32S3)
+#define FAS_CNT_H_LIM cnt_h_lim_un
+#define FAS_CNT_VAL pulse_cnt_un
+#define FAS_THR_H_LIM_EN thr_h_lim_en_un
+#define FAS_THR_L_LIM_EN thr_l_lim_en_un
+#elif defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32H2)
+#define FAS_CNT_H_LIM cnt_h_lim
+#define FAS_CNT_VAL pulse_cnt
+#define FAS_THR_H_LIM_EN thr_h_lim_en
+#define FAS_THR_L_LIM_EN thr_l_lim_en
+#else
+#define FAS_CNT_H_LIM cnt_h_lim
+#define FAS_CNT_VAL cnt_val
+#define FAS_THR_H_LIM_EN thr_h_lim_en
+#define FAS_THR_L_LIM_EN thr_l_lim_en
+#endif
+
+#if defined(CONFIG_IDF_TARGET_ESP32C6) || defined(CONFIG_IDF_TARGET_ESP32H2)
+#define FAS_GPIO_OUT_SEL out_sel
+#define FAS_GPIO_OUT_SEL_DISCONNECT 128
+#define FAS_GEN_A_UPMETHOD cmpr_a_upmethod
+#elif defined(CONFIG_IDF_TARGET_ESP32S3)
+#define FAS_GPIO_OUT_SEL func_sel
+#define FAS_GPIO_OUT_SEL_DISCONNECT 0x100
+#define FAS_GEN_A_UPMETHOD gen_a_upmethod
+#else
+#define FAS_GPIO_OUT_SEL func_sel
+#define FAS_GPIO_OUT_SEL_DISCONNECT 0x100
+#define FAS_GEN_A_UPMETHOD gen_a_upmethod
+#endif
+
+#if defined(CONFIG_IDF_TARGET_ESP32H2)
+#define FAS_MCPWM_PRESCALE (3 - 1)
+#else
+#define FAS_MCPWM_PRESCALE (5 - 1)
+#endif
+
 struct pcnt_unit_internal {
   void* group;
   portMUX_TYPE spinlock;
@@ -18,6 +55,7 @@ struct mapping_s {
   mcpwm_gen_handle_t gen;
   pcnt_unit_handle_t pcnt_unit;
   uint8_t pcnt_unit_id;
+  uint8_t timer_in_group;
   mcpwm_dev_t* mcpwm;
 };
 
@@ -29,6 +67,22 @@ static bool pcnt_isr_installed = false;
   REG_SET_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit_id))); \
   REG_CLR_BIT(PCNT_CTRL_REG, (1 << (2 * pcnt_unit_id)))
 
+static inline uint8_t _group_for_timer(int timer_num) {
+#if SOC_MCPWM_GROUPS > 1
+  return timer_num < SOC_MCPWM_TIMERS_PER_GROUP ? 0 : 1;
+#else
+  return 0;
+#endif
+}
+
+static inline mcpwm_dev_t* _mcpwm_for_timer(int timer_num) {
+#if SOC_MCPWM_GROUPS > 1
+  return timer_num < SOC_MCPWM_TIMERS_PER_GROUP ? &MCPWM0 : &MCPWM1;
+#else
+  return &MCPWM0;
+#endif
+}
+
 static void IRAM_ATTR prepare_for_next_command(
     StepperQueue* queue, const struct queue_entry* e_next) {
   uint8_t next_steps = e_next->steps;
@@ -36,7 +90,7 @@ static void IRAM_ATTR prepare_for_next_command(
     const struct mapping_s* mapping =
         (const struct mapping_s*)queue->driver_data;
     uint8_t pcnt_unit_id = mapping->pcnt_unit_id;
-    PCNT.conf_unit[pcnt_unit_id].conf2.cnt_h_lim = next_steps;
+    PCNT.conf_unit[pcnt_unit_id].conf2.FAS_CNT_H_LIM = next_steps;
   }
 }
 
@@ -45,7 +99,7 @@ static void IRAM_ATTR apply_command(StepperQueue* queue,
   const struct mapping_s* mapping = (const struct mapping_s*)queue->driver_data;
   mcpwm_dev_t* mcpwm = mapping->mcpwm;
   uint8_t pcnt_unit_id = mapping->pcnt_unit_id;
-  uint8_t timer = mapping->pcnt_unit_id;
+  uint8_t timer = mapping->timer_in_group;
   uint8_t steps = e->steps;
   if (e->toggle_dir) {
     LL_TOGGLE_PIN(queue->dirPin);
@@ -63,18 +117,18 @@ static void IRAM_ATTR apply_command(StepperQueue* queue,
     mcpwm->int_ena.val |= TIMER_BIT(timer);
   } else {
     bool disable_mcpwm_interrupt = true;
-    if (PCNT.conf_unit[pcnt_unit_id].conf2.cnt_h_lim != steps) {
-      uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit_id].cnt_val;
+    if (PCNT.conf_unit[pcnt_unit_id].conf2.FAS_CNT_H_LIM != steps) {
+      uint16_t val1 = steps - PCNT.cnt_unit[pcnt_unit_id].FAS_CNT_VAL;
       mcpwm->int_clr.val = TIMER_BIT(timer);
-      uint16_t val2 = steps - PCNT.cnt_unit[pcnt_unit_id].cnt_val;
+      uint16_t val2 = steps - PCNT.cnt_unit[pcnt_unit_id].FAS_CNT_VAL;
       if (val1 != val2) {
         mcpwm->int_clr.val = TIMER_BIT(timer);
       }
-      PCNT.conf_unit[pcnt_unit_id].conf2.cnt_h_lim = val2;
+      PCNT.conf_unit[pcnt_unit_id].conf2.FAS_CNT_H_LIM = val2;
       isr_pcnt_counter_clear(pcnt_unit_id);
       if ((mcpwm->int_raw.val & TIMER_BIT(timer)) != 0) {
-        if (PCNT.cnt_unit[pcnt_unit_id].cnt_val == 0) {
-          PCNT.conf_unit[pcnt_unit_id].conf2.cnt_h_lim = val2 - 1;
+        if (PCNT.cnt_unit[pcnt_unit_id].FAS_CNT_VAL == 0) {
+          PCNT.conf_unit[pcnt_unit_id].conf2.FAS_CNT_H_LIM = val2 - 1;
           isr_pcnt_counter_clear(pcnt_unit_id);
           disable_mcpwm_interrupt = val2 > 0;
         }
@@ -90,7 +144,7 @@ static void IRAM_ATTR apply_command(StepperQueue* queue,
 static void IRAM_ATTR init_stop(StepperQueue* q) {
   const struct mapping_s* mapping = (const struct mapping_s*)q->driver_data;
   mcpwm_dev_t* mcpwm = mapping->mcpwm;
-  uint8_t timer = mapping->pcnt_unit_id;
+  uint8_t timer = mapping->timer_in_group;
   mcpwm->timer[timer].timer_cfg1.timer_start = 0;
   mcpwm->int_ena.val &= ~TIMER_BIT(timer);
   q->_isRunning = false;
@@ -148,14 +202,6 @@ static bool IRAM_ATTR mcpwm_on_reach(mcpwm_cmpr_handle_t cmpr,
   return false;
 }
 
-static mcpwm_dev_t* _mcpwm_for_timer(int timer_num) {
-  return timer_num < 3 ? &MCPWM0 : &MCPWM1;
-}
-
-static uint8_t _group_for_timer(int timer_num) { return timer_num < 3 ? 0 : 1; }
-
-static int _pcnt_unit_for_timer(int timer_num) { return timer_num; }
-
 void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   _step_pin = step_pin;
 
@@ -164,7 +210,8 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 
   int timer_num = channel_num;
   uint8_t group_id = _group_for_timer(timer_num);
-  uint8_t pcnt_unit_id = _pcnt_unit_for_timer(timer_num);
+  uint8_t timer_in_group = timer_num % SOC_MCPWM_TIMERS_PER_GROUP;
+  uint8_t pcnt_unit_id = timer_num;
 
   pcnt_unit_config_t pcnt_cfg = {.low_limit = -32768,
                                  .high_limit = 32767,
@@ -188,10 +235,11 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 
   mapping->pcnt_unit_id =
       ((struct pcnt_unit_internal*)mapping->pcnt_unit)->unit_id;
+  mapping->timer_in_group = timer_in_group;
 
-  PCNT.conf_unit[pcnt_unit_id].conf2.cnt_h_lim = 1;
-  PCNT.conf_unit[pcnt_unit_id].conf0.thr_h_lim_en = 1;
-  PCNT.conf_unit[pcnt_unit_id].conf0.thr_l_lim_en = 0;
+  PCNT.conf_unit[pcnt_unit_id].conf2.FAS_CNT_H_LIM = 1;
+  PCNT.conf_unit[pcnt_unit_id].conf0.FAS_THR_H_LIM_EN = 1;
+  PCNT.conf_unit[pcnt_unit_id].conf0.FAS_THR_L_LIM_EN = 0;
 
   pcnt_unit_to_queue[pcnt_unit_id] = this;
   if (!pcnt_isr_installed) {
@@ -248,24 +296,32 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 
   mcpwm_dev_t* mcpwm = _mcpwm_for_timer(timer_num);
   mapping->mcpwm = mcpwm;
-  int timer_in_group = timer_num % 3;
 
   mcpwm->operators[timer_in_group].generator[0].val = 0;
   mcpwm->operators[timer_in_group].generator[1].val = 0;
   mcpwm->operators[timer_in_group].generator[0].gen_dtep = 1;
-  mcpwm->operators[timer_in_group].gen_stmp_cfg.gen_a_upmethod = 0;
+  mcpwm->operators[timer_in_group].gen_stmp_cfg.FAS_GEN_A_UPMETHOD = 0;
   mcpwm->operators[timer_in_group].dt_cfg.val = 0;
   mcpwm->operators[timer_in_group].carrier_cfg.val = 0;
   mcpwm->operators[timer_in_group].gen_force.val = 0;
-  mcpwm->clk_cfg.clk_prescale = 5 - 1;
+  mcpwm->clk_cfg.clk_prescale = FAS_MCPWM_PRESCALE;
   mcpwm->operator_timersel.val = 0;
   mcpwm->operator_timersel.operator0_timersel = 0;
   mcpwm->operator_timersel.operator1_timersel = 1;
   mcpwm->operator_timersel.operator2_timersel = 2;
 
-  GPIO.func_out_sel_cfg[step_pin].func_sel =
-      (timer_num < 3) ? PWM0_OUT0A_IDX + timer_num * 2
-                      : PWM0_OUT0A_IDX + (timer_num - 3) * 2;
+#if SOC_MCPWM_GROUPS > 1
+  if (group_id == 0) {
+    GPIO.func_out_sel_cfg[step_pin].FAS_GPIO_OUT_SEL =
+        PWM0_OUT0A_IDX + timer_in_group * 2;
+  } else {
+    GPIO.func_out_sel_cfg[step_pin].FAS_GPIO_OUT_SEL =
+        PWM1_OUT0A_IDX + timer_in_group * 2;
+  }
+#else
+  GPIO.func_out_sel_cfg[step_pin].FAS_GPIO_OUT_SEL =
+      PWM0_OUT0A_IDX + timer_in_group * 2;
+#endif
   GPIO.func_out_sel_cfg[step_pin].oen_sel = 0;
 
   ESP_ERROR_CHECK_WITHOUT_ABORT(mcpwm_timer_enable(mapping->timer));
@@ -282,14 +338,24 @@ void StepperQueue::connect_mcpwm_pcnt() {
       pcnt_periph_signals.groups[0].units[pcnt_unit_id].channels[0].pulse_sig;
   gpio_iomux_in(step_pin, signal);
 
-  GPIO.func_out_sel_cfg[step_pin].func_sel =
-      (mapping->mcpwm == &MCPWM0) ? PWM0_OUT0A_IDX + (pcnt_unit_id) * 2
-                                  : PWM0_OUT0A_IDX + (pcnt_unit_id - 3) * 2;
+#if SOC_MCPWM_GROUPS > 1
+  if (mapping->mcpwm == &MCPWM0) {
+    GPIO.func_out_sel_cfg[step_pin].FAS_GPIO_OUT_SEL =
+        PWM0_OUT0A_IDX + pcnt_unit_id * 2;
+  } else {
+    GPIO.func_out_sel_cfg[step_pin].FAS_GPIO_OUT_SEL =
+        PWM1_OUT0A_IDX + (pcnt_unit_id - SOC_MCPWM_TIMERS_PER_GROUP) * 2;
+  }
+#else
+  GPIO.func_out_sel_cfg[step_pin].FAS_GPIO_OUT_SEL =
+      PWM0_OUT0A_IDX + pcnt_unit_id * 2;
+#endif
   GPIO.func_out_sel_cfg[step_pin].oen_sel = 0;
 }
 
 void StepperQueue::disconnect_mcpwm_pcnt() {
-  GPIO.func_out_sel_cfg[_step_pin].func_sel = 0x100;
+  GPIO.func_out_sel_cfg[_step_pin].FAS_GPIO_OUT_SEL =
+      FAS_GPIO_OUT_SEL_DISCONNECT;
 }
 
 void StepperQueue::startQueue_mcpwm_pcnt() {
@@ -314,7 +380,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
     return true;
   }
   const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
-  uint8_t timer = mapping->pcnt_unit_id;
+  uint8_t timer = mapping->timer_in_group;
   if (mapping->mcpwm->timer[timer].timer_status.timer_value > 1) {
     return false;
   }
@@ -323,7 +389,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
 
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() const {
   const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
-  return PCNT.cnt_unit[mapping->pcnt_unit_id].cnt_val;
+  return PCNT.cnt_unit[mapping->pcnt_unit_id].FAS_CNT_VAL;
 }
 
 #endif

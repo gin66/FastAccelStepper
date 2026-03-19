@@ -170,14 +170,14 @@ Comments to pin sharing:
 |-------------|--------------------|-------------|---------------------------|----------------------------|----------|---------|------------|
 | ESP32       | MCPWM/PCNT + RMT   | 14 (6+8)    | MCPWM/PCNT + RMT + I2S    | 14 (6+8) + 32              | 2        | 32 pins | 2 ch       |
 | ESP32-S2    | RMT                | 4           | RMT + I2S                 | 4 + 32                     | 2        | 32 pins | 2 ch       |
-| ESP32-S3    | MCPWM/PCNT + RMT   | 8           | RMT + I2S                 | 4 + 32                     | 2        | 32 pins | 2 ch       |
+| ESP32-S3    | MCPWM/PCNT + RMT   | 8           | MCPWM/PCNT + RMT + I2S    | 4 (4) + 32                  | 2        | 32 pins | 2 ch       |
 | ESP32-C3    | RMT                | 2           | RMT + I2S                 | 2 + 32                     | 1        | 32 pins | 1 ch       |
-| ESP32-C6    | -                  | -           | RMT + I2S                 | 4 + 32                     | 1        | 32 pins | 1 ch       |
+| ESP32-C6    | -                  | -           | MCPWM/PCNT + RMT + I2S    | 2 (2) + 32                  | 1        | 32 pins | 1 ch       |
 | ESP32-P4    | -                  | -           | RMT + I2S                 | 4 + 32                     | 3        | 32 pins | 3 ch       |
 
 **Notes:**
 - IDF 5.3+ Max = MCPWM/PCNT + RMT channels + I2S Mux slots (can be combined)
-- MCPWM/PCNT is available on IDF 5.3+ for ESP32 (classic) only
+- MCPWM/PCNT is available on IDF 5.3+ for ESP32, ESP32-S3, ESP32-C6, ESP32-H2
 - I2S Mux requires ESP-IDF >=5.3 and uses one I2S controller
 - I2S Mux slots are shared: if step/dir/enable all use I2S Mux, each stepper consumes 1-3 slots
   - Step only: up to 32 steppers
@@ -394,7 +394,7 @@ For the other stepper motors, the rmt module comes into use.
 
 #### ESP-IDF version >=5.3.0:
 
-RMT, I2S Mux/Direct, and MCPWM/PCNT (ESP32 classic only) drivers are supported.
+RMT, I2S Mux/Direct, and MCPWM/PCNT (ESP32, ESP32-S3, ESP32-C6, ESP32-H2) drivers are supported.
 
 #### I2S Mux Driver Implementation
 
@@ -444,7 +444,7 @@ The ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels and 
 This stepper driver uses mcpwm/pcnt + rmt modules. Can drive up to 8 motors. Tested with 6 motors (not by me). 
 #### ESP-IDF version >=5.3.0:
 This stepper driver uses rmt modules. Can drive up to 4 motors.
-MCPWM/PCNT is not available on ESP32-S3 with IDF 5.3+.
+MCPWM/PCNT is available on ESP32-S3 with IDF 5.3+ (4 steppers).
 I2S Mux driver is also available with same capabilities as ESP32 (see ESP32 I2S Mux section above). 
 
 ### ESP32C3

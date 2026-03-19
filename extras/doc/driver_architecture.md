@@ -87,6 +87,7 @@ src/
     StepperISR_idf4_esp32_rmt.cpp         ← IDF4 RMT
     StepperISR_idf4_esp32c3_rmt.cpp       ← IDF4 ESP32-C3
     StepperISR_idf4_esp32s3_rmt.cpp       ← IDF4 ESP32-S3
+    StepperISR_idf5_esp32_mcpwm_pcnt.cpp ← IDF5 MCPWM/PCNT (ESP32, S3, C6, H2)
     StepperISR_idf5_esp32_rmt.cpp         ← IDF5 RMT
     StepperISR_esp32xx_rmt.cpp            ← Shared RMT code
   pd_sam/
@@ -102,10 +103,12 @@ src/
 | Architecture | Pulse Mechanism | Channels | Pin Flexibility |
 |--------------|-----------------|----------|-----------------|
 | **AVR** | Timer compare output (OC1A/OC1B/OC4A-C) | 2-3 | Fixed to specific pins |
-| **ESP32 MCPWM/PCNT** | MCPWM generates, PCNT counts | 0-6 | Any GPIO |
+| **ESP32 MCPWM/PCNT** | MCPWM generates, PCNT counts | 2-6 | Any GPIO |
 | **ESP32 RMT (IDF4)** | RMT peripheral DMA | 2-8 | Any GPIO |
 | **ESP32 RMT (IDF5)** | RMT with encoder callback | 2-8 | Any GPIO |
-| **ESP32-C3/S3 RMT** | RMT peripheral | 2-4 | Any GPIO |
+| **ESP32-C3 RMT** | RMT peripheral | 2 | Any GPIO |
+| **ESP32-C6/H2 MCPWM/PCNT** | MCPWM generates, PCNT counts | 2 | Any GPIO |
+| **ESP32-S3 RMT** | RMT peripheral | 2-4 | Any GPIO |
 | **SAM Due** | PWM + pin change interrupt | 6 | Limited (specific PWM pins) |
 | **RP2040/RP2350** | PIO state machine | 8 | GPIO 0-31 |
 
