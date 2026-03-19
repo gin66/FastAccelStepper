@@ -4,6 +4,7 @@ idf_component_register(
     REQUIRES
         esp_driver_gpio
         esp_driver_rmt
+        esp_driver_mcpwm
         esp_driver_pcnt
         esp_driver_i2s
 )

@@ -8,19 +8,18 @@
 //==========================================================================
 
 #if CONFIG_IDF_TARGET_ESP32
-// #define SUPPORT_ESP32_MCPWM_PCNT
+#define SUPPORT_ESP32_MCPWM_PCNT
 #define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 8
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 64
 
-// #define QUEUES_MCPWM_PCNT 6
-#define QUEUES_MCPWM_PCNT 0
+#define QUEUES_MCPWM_PCNT 6
 #define QUEUES_RMT 8
 
 #define NEED_RMT_HEADERS
-// #define NEED_MCPWM_HEADERS
+#define NEED_MCPWM_HEADERS
 #define NEED_PCNT_HEADERS
 
 //==========================================================================
@@ -137,19 +136,21 @@
 #include <soc/gpio_sig_map.h>
 
 #ifdef NEED_MCPWM_HEADERS
-#include <driver/mcpwm.h>
+#include <driver/mcpwm_timer.h>
+#include <driver/mcpwm_oper.h>
+#include <driver/mcpwm_cmpr.h>
+#include <driver/mcpwm_gen.h>
 #include <soc/mcpwm_reg.h>
 #include <soc/mcpwm_struct.h>
 #endif
 
 #ifdef NEED_PCNT_HEADERS
 #include <driver/pulse_cnt.h>
-// #include <soc/pcnt_reg.h>
-// #include <soc/pcnt_struct.h>
+#include <soc/pcnt_reg.h>
+#include <soc/pcnt_struct.h>
 #include <soc/pcnt_periph.h>
+#include <soc/gpio_struct.h>
 #include <driver/gpio.h>
-#include <rom/gpio.h>
-#include <hal/gpio_ll.h>
 #include <esp_rom_gpio.h>
 #endif
 

@@ -188,6 +188,20 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     return nullptr;
   }
 
+#if defined(SUPPORT_ESP32_MCPWM_PCNT)
+  if (driver == FasDriver::MCPWM_PCNT) {
+    if (StepperQueue::_mcpwm_pcnt_allocated >= QUEUES_MCPWM_PCNT) {
+      return nullptr;
+    }
+    StepperQueue* q = new StepperQueue();
+    q->_initVars();
+    q->use_mcpwm_pcnt = true;
+    q->init_mcpwm_pcnt(StepperQueue::_mcpwm_pcnt_allocated, step_pin);
+    StepperQueue::_mcpwm_pcnt_allocated++;
+    return q;
+  }
+#endif
+
 #if defined(SUPPORT_ESP32_RMT)
   if (driver == DRIVER_RMT) {
     if (StepperQueue::_rmt_allocated >= QUEUES_RMT) {
@@ -216,7 +230,6 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   }
 #endif
 
-  // Just use the next possible one
   if (driver != DRIVER_DONT_CARE) {
     return nullptr;
   }
@@ -224,6 +237,11 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   if (q == nullptr) {
     q = tryAllocateQueue(engine, DRIVER_I2S_DIRECT, step_pin);
   }
+#if defined(SUPPORT_ESP32_MCPWM_PCNT)
+  if (q == nullptr) {
+    q = tryAllocateQueue(engine, FasDriver::MCPWM_PCNT, step_pin);
+  }
+#endif
   return q;
 }
 #endif  // SUPPORT_SELECT_DRIVER_TYPE && SUPPORT_DYNAMIC_ALLOCATION
