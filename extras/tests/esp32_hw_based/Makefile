@@ -1,29 +1,45 @@
-.PHONY: all test test_all clean compile compile_arduino_espidf4 compile_arduino_espidf5 \
+.PHONY: all test test_all test_idf5_3 clean compile \
+	compile_arduino_espidf4 compile_arduino_espidf5 \
 	compile_arduino_espidf_V6_13_0 compile_idf4 compile_idf5 compile_idf5_V6_13_0 \
 	.test_espidf4 .test_espidf5 .test_arduino_espidf_V6_13_0 .test_idf5 .test_idf5_V6_13_0
 
 all: compile test
 
-# grabserial is a python tool.
+# Test scripts use uv shebang with pyserial (no grabserial needed).
 
 # macos:
 DEV=cu.usbserial-0001
 
-# for espidf4 there is 6*mcpwm+8*rmt => M1 is mcpwn and M9 is rmt
-# for espidf5 there is 8*rmt+2*i2s => M1 is rmt and M9 is i2s
+# for espidf5 ESP32 classic has 6*mcpwm+8*rmt, S2/S3/C3/C6 have only RMT+I2S
+# for espidf4 there is 6*mcpwm+8*rmt (ESP32) or MCPWM/PCNT+RMT (S3)
 test: M1.test M9.test
 
+# ESP-IDF 5.3 classic ESP32 (MCPWM/PCNT+RMT+I2S): test M1..M3 with Driver-Types config
+test_idf5_3: M1.idf5_3_test M2.idf5_3_test M3.idf5_3_test
+
+%.idf5_3_test:
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_04.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_05.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_06.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_01a.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_01b.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_02.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_07a.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_07b.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_07c.py $(DEV)
+	STEPPER_CONFIG=1 MOTOR=$* ./seq_03.py $(DEV)
+
 %.test:
-	MOTOR=$* ./seq_04.sh $(DEV)
-	MOTOR=$* ./seq_05.sh $(DEV)
-	MOTOR=$* ./seq_06.sh $(DEV)
-	MOTOR=$* ./seq_01a.sh $(DEV)
-	MOTOR=$* ./seq_01b.sh $(DEV)
-	MOTOR=$* ./seq_02.sh $(DEV)
-	MOTOR=$* ./seq_07a.sh $(DEV)
-	MOTOR=$* ./seq_07b.sh $(DEV)
-	MOTOR=$* ./seq_07c.sh $(DEV)
-	MOTOR=$* ./seq_03.sh $(DEV)
+	MOTOR=$* ./seq_04.py $(DEV)
+	MOTOR=$* ./seq_05.py $(DEV)
+	MOTOR=$* ./seq_06.py $(DEV)
+	MOTOR=$* ./seq_01a.py $(DEV)
+	MOTOR=$* ./seq_01b.py $(DEV)
+	MOTOR=$* ./seq_02.py $(DEV)
+	MOTOR=$* ./seq_07a.py $(DEV)
+	MOTOR=$* ./seq_07b.py $(DEV)
+	MOTOR=$* ./seq_07c.py $(DEV)
+	MOTOR=$* ./seq_03.py $(DEV)
 
 #test_all: .test_espidf4 .test_espidf5 .test_idf5 .test_idf5_V6_13_0 .test_arduino_espidf_V6_13_0
 test_all: .test_espidf4 .test_espidf5 .test_idf5 .test_arduino_espidf_V6_13_0
