@@ -152,6 +152,7 @@
 #include <soc/gpio_struct.h>
 #include <driver/gpio.h>
 #include <esp_rom_gpio.h>
+#include <rom/gpio.h>
 #endif
 
 #ifdef NEED_RMT_HEADERS
