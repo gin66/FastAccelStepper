@@ -5,495 +5,22 @@
 #ifdef SIM_TEST_INPUT
 #include <avr/sleep.h>
 #endif
-#if defined(ARDUINO_ARCH_ESP32)||defined(ESP_PLATFORM)
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #include <esp_task_wdt.h>
 #include <esp_log.h>
 #endif
 
 #define VERSION "post-4f2e1e4"
 
-struct stepper_config_s {
-  uint8_t step;
-  uint8_t enable_low_active;
-  uint8_t enable_high_active;
-  uint8_t direction;
-  uint16_t dir_change_delay;
-  bool direction_high_count_up;
-  bool auto_enable;
-  uint32_t on_delay_us;
-  uint16_t off_delay_ms;
-};
-
+#include "StepperConfig.h"
 #if defined(ARDUINO_ARCH_AVR)
-#if (defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || \
-     defined(__AVR_ATmega328__) || defined(__AVR_ATmega328P__))
-// Example hardware configuration for Arduino Nano
-// Please adapt to your configuration
-const uint8_t led_pin = 13;  // turn off with PIN_UNDEFINED
-const struct stepper_config_s stepper_config[MAX_STEPPER] = {
-    {
-      // stepper 1 shall be connected to OC1A
-      step : stepPinStepper1A,
-      enable_low_active : 6,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 5,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500000,
-      off_delay_ms : 5000
-    },
-    {
-      // stepper 2 shall be connected to OC1B
-      step : stepPinStepper1B,
-      enable_low_active : 8,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 7,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    }};
-#elif defined(__AVR_ATmega2560__)
-// Example hardware configuration for Arduino ATmega2560
-// Please adapt to your configuration
-const uint8_t led_pin = PIN_UNDEFINED;  // turn off with PIN_UNDEFINED
-const struct stepper_config_s stepper_config[MAX_STEPPER] = {
-    {
-      step : stepPinStepperA,
-      enable_low_active : 19,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 21,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500000,
-      off_delay_ms : 5000
-    },
-    {
-      step : stepPinStepperB,
-      enable_low_active : 18,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 20,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      // stepper 3 shall be connected to OC4C
-      step : stepPinStepperC,
-      enable_low_active : 43,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 42,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    }};
-#elif defined(__AVR_ATmega32U4__)
-// Example hardware configuration for Arduino ATmega32u4
-// Please adapt to your configuration
-const uint8_t led_pin = PIN_UNDEFINED;  // turn off with PIN_UNDEFINED
-const struct stepper_config_s stepper_config[MAX_STEPPER] = {
-    {
-      step : stepPinStepperA,
-      enable_low_active : 16,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 26,  // PB4
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500000,
-      off_delay_ms : 5000
-    },
-    {
-      step : stepPinStepperB,
-      enable_low_active : 15,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 14,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    }};
-#endif
+#include "StepperPins_avr.h"
 #elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
-// Example hardware configuration for esp32 board.
-// Please adapt to your configuration
-#if defined(CONFIG_IDF_TARGET_ESP32C3) || defined(CONFIG_IDF_TARGET_ESP32C6)
-const uint8_t led_pin = 8;
-#else
-const uint8_t led_pin = PIN_UNDEFINED;
-#endif
-const struct stepper_config_s stepper_config[MAX_STEPPER+1] = {
-// clang-format off
-    // Test-HW
-    // Position 01 linked to atmega nano
-    // 2: Enable Left Pin 13 GPIO13   , DIR Right Pin 7 GPIO18,    Step Right Pin 13 GPIO15
-    // 3: Enable Left Pin 12 GPIO12   , DIR Right Pin 6 GPIO19,    Step Right Pin 12 GPIO2  blue LED
-    // 4: Enable Left Pin 11 GPIO14   , DIR Right Pin 5 GPIO21,    Step Right Pin 11 GPIO4
-    // 5: Enable Left Pin 10 GPIO27   , DIR Right Pin 4 GPIO3 RX0, Step Right Pin 10 GPIO16 RX2
-    // 6: Enable Left Pin 9  GPIO26 A9, DIR Right Pin 3 GPIO1 TX0, Step Right Pin 9  GPIO17 TX2
-    // 7: Enable Left Pin 8  GPIO25 A8, DIR Right Pin 2 GPIO22,    Step Right Pin 8  GPIO5
-    //                          ALL Enable: Right Pin 1 GPIO23
-    // Left Pin 15: +5V
-// clang-format on
-#if defined(CONFIG_IDF_TARGET_ESP32C3)
-    {
-      step : 6,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 50,
-      off_delay_ms : 1000
-    },
-    {
-      step : 7,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000
-    },
-#elif defined(CONFIG_IDF_TARGET_ESP32C6)
-    {
-      step : 6,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 7,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 50,
-      off_delay_ms : 1000
-    },
-    {
-      step : 15,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000
-    },
-#else
-    {
-      // position 01.234567 => 2
-      step : 17,
-      enable_low_active : 26,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,  // was GPIO 1 in conflict with TXD, via wire to Dir of
-                       // next stepper
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 50,
-      off_delay_ms : 1000
-    },
-    {
-      // position 01.234567 => 3
-      step : 15,
-      enable_low_active : 13,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000
-    },
-#endif
-#if MAX_STEPPER > 2
-    {
-      // position 01.234567 => 4, step is linked to blue LED
-      step : 2,
-      enable_low_active : 12,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 19,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000
-    },
-    {
-      // position 01.234567 => 5
-      step : 5,
-      enable_low_active : 25,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 22,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-#endif
-#if MAX_STEPPER > 4
-    {
-      // position 01.234567 => 6
-      step : 16,
-      enable_low_active : 27,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 21,  // was GPIO 3 in conflict with RXD, via wire to GPIO21
-                       // (Dir next stepper)
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      // position 01.234567 => 7
-      step : 4,
-      enable_low_active : 14,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 21,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-#endif
-#if MAX_STEPPER > 6
-    {
-      step : 14,  // direction pin of M3
-      enable_low_active : 26,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 19,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      step : 23,  // ALL ENABLE PIN !!!!
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-#endif
-#if MAX_STEPPER > 8
-    {
-      step : 32,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      step : 33,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-#endif
-#if MAX_STEPPER == 14
-    {
-      step : 25,  // enable pin of M6
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      step : 26,  // enable pin of M5
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      step : 22,  // direction pin of M6
-      enable_low_active : 26,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      step : 21,  // direction pin of M3
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-#endif
-    {
-      step : PIN_UNDEFINED,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    }
-};
+#include "StepperPins_esp32.h"
 #elif defined(ARDUINO_ARCH_SAM)
-// Hardware configuration copied from esp32 board. Not used on due board
-// Please adapt to your configuration
-const uint8_t led_pin = PIN_UNDEFINED;
-const struct stepper_config_s stepper_config[MAX_STEPPER] = {
-    {
-      step : 17,
-      enable_low_active : 26,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,  // was GPIO 1 in conflict with TXD, via wire to Dir of
-                       // next stepper
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 50,
-      off_delay_ms : 1000
-    },
-    {
-      step : 15,
-      enable_low_active : 13,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 18,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000
-    },
-    {
-      step : 2,
-      enable_low_active : 12,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 19,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500,
-      off_delay_ms : 1000
-    },
-    {
-      step : 5,
-      enable_low_active : 25,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 22,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      step : 16,
-      enable_low_active : 27,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 21,  // was GPIO 3 in conflict with RXD, via wire to GPIO21
-                       // (Dir next stepper)
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    },
-    {
-      step : 4,
-      enable_low_active : 14,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 21,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 5000,
-      off_delay_ms : 10
-    }};
+#include "StepperPins_sam.h"
 #elif defined(PICO_RP2040) || defined(PICO_RP2350)
-const uint8_t led_pin = LED_BUILTIN;
-const struct stepper_config_s stepper_config[12] = {
-    {
-      step : 14,
-      enable_low_active : 13,
-      enable_high_active : PIN_UNDEFINED,
-      direction : 15,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500000,
-      off_delay_ms : 5000
-    },
-    {
-      step : 18,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500000,
-      off_delay_ms : 5000
-    },
-    {
-      step : 19,
-      enable_low_active : PIN_UNDEFINED,
-      enable_high_active : PIN_UNDEFINED,
-      direction : PIN_UNDEFINED,
-      dir_change_delay : 0,
-      direction_high_count_up : true,
-      auto_enable : true,
-      on_delay_us : 500000,
-      off_delay_ms : 5000
-    },
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED},
-    {step : PIN_UNDEFINED}};
-
+#include "StepperPins_pico.h"
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -1042,7 +569,11 @@ void setup() {
     FastAccelStepper* s = NULL;
     const struct stepper_config_s* config = &stepper_config[i];
     if (config->step != PIN_UNDEFINED) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+      s = engine.stepperConnectToPin(config->step, config->driver_type);
+#else
       s = engine.stepperConnectToPin(config->step);
+#endif
       if (s) {
         s->setDirectionPin(config->direction, config->direction_high_count_up,
                            config->dir_change_delay);
@@ -1051,12 +582,10 @@ void setup() {
         s->setAutoEnable(config->auto_enable);
         s->setDelayToEnable(config->on_delay_us);
         s->setDelayToDisable(config->off_delay_ms);
-      }
-      else {
+      } else {
         break;
       }
-    }
-    else {
+    } else {
       break;
     }
     stepper[i] = s;
@@ -1550,7 +1079,7 @@ bool process_cmd(char* cmd) {
           break;
       }
       break;
-  #endif
+#endif
     case MODE(normal, 'N'):
       if (*cmd == 0) {
         output_msg(MSG_OUTPUT_DRIVER_ON);
