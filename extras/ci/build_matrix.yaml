@@ -153,22 +153,6 @@ templates:
     lib_extra_dirs: .
 
 environments:
-  esp32_tasmota_3_0_0:
-    platform: https://github.com/tasmota/platform-espressif32/releases/download/2024.05.12/platform-espressif32.zip
-    board: esp32dev
-    framework: arduino
-    build_flags: ["-Wall", "-DCORE_DEBUG_LEVEL=6", "-DLOG_LOCAL_LEVEL=6"]
-    board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
-
-  esp32_tasmota_2_0_15:
-    platform: https://github.com/tasmota/platform-espressif32/releases/download/2024.04.00/platform-espressif32.zip
-    board: esp32dev
-    framework: arduino
-    build_flags: ["-Wall", "-DCORE_DEBUG_LEVEL=5"]
-    board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
-
   esp32:
     template: esp32_arduino
 
@@ -410,7 +394,6 @@ workflows:
       - esp32s3_pioarduino_V53_03_11
       - esp32c6_pioarduino_V53_03_11
       - esp32h2_pioarduino_V53_03_11
-      - esp32_tasmota_3_0_0
       - esp32c3_V6_5_0
       - esp32c3_V6_6_0
       - esp32c3_V6_7_0

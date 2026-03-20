@@ -41,7 +41,6 @@ jobs:
           - esp32s3_pioarduino_V53_03_11
           - esp32c6_pioarduino_V53_03_11
           - esp32h2_pioarduino_V53_03_11
-          - esp32_tasmota_3_0_0
           - esp32c3_V6_5_0
           - esp32c3_V6_6_0
           - esp32c3_V6_7_0

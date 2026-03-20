@@ -12,9 +12,6 @@
 ## Matrix build for espidf using platformio
 [![Build espidf](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml)
 
-## Build for esp32 with tasmota
-[![`V2_0_15`](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_examples_esp32_tasmota_2_0_15.yml)
-
 ## Arduino and esp32
 
 Arduino core v3.0.x are using esp-idf v5.0 up to v5.1 and FastAccelStepper will fail to compile.
