@@ -1,0 +1,16 @@
+name: Upload component
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  upload_components:
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: espressif/upload-components-ci-action@v2
+        with:
+          components: "fastaccelstepper: ."
+          namespace: "gin66"
