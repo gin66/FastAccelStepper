@@ -1,7 +1,7 @@
 name: Upload component
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
 
 jobs:
   upload_components:
