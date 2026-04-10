@@ -1,5 +1,5 @@
 #######################################
-# Syntax Coloring Map For AccelStepper
+# Syntax Coloring Map For FastAccelStepper
 #######################################
 
 #######################################
@@ -7,18 +7,173 @@
 #######################################
 
 FastAccelStepper	KEYWORD1
-Speed KEYWORD1
-Acceleration KEYWORD1
+FastAccelStepperEngine	KEYWORD1
 
 #######################################
 # Methods and Functions (KEYWORD2)
 #######################################
 
-disableOutputs	KEYWORD2
-enableOutputs	KEYWORD2
+# FastAccelStepperEngine
+init	KEYWORD2
+stepperConnectToPin	KEYWORD2
+setExternalCallForPin	KEYWORD2
+setDebugLed	KEYWORD2
+manageSteppers	KEYWORD2
+task_rate	KEYWORD2
+initI2sMux	KEYWORD2
+i2sMuxSetBit	KEYWORD2
+i2sMuxGetBit	KEYWORD2
+
+# FastAccelStepper - Pin configuration
+getStepPin	KEYWORD2
+setDirectionPin	KEYWORD2
+getDirectionPin	KEYWORD2
+directionPinHighCountsUp	KEYWORD2
 setEnablePin	KEYWORD2
+getEnablePinHighActive	KEYWORD2
+getEnablePinLowActive	KEYWORD2
+enableOutputs	KEYWORD2
+disableOutputs	KEYWORD2
+setAutoEnable	KEYWORD2
+setDelayToEnable	KEYWORD2
+setDelayToDisable	KEYWORD2
+
+# FastAccelStepper - Position
+getCurrentPosition	KEYWORD2
+setCurrentPosition	KEYWORD2
+
+# FastAccelStepper - Status
+isRunning	KEYWORD2
+rampState	KEYWORD2
+isRampGeneratorActive	KEYWORD2
+
+# FastAccelStepper - Speed
+getMaxSpeedInUs	KEYWORD2
+getMaxSpeedInTicks	KEYWORD2
+getMaxSpeedInHz	KEYWORD2
+getMaxSpeedInMilliHz	KEYWORD2
+setAbsoluteSpeedLimit	KEYWORD2
+setSpeedInUs	KEYWORD2
+setSpeedInTicks	KEYWORD2
+setSpeedInHz	KEYWORD2
+setSpeedInMilliHz	KEYWORD2
+getSpeedInUs	KEYWORD2
+getSpeedInTicks	KEYWORD2
+getSpeedInMilliHz	KEYWORD2
+getCurrentSpeedInUs	KEYWORD2
+getCurrentSpeedInMilliHz	KEYWORD2
+
+# FastAccelStepper - Acceleration
+setAcceleration	KEYWORD2
+getAcceleration	KEYWORD2
+getCurrentAcceleration	KEYWORD2
+setLinearAcceleration	KEYWORD2
+setJumpStart	KEYWORD2
+applySpeedAcceleration	KEYWORD2
+
+# FastAccelStepper - Move commands
+move	KEYWORD2
+moveTo	KEYWORD2
+keepRunning	KEYWORD2
+isRunningContinuously	KEYWORD2
+runForward	KEYWORD2
+runBackward	KEYWORD2
+forwardStep	KEYWORD2
+backwardStep	KEYWORD2
+moveByAcceleration	KEYWORD2
+stopMove	KEYWORD2
+isStopping	KEYWORD2
+stepsToStop	KEYWORD2
+forceStop	KEYWORD2
+forceStopAndNewPosition	KEYWORD2
+targetPos	KEYWORD2
+
+# FastAccelStepper - Task planning
+setForwardPlanningTimeInMs	KEYWORD2
+
+# FastAccelStepper - Timed moves
+moveTimed	KEYWORD2
+
+# FastAccelStepper - Low level queue
+addQueueEntry	KEYWORD2
+isQueueEmpty	KEYWORD2
+isQueueFull	KEYWORD2
+isQueueRunning	KEYWORD2
+ticksInQueue	KEYWORD2
+hasTicksInQueue	KEYWORD2
+queueEntries	KEYWORD2
+getPositionAfterCommandsCompleted	KEYWORD2
+getPeriodInUsAfterCommandsCompleted	KEYWORD2
+getPeriodInTicksAfterCommandsCompleted	KEYWORD2
+setPositionAfterCommandsCompleted	KEYWORD2
+
+# FastAccelStepper - Pin detach/attach
+detachFromPin	KEYWORD2
+reAttachToPin	KEYWORD2
+
+# FastAccelStepper - ESP32 pulse counter
+attachToPulseCounter	KEYWORD2
+readPulseCounter	KEYWORD2
+clearPulseCounter	KEYWORD2
+pulseCounterAttached	KEYWORD2
+
+# FastAccelStepper - ESP32 driver type
+driverType	KEYWORD2
+driverTypeString	KEYWORD2
 
 #######################################
 # Constants (LITERAL1)
 #######################################
- 
+
+# Pin constants
+PIN_UNDEFINED	LITERAL1
+PIN_EXTERNAL_FLAG	LITERAL1
+MAX_ON_DELAY_TICKS	LITERAL1
+
+# Ramp state constants
+RAMP_STATE_IDLE	LITERAL1
+RAMP_STATE_COAST	LITERAL1
+RAMP_STATE_ACCELERATE	LITERAL1
+RAMP_STATE_DECELERATE	LITERAL1
+RAMP_STATE_REVERSE	LITERAL1
+RAMP_STATE_ACCELERATING_FLAG	LITERAL1
+RAMP_STATE_DECELERATING_FLAG	LITERAL1
+RAMP_DIRECTION_COUNT_UP	LITERAL1
+RAMP_DIRECTION_COUNT_DOWN	LITERAL1
+RAMP_DIRECTION_MASK	LITERAL1
+RAMP_STATE_MASK	LITERAL1
+
+# Move result codes
+MOVE_OK	LITERAL1
+MOVE_ERR_NO_DIRECTION_PIN	LITERAL1
+MOVE_ERR_SPEED_IS_UNDEFINED	LITERAL1
+MOVE_ERR_ACCELERATION_IS_UNDEFINED	LITERAL1
+
+# MoveTimed result codes
+MOVE_TIMED_OK	LITERAL1
+MOVE_TIMED_BUSY	LITERAL1
+MOVE_TIMED_EMPTY	LITERAL1
+MOVE_TIMED_TOO_LARGE_ERROR	LITERAL1
+
+# AddQueueEntry result codes
+AQE_OK	LITERAL1
+AQE_QUEUE_FULL	LITERAL1
+AQE_DIR_PIN_IS_BUSY	LITERAL1
+AQE_DIR_PIN_2MS_PAUSE_ADDED	LITERAL1
+AQE_WAIT_FOR_ENABLE_PIN_ACTIVE	LITERAL1
+AQE_DEVICE_NOT_READY	LITERAL1
+AQE_ERROR_TICKS_TOO_LOW	LITERAL1
+AQE_ERROR_EMPTY_QUEUE_TO_START	LITERAL1
+AQE_ERROR_NO_DIR_PIN_TO_TOGGLE	LITERAL1
+
+# Delay result codes
+DELAY_OK	LITERAL1
+DELAY_TOO_LOW	LITERAL1
+DELAY_TOO_HIGH	LITERAL1
+
+# Driver type constants
+DRIVER_MCPWM_PCNT	LITERAL1
+DRIVER_RMT	LITERAL1
+DRIVER_I2S_DIRECT	LITERAL1
+DRIVER_I2S_MUX	LITERAL1
+DRIVER_DONT_CARE	LITERAL1
