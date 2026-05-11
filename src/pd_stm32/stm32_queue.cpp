@@ -15,33 +15,29 @@ uint8_t fas_stm32_clock_error = 0;
 StepperQueue* StepperQueue::_ch_to_queue[4] = {NULL, NULL, NULL, NULL};
 
 // ====================================================================
-// Log2 timer frequency variables (for SUPPORT_LOG2_TIMER_FREQ_VARIABLES)
-// Defined here when RampCalculator.h selects runtime fallback path.
-// ====================================================================
-#ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-static log2_value_t log2_timer_freq;
-static log2_value_t log2_timer_freq_div_sqrt_of_2;
-static log2_value_t log2_timer_freq_square_div_2;
-#endif
-
-// ====================================================================
 // TIM2 clock detection
 //
 // TIM2 counter clock = PCLK1 * (APB1_prescaler==1 ? 1 : 2)
 //
-// The APB1 prescaler is in RCC->CFGR.PPRE on most STM32 families.
-// On H7 it is in RCC->D2CFGR.D2PPRE1 (D2 domain).
+// The APB1 prescaler is in:
+//   - H7: RCC->D2CFGR.D2PPRE1 (D2 domain)
+//   - G0/G4: RCC->CFGR.PPRE (single field)
+//   - F1/F4/F7/L1/L4: RCC->CFGR.PPRE1
 // ====================================================================
 static uint32_t getTim2Clock(void) {
     uint32_t pclk1 = HAL_RCC_GetPCLK1Freq();
 #if defined(STM32H7xx)
-    // H7 series: D2 domain, D2CFGR register
+    // H7 series: D2 domain
     uint32_t dppre1 = (RCC->D2CFGR & RCC_D2CFGR_D2PPRE1) >> RCC_D2CFGR_D2PPRE1_Pos;
     if (dppre1 > 1) pclk1 *= 2;
+#elif defined(STM32G0xx) || defined(STM32G4xx)
+    // G0/G4: single PPRE field (no PPRE1/PPRE2)
+    uint32_t pp = (RCC->CFGR & RCC_CFGR_PPRE) >> RCC_CFGR_PPRE_Pos;
+    if (pp > 1) pclk1 *= 2;
 #else
-    // All other STM32 families
-    uint32_t apb1_pre = (RCC->CFGR & RCC_CFGR_PPRE) >> RCC_CFGR_PPRE_Pos;
-    if (apb1_pre > 1) pclk1 *= 2;
+    // F1/F4/F7/L1/L4: PPRE1 field
+    uint32_t pp = (RCC->CFGR & RCC_CFGR_PPRE1) >> RCC_CFGR_PPRE1_Pos;
+    if (pp > 1) pclk1 *= 2;
 #endif
     return pclk1;
 }
@@ -114,18 +110,16 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     // Ensure TIM2 is initialized
     initStepTimer();
 
-    // Step pin GPIO configuration
+    // Step pin GPIO configuration — validate port first
     _step_pin = step_pin;
     _step_port = digitalPinToPort(step_pin);
+    if (!_step_port) return;  // Invalid pin — init fails silently, ISR skips
+
     uint32_t mask = digitalPinToBitMask(step_pin);
     _step_set_mask = mask;
 
-    // Configure clear mask based on BSRR/BRR architecture
-#if STM32_BSRR_CLEAR_SHIFT
-    _step_clr_mask = mask << 16;  // BSRR high half = reset bits
-#else
-    _step_clr_mask = mask;        // BRR register (direct)
-#endif
+    // Clear mask: BSRR high half = reset (mask << 16 works on ALL families)
+    _step_clr_mask = mask << 16;
 
     // Configure pin as OUTPUT, initial LOW
     pinMode(step_pin, OUTPUT);
@@ -150,31 +144,28 @@ void StepperQueue::startQueue(void) {
     _dir_delay_active = false;
 
     // Write CCR first, then barrier, then enable interrupt
-    // This ensures the compare value is visible before the IRQ can fire.
     *_ccr_reg = TIM2->CNT + (TICKS_PER_S / 1000000);  // ~1µs offset
     __DMB();
 
-    // DIER RMW: disable interrupts to prevent race with ISR on other channels
+    // Save/restore PRIMASK for reentrant-safe IRQ disable
+    uint32_t prim = __get_PRIMASK();
     __disable_irq();
     TIM2->DIER |= CCXIE_BIT(_timer_ch);
-    __enable_irq();
+    if (!prim) __enable_irq();
 }
 
 void StepperQueue::forceStop(void) {
-    // Disable CC interrupt (atomic)
+    // Save/restore PRIMASK for reentrant-safe IRQ disable
+    uint32_t prim = __get_PRIMASK();
     __disable_irq();
     TIM2->DIER &= ~CCXIE_BIT(_timer_ch);
     _isRunning = false;
     read_idx = next_write_idx;  // Discard remaining queue entries
-    __enable_irq();
+    if (!prim) __enable_irq();
 
-    // Ensure step pin is LOW (use BSRR/BRR appropriately)
+    // Ensure step pin is LOW (BSRR high-half clear works on ALL families)
     if (_step_port) {
-#if STM32_BSRR_CLEAR_SHIFT
         _step_port->BSRR = _step_clr_mask;
-#else
-        _step_port->BRR = _step_clr_mask;
-#endif
     }
 }
 
@@ -253,14 +244,9 @@ void TIM2_IRQHandler(void) {
 
         if (q->_pulse_high) {
             // ====== Phase 2: pulse end ======
-            // The step pin was HIGH; bring it LOW.
+            // The step pin was HIGH; bring it LOW (BSRR high-half clear).
             q->_pulse_high = false;
-
-#if STM32_BSRR_CLEAR_SHIFT
             q->_step_port->BSRR = q->_step_clr_mask;
-#else
-            q->_step_port->BRR = q->_step_clr_mask;
-#endif
 
             // Read queue entry
             uint8_t rp = q->read_idx;
@@ -359,6 +345,12 @@ __attribute__((weak)) void PendSV_Handler(void) {
 StepperQueue* StepperQueue::tryAllocateQueue(
     FastAccelStepperEngine* engine, uint8_t step_pin) {
     (void)engine;
+
+    // Validate step pin before any hardware access
+    if (step_pin == PIN_UNDEFINED) return nullptr;
+    if ((step_pin & PIN_EXTERNAL_FLAG)) return nullptr;  // External pins not supported
+    if (!digitalPinToPort(step_pin)) return nullptr;      // Invalid pin → NULL port
+
     int8_t idx = findFreeSlot();
     if (idx < 0) return nullptr;
 

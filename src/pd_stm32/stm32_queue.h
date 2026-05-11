@@ -23,15 +23,11 @@
 #define CCXIE_BIT(ch)   (TIM_DIER_CC1IE << (ch))
 #define CCXIF_BIT(ch)   (TIM_SR_CC1IF << (ch))
 
-// ---- BSRR/BRR detection ----
-// portClearRegister returns &BSRR on F2/F4/F7, &BRR elsewhere
-// When BSRR: write mask << 16 for reset
-// When BRR:  write mask directly
-#if defined(STM32F2xx) || defined(STM32F4xx) || defined(STM32F7xx)
-#define STM32_BSRR_CLEAR_SHIFT 1
-#else
-#define STM32_BSRR_CLEAR_SHIFT 0
-#endif
+// BSRR register layout (identical on ALL STM32 families):
+//   Bits [0:15]  = set bits  (write 1 → pin HIGH)
+//   Bits [16:31] = reset bits (write 1 → pin LOW)
+// Clear is always done via BSRR high-half (mask << 16).
+// Separate BRR register is NOT used — BSRR reset-half works everywhere.
 
 // ====================================================================
 // StepperQueue class — STM32-specific implementation
@@ -46,13 +42,13 @@ class StepperQueue : public StepperQueueBase {
   // Step pin GPIO
   uint8_t         _step_pin;
   GPIO_TypeDef*   _step_port;
-  uint32_t        _step_set_mask;   // BSRR set mask (low 16 bits)
-  uint32_t        _step_clr_mask;   // Clear mask (BRR or BSRR<<16)
+  uint32_t        _step_set_mask;   // BSRR set mask (write to BSRR low = set HIGH)
+  uint32_t        _step_clr_mask;   // BSRR clear mask (write to BSRR high = set LOW) = mask<<16
 
-  // Direction pin (atomic via BSRR/BRR)
+  // Direction pin (atomic via BSRR)
   volatile uint32_t* _dir_bsrr;     // &GPIOx->BSRR
-  uint32_t        _dir_set_mask;    // BSRR low bits = set
-  uint32_t        _dir_clr_mask;    // BSRR high bits = reset, or BRR
+  uint32_t        _dir_set_mask;    // BSRR low bits = set HIGH
+  uint32_t        _dir_clr_mask;    // BSRR high bits = set LOW (mask << 16)
 
   // Timer
   volatile uint32_t* _ccr_reg;      // &TIM2->CCR1/2/3/4
@@ -94,11 +90,7 @@ class StepperQueue : public StepperQueueBase {
       uint32_t mask = digitalPinToBitMask(dir_pin);
       _dir_bsrr = &port->BSRR;
       _dir_set_mask = mask;
-#if STM32_BSRR_CLEAR_SHIFT
-      _dir_clr_mask = mask << 16;   // BSRR high half = reset
-#else
-      _dir_clr_mask = mask;         // BRR register direct
-#endif
+      _dir_clr_mask = mask << 16;   // BSRR high half = reset (works on ALL families)
     }
   }
 
