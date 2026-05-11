@@ -639,6 +639,49 @@ Found on youtube:
 As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepper/issues/110):
 * [22 01 2021 Stepper POC3](https://youtu.be/fm2_VkUG10k)
 
+## STM32 Arduino Support
+
+FastAccelStepper supports STM32 microcontrollers via the official
+[Arduino Core STM32](https://github.com/stm32duino/Arduino_Core_STM32).
+
+### Architecture
+
+- **Step generation**: TIM2 CC interrupt + BSRR/BRR GPIO (push-pull OUTPUT)
+- **Steppers**: Up to 4 (any GPIO pins, dynamic slot allocation)
+- **Pulse width**: 6 µs (configurable via `STEP_PULSE_WIDTH_US`)
+- **Cyclic fill**: PendSV exception, triggered from TIM2 ISR every 3ms via uwTick
+- **GPIO mode**: Standard push-pull OUTPUT (any GPIO pin works)
+- **Direction**: Atomic BSRR set/reset — not ODR XOR (race-free)
+- **Direction settling**: `_dir_delay_active` state machine, 30µs delay
+- **TIM2 clock**: Auto-detection with APB1 prescaler ×2 correction
+- **Interrupt safety**: PRIMASK save/restore (reentrant)
+- **SR handling**: Snapshot → clear all processed at once (rc_w0)
+- **PendSV**: `__attribute__((weak))` — FreeRTOS compatible
+
+### Default Pin Mapping
+
+| Stepper | Default Pin | Notes |
+|---------|-------------|-------|
+| 0 | PA0 | Any GPIO pin can be used |
+| 1 | PA1 | (PA0-PA3 are conventional only) |
+| 2 | PA2 | |
+| 3 | PA3 | |
+
+### ⚠ Warnings
+
+1. **No FreeRTOS** — PendSV is overridden (weak, FreeRTOS can override).
+2. **TIM2 is reserved** — Do not use TIM2 elsewhere.
+3. **HAL timebase must be SysTick** (default). uwTick is used for cyclic fill.
+4. **Do not call HAL_Delay() with steppers running** — TIM2 priority 0 may preempt SysTick. Use millis() polling.
+5. **TICKS_PER_S must match TIM2 counter clock** — Define before library includes:
+   ```cpp
+   #define TICKS_PER_S 72000000UL  // STM32F103 @72MHz
+   #include <FastAccelStepper.h>
+   ```
+   See `pd_stm32/pd_config.h` for examples for each board.
+6. **Clock error**: After `engine.init()`, check `fas_stm32_clock_error`:
+   if non-zero, `TICKS_PER_S` exceeds actual TIM2 clock.
+
 ## Contribution
 
 - Thanks ixil for pull request (https://github.com/gin66/FastAccelStepper/pull/19) for ATmega2560
