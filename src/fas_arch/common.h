@@ -94,6 +94,11 @@ struct queue_end_s {
 #include "fas_arch/arduino_rp_pico.h"
 #include "pd_pico/pd_config.h"
 
+#elif defined(ARDUINO_ARCH_STM32)
+// STM32 family (STM32duino core)
+#include "fas_arch/arduino_stm32.h"
+#include "pd_stm32/pd_config.h"
+
 #else
 #error "Unsupported devices"
 #endif

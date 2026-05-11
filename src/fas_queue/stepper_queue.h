@@ -19,6 +19,8 @@
 #include "pd_pico/pico_queue.h"
 #elif defined(SUPPORT_ESP32)
 #include "pd_esp32/esp32_queue.h"
+#elif defined(FAS_STM32)
+#include "pd_stm32/stm32_queue.h"
 #else
 #error "Unsupported architecture"
 #endif
