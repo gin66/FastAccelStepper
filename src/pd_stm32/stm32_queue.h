@@ -37,7 +37,7 @@ class StepperQueue : public StepperQueueBase {
 #include "../fas_queue/protocol.h"
 
   volatile bool _isRunning;
-  bool _initialized;
+  // bool _initialized was removed — set but never read (fix_plan_v3 FIX #7)
 
   // Step pin GPIO
   uint8_t         _step_pin;
@@ -73,7 +73,7 @@ class StepperQueue : public StepperQueueBase {
     _ccr_reg        = NULL;
     _timer_ch       = 0;
     _isRunning      = false;
-    _initialized    = false;
+    // _initialized = false was removed (fix_plan_v3 FIX #7)
     _pulse_high     = false;
     _dir_delay_active = false;
     max_speed_in_ticks = STEP_PULSE_WIDTH_TICKS * 4;
@@ -82,11 +82,19 @@ class StepperQueue : public StepperQueueBase {
   inline bool isRunning() const            { return _isRunning; }
   inline bool isReadyForCommands() const   { return true; }
 
+  // setDirPin — configure direction pin for atomic BSRR access
+  // Validates digitalPinToPort() before dereferencing.
+  // If port is NULL (invalid pin), _dir_bsrr stays NULL → SET_DIRECTION_PIN_STATE
+  // will be a no-op (safe, queued direction change fails silently).
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
     if ((dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0)) {
       GPIO_TypeDef* port = digitalPinToPort(dir_pin);
+      if (!port) {           // Invalid pin → BSRR stays NULL, SET_DIRECTION_PIN_STATE becomes no-op
+        _dir_bsrr = NULL;
+        return;
+      }
       uint32_t mask = digitalPinToBitMask(dir_pin);
       _dir_bsrr = &port->BSRR;
       _dir_set_mask = mask;
@@ -95,9 +103,6 @@ class StepperQueue : public StepperQueueBase {
   }
 
   void adjustSpeedToStepperCount(uint8_t steppers);
-
- private:
-  static StepperQueue* allocateSlot(uint8_t step_pin, uint8_t timer_ch);
 };
 
 // ---- Direction pin: atomic via BSRR/BRR ----
@@ -114,6 +119,9 @@ class StepperQueue : public StepperQueueBase {
   digitalWrite((pin), (high) ? HIGH : LOW)
 
 // ---- Direction-to-pulse delay ----
+// Guard allows override from build_flags (-DAFTER_SET_DIR_PIN_DELAY_US=50)
+#ifndef AFTER_SET_DIR_PIN_DELAY_US
 #define AFTER_SET_DIR_PIN_DELAY_US 30
+#endif
 
 #endif /* PD_STM32_QUEUE_H */
