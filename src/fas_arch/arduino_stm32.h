@@ -15,7 +15,7 @@
   __set_PRIMASK(__fas_prim)
 
 #define FAS_PSTR(s)  (s)
-#define PIN_UNDEFINED 0xFF
-#define PIN_EXTERNAL_FLAG 128
+// PIN_UNDEFINED (255) and PIN_EXTERNAL_FLAG (128) are defined in
+// FastAccelStepper.h. Do NOT redefine here to avoid -Wmacro-redefined.
 
 #endif /* FAS_ARCH_ARDUINO_STM32_H */

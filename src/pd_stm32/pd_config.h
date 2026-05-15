@@ -37,6 +37,12 @@
 #define DELAY_MS_BASE          2
 #define CYCLIC_INTERVAL_MS     3
 
+// ====================================================================
+// NOTE: STM32F1 TIM2 is 16-bit only.
+// ARR = 0xFFFFFFFF is masked to 0xFFFF by F1 hardware.
+// Minimum speed = TICKS_PER_S / 65536 ≈ 1098 steps/s @72MHz.
+// ====================================================================
+
 // ---- Feature flags ----
 #define SUPPORT_QUEUE_ENTRY_END_POS_U16
 #define NEED_GENERIC_GET_CURRENT_POSITION
