@@ -6,8 +6,8 @@
 // ====================================================================
 // Compile-time TICKS_PER_S
 //
-// User MUST define TICKS_PER_S matching their board's TIM2 counter clock.
-// TIM2 counter clock = PCLK1 * (APB1_prescaler==1 ? 1 : 2)
+// User MUST define TICKS_PER_S matching their board's TIM2 (or TIM3 on C0) counter clock.
+// Timer counter clock = PCLK1 * (APB1_prescaler==1 ? 1 : 2)
 //
 // Examples (all with PLL enabled):
 //   STM32F103 @72MHz:  TICKS_PER_S = 72000000  (APB1=36MHz ×2)
@@ -31,17 +31,18 @@
 #ifndef STEP_PULSE_WIDTH_US
 #define STEP_PULSE_WIDTH_US 6
 #endif
-#define STEP_PULSE_WIDTH_TICKS ((uint32_t)(STEP_PULSE_WIDTH_US * (TICKS_PER_S / 1000000L)))
+#define STEP_PULSE_WIDTH_TICKS ((uint32_t)(STEP_PULSE_WIDTH_US * (TICKS_PER_S / 1000000UL)))
 
 // ---- Timing constants ----
 #define MIN_CMD_TICKS          (TICKS_PER_S / 5000)
 #define MIN_DIR_DELAY_US       200
-#define MAX_DIR_DELAY_US       (65535 / (TICKS_PER_S / 1000000))
+#define MAX_DIR_DELAY_US       (65535 / (TICKS_PER_S / 1000000UL))
 #define DELAY_MS_BASE          2
 #define CYCLIC_INTERVAL_MS     3
 
 // ====================================================================
 // NOTE: STM32F1 TIM2 is 16-bit only.
+// C0 TIM3 is also 16-bit (ARR=0xFFFF). Min speed @48MHz ≈ 733 steps/s.
 // ARR = 0xFFFFFFFF is masked to 0xFFFF by F1 hardware.
 // Minimum speed = TICKS_PER_S / 65536 ≈ 1098 steps/s @72MHz.
 // ====================================================================
