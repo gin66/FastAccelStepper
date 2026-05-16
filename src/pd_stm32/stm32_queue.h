@@ -51,7 +51,7 @@ class StepperQueue : public StepperQueueBase {
   uint32_t        _dir_clr_mask;    // BSRR high bits = set LOW (mask << 16)
 
   // Timer
-  volatile uint32_t* _ccr_reg;      // &TIM2->CCR1/2/3/4
+  volatile uint32_t* _ccr_reg;      // &FAS_TIMER->CCR1/2/3/4 (TIM2 or TIM3 on C0)
   uint8_t         _timer_ch;        // 0..3
 
   // Pulse tracking

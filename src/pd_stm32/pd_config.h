@@ -9,11 +9,14 @@
 // User MUST define TICKS_PER_S matching their board's TIM2 counter clock.
 // TIM2 counter clock = PCLK1 * (APB1_prescaler==1 ? 1 : 2)
 //
-// Examples:
+// Examples (all with PLL enabled):
 //   STM32F103 @72MHz:  TICKS_PER_S = 72000000  (APB1=36MHz ×2)
 //   STM32F407 @168MHz: TICKS_PER_S = 84000000  (APB1=42MHz ×2)
-//   STM32G0   @64MHz:  TICKS_PER_S = 64000000  (APB1=64MHz ×1)
-//   STM32H743 @480MHz: TICKS_PER_S = 240000000 (APB1=120MHz ×2)
+//   STM32G0   @64MHz (with PLL):  TICKS_PER_S = 64000000  (APB1=64MHz ×1)
+//   STM32H743 @480MHz (with PLL): TICKS_PER_S = 240000000 (APB1=120MHz ×2)
+//   STM32C031 @48MHz (with PLL):  TICKS_PER_S = 48000000  (APB1=48MHz ×1, TIM3)
+//   STM32F091 @48MHz (with PLL):  TICKS_PER_S = 48000000  (APB1=48MHz ×1, TIM2)
+//   STM32L073 @32MHz (with PLL):  TICKS_PER_S = 32000000  (APB1=32MHz ×1, TIM2)
 // ====================================================================
 #ifndef TICKS_PER_S
 #define TICKS_PER_S 72000000UL
