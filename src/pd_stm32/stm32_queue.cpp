@@ -243,6 +243,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
 #if defined(STM32C0xx)
     volatile uint32_t* ccr[] = {&FAS_TIMER->CCR1, &FAS_TIMER->CCR2, &FAS_TIMER->CCR3, &FAS_TIMER->CCR4};
 #else
+    // non-C0 branch: FAS_TIMER resolves to TIM2, so hardcoding TIM2 is intentional.
     volatile uint32_t* ccr[] = {&TIM2->CCR1, &TIM2->CCR2, &TIM2->CCR3, &TIM2->CCR4};
 #endif
     _ccr_reg = ccr[_timer_ch];
@@ -321,7 +322,7 @@ bool StepperQueue::getActualTicksWithDirection(
 
 // ====================================================================
 // Cyclic PendSV trigger
-// Called at end of TIM2_IRQHandler every ~3ms.
+// Called at end of FAS_TIMER_IRQHandler every ~3ms.
 // Triggers PendSV exception to fill queues without consuming ISR time.
 // ====================================================================
 static void cyclic_check_and_pend(void) {
