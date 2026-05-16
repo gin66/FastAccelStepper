@@ -218,7 +218,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     static const uint8_t ch_map[4] = {0, 1, 2, 3};
     _timer_ch = ch_map[queue_num];
 
-    // Ensure TIM2 is initialized
+    // Ensure step timer is initialized (TIM2 / TIM3 on C0)
     initStepTimer();
 
     // Step pin GPIO configuration — validate port first

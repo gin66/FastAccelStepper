@@ -152,6 +152,12 @@ templates:
     framework: arduino
     lib_extra_dirs: .
 
+  stm32:
+    platform: ststm32
+    framework: arduino
+    build_flags: ["-Wall"]
+    lib_extra_dirs: .
+
 environments:
   esp32:
     template: esp32_arduino
@@ -284,6 +290,31 @@ environments:
     board: rpipico2
     board_upload_psram_length: 1048576
     build_flags: ["-D__FREERTOS=1"]
+
+  bluepill_f103c8:
+    template: stm32
+    board: bluepill_f103c8
+    build_flags_extra: ["-DTICKS_PER_S=72000000UL"]
+
+  nucleo_g070rb:
+    template: stm32
+    board: nucleo_g070rb
+    build_flags_extra: ["-DTICKS_PER_S=64000000UL"]
+
+  blackpill_f401cc:
+    template: stm32
+    board: blackpill_f401cc
+    build_flags_extra: ["-DTICKS_PER_S=84000000UL"]
+
+  nucleo_h743zi:
+    template: stm32
+    board: nucleo_h743zi
+    build_flags_extra: ["-DTICKS_PER_S=240000000UL"]
+
+  nucleo_l476rg:
+    template: stm32
+    board: nucleo_l476rg
+    build_flags_extra: ["-DTICKS_PER_S=80000000UL"]
 
 versioned_environments:
   esp32:
@@ -429,6 +460,11 @@ workflows:
       - atmelsam
       - rpipico
       - rpipico2
+      - bluepill_f103c8
+      - nucleo_g070rb
+      - blackpill_f401cc
+      - nucleo_h743zi
+      - nucleo_l476rg
     script: build-platformio.sh
 
   idf:
