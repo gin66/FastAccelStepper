@@ -182,6 +182,10 @@ def generate_workflow_yml(workflow_name: str, workflow_config: dict[str, Any]) -
 
     lines.extend(
         [
+            "concurrency:",
+            "  group: ${{ github.workflow }}-${{ github.ref }}",
+            "  cancel-in-progress: true",
+            "",
             "jobs:",
             "  build:",
             "    strategy:",

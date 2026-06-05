@@ -1,7 +1,8 @@
 name: Upload component
 on:
   push:
-    branches: [ master ]
+    tags:
+      - '*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -10,11 +11,11 @@ concurrency:
 jobs:
   upload_components:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
     steps:
       - uses: actions/checkout@v4
       - uses: espressif/upload-components-ci-action@v2
         with:
           components: "fastaccelstepper: ."
           namespace: "gin66"
+          version: ${{ github.ref_name }}
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
