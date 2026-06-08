@@ -12,6 +12,30 @@
 #define LOG2_ACCEL_FACTOR LOG2_CONST_128E12
 #define US_TO_TICKS(u32) ((u32) * 16)
 #define TICKS_TO_US(u32) ((u32) / 16)
+// === STM32F103: 72MHz÷4(PSC=3)=18MHz ===
+#elif (TICKS_PER_S == 18000000L)
+#define LOG2_TICKS_PER_S               ((log2_value_t)0x3034)
+#define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x2F34)
+#define LOG2_ACCEL_FACTOR               ((log2_value_t)0x5E68)
+#define US_TO_TICKS(u32)                ((u32) * 18)
+#define TICKS_TO_US(u32)                ((u32) / 18)
+
+// === STM32F401: 84MHz÷5(PSC=4)=16.8MHz ===
+#elif (TICKS_PER_S == 16800000L)
+#define LOG2_TICKS_PER_S               ((log2_value_t)0x3001)
+#define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x2F01)
+#define LOG2_ACCEL_FACTOR               ((log2_value_t)0x5E02)
+#define US_TO_TICKS(u32)                ((uint32_t)((u32) * 168 / 10))
+#define TICKS_TO_US(u32)                ((uint32_t)((u32) * 10 / 168))
+
+// === STM32H743 @400MHz: 200MHz÷10(PSC=9)=20MHz ===
+#elif (TICKS_PER_S == 20000000L)
+#define LOG2_TICKS_PER_S               ((log2_value_t)0x3082)
+#define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x2F82)
+#define LOG2_ACCEL_FACTOR               ((log2_value_t)0x5F04)
+#define US_TO_TICKS(u32)                ((u32) * 20)
+#define TICKS_TO_US(u32)                ((u32) / 20)
+
 #elif (TICKS_PER_S == 21000000L)
 #define LOG2_TICKS_PER_S LOG2_CONST_21E6
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 LOG2_CONST_21E6_DIV_SQRT_OF_2
@@ -110,18 +134,11 @@
 #define US_TO_TICKS(u32)                ((u32) * 550)
 #define TICKS_TO_US(u32)                ((u32) / 550)
 #else
-#define SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-#define LOG2_TICKS_PER_S log2_timer_freq
-#define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 log2_timer_freq_div_sqrt_of_2
-#define LOG2_ACCEL_FACTOR log2_timer_freq_square_div_2
-// This overflows for approx. 1s at 40 MHz, only
-#define US_TO_TICKS(u32) \
-  ((uint32_t)((((uint32_t)((u32) * (TICKS_PER_S / 10000L))) / 100L)))
-
-// This calculation needs more work
-#define TICKS_TO_US(u32) \
-  ((uint32_t)((((uint32_t)((u32) / (TICKS_PER_S / 1000000L))) / 1L)))
-
+// V17: Replaced SUPPORT_LOG2_TIMER_FREQ_VARIABLES with #error.
+// All CI boards use predefined entries — this branch is never reached.
+// Supported values: 16M, 18M, 20M, 21M, 32M, 48M, 64M, 72M, 80M, 84M,
+// 100M, 120M, 168M, 170M, 216M, 480M, 550M
+#error "Unsupported TICKS_PER_S. Use timer prescaler to match a supported value."
 #endif
 
 #ifdef TEST_TIMING

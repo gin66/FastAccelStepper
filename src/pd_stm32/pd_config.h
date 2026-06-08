@@ -6,20 +6,27 @@
 // ====================================================================
 // Compile-time TICKS_PER_S
 //
-// User MUST define TICKS_PER_S matching their board's TIM2 (or TIM3 on C0) counter clock.
-// Timer counter clock = PCLK1 * (APB1_prescaler==1 ? 1 : 2)
+// Default is 16MHz. Each board's TIM2 prescaler (stm32_queue.cpp) brings the
+// actual timer clock close to this value, ensuring all tick values fit in uint16_t
+// (no overflow for 1ms/2ms pipeline operations).
 //
-// Examples (all with PLL enabled):
-//   STM32F103 @72MHz:  TICKS_PER_S = 72000000  (APB1=36MHz ×2)
-//   STM32F407 @168MHz: TICKS_PER_S = 84000000  (APB1=42MHz ×2)
-//   STM32G0   @64MHz (with PLL):  TICKS_PER_S = 64000000  (APB1=64MHz ×1)
-//   STM32H743 @480MHz (with PLL): TICKS_PER_S = 240000000 (APB1=120MHz ×2)
-//   STM32C031 @48MHz (with PLL):  TICKS_PER_S = 48000000  (APB1=48MHz ×1, TIM3)
-//   STM32F091 @48MHz (with PLL):  TICKS_PER_S = 48000000  (APB1=48MHz ×1, TIM2)
-//   STM32L073 @32MHz (with PLL):  TICKS_PER_S = 32000000  (APB1=32MHz ×1, TIM2)
+// Timer clock formula: TIM_CLK = PCLK1 * (APB1_prescaler > 1 ? 2 : 1)
+// Prescaler formula: PSC = (actual_timer_clk / TICKS_PER_S) - 1
+//
+// CI boards with override (build_flags_extra in build_matrix.yaml):
+//   F103 (bluepill):  -DTICKS_PER_S=18000000  (72M÷4, PSC=3)  → 18MHz
+//   F401 (blackpill): -DTICKS_PER_S=16800000  (84M÷5, PSC=4)  → 16.8MHz
+//   H743 (nucleo):    -DTICKS_PER_S=20000000  (200M÷10, PSC=9) → 20MHz
+//
+// CI boards using default (no override):
+//   G070 (nucleo):    64M÷4 (PSC=3) → 16MHz — exact
+//   L476 (nucleo):    80M÷5 (PSC=4) → 16MHz — exact
+//
+// If TICKS_PER_S is not a supported predefined value, RampCalculator.h will
+// emit a clear #error. Always use timer prescaler to match a supported value.
 // ====================================================================
 #ifndef TICKS_PER_S
-#define TICKS_PER_S 72000000UL
+#define TICKS_PER_S 16000000UL
 #endif
 
 // ---- Queue topology ----

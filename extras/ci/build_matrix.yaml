@@ -294,27 +294,27 @@ environments:
   bluepill_f103c8:
     template: stm32
     board: bluepill_f103c8
-    build_flags_extra: ["-DTICKS_PER_S=72000000UL"]
+    build_flags_extra: ["-DTICKS_PER_S=18000000UL"]   # F103: 72M÷4(PSC=3) = 18MHz
 
   nucleo_g070rb:
     template: stm32
     board: nucleo_g070rb
-    build_flags_extra: ["-DTICKS_PER_S=64000000UL"]
+    # G0: 64M÷4(PSC=3) = 16MHz → dùng default TICKS_PER_S=16000000UL từ pd_config.h
 
   blackpill_f401cc:
     template: stm32
     board: blackpill_f401cc
-    build_flags_extra: ["-DTICKS_PER_S=84000000UL"]
+    build_flags_extra: ["-DTICKS_PER_S=16800000UL"]   # F401: 84M÷5(PSC=4) = 16.8MHz
 
   nucleo_h743zi:
     template: stm32
     board: nucleo_h743zi
-    build_flags_extra: ["-DTICKS_PER_S=240000000UL"]
+    build_flags_extra: ["-DTICKS_PER_S=20000000UL"]   # H743 @400MHz: 200M÷10(PSC=9) = 20MHz
 
   nucleo_l476rg:
     template: stm32
     board: nucleo_l476rg
-    build_flags_extra: ["-DTICKS_PER_S=80000000UL"]
+    # L4: 80M÷5(PSC=4) = 16MHz → dùng default TICKS_PER_S=16000000UL từ pd_config.h
 
 versioned_environments:
   esp32:

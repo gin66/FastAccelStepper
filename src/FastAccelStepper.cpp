@@ -134,8 +134,13 @@ AqeResultCode FastAccelStepper::addQueueEntry(
   if (_dirPin & PIN_EXTERNAL_FLAG) {
     if (dir_change_needed) {
       if (!handleExternalDirectionPin(q, cmd->count_up)) {
+        // V17: Clamp to uint16_t max to prevent narrowing conversion
+        // (US_TO_TICKS(2000) can exceed 65535 for TICKS_PER_S > 32M).
+        // This is a safety guard — boards with TICKS_PER_S ≤ 32M are unaffected.
+        uint32_t _pause_ticks = US_TO_TICKS(2000);
+        if (_pause_ticks > 65535) _pause_ticks = 65535;
         struct stepper_command_s pause_cmd = {
-            .ticks = US_TO_TICKS((uint16_t)2000),
+            .ticks = (uint16_t)_pause_ticks,
             .steps = 0,
             .count_up = cmd->count_up};
         res = q->addQueueEntry(&pause_cmd, start);
