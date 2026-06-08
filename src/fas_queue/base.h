@@ -53,7 +53,9 @@ class StepperQueueBase {
     dirHighCountsUp = true;
     dirPin = PIN_UNDEFINED;
     // intentionally slow speed to make missing initialization detectable
-    max_speed_in_ticks = TICKS_PER_S / 1000;
+    // Clamp to uint16_t max to prevent narrowing conversion overflow
+    // (e.g. TICKS_PER_S > 65M would overflow uint16_t without clamp)
+    max_speed_in_ticks = (uint16_t)fas_min((uint32_t)(TICKS_PER_S / 1000), (uint32_t)65535);
     _last_command_ticks = 65535;
   }
 
