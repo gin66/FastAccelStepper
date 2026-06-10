@@ -12,6 +12,19 @@
 #define LOG2_ACCEL_FACTOR LOG2_CONST_128E12
 #define US_TO_TICKS(u32) ((u32) * 16)
 #define TICKS_TO_US(u32) ((u32) / 16)
+
+// === STM32H743 @400MHz default path ===
+// TIM2 @200MHz, PSC=11 → timer actual = 200M/12 = 16.666.667 Hz
+// Avoids ~4% timing error when user doesn't override TICKS_PER_S
+// Note: modulo check gives false positive (200M % 16666666 = 8),
+// but timing is <0.0001% error. Use 20000000 for error=0.
+#elif (TICKS_PER_S == 16666666L)
+#define LOG2_TICKS_PER_S               ((log2_value_t)0x2FFB)  // VERIFIED: log2(16666666)*512 = 12283.41
+#define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x2EFB)  // VERIFIED: log2(16666666/√2)*512 = 12027.41
+#define LOG2_ACCEL_FACTOR               ((log2_value_t)0x5DF6)  // VERIFIED: 2×0x2FFB−512 = 24054 = 0x5DF6
+#define US_TO_TICKS(u32)                ((uint32_t)((u32) * 50 / 3))
+#define TICKS_TO_US(u32)                ((uint32_t)((u32) * 3 / 50))
+
 // === STM32F103: 72MHz÷4(PSC=3)=18MHz ===
 #elif (TICKS_PER_S == 18000000L)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x3034)
@@ -50,84 +63,84 @@
 #define US_TO_TICKS(u32)                ((u32) * 32)
 #define TICKS_TO_US(u32)                ((u32) / 32)
 #elif (TICKS_PER_S == 48000000L)
-// STM32F0/G0/WL
+// STM32F0/G0/WL — STM32 fork: UNVERIFIED_IN_CI (prescaled to 16M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x3308)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x3208)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x6411)
 #define US_TO_TICKS(u32)                ((u32) * 48)
 #define TICKS_TO_US(u32)                ((u32) / 48)
 #elif (TICKS_PER_S == 64000000L)
-// STM32G0/WB
+// STM32G0/WB — STM32 fork: UNVERIFIED_IN_CI (prescaled to 16M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x33dd)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x32dd)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x65ba)
 #define US_TO_TICKS(u32)                ((u32) * 64)
 #define TICKS_TO_US(u32)                ((u32) / 64)
 #elif (TICKS_PER_S == 72000000L)
-// STM32F1/L1 (most common)
+// STM32F1/L1 — STM32 fork: UNVERIFIED_IN_CI (prescaled to 18M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x3434)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x3334)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x6668)
 #define US_TO_TICKS(u32)                ((u32) * 72)
 #define TICKS_TO_US(u32)                ((u32) / 72)
 #elif (TICKS_PER_S == 80000000L)
-// STM32L4
+// STM32L4 — STM32 fork: UNVERIFIED_IN_CI (prescaled to 16M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x3482)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x3382)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x6704)
 #define US_TO_TICKS(u32)                ((u32) * 80)
 #define TICKS_TO_US(u32)                ((u32) / 80)
 #elif (TICKS_PER_S == 84000000L)
-// STM32F401/411
+// STM32F401/411 — STM32 fork: UNVERIFIED_IN_CI (prescaled to 16.8M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x34a6)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x33a6)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x674c)
 #define US_TO_TICKS(u32)                ((u32) * 84)
 #define TICKS_TO_US(u32)                ((u32) / 84)
 #elif (TICKS_PER_S == 100000000L)
-// STM32F411/746
+// STM32F411/746 — STM32 fork: UNVERIFIED_IN_CI (prescaled to ≤20M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x3527)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x3427)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x684d)
 #define US_TO_TICKS(u32)                ((u32) * 100)
 #define TICKS_TO_US(u32)                ((u32) / 100)
 #elif (TICKS_PER_S == 120000000L)
-// STM32L4+/F4
+// STM32L4+/F4 — STM32 fork: UNVERIFIED_IN_CI (prescaled to ≤20M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x35ad)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x34ad)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x695a)
 #define US_TO_TICKS(u32)                ((u32) * 120)
 #define TICKS_TO_US(u32)                ((u32) / 120)
 #elif (TICKS_PER_S == 168000000L)
-// STM32F405/407
+// STM32F405/407 — STM32 fork: UNVERIFIED_IN_CI (prescaled to ≤20M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x36a6)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x35a6)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x6b4c)
 #define US_TO_TICKS(u32)                ((u32) * 168)
 #define TICKS_TO_US(u32)                ((u32) / 168)
 #elif (TICKS_PER_S == 170000000L)
-// STM32F3/G4
+// STM32F3/G4 — STM32 fork: UNVERIFIED_IN_CI (prescaled to ≤20M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x36af)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x35af)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x6b5e)
 #define US_TO_TICKS(u32)                ((u32) * 170)
 #define TICKS_TO_US(u32)                ((u32) / 170)
 #elif (TICKS_PER_S == 216000000L)
-// STM32F7
+// STM32F7 — STM32 fork: UNVERIFIED_IN_CI (prescaled to ≤20M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x375f)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x365f)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x6cbe)
 #define US_TO_TICKS(u32)                ((u32) * 216)
 #define TICKS_TO_US(u32)                ((u32) / 216)
 #elif (TICKS_PER_S == 480000000L)
-// STM32H7 (default)
+// STM32H7 (default) — STM32 fork: UNVERIFIED_IN_CI (prescaled to 20M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x39ad)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x38ad)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x715a)
 #define US_TO_TICKS(u32)                ((u32) * 480)
 #define TICKS_TO_US(u32)                ((u32) / 480)
 #elif (TICKS_PER_S == 550000000L)
-// STM32H7 (overclock)
+// STM32H7 (overclock) — STM32 fork: UNVERIFIED_IN_CI (prescaled to ≤20M)
 #define LOG2_TICKS_PER_S               ((log2_value_t)0x3a12)
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 ((log2_value_t)0x3912)
 #define LOG2_ACCEL_FACTOR               ((log2_value_t)0x7224)
