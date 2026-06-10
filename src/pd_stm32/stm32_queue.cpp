@@ -19,6 +19,17 @@
 // GCC and ARMCC define __ARM_ARCH_6M__ automatically when compiling
 // with -mcpu=cortex-m0 or -mcpu=cortex-m0plus.
 // ====================================================================
+
+// ====================================================================
+// FAS_SPURIOUS_MAX — Spurious Interrupt Guard (Phase 2A)
+//
+// If a timer channel fires an interrupt when no queue is active (e.g. due
+// to EMI or configuration error), the ISR would loop indefinitely clearing
+// the flag. This guard counts consecutive spurious interrupts per channel
+// and disables the channel after FAS_SPURIOUS_MAX occurrences.
+// ====================================================================
+#define FAS_SPURIOUS_MAX 10
+static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
 #if defined(__ARM_ARCH_6M__)
     // M0/M0+ (G0, F0, L0, C0): không có __DMB()
     #define FAS_DMB() __DSB()
@@ -410,7 +421,17 @@ void TIM2_IRQHandler(void) {
         ch_processed |= ccif;
 
         StepperQueue* q = StepperQueue::_ch_to_queue[ch];
-        if (!q || !q->_isRunning) continue;
+        // Phase 2A: Spurious interrupt guard — count consecutive inactive
+        // channel interrupts. If EMI or config error triggers repeated
+        // flags, disable channel after FAS_SPURIOUS_MAX occurrences.
+        if (!q || !q->_isRunning) {
+            fas_spurious_count[ch]++;
+            if (fas_spurious_count[ch] >= FAS_SPURIOUS_MAX) {
+                FAS_TIMER->DIER &= ~CCXIE_BIT(ch);
+                fas_spurious_count[ch] = 0;
+            }
+            continue;
+        }
 
         if (q->_pulse_high) {
             // ====== Phase 2: pulse end ======
@@ -518,8 +539,30 @@ void TIM2_IRQHandler(void) {
 //
 // Weak attribute allows FreeRTOS to override this handler.
 // Define DISABLE_FAS_PENDSV to skip installation entirely.
+//
+// ══════════════════════════════════════════════════════════════════════
+// Phase 2B: FreeRTOS Compatibility Warning
+//
+// FastAccelStepper uses PendSV_Handler (weak attribute) for deferred
+// queue filling. FreeRTOS may also claim PendSV for context switching.
+// If both are active, they will conflict at runtime.
+//
+// If you use FreeRTOS:
+//   1. Add -DDISABLE_FAS_PENDSV to your build flags
+//   2. Call engine->manageSteppers() from a low-priority task/timer
+//
+// Phase 2C: NVIC Priority (Jitter Protection)
+//
+// TIMER must have the HIGHEST priority (0) to ensure tick-exact step
+// pulse timing. PendSV must have the LOWEST priority so it only runs
+// when CPU is idle, never blocking step generation (set in initStepTimer
+// and fas_init_engine respectively).
+// ══════════════════════════════════════════════════════════════════════
 // ====================================================================
 #if !defined(DISABLE_FAS_PENDSV)
+#if defined(configUSE_PORT_OPTIMISED_TASK_SELECTION)
+#pragma message "FAS: PendSV_Handler may conflict if FreeRTOS uses PendSV. Define DISABLE_FAS_PENDSV to skip."
+#endif
 __attribute__((weak)) void PendSV_Handler(void) {
     _cyclic_pending = false;
     FAS_DMB();
