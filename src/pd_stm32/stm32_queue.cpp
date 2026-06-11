@@ -62,13 +62,13 @@ static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
 #if defined(STM32C0xx)
     #define FAS_TIMER            TIM3
     #define FAS_TIMER_IRQn       TIM3_IRQn
-    #define FAS_TIMER_RCC_ENABLE __HAL_RCC_TIM3_CLK_ENABLE()
+    #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
     #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
 #else
     #define FAS_TIMER            TIM2
     #define FAS_TIMER_IRQn       TIM2_IRQn
-    #define FAS_TIMER_RCC_ENABLE __HAL_RCC_TIM2_CLK_ENABLE()
+    #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
     #if defined(STM32F1xx)
         #define FAS_TIM_IS_16BIT
         #define FAS_TIMER_ARR_MAX 0xFFFF
