@@ -49,7 +49,8 @@
 
 // ====================================================================
 // NOTE: STM32F1 TIM2 is 16-bit only.
-// C0 TIM3 is also 16-bit (ARR=0xFFFF). With PSC=2 => timer=16MHz.
+// C0/G0 TIM3 is 16-bit (ARR=0xFFFF). With PSC=2 => timer=16MHz.
+// L0 TIM2 is also 16-bit (RM0367 §24).
 // Min speed = 16MHz / 65536 ≈ 244 steps/s.
 // ARR = 0xFFFFFFFF is masked to 0xFFFF by F1 hardware.
 // Minimum speed = TICKS_PER_S / 65536 ≈ 1098 steps/s @72MHz.

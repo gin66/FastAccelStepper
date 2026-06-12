@@ -40,6 +40,19 @@
 #endif
 
 // ====================================================================
+// STM32G0: ensure CMSIS device header is included for peripheral macros
+//
+// framework-arduinostm32@4.21200.0 does not include the CMSIS device
+// header (stm32g0xx.h) by default on G0, so TIM2, TIM2_IRQn, and
+// __HAL_RCC_TIM2_CLK_ENABLE are not visible without an explicit include.
+// We include through the variant's pinmap header which always exists.
+// ====================================================================
+#if defined(STM32G0xx)
+#include <pins_arduino.h>
+#include <stm32g0xx_hal.h>
+#endif
+
+// ====================================================================
 // FAS_DMB — Data Memory Barrier wrapper
 //
 // ARMv6-M (M0/M0+) does not have __DMB(). Use __DSB() instead.
@@ -100,7 +113,24 @@ static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
     #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
+#elif defined(STM32G0xx)
+    // STM32G0 series: TIM3 is 16-bit, 4 channels (CCR1-CCR4).
+    // G0 does NOT expose TIM2 peripheral macros in framework-arduinostm32@4.21200.0.
+    // G0 TIM3 is 16-bit (ARR=0xFFFF), similar to C0.
+    #define FAS_TIMER            TIM3
+    #define FAS_TIMER_IRQn       TIM3_IRQn
+    #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
+    #define FAS_TIM_IS_16BIT
+    #define FAS_TIMER_ARR_MAX    0xFFFF
+#elif defined(STM32L0xx)
+    // STM32L0 series: TIM2 is 16-bit only (RM0367 §24: TIM2 is 16-bit on L0)
+    #define FAS_TIMER            TIM2
+    #define FAS_TIMER_IRQn       TIM2_IRQn
+    #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
+    #define FAS_TIM_IS_16BIT
+    #define FAS_TIMER_ARR_MAX    0xFFFF
 #else
+    // F4/F7/H7/G4/L4/WB/WL/L5/U5/H5, etc.: TIM2 is 32-bit
     #define FAS_TIMER            TIM2
     #define FAS_TIMER_IRQn       TIM2_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
@@ -175,7 +205,7 @@ static uint32_t getTimClock(void) {
 // On 32-bit timers, simple addition is safe (no overflow in practice).
 // ====================================================================
 static inline void fas_tim_set_ccr(volatile uint32_t* ccr, uint32_t delay) {
-#if defined(STM32F1xx) || defined(STM32C0xx)
+#if defined(STM32F1xx) || defined(STM32C0xx) || defined(STM32G0xx) || defined(STM32L0xx)
     uint32_t cnt = FAS_TIMER->CNT;
     // 16-bit timer: (cnt + delay) & 0xFFFF xử lý wrap chính xác.
     // Xem toán học ở comment function.
@@ -287,10 +317,11 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     // Must match the timer type: TIM2 on most families, TIM3 on C0
     // This is the only place where the concrete timer register is referenced.
     // All other CCR writes go through _ccr_reg (fast pointer) or fas_tim_set_ccr().
-#if defined(STM32C0xx)
-    volatile uint32_t* ccr[] = {&FAS_TIMER->CCR1, &FAS_TIMER->CCR2, &FAS_TIMER->CCR3, &FAS_TIMER->CCR4};
+#if defined(STM32C0xx) || defined(STM32G0xx)
+    // C0 + G0: use TIM3 CCR1-CCR4 (TIM3 is the step timer on these families)
+    volatile uint32_t* ccr[] = {&TIM3->CCR1, &TIM3->CCR2, &TIM3->CCR3, &TIM3->CCR4};
 #else
-    // non-C0 branch: FAS_TIMER resolves to TIM2, so hardcoding TIM2 is intentional.
+    // All others (F1, F4, F7, H7, G4, L0, L4, WB, WL, L5, U5, H5): TIM2 CCR1-CCR4
     volatile uint32_t* ccr[] = {&TIM2->CCR1, &TIM2->CCR2, &TIM2->CCR3, &TIM2->CCR4};
 #endif
     _ccr_reg = ccr[_timer_ch];
@@ -441,7 +472,7 @@ static void fas_stm32_report_clock_error(void) {
 //
 // IMPORTANT: All CCR writes use fas_tim_set_ccr() for 16-bit wrap safety.
 // ====================================================================
-#if defined(STM32C0xx)
+#if defined(STM32C0xx) || defined(STM32G0xx)
 void TIM3_IRQHandler(void) {
 #else
 void TIM2_IRQHandler(void) {

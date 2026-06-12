@@ -649,7 +649,7 @@ FastAccelStepper supports STM32 microcontrollers via the official
 - **Step generation**: TIM2 CC interrupt + BSRR/BRR GPIO (push-pull OUTPUT)
 - **Steppers**: Up to 4 (any GPIO pins, dynamic slot allocation)
 - **Pulse width**: 6 µs (configurable via `STEP_PULSE_WIDTH_US`)
-- **Cyclic fill**: PendSV exception, triggered from FAS_TIMER ISR (TIM2 or TIM3 on C0) every 3ms via uwTick
+- **Cyclic fill**: PendSV exception, triggered from FAS_TIMER ISR (TIM2, or TIM3 on C0/G0) every 3ms via uwTick
 - **GPIO mode**: Standard push-pull OUTPUT (any GPIO pin works)
 - **Direction**: Atomic BSRR set/reset — not ODR XOR (race-free)
 - **Direction settling**: `_dir_delay_active` state machine, 30µs delay
@@ -719,13 +719,13 @@ FastAccelStepper supports STM32 microcontrollers via the official
 |--------------------|----------|-------------|-----------|------------------------|-----|-------------|-------|
 | Blue Pill          | F103C8   | TIM2 **16-bit** | 72 MHz    | 18000000               | 3   | 18.000 MHz  | 0 ✅ |
 | Black Pill V2      | F401CC   | TIM2 32-bit | 84 MHz    | 16800000               | 4   | 16.800 MHz  | 0 ✅ |
-| Nucleo-G070RB      | G070RB   | TIM2 32-bit | 64 MHz    | 16000000 (default)     | 3   | 16.000 MHz  | 0 ✅ |
+| Nucleo-G070RB      | G070RB   | TIM3 **16-bit** | 64 MHz    | 16000000 (default)     | 3   | 16.000 MHz  | 0 ✅ |
 | Nucleo-H743ZI      | H743ZI   | TIM2 32-bit | 200 MHz   | 20000000               | 9   | 20.000 MHz  | 0 ✅ |
 | Nucleo-H743ZI      | H743ZI   | TIM2 32-bit | 200 MHz   | 16666666               | 11  | 16.667 MHz  | 2 ⚠️ |
 | Nucleo-L476RG      | L476RG   | TIM2 32-bit | 80 MHz    | 16000000 (default)     | 4   | 16.000 MHz  | 0 ✅ |
 | Nucleo-C031C6      | C031C6   | TIM3 **16-bit** | 48 MHz    | 16000000 (default)     | 2   | 16.000 MHz  | 0 ✅ |
 | Nucleo-F091RC      | F091RC   | TIM2 32-bit | 48 MHz    | 16000000 (default)     | 2   | 16.000 MHz  | 0 ✅ |
-| Nucleo-L073RZ      | L073RZ   | TIM2 **32-bit** | 32 MHz    | 32000000               | 0   | 32.000 MHz  | 0 ✅ |
+| Nucleo-L073RZ      | L073RZ   | TIM2 **16-bit** | 32 MHz    | 32000000               | 0   | 32.000 MHz  | 0 ✅ |
 
 
 
