@@ -727,7 +727,39 @@ FastAccelStepper supports STM32 microcontrollers via the official
 | Nucleo-F091RC      | F091RC   | TIM2 32-bit | 48 MHz    | 16000000 (default)     | 2   | 16.000 MHz  | 0 ✅ |
 | Nucleo-L073RZ      | L073RZ   | TIM2 **32-bit** | 32 MHz    | 32000000               | 0   | 32.000 MHz  | 0 ✅ |
 
-⚠️: error=2 nhưng timing sai < 0.0001%. Dùng `-DTICKS_PER_S=20000000` để error=0.
+
+
+## Local Compile Test Results (STM32)
+
+FastAccelStepper has been compile-tested locally with the following STM32 boards using PlatformIO + Arduino framework.
+
+### ✅ Boards PASS (15/15 Arduino boards)
+
+| #  | Board ID                  | Chip           | Flash   | RAM    | Status |
+|----|---------------------------|----------------|---------|--------|--------|
+| 1  | `blackpill_f103c8`        | STM32F103C8    | 21004   | 2628   | ✅ PASS |
+| 2  | `bluepill_f103c8`         | STM32F103C8    | 21004   | 2628   | ✅ PASS |
+| 3  | `bluepill_f103c8_128k`    | STM32F103CB    | 21004   | 2628   | ✅ PASS |
+| 4  | `genericSTM32F103C8`      | STM32F103C8    | 20880   | 2628   | ✅ PASS |
+| 5  | `black_f407ve`            | STM32F407VE    | 23724   | 2712   | ✅ PASS |
+| 6  | `black_f407vg`            | STM32F407VG    | —       | —      | ✅ PASS |
+| 7  | `genericSTM32F407VET6`    | STM32F407VE    | —       | —      | ✅ PASS |
+| 8  | `disco_f407vg`            | STM32F407VG    | —       | —      | ✅ PASS |
+| 9  | `blackpill_f411ce`        | STM32F411CE    | —       | —      | ✅ PASS |
+| 10 | `genericSTM32F411CE`      | STM32F411CE    | —       | —      | ✅ PASS |
+| 11 | `nucleo_f411re`           | STM32F411RE    | —       | —      | ✅ PASS |
+| 12 | `blackpill_f401ce`        | STM32F401CE    | —       | —      | ✅ PASS |
+| 13 | `blackpill_f401cc`        | STM32F401CC    | —       | —      | ✅ PASS |
+| 14 | `genericSTM32F401CE`      | STM32F401CE    | —       | —      | ✅ PASS |
+| 15 | `nucleo_f401re`           | STM32F401RE    | —       | —      | ✅ PASS |
+
+### ❌ Boards FAIL
+
+| Board ID               | Chip          | Reason                                           |
+|------------------------|---------------|--------------------------------------------------|
+| `disco_f411ve`         | STM32F411VE   | Board does not support Arduino framework (mbed only). Excluded from Arduino test list. |
+
+**Note**: All tests were performed with `toolchain-gccarmnoneeabi 12.3.1` and `framework-arduinoststm32 2.12.0`. See `extras/doc/stm32_compile_report.md` for full details.
 
 ## Contribution
 

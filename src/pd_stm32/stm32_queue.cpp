@@ -5,6 +5,41 @@
 #if defined(ARDUINO_ARCH_STM32)
 
 // ====================================================================
+// STM32 variant macro alias
+//
+// STM32duino core define variant macro dạng STM32F1, STM32F4 (không 'xx').
+// STM32CubeFW HAL define dạng STM32F1xx, STM32F4xx (có 'xx').
+// Code dùng STM32F1xx → cần alias nếu core define STM32F1.
+// ====================================================================
+#if defined(STM32F1) && !defined(STM32F1xx)
+#define STM32F1xx
+#endif
+#if defined(STM32F4) && !defined(STM32F4xx)
+#define STM32F4xx
+#endif
+#if defined(STM32F0) && !defined(STM32F0xx)
+#define STM32F0xx
+#endif
+#if defined(STM32G0) && !defined(STM32G0xx)
+#define STM32G0xx
+#endif
+#if defined(STM32G4) && !defined(STM32G4xx)
+#define STM32G4xx
+#endif
+#if defined(STM32H7) && !defined(STM32H7xx)
+#define STM32H7xx
+#endif
+#if defined(STM32L0) && !defined(STM32L0xx)
+#define STM32L0xx
+#endif
+#if defined(STM32L4) && !defined(STM32L4xx)
+#define STM32L4xx
+#endif
+#if defined(STM32C0) && !defined(STM32C0xx)
+#define STM32C0xx
+#endif
+
+// ====================================================================
 // FAS_DMB — Data Memory Barrier wrapper
 //
 // ARMv6-M (M0/M0+) does not have __DMB(). Use __DSB() instead.
@@ -83,7 +118,7 @@ static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
 static FastAccelStepperEngine* fas_engine = NULL;
 static uint8_t stepper_allocated_mask = 0;
 static volatile bool _cyclic_pending = false;
-static uint32_t _last_cyclic_uwtick = 0;
+static uint32_t _last_cyclic_tick = 0;
 uint8_t fas_stm32_clock_error = 0;
 uint32_t fas_stm32_clock_tim_clk = 0;   // Cached timer clock for warning output
 StepperQueue* StepperQueue::_ch_to_queue[4] = {NULL, NULL, NULL, NULL};
@@ -198,9 +233,10 @@ static void initStepTimer(void) {
     FAS_TIMER->DIER = 0;           // All interrupts disabled initially
 
     // Force LOW all channels (OCxM = 100 = Force Inactive)
-    // This prevents spurious pulses during initialization.
-    FAS_TIMER->CCMR1 = (4 << 4) | (4 << 12);   // OC1M=100, OC2M=100
-    FAS_TIMER->CCMR2 = (4 << 4) | (4 << 12);   // OC3M=100, OC4M=100
+    // Using HAL constants ensures correct 4-bit OCxM on all STM32 families
+    // (F1/F4: 3-bit, others: 4-bit with bit[3]=0 in CCMR bit 16).
+    FAS_TIMER->CCMR1 = TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC2M_2;  // OC1M=4, OC2M=4
+    FAS_TIMER->CCMR2 = TIM_CCMR2_OC3M_2 | TIM_CCMR2_OC4M_2;  // OC3M=4, OC4M=4
 
     // NVIC configuration
     NVIC_SetPriority(FAS_TIMER_IRQn, 0);   // Highest priority for step timing
@@ -337,9 +373,9 @@ bool StepperQueue::getActualTicksWithDirection(
 // Triggers PendSV exception to fill queues without consuming ISR time.
 // ====================================================================
 static void cyclic_check_and_pend(void) {
-    uint32_t now = uwTick;
-    if ((now - _last_cyclic_uwtick) >= CYCLIC_INTERVAL_MS) {
-        _last_cyclic_uwtick = now;
+    uint32_t now = HAL_GetTick();
+    if ((now - _last_cyclic_tick) >= CYCLIC_INTERVAL_MS) {
+        _last_cyclic_tick = now;
         if (!_cyclic_pending) {
             _cyclic_pending = true;
             SCB->ICSR = SCB_ICSR_PENDSVSET_Msk;
@@ -504,25 +540,34 @@ void TIM2_IRQHandler(void) {
                 q->_step_port->BSRR = q->_step_set_mask;
                 fas_tim_set_ccr(q->_ccr_reg, STEP_PULSE_WIDTH_TICKS);
             } else {
-                // Pure pause (steps=0): skip pulse, schedule entry ticks
+                // steps=0 after dir settle: advance read_idx, schedule pause
+                q->read_idx = rp + 1;     // advance entry
                 q->_pulse_high = false;
                 fas_tim_set_ccr(q->_ccr_reg, e->ticks);
+                // NEXT ISR: Phase 1, reads entry at the new read_idx
             }
         } else {
             // ====== Phase 1: pulse start ======
             uint8_t rp = q->read_idx;
+            uint8_t wp = q->next_write_idx;
+            // Queue-empty guard: check before reading entry (Phase 2 has this, Phase 1 was missing)
+            if (rp == wp) {
+                FAS_TIMER->DIER &= ~CCXIE_BIT(ch);
+                q->_isRunning = false;
+                continue;
+            }
             struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];
             if (e->steps > 0) {
-                // Set step pin HIGH, schedule LOW after STEP_PULSE_WIDTH_TICKS.
+                // Start pulse: set pin HIGH, schedule LOW after step pulse width
                 q->_pulse_high = true;
                 q->_step_port->BSRR = q->_step_set_mask;
                 fas_tim_set_ccr(q->_ccr_reg, STEP_PULSE_WIDTH_TICKS);
             } else {
-                // steps=0: skip pulse, schedule entry ticks directly.
-                // On next ISR, _pulse_high=false and _dir_delay_active=false,
-                // so it will re-enter Phase 1 and advance to next entry.
+                // steps=0 pause: advance read_idx, schedule pause duration
+                q->read_idx = rp + 1;
                 q->_pulse_high = false;
                 fas_tim_set_ccr(q->_ccr_reg, e->ticks);
+                // After pause ticks, ISR re-enters Phase 1 with the NEXT entry
             }
         }
     }
@@ -560,7 +605,10 @@ void TIM2_IRQHandler(void) {
 // ══════════════════════════════════════════════════════════════════════
 // ====================================================================
 #if !defined(DISABLE_FAS_PENDSV)
-#if defined(configUSE_PORT_OPTIMISED_TASK_SELECTION)
+#if defined(configUSE_PORT_OPTIMISED_TASK_SELECTION) || \
+    defined(configUSE_TICKLESS_IDLE) || \
+    defined(INC_FREERTOS_H) || \
+    defined(FREERTOS_CONFIG_H)
 #pragma message "FAS: PendSV_Handler may conflict if FreeRTOS uses PendSV. Define DISABLE_FAS_PENDSV to skip."
 #endif
 __attribute__((weak)) void PendSV_Handler(void) {
@@ -591,6 +639,37 @@ StepperQueue* StepperQueue::tryAllocateQueue(
     fas_queue[idx].init((uint8_t)idx, step_pin);
     stepper_allocated_mask |= (1 << idx);
     return &fas_queue[idx];
+}
+
+// ====================================================================
+// freeQueue — Release stepper slot for reallocation
+//
+// Stops the queue (if running), clears the allocated bit, and resets
+// channel mapping so the slot can be reused by another step pin.
+// ====================================================================
+void StepperQueue::freeQueue(void) {
+    uint32_t prim = __get_PRIMASK();
+    __disable_irq();
+
+    if (_isRunning) {
+        FAS_TIMER->DIER &= ~CCXIE_BIT(_timer_ch);
+        _isRunning = false;
+    }
+
+    uint8_t ch = _timer_ch;
+    stepper_allocated_mask &= ~(1 << ch);
+    _ch_to_queue[ch] = NULL;
+
+    // Clear all state to avoid stale values on reallocation
+    _step_pin = PIN_UNDEFINED;
+    _step_port = NULL;
+    _ccr_reg = NULL;
+    _dir_bsrr = NULL;
+    _last_command_ticks = 0;    // prevent getActualTicksWithDirection() returning stale speed
+    _pulse_high = false;        // reset pulse state
+    _dir_delay_active = false;  // reset dir settle state
+
+    if (!prim) __enable_irq();
 }
 
 // ====================================================================
