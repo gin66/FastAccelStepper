@@ -49,7 +49,8 @@
 
 // ====================================================================
 // NOTE: STM32F1 TIM2 is 16-bit only.
-// C0 TIM3 is also 16-bit (ARR=0xFFFF). Min speed @48MHz ≈ 733 steps/s.
+// C0 TIM3 is also 16-bit (ARR=0xFFFF). With PSC=2 => timer=16MHz.
+// Min speed = 16MHz / 65536 ≈ 244 steps/s.
 // ARR = 0xFFFFFFFF is masked to 0xFFFF by F1 hardware.
 // Minimum speed = TICKS_PER_S / 65536 ≈ 1098 steps/s @72MHz.
 // ====================================================================
@@ -59,5 +60,23 @@
 #define NEED_GENERIC_GET_CURRENT_POSITION
 #define noop_or_wait __NOP()
 #define DEBUG_LED_HALF_PERIOD 50
+
+// ====================================================================
+// STM32 Family Guard
+//
+// Chỉ cho phép compile với các dòng STM32 đã được xác nhận.
+// Nếu dòng của bạn chưa có trong danh sách, thêm macro tương ứng
+// và kiểm tra các files cần sửa (xem README STM32 section).
+// ====================================================================
+#if !defined(STM32C0xx) && !defined(STM32F0xx) && !defined(STM32F1xx) && \
+    !defined(STM32F3xx) && !defined(STM32F4xx) && !defined(STM32F7xx) && \
+    !defined(STM32G0xx) && !defined(STM32G4xx) && !defined(STM32H7xx) && \
+    !defined(STM32L0xx) && !defined(STM32L4xx) && !defined(STM32WBxx) && \
+    !defined(STM32WLxx) && !defined(STM32L5xx) && !defined(STM32U5xx) && \
+    !defined(STM32H5xx)
+#error "FAS: STM32 family not in known list. \
+See src/pd_stm32/ for required changes (timer selection, APB clock, CCMR width). \
+Add your family macro (e.g. -DSTM32H5xx) to this guard after testing."
+#endif
 
 #endif /* PD_STM32_CONFIG_H */

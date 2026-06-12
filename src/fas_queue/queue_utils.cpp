@@ -48,6 +48,9 @@ bool StepperQueue::hasTicksInQueue(uint32_t min_ticks) const {
   return false;
 }
 
+#if !defined(ARDUINO_ARCH_STM32)
+// STM32 uses its own implementation in pd_stm32/stm32_queue.cpp
+// with cached _last_command_ticks for better performance.
 bool StepperQueue::getActualTicksWithDirection(
     struct actual_ticks_s* speed) const {
   // Retrieve current step rate from the current command.
@@ -76,3 +79,4 @@ bool StepperQueue::getActualTicksWithDirection(
   }
   return false;
 }
+#endif /* !defined(ARDUINO_ARCH_STM32) */

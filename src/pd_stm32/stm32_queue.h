@@ -103,6 +103,7 @@ class StepperQueue : public StepperQueueBase {
   }
 
   void adjustSpeedToStepperCount(uint8_t steppers);
+  void freeQueue(void);
 };
 
 // ---- Direction pin: atomic via BSRR/BRR ----
@@ -123,5 +124,11 @@ class StepperQueue : public StepperQueueBase {
 #ifndef AFTER_SET_DIR_PIN_DELAY_US
 #define AFTER_SET_DIR_PIN_DELAY_US 30
 #endif
+
+// ---- Direction change delay (synchronized-with-commands via BSRR) ----
+// STM32 uses atomic BSRR writes in ISR between step pulses.
+// Direction change is synchronized with command execution, no buffer delay needed.
+#define BEFORE_DIR_CHANGE_DELAY_TICKS(q) 0
+#define AFTER_DIR_CHANGE_DELAY_TICKS(q)  0
 
 #endif /* PD_STM32_QUEUE_H */
