@@ -5,20 +5,290 @@
 #if defined(ARDUINO_ARCH_STM32)
 
 // ====================================================================
-// STM32 variant macro alias
+// STM32 Family Detection (3-Layer Architecture)
 //
-// STM32duino core define variant macro dạng STM32F1, STM32F4 (không 'xx').
-// STM32CubeFW HAL define dạng STM32F1xx, STM32F4xx (có 'xx').
-// Code dùng STM32F1xx → cần alias nếu core define STM32F1.
+// Layer 1: Product-Line Detection
+// stm32duino core passes per-device macros via build.product_line
+// (-DSTM32G070xx, -DSTM32F103xB). These are ALWAYS available from
+// compiler flags. We map them to family macros (STM32G0xx, STM32F1xx).
+//
+// Layer 2: Legacy Aliases
+// CMSIS device headers (stm32f1xx.h) define short names (STM32F1).
+// These aliases catch non-Arduino frameworks (CubeMX, Mbed, Zephyr).
+//
+// Layer 3: Timer Grouping
+// pd_config.h defines FAS_STM32_TIMER_16BIT / FAS_STM32_TIMER_32BIT
+// based on the detected family macro.
 // ====================================================================
+
+// ===== LAYER 1: Product-Line to Family Macro Map =====
+// Source: official stm32_def_build.h from framework-arduinoststm32
+
+// STM32C0xx
+#if defined(STM32C011xx) || defined(STM32C031xx) || defined(STM32C051xx) || \
+    defined(STM32C071xx) || defined(STM32C091xx) || defined(STM32C092xx)
+  #ifndef STM32C0xx
+    #define STM32C0xx
+  #endif
+#endif
+
+// STM32F0xx
+#if defined(STM32F030x6) || defined(STM32F030x8) || defined(STM32F030xC) || \
+    defined(STM32F031x6) || defined(STM32F038xx) || defined(STM32F042x6) || \
+    defined(STM32F048xx) || defined(STM32F051x8) || defined(STM32F058xx) || \
+    defined(STM32F070x6) || defined(STM32F070xB) || defined(STM32F071xB) || \
+    defined(STM32F072xB) || defined(STM32F078xx) || defined(STM32F091xC) || \
+    defined(STM32F098xx)
+  #ifndef STM32F0xx
+    #define STM32F0xx
+  #endif
+#endif
+
+// STM32F1xx
+#if defined(STM32F100xB) || defined(STM32F100xE) || defined(STM32F101x6) || \
+    defined(STM32F101xB) || defined(STM32F101xE) || defined(STM32F101xG) || \
+    defined(STM32F102x6) || defined(STM32F102xB) || defined(STM32F103x6) || \
+    defined(STM32F103xB) || defined(STM32F103xE) || defined(STM32F103xG) || \
+    defined(STM32F105xC) || defined(STM32F107xC)
+  #ifndef STM32F1xx
+    #define STM32F1xx
+  #endif
+#endif
+
+// STM32F2xx
+#if defined(STM32F205xx) || defined(STM32F207xx) || defined(STM32F215xx) || \
+    defined(STM32F217xx)
+  #ifndef STM32F2xx
+    #define STM32F2xx
+  #endif
+#endif
+
+// STM32F3xx
+#if defined(STM32F301x8) || defined(STM32F302x8) || defined(STM32F302xC) || \
+    defined(STM32F302xE) || defined(STM32F303x8) || defined(STM32F303xC) || \
+    defined(STM32F303xE) || defined(STM32F318xx) || defined(STM32F328xx) || \
+    defined(STM32F334x8) || defined(STM32F358xx) || defined(STM32F373xC) || \
+    defined(STM32F378xx) || defined(STM32F398xx)
+  #ifndef STM32F3xx
+    #define STM32F3xx
+  #endif
+#endif
+
+// STM32F4xx
+#if defined(STM32F401xC) || defined(STM32F401xE) || defined(STM32F405xx) || \
+    defined(STM32F407xx) || defined(STM32F410Cx) || defined(STM32F410Rx) || \
+    defined(STM32F410Tx) || defined(STM32F411xE) || defined(STM32F412Cx) || \
+    defined(STM32F412Rx) || defined(STM32F412Vx) || defined(STM32F412Zx) || \
+    defined(STM32F413xx) || defined(STM32F415xx) || defined(STM32F417xx) || \
+    defined(STM32F423xx) || defined(STM32F427xx) || defined(STM32F429xx) || \
+    defined(STM32F437xx) || defined(STM32F439xx) || defined(STM32F446xx) || \
+    defined(STM32F469xx) || defined(STM32F479xx)
+  #ifndef STM32F4xx
+    #define STM32F4xx
+  #endif
+#endif
+
+// STM32F7xx
+#if defined(STM32F722xx) || defined(STM32F723xx) || defined(STM32F730xx) || \
+    defined(STM32F732xx) || defined(STM32F733xx) || defined(STM32F745xx) || \
+    defined(STM32F746xx) || defined(STM32F750xx) || defined(STM32F756xx) || \
+    defined(STM32F765xx) || defined(STM32F767xx) || defined(STM32F769xx) || \
+    defined(STM32F777xx) || defined(STM32F779xx)
+  #ifndef STM32F7xx
+    #define STM32F7xx
+  #endif
+#endif
+
+// STM32G0xx (bao gồm STM32G070xx)
+#if defined(STM32G030xx) || defined(STM32G031xx) || defined(STM32G041xx) || \
+    defined(STM32G050xx) || defined(STM32G051xx) || defined(STM32G061xx) || \
+    defined(STM32G070xx) || defined(STM32G071xx) || defined(STM32G081xx) || \
+    defined(STM32G0B0xx) || defined(STM32G0B1xx) || defined(STM32G0C1xx) || \
+    defined(STM32GBK1CB)
+  #ifndef STM32G0xx
+    #define STM32G0xx
+  #endif
+#endif
+
+// STM32G4xx
+#if defined(STM32G411xB) || defined(STM32G411xC) || defined(STM32G414xx) || \
+    defined(STM32G431xx) || defined(STM32G441xx) || defined(STM32G471xx) || \
+    defined(STM32G473xx) || defined(STM32G474xx) || defined(STM32G483xx) || \
+    defined(STM32G484xx) || defined(STM32G491xx) || defined(STM32G4A1xx)
+  #ifndef STM32G4xx
+    #define STM32G4xx
+  #endif
+#endif
+
+// STM32H5xx
+#if defined(STM32H503xx) || defined(STM32H523xx) || defined(STM32H533xx) || \
+    defined(STM32H562xx) || defined(STM32H563xx) || defined(STM32H573xx)
+  #ifndef STM32H5xx
+    #define STM32H5xx
+  #endif
+#endif
+
+// STM32H7xx
+#if defined(STM32H723xx) || defined(STM32H725xx) || defined(STM32H730xx) || \
+    defined(STM32H730xxQ) || defined(STM32H733xx) || defined(STM32H735xx) || \
+    defined(STM32H742xx) || defined(STM32H743xx) || defined(STM32H745xG) || \
+    defined(STM32H745xx) || defined(STM32H747xG) || defined(STM32H747xx) || \
+    defined(STM32H750xx) || defined(STM32H753xx) || defined(STM32H755xx) || \
+    defined(STM32H757xx) || defined(STM32H7A3xx) || defined(STM32H7A3xxQ) || \
+    defined(STM32H7B0xx) || defined(STM32H7B0xxQ) || defined(STM32H7B3xx) || \
+    defined(STM32H7B3xxQ)
+  #ifndef STM32H7xx
+    #define STM32H7xx
+  #endif
+#endif
+
+// STM32L0xx
+#if defined(STM32L010x4) || defined(STM32L010x6) || defined(STM32L010x8) || \
+    defined(STM32L010xB) || defined(STM32L011xx) || defined(STM32L021xx) || \
+    defined(STM32L031xx) || defined(STM32L041xx) || defined(STM32L051xx) || \
+    defined(STM32L052xx) || defined(STM32L053xx) || defined(STM32L062xx) || \
+    defined(STM32L063xx) || defined(STM32L071xx) || defined(STM32L072xx) || \
+    defined(STM32L073xx) || defined(STM32L081xx) || defined(STM32L082xx) || \
+    defined(STM32L083xx)
+  #ifndef STM32L0xx
+    #define STM32L0xx
+  #endif
+#endif
+
+// STM32L1xx
+#if defined(STM32L100xB) || defined(STM32L100xBA) || defined(STM32L100xC) || \
+    defined(STM32L151xB) || defined(STM32L151xBA) || defined(STM32L151xC) || \
+    defined(STM32L151xCA) || defined(STM32L151xD) || defined(STM32L151xDx) || \
+    defined(STM32L151xE) || defined(STM32L152xB) || defined(STM32L152xBA) || \
+    defined(STM32L152xC) || defined(STM32L152xCA) || defined(STM32L152xD) || \
+    defined(STM32L152xDx) || defined(STM32L152xE) || defined(STM32L162xC) || \
+    defined(STM32L162xCA) || defined(STM32L162xD) || defined(STM32L162xDx) || \
+    defined(STM32L162xE)
+  #ifndef STM32L1xx
+    #define STM32L1xx
+  #endif
+#endif
+
+// STM32L4xx
+#if defined(STM32L412xx) || defined(STM32L422xx) || defined(STM32L431xx) || \
+    defined(STM32L432xx) || defined(STM32L433xx) || defined(STM32L442xx) || \
+    defined(STM32L443xx) || defined(STM32L451xx) || defined(STM32L452xx) || \
+    defined(STM32L462xx) || defined(STM32L471xx) || defined(STM32L475xx) || \
+    defined(STM32L476xx) || defined(STM32L485xx) || defined(STM32L486xx) || \
+    defined(STM32L496xx) || defined(STM32L4A6xx) || defined(STM32L4P5xx) || \
+    defined(STM32L4Q5xx) || defined(STM32L4R5xx) || defined(STM32L4R7xx) || \
+    defined(STM32L4R9xx) || defined(STM32L4S5xx) || defined(STM32L4S7xx) || \
+    defined(STM32L4S9xx)
+  #ifndef STM32L4xx
+    #define STM32L4xx
+  #endif
+#endif
+
+// STM32L5xx
+#if defined(STM32L552xx) || defined(STM32L562xx)
+  #ifndef STM32L5xx
+    #define STM32L5xx
+  #endif
+#endif
+
+// STM32MP1xx
+#if defined(STM32MP151Axx) || defined(STM32MP151Cxx) || defined(STM32MP153Axx) || \
+    defined(STM32MP153Cxx) || defined(STM32MP157Axx) || defined(STM32MP157Cxx) || \
+    defined(STM32MP15xx)
+  #ifndef STM32MP1xx
+    #define STM32MP1xx
+  #endif
+#endif
+
+// STM32U0xx
+#if defined(STM32U031xx) || defined(STM32U073xx) || defined(STM32U083xx)
+  #ifndef STM32U0xx
+    #define STM32U0xx
+  #endif
+#endif
+
+// STM32U3xx
+#if defined(STM32U375xx) || defined(STM32U385xx)
+  #ifndef STM32U3xx
+    #define STM32U3xx
+  #endif
+#endif
+
+// STM32U5xx
+#if defined(STM32U535xx) || defined(STM32U545xx) || defined(STM32U575xx) || \
+    defined(STM32U585xx) || defined(STM32U595xx) || defined(STM32U599xx) || \
+    defined(STM32U5A5xx) || defined(STM32U5A9xx) || defined(STM32U5F7xx) || \
+    defined(STM32U5F9xx) || defined(STM32U5G7xx) || defined(STM32U5G9xx)
+  #ifndef STM32U5xx
+    #define STM32U5xx
+  #endif
+#endif
+
+// STM32WB0x (⚠️ product line KHÔNG có 'xx' suffix)
+#if defined(STM32WB05) || defined(STM32WB06) || defined(STM32WB07) || \
+    defined(STM32WB09)
+  #ifndef STM32WB0x
+    #define STM32WB0x
+  #endif
+#endif
+
+// STM32WBAxx
+#if defined(STM32WBA50xx) || defined(STM32WBA52xx) || defined(STM32WBA54xx) || \
+    defined(STM32WBA55xx) || defined(STM32WBA5Mxx) || defined(STM32WBA62xx) || \
+    defined(STM32WBA63xx) || defined(STM32WBA64xx) || defined(STM32WBA65xx) || \
+    defined(STM32WBA6Mxx)
+  #ifndef STM32WBAxx
+    #define STM32WBAxx
+  #endif
+#endif
+
+// STM32WBxx
+#if defined(STM32WB10xx) || defined(STM32WB15xx) || defined(STM32WB1Mxx) || \
+    defined(STM32WB30xx) || defined(STM32WB35xx) || defined(STM32WB50xx) || \
+    defined(STM32WB55xx) || defined(STM32WB5Mxx)
+  #ifndef STM32WBxx
+    #define STM32WBxx
+  #endif
+#endif
+
+// STM32WL3x (⚠️ Pattern: STM32WL3XX, STM32WL3RX)
+#if defined(STM32WL3RX) || defined(STM32WL3XX)
+  #ifndef STM32WL3x
+    #define STM32WL3x
+  #endif
+#endif
+
+// STM32WLxx
+#if defined(STM32WL54xx) || defined(STM32WL55xx) || defined(STM32WL5Mxx) || \
+    defined(STM32WLE4xx) || defined(STM32WLE5xx)
+  #ifndef STM32WLxx
+    #define STM32WLxx
+  #endif
+#endif
+
+// ===== LAYER 2: Legacy Short-Name Aliases =====
+// Cho non-Arduino frameworks (CubeMX, Mbed, Zephyr)
+// CMSIS device headers define STM32F1, STM32G0 etc.
+#if defined(STM32C0) && !defined(STM32C0xx)
+#define STM32C0xx
+#endif
+#if defined(STM32F0) && !defined(STM32F0xx)
+#define STM32F0xx
+#endif
 #if defined(STM32F1) && !defined(STM32F1xx)
 #define STM32F1xx
+#endif
+#if defined(STM32F2) && !defined(STM32F2xx)
+#define STM32F2xx
+#endif
+#if defined(STM32F3) && !defined(STM32F3xx)
+#define STM32F3xx
 #endif
 #if defined(STM32F4) && !defined(STM32F4xx)
 #define STM32F4xx
 #endif
-#if defined(STM32F0) && !defined(STM32F0xx)
-#define STM32F0xx
+#if defined(STM32F7) && !defined(STM32F7xx)
+#define STM32F7xx
 #endif
 #if defined(STM32G0) && !defined(STM32G0xx)
 #define STM32G0xx
@@ -26,30 +296,50 @@
 #if defined(STM32G4) && !defined(STM32G4xx)
 #define STM32G4xx
 #endif
+#if defined(STM32H5) && !defined(STM32H5xx)
+#define STM32H5xx
+#endif
 #if defined(STM32H7) && !defined(STM32H7xx)
 #define STM32H7xx
 #endif
 #if defined(STM32L0) && !defined(STM32L0xx)
 #define STM32L0xx
 #endif
+#if defined(STM32L1) && !defined(STM32L1xx)
+#define STM32L1xx
+#endif
 #if defined(STM32L4) && !defined(STM32L4xx)
 #define STM32L4xx
 #endif
-#if defined(STM32C0) && !defined(STM32C0xx)
-#define STM32C0xx
+#if defined(STM32L5) && !defined(STM32L5xx)
+#define STM32L5xx
 #endif
-
-// ====================================================================
-// STM32G0: ensure CMSIS device header is included for peripheral macros
-//
-// framework-arduinostm32@4.21200.0 does not include the CMSIS device
-// header (stm32g0xx.h) by default on G0, so TIM2, TIM2_IRQn, and
-// __HAL_RCC_TIM2_CLK_ENABLE are not visible without an explicit include.
-// We include through the variant's pinmap header which always exists.
-// ====================================================================
-#if defined(STM32G0xx)
-#include <pins_arduino.h>
-#include <stm32g0xx_hal.h>
+#if defined(STM32MP1) && !defined(STM32MP1xx)
+#define STM32MP1xx
+#endif
+#if defined(STM32U0) && !defined(STM32U0xx)
+#define STM32U0xx
+#endif
+#if defined(STM32U3) && !defined(STM32U3xx)
+#define STM32U3xx
+#endif
+#if defined(STM32U5) && !defined(STM32U5xx)
+#define STM32U5xx
+#endif
+#if defined(STM32WB0) && !defined(STM32WB0x)
+#define STM32WB0x
+#endif
+#if defined(STM32WBA) && !defined(STM32WBAxx)
+#define STM32WBAxx
+#endif
+#if defined(STM32WB) && !defined(STM32WBxx)
+#define STM32WBxx
+#endif
+#if defined(STM32WL3) && !defined(STM32WL3x)
+#define STM32WL3x
+#endif
+#if defined(STM32WL) && !defined(STM32WLxx)
+#define STM32WLxx
 #endif
 
 // ====================================================================
@@ -91,47 +381,80 @@ static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
 #endif
 
 // ====================================================================
-// Timer selection — explicit per-family
+// Timer selection — explicit per-family (24 families)
 //
 // Mỗi STM32 family có #elif riêng. Nếu board của bạn chưa có trong
 // danh sách, thêm #elif tương ứng. Xem README để biết thông số cần.
 //
-// Families được nhóm theo timer type:
+// Families được nhóm theo timer type (CMSIS/RM-verified):
 //   Group A (TIM3 16-bit): C0, G0
-//   Group B (TIM2 16-bit): F1, L0
-//   Group C (TIM2 32-bit): F0, F3, F4, F7, H7, G4, L4, WB, WL, L5, U5, H5
+//   Group B (TIM2 16-bit): F1, L0, L1
+//   Group C (TIM2 32-bit): F0, F2, F3, F4, F7, G4, H5, H7, L4, L5,
+//                          MP1, U0, U3, U5, WBA, WB, WL
+//   Excluded:              WB0x (no general-purpose timer)
+//                          WL3x (no RCC_CFGR_PPRE — non-standard clock tree)
+//
+// CMSIS evidence for "single APB PPRE":
+//   F0: stm32f091xc.h — RCC_CFGR_PPRE (bit 8, 3-bit mask 0x7)
+//   U0: stm32u031xx.h — RCC_CFGR_PPRE (bit 12, 3-bit mask 0x7)
+//   C0/G0/L0: same macro, same bit position
+//   WL3x: NONE — excluded (no PPRE register)
+//
+// CMSIS evidence for "dual APB PPRE1":
+//   All families: confirmed via findstr /M "RCC_CFGR_PPRE1" in hal_rcc.h
 // ====================================================================
 #if defined(STM32C0xx) || defined(STM32G0xx)
-    // C0 + G0: TIM3 is 16-bit, 4 channels (CCR1-CCR4).
-    // C0 does not have TIM2. G0 Arduino core does not expose TIM2 macros.
+    // Group A: TIM3 16-bit
+    // G0: TIM2 availability varies (G030/G031 = no TIM2, G0B1/G0C1 = has TIM2).
+    // TIM3 exists on ALL G0 parts — common denominator for reliable support.
     #define FAS_TIMER            TIM3
     #define FAS_TIMER_IRQn       TIM3_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
     #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
 
-#elif defined(STM32F1xx) || defined(STM32L0xx)
-    // F1 + L0: TIM2 is 16-bit (F1 hardware, L0 RM0367 §24)
+#elif defined(STM32F1xx) || defined(STM32L0xx) || defined(STM32L1xx)
+    // Group B: TIM2 16-bit (F1 RM0008, L0 RM0367 §24, L1 RM0038)
     #define FAS_TIMER            TIM2
     #define FAS_TIMER_IRQn       TIM2_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
     #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
 
-#elif defined(STM32F0xx) || defined(STM32F3xx) || defined(STM32F4xx) || \
-      defined(STM32F7xx) || defined(STM32H7xx) || defined(STM32G4xx) || \
-      defined(STM32L4xx) || defined(STM32WBxx) || defined(STM32WLxx) || \
-      defined(STM32L5xx) || defined(STM32U5xx) || defined(STM32H5xx)
-    // Families này: TIM2 is 32-bit
+#elif defined(STM32F0xx) || defined(STM32F2xx) || defined(STM32F3xx) || \
+      defined(STM32F4xx) || defined(STM32F7xx) || defined(STM32G4xx) || \
+      defined(STM32H5xx) || defined(STM32H7xx) || defined(STM32L4xx) || \
+      defined(STM32L5xx) || defined(STM32MP1xx) || defined(STM32U0xx) || \
+      defined(STM32U3xx) || defined(STM32U5xx) || defined(STM32WBAxx) || \
+      defined(STM32WBxx) || defined(STM32WLxx)
+    // Group C: TIM2 32-bit — 17 families
+    // F0: RM0091 §18 "32-bit counter" (previously in Group B in v12).
+    // U0: stm32u031xx.h — TIM2_TypeDef with __IO uint32_t CNT → 32-bit
+    //     PPRE at bit 12 (differs from other M0+ at bit 8). 3-bit field (mask 0x7).
+    //     Macros handle position — code is transportable.
+    // F2/F3/F4/F7/G4/H5/H7/L4/L5/MP1/U3/U5/WBA/WB/WL: confirmed 32-bit
     #define FAS_TIMER            TIM2
     #define FAS_TIMER_IRQn       TIM2_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
     #define FAS_TIMER_ARR_MAX    0xFFFFFFFF
 
+#elif defined(STM32WL3x)
+    // WL3x has no RCC_CFGR_PPRE register — stm32wl3xx.h uses CLKSYSDIV instead.
+    // TIM2 exists and is 32-bit (uint32_t CNT) but clock detection is unsupported.
+    // No CI board available — pending hardware verification.
+    #error "FAS: STM32WL3x unsupported — no RCC_CFGR_PPRE register (non-standard clock tree). \
+Pending hardware verification — contact maintainer to add support."
+
+#elif defined(STM32WB0x)
+    // WB0x (WB05/WB06/WB07/WB09) has NO general-purpose timer
+    // TIM2_IRQn exists but no TIM2_TypeDef/CNT/ARR/CCR registers
+    #error "FAS: STM32WB0x unsupported — no general-purpose timer with CCR registers. \
+Use STM32WBxx (Cortex-M4) for FAS support."
+
 #else
     #error "FAS: Unsupported STM32 family. \
-Add a new #elif branch in src/pd_stm32/stm32_queue.cpp. \
-See README section 'Adding a new STM32 family' for instructions."
+Add product-line macro to detection block (line ~14), then add family \
+to timer selection block (line ~110). See README STM32 section."
 #endif
 
 // ====================================================================
@@ -169,14 +492,29 @@ static uint32_t getTimClock(void) {
     // H7 series: D2 domain, D2CFGR register
     uint32_t dppre1 = (RCC->D2CFGR & RCC_D2CFGR_D2PPRE1) >> RCC_D2CFGR_D2PPRE1_Pos;
     if (dppre1 >= 4) pclk1 *= 2;
-#elif defined(STM32G0xx) || defined(STM32C0xx)
-    // G0/C0: single APB bus, uses RCC_CFGR_PPRE
+#elif defined(STM32C0xx) || defined(STM32F0xx) || defined(STM32G0xx) || \
+      defined(STM32L0xx) || defined(STM32U0xx)
+    // Single APB bus (Cortex-M0+): uses RCC_CFGR_PPRE (no '1')
+    // C0, F0, G0, L0, U0
+    // U0: PPRE at bit 12 (macro handles difference automatically)
     uint32_t pp = (RCC->CFGR & RCC_CFGR_PPRE) >> RCC_CFGR_PPRE_Pos;
     if (pp >= 4) pclk1 *= 2;
-#else
-    // F1/F4/F7/L1/L4/G4/WB...: uses RCC_CFGR_PPRE1
+#elif defined(STM32WL3x)
+    // WL3x has no RCC_CFGR_PPRE — non-standard clock tree
+    #error "FAS: STM32WL3x unsupported — requires WL3x-specific APB clock detection. \
+No CI board available — contact maintainer to add support."
+#elif defined(STM32F1xx) || defined(STM32F2xx) || defined(STM32F3xx) || \
+      defined(STM32F4xx) || defined(STM32F7xx) || defined(STM32G4xx) || \
+      defined(STM32H5xx) || defined(STM32L1xx) || defined(STM32L4xx) || \
+      defined(STM32L5xx) || defined(STM32MP1xx) || defined(STM32U3xx) || \
+      defined(STM32U5xx) || defined(STM32WBAxx) || defined(STM32WBxx) || \
+      defined(STM32WLxx)
+    // Multi-APB: uses RCC_CFGR_PPRE1
     uint32_t pp = (RCC->CFGR & RCC_CFGR_PPRE1) >> RCC_CFGR_PPRE1_Pos;
     if (pp >= 4) pclk1 *= 2;
+#else
+    #error "FAS: Unsupported STM32 family in getTimClock(). \
+Add APB prescaler detection for your family."
 #endif
     return pclk1;
 }
@@ -197,13 +535,15 @@ static uint32_t getTimClock(void) {
 // On 32-bit timers, simple addition is safe (no overflow in practice).
 // ====================================================================
 static inline void fas_tim_set_ccr(volatile uint32_t* ccr, uint32_t delay) {
-#if defined(STM32F1xx) || defined(STM32C0xx) || defined(STM32G0xx) || defined(STM32L0xx)
+#if defined(FAS_STM32_TIMER_16BIT)
     uint32_t cnt = FAS_TIMER->CNT;
-    // 16-bit timer: (cnt + delay) & 0xFFFF xử lý wrap chính xác.
-    // Xem toán học ở comment function.
+    // 16-bit timer: (cnt + delay) & 0xFFFF handles wrap correctly
     *ccr = (cnt + delay) & 0xFFFF;
-#else
+#elif defined(FAS_STM32_TIMER_32BIT)
     *ccr = FAS_TIMER->CNT + delay;
+#else
+    #error "FAS: FAS_STM32_TIMER_16BIT or _32BIT not defined. \
+Check pd_config.h timer grouping."
 #endif
 }
 
@@ -310,11 +650,23 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
     // This is the only place where the concrete timer register is referenced.
     // All other CCR writes go through _ccr_reg (fast pointer) or fas_tim_set_ccr().
 #if defined(STM32C0xx) || defined(STM32G0xx)
-    // C0 + G0: use TIM3 CCR1-CCR4 (TIM3 is the step timer on these families)
+    // Group A: TIM3 CCR1-CCR4
     volatile uint32_t* ccr[] = {&TIM3->CCR1, &TIM3->CCR2, &TIM3->CCR3, &TIM3->CCR4};
-#else
-    // All others (F1, F4, F7, H7, G4, L0, L4, WB, WL, L5, U5, H5): TIM2 CCR1-CCR4
+#elif defined(STM32F0xx) || defined(STM32F1xx) || defined(STM32F2xx) || \
+      defined(STM32F3xx) || defined(STM32F4xx) || defined(STM32F7xx) || \
+      defined(STM32G4xx) || defined(STM32H5xx) || defined(STM32H7xx) || \
+      defined(STM32L0xx) || defined(STM32L1xx) || defined(STM32L4xx) || \
+      defined(STM32L5xx) || defined(STM32MP1xx) || defined(STM32U0xx) || \
+      defined(STM32U3xx) || defined(STM32U5xx) || defined(STM32WBAxx) || \
+      defined(STM32WBxx) || defined(STM32WLxx)
+    // Groups B + C: TIM2 CCR1-CCR4
     volatile uint32_t* ccr[] = {&TIM2->CCR1, &TIM2->CCR2, &TIM2->CCR3, &TIM2->CCR4};
+#elif defined(STM32WL3x)
+    #error "FAS: STM32WL3x unsupported — no timer CCR registers (no PPRE clock)."
+#elif defined(STM32WB0x)
+    #error "FAS: STM32WB0x unsupported — no timer CCR registers."
+#else
+    #error "FAS: Unsupported STM32 family in CCR init."
 #endif
     _ccr_reg = ccr[_timer_ch];
 
@@ -466,8 +818,21 @@ static void fas_stm32_report_clock_error(void) {
 // ====================================================================
 #if defined(STM32C0xx) || defined(STM32G0xx)
 void TIM3_IRQHandler(void) {
-#else
+#elif defined(STM32F0xx) || defined(STM32F1xx) || defined(STM32F2xx) || \
+      defined(STM32F3xx) || defined(STM32F4xx) || defined(STM32F7xx) || \
+      defined(STM32G4xx) || defined(STM32H5xx) || defined(STM32H7xx) || \
+      defined(STM32L0xx) || defined(STM32L1xx) || defined(STM32L4xx) || \
+      defined(STM32L5xx) || defined(STM32MP1xx) || defined(STM32U0xx) || \
+      defined(STM32U3xx) || defined(STM32U5xx) || defined(STM32WBAxx) || \
+      defined(STM32WBxx) || defined(STM32WLxx)
 void TIM2_IRQHandler(void) {
+#elif defined(STM32WL3x)
+    #error "FAS: STM32WL3x unsupported — no timer ISR available (no PPRE clock)."
+#elif defined(STM32WB0x)
+    #error "FAS: STM32WB0x unsupported — no timer ISR available."
+#else
+    #error "FAS: Unsupported STM32 family in ISR name. \
+Add ISR handler name for your family's timer."
 #endif
     uint32_t sr = FAS_TIMER->SR;
     uint32_t ch_processed = 0;
