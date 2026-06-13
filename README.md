@@ -713,19 +713,48 @@ FastAccelStepper supports STM32 microcontrollers via the official
    (see `pd_stm32/stm32_queue.cpp`), but real-world timing, pulse generation, and
    direction settling have not been validated. Use with caution.
 
+### Adding a new STM32 family
+
+To add support for a new STM32 family not yet in the supported list:
+
+1. **Check timer availability**: Consult the MCU reference manual (RM).
+   Does the MCU have TIM2? Is it 16-bit or 32-bit? If no TIM2 available, which timer
+   has 4 CC channels (CCR1-CCR4) that can be used instead?
+
+2. **Add an `#elif` branch** in `src/pd_stm32/stm32_queue.cpp`:
+   ```cpp
+   #elif defined(STM32XXxx)
+       #define FAS_TIMER            TIM2   // or TIM3, etc.
+       #define FAS_TIMER_IRQn       TIM2_IRQn
+       #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
+       // #define FAS_TIM_IS_16BIT   // uncomment if timer is 16-bit
+       #define FAS_TIMER_ARR_MAX    0xFFFFFFFF  // or 0xFFFF if 16-bit
+   ```
+
+3. **Update `fas_tim_set_ccr()`** (line ~207): add your family macro to the
+   16-bit wrap guard condition if the timer is 16-bit.
+
+4. **Update `getTimClock()`** (line ~174): add APB clock detection if your
+   family uses a different RCC register layout.
+
+5. **Update CCR init** (line ~320): add your family to the hardcoded CCR
+   pointer selection block if it uses a different timer (e.g. TIM3 instead of TIM2).
+
+6. **Register your family macro** in `src/pd_stm32/pd_config.h` family guard.
+
 ### TICKS_PER_S Reference Table
 
 | Board              | MCU      | Timer        | TIM_CLK   | TICKS_PER_S (prescaled) | PSC | Timer actual | Error |
 |--------------------|----------|-------------|-----------|------------------------|-----|-------------|-------|
 | Blue Pill          | F103C8   | TIM2 **16-bit** | 72 MHz    | 18000000               | 3   | 18.000 MHz  | 0 ✅ |
 | Black Pill V2      | F401CC   | TIM2 32-bit | 84 MHz    | 16800000               | 4   | 16.800 MHz  | 0 ✅ |
-| Nucleo-G070RB      | G070RB   | TIM2 32-bit | 64 MHz    | 16000000 (default)     | 3   | 16.000 MHz  | 0 ✅ |
+| Nucleo-G070RB      | G070RB   | TIM3 **16-bit** | 64 MHz    | 16000000 (default)     | 3   | 16.000 MHz  | 0 ✅ |
 | Nucleo-H743ZI      | H743ZI   | TIM2 32-bit | 200 MHz   | 20000000               | 9   | 20.000 MHz  | 0 ✅ |
 | Nucleo-H743ZI      | H743ZI   | TIM2 32-bit | 200 MHz   | 16666666               | 11  | 16.667 MHz  | 2 ⚠️ |
 | Nucleo-L476RG      | L476RG   | TIM2 32-bit | 80 MHz    | 16000000 (default)     | 4   | 16.000 MHz  | 0 ✅ |
 | Nucleo-C031C6      | C031C6   | TIM3 **16-bit** | 48 MHz    | 16000000 (default)     | 2   | 16.000 MHz  | 0 ✅ |
 | Nucleo-F091RC      | F091RC   | TIM2 32-bit | 48 MHz    | 16000000 (default)     | 2   | 16.000 MHz  | 0 ✅ |
-| Nucleo-L073RZ      | L073RZ   | TIM2 **32-bit** | 32 MHz    | 32000000               | 0   | 32.000 MHz  | 0 ✅ |
+| Nucleo-L073RZ      | L073RZ   | TIM2 **16-bit** | 32 MHz    | 32000000               | 0   | 32.000 MHz  | 0 ✅ |
 
 
 

@@ -91,55 +91,47 @@ static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
 #endif
 
 // ====================================================================
-// Timer selection — STM32C0 does NOT have TIM2
+// Timer selection — explicit per-family
 //
-// STM32C0 series (e.g. STM32C031) only has TIM1, TIM3, TIM14, TIM16, TIM17.
-// We use TIM3 on C0. TIM3 is a 16-bit timer (ARR=0xFFFF).
-// All other STM32 families use TIM2 (32-bit on most, 16-bit on F1).
+// Mỗi STM32 family có #elif riêng. Nếu board của bạn chưa có trong
+// danh sách, thêm #elif tương ứng. Xem README để biết thông số cần.
 //
-// TIM3 on C0 supports up to 4 channels (CCR1-CCR4) via TIM3->CCR1-4,
-// which matches the 4 stepper channels expected by the code.
-//
-// Macros:
-//   FAS_TIMER           — timer peripheral (TIM2 or TIM3)
-//   FAS_TIMER_IRQn      — NVIC IRQ number
-//   FAS_TIMER_RCC_ENABLE — HAL macro to enable timer clock
-//   FAS_TIMER_ARR_MAX   — auto-reload max (0xFFFF for 16-bit, 0xFFFFFFFF for 32-bit)
-//   FAS_TIM_IS_16BIT    — defined if timer is 16-bit (needs wrap handling)
+// Families được nhóm theo timer type:
+//   Group A (TIM3 16-bit): C0, G0
+//   Group B (TIM2 16-bit): F1, L0
+//   Group C (TIM2 32-bit): F0, F3, F4, F7, H7, G4, L4, WB, WL, L5, U5, H5
 // ====================================================================
-#if defined(STM32C0xx)
+#if defined(STM32C0xx) || defined(STM32G0xx)
+    // C0 + G0: TIM3 is 16-bit, 4 channels (CCR1-CCR4).
+    // C0 does not have TIM2. G0 Arduino core does not expose TIM2 macros.
     #define FAS_TIMER            TIM3
     #define FAS_TIMER_IRQn       TIM3_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
     #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
-#elif defined(STM32G0xx)
-    // STM32G0 series: TIM3 is 16-bit, 4 channels (CCR1-CCR4).
-    // G0 does NOT expose TIM2 peripheral macros in framework-arduinostm32@4.21200.0.
-    // G0 TIM3 is 16-bit (ARR=0xFFFF), similar to C0.
-    #define FAS_TIMER            TIM3
-    #define FAS_TIMER_IRQn       TIM3_IRQn
-    #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
-    #define FAS_TIM_IS_16BIT
-    #define FAS_TIMER_ARR_MAX    0xFFFF
-#elif defined(STM32L0xx)
-    // STM32L0 series: TIM2 is 16-bit only (RM0367 §24: TIM2 is 16-bit on L0)
+
+#elif defined(STM32F1xx) || defined(STM32L0xx)
+    // F1 + L0: TIM2 is 16-bit (F1 hardware, L0 RM0367 §24)
     #define FAS_TIMER            TIM2
     #define FAS_TIMER_IRQn       TIM2_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
     #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
+
+#elif defined(STM32F0xx) || defined(STM32F3xx) || defined(STM32F4xx) || \
+      defined(STM32F7xx) || defined(STM32H7xx) || defined(STM32G4xx) || \
+      defined(STM32L4xx) || defined(STM32WBxx) || defined(STM32WLxx) || \
+      defined(STM32L5xx) || defined(STM32U5xx) || defined(STM32H5xx)
+    // Families này: TIM2 is 32-bit
+    #define FAS_TIMER            TIM2
+    #define FAS_TIMER_IRQn       TIM2_IRQn
+    #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
+    #define FAS_TIMER_ARR_MAX    0xFFFFFFFF
+
 #else
-    // F4/F7/H7/G4/L4/WB/WL/L5/U5/H5, etc.: TIM2 is 32-bit
-    #define FAS_TIMER            TIM2
-    #define FAS_TIMER_IRQn       TIM2_IRQn
-    #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
-    #if defined(STM32F1xx)
-        #define FAS_TIM_IS_16BIT
-        #define FAS_TIMER_ARR_MAX 0xFFFF
-    #else
-        #define FAS_TIMER_ARR_MAX 0xFFFFFFFF
-    #endif
+    #error "FAS: Unsupported STM32 family. \
+Add a new #elif branch in src/pd_stm32/stm32_queue.cpp. \
+See README section 'Adding a new STM32 family' for instructions."
 #endif
 
 // ====================================================================
