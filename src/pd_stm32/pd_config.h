@@ -125,6 +125,22 @@ Add your board's product_line macro there, then add family \
 //    WB0x — no general-purpose timer
 //    WL3x — no RCC_CFGR_PPRE register (non-standard clock tree)
 // ====================================================================
+// Explicit unsupported guard using CMSIS product-line macros.
+// These macros exist at parse time (from compiler -D flags or CMSIS headers),
+// unlike custom FAS family macros (STM32WL3x/STM32WB0x) which are defined
+// later in stm32_queue.cpp Layer 1.
+#if defined(STM32WL3RX) || defined(STM32WL3XX)
+  #error "FAS: STM32WL3x detected but unsupported. \
+STM32WL3x has no RCC_CFGR_PPRE register (non-standard clock tree). \
+Use STM32WLxx for FAS support."
+
+#elif defined(STM32WB05) || defined(STM32WB06) || defined(STM32WB07) || \
+      defined(STM32WB09)
+  #error "FAS: STM32WB0x detected but unsupported. \
+STM32WB0x has no general-purpose timer (BLE-optimized part). \
+Use STM32WBxx (Cortex-M4) for FAS support."
+#endif
+
 #if !defined(STM32C0xx) && !defined(STM32F0xx) && !defined(STM32F1xx) && \
     !defined(STM32F2xx) && !defined(STM32F3xx) && !defined(STM32F4xx) && \
     !defined(STM32F7xx) && !defined(STM32G0xx) && !defined(STM32G4xx) && \

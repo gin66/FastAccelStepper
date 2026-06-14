@@ -410,7 +410,6 @@ static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
     #define FAS_TIMER            TIM3
     #define FAS_TIMER_IRQn       TIM3_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM3_CLK_ENABLE()
-    #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
 
 #elif defined(STM32F1xx) || defined(STM32L0xx) || defined(STM32L1xx)
@@ -418,7 +417,6 @@ static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
     #define FAS_TIMER            TIM2
     #define FAS_TIMER_IRQn       TIM2_IRQn
     #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
-    #define FAS_TIM_IS_16BIT
     #define FAS_TIMER_ARR_MAX    0xFFFF
 
 #elif defined(STM32F0xx) || defined(STM32F2xx) || defined(STM32F3xx) || \
@@ -503,9 +501,14 @@ static uint32_t getTimClock(void) {
     // WL3x has no RCC_CFGR_PPRE — non-standard clock tree
     #error "FAS: STM32WL3x unsupported — requires WL3x-specific APB clock detection. \
 No CI board available — contact maintainer to add support."
+#elif defined(STM32H5xx)
+    // H5 series: APB1 prescaler is in RCC->CFGR2 (not CFGR), per RM0481
+    uint32_t pp = (RCC->CFGR2 & RCC_CFGR2_PPRE1) >> RCC_CFGR2_PPRE1_Pos;
+    if (pp >= 4) pclk1 *= 2;
+
 #elif defined(STM32F1xx) || defined(STM32F2xx) || defined(STM32F3xx) || \
       defined(STM32F4xx) || defined(STM32F7xx) || defined(STM32G4xx) || \
-      defined(STM32H5xx) || defined(STM32L1xx) || defined(STM32L4xx) || \
+      defined(STM32L1xx) || defined(STM32L4xx) || \
       defined(STM32L5xx) || defined(STM32MP1xx) || defined(STM32U3xx) || \
       defined(STM32U5xx) || defined(STM32WBAxx) || defined(STM32WBxx) || \
       defined(STM32WLxx)
