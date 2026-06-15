@@ -65,16 +65,16 @@
 // ====================================================================
 // Timer Grouping — FAS_STM32_TIMER_16BIT / FAS_STM32_TIMER_32BIT
 //
-// Helper macro for fas_tim_set_ccr(). Mỗi family được liệt kê explicit.
-// #else chỉ dùng cho #error — báo family không được hỗ trợ.
+// Helper macro for fas_tim_set_ccr(). Each family is listed explicitly.
+// #else is only used for #error — to report an unsupported family.
 //
 // CMSIS/RM-verified assignments:
 //   16-bit timers (Group A+B):
-//     Group A: TIM3 used (C0 không có TIM2, G0 TIM3 common denominator)
+//     Group A: TIM3 used (C0 does not have TIM2, G0 TIM3 is the common denominator)
 //     Group B: TIM2 HW-limited to 16-bit (F1, L0, L1)
 //
 //   32-bit timers (Group C):
-//     TIM2 có 32-bit counter. Gồm F0, F2, F3, F4, F7, G4, H5, H7,
+//     TIM2 has a 32-bit counter. Includes F0, F2, F3, F4, F7, G4, H5, H7,
 //     L4, L5, MP1, U0, U3, U5, WBA, WB, WL
 //
 //   Excluded:
@@ -117,9 +117,6 @@ Add your board's product_line macro there, then add family \
 // ====================================================================
 // STM32 Family Guard
 //
-// Chỉ cho phép compile với các dòng STM32 đã được xác nhận.
-// Nếu dòng của bạn chưa có trong danh sách, thêm macro tương ứng
-// và kiểm tra các files cần sửa (xem README STM32 section).
 //
 // ⚠️ STM32WB0x and STM32WL3x are deliberately excluded:
 //    WB0x — no general-purpose timer

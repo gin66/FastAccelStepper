@@ -224,7 +224,7 @@
   #endif
 #endif
 
-// STM32WB0x (⚠️ product line KHÔNG có 'xx' suffix)
+// STM32WB0x (⚠️ product line without 'xx' suffix)
 #if defined(STM32WB05) || defined(STM32WB06) || defined(STM32WB07) || \
     defined(STM32WB09)
   #ifndef STM32WB0x
@@ -267,7 +267,7 @@
 #endif
 
 // ===== LAYER 2: Legacy Short-Name Aliases =====
-// Cho non-Arduino frameworks (CubeMX, Mbed, Zephyr)
+// For non-Arduino frameworks (CubeMX, Mbed, Zephyr)
 // CMSIS device headers define STM32F1, STM32G0 etc.
 #if defined(STM32C0) && !defined(STM32C0xx)
 #define STM32C0xx
@@ -369,15 +369,15 @@
 #define FAS_SPURIOUS_MAX 10
 static uint8_t fas_spurious_count[4] = {0, 0, 0, 0};
 #if defined(__ARM_ARCH_6M__)
-    // M0/M0+ (G0, F0, L0, C0): không có __DMB()
+    // M0/M0+ (G0, F0, L0, C0): not have __DMB()
     #define FAS_DMB() __DSB()
 #elif defined(__ARM_ARCH_7M__) || defined(__ARM_ARCH_7EM__) || \
       defined(__ARM_ARCH_8M_MAIN__)
-    // M3/M4/M7/M33: có __DMB()
+    // M3/M4/M7/M33: have __DMB()
     #define FAS_DMB() __DMB()
-    // reserved: __ARM_ARCH_8M_BASE__ (M23) → dùng __DSB() nếu cần
+    // reserved: __ARM_ARCH_8M_BASE__ (M23) → use __DSB()
 #else
-    #define FAS_DMB() __DSB()  // fallback an toàn
+    #define FAS_DMB() __DSB()  // fallback 
 #endif
 
 // ====================================================================

@@ -1,19 +1,25 @@
-#if defined(ARDUINO_ARCH_AVR)
-#include "AVRStepperPins.h"
+#if defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_STM32)
 #include "FastAccelStepper.h"
 #ifdef SIMULATOR
 #include <avr/sleep.h>
 #endif
 
-// As in StepperDemo for Motor 1 on AVR
+#if defined(ARDUINO_ARCH_AVR)
+#include "AVRStepperPins.h"
 #define dirPinStepperX 5
 #define enablePinStepperX 6
 #define stepPinStepperX stepPinStepper1A
-
-// As in StepperDemo for Motor 2 on AVR
 #define dirPinStepperY 7
 #define enablePinStepperY 8
 #define stepPinStepperY stepPinStepper1B
+#elif defined(ARDUINO_ARCH_STM32)
+#define dirPinStepperX PB0
+#define enablePinStepperX PA4
+#define stepPinStepperX PA0
+#define dirPinStepperY PB1
+#define enablePinStepperY PIN_UNDEFINED
+#define stepPinStepperY PA1
+#endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepperX = NULL;
@@ -55,10 +61,18 @@ void setup() {
       Serial.println("Cannot initialize steppers");
     }
   }
+#if defined(ARDUINO_ARCH_STM32)
+  stepperX->setDirectionPin(dirPinStepperX, true, 1000);
+#else
   stepperX->setDirectionPin(dirPinStepperX);
+#endif
   stepperX->setEnablePin(enablePinStepperX);
   stepperX->setAutoEnable(false);
+#if defined(ARDUINO_ARCH_STM32)
+  stepperY->setDirectionPin(dirPinStepperY, true, 1000);
+#else
   stepperY->setDirectionPin(dirPinStepperY);
+#endif
   stepperY->setEnablePin(enablePinStepperY);
   stepperY->setAutoEnable(false);
 

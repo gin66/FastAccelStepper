@@ -26,6 +26,10 @@ const uint8_t dirPinStepper = 3;
 const uint8_t stepPinStepper = 15;  // only defined to satisfy compiler
 const uint8_t enablePinStepper = 13;
 const uint8_t dirPinStepper = 14;
+#elif defined(ARDUINO_ARCH_STM32)
+const uint8_t stepPinStepper = PA0;
+const uint8_t enablePinStepper = PA4;
+const uint8_t dirPinStepper = PB0;
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();

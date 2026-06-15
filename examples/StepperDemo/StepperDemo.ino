@@ -1,4 +1,3 @@
-#include "AVRStepperPins.h"
 #include "FastAccelStepper.h"
 #include "test_seq.h"
 
@@ -27,6 +26,8 @@
 #include "StepperPins_sam.h"
 #elif defined(PICO_RP2040) || defined(PICO_RP2350)
 #include "StepperPins_pico.h"
+#elif defined(ARDUINO_ARCH_STM32)
+#include "StepperPins_stm32.h"
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
