@@ -79,8 +79,30 @@ const struct stepper_config_s stepper_config[MAX_STEPPER] = {
       on_delay_us : 500,
       off_delay_ms : 1000,
     },
-    {step : PIN_UNDEFINED},  // stepper 3
-    {step : PIN_UNDEFINED},  // stepper 4
+    // stepper 3 — disabled; explicit PIN_UNDEFINED to avoid zero-init direction=PA0
+    {
+      step : PIN_UNDEFINED,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : PIN_UNDEFINED,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : false,
+      on_delay_us : 0,
+      off_delay_ms : 0,
+    },
+    // stepper 4 — disabled; explicit PIN_UNDEFINED to avoid zero-init direction=PA0
+    {
+      step : PIN_UNDEFINED,
+      enable_low_active : PIN_UNDEFINED,
+      enable_high_active : PIN_UNDEFINED,
+      direction : PIN_UNDEFINED,
+      dir_change_delay : 0,
+      direction_high_count_up : true,
+      auto_enable : false,
+      on_delay_us : 0,
+      off_delay_ms : 0,
+    },
 };
 // Only 1 config variant — can add more later
 #define NUM_CONFIGS 1

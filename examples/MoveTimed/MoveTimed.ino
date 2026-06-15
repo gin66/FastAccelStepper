@@ -13,11 +13,17 @@
 #define enablePinStepperY 8
 #define stepPinStepperY stepPinStepper1B
 #elif defined(ARDUINO_ARCH_STM32)
+#undef dirPinStepperX
 #define dirPinStepperX PB0
+#undef enablePinStepperX
 #define enablePinStepperX PA4
+#undef stepPinStepperX
 #define stepPinStepperX PA0
+#undef dirPinStepperY
 #define dirPinStepperY PB1
+#undef enablePinStepperY
 #define enablePinStepperY PIN_UNDEFINED
+#undef stepPinStepperY
 #define stepPinStepperY PA1
 #endif
 
