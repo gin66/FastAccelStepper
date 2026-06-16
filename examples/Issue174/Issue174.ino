@@ -13,6 +13,9 @@ long chirpTimeInitial = 0;
 #elif defined(ARDUINO_ARCH_STM32)
 #define dirPinStepper PB0
 #define stepPinStepper PA0
+#else
+#define dirPinStepper 8
+#define stepPinStepper 9
 #endif
 
 // no clue what this does

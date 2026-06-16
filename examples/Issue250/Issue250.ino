@@ -18,6 +18,10 @@
 #define dirPinStepper PB0
 #define enablePinStepper PA4
 #define stepPinStepper PA0
+#else
+#define dirPinStepper 5
+#define enablePinStepper 6
+#define stepPinStepper 9
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
