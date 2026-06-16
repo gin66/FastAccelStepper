@@ -8,14 +8,35 @@
 #endif
 
 // As in StepperDemo for Motor 1 on AVR
+#if defined(ARDUINO_ARCH_AVR)
 #define dirPinStepper1 5
 #define enablePinStepper1 6
 #define stepPinStepper1 9  // OC1A in case of AVR
-
-// As in StepperDemo for Motor 2 on AVR
 #define dirPinStepper2 7
 #define enablePinStepper2 8
 #define stepPinStepper2 10  // OC1B in case of AVR
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#define dirPinStepper1 18
+#define enablePinStepper1 26
+#define stepPinStepper1 17
+#define dirPinStepper2 19
+#define enablePinStepper2 PIN_UNDEFINED
+#define stepPinStepper2 16
+#elif defined(ARDUINO_ARCH_STM32)
+#define dirPinStepper1 PB0
+#define enablePinStepper1 PA4
+#define stepPinStepper1 PA0
+#define dirPinStepper2 PB1
+#define enablePinStepper2 PIN_UNDEFINED
+#define stepPinStepper2 PA1
+#else
+#define dirPinStepper1 18
+#define enablePinStepper1 26
+#define stepPinStepper1 17
+#define dirPinStepper2 19
+#define enablePinStepper2 PIN_UNDEFINED
+#define stepPinStepper2 16
+#endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper1 = NULL;
@@ -31,7 +52,11 @@ void setup() {
   engine.setExternalCallForPin(setExternalPin);
   stepper1 = engine.stepperConnectToPin(stepPinStepper1);
   if (stepper1) {
+#if defined(ARDUINO_ARCH_STM32)
+    stepper1->setDirectionPin(dirPinStepper1 | PIN_EXTERNAL_FLAG, true, 1000);
+#else
     stepper1->setDirectionPin(dirPinStepper1 | PIN_EXTERNAL_FLAG);
+#endif
     stepper1->setEnablePin(enablePinStepper1);
     stepper1->setAutoEnable(true);
 
@@ -41,7 +66,12 @@ void setup() {
 
   stepper2 = engine.stepperConnectToPin(stepPinStepper2);
   if (stepper2) {
+#if defined(ARDUINO_ARCH_STM32)
+    stepper2->setDirectionPin(dirPinStepper2, true, 1000);
+    stepper2->setAutoEnable(false);
+#else
     stepper2->setDirectionPin(dirPinStepper2);
+#endif
     stepper2->setEnablePin(enablePinStepper2);
     stepper2->setAutoEnable(true);
 

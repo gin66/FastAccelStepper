@@ -12,6 +12,13 @@
 #define stepPinStepper 17
 #define enablePinStepper 26
 #define dirPinStepper 18
+#elif defined(ARDUINO_ARCH_STM32)
+#define stepPinStepper PA0
+#define enablePinStepper PA4
+#define dirPinStepper PB0
+#define vTaskDelay(xx) \
+  {                    \
+  }
 #else
 #define vTaskDelay(xx) \
   {                    \
