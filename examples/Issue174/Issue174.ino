@@ -7,8 +7,13 @@ long chirpTimeInitial = 0;
 // #define stepPinStepper 9  // step pin must be pin 9, 10 or 11
 
 // Stepper Wiring
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #define dirPinStepper 19
 #define stepPinStepper 14
+#elif defined(ARDUINO_ARCH_STM32)
+#define dirPinStepper PB0
+#define stepPinStepper PA0
+#endif
 
 // no clue what this does
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -49,7 +54,11 @@ void setup() {
     Serial.println("Setup stepper!");
 
     // Stepper Parameters
+#if defined(ARDUINO_ARCH_STM32)
+    stepper->setDirectionPin(dirPinStepper, false, 1000);
+#else
     stepper->setDirectionPin(dirPinStepper, false);
+#endif
     stepper->setAutoEnable(true);
 
     stepper->setSpeedInHz(maxStepperSpeed);     // steps/s

@@ -1,14 +1,23 @@
 #include "FastAccelStepper.h"
 
 #ifdef SIMULATOR
-#include <util/delay.h>
 #include <avr/sleep.h>
 #endif
 
 // As in StepperDemo for Motor 1 on AVR
+#if defined(ARDUINO_ARCH_AVR)
 #define dirPinStepper 5
 #define enablePinStepper 6
 #define stepPinStepper 9  // OC1A in case of AVR
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
+#define dirPinStepper 18
+#define enablePinStepper 26
+#define stepPinStepper 17
+#elif defined(ARDUINO_ARCH_STM32)
+#define dirPinStepper PB0
+#define enablePinStepper PA4
+#define stepPinStepper PA0
+#endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
@@ -18,7 +27,11 @@ void setup() {
   engine.init();
   stepper = engine.stepperConnectToPin(stepPinStepper);
   if (stepper) {
+#if defined(ARDUINO_ARCH_STM32)
+    stepper->setDirectionPin(dirPinStepper, true, 1000);
+#else
     stepper->setDirectionPin(dirPinStepper);
+#endif
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
 
