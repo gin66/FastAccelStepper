@@ -1,9 +1,23 @@
 #include "FastAccelStepper.h"
 
 // As in StepperDemo for Motor 1 on AVR
-#define dirPinStepper 17
-#define enablePinStepper 25
+#if defined(ARDUINO_ARCH_AVR)
+#define stepPinStepper 9
+#define enablePinStepper 6
+#define dirPinStepper 5
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #define stepPinStepper 16
+#define enablePinStepper 25
+#define dirPinStepper 17
+#elif defined(ARDUINO_ARCH_STM32)
+#define stepPinStepper PA0
+#define enablePinStepper PA4
+#define dirPinStepper PB0
+#else
+#define stepPinStepper 16
+#define enablePinStepper 25
+#define dirPinStepper 17
+#endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
@@ -22,7 +36,11 @@ void setup() {
   Serial.println((unsigned int)stepper);
   Serial.println((unsigned int)&engine);
   if (stepper) {
+#if defined(ARDUINO_ARCH_STM32)
+    stepper->setDirectionPin(dirPinStepper, true, 1000);
+#else
     stepper->setDirectionPin(dirPinStepper);
+#endif
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
 
