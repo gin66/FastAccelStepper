@@ -3,12 +3,21 @@
 .pio
 .dir
 .tested
+.github
+.cursor
+.venv
+.venv/
+venv/
+env/
+.env/
 run_avr
 pio_dirs
 pio_espidf
 PCB/
-examples/*/*.h
-examples/*/*.cpp
+# 2026.06.15 Removed ignore on examples/ to allow .h files (e.g. StepperPins_stm32.h)
+# to be tracked by git and available for CI build via build-pio-dirs.sh
+# examples/*/*.h
+# examples/*/*.cpp
 !examples/*/test_*.cpp
 extras/tests/pc_based/test_[0-9][0-9]
 extras/tests/pc_based/FastAccelStepper.cpp
@@ -32,7 +41,8 @@ extras/tests/simavr_based/simavr
 extras/tests/simavr_based/test_sd*/Makefile
 extras/tests/simavr_based/test_seq*/Makefile
 extras/tests/esp32_hw_based/*.log
-examples
+# 2026.06.15 Removed ignore on examples/ to allow .h files
+# examples
 extras/gen_log2_const/Log2Representation.cpp
 extras/gen_log2_const/main
 extras/tests/simavr_based/.fas

@@ -7,11 +7,14 @@
 
 class FastAccelStepper;
 
-#ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-extern log2_value_t log2_timer_freq;
-extern log2_value_t log2_timer_freq_div_sqrt_of_2;
-extern log2_value_t log2_timer_freq_square_div_2;
-#endif
+// V17: Removed — SUPPORT_LOG2_TIMER_FREQ_VARIABLES no longer defined.
+// All CI boards use predefined TICKS_PER_S values. #else fallback in
+// RampCalculator.h was replaced with #error, so this code path is dead.
+// #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
+// extern log2_value_t log2_timer_freq;
+// extern log2_value_t log2_timer_freq_div_sqrt_of_2;
+// extern log2_value_t log2_timer_freq_square_div_2;
+// #endif
 
 class RampGenerator {
  private:

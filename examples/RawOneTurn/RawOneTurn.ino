@@ -12,7 +12,11 @@ void setup() {
   engine.init();
   stepper = engine.stepperConnectToPin(stepPinStepper);
   if (stepper) {
+#if defined(ARDUINO_ARCH_STM32)
+    stepper->setDirectionPin(dirPinStepper, true, 1000);
+#else
     stepper->setDirectionPin(dirPinStepper);
+#endif
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
     stepper->enableOutputs();

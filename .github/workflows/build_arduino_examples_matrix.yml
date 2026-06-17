@@ -10,10 +10,6 @@ on:
   pull_request:
     branches: [ master ]
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   build:
     strategy:
@@ -80,6 +76,11 @@ jobs:
           - atmelsam
           - rpipico
           - rpipico2
+          - bluepill_f103c8
+          - nucleo_g070rb
+          - blackpill_f401cc
+          - nucleo_h743zi
+          - nucleo_l476rg
 
     runs-on: ubuntu-latest
 

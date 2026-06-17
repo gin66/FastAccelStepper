@@ -639,6 +639,157 @@ Found on youtube:
 As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepper/issues/110):
 * [22 01 2021 Stepper POC3](https://youtu.be/fm2_VkUG10k)
 
+## STM32 Arduino Support
+
+FastAccelStepper supports STM32 microcontrollers via the official
+[Arduino Core STM32](https://github.com/stm32duino/Arduino_Core_STM32).
+
+### Architecture
+
+- **Step generation**: TIM2 CC interrupt + BSRR/BRR GPIO (push-pull OUTPUT)
+- **Steppers**: Up to 4 (any GPIO pins, dynamic slot allocation)
+- **Pulse width**: 6 µs (configurable via `STEP_PULSE_WIDTH_US`)
+- **Cyclic fill**: PendSV exception, triggered from FAS_TIMER ISR (TIM2 or TIM3 on C0) every 3ms via uwTick
+- **GPIO mode**: Standard push-pull OUTPUT (any GPIO pin works)
+- **Direction**: Atomic BSRR set/reset — not ODR XOR (race-free)
+- **Direction settling**: `_dir_delay_active` state machine, 30µs delay
+- **Timer clock**: Auto-detection of TIM2 (or TIM3 on C0) with APB1 prescaler ×2 correction
+- **Interrupt safety**: PRIMASK save/restore (reentrant)
+- **SR handling**: Snapshot → clear all processed at once (rc_w0)
+- **PendSV**: `__attribute__((weak))` — FreeRTOS compatible
+- **C0 support**: STM32C0 series uses TIM3 instead of TIM2 (C0 has no TIM2).
+  TIM3 is 16-bit (ARR=0xFFFF). With PSC=2 → timer clock = 16MHz, resulting
+  minimum speed ≈ 244 steps/s (16,000,000 / 65535).
+  Prescaler PSC=2 is integer (48/16=3) → `fas_stm32_clock_error` = 0.
+
+### Default Pin Mapping
+
+| Stepper | Default Pin | Notes |
+|---------|-------------|-------|
+| 0 | PA0 | Any GPIO pin can be used |
+| 1 | PA1 | (PA0-PA3 are conventional only) |
+| 2 | PA2 | |
+| 3 | PA3 | |
+
+### ⚠ Warnings
+
+1. **FreeRTOS compatibility** — FastAccelStepper uses `PendSV_Handler` (via `__attribute__((weak))`) for deferred queue filling. FreeRTOS may also claim PendSV for task scheduling. If both claim PendSV without coordination, a runtime crash will occur.
+   - **If you use FreeRTOS**: Add `-DDISABLE_FAS_PENDSV` to build flags, and call `engine->manageSteppers()` periodically from a low-priority task or timer.
+   - Doing nothing (using both PendSV handlers) will cause undefined behavior.
+2. **FAS_TIMER is reserved** — Do not use TIM2 (or TIM3 on STM32C0) elsewhere.
+3. **HAL timebase must be SysTick** (default). uwTick is used for cyclic fill.
+4. **Do not call HAL_Delay() with steppers running** — TIM2 priority 0 may preempt SysTick. Use millis() polling.
+5. **TICKS_PER_S must match the timer counter clock** — It MUST be defined in your
+   build environment (DO NOT define it in the sketch — separate compilation prevents
+   `#define` in `.ino` from affecting library `.cpp` files):
+   - **PlatformIO**: Add to `platformio.ini`:
+     ```ini
+     build_flags = -DTICKS_PER_S=18000000UL
+     ```
+   - **Arduino IDE**: Create `build_opt.h` in the sketch folder:
+     Sketch → Show Sketch Folder → create text file named `build_opt.h` containing:
+     ```cpp
+     -DTICKS_PER_S=18000000UL
+     ```
+     ⚠️ **The `-D` prefix is required** (not a C `#define` — the file is parsed by the
+     compiler's command-line argument parser). File must end with a newline.
+   - TIM2 is used on most STM32 families (TIM3 on STM32C0).
+   - Use prescaled value (actual timer clock ÷ PSC+1), typically 16-20MHz.
+   See `pd_stm32/pd_config.h` for examples for each board and the table below.
+6. **Clock error**: After `engine.init()`, check `fas_stm32_clock_error`:
+   if non-zero, `TICKS_PER_S` exceeds actual timer clock.
+
+7. **Error codes**: After `engine.init()`, check `fas_stm32_clock_error`:
+   - `0` = OK (timer configured correctly)
+   - `1` = TICKS_PER_S > actual timer clock, or prescaler clamped at 65535
+         (timing will be wrong — define correct TICKS_PER_S in build_flags)
+   - `2` = Non-integer prescaler (timer clock not divisible by TICKS_PER_S)
+   See `pd_stm32/stm32_queue.cpp` for details.
+   Check via serial monitor (must call `Serial.begin()` before `engine.init()`).
+
+8. **Hardware testing pending** — This STM32 port has been verified by CI compilation
+   (5 boards: F103, G070, F401, H743, L476) but has **NOT** been tested on physical hardware
+   with actual stepper motors. Clock calculations and prescalers are mathematically verified
+   (see `pd_stm32/stm32_queue.cpp`), but real-world timing, pulse generation, and
+   direction settling have not been validated. Use with caution.
+
+### Adding a new STM32 family
+
+To add support for a new STM32 family not yet in the supported list:
+
+1. **Check timer availability**: Consult the MCU reference manual (RM).
+   Does the MCU have TIM2? Is it 16-bit or 32-bit? If no TIM2 available, which timer
+   has 4 CC channels (CCR1-CCR4) that can be used instead?
+
+2. **Add an `#elif` branch** in `src/pd_stm32/stm32_queue.cpp`:
+   ```cpp
+   #elif defined(STM32XXxx)
+       #define FAS_TIMER            TIM2   // or TIM3, etc.
+       #define FAS_TIMER_IRQn       TIM2_IRQn
+       #define FAS_TIMER_RCC_ENABLE() __HAL_RCC_TIM2_CLK_ENABLE()
+       // #define FAS_TIM_IS_16BIT   // uncomment if timer is 16-bit
+       #define FAS_TIMER_ARR_MAX    0xFFFFFFFF  // or 0xFFFF if 16-bit
+   ```
+
+3. **Update `fas_tim_set_ccr()`** (line ~207): add your family macro to the
+   16-bit wrap guard condition if the timer is 16-bit.
+
+4. **Update `getTimClock()`** (line ~174): add APB clock detection if your
+   family uses a different RCC register layout.
+
+5. **Update CCR init** (line ~320): add your family to the hardcoded CCR
+   pointer selection block if it uses a different timer (e.g. TIM3 instead of TIM2).
+
+6. **Register your family macro** in `src/pd_stm32/pd_config.h` family guard.
+
+### TICKS_PER_S Reference Table
+
+| Board              | MCU      | Timer        | TIM_CLK   | TICKS_PER_S (prescaled) | PSC | Timer actual | Error |
+|--------------------|----------|-------------|-----------|------------------------|-----|-------------|-------|
+| Blue Pill          | F103C8   | TIM2 **16-bit** | 72 MHz    | 18000000               | 3   | 18.000 MHz  | 0 ✅ |
+| Black Pill V2      | F401CC   | TIM2 32-bit | 84 MHz    | 16800000               | 4   | 16.800 MHz  | 0 ✅ |
+| Nucleo-G070RB      | G070RB   | TIM3 **16-bit** | 64 MHz    | 16000000 (default)     | 3   | 16.000 MHz  | 0 ✅ |
+| Nucleo-H743ZI      | H743ZI   | TIM2 32-bit | 200 MHz   | 20000000               | 9   | 20.000 MHz  | 0 ✅ |
+| Nucleo-H743ZI      | H743ZI   | TIM2 32-bit | 200 MHz   | 16666666               | 11  | 16.667 MHz  | 2 ⚠️ |
+| Nucleo-L476RG      | L476RG   | TIM2 32-bit | 80 MHz    | 16000000 (default)     | 4   | 16.000 MHz  | 0 ✅ |
+| Nucleo-C031C6      | C031C6   | TIM3 **16-bit** | 48 MHz    | 16000000 (default)     | 2   | 16.000 MHz  | 0 ✅ |
+| Nucleo-F091RC      | F091RC   | TIM2 32-bit | 48 MHz    | 16000000 (default)     | 2   | 16.000 MHz  | 0 ✅ |
+| Nucleo-L073RZ      | L073RZ   | TIM2 **16-bit** | 32 MHz    | 32000000               | 0   | 32.000 MHz  | 0 ✅ |
+
+
+
+## Local Compile Test Results (STM32)
+
+FastAccelStepper has been compile-tested locally with the following STM32 boards using PlatformIO + Arduino framework.
+
+### ✅ Boards PASS (15/15 Arduino boards)
+
+| #  | Board ID                  | Chip           | Flash   | RAM    | Status |
+|----|---------------------------|----------------|---------|--------|--------|
+| 1  | `blackpill_f103c8`        | STM32F103C8    | 21004   | 2628   | ✅ PASS |
+| 2  | `bluepill_f103c8`         | STM32F103C8    | 21004   | 2628   | ✅ PASS |
+| 3  | `bluepill_f103c8_128k`    | STM32F103CB    | 21004   | 2628   | ✅ PASS |
+| 4  | `genericSTM32F103C8`      | STM32F103C8    | 20880   | 2628   | ✅ PASS |
+| 5  | `black_f407ve`            | STM32F407VE    | 23724   | 2712   | ✅ PASS |
+| 6  | `black_f407vg`            | STM32F407VG    | —       | —      | ✅ PASS |
+| 7  | `genericSTM32F407VET6`    | STM32F407VE    | —       | —      | ✅ PASS |
+| 8  | `disco_f407vg`            | STM32F407VG    | —       | —      | ✅ PASS |
+| 9  | `blackpill_f411ce`        | STM32F411CE    | —       | —      | ✅ PASS |
+| 10 | `genericSTM32F411CE`      | STM32F411CE    | —       | —      | ✅ PASS |
+| 11 | `nucleo_f411re`           | STM32F411RE    | —       | —      | ✅ PASS |
+| 12 | `blackpill_f401ce`        | STM32F401CE    | —       | —      | ✅ PASS |
+| 13 | `blackpill_f401cc`        | STM32F401CC    | —       | —      | ✅ PASS |
+| 14 | `genericSTM32F401CE`      | STM32F401CE    | —       | —      | ✅ PASS |
+| 15 | `nucleo_f401re`           | STM32F401RE    | —       | —      | ✅ PASS |
+
+### ❌ Boards FAIL
+
+| Board ID               | Chip          | Reason                                           |
+|------------------------|---------------|--------------------------------------------------|
+| `disco_f411ve`         | STM32F411VE   | Board does not support Arduino framework (mbed only). Excluded from Arduino test list. |
+
+**Note**: All tests were performed with `toolchain-gccarmnoneeabi 12.3.1` and `framework-arduinoststm32 2.12.0`. See `extras/doc/stm32_compile_report.md` for full details.
+
 ## Contribution
 
 - Thanks ixil for pull request (https://github.com/gin66/FastAccelStepper/pull/19) for ATmega2560

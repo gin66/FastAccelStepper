@@ -8,7 +8,7 @@
 #if defined(ARDUINO_ARCH_AVR)
 #define get_char(x) pgm_read_byte(x)
 #define MSG_TYPE PGM_P
-#elif defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAM)
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAM) || defined(ARDUINO_ARCH_STM32)
 #define get_char(x) *x
 #define MSG_TYPE const char*
 #elif defined(ESP_PLATFORM)

@@ -1,9 +1,23 @@
 #include "FastAccelStepper.h"
 
 // for avr: either use pin 9 or 10 aka OC1A or OC1B
+#if defined(ARDUINO_ARCH_AVR)
+#define stepPinStepper 9
+#define enablePinStepper 6
+#define dirPinStepper 5
+#elif defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 #define stepPinStepper 17
 #define enablePinStepper 26
 #define dirPinStepper 18
+#elif defined(ARDUINO_ARCH_STM32)
+#define stepPinStepper PA0
+#define enablePinStepper PA4
+#define dirPinStepper PB0
+#else
+#define stepPinStepper 17
+#define enablePinStepper 26
+#define dirPinStepper 18
+#endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper;
@@ -17,7 +31,11 @@ void setup() {
   stepper = engine.stepperConnectToPin(stepPinStepper);
 
   if (stepper) {
+#if defined(ARDUINO_ARCH_STM32)
+    stepper->setDirectionPin(dirPinStepper, true, 1000);
+#else
     stepper->setDirectionPin(dirPinStepper);
+#endif
     stepper->setEnablePin(enablePinStepper);
     stepper->setAutoEnable(true);
   }

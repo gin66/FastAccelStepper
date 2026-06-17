@@ -6,24 +6,23 @@
 #include "fas_ramp/RampControl.h"
 #include "fas_arch/common.h"
 
-#ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-static log2_value_t log2_timer_freq;
-static log2_value_t log2_timer_freq_div_sqrt_of_2;
-static log2_value_t log2_timer_freq_square_div_2;
-#endif
+// V17: Removed — SUPPORT_LOG2_TIMER_FREQ_VARIABLES no longer defined.
+// #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
+// static log2_value_t log2_timer_freq;
+// static log2_value_t log2_timer_freq_div_sqrt_of_2;
+// static log2_value_t log2_timer_freq_square_div_2;
+// #endif
 
 void ramp_rw_s::init() {
   __builtin_memset(this, 0, sizeof(*this));
   curr_ticks = TICKS_FOR_STOPPED_MOTOR;
 }
 
+// V17: init_ramp_module() body was only the SUPPORT_LOG2_TIMER_FREQ_VARIABLES
+// block. Since that macro is never defined, the function is now empty.
+// Keep it as a no-op for future compatibility.
 void init_ramp_module() {
-#ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-  log2_timer_freq = log2_from((uint32_t)TICKS_PER_S);
-  log2_timer_freq_div_sqrt_of_2 =
-      log2_shr(log2_multiply(log2_timer_freq, log2_timer_freq), 1);
-  log2_timer_freq_square_div_2 = log2_shr(log2_square(log2_timer_freq), 1);
-#endif
+  // SUPPORT_LOG2_TIMER_FREQ_VARIABLES block removed in V17
 }
 
 //*************************************************************************************************

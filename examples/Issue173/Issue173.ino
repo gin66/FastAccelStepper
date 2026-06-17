@@ -14,6 +14,10 @@
 #define dirPinStepperESP 18
 #define stepPinStepperESP 17
 #define enablePinStepperESP 26
+#elif defined(ARDUINO_ARCH_STM32)
+#define dirPinStepper PB0
+#define stepPinStepper PA0
+#define enablePinStepper PA4
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -34,6 +38,10 @@ void setup() {
   stepper = engine.stepperConnectToPin(stepPinStepperESP);
   stepper->setDirectionPin(dirPinStepperESP);
   stepper->setEnablePin(enablePinStepperESP, true);
+#elif defined(ARDUINO_ARCH_STM32)
+  stepper = engine.stepperConnectToPin(stepPinStepper);
+  stepper->setDirectionPin(dirPinStepper, true, 1000);
+  stepper->setEnablePin(enablePinStepper, true);
 #endif
 
   stepper->setAutoEnable(true);
