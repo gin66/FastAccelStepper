@@ -155,7 +155,12 @@
 
 #ifdef NEED_RMT_HEADERS
 #include <driver/rmt_tx.h>
+#include <esp_idf_version.h>
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
+#include <hal/rmt_periph.h>
+#else
 #include <soc/rmt_periph.h>
+#endif
 #include <soc/rmt_reg.h>
 #include <soc/rmt_struct.h>
 
