@@ -655,4 +655,5 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks viteo for pull request (https://github.com/gin66/FastAccelStepper/pull/319): add dir pin input to `attachToPulseCounter()`
 - Thanks Magnus for pico sdk support and code improvement hints (#334)
 - Thanks Sam W for pull request (https://github.com/gin66/FastAccelStepper/pull/351) samx3-due: Fix null result from `tryAllocateQueue()`
+- Thanks drayde for pull request (https://github.com/gin66/FastAccelStepper/pull/366) Fix ESP-IDF 6 RMT header include
 
