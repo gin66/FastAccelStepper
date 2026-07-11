@@ -800,7 +800,7 @@ void output_info(bool only_running) {
 
 #if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM)
 void esp_reset() {
-#if ESP_IDF_VERSION_MAJOR == 5
+#if ESP_IDF_VERSION_MAJOR >= 5
   const esp_task_wdt_config_t wdt_config = {
       .timeout_ms = 1, .idle_core_mask = 1, .trigger_panic = true};
 
@@ -1458,7 +1458,7 @@ void loop() {
 #ifdef NEED_APP_MAIN
 #include "hal/wdt_hal.h"
 extern "C" void app_main() {
-#if ESP_IDF_VERSION_MAJOR == 5
+#if ESP_IDF_VERSION_MAJOR >= 5
   esp_task_wdt_deinit();
   esp_task_wdt_config_t config = {
       .timeout_ms = 1000, .idle_core_mask = 0, .trigger_panic = true};

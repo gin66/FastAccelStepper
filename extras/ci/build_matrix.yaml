@@ -30,7 +30,7 @@ templates:
       - "-Wno-deprecated-declarations"
       - "-Wno-error=incompatible-pointer-types"
       - "-Wno-unused-function"
-      - "-Wno-error=attributes"
+      - "-Wno-attributes"
       - "-Wno-error=missing-field-initializers"
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
@@ -69,7 +69,7 @@ templates:
       - "-Wno-deprecated-declarations"
       - "-Wno-error=incompatible-pointer-types"
       - "-Wno-unused-function"
-      - "-Wno-error=attributes"
+      - "-Wno-attributes"
       - "-Wno-error=missing-field-initializers"
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
@@ -84,7 +84,7 @@ templates:
       - "-Wno-deprecated-declarations"
       - "-Wno-error=incompatible-pointer-types"
       - "-Wno-unused-function"
-      - "-Wno-error=attributes"
+      - "-Wno-attributes"
       - "-Wno-error=missing-field-initializers"
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
@@ -99,7 +99,7 @@ templates:
       - "-Wno-deprecated-declarations"
       - "-Wno-error=incompatible-pointer-types"
       - "-Wno-unused-function"
-      - "-Wno-error=attributes"
+      - "-Wno-attributes"
       - "-Wno-error=missing-field-initializers"
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
@@ -114,7 +114,7 @@ templates:
       - "-Wno-deprecated-declarations"
       - "-Wno-error=incompatible-pointer-types"
       - "-Wno-unused-function"
-      - "-Wno-error=attributes"
+      - "-Wno-attributes"
       - "-Wno-error=missing-field-initializers"
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
@@ -129,7 +129,7 @@ templates:
       - "-Wno-deprecated-declarations"
       - "-Wno-error=incompatible-pointer-types"
       - "-Wno-unused-function"
-      - "-Wno-error=attributes"
+      - "-Wno-attributes"
       - "-Wno-error=missing-field-initializers"
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
