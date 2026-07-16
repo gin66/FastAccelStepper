@@ -817,7 +817,7 @@ MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
       uint32_t this_duration = rate;
       cmd.steps = 1;
       while (this_duration) {
-        if (this_duration > 131072) {
+        if (this_duration >= 131072) {
           cmd.ticks = 65535;
         } else if (this_duration > 65535) {
           cmd.ticks = this_duration / 2;
