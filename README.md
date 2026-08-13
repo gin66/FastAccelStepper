@@ -74,7 +74,7 @@ FastAccelStepper offers the following features:
 
 ## Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.com/#gin66/FastAccelStepper&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.dera.page/#gin66/FastAccelStepper&Date)
 
 
 ## AI generated documentation
