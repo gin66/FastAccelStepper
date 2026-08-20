@@ -1,3 +1,6 @@
+pre-1.2.8:
+- esp32 RMT: Ensure each filled RMT part ends with a pause symbol so DIR toggle cannot race the last step pulse (#370)
+
 1.2.7:
 - esp32_idf: Fix StepperDemo.cpp build for ESP-IDF 6 (uses `esp_task_wdt_init(const esp_task_wdt_config_t*)` API via `ESP_IDF_VERSION_MAJOR >= 5` guard)
 - ci: Switch IDF build flags from `-Wno-error=attributes` to `-Wno-attributes` to silence `'noreturn' attribute does not apply to types` warning emitted by ESP-IDF 6 `hal/assert.h`
