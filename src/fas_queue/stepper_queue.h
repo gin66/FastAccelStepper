@@ -15,6 +15,8 @@
 #include "pd_test/test_queue.h"
 #elif defined(SUPPORT_SAM)
 #include "pd_sam/sam_queue.h"
+#elif defined(SUPPORT_SAMD51)
+#include "pd_samd/samd_queue.h"
 #elif defined(SUPPORT_RP_PICO)
 #include "pd_pico/pico_queue.h"
 #elif defined(SUPPORT_ESP32)
