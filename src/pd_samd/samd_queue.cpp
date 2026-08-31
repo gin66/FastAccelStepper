@@ -360,6 +360,11 @@ void StepperQueue::startQueue() {
 
   tcc->INTFLAG.reg = TCC_INTFLAG_OVF;
   // Retrigger: counter restarts at zero, the step edge (if CC > 0) fires now.
+  // Scope-verified on SAMD51: RETRIGGER is not an update condition, so the
+  // buffered period-2 values staged above are NOT latched here; they take
+  // effect at the first period boundary as the pipeline model requires
+  // (an acceleration ramp from standstill shows the long first interval,
+  // not a duplicated second interval).
   tcc->CTRLBSET.reg = TCC_CTRLBSET_CMD_RETRIGGER;
 }
 
