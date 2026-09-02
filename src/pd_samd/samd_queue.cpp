@@ -122,6 +122,11 @@ bool StepperQueue::stageNextPeriod() {
 }
 
 void StepperQueue::handleOverflow() {
+  if ((_tcc->INTFLAG.reg & TCC_INTFLAG_OVF) == 0) {
+    // Spurious: startQueue() cleared the flag after the NVIC had already
+    // pended this interrupt. The new run's priming must not be consumed.
+    return;
+  }
   _tcc->INTFLAG.reg = TCC_INTFLAG_OVF;
   if (stageNextPeriod()) {
     _noMoreCommands = false;
@@ -130,6 +135,10 @@ void StepperQueue::handleOverflow() {
   if (_noMoreCommands) {
     // Grace period elapsed without new commands: stop.
     // STOP drives the output to the DRVCTRL non-recoverable state (low).
+    // Do not overlap a CTRLB command still syncing (e.g. the RETRIGGER of a
+    // startQueue() whose first period was very short).
+    while (_tcc->SYNCBUSY.bit.CTRLB) {
+    }
     _tcc->CTRLBSET.reg = TCC_CTRLBSET_CMD_STOP;
     _noMoreCommands = false;
     _isRunning = false;
@@ -326,9 +335,35 @@ void StepperQueue::startQueue() {
   _isRunning = true;
   _noMoreCommands = false;
 
-  // The TCC is stopped here (init() or the OVF ISR stopped it).
-  // Discard stale buffered values from a previous run.
-  tcc->STATUS.reg = TCC_STATUS_PERBUFV | (TCC_STATUS_CCBUFV0 << _tcc_channel);
+  // The TCC is stopped here (init(), forceStop() or the OVF ISR stopped it),
+  // but three remnants of the previous run must be cleared before priming:
+  //
+  // 1. A latched-but-unserviced overflow (possible when a stop lands just
+  //    after TOP). Left pending, the ISR would fire mid-priming and consume
+  //    the entries staged below. Clear it first; handleOverflow() also
+  //    guards against a spurious NVIC-pended call.
+  tcc->INTFLAG.reg = TCC_INTFLAG_OVF;
+  // 2. The STOP command itself may still be crossing into the 16 MHz TCC
+  //    clock domain. Register write-syncs must not overlap it.
+  while (tcc->SYNCBUSY.bit.CTRLB) {
+  }
+  // 3. Stale buffered values (an abrupt stop strands a staged PERBUF/CCBUF
+  //    that never latched). Silicon erratum DS80000748 2.20.1: clearing
+  //    STATUS.PERBUFV/CCBUFVx releases SYNCBUSY *before* the buffer register
+  //    is actually restored, so a PER/CC write issued then collides with the
+  //    still-running restore and SYNCBUSY.PER locks permanently (observed as
+  //    a random hang below). Workaround per errata: clear the flags twice.
+  //    The restore itself reports through SYNCBUSY.PER/CCx (per the erratum's
+  //    TC wording), so drain those channels too before the direct writes.
+  uint32_t bufv_mask = TCC_STATUS_PERBUFV | (TCC_STATUS_CCBUFV0 << _tcc_channel);
+  uint32_t sync_mask = TCC_SYNCBUSY_STATUS | TCC_SYNCBUSY_PER |
+                       (TCC_SYNCBUSY_CC0 << _tcc_channel);
+  tcc->STATUS.reg = bufv_mask;
+  while (tcc->SYNCBUSY.reg & sync_mask) {
+  }
+  tcc->STATUS.reg = bufv_mask;
+  while (tcc->SYNCBUSY.reg & sync_mask) {
+  }
 
   // Prime period 1 in the direct registers.
   struct queue_entry* e = &entry[rp & QUEUE_LEN_MASK];
@@ -358,7 +393,8 @@ void StepperQueue::startQueue() {
     tcc->CCBUF[_tcc_channel].reg = 0;
   }
 
-  tcc->INTFLAG.reg = TCC_INTFLAG_OVF;
+  // (INTFLAG.OVF was cleared at entry; the counter has been stopped since,
+  // so no overflow can have latched in between.)
   // Retrigger: counter restarts at zero, the step edge (if CC > 0) fires now.
   // Scope-verified on SAMD51: RETRIGGER is not an update condition, so the
   // buffered period-2 values staged above are NOT latched here; they take
@@ -369,11 +405,29 @@ void StepperQueue::startQueue() {
 }
 
 void StepperQueue::forceStop() {
+  // Called from application context while the TCC may be running at speed.
+  // The OVF ISR stages PERBUF/CCBUF at every period boundary, and those
+  // writes synchronize through the shared SYNCBUSY.PER/CCx channels. A STOP
+  // command issued while one of those syncs is in flight can wedge the sync
+  // bridge (same hardware as erratum DS80000748 2.20.1), leaving SYNCBUSY.PER
+  // stuck and hanging the next startQueue(). So: block the ISR, drain every
+  // in-flight sync, then stop.
+  noInterrupts();
+  while (_tcc->SYNCBUSY.reg &
+         (TCC_SYNCBUSY_CTRLB | TCC_SYNCBUSY_STATUS | TCC_SYNCBUSY_PER |
+          (TCC_SYNCBUSY_CC0 << _tcc_channel))) {
+  }
   _tcc->CTRLBSET.reg = TCC_CTRLBSET_CMD_STOP;
+  while (_tcc->SYNCBUSY.bit.CTRLB) {
+  }
+  // A stop landing just after TOP may leave a latched overflow. Drop it so
+  // the stale NVIC pend hits handleOverflow()'s spurious-interrupt guard.
+  _tcc->INTFLAG.reg = TCC_INTFLAG_OVF;
   _isRunning = false;
   _noMoreCommands = false;
   // empty the queue
   read_idx = next_write_idx;
+  interrupts();
 }
 
 static uint8_t stepper_allocated_count = 0;
