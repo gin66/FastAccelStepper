@@ -355,7 +355,8 @@ void StepperQueue::startQueue() {
   //    a random hang below). Workaround per errata: clear the flags twice.
   //    The restore itself reports through SYNCBUSY.PER/CCx (per the erratum's
   //    TC wording), so drain those channels too before the direct writes.
-  uint32_t bufv_mask = TCC_STATUS_PERBUFV | (TCC_STATUS_CCBUFV0 << _tcc_channel);
+  uint32_t bufv_mask =
+      TCC_STATUS_PERBUFV | (TCC_STATUS_CCBUFV0 << _tcc_channel);
   uint32_t sync_mask = TCC_SYNCBUSY_STATUS | TCC_SYNCBUSY_PER |
                        (TCC_SYNCBUSY_CC0 << _tcc_channel);
   tcc->STATUS.reg = bufv_mask;
