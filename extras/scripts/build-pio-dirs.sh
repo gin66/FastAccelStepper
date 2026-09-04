@@ -17,17 +17,20 @@ pwd
 # So create the pio_dirs-directory during the github action 
 rm -fR pio_dirs
 mkdir pio_dirs
-for i in `ls examples`
+for SRC in examples extras/issues
 do
-	(mkdir -p pio_dirs/$i/src
-	cd pio_dirs/$i
-        mkdir FastAccelStepper
-        ln -s $ROOT/src FastAccelStepper
-	ln -s ../../extras/ci/platformio.ini .
-	cd src
-	FILES=`cd ../../../examples/$i;find . -type f`
-	for f in $FILES;do ln -s ../../../examples/$i/$f .;done
-	)
+	for i in `ls $SRC`
+	do
+		(mkdir -p pio_dirs/$i/src
+		cd pio_dirs/$i
+	        mkdir FastAccelStepper
+	        ln -s $ROOT/src FastAccelStepper
+		ln -s ../../extras/ci/platformio.ini .
+		cd src
+		FILES=`cd ../../../$SRC/$i;find . -type f`
+		for f in $FILES;do ln -s ../../../$SRC/$i/$f .;done
+		)
+	done
 done
 
 # for espidf as of now, the src/* files need to be linked into the example build directory
