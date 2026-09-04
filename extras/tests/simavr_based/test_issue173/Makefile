@@ -125,7 +125,7 @@ x.vcd: $(SRC) ../run_avr platformio.ini src/Issue173.ino
 
 src/Issue173.ino:
 	mkdir -p src
-	cd src; ln -s ../../../../../examples/Issue173/Issue173.ino .
+	cd src; ln -s ../../../../issues/Issue173/Issue173.ino .
 
 clean:
 	rm -fR .pio .tested x.vcd result.txt
