@@ -80,6 +80,15 @@ struct queue_end_s {
 #include "fas_arch/arduino_sam.h"
 #include "pd_sam/pd_config.h"
 
+#elif defined(ARDUINO_ARCH_SAMD)
+// SAMD-architecture (Microchip SAMD51 only)
+#if defined(__SAMD51__)
+#include "fas_arch/arduino_samd.h"
+#include "pd_samd/pd_config.h"
+#else
+#error "Only SAMD51 is supported on the SAMD architecture (no SAMD21 yet)"
+#endif
+
 #elif defined(ARDUINO_ARCH_AVR)
 // AVR family
 #include "fas_arch/arduino_avr.h"

@@ -25,6 +25,8 @@
 #endif
 #elif defined(ARDUINO_ARCH_SAM)
 #include "StepperPins_sam.h"
+#elif defined(ARDUINO_ARCH_SAMD)
+#include "StepperPins_samd.h"
 #elif defined(PICO_RP2040) || defined(PICO_RP2350)
 #include "StepperPins_pico.h"
 #endif

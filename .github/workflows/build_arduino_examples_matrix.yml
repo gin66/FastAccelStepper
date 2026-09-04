@@ -82,6 +82,7 @@ jobs:
           - atmega2560
           - atmega32u4
           - atmelsam
+          - samd51
           - rpipico
           - rpipico2
 
