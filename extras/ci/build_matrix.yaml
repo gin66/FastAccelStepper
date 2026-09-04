@@ -147,6 +147,13 @@ templates:
     build_flags: ["-Wall", "-Wno-deprecated-declarations"]
     lib_extra_dirs: .
 
+  samd51:
+    platform: atmelsam
+    board: adafruit_feather_m4
+    framework: arduino
+    build_flags: ["-Wall", "-Wno-deprecated-declarations"]
+    lib_extra_dirs: .
+
   rp2040:
     platform: https://github.com/maxgerhardt/platform-raspberrypi.git
     framework: arduino
@@ -223,6 +230,9 @@ environments:
 
   atmelsam:
     template: sam
+
+  samd51:
+    template: samd51
 
   pico:
     template: rp2040
@@ -391,6 +401,7 @@ workflows:
       - atmega2560
       - atmega32u4
       - atmelsam
+      - samd51
       - rpipico
       - rpipico2
     script: build-platformio.sh

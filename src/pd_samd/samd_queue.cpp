@@ -210,7 +210,7 @@ bool StepperQueue::isValidStepPin(uint8_t step_pin) {
 }
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
-  uint8_t tcc_num, channel;
+  uint8_t tcc_num = 0, channel = 0;
   step_pin_to_tcc(step_pin, &tcc_num, &channel);  // validated by caller
   _queue_num = queue_num;
   _step_pin = step_pin;

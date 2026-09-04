@@ -1,6 +1,6 @@
 #!/bin/sh
 
-TARGETS=${1:-nanoatmega168 nanoatmega328 atmega2560 esp32 esp32s2 esp32c3 atmelsam atmega32u4}
+TARGETS=${1:-nanoatmega168 nanoatmega328 atmega2560 esp32 esp32s2 esp32c3 atmelsam samd51 atmega32u4}
 echo "execute for ${TARGETS}"
 
 if [ "$GITHUB_WORKSPACE" != "" ]
