@@ -1,4 +1,11 @@
 pre-1.2.8:
+- samd51: New platform port (Microchip SAMD51, Arduino SAMD51 core) (#317)
+  - TCC PWM pulse driver: one TCC instance per stepper, hardware-timed pulse edges via buffered `PERBUF`/`CCBUF` registers
+  - 16 MHz tick timebase from DFLL48M divided by 3 on a dedicated GCLK generator
+  - ~4 ms ramp tick driven by a plain TC instance (TC3 default, compile-time override)
+  - Workaround for silicon erratum DS80000748 (SYNCBUSY/buffer-latch race on abort)
+  - Up to 3 steppers on SAMD51G, up to 5 on SAMD51J/N/P; SAMD21 not supported
+  - ADR 0001/0002 document the port design decisions
 - esp32 RMT: Ensure each filled RMT part ends with a pause symbol so DIR toggle cannot race the last step pulse (#370)
 
 1.2.7:
