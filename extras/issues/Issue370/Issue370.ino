@@ -33,6 +33,12 @@
 
 #include "FastAccelStepper.h"
 
+// The whole reproduction below relies on the ESP32 pulse counter (PCNT) and on
+// the selectable RMT driver backend. On platforms without pulse counter support
+// and/or without selectable driver types, fall back to an empty setup()/loop()
+// so the sketch still compiles (it is a no-op there).
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && defined(SUPPORT_SELECT_DRIVER_TYPE)
+
 // --- Pin configuration: identical to station-worker ---
 #define STEP_PIN 19
 #define DIR_PIN 18
@@ -302,3 +308,14 @@ void loop() {
   }
 }
 
+#else
+
+// No ESP32 pulse counter / selectable driver: nothing to reproduce, so keep the
+// sketch compilable with an empty application.
+void setup() {
+}
+
+void loop() {
+}
+
+#endif      // SUPPORT_ESP32_PULSE_COUNTER && SUPPORT_SELECT_DRIVER_TYPE
