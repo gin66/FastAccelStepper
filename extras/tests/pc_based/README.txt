@@ -190,12 +190,38 @@ Tests;
   - hasStepsInQueue() detection (steps vs pause commands)
   - Realistic direction change scenario with delays
   
+   Key validation criteria:
+   1. Direction delays must be clamped to valid range
+   2. Pause commands inserted on direction change (non-external pins)
+   3. External pins return AQE_DIR_PIN_2MS_PAUSE_ADDED if queue has steps
+   4. External pins succeed when queue is empty of steps
+   5. Callback mechanism works for external enable/disable
+
+- test_24
+  moveTimedFill() command generation test for issue #370
+
+  Uses the macro-overridable moveTimedFill() extracted from
+  FastAccelStepper::moveTimed() (see src/fas_moveTimed/move_timed.h) and
+  redirects queue access to a capturing mock (MT_ADD_ENTRY). This tests the
+  pure command-generation logic of moveTimed() with no hardware dependency.
+
+  Feeds the exact 87-command Issue370 profile (net 0 steps/cycle) through
+  moveTimedFill() twice (like the Issue370 repro, which runs 2 cycles) and
+  verifies that the generated low-level commands still sum to the commanded
+  value. A queue-full return (MOVE_TIMED_BUSY) resets the modelled free
+  entries and resends the SAME command, since a busy move is dropped and
+  must be repeated. This checks whether moveTimed() itself corrupts step
+  accounting (which would explain the library-position drift of -2 seen
+  in the Issue370 reproduction) as opposed to the drift living in the
+  pulse-driver position tracking (RMT prefetch).
+
   Key validation criteria:
-  1. Direction delays must be clamped to valid range
-  2. Pause commands inserted on direction change (non-external pins)
-  3. External pins return AQE_DIR_PIN_2MS_PAUSE_ADDED if queue has steps
-  4. External pins succeed when queue is empty of steps
-  5. Callback mechanism works for external enable/disable
+  1. The 87-command profile must net to zero steps per cycle
+  2. moveTimedFill() must preserve the commanded step sum across all three
+     code paths (pause-only, slow-with-pauses, fast-packed)
+  3. A busy return (modeled as running out of free entries) must not drop
+     the command: it is resent after the queue drains
+  4. Run 2 cycles, matching the Issue370 reproduction
 
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration
