@@ -41,6 +41,7 @@ jobs:
           - esp32_V6_12_0
           - esp32_V6_13_0
           - esp32_V7_0_1
+          - esp32_V7_1_1
           - esp32_pioarduino_V53_03_11
           - esp32s2_pioarduino_V53_03_11
           - esp32s3_pioarduino_V53_03_11
