@@ -6,7 +6,6 @@ pre-1.2.8:
   - Workaround for silicon erratum DS80000748 (SYNCBUSY/buffer-latch race on abort)
   - Up to 3 steppers on SAMD51G, up to 5 on SAMD51J/N/P; SAMD21 not supported
   - ADR 0001/0002 document the port design decisions
-- esp32 RMT: Ensure each filled RMT part ends with a pause symbol so DIR toggle cannot race the last step pulse (#370)
 
 1.2.7:
 - esp32_idf: Fix StepperDemo.cpp build for ESP-IDF 6 (uses `esp_task_wdt_init(const esp_task_wdt_config_t*)` API via `ESP_IDF_VERSION_MAJOR >= 5` guard)

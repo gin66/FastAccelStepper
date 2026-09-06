@@ -161,6 +161,11 @@ static bool feedCommand(int16_t steps, uint32_t ticks, int32_t& drift) {
 
 static void runCycles(uint16_t cycles) {
   buildPattern();
+  int16_t step_cnt = 0;
+  for (uint16_t i = 0; i < patternLen; i++) {
+     step_cnt += pattern[i].steps;
+     Serial.printf("%2d: steps=%d ticks=%d => %d steps\n",i, pattern[i].steps, pattern[i].ticks, step_cnt);
+  }
 
   int32_t startPos = stepper->getCurrentPosition();
   int64_t startPcnt = readPcntAccum();
@@ -189,6 +194,7 @@ static void runCycles(uint16_t cycles) {
           prefilled++;
           continue;
         }
+        Serial.printf("return: %s\n", toString(rc));
         // queue full -> start it and fall through to normal feeding
         stepper->moveTimed(0, 0, NULL, true);
         started = true;

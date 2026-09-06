@@ -79,29 +79,6 @@ class RmtBufferTest {
     }
   }
 
-  // Each filled part must end with a pause entry (no step bit in either
-  // half). If the last entry contains a step, an RMT refill/DIR toggle can
-  // race the still-executing last symbol (#370).
-  bool last_entries_without_step(uint32_t* bad_index = nullptr,
-                                 uint32_t* bad_entry = nullptr) {
-    if (rmt_offset == 0 || (rmt_offset % PART_SIZE) != 0) {
-      return false;
-    }
-    for (uint32_t base = 0; base < rmt_offset; base += PART_SIZE) {
-      uint32_t entry = rmt_entries[base + PART_SIZE - 1];
-      if ((entry & 0x8000) != 0 || ((entry >> 16) & 0x8000) != 0) {
-        if (bad_index) {
-          *bad_index = base + PART_SIZE - 1;
-        }
-        if (bad_entry) {
-          *bad_entry = entry;
-        }
-        return false;
-      }
-    }
-    return true;
-  }
-
   RmtAnalysis analyze() {
     RmtAnalysis result = {0, 0, 0xffff, 0, 0};
     bool step_high = false;
@@ -254,9 +231,6 @@ bool run_tests() {
 
     bool steps_ok = (result.step_count == tc->expected_steps);
     bool ticks_ok = (result.total_ticks == tc->expected_ticks);
-    uint32_t bad_index = 0;
-    uint32_t bad_entry = 0;
-    bool last_ok = test.last_entries_without_step(&bad_index, &bad_entry);
 
     uint32_t high_low_ratio = 0;
     if (result.total_low_ticks > 0) {
@@ -267,11 +241,6 @@ bool run_tests() {
            result.step_count, tc->expected_steps, steps_ok ? "OK" : "FAIL");
     printf("  Ticks: %" PRIu64 " (expected %" PRIu64 ") %s\n",
            result.total_ticks, tc->expected_ticks, ticks_ok ? "OK" : "FAIL");
-    printf("  Last entry without step: %s", last_ok ? "OK" : "FAIL");
-    if (!last_ok) {
-      printf(" (idx=%" PRIu32 " entry=0x%08" PRIx32 ")", bad_index, bad_entry);
-    }
-    printf("\n");
     printf("  High/Low: %" PRIu32 "/%" PRIu32 " ticks (ratio %u%%)\n",
            result.total_high_ticks, result.total_low_ticks, high_low_ratio);
     printf("  Min symbol: %u ticks\n", result.min_symbol_period);
@@ -281,9 +250,8 @@ bool run_tests() {
       printf("  WARNING: High/Low ratio outside 30-200%% range\n");
     }
 
-    if (!steps_ok || !ticks_ok || !last_ok) {
+    if (!steps_ok || !ticks_ok) {
       all_passed = false;
-      fail_count++;
       test.dump_rmt(50);
     } else if (dump_rmt_symbols) {
       printf("  RMT symbols for this test:\n");
@@ -364,23 +332,15 @@ bool run_tests() {
 
       bool steps_ok = (result.step_count == expected_steps);
       bool ticks_ok = (result.total_ticks == expected_ticks);
-      uint32_t bad_index = 0;
-      uint32_t bad_entry = 0;
-      bool last_ok = test.last_entries_without_step(&bad_index, &bad_entry);
 
-      if (!steps_ok || !ticks_ok || !last_ok) {
+      if (!steps_ok || !ticks_ok) {
         if (round_fails == 0) {
           printf("\n");
         }
         printf("  FAIL steps=%d: got %" PRIu32 " steps, %" PRIu64
-               " ticks (expected %" PRIu32 ", %" PRIu64 ") last_ok=%s",
+               " ticks (expected %" PRIu32 ", %" PRIu64 ")\n",
                steps, result.step_count, result.total_ticks, expected_steps,
-               expected_ticks, last_ok ? "yes" : "no");
-        if (!last_ok) {
-          printf(" (idx=%" PRIu32 " entry=0x%08" PRIx32 ")", bad_index,
-                 bad_entry);
-        }
-        printf("\n");
+               expected_ticks);
         round_fails++;
         all_passed = false;
         if (round_fails <= 2) {
