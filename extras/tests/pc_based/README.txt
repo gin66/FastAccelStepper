@@ -202,18 +202,45 @@ Tests;
 
   Uses the macro-overridable moveTimedFill() extracted from
   FastAccelStepper::moveTimed() (see src/fas_moveTimed/move_timed.h) and
-  redirects queue access to a capturing mock (MT_ADD_ENTRY). This tests the
-  pure command-generation logic of moveTimed() with no hardware dependency.
+  redirects queue access to a local 16-entry StepperQueue (MT_ADD_ENTRY is
+  bound to an enqueue() that mirrors addQueueEntry(), including queue_end
+  position and toggle handling). This tests the pure command-generation and
+  queue bookkeeping logic of moveTimed() with no hardware dependency.
 
-  Feeds the exact 87-command Issue370 profile (net 0 steps/cycle) through
-  moveTimedFill() twice (like the Issue370 repro, which runs 2 cycles) and
-  verifies that the generated low-level commands still sum to the commanded
-  value. A queue-full return (MOVE_TIMED_BUSY) resets the modelled free
-  entries and resends the SAME command, since a busy move is dropped and
-  must be repeated. This checks whether moveTimed() itself corrupts step
-  accounting (which would explain the library-position drift of -2 seen
-  in the Issue370 reproduction) as opposed to the drift living in the
-  pulse-driver position tracking (RMT prefetch).
+  Phase 1 replays the exact Issue370 runCycles() feed (87-command profile,
+  net 0 steps/cycle, baseTicks=105960) over 3 cycles: commands are prefilled
+  without starting until the 16-entry queue is full, then the queue is
+  started and feeding continues with the same drift compensation as the
+  Issue370 firmware. When a command cannot be enqueued (MOVE_TIMED_BUSY,
+  which drops the move in the real code), the RMT ISR is simulated by
+  draining one chunk with the real rmt_fill_buffer() and the command is
+  retried. Checks:
+    1. every cycle nets to the commanded sum (= 0)
+    2. all 3 cycles generate identical command streams (steps + count_up)
+    3. the queued position (queue_end.pos) returns to zero
+
+  A failure here would mean moveTimed() itself corrupts the step accounting
+  and would explain the -2 library-position drift seen in the Issue370
+  reproduction. A pass means the command stream is faithful and position
+  neutral.
+
+  Phase 2 feeds the SAME captured command stream through the real ESP32 RMT
+  fill buffer translation (pd_esp32/StepperISR_esp32xx_rmt.cpp, the same
+  code compiled on the ESP32). The commands are placed into a real
+  StepperQueue via the same enqueue() (toggle_dir set on direction changes)
+  and drained via rmt_fill_buffer(). The resulting RMT symbols are analyzed
+  for step-pulse count and total ticks, and the queue_end position is
+  checked again. rmt_fill_buffer inserts a MIN_CMD_TICKS pause when a
+  direction change follows a chunk that contained steps; toggles that follow
+  a pause chunk do not get one, and that difference is validated against the
+  captured stream. This checks that the RMT encoding layer is faithful: no
+  step pulses are lost or added at the direction-change pause boundaries.
+
+  Note that the on-chip PCNT and queue_end both agree with the commands
+  while the external driver counts -2 per cycle at the dangerous reversal
+  (first cycle clean). Since Phase 1 and Phase 2 prove the command stream
+  and its RMT translation to be position neutral, that -2 lives in the
+  wire-level DIR-toggle alignment, not in the library.
 
   Key validation criteria:
   1. The 87-command profile must net to zero steps per cycle
@@ -222,6 +249,10 @@ Tests;
   3. A busy return (modeled as running out of free entries) must not drop
      the command: it is resent after the queue drains
   4. Run 2 cycles, matching the Issue370 reproduction
+  5. Phase 2: RMT step-pulse count must equal the commanded |steps| sum
+  6. Phase 2: RMT total ticks must equal the base command ticks plus the
+     pause parts inserted at direction changes, and the number of pause
+     parts must match the toggle analysis of the command stream
 
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration

@@ -1,4 +1,10 @@
 pre-1.2.8:
+- Fix moveTimed(): reserve 2 queue slots for direction-change pause commands so
+  a move is only admitted (and stays atomic) when it plus the direction pauses
+  fits into the queue, instead of silently dropping steps (#370)
+- Document the capacity contract: a move may generate at most QUEUE_LEN - 2
+  queue commands; for streaming keep well below QUEUE_LEN/2 and split large
+  moves on the application side (#370)
 - samd51: New platform port (Microchip SAMD51, Arduino SAMD51 core) (#317)
   - TCC PWM pulse driver: one TCC instance per stepper, hardware-timed pulse edges via buffered `PERBUF`/`CCBUF` registers
   - 16 MHz tick timebase from DFLL48M divided by 3 on a dedicated GCLK generator

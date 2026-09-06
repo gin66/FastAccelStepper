@@ -17,10 +17,11 @@
 //
 // Overridable macros:
 //   MT_QUEUE_LEN       queue depth (default: QUEUE_LEN)
-//   MT_QUEUE_EMPTY(s)  whether the queue is empty (default: (s)->isQueueEmpty())
-//   MT_FREE_ENTRIES(s) number of free entries (default: (s)->queueEntries())
-//   MT_ADD_ENTRY(s,cmd,start)
-//                      enqueue a command (default: (s)->addQueueEntry(cmd,start))
+//   MT_QUEUE_EMPTY(s)  whether the queue is empty (default:
+//   (s)->isQueueEmpty()) MT_FREE_ENTRIES(s) number of free entries (default:
+//   (s)->queueEntries()) MT_ADD_ENTRY(s,cmd,start)
+//                      enqueue a command (default:
+//                      (s)->addQueueEntry(cmd,start))
 
 #ifndef MT_QUEUE_LEN
 #define MT_QUEUE_LEN QUEUE_LEN
@@ -36,6 +37,20 @@
 
 #ifndef MT_ADD_ENTRY
 #define MT_ADD_ENTRY(s, cmd, start) ((s)->addQueueEntry((cmd), (start)))
+#endif
+
+// Up to two queue entries are consumed by the direction-change machinery in
+// FastAccelStepper::addQueueEntry() (a before and an after pause command) in
+// addition to the step command it wraps. moveTimedFill() must therefore treat
+// those two slots as reserved for every timed move, so that a move is only
+// admitted when the whole move plus the direction pauses fits into the queue.
+// Otherwise a direction change could run the queue short between the separate
+// pause/step appends and silently drop steps (Issue 370). The application
+// should keep the number of queue commands a move generates well below
+// QUEUE_LEN/2 so that splitting large moves on the application side stays
+// feasible.
+#ifndef MT_RESERVED_DIR_CHANGE_SLOTS
+#define MT_RESERVED_DIR_CHANGE_SLOTS 2
 #endif
 
 // Fills the queue with the commands for a timed move.
@@ -62,6 +77,11 @@ inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
     return ret_ok;
   }
   uint8_t freeEntries = MT_QUEUE_LEN - MT_FREE_ENTRIES(s);
+  if (freeEntries > MT_RESERVED_DIR_CHANGE_SLOTS) {
+    freeEntries -= MT_RESERVED_DIR_CHANGE_SLOTS;
+  } else {
+    freeEntries = 0;
+  }
   if (actual_duration != NULL) {
     *actual_duration = 0;
   }
