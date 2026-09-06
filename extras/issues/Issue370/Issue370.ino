@@ -26,8 +26,10 @@
 //   r        run 1 cycle
 //   r50      run 50 cycles
 //   p        print counters (library pos, commanded sum, PCNT)
+//   P        print pattern
 //   z        zero all counters (do this after aligning MotionStudio)
 //   f / s    faster / slower base rate (finds the speed threshold)
+//   d        toggle DIR delay 0us <-> 200us
 //   h        help
 // ============================================================================
 
@@ -48,8 +50,10 @@
 // (station-worker.ino: dirHighCountsUp = (side == RIGHT || side == CENTER))
 #define DIR_HIGH_COUNTS_UP true
 
-// Same DIR setup delay as the main firmware (clamped to 200us minimum anyway)
+// Same DIR setup delay as the main firmware (clamped to 200us minimum anyway).
+// Toggle between 0 and 200 with the 'd' command to compare the RMT miscount.
 #define DIR_CHANGE_DELAY_US 200
+static uint16_t dirChangeDelayUs = DIR_CHANGE_DELAY_US;
 
 // --- Motion profile (defaults reproduce the diamond corner exactly) ---
 // Base command duration: 105960 ticks @16MHz = 6.6225 ms (1mm @ 151 mm/s)
@@ -161,12 +165,6 @@ static bool feedCommand(int16_t steps, uint32_t ticks, int32_t& drift) {
 
 static void runCycles(uint16_t cycles) {
   buildPattern();
-  int16_t step_cnt = 0;
-  for (uint16_t i = 0; i < patternLen; i++) {
-     step_cnt += pattern[i].steps;
-     Serial.printf("%2d: steps=%d ticks=%d => %d steps\n",i, pattern[i].steps, pattern[i].ticks, step_cnt);
-  }
-
   int32_t startPos = stepper->getCurrentPosition();
   int64_t startPcnt = readPcntAccum();
   int64_t startCmd = commandedSum;
@@ -229,6 +227,16 @@ static void runCycles(uint16_t cycles) {
   Serial.println("Read the encoder/pulse count in MotionStudio now.");
 }
 
+static void dumpPattern() {
+  buildPattern();
+  int16_t step_cnt = 0;
+  for (uint16_t i = 0; i < patternLen; i++) {
+    step_cnt += pattern[i].steps;
+    Serial.printf("%2d: steps=%d ticks=%d => %d steps\n", i, pattern[i].steps,
+                  pattern[i].ticks, step_cnt);
+  }
+}
+
 static void printCounters() {
   Serial.printf("Library position: %ld  Commanded sum: %lld  PCNT: %lld\n",
                 (long)stepper->getCurrentPosition(), commandedSum, readPcntAccum());
@@ -238,7 +246,9 @@ static void printHelp() {
   Serial.println("debug-stepper — minimal RMT direction-change repro");
   Serial.println("  r      run 1 cycle          rN   run N cycles (e.g. r50)");
   Serial.println("  p      print counters       z    zero counters");
+  Serial.println("  P      print pattern");
   Serial.println("  f / s  faster / slower base rate (x0.8 / x1.25)");
+  Serial.println("  d      toggle DIR delay 0us <-> 200us");
   Serial.println("  h      this help");
 }
 
@@ -253,7 +263,7 @@ void setup() {
     while (1) delay(1000);
   }
 
-  stepper->setDirectionPin(DIR_PIN, DIR_HIGH_COUNTS_UP, DIR_CHANGE_DELAY_US);
+  stepper->setDirectionPin(DIR_PIN, DIR_HIGH_COUNTS_UP, dirChangeDelayUs);
   stepper->setEnablePin(ENABLE_PIN);
   stepper->setAutoEnable(false);
   stepper->enableOutputs();
@@ -287,6 +297,7 @@ void loop() {
           break;
         }
         case 'p': printCounters(); break;
+        case 'P': dumpPattern(); break;
         case 'z':
           stepper->setCurrentPosition(0);
           stepper->clearPulseCounter();
@@ -304,6 +315,11 @@ void loop() {
           baseTicks = (uint32_t)(baseTicks * 1.25);
           Serial.printf("baseTicks=%lu (fast rate ~%.0f steps/s)\n",
                         (unsigned long)baseTicks, 16000000.0 * FAST_STEPS / baseTicks);
+          break;
+        case 'd':
+          dirChangeDelayUs = dirChangeDelayUs ? 0 : DIR_CHANGE_DELAY_US;
+          stepper->setDirectionPin(DIR_PIN, DIR_HIGH_COUNTS_UP, dirChangeDelayUs);
+          Serial.printf("DIR delay = %u us\n", dirChangeDelayUs);
           break;
         case 'h': printHelp(); break;
         default: Serial.println("? (h for help)"); break;
