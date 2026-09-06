@@ -1,4 +1,4 @@
-pre-1.2.8:
+1.2.8:
 - Fix moveTimed(): reserve 2 queue slots for direction-change pause commands so
   a move is only admitted (and stays atomic) when it plus the direction pauses
   fits into the queue, instead of silently dropping steps (#370)

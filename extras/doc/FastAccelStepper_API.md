@@ -662,6 +662,22 @@ Negative values (errors):
   Queue depth is 32 (ESP32/SAM) or 16 (AVR). Each entry emits max 255
   steps. For slow speeds (>65535 ticks/step), pauses are needed, reducing
   capacity. Recommendation: keep duration in the range of milliseconds.
+
+### Capacity and direction-change pauses
+
+A direction change with a configured direction-pin delay makes the queue
+driver insert up to two pause commands (a before and an after pause) on
+top of the step command itself. moveTimed() therefore reserves these two
+slots up front and only admits a move when the whole move plus the two
+reserved slots fits into the queue at once (atomic append). Otherwise it
+returns MOVE_TIMED_BUSY instead of silently dropping steps mid-append
+(see Issue 370).
+
+As a consequence a single move may use at most QUEUE_LEN - 2 queue
+entries. For streaming at fixed speed it is recommended to keep the number
+of queue commands a move generates well below QUEUE_LEN/2 and to split
+larger moves on the application side, so the reserved slots never block a
+steady feed.
 - (plus AQE_ERROR_TICKS_TOO_LOW, AQE_ERROR_EMPTY_QUEUE_TO_START,
    AQE_ERROR_NO_DIR_PIN_TO_TOGGLE from AqeResultCode)
 ```cpp
