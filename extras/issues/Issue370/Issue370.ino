@@ -243,6 +243,13 @@ static void printCounters() {
 }
 
 static void printHelp() {
+  Serial.print("Platform: ESP-IDF ");
+  Serial.print(ESP_IDF_VERSION_MAJOR);
+  Serial.print(".");
+  Serial.print(ESP_IDF_VERSION_MINOR);
+  Serial.print(".");
+  Serial.print(ESP_IDF_VERSION_PATCH);
+  Serial.println();
   Serial.println("debug-stepper — minimal RMT direction-change repro");
   Serial.println("  r      run 1 cycle          rN   run N cycles (e.g. r50)");
   Serial.println("  p      print counters       z    zero counters");
