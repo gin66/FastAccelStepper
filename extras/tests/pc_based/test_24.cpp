@@ -40,8 +40,6 @@ static int log_idx;
 
 // Phase 2: feed the captured command stream through the real ESP32 RMT fill
 // buffer translation (the code that produces the RMT symbols on hardware).
-// This must come before fas_moveTimed/move_timed.h so that StepperQueue is a
-// complete type while the MT_* macros are expanded.
 uint16_t debug_part_size = 24;
 #define SUPPORT_ESP32_RMT
 #define IRAM_ATTR
@@ -50,6 +48,11 @@ uint16_t debug_part_size = 24;
 #include "pd_esp32/StepperISR_esp32xx_rmt.cpp"
 
 #include "FastAccelStepper.h"
+
+// Production bodies of addQueueEntry() and moveTimed(), compiled against this
+// test's StepperQueue/FastAccelStepper instead of the hardware queues.
+#include "fas_member/fas_add_queue_entry.h"
+#include "fas_member/move_timed.h"
 
 static StepperQueue feed_q;
 static StepperQueue rmt_q;
@@ -66,21 +69,66 @@ static void check(int cond, const char* msg) {
   }
 }
 
-// Mirror StepperQueue::addQueueEntry() (queue_add_entry.cpp) for the
-// standalone test: maintains queue_end position, toggle flags and the write
-// index. startQueue() is emulated by setting _isRunning.
-static AqeResultCode enqueue(StepperQueue* q,
-                             const struct stepper_command_s* cmd, bool start) {
+// The test is not linked against FastAccelStepper.o, so provide the
+// FastAccelStepper members that addQueueEntry()/moveTimed() reference. Their
+// production bodies come from fas_queue/fas_add_queue_entry.h and
+// fas_moveTimed/move_timed.h below.
+StepperQueue* FastAccelStepper::_queue() const {
+  return (_queue_num == 0) ? &feed_q : &rmt_q;
+}
+bool FastAccelStepper::enableOutputs() { return true; }
+bool FastAccelStepper::isQueueRunning() const { return _queue()->isRunning(); }
+bool FastAccelStepper::handleExternalDirectionPin(StepperQueue* q,
+                                                  bool count_up) {
+  (void)q;
+  (void)count_up;
+  return true;
+}
+uint8_t FastAccelStepper::queueEntries() const {
+  return _queue()->queueEntries();
+}
+bool FastAccelStepper::isQueueEmpty() const { return _queue()->isQueueEmpty(); }
+
+// Test-only init: TEST makes init() public. Configure the stepper for the test
+// (no engine auto-enable, dir pin active).
+void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
+                            uint8_t step_pin) {
+  (void)step_pin;
+  _engine = engine;
+  _queue_num = num;
+  _dirPin = 1;
+  _dirHighCountsUp = true;
+  _autoEnable = false;
+  _on_delay_ticks = 0;
+  _dir_change_delay_ticks = 0;
+  _auto_disable_delay_counter = 0;
+  _off_delay_count = 1;
+}
+
+// Test has no real engine, so the dir-pin is never busy.
+bool FastAccelStepperEngine::isDirPinBusy(uint8_t dirPin,
+                                          uint8_t except_stepper) {
+  (void)dirPin;
+  (void)except_stepper;
+  return false;
+}
+
+// StepperQueue::addQueueEntry() (queue_add_entry.cpp) for the standalone
+// test: maintains queue_end position, toggle flags and the write index.
+// startQueue() is emulated by setting _isRunning. Writes to feed_q are
+// additionally captured into log_cmd[].
+AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
+                                          bool start) {
   if (cmd == NULL) {
-    if (start && !q->isRunning()) {
-      if (q->next_write_idx == q->read_idx) {
+    if (start && !isRunning()) {
+      if (next_write_idx == read_idx) {
         return AQE_ERROR_EMPTY_QUEUE_TO_START;
       }
-      q->_isRunning = true;
+      _isRunning = true;
     }
     return AQE_OK;
   }
-  if (q->isQueueFull()) {
+  if (isQueueFull()) {
     return AQE_QUEUE_FULL;
   }
   uint16_t period = cmd->ticks;
@@ -92,16 +140,16 @@ static AqeResultCode enqueue(StepperQueue* q,
   if (command_rate_ticks < MIN_CMD_TICKS) {
     return AQE_ERROR_TICKS_TOO_LOW;
   }
-  uint8_t wp = q->next_write_idx;
-  struct queue_entry* e = &q->entry[wp & QUEUE_LEN_MASK];
-  bool dir = (cmd->count_up == q->dirHighCountsUp);
+  uint8_t wp = next_write_idx;
+  struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
+  bool dir = (cmd->count_up == dirHighCountsUp);
   bool toggle_dir = false;
-  if (q->dirPin != PIN_UNDEFINED) {
-    if ((q->isQueueEmpty() && !q->isRunning()) &&
-        ((q->dirPin & PIN_EXTERNAL_FLAG) == 0)) {
-      q->queue_end.dir = dir;
+  if (dirPin != PIN_UNDEFINED) {
+    if ((isQueueEmpty() && !isRunning()) &&
+        ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
+      queue_end.dir = dir;
     } else {
-      toggle_dir = (dir != q->queue_end.dir);
+      toggle_dir = (dir != queue_end.dir);
     }
   }
   e->steps = steps;
@@ -111,17 +159,17 @@ static AqeResultCode enqueue(StepperQueue* q,
   e->moreThanOneStep = steps > 1 ? 1 : 0;
   e->hasSteps = steps > 0 ? 1 : 0;
   e->ticks = period;
-  struct queue_end_s next_queue_end = q->queue_end;
+  struct queue_end_s next_queue_end = queue_end;
 #if defined(SUPPORT_QUEUE_ENTRY_END_POS_U16)
   e->end_pos_last16 = (uint32_t)next_queue_end.pos & 0xffff;
 #endif
   next_queue_end.pos = next_queue_end.pos + (cmd->count_up ? steps : -steps);
   next_queue_end.dir = dir;
   next_queue_end.count_up = cmd->count_up;
-  q->next_write_idx = wp + 1;
-  q->queue_end = next_queue_end;
+  next_write_idx = wp + 1;
+  queue_end = next_queue_end;
 
-  if (q == &feed_q &&
+  if (this == &feed_q &&
       (uint32_t)log_idx < sizeof(log_cmd) / sizeof(log_cmd[0])) {
     log_cmd[log_idx].ticks = period;
     log_cmd[log_idx].steps = steps;
@@ -129,87 +177,31 @@ static AqeResultCode enqueue(StepperQueue* q,
     log_idx++;
   }
 
-  if (!q->isRunning() && start) {
-    q->_isRunning = true;
+  if (!isRunning() && start) {
+    _isRunning = true;
   }
   if (steps > 0) {
-    q->_nr_of_pauses = 0;
-    q->_last_pause_ticks = 0;
+    _nr_of_pauses = 0;
+    _last_pause_ticks = 0;
   } else {
-    if (q->_nr_of_pauses < 255) {
-      q->_nr_of_pauses++;
+    if (_nr_of_pauses < 255) {
+      _nr_of_pauses++;
     }
-    if (65535 - q->_last_pause_ticks >= period) {
-      q->_last_pause_ticks += period;
+    if (65535 - _last_pause_ticks >= period) {
+      _last_pause_ticks += period;
     } else {
-      q->_last_pause_ticks = 65535;
+      _last_pause_ticks = 65535;
     }
   }
   return AQE_OK;
 }
 
-// Mirror FastAccelStepper::addQueueEntry() (FastAccelStepper.cpp) for the
-// standalone test: inserts the BEFORE-direction-change pause (and the AFTER
-// pause) when a command reverses direction, exactly as production does. This
-// is the logic that feeds through enqueue() above.
-static AqeResultCode feed_real(StepperQueue* q,
-                               const struct stepper_command_s* cmd, bool start,
-                               uint16_t after_delay_ticks) {
-  bool dir_change_needed = false;
-  if (q->dirPin != PIN_UNDEFINED) {
-    bool dir = (cmd->count_up == q->dirHighCountsUp);
-    if (!(q->isQueueEmpty() && !q->isRunning()) &&
-        ((q->dirPin & PIN_EXTERNAL_FLAG) == 0)) {
-      dir_change_needed = (dir != q->queue_end.dir);
-    }
-  }
-  if (dir_change_needed && (cmd->steps != 0)) {
-    uint16_t before_delay = BEFORE_DIR_CHANGE_DELAY_TICKS(q);
-    uint16_t after_delay = after_delay_ticks;
-    if (q->_nr_of_pauses != 0 && q->_last_pause_ticks >= before_delay) {
-      before_delay = 0;
-    }
-    uint8_t commands_needed = 1;
-    if (before_delay > 0) {
-      commands_needed++;
-    }
-    if (after_delay > 0) {
-      commands_needed++;
-    }
-    if (q->queueEntries() >= QUEUE_LEN - commands_needed) {
-      return AQE_DIR_PIN_IS_BUSY;
-    }
-    if (before_delay > 0) {
-      struct stepper_command_s before_cmd = {
-          .ticks = (uint16_t)(before_delay > MIN_CMD_TICKS ? before_delay
-                                                           : MIN_CMD_TICKS),
-          .steps = 0,
-          .count_up = q->queue_end.count_up};
-      AqeResultCode r = enqueue(q, &before_cmd, start);
-      if (r != AQE_OK) {
-        return r;
-      }
-    }
-    if (after_delay > 0) {
-      struct stepper_command_s after_cmd = {
-          .ticks = (uint16_t)(after_delay > MIN_CMD_TICKS ? after_delay
-                                                          : MIN_CMD_TICKS),
-          .steps = 0,
-          .count_up = cmd->count_up};
-      AqeResultCode r = enqueue(q, &after_cmd, start);
-      if (r != AQE_OK) {
-        return r;
-      }
-    }
-  }
-  return enqueue(q, cmd, start);
+// Test stepper: points addQueueEntry()/moveTimed() at feed_q (num 0) or
+// rmt_q (num 1) and disables the auto-enable / external-dir-pin paths.
+static FastAccelStepper test_stepper;
+static void setup_step(uint8_t num) {
+  test_stepper.init(NULL, num, 0);
 }
-
-#define MT_QUEUE_EMPTY(s) (feed_q.isQueueEmpty())
-#define MT_FREE_ENTRIES(s) (feed_q.queueEntries())
-#define MT_ADD_ENTRY(s, cmd, start) enqueue(&feed_q, (cmd), (start))
-
-#include "fas_moveTimed/move_timed.h"
 
 static void reset() {
   log_idx = 0;
@@ -217,6 +209,7 @@ static void reset() {
   feed_q._base_initVars();
   feed_q._pd_initVars();
   feed_q.setDirPin(1, true);
+  setup_step(0);
 }
 
 // ---- Phase 2: RMT translation of the captured command stream --------------
@@ -276,8 +269,8 @@ static void feed_rmt() {
       struct stepper_command_s cmd = {.ticks = log_cmd[fed].ticks,
                                       .steps = log_cmd[fed].steps,
                                       .count_up = log_cmd[fed].count_up};
-      AqeResultCode rc = enqueue(&rmt_q, &cmd, false);
-      check(rc == AQE_OK, "phase2: enqueue rejected a generated command");
+      AqeResultCode rc = rmt_q.addQueueEntry(&cmd, false);
+      check(rc == AQE_OK, "phase2: addQueueEntry rejected a generated command");
       if (rc != AQE_OK) {
         return;
       }
@@ -378,7 +371,7 @@ static bool feedCommand(int16_t steps, uint32_t ticks, int32_t& drift,
   uint32_t actual = 0;
   for (;;) {
     MoveTimedResultCode rc =
-        moveTimedFill(NULL, steps, duration, &actual, false);
+        test_stepper.moveTimed(steps, duration, &actual, false);
     switch (rc) {
       case MOVE_TIMED_OK:
       case MOVE_TIMED_EMPTY:
@@ -418,7 +411,8 @@ static void cap_check() {
   // Empty queue: all 16 slots free. A 255-step fast move (1 command, rate 100
   // ticks/step) needs 1 + 2 reserved = 3 slots for a direction change, so it
   // must be accepted.
-  MoveTimedResultCode rc = moveTimedFill(NULL, 255, 255 * 100, &actual, false);
+  MoveTimedResultCode rc =
+      test_stepper.moveTimed(255, 255 * 100, &actual, false);
   if (rc != MOVE_TIMED_OK && rc != MOVE_TIMED_EMPTY) {
     printf("cap: expected accept with full free queue, got rc=%d\n", (int)rc);
     check(false, "cap: fully-free queue rejected a 1-command move");
@@ -434,18 +428,18 @@ static void cap_check() {
   // move is rejected when free < 1 + 2.
   for (int i = 0; i < QUEUE_LEN - 3; i++) {
     struct stepper_command_s c = {.ticks = 10000, .steps = 1, .count_up = true};
-    AqeResultCode erc = enqueue(&feed_q, &c, false);
+    AqeResultCode erc = feed_q.addQueueEntry(&c, false);
     if (erc != AQE_OK) {
       check(false, "cap: setup enqueue failed");
       return;
     }
   }
   // 3 slots free now. A 1-command move needs 1 + 2 = 3 -> fits.
-  rc = moveTimedFill(NULL, 1, 10000, NULL, false);
+  rc = test_stepper.moveTimed(1, 10000, NULL, false);
   check(rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY,
         "cap: 1-command move with exactly 3 free slots must be accepted");
   // 2 slots free now. The same move needs 3 -> must be rejected (BUSY).
-  rc = moveTimedFill(NULL, 1, 10000, NULL, false);
+  rc = test_stepper.moveTimed(1, 10000, NULL, false);
   check(rc == MOVE_TIMED_BUSY,
         "cap: 1-command move with 2 free slots must be rejected (BUSY)");
 }
@@ -485,8 +479,8 @@ static void minimal_repro() {
     for (int i = 0; i < n_min; i++) {
       if (!started) {
         uint32_t actual = 0;
-        MoveTimedResultCode rc = moveTimedFill(
-            NULL, min_cmd[i].steps, min_cmd[i].ticks, &actual, false);
+        MoveTimedResultCode rc = test_stepper.moveTimed(
+            min_cmd[i].steps, min_cmd[i].ticks, &actual, false);
         if (rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY) {
           drift = (int32_t)(min_cmd[i].ticks - actual);
           cmd_sum += min_cmd[i].steps;
@@ -497,7 +491,7 @@ static void minimal_repro() {
           printf("min: prefill error rc=%d at %d\n", (int)rc, i);
           return;
         }
-        moveTimedFill(NULL, 0, 0, NULL, true);
+        test_stepper.moveTimed(0, 0, NULL, true);
         started = true;
       }
       if (!feedCommand(min_cmd[i].steps, min_cmd[i].ticks, drift, cmd_sum)) {
@@ -506,7 +500,7 @@ static void minimal_repro() {
     }
   }
   if (!started) {
-    moveTimedFill(NULL, 0, 0, NULL, true);
+    test_stepper.moveTimed(0, 0, NULL, true);
     started = true;
   }
 
@@ -520,6 +514,7 @@ static void minimal_repro() {
   rmt_q._pd_initVars();
   rmt_q.setDirPin(1, true);
   rmt_q._before_dir_change_delay_ticks = MIN_CMD_TICKS;
+  setup_step(1);
 
   printf(
       "\n=== Issue370_minimal pipeline dump (FAST_STEPS=2, FAST_CMDS=1) ===\n");
@@ -538,9 +533,9 @@ static void minimal_repro() {
       struct stepper_command_s cmd = {.ticks = log_cmd[fed].ticks,
                                       .steps = log_cmd[fed].steps,
                                       .count_up = log_cmd[fed].count_up};
-      AqeResultCode rc = feed_real(&rmt_q, &cmd, false, 0);
+      AqeResultCode rc = test_stepper.addQueueEntry(&cmd, false);
       if (rc != AQE_OK) {
-        printf("min: feed-phase enqueue rejected: %d\n", (int)rc);
+        printf("min: feed-phase addQueueEntry rejected: %d\n", (int)rc);
         return;
       }
       const struct queue_entry* e =
@@ -617,8 +612,8 @@ int main() {
     for (int i = 0; i < pattern_len; i++) {
       if (!started) {
         uint32_t actual = 0;
-        MoveTimedResultCode rc = moveTimedFill(
-            NULL, pattern[i].steps, pattern[i].ticks, &actual, false);
+        MoveTimedResultCode rc = test_stepper.moveTimed(
+            pattern[i].steps, pattern[i].ticks, &actual, false);
         if (rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY) {
           drift = (int32_t)(pattern[i].ticks - actual);
           commanded_sum += pattern[i].steps;
@@ -629,7 +624,7 @@ int main() {
           printf("prefill error: rc=%d at cmd %d\n", (int)rc, i);
           return 1;
         }
-        moveTimedFill(NULL, 0, 0, NULL, true);  // start the queue
+        test_stepper.moveTimed(0, 0, NULL, true);  // start the queue
         started = true;
       }
       if (!feedCommand(pattern[i].steps, pattern[i].ticks, drift,
@@ -660,7 +655,7 @@ int main() {
 
   check(commanded_sum == 0, "pattern itself must net to zero");
   check(generated_sum == commanded_sum,
-        "moveTimedFill must preserve the commanded step sum");
+        "moveTimed must preserve the commanded step sum");
   check(feed_q.queue_end.pos == 0,
         "queue_end position must return to zero after a full run");
 

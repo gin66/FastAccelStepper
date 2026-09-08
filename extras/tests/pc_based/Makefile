@@ -45,7 +45,7 @@ ramp_helper.o: ramp_helper.cpp $(SRC_LIB_H)
 LIB_H=FastAccelStepper.h FastAccelStepperEngine.h log2/Log2Representation.h log2/Log2RepresentationConst.h \
 	  fas_queue/stepper_queue.h fas_queue/queue.h fas_queue/base.h \
 	  fas_ramp/RampGenerator.h fas_ramp/RampControl.h fas_ramp/RampCalculator.h \
-	  fas_arch/common.h fas_moveTimed/move_timed.h pd_test/test_queue.h
+	  fas_arch/common.h fas_member/move_timed.h fas_member/fas_add_queue_entry.h pd_test/test_queue.h
 LIB_O=FastAccelStepper.o FastAccelStepperEngine.o Log2Representation.o StepperISR_test.o \
 	  RampGenerator.o RampControl.o RampCalculator.o queue_add_entry.o queue_get_position.o queue_init.o queue_utils.o
 
@@ -63,10 +63,11 @@ test_22: test_22.o
 test_22.o: test_22.cpp i2s_test_common.h $(PRJ_ROOT)/src/pd_esp32/i2s_fill.cpp $(PRJ_ROOT)/src/pd_esp32/i2s_fill.h $(PRJ_ROOT)/src/pd_esp32/i2s_constants.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
-# test_24 unit-tests the inline moveTimedFill() with macro-overridden queue
-# access (see src/fas_moveTimed/move_timed.h). It is self-contained and the
-# differently macro-expanded inline definition would collide with the one in
-# FastAccelStepper.o, so it is linked standalone.
+# test_24 unit-tests the inline FastAccelStepper::moveTimed() and
+# addQueueEntry() bodies (see src/fas_member/move_timed.h and
+# src/fas_member/fas_add_queue_entry.h) against the test's own StepperQueue. It
+# is self-contained: it defines the queue/stepper members used by the inline
+# bodies, so it must not be linked against FastAccelStepper.o / queue_add_entry.o.
 test_24: test_24.o
 	g++ -o $@ $< $(LDLIBS)
 

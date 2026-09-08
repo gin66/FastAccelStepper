@@ -3,45 +3,19 @@
 
 #include <stdint.h>
 
-#include "FastAccelStepper.h"
 #include "fas_arch/result_codes.h"
 
 // This header contains the core command generation logic of
 // FastAccelStepper::moveTimed(). It is kept separate so it can be unit
 // tested on the pc_based platform without any real hardware dependencies.
 //
-// All queue access is abstracted behind macros that default to the real
-// FastAccelStepper methods. A unit test can #define these macros before
-// including this header in order to redirect the queue access to its own
-// mock.
-//
-// Overridable macros:
-//   MT_QUEUE_LEN       queue depth (default: QUEUE_LEN)
-//   MT_QUEUE_EMPTY(s)  whether the queue is empty (default:
-//   (s)->isQueueEmpty()) MT_FREE_ENTRIES(s) number of free entries (default:
-//   (s)->queueEntries()) MT_ADD_ENTRY(s,cmd,start)
-//                      enqueue a command (default:
-//                      (s)->addQueueEntry(cmd,start))
-
-#ifndef MT_QUEUE_LEN
-#define MT_QUEUE_LEN QUEUE_LEN
-#endif
-
-#ifndef MT_QUEUE_EMPTY
-#define MT_QUEUE_EMPTY(s) ((s)->isQueueEmpty())
-#endif
-
-#ifndef MT_FREE_ENTRIES
-#define MT_FREE_ENTRIES(s) ((s)->queueEntries())
-#endif
-
-#ifndef MT_ADD_ENTRY
-#define MT_ADD_ENTRY(s, cmd, start) ((s)->addQueueEntry((cmd), (start)))
-#endif
+// The test provides its own FastAccelStepper/StepperQueue definitions and
+// includes this header to compile the production moveTimed() body verbatim,
+// the same pattern as fas_member/fas_add_queue_entry.h.
 
 // Up to two queue entries are consumed by the direction-change machinery in
 // FastAccelStepper::addQueueEntry() (a before and an after pause command) in
-// addition to the step command it wraps. moveTimedFill() must therefore treat
+// addition to the step command it wraps. moveTimed() must therefore treat
 // those two slots as reserved for every timed move, so that a move is only
 // admitted when the whole move plus the direction pauses fits into the queue.
 // Otherwise a direction change could run the queue short between the separate
@@ -49,36 +23,19 @@
 // should keep the number of queue commands a move generates well below
 // QUEUE_LEN/2 so that splitting large moves on the application side stays
 // feasible.
-#ifndef MT_RESERVED_DIR_CHANGE_SLOTS
-#define MT_RESERVED_DIR_CHANGE_SLOTS 2
-#endif
-
-// Fills the queue with the commands for a timed move.
-//
-// s     - the FastAccelStepper whose queue is to be filled
-// steps - number of steps (negative for reverse), 0 for a pure delay
-// duration - requested duration in ticks
-// actual_duration - optional out parameter receiving the accumulated ticks
-// start - whether to start the queue
-//
-// Returns a MoveTimedResultCode. The error/retry semantics of the default
-// addQueueEntry() (e.g. ErrorTicksTooLow for too short durations) are
-// preserved since that is invoked via MT_ADD_ENTRY.
-inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
-                                         uint32_t duration,
-                                         uint32_t* actual_duration,
-                                         bool start) {
+inline MoveTimedResultCode FastAccelStepper::moveTimed(
+    int16_t steps, uint32_t duration, uint32_t* actual_duration, bool start) {
   MoveTimedResultCode ret_ok =
-      MT_QUEUE_EMPTY(s) ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
+      isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
     if (start) {
-      MT_ADD_ENTRY(s, NULL, true);  // start the queue
+      addQueueEntry(NULL, true);  // start the queue
     }
     return ret_ok;
   }
-  uint8_t freeEntries = MT_QUEUE_LEN - MT_FREE_ENTRIES(s);
-  if (freeEntries > MT_RESERVED_DIR_CHANGE_SLOTS) {
-    freeEntries -= MT_RESERVED_DIR_CHANGE_SLOTS;
+  uint8_t freeEntries = QUEUE_LEN - queueEntries();
+  if (freeEntries > 2) {
+    freeEntries -= 2;
   } else {
     freeEntries = 0;
   }
@@ -87,7 +44,7 @@ inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
   }
   struct stepper_command_s cmd = {.ticks = 0, .steps = 0, .count_up = true};
   if (steps == 0) {
-    if ((duration >> 16) >= MT_QUEUE_LEN) {
+    if ((duration >> 16) >= QUEUE_LEN) {
       return MOVE_TIMED_TOO_LARGE_ERROR;
     }
     if ((duration >> 16) >= freeEntries) {
@@ -105,7 +62,7 @@ inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
         // cmd.
         cmd.ticks = duration >> 1;
       }
-      AqeResultCode ret = MT_ADD_ENTRY(s, &cmd, start);
+      AqeResultCode ret = addQueueEntry(&cmd, start);
       if (ret != AQE_OK) {
         // unexpected
         return tmrFrom(ret);
@@ -131,14 +88,14 @@ inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
   if (rate > 65535) {
     // we need pauses, so only few steps can be executed
     uint16_t cmds_per_step = (rate >> 16) + 1;  // bit too small
-    if (cmds_per_step >= MT_QUEUE_LEN) {
+    if (cmds_per_step >= QUEUE_LEN) {
       return MOVE_TIMED_TOO_LARGE_ERROR;
     }
-    if (steps >= MT_QUEUE_LEN) {
+    if (steps >= QUEUE_LEN) {
       return MOVE_TIMED_TOO_LARGE_ERROR;
     }
     uint8_t cmds = steps * cmds_per_step;
-    if (cmds >= MT_QUEUE_LEN) {
+    if (cmds >= QUEUE_LEN) {
       return MOVE_TIMED_TOO_LARGE_ERROR;
     }
     if (cmds > freeEntries) {
@@ -158,7 +115,7 @@ inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
         }
         this_duration -= cmd.ticks;
 
-        AqeResultCode ret = MT_ADD_ENTRY(s, &cmd, start);
+        AqeResultCode ret = addQueueEntry(&cmd, start);
         if (ret != AQE_OK) {
           // unexpected
           return tmrFrom(ret);
@@ -173,7 +130,7 @@ inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
     return ret_ok;
   }
   // Now we need to run steps at "high" speed.
-  if (steps > MT_QUEUE_LEN * 255) {
+  if (steps > QUEUE_LEN * 255) {
     return MOVE_TIMED_TOO_LARGE_ERROR;
   }
   if (steps > freeEntries * 255) {
@@ -198,7 +155,7 @@ inline MoveTimedResultCode moveTimedFill(FastAccelStepper* s, int16_t steps,
       cmd.ticks++;
       missing = 0;  // only increase once
     }
-    AqeResultCode ret = MT_ADD_ENTRY(s, &cmd, start);
+    AqeResultCode ret = addQueueEntry(&cmd, start);
     if (ret != AQE_OK) {
       // unexpected
       return tmrFrom(ret);

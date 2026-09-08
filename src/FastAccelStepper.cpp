@@ -1,6 +1,6 @@
 #include "FastAccelStepper.h"
 #include "fas_queue/stepper_queue.h"
-#include "fas_moveTimed/move_timed.h"
+#include "fas_member/move_timed.h"
 
 // This define in order to not shoot myself.
 #ifndef TEST
@@ -65,7 +65,7 @@ bool FastAccelStepper::handleExternalDirectionPin(StepperQueue* q,
 }
 
 //*************************************************************************************************
-#include "fas_queue/fas_add_queue_entry.h"
+#include "fas_member/fas_add_queue_entry.h"
 
 //*************************************************************************************************
 // fill_queue generates commands to the stepper for executing a ramp
@@ -596,12 +596,6 @@ void FastAccelStepper::backwardStep(bool blocking) {
 }
 int32_t FastAccelStepper::getCurrentPosition() const {
   return _queue()->getCurrentPosition();
-}
-MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
-                                                uint32_t duration,
-                                                uint32_t* actual_duration,
-                                                bool start) {
-  return moveTimedFill(this, steps, duration, actual_duration, start);
 }
 void FastAccelStepper::detachFromPin() { _queue()->disconnect(); }
 void FastAccelStepper::reAttachToPin() { _queue()->connect(); }
