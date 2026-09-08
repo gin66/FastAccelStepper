@@ -121,6 +121,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
     Serial.println('N');
 #endif
   }
+#if defined(SUPPORT_PAUSE_CMD_COUNTING)
   if (steps > 0) {
     _nr_of_pauses = 0;
     _last_pause_ticks = 0;
@@ -134,5 +135,6 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
       _last_pause_ticks = 65535;
     }
   }
+#endif
   return AQE_OK;
 }

@@ -45,8 +45,10 @@ class StepperQueueBase {
   bool dirHighCountsUp;
   uint8_t dirPin;
   uint16_t max_speed_in_ticks;
+#if defined(SUPPORT_PAUSE_CMD_COUNTING)
   uint16_t _last_pause_ticks;
   uint8_t _nr_of_pauses;
+#endif
 
   void _base_initVars() {
     queue_end.dir = true;
@@ -55,8 +57,10 @@ class StepperQueueBase {
     dirPin = PIN_UNDEFINED;
     // intentionally slow speed to make missing initialization detectable
     max_speed_in_ticks = TICKS_PER_S / 1000;
+#if defined(SUPPORT_PAUSE_CMD_COUNTING)
     _last_pause_ticks = 0;
     _nr_of_pauses = 0;
+#endif
   }
 
   inline uint8_t queueEntries() const {

@@ -66,6 +66,8 @@
 
 #define SUPPORT_QUEUE_ENTRY_START_POS_U16
 
+#define SUPPORT_PAUSE_CMD_COUNTING
+
 #define DEBUG_LED_HALF_PERIOD 50
 
 #define noop_or_wait vTaskDelay(1)
