@@ -268,10 +268,12 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 
   mcpwm_operator_config_t oper_cfg = {.group_id = group_id,
                                       .intr_priority = 1,
-                                      .flags = {.update_gen_action_on_tez = 1,
-                                                .update_gen_action_on_tep = 1,
-                                                .update_dead_time_on_tez = 0,
-                                                .update_dead_time_on_tep = 0}};
+                                       .flags = {.update_gen_action_on_tez = 1,
+                                                  .update_gen_action_on_tep = 1,
+                                                  .update_gen_action_on_sync = 0,
+                                                  .update_dead_time_on_tez = 0,
+                                                  .update_dead_time_on_tep = 0,
+                                                  .update_dead_time_on_sync = 0}};
   ESP_ERROR_CHECK_WITHOUT_ABORT(mcpwm_new_operator(&oper_cfg, &mapping->oper));
   ESP_ERROR_CHECK_WITHOUT_ABORT(
       mcpwm_operator_connect_timer(mapping->oper, mapping->timer));
@@ -286,7 +288,11 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
       mcpwm_comparator_set_compare_value(mapping->cmpr, 1));
 
   mcpwm_generator_config_t gen_cfg = {.gen_gpio_num = step_pin,
-                                      .flags = {.invert_pwm = 0}};
+                                       .flags = {.invert_pwm = 0,
+                                                 .io_loop_back = 0,
+                                                 .io_od_mode = 0,
+                                                 .pull_up = 0,
+                                                 .pull_down = 0}};
   ESP_ERROR_CHECK_WITHOUT_ABORT(
       mcpwm_new_generator(mapping->oper, &gen_cfg, &mapping->gen));
 
