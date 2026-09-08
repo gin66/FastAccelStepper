@@ -51,6 +51,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
   bool dir = (cmd->count_up == dirHighCountsUp);
   bool toggle_dir = false;
+  bool dir_changed = false;
 #if defined(SUPPORT_RP_PICO)
   if (isQueueEmpty() && !isRunning()) {
     // store the offset from pico sm's step count and position
@@ -58,6 +59,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   }
 #endif
   if (dirPin != PIN_UNDEFINED) {
+    dir_changed = (dir != queue_end.dir);
     if ((isQueueEmpty() && !isRunning()) &&
         ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
       // set the dirPin here. Necessary with shared direction pins
@@ -67,7 +69,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 #endif
       queue_end.dir = dir;
     } else {
-      toggle_dir = (dir != queue_end.dir);
+      toggle_dir = dir_changed;
     }
   }
 
@@ -122,9 +124,8 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 #endif
   }
 #if defined(SUPPORT_PAUSE_CMD_COUNTING)
-  if (steps > 0) {
-    _nr_of_pauses = 0;
-    _last_pause_ticks = 0;
+  if ((steps > 0) || dir_changed) {
+    clear_pause_stats();
   } else {
     if (_nr_of_pauses < 255) {
       _nr_of_pauses++;

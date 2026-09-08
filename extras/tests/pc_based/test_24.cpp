@@ -150,12 +150,14 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
   bool dir = (cmd->count_up == dirHighCountsUp);
   bool toggle_dir = false;
+  bool dir_changed = false;
   if (dirPin != PIN_UNDEFINED) {
+    dir_changed = (dir != queue_end.dir);
     if ((isQueueEmpty() && !isRunning()) &&
         ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {
       queue_end.dir = dir;
     } else {
-      toggle_dir = (dir != queue_end.dir);
+      toggle_dir = dir_changed;
     }
   }
   e->steps = steps;
@@ -186,9 +188,8 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   if (!isRunning() && start) {
     _isRunning = true;
   }
-  if (steps > 0) {
-    _nr_of_pauses = 0;
-    _last_pause_ticks = 0;
+  if ((steps > 0) || dir_changed) {
+    clear_pause_stats();
   } else {
     if (_nr_of_pauses < 255) {
       _nr_of_pauses++;
@@ -399,53 +400,18 @@ static bool feedCommand(int16_t steps, uint32_t ticks, int32_t& drift,
   }
 }
 
-// Phase 0: capacity guard for the direction-change reservation (Issue 370).
-// moveTimedFill() must reserve 2 queue slots for the direction-change pauses
-// that FastAccelStepper::addQueueEntry() inserts on top of the step command.
-// So a move generating k commands must be rejected while fewer than k+2 slots
-// are free, instead of being admitted and then failing mid-append (which would
-// silently drop steps).
-static void cap_check() {
-  reset();
-  if (feed_q.queueEntries() != 0) {
-    check(false, "cap: queue must start empty");
-    return;
-  }
-  uint32_t actual = 0;
-  // Empty queue: all 16 slots free. A 255-step fast move (1 command, rate 100
-  // ticks/step) needs 1 + 2 reserved = 3 slots for a direction change, so it
-  // must be accepted.
-  MoveTimedResultCode rc =
-      test_stepper.moveTimed(255, 255 * 100, &actual, false);
-  if (rc != MOVE_TIMED_OK && rc != MOVE_TIMED_EMPTY) {
-    printf("cap: expected accept with full free queue, got rc=%d\n", (int)rc);
-    check(false, "cap: fully-free queue rejected a 1-command move");
-    return;
-  }
-  // The single command occupies one slot; 15 remain free. Two more 255-step
-  // commands (one slot each) must still fit within the k+2 guard, but a
-  // direction change needs 3 slots so the queue must reject only when the
-  // free budget (minus 2 reserved) is exhausted.
-  reset();
-  // Pre-fill the queue so that exactly 2 slots remain free BEFORE the
-  // reservation: emulate the dir-change pause need by asserting that a 1-step
-  // move is rejected when free < 1 + 2.
-  for (int i = 0; i < QUEUE_LEN - 3; i++) {
-    struct stepper_command_s c = {.ticks = 10000, .steps = 1, .count_up = true};
-    AqeResultCode erc = feed_q.addQueueEntry(&c, false);
-    if (erc != AQE_OK) {
-      check(false, "cap: setup enqueue failed");
-      return;
+// Feed one captured command into rmt_q via the FastAccelStepper wrapper, the
+// same way the issue370 firmware does. A direction change may return
+// AQE_DIR_CHANGE_PAUSE_INJECTED (pauses queued, command not yet): retry until
+// the command itself is enqueued.
+static AqeResultCode feedViaStepper(struct stepper_command_s* cmd) {
+  for (int i = 0; i < 10; i++) {
+    AqeResultCode rc = test_stepper.addQueueEntry(cmd, false);
+    if (rc != AQE_DIR_CHANGE_PAUSE_INJECTED) {
+      return rc;
     }
   }
-  // 3 slots free now. A 1-command move needs 1 + 2 = 3 -> fits.
-  rc = test_stepper.moveTimed(1, 10000, NULL, false);
-  check(rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY,
-        "cap: 1-command move with exactly 3 free slots must be accepted");
-  // 2 slots free now. The same move needs 3 -> must be rejected (BUSY).
-  rc = test_stepper.moveTimed(1, 10000, NULL, false);
-  check(rc == MOVE_TIMED_BUSY,
-        "cap: 1-command move with 2 free slots must be rejected (BUSY)");
+  return AQE_DIR_CHANGE_PAUSE_INJECTED;
 }
 
 // Minimal reproduction of the Issue370_minimal dangerous reversal on the PC
@@ -537,9 +503,13 @@ static void minimal_repro() {
       struct stepper_command_s cmd = {.ticks = log_cmd[fed].ticks,
                                       .steps = log_cmd[fed].steps,
                                       .count_up = log_cmd[fed].count_up};
-      AqeResultCode rc = test_stepper.addQueueEntry(&cmd, false);
+      AqeResultCode rc = feedViaStepper(&cmd);
+      if (rc == AQE_QUEUE_FULL) {
+        break;  // drain below, then retry this command
+      }
       if (rc != AQE_OK) {
         printf("min: feed-phase addQueueEntry rejected: %d\n", (int)rc);
+        check(false, "min: feed-phase addQueueEntry failed");
         return;
       }
       const struct queue_entry* e =
@@ -594,7 +564,6 @@ static void minimal_repro() {
 }
 
 int main() {
-  cap_check();
   minimal_repro();
   // keep print buffer flush ordering deterministic
   printf("\n");

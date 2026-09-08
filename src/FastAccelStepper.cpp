@@ -40,6 +40,9 @@ bool FastAccelStepper::handleExternalDirectionPin(StepperQueue* q,
       bool newState = _engine->_externalCallForPin(_dirPin, desiredPinState);
       if (newState == (desiredPinState == HIGH)) {
         _pendingExternalDirState = ExtDirPendingState::None;
+#if defined(SUPPORT_PAUSE_CMD_COUNTING)
+        q->clear_pause_stats();
+#endif
       }
     }
     if (_pendingExternalDirState != ExtDirPendingState::None) {
@@ -59,6 +62,9 @@ bool FastAccelStepper::handleExternalDirectionPin(StepperQueue* q,
                                        : ExtDirPendingState::Low;
         return false;
       }
+#if defined(SUPPORT_PAUSE_CMD_COUNTING)
+      q->clear_pause_stats();
+#endif
     }
   }
   return true;
