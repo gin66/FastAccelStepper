@@ -477,11 +477,12 @@ class FastAccelStepper {
   // This enum extends AqeResultCode with additional codes:
   //
   // Positive values (retry later):
-  // - MOVE_TIMED_BUSY (5):      Queue too full to append this timed move
-  // - MOVE_TIMED_EMPTY (6):     Queue ran empty, but move was appended
+  // - MOVE_TIMED_BUSY (7):      Queue too full to append this timed move
+  // - MOVE_TIMED_EMPTY (8):     Queue ran empty, but move was appended
   // - (plus AQE_QUEUE_FULL, AQE_DIR_PIN_IS_BUSY,
   // AQE_WAIT_FOR_ENABLE_PIN_ACTIVE,
-  //    AQE_DEVICE_NOT_READY from AqeResultCode)
+  //    AQE_DEVICE_NOT_READY, AQE_DIR_PIN_2MS_PAUSE_ADDED,
+  //    AQE_DIR_CHANGE_PAUSE_INJECTED from AqeResultCode)
   //
   // Zero:
   // - MOVE_TIMED_OK (0):        Move successfully appended

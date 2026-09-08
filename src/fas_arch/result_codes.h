@@ -101,7 +101,9 @@ static inline const char* toString(MoveResultCode code) {
 #define MOVE_ERR_ACCELERATION_IS_UNDEFINED \
   MoveResultCode::ErrorAccelerationIsUndefined
 
-// Define the MoveResultCode enum with equivalent values
+// MoveTimedResultCode values 0..6 mirror AqeResultCode so that tmrFrom() is a
+// value-preserving cast; MoveBusy/MoveEmpty sit above the AQE range to avoid
+// aliasing AqeResultCode::DirChangePauseInjected.
 enum class MoveTimedResultCode : int8_t {
   OK = 0,
   QueueFull = 1,
@@ -109,8 +111,9 @@ enum class MoveTimedResultCode : int8_t {
   WaitForEnablePinActive = 3,
   DeviceNotReady = 4,
   DirPin2msPauseAdded = 5,
-  MoveBusy = 6,
-  MoveEmpty = 7,
+  DirChangePauseInjected = 6,
+  MoveBusy = 7,
+  MoveEmpty = 8,
   ErrorTicksTooLow = -1,
   ErrorEmptyQueueToStart = -2,
   ErrorNoDirPinToToggle = -3,
@@ -139,6 +142,8 @@ static inline const char* toString(MoveTimedResultCode code) {
       return toString(AqeResultCode::DeviceNotReady);
     case MoveTimedResultCode::DirPin2msPauseAdded:
       return toString(AqeResultCode::DirPin2msPauseAdded);
+    case MoveTimedResultCode::DirChangePauseInjected:
+      return toString(AqeResultCode::DirChangePauseInjected);
     case MoveTimedResultCode::MoveBusy:
       return FAS_PSTR("Move still ongoing");
     case MoveTimedResultCode::MoveEmpty:
