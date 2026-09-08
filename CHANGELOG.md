@@ -1,4 +1,20 @@
-pre-1.2.9:
+pre-1.3.0:
+- Refactor direction-change pause handling out of FastAccelStepper::addQueueEntry()
+  into the queue protocol method StepperQueue::addDirChangePauseToQueue()
+- New result code AQE_DIR_CHANGE_PAUSE_INJECTED (6): direction-change pause(s)
+  were queued, the submitted command was not. The caller must retry;
+  moveTimed() and the internal queue fill do so automatically.
+- avr/sam/samd/pico: driver-specific inline addDirChangePauseToQueue()
+  implementing the user requested direction-pin delay as a pause command that
+  carries the change (SAM enforces at least MIN_CMD_TICKS)
+- esp32: driver-specific inline addDirChangePauseToQueue(); the buffered
+  drivers (RMT, I2S) first drain their output pipeline (RMT idf4: one
+  MIN_CMD_TICKS pause, RMT idf5/6: two, I2S: more than one I2S buffer half),
+  and the pause that performs the change enforces the user requested delay.
+  I2S additionally keeps the change alone for one buffer half (>= I2S_BLOCK_TICKS)
+- Replace the macro-driven direction-change delay configuration
+  (BEFORE/AFTER_DIR_CHANGE_DELAY_TICKS) with hard-coded per-driver values;
+  the shared dir_change_pause.h default is now used by the test platform only
 - esp32 RMT: Ensure each filled RMT part ends with a pause symbol so DIR toggle cannot race the last step pulse (#370)
 
 1.2.8:

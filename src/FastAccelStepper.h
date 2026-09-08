@@ -472,6 +472,14 @@ class FastAccelStepper {
   // be one. Perhaps performing the step in the middle of the duration is more
   // appropriate ?
   //
+  // A move that changes direction makes the queue driver insert additional
+  // pause commands (see "Capacity and direction-change pauses" below). These
+  // pauses are NOT included in the returned actual_duration, but they do extend
+  // the time the move takes and they consume queue slots. The application has
+  // to account for them - e.g. when scheduling the next timed move or when
+  // deciding that a stepper has finished - in order to not get out of sync with
+  // the stepper timing.
+  //
   // ### MoveTimedResultCode - Return codes for moveTimed()
   //
   // This enum extends AqeResultCode with additional codes:
@@ -495,13 +503,17 @@ class FastAccelStepper {
   //
   // ### Capacity and direction-change pauses
   //
-  // A direction change with a configured direction-pin delay makes the queue
-  // driver insert up to two pause commands (a before and an after pause) on
-  // top of the step command itself. moveTimed() therefore reserves these two
-  // slots up front and only admits a move when the whole move plus the two
-  // reserved slots fits into the queue at once (atomic append). Otherwise it
-  // returns MOVE_TIMED_BUSY instead of silently dropping steps mid-append
-  // (see Issue 370).
+  // A direction change makes the queue driver insert one or more pause
+  // commands on top of the step command itself: buffered drivers (ESP32 RMT,
+  // I2S) first drain their output pipeline so no step in the old direction is
+  // emitted after the change, and every driver enforces a configured
+  // direction-pin delay with a pause command that carries the change. The
+  // actual number of inserted pauses is driver dependent (currently between
+  // zero and three). moveTimed() therefore reserves two extra slots up front
+  // and only admits a move when the whole move plus the reserved slots fits
+  // into the queue at once (atomic append). Otherwise it returns
+  // MOVE_TIMED_BUSY instead of silently dropping steps mid-append (see
+  // Issue 370).
   //
   // As a consequence a single move may use at most QUEUE_LEN - 2 queue
   // entries. For streaming at fixed speed it is recommended to keep the number
@@ -543,9 +555,14 @@ class FastAccelStepper {
   //   returned. The caller should retry until the queue drains and the callback
   //   completes.
   //
-  // - For regular direction pins: If setDirectionPin() was called with
-  //   dir_change_delay_us > 0, a pause command of that duration is inserted
-  //   before the first step in the new direction.
+  // - For regular direction pins: If a pause is required (a configured
+  //   dir_change_delay_us > 0 and/or the driver needs to drain its output
+  //   pipeline before the change), one or more pause commands are queued and
+  //   AQE_DIR_CHANGE_PAUSE_INJECTED is returned WITHOUT enqueueing the
+  //   submitted command. The caller must retry (the same as for
+  //   AQE_DIR_PIN_2MS_PAUSE_ADDED); moveTimed() and the internal queue fill
+  //   do so automatically. On the retry the direction already matches, or the
+  //   pauses are skipped, and the command is enqueued.
   //
   // - For autoEnable mode: The enable-on delay is extended to at least
   //   dir_change_delay_ticks if a direction change occurs.
@@ -578,11 +595,15 @@ class FastAccelStepper {
   // ### AqeResultCode - Return codes for addQueueEntry()
   //
   // Positive values indicate the caller should retry later:
-  // - AQE_OK (0):              Command added successfully
-  // - AQE_QUEUE_FULL (1):      Queue is full, retry later
-  // - AQE_DIR_PIN_IS_BUSY (2): External dir pin change in progress, retry later
+  // - AQE_OK (0):                      Command added successfully
+  // - AQE_QUEUE_FULL (1):              Queue is full, retry later
+  // - AQE_DIR_PIN_IS_BUSY (2):         Direction pin is busy, retry later
   // - AQE_WAIT_FOR_ENABLE_PIN_ACTIVE (3): Waiting for enable delay, retry later
-  // - AQE_DEVICE_NOT_READY (4): Device not ready, retry later
+  // - AQE_DEVICE_NOT_READY (4):        Device not ready, retry later
+  // - AQE_DIR_PIN_2MS_PAUSE_ADDED (5): 2ms pause queued for an external dir
+  //   pin; retry until the callback completes
+  // - AQE_DIR_CHANGE_PAUSE_INJECTED (6): dir-change pause(s) queued; retry to
+  //   enqueue the submitted command
   //
   // Negative values indicate errors (do not retry):
   // - AQE_ERROR_TICKS_TOO_LOW (-1):        ticks < getMaxSpeedInTicks()

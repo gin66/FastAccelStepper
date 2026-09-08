@@ -149,6 +149,8 @@ static bool feedCommand(int16_t steps, uint32_t ticks, int32_t& drift) {
       case MOVE_TIMED_BUSY:
       case MoveTimedResultCode::QueueFull:
       case MoveTimedResultCode::DirPinIsBusy:
+      case MoveTimedResultCode::DirPin2msPauseAdded:
+      case MoveTimedResultCode::DirChangePauseInjected:
       case MoveTimedResultCode::WaitForEnablePinActive:
         delayMicroseconds(200);  // queue full / dir pending: retry
         break;
@@ -183,19 +185,37 @@ static void runCycles(uint16_t cycles) {
     for (uint16_t i = 0; i < patternLen; i++) {
       // Prefill without starting, exactly like the worker's startExecution()
       if (!started) {
-        uint32_t actual = 0;
-        MoveTimedResultCode rc =
-            stepper->moveTimed(pattern[i].steps, pattern[i].ticks, &actual, false);
-        if (rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY) {
-          drift = (int32_t)(pattern[i].ticks - actual);
-          commandedSum += pattern[i].steps;
-          prefilled++;
+        bool enqueued = false;
+        while (!enqueued) {
+          uint32_t actual = 0;
+          MoveTimedResultCode rc = stepper->moveTimed(
+              pattern[i].steps, pattern[i].ticks, &actual, false);
+          switch (rc) {
+            case MOVE_TIMED_OK:
+            case MOVE_TIMED_EMPTY:
+              drift = (int32_t)(pattern[i].ticks - actual);
+              commandedSum += pattern[i].steps;
+              prefilled++;
+              enqueued = true;
+              break;
+            case MoveTimedResultCode::DirChangePauseInjected:
+            case MoveTimedResultCode::DirPin2msPauseAdded:
+              // direction-change pauses were queued, the command was not:
+              // retry until the command is appended
+              delayMicroseconds(200);
+              break;
+            default:
+              Serial.printf("return: %s\n", toString(rc));
+              // queue full -> start it and fall through to normal feeding
+              stepper->moveTimed(0, 0, NULL, true);
+              started = true;
+              enqueued = true;
+              break;
+          }
+        }
+        if (!started) {
           continue;
         }
-        Serial.printf("return: %s\n", toString(rc));
-        // queue full -> start it and fall through to normal feeding
-        stepper->moveTimed(0, 0, NULL, true);
-        started = true;
       }
       if (stepper->readPulseCounter() != 0) pcnt_ok = true;
       if (!feedCommand(pattern[i].steps, pattern[i].ticks, drift)) return;

@@ -13,16 +13,15 @@
 // includes this header to compile the production moveTimed() body verbatim,
 // the same pattern as fas_member/add_queue_entry.h.
 
-// Up to two queue entries are consumed by the direction-change machinery in
-// FastAccelStepper::addQueueEntry() (a before and an after pause command) in
-// addition to the step command it wraps. moveTimed() must therefore treat
-// those two slots as reserved for every timed move, so that a move is only
-// admitted when the whole move plus the direction pauses fits into the queue.
-// Otherwise a direction change could run the queue short between the separate
-// pause/step appends and silently drop steps (Issue 370). The application
-// should keep the number of queue commands a move generates well below
-// QUEUE_LEN/2 so that splitting large moves on the application side stays
-// feasible.
+// A direction change makes the queue driver insert one or more pause commands
+// (driver dependent, currently up to three) on top of the step command it
+// wraps. moveTimed() must therefore treat two slots as reserved for every
+// timed move, so that a move is only admitted when the whole move plus the
+// direction pauses fits into the queue. Otherwise a direction change could run
+// the queue short between the separate pause/step appends and silently drop
+// steps (Issue 370). The application should keep the number of queue commands
+// a move generates well below QUEUE_LEN/2 so that splitting large moves on the
+// application side stays feasible.
 MoveTimedResultCode FastAccelStepper::moveTimed(
     int16_t steps, uint32_t duration, uint32_t* actual_duration, bool start) {
   MoveTimedResultCode ret_ok =
