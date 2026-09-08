@@ -23,7 +23,7 @@
 // should keep the number of queue commands a move generates well below
 // QUEUE_LEN/2 so that splitting large moves on the application side stays
 // feasible.
-inline MoveTimedResultCode FastAccelStepper::moveTimed(
+MoveTimedResultCode FastAccelStepper::moveTimed(
     int16_t steps, uint32_t duration, uint32_t* actual_duration, bool start) {
   MoveTimedResultCode ret_ok =
       isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
