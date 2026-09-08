@@ -34,11 +34,6 @@ MoveTimedResultCode FastAccelStepper::moveTimed(
     return ret_ok;
   }
   uint8_t freeEntries = QUEUE_LEN - queueEntries();
-  if (freeEntries > 2) {
-    freeEntries -= 2;
-  } else {
-    freeEntries = 0;
-  }
   if (actual_duration != NULL) {
     *actual_duration = 0;
   }
