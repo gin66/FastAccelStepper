@@ -85,6 +85,28 @@ class StepperQueue : public StepperQueueBase {
 #define SET_ENABLE_PIN_STATE(q, pin, high) \
   digitalWrite((pin), (high) ? HIGH : LOW)
 
-#include "fas_queue/dir_change_pause.h"
+inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
+    const struct stepper_command_s* cmd, bool start,
+    uint16_t dir_change_delay_ticks) {
+  if (dir_change_delay_ticks == 0) {
+    return AQE_OK;
+  }
+  if ((cmd->steps == 0) && (cmd->ticks >= dir_change_delay_ticks)) {
+    return AQE_OK;
+  }
+  uint16_t pause_ticks = dir_change_delay_ticks;
+  if (cmd->steps == 0) {
+    pause_ticks = dir_change_delay_ticks - cmd->ticks;
+  }
+  struct stepper_command_s pause_cmd = {
+      .ticks = (uint16_t)fas_max(pause_ticks, MIN_CMD_TICKS),
+      .steps = 0,
+      .count_up = cmd->count_up};
+  AqeResultCode res = addQueueEntry(&pause_cmd, start);
+  if (res != AQE_OK) {
+    return res;
+  }
+  return AQE_DIR_CHANGE_PAUSE_INJECTED;
+}
 
 #endif  // PD_AVR_QUEUE_H
