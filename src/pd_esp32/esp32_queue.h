@@ -174,48 +174,12 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
   }
 }
 
-static inline uint16_t esp32_before_dir_change_delay_ticks(StepperQueue* q) {
-#if defined(SUPPORT_SELECT_DRIVER_TYPE)
-#ifdef SUPPORT_ESP32_RMT
-  if (q->_driver_type == FasDriver::RMT) return MIN_CMD_TICKS;
-#endif
-#ifdef SUPPORT_ESP32_I2S
-  if (q->_driver_type == FasDriver::I2S_DIRECT ||
-      q->_driver_type == FasDriver::I2S_MUX)
-    return I2S_BLOCK_TICKS;
-#endif
-  return 0;
-#elif defined(SUPPORT_ESP32_RMT)
-  return MIN_CMD_TICKS;
-#elif defined(SUPPORT_ESP32_I2S)
-  return I2S_BLOCK_TICKS;
-#else
-  return 0;
-#endif
-}
-
-static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
-#if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
-  return (q->_driver_type == FasDriver::I2S_DIRECT ||
-          q->_driver_type == FasDriver::I2S_MUX)
-             ? I2S_BLOCK_TICKS
-             : 0;
-#elif defined(SUPPORT_ESP32_I2S)
-  return I2S_BLOCK_TICKS;
-#else
-  return 0;
-#endif
-}
-
 #define SET_DIRECTION_PIN_STATE(q, high) \
   esp32_set_direction_pin_state((q), (high))
 
 #define SET_ENABLE_PIN_STATE_NEED_QUEUE
 #define SET_ENABLE_PIN_STATE(q, pin, high) \
   esp32_set_enable_pin_state((q), (pin), (high))
-#define BEFORE_DIR_CHANGE_DELAY_TICKS(q) \
-  esp32_before_dir_change_delay_ticks((q))
-#define AFTER_DIR_CHANGE_DELAY_TICKS(q) esp32_after_dir_change_delay_ticks((q))
 
 #else
 
@@ -229,12 +193,145 @@ static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
     gpio_ll_set_level(&GPIO, (gpio_num_t)(pin), (high) ? 1 : 0); \
   } while (0)
 
-#if defined(SUPPORT_ESP32_RMT)
-#define BEFORE_DIR_CHANGE_DELAY_TICKS(q) (MIN_CMD_TICKS)
-#endif
-
 #endif  // SUPPORT_ESP32_I2S
 
-#include "fas_queue/dir_change_pause.h"
+//==========================================================================
+// DIRECTION CHANGE PAUSE INSERTION
+//==========================================================================
+//
+// Buffered drivers (RMT, I2S) cannot change the direction pin at the moment a
+// queued step command is consumed: the pin is toggled while the driver fill
+// routine processes the entry, i.e. up to a full buffer before the content is
+// actually emitted. Pause command(s) are therefore inserted BEFORE the
+// direction-changing command so that all steps in the old direction have left
+// the output pipeline when the pin is toggled. MCPWM/PCNT is synchronized
+// with the command and needs no pause.
+//
+//   driver            drain pauses before dir change    pause carrying the dir
+//   change RMT (idf4)        1 x MIN_CMD_TICKS                  user
+//   dir_change_delay RMT (idf5/6)      2 x MIN_CMD_TICKS                  user
+//   dir_change_delay I2S direct/mux    1 x I2S_BLOCK_TICKS + 1
+//   max(I2S_BLOCK_TICKS, user dir_change_delay) MCPWM/PCNT        none user
+//   dir_change_delay
+//
+// The pause that carries the direction change uses the new direction
+// (count_up = cmd->count_up): the driver toggles the pin when it processes
+// that entry and then idles for the pause duration, so the user requested
+// dir_change_delay_ticks is honored as part of the direction change. I2S
+// additionally needs this entry to fill one I2S buffer half on its own, hence
+// its length is raised to at least I2S_BLOCK_TICKS.
+static inline uint8_t esp32_before_pause_count(StepperQueue* q) {
+#if defined(SUPPORT_ESP32_RMT)
+#if defined(SUPPORT_ESP32_RMT_V2)
+  const uint8_t rmt_pauses = 2;
+#else
+  const uint8_t rmt_pauses = 1;
+#endif
+#endif
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#if defined(SUPPORT_ESP32_RMT)
+  if (q->_driver_type == FasDriver::RMT) {
+    return rmt_pauses;
+  }
+#endif
+#if defined(SUPPORT_ESP32_I2S)
+  if (q->_driver_type == FasDriver::I2S_DIRECT ||
+      q->_driver_type == FasDriver::I2S_MUX) {
+    return 1;
+  }
+#endif
+  return 0;
+#elif defined(SUPPORT_ESP32_RMT)
+  return rmt_pauses;
+#elif defined(SUPPORT_ESP32_I2S)
+  return 1;
+#else
+  return 0;
+#endif
+}
+
+static inline uint16_t esp32_before_pause_ticks(StepperQueue* q) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#if defined(SUPPORT_ESP32_RMT)
+  if (q->_driver_type == FasDriver::RMT) {
+    return MIN_CMD_TICKS;
+  }
+#endif
+#if defined(SUPPORT_ESP32_I2S)
+  if (q->_driver_type == FasDriver::I2S_DIRECT ||
+      q->_driver_type == FasDriver::I2S_MUX) {
+    return I2S_BLOCK_TICKS + 1;
+  }
+#endif
+  return 0;
+#elif defined(SUPPORT_ESP32_RMT)
+  return MIN_CMD_TICKS;
+#elif defined(SUPPORT_ESP32_I2S)
+  return I2S_BLOCK_TICKS + 1;
+#else
+  return 0;
+#endif
+}
+
+static inline uint16_t esp32_after_pause_ticks(StepperQueue* q) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#if defined(SUPPORT_ESP32_I2S)
+  if (q->_driver_type == FasDriver::I2S_DIRECT ||
+      q->_driver_type == FasDriver::I2S_MUX) {
+    return I2S_BLOCK_TICKS;
+  }
+#endif
+  return 0;
+#elif defined(SUPPORT_ESP32_I2S)
+  return I2S_BLOCK_TICKS;
+#else
+  return 0;
+#endif
+}
+
+inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
+    const struct stepper_command_s* cmd, bool start,
+    uint16_t dir_change_delay_ticks) {
+  uint8_t flush_count = esp32_before_pause_count(this);
+  uint16_t delay_ticks =
+      (uint16_t)fas_max(dir_change_delay_ticks, esp32_after_pause_ticks(this));
+  bool toggle_pause = false;
+  if (cmd->steps == 0) {
+    if ((delay_ticks != 0) && (cmd->ticks < delay_ticks)) {
+      toggle_pause = true;
+      delay_ticks = (uint16_t)fas_max(delay_ticks - cmd->ticks, MIN_CMD_TICKS);
+    }
+  } else {
+    if (delay_ticks != 0) {
+      toggle_pause = true;
+      delay_ticks = (uint16_t)fas_max(delay_ticks, MIN_CMD_TICKS);
+    }
+  }
+  if ((flush_count == 0) && !toggle_pause) {
+    return AQE_OK;
+  }
+  uint8_t insert_count = flush_count + (toggle_pause ? 1 : 0);
+  if (queueEntries() >= QUEUE_LEN - (uint8_t)(insert_count + 1)) {
+    return AQE_DIR_PIN_IS_BUSY;
+  }
+  uint16_t flush_ticks = esp32_before_pause_ticks(this);
+  for (uint8_t i = 0; i < flush_count; i++) {
+    struct stepper_command_s flush_cmd = {
+        .ticks = flush_ticks, .steps = 0, .count_up = queue_end.count_up};
+    AqeResultCode res = addQueueEntry(&flush_cmd, start);
+    if (res != AQE_OK) {
+      return res;
+    }
+  }
+  if (toggle_pause) {
+    struct stepper_command_s delay_cmd = {
+        .ticks = delay_ticks, .steps = 0, .count_up = cmd->count_up};
+    AqeResultCode res = addQueueEntry(&delay_cmd, start);
+    if (res != AQE_OK) {
+      return res;
+    }
+  }
+  return toggle_pause ? AQE_DIR_CHANGE_PAUSE_INJECTED : AQE_OK;
+}
 
 #endif
