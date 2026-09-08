@@ -25,6 +25,9 @@ enum class AqeResultCode : int8_t {
 static inline bool aqeRetry(AqeResultCode code) {
   return (static_cast<int8_t>(code)) > 0;
 }
+static inline bool aqeRetryImmediately(AqeResultCode code) {
+  return code == AqeResultCode::DirChangePauseInjected;
+}
 static inline bool aqeIsOk(AqeResultCode status) {
   return status == AqeResultCode::OK;
 }

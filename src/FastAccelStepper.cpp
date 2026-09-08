@@ -118,7 +118,9 @@ void FastAccelStepper::fill_queue() {
     AqeResultCode res = AQE_OK;
     _rg.getNextCommand(&q->queue_end, &cmd);
     if (cmd.command.ticks != 0) {
-      res = addQueueEntry(&cmd.command, !delayed_start);
+      do {
+        res = addQueueEntry(&cmd.command, !delayed_start);
+      } while (aqeRetryImmediately(res));
     }
     if (res == AQE_OK) {
       _rg.afterCommandEnqueued(&cmd);

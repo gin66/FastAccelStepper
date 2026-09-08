@@ -610,6 +610,22 @@ class FastAccelStepper {
   // - AQE_ERROR_EMPTY_QUEUE_TO_START (-2): Empty command with start=true, but
   // queue empty
   // - AQE_ERROR_NO_DIR_PIN_TO_TOGGLE (-3): count_up=false without direction pin
+  //
+  // ### aqeRetry() / aqeRetryImmediately() / aqeIsOk() - helpers for
+  // AqeResultCode
+  //
+  // aqeRetry(code) returns true for all positive codes, i.e. every code that
+  // indicates the caller should retry addQueueEntry() later. Negative codes
+  // (errors) and AQE_OK return false.
+  //
+  // aqeRetryImmediately(code) returns true only for
+  // AQE_DIR_CHANGE_PAUSE_INJECTED. This code means a direction-change pause
+  // was queued but the submitted command was not yet enqueued, so the caller
+  // should retry addQueueEntry() immediately (without waiting) to enqueue it.
+  // All other codes return false.
+  //
+  // aqeIsOk(code) returns true only for AQE_OK, i.e. the command was added
+  // successfully.
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd,
                               bool start = true);
 
