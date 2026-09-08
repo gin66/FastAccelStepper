@@ -42,6 +42,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+// The reproduction relies on the ESP32 pulse counter (PCNT) and on the
+// selectable RMT driver backend. Both are only available on esp-idf 4/5; on
+// configurations without them (e.g. esp-idf 6), compile a no-op application.
+#if defined(SUPPORT_ESP32_PULSE_COUNTER) && defined(SUPPORT_SELECT_DRIVER_TYPE)
+
 // --- Serial helpers: ESP-IDF UART driver on the console UART (115200 baud) --
 static void serialInit() {
   uart_config_t uart_config;
@@ -397,6 +402,16 @@ void loop() {
     }
   }
 }
+
+#else
+
+// No ESP32 pulse counter / selectable driver (e.g. esp-idf 6): the direction
+// change miscount cannot be observed, so keep the application a no-op.
+void setup() {}
+
+void loop() {}
+
+#endif  // SUPPORT_ESP32_PULSE_COUNTER && SUPPORT_SELECT_DRIVER_TYPE
 
 extern "C" void app_main() {
   setup();
