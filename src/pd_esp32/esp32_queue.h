@@ -60,7 +60,6 @@ class StepperQueue : public StepperQueueBase {
     struct {
       RMT_CHANNEL_T channel;
       bool _rmtStopped;
-      bool lastChunkContainsSteps;
 #if defined(SUPPORT_ESP32_RMT_V2)
       rmt_encoder_handle_t _tx_encoder;
 #if ESP_IDF_VERSION_MAJOR >= 5

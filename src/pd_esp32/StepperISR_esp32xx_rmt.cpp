@@ -43,21 +43,9 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
   uint8_t rp = q->read_idx;
   struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
   if (e_curr->toggle_dir) {
-    // the command requests dir pin toggle
-    // This is ok only, if the ongoing command does not contain steps
-    if (q->lastChunkContainsSteps) {
-      // So we need a pause. change the finished read entry into a pause
-      q->lastChunkContainsSteps = false;
-      for (uint8_t i = 0; i < PART_SIZE; i++) {
-        // two pauses à n ticks to achieve MIN_CMD_TICKS
-        *data++ = 0x00010001 *
-                  ((MIN_CMD_TICKS + 2 * PART_SIZE - 1) / (2 * PART_SIZE));
-      }
-      return;
-    }
-    // The ongoing command does not contain steps, so change dir here should be
-    // ok. But we need the gpio_ll functions, which are always
-    // inlined...hopefully.
+    // The pause before this dir change has been inserted by addQueueEntry()
+    // (BEFORE_DIR_CHANGE_DELAY_TICKS), so all previous steps have already been
+    // emitted. Toggling here is safe.
     LL_TOGGLE_PIN(q->dirPin);
     // and delete the request
     e_curr->toggle_dir = 0;
@@ -70,7 +58,6 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
   //}
   if (steps == 0) {
     uint32_t last_entry;
-    q->lastChunkContainsSteps = false;
     for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
       // two pauses à 8 ticks
       *data++ = 0x00040004;
@@ -83,7 +70,6 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
     last_entry |= ticks_r;
     *data++ = last_entry;
   } else {
-    q->lastChunkContainsSteps = true;
     if (ticks == 0xffff) {
       // special treatment for this case, because an rmt entry can only cover up
       // to 0xfffe ticks every step must be minimum split into two rmt entries,
@@ -238,7 +224,6 @@ void IRAM_ATTR rmt_apply_command(StepperQueue* q, bool fill_part_one,
   if (rp == q->next_write_idx) {
     // no command in queue
     if (fill_part_one) {
-      q->lastChunkContainsSteps = false;
       for (uint8_t i = 0; i < PART_SIZE; i++) {
         // make a pause with approx. 1ms
         //    258 ticks * 2 * 31 = 15996 @ 16MHz

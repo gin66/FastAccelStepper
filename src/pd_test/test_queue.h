@@ -20,7 +20,6 @@ class StepperQueue : public StepperQueueBase {
 #ifdef SUPPORT_ESP32_RMT
     channel = RMT_CHANNEL_T();
     _rmtStopped = true;
-    lastChunkContainsSteps = false;
 #endif
   }
 
@@ -29,7 +28,6 @@ class StepperQueue : public StepperQueueBase {
 #ifdef SUPPORT_ESP32_RMT
   RMT_CHANNEL_T channel;
   bool _rmtStopped;
-  bool lastChunkContainsSteps;
 #endif
 
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {

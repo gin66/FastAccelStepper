@@ -179,7 +179,6 @@ void StepperQueue::startQueue_rmt() {
   //	_channel_enabled = false;
   //}
 
-  lastChunkContainsSteps = false;
   _isRunning = true;
   _rmtStopped = false;
 

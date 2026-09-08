@@ -295,7 +295,6 @@ void StepperQueue::startQueue_rmt() {
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
   }
 
-  lastChunkContainsSteps = true;
   rmt_apply_command(this, true, mem);
 
 #ifdef TRACE

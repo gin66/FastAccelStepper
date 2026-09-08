@@ -196,9 +196,7 @@ static void feed_rmt() {
   uint32_t rmt_offset = 0;
   uint32_t fed = 0;
   uint32_t toggle_entries = 0;
-  uint32_t expected_pauses = 0;
   uint64_t base_ticks = 0;
-  bool last_chunk_steps = false;
 
   while (fed < (uint32_t)log_idx || rmt_q.read_idx != rmt_q.next_write_idx) {
     while (fed < (uint32_t)log_idx) {
@@ -218,16 +216,11 @@ static void feed_rmt() {
           &rmt_q.entry[(uint8_t)(rmt_q.next_write_idx - 1) & QUEUE_LEN_MASK];
       if (e->toggle_dir) {
         toggle_entries++;
-        if (last_chunk_steps) {
-          expected_pauses++;
-        }
       }
       if (e->steps > 0) {
         base_ticks += (uint64_t)e->steps * e->ticks;
-        last_chunk_steps = true;
       } else {
         base_ticks += e->ticks;
-        last_chunk_steps = false;
       }
       fed++;
     }
@@ -242,6 +235,11 @@ static void feed_rmt() {
     rmt_offset += PART_SIZE;
   }
 
+  // Direction-change pauses are now inserted by addQueueEntry()
+  // (BEFORE_DIR_CHANGE_DELAY_TICKS), NOT by the RMT fill buffer. So the RMT
+  // translation must not add any pause symbols of its own: every toggle_dir
+  // entry is emitted as-is and the total ticks must equal the base command
+  // ticks (no injected pause ticks).
   uint32_t pause_sym = rmt_pause_symbol();
   uint32_t pauses = 0;
   for (uint32_t i = 0; i + PART_SIZE <= rmt_offset; i++) {
@@ -256,24 +254,21 @@ static void feed_rmt() {
   for (int i = 0; i < log_idx; i++) {
     steps_expected += log_cmd[i].steps;
   }
-  uint64_t pause_ticks = (uint64_t)PART_SIZE * 2 * (pause_sym & 0xffff);
-  uint64_t expected_ticks = base_ticks + (uint64_t)pauses * pause_ticks;
 
   printf("phase2 feed  = %u cmds -> %u rmt entries\n", fed, rmt_offset);
-  printf("toggle cmds  = %u (pauses: %u expected / %u detected)\n",
-         toggle_entries, expected_pauses, pauses);
+  printf("toggle cmds  = %u (pause symbols injected: %u)\n", toggle_entries,
+         pauses);
   printf("base ticks   = %" PRIu64 "\n", (int64_t)base_ticks);
   printf("RMT steps    = %u (expected %u)\n", rmt.step_count, steps_expected);
   printf("RMT ticks    = %" PRIu64 " (expected %" PRIu64 ")\n",
-         (int64_t)rmt.total_ticks, (int64_t)expected_ticks);
+         (int64_t)rmt.total_ticks, (int64_t)base_ticks);
   printf("queue_end.pos= %" PRId32 "\n", (int32_t)rmt_q.queue_end.pos);
 
   check(fed == (uint32_t)log_idx, "phase2: not all commands were fed");
-  check(pauses == expected_pauses,
-        "phase2: pause insertion does not match reference");
+  check(pauses == 0, "phase2: RMT fill buffer must not inject pause symbols");
   check(rmt.step_count == steps_expected,
         "phase2: step pulses were lost or added by rmt_fill_buffer");
-  check(rmt.total_ticks == expected_ticks,
+  check(rmt.total_ticks == base_ticks,
         "phase2: total ticks changed by rmt_fill_buffer");
   check(rmt_q.queue_end.pos == 0,
         "phase2: queue_end position drifted from commanded sum");
