@@ -121,6 +121,18 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
     Serial.println('N');
 #endif
   }
-  _last_command_ticks = period;
+  if (steps > 0) {
+    _nr_of_pauses = 0;
+    _last_pause_ticks = 0;
+  } else {
+    if (_nr_of_pauses < 255) {
+      _nr_of_pauses++;
+    }
+    if (65535 - _last_pause_ticks >= period) {
+      _last_pause_ticks += period;
+    } else {
+      _last_pause_ticks = 65535;
+    }
+  }
   return AQE_OK;
 }

@@ -132,8 +132,77 @@ static AqeResultCode enqueue(StepperQueue* q,
   if (!q->isRunning() && start) {
     q->_isRunning = true;
   }
-  q->_last_command_ticks = period;
+  if (steps > 0) {
+    q->_nr_of_pauses = 0;
+    q->_last_pause_ticks = 0;
+  } else {
+    if (q->_nr_of_pauses < 255) {
+      q->_nr_of_pauses++;
+    }
+    if (65535 - q->_last_pause_ticks >= period) {
+      q->_last_pause_ticks += period;
+    } else {
+      q->_last_pause_ticks = 65535;
+    }
+  }
   return AQE_OK;
+}
+
+// Mirror FastAccelStepper::addQueueEntry() (FastAccelStepper.cpp) for the
+// standalone test: inserts the BEFORE-direction-change pause (and the AFTER
+// pause) when a command reverses direction, exactly as production does. This
+// is the logic that feeds through enqueue() above.
+static AqeResultCode feed_real(StepperQueue* q,
+                               const struct stepper_command_s* cmd, bool start,
+                               uint16_t after_delay_ticks) {
+  bool dir_change_needed = false;
+  if (q->dirPin != PIN_UNDEFINED) {
+    bool dir = (cmd->count_up == q->dirHighCountsUp);
+    if (!(q->isQueueEmpty() && !q->isRunning()) &&
+        ((q->dirPin & PIN_EXTERNAL_FLAG) == 0)) {
+      dir_change_needed = (dir != q->queue_end.dir);
+    }
+  }
+  if (dir_change_needed && (cmd->steps != 0)) {
+    uint16_t before_delay = BEFORE_DIR_CHANGE_DELAY_TICKS(q);
+    uint16_t after_delay = after_delay_ticks;
+    if (q->_nr_of_pauses != 0 && q->_last_pause_ticks >= before_delay) {
+      before_delay = 0;
+    }
+    uint8_t commands_needed = 1;
+    if (before_delay > 0) {
+      commands_needed++;
+    }
+    if (after_delay > 0) {
+      commands_needed++;
+    }
+    if (q->queueEntries() >= QUEUE_LEN - commands_needed) {
+      return AQE_DIR_PIN_IS_BUSY;
+    }
+    if (before_delay > 0) {
+      struct stepper_command_s before_cmd = {
+          .ticks = (uint16_t)(before_delay > MIN_CMD_TICKS ? before_delay
+                                                           : MIN_CMD_TICKS),
+          .steps = 0,
+          .count_up = q->queue_end.count_up};
+      AqeResultCode r = enqueue(q, &before_cmd, start);
+      if (r != AQE_OK) {
+        return r;
+      }
+    }
+    if (after_delay > 0) {
+      struct stepper_command_s after_cmd = {
+          .ticks = (uint16_t)(after_delay > MIN_CMD_TICKS ? after_delay
+                                                          : MIN_CMD_TICKS),
+          .steps = 0,
+          .count_up = cmd->count_up};
+      AqeResultCode r = enqueue(q, &after_cmd, start);
+      if (r != AQE_OK) {
+        return r;
+      }
+    }
+  }
+  return enqueue(q, cmd, start);
 }
 
 #define MT_QUEUE_EMPTY(s) (feed_q.isQueueEmpty())
@@ -381,8 +450,155 @@ static void cap_check() {
         "cap: 1-command move with 2 free slots must be rejected (BUSY)");
 }
 
+// Minimal reproduction of the Issue370_minimal dangerous reversal on the PC
+// wire-level pipeline. Per cycle: +2 fast UP at full rate, then a reversal to
+// -2 DOWN. Despite +2 ... -2 netting to zero in the library bookkeeping, the
+// RMT DIR toggle (software LL_TOGGLE_PIN at buffer-fill time) fires before the
+// two fast UP steps are emitted, so those steps go out in the wrong direction.
+//
+// We dump the exact queue entries as they pass through the real
+// rmt_fill_buffer(), so the toggle position relative to the preceding steps is
+// visible.
+//
+// Note on the ticks printed below: for a k-step command moveTimed() is given
+// the TOTAL duration (here 105960 for 2 steps), and each queue_entry.ticks is
+// the period BETWEEN steps, i.e. duration / steps = 52980. There is no timing
+// drift; RMT ticks sum to 2 * 105960 for the 4 steps of +2 ... -2.
+static void minimal_repro() {
+  reset();
+  check(feed_q.queueEntries() == 0, "min: queue must start empty");
+
+  // Issue370_minimal buildPattern() with FAST_STEPS=2, FAST_CMDS=1:
+  //   A: +2 fast UP (dangerous run-up)
+  //   B: -2         (dangerous reversal UP -> DOWN)
+  // net = 0 per cycle
+  static const Cmd min_cmd[] = {{+2, 105960}, {-2, 105960}};
+  const int n_min = (int)(sizeof(min_cmd) / sizeof(min_cmd[0]));
+  const int cycles = 1;
+
+  int64_t cmd_sum = 0;
+  int32_t drift = 0;
+  bool started = false;
+  int prefilled = 0;
+
+  for (int c = 0; c < cycles; c++) {
+    for (int i = 0; i < n_min; i++) {
+      if (!started) {
+        uint32_t actual = 0;
+        MoveTimedResultCode rc = moveTimedFill(
+            NULL, min_cmd[i].steps, min_cmd[i].ticks, &actual, false);
+        if (rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY) {
+          drift = (int32_t)(min_cmd[i].ticks - actual);
+          cmd_sum += min_cmd[i].steps;
+          prefilled++;
+          continue;
+        }
+        if (rc != MOVE_TIMED_BUSY) {
+          printf("min: prefill error rc=%d at %d\n", (int)rc, i);
+          return;
+        }
+        moveTimedFill(NULL, 0, 0, NULL, true);
+        started = true;
+      }
+      if (!feedCommand(min_cmd[i].steps, min_cmd[i].ticks, drift, cmd_sum)) {
+        return;
+      }
+    }
+  }
+  if (!started) {
+    moveTimedFill(NULL, 0, 0, NULL, true);
+    started = true;
+  }
+
+  // Feed the SAME captured command stream through the real RMT fill buffer and
+  // dump the queue entries in pipeline order, marking toggle_dir.
+  // A BEFORE-direction-change pause is configured: the +2 run just before the
+  // reversal still has steps in flight, so production must KEEP the pause even
+  // though the prior period (52980 ticks) exceeds it.
+  __builtin_memset(&rmt_q, 0, sizeof(rmt_q));
+  rmt_q._base_initVars();
+  rmt_q._pd_initVars();
+  rmt_q.setDirPin(1, true);
+  rmt_q._before_dir_change_delay_ticks = MIN_CMD_TICKS;
+
+  printf(
+      "\n=== Issue370_minimal pipeline dump (FAST_STEPS=2, FAST_CMDS=1) ===\n");
+  printf(
+      "idx  entry:  steps ticks     count_up toggle_dir  (in-pipeline "
+      "order)\n");
+  uint32_t fed = 0;
+  uint32_t rmt_offset = 0;
+  uint32_t part = 0;
+  while (fed < (uint32_t)log_idx || rmt_q.read_idx != rmt_q.next_write_idx) {
+    while (fed < (uint32_t)log_idx) {
+      uint8_t queued = rmt_q.next_write_idx - rmt_q.read_idx;
+      if (queued >= QUEUE_LEN) {
+        break;
+      }
+      struct stepper_command_s cmd = {.ticks = log_cmd[fed].ticks,
+                                      .steps = log_cmd[fed].steps,
+                                      .count_up = log_cmd[fed].count_up};
+      AqeResultCode rc = feed_real(&rmt_q, &cmd, false, 0);
+      if (rc != AQE_OK) {
+        printf("min: feed-phase enqueue rejected: %d\n", (int)rc);
+        return;
+      }
+      const struct queue_entry* e =
+          &rmt_q.entry[(uint8_t)(rmt_q.next_write_idx - 1) & QUEUE_LEN_MASK];
+      printf("%3u queue:  %4u %-10u %-7s %s\n", fed, e->steps, e->ticks,
+             e->countUp ? "UP" : "DOWN", e->toggle_dir ? "TOGGLE" : "");
+      fed++;
+    }
+    if (rmt_q.read_idx == rmt_q.next_write_idx) {
+      break;
+    }
+    if (rmt_offset + PART_SIZE > MAX_RMT_ENTRIES) {
+      printf("min: RMT entry buffer overflow\n");
+      return;
+    }
+    uint8_t rp_before = rmt_q.read_idx;
+    const struct queue_entry* ec = &rmt_q.entry[rp_before & QUEUE_LEN_MASK];
+    bool this_is_toggle = ec->toggle_dir != 0;
+    if (this_is_toggle) {
+      printf(
+          "%3u fill :  part %u  consuming entry rp=%u (%s)  "
+          "DIR toggled NOW\n",
+          part, part % 2, rp_before, "TOGGLE");
+    } else {
+      printf("%3u fill :  part %u  consuming entry rp=%u (%s %s)\n", part,
+             part % 2, rp_before, ec->steps > 0 ? "steps" : "pause",
+             ec->countUp ? "UP" : "DOWN");
+    }
+    rmt_fill_buffer(&rmt_q, (part % 2) == 0, &rmt_entries[rmt_offset]);
+    rmt_offset += PART_SIZE;
+    part++;
+  }
+
+  RmtResult rmt = analyze_rmt(rmt_offset);
+  printf("captured cmds = %u, rmt offset = %u\n", fed, rmt_offset);
+  printf("RMT steps     = %u\n", rmt.step_count);
+  printf("queue_end.pos = %" PRId32 "\n", (int32_t)rmt_q.queue_end.pos);
+  printf("RMT ticks     = %" PRIu64 " (incl. injected before-pause)\n",
+         (int64_t)rmt.total_ticks);
+
+  // Wire-level reading: the production fix keeps a BEFORE-direction-change
+  // pause before the TOGGLE entry. That pause is transmitted before the toggle
+  // reaches the fill position, letting the in-flight UP steps finish in the UP
+  // direction before DIR changes -- so no steps leak into the DOWN direction.
+  printf("=== end dump ===\n");
+
+  // The two fast UP steps are now separated from the direction toggle by the
+  // injected before-pause, mirroring the Issue370_minimal drift fix.
+  check(cmd_sum == 0, "min: commanded pattern must net to zero");
+  check(rmt_q.queue_end.pos == 0,
+        "min: library queue_end position must return to zero");
+}
+
 int main() {
   cap_check();
+  minimal_repro();
+  // keep print buffer flush ordering deterministic
+  printf("\n");
   const int cycles = 3;
   int64_t commanded_sum = 0;
   int pattern_len = (int)(sizeof(pattern) / sizeof(pattern[0]));

@@ -246,8 +246,8 @@ static void test_no_delay_if_prior_pause_sufficient() {
   test_result("No delay if prior pause sufficient", no_extra_pause);
 }
 
-static void test_no_delay_if_prior_step_sufficient() {
-  printf("Running: No delay if prior single step has sufficient ticks\n");
+static void test_delay_if_prior_step_sufficient() {
+  printf("Running: Delay IS inserted if prior step has sufficient ticks\n");
   init_queue();
 
   FastAccelStepper s;
@@ -278,11 +278,14 @@ static void test_no_delay_if_prior_step_sufficient() {
   uint8_t entries_total = fas_queue[0].next_write_idx - fas_queue[0].read_idx;
   printf("  Entries after backward cmd: %d\n", entries_total);
 
-  bool no_extra_pause = (entries_total == entries_after_step + 1);
-  printf("  Extra pause inserted: %s (expected: no)\n",
-         no_extra_pause ? "no" : "yes");
+  // Even though the prior step's period is long enough, it still had steps
+  // of the old direction in flight. The before-pause must be inserted so
+  // those steps finish before the direction change.
+  bool extra_pause = (entries_total == entries_after_step + 2);
+  printf("  Extra pause inserted: %s (expected: yes)\n",
+         extra_pause ? "yes" : "no");
 
-  test_result("No delay if prior step sufficient", no_extra_pause);
+  test_result("Delay if prior step sufficient", extra_pause);
 }
 
 static void test_external_dir_pin_with_empty_queue() {
@@ -561,7 +564,7 @@ int main() {
   test_dir_change_delay_not_on_pause_command();
   test_before_after_dir_change_delay_defined();
   test_no_delay_if_prior_pause_sufficient();
-  test_no_delay_if_prior_step_sufficient();
+  test_delay_if_prior_step_sufficient();
 
   puts("\n=== Part 3: External Direction Pin (MAY FAIL) ===");
   test_external_dir_pin_with_empty_queue();

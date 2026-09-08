@@ -158,7 +158,7 @@ AqeResultCode FastAccelStepper::addQueueEntry(
     after_delay = fas_max(AFTER_DIR_CHANGE_DELAY_TICKS(q), after_delay);
 #endif
 
-    if (q->_last_command_ticks >= before_delay) {
+    if (q->_nr_of_pauses != 0 && q->_last_pause_ticks >= before_delay) {
       before_delay = 0;
     }
 
