@@ -113,30 +113,31 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
       }
     } else {
       uint8_t steps_to_do = steps;
-      if (steps > PART_SIZE - 1) {
-        steps_to_do = PART_SIZE - 1;
-        if (steps < 2 * (PART_SIZE - 1)) {
+      if (steps > PART_SIZE) {
+        steps_to_do = PART_SIZE;
+        if (steps < 2 * PART_SIZE) {
           steps_to_do >>= 1;
         }
       }
       // deduct this buffer's step from total
       steps -= steps_to_do;
-      if (steps_to_do < PART_SIZE - 1) {
-        // Fill the partition; last entry must be a pause (#370).
-        // Worst case is one step: stretch it so the threshold arrives early.
-        // Minimum period is 80ticks @200kHz. Minimum command time is 3200
-        // ticks. Consequently, 80 ticks will come with minimum 40 steps.
-        // For one remaining step, stretch into PART_SIZE (ends as pause).
-        // For more, reserve one entry for the trailing pause after the last
-        // step.
+      if (steps_to_do < PART_SIZE) {
+        // We need to fill up the partition.
+        // Worst case would be one step in the buffer.
+        // In order to get threshold interrupt early enough,
+        // the first step should be stretched to maximum.
+        // The minimum period is 80ticks @200kHz.
+        // Minimum command time is 3200 ticks.
+        // Consequently, 80 ticks will come with minimum 40 steps.
+        // Split into two rmt parts, so 20 steps each.
+        // For PART_SIZE 23 or 31, minimum period is 2*2*PART_SIZE = 92 or
+        // 124ticks. A single step with 80ticks cannot be stretched to
+        // PART_SIZE.
+        // => we need to stretch eventually two steps.
         uint8_t i = 0;
         while (true) {
-          uint8_t extend_to_i;
-          if (steps_to_do == 1) {
-            extend_to_i = PART_SIZE - steps_to_do;
-          } else {
-            extend_to_i = (PART_SIZE - 1) - steps_to_do;
-          }
+          uint8_t extend_to_i = PART_SIZE - steps_to_do;  // extend_to_i >= 1
+          // if steps_to_do = PART_SIZE-1, then extend_to_i = 1
           if (i >= extend_to_i) {
             // we have already extended enough
             break;
@@ -177,7 +178,7 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
             }
           }
         }
-        // Now add remaining steps, if any; last step ends with pause
+        // Now add remaining steps, if any
         if (steps_to_do > 0) {
           uint16_t ticks_high = ticks >> 1;
           uint16_t ticks_low = ticks - ticks_high;
@@ -185,27 +186,21 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
           uint32_t rmt_entry = ticks_low;
           rmt_entry <<= 16;
           rmt_entry |= ticks_high | 0x8000;  // with step
-          for (uint8_t i = 1; i < steps_to_do; i++) {
+          for (uint8_t i = 1; i <= steps_to_do; i++) {
             *data++ = rmt_entry;
           }
-          rmt_entry -= 0x80000;
-          *data++ = rmt_entry;
-          *data++ = 0x00040004;
         }
       } else {
-        // steps_to_do == PART_SIZE - 1
+        // either >= 2*PART_SIZE or = PART_SIZE
+        // every entry one step
         uint16_t ticks_high = ticks >> 1;
         uint16_t ticks_low = ticks - ticks_high;
         uint32_t rmt_entry = ticks_low;
         rmt_entry <<= 16;
         rmt_entry |= ticks_high | 0x8000;  // with step
-        for (uint8_t i = 0; i < PART_SIZE - 2; i++) {
+        for (uint8_t i = 0; i < PART_SIZE; i++) {
           *data++ = rmt_entry;
         }
-        // last step: shorten low by 8, then pause entry 0x00040004
-        rmt_entry -= 0x80000;
-        *data++ = rmt_entry;
-        *data++ = 0x00040004;
       }
     }
   }
