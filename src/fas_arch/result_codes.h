@@ -16,6 +16,7 @@ enum class AqeResultCode : int8_t {
   WaitForEnablePinActive = 3,
   DeviceNotReady = 4,
   DirPin2msPauseAdded = 5,
+  DirChangePauseInjected = 6,
   ErrorTicksTooLow = -1,
   ErrorEmptyQueueToStart = -2,
   ErrorNoDirPinToToggle = -3
@@ -36,6 +37,8 @@ static inline const char* toString(AqeResultCode code) {
       return FAS_PSTR("Queue Full");
     case AqeResultCode::DirPin2msPauseAdded:
       return FAS_PSTR("Dir Pin 2ms Pause Added");
+    case AqeResultCode::DirChangePauseInjected:
+      return FAS_PSTR("Dir Change Pause Injected");
     case AqeResultCode::DirPinIsBusy:
       return FAS_PSTR("Direction Pin is Busy");
     case AqeResultCode::WaitForEnablePinActive:
@@ -55,6 +58,7 @@ static inline const char* toString(AqeResultCode code) {
 #define AQE_OK AqeResultCode::OK
 #define AQE_QUEUE_FULL AqeResultCode::QueueFull
 #define AQE_DIR_PIN_2MS_PAUSE_ADDED AqeResultCode::DirPin2msPauseAdded
+#define AQE_DIR_CHANGE_PAUSE_INJECTED AqeResultCode::DirChangePauseInjected
 #define AQE_DIR_PIN_IS_BUSY AqeResultCode::DirPinIsBusy
 #define AQE_WAIT_FOR_ENABLE_PIN_ACTIVE AqeResultCode::WaitForEnablePinActive
 #define AQE_DEVICE_NOT_READY AqeResultCode::DeviceNotReady

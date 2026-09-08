@@ -85,4 +85,6 @@ class StepperQueue : public StepperQueueBase {
 #define SET_ENABLE_PIN_STATE(q, pin, high) \
   digitalWrite((pin), (high) ? HIGH : LOW)
 
+#include "fas_queue/dir_change_pause.h"
+
 #endif  // PD_AVR_QUEUE_H

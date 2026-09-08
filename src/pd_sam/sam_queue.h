@@ -55,4 +55,6 @@ class StepperQueue : public StepperQueueBase {
 
 #define AFTER_SET_DIR_PIN_DELAY_US 30
 
+#include "fas_queue/dir_change_pause.h"
+
 #endif

@@ -32,6 +32,12 @@ static StepperQueue* tryAllocateQueue(FastAccelStepperEngine* engine,
 //==========================================================================
 
 AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start);
+// Driver inserts the before/after direction-change pause commands (if any)
+// into the queue. Does NOT enqueue cmd itself; the caller enqueues it
+// afterwards. Always compiled, regardless of driver type.
+AqeResultCode addDirChangePauseToQueue(const struct stepper_command_s* cmd,
+                                       bool start,
+                                       uint16_t dir_change_delay_ticks);
 int32_t getCurrentPosition() const;
 uint32_t ticksInQueue() const;
 bool hasTicksInQueue(uint32_t min_ticks) const;

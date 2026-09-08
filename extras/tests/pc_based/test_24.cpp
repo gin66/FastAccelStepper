@@ -49,6 +49,12 @@ uint16_t debug_part_size = 24;
 
 #include "FastAccelStepper.h"
 
+// Direction-change pause insertion is provided by the pd_test default in
+// dir_change_pause.h; this standalone test does not link the library .o files,
+// so include it here (after StepperQueue and its BEFORE/AFTER macros are
+// known).
+#include "fas_queue/dir_change_pause.h"
+
 // Production bodies of addQueueEntry() and moveTimed(), compiled against this
 // test's StepperQueue/FastAccelStepper instead of the hardware queues.
 #include "fas_member/add_queue_entry.h"
@@ -71,8 +77,8 @@ static void check(int cond, const char* msg) {
 
 // The test is not linked against FastAccelStepper.o, so provide the
 // FastAccelStepper members that addQueueEntry()/moveTimed() reference. Their
-// production bodies come from fas_queue/fas_add_queue_entry.h and
-// fas_moveTimed/move_timed.h below.
+// production bodies come from fas_member/add_queue_entry.h and
+// fas_member/move_timed.h above.
 StepperQueue* FastAccelStepper::_queue() const {
   return (_queue_num == 0) ? &feed_q : &rmt_q;
 }
@@ -199,9 +205,7 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
 // Test stepper: points addQueueEntry()/moveTimed() at feed_q (num 0) or
 // rmt_q (num 1) and disables the auto-enable / external-dir-pin paths.
 static FastAccelStepper test_stepper;
-static void setup_step(uint8_t num) {
-  test_stepper.init(NULL, num, 0);
-}
+static void setup_step(uint8_t num) { test_stepper.init(NULL, num, 0); }
 
 static void reset() {
   log_idx = 0;

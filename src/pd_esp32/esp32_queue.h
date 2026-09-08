@@ -235,4 +235,6 @@ static inline uint16_t esp32_after_dir_change_delay_ticks(StepperQueue* q) {
 
 #endif  // SUPPORT_ESP32_I2S
 
+#include "fas_queue/dir_change_pause.h"
+
 #endif

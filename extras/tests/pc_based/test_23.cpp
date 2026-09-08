@@ -62,6 +62,22 @@ static void process_queue_ticks(uint32_t ticks_to_process) {
   }
 }
 
+// AQE_DIR_CHANGE_PAUSE_INJECTED is a positive/informational result: the
+// direction-change pause(s) are in the queue, but the actual command was not
+// yet enqueued. The caller must invoke addQueueEntry() again (cf. aqeRetry()).
+static AqeResultCode addQueueEntryWithDirChange(FastAccelStepper* s,
+                                                struct stepper_command_s* cmd,
+                                                bool start) {
+  AqeResultCode res = AQE_OK;
+  for (int i = 0; i < 10; i++) {
+    res = s->addQueueEntry(cmd, start);
+    if (res != AQE_DIR_CHANGE_PAUSE_INJECTED) {
+      break;
+    }
+  }
+  return res;
+}
+
 static bool external_dir_callback_called = false;
 static uint8_t last_callback_pin = 0;
 static uint8_t last_callback_value = 0;
@@ -154,7 +170,8 @@ static void test_dir_change_delay_inserted_on_dir_change() {
 
   struct stepper_command_s cmd2 = {
       .ticks = 1600, .steps = 10, .count_up = false};
-  s.addQueueEntry(&cmd2, false);
+  AqeResultCode res = addQueueEntryWithDirChange(&s, &cmd2, false);
+  printf("  Backward cmd result: %s\n", toString(res));
 
   uint8_t entries_total = fas_queue[0].next_write_idx - fas_queue[0].read_idx;
   printf("  Entries after backward cmd: %d\n", entries_total);
@@ -273,7 +290,7 @@ static void test_delay_if_prior_step_sufficient() {
 
   struct stepper_command_s cmd2 = {
       .ticks = 1600, .steps = 10, .count_up = false};
-  res = s.addQueueEntry(&cmd2, false);
+  res = addQueueEntryWithDirChange(&s, &cmd2, false);
 
   uint8_t entries_total = fas_queue[0].next_write_idx - fas_queue[0].read_idx;
   printf("  Entries after backward cmd: %d\n", entries_total);

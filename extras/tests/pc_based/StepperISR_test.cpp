@@ -1,5 +1,7 @@
 #include "fas_queue/stepper_queue.h"
 
+#include "fas_queue/dir_change_pause.h"
+
 #include "FastAccelStepper.h"
 
 static uint8_t stepper_allocated_mask = 0;

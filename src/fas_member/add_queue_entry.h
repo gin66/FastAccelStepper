@@ -79,53 +79,10 @@ AqeResultCode FastAccelStepper::addQueueEntry(
         return res;
       }
     }
-  } else if (dir_change_needed && (cmd->steps != 0)) {
-#if defined(BEFORE_DIR_CHANGE_DELAY_TICKS)
-    uint16_t before_delay = BEFORE_DIR_CHANGE_DELAY_TICKS(q);
-#else
-    uint16_t before_delay = 0;
-#endif
-    uint16_t after_delay = _dir_change_delay_ticks;
-
-#if defined(AFTER_DIR_CHANGE_DELAY_TICKS)
-    after_delay = fas_max(AFTER_DIR_CHANGE_DELAY_TICKS(q), after_delay);
-#endif
-
-    if (q->_nr_of_pauses != 0 && q->_last_pause_ticks >= before_delay) {
-      before_delay = 0;
-    }
-
-    uint8_t commands_needed = 1;
-    if (before_delay > 0) {
-      commands_needed++;
-    }
-    if (after_delay > 0) {
-      commands_needed++;
-    }
-    if (q->queueEntries() >= QUEUE_LEN - commands_needed) {
-      return AQE_DIR_PIN_IS_BUSY;
-    }
-
-    if (before_delay > 0) {
-      struct stepper_command_s before_cmd = {
-          .ticks = (uint16_t)fas_max(before_delay, MIN_CMD_TICKS),
-          .steps = 0,
-          .count_up = q->queue_end.count_up }; // delay with old value
-      res = q->addQueueEntry(&before_cmd, start);
-      if (res != AQE_OK) {
-        return res;
-      }
-    }
-
-    if (after_delay > 0) {
-      struct stepper_command_s after_cmd = {
-          .ticks = (uint16_t)fas_max(after_delay, MIN_CMD_TICKS),
-          .steps = 0,
-          .count_up = cmd->count_up};
-      res = q->addQueueEntry(&after_cmd, start);
-      if (res != AQE_OK) {
-        return res;
-      }
+  } else if (dir_change_needed) {
+    res = q->addDirChangePauseToQueue(cmd, start, _dir_change_delay_ticks);
+    if (res != AQE_OK) {
+      return res;
     }
   }
   res = q->addQueueEntry(cmd, start);
