@@ -65,7 +65,7 @@ bool FastAccelStepper::handleExternalDirectionPin(StepperQueue* q,
 }
 
 //*************************************************************************************************
-#include "fas_member/fas_add_queue_entry.h"
+#include "fas_member/add_queue_entry.h"
 
 //*************************************************************************************************
 // fill_queue generates commands to the stepper for executing a ramp

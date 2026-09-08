@@ -11,7 +11,7 @@
 //
 // The test provides its own FastAccelStepper/StepperQueue definitions and
 // includes this header to compile the production moveTimed() body verbatim,
-// the same pattern as fas_member/fas_add_queue_entry.h.
+// the same pattern as fas_member/add_queue_entry.h.
 
 // Up to two queue entries are consumed by the direction-change machinery in
 // FastAccelStepper::addQueueEntry() (a before and an after pause command) in

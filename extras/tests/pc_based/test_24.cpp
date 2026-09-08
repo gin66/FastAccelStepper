@@ -51,7 +51,7 @@ uint16_t debug_part_size = 24;
 
 // Production bodies of addQueueEntry() and moveTimed(), compiled against this
 // test's StepperQueue/FastAccelStepper instead of the hardware queues.
-#include "fas_member/fas_add_queue_entry.h"
+#include "fas_member/add_queue_entry.h"
 #include "fas_member/move_timed.h"
 
 static StepperQueue feed_q;
