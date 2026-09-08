@@ -177,7 +177,7 @@ AqeResultCode FastAccelStepper::addQueueEntry(
       struct stepper_command_s before_cmd = {
           .ticks = (uint16_t)fas_max(before_delay, MIN_CMD_TICKS),
           .steps = 0,
-          .count_up = cmd->count_up};
+          .count_up = q->queue_end.count_up }; // delay with old value
       res = q->addQueueEntry(&before_cmd, start);
       if (res != AQE_OK) {
         return res;
