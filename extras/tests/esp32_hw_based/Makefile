@@ -31,20 +31,23 @@
 
 # macos:
 DEV ?= cu.usbserial-0001
+# Firmware under test; test_all sets this per config. Standalone `make test` = already flashed.
+DUT ?= flashed
 
 all: compile test
 
 test: M1.test M9.test
 
-# $1 = seq_xx.py. Logs "M1 seq_04 passed" (or FAILED) to test_all.log.
+# $1 = seq_xx.py. Logs "arduino_espidf4  M1 seq_04 passed" (or FAILED).
 define RUN_SEQ
-	MOTOR=$* ./$(1) $(DEV) && printf '%s  %s %s passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s %s FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
+	MOTOR=$* ./$(1) $(DEV) && printf '%s  %s  %s %s passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s  %s %s FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
 endef
 define RUN_SEQ_CFG1
-	STEPPER_CONFIG=1 MOTOR=$* ./$(1) $(DEV) && printf '%s  %s %s config=1 passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s %s config=1 FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
+	STEPPER_CONFIG=1 MOTOR=$* ./$(1) $(DEV) && printf '%s  %s  %s %s config=1 passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s  %s %s config=1 FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
 endef
 
 # ESP-IDF 5.3 classic ESP32 (MCPWM/PCNT+RMT+I2S): test M1..M3 with Driver-Types config
+test_idf5_3: DUT := driver_types
 test_idf5_3: M1.idf5_3_test M2.idf5_3_test M3.idf5_3_test
 
 %.idf5_3_test:
@@ -81,38 +84,48 @@ test_all_begin:
 		if [ -e .test_$$s ]; then printf '# skip %s (stamp exists)\n' "$$s" | tee -a test_all.log; fi; \
 	done
 
+# $1=dut name  $2=pio env  $3=human description (logged before compile/test)
+define RECORD_DUT
+	printf '%s  DUT %-18s  pio=%s  %s\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(1)" "$(2)" "$(3)" | tee -a test_all.log
+endef
 define RECORD_PASS
-	printf '%s  PASS  %-18s  pio=%s\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(1)" "$(2)" | tee -a test_all.log
+	printf '%s  PASS %-18s  pio=%s\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(1)" "$(2)" | tee -a test_all.log
 endef
 
 .test_arduino_espidf4:
-	$(MAKE) compile_arduino_espidf4 && $(MAKE) test
+	$(call RECORD_DUT,arduino_espidf4,esp32_V6_8_1,Arduino 2.0.17 / IDF 4.4.7)
+	$(MAKE) compile_arduino_espidf4 && $(MAKE) test DUT=arduino_espidf4
 	$(call RECORD_PASS,arduino_espidf4,esp32_V6_8_1)
 	touch .test_arduino_espidf4
 
 .test_arduino_3:
-	$(MAKE) compile_arduino_3 && $(MAKE) test
+	$(call RECORD_DUT,arduino_3,esp32_pioarduino_V53_03_11,Arduino 3.1.1 / IDF 5.3.2)
+	$(MAKE) compile_arduino_3 && $(MAKE) test DUT=arduino_3
 	$(call RECORD_PASS,arduino_3,esp32_pioarduino_V53_03_11)
 	touch .test_arduino_3
 
 # Cannot install/run
 #.test_idf4:
-#	$(MAKE) compile_idf4 && $(MAKE) test
+#	$(call RECORD_DUT,idf4,esp32_idf_V5_3_0,ESP-IDF 4.4.3)
+#	$(MAKE) compile_idf4 && $(MAKE) test DUT=idf4
 #	$(call RECORD_PASS,idf4,esp32_idf_V5_3_0)
 #	touch .test_idf4
 
 .test_arduino_latest:
-	$(MAKE) compile_arduino_latest && $(MAKE) test
+	$(call RECORD_DUT,arduino_latest,esp32_V7_1_2,Arduino 2.0.17 / PIO 7.1.2)
+	$(MAKE) compile_arduino_latest && $(MAKE) test DUT=arduino_latest
 	$(call RECORD_PASS,arduino_latest,esp32_V7_1_2)
 	touch .test_arduino_latest
 
 .test_idf5:
-	$(MAKE) compile_idf5 && $(MAKE) test
+	$(call RECORD_DUT,idf5,esp32_idf_V6_9_0,ESP-IDF 5.3.1)
+	$(MAKE) compile_idf5 && $(MAKE) test DUT=idf5
 	$(call RECORD_PASS,idf5,esp32_idf_V6_9_0)
 	touch .test_idf5
 
 .test_idf6:
-	$(MAKE) compile_idf6 && $(MAKE) test
+	$(call RECORD_DUT,idf6,esp32_idf_V7_1_2,ESP-IDF 6.1.0)
+	$(MAKE) compile_idf6 && $(MAKE) test DUT=idf6
 	$(call RECORD_PASS,idf6,esp32_idf_V7_1_2)
 	touch .test_idf6
 
