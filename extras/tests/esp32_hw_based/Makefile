@@ -11,7 +11,7 @@
 #   make test                         run seq_* on M1 and M9 (whatever is already flashed)
 #   make test_idf5_3                  Driver-Types config: M1=RMT, M2=I2S, M3=MCPWM
 #   make test_all                     flash+test the usual set (skips ones already stamped)
-#   make clean                        drop logs and test_all stamps
+#   make clean                        drop seq_*.log, test_all.log, and stamps
 #
 # `pio run -e` names must exist in extras/ci/platformio.ini
 # (from extras/ci/build_matrix.yaml). PIO version != ESP-IDF version:
@@ -21,7 +21,7 @@
 #   Arduino 2.x / IDF 4: M1=MCPWM, M9=RMT
 #   Arduino 3.x / IDF 5: M1=RMT,   M9=I2S   (MCPWM is M3 with STEPPER_CONFIG=1)
 
-.PHONY: all test test_all test_idf5_3 clean compile help \
+.PHONY: all test test_all test_all_begin test_idf5_3 clean compile help \
 	compile_arduino_espidf4 compile_arduino_3 compile_arduino_latest \
 	compile_idf4 compile_idf5 compile_idf6 \
 	compile_esp32_V6_8_1 compile_esp32_pioarduino_V53_03_11 compile_esp32_V7_1_2 \
@@ -36,54 +36,85 @@ all: compile test
 
 test: M1.test M9.test
 
+# $1 = seq_xx.py. Logs "M1 seq_04 passed" (or FAILED) to test_all.log.
+define RUN_SEQ
+	MOTOR=$* ./$(1) $(DEV) && printf '%s  %s %s passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s %s FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
+endef
+define RUN_SEQ_CFG1
+	STEPPER_CONFIG=1 MOTOR=$* ./$(1) $(DEV) && printf '%s  %s %s config=1 passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s %s config=1 FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
+endef
+
 # ESP-IDF 5.3 classic ESP32 (MCPWM/PCNT+RMT+I2S): test M1..M3 with Driver-Types config
 test_idf5_3: M1.idf5_3_test M2.idf5_3_test M3.idf5_3_test
 
 %.idf5_3_test:
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_04.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_05.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_06.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_01a.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_01b.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_02.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_07a.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_07b.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_07c.py $(DEV)
-	STEPPER_CONFIG=1 MOTOR=$* ./seq_03.py $(DEV)
+	$(call RUN_SEQ_CFG1,seq_04.py)
+	$(call RUN_SEQ_CFG1,seq_05.py)
+	$(call RUN_SEQ_CFG1,seq_06.py)
+	$(call RUN_SEQ_CFG1,seq_01a.py)
+	$(call RUN_SEQ_CFG1,seq_01b.py)
+	$(call RUN_SEQ_CFG1,seq_02.py)
+	$(call RUN_SEQ_CFG1,seq_07a.py)
+	$(call RUN_SEQ_CFG1,seq_07b.py)
+	$(call RUN_SEQ_CFG1,seq_07c.py)
+	$(call RUN_SEQ_CFG1,seq_03.py)
 
 %.test:
-	MOTOR=$* ./seq_04.py $(DEV)
-	MOTOR=$* ./seq_05.py $(DEV)
-	MOTOR=$* ./seq_06.py $(DEV)
-	MOTOR=$* ./seq_01a.py $(DEV)
-	MOTOR=$* ./seq_01b.py $(DEV)
-	MOTOR=$* ./seq_02.py $(DEV)
-	MOTOR=$* ./seq_07a.py $(DEV)
-	MOTOR=$* ./seq_07b.py $(DEV)
-	MOTOR=$* ./seq_07c.py $(DEV)
-	MOTOR=$* ./seq_03.py $(DEV)
+	$(call RUN_SEQ,seq_04.py)
+	$(call RUN_SEQ,seq_05.py)
+	$(call RUN_SEQ,seq_06.py)
+	$(call RUN_SEQ,seq_01a.py)
+	$(call RUN_SEQ,seq_01b.py)
+	$(call RUN_SEQ,seq_02.py)
+	$(call RUN_SEQ,seq_07a.py)
+	$(call RUN_SEQ,seq_07b.py)
+	$(call RUN_SEQ,seq_07c.py)
+	$(call RUN_SEQ,seq_03.py)
 
-#test_all: .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_idf6 .test_arduino_latest
-test_all: .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_arduino_latest
+#test_all: test_all_begin .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_idf6 .test_arduino_latest
+test_all: test_all_begin .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_arduino_latest
+	@printf '%s  DONE  test_all\n' "$$(date '+%Y-%m-%d %H:%M:%S')" | tee -a test_all.log
+
+test_all_begin:
+	@printf '\n# test_all %s\n' "$$(date '+%Y-%m-%d %H:%M:%S')" | tee -a test_all.log
+	@for s in arduino_espidf4 arduino_3 idf5 arduino_latest; do \
+		if [ -e .test_$$s ]; then printf '# skip %s (stamp exists)\n' "$$s" | tee -a test_all.log; fi; \
+	done
+
+define RECORD_PASS
+	printf '%s  PASS  %-18s  pio=%s\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(1)" "$(2)" | tee -a test_all.log
+endef
 
 .test_arduino_espidf4:
-	$(MAKE) compile_arduino_espidf4 && $(MAKE) test && touch .test_arduino_espidf4
+	$(MAKE) compile_arduino_espidf4 && $(MAKE) test
+	$(call RECORD_PASS,arduino_espidf4,esp32_V6_8_1)
+	touch .test_arduino_espidf4
 
 .test_arduino_3:
-	$(MAKE) compile_arduino_3 && $(MAKE) test && touch .test_arduino_3
+	$(MAKE) compile_arduino_3 && $(MAKE) test
+	$(call RECORD_PASS,arduino_3,esp32_pioarduino_V53_03_11)
+	touch .test_arduino_3
 
 # Cannot install/run
 #.test_idf4:
-#	$(MAKE) compile_idf4 && $(MAKE) test && touch .test_idf4
+#	$(MAKE) compile_idf4 && $(MAKE) test
+#	$(call RECORD_PASS,idf4,esp32_idf_V5_3_0)
+#	touch .test_idf4
 
 .test_arduino_latest:
-	$(MAKE) compile_arduino_latest && $(MAKE) test && touch .test_arduino_latest
+	$(MAKE) compile_arduino_latest && $(MAKE) test
+	$(call RECORD_PASS,arduino_latest,esp32_V7_1_2)
+	touch .test_arduino_latest
 
 .test_idf5:
-	$(MAKE) compile_idf5 && $(MAKE) test && touch .test_idf5
+	$(MAKE) compile_idf5 && $(MAKE) test
+	$(call RECORD_PASS,idf5,esp32_idf_V6_9_0)
+	touch .test_idf5
 
 .test_idf6:
-	$(MAKE) compile_idf6 && $(MAKE) test && touch .test_idf6
+	$(MAKE) compile_idf6 && $(MAKE) test
+	$(call RECORD_PASS,idf6,esp32_idf_V7_1_2)
+	touch .test_idf6
 
 compile: compile_arduino_espidf4
 
@@ -124,6 +155,7 @@ help:
 	@echo "make test                      M1+M9 on the firmware already on the board"
 	@echo "make test_idf5_3               M1..M3 with STEPPER_CONFIG=1 (RMT/I2S/MCPWM)"
 	@echo "make test_all                  compile+test: arduino_espidf4, arduino_3, idf5, arduino_latest"
+	@echo "Passed configs: ls .test_*   and  cat test_all.log"
 
 clean:
-	rm -f seq*.log .test_*
+	rm -f seq*.log test_all.log .test_*
