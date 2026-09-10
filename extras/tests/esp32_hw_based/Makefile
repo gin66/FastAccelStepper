@@ -40,10 +40,10 @@ test: M1.test M9.test
 
 # $1 = seq_xx.py. Logs "arduino_espidf4  M1 seq_04 passed" (or FAILED).
 define RUN_SEQ
-	MOTOR=$* ./$(1) $(DEV) && printf '%s  %s  %s %s passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s  %s %s FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
+	DUT=$(DUT) MOTOR=$* ./$(1) $(DEV) && printf '%s  %s  %s %s passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s  %s %s FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
 endef
 define RUN_SEQ_CFG1
-	STEPPER_CONFIG=1 MOTOR=$* ./$(1) $(DEV) && printf '%s  %s  %s %s config=1 passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s  %s %s config=1 FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
+	DUT=$(DUT) STEPPER_CONFIG=1 MOTOR=$* ./$(1) $(DEV) && printf '%s  %s  %s %s config=1 passed\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log || { printf '%s  %s  %s %s config=1 FAILED\n' "$$(date '+%Y-%m-%d %H:%M:%S')" "$(DUT)" "$*" "$(1:.py=)" | tee -a test_all.log; exit 1; }
 endef
 
 # ESP-IDF 5.3 classic ESP32 (MCPWM/PCNT+RMT+I2S): test M1..M3 with Driver-Types config
