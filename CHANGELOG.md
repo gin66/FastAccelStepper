@@ -9,13 +9,14 @@ pre-1.3.0:
   carries the change (SAM enforces at least MIN_CMD_TICKS)
 - esp32: driver-specific inline addDirChangePauseToQueue(); the buffered
   drivers (RMT, I2S) first drain their output pipeline (RMT idf4: one
-  MIN_CMD_TICKS pause, RMT idf5/6: two, I2S: more than one I2S buffer half),
+  MIN_CMD_TICKS pause = one RMT half, the queue-visible equivalent of the
+  1.2.7 fill-time inject; RMT idf5/6: two, because the encoder runs two
+  halves ahead; I2S: more than one I2S buffer half),
   and the pause that performs the change enforces the user requested delay.
   I2S additionally keeps the change alone for one buffer half (>= I2S_BLOCK_TICKS)
 - Replace the macro-driven direction-change delay configuration
   (BEFORE/AFTER_DIR_CHANGE_DELAY_TICKS) with hard-coded per-driver values;
   the shared dir_change_pause.h default is now used by the test platform only
-- esp32 RMT: Ensure each filled RMT part ends with a pause symbol so DIR toggle cannot race the last step pulse (#370)
 
 1.2.8:
 - Fix moveTimed(): reserve 2 queue slots for direction-change pause commands so

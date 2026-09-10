@@ -43,11 +43,9 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
   uint8_t rp = q->read_idx;
   struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
   if (e_curr->toggle_dir) {
-    // The pause(s) before this dir change have been inserted by
-    // addDirChangePauseToQueue(), so all previous steps have already been
-    // emitted. Toggling here is safe.
+    // addDirChangePauseToQueue() has already queued a pause part in the old
+    // direction, so the other RMT half is a pause when this fill toggles DIR.
     LL_TOGGLE_PIN(q->dirPin);
-    // and delete the request
     e_curr->toggle_dir = 0;
   }
 

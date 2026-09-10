@@ -216,6 +216,24 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //                  I2S_BLOCK_TICKS)
 //   MCPWM/PCNT    none                               user dir_change_delay
 //
+// IDF4 vs IDF5 RMT pause count is not a guess: it is the number of PART_SIZE
+// halves the hardware fills ahead of the wire. Each queue pause occupies
+// exactly one half, so N pauses put a pause in the other half when the
+// toggle command is filled — the same slot the 1.2.7 fill-time inject used.
+//
+//   IDF4 ping-pongs one half per interrupt (and startQueue's double-fill
+//   puts the drain in part 2, so the first ISR fill is the toggle while
+//   that drain plays). One pause is therefore the same as one inject:
+//   last step part -> pause part -> fill that toggles DIR.
+//   A second pause shifts the toggle one half later, so DIR no longer
+//   sits on the pause that immediately follows the last steps.
+//
+//   IDF5/6's encoder is invoked two PART_SIZE chunks ahead, so two pauses
+//   are required for the same "other half is a pause" condition.
+//
+// The fill path must not insert pauses of its own: extra ticks would be
+// invisible to addQueueEntry()/moveTimed().
+//
 // Once the pipeline is drained, the pause that carries the direction change is
 // inserted (count_up = cmd->count_up). The driver toggles the pin while
 // processing that entry and then idles, so the user requested
