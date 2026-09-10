@@ -1,7 +1,13 @@
 # Build Matrix Database
-# Single source of truth for platformio.ini and GitHub workflow configurations
+# Single source of truth for platformio.ini, GitHub workflows, and
+# extras/tests/esp32_hw_based/envs.mk
 #
-# Usage: ./extras/scripts/generate_build_configs.py [--platformio] [--workflows] [--dry-run]
+# ESP32 platform versions are platformio/platform-espressif32 releases:
+#   https://github.com/platformio/platform-espressif32/releases
+# PIO platform version != ESP-IDF version. Check "Supported Frameworks" on
+# each GitHub release for the Arduino and ESP-IDF versions it ships.
+#
+# Usage: ./extras/scripts/generate_build_configs.py [--platformio] [--workflows] [--hw-tests] [--dry-run]
 
 templates:
   esp32_arduino:
@@ -299,7 +305,7 @@ versioned_environments:
   esp32:
     prefix: esp32
     template: esp32_arduino
-    versions: ["7.1.1", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
+    versions: ["7.1.2", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
 
   esp32_werror:
     prefix: esp32
@@ -337,7 +343,7 @@ versioned_environments:
     prefix: esp32_idf
     template: esp32_idf
     build_flags_extra: ["-DCONFIG_RMT_ENABLE_DEBUG_LOG=5"]
-    versions: ["7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.7.0"]
+    versions: ["7.1.2", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.7.0"]
 
   esp32_idf_old:
     prefix: esp32_idf
@@ -347,27 +353,47 @@ versioned_environments:
   esp32c3_idf:
     prefix: esp32c3_idf
     template: esp32c3_idf
-    versions: ["7.1.1", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
+    versions: ["7.1.2", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
 
   esp32s2_idf:
     prefix: esp32s2_idf
     template: esp32s2_idf
-    versions: ["7.1.1", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
+    versions: ["7.1.2", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
 
   esp32s3_idf:
     prefix: esp32s3_idf
     template: esp32s3_idf
-    versions: ["7.1.1", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
+    versions: ["7.1.2", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "5.3.0"]
 
   esp32c6_idf:
     prefix: esp32c6_idf
     template: esp32c6_idf
-    versions: ["7.1.1", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1"]
+    versions: ["7.1.2", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1"]
 
   esp32h2_idf:
     prefix: esp32h2_idf
     template: esp32h2_idf
-    versions: ["7.1.1", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1"]
+    versions: ["7.1.2", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1"]
+
+# Classic ESP32 hardware tests (extras/tests/esp32_hw_based).
+# Env names must exist in environments / versioned_environments above.
+# Arduino envs are flashed from pio_dirs/StepperDemo; IDF envs from pio_espidf/StepperDemo.
+# Compile-only (not in test_all): esp32_idf_V5_3_0 cannot install/run on this
+# board; esp32_idf_V7_1_2 is available via make compile_esp32_idf_V7_1_2.
+hw_tests:
+  default_compile: esp32_V6_8_1
+  compile:
+    - esp32_V6_8_1
+    - esp32_pioarduino_V53_03_11
+    - esp32_V7_1_2
+    - esp32_idf_V5_3_0
+    - esp32_idf_V6_9_0
+    - esp32_idf_V7_1_2
+  test_all:
+    - esp32_V6_8_1
+    - esp32_pioarduino_V53_03_11
+    - esp32_idf_V6_9_0
+    - esp32_V7_1_2
 
 workflows:
   arduino:
