@@ -37,6 +37,7 @@
 
 #include <cstring>
 #include "driver/uart.h"
+#include "esp_idf_version.h"
 #include "esp_rom_sys.h"
 #include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
@@ -56,7 +57,11 @@ static void serialInit() {
   uart_config.parity = UART_PARITY_DISABLE;
   uart_config.stop_bits = UART_STOP_BITS_1;
   uart_config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   uart_config.source_clk = UART_SCLK_DEFAULT;
+#else
+  uart_config.source_clk = UART_SCLK_APB;
+#endif
   uart_param_config(UART_NUM_0, &uart_config);
   uart_driver_install(UART_NUM_0, 256, 0, 0, NULL, 0);
 }
