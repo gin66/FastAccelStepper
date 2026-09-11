@@ -46,8 +46,8 @@ bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
       // nothing ever blocks: a busy or transient result simply leaves the
       // state unchanged and the main loop feeds the next command on the
       // following tick, keeping the task watchdog happy.
-      if (seq->s16_1 < REPLAY_PATTERN_LEN) {
-        int16_t idx = seq->s16_1;
+      int16_t idx = seq->s16_1;
+      if (idx < REPLAY_PATTERN_LEN) {
         bool start = (seq->s16_2 != 0);
         MoveTimedResultCode rc =
             seq14_feed(stepper, REPLAY_PATTERN[idx].steps,
@@ -63,6 +63,9 @@ bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
             // pure fill phase (start=false) to running top-up mode
             // (start=true, which auto-restarts the queue) and retry the
             // same command on the next tick without advancing.
+            if (seq->s16_2 == 0) {
+              stepper->moveTimed(0, 0, NULL, true);  // start the queue
+            }
             seq->s16_2 = 1;
             break;
           case MoveTimedResultCode::DirPinIsBusy:

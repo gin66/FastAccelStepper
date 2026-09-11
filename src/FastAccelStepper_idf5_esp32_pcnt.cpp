@@ -1,35 +1,62 @@
 #include "fas_queue/stepper_queue.h"
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 5)
 
-// Why the hell, does espressif think, that the unit and channel id are not
-// needed ? Without unit/channel ID, the needed parameter for
-// gpio_matrix_in/gpio_iomux_in cannot be derived.
-//
-// Here we declare the private pcnt_chan_t structure, which is not safe.
+// pcnt_new_channel() with a real GPIO still calls gpio_config() on that pin
+// (input + pull-up, output off). Step and dir pins are already driven by
+// RMT/MCPWM/GPIO; that drop of output routing stops the pulse driver.
+// Channel is created with virtual IOs, then only input is appended via the
+// GPIO matrix (same approach as the MCPWM/PCNT driver, without touching
+// func_out_sel).
+
 struct pcnt_unit_t {
   /*pcnt_group_t*/ void* group;
   portMUX_TYPE spinlock;
   int unit_id;
-  // remainder of struct not needed
 };
+
 struct pcnt_chan_t {
   pcnt_unit_t* unit;
   int channel_id;
-  // remainder of struct not needed
 };
+
+static void pcnt_listen_on_output_pin(int gpio_num, int signal_idx) {
+  gpio_ll_input_enable(&GPIO, (gpio_num_t)gpio_num);
+  esp_rom_gpio_connect_in_signal((uint32_t)gpio_num, (uint32_t)signal_idx,
+                                 false);
+}
+
+static void pcnt_abort_attach(pcnt_channel_handle_t chan,
+                              pcnt_unit_handle_t unit, bool enabled) {
+  if (enabled) {
+    pcnt_unit_disable(unit);
+  }
+  if (chan) {
+    pcnt_del_channel(chan);
+  }
+  if (unit) {
+    pcnt_del_unit(unit);
+  }
+}
 
 bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
                                             int16_t low_value,
                                             int16_t high_value,
                                             uint8_t dir_pin) {
-  pcnt_unit_config_t config = {.low_limit = low_value,
-                               .high_limit = high_value,
+  (void)unused_pcnt_unit;
+
+  int low_limit = low_value;
+  int high_limit = high_value;
+  if ((low_limit == 0) && (high_limit == 0)) {
+    low_limit = -32768;
+    high_limit = 32767;
+  }
+
+  pcnt_unit_config_t config = {.low_limit = low_limit,
+                               .high_limit = high_limit,
                                .intr_priority = 0,
                                .flags = {.accum_count = 0}};
   pcnt_unit_handle_t punit = NULL;
-  esp_err_t rc;
-  rc = pcnt_new_unit(&config, &punit);
-  if (rc != ESP_OK) {
+  if (pcnt_new_unit(&config, &punit) != ESP_OK) {
     return false;
   }
 
@@ -49,9 +76,9 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
   if (dir_pin == PIN_UNDEFINED) {
     dir_pin = getDirectionPin();
   }
-
-  if (dir_pin != PIN_UNDEFINED && (dir_pin & PIN_EXTERNAL_FLAG) == 0) {
-    chan_config.level_gpio_num = dir_pin;
+  bool use_dir =
+      (dir_pin != PIN_UNDEFINED) && ((dir_pin & PIN_EXTERNAL_FLAG) == 0);
+  if (use_dir) {
     if (directionPinHighCountsUp()) {
       level_low = PCNT_CHANNEL_LEVEL_ACTION_INVERSE;
     } else {
@@ -60,69 +87,58 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
   }
 
   pcnt_channel_handle_t pcnt_chan = NULL;
-  rc = pcnt_new_channel(punit, &chan_config, &pcnt_chan);
-  if (rc != ESP_OK) {
-    pcnt_del_unit(punit);
+  if (pcnt_new_channel(punit, &chan_config, &pcnt_chan) != ESP_OK) {
+    pcnt_abort_attach(NULL, punit, false);
     return false;
   }
 
   int unit_id = punit->unit_id;
   int channel_id = pcnt_chan->channel_id;
-  if ((unit_id < 0) || (unit_id >= SUPPORT_ESP32_PULSE_COUNTER)) {
-    // perhaps the pcnt_chan_t-structure is changed !?
-    pcnt_del_channel(pcnt_chan);
-    pcnt_del_unit(punit);
+  if ((unit_id < 0) || (unit_id >= SUPPORT_ESP32_PULSE_COUNTER) ||
+      (channel_id < 0) || (channel_id >= 2)) {
+    pcnt_abort_attach(pcnt_chan, punit, false);
     return false;
   }
 
-  rc =
-      pcnt_channel_set_edge_action(pcnt_chan, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
-                                   PCNT_CHANNEL_EDGE_ACTION_HOLD);
-  if (rc != ESP_OK) {
+  if (pcnt_channel_set_edge_action(pcnt_chan, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
+                                   PCNT_CHANNEL_EDGE_ACTION_HOLD) != ESP_OK) {
+    pcnt_abort_attach(pcnt_chan, punit, false);
     return false;
   }
-  rc = pcnt_channel_set_level_action(pcnt_chan, level_high, level_low);
-  if (rc != ESP_OK) {
-    return false;
-  }
-
-  rc = pcnt_unit_enable(punit);
-  if (rc != ESP_OK) {
-    return false;
-  }
-  rc = pcnt_unit_clear_count(punit);
-  if (rc != ESP_OK) {
-    return false;
-  }
-  rc = pcnt_unit_start(punit);
-  if (rc != ESP_OK) {
+  if (pcnt_channel_set_level_action(pcnt_chan, level_high, level_low) !=
+      ESP_OK) {
+    pcnt_abort_attach(pcnt_chan, punit, false);
     return false;
   }
 
   uint8_t step_pin = getStepPin();
-#ifdef TRACE
-  printf("pins = %d/%d unit_id=%d channel_id=%d\n", step_pin, dir_pin, unit_id,
-         channel_id);
-#endif
-  int signal = pcnt_periph_signals.groups[0]
-                   .units[unit_id]
-                   .channels[channel_id]
-                   .pulse_sig;
-  gpio_matrix_in(step_pin, signal, 0);
-  gpio_iomux_in(step_pin, signal);
-  if (dir_pin != PIN_UNDEFINED && (dir_pin & PIN_EXTERNAL_FLAG) == 0) {
-    pinMode(dir_pin, OUTPUT);
-    int control = pcnt_periph_signals.groups[0]
+  int pulse_sig = pcnt_periph_signals.groups[0]
                       .units[unit_id]
                       .channels[channel_id]
-                      .control_sig;
-    gpio_iomux_out(dir_pin, 0x100, false);
-    gpio_matrix_in(dir_pin, control, 0);
-    gpio_iomux_in(dir_pin, control);
+                      .pulse_sig;
+  pcnt_listen_on_output_pin(step_pin, pulse_sig);
+  if (use_dir) {
+    int control_sig = pcnt_periph_signals.groups[0]
+                          .units[unit_id]
+                          .channels[channel_id]
+                          .control_sig;
+    pcnt_listen_on_output_pin(dir_pin, control_sig);
+  }
+
+  if (pcnt_unit_enable(punit) != ESP_OK) {
+    pcnt_abort_attach(pcnt_chan, punit, false);
+    return false;
+  }
+  if (pcnt_unit_clear_count(punit) != ESP_OK) {
+    pcnt_abort_attach(pcnt_chan, punit, true);
+    return false;
+  }
+  if (pcnt_unit_start(punit) != ESP_OK) {
+    pcnt_abort_attach(pcnt_chan, punit, true);
+    return false;
   }
 
   _attached_pulse_unit = punit;
-
   return true;
 }
 
@@ -131,6 +147,7 @@ void FastAccelStepper::clearPulseCounter() {
     pcnt_unit_clear_count(_attached_pulse_unit);
   }
 }
+
 int16_t FastAccelStepper::readPulseCounter() {
   int value = 0;
   if (pulseCounterAttached()) {
