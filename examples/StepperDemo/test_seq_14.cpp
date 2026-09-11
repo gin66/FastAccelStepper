@@ -5,36 +5,19 @@
 
 #define SEQ14_TIME_LIMIT_MS 1000
 
-static bool seq14_retry(MoveTimedResultCode rc) {
-  switch (rc) {
-    case MOVE_TIMED_BUSY:
-    case MoveTimedResultCode::QueueFull:
-    case MoveTimedResultCode::DirPinIsBusy:
-    case MoveTimedResultCode::DirPin2msPauseAdded:
-    case MoveTimedResultCode::DirChangePauseInjected:
-    case MoveTimedResultCode::WaitForEnablePinActive:
-    case MoveTimedResultCode::DeviceNotReady:
-      return true;
-    default:
-      return false;
-  }
-}
-
-static bool seq14_feed(FastAccelStepper* stepper, int16_t steps, uint32_t ticks,
-                       int32_t* drift) {
+// Feed one command to the stepper. A successful append (MOVE_TIMED_OK /
+// MOVE_TIMED_EMPTY) updates the drift; every other result is handed back to the
+// caller so it can decide what to do on the next loop() tick.
+static MoveTimedResultCode seq14_feed(FastAccelStepper* stepper, int16_t steps,
+                                      uint32_t ticks, int32_t* drift,
+                                      bool start) {
   uint32_t duration = ticks + *drift;
-  for (;;) {
-    uint32_t actual = 0;
-    MoveTimedResultCode rc = stepper->moveTimed(steps, duration, &actual, true);
-    if ((rc == MOVE_TIMED_OK) || (rc == MOVE_TIMED_EMPTY)) {
-      *drift = (int32_t)(duration - actual);
-      return true;
-    }
-    if (!seq14_retry(rc)) {
-      PRINTLN(toString(rc));
-      return false;
-    }
+  uint32_t actual = 0;
+  MoveTimedResultCode rc = stepper->moveTimed(steps, duration, &actual, start);
+  if ((rc == MOVE_TIMED_OK) || (rc == MOVE_TIMED_EMPTY)) {
+    *drift = (int32_t)(duration - actual);
   }
+  return rc;
 }
 
 bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
@@ -51,18 +34,52 @@ bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
       stepper->setCurrentPosition(0);
       stepper->clearPulseCounter();
       seq->u32_1 = MILLIS();
+      seq->s16_1 = 0;  // next command index into REPLAY_PATTERN
+      seq->s16_2 = 0;  // 0: filling (start=false), 1: running top-up
+      seq->s32_1 = 0;  // drift
       seq->state++;
-      // fall through
+      break;
     case 1: {
-      int32_t drift = 0;
-      for (uint16_t i = 0; i < REPLAY_PATTERN_LEN; i++) {
-        if (!seq14_feed(stepper, REPLAY_PATTERN[i].steps,
-                        REPLAY_PATTERN[i].ticks, &drift)) {
-          seq->state = TEST_STATE_ERROR;
-          return true;
+      // Replay the recorded #370 stroke one command per loop() tick. The
+      // command index and the fill/run mode live in the sequence state, so
+      // nothing ever blocks: a busy or transient result simply leaves the
+      // state unchanged and the main loop feeds the next command on the
+      // following tick, keeping the task watchdog happy.
+      if (seq->s16_1 < REPLAY_PATTERN_LEN) {
+        int16_t idx = seq->s16_1;
+        bool start = (seq->s16_2 != 0);
+        MoveTimedResultCode rc =
+            seq14_feed(stepper, REPLAY_PATTERN[idx].steps,
+                       REPLAY_PATTERN[idx].ticks, &seq->s32_1, start);
+        switch (rc) {
+          case MOVE_TIMED_OK:
+          case MOVE_TIMED_EMPTY:
+            seq->s16_1++;
+            break;
+          case MOVE_TIMED_BUSY:
+          case MoveTimedResultCode::QueueFull:
+            // Queue is full: the move was not appended. Switch from the
+            // pure fill phase (start=false) to running top-up mode
+            // (start=true, which auto-restarts the queue) and retry the
+            // same command on the next tick without advancing.
+            seq->s16_2 = 1;
+            break;
+          case MoveTimedResultCode::DirPinIsBusy:
+          case MoveTimedResultCode::DirPin2msPauseAdded:
+          case MoveTimedResultCode::DirChangePauseInjected:
+          case MoveTimedResultCode::WaitForEnablePinActive:
+          case MoveTimedResultCode::DeviceNotReady:
+            // Transient: keep the index and mode for the next tick.
+            break;
+          default:
+            PRINTLN(toString(rc));
+            seq->state = TEST_STATE_ERROR;
+            break;
+        }
+        if (seq->s16_1 >= REPLAY_PATTERN_LEN) {
+          seq->state++;
         }
       }
-      seq->state++;
       break;
     }
     case 2:
