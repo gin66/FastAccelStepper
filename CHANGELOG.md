@@ -12,6 +12,9 @@ pre-1.3.0:
 - esp32: IDF 5 MCPWM/PCNT inserts one MIN_CMD_TICKS pause before a direction
   change. Pause TEA at compare=1 applies DIR at the start of that pause
   (one-command pipeline); STEP stays low for the rest. IDF 4 does not need this.
+- esp32: MCPWM/PCNT (IDF 4 and 5): do not prefetch PCNT H_LIM after a pause.
+  dir_change_delay_us inserted a pause between commands, the old step count
+  stayed latched, and e.g. -26 then +10 ran as -26 then +26.
 - Refactor direction-change pause handling out of FastAccelStepper::addQueueEntry()
   into the queue protocol method StepperQueue::addDirChangePauseToQueue()
 - New result code AQE_DIR_CHANGE_PAUSE_INJECTED (6): direction-change pause(s)

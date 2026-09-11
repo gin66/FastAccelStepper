@@ -167,7 +167,7 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
       }
       apply_command(q, e_curr);
       rp++;
-      if (rp != q->next_write_idx) {
+      if ((rp != q->next_write_idx) && (e_curr->steps != 0)) {
         struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
         q->_nextCommandIsPrepared = true;
         prepare_for_next_command(q, e_next);

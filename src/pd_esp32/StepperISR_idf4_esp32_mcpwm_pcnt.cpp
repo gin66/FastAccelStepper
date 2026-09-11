@@ -280,7 +280,11 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
       }
       apply_command(q, e_curr);
       rp++;
-      if (rp != q->next_write_idx) {
+      if ((rp != q->next_write_idx) && (e_curr->steps != 0)) {
+        // cnt_h_lim is latched on counter zero. prepare() is a no-op for
+        // pauses, so prefetching after a pause leaves the previous step
+        // count active (e.g. -26, pause, +10 ran as +26). The next ISR
+        // prepares and clears instead.
         struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
         q->_nextCommandIsPrepared = true;
         prepare_for_next_command(q, e_next);  // a no-op for pause command
