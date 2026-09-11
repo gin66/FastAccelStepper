@@ -310,7 +310,11 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   mcpwm->operators[timer_in_group].dt_cfg.val = 0;
   mcpwm->operators[timer_in_group].carrier_cfg.val = 0;
   mcpwm->operators[timer_in_group].gen_force.val = 0;
+  // 160 MHz/5 (H2: 96 MHz/3) = 32 MHz => 16 MHz in up/down-mode.
+  // mcpwm_new_timer(resolution_hz=TICKS_PER_S) also sets timer_prescale to
+  // reach 16 MHz; leaving that in place with clk_prescale=5 is ~5x too slow.
   mcpwm->clk_cfg.clk_prescale = FAS_MCPWM_PRESCALE;
+  mcpwm->timer[timer_in_group].timer_cfg0.timer_prescale = 0;
   mcpwm->operator_timersel.val = 0;
   mcpwm->operator_timersel.operator0_timersel = 0;
   mcpwm->operator_timersel.operator1_timersel = 1;

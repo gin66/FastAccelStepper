@@ -6,6 +6,12 @@ pre-1.3.0:
   gpio_iomux_input, which would drop the pulse driver)
 - esp32: attachToPulseCounter() on ESP-IDF 5 no longer resets step/dir GPIO
   (pcnt_new_channel was calling gpio_config() as input+pull-up on the dir pin)
+- esp32: IDF 5 MCPWM/PCNT timebase matches IDF 4 (16 MHz). mcpwm_new_timer()
+  had already divided the timer clock for 16 MHz; clk_prescale=5 on top made
+  steps ~5x too slow. timer_prescale is now 0 as in IDF 4.
+- esp32: IDF 5 MCPWM/PCNT inserts one MIN_CMD_TICKS pause before a direction
+  change. Pause TEA at compare=1 applies DIR at the start of that pause
+  (one-command pipeline); STEP stays low for the rest. IDF 4 does not need this.
 - Refactor direction-change pause handling out of FastAccelStepper::addQueueEntry()
   into the queue protocol method StepperQueue::addDirChangePauseToQueue()
 - New result code AQE_DIR_CHANGE_PAUSE_INJECTED (6): direction-change pause(s)

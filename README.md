@@ -444,6 +444,8 @@ As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers a
 
 One specific note for the rmt: If a direction pin toggle is needed directly after a command with steps, then the driver will add before that direction pin toggle another pause of `MIN_CMD_TICKS` ticks.
 
+MCPWM/PCNT on ESP-IDF 5 inserts one `MIN_CMD_TICKS` pause before a direction change. Pause commands complete via the MCPWM compare interrupt at tick 1, so the next command (and DIR) is applied at the start of that pause — a one-command pipeline. STEP stays low for the rest of the pause. ESP-IDF 4 MCPWM/PCNT does not need this pause.
+
 ### ESP32S2
 
 This stepper driver uses rmt module only.

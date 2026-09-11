@@ -221,7 +221,14 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //                 GPIO DIR is async at fill time
 //   I2S mux DIR   none                               max(I2S_BLOCK_TICKS,
 //                 (mask applies to the next block)   user dir_change_delay)
-//   MCPWM/PCNT    none                               user dir_change_delay
+//   MCPWM/PCNT    none (idf4)                        user dir_change_delay
+//   MCPWM/PCNT    1 x MIN_CMD_TICKS (idf5+)          user dir_change_delay
+//                 Pause commands interrupt at MCPWM
+//                 compare (tick 1), so the next
+//                 command — and DIR — is applied at
+//                 the start of that pause (one-command
+//                 pipeline). STEP stays low for the
+//                 rest of MIN_CMD_TICKS.
 //
 // IDF4 vs IDF5 RMT pause count is not a guess: it is the number of PART_SIZE
 // halves the hardware fills ahead of the wire. Each queue pause occupies
@@ -250,7 +257,9 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 // needed_pause_ticks: GPIO DIR needs 2*I2S_BLOCK_TICKS before the change
 // (in-flight block and the block being filled must contain no steps). Mux-slot
 // DIR (PIN_I2S_FLAG) updates _mux_state for the next block, so the after-pause
-// is I2S_BLOCK_TICKS and there is no extra before-pause.
+// is I2S_BLOCK_TICKS and there is no extra before-pause. IDF5 MCPWM uses
+// needed_pause_ticks = MIN_CMD_TICKS: pause TEA at compare=1 applies the
+// following command (DIR) at the start of the pause (IDF4 MCPWM does not).
 static inline bool esp32_driver_is_rmt(StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_ESP32_RMT)
@@ -259,6 +268,20 @@ static inline bool esp32_driver_is_rmt(StepperQueue* q) {
   return false;
 #endif
 #elif defined(SUPPORT_ESP32_RMT)
+  return true;
+#else
+  return false;
+#endif
+}
+
+static inline bool esp32_driver_is_mcpwm(StepperQueue* q) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#if defined(SUPPORT_ESP32_MCPWM_PCNT)
+  return q->_driver_type == FasDriver::MCPWM_PCNT;
+#else
+  return false;
+#endif
+#elif defined(SUPPORT_ESP32_MCPWM_PCNT)
   return true;
 #else
   return false;
@@ -312,6 +335,11 @@ static inline uint16_t esp32_before_pause_ticks(StepperQueue* q) {
   if (esp32_driver_is_rmt(q)) {
     return MIN_CMD_TICKS;
   }
+#if defined(SUPPORT_ESP32_MCPWM_PCNT) && (ESP_IDF_VERSION_MAJOR >= 5)
+  if (esp32_driver_is_mcpwm(q)) {
+    return MIN_CMD_TICKS;
+  }
+#endif
 #if defined(SUPPORT_ESP32_I2S)
   if (esp32_driver_is_i2s(q) && !esp32_i2s_dir_is_mux_slot(q)) {
     return (uint16_t)(2 * I2S_BLOCK_TICKS);

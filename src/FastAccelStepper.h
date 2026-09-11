@@ -115,6 +115,12 @@ class FastAccelStepper {
   //
   // ESP32 I2S_DIRECT requires a GPIO (or external pin >= 128). I2S mux slots
   // (`pin | PIN_I2S_FLAG`) are valid only with I2S_MUX.
+  //
+  // ESP32 MCPWM/PCNT on ESP-IDF 5 inserts one MIN_CMD_TICKS pause before a
+  // direction change. Pause commands interrupt at MCPWM compare (tick 1), so
+  // DIR is applied at the start of that pause (one-command pipeline); STEP
+  // stays low for the rest. ESP-IDF 4 does not need this. Independent of
+  // dir_change_delay_us.
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
   inline uint8_t getDirectionPin() const { return _dirPin; }
