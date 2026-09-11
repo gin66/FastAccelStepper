@@ -1,4 +1,7 @@
 pre-1.3.0:
+- esp32: Enable attachToPulseCounter() on ESP-IDF 6. Step/dir pins stay
+  outputs; PCNT only appends GPIO-matrix input (no gpio_set_direction /
+  gpio_iomux_input, which would drop the pulse driver)
 - Refactor direction-change pause handling out of FastAccelStepper::addQueueEntry()
   into the queue protocol method StepperQueue::addDirChangePauseToQueue()
 - New result code AQE_DIR_CHANGE_PAUSE_INJECTED (6): direction-change pause(s)
