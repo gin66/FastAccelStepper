@@ -34,7 +34,7 @@ const struct stepper_config_s esp32_config_0[] = {
       driver_type : DRIVER_DONT_CARE,
 #endif
     },
-    {step : PIN_UNDEFINED}};
+    STEPPER_CONFIG_END};
 #define NUM_CONFIGS 1
 const struct stepper_config_set_s stepper_configs[NUM_CONFIGS] = {
     {"C3-Test", esp32_config_0},

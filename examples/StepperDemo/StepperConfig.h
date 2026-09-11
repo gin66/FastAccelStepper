@@ -23,4 +23,35 @@ struct stepper_config_set_s {
   const struct stepper_config_s* config;
 };
 
+// Last entry of a config list (step == PIN_UNDEFINED). All fields are set so
+// -Wmissing-field-initializers stays quiet.
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+#define STEPPER_CONFIG_END              \
+  {                                     \
+    step : PIN_UNDEFINED,               \
+    enable_low_active : PIN_UNDEFINED,  \
+    enable_high_active : PIN_UNDEFINED, \
+    direction : PIN_UNDEFINED,          \
+    dir_change_delay : 0,               \
+    direction_high_count_up : true,     \
+    auto_enable : false,                \
+    on_delay_us : 0,                    \
+    off_delay_ms : 0,                   \
+    driver_type : DRIVER_DONT_CARE      \
+  }
+#else
+#define STEPPER_CONFIG_END              \
+  {                                     \
+    step : PIN_UNDEFINED,               \
+    enable_low_active : PIN_UNDEFINED,  \
+    enable_high_active : PIN_UNDEFINED, \
+    direction : PIN_UNDEFINED,          \
+    dir_change_delay : 0,               \
+    direction_high_count_up : true,     \
+    auto_enable : false,                \
+    on_delay_us : 0,                    \
+    off_delay_ms : 0                    \
+  }
+#endif
+
 #endif

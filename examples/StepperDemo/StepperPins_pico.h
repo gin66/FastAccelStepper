@@ -39,7 +39,7 @@ const struct stepper_config_s pico_config_0[] = {
       on_delay_us : 500000,
       off_delay_ms : 5000
     },
-    {step : PIN_UNDEFINED}};
+    STEPPER_CONFIG_END};
 #define NUM_CONFIGS 1
 const struct stepper_config_set_s stepper_configs[NUM_CONFIGS] = {
     {"Default", pico_config_0},

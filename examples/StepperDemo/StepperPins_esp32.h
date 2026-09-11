@@ -224,7 +224,7 @@ const struct stepper_config_s esp32_config_0[] = {
 #endif
     },
 #endif
-    {step : PIN_UNDEFINED}};
+    STEPPER_CONFIG_END};
 const struct stepper_config_s esp32_config_1[] = {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(QUEUES_RMT) && \
     (QUEUES_RMT > 0)
@@ -271,7 +271,7 @@ const struct stepper_config_s esp32_config_1[] = {
       driver_type : DRIVER_MCPWM_PCNT,
     },
 #endif
-    {step : PIN_UNDEFINED}};
+    STEPPER_CONFIG_END};
 #define NUM_CONFIGS 2
 const struct stepper_config_set_s stepper_configs[NUM_CONFIGS] = {
     {"Test-HW", esp32_config_0},
