@@ -19,6 +19,12 @@ pre-1.3.0:
   halves ahead; I2S: more than one I2S buffer half),
   and the pause that performs the change enforces the user requested delay.
   I2S additionally keeps the change alone for one buffer half (>= I2S_BLOCK_TICKS)
+- esp32 I2S: direction-change pauses depend on the DIR pin. GPIO DIR is
+  async at fill time, so 2*I2S_BLOCK_TICKS of pause is required before the
+  change (both DMA blocks without steps). Mux-slot DIR (PIN_I2S_FLAG) updates
+  the next block's mask, so I2S_BLOCK_TICKS after the change and no extra
+  before-pause. GPIO before-pause is skipped when `_last_pause_ticks` already
+  covers 2*I2S_BLOCK_TICKS.
 - Replace the macro-driven direction-change delay configuration
   (BEFORE/AFTER_DIR_CHANGE_DELAY_TICKS) with hard-coded per-driver values;
   the shared dir_change_pause.h default is now used by the test platform only

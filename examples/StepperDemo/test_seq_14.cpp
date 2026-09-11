@@ -29,6 +29,7 @@ bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
         seq->state = TEST_STATE_ERROR;
         return true;
       }
+      PRINTLN("Attached to pulse counter 7");
       stepper->setAutoEnable(false);
       stepper->enableOutputs();
       stepper->setCurrentPosition(0);

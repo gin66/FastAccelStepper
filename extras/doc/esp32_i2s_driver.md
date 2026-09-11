@@ -204,10 +204,8 @@ The function:
 2. Stores it in `StepperQueue::_i2s_mux_manager` (static)
 3. Sets `StepperQueue::_i2s_mux_initialized = true`
 
-**DIR/ENABLE signals**: In I2S_MUX mode, DIR and ENABLE pins are controlled via
-standard GPIO (not through the I2S bitstream). Use `setDirectionPin()` and
-`setAutoEnable()` as with other driver types. The I2S bitstream only carries
-STEP signals.
+**DIR/ENABLE signals**: GPIO pins or I2S mux slots (`pin | PIN_I2S_FLAG`).
+See [DIR/ENABLE Signal Handling](#direnable-signal-handling).
 
 ### I2S_MUX Mode — Stepper Connection
 
@@ -483,27 +481,40 @@ based on whether this is an I2S_DIRECT or I2S_MUX queue.
 
 ---
 
-## DIR/ENABLE Signal Handling (I2S_MUX Mode)
+## DIR/ENABLE Signal Handling
 
-In I2S_MUX mode, DIR and ENABLE signals are controlled via standard GPIO pins,
-not through the I2S bitstream. This simplifies the design and avoids the need
-for bitmask configuration.
+DIR and ENABLE may be GPIO pins or I2S mux slots (`pin | PIN_I2S_FLAG`).
+`setDirectionPin()` / `setEnablePin()` / `setAutoEnable()` work as with other
+drivers. In MUX mode the I2S bitstream carries STEP bits; mux-slot DIR/ENABLE
+are held in `_mux_state` and written into every frame by `init_mux_buffer()`.
 
-- **DIR**: Use `setDirectionPin()` as with other driver types
-- **ENABLE**: Use `setAutoEnable()` or manual enable control via GPIO
+### Direction Change Timing
 
-The I2S bitstream only carries STEP signals for each slot.
+The fill path toggles DIR when it consumes `toggle_dir` (GPIO via
+`LL_TOGGLE_PIN`, mux-slot via `i2sMuxSetBit`). It does not insert pauses of
+its own. `addQueueEntry()` / `addDirChangePauseToQueue()` insert drain pauses
+using `SUPPORT_PAUSE_CMD_COUNTING` (`_last_pause_ticks`; pause *count* is
+RMT-only):
+
+| DIR pin | Before (`needed_pause_ticks`) | After |
+|---------|-------------------------------|-------|
+| GPIO (I2S_DIRECT always; I2S_MUX without `PIN_I2S_FLAG`) | `2*I2S_BLOCK_TICKS` — in-flight block and the block being filled must contain no steps (GPIO DIR is async at fill time) | none (only user `dir_change_delay_ticks`) |
+| Mux slot (`PIN_I2S_FLAG`, I2S_MUX only) | none — `i2sMuxSetBit()` updates `_mux_state` for the next `init_mux_buffer()` | `I2S_BLOCK_TICKS` so reverse steps start in the next block |
+
+I2S_DIRECT direction pins are GPIO. `PIN_I2S_FLAG` on a DIRECT stepper is stripped.
+
+Skipped when `_last_pause_ticks` already meets `needed_pause_ticks`
+(`moveTimed()` or an explicit pause).
 
 ---
 
 ## ForceStop
 
-### Current Implementation (I2S_DIRECT)
-
 ```cpp
 void StepperQueue::forceStop_i2s() {
   _isRunning = false;
   _fill_state = {};
+  read_idx = next_write_idx;
 }
 ```
 
@@ -685,3 +696,4 @@ The fill function is testable on PC without I2S hardware. `test_21.cpp` provides
 | Pulse width | Fixed 32 ticks | Fixed 64 ticks (1 frame) |
 | WS pin | Unused | Required for demux |
 | Min speed ticks | 80 | 400 |
+| Dir-change pause | GPIO DIR: `2*I2S_BLOCK_TICKS` before. Mux-slot DIR: `I2S_BLOCK_TICKS` after | Same |

@@ -198,6 +198,8 @@ it does not insert additional delays between direction changes and step pulses.
 It is the responsibility of command generation (ramp generator / `addQueueEntry()`)
 to insert sufficient pause commands between a direction change and the next step
 to meet the stepper driver's minimum direction setup time (`MIN_DIR_DELAY_US`).
+Buffered drivers (RMT, I2S) skip those pauses when `SUPPORT_PAUSE_CMD_COUNTING`
+shows the caller already queued them. See `extras/doc/esp32_i2s_driver.md`.
 
 ### forceStop() Contract
 

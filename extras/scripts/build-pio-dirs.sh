@@ -33,7 +33,11 @@ do
 	done
 done
 
-# for espidf as of now, the src/* files need to be linked into the example build directory
+# ESP-IDF examples: link sources into the PlatformIO build directory.
+# StepperDemo.ino cannot be symlinked as StepperDemo.cpp: PlatformIO's
+# espidf.py compiles os.path.realpath(src), so the suffix becomes .ino
+# and SCons rejects it. A one-line .cpp include keeps the suffix and
+# still tracks edits to the sketch. Other files are plain symlinks.
 rm -fR pio_espidf
 mkdir pio_espidf
 for i in `cd extras;ls idf_examples`
@@ -47,7 +51,22 @@ do
 	)
 done
 mkdir -p pio_espidf/StepperDemo/src
-(cd pio_espidf/StepperDemo;ln -s ../../extras/ci/platformio.ini;cd src;cp ../../../examples/StepperDemo/* .;mv StepperDemo.ino StepperDemo.cpp)
+(
+	cd pio_espidf/StepperDemo
+	ln -s ../../extras/ci/platformio.ini .
+	cd src
+	FILES=`cd ../../../examples/StepperDemo;find . -type f`
+	for f in $FILES
+	do
+		base=`basename "$f"`
+		if [ "$base" = "StepperDemo.ino" ]
+		then
+			printf '%s\n' '#include "../../../examples/StepperDemo/StepperDemo.ino"' >StepperDemo.cpp
+		else
+			ln -s ../../../examples/StepperDemo/$f .
+		fi
+	done
+)
 
 for i in `cd pio_espidf;ls`
 do

@@ -244,6 +244,11 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 uint8_t FastAccelStepper::getStepPin() const { return _stepPin; }
 void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
                                        uint16_t dir_change_delay_us) {
+#if defined(SUPPORT_ESP32_I2S) && defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (_queue()->_driver_type == FasDriver::I2S_DIRECT) {
+    dirPin &= (uint8_t)~PIN_I2S_FLAG;
+  }
+#endif
   _dirPin = dirPin;
   _dirHighCountsUp = dirHighCountsUp;
   if (_dirPin != PIN_UNDEFINED) {

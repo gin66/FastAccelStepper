@@ -112,6 +112,11 @@ class StepperQueue : public StepperQueueBase {
 #endif
 
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {
+#if defined(SUPPORT_ESP32_I2S) && defined(SUPPORT_SELECT_DRIVER_TYPE)
+    if (_driver_type == FasDriver::I2S_DIRECT) {
+      dir_pin &= (uint8_t)~PIN_I2S_FLAG;
+    }
+#endif
     dirPin = dir_pin;
     dirHighCountsUp = _dirHighCountsUp;
 #ifdef SUPPORT_ESP32_I2S
@@ -211,9 +216,11 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //   driver        drain pauses before dir change     dir change/delay pause
 //   RMT (idf4)    1 x MIN_CMD_TICKS                  user dir_change_delay
 //   RMT (idf5/6)  2 x MIN_CMD_TICKS                  user dir_change_delay
-//   I2S           1 x I2S_BLOCK_TICKS + 1            max(I2S_BLOCK_TICKS, user
-//                 (only while _last_pause_ticks <    dir_change_delay)
-//                  I2S_BLOCK_TICKS)
+//   I2S GPIO DIR  1 x 2*I2S_BLOCK_TICKS (old dir)    user dir_change_delay
+//                 both DMA blocks must be pause:
+//                 GPIO DIR is async at fill time
+//   I2S mux DIR   none                               max(I2S_BLOCK_TICKS,
+//                 (mask applies to the next block)   user dir_change_delay)
 //   MCPWM/PCNT    none                               user dir_change_delay
 //
 // IDF4 vs IDF5 RMT pause count is not a guess: it is the number of PART_SIZE
@@ -237,9 +244,13 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 // Once the pipeline is drained, the pause that carries the direction change is
 // inserted (count_up = cmd->count_up). The driver toggles the pin while
 // processing that entry and then idles, so the user requested
-// dir_change_delay_ticks is honored as part of the direction change. I2S
-// additionally needs this entry to fill one I2S buffer half on its own, hence
-// its length is raised to at least I2S_BLOCK_TICKS.
+// dir_change_delay_ticks is honored as part of the direction change.
+//
+// needed_pauses is RMT-only (each pause occupies one RMT half). I2S uses
+// needed_pause_ticks: GPIO DIR needs 2*I2S_BLOCK_TICKS before the change
+// (in-flight block and the block being filled must contain no steps). Mux-slot
+// DIR (PIN_I2S_FLAG) updates _mux_state for the next block, so the after-pause
+// is I2S_BLOCK_TICKS and there is no extra before-pause.
 static inline bool esp32_driver_is_rmt(StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_ESP32_RMT)
@@ -280,13 +291,30 @@ static inline uint8_t esp32_before_pause_count(StepperQueue* q) {
   return 0;
 }
 
+static inline bool esp32_i2s_dir_is_mux_slot(StepperQueue* q) {
+#if defined(SUPPORT_ESP32_I2S)
+  if (!esp32_driver_is_i2s(q) || ((q->dirPin & PIN_I2S_FLAG) == 0)) {
+    return false;
+  }
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (q->_driver_type == FasDriver::I2S_DIRECT) {
+    return false;
+  }
+#endif
+  return true;
+#else
+  (void)q;
+  return false;
+#endif
+}
+
 static inline uint16_t esp32_before_pause_ticks(StepperQueue* q) {
   if (esp32_driver_is_rmt(q)) {
     return MIN_CMD_TICKS;
   }
 #if defined(SUPPORT_ESP32_I2S)
-  if (esp32_driver_is_i2s(q)) {
-    return I2S_BLOCK_TICKS + 1;
+  if (esp32_driver_is_i2s(q) && !esp32_i2s_dir_is_mux_slot(q)) {
+    return (uint16_t)(2 * I2S_BLOCK_TICKS);
   }
 #endif
   return 0;
@@ -294,9 +322,11 @@ static inline uint16_t esp32_before_pause_ticks(StepperQueue* q) {
 
 static inline uint16_t esp32_after_pause_ticks(StepperQueue* q) {
 #if defined(SUPPORT_ESP32_I2S)
-  if (esp32_driver_is_i2s(q)) {
+  if (esp32_driver_is_i2s(q) && esp32_i2s_dir_is_mux_slot(q)) {
     return I2S_BLOCK_TICKS;
   }
+#else
+  (void)q;
 #endif
   return 0;
 }
@@ -312,31 +342,18 @@ static inline AqeResultCode esp32_enqueue_pause(StepperQueue* q,
 inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
     const struct stepper_command_s* cmd, bool start,
     uint16_t dir_change_delay_ticks) {
-  // Drain the output pipeline: generate one pause command per call until the
-  // recorded pauses satisfy the driver's requirement.
-  if (esp32_driver_is_rmt(this)) {
-    if (_nr_of_pauses < esp32_before_pause_count(this)) {
-      AqeResultCode res = esp32_enqueue_pause(
-          this, esp32_before_pause_ticks(this), start, queue_end.count_up);
-      if (res != AQE_OK) {
-        return res;
-      }
-      return AQE_DIR_CHANGE_PAUSE_INJECTED;
+  uint8_t needed_pauses = esp32_before_pause_count(this);
+  uint16_t needed_pause_ticks = esp32_before_pause_ticks(this);
+  if ((_nr_of_pauses < needed_pauses) ||
+      (_last_pause_ticks < needed_pause_ticks)) {
+    AqeResultCode res = esp32_enqueue_pause(this, needed_pause_ticks, start,
+                                            queue_end.count_up);
+    if (res != AQE_OK) {
+      return res;
     }
+    return AQE_DIR_CHANGE_PAUSE_INJECTED;
   }
-#if defined(SUPPORT_ESP32_I2S)
-  else if (esp32_driver_is_i2s(this)) {
-    if (_last_pause_ticks < I2S_BLOCK_TICKS) {
-      AqeResultCode res = esp32_enqueue_pause(
-          this, esp32_before_pause_ticks(this), start, queue_end.count_up);
-      if (res != AQE_OK) {
-        return res;
-      }
-      return AQE_DIR_CHANGE_PAUSE_INJECTED;
-    }
-  }
-#endif
-  // The pipeline is drained. Enforce the direction-change/delay pause.
+  // Before-pause requirement is met. Enforce the direction-change/delay pause.
   uint16_t delay_ticks =
       (uint16_t)fas_max(dir_change_delay_ticks, esp32_after_pause_ticks(this));
   bool needs_toggle_pause = false;

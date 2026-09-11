@@ -255,6 +255,9 @@ clamped to MIN_DIR_DELAY_US. Values above MAX_DIR_DELAY_US will be clamped
 to MAX_DIR_DELAY_US. For external pins, dir_change_delay_us is ignored,
 because the mechanism applied for external pins provides already pause
 in the range of ms or more.
+
+ESP32 I2S_DIRECT requires a GPIO (or external pin >= 128). I2S mux slots
+(`pin | PIN_I2S_FLAG`) are valid only with I2S_MUX.
 ```cpp
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
@@ -735,6 +738,11 @@ sufficient delay before the first step in the new direction:
   AQE_DIR_PIN_2MS_PAUSE_ADDED); moveTimed() and the internal queue fill
   do so automatically. On the retry the direction already matches, or the
   pauses are skipped, and the command is enqueued.
+
+  ESP32 I2S GPIO DIR is async at fill time, so both DMA blocks must be
+  pause (2*I2S_BLOCK_TICKS before the change). I2S mux-slot DIR is valid
+  only with I2S_MUX and needs I2S_BLOCK_TICKS after the change (the mask
+  applies to the next buffer). I2S_DIRECT direction pins are GPIO.
 
 - For autoEnable mode: The enable-on delay is extended to at least
   dir_change_delay_ticks if a direction change occurs.
