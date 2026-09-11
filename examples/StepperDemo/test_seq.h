@@ -12,7 +12,7 @@ struct test_seq_s {
 };
 
 #if !defined(__AVR_ATmega32U4__)
-#define NUM_TEST_SEQUENCE 13
+#define NUM_TEST_SEQUENCE 14
 #else
 #define NUM_TEST_SEQUENCE 12
 #endif
@@ -84,4 +84,9 @@ bool test_seq_12(FastAccelStepper* stepper, struct test_seq_s* seq,
 
 // test case for one stepper to reproduce issue #113
 bool test_seq_13(FastAccelStepper* stepper, struct test_seq_s* seq,
+                 uint32_t time_ms);
+
+// Issue370 sampled stroke via moveTimed(). ESP32 pulse counter only: PCNT must
+// be -592 and the running ramp must finish in < 1s.
+bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms);

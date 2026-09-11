@@ -42,6 +42,7 @@
 #include "esp_task_wdt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "sdkconfig.h"
 
 // The reproduction relies on the ESP32 pulse counter (PCNT) and on the
 // selectable RMT driver backend. Both are only available on esp-idf 4/5; on
@@ -340,7 +341,6 @@ static void printHelp() {
 }
 
 void setup() {
-  esp_task_wdt_deinit();
   serialInit();
   vTaskDelay(pdMS_TO_TICKS(200));
 
@@ -438,7 +438,21 @@ void loop() {}
 
 #endif  // SUPPORT_ESP32_PULSE_COUNTER && SUPPORT_SELECT_DRIVER_TYPE
 
+// IDF 4.x/5.0: deinit() returns ESP_ERR_INVALID_STATE while idle tasks are
+// still subscribed (CONFIG_ESP_TASK_WDT_CHECK_IDLE_TASK_*). IDF 5.1+
+// unsubscribes idle tasks itself.
+static void disableTaskWdt() {
+#if ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(5, 1, 0)
+  (void)esp_task_wdt_delete(xTaskGetIdleTaskHandle());
+#if !defined(CONFIG_FREERTOS_UNICORE)
+  (void)esp_task_wdt_delete(xTaskGetIdleTaskHandleForCPU(1));
+#endif
+#endif
+  (void)esp_task_wdt_deinit();
+}
+
 extern "C" void app_main() {
+  disableTaskWdt();
   setup();
   while (true) {
     loop();

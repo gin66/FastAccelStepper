@@ -29,7 +29,7 @@ if not DEVICE.startswith("/"):
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEST_ALL_LOG = os.path.join(SCRIPT_DIR, "test_all.log")
-SEQUENCES = [13, 1, 2, 3, 4, 6, 7, 10, 11]
+SEQUENCES = [13, 14, 1, 2, 3, 4, 6, 7, 10, 11]
 PASS = "test passed"
 
 

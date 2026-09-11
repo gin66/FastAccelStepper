@@ -15,6 +15,7 @@ struct test_seq_def_s test_sequence[NUM_TEST_SEQUENCE] = {
     {{'1', '2', 0, 0}, test_seq_12}
 #if !defined(__AVR_ATmega32U4__)
     ,
-    {{'1', '3', 0, 0}, test_seq_13}
+    {{'1', '3', 0, 0}, test_seq_13},
+    {{'1', '4', 0, 0}, test_seq_14}
 #endif
 };

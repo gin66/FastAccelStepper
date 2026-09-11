@@ -1,4 +1,6 @@
 pre-1.3.0:
+- StepperDemo: test sequence 14 replays the Issue370 sampled stroke on
+  ESP32 with pulse counter (PCNT must be -592, ramp < 1s)
 - esp32: Enable attachToPulseCounter() on ESP-IDF 6. Step/dir pins stay
   outputs; PCNT only appends GPIO-matrix input (no gpio_set_direction /
   gpio_iomux_input, which would drop the pulse driver)
