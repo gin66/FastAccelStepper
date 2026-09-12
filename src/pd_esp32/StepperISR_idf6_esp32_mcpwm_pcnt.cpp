@@ -216,7 +216,9 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   pcnt_unit_config_t pcnt_cfg = {.low_limit = -32768,
                                  .high_limit = 32767,
                                  .intr_priority = 1,
-                                 .flags = {.accum_count = 0}};
+                                    .flags = {.accum_count = 0},
+                                    .group_id = PCNT_UNIT_GROUP_ID_DEFAULT,
+                                    .clk_src = ESP_PCNT_CLK_DEFAULT};
   ESP_ERROR_CHECK_WITHOUT_ABORT(pcnt_new_unit(&pcnt_cfg, &mapping->pcnt_unit));
 
   pcnt_chan_config_t chan_cfg = {.edge_gpio_num = step_pin,
@@ -262,7 +264,9 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
       .count_mode = MCPWM_TIMER_COUNT_MODE_UP_DOWN,
       .period_ticks = 400,
       .intr_priority = 1,
-      .flags = {.update_period_on_empty = 0, .update_period_on_sync = 0}};
+       .flags = {.update_period_on_empty = 0,
+               .update_period_on_sync = 0,
+               .allow_pd = 0}};
   ESP_ERROR_CHECK_WITHOUT_ABORT(mcpwm_new_timer(&timer_cfg, &mapping->timer));
 
   mcpwm_operator_config_t oper_cfg = {.group_id = group_id,
