@@ -44,9 +44,8 @@ ramp_helper.o: ramp_helper.cpp $(SRC_LIB_H)
 
 LIB_H=FastAccelStepper.h FastAccelStepperEngine.h log2/Log2Representation.h log2/Log2RepresentationConst.h \
 	  fas_queue/stepper_queue.h fas_queue/queue.h fas_queue/base.h \
-	  fas_queue/dir_change_pause.h \
 	  fas_ramp/RampGenerator.h fas_ramp/RampControl.h fas_ramp/RampCalculator.h \
-	  fas_arch/common.h fas_member/move_timed.h fas_member/add_queue_entry.h pd_test/test_queue.h
+	  fas_arch/common.h fas_member/move_timed.h fas_member/add_queue_entry.h pd_test/test_queue.h pd_test/dir_change_pause.h
 LIB_O=FastAccelStepper.o FastAccelStepperEngine.o Log2Representation.o StepperISR_test.o \
 	  RampGenerator.o RampControl.o RampCalculator.o queue_add_entry.o queue_get_position.o queue_init.o queue_utils.o
 

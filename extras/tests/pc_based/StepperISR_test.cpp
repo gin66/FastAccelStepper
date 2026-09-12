@@ -1,6 +1,6 @@
 #include "fas_queue/stepper_queue.h"
 
-#include "fas_queue/dir_change_pause.h"
+#include "pd_test/dir_change_pause.h"
 
 #include "FastAccelStepper.h"
 

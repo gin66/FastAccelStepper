@@ -50,10 +50,11 @@ uint16_t debug_part_size = 24;
 #include "FastAccelStepper.h"
 
 // Direction-change pause insertion is provided by the pd_test default in
-// dir_change_pause.h; this standalone test does not link the library .o files,
-// so include it here (after StepperQueue and its BEFORE/AFTER macros are
-// known).
-#include "fas_queue/dir_change_pause.h"
+// pd_test/dir_change_pause.h; this standalone test does not link the library .o
+// files, so it includes that default itself. It must be included after
+// StepperQueue and its BEFORE/AFTER macros are known. The pd_test target
+// #defines inline away, so this must be included in exactly one TU per binary.
+#include "pd_test/dir_change_pause.h"
 
 // Production bodies of addQueueEntry() and moveTimed(), compiled against this
 // test's StepperQueue/FastAccelStepper instead of the hardware queues.
