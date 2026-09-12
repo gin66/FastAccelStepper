@@ -10,7 +10,7 @@
 #   make compile_idf4                 native ESP-IDF 4.4.3        (esp32_idf_V5_3_0, often cannot run)
 #   make test                         run seq_* on M1 and M9 (whatever is already flashed)
 #   make test_idf5_3                  IDF 5.3 Driver-Types config: M1=RMT, M2=I2S, M3=MCPWM
-#   make test_idf6_1                  IDF 6.1 Driver-Types config: M1=RMT, M2=I2S (MCPWM off)
+#   make test_idf6_1                  IDF 6.1 Driver-Types config: M1=RMT, M2=I2S, M3=MCPWM
 #   make test_all                     flash+test the usual set (skips ones already stamped)
 #   make clean                        drop seq_*.log, test_all.log, and stamps
 #
@@ -63,10 +63,10 @@ test_idf5_3: M1.idf5_3_test M2.idf5_3_test M3.idf5_3_test
 	$(call RUN_SEQ_CFG1,seq_07c.py)
 	$(call RUN_SEQ_CFG1,seq_03.py)
 
-# ESP-IDF 6.1.0 (esp32_idf_V7_1_2): MCPWM not enabled yet, so the
-# Driver-Types config drives M1=RMT, M2=I2S. Run it with STEPPER_CONFIG=1.
+# ESP-IDF 6.1.0 (esp32_idf_V7_1_2): MCPWM/PCNT+RMT+I2S. Driver-Types config
+# drives M1=RMT, M2=I2S, M3=MCPWM. Run it with STEPPER_CONFIG=1.
 test_idf6_1: DUT := idf6_cfg1
-test_idf6_1: M1.idf6_1_test M2.idf6_1_test
+test_idf6_1: M1.idf6_1_test M2.idf6_1_test M3.idf6_1_test
 
 %.idf6_1_test:
 	$(call RUN_SEQ_CFG1,seq_04.py)

@@ -229,6 +229,13 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //                 the start of that pause (one-command
 //                 pipeline). STEP stays low for the
 //                 rest of MIN_CMD_TICKS.
+//                 IDF5/6 generator actions latch at
+//                 TEZ/TEP. startQueue therefore applies
+//                 the first command with immediate
+//                 update: leftover utea=2 from the
+//                 previous run would otherwise emit a
+//                 step at the first TEA of a leading
+//                 pause, with DIR still old (#370).
 //
 // IDF4 vs IDF5 RMT pause count is not a guess: it is the number of PART_SIZE
 // halves the hardware fills ahead of the wire. Each queue pause occupies

@@ -18,6 +18,12 @@ pre-1.3.0:
 - esp32: IDF 5 MCPWM/PCNT inserts one MIN_CMD_TICKS pause before a direction
   change. Pause TEA at compare=1 applies DIR at the start of that pause
   (one-command pipeline); STEP stays low for the rest. IDF 4 does not need this.
+- esp32: IDF 5/6 MCPWM/PCNT startQueue latches the first command's generator
+  action immediately. Leftover utea=2 from the previous run would otherwise
+  emit a step at the first TEA of a leading dir-change pause (DIR still old),
+  which showed up as api=0/pcnt=2 after seq_01 reverse and as a late DIR edge
+  on subsequent Issue370 runs (#370). init_stop now parks utea=1 at the stop
+  TEZ so the next start does not inherit a step action.
 - esp32: MCPWM/PCNT (IDF 4 and 5): do not prefetch PCNT H_LIM after a pause.
   dir_change_delay_us inserted a pause between commands, the old step count
   stayed latched, and e.g. -26 then +10 ran as -26 then +26.
