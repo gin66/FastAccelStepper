@@ -215,7 +215,6 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   uint8_t pcnt_unit_id = timer_num;
 
   pcnt_unit_config_t pcnt_cfg = {
-      .group_id = 0,
       .clk_src = PCNT_CLK_SRC_DEFAULT,
       .low_limit = -32768,
       .high_limit = 32767,
