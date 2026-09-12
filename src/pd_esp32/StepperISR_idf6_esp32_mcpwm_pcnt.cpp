@@ -1,5 +1,5 @@
 #include "fas_queue/stepper_queue.h"
-#if defined(SUPPORT_ESP32_MCPWM_PCNT) && (ESP_IDF_VERSION_MAJOR == 5)
+#if defined(SUPPORT_ESP32_MCPWM_PCNT) && (ESP_IDF_VERSION_MAJOR == 6)
 
 #include <esp_intr_alloc.h>
 
@@ -224,8 +224,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
                                  .flags = {.invert_edge_input = 0,
                                            .invert_level_input = 0,
                                            .virt_edge_io_level = 0,
-                                           .virt_level_io_level = 0,
-                                           .io_loop_back = 0}};
+                                           .virt_level_io_level = 0}};
   pcnt_channel_handle_t pcnt_chan;
   ESP_ERROR_CHECK_WITHOUT_ABORT(
       pcnt_new_channel(mapping->pcnt_unit, &chan_cfg, &pcnt_chan));
@@ -288,11 +287,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
       mcpwm_comparator_set_compare_value(mapping->cmpr, 1));
 
   mcpwm_generator_config_t gen_cfg = {.gen_gpio_num = step_pin,
-                                       .flags = {.invert_pwm = 0,
-                                                 .io_loop_back = 0,
-                                                 .io_od_mode = 0,
-                                                 .pull_up = 0,
-                                                 .pull_down = 0}};
+                                     .flags = {.invert_pwm = 0}};
   ESP_ERROR_CHECK_WITHOUT_ABORT(
       mcpwm_new_generator(mapping->oper, &gen_cfg, &mapping->gen));
 
@@ -344,9 +339,11 @@ void StepperQueue::connect_mcpwm_pcnt() {
   uint8_t step_pin = _step_pin;
   uint8_t pcnt_unit_id = mapping->pcnt_unit_id;
 
-  int signal =
-      pcnt_periph_signals.groups[0].units[pcnt_unit_id].channels[0].pulse_sig;
-  gpio_iomux_in(step_pin, signal);
+  int pulse_sig =
+      soc_pcnt_signals[0].units[pcnt_unit_id].channels[0].pulse_sig_id_matrix;
+  gpio_input_enable((gpio_num_t)step_pin);
+  esp_rom_gpio_connect_in_signal((uint32_t)step_pin,
+                                    (uint32_t)pulse_sig, false);
 
 #if SOC_MCPWM_GROUPS > 1
   if (mapping->mcpwm == &MCPWM0) {

@@ -1,4 +1,10 @@
 pre-1.3.0:
+- esp32: ESP-IDF 6.1 now supports the MCPWM/PCNT driver. A dedicated
+  StepperISR_idf6_esp32_mcpwm_pcnt.cpp handles the ESP-IDF 6.x MCPWM/PCNT API
+  (mcpwm_timer/oper/cmpr/gen + hal/mcpwm_ll, pulse_cnt). pd_config_idf6.h enables
+  MCPWM/PCNT (QUEUES_MCPWM_PCNT 6) for ESP32 and ESP32-S3, and the IDF5 MCPWM/PCNT
+  ISR is now guarded to ESP-IDF 5 only. IDF 6.1 runs all three drivers (MCPWM/PCNT,
+  RMT and I2S) on ESP32/ESP32-S3.
 - StepperDemo: test sequence 14 replays the Issue370 sampled stroke on
   ESP32 with pulse counter (PCNT must be -592, ramp < 1s)
 - esp32: Enable attachToPulseCounter() on ESP-IDF 6. Step/dir pins stay
