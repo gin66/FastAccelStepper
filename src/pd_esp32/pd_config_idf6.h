@@ -167,6 +167,11 @@
 #define PART_SIZE (RMT_SIZE >> 1)
 #endif
 
+#include <hal/i2s_ll.h>
+#if I2S_LL_INST_NUM >= 1
+#define SUPPORT_ESP32_I2S
+#endif
+
 // in order to avoid spikes, first set the value and then make an output
 // esp32 idf5 does not like this approach => output first, then value
 #define PIN_OUTPUT(pin, value)  \

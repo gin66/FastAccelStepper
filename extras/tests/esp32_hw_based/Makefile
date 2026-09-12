@@ -9,7 +9,8 @@
 #   make compile_idf6                 native ESP-IDF 6.1.0        (esp32_idf_V7_1_2)
 #   make compile_idf4                 native ESP-IDF 4.4.3        (esp32_idf_V5_3_0, often cannot run)
 #   make test                         run seq_* on M1 and M9 (whatever is already flashed)
-#   make test_idf5_3                  Driver-Types config: M1=RMT, M2=I2S, M3=MCPWM
+#   make test_idf5_3                  IDF 5.3 Driver-Types config: M1=RMT, M2=I2S, M3=MCPWM
+#   make test_idf6_1                  IDF 6.1 Driver-Types config: M1=RMT, M2=I2S (MCPWM off)
 #   make test_all                     flash+test the usual set (skips ones already stamped)
 #   make clean                        drop seq_*.log, test_all.log, and stamps
 #
@@ -21,7 +22,7 @@
 #   Arduino 2.x / IDF 4: M1=MCPWM, M9=RMT
 #   Arduino 3.x / IDF 5: M1=RMT,   M9=I2S   (MCPWM is M3 with STEPPER_CONFIG=1)
 
-.PHONY: all test test_all test_all_begin test_idf5_3 clean compile help \
+.PHONY: all test test_all test_all_begin test_idf5_3 test_idf6_1 clean compile help \
 	compile_arduino_espidf4 compile_arduino_3 compile_arduino_latest \
 	compile_idf4 compile_idf5 compile_idf6 \
 	compile_esp32_V6_8_1 compile_esp32_pioarduino_V53_03_11 compile_esp32_V7_1_2 \
@@ -62,6 +63,23 @@ test_idf5_3: M1.idf5_3_test M2.idf5_3_test M3.idf5_3_test
 	$(call RUN_SEQ_CFG1,seq_07c.py)
 	$(call RUN_SEQ_CFG1,seq_03.py)
 
+# ESP-IDF 6.1.0 (esp32_idf_V7_1_2): MCPWM not enabled yet, so the
+# Driver-Types config drives M1=RMT, M2=I2S. Run it with STEPPER_CONFIG=1.
+test_idf6_1: DUT := idf6_cfg1
+test_idf6_1: M1.idf6_1_test M2.idf6_1_test
+
+%.idf6_1_test:
+	$(call RUN_SEQ_CFG1,seq_04.py)
+	$(call RUN_SEQ_CFG1,seq_05.py)
+	$(call RUN_SEQ_CFG1,seq_06.py)
+	$(call RUN_SEQ_CFG1,seq_01a.py)
+	$(call RUN_SEQ_CFG1,seq_01b.py)
+	$(call RUN_SEQ_CFG1,seq_02.py)
+	$(call RUN_SEQ_CFG1,seq_07a.py)
+	$(call RUN_SEQ_CFG1,seq_07b.py)
+	$(call RUN_SEQ_CFG1,seq_07c.py)
+	$(call RUN_SEQ_CFG1,seq_03.py)
+
 %.test:
 	$(call RUN_SEQ,seq_04.py)
 	$(call RUN_SEQ,seq_05.py)
@@ -74,13 +92,12 @@ test_idf5_3: M1.idf5_3_test M2.idf5_3_test M3.idf5_3_test
 	$(call RUN_SEQ,seq_07c.py)
 	$(call RUN_SEQ,seq_03.py)
 
-#test_all: test_all_begin .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_idf6 .test_arduino_latest
-test_all: test_all_begin .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_arduino_latest
+test_all: test_all_begin .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_idf6_1 .test_arduino_latest
 	@printf '%s  DONE  test_all\n' "$$(date '+%Y-%m-%d %H:%M:%S')" | tee -a test_all.log
 
 test_all_begin:
 	@printf '\n# test_all %s\n' "$$(date '+%Y-%m-%d %H:%M:%S')" | tee -a test_all.log
-	@for s in arduino_espidf4 arduino_3 idf5 arduino_latest; do \
+	@for s in arduino_espidf4 arduino_3 idf5 idf6_1 arduino_latest; do \
 		if [ -e .test_$$s ]; then printf '# skip %s (stamp exists)\n' "$$s" | tee -a test_all.log; fi; \
 	done
 
@@ -123,11 +140,11 @@ endef
 	$(call RECORD_PASS,idf5,esp32_idf_V6_9_0)
 	touch .test_idf5
 
-.test_idf6:
-	$(call RECORD_DUT,idf6,esp32_idf_V7_1_2,ESP-IDF 6.1.0)
-	$(MAKE) compile_idf6 && $(MAKE) test DUT=idf6
-	$(call RECORD_PASS,idf6,esp32_idf_V7_1_2)
-	touch .test_idf6
+.test_idf6_1:
+	$(call RECORD_DUT,idf6_1,esp32_idf_V7_1_2,ESP-IDF 6.1.0 / Driver-Types M1=RMT M2=I2S)
+	$(MAKE) compile_idf6 && $(MAKE) test_idf6_1
+	$(call RECORD_PASS,idf6_1,esp32_idf_V7_1_2)
+	touch .test_idf6_1
 
 compile: compile_arduino_espidf4
 
@@ -153,7 +170,7 @@ compile_idf5 compile_esp32_idf_V6_9_0:
 	(cd ../../scripts; ./build-pio-dirs.sh)
 	(cd ../../../pio_espidf/StepperDemo; rm -fR .pio; pio run -e esp32_idf_V6_9_0 -t upload --upload-port /dev/$(DEV))
 
-# native ESP-IDF 6.1.0 (MCPWM/I2S not enabled in the library yet)
+# native ESP-IDF 6.1.0 (RMT + I2S enabled, MCPWM/PCNT off for now)
 compile_idf6 compile_esp32_idf_V7_1_2:
 	(cd ../../scripts; ./build-pio-dirs.sh)
 	(cd ../../../pio_espidf/StepperDemo; rm -fR .pio; pio run -e esp32_idf_V7_1_2 -t upload --upload-port /dev/$(DEV))
@@ -166,8 +183,9 @@ help:
 	@echo "make compile_idf5              ESP-IDF 5.3.1                pio -e esp32_idf_V6_9_0"
 	@echo "make compile_idf6              ESP-IDF 6.1.0                pio -e esp32_idf_V7_1_2"
 	@echo "make test                      M1+M9 on the firmware already on the board"
-	@echo "make test_idf5_3               M1..M3 with STEPPER_CONFIG=1 (RMT/I2S/MCPWM)"
-	@echo "make test_all                  compile+test: arduino_espidf4, arduino_3, idf5, arduino_latest"
+	@echo "make test_idf5_3               IDF 5.3 M1..M3 with STEPPER_CONFIG=1 (RMT/I2S/MCPWM)"
+	@echo "make test_idf6_1               IDF 6.1 M1..M2 with STEPPER_CONFIG=1 (RMT/I2S, MCPWM off)"
+	@echo "make test_all                  compile+test: arduino_espidf4, arduino_3, idf5, idf6_1, arduino_latest"
 	@echo "Passed configs: ls .test_*   and  cat test_all.log"
 
 clean:

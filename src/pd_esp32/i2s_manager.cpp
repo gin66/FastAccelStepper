@@ -36,7 +36,11 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
   i2s_std_config_t std_cfg = {
       .clk_cfg = {.sample_rate_hz = I2S_SAMPLE_RATE_HZ,
                   .clk_src = I2S_CLK_SRC_DEFAULT,
-                  .mclk_multiple = I2S_MCLK_MULTIPLE_128},
+                  .mclk_multiple = I2S_MCLK_MULTIPLE_128,
+#if ESP_IDF_VERSION_MAJOR >= 6
+                  .bclk_div = 0
+#endif
+      },
       .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
                                                   I2S_SLOT_MODE_STEREO),
       .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,

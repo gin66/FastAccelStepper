@@ -545,6 +545,7 @@ void setup() {
     }
 #if defined(ESP_PLATFORM) && !defined(ARDUINO_ARCH_ESP32)
     DELAY_MS(10);
+    esp_task_wdt_reset();
 #else
     delay(10);
 #endif
