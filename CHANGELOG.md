@@ -1,56 +1,13 @@
-pre-1.3.0:
-- esp32: ESP-IDF 6.1 now supports the MCPWM/PCNT driver. A dedicated
-  StepperISR_idf6_esp32_mcpwm_pcnt.cpp handles the ESP-IDF 6.x MCPWM/PCNT API
-  (mcpwm_timer/oper/cmpr/gen + hal/mcpwm_ll, pulse_cnt). pd_config_idf6.h enables
-  MCPWM/PCNT (QUEUES_MCPWM_PCNT 6) for ESP32 and ESP32-S3, and the IDF5 MCPWM/PCNT
-  ISR is now guarded to ESP-IDF 5 only. IDF 6.1 runs all three drivers (MCPWM/PCNT,
-  RMT and I2S) on ESP32/ESP32-S3.
-- StepperDemo: test sequence 14 replays the Issue370 sampled stroke on
-  ESP32 with pulse counter (PCNT must be -592, ramp < 1s)
-- esp32: Enable attachToPulseCounter() on ESP-IDF 6. Step/dir pins stay
-  outputs; PCNT only appends GPIO-matrix input (no gpio_set_direction /
-  gpio_iomux_input, which would drop the pulse driver)
+1.3.0:
+- esp32: ESP-IDF 6.1 now supports the MCPWM/PCNT and I2S drivers
+- esp32: Enable attachToPulseCounter() on ESP-IDF 6
 - esp32: attachToPulseCounter() on ESP-IDF 5 no longer resets step/dir GPIO
-  (pcnt_new_channel was calling gpio_config() as input+pull-up on the dir pin)
-- esp32: IDF 5 MCPWM/PCNT timebase matches IDF 4 (16 MHz). mcpwm_new_timer()
-  had already divided the timer clock for 16 MHz; clk_prescale=5 on top made
-  steps ~5x too slow. timer_prescale is now 0 as in IDF 4.
-- esp32: IDF 5 MCPWM/PCNT inserts one MIN_CMD_TICKS pause before a direction
-  change. Pause TEA at compare=1 applies DIR at the start of that pause
-  (one-command pipeline); STEP stays low for the rest. IDF 4 does not need this.
-- esp32: IDF 5/6 MCPWM/PCNT startQueue latches the first command's generator
-  action immediately. Leftover utea=2 from the previous run would otherwise
-  emit a step at the first TEA of a leading dir-change pause (DIR still old),
-  which showed up as api=0/pcnt=2 after seq_01 reverse and as a late DIR edge
-  on subsequent Issue370 runs (#370). init_stop now parks utea=1 at the stop
-  TEZ so the next start does not inherit a step action.
-- esp32: MCPWM/PCNT (IDF 4 and 5): do not prefetch PCNT H_LIM after a pause.
-  dir_change_delay_us inserted a pause between commands, the old step count
-  stayed latched, and e.g. -26 then +10 ran as -26 then +26.
-- Refactor direction-change pause handling out of FastAccelStepper::addQueueEntry()
-  into the queue protocol method StepperQueue::addDirChangePauseToQueue()
-- New result code AQE_DIR_CHANGE_PAUSE_INJECTED (6): direction-change pause(s)
-  were queued, the submitted command was not. The caller must retry;
-  moveTimed() and the internal queue fill do so automatically.
-- avr/sam/samd/pico: driver-specific inline addDirChangePauseToQueue()
-  implementing the user requested direction-pin delay as a pause command that
-  carries the change (SAM enforces at least MIN_CMD_TICKS)
-- esp32: driver-specific inline addDirChangePauseToQueue(); the buffered
-  drivers (RMT, I2S) first drain their output pipeline (RMT idf4: one
-  MIN_CMD_TICKS pause = one RMT half, the queue-visible equivalent of the
-  1.2.7 fill-time inject; RMT idf5/6: two, because the encoder runs two
-  halves ahead; I2S: more than one I2S buffer half),
-  and the pause that performs the change enforces the user requested delay.
-  I2S additionally keeps the change alone for one buffer half (>= I2S_BLOCK_TICKS)
-- esp32 I2S: direction-change pauses depend on the DIR pin. GPIO DIR is
-  async at fill time, so 2*I2S_BLOCK_TICKS of pause is required before the
-  change (both DMA blocks without steps). Mux-slot DIR (PIN_I2S_FLAG) updates
-  the next block's mask, so I2S_BLOCK_TICKS after the change and no extra
-  before-pause. GPIO before-pause is skipped when `_last_pause_ticks` already
-  covers 2*I2S_BLOCK_TICKS.
-- Replace the macro-driven direction-change delay configuration
-  (BEFORE/AFTER_DIR_CHANGE_DELAY_TICKS) with hard-coded per-driver values;
-  the shared dir_change_pause.h default is now used by the test platform only
+- esp32: IDF 5 MCPWM/PCNT fix time base mismatch
+- esp32: IDF 5 MCPWM/PCNT pauses briefly before a direction change so the direction pin settles before the next step (IDF 4 already does this)
+- esp32: Fix a spurious step at the start of a move on IDF 5/6 MCPWM/PCNT (#370)
+- esp32: Fix a wrong step count after a direction-change pause on MCPWM/PCNT, where a following move reused the previous move's step count
+- The direction-pin change delay (third parameter of setDirectionPin()) is now applied consistently on all platforms (AVR, SAM, SAMD, Pico and ESP32 RMT/I2S/MCPWM)
+- addQueueEntry() may now return AQE_DIR_CHANGE_PAUSE_INJECTED when a direction-change pause is inserted instead of the command; the caller must retry
 
 1.2.8:
 - Fix moveTimed(): reserve 2 queue slots for direction-change pause commands so
