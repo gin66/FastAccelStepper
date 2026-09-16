@@ -360,6 +360,8 @@ const static char messages[] PROGMEM =
     ____ "reset" ____ _ooo_ _Perform_ "reset" _NL_
     ____ "p<n> " ____ _ooo_ _attach " " _pulse_counter_ "n<=7" _NL_
     ____ "p<n>,l,h " _ooo_ _attach " " _pulse_counter_ "n<=7 with low,high limits" _NL_
+    ____ "pi<n>" ____ _ooo_ "like p with inverted step pulse" _NL_
+    ____ "pi<n>,l,h" _NL_
     ____ "pc   " ____ _ooo_ _clear_ _pulse_counter_ _NL_
 #endif
 #if !defined(__AVR_ATmega32U4__)
@@ -1284,12 +1286,17 @@ bool process_cmd(char* cmd) {
         stepper_selected->clearPulseCounter();
         return true;
       }
+      gv = 0;
+      if (*cmd == 'i') {
+        gv = 1;
+        cmd++;
+      }
       if (get_val1_val2_val3(cmd) == 3) {
         output_msg(MSG_ATTACH_PULSE_COUNTER);
         PRINTI32(val_n[0]);
         PRINTLN("");
-        if (!stepper_selected->attachToPulseCounter(val_n[0], val_n[1],
-                                                    val_n[2])) {
+        if (!stepper_selected->attachToPulseCounter(
+                val_n[0], val_n[1], val_n[2], PIN_UNDEFINED, gv != 0)) {
           output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
         }
         return true;
@@ -1298,7 +1305,8 @@ bool process_cmd(char* cmd) {
         output_msg(MSG_ATTACH_PULSE_COUNTER);
         PRINTI32(val_n[0]);
         PRINTLN("");
-        if (!stepper_selected->attachToPulseCounter(val_n[0])) {
+        if (!stepper_selected->attachToPulseCounter(val_n[0], -16384, 16384,
+                                                    PIN_UNDEFINED, gv != 0)) {
           output_msg(MSG_ERROR_ATTACH_PULSE_COUNTER);
         }
         return true;

@@ -20,8 +20,8 @@ uint32_t ctrl_idx[SUPPORT_ESP32_PULSE_COUNTER] = {
 
 bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
                                             int16_t low_value,
-                                            int16_t high_value,
-                                            uint8_t dir_pin) {
+                                            int16_t high_value, uint8_t dir_pin,
+                                            bool invert_step_pulse) {
   if (pcnt_unit >= SUPPORT_ESP32_PULSE_COUNTER) {
     return false;
   }
@@ -46,8 +46,13 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t pcnt_unit,
       cfg.hctrl_mode = PCNT_MODE_REVERSE;
     }
   }
-  cfg.pos_mode = PCNT_COUNT_INC;  // increment on rising edge
-  cfg.neg_mode = PCNT_COUNT_DIS;  // ignore falling edge
+  if (invert_step_pulse) {
+    cfg.pos_mode = PCNT_COUNT_DIS;
+    cfg.neg_mode = PCNT_COUNT_INC;
+  } else {
+    cfg.pos_mode = PCNT_COUNT_INC;
+    cfg.neg_mode = PCNT_COUNT_DIS;
+  }
   cfg.counter_h_lim = high_value;
   cfg.counter_l_lim = low_value;
   cfg.unit = (pcnt_unit_t)pcnt_unit;

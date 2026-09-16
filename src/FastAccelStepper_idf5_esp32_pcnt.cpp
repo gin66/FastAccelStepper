@@ -40,8 +40,8 @@ static void pcnt_abort_attach(pcnt_channel_handle_t chan,
 
 bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
                                             int16_t low_value,
-                                            int16_t high_value,
-                                            uint8_t dir_pin) {
+                                            int16_t high_value, uint8_t dir_pin,
+                                            bool invert_step_pulse) {
   (void)unused_pcnt_unit;
 
   int low_limit = low_value;
@@ -100,8 +100,14 @@ bool FastAccelStepper::attachToPulseCounter(uint8_t unused_pcnt_unit,
     return false;
   }
 
-  if (pcnt_channel_set_edge_action(pcnt_chan, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
-                                   PCNT_CHANNEL_EDGE_ACTION_HOLD) != ESP_OK) {
+  pcnt_channel_edge_action_t pos_action = PCNT_CHANNEL_EDGE_ACTION_INCREASE;
+  pcnt_channel_edge_action_t neg_action = PCNT_CHANNEL_EDGE_ACTION_HOLD;
+  if (invert_step_pulse) {
+    pos_action = PCNT_CHANNEL_EDGE_ACTION_HOLD;
+    neg_action = PCNT_CHANNEL_EDGE_ACTION_INCREASE;
+  }
+  if (pcnt_channel_set_edge_action(pcnt_chan, pos_action, neg_action) !=
+      ESP_OK) {
     pcnt_abort_attach(pcnt_chan, punit, false);
     return false;
   }

@@ -736,6 +736,10 @@ class FastAccelStepper {
   // of the GPIOs, then the additional dir_pin_readback parameter informs
   // about this pin.
   //
+  // By default the pulse counter increments on the rising edge of the step
+  // pulse (low-to-high). Set invert_step_pulse to true to increment on the
+  // falling edge instead, for inverted step polarity.
+  //
   // Update for idf5/idf6 version:
   // The pcnt_unit value is not used, because the available units are managed
   // by the system. The parameter is kept for compatibility.
@@ -744,7 +748,8 @@ class FastAccelStepper {
   bool attachToPulseCounter(uint8_t unused_pcnt_unit = 0,
                             int16_t low_value = -16384,
                             int16_t high_value = 16384,
-                            uint8_t dir_pin_readback = PIN_UNDEFINED);
+                            uint8_t dir_pin_readback = PIN_UNDEFINED,
+                            bool invert_step_pulse = false);
   int16_t readPulseCounter();
   void clearPulseCounter();
   inline bool pulseCounterAttached() { return _attached_pulse_unit != NULL; }
@@ -752,7 +757,8 @@ class FastAccelStepper {
 #if defined(SUPPORT_ESP32_PULSE_COUNTER) && (ESP_IDF_VERSION_MAJOR == 4)
   bool attachToPulseCounter(uint8_t pcnt_unit, int16_t low_value = -16384,
                             int16_t high_value = 16384,
-                            uint8_t dir_pin_readback = PIN_UNDEFINED);
+                            uint8_t dir_pin_readback = PIN_UNDEFINED,
+                            bool invert_step_pulse = false);
   int16_t readPulseCounter();
   void clearPulseCounter();
   inline bool pulseCounterAttached() { return _attached_pulse_cnt_unit >= 0; }

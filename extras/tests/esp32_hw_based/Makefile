@@ -61,6 +61,7 @@ test_idf5_3: M1.idf5_3_test M2.idf5_3_test M3.idf5_3_test
 	$(call RUN_SEQ_CFG1,seq_07a.py)
 	$(call RUN_SEQ_CFG1,seq_07b.py)
 	$(call RUN_SEQ_CFG1,seq_07c.py)
+	$(call RUN_SEQ_CFG1,seq_08.py)
 	$(call RUN_SEQ_CFG1,seq_03.py)
 
 # ESP-IDF 6.1.0 (esp32_idf_V7_1_2): MCPWM/PCNT+RMT+I2S. Driver-Types config
@@ -78,6 +79,7 @@ test_idf6_1: M1.idf6_1_test M2.idf6_1_test M3.idf6_1_test
 	$(call RUN_SEQ_CFG1,seq_07a.py)
 	$(call RUN_SEQ_CFG1,seq_07b.py)
 	$(call RUN_SEQ_CFG1,seq_07c.py)
+	$(call RUN_SEQ_CFG1,seq_08.py)
 	$(call RUN_SEQ_CFG1,seq_03.py)
 
 %.test:
@@ -90,6 +92,7 @@ test_idf6_1: M1.idf6_1_test M2.idf6_1_test M3.idf6_1_test
 	$(call RUN_SEQ,seq_07a.py)
 	$(call RUN_SEQ,seq_07b.py)
 	$(call RUN_SEQ,seq_07c.py)
+	$(call RUN_SEQ,seq_08.py)
 	$(call RUN_SEQ,seq_03.py)
 
 test_all: test_all_begin .test_arduino_espidf4 .test_arduino_3 .test_idf5 .test_idf6_1 .test_arduino_latest
