@@ -1,4 +1,4 @@
-pre-1.3.1:
+1.3.1:
 - esp32: attachToPulseCounter() accepts invert_step_pulse to count inverted step pulses
 - StepperDemo: `pi<n>[,l,h]` attaches the pulse counter with inverted step pulse
 - esp32: IDF4 MCPWM/PCNT inserts one MIN_CMD_TICKS pause (old DIR) before a direction change so DIR is not toggled while STEP is still high (#370)
