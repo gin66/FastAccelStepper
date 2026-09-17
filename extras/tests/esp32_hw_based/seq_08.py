@@ -5,8 +5,8 @@ Runs on every motor/driver (MCPWM/PCNT, RMT, I2S). Command:
 
   A1000000 V100 pi7 f w1000 P0 W
 
-ESP-IDF 4 MCPWM/PCNT currently fails inverted step-pulse counting
-(#370: DIR changes while STEP is still high; times out waiting for @0 [0]).
+Counts falling STEP edges. MCPWM must not toggle DIR while STEP is still
+high (#370); the old-DIR MIN_CMD_TICKS pause covers that.
 """
 
 import os

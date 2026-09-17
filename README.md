@@ -446,7 +446,7 @@ As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers a
 
 One specific note for the rmt: If a direction pin toggle is needed directly after a command with steps, then the driver will add before that direction pin toggle another pause of `MIN_CMD_TICKS` ticks.
 
-MCPWM/PCNT on ESP-IDF 5 inserts one `MIN_CMD_TICKS` pause before a direction change. Pause commands complete via the MCPWM compare interrupt at tick 1, so the next command (and DIR) is applied at the start of that pause — a one-command pipeline. STEP stays low for the rest of the pause. ESP-IDF 4 MCPWM/PCNT does not need this pause.
+MCPWM/PCNT inserts one `MIN_CMD_TICKS` pause (old DIR) before a direction change. `apply_command()` (and DIR) runs at MCPWM compare tick 1 (TEA), when STEP has just gone high and stays high until TEP. The pause defers the DIR toggle until STEP is low (#370). Independent of `dir_change_delay_us`. ESP-IDF 5+ additionally latches generator actions at TEZ/TEP; `startQueue` applies the first command immediately so leftover step action cannot pulse during a leading pause.
 
 ### ESP32S2
 

@@ -1,7 +1,8 @@
 pre-1.3.1:
 - esp32: attachToPulseCounter() accepts invert_step_pulse to count inverted step pulses
 - StepperDemo: `pi<n>[,l,h]` attaches the pulse counter with inverted step pulse
-- esp32_hw_based: seq_08 inverted pulse-counter attach (`pi7`) on every motor/driver; IDF4 MCPWM/PCNT fails (#370, DIR change while STEP is high)
+- esp32: IDF4 MCPWM/PCNT inserts one MIN_CMD_TICKS pause (old DIR) before a direction change so DIR is not toggled while STEP is still high (#370)
+- esp32_hw_based: seq_08 inverted pulse-counter attach (`pi7`) on every motor/driver
 
 1.3.0:
 - esp32: ESP-IDF 6.1 now supports the MCPWM/PCNT and I2S drivers

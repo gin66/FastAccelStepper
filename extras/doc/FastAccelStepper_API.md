@@ -259,12 +259,15 @@ in the range of ms or more.
 ESP32 I2S_DIRECT requires a GPIO (or external pin >= 128). I2S mux slots
 (`pin | PIN_I2S_FLAG`) are valid only with I2S_MUX.
 
-ESP32 MCPWM/PCNT on ESP-IDF 5+ inserts one MIN_CMD_TICKS pause before a
-direction change. Pause commands interrupt at MCPWM compare (tick 1), so
-DIR is applied at the start of that pause (one-command pipeline); STEP
-stays low for the rest. startQueue latches that first command immediately
-so a leftover step action cannot pulse during the pause. ESP-IDF 4 does
-not need this. Independent of dir_change_delay_us.
+ESP32 MCPWM/PCNT inserts one MIN_CMD_TICKS pause (old DIR) before a
+direction change. apply_command() runs at MCPWM compare (tick 1, TEA),
+when STEP has just gone high; STEP stays high until TEP. The pause
+defers the DIR toggle to TEA of that pause, with STEP already low
+(#370). Independent of dir_change_delay_us.
+
+ESP-IDF 5+ also latches generator actions at TEZ/TEP (one-command
+pipeline). startQueue applies the first command with immediate update
+so leftover utea=2 cannot pulse during a leading pause.
 ```cpp
   void setDirectionPin(uint8_t dirPin, bool dirHighCountsUp = true,
                        uint16_t dir_change_delay_us = 0);
