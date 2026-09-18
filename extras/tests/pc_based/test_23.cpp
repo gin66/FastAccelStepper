@@ -63,8 +63,9 @@ static void process_queue_ticks(uint32_t ticks_to_process) {
 }
 
 // AQE_DIR_CHANGE_PAUSE_INJECTED is a positive/informational result: the
-// direction-change pause(s) are in the queue, but the actual command was not
-// yet enqueued. The caller must invoke addQueueEntry() again (cf. aqeRetry()).
+// direction-change pause is in the queue, but the actual command was not
+// yet enqueued. At most one pause is injected per call, so the caller must
+// invoke addQueueEntry() again (cf. aqeRetry()) until AQE_OK is returned.
 static AqeResultCode addQueueEntryWithDirChange(FastAccelStepper* s,
                                                 struct stepper_command_s* cmd,
                                                 bool start) {

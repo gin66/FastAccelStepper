@@ -71,6 +71,13 @@ test_22.o: test_22.cpp i2s_test_common.h $(PRJ_ROOT)/src/pd_esp32/i2s_fill.cpp $
 test_24: test_24.o
 	g++ -o $@ $< $(LDLIBS)
 
+# test_25 unit-tests the moveTimed() pause reporting (see
+# src/fas_member/move_timed.h): per-call actual_duration semantics and the
+# injected pause ticks reported on DirChangePauseInjected / DirPin2msPauseAdded.
+# It is self-contained like test_24 and must not link LIB_O.
+test_25: test_25.o
+	g++ -o $@ $< $(LDLIBS)
+
 test_%: test_%.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
 

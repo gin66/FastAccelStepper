@@ -55,6 +55,9 @@ class StepperQueueBase {
   }
 #endif
 
+  // ticks of the pause(s) injected for the current moveTimed() call
+  uint16_t _injected_pause_ticks;
+
   void _base_initVars() {
     queue_end.dir = true;
     queue_end.count_up = true;
@@ -65,6 +68,7 @@ class StepperQueueBase {
 #if defined(SUPPORT_PAUSE_CMD_COUNTING)
     clear_pause_stats();
 #endif
+    _injected_pause_ticks = 0;
   }
 
   inline uint8_t queueEntries() const {

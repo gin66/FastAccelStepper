@@ -1,3 +1,6 @@
+1.3.2:
+- moveTimed(): on a direction-change/2ms pause return (DirChangePauseInjected / DirPin2msPauseAdded) the command was not enqueued and *actual_duration now carries the ticks of the injected pause; accumulate it per retry and compute the drift from duration - (actual + extra) once the move is accepted
+
 1.3.1:
 - esp32: attachToPulseCounter() accepts invert_step_pulse to count inverted step pulses
 - StepperDemo: `pi<n>[,l,h]` attaches the pulse counter with inverted step pulse

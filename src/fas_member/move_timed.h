@@ -13,17 +13,25 @@
 // includes this header to compile the production moveTimed() body verbatim,
 // the same pattern as fas_member/add_queue_entry.h.
 
-// A direction change makes the queue driver insert one or more pause commands
-// (driver dependent, currently up to three) on top of the step command it
-// wraps. moveTimed() must therefore treat two slots as reserved for every
+// A direction change makes the queue driver inject at most one pause command
+// per call (driver dependent; up to three pauses total across retries, e.g.
+// ESP32 RMT). moveTimed() must therefore treat two slots as reserved for every
 // timed move, so that a move is only admitted when the whole move plus the
 // direction pauses fits into the queue. Otherwise a direction change could run
 // the queue short between the separate pause/step appends and silently drop
 // steps (Issue 370). The application should keep the number of queue commands
 // a move generates well below QUEUE_LEN/2 so that splitting large moves on the
 // application side stays feasible.
-MoveTimedResultCode FastAccelStepper::moveTimed(
-    int16_t steps, uint32_t duration, uint32_t* actual_duration, bool start) {
+//
+// On a pause-injected return (AqeResultCode::DirChangePauseInjected or
+// AqeResultCode::DirPin2msPauseAdded) the command was NOT enqueued and
+// *actual_duration carries the ticks of the one injected pause. The
+// application accumulates this value per retry and computes the drift only
+// once the move is accepted (see API documentation).
+MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
+                                                uint32_t duration,
+                                                uint32_t* actual_duration,
+                                                bool start) {
   MoveTimedResultCode ret_ok =
       isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
@@ -36,6 +44,7 @@ MoveTimedResultCode FastAccelStepper::moveTimed(
   if (actual_duration != NULL) {
     *actual_duration = 0;
   }
+  _queue()->_injected_pause_ticks = 0;
   struct stepper_command_s cmd = {.ticks = 0, .steps = 0, .count_up = true};
   if (steps == 0) {
     if ((duration >> 16) >= QUEUE_LEN) {
@@ -58,7 +67,9 @@ MoveTimedResultCode FastAccelStepper::moveTimed(
       }
       AqeResultCode ret = addQueueEntry(&cmd, start);
       if (ret != AQE_OK) {
-        // unexpected
+        if ((actual_duration != NULL) && aqeIsPauseInjected(ret)) {
+          *actual_duration += _queue()->_injected_pause_ticks;
+        }
         return tmrFrom(ret);
       }
       if (actual_duration != NULL) {
@@ -111,7 +122,9 @@ MoveTimedResultCode FastAccelStepper::moveTimed(
 
         AqeResultCode ret = addQueueEntry(&cmd, start);
         if (ret != AQE_OK) {
-          // unexpected
+          if ((actual_duration != NULL) && aqeIsPauseInjected(ret)) {
+            *actual_duration += _queue()->_injected_pause_ticks;
+          }
           return tmrFrom(ret);
         }
         if (actual_duration != NULL) {
@@ -151,7 +164,9 @@ MoveTimedResultCode FastAccelStepper::moveTimed(
     }
     AqeResultCode ret = addQueueEntry(&cmd, start);
     if (ret != AQE_OK) {
-      // unexpected
+      if ((actual_duration != NULL) && aqeIsPauseInjected(ret)) {
+        *actual_duration += _queue()->_injected_pause_ticks;
+      }
       return tmrFrom(ret);
     }
     if (actual_duration != NULL) {

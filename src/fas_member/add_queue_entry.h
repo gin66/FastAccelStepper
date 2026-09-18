@@ -74,6 +74,7 @@ AqeResultCode FastAccelStepper::addQueueEntry(
             .count_up = cmd->count_up};
         res = q->addQueueEntry(&pause_cmd, start);
         if (res == AQE_OK) {
+          q->_injected_pause_ticks = pause_cmd.ticks;
           res = AQE_DIR_PIN_2MS_PAUSE_ADDED;
         }
         return res;

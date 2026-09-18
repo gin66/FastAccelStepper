@@ -403,7 +403,7 @@ static bool feedCommand(int16_t steps, uint32_t ticks, int32_t& drift,
 
 // Feed one captured command into rmt_q via the FastAccelStepper wrapper, the
 // same way the issue370 firmware does. A direction change may return
-// AQE_DIR_CHANGE_PAUSE_INJECTED (pauses queued, command not yet): retry until
+// AQE_DIR_CHANGE_PAUSE_INJECTED (pause queued, command not yet): retry until
 // the command itself is enqueued.
 static AqeResultCode feedViaStepper(struct stepper_command_s* cmd) {
   for (int i = 0; i < 10; i++) {

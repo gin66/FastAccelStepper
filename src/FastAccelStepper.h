@@ -485,13 +485,32 @@ class FastAccelStepper {
   // be one. Perhaps performing the step in the middle of the duration is more
   // appropriate ?
   //
-  // A move that changes direction makes the queue driver insert additional
-  // pause commands (see "Capacity and direction-change pauses" below). These
-  // pauses are NOT included in the returned actual_duration, but they do extend
-  // the time the move takes and they consume queue slots. The application has
-  // to account for them - e.g. when scheduling the next timed move or when
+  // A move that changes direction makes the queue driver inject a pause command
+  // (see "Capacity and direction-change pauses" below). These pauses extend the
+  // time the move takes and they consume queue slots. If a pause is injected,
+  // moveTimed() returns AQE_DIR_CHANGE_PAUSE_INJECTED or
+  // AQE_DIR_PIN_2MS_PAUSE_ADDED and the command was NOT enqueued; in this case
+  // *actual_duration carries the ticks of the one injected pause. The
+  // application accumulates this value per retry (e.g. an "extra" variable) and
+  // computes the drift only after the move is accepted. The application has to
+  // account for the pauses - e.g. when scheduling the next timed move or when
   // deciding that a stepper has finished - in order to not get out of sync with
   // the stepper timing.
+  //
+  // Recommended retry pattern:
+  //   uint32_t actual = 0, extra = 0;
+  //   for (;;) {
+  //     rc = stepper.moveTimed(steps, duration, &actual);
+  //     if (rc == DirChangePauseInjected || rc == DirPin2msPauseAdded) {
+  //       extra += actual;
+  //       continue;
+  //     }
+  //     if (rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY) {
+  //       drift = (int32_t)(duration - (actual + extra));
+  //       break;
+  //     }
+  //     ... other retry codes unchanged ...
+  //   }
   //
   // ### MoveTimedResultCode - Return codes for moveTimed()
   //
@@ -500,10 +519,15 @@ class FastAccelStepper {
   // Positive values (retry later):
   // - MOVE_TIMED_BUSY (7):      Queue too full to append this timed move
   // - MOVE_TIMED_EMPTY (8):     Queue ran empty, but move was appended
+  // - AQE_DIR_CHANGE_PAUSE_INJECTED (6): Direction-change pause injected, the
+  //   move command was NOT enqueued. *actual_duration holds the injected pause
+  //   ticks. Accumulate and retry the same move.
+  // - AQE_DIR_PIN_2MS_PAUSE_ADDED (5): 2ms pause for an external direction pin
+  //   inserted, the move command was NOT enqueued. *actual_duration holds the
+  //   injected pause ticks. Accumulate and retry the same move.
   // - (plus AQE_QUEUE_FULL, AQE_DIR_PIN_IS_BUSY,
-  // AQE_WAIT_FOR_ENABLE_PIN_ACTIVE,
-  //    AQE_DEVICE_NOT_READY, AQE_DIR_PIN_2MS_PAUSE_ADDED,
-  //    AQE_DIR_CHANGE_PAUSE_INJECTED from AqeResultCode)
+  //   AQE_WAIT_FOR_ENABLE_PIN_ACTIVE, AQE_DEVICE_NOT_READY from
+  //   AqeResultCode)
   //
   // Zero:
   // - MOVE_TIMED_OK (0):        Move successfully appended
@@ -516,15 +540,16 @@ class FastAccelStepper {
   //
   // ### Capacity and direction-change pauses
   //
-  // A direction change makes the queue driver insert one or more pause
-  // commands on top of the step command itself: buffered drivers (ESP32 RMT,
-  // I2S) first drain their output pipeline so no step in the old direction is
-  // emitted after the change, and every driver enforces a configured
-  // direction-pin delay with a pause command that carries the change. The
-  // actual number of inserted pauses is driver dependent (currently between
-  // zero and three). moveTimed() therefore reserves two extra slots up front
-  // and only admits a move when the whole move plus the reserved slots fits
-  // into the queue at once (atomic append). Otherwise it returns
+  // A direction change makes the queue driver inject pause commands on top of
+  // the step command itself: buffered drivers (ESP32 RMT, I2S) first drain
+  // their output pipeline so no step in the old direction is emitted after the
+  // change, and every driver enforces a configured direction-pin delay with a
+  // pause command that carries the change. At most one pause is injected per
+  // addQueueEntry()/moveTimed() call; the total number over the course of a
+  // move is driver dependent (e.g. the ESP32 RMT driver needs up to three
+  // pauses across retries). moveTimed() therefore reserves two extra slots up
+  // front and only admits a move when the whole move plus the reserved slots
+  // fits into the queue at once (atomic append). Otherwise it returns
   // MOVE_TIMED_BUSY instead of silently dropping steps mid-append (see
   // Issue 370).
   //

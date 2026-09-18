@@ -254,6 +254,29 @@ Tests;
      pause parts inserted at direction changes, and the number of pause
      parts must match the toggle analysis of the command stream
 
+- test_25
+  moveTimed() pause reporting via *actual_duration
+
+  When a direction change forces the queue driver to inject a pause, the
+  moveTimed() call returns AQE_DIR_CHANGE_PAUSE_INJECTED / 
+  AQE_DIR_PIN_2MS_PAUSE_ADDED and the command was NOT enqueued. In this case
+  *actual_duration carries the ticks of the one injected pause; the caller
+  accumulates the value (extra) across retries and computes the drift only
+  after the move is accepted: drift = duration - (actual + extra).
+
+  Scenario A: per-call zeroing - actual_duration is never cumulative.
+  Scenario B: regular dir pin with before+after dir-change pause - exactly
+    one pause is injected per failing call (before, then after on retries),
+    and each failing call reports its pause ticks in *actual_duration.
+  Scenario C: external dir pin - the 2ms pause mechanism reports its ticks
+    (US_TO_TICKS(2000)) in the failing call.
+
+  Key validation criteria:
+  1. actual_duration must be per-call, not cumulative
+  2. A pause-injected return must report exactly the injected pause ticks
+  3. Each failing moveTimed() call must enqueue at most one entry
+  4. The final drift must account for all injected pause ticks (actual+extra)
+
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration
   Usage: make ramp_helper && ./ramp_helper <speed_us> <acceleration> <steps>

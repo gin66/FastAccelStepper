@@ -106,6 +106,7 @@ inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
   if (res != AQE_OK) {
     return res;
   }
+  _injected_pause_ticks = pause_cmd.ticks;
   return AQE_DIR_CHANGE_PAUSE_INJECTED;
 }
 

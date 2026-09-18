@@ -31,6 +31,10 @@ static inline bool aqeRetryImmediately(AqeResultCode code) {
 static inline bool aqeIsOk(AqeResultCode status) {
   return status == AqeResultCode::OK;
 }
+static inline bool aqeIsPauseInjected(AqeResultCode code) {
+  return (code == AqeResultCode::DirPin2msPauseAdded) ||
+         (code == AqeResultCode::DirChangePauseInjected);
+}
 
 static inline const char* toString(AqeResultCode code) {
   switch (code) {

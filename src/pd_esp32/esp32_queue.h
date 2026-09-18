@@ -371,7 +371,11 @@ static inline AqeResultCode esp32_enqueue_pause(StepperQueue* q,
                                                 bool start, bool count_up) {
   struct stepper_command_s pause_cmd = {
       .ticks = pause_ticks, .steps = 0, .count_up = count_up};
-  return q->addQueueEntry(&pause_cmd, start);
+  AqeResultCode res = q->addQueueEntry(&pause_cmd, start);
+  if (res == AQE_OK) {
+    q->_injected_pause_ticks = pause_ticks;
+  }
+  return res;
 }
 
 inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
