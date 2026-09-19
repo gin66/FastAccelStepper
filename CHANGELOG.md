@@ -1,4 +1,4 @@
-pre-1.3.3:
+1.3.3:
 - moveTimed(0, duration): pause uses last direction XOR prepare_revert (default false does not toggle DIR; true pauses in the opposite direction)
 
 1.3.2:
