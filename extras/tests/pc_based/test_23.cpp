@@ -225,6 +225,51 @@ static void test_before_after_dir_change_delay_defined() {
   test_result("BEFORE/AFTER_DIR_CHANGE_DELAY_TICKS check", true);
 }
 
+static void test_dir_change_before_after_getters() {
+  printf("Running: getDirChangeBeforeTicks / AfterTicks\n");
+  init_queue();
+  FastAccelStepperEngine engine;
+  engine.init();
+  FastAccelStepper* s = engine.stepperConnectToPin(0);
+  assert(s != NULL);
+  test_result("before/after 0 without dir pin",
+              s->getDirChangeBeforeTicks() == 0 &&
+                  s->getDirChangeBeforePauseCount() == 0 &&
+                  s->getDirChangeAfterTicks() == 0);
+
+  s->setDirectionPin(5, true, 0);
+  fas_queue[0]._before_dir_change_delay_ticks = 0;
+  fas_queue[0]._after_dir_change_delay_ticks = 0;
+  test_result("before/after 0 with dir pin delay 0",
+              s->getDirChangeBeforeTicks() == 0 &&
+                  s->getDirChangeBeforePauseCount() == 0 &&
+                  s->getDirChangeAfterTicks() == 0);
+
+  uint16_t before = US_TO_TICKS(500);
+  fas_queue[0]._before_dir_change_delay_ticks = before;
+  test_result("before ticks from driver",
+              s->getDirChangeBeforeTicks() ==
+                      fas_max(before, (uint16_t)MIN_CMD_TICKS) &&
+                  s->getDirChangeBeforePauseCount() == 1);
+
+  s->setDirectionPin(5, true, 1000);
+  uint16_t user_after = US_TO_TICKS(1000);
+  test_result("after ticks from user delay",
+              s->getDirChangeAfterTicks() ==
+                  fas_max(user_after, (uint16_t)MIN_CMD_TICKS));
+
+  uint16_t driver_after = US_TO_TICKS(2000);
+  fas_queue[0]._after_dir_change_delay_ticks = driver_after;
+  test_result("after ticks max(user, driver)",
+              s->getDirChangeAfterTicks() ==
+                  fas_max(driver_after, (uint16_t)MIN_CMD_TICKS));
+
+  engine.setExternalCallForPin(mock_external_callback);
+  s->setDirectionPin(EXTERNAL_DIR_PIN, true, 1000);
+  test_result("external dir after is 2ms",
+              s->getDirChangeAfterTicks() == US_TO_TICKS((uint16_t)2000));
+}
+
 static void test_no_delay_if_prior_pause_sufficient() {
   printf("Running: No delay if prior pause has sufficient ticks\n");
   init_queue();
@@ -581,6 +626,7 @@ int main() {
   test_dir_change_delay_inserted_on_dir_change();
   test_dir_change_delay_not_on_pause_command();
   test_before_after_dir_change_delay_defined();
+  test_dir_change_before_after_getters();
   test_no_delay_if_prior_pause_sufficient();
   test_delay_if_prior_step_sufficient();
 

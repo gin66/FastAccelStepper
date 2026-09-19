@@ -242,6 +242,61 @@ void FastAccelStepper::init(FastAccelStepperEngine* engine, uint8_t num,
 #endif
 }
 uint8_t FastAccelStepper::getStepPin() const { return _stepPin; }
+
+uint16_t FastAccelStepper::getDirChangeBeforeTicks() const {
+  if (_dirPin == PIN_UNDEFINED) {
+    return 0;
+  }
+  StepperQueue* q = _queue();
+  uint16_t t = 0;
+#if defined(SUPPORT_ESP32)
+  t = esp32_before_pause_ticks(q);
+#endif
+#if defined(BEFORE_DIR_CHANGE_DELAY_TICKS)
+  if (t == 0) {
+    t = BEFORE_DIR_CHANGE_DELAY_TICKS(q);
+  }
+#endif
+  (void)q;
+  if (t == 0) {
+    return 0;
+  }
+  return fas_max(t, (uint16_t)MIN_CMD_TICKS);
+}
+
+uint8_t FastAccelStepper::getDirChangeBeforePauseCount() const {
+  if (getDirChangeBeforeTicks() == 0) {
+    return 0;
+  }
+#if defined(SUPPORT_ESP32)
+  uint8_t n = esp32_before_pause_count(_queue());
+  if (n != 0) {
+    return n;
+  }
+#endif
+  return 1;
+}
+
+uint16_t FastAccelStepper::getDirChangeAfterTicks() const {
+  if (_dirPin == PIN_UNDEFINED) {
+    return 0;
+  }
+  if (_dirPin & PIN_EXTERNAL_FLAG) {
+    return US_TO_TICKS((uint16_t)2000);
+  }
+  uint16_t t = _dir_change_delay_ticks;
+#if defined(SUPPORT_ESP32)
+  t = fas_max(t, esp32_after_pause_ticks(_queue()));
+#endif
+#if defined(AFTER_DIR_CHANGE_DELAY_TICKS)
+  t = fas_max(t, AFTER_DIR_CHANGE_DELAY_TICKS(_queue()));
+#endif
+  if (t == 0) {
+    return 0;
+  }
+  return fas_max(t, (uint16_t)MIN_CMD_TICKS);
+}
+
 void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
                                        uint16_t dir_change_delay_us) {
 #if defined(SUPPORT_ESP32_I2S) && defined(SUPPORT_SELECT_DRIVER_TYPE)

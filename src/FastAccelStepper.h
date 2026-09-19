@@ -130,6 +130,19 @@ class FastAccelStepper {
   inline uint8_t getDirectionPin() const { return _dirPin; }
   inline bool directionPinHighCountsUp() const { return _dirHighCountsUp; }
 
+  // Ticks of each pause to issue *before* a direction change (old DIR),
+  // for pipeline drain (RMT/I2S/MCPWM). 0 means none. Issue
+  // `getDirChangeBeforePauseCount()` such pauses. Coordinated n-axis
+  // planners should emit these on every axis, not wait for inject.
+  uint16_t getDirChangeBeforeTicks() const;
+  // How many before-pauses the driver needs (ESP32 RMT idf5/6: 2;
+  // otherwise 0 or 1). 0 if `getDirChangeBeforeTicks()` is 0.
+  uint8_t getDirChangeBeforePauseCount() const;
+  // Ticks of the pause that carries the new DIR: max of the user
+  // `dir_change_delay_us` from `setDirectionPin()` and the driver's
+  // after-delay. External DIR pins return 2 ms. 0 means none.
+  uint16_t getDirChangeAfterTicks() const;
+
   // ## Enable Pin
   // if enable pin is connected, then use this function.
   //

@@ -1,5 +1,8 @@
+pre-1.3.4:
+- getDirChangeBeforeTicks() / getDirChangeBeforePauseCount() / getDirChangeAfterTicks(): planner-facing DIR pause budget (driver drain + user dir_change_delay from setDirectionPin())
+
 1.3.3:
-- moveTimed(0, duration): pause uses last direction XOR prepare_revert (default false does not toggle DIR; true pauses in the opposite direction)
+- moveTimed(steps, duration, actual_duration, start=true, prepare_revert=false): a pause (steps=0) uses last queued direction XOR prepare_revert. Default false keeps DIR; true issues the pause in the opposite direction.
 
 1.3.2:
 - moveTimed(): on DirChangePauseInjected / DirPin2msPauseAdded, *actual_duration reports the injected pause ticks (previously left at 0)
