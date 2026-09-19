@@ -29,6 +29,9 @@ getStepPin	KEYWORD2
 setDirectionPin	KEYWORD2
 getDirectionPin	KEYWORD2
 directionPinHighCountsUp	KEYWORD2
+getDirChangeBeforeTicks	KEYWORD2
+getDirChangeBeforePauseCount	KEYWORD2
+getDirChangeAfterTicks	KEYWORD2
 setEnablePin	KEYWORD2
 getEnablePinHighActive	KEYWORD2
 getEnablePinLowActive	KEYWORD2

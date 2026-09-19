@@ -1,12 +1,15 @@
 Unreleased:
-- Teensy 4.0/4.1 support (EXPERIMENTAL): new pd_teensy backend, up to 16 steppers via the i.MX RT1062's QuadTimer modules, any digital pin usable as step/dir (see README "Teensy 4.0/4.1" section). Verified on real Teensy 4.0 hardware: single stepper through a DM556 driver board reaching the driver's full 200 kHz rated speed with zero missed steps, and all 16 steppers across all 4 QuadTimer modules running simultaneously with no cross-talk
-- fix: teensy_queue.cpp's step-timing ISR was missing a Cortex-M7 `dsb` memory barrier after clearing the QuadTimer interrupt flags, matching one luni64/TeensyStep4's own code has for the same reason - without it, step rate would plateau then the motor would hang as interrupt frequency increased during acceleration
-- fix (shared with #372): RampControl.cpp declared the log2 timer-frequency variables `static`, conflicting with their `extern` declaration. Ill-formed C++, breaks the build for any platform whose TICKS_PER_S isn't exactly 16000000 or 21000000 - needed for this port's 9.375 MHz tick rate
-- fix (shared with #372): those extern declarations also lived in the wrong header (RampGenerator.h, included after the header that already needs them) - moved into RampCalculator.h
-- fix (shared with #372): `log2_timer_freq_div_sqrt_of_2` was computed with a copy-paste of the formula for `log2_timer_freq_square_div_2` (squaring the frequency instead of dividing by sqrt(2)). Caused the stepper to "hang" for minutes on any ramp start/reversal from standstill, unless setLinearAcceleration() happened to be in use (which masks it) - found via real hardware testing on this port
+- Teensy 4.0/4.1 support (EXPERIMENTAL): new pd_teensy backend, up to 16 steppers via the i.MX RT1062's QuadTimer modules
+- fix: teensy_queue.cpp step-timing ISR missing Cortex-M7 `dsb` memory barrier
+- fix: RampControl.cpp static variable conflicting with extern declaration
+- fix: moved extern declarations from RampGenerator.h to RampCalculator.h
+- fix: `log2_timer_freq_div_sqrt_of_2` used wrong formula (squared instead of sqrt(2))
+
+pre-1.3.4:
+- getDirChangeBeforeTicks() / getDirChangeBeforePauseCount() / getDirChangeAfterTicks(): planner-facing DIR pause budget (driver drain + user dir_change_delay from setDirectionPin())
 
 1.3.3:
-- moveTimed(0, duration): pause uses last direction XOR prepare_revert (default false does not toggle DIR; true pauses in the opposite direction)
+- moveTimed(steps, duration, actual_duration, start=true, prepare_revert=false): a pause (steps=0) uses last queued direction XOR prepare_revert. Default false keeps DIR; true issues the pause in the opposite direction.
 
 1.3.2:
 - moveTimed(): on DirChangePauseInjected / DirPin2msPauseAdded, *actual_duration reports the injected pause ticks (previously left at 0)

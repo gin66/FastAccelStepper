@@ -174,6 +174,8 @@ Tests;
   - Behavior with/without delay configured
   - No extra delay if prior pause has sufficient ticks
   - No extra delay if prior single step has sufficient ticks
+  - getDirChangeBeforeTicks / getDirChangeBeforePauseCount /
+    getDirChangeAfterTicks match driver before/after and user delay
   
   Part 3: External direction pin behavior tests
   - External dir pin (pin >= 128) with empty queue succeeds
