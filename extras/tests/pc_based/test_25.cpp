@@ -1,4 +1,5 @@
-// test_25: moveTimed() pause reporting via *actual_duration
+// test_25: moveTimed() pause reporting, DIR-preserving dwells,
+// and prepare_revert
 //
 // When a direction change forces the queue driver to inject a pause, the
 // moveTimed() call returns AQE_DIR_CHANGE_PAUSE_INJECTED (6) or
@@ -314,10 +315,69 @@ static void test_external_dir_pin_2ms() {
         "C: external callback only failed once");
 }
 
+// ---- Scenario D: timekeeping pause keeps last direction --------------------
+
+static void test_pause_inherits_direction() {
+  printf("Running: moveTimed(0, dt) after DOWN does not toggle DIR\n");
+  reset(1, 0, 0, 0);
+
+  uint32_t actual = 0;
+  MoveTimedResultCode rc = test_stepper.moveTimed(-3, 12000, &actual, false);
+  check(rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY, "D: DOWN move accepted");
+  check(test_q.queue_end.count_up == false, "D: queue_end is DOWN");
+  uint8_t entries_before = test_q.queueEntries();
+
+  rc = test_stepper.moveTimed(0, 8000, &actual, false);
+  check(rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY, "D: pause accepted");
+  check(actual == 8000, "D: pause actual == duration");
+  check(test_q.queue_end.count_up == false, "D: pause kept DOWN");
+  check(test_q.queueEntries() == (uint8_t)(entries_before + 1),
+        "D: pause enqueued one entry");
+  uint8_t wi = (uint8_t)(test_q.next_write_idx - 1);
+  check(test_q.entry[wi & QUEUE_LEN_MASK].countUp == 0,
+        "D: pause entry countUp is DOWN");
+  check(test_q.entry[wi & QUEUE_LEN_MASK].toggle_dir == 0,
+        "D: pause entry did not toggle DIR");
+  check(test_q.entry[wi & QUEUE_LEN_MASK].hasSteps == 0,
+        "D: pause has no steps");
+}
+
+// ---- Scenario E: prepare_revert pause flips DIR --------------------------
+
+static void test_prepare_revert() {
+  printf("Running: moveTimed(0, dt, prepare_revert) flips DIR\n");
+  reset(1, 0, 0, 0);
+
+  uint32_t actual = 0;
+  MoveTimedResultCode rc = test_stepper.moveTimed(2, 8000, &actual, false);
+  check(rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY, "E: UP move accepted");
+  check(test_q.queue_end.count_up == true, "E: queue_end is UP");
+
+  rc = test_stepper.moveTimed(0, 8000, &actual, false, true);
+  check(rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY,
+        "E: revert pause accepted");
+  check(actual == 8000, "E: revert pause actual == duration");
+  check(test_q.queue_end.count_up == false, "E: queue_end is DOWN");
+  uint8_t wi = (uint8_t)(test_q.next_write_idx - 1);
+  check(test_q.entry[wi & QUEUE_LEN_MASK].countUp == 0,
+        "E: pause entry countUp is DOWN");
+  check(test_q.entry[wi & QUEUE_LEN_MASK].toggle_dir == 1,
+        "E: pause entry toggled DIR");
+  check(test_q.entry[wi & QUEUE_LEN_MASK].hasSteps == 0,
+        "E: pause has no steps");
+
+  rc = test_stepper.moveTimed(-2, 8000, &actual, false);
+  check(rc == MOVE_TIMED_OK || rc == MOVE_TIMED_EMPTY,
+        "E: reversing moveTimed does not inject");
+  check(actual == 8000, "E: reversing move actual == duration");
+}
+
 int main() {
   test_per_call_zeroing();
   test_dir_change_pause_reporting();
   test_external_dir_pin_2ms();
+  test_pause_inherits_direction();
+  test_prepare_revert();
 
   if (failures != 0) {
     printf("TEST_25 FAILED (%d failures)\n", failures);
@@ -325,6 +385,7 @@ int main() {
   }
   printf(
       "TEST_25 PASSED (moveTimed pause ticks reported via "
-      "*actual_duration)\n");
+      "*actual_duration; pauses inherit DIR; prepare_revert)\n");
   return 0;
+
 }

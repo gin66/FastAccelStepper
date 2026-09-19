@@ -1,5 +1,8 @@
+pre-1.3.3:
+- moveTimed(0, duration): pause uses last direction XOR prepare_revert (default false does not toggle DIR; true pauses in the opposite direction)
+
 1.3.2:
-- moveTimed(): on a direction-change/2ms pause return (DirChangePauseInjected / DirPin2msPauseAdded) the command was not enqueued and *actual_duration now carries the ticks of the injected pause; accumulate it per retry and compute the drift from duration - (actual + extra) once the move is accepted
+- moveTimed(): on DirChangePauseInjected / DirPin2msPauseAdded, *actual_duration reports the injected pause ticks (previously left at 0)
 
 1.3.1:
 - esp32: attachToPulseCounter() accepts invert_step_pulse to count inverted step pulses

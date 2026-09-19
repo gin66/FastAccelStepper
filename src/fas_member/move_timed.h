@@ -23,6 +23,9 @@
 // a move generates well below QUEUE_LEN/2 so that splitting large moves on the
 // application side stays feasible.
 //
+// A steps==0 pause uses queue_end.count_up XOR prepare_revert: false keeps
+// DIR, true issues the pause in the opposite direction (a dir change).
+//
 // On a pause-injected return (AqeResultCode::DirChangePauseInjected or
 // AqeResultCode::DirPin2msPauseAdded) the command was NOT enqueued and
 // *actual_duration carries the ticks of the one injected pause. The
@@ -31,7 +34,8 @@
 MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
                                                 uint32_t duration,
                                                 uint32_t* actual_duration,
-                                                bool start) {
+                                                bool start,
+                                                bool prepare_revert) {
   MoveTimedResultCode ret_ok =
       isQueueEmpty() ? MOVE_TIMED_EMPTY : MOVE_TIMED_OK;
   if ((steps == 0) && (duration == 0)) {
@@ -45,7 +49,8 @@ MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
     *actual_duration = 0;
   }
   _queue()->_injected_pause_ticks = 0;
-  struct stepper_command_s cmd = {.ticks = 0, .steps = 0, .count_up = true};
+  bool count_up = _queue()->queue_end.count_up ^ prepare_revert;
+  struct stepper_command_s cmd = {.ticks = 0, .steps = 0, .count_up = count_up};
   if (steps == 0) {
     if ((duration >> 16) >= QUEUE_LEN) {
       return MOVE_TIMED_TOO_LARGE_ERROR;
@@ -84,6 +89,8 @@ MoveTimedResultCode FastAccelStepper::moveTimed(int16_t steps,
   if (steps < 0) {
     cmd.count_up = false;
     steps = -steps;
+  } else {
+    cmd.count_up = true;
   }
 
   // There are steps to execute

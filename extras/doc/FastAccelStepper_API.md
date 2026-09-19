@@ -656,6 +656,10 @@ The current implementation immediately starts with a step, if there should
 be one. Perhaps performing the step in the middle of the duration is more
 appropriate ?
 
+A pause (steps = 0, duration > 0) uses the last queued direction, XOR
+prepare_revert (default false). So a normal pause does not toggle DIR;
+moveTimed(0, dt, ..., true) is a pause in the opposite direction.
+
 A move that changes direction makes the queue driver inject a pause command
 (see "Capacity and direction-change pauses" below). These pauses extend the
 time the move takes and they consume queue slots. If a pause is injected,
@@ -666,7 +670,9 @@ application accumulates this value per retry (e.g. an "extra" variable) and
 computes the drift only after the move is accepted. The application has to
 account for the pauses - e.g. when scheduling the next timed move or when
 deciding that a stepper has finished - in order to not get out of sync with
-the stepper timing.
+the stepper timing. Coordinated multi-axis motion can issue a
+prepare_revert pause on the reversing axis and the same duration as a
+normal pause on the others.
 
 Recommended retry pattern:
   uint32_t actual = 0, extra = 0;
@@ -733,7 +739,8 @@ steady feed.
    AQE_ERROR_NO_DIR_PIN_TO_TOGGLE from AqeResultCode)
 ```cpp
   MoveTimedResultCode moveTimed(int16_t steps, uint32_t duration,
-                                uint32_t* actual_duration, bool start = true);
+                                uint32_t* actual_duration, bool start = true,
+                                bool prepare_revert = false);
 ```
 ## Low Level Stepper Queue Management (low level access)
 
