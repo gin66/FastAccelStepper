@@ -193,7 +193,7 @@ horizon, and a PC-checkable oracle.
   port, or heap-allocated lookahead. The class is a header template
   with member arrays.
 - Isabelle or other machine-checked proofs. Theory is probed by
-  PC tests (todo.md steps 2b / 3b), not a prover.
+  PC tests (todo.md steps 2b–2g / 3b), not a prover.
 
 ---
 
@@ -1868,7 +1868,7 @@ is test-first on `extras/tests/pc_based`.
 
 | Phase | Delivers | Tests |
 |-------|----------|-------|
-| P0 | `RampCalculator` identity + `R` scan (end or direction change), no queues | F1 planner-only, F10 `R`, F19 speed cap, steps 2b/3b theory probes |
+| P0 | `RampCalculator` identity + `R` scan (end or direction change), no queues | F1 planner-only, F10 `R`, F19 speed cap, steps 2b–2g / 3b theory probes |
 | P1 | Linear DDA + longest-then-rebind + `addQueueEntry` feeder | F1–F3, F5, F9, F12, F14–F18 |
 | P2 | gnuplot dumps (always) + HTML (`FAS_NAXIS_TRACE`) | F5, F8 Linear pages |
 | P3 | Overshoot ramps, `overshoot_max`, continuing-axis corners | F4, F4b, F6, F6b, F7 |

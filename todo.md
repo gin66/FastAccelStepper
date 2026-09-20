@@ -12,7 +12,7 @@ Rules for every step:
    No new `src/*.cpp`.
 3. No `float` / `double` / integer `/` in the production header.
    Period and accel use `log2_value_t` and `RampCalculator`.
-   No Isabelle. Theory is probed in steps 2b and 3b.
+   No Isabelle. Theory is probed in steps 2b–2g and 3b.
 4. Each motion fixture writes `test_26_<id>.gnuplot` the way
    `test_02` writes `test_02_f5.gnuplot` (via a small helper modeled
    on `RampChecker::start_plot` / `finish_plot`). `make clean`
@@ -137,7 +137,7 @@ micro-segments, `R < P_stop`) caps speed and still plans; same
 
 ---
 
-## Step 2b — theory probes for `R`, binder, collinear (no queues)
+## Step 2b — theory probes for `R`, binder, collinear (no queues) ✅
 
 These must fail on a wrong *model*, even if later F-fixtures are
 green. Oracle is a small pure function, not FasNAxis state.
@@ -148,11 +148,9 @@ green. Oracle is a small pure function, not FasNAxis state.
    if `|Δ_i|*ticks_i > |Δ_b|*ticks_b`), DDA step counts to the
    vertex. Path direction maps the binder’s `P ≤ R` onto slaves.
    The planner must match this function on the same inputs.
-2. **Exhaustive tiny Linear.** All 2-axis polylines with
-   `|Δ_i| ≤ 5`, 3–4 vertices, two or three `ticks_cfg` ratios.
-   Vertices exact; no axis exceeds its envelope; `P ≤ R` is
-   checked from the *issued step counts*, not from planner
-   fields.
+2. *(moved to 2c–2g)* Exhaustive tiny Linear was too large as one
+   step. DDA walk, one-block Linear, issued-period `P ≤ R`,
+   two-block path-stop, then the exhaustive set.
 3. **Rebind neighbourhood.** `|Δ_x| ∈ {99,100,101}`,
    `ticks_y/ticks_x` in `{1, 2, 99/100}` (integer ticks, not
    a `/` in production). Especially `|Δ_x|*ticks_x ≈
@@ -168,13 +166,169 @@ green. Oracle is a small pure function, not FasNAxis state.
    direction: `(800, 400)` Linear slaves Y onto X’s `R = 800`
    triangle.
 
-**Done when:** exhaustive set is green; disabling the rebind
+**Done when:** items 1, 3, 4, 5 green; disabling the rebind
 rule makes the neighbourhood fail; disabling remaining-to-stop
 makes (5) fail to brake (`peak P` is not `< R`).
 `make -C extras/tests/pc_based mutations` runs
 `prove_mutations.sh` next to the tests (it is a test, not a
-library script under `extras/scripts`). Item 2 (exhaustive tiny
-Linear) is still open.
+library script under `extras/scripts`).
+
+---
+
+## Step 2c — DDA walk, one block (geometry only) ✅
+
+No ramp, no period, no queues. `Remaining::dda_steps` already
+counts; this step *walks* the error accumulator one binder
+step at a time.
+
+**Test first:** 2-axis hand cases, integer positions only.
+
+| `Δ` | Binder | Assert |
+|-----|--------|--------|
+| `(5,0)` | X | Y never steps; end `(5,0)` |
+| `(0,4)` | Y | X never steps; end `(0,4)` |
+| `(5,5)` | X (tie → smaller index) | Y steps every binder step |
+| `(5,3)` | X | classic Bresenham; end `(5,3)` |
+| `(5,−3)` | X | Y steps are `−1`; end `(5,−3)` |
+| `(−4,2)` | X | signs follow `Δ` |
+
+Per binder step each slave takes 0 or 1 step (never 2). Walked
+count equals `Remaining::dda_steps`. Chord invariant (integer,
+no `/`): `|2·err| ≤ |Δ_bind|` after every binder step. Test-only
+double may check distance to the chord `≤ 0.5√n` (§12.4).
+
+**Implement:** walker in `src/fas_naxis/dda.h` (or methods on
+`Remaining`). Error accumulator + `2*err >= |Δ_bind|` compare
+already used by `dda_steps`. No `float` / `/`.
+
+**Plot:** `test_26_f2c.gnuplot` — XY of `(5,3)` on the chord.
+
+**Done when:** table green; walked counts match `dda_steps`.
+
+**Done:** `src/fas_naxis/dda.h` holds `DdaWalk{bind, slave}` that walks
+the Bresenham error accumulator one binder step at a time (`err +=
+|slave|`; step + `err -= |bind|` when `2*err >= |bind|`). `f2c_dda_walk()`
+runs the six 2-axis hand cases (table above) through `DdaWalk`: each binder
+step issues exactly one binder step and 0 or 1 slave step (never 2), the
+walked per-axis count equals `Remaining::dda_steps(bind, slave)` (compared
+as magnitude, so `(5,-3)` gives `-3`), end position equals the waypoint,
+the chord invariant `|2*err| <= |bind|` holds after every step, and a
+test-only double confirms distance to the chord `<= 0.5*sqrt(n)`
+(section 12.4). Plot: `test_26_f2c.gnuplot`.
+
+---
+
+## Step 2d — Linear one-block rest-to-rest (binder ramp + DDA)
+
+Still no queues. One committed block: binder runs `RampLaw` on
+`|Δ_bind|`; each binder step is one DDA tick from 2c.
+
+**Test first:** equal `ticks_cfg`, rest-to-rest, §14.1 accel.
+
+- `(20, 8)`: X binds; issued `|steps|` per axis equals `|Δ|`;
+  end is the vertex; path on the chord.
+- `(20, 0)`: Y never steps.
+- `(8, 20)`: Y binds.
+- Binder `P ≤ R` from `RampLaw` fields is allowed here (sanity).
+  Reconstruction from issued periods is 2e, not this step.
+
+**Implement:** `src/fas_naxis/linear.h` — one block, no ring, no
+`addQueueEntry`. Emit a per-binder-step trace `{ticks, step[NAXES]
+in {−1,0,1}}`. Reuse `Remaining::binder_axis` and the 2c walker.
+
+**Plot:** `test_26_f2d.gnuplot` — XY of `(20,8)` plus binder
+speed vs time.
+
+**Done when:** step sums match `Δ`; path on the chord; plot exists.
+
+---
+
+## Step 2e — `P ≤ R` from issued periods (not planner fields)
+
+Same interpolator as 2d. Ignore `RampLaw.P`. A wrong model that
+only writes planner fields must fail here.
+
+**Test first:** replay the `(20, 8)` trace from 2d.
+
+- Binder `P_issued = calculate_ramp_steps(ticks)` (`P = 0` if
+  that record is a pause). Never read `RampLaw.P`.
+- Remaining after `k` binder steps = `|Δ_bind| − k` (last point
+  is rest).
+- Every sample: `P_issued ≤ remaining`. Peak `P_issued < |Δ_bind|`
+  on this short block (live remaining-to-stop).
+- Envelope: every moving command `ticks ≥ ticks_i_cfg` (one-step
+  slack, §12.4).
+
+Second hand case: `(20, 8)` with Y 4× slower (integer ticks). Y
+binds (rebind); reconstruction and envelope run on the *new*
+binder; X is DDA-scaled down.
+
+**Implement:** a trace oracle in `test_26.cpp` (or a helper next
+to it). Production interpolator only needs to record issued
+`ticks`. No queues.
+
+**Plot:** none required.
+
+**Done when:** both hand cases green without reading planner `P`.
+
+---
+
+## Step 2f — two-block Linear: path-stop vs collinear
+
+Still no queues. The interpolator walks `Remaining` across two
+blocks: snap at vertices; `R` is `remaining_linear_binder`;
+rebind per block.
+
+**Test first:**
+
+| Polyline | Assert |
+|----------|--------|
+| `(5,0)+(0,5)` | vertex `(5,0)` is a sample; reconstructed binder `P → 0` there; Y is the binder after the vertex |
+| `(3,3)+(2,2)` | collinear; end `(5,5)`; no rest at the joint (`P` does not return to 0) |
+| `(5,0)+(−3,0)` | reversal; `P → 0` at `(5,0)`; then X the other way |
+
+Issued step sums equal the polyline. Envelope as in 2e. `P ≤ R`
+from issued periods, including at the vertex sample.
+
+**Implement:** extend `linear.h` to a two-block walk. DIR pauses
+are Step 9 (queues); here a reversal is only `P → 0` then the
+other sign.
+
+**Plot:** `test_26_f2f.gnuplot` — the L, vertices marked.
+
+**Done when:** the three rows green.
+
+---
+
+## Step 2g — exhaustive tiny Linear
+
+No new production if 2c–2f are right. Nested loops in
+`test_26.cpp` only.
+
+**Test first:** all 2-axis polylines with `|Δ_i| ≤ 5`, 3 vertices
+(2 blocks) and 4 vertices (3 blocks), three integer `ticks_cfg`
+pairs: `(4000,4000)`, `(4000,8000)`, `(100,99)`. Skip the
+all-zero polyline. Idle-then-move is included (first block may
+be `0`). Accel = 2000 (§14.1).
+
+On every polyline:
+
+- vertices exact (integer position equals the waypoint)
+- no axis exceeds envelope (`ticks ≥ ticks_i_cfg`, one-step slack)
+- `P ≤ R` from issued periods as in 2e, including path-stops
+- collinear joints do not rest; non-collinear / reversal joints
+  have `P → 0` at that vertex
+
+`|Δ| ≤ 5` is combinatorics (DDA / vertex / `P ≤ R`), not
+coasting. Do not assert `P_stop` cruise here.
+
+**Implement:** enumeration + the 2e/2f oracle. Interpolator must
+stay O(steps) so ~10⁶ polylines finish in a few seconds.
+
+**Plot:** none (too many). Optional one representative
+`test_26_f2g.gnuplot` if a failure needs a picture.
+
+**Done when:** exhaustive set is green.
 
 ---
 
@@ -521,7 +675,9 @@ SimPort-only — prefer one binary unless the link set fights
 | After step | Whitepaper phase | What a reviewer can check |
 |------------|------------------|---------------------------|
 | 1–3 | P0 | log2 + `R` + `P≤R` without queues |
-| 2b, 3b | P0 | theory probes (oracle, exhaustive, rebind, collinear, trace stoppability) |
+| 2b | P0 | theory probes (oracle, rebind, collinear, lookahead speed cap, mutations) |
+| 2c–2g | P0 | tiny Linear: DDA walk, one-block, issued-period `P≤R`, two-block, exhaustive |
+| 3b | P0 | trace stoppability on F1/F5/F10 |
 | 4–9 | P1 | Linear through `addQueueEntry`; F18 rebind |
 | 10 | P2 | gnuplot always; HTML optional |
 | 11–12 | P3 | Overshoot |

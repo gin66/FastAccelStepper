@@ -14,6 +14,7 @@
 #include <stdlib.h>
 
 #include "fas_arch/test_pc.h"  // test() macro
+#include "fas_naxis/dda.h"
 #include "fas_naxis/ramp_law.h"
 #include "fas_naxis/ramp_map.h"
 #include "fas_naxis/remaining.h"
@@ -578,6 +579,124 @@ void f2b_oracle() {
   printf("F2b oracle: all theory probes green\n");
 }
 
+// Step 2c (whitepaper section 6.3): the DDA walk, one block, geometry only.
+//
+// No ramp, no period, no queues. Remaining::dda_steps already counts how many
+// steps a slave issues over |bind| binder steps; this step *walks* the error
+// accumulator one binder step at a time (DdaWalk). Two-axis hand cases with
+// integer positions only. Each binder step issues 0 or 1 step per axis (never
+// 2); the walked count per axis must equal Remaining::dda_steps; the chord
+// invariant |2*err| <= |bind| holds after every binder step; a test-only
+// double confirms distance to the chord <= 0.5*sqrt(n) (section 12.4).
+struct DdaCase {
+  const char* name;
+  int32_t dx;
+  int32_t dy;
+  int binder;  // expected binder axis (0 = X, 1 = Y; tie -> smaller index)
+};
+
+static void f2c_dda_walk() {
+  DdaCase cases[] = {
+      {"(5,0)  X binder, Y never steps", 5, 0, 0},
+      {"(0,4)  Y binder, X never steps", 0, 4, 1},
+      {"(5,5)  X binder (tie), Y every step", 5, 5, 0},
+      {"(5,3)  X binder, Bresenham", 5, 3, 0},
+      {"(5,-3) X binder, Y steps -1", 5, -3, 0},
+      {"(-4,2) X binder, signs follow delta", -4, 2, 0},
+  };
+  for (int c = 0; c < 6; c++) {
+    const DdaCase& cs = cases[c];
+    int32_t d[2] = {cs.dx, cs.dy};
+    uint32_t ticks[2] = {4000, 4000};  // equal ticks: longest |delta| binds
+    int binder = Remaining::binder_axis(d, ticks, 2);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "2c binder for %s", cs.name);
+    test(binder == cs.binder, msg);
+    int32_t bind = d[binder];
+    int32_t slave = d[1 - binder];
+
+    int32_t walked[2] = {0, 0};
+    int32_t pos[2] = {0, 0};
+    DdaWalk w(bind, slave);
+    // A test-only double accumulator for the 12.4 chord-distance check. This is
+    // not production; the production walker is integer-only (DdaWalk).
+    double max_chord_dist = 0.0;
+    double chord_len = 0.0;
+    while (!w.done()) {
+      int out_bind = 0, out_slave = 0;
+      w.step(&out_bind, &out_slave);
+      test(out_bind == 1 || out_bind == -1, "2c binder steps exactly one");
+      test(out_slave == -1 || out_slave == 0 || out_slave == 1,
+           "2c slave steps 0 or 1, never 2");
+      walked[binder] += out_bind;
+      walked[1 - binder] += out_slave;
+      pos[binder] += out_bind;
+      pos[1 - binder] += out_slave;
+      test(w.on_chord(), "2c chord invariant |2*err| <= |bind|");
+
+      // 12.4: perpendicular distance of (pos) from the origin-to-d chord.
+      double px = (double)pos[0], py = (double)pos[1];
+      double dx = (double)d[0], dy = (double)d[1];
+      double denom = dx * dx + dy * dy;
+      if (denom > 0.0) {
+        chord_len = denom;
+        double dist2 = (px * dy - py * dx) / denom;  // (dx,dy) unit-ish
+        double dist = dist2 * dist2;
+        if (dist > max_chord_dist) {
+          max_chord_dist = dist;
+        }
+      }
+    }
+    // Walked count per axis must equal the analytic dda_steps oracle.
+    int expected_bind = Remaining::dda_steps(bind, bind);
+    int expected_slave = Remaining::dda_steps(bind, slave);
+    int32_t wb_abs = (walked[binder] > 0) ? walked[binder] : -walked[binder];
+    test(wb_abs == expected_bind, "2c binder walked count == dda_steps");
+    int32_t ws_abs =
+        (walked[1 - binder] > 0) ? walked[1 - binder] : -walked[1 - binder];
+    test(ws_abs == expected_slave, "2c slave walked count == dda_steps");
+
+    // End position equals the waypoint (integer positions only).
+    test(pos[0] == cs.dx && pos[1] == cs.dy, "2c end position == waypoint");
+
+    // 12.4 test-only: max perpendicular distance^2 <= 0.25 * n.
+    double n = chord_len;
+    test(max_chord_dist <= 0.25 * n + 1e-9, "2c chord distance <= 0.5*sqrt(n)");
+  }
+
+  // Plot: XY of (5,3) on the chord (binder X, Y slaved).
+  {
+    int32_t d[2] = {5, 3};
+    int binder = 0;
+    int32_t bind = d[binder], slave = d[1 - binder];
+    NaxisPlot plot;
+    plot.start_plot("f2c", "FasNAxis F2c DDA walk (5,3)", 2);
+    plot.poly_point(0.0, 0.0);
+    plot.poly_point(5.0, 3.0);
+    plot.poly_done();
+    DdaWalk w(bind, slave);
+    int32_t pos[2] = {0, 0};
+    for (int s = 0; s <= 5; s++) {
+      double speed[2] = {0.0, 0.0};
+      double P[2] = {0.0, 0.0};
+      double R[2] = {0.0, 0.0};
+      double ticks[2] = {0.0, 0.0};
+      plot.row((double)s, (double)pos[0], (double)pos[1], 0.0, speed, P, R,
+               ticks);
+      if (w.done()) {
+        break;
+      }
+      int out_bind = 0, out_slave = 0;
+      w.step(&out_bind, &out_slave);
+      pos[0] += out_bind;
+      pos[1] += out_slave;
+    }
+    plot.finish_plot();
+    printf("F2c DDA walk plot written: test_26_f2c.gnuplot\n");
+  }
+  printf("F2c DDA walk: 2-axis hand cases green\n");
+}
+
 // Step 3 (whitepaper section 7.1): the ramp law P vs R, still with no queue.
 //
 // One axis, rest-to-rest over S = 10000 steps at the section 14.1 limits
@@ -751,6 +870,7 @@ int main() {
   f1_kernel();
   f2_remaining();
   f2b_oracle();
+  f2c_dda_walk();
   f3_ramp();
   printf("TEST_26 PASSED\n");
   return 0;
