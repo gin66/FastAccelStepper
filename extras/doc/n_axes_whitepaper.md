@@ -2,7 +2,7 @@
 
 White paper / concept. Not an implementation.
 
-Status: draft concept, 2026-09-19.
+Status: draft concept, 2026-09-20.
 Working name: **FasNAxis**.
 
 ---
@@ -26,11 +26,13 @@ enough that the queues never run empty.
 
 Planning reuses the FAS ramp map, in **log2** (`RampCalculator`):
 period ↔ ramp-steps, no float and no integer division on the hot path.
-Lookahead is **remaining steps in the current direction**, and it is
-a hard requirement: the buffered waypoints must cover a **full stop
-from configured max speed on every axis**. If they do not, that is
-an error the caller has to fix (more waypoints, lower `v`, higher
-`a`, or a larger `HORIZON`) — not a silent starve.
+Lookahead is parsed until **end of path or a direction change**.
+That remaining-step count `R_i` is the upper limit on ramp-steps
+(`P_i ≤ R_i`) and therefore on speed. The **path direction** then
+implies the other axes’ speeds (Linear DDA / Overshoot common `T`).
+A short lookahead **reduces speed**; it is not an error. Angle
+changes of the path still need motor accel/decel and therefore
+**preparation** (§8.4).
 
 Two geometry modes are first-class:
 
@@ -96,18 +98,27 @@ Time-optimal coordinated motion has to:
 
 1. visit the trajectory points in order, on a common clock,
 2. use as much of each axis’s `v_max` / `a_max` as the path and the
-   **future** path allow,
-3. start decelerating early enough for a corner, a reversal, or the
-   end of the program,
+   **already buffered** future path allow,
+3. start decelerating early enough for a corner, a reversal, the
+   last buffered waypoint (treated as rest), or `endPath()`,
 4. choose, per run, whether the *geometry between* the points is an
    exact line or is allowed to leave that line because the acc/speed
    profiles of the axes do not share one time-law.
 
-(3) is why lookahead has to be substantial — but the quantity to look
-at is not Euclidean `s_stop = v²/(2a)` computed in float. It is
-**remaining steps in the current direction**, the same comparison
-`_getNextCommand` already makes between `remaining_steps` and
-`performed_ramp_up_steps`.
+(3) is the lookahead–speed relation. Parse the buffered n-dim
+points until the path **ends** or some axis **changes direction**.
+The remaining steps `R` in that run are the upper bound on
+ramp-steps `P` (same comparison `_getNextCommand` already makes
+between `remaining_steps` and `performed_ramp_up_steps`). The
+path’s direction vector then scales that bound onto every axis.
+If `R` is short, speed is low — motion continues. A
+`LookaheadTooShort` error / feed-hold is the wrong concept.
+
+Angle changes of the path (a new `Δ'` that is not collinear with
+`Δ`) are the remaining hard part: the implied per-axis speeds
+jump, so motors must accel/decel, and that needs distance
+**before** the vertex. v1’s preparation is conservative and is
+specified in §8.4; it is not an error code.
 
 (4) is the mode switch. Independent FAS `moveTo()` on each axis is
 the uncontrolled version of overshoot: the short axis finishes first
@@ -147,7 +158,7 @@ horizon, and a PC-checkable oracle.
 | G1 | n-axis motion through a sequence of trajectory points, n ≥ 1, native space = stepper steps |
 | G2 | Hard constraints are the **currently configured** per-stepper period (`getSpeedInTicks()`) and acceleration (`getAcceleration()`), plus the device min-period `getMaxSpeedInTicks()` |
 | G3 | Two geometry modes, both time-optimal under G2: **Linear** (exact chords, shared time-law) and **Overshoot** (per-axis ramps, slight chordal deviation, waypoints still hit) |
-| G4 | Lookahead **must** cover a full stop from configured max speed on **every** axis (`R_i ≥ P_stop_i`). Falling short is an error with a hint to check acc/vel / `HORIZON` / waypoint spacing, not a silent feed-hold |
+| G4 | Parse lookahead until end or direction change → `R_i` is the cap on ramp-steps (`P_i ≤ R_i`). Path direction implies the other axes’ speeds. Short `R` **reduces speed**, it is not an error. Angle changes need accel/decel **preparation** (§8.4) |
 | G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner **issues** the driver’s before/after DIR pauses on a reversal (all axes share that time). Leftover injection is globalized, not ignored |
 | G6 | Tick-level timebase shared by all axes; lost sync is a hard error |
 | G7 | Tests run on the existing PC harness only — no simavr, no hardware, no PlatformIO job for this library |
@@ -170,8 +181,13 @@ horizon, and a PC-checkable oracle.
   not skip or round past a waypoint. Corner-cutting junction
   deviation (`δ`) is a different mechanism and is not a v1 mode.
 - A per-block feedrate `F`. v1 is axis-limit only.
+- A `LookaheadTooShort` / feed-hold error when `R < P_stop`.
+  Short lookahead is a speed cap (G4), not a fault.
 - Feed holds, jogging, or on-the-fly waypoint edits other than
   “append more blocks” / “end path” / “dwell at rest”.
+- A blended non-zero junction speed at a finite path-angle
+  change (GRBL-style). v1 Linear path-stops; Overshoot prepares
+  per axis via `R`. Smoother `ΔP` junctions are a later overlay.
 - A GUI application. gnuplot and HTML are **test artifacts**.
 - A separately compiled FasNAxis translation unit, a virtual axis
   port, or heap-allocated lookahead. The class is a header template
@@ -491,9 +507,9 @@ Three stacked stages, two buffers. Only the last stage calls FAS.
                         │
                         ▼
              ┌─────────────────────┐
-             │  Block planner      │  lookahead: remaining steps
-             │  Linear: one ramp   │  in the current direction
-             │  Overshoot: ramps_i │  log2 period ↔ ramp-steps
+             │  Block planner      │  lookahead: parse to end or
+             │  Linear: one ramp   │  direction change → max P;
+             │  Overshoot: ramps_i │  path direction implies speed
              └──────────┬──────────┘
                         │ committed blocks (ramp state + T)
                         ▼
@@ -516,12 +532,12 @@ The two buffers are different lengths on purpose:
 
 | Buffer | Unit | Typical depth | Job |
 |--------|------|---------------|-----|
-| Lookahead / block buffer | path segments | tens to thousands | enough **steps in the current direction** to stop |
+| Lookahead / block buffer | n-dim waypoints | tens to thousands | parse to end or direction change → max `P`; last point is rest |
 | Slice / command buffer | time slices | 10–50 ms | enough **time** to keep `QUEUE_LEN` from underrunning |
 
 Confusing them is the usual design mistake. A 2 ms slice buffer can
-never be “substantial lookahead”. The velocity decision lives in the
-block buffer.
+never be the n-dim lookahead. The velocity decision lives in the
+block buffer: short `R` lowers `P`, it does not stall the feeder.
 
 PC tests record at three taps: planner output (ramp-steps / ticks per
 axis), interpolator output (integer slices), and feeder output
@@ -622,7 +638,9 @@ near-square diagonal: the *slow* motor binds even if it is not
 the longest distance (F9, F18).
 
 Once the binder is known, it runs the FAS ramp against remaining
-steps until the next path-stop corner (§8). Slaves:
+steps until the next path-stop (§8): a non-collinear vertex, an
+axis reversal, `endPath()`, or the **last buffered waypoint**
+(open path: unknown next angle, last point is rest). Slaves:
 
 ```
 err_i += |Δ_i|
@@ -632,15 +650,21 @@ if 2*err_i >= |Δ_bind|:  step i, err_i -= |Δ_bind|
 No division after the block is accepted. The path is the chord
 because every slave step is locked to the binder’s step count.
 
+That lock **is** the path-direction implication: the binder’s `P`
+(already capped by `R`) sets every slave’s step rate. A short
+lookahead on the polyline lowers the binder, hence every axis.
+
 A path-stop corner (Linear `v = 0`) is any vertex that is not
-collinear in the same sense (§8.2). Remaining steps for the binder
-is the sum of `|Δ_bind|` over blocks up to that corner.
+collinear in the same sense (§8.5), plus the last buffered point
+while the path is open. Remaining steps for the binder is the
+sum of `|Δ_bind|` over blocks up to that stop.
 
 ### 6.4 Overshoot
 
 Each axis is a 1-D FAS ramp on its own remaining steps in the
-**current direction** (sum of `|Δ_i|` until that axis reverses or
-the path ends). Segment boundaries stay **time-synchronized**:
+**current direction** (sum of `|Δ_i|` until that axis reverses,
+the path ends, or the last buffered point). Segment boundaries
+stay **time-synchronized**:
 axis i is at `p_i[k]` at the same `t_k` as every other axis.
 
 ```
@@ -745,35 +769,52 @@ ticks(P) = calculate_ticks(P)          // period at ramp position P
 P(ticks) = calculate_ramp_steps(ticks) // inverse
 ```
 
-`P` is `performed_ramp_up_steps`. Acceleration is counting `P`
-up; deceleration is counting `P` down toward 0. Coast is `P`
+`P` is `performed_ramp_up_steps`. It **starts at 0** and is
+never a precomputed `min(P_stop, R/2)`. Acceleration is counting
+`P` up; deceleration is counting `P` down toward 0. Coast is `P`
 held, period clipped to `ticks_i_cfg`.
 
-The single-axis control law (`RampControl::_getNextCommand`),
-which FasNAxis applies per axis (Overshoot) or to the binder
-(Linear):
+The two caps are applied live, the same way FAS
+`_getNextCommand` already compares `remaining_steps` to
+`performed_ramp_up_steps`:
+
+- **max speed:** `P` stops increasing once the period has reached
+  `ticks_i_cfg` (`P_coast` / `P_stop` = `calculate_ramp_steps`)
+- **remaining-to-standstill:** when `R == P` the next steps count
+  `P` down (there are exactly `P` steps of braking room left).
+  This is not estimated in advance.
 
 ```
-R = remaining steps in the current direction          // §8
-P = performed_ramp_up_steps
+R = remaining steps to stand still in the current direction  // §8
+P = performed_ramp_up_steps   // starts at 0
 
 if R > P:   accelerate (P++) or coast if already at ticks_i_cfg
 if R == P:  decelerate (P--)
-if R < P:   too fast — lookahead failed; treat as
+if R < P:   too fast — P exceeded R (planner bug); treat as
             reverse/decel (same as FAS overshoot handling)
 
 ticks = max(calculate_ticks(P), ticks_i_cfg, ticks_min)
 ```
 
+A rest-to-rest move of `N` steps **coasts** if `N/2 > P_stop`
+(equivalently `N > 2 P_stop`): there is room to reach configured
+max and still stop. If `N/2 < P_stop`, the move is a triangle
+whose peak is whatever `P` has grown to when `R` catches it
+(about `N/2`). That peak is an **outcome** of the law, not an
+input the planner writes as `P`.
+
 No sqrt, no `/`. `R` is an integer sum. `P` changes by the steps
 just issued, so `|P_out − P_in| ≤ |Δ|` on a block — a 1-step
-block cannot take an axis from rest to high speed.
+block cannot take an axis from rest to high speed. Period is
+taken after the `P` update: first step from rest is
+`calculate_ticks(1)`; `calculate_ticks(0)` is never called.
 
 ### 7.2 Linear — one ramp, DDA slaves
 
 The binder of §6.3 (longest `|Δ|`, rebound if a slave would
 exceed v/a) runs §7.1 with `R` = remaining binder-steps until the
-next Linear path-stop. Each planning chunk of `planning_steps`
+next Linear path-stop (angle change, reversal, last point, or
+`endPath()`). Each planning chunk of `planning_steps`
 (same 2 ms rule FAS uses) is one interpolator slice: one
 `addQueueEntry` on the binder at `calculate_ticks(P)`, DDA slaves
 take 0 or 1 step per binder step, idle axes get a pause of the
@@ -816,9 +857,20 @@ continuing-axis corners; rest-to-rest lone segments (F4) do not.
 
 ## 8. Lookahead
 
-### 8.1 Remaining steps in the current direction
+Lookahead is a ring of n-dimensional waypoints, not a Euclidean
+`v(s)` pass. Three facts, in order:
 
-This replaces a Euclidean reverse/forward pass in `v(s)`.
+1. Parse until **end of path** or an axis **direction change**.
+   That remaining-step count `R_i` is the upper limit on
+   ramp-steps, hence on speed: `P_i ≤ R_i`.
+2. The **path direction** (the n-dim `Δ` of the current run)
+   maps that cap onto every axis.
+3. **Angle changes** of the path change those implied speeds, so
+   motors must accel/decel. That needs **preparation** before the
+   vertex. It is the remaining hard part; v1’s answer is
+   conservative (§8.4). It is not a `LookaheadTooShort` error.
+
+### 8.1 Parse until end or direction change
 
 For axis i, walking the block ring from the executing head:
 
@@ -833,27 +885,38 @@ for each block b in order:
     if sign == 0: sign = s
     if s != sign: break             // reversal: must be at 0 here
     R_i += |Δ_i[b]|
-    if path ended after b: break
-if path not ended and ring not full: R_i is a lower bound
+    if path ended after b: break    // endPath() or last buffered point
 ```
 
-`R_i` is the deceleration budget. The ramp law of §7.1 with this
-`R_i` is the whole reverse pass: you may not have `P > R_i`.
+The scan **stops** at the first of: path end, that axis going
+idle after moving, or `sign(Δ_i)` flipping. The last buffered
+waypoint of an open path is treated as **rest** — the next
+angle is unknown, so the only safe `P` at that point is 0.
+When more waypoints arrive, `R` may grow and the unexecuted
+tail is replanned faster. `R` is therefore exact for the
+current buffer, not a lower bound the planner waits to fill.
 
-Linear additionally stops the *path* at a non-collinear vertex
-(§8.2). For the binder, `R` is summed only up to that vertex,
-even if that axis would not reverse there.
+Linear additionally ends the *binder’s* `R` at a non-collinear
+vertex (§8.5), even if that axis would not reverse there.
 
-**Stop distance from configured max** (per axis, at
-`addAxis` / `setLimitsFromSteppers`):
+### 8.2 `R` is the cap on ramp-steps
+
+The ramp law of §7.1 with this `R` is the whole reverse pass:
+
+```
+P_i ≤ R_i
+ticks_i = max(calculate_ticks(P_i), ticks_i_cfg, ticks_min)
+```
+
+Configured max is
 
 ```
 P_stop_i = calculate_ramp_steps(ticks_i_cfg)
 ```
 
-That is how many steps that motor needs to go from rest to
-`v_max` — and therefore how many it needs to **brake from `v_max`
-to rest**. Oracle language:
+(`addAxis` / `setLimitsFromSteppers`). That is how many steps
+the motor needs from rest to `v_max`, and therefore from
+`v_max` to rest. Oracle language:
 
 | v_max | a_max | `P_stop` | t_stop |
 |------:|------:|---------:|-------:|
@@ -862,37 +925,106 @@ to rest**. Oracle language:
 | 20 000 | 5 000 | 40 000 | 4.0 s |
 | 40 000 | 2 000 | 400 000 | 20 s |
 
-A 2 ms slice is 8 steps at 4000 step/s. Stopping from that speed
-needs **one** integer `R ≥ P_stop`, not 500 slices.
+If `R_i < P_stop_i`, axis i **cannot be at configured max**.
+`P` still starts at 0 and follows §7.1 against this `R`; there
+is no separate `P = min(P_stop, R/2)` estimate. From rest a
+triangle’s peak is about `R/2` only because accel stops when
+`R` catches `P`. Rest-to-rest coast at `ticks_cfg` needs
+`N/2 > P_stop` (i.e. `S ≥ 2 P_stop`) and, while coasting,
+`R ≥ P_stop`. None of that is an error: the move is a slower
+triangle. `endPath()` uses the same law (last point is rest,
+and `R` will not grow).
 
-A second limit is the compile-time **block count** `HORIZON` (the
-second template argument of `FasNAxis`). A stream of
-micro-segments cannot grow past that ring. Default in the class is
-64 (MCU-sized). PC tests instantiate `FasNAxis<N, 4096, SimPort>`
-(or similar) so the horizon is still substantial without putting a
-4096-block array on every AVR sketch that merely includes the
-header.
+A 2 ms slice is 8 steps at 4000 step/s. The cap is **one**
+integer `R`, not 500 slices.
 
-If `HORIZON` blocks, even all counted, cannot sum to `P_stop_i`
-on some axis (worst case: 1-step micro-segments ⇒ `HORIZON <
-P_stop_i`), that is a **configuration error** at `addAxis` /
-`setLimitsFromSteppers`: the sketch cannot legally reach the
-configured speed. The hint names `HORIZON`, `setSpeed*`, and
-`setAcceleration`.
+`HORIZON` (the second template argument, default 64 on MCU)
+is the max number of **n-dim points**, not of steps. One
+10 000-step `addLine` with `HORIZON = 8` still has `R = 10000`
+and can reach `P_stop`. A stream of 1-step micro-segments
+cannot: `R ≤ HORIZON`, so `P` stays small. That is the
+lookahead–speed relation. It is **not** a configuration
+error at `addAxis`. PC tests instantiate
+`FasNAxis<N, 4096, SimPort>` when they want a long point
+horizon without putting a 4096-block array on every AVR
+sketch that merely includes the header.
 
-### 8.2 Junction speed — Linear
+`kappa_stop_q8` (default 320 = 1.25 in Q8) is only a
+**diagnostic** threshold:
+`R_i * 256 < P_stop_i * kappa_stop_q8` (path open) means
+speed is limited by lookahead. Kinematics stay `P ≤ R`.
+Integer, no `/`.
 
-At a vertex the direction jumps from `Δ` to `Δ'`.
+### 8.3 Path direction implies the other axes’ speeds
 
-**Exact polyline, continuous velocity, finite acceleration.**
-Any real change of direction in zero distance requires path speed
-0. FasNAxis does **not** use slice length `Δt` to invent a corner
-speed.
+`R_i` is per axis. The motion is a **path**, so one axis’s
+cap limits the others.
+
+**Linear.** One ramp, DDA slaves (§6.3). The binder’s `R`
+is remaining binder-steps to the next path-stop (including
+the last buffered point). Binder `P ≤ R` sets the time-law;
+every slave steps in lock with the binder. Short lookahead
+on the polyline therefore slows **every** axis, in the
+ratios of `Δ`. Rebind still applies: if a slave would exceed
+its own `ticks_i_cfg` / `a_i_max` under that time-law, that
+slave binds and the long axis is scaled down. The
+lookahead-capped binder period is the `ticks_b` in that
+compare.
+
+**Overshoot.** Each axis runs §7.1 on its own `R_i`. Segment
+time `T = max_i T_opt_i`. A short-`R` axis has a larger
+`T_opt` (triangle, long periods). That `T` lengthens every
+other axis’s period. DIR pauses at a reversal still freeze
+the continuing axes at the vertex (§4.4.1).
+
+So: max steps in one direction → max `P` of that axis →
+path direction → max `P` / period of the related axes.
+
+### 8.4 Angle changes need preparation
+
+A direction change of an **axis** is a sign flip of `Δ_i`
+and is already handled: `R_i` ends, `P_i` must be 0 there
+(§8.1).
+
+An **angle change of the path** is a jump from `Δ` to `Δ'`
+that is not collinear. Even when no axis reverses, the
+implied per-axis speeds change (new ratios, maybe a new
+binder). Each motor must accel or decel by some `ΔP`.
+That change takes `|ΔP|` steps and must be **prepared
+before the vertex**, using the incoming `R` — this is why a
+path-angle change reduces speed **before the next trajectory
+point**, so that the acceleration to the new implied speeds
+stays inside `a_max`.
+
+v1 preparation, by case:
+
+| What the lookahead shows | Preparation |
+|--------------------------|-------------|
+| Nothing past the last point (path open) | Last n-dim point is rest. Prepared for *any* next angle, including reversal. Short buffer ⇒ low `P`. |
+| Collinear continuation (≤ 2°, §8.5) | No `P` change. `R` continues through the vertex. |
+| Axis reversal | That axis to `P = 0` at the vertex (`R` ends). Linear also zeros the path. |
+| Finite path-angle change, no reversal | **Linear:** path-stop (`P → 0`). Maximum preparation, exact chords. **Overshoot:** only reversing / going-idle axes to 0; continuing axes keep `P`; bulge capped by `overshoot_max` (which may itself lower the continuing `P`). |
+
+Why this is tricky: a smoother junction would look *past*
+the vertex at `Δ'`, compute each `P_i'` from the new
+direction, and require `|P_i − P_i'|` to fit in the
+incoming remaining steps — a partial-speed blend, not a
+full stop. v1 does **not** do that. Linear’s 2° test is
+the “angle change is negligible” threshold; anything
+larger path-stops. Overshoot pays with chordal bulge
+instead of a blended Linear speed. A `ΔP` junction is a
+later overlay, not a reason to raise `LookaheadTooShort`.
+
+FasNAxis does **not** use slice length `Δt` to invent a
+corner speed. Inside-corner shortcuts (GRBL `δ`) miss the
+vertex and are not v1.
+
+### 8.5 Junction — Linear
 
 Collinear, same sense (keep cruising):
 
-- no axis reverses: `sign(Δ_i)` matches `sign(Δ'_i)` for every i
-  with either component nonzero, **and**
+- no axis reverses: `sign(Δ_i)` matches `sign(Δ'_i)` for
+  every i with either component nonzero, **and**
 - the unsigned angle is ≤ 2° so 1° sampled arcs count as
   collinear and 90° corners do not:
 
@@ -903,109 +1035,76 @@ Collinear, same sense (keep cruising):
 (`cos²(2°) ≈ 0.99878`. Integer mul/compare, no division, no
 sqrt.) `ε` is this test; it is not a free real.
 
-Otherwise the vertex is a path-stop: binder `R` ends here, `P`
-must reach 0.
+Otherwise the vertex is a path-stop: binder `R` ends here,
+`P` must reach 0. That *is* the preparation of §8.4.
 
-Inside-corner shortcuts (GRBL-style junction deviation `δ`) *miss*
-the vertex. They are not v1.
+### 8.6 Junction — Overshoot
 
-### 8.3 Junction speed — Overshoot
+Per axis, the scan of §8.1 **is** the junction rule:
 
-Per axis, the remaining-steps scan of §8.1 **is** the junction
-rule:
+- reversal (`Δ_i` and `Δ'_i` opposite signs) or going idle
+  after moving: `R_i` ends, so `P_i` must be 0 at that vertex
+- continuation (same sign, including through a 90° corner on
+  the axis that does not reverse): `R_i` includes the next
+  blocks, so `P_i` may stay high
 
-- reversal (`Δ_i` and `Δ'_i` opposite signs) or going idle after
-  moving: `R_i` ends, so `P_i` must be 0 at that vertex
-- continuation (same sign, including through a 90° corner on the
-  axis that does not reverse): `R_i` includes the next blocks, so
-  `P_i` may stay high
+A 90° corner where X continues and Y reverses: `P_x` may
+stay high, `P_y = 0`. Linear would have zeroed the binder,
+hence both. Overshoot is faster here, and the path through
+the vertex flattens, bounded by `overshoot_max`. Y’s DIR
+before/after pauses still freeze **X at the vertex** for
+τ_dir (§4.4.1); X does not keep stepping through the toggle.
 
-A 90° corner where X continues and Y reverses: `P_x` may stay
-high, `P_y = 0`. Linear would have zeroed the binder, hence both.
-Overshoot is faster here, and the path through the vertex
-flattens, bounded by `overshoot_max`. Y’s DIR before/after
-pauses still freeze **X at the vertex** for τ_dir (§4.4.1); X
-does not keep stepping through the toggle.
+A 90° corner of an axis-aligned square: the “continuing”
+axis of the next side was idle (`Δ = 0`), so both `P` are
+already 0. Linear and Overshoot match.
 
-A 90° corner of an axis-aligned square: the “continuing” axis of
-the next side was idle (`Δ = 0`), so both `P` are already 0.
-Linear and Overshoot match.
+### 8.7 What is committed
 
-### 8.4 What is committed
+Feed a **stoppable** plan to the last path-stop in the
+current buffer (reversal, Linear non-collinear vertex,
+`endPath()`, or last buffered point). Do not wait for
+`R ≥ P_stop` before moving.
 
-Only steps whose `R` can no longer grow (the reverse scan has
-already seen a reversal, a Linear path-stop, or `endPath()`) are
-**committed** to the interpolator. Uncommitted blocks may be
-revised when more waypoints arrive. A `LookaheadTooShort` path
-does not commit a cruise at `P_stop`.
+Commands already in the hardware queues stay. The
+unexecuted tail is **replanned** when `R` grows (more
+waypoints, collinear continuation) — typically faster, same
+`P ≤ R` law. Speculative decel that was queued because the
+last point was rest may already be in the queue; that is
+acceptable streaming (you slowed, then sped up). It is not
+a feed-hold.
 
-This is the operational meaning of “substantial lookahead”:
-**do not raise `P` above the `R` a future reversal or stop still
-allows, and do not claim `v_max` unless `R ≥ P_stop`.**
+There is no separate `v_in[]` / `v_out[]` array. Endpoint
+speed *is* `P` at the vertex. Initialize nothing to
+`v_path_max`; the ramp starts at `P = 0` and is clipped by
+`ticks_i_cfg` and by `R`.
 
-There is no separate `v_in[]` / `v_out[]` array. Endpoint speed
-*is* `P` at the vertex. Initialize nothing to `v_path_max`; the
-ramp starts at `P = 0` and is clipped by `ticks_i_cfg`.
+Tests: F11 dribbles waypoints so `R < P_stop` while the
+path is open — motion continues at the `R`-capped speed,
+`pump()` stays `Running`, `P ≤ R`, cruise only after `R`
+grows. F19 is a small `HORIZON` of micro-segments: same
+cap, `addAxis` succeeds; contrast one long `addLine` with
+the same `HORIZON`, which *can* reach `P_stop`.
 
-### 8.5 Lookahead too short is an error
+### 8.8 Reversals of a single axis
 
-The buffered waypoints **must** be far enough ahead that **any**
-axis still allowed to run at configured max can still full-stop:
+Even on a smooth polyline an axis can reverse (a circle’s X
+axis at the left and right extrema). That is a direction
+change in the scan of §8.1, and an angle change of the path
+(§8.4).
 
-```
-path not ended  ⇒  for every axis i:  R_i ≥ P_stop_i
-```
+**Linear:** at the extremum some `Δ_i` changes sign, which
+fails §8.5, so the path stops. A sampled circle would stop
+twice per revolution. That is correct for exact chords, and
+the wrong mode for a circle. (1° chords *without* a sign
+change pass the 2° collinear test, so Linear does not stop
+at every chord.)
 
-(`kappa_stop_q8`, default 320 = 1.25 in Q8, only thickens the
-compare: `R_i * 256 ≥ P_stop_i * kappa_stop_q8`. Integer, no
-`/`.)
+**Overshoot:** only the reversing axis has `R → 0`; the
+others keep `P`. A sampled circle is the motivating case.
 
-This is **not** a silent CNC feed-hold. If the inequality fails:
-
-1. Do not raise `P` above current `R` (the motion stays
-   stoppable).
-2. `pump()` returns `LookaheadTooShort`.
-3. `hasLookaheadError()` stays true until `R_i ≥ P_stop_i` on
-   every axis or `endPath()` is called.
-4. `lookaheadHint()` tells the caller what to pay attention to:
-   axis index, `R_i`, `P_stop_i`, and that **acceleration /
-   max speed / `HORIZON` / waypoint spacing** are the knobs.
-   Example: “axis 0 needs 4000 steps to stop from 4000 step/s
-   @ 2000 step/s²; lookahead is 800 steps. Lower speed, raise
-   accel, feed longer segments, or increase HORIZON.”
-
-`endPath()` is the explicit “that was the last waypoint; stop
-there”. Then `R` is complete by definition and
-`LookaheadTooShort` does **not** apply. If `P > R` at that
-moment the planner already failed the `P ≤ R` law (test
-failure). If `P ≤ R < P_stop`, the move simply never reached
-configured max — legal, because the caller asked to stop.
-
-A ring that is **full** and still `R_i < P_stop_i` with the path
-open is the same error: `HORIZON` is too small for this v/a and
-this segment size.
-
-Tests: F11 is now the *negative* case (error flag, hint text,
-`P` never exceeds `R`, recovers to cruise only after enough
-waypoints are appended). F19 is `HORIZON` too small for
-`P_stop` at `addAxis`.
-
-### 8.6 Reversals of a single axis
-
-Even on a smooth polyline an axis can reverse (a circle’s X axis at
-the left and right extrema).
-
-**Linear:** at the extremum some `Δ_i` changes sign, which fails
-§8.2, so the path stops. A sampled circle would stop twice per
-revolution. That is correct for exact chords, and the wrong mode
-for a circle. (1° chords *without* a sign change pass the 2°
-collinear test, so Linear does not stop at every chord.)
-
-**Overshoot:** only the reversing axis has `R → 0`; the others
-keep `P`. A sampled circle is the motivating case.
-
-True arc blocks remain v2. v1 tests a coarse square in Linear
-(must stop) and a fine circle in Overshoot (must not).
+True arc blocks remain v2. v1 tests a coarse square in
+Linear (must stop) and a fine circle in Overshoot (must not).
 
 ---
 
@@ -1180,16 +1279,18 @@ more than a typical loop hiccup).
 `pump()` does, in order:
 
 1. Accept newly queued waypoints into the block buffer.
-2. Recompute `R_i` / `P_stop_i` if the buffer or limits changed.
-3. If the path is open and some `R_i < P_stop_i`: set
-   `LookaheadTooShort` (still plan, but do not cruise at `P_stop`).
-4. Commit blocks whose `R` is frozen under §8.4.
+2. Recompute `R_i` (parse to end or direction change) and
+   `P_stop_i` if the buffer or limits changed.
+3. Plan with `P ≤ R` to the last path-stop in the buffer
+   (last point is rest if the path is open). Short `R`
+   lowers speed; it does not set an error flag.
+4. Commit / replan under §8.7 (feed the stoppable plan;
+   replan the unexecuted tail if `R` grew).
 5. Interpolate commands into the slice buffer until it holds
    `T_slice_buf` (default 20 ms) or the committed path is exhausted.
 6. While any axis has free queue room, pop a command and
    `addQueueEntry` it (with the retry/dwell protocol).
-7. Return a status: running / idle / `LookaheadTooShort` /
-   underrun / error.
+7. Return a status: running / idle / underrun / error.
 
 On PC tests, `pump()` is called in a deterministic loop that also
 **drains** the simulated queues by the elapsed ticks, exactly as
@@ -1245,7 +1346,8 @@ Rules:
 - No `new` / `malloc`. Lookahead and slice state are member arrays
   sized by template parameters.
 - G10: no `float`, no integer `/` in kinematics; `overshoot_max`
-  in steps, `kappa_stop_q8` in 1/256 units.
+  in steps, `kappa_stop_q8` in 1/256 units (diagnostic
+  lookahead-speed flag only).
 - Trace / HTML dump is compiled only if the TU defines
   `FAS_NAXIS_TRACE`. The production class has no viewer dependency.
 - `FasNAxis.h` may include `FastAccelStepper.h` and
@@ -1262,7 +1364,6 @@ config.
 enum PumpStatus {
   Idle,
   Running,
-  LookaheadTooShort,  // R < P_stop, path open; see lookaheadHint()
   Underrun,
   Error
 };
@@ -1294,10 +1395,10 @@ class FasNAxis {
   PumpStatus pump();                     // plan + feed
   bool isBusy() const;
   bool hasUnderrun() const;
-  bool hasLookaheadError() const;        // R_i < P_stop_i, path still open
+  bool isSpeedLimitedByLookahead() const;  // some R_i < kappa*P_stop, path open; not an error
   uint32_t stopDistanceSteps(uint8_t i) const;  // P_stop_i
   uint32_t remainingSteps(uint8_t i) const;     // R_i
-  const char* lookaheadHint() const;     // acc/vel/HORIZON/spacing
+  const char* lookaheadHint() const;     // diagnostic: axis, R vs P_stop, HORIZON
 
 #if defined(FAS_NAXIS_TRACE)
   void enableTrace(Trace* t);
@@ -1313,8 +1414,8 @@ class FasNAxis {
 
 If a constructor argument is `dt_ticks == 0`, store 32000 (so a
 zeroed config still means “default slice”, not a zero-duration
-slice). Same for `kappa_stop_q8 == 0` → 320. `overshoot_max == 0`
-is Linear-like cap and is legal.
+slice). Same for `kappa_stop_q8 == 0` → 320 (diagnostic only).
+`overshoot_max == 0` is Linear-like cap and is legal.
 
 `addLine` to the current position (`L = 0`, every `Δ_i = 0`) is a
 dwell of 0 ticks (no-op). `addDwellTicks` appends a
@@ -1452,9 +1553,11 @@ After a run, from the trace:
    documented kick-off bound (PC: same simulated tick).
 3. **No underrun** unless the test is the underrun-negative case.
    Prefill empty queue is not underrun.
-3b. **Lookahead:** unless `endPath()` was called, `R_i ≥ P_stop_i`
-   on every axis. F11/F19 are the negative cases (`LookaheadTooShort`
-   + hint names acc/vel/`HORIZON`).
+3b. **Lookahead:** `P_i ≤ R_i` at every committed sample. Last
+   buffered point of an open path is rest. If `R_i < P_stop_i`,
+   that axis never claims configured max (F11/F19: speed cap,
+   `pump()` still `Running`, `isSpeedLimitedByLookahead()`).
+   `endPath()` is the same law with `R` frozen.
 4. **Period:** for every command with `steps ≠ 0`,
    `ticks ≥ ticks_min` and `ticks ≥ ticks_cfg` (one-step slack).
 5. **Ramp law:** `P ≤ R` at every committed sample. Period is never
@@ -1468,8 +1571,10 @@ After a run, from the trace:
    equals the waypoint at the vertex sample).
 8. **Lookahead effect:** a fixture with a long fast segment and a
    late 90° Linear corner must have started decelerating when
-   `R` reached `P`. A planner that only sees the current block
-   and does not sum `R` across micro-segments fails F10.
+   `R` reached `P` (angle-change preparation). A planner that
+   only sees the current block and does not sum `R` across
+   micro-segments fails F10. F11: short open-path `R` caps speed
+   without an error.
 9. **Time optimality (weak):** on a single long collinear segment
    from rest to rest, both modes match `calculate_ticks` of a FAS
    1-D ramp within a few Δt. Overshoot wins on polylines where at
@@ -1485,14 +1590,14 @@ After a run, from the trace:
 | F3 | 2 axis, (10000, 100), Linear | Short axis well below its ramp; long axis binds; path on the chord | XY vs chord |
 | F4 | Same segment, Overshoot, cap 8 | `max d² ≤ 64`; waypoints hit | XY bulge vs F3 |
 | F4b | Same, Overshoot, cap `∞` | Raw profile bulge (order 10 steps, not an L); still hits endpoints | XY |
-| F5 | Square 1600, Linear | `P → 0` at each corner; lookahead starts decel on the side | XY + v(t) |
+| F5 | Square 1600, Linear | `P → 0` at each corner (angle change prepared on the side) | XY + v(t) |
 | F6 | 45° dog-leg, Overshoot | X continues, Y reverses; `P_x ≠ 0` at the vertex; `P_y = 0`; `T <` Linear | XY flatten |
 | F6b | `(0,0)→(4000,1)→(4000,4000)`, Overshoot | Feasible (`P_y` after 1 step is ≤ 1); vertex hit; cap holds | XY |
 | F7 | Circle r = 1600, 1° chords, Overshoot | Near-constant path speed; X/Y reverse without stopping the other axis; `d²` per chord ≤ cap | XY circle |
 | F8 | 3 axis helix, both modes | HTML 3D overlay of chord vs path; no axis above limits | HTML + gnuplot |
 | F9 | Asymmetric limits `ticks_x = 10*ticks_y`, Linear, equal `\|Δ\|` | X is slower so X binds; Y scaled down | XY |
 | F10 | Micro-segments totalling a long line, Linear | `R` sees through them; does not stop at each | v(t) no dips |
-| F11 | Streaming with `R < P_stop`, path open | `LookaheadTooShort`; hint names acc/vel; `P ≤ R`; cruise only after enough waypoints | v(t) capped then recovers |
+| F11 | Streaming with `R < P_stop`, path open | speed capped by `R`; `pump()` `Running`; `isSpeedLimitedByLookahead()`; `P ≤ R`; cruise after `R` grows | v(t) capped then recovers |
 | F12 | Axis reversal + `dir_after` / `dir_before` | planner issues before (old DIR) + after (new DIR) on all axes; following step has no Injected | event marks |
 | F12b | Overshoot corner, X continues at high `P` | X does not step during τ_dir; vertex held; X resumes at same `P` | XY frozen at corner |
 | F12c | SimPort injects one extra before-pause | all axes dwell it; no XY leave-vertex; clocks together | event marks |
@@ -1502,13 +1607,13 @@ After a run, from the trace:
 | F16 | `addAxis` while ramp active | `addAxis` fails; no race with `manageSteppers` | — |
 | F17 | First fill on empty queue | Not underrun; path completes | — |
 | F18 | Linear `(10000, 9000)`, Y 40× slower | Longest is X but Y would exceed `v_max` if scaled to X; Y binds, X scaled down | XY + v(t) |
-| F19 | `HORIZON` too small for `P_stop` | Error at `addAxis` / `pump`; hint names `HORIZON` and acc/vel | — |
+| F19 | `HORIZON` too small to hold `P_stop` as micro-segments | `addAxis` succeeds; `P` never reaches `P_stop`; same `HORIZON` with one long `addLine` *does* coast | v(t) capped |
 
 F7 is the regression sibling of `examples/MoveTimed`. F5 is Linear
 lookahead. F6 / F6b is where `overshoot_max` and `P ≤ \|Δ\|` bite.
 F1 is the identity with `RampCalculator`. F11/F19 are lookahead
-errors (not silent starve). F18 is the “longest axis too fast for
-a slave” rebind.
+**speed caps** (not errors, not silent starve). F18 is the
+“longest axis too fast for a slave” rebind.
 
 ### 12.6 FAS adapter tests
 
@@ -1646,6 +1751,7 @@ T_coast = 0.5 s
 T = 4.5 s
 ```
 
+`P` starts at 0. Coasting happens because `N/2 = 5000 > P_coast`.
 At `Δt = 2 ms`: 2250 slices. Lookahead: a single block, path
 ended, `R = 10000`. Feeder issues mostly 8-step slices. Decel
 when `R == P`, tapering `P` to 0.
@@ -1662,7 +1768,7 @@ T_loop ≈ 7.156 s
 ```
 
 Lookahead does not shorten this in Linear: every corner fails
-§8.2 (axis-aligned 90°), so `R` ends at the vertex and `P → 0`.
+§8.5 (axis-aligned 90°), so `R` ends at the vertex and `P → 0`.
 It only ensures the triangle is planned *before* the side starts.
 Overshoot on the same square is numerically the same path (idle
 axis ⇒ everyone at rest at the corner).
@@ -1681,8 +1787,9 @@ default `overshoot_max = 8`.
 
 Long axis 10 000 steps at 4000 step/s, 2000 step/s², then a 90°
 corner into a 100-step stub, Linear. `R` of the binder ends at
-the corner. Decel distance 4000 steps, so `P` must start falling
-by `s = 6000`. Split into 100-step blocks: without summing `R`
+the corner (angle change → path-stop, preparation = full stop).
+Decel distance 4000 steps, so `P` must start falling by
+`s = 6000`. Split into 100-step blocks: without summing `R`
 across them the planner would not see the corner in time. F10 is
 that test.
 
@@ -1707,6 +1814,28 @@ has `d ≈ 0`.
 to X’s `T` is one slow step, not a high-`v_out` trapezoid at
 `a_max`. `overshoot_max` places that step near the linear
 fraction. The second block then accels Y from `P ≤ 1`.
+
+### 14.7 Short lookahead is a speed cap, not an error
+
+Same limits, `P_stop = 4000`. Stream 800-step collinear chunks,
+path open, `pump()` between chunks.
+
+After the first chunk the last n-dim point is 800 steps away and
+is rest. From rest, peak `P ≈ 400` (accel until `R == P`). Configured
+4000 step/s is never reached. `pump()` returns `Running`.
+`isSpeedLimitedByLookahead()` is true.
+
+After ten chunks are buffered (`R = 8000` at the head, collinear
+so the scan does not stop), `R ≥ P_stop` and the head may coast.
+F11 is that recovery. F19 is the same cap with `HORIZON` too
+small to ever hold 4000 steps of micro-segments: `addAxis`
+succeeds; contrast one 10 000-step `addLine` at the same
+`HORIZON`, which *can* coast because `R` is steps, not points.
+
+A 2-axis first chunk `(800, 400)`, Linear: binder X, `R = 800`
+to the last point. Y is DDA-slaved onto that triangle — path
+direction implies Y’s speed. Overshoot: `R_x = 800`, `R_y = 400`,
+`T = max T_opt`, so Y’s shorter `R` lengthens X as well.
 
 ---
 
@@ -1739,16 +1868,16 @@ is test-first on `extras/tests/pc_based`.
 
 | Phase | Delivers | Tests |
 |-------|----------|-------|
-| P0 | `RampCalculator` identity + `R` / `P_stop` scan, no queues | F1 planner-only, F10 `R`, F19, steps 2b/3b theory probes |
+| P0 | `RampCalculator` identity + `R` scan (end or direction change), no queues | F1 planner-only, F10 `R`, F19 speed cap, steps 2b/3b theory probes |
 | P1 | Linear DDA + longest-then-rebind + `addQueueEntry` feeder | F1–F3, F5, F9, F12, F14–F18 |
 | P2 | gnuplot dumps (always) + HTML (`FAS_NAXIS_TRACE`) | F5, F8 Linear pages |
 | P3 | Overshoot ramps, `overshoot_max`, continuing-axis corners | F4, F4b, F6, F6b, F7 |
-| P4 | Open-path lookahead error + recovery | F11 |
+| P4 | Open-path lookahead speed cap + recovery; underrun | F11, F13 |
 | P5 | Same header against real `FastAccelStepper` (1–2 axis) | F1/F2 identity-class |
 
-P0 proves `R ≥ P_stop`. P1 is the first time queue quantization
-and DIR pauses exist. The header is in `src/` from P0; nothing is
-added to `FastAccelStepper.cpp`.
+P0 proves `P ≤ R` and that short `R` caps speed. P1 is the first
+time queue quantization and DIR pauses exist. The header is in
+`src/` from P0; nothing is added to `FastAccelStepper.cpp`.
 
 ---
 
@@ -1756,15 +1885,16 @@ added to `FastAccelStepper.cpp`.
 
 FasNAxis is a coordinated-motion planner that uses FAS only as a
 tick-exact multi-queue executor. Kinematics are the **existing
-log2 ramp map** (`calculate_ticks(P)`). Lookahead is **remaining
-steps in the current direction**, and it is mandatory: the
-buffer must cover a full stop from configured max on every axis,
-or `pump()` reports `LookaheadTooShort` with a hint to check
-acc/vel / `HORIZON` / spacing. Execution is `addQueueEntry`
-commands with a shared tick sum. Reversals are planner-issued
-before/after DIR pauses plus matching dwells. Underrun is a hard
-error after kick-off. Production does not use float or integer
-division for planning.
+log2 ramp map** (`calculate_ticks(P)`). Lookahead is parsed until
+**end of path or a direction change**; that `R` is the cap on
+ramp-steps (`P ≤ R`). The path direction then implies the other
+axes’ speeds. Short lookahead **reduces speed**, it is not an
+error. Angle changes need motor accel/decel and therefore
+preparation (v1 Linear path-stops; Overshoot prepares per axis).
+Execution is `addQueueEntry` commands with a shared tick sum.
+Reversals are planner-issued before/after DIR pauses plus
+matching dwells. Underrun is a hard error after kick-off.
+Production does not use float or integer division for planning.
 
 Two geometry modes, both hitting every trajectory point:
 

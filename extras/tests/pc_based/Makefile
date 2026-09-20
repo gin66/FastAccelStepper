@@ -85,6 +85,18 @@ test_%: test_%.o $(LIB_O)
 test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
+# FasNAxis headers: test_26 includes them, so a header-only change must rebuild.
+test_26.o: naxis_plot.h \
+	$(PRJ_ROOT)/src/fas_naxis/remaining.h \
+	$(PRJ_ROOT)/src/fas_naxis/ramp_law.h \
+	$(PRJ_ROOT)/src/fas_naxis/ramp_map.h
+
+# Step 2b theory-probe mutations. This is a test (rebuilds test_26 with a
+# wrong model and requires FAIL), not a library script. Not part of `make test`.
+.PHONY: mutations
+mutations:
+	sh ./prove_mutations.sh
+
 log2_test: log2_test.o Log2Representation.o
 log2_test.o: log2_test.cpp $(PRJ_ROOT)/src/log2/Log2Representation.h test_03.h
 
@@ -126,4 +138,4 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 VERSION=$(shell git rev-parse --short HEAD)
 
 clean: clean_coverage
-	rm -f *.o test_[0-9][0-9] *.gnuplot log2_test rmc_test test.log
+	rm -f *.o test_[0-9][0-9] test_26_FAS_NAXIS_* *.gnuplot* log2_test rmc_test test.log

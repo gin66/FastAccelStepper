@@ -87,7 +87,7 @@ wrapper vs `RampCalculator`.
 
 ---
 
-## Step 2 — remaining-steps scan `R` (lookahead)
+## Step 2 — remaining-steps scan `R` (lookahead) ✅
 
 **Test first:** feed polylines as arrays of `Δ[NAXES]`, no queues.
 
@@ -101,24 +101,39 @@ wrapper vs `RampCalculator`.
 | F10 micro-segments | 100 × 100-step collinear | `R` at head is the full 10000, not 100 |
 | F6b | `(4000,1)` then `(0,3999)` | `R_x = 4000` (then idle); `R_y = 4000` (continues) |
 
-Integer add/sign only. The 2° collinear test of §8.2 lives here:
+Integer add/sign only. The 2° collinear test of §8.5 lives here:
 
 ```
 (Δ · Δ')² * 100000  >=  99878 * |Δ|² * |Δ'|²
 ```
 
-Also compute `P_stop_i = calculate_ramp_steps(ticks_i_cfg)` and
-assert `LookaheadTooShort` logic (path open ⇒ `R_i ≥ P_stop_i`)
-on a fixture that only feeds 800 steps with `P_stop = 4000`.
+Also compute `P_stop_i = calculate_ramp_steps(ticks_i_cfg)`.
+A fixture that only feeds 800 steps with `P_stop = 4000` (path
+open, last point = rest) must **reduce** allowed `P` (`P ≤ R`,
+live remaining-to-stop so peak `P < R`) and must **not** raise
+an error. `P` starts at 0 and is capped by `P_stop` **and** by
+remaining-to-standstill; it is not estimated as
+`min(P_stop, R/2)`. Coasting happens when `N/2 > P_stop`.
+`R` is the parse to end or direction change, not a lower bound
+the planner waits to fill.
+
+Path-angle change: speed is reduced **before** the next
+trajectory point so per-axis accel stays in limits (§8.4).
+v1 Linear path-stops (`P → 0` at the vertex); Overshoot
+prepares per axis via `R`. F5 is the Linear fixture. A blended
+`ΔP` junction is not v1.
 
 **Implement:** `src/fas_naxis/remaining.h` (or methods on the class).
 No queue I/O yet.
 
-**Plot:** `test_26_f10.gnuplot` — `R(t)` as blocks are consumed;
-must not drop to 100 at every micro-segment.
+**Plot:** `test_26_f10.gnuplot` — live ramp over the collinear
+10000: `P` starts at 0, coasts because `N/2 > P_stop`, `R(t)` is
+remaining-to-stop (does not drop to 100 at every micro-segment),
+commanded and realized share the chord (deviation ~ 0).
 
-**Done when:** table above is green; F19 kernel (`HORIZON` /
-`R < P_stop`) fails closed with a hint that names acc/vel.
+**Done when:** table above is green; F19 kernel (`HORIZON` of
+micro-segments, `R < P_stop`) caps speed and still plans; same
+`HORIZON` with one long block can reach `P_stop`.
 
 ---
 
@@ -128,10 +143,11 @@ These must fail on a wrong *model*, even if later F-fixtures are
 green. Oracle is a small pure function, not FasNAxis state.
 
 1. **Reference oracle.** Given waypoints + `ticks_cfg` / accel,
-   compute `R`, `P_stop`, Linear binder (longest `|Δ|`, rebind if
-   `|Δ_i|*ticks_i > |Δ_b|*ticks_b`), DDA step counts to the
-   vertex. The planner must match this function on the same
-   inputs.
+   compute `R` (parse to end or direction change; last buffered
+   point is rest), `P_stop`, Linear binder (longest `|Δ|`, rebind
+   if `|Δ_i|*ticks_i > |Δ_b|*ticks_b`), DDA step counts to the
+   vertex. Path direction maps the binder’s `P ≤ R` onto slaves.
+   The planner must match this function on the same inputs.
 2. **Exhaustive tiny Linear.** All 2-axis polylines with
    `|Δ_i| ≤ 5`, 3–4 vertices, two or three `ticks_cfg` ratios.
    Vertices exact; no axis exceeds its envelope; `P ≤ R` is
@@ -142,15 +158,27 @@ green. Oracle is a small pure function, not FasNAxis state.
    a `/` in production). Especially `|Δ_x|*ticks_x ≈
    |Δ_y|*ticks_y`.
 4. **Collinear boundary.** 1° must pass, 2° is the documented
-   edge, 3° and 90° must stop. Include n=3 with one tiny
-   component.
+   edge, 3° and 90° must stop (angle change → Linear path-stop,
+   preparation = `P → 0` at that vertex). Include n=3 with one
+   tiny component.
+5. **Lookahead speed cap.** Open path of 800 steps, `P_stop = 4000`:
+   last point is rest, allowed `P ≤ R`, live remaining-to-stop so
+   peak `P < R`, no error. Append collinear blocks until
+   `N/2 > P_stop`: coasting to `P_stop` becomes legal. Path
+   direction: `(800, 400)` Linear slaves Y onto X’s `R = 800`
+   triangle.
 
 **Done when:** exhaustive set is green; disabling the rebind
-rule in a local `#if 0` makes the neighbourhood fail.
+rule makes the neighbourhood fail; disabling remaining-to-stop
+makes (5) fail to brake (`peak P` is not `< R`).
+`make -C extras/tests/pc_based mutations` runs
+`prove_mutations.sh` next to the tests (it is a test, not a
+library script under `extras/scripts`). Item 2 (exhaustive tiny
+Linear) is still open.
 
 ---
 
-## Step 3 — ramp law `P` vs `R` (still no queues)
+## Step 3 — ramp law `P` vs `R` (still no queues) ✅
 
 **Test first:** one axis, rest-to-rest `S = 10000`, limits of §14.1.
 
@@ -172,6 +200,14 @@ clarity and a second pass with `planning_steps`.
 `P` vs time, `R` vs time. Compare by eye to `test_02` trapezoids.
 
 **Done when:** F1 rest-to-rest matches the analytic/FAS ramp.
+
+**Done:** `src/fas_naxis/ramp_law.h` holds `RampLaw{P,R,ticks}` applying the
+§7.1 law (`P` starts at 0; `R > P` accel / coast, `R == P` decel, period after
+the `P` update so the first step is `calculate_ticks(1)`). `f3_ramp()` drives
+`S = 10000` rest-to-rest: `P <= R` every step, peak `P == P_coast` (coasts
+because `N/2 > P_stop`), decel starts at `S - P_coast`, total ticks match an
+independent trapezoid, batched chunks land on the same P trajectory. Plot:
+`test_26_f3.gnuplot`.
 
 ---
 
@@ -227,9 +263,13 @@ table in whitepaper §4.1 / §4.4.1 without `FasNAxis` planning.
 
 - `FasNAxisConfig{}` has `dt_ticks=32000`, `kappa_stop_q8=320`,
   `overshoot_max=8`, `mode=Linear`. `dt_ticks==0` in a raw struct
-  still becomes 32000 in the constructor.
+  still becomes 32000 in the constructor. `kappa_stop_q8==0` → 320
+  (diagnostic threshold for `isSpeedLimitedByLookahead` only).
+- `PumpStatus` has `Idle`, `Running`, `Underrun`, `Error` — no
+  `LookaheadTooShort`.
 - `addAxis` fails if `i >= NAXES`, if the pointer is null, or if
-  `isRampGeneratorActive()` / `isRunning()`.
+  `isRampGeneratorActive()` / `isRunning()`. Small `HORIZON`
+  relative to `P_stop` is **not** an `addAxis` failure.
 - `addLine` before `syncFromSteppers()` / `setCurrentPosition()`
   is illegal.
 - `addLine` to the current position is a no-op (`L=0`).
@@ -284,8 +324,9 @@ not underrun) green.
 - F10 100-step micro-segments totalling 10000: `R` sees through;
   no rest at each joint (collinear test).
 
-**Implement:** block ring `HORIZON`, `R` scan of §8.1 + Linear
-path-stop of §8.2, commit rule of §8.4.
+**Implement:** block ring `HORIZON`, `R` scan of §8.1 (end or
+direction change) + Linear path-stop of §8.5 (angle change),
+commit / replan of §8.7. Last buffered point is rest.
 
 **Plots:** `test_26_f5.gnuplot` (XY square, v(t) touching 0 at
 corners), `test_26_f9.gnuplot`, `test_26_f18.gnuplot`,
@@ -411,26 +452,35 @@ toward Linear; snap + revert at extrema.
 
 ---
 
-## Step 13 — dwell, starve, underrun (F11, F13)
+## Step 13 — dwell, starve, underrun, lookahead speed cap (F11, F13, F19)
 
 **Test first:**
 
 - `addDwellTicks` mid-path: planned stop, wait, continue from
   rest. Not a pause command at speed.
 - F11: dribble waypoints so `R < P_stop` while the path is still
-  open. **Not** a silent feed-hold: `pump()` returns
-  `LookaheadTooShort`, `lookaheadHint()` names acc/vel/`HORIZON`,
-  `P ≤ R`. After enough waypoints, cruise is allowed again.
+  open. Last point is rest. **Not** an error and **not** a
+  feed-hold: `pump()` returns `Running`,
+  `isSpeedLimitedByLookahead()` is true, `P ≤ R`, peak `P` fits
+  in `R` (about `R/2` from rest). After enough collinear
+  waypoints, `R` grows and cruise at `ticks_cfg` is allowed.
+  `lookaheadHint()` may name axis / `R` / `P_stop` / `HORIZON`
+  as a diagnostic, not as recovery advice that the caller must
+  act on before motion continues.
 - F13: starve `pump()` on purpose after kick-off; `hasUnderrun()`;
   plot still written up to the fault.
-- F19: `HORIZON` too small to ever hold `P_stop`; error at
-  `addAxis` / first `pump`, same hint.
+- F19: `HORIZON` too small to hold `P_stop` as micro-segments.
+  `addAxis` succeeds. `P` never reaches `P_stop`. Same
+  `HORIZON` with one long `addLine` *does* coast (`R` is steps,
+  not points).
 
-**Implement:** zero-displacement blocks; §8.5 lookahead error;
-underrun flag after kick-off only.
+**Implement:** zero-displacement blocks; §8.2 / §8.7 speed cap
+and replan; underrun flag after kick-off only. No
+`LookaheadTooShort` status.
 
 **Plots:** `test_26_f11.gnuplot` (v(t) capped then recovers),
-`test_26_f13.gnuplot` (cut off at underrun event).
+`test_26_f13.gnuplot` (cut off at underrun event),
+`test_26_f19.gnuplot` (micro-segment cap vs long-line coast).
 
 **Done when:** F11, F13, F19 green.
 
@@ -475,7 +525,7 @@ SimPort-only — prefer one binary unless the link set fights
 | 4–9 | P1 | Linear through `addQueueEntry`; F18 rebind |
 | 10 | P2 | gnuplot always; HTML optional |
 | 11–12 | P3 | Overshoot |
-| 13 | P4 | lookahead error / underrun |
+| 13 | P4 | lookahead speed cap / underrun |
 | 14–15 | P5 | 3-axis sim + 1–2 axis FAS |
 
 Do not start a later step until the earlier step’s tests are

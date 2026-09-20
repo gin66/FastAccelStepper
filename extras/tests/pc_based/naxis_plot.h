@@ -6,10 +6,11 @@
 // XY figure — the commanded polyline in grey with the realized path on top —
 // which is what "one figure should show the xy-plot for 2 steppers" means.
 // Panels 2..4 overlay one series per axis: speed [steps/s] over time,
-// performed-vs-remaining ramp steps P/R over time, and period [ticks] over
-// time. Panel 5 plots the step deviation distance (commanded (x,y) minus
-// realized (x,y)) over time on its own scale: the 1600x1600 XY path is too
-// coarse to reveal small per-step deviations, so they need their own panel.
+// performed ramp-up P vs remaining-to-stop R over time (legend spells the
+// abbreviations out), and period [ticks] over time. Panel 5 plots the step
+// deviation distance (commanded (x,y) minus realized (x,y)) over time on
+// its own scale: the 1600x1600 XY path is too coarse to reveal small
+// per-step deviations, so they need their own panel.
 // Speeds use the test-only TICKS_PER_S / ticks conversion (whitepaper
 // section 6.1 / 13.1); the helper holds no kinematics.
 //
@@ -160,20 +161,24 @@ class NaxisPlot {
     fprintf(gp, "%s", plot);
 
     // Panel 2: per-axis speed over time (one series per axis).
+    fprintf(gp, "set yrange [*:*]\n");
     fprintf(gp, "set title \"speed [steps/s] over time [s]\"\n");
     int cols2[1] = {5};
     int per2[1] = {1};
     const char* prefixes2[1] = {"speed"};
-    build_statement(plot, sizeof(plot), cols2, per2, prefixes2, 1);
+    build_statement(plot, sizeof(plot), cols2, per2, prefixes2, NULL, 1);
     fprintf(gp, "%s", plot);
 
-    // Panel 3: performed (P) vs remaining (R) ramp steps over time, both
-    // groups in one panel so P and R read together.
-    fprintf(gp, "set title \"P vs R [steps] over time [s]\"\n");
+    // Panel 3: performed ramp-up P vs remaining-to-stop R over time. Legend
+    // spells the abbreviations out (P0/R0 alone is too cryptic).
+    fprintf(gp,
+            "set title \"performed ramp-up P vs remaining-to-stop R "
+            "[steps] over time [s]\"\n");
     int cols3[2] = {6, 7};
     int per3[2] = {1, 1};
     const char* prefixes3[2] = {"P", "R"};
-    build_statement(plot, sizeof(plot), cols3, per3, prefixes3, 2);
+    const char* suffixes3[2] = {"performed ramp-up", "remaining to stop"};
+    build_statement(plot, sizeof(plot), cols3, per3, prefixes3, suffixes3, 2);
     fprintf(gp, "%s", plot);
 
     // Panel 4: per-axis period over time.
@@ -181,19 +186,21 @@ class NaxisPlot {
     int cols4[1] = {8};
     int per4[1] = {1};
     const char* prefixes4[1] = {"period"};
-    build_statement(plot, sizeof(plot), cols4, per4, prefixes4, 1);
+    build_statement(plot, sizeof(plot), cols4, per4, prefixes4, NULL, 1);
     fprintf(gp, "%s", plot);
 
     // Panel 5: step deviation — commanded (x,y) minus realized (x,y) as a
     // single radius in steps, on its own scale. The XY panel above is too
     // coarse to reveal small per-step deviations.
     fprintf(gp, "set yrange [-10:10]\n");
-    fprintf(gp, "set title \"step deviation [steps] over time [s]\"\n");
+    fprintf(gp,
+            "set title \"commanded minus realized [steps] over time [s]\"\n");
     int cols5[1] = {4};
     int per5[1] = {0};
-    const char* prefixes5[1] = {"dev"};
-    build_statement(plot, sizeof(plot), cols5, per5, prefixes5, 1);
+    const char* prefixes5[1] = {"commanded-realized"};
+    build_statement(plot, sizeof(plot), cols5, per5, prefixes5, NULL, 1);
     fprintf(gp, "%s", plot);
+    fprintf(gp, "unset multiplot\n");
 
     fclose(gp);
     gp = NULL;
@@ -205,30 +212,46 @@ class NaxisPlot {
  private:
   char filename[100];
   char title[100];
-  char plot[512];
+  char plot[2048];
   FILE* gp;
   bool open;
 
   // Emits one newline-terminated "plot <series>, <series> ..." statement into
   // `out`. Each (col, prefix) group contributes one series per axis
-  // ("using 1:<col> with linespoints title \"<prefix><i>\""), all groups
-  // comma-chained into a single plot statement so they share one panel. When
-  // `per_axis[g]` is set the column is offset by 4*i so the per-axis overlay
-  // series land in their own columns; deviation is a single column (per_axis
-  // 0). `len` accumulates because snprintf returns the chars that *would* be
-  // written, not the running total.
+  // ("using 1:<col> with linespoints title \"<prefix><i> <suffix>\""), all
+  // groups comma-chained into a single plot statement so they share one
+  // panel. When `per_axis[g]` is set the column is offset by 4*i; a zero
+  // per_axis group (deviation) is a single column titled with just the
+  // prefix, no axis index. `suffixes` may be NULL (no extra legend text) or
+  // an empty string per group.
   void build_statement(char* out, size_t out_sz, const int* cols,
                        const int* per_axis, const char** prefixes,
-                       int ngroups) {
+                       const char** suffixes, int ngroups) {
     size_t len = 0;
     bool first = true;
     for (int g = 0; g < ngroups; g++) {
-      for (int i = 0; i < n_axes; i++) {
+      int nseries = per_axis[g] ? n_axes : 1;
+      const char* suf =
+          (suffixes != NULL && suffixes[g] != NULL) ? suffixes[g] : "";
+      for (int i = 0; i < nseries; i++) {
         int col = per_axis[g] ? cols[g] + 4 * i : cols[g];
-        int w = snprintf(out + len, out_sz - len,
-                         "%s$data using 1:%d with linespoints "
-                         "title \"%s%d\"",
-                         first ? "plot " : ", ", col, prefixes[g], i);
+        int w;
+        if (per_axis[g] && suf[0] != 0) {
+          w = snprintf(out + len, out_sz - len,
+                       "%s$data using 1:%d with linespoints "
+                       "title \"%s%d %s\"",
+                       first ? "plot " : ", ", col, prefixes[g], i, suf);
+        } else if (per_axis[g]) {
+          w = snprintf(out + len, out_sz - len,
+                       "%s$data using 1:%d with linespoints "
+                       "title \"%s%d\"",
+                       first ? "plot " : ", ", col, prefixes[g], i);
+        } else {
+          w = snprintf(out + len, out_sz - len,
+                       "%s$data using 1:%d with linespoints "
+                       "title \"%s\"",
+                       first ? "plot " : ", ", col, prefixes[g]);
+        }
         first = false;
         if (w < 0 || (size_t)w >= out_sz - len) {
           out[0] = 0;
