@@ -63,7 +63,7 @@ columns.
 
 ---
 
-## Step 1 — log2 ramp map identity (F1 kernel)
+## Step 1 — log2 ramp map identity (F1 kernel) ✅
 
 **Test first:** for `a = 2000`, `ticks_cfg` of 4000 step/s, and
 `P = 1, 2, 4, …, 4000`:

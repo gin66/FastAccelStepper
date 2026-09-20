@@ -61,6 +61,54 @@ class NaxisPlot {
     fprintf(gp, "$poly <<EOF\n");
   }
 
+  // ---- Scalar-overlay mode (no kinematics) -------------------------------
+  // For fixtures that are not motion traces (e.g. the F1 period-vs-P kernel
+  // identity): a single panel with two series that share one x-axis. The two
+  // series carry the same x so an overlay reads as flat agreement when the
+  // wrapper forwards to the reference, and as a divergence when it does not.
+  void start_scalar(const char* fixture, const char* fixture_title) {
+    snprintf(title, sizeof(title), "%s", fixture_title);
+    snprintf(filename, sizeof(filename), "test_26_%s.gnuplot", fixture);
+    gp = fopen(filename, "w");
+    if (gp == NULL) {
+      open = false;
+      return;
+    }
+    open = true;
+    fprintf(gp, "$sca <<EOF\n");
+  }
+
+  // One (x, a, b) row: x in column 1, series A in column 2, series B in 3.
+  void scalar_row(double x, double a, double b) {
+    if (!open) {
+      return;
+    }
+    fprintf(gp, "%.6f %.6f %.6f\n", x, a, b);
+  }
+
+  void finish_scalar(double x_min, double x_max, const char* x_label,
+                     const char* y_label, const char* a_title,
+                     const char* b_title) {
+    if (!open) {
+      return;
+    }
+    fprintf(gp, "EOF\n");
+    fprintf(gp, "set term pngcairo size 800, 600\n");
+    fprintf(gp, "set output \"%s.png\"\n", filename);
+    fprintf(gp, "set xlabel \"%s\"\n", x_label);
+    fprintf(gp, "set ylabel \"%s\"\n", y_label);
+    fprintf(gp, "set xrange [%.1f:%.1f]\n", x_min, x_max);
+    fprintf(gp, "set title \"%s\"\n", title);
+    fprintf(gp,
+            "plot $sca using 1:2 with linespoints linewidth 2 lc rgb 'blue' "
+            "title \"%s\", $sca using 1:3 with linespoints linewidth 1 lc rgb "
+            "'red' title \"%s\"\n",
+            a_title, b_title);
+    fclose(gp);
+    gp = NULL;
+    open = false;
+  }
+
   // One commanded polyline vertex (grey reference line in panel 1).
   void poly_point(double x, double y) {
     if (open) {
