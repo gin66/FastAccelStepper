@@ -15,6 +15,7 @@
 
 #include "fas_arch/test_pc.h"  // test() macro
 #include "fas_naxis/dda.h"
+#include "fas_naxis/linear.h"
 #include "fas_naxis/ramp_law.h"
 #include "fas_naxis/ramp_map.h"
 #include "fas_naxis/remaining.h"
@@ -864,6 +865,137 @@ void f3_ramp() {
   printf("F3 ramp plot written: test_26_f3.gnuplot\n");
 }
 
+// Step 2d (whitepaper section 6.3 / 9.2): the Linear one-block rest-to-rest
+// interpolator. One committed segment: the binder runs a RampLaw over
+// |delta_bind|; each binder step is one DDA tick from 2c. Equal ticks_cfg, so
+// the longest |delta| binds. Checks: issued |steps| per axis equal |delta|;
+// the walk ends at the vertex; the path lies on the chord; the binder P <= R
+// from the RampLaw fields holds every step (a sanity check for this step --
+// reconstruction from issued periods is Step 2e, not here).
+void f2d_linear_one_block() {
+  const uint32_t ticks_cfg = 4000;
+  const uint32_t accel = 2000;   // section 14.1 limits
+  struct Case {
+    const char* name;
+    int32_t dx, dy;
+    int expect_binder;
+  };
+  Case cases[] = {
+       {"(20,8) X binds", 20, 8, 0},
+       {"(20,0) Y never steps", 20, 0, 0},
+       {"(8,20) Y binds", 8, 20, 1},
+   };
+  for (int c = 0; c < 3; c++) {
+    const Case& cs = cases[c];
+    int32_t d[2] = {cs.dx, cs.dy};
+    uint32_t ticks[2] = {ticks_cfg, ticks_cfg};
+    LinearBlock block(ticks_cfg, accel, 2, d, ticks);
+    char msg[64];
+    snprintf(msg, sizeof(msg), "2d binder for %s", cs.name);
+    test(block.binder == cs.expect_binder, msg);
+
+    int32_t issued[2] = {0, 0};   // signed accumulated steps per axis
+    int32_t pos[2] = {0, 0};
+    double max_chord_dist = 0.0;
+    double chord_len = 0.0;
+    double px0 = 0.0, py0 = 0.0;
+    while (!block.done()) {
+      int step_out[2];
+      block.step(step_out);
+      test(step_out[0] == -1 || step_out[0] == 0 || step_out[0] == 1,
+           "2d axis 0 steps in {-1,0,1}");
+      test(step_out[1] == -1 || step_out[1] == 0 || step_out[1] == 1,
+           "2d axis 1 steps in {-1,0,1}");
+      issued[0] += step_out[0];
+      issued[1] += step_out[1];
+      pos[0] += step_out[0];
+      pos[1] += step_out[1];
+      // Sanity for this step: binder P <= R from the RampLaw fields (2e proves
+      // the same from issued periods, not these fields).
+      test(block.law.P <= block.law.R, "2d binder P <= R (fields)");
+      // 12.4: perpendicular distance of (pos) from the origin-to-d chord.
+      double px = (double)pos[0], py = (double)pos[1];
+      double ax = (double)d[0], ay = (double)d[1];
+      double denom = ax * ax + ay * ay;
+      if (denom > 0.0) {
+        chord_len = denom;
+        double dist = (px * ay - py * ax) / denom;   // chord unit-ish, signed
+        double d2 = dist * dist;
+        if (d2 > max_chord_dist) {
+          max_chord_dist = d2;
+        }
+        px0 = px;
+        py0 = py;
+      }
+    }
+    // Issued |steps| per axis equals |delta|.
+    int32_t is0 = issued[0] > 0 ? issued[0] : -issued[0];
+    int32_t is1 = issued[1] > 0 ? issued[1] : -issued[1];
+    int32_t ex0 = cs.dx > 0 ? cs.dx : -cs.dx;
+    int32_t ex1 = cs.dy > 0 ? cs.dy : -cs.dy;
+    snprintf(msg, sizeof(msg), "2d issued|steps| axis0 == |delta| for %s",
+             cs.name);
+    test(is0 == ex0, msg);
+    snprintf(msg, sizeof(msg), "2d issued|steps| axis1 == |delta| for %s",
+             cs.name);
+    test(is1 == ex1, msg);
+    // End position is the vertex.
+    test(pos[0] == cs.dx && pos[1] == cs.dy, "2d end position == vertex");
+    // Path on the chord: 12.4 max perpendicular distance^2 <= 0.25 * n.
+    double n = chord_len;
+    test(max_chord_dist <= 0.25 * n + 1e-9,
+          "2d path within 0.5*sqrt(n) of the chord");
+    printf("F2d %s: binder=%d issued=(%d,%d) end=(%d,%d) chord^2=%.3f n=%.1f\n",
+             cs.name, block.binder, issued[0], issued[1], pos[0], pos[1],
+            max_chord_dist, n);
+    (void)px0;
+    (void)py0;
+  }
+
+    // Plot: XY of (20,8) plus binder speed vs time.
+  {
+    int32_t d[2] = {20, 8};
+    uint32_t ticks[2] = {ticks_cfg, ticks_cfg};
+    LinearBlock block(ticks_cfg, accel, 2, d, ticks);
+    NaxisPlot plot;
+    plot.start_plot("f2d", "FasNAxis F2d Linear one-block (20,8)", 2);
+    plot.poly_point(0.0, 0.0);
+    plot.poly_point((double)d[0], (double)d[1]);
+    plot.poly_done();
+    int32_t pos[2] = {0, 0};
+    // First sample at rest (P == 0) so the trace has a start point.
+    {
+      double speed0[2] = {0.0, 0.0};
+      double P0[2] = {0.0, 0.0};
+      double R0[2] = {(double)block.law.R, 0.0};
+      double ticks0[2] = {0.0, 0.0};
+      plot.row(0.0, 0.0, 0.0, 0.0, speed0, P0, R0, ticks0);
+    }
+    while (!block.done()) {
+      int step_out[2];
+      uint32_t ticks_issued = block.step(step_out);
+      pos[0] += step_out[0];
+      pos[1] += step_out[1];
+      double t = (double)block.law.total_ticks / NAXIS_PLOT_TICKS_PER_S;
+      double speed[2] = {
+           block.law.P == 0 ? 0.0
+                       : NAXIS_PLOT_TICKS_PER_S / (double)ticks_issued,
+           0.0,
+      };
+      double Pcol[2] = {(double)block.law.P, 0.0};
+      double Rcol[2] = {(double)block.law.R, 0.0};
+      double tickscol[2] = {(block.law.P == 0) ? 0.0 : (double)ticks_issued,
+                           0.0};
+      plot.row(t, (double)pos[0], (double)pos[1], 0.0, speed, Pcol, Rcol,
+               tickscol);
+    }
+    plot.finish_plot();
+    test(plot.is_open() == false, "2d plot closed");
+    printf("F2d Linear one-block plot written: test_26_f2d.gnuplot\n");
+  }
+  printf("F2d Linear one-block: hand cases green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -872,6 +1004,7 @@ int main() {
   f2b_oracle();
   f2c_dda_walk();
   f3_ramp();
+  f2d_linear_one_block();
   printf("TEST_26 PASSED\n");
   return 0;
 }
