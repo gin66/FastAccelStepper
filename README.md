@@ -21,7 +21,7 @@ Arduino core 3.1.0 will support ESP-IDF V5.3.0 (based on RC1)
 ## Overview
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560, ATmega32u4), atmelsam due, Microchip SAMD51, esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4, Raspberry pi pico and pico2.
+Supported are avr (ATmega 168/328/P, ATmega2560, ATmega32u4), atmelsam due, Microchip SAMD51, esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4, Raspberry pi pico and pico2, and (experimentally, not yet hardware-verified) Teensy 4.0/4.1.
 
 For memory footprint information across supported architectures, see [Memory Report](https://github.com/gin66/FastAccelStepper/blob/master/extras/doc/memory_report.md).
 
@@ -96,6 +96,7 @@ The `src/` directory is organized into the following subdirectories:
 | `pd_pico/` | RP2040/RP2350 pulse driver: PIO-based stepper control |
 | `pd_sam/` | SAM Due pulse driver: timer-based stepper control |
 | `pd_samd/` | SAMD51 pulse driver: TCC PWM-based stepper control |
+| `pd_teensy/` | Teensy 4.0/4.1 pulse driver: QuadTimer-based stepper control (EXPERIMENTAL, not yet hardware-verified) |
 | `pd_test/` | Test platform pulse driver: PC-based testing simulation |
 | `fas_queue/` | Queue implementation: command queue management |
 | `fas_ramp/` | Ramp calculation: acceleration/deceleration curves |
@@ -290,6 +291,14 @@ Tested with max two stepper motors with 50 kHz step rate by clazarowitz
 * Steppers' command queue depth: 32
 * SAMD21 is not supported (compile error)
 * requires an Arduino SAMD51 core (uses the variant pin table); tested with the Adafruit SAMD core
+
+### Teensy 4.0/4.1 (EXPERIMENTAL - not yet verified on real hardware)
+
+* up to 16 stepper motors: 4 QuadTimer (TMR) modules x 4 channels each
+* step/dir pins are plain GPIO (toggled via `digitalWriteFast()`), not restricted to specific muxed pins - any digital pin works
+* two ISR calls per step (rising + falling edge), each hardware-timed by a QuadTimer compare match, the same principle this library's AVR backend uses
+* Steppers' command queue depth: 32
+* this port was written without access to real Teensy 4.x hardware or a compiler for it - see the warning at the top of [pd_teensy/pd_config.h](https://github.com/gin66/FastAccelStepper/blob/master/src/pd_teensy/pd_config.h). Please verify step timing/pulse width on a scope before relying on it, and report back what you find
 
 ## Usage
 

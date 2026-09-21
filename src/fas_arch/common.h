@@ -75,6 +75,11 @@ struct queue_end_s {
 #include "fas_arch/espidf_esp32.h"
 #include "pd_esp32/pd_config.h"
 
+#elif defined(__IMXRT1062__)
+// Teensy 4.0/4.1, via Teensyduino. EXPERIMENTAL - see pd_teensy/pd_config.h.
+#include "fas_arch/arduino_teensy.h"
+#include "pd_teensy/pd_config.h"
+
 #elif defined(ARDUINO_ARCH_SAM)
 // SAM-architecture
 #include "fas_arch/arduino_sam.h"
