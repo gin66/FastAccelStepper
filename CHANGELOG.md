@@ -1,3 +1,6 @@
+Unreleased:
+- fix: RampControl.cpp declared the log2 timer-frequency variables `static`, conflicting with their `extern` declaration in RampGenerator.h. That combination is ill-formed C++ (a static redeclaration cannot follow a non-static/extern one in the same translation unit) and breaks the build for any platform whose TICKS_PER_S isn't exactly 16000000 or 21000000 - e.g. an AVR board not running at 16/21 MHz - the moment SUPPORT_LOG2_TIMER_FREQ_VARIABLES is exercised
+
 1.3.3:
 - moveTimed(0, duration): pause uses last direction XOR prepare_revert (default false does not toggle DIR; true pauses in the opposite direction)
 
