@@ -89,7 +89,9 @@ test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 test_26.o: naxis_plot.h \
 	$(PRJ_ROOT)/src/fas_naxis/remaining.h \
 	$(PRJ_ROOT)/src/fas_naxis/ramp_law.h \
-	$(PRJ_ROOT)/src/fas_naxis/ramp_map.h
+	$(PRJ_ROOT)/src/fas_naxis/ramp_map.h \
+	$(PRJ_ROOT)/src/fas_naxis/dda.h \
+	$(PRJ_ROOT)/src/fas_naxis/linear.h \
 
 # Step 2b theory-probe mutations. This is a test (rebuilds test_26 with a
 # wrong model and requires FAIL), not a library script. Not part of `make test`.

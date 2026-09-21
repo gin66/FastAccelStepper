@@ -5,6 +5,7 @@
 
 #include "fas_naxis/dda.h"
 #include "fas_naxis/ramp_law.h"
+#include "fas_naxis/ramp_map.h"
 #include "fas_naxis/remaining.h"
 
 // FasNAxis Linear one-block interpolator (Step 2d, whitepaper section 6.3 /
@@ -77,6 +78,206 @@ class LinearBlock {
  private:
   static uint32_t abs_delta(int32_t d) {
     return d > 0 ? (uint32_t)d : (uint32_t)(-(int64_t)d);
+  }
+};
+
+// FasNAxis Linear multi-block interpolator (Step 2f / 2h, whitepaper section
+// 8.1 + 8.5 + 9.2). Walks a committed polyline held in a Remaining ring with
+// no queues. The DDA master is the longest |delta| of the current block
+// (Remaining::longest_axis, tie-break slower ticks_cfg). Each master step is
+// one DDA tick (the 2c walker) that also advances 0 or 1 step of the slave.
+//
+// The ramp law (P vs R) is run per block. R is
+// Remaining::remaining_linear_binder from the current block: end or
+// non-collinear vertex (Linear path-stop of section 8.5). P is live; P <= R at
+// every step. At a path-stop vertex the DDA master may switch to the next
+// block's longest axis, but R remains in path-step units (the total number of
+// DDA ticks to the next stop) so a collinear run can rebind the DDA master
+// without changing the ramp currency.
+//
+// At a path-stop joint P starts from 0 at the new block. At a collinear joint
+// P carries over (the ramp does not reset). This is what distinguishes path-
+// stop from collinear: P -> 0 at a non-collinear vertex; P continues at a
+// collinear joint.
+//
+// DIR pauses (before/after reversal) are Step 9 (queues). Here a reversal is
+// only P -> 0 then the new sign on the next block.
+class LinearPoly {
+ public:
+  Remaining* rem;
+  const uint32_t* ticks;
+  uint32_t accel;
+  int n_axes;
+  int block;   // current block index
+  int master;  // DDA master axis for the current block
+  DdaWalk dda;
+  RampMap map;
+  uint32_t ticks_law;
+  uint32_t P;
+  uint32_t R;
+  uint32_t R_before_cmd;  // R at the start of the last issued command
+  uint64_t total_ticks;
+  bool finished;
+
+  LinearPoly(Remaining* rem_, const uint32_t* ticks_, uint32_t accel_)
+      : rem(rem_),
+        ticks(ticks_),
+        accel(accel_),
+        n_axes(rem_->n_axes),
+        block(0),
+        master(0),
+        dda(0, 0),
+        map(ticks_[0], accel_),
+        ticks_law(ticks_[0]),
+        P(0),
+        R(0),
+        R_before_cmd(0),
+        total_ticks(0),
+        finished(false) {
+    start_block(0, true);
+  }
+
+  bool done() const {
+    return finished || (block >= rem->n_blocks - 1 && dda.done());
+  }
+
+  // One master step. step_out[i] in {-1,0,1}. Period from the FAS map at the
+  // updated P, floored to ticks_law. R_before_cmd holds the R that was active
+  // at this command so the caller can reconstruct P <= R from issued periods
+  // without reading this object's P/R fields.
+  uint32_t step(int* step_out) {
+    for (int i = 0; i < n_axes; i++) {
+      step_out[i] = 0;
+    }
+    while (!finished && dda.done()) {
+      bool last = (block + 1 >= rem->n_blocks);
+      bool stop = last || !rem->collinear_same_sense(block, block + 1);
+      start_block(block + 1, stop);
+    }
+    if (finished) {
+      return 0;
+    }
+    R_before_cmd = R;
+    uint32_t t = apply_law();
+    int out_bind = 0;
+    int out_slave = 0;
+    dda.step(&out_bind, &out_slave);
+    step_out[master] = out_bind;
+    if (n_axes > 1) {
+      step_out[1 - master] = out_slave;
+    }
+    return t;
+  }
+
+ private:
+  static uint32_t abs_u(int32_t d) {
+    return d > 0 ? (uint32_t)d : (uint32_t)(-(int64_t)d);
+  }
+
+  int next_moving(int from) const {
+    for (int b = from; b < rem->n_blocks; b++) {
+      bool moving = false;
+      for (int i = 0; i < n_axes; i++) {
+        if (rem->delta_of(i, b) != 0) {
+          moving = true;
+          break;
+        }
+      }
+      if (moving) {
+        return b;
+      }
+    }
+    return rem->n_blocks;
+  }
+
+  void start_block(int b, bool reset_P) {
+    b = next_moving(b);
+    if (b >= rem->n_blocks) {
+      finished = true;
+      return;
+    }
+    int32_t d[2];
+    d[0] = rem->delta_of(0, b);
+    d[1] = n_axes > 1 ? rem->delta_of(1, b) : 0;
+    master = Remaining::longest_axis(d, ticks, n_axes);
+    ticks_law = Remaining::ticks_floor(d, ticks, n_axes);
+    if (ticks_law == 0) {
+      ticks_law = ticks[0];
+    }
+    map = RampMap(ticks_law, accel);
+    int32_t bind = d[master];
+    int32_t slave = n_axes > 1 ? d[1 - master] : 0;
+    dda = DdaWalk(bind, slave);
+    if (reset_P) {
+      P = 0;
+      R = remaining_path_steps(b);
+      if (R == 0) {
+        R = abs_u(bind);
+      }
+    } else {
+      // Collinear joint: P carries over, recompute R to the next path-stop
+      // (the run may continue into more blocks). R is in path-step units so
+      // a master switch does not change the currency.
+      R = remaining_path_steps(b);
+      if (R == 0) {
+        R = abs_u(bind);
+      }
+    }
+    block = b;
+    finished = false;
+  }
+
+  // Remaining DDA/master steps to the next Linear path-stop from head `head`.
+  // P and R live in these units (one DDA tick per command) so a collinear run
+  // may rebind the DDA master without changing the ramp-step currency.
+  uint32_t remaining_path_steps(int head) const {
+    uint32_t s = 0;
+    int started = 0;
+    for (int b = head; b < rem->n_blocks; b++) {
+      int32_t d[2];
+      d[0] = rem->delta_of(0, b);
+      d[1] = n_axes > 1 ? rem->delta_of(1, b) : 0;
+      if (d[0] == 0 && d[1] == 0) {
+        if (started) {
+          break;
+        }
+        continue;
+      }
+      if (started && !rem->collinear_same_sense(b - 1, b)) {
+        break;
+      }
+      int m = Remaining::longest_axis(d, ticks, n_axes);
+      s += abs_u(d[m]);
+      started = 1;
+    }
+    return s;
+  }
+
+  uint32_t apply_law() {
+    uint32_t coast = map.P_coast();
+    if (R > P) {
+      if (P < coast) {
+        P++;
+      }
+    } else {
+      if (P > 0) {
+        P--;
+      }
+    }
+    uint32_t t;
+    if (P == 0) {
+      t = ticks_law;
+    } else {
+      t = map.calculate_ticks(P);
+      if (t < ticks_law) {
+        t = ticks_law;
+      }
+    }
+    total_ticks += t;
+    if (R > 0) {
+      R--;
+    }
+    return t;
   }
 };
 

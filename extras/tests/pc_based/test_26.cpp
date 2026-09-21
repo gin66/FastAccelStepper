@@ -1137,14 +1137,16 @@ static void push_block(int32_t blocks[][2], int* n_blocks, int32_t* posx,
   (*n_blocks)++;
 }
 
-// Walk the Linear reference. Reconstruct P from issued periods (never from
-// NaxisRefLinear.P). At each block end, store the last moving P_issued.
-static void ref_walk_polyline(Remaining* rem, const uint32_t* ticks,
-                              uint32_t accel, int32_t* end_pos, int32_t* issued,
-                              bool* envelope_ok, bool* p_le_r_ok,
-                              uint32_t* vertex_p, int* n_vertex, int max_vertex,
-                              NaxisPlot* plot, uint32_t* recon_slack) {
-  NaxisRefLinear ref(rem, ticks, accel);
+// Walk a Linear walker (NaxisRefLinear oracle or LinearPoly interpolator). Both
+// share the same public interface (step/done/master/ticks_law/R_before_cmd/R/P
+// /dda/total_ticks). Reconstruct P from issued periods (never from P/R fields).
+// At each block end, store the last moving P_issued.
+template <class Walker>
+static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
+                          uint32_t accel, int32_t* end_pos, int32_t* issued,
+                          bool* envelope_ok, bool* p_le_r_ok,
+                          uint32_t* vertex_p, int* n_vertex, int max_vertex,
+                          NaxisPlot* plot, uint32_t* recon_slack) {
   int32_t pos[2] = {0, 0};
   issued[0] = 0;
   issued[1] = 0;
@@ -1217,6 +1219,17 @@ static void ref_walk_polyline(Remaining* rem, const uint32_t* ticks,
   if (recon_slack) {
     *recon_slack = slack;
   }
+}
+
+// NaxisRefLinear oracle walker (Step 2ref / F20).
+static void ref_walk_polyline(Remaining* rem, const uint32_t* ticks,
+                              uint32_t accel, int32_t* end_pos, int32_t* issued,
+                              bool* envelope_ok, bool* p_le_r_ok,
+                              uint32_t* vertex_p, int* n_vertex, int max_vertex,
+                              NaxisPlot* plot, uint32_t* recon_slack) {
+  NaxisRefLinear ref(rem, ticks, accel);
+  walk_polyline(ref, rem, ticks, accel, end_pos, issued, envelope_ok, p_le_r_ok,
+                vertex_p, n_vertex, max_vertex, plot, recon_slack);
 }
 
 // Step 2ref: globally fastest constraint-faithful Linear track. One-block
@@ -1410,6 +1423,151 @@ void f20_long_polyline() {
   printf("F20 long polyline plot written: test_26_f20.gnuplot\n");
 }
 
+// Step 2f: two-block Linear, path-stop vs collinear. The LinearPoly
+// interpolator (src/fas_naxis/linear.h) walks two committed blocks and is
+// compared to the NaxisRefLinear oracle on the three two-block rows: a 90deg
+// L (path-stop, P -> 0 at the vertex, binder switches to the next axis), a
+// collinear run (P carries, no rest at the joint), and a reversal (P -> 0
+// then the other sign). P is reconstructed from issued periods; a wrong model
+// that only writes planner P fields must fail here.
+void f2f_two_block() {
+  const uint32_t accel = 2000;
+  uint32_t ticks_eq[2] = {4000, 4000};
+  struct Row {
+    const char* name;
+    int32_t a0, a1, b0, b1;
+    bool path_stop;
+    int master_after;  // binder expected after the joint (block 1)
+  };
+  Row rows[] = {
+      {"(5,0)+(0,5) L", 5, 0, 0, 5, true, 1},
+      {"(3,3)+(2,2) collinear", 3, 3, 2, 2, false, 0},
+      {"(5,0)+(-3,0) reversal", 5, 0, -3, 0, true, 0},
+  };
+  for (int c = 0; c < 3; c++) {
+    const Row& r = rows[c];
+    int32_t sum0 = r.a0 + r.b0;
+    int32_t sum1 = r.a1 + r.b1;
+    int32_t d0[2] = {r.a0, r.a1};
+    int32_t d1[2] = {r.b0, r.b1};
+
+    // Oracle walk (truth).
+    Remaining ref_rem(2, 2);
+    ref_rem.set_block(0, d0);
+    ref_rem.set_block(1, d1);
+    int32_t ref_end[2], ref_issued[2];
+    bool ref_env = true, ref_plr = true;
+    uint32_t ref_vp[8];
+    int ref_nv = 0;
+    uint32_t ref_slack = 0;
+    ref_walk_polyline(&ref_rem, ticks_eq, accel, ref_end, ref_issued, &ref_env,
+                      &ref_plr, ref_vp, &ref_nv, 8, NULL, &ref_slack);
+
+    // Interpolator walk (the production core under test).
+    Remaining poly_rem(2, 2);
+    poly_rem.set_block(0, d0);
+    poly_rem.set_block(1, d1);
+    LinearPoly poly(&poly_rem, ticks_eq, accel);
+    int32_t poly_end[2], poly_issued[2];
+    bool poly_env = true, poly_plr = true;
+    uint32_t poly_vp[8];
+    int poly_nv = 0;
+    uint32_t poly_slack = 0;
+    walk_polyline(poly, &poly_rem, ticks_eq, accel, poly_end, poly_issued,
+                  &poly_env, &poly_plr, poly_vp, &poly_nv, 8, NULL,
+                  &poly_slack);
+
+    char msg[96];
+    snprintf(msg, sizeof(msg), "2f %s envelope (interpolator)", r.name);
+    test(poly_env, msg);
+    snprintf(msg, sizeof(msg), "2f %s P_issued <= R (interpolator)", r.name);
+    test(poly_plr, msg);
+    snprintf(msg, sizeof(msg), "2f %s issued |steps| == |delta|", r.name);
+    test(poly_issued[0] == sum0 && poly_issued[1] == sum1, msg);
+    snprintf(msg, sizeof(msg), "2f %s end position is last vertex", r.name);
+    test(poly_end[0] == sum0 && poly_end[1] == sum1, msg);
+    snprintf(msg, sizeof(msg), "2f %s a vertex sample per block", r.name);
+    test(poly_nv >= 2, msg);
+    if (r.path_stop) {
+      snprintf(msg, sizeof(msg), "2f %s path-stop joint P_issued <= 1", r.name);
+      test(poly_vp[0] <= 1, msg);
+    } else {
+      snprintf(msg, sizeof(msg), "2f %s collinear joint does not rest", r.name);
+      test(poly_vp[0] > 1, msg);
+    }
+
+    // Interpolator must match the oracle within a few DDA ticks (log2 /
+    // one-step slack). Compare issued step counts and the joint P sample.
+    test(ref_env && ref_plr, "2f oracle envelope and P<=R hold");
+    snprintf(msg, sizeof(msg), "2f %s interpolator issues match oracle",
+             r.name);
+    test(poly_issued[0] == ref_issued[0] && poly_issued[1] == ref_issued[1],
+         msg);
+    snprintf(msg, sizeof(msg), "2f %s joint P within log2 slack of oracle",
+             r.name);
+    uint32_t dp = (poly_vp[0] > ref_vp[0]) ? poly_vp[0] - ref_vp[0]
+                                           : ref_vp[0] - poly_vp[0];
+    test(dp <= 2, msg);
+
+    // After the joint the DDA binder is the longest axis of block 1.
+    int master1 = Remaining::longest_axis(d1, ticks_eq, 2);
+    snprintf(msg, sizeof(msg), "2f %s master switches to %d after joint",
+             r.name, r.master_after);
+    test(master1 == r.master_after, msg);
+    test(master1 == poly.master, "2f interpolator master matches oracle");
+
+    printf("F2f %s: joint_P poly=%u ref=%u end=(%d,%d) nv=%d\n", r.name,
+           poly_vp[0], ref_vp[0], poly_end[0], poly_end[1], poly_nv);
+    (void)ref_slack;
+    (void)poly_slack;
+    (void)ref_nv;
+  }
+
+  // Plot: the 90deg L (0,0)->(5,0)->(5,5), the realized path on the chords
+  // with the corner (vertex) marked and the per-axis speed over time.
+  {
+    int32_t d0[2] = {5, 0};
+    int32_t d1[2] = {0, 5};
+    Remaining rem(2, 2);
+    rem.set_block(0, d0);
+    rem.set_block(1, d1);
+    LinearPoly poly(&rem, ticks_eq, accel);
+    NaxisPlot plot;
+    plot.start_plot("f2f", "FasNAxis F2f two-block L (5,0)+(0,5)", 2);
+    plot.poly_point(0.0, 0.0);
+    plot.poly_point(5.0, 0.0);
+    plot.poly_point(5.0, 5.0);
+    plot.poly_done();
+    int32_t pos[2] = {0, 0};
+    {
+      double z[2] = {0.0, 0.0};
+      plot.row(0.0, 0.0, 0.0, 0.0, z, z, z, z);
+    }
+    while (!poly.done()) {
+      int step_out[2];
+      uint32_t ticks_issued = poly.step(step_out);
+      pos[0] += step_out[0];
+      pos[1] += step_out[1];
+      double t = (double)poly.total_ticks / NAXIS_PLOT_TICKS_PER_S;
+      double v = NAXIS_PLOT_TICKS_PER_S / (double)ticks_issued;
+      double speed[2] = {poly.master == 0 ? v : 0.0,
+                         poly.master == 1 ? v : 0.0};
+      double Pcol[2] = {poly.master == 0 ? (double)poly.P : 0.0,
+                        poly.master == 1 ? (double)poly.P : 0.0};
+      double Rcol[2] = {poly.master == 0 ? (double)poly.R : 0.0,
+                        poly.master == 1 ? (double)poly.R : 0.0};
+      double tickscol[2] = {poly.master == 0 ? (double)ticks_issued : 0.0,
+                            poly.master == 1 ? (double)ticks_issued : 0.0};
+      plot.row(t, (double)pos[0], (double)pos[1], 0.0, speed, Pcol, Rcol,
+               tickscol);
+    }
+    plot.finish_plot();
+    test(plot.is_open() == false, "2f plot closed");
+    printf("F2f two-block L plot written: test_26_f2f.gnuplot\n");
+  }
+  printf("F2f two-block Linear path-stop/collinear/reversal green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -1422,6 +1580,7 @@ int main() {
   f2e_issued_periods();
   f2ref_reference();
   f20_long_polyline();
+  f2f_two_block();
   printf("TEST_26 PASSED\n");
   return 0;
 }

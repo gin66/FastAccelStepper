@@ -365,7 +365,7 @@ path-stop and cruise joints. Plot: `test_26_f20.gnuplot`.
 
 ---
 
-## Step 2f — two-block Linear: path-stop vs collinear
+## Step 2f — two-block Linear: path-stop vs collinear ✅
 
 Still no queues. The interpolator walks `Remaining` across two
 blocks: snap at vertices; `R` is `remaining_linear_binder`;
@@ -390,6 +390,19 @@ reversal is only `P → 0` then the other sign.
 **Plot:** `test_26_f2f.gnuplot` — the L, vertices marked.
 
 **Done when:** the three rows green.
+
+**Done:** `src/fas_naxis/linear.h` holds `LinearPoly`, an N-block Linear
+interpolator (the two-block case of Step 2f, generalized for Step 2h). It
+walks a `Remaining` ring: the DDA master is `Remaining::longest_axis` per
+block, `R` is `remaining_path_steps` (path-step currency so a collinear run may
+rebind the master), `P` resets at a path-stop (non-collinear vertex or last
+block) and carries across a collinear joint. `f2f_two_block()` runs the three
+rows — `(5,0)+(0,5)` L, `(3,3)+(2,2)` collinear, `(5,0)+(−3,0)` reversal —
+through the interpolator and the `naxis_ref` oracle: envelope, `P_issued ≤ R`
+from issued periods, issued `|steps| == |Δ|`, end is the last vertex, a vertex
+sample per block, `P → 0` at a path-stop joint / no rest at a collinear joint,
+and the two tracks agree within a 2-step log2 band. Plot:
+`test_26_f2f.gnuplot` (the L). DIR pauses remain Step 9.
 
 ---
 
