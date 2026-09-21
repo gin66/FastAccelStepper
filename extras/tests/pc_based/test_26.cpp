@@ -23,6 +23,7 @@
 #include "fas_naxis/remaining.h"
 #include "naxis_plot.h"
 #include "naxis_ref.h"
+#include "naxis_sim_port.h"
 
 // The normal test_% rule links LIB_O (FastAccelStepper.o), which references the
 // PC interrupt hooks below. The other tests define these; Step 15's real-queue
@@ -1843,6 +1844,133 @@ void f2h_nblock_vs_f20() {
   printf("F2h N-block interpolator matches F20 reference green\n");
 }
 
+// F4 — SimPort addQueueEntry contract (whitepaper section 4.1 / 4.1.1 /
+// 4.4.1). A self-contained section that exercises the duck-typed StepperQueue
+// stand-in without FasNAxis planning: the feeder talks to addQueueEntry() only.
+//
+//   - append on an empty queue: isQueueEmpty() was true before, no underrun
+//   - kick-off addQueueEntry(NULL, true); empty queue afterwards is an
+//     underrun, not before
+//   - a pause (steps = 0) uses the caller's count_up, no implicit flip; a
+//     reverting pause (count_up = !old) simply leaves the port in the new DIR
+//   - pd_test default: a reversing step enqueues with no injected pause
+//   - inject hook: a reversing step injects a before-pause (old DIR) then an
+//     after-pause (new DIR) that flips queue_end, so a naive retry would XOR
+//     back; the following step sees no further injection
+//   - drain advances position (signed) and the simulated clock
+//   - isRampGeneratorActive() is false unless the test forces it
+void f4_sim_port() {
+  const uint16_t max_ticks = 80;
+  SimPort port(max_ticks);
+  test(port.isQueueEmpty(), "F4: fresh port queue empty");
+  test(port.isRampGeneratorActive() == false,
+       "F4: ramp generator idle by default");
+
+  // Append on an empty queue: isQueueEmpty() was true before, not underrun.
+  struct stepper_command_s c = {4000, 3, true};
+  test(port.addQueueEntry(&c, false) == AQE_OK, "F4: append returns OK");
+  test(port.isQueueEmpty() == false, "F4: queue populated after append");
+  test(port.hasUnderrun() == false, "F4: empty-prefill is not underrun");
+
+  // Kick-off starts the queue. After that, an empty queue is an underrun.
+  test(port.addQueueEntry(NULL, true) == AQE_OK, "F4: kick-off returns OK");
+  test(port.isRunning(), "F4: port running after kick-off");
+  port.drain();
+  test(port.isQueueEmpty(), "F4: queue drained");
+  test(port.hasUnderrun(), "F4: empty after kick-off with motion is underrun");
+
+  // Kick-off on an empty, un-kicked-off queue is an error.
+  SimPort empty(max_ticks);
+  test(empty.addQueueEntry(NULL, true) == AQE_ERROR_EMPTY_QUEUE_TO_START,
+       "F4: kick-off on empty queue is an error");
+
+  // A pause (steps = 0) uses the count_up the caller passes: no implicit flip.
+  SimPort pause(max_ticks);
+  struct stepper_command_s p0 = {4000, 0, false};
+  test(pause.addQueueEntry(&p0, false) == AQE_OK, "F4: pause enqueues");
+  test(pause.queueEndCountUp() == false, "F4: pause keeps caller count_up");
+
+  // A reverting pause (count_up = !old) leaves the port in the new DIR without
+  // any injected pause: this is pd_test's revert.
+  SimPort revert(max_ticks);
+  struct stepper_command_s base = {4000, 1, true};
+  test(revert.addQueueEntry(&base, false) == AQE_OK, "F4: base step enqueues");
+  test(revert.queueEndCountUp() == true, "F4: base step is count_up");
+  struct stepper_command_s rev = {4000, 0, false};  // revert to old DIR
+  test(revert.addQueueEntry(&rev, false) == AQE_OK, "F4: reverting pause OK");
+  test(revert.queueEndCountUp() == false,
+       "F4: reverting pause flips to old DIR");
+
+  // pd_test default: a reversing step enqueues with no injected pause.
+  SimPort def(max_ticks);
+  struct stepper_command_s step_up = {4000, 1, true};
+  test(def.addQueueEntry(&step_up, false) == AQE_OK, "F4: first step enqueues");
+  struct stepper_command_s step_dn = {4000, 1, false};
+  AqeResultCode r = def.addQueueEntry(&step_dn, false);
+  test(r == AQE_OK, "F4: default reversing step enqueues, no inject");
+  test(def.injectedPauseTicks() == 0, "F4: no injected pause on default");
+  test(def.queueEndCountUp() == false, "F4: default reversing step new DIR");
+
+  // Inject hook: a reversing step injects a before-pause (old DIR) then an
+  // after-pause (new DIR, flips queue_end); a naive retry would XOR back.
+  SimPort inj(max_ticks);
+  inj.setInjectMode(SimPort::InjectDirPauses);
+  inj.setInjectTicks(8000);
+  struct stepper_command_s s_up = {4000, 1, true};
+  test(inj.addQueueEntry(&s_up, false) == AQE_OK, "F4: inject first step OK");
+  struct stepper_command_s s_dn = {4000, 1, false};
+  AqeResultCode r1 = inj.addQueueEntry(&s_dn, false);
+  test(r1 == AQE_DIR_CHANGE_PAUSE_INJECTED, "F4: inject before-pause injected");
+  test(inj.injectedPauseTicks() == 8000, "F4: injected ticks recorded");
+  test(inj.queueEndCountUp() == true, "F4: before-pause keeps old DIR");
+  AqeResultCode r2 = inj.addQueueEntry(&s_dn, false);
+  test(r2 == AQE_DIR_CHANGE_PAUSE_INJECTED, "F4: inject after-pause injected");
+  test(inj.queueEndCountUp() == false,
+       "F4: after-pause flips queue_end to new DIR");
+  AqeResultCode r3 = inj.addQueueEntry(&s_dn, false);
+  test(r3 == AQE_OK, "F4: reversing step enqueues once sequence done");
+  test(inj.queueEndCountUp() == false, "F4: step leaves port in new DIR");
+
+  // A following reversing step sees no further injection until it reverses:
+  // a step continuing in the same DIR does not re-enter the inject sequence.
+  SimPort inj2(max_ticks);
+  inj2.setInjectMode(SimPort::InjectDirPauses);
+  inj2.setInjectTicks(8000);
+  struct stepper_command_s a_up = {4000, 1, true};
+  test(inj2.addQueueEntry(&a_up, false) == AQE_OK, "F4: inj2 first step OK");
+  struct stepper_command_s a_dn = {4000, 1, false};
+  inj2.addQueueEntry(&a_dn, false);
+  inj2.addQueueEntry(&a_dn, false);
+  test(inj2.queueEndCountUp() == false, "F4: inj2 reversed once");
+  struct stepper_command_s a_dn2 = {4000, 1, false};
+  AqeResultCode r4 = inj2.addQueueEntry(&a_dn2, false);
+  test(r4 == AQE_OK, "F4: same-direction step has no further inject");
+  test(inj2.injectedPauseTicks() == 0, "F4: no inject on a non-reversing step");
+
+  // Error: ticks below max speed is a planner bug, not a retry.
+  SimPort err(max_ticks);
+  struct stepper_command_s too_low = {40, 3, true};
+  test(err.addQueueEntry(&too_low, false) == AQE_ERROR_TICKS_TOO_LOW,
+       "F4: ticks below max speed is ErrorTicksTooLow");
+
+  // drain() advances position (signed by count_up) and the simulated clock.
+  SimPort drain(max_ticks);
+  drain.addQueueEntry(&s_up, false);
+  drain.addQueueEntry(&step_dn, false);
+  drain.addQueueEntry(NULL, true);
+  test(drain.position() == 0, "F4: net position zero before drain");
+  drain.drain();
+  test(drain.clock() == (4000u + 4000u), "F4: clock sums both commands");
+  test(drain.position() == 0, "F4: +1 then -1 nets to zero");
+
+  // A forced ramp generator is visible through isRampGeneratorActive().
+  SimPort rg(max_ticks);
+  rg.setRampGeneratorActive(true);
+  test(rg.isRampGeneratorActive(), "F4: forced ramp generator active");
+
+  printf("F4 SimPort addQueueEntry contract green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -1858,6 +1986,7 @@ int main() {
   f20_long_polyline();
   f2f_two_block();
   f2h_nblock_vs_f20();
+  f4_sim_port();
   printf("TEST_26 PASSED\n");
   return 0;
 }

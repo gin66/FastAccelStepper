@@ -527,7 +527,7 @@ comments (or `#if` hooks) next to those fixtures.
 
 ---
 
-## Step 4 — `SimPort` `addQueueEntry` contract
+## Step 4 — `SimPort` `addQueueEntry` contract ✅
 
 **Test first:** a duck-typed port used as
 `FasNAxis<1, 64, SimPort>`. Feeder is `addQueueEntry` (§4.1).
@@ -554,6 +554,23 @@ list.
 
 **Done when:** a self-contained section of `test_26` covers the
 table in whitepaper §4.1 / §4.4.1 without `FasNAxis` planning.
+
+**Done:** `extras/tests/pc_based/naxis_sim_port.h` holds `SimPort`, a
+duck-typed StepperQueue stand-in the feeder talks to through
+`addQueueEntry()` only. `f4_sim_port()` in `test_26.cpp` runs the
+§4.1/§4.4.1 table: append on an empty queue (`isQueueEmpty()` was
+true before, no underrun), kick-off `addQueueEntry(NULL, true)` and the
+empty-after-kick-off underrun (empty before kick-off is not underrun),
+kick-off on an empty queue is `ErrorEmptyQueueToStart`, a pause
+(`steps = 0`) uses the caller's `count_up` with no implicit flip, a
+reverting pause (`count_up = !old`) leaves the port in the new DIR
+with no inject (the pd_test default), the `InjectDirPauses` hook
+injects a before-pause (old DIR) then an after-pause (new DIR, which
+flips `queue_end` so a naive retry would XOR back) before the step
+enqueues, a following same-direction step sees no further injection,
+ticks below `max_speed_in_ticks` is `ErrorTicksTooLow`, `drain()`
+advances signed position and the simulated clock, and
+`isRampGeneratorActive()` is false unless forced.
 
 ---
 
