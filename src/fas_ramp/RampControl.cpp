@@ -7,9 +7,12 @@
 #include "fas_arch/common.h"
 
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-static log2_value_t log2_timer_freq;
-static log2_value_t log2_timer_freq_div_sqrt_of_2;
-static log2_value_t log2_timer_freq_square_div_2;
+// Definitions for the `extern` declarations in RampGenerator.h. Must have
+// external linkage (no `static`): RampGenerator.cpp, a separate translation
+// unit, also uses these via the LOG2_TICKS_PER_S* macros in RampCalculator.h.
+log2_value_t log2_timer_freq;
+log2_value_t log2_timer_freq_div_sqrt_of_2;
+log2_value_t log2_timer_freq_square_div_2;
 #endif
 
 void ramp_rw_s::init() {
