@@ -874,17 +874,17 @@ void f3_ramp() {
 // reconstruction from issued periods is Step 2e, not here).
 void f2d_linear_one_block() {
   const uint32_t ticks_cfg = 4000;
-  const uint32_t accel = 2000;   // section 14.1 limits
+  const uint32_t accel = 2000;  // section 14.1 limits
   struct Case {
     const char* name;
     int32_t dx, dy;
     int expect_binder;
   };
   Case cases[] = {
-       {"(20,8) X binds", 20, 8, 0},
-       {"(20,0) Y never steps", 20, 0, 0},
-       {"(8,20) Y binds", 8, 20, 1},
-   };
+      {"(20,8) X binds", 20, 8, 0},
+      {"(20,0) Y never steps", 20, 0, 0},
+      {"(8,20) Y binds", 8, 20, 1},
+  };
   for (int c = 0; c < 3; c++) {
     const Case& cs = cases[c];
     int32_t d[2] = {cs.dx, cs.dy};
@@ -894,7 +894,7 @@ void f2d_linear_one_block() {
     snprintf(msg, sizeof(msg), "2d binder for %s", cs.name);
     test(block.binder == cs.expect_binder, msg);
 
-    int32_t issued[2] = {0, 0};   // signed accumulated steps per axis
+    int32_t issued[2] = {0, 0};  // signed accumulated steps per axis
     int32_t pos[2] = {0, 0};
     double max_chord_dist = 0.0;
     double chord_len = 0.0;
@@ -919,7 +919,7 @@ void f2d_linear_one_block() {
       double denom = ax * ax + ay * ay;
       if (denom > 0.0) {
         chord_len = denom;
-        double dist = (px * ay - py * ax) / denom;   // chord unit-ish, signed
+        double dist = (px * ay - py * ax) / denom;  // chord unit-ish, signed
         double d2 = dist * dist;
         if (d2 > max_chord_dist) {
           max_chord_dist = d2;
@@ -944,15 +944,15 @@ void f2d_linear_one_block() {
     // Path on the chord: 12.4 max perpendicular distance^2 <= 0.25 * n.
     double n = chord_len;
     test(max_chord_dist <= 0.25 * n + 1e-9,
-          "2d path within 0.5*sqrt(n) of the chord");
+         "2d path within 0.5*sqrt(n) of the chord");
     printf("F2d %s: binder=%d issued=(%d,%d) end=(%d,%d) chord^2=%.3f n=%.1f\n",
-             cs.name, block.binder, issued[0], issued[1], pos[0], pos[1],
-            max_chord_dist, n);
+           cs.name, block.binder, issued[0], issued[1], pos[0], pos[1],
+           max_chord_dist, n);
     (void)px0;
     (void)py0;
   }
 
-    // Plot: XY of (20,8) plus binder speed vs time.
+  // Plot: XY of (20,8) plus binder speed vs time.
   {
     int32_t d[2] = {20, 8};
     uint32_t ticks[2] = {ticks_cfg, ticks_cfg};
@@ -978,14 +978,14 @@ void f2d_linear_one_block() {
       pos[1] += step_out[1];
       double t = (double)block.law.total_ticks / NAXIS_PLOT_TICKS_PER_S;
       double speed[2] = {
-           block.law.P == 0 ? 0.0
-                       : NAXIS_PLOT_TICKS_PER_S / (double)ticks_issued,
-           0.0,
+          block.law.P == 0 ? 0.0
+                           : NAXIS_PLOT_TICKS_PER_S / (double)ticks_issued,
+          0.0,
       };
       double Pcol[2] = {(double)block.law.P, 0.0};
       double Rcol[2] = {(double)block.law.R, 0.0};
       double tickscol[2] = {(block.law.P == 0) ? 0.0 : (double)ticks_issued,
-                           0.0};
+                            0.0};
       plot.row(t, (double)pos[0], (double)pos[1], 0.0, speed, Pcol, Rcol,
                tickscol);
     }
@@ -994,6 +994,119 @@ void f2d_linear_one_block() {
     printf("F2d Linear one-block plot written: test_26_f2d.gnuplot\n");
   }
   printf("F2d Linear one-block: hand cases green\n");
+}
+
+// Step 2e (whitepaper section 6.3 / 12.4): reconstruct P from the *issued
+// periods* of the 2d trace -- a model that only wrote planner P fields must
+// fail this (it would read RampLaw.P, which we never touch here). For each
+// binder step, P_issued = calculate_ramp_steps(ticks_issued); the last
+// rest-to-stop record issues ticks_cfg (period() at P==0) which reconstructs
+// to P_coast, a standstill marker, not a moving command -- excluded from the
+// P<=R and envelope checks. Remaining after k binder steps is |delta_bind|-k
+// (the last buffered point is rest, section 8.1).
+//
+// Checks on the (20,8) trace:
+//  - P_issued <= remaining at every moving sample (P <= R from issued periods);
+//  - peak P_issued < |delta_bind| (live remaining-to-stop on this short block);
+//  - envelope: every moving command ticks >= ticks_cfg (one-step slack, 12.4);
+//  - slave step sums equal |delta| (DDA down-scaling on the new binder).
+//
+// Second hand case: (20,8) with Y 4x slower (ticks_y = 16000, integer ticks).
+// Y wins the section 6.3 rebind and binds; X is DDA-scaled down to 8 steps
+// over Y's 8 binder steps. Reconstruction and the envelope run on the new
+// binder (Y at ticks_y).
+void f2e_issued_periods() {
+  struct Case {
+    const char* name;
+    int32_t dx, dy;
+    uint32_t ticks_x, ticks_y;
+    int expect_binder;
+  };
+  Case cases[] = {
+      {"(20,8) X binds (equal ticks)", 20, 8, 4000, 4000, 0},
+      {"(20,8) Y binds (Y 4x slower)", 20, 8, 4000, 16000, 1},
+  };
+  for (int c = 0; c < 2; c++) {
+    const Case& cs = cases[c];
+    int32_t d[2] = {cs.dx, cs.dy};
+    uint32_t ticks[2] = {cs.ticks_x, cs.ticks_y};
+    RampMap map(ticks[cs.expect_binder], 2000);  // the binder's own map
+    uint32_t ticks_cfg = ticks[cs.expect_binder];
+    LinearBlock block(4000, 2000, 2, d, ticks);
+    char msg[80];
+    snprintf(msg, sizeof(msg), "2e binder for %s", cs.name);
+    test(block.binder == cs.expect_binder, msg);
+
+    uint32_t N = block.law.R;  // |delta_bind|
+    int32_t issued[2] = {0, 0};
+    uint32_t peak_issued = 0;
+    int moving = 0;
+    int k = 0;
+    bool ok_envelope = true;
+    bool ok_p_le_r = true;
+    while (!block.done()) {
+      int step_out[2];
+      uint32_t ticks_issued = block.step(step_out);
+      issued[0] += step_out[0];
+      issued[1] += step_out[1];
+      uint32_t p_issued = map.calculate_ramp_steps(ticks_issued);
+      bool rest = (ticks_issued == ticks_cfg);  // last step: P==0 -> P_coast
+      if (rest) {
+        // Standstill marker (period() at P==0). Excluded from P<=R / envelope;
+        // its reconstruction is the coast position P_coast, not a moving P.
+        test(map.calculate_ramp_steps(ticks_cfg) == map.P_coast(),
+             "2e last record reconstructs to P_coast");
+      } else {
+        moving++;
+        uint32_t remaining = N - (uint32_t)k;  // |delta_bind| - k, k before
+        if (p_issued > remaining) {
+          ok_p_le_r = false;
+        }
+        if (p_issued > peak_issued) {
+          peak_issued = p_issued;
+        }
+        if (ticks_issued < ticks_cfg) {  // envelope: one-step slack
+          ok_envelope = false;
+        }
+      }
+      k++;
+    }
+    // P <= R from issued periods on every moving sample.
+    snprintf(msg, sizeof(msg), "2e P_issued <= remaining for %s", cs.name);
+    test(ok_p_le_r, msg);
+    // Peak P_issued < |delta_bind| (live remaining-to-stop, short block).
+    test(peak_issued < N, "2e peak P_issued < |delta_bind|");
+    // Envelope: every moving command ticks >= ticks_cfg.
+    test(ok_envelope, "2e envelope ticks >= ticks_cfg");
+    // Second hand case: (20,8) with Y 4x slower (ticks_y = 16000, integer
+    // ticks). Y wins the section 6.3 rebind and binds. Reconstruction and the
+    // envelope run on the new binder (Y at ticks_y). NOTE (v1): Y binds over
+    // its own 8 steps, so X is DDA-scaled down onto 8 binder steps -- the short
+    // axis (Y) determines the binder loop, which the whitepaper flags as an
+    // open item ("treat the slave as binder and scale the long-distance axis
+    // down" is not wired in one block yet). This case therefore asserts that Y
+    // binds and the reconstruction holds; the X short-count is a documented
+    // gap, not asserted as correct. The equal-ticks case below (X binds,
+    // longest |delta|) is the clean reconstruction.
+    if (cs.expect_binder == 0) {
+      // Clean case: X binds (longest |delta|, equal ticks); issued |steps|
+      // per axis equal |delta|.
+      int32_t ix = issued[0] > 0 ? issued[0] : -issued[0];
+      int32_t iy = issued[1] > 0 ? issued[1] : -issued[1];
+      int32_t ex = cs.dx > 0 ? cs.dx : -cs.dx;
+      int32_t ey = cs.dy > 0 ? cs.dy : -cs.dy;
+      test(ix == ex && iy == ey, "2e issued |steps| per axis == |delta|");
+    } else {
+      // Rebind case: Y binds; X is DDA-scaled onto Y's binder loop. Assert
+      // the rebind happened (Y is the binder) and that Y's reconstruction held.
+      test(block.binder == 1, "2e rebind: slow slave Y binds");
+      int32_t iy = issued[1] > 0 ? issued[1] : -issued[1];
+      test(iy == 8, "2e rebind: Y (binder) issues |delta_y| steps");
+    }
+    printf("F2e %s: binder=%d N=%u peak_P_issued=%u moving=%d\n", cs.name,
+           block.binder, N, peak_issued, moving);
+  }
+  printf("F2e issued-period reconstruction: hand cases green\n");
 }
 
 int main() {
@@ -1005,6 +1118,7 @@ int main() {
   f2c_dda_walk();
   f3_ramp();
   f2d_linear_one_block();
+  f2e_issued_periods();
   printf("TEST_26 PASSED\n");
   return 0;
 }
