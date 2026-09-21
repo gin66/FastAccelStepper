@@ -172,7 +172,7 @@ struct ramp_config_s {
     if (max_ramp_up_steps == 0) {
       max_ramp_up_steps = 1;
     }
-#ifdef TEST
+#ifdef TRACE
     printf("MAX_RAMP_UP_STEPS=%d from %d ticks\n", max_ramp_up_steps,
            parameters.min_travel_ticks);
 #endif
