@@ -71,6 +71,14 @@ class SimPort {
   // step in inject mode, the last injected) command left the port in.
   bool queueEndCountUp() const { return queue_end_count_up_; }
   int32_t position() const { return position_; }
+  // Duck-type alias for the real FastAccelStepper::getCurrentPosition(): the
+  // FasNAxis feeder / syncFromSteppers() talks to every stepper through one
+  // name, so SimPort exposes the same getter the production stepper uses.
+  int32_t getCurrentPosition() const { return position_; }
+  // Duck-type alias for the real FastAccelStepper::getMaxSpeedInTicks():
+  // addAxis / setLimitsFromSteppers read the configured period through one
+  // name, so SimPort exposes its max_speed_in_ticks under that name.
+  uint16_t getMaxSpeedInTicks() const { return max_speed_in_ticks_; }
   uint32_t clock() const { return clock_; }
   // Ticks of the pause(s) the last call injected (0 for AQE_OK). This is what
   // the feeder globalizes onto the other axes on a DirChangePauseInjected

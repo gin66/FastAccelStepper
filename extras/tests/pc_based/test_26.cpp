@@ -15,6 +15,7 @@
 
 #include <math.h>
 
+#include "FasNAxis.h"
 #include "fas_arch/test_pc.h"  // test() macro
 #include "fas_naxis/dda.h"
 #include "fas_naxis/linear.h"
@@ -1971,6 +1972,100 @@ void f4_sim_port() {
   printf("F4 SimPort addQueueEntry contract green\n");
 }
 
+// F16 (whitepaper section 6 / 14 / F-table row F16): the header skeleton and
+// its registration contract. No motion yet (that is Step 6+). This pins:
+//    - FasNAxisConfig{} default member initializers, and the constructor's
+//      0 -> default recovery for dt_ticks and kappa_stop_q8.
+//    - PumpStatus has Idle/Running/Underrun/Error and NO LookaheadTooShort.
+//    - addAxis fails on i >= NAXES, a null pointer, or a running/ramp-active
+//      stepper; a small HORIZON relative to P_stop is NOT an addAxis failure.
+//    - addLine before any position sync is illegal; after sync it is legal.
+//    - addLine to the current position (every delta 0) is a no-op.
+// Backed by SimPort so we exercise the same query surface the real
+// FastAccelStepper uses (isRampGeneratorActive / isRunning), without raising
+// MAX_STEPPER or linking extra queues.
+static void f16_skeleton() {
+  // Default config: a valid Linear config with documented defaults.
+  FasNAxisConfig cfg;
+  test(cfg.dt_ticks == 32000, "F16: default dt_ticks is 32000");
+  test(cfg.kappa_stop_q8 == 320, "F16: default kappa_stop_q8 is 320");
+  test(cfg.overshoot_max == 8, "F16: default overshoot_max is 8");
+  test(cfg.mode == FasNAxisConfig::Linear, "F16: default mode is Linear");
+  test(cfg.dir_before_ticks == 0, "F16: default dir_before_ticks is 0");
+  test(cfg.dir_after_ticks == 0, "F16: default dir_after_ticks is 0");
+
+  // PumpStatus enumerates exactly Idle/Running/Underrun/Error and no
+  // LookaheadTooShort (that concept is deliberately absent from v1).
+  test((int)PumpStatus::Idle == 0 && (int)PumpStatus::Running == 1 &&
+           (int)PumpStatus::Underrun == 2 && (int)PumpStatus::Error == 3,
+       "F16: PumpStatus has Idle/Running/Underrun/Error");
+
+  // 0 -> default recovery: a raw zeroed struct still means the defaults, not a
+  // zero-duration slice / zero diagnostic threshold.
+  FasNAxisConfig zeroed;
+  zeroed.dt_ticks = 0;
+  zeroed.kappa_stop_q8 = 0;
+  FasNAxis<2, 8, SimPort> recovered(zeroed);
+  test(recovered.dt_ticks() == 32000, "F16: dt_ticks 0 recovers to 32000");
+  test(recovered.kappa_stop_q8() == 320,
+       "F16: kappa_stop_q8 0 recovers to 320");
+
+  // addAxis rejects the out-of-range index.
+  SimPort px(4000);
+  SimPort py(4000);
+  FasNAxis<2, 8, SimPort> ok(cfg);
+  test(ok.addAxis(0, &px) == true, "F16: addAxis(0) succeeds");
+  test(ok.addAxis(1, &py) == true, "F16: addAxis(1) succeeds");
+  test(ok.addAxis(2, &px) == false, "F16: addAxis(i>=NAXES) fails");
+
+  // addAxis rejects a null pointer.
+  test(ok.addAxis(0, NULL) == false, "F16: addAxis(null) fails");
+
+  // A small HORIZON relative to P_stop is NOT an addAxis failure: the same
+  // HORIZON that later caps the ramp (F19) still registers cleanly.
+  FasNAxis<2, 2, SimPort> tiny(cfg);
+  test(tiny.addAxis(0, &px) == true, "F16: small HORIZON addAxis succeeds");
+  test(tiny.addAxis(1, &py) == true, "F16: small HORIZON addAxis succeeds");
+
+  // addAxis fails when the stepper's ramp generator is active or it is
+  // running (no race with manageSteppers / a prior moveTo).
+  SimPort ramping(4000);
+  ramping.setRampGeneratorActive(true);
+  FasNAxis<2, 8, SimPort> r(cfg);
+  test(r.addAxis(0, &px) == true, "F16: addAxis on idle port succeeds");
+  test(r.addAxis(1, &ramping) == false, "F16: addAxis while ramp active fails");
+
+  // Position sync: addLine is illegal before a sync; legal after.
+  FasNAxis<2, 8, SimPort> p(cfg);
+  p.addAxis(0, &px);
+  p.addAxis(1, &py);
+  int32_t at[2] = {10, 20};
+  test(p.addLine(at) == false, "F16: addLine before sync is illegal");
+  p.syncFromSteppers();
+  test(p.addLine(at) == true, "F16: addLine after sync is legal");
+
+  // setCurrentPosition opens the same door as syncFromSteppers().
+  FasNAxis<2, 8, SimPort> q(cfg);
+  q.addAxis(0, &px);
+  q.addAxis(1, &py);
+  int32_t cur[2] = {0, 0};
+  test(q.addLine(cur) == false,
+       "F16: addLine before setCurrentPosition illegal");
+  q.setCurrentPosition(cur);
+  test(q.addLine(cur) == true, "F16: addLine after setCurrentPosition legal");
+
+  // addLine to the current position (every delta 0) is a no-op, not a motion.
+  FasNAxis<2, 8, SimPort> s(cfg);
+  s.addAxis(0, &px);
+  s.addAxis(1, &py);
+  int32_t here[2] = {100, 200};
+  s.setCurrentPosition(here);
+  test(s.addLine(here) == true, "F16: addLine at current position is legal");
+  test(s.block_count() == 0, "F16: addLine to current position is a no-op");
+
+  printf("F16 header skeleton + addAxis/position contract green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -1987,6 +2082,7 @@ int main() {
   f2f_two_block();
   f2h_nblock_vs_f20();
   f4_sim_port();
+  f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;
 }

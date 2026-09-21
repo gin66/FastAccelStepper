@@ -574,7 +574,7 @@ advances signed position and the simulated clock, and
 
 ---
 
-## Step 5 — header skeleton + `addAxis` / position
+## Step 5 — header skeleton + `addAxis` / position ✅
 
 **Test first (F16):**
 
@@ -597,6 +597,31 @@ registration, current position. No motion yet.
 Sketch in the whitepaper is C++11 (no designated initializers).
 
 **Done when:** F16 and config-default tests pass.
+
+**Done:** `src/FasNAxis.h` holds `FasNAxis<NAXES, HORIZON=64,
+Stepper=FastAccelStepper>` (header-only, NOT included from
+`FastAccelStepper.h`; the default `FastAccelStepper` is forward
+declared so the template parses when only this header is included,
+as in the self-contained `test_26`). `FasNAxisConfig{}` carries the
+documented defaults (`dt_ticks=32000`, `kappa_stop_q8=320`,
+`overshoot_max=8`, `dir_before/after_ticks=0`, `mode=Linear`); the
+constructor recovers `dt_ticks==0 → 32000` and `kappa_stop_q8==0 →
+320` so a raw zeroed struct still means the defaults. `PumpStatus` is
+a scoped `enum class {Idle=0, Running=1, Underrun=2, Error=3}` — no
+`LookaheadTooShort`. `addAxis(i, s)` fails on `i >= NAXES`, a null
+pointer, or `isRampGeneratorActive()` / `isRunning()`, and reads
+`ticks_cfg` from `getMaxSpeedInTicks()`; a small `HORIZON` still
+registers cleanly (the ramp cap is F19's concern). `syncFromSteppers()`
+reads `getCurrentPosition()` per axis, `setCurrentPosition(p)` takes an
+array; both open `addLine`, which is illegal (returns `false`) before
+a sync and a no-op (returns `true`, records no block, verifiable via
+`block_count() == 0`) when the target equals the current position
+(`L = 0`). Backed by `SimPort` (a `getCurrentPosition()` / 
+`getMaxSpeedInTicks()` duck-type was added to `naxis_sim_port.h`) so
+F16 exercises the same query surface as the real stepper without
+raising `MAX_STEPPER` or linking extra queues. `f16_skeleton()` in
+`test_26.cpp` runs the full contract table; no motion is planned
+(that is Step 6+).
 
 ---
 
