@@ -19,10 +19,13 @@ The execution primitive is a queue command `{ticks, steps, count_up}`
 via `addQueueEntry()` — the same call the ramp generator uses.
 **Decision (§4.1):** FasNAxis does not use `moveTimed()`.
 
-FasNAxis sits *on top of* the queues. It accepts a stream of
-n-dimensional waypoints, plans under the **actual per-stepper speed
-and acceleration limits**, and feeds synchronized commands fast
-enough that the queues never run empty.
+FasNAxis sits *on top of* the queues. Two planner problems
+(§3.3) share those queues and G2. **v1 is (1):** a polyline
+with no time — run it as fast as G1/G2 and the geometry mode
+allow. **(2)** is later: a polyline **with** time, executed
+faithfully or rejected if it is faster than that feasible
+track. v1 never treats “too fast a request” as an error
+because it chooses the speed.
 
 Planning reuses the FAS ramp map, in **log2** (`RampCalculator`):
 period ↔ ramp-steps, no float and no integer division on the hot path.
@@ -157,7 +160,7 @@ horizon, and a PC-checkable oracle.
 |----|------|
 | G1 | n-axis motion through a sequence of trajectory points, n ≥ 1, native space = stepper steps |
 | G2 | Hard constraints are the **currently configured** per-stepper period (`getSpeedInTicks()`) and acceleration (`getAcceleration()`), plus the device min-period `getMaxSpeedInTicks()` |
-| G3 | Two geometry modes, both time-optimal under G2: **Linear** (exact chords, shared time-law) and **Overshoot** (per-axis ramps, slight chordal deviation, waypoints still hit) |
+| G3 | **v1 = as fast as possible** (§3.3 problem 1). Two geometry modes, both time-optimal **under G2 and that mode’s geometry** (§12.4.1). A faster track that violates G1/G2 or the mode geometry is not a reference. **Linear** (exact chords, shared time-law; path speed 0 at a non-collinear vertex) and **Overshoot** (per-axis ramps, slight chordal deviation, waypoints still hit) |
 | G4 | Parse lookahead until end or direction change → `R_i` is the cap on ramp-steps (`P_i ≤ R_i`). Path direction implies the other axes’ speeds. Short `R` **reduces speed**, it is not an error. Angle changes need accel/decel **preparation** (§8.4) |
 | G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner **issues** the driver’s before/after DIR pauses on a reversal (all axes share that time). Leftover injection is globalized, not ignored |
 | G6 | Tick-level timebase shared by all axes; lost sync is a hard error |
@@ -180,20 +183,105 @@ horizon, and a PC-checkable oracle.
 - Missing trajectory points. Overshoot leaves the *chord*, it does
   not skip or round past a waypoint. Corner-cutting junction
   deviation (`δ`) is a different mechanism and is not a v1 mode.
-- A per-block feedrate `F`. v1 is axis-limit only.
+- **Faithful timed trajectory** (§3.3 problem 2): polyline plus
+  time data, execute that timing or error if not achievable.
+  v1 is problem 1 only (as fast as possible). A per-block
+  feedrate `F` without a feasibility error is also not v1.
 - A `LookaheadTooShort` / feed-hold error when `R < P_stop`.
   Short lookahead is a speed cap (G4), not a fault.
 - Feed holds, jogging, or on-the-fly waypoint edits other than
   “append more blocks” / “end path” / “dwell at rest”.
 - A blended non-zero junction speed at a finite path-angle
-  change (GRBL-style). v1 Linear path-stops; Overshoot prepares
-  per axis via `R`. Smoother `ΔP` junctions are a later overlay.
+  change (GRBL-style). Staying on both chords at a kink at
+  nonzero path speed is not constraint-faithful (the unit
+  tangent jumps; §12.4.1). v1 Linear therefore path-stops;
+  Overshoot prepares per axis via `R` and may leave the chord.
+  Smoother `ΔP` junctions are a later overlay, still G1/G2.
+- A Linear oracle that is faster by **leaving the chord**,
+  cutting a corner, or skipping a vertex. That track is not
+  Linear. Overshoot is the mode that may leave the chord
+  (§12.4.1).
 - A GUI application. gnuplot and HTML are **test artifacts**.
 - A separately compiled FasNAxis translation unit, a virtual axis
   port, or heap-allocated lookahead. The class is a header template
   with member arrays.
 - Isabelle or other machine-checked proofs. Theory is probed by
-  PC tests (todo.md steps 2b–2g / 3b), not a prover.
+  PC tests (todo.md steps 2b–2g / 2ref / 3b), not a prover.
+
+### 3.3 Two planner problems
+
+Same G1/G2/G6, same Linear/Overshoot geometry. Different
+**input** and **error policy**.
+
+| | **(1) As fast as possible — v1** | **(2) Faithful timed — later** |
+|--|--|--|
+| Input | Polyline (waypoints only) | Polyline **plus time and speed at each point** (not Δpos per 1 ms frame; §3.3.1) |
+| Output | The globally fastest constraint-faithful track (§12.4.1) | That same geometry at the **requested** timing, with **near-exact step period** |
+| Too fast | Not a caller error: the planner **chooses** the speed. Short lookahead **slows** the track (G4) | **Error.** If the request is faster than (1)’s track, or would need a/v the motors cannot do smoothly, reject; do not silently slow |
+| Too slow | — (there is no requested time) | Stretch: lengthen periods, still hit vertices, still G2 |
+| PC truth | `naxis_ref.h` **is** the output | `naxis_ref.h` is the **duration bound**; the command stream is also checked for period noise (no 1/2-step hunting) |
+
+(1) and (2) are not two speeds of one API. In (1), infeasible
+speed does not exist. In (2), infeasible time is a hard error
+(`TimingNotAchievable` or equivalent — not `LookaheadTooShort`,
+not a feed-hold). Stretching a feasible slow request is the
+same lengthen-period idea Overshoot already uses on
+non-binding axes.
+
+v1 implements (1). `naxis_ref` is therefore both the v1
+reference output and the later **duration** bound for (2).
+Smoothness of (2) is a second constraint: see §3.3.1.
+
+### 3.3.1 Timed waypoints: control speed, not 1 ms frames
+
+GitHub issue
+[#363](https://github.com/gin66/FastAccelStepper/issues/363)
+is the reference for why (2) is hard. A caller who samples a
+smooth trajectory (Ruckig, quintic, …) as **position every
+1 ms** and feeds `moveTimed(Δsteps, 1 ms)` will **not** get
+that smoothness out of the motors.
+
+Integer steps in a fixed frame quantize the rate. At 1500
+step/s a 1 ms box is 1.5 steps, so the queue alternates
+1 step / 1 ms (1 kHz) and 2 steps / 1 ms (2 kHz). The
+hardware executes that perfectly; the machine hears it as
+noise. The FAS ramp generator is smoother because it does
+**not** time-box commands: it issues a period close to
+`calculate_ticks(P)`, often several steps at that period, and
+fills 10–20 ms ahead. Commands are **step-separated**, not
+1 ms frames.
+
+For (2) the trajectory must provide **speed at position**
+(and time). The feeder turns that into period:
+
+- period `τ` from the speed at that point (ticks/step)
+- if `τ` is short, one command with `steps > 1` at that
+  period (`steps/duration` **is** the speed)
+- if `τ` is long, one step plus pauses so the pulse sits at
+  the right time in the interval — not a step at every frame
+  start (the “start of duration” placement in `moveTimed` is
+  already called out in the FAS source)
+- `actual_duration` is tracked; the next command adapts
+  (drift). A 1 ms request is rarely 1 ms on the tick grid
+- planning covers more than the next millisecond (queue
+  depth, typically 16–32)
+
+Shared tick sum across axes is unchanged (G6). Different
+per-axis periods are fine; starting every axis with a step
+every millisecond is not.
+
+Feasibility for (2) is therefore:
+
+1. Requested duration `≥` `naxis_ref` (a few Δt slack).
+2. Consecutive speeds reachable under `a_max` / `ticks_cfg`
+   (the same envelope as (1)).
+3. Issued periods must not hunt by ~2× every millisecond.
+   A timed path that only works as 1/2-step frames is
+   **not achievable smoothly** — that is an error, not a
+   feeder trick.
+
+Develop (2) on PC against the queue simulator first
+(same advice as in #363). v1 does not implement (2).
 
 ---
 
@@ -214,7 +302,10 @@ FasNAxis would have to form `duration = k * ticks` and then let
 that `/` quantize the period again. Accel is a **changing**
 period; bundling several ramp steps into one duration flattens
 them. The log2 map exists so production never divides to get a
-period. Using `moveTimed` undoes that.
+period. Using `moveTimed` undoes that. Issue
+[#363](https://github.com/gin66/FastAccelStepper/issues/363)
+is the smoothness cost of that second quantizer when the
+caller also time-boxes in 1 ms position frames (§3.3.1).
 
 The FAS ramp generator already feeds the queue with
 `addQueueEntry`. FasNAxis does the same.
@@ -584,8 +675,8 @@ path = chord                       path leaves the chord, still hits p0 and p1
 |--|------------|----------------|
 | Geometry | `p(t)` lies on the chord `p0→p1` (½-step rounding) | `p(t)` may leave the chord; `p(t_start)=p0`, `p(t_end)=p1` |
 | Time-law | One ramp, slaved DDA | One ramp per axis, common `T` |
-| Who binds | Longest `\|Δ\|` first; rebind if a slave would exceed its v/a (§6.3) | Each axis binds on its own remaining steps; `T` is the slowest axis |
-| Non-binding axes | DDA along the chord — scaled **down** relative to the binder | May run *slower* than their ramp (longer period) so they occupy all of `T`; never faster |
+| Who binds | Longest `\|Δ\|` walks DDA; rebind lengthens `ticks_b` if a slave would exceed its v/a (§6.3) | Each axis binds on its own remaining steps; `T` is the slowest axis |
+| Non-binding axes | DDA along the chord — scaled **down** in steps relative to the master; the master may also be scaled down in speed | May run *slower* than their ramp (longer period) so they occupy all of `T`; never faster |
 | Sharp corner | Whole path speed → 0 unless collinear | Only axes that reverse go through 0; continuing axes keep ramp-steps |
 | Typical use | Plotter, laser, exact contour | Faster point-to-point, circles, shallow corners |
 
@@ -593,32 +684,44 @@ One-axis motion is identical in both modes (and matches a FAS
 single-axis ramp of the same `ticks_cfg` / `a` over the same
 remaining steps, within slice quantization).
 
-Path progress `s` is **steps of the binding axis** on the current
-block (0 … `|Δ_bind|`), not a real in `[0,1]`.
+Path progress `s` is **steps of the DDA master** on the current
+block (0 … `|Δ_master|`), not a real in `[0,1]`.
 
 ### 6.3 Linear
 
 Waypoints are connected by straight lines in step space. The
 trajectory stays on the polyline.
 
-**Who sets the speed.** On a block, the axis with the largest
-`|Δ_i|` is the tentative binder: it runs as fast as *its* ramp
-and *its* remaining-steps budget allow. Every other axis is
-**scaled down** to finish in the same time (DDA onto the binder’s
-step count). A shorter axis therefore never runs faster than the
-longest one.
+**Who walks DDA (the master).** On a block, the axis with the
+largest `|Δ_i|` is the DDA master (tie-break: larger `ticks_cfg`,
+the slower motor). It runs a FAS ramp over `|Δ_master|` remaining
+steps. Every other axis is **scaled down** in *step count* to
+finish in the same time (DDA onto the master’s step count).
+Because `|Δ_slave| ≤ |Δ_master|`, each slave takes 0 or 1 step
+per master step, issued `|steps_i| = |Δ_i|`, and the vertex is
+hit. A shorter axis is never the DDA loop bound.
 
-**Unless that is too fast for a slave.** Scaling down is in
-*steps*, not in that slave’s own v/a envelope. If the binder
-coasts at `ticks_b_cfg`, wall-clock for the block is proportional
-to `|Δ_b| * ticks_b`. Slave i needs at least `|Δ_i| * ticks_i_cfg`
+**Who sets the speed (time-law).** Scaling down is in steps, not
+in that slave’s own v/a envelope. If the master coasts at
+`ticks_b_cfg`, wall-clock for the block is proportional to
+`|Δ_b| * ticks_b`. Slave i needs at least `|Δ_i| * ticks_i_cfg`
 at its own max. Integer compare, no division:
 
 ```
 if |Δ_i| * ticks_i_cfg  >  |Δ_b| * ticks_b     // slave would have
                                                  // to go faster than v_i_max
-    binder is too fast; rebind to i (or lengthen ticks_b)
+    master is too fast; lengthen ticks_b
 ```
+
+v1 lengthens the master’s period rather than walking DDA on the
+short axis: `ticks_b' = max ticks_i_cfg` over axes with
+`Δ_i ≠ 0` (integer max, no `/`). Every shared command then
+satisfies every moving-axis envelope. The constraining slave
+“binds” the time-law; the long axis is scaled **down in speed**,
+not in count. Rebinding the DDA loop to a shorter slave would
+issue only `|Δ_slave|` steps on the long axis and miss the
+waypoint (the Step 2e `(20,8)` Y-4× case, and 2g with
+`(4000,8000)`).
 
 Same for acceleration. DDA gives the slave
 `a_i ≈ a_b * |Δ_i| / |Δ_b|`. That exceeds `a_i_max` when:
@@ -628,36 +731,43 @@ a_b * |Δ_i|  >  a_i_max * |Δ_b|
 ```
 
 (`a` stays `log2_accel` in production; the compare is
-`log2_multiply` of those integers.) Then the binder must ramp
-slower — equivalently, treat the slave as binder and scale the
-long-distance axis **down**.
+`log2_multiply` of those integers.) Then the master must ramp
+slower — equivalently, treat the slave as the time-law binder
+and scale the long-distance axis **down in speed**. v1 tests use
+one `a`, so this compare is idle while the DDA master is
+longest. Mixed-`a` is the same lengthen (or a `P` cap), not a
+DDA rebind.
 
 Equal `|Δ|` (45° with identical motors): either axis, tie-break
 on larger `ticks_cfg` (slower motor). Asymmetric motors on a
-near-square diagonal: the *slow* motor binds even if it is not
-the longest distance (F9, F18).
+near-square diagonal: the *slow* motor binds the time-law even
+if it is not the longest distance (F9, F18). F9 equal `|Δ|`:
+slower X is DDA master and time-law, Y scaled down in steps.
+F18 longest X, Y 40× slower: X stays DDA master, Y lengthens
+`ticks_b`, X scaled down in speed; both axes issue full `|Δ|`.
 
-Once the binder is known, it runs the FAS ramp against remaining
+Once the DDA master is known, it runs the FAS ramp (period
+lengthened if a slave constrains the time-law) against remaining
 steps until the next path-stop (§8): a non-collinear vertex, an
 axis reversal, `endPath()`, or the **last buffered waypoint**
 (open path: unknown next angle, last point is rest). Slaves:
 
 ```
 err_i += |Δ_i|
-if 2*err_i >= |Δ_bind|:  step i, err_i -= |Δ_bind|
+if 2*err_i >= |Δ_master|:  step i, err_i -= |Δ_master|
 ```
 
 No division after the block is accepted. The path is the chord
-because every slave step is locked to the binder’s step count.
+because every slave step is locked to the master’s step count.
 
-That lock **is** the path-direction implication: the binder’s `P`
+That lock **is** the path-direction implication: the master’s `P`
 (already capped by `R`) sets every slave’s step rate. A short
-lookahead on the polyline lowers the binder, hence every axis.
+lookahead on the polyline lowers the master, hence every axis.
 
 A path-stop corner (Linear `v = 0`) is any vertex that is not
 collinear in the same sense (§8.5), plus the last buffered point
-while the path is open. Remaining steps for the binder is the
-sum of `|Δ_bind|` over blocks up to that stop.
+while the path is open. Remaining steps for the master is the
+sum of `|Δ_master|` over blocks up to that stop.
 
 ### 6.4 Overshoot
 
@@ -750,8 +860,9 @@ Production (`src/FasNAxis.h` and anything it includes):
 - No `float`, no `double`, no integer `/` on the hot path.
 
 PC tests and `FAS_NAXIS_TRACE` oracles may use double to plot
-steps/s and Euclidean `d(t)`. That code is not in the production
-header.
+steps/s and Euclidean `d(t)`, and the PC reference track of
+§12.4.1 may use double for duration compares. That code is not
+in the production header.
 
 ---
 
@@ -759,6 +870,11 @@ header.
 
 A block is the motion between two consecutive trajectory points.
 Kinematics are the FAS ramp, not a separate `v²/2a` formula.
+“Time-optimal” here is the 1-D FAS law under that block’s `R`
+and `ticks_cfg`. n-axis time-optimal is the shortest track that
+is still **constraint-faithful** for that mode (§12.4.1). A
+faster timing that leaves Linear’s chords is Overshoot (or
+illegal Linear), not a better Linear.
 
 ### 7.1 Ramp-steps ↔ period
 
@@ -811,14 +927,15 @@ taken after the `P` update: first step from rest is
 
 ### 7.2 Linear — one ramp, DDA slaves
 
-The binder of §6.3 (longest `|Δ|`, rebound if a slave would
-exceed v/a) runs §7.1 with `R` = remaining binder-steps until the
-next Linear path-stop (angle change, reversal, last point, or
-`endPath()`). Each planning chunk of `planning_steps`
-(same 2 ms rule FAS uses) is one interpolator slice: one
-`addQueueEntry` on the binder at `calculate_ticks(P)`, DDA slaves
-take 0 or 1 step per binder step, idle axes get a pause of the
-same tick sum. Pause stuffing when `ticks > 65535`.
+The DDA master of §6.3 (longest `|Δ|`; time-law lengthens
+`ticks_b` if a slave would exceed v/a) runs §7.1 with `R` =
+remaining master-steps until the next Linear path-stop (angle
+change, reversal, last point, or `endPath()`). Each planning
+chunk of `planning_steps` (same 2 ms rule FAS uses) is one
+interpolator slice: one `addQueueEntry` on the master at
+`calculate_ticks(P)`, DDA slaves take 0 or 1 step per master
+step, idle axes get a pause of the same tick sum. Pause stuffing
+when `ticks > 65535`.
 
 ### 7.3 Overshoot — ramp per axis, common T
 
@@ -960,15 +1077,17 @@ Integer, no `/`.
 `R_i` is per axis. The motion is a **path**, so one axis’s
 cap limits the others.
 
-**Linear.** One ramp, DDA slaves (§6.3). The binder’s `R`
-is remaining binder-steps to the next path-stop (including
-the last buffered point). Binder `P ≤ R` sets the time-law;
-every slave steps in lock with the binder. Short lookahead
+**Linear.** One ramp, DDA slaves (§6.3). The master’s `R`
+is remaining master-steps to the next path-stop (including
+the last buffered point). Master `P ≤ R` sets the time-law;
+every slave steps in lock with the master. Short lookahead
 on the polyline therefore slows **every** axis, in the
 ratios of `Δ`. Rebind still applies: if a slave would exceed
 its own `ticks_i_cfg` / `a_i_max` under that time-law, that
-slave binds and the long axis is scaled down. The
-lookahead-capped binder period is the `ticks_b` in that
+slave binds the period (`ticks_b` is lengthened) and the
+long axis is scaled down **in speed**. The DDA master stays
+the longest `|Δ|`, so issued `|steps_i| = |Δ_i|`. The
+lookahead-capped master period is the `ticks_b` in that
 compare.
 
 **Overshoot.** Each axis runs §7.1 on its own `R_i`. Segment
@@ -1500,6 +1619,7 @@ src/fas_naxis/*.h
 extras/doc/n_axes_whitepaper.md
 extras/tests/pc_based/
   test_26.cpp                  // FasNAxis suite; Makefile wildcard picks it up
+  naxis_ref.h                  // PC reference track (§12.4.1); not production
   naxis_sim_port.h
   naxis_plot.h                 // gnuplot helper (RampChecker-style)
   naxis_html_dump.h            // FAS_NAXIS_TRACE helper
@@ -1579,7 +1699,106 @@ After a run, from the trace:
    from rest to rest, both modes match `calculate_ticks` of a FAS
    1-D ramp within a few Δt. Overshoot wins on polylines where at
    least one axis *continues* through a vertex (F6, F7):
-   `T_overshoot ≤ T_linear`.
+   `T_overshoot ≤ T_linear`. That is a **geometry** relaxation
+   (leaving the chord is legal in Overshoot), still G1/G2. The
+   PC reference track of §12.4.1 is the duration truth. A
+   faster track that cuts a corner or overspeeds an axis is
+   not a bound; it is infeasible.
+
+### 12.4.1 PC reference track
+
+Any candidate track — including a “fastest” one — is illegal
+unless it is **constraint-faithful**:
+
+- **G1:** every waypoint is hit (integer position equals the
+  vertex at that sample).
+- **G2:** no axis faster than its `ticks_cfg` / `a_max` /
+  `ticks_min`.
+- **G6:** common tick clock.
+- **Mode geometry:** Linear stays on the chords (distance to
+  the polyline `≤ 0.5 √n`); Overshoot `d² ≤ overshoot_max²`
+  and still hits every vertex.
+- **v1 kinematics:** FAS trapezoid (`calculate_ticks(P)`),
+  discrete steps in `{−1,0,1}` per command, `P ≤ R`.
+
+A track that cuts a corner, overspeeds a motor, skips a
+vertex, or (in Linear) leaves the chord is not a faster
+reference. It is not a feasible track.
+
+G3’s time-optimal is the **shortest duration among those
+feasible tracks**, per mode. That globally fastest feasible
+track **is** the PC reference (`naxis_ref.h`). It is not a
+second, looser object, and it is not a replay of interpolator
+fields. Linear and Overshoot have different feasible sets, so
+they have different fastest tracks; each mode’s reference is
+that mode’s global fastest.
+
+This is planner problem **(1)** (§3.3). Problem **(2)** (timed
+polyline) uses the same track as a **lower bound**: a request
+shorter than this duration is an error; a longer request is
+stretched. v1 does not implement (2).
+
+| Mode | Feasible set (on top of G1/G2/G6) | Fastest constraint-faithful track | PC truth? |
+|--|--|--|--|
+| **Linear** | On the chords. At a non-collinear vertex the unit tangent jumps, so path speed must be 0 there (incoming and outgoing chords cannot share a nonzero velocity). Collinear (≤2°, §8.5) may cruise. A reversing axis is at 0. | DDA on longest `\|Δ\|`, `ticks_b` lengthened if a slave would exceed v/a, FAS ramp on remaining master-steps to the next path-stop. This **is** the globally fastest Linear track, and **is** `naxis_ref`. | `naxis_ref.h` (Step 2ref) |
+| **Overshoot** | May leave the chord within `overshoot_max`. Continuing axes need not zero `P`. Reversing / going-idle axes still at 0. | Per-axis FAS ramp over `R_i` (until that axis reverses); `T = max T_opt_i`; slower axes stretch. | Same header, Step 11 |
+
+Linear path-stop at >2° is not extra conservatism relative to
+G1+Linear+finite speed: it is required for a constraint-faithful
+Linear track. A CNC/TOPP timing with nonzero corner speed
+**rounds or cuts** the vertex; that is a different geometry, so
+it is not a Linear bound. “Each motor as fast as it can”
+without DDA lock also leaves the chord: that is uncapped
+Overshoot, not Linear.
+
+**The reference is that fastest track.** PC-only header
+`extras/tests/pc_based/naxis_ref.h` (todo.md Step 2ref). Given
+waypoints + `ticks_cfg` / accel + mode, emit the globally
+fastest feasible per-step trace `{ticks, step[NAXES] in
+{−1,0,1}}` and its total tick sum:
+
+1. Parse `R` as in §8 (end, idle-after-move, sign flip; Linear
+   also stops at non-collinear vertices). Last buffered point
+   is rest (end of path, or open path: next angle unknown, so
+   prepared for reversal). Infinite `HORIZON`.
+2. **Linear:** DDA master = longest `|Δ|`; `ticks_b' = max`
+   moving `ticks_i`; 1-D time-law from `RampCalculator` (never
+   from interpolator `P` fields). Issued `|steps_i| = |Δ_i|`.
+   Concatenate blocks; collinear joints do not rest.
+3. **Overshoot:** `T_opt_i` = duration of axis `i`’s FAS ramp
+   over that block’s `|Δ_i|` with `P_in` / `P_out` from its own
+   `R_i`; `T = max T_opt_i`; non-binding axes lengthen period.
+   (Linear first: Step 2ref. Overshoot `T_opt` with Step 11.)
+4. Envelope: when axis `i` steps, `ticks ≥ ticks_i_cfg`
+   (one-step slack). `P_issued = calculate_ramp_steps(ticks)`
+   on the master’s issued periods; `P_issued ≤ remaining`.
+
+The 1-D law is `RampCalculator`. DDA counts are
+`Remaining::dda_steps`. The interpolator must match this
+trace (log2 / one-step slack of §12.4), not the other way
+around. Named fixtures F1–F19 are regression stories; they
+do not falsify theory if the “reference” reuses planner
+fields.
+
+`double` is allowed here (G10). The production header cannot
+be this generator (no `float`, no `/`). `naxis_ref.h` is not
+included from `src/FasNAxis.h`.
+
+F20 is the long-polyline probe of this reference: a half-circle
+of 1° chords sandwiched in a seeded random walk (several
+hundred waypoints, anisotropic ticks). Rounding the arc
+produces collinear cruise, Y-reversal path-stops, and DDA
+master switches; `P`/`R` are **path steps** (one DDA tick) so a
+master change does not change the ramp-step currency. The
+interpolator must match this trace once it walks N blocks
+(todo Step 2h).
+
+**Mode comparison (still constraint-faithful):** Overshoot with
+`overshoot_max = ∞` is a lower bound on Linear duration only
+because it **relaxes geometry** (leaving the chord is legal),
+not because it relaxes G2. F6/F7: `T_overshoot ≤ T_linear`.
+Linear duration must be `≥` that Overshoot duration. A bound
+that violates G1/G2 does not count.
 
 ### 12.5 Fixture list (minimum)
 
@@ -1595,7 +1814,7 @@ After a run, from the trace:
 | F6b | `(0,0)→(4000,1)→(4000,4000)`, Overshoot | Feasible (`P_y` after 1 step is ≤ 1); vertex hit; cap holds | XY |
 | F7 | Circle r = 1600, 1° chords, Overshoot | Near-constant path speed; X/Y reverse without stopping the other axis; `d²` per chord ≤ cap | XY circle |
 | F8 | 3 axis helix, both modes | HTML 3D overlay of chord vs path; no axis above limits | HTML + gnuplot |
-| F9 | Asymmetric limits `ticks_x = 10*ticks_y`, Linear, equal `\|Δ\|` | X is slower so X binds; Y scaled down | XY |
+| F9 | Asymmetric limits `ticks_x = 10*ticks_y`, Linear, equal `\|Δ\|` | X is slower so X is DDA master and time-law; Y scaled down in steps | XY |
 | F10 | Micro-segments totalling a long line, Linear | `R` sees through them; does not stop at each | v(t) no dips |
 | F11 | Streaming with `R < P_stop`, path open | speed capped by `R`; `pump()` `Running`; `isSpeedLimitedByLookahead()`; `P ≤ R`; cruise after `R` grows | v(t) capped then recovers |
 | F12 | Axis reversal + `dir_after` / `dir_before` | planner issues before (old DIR) + after (new DIR) on all axes; following step has no Injected | event marks |
@@ -1606,14 +1825,17 @@ After a run, from the trace:
 | F15 | Slice would exceed `ticks_min` | Planner rejects / clips at plan time, never `ErrorTicksTooLow` at feed | — |
 | F16 | `addAxis` while ramp active | `addAxis` fails; no race with `manageSteppers` | — |
 | F17 | First fill on empty queue | Not underrun; path completes | — |
-| F18 | Linear `(10000, 9000)`, Y 40× slower | Longest is X but Y would exceed `v_max` if scaled to X; Y binds, X scaled down | XY + v(t) |
+| F18 | Linear `(10000, 9000)`, Y 40× slower | Longest is X (DDA master) but Y would exceed `v_max` if X ran at `ticks_x`; Y lengthens `ticks_b`, X scaled down in speed; both axes issue full `\|Δ\|` | XY + v(t) |
 | F19 | `HORIZON` too small to hold `P_stop` as micro-segments | `addAxis` succeeds; `P` never reaches `P_stop`; same `HORIZON` with one long `addLine` *does* coast | v(t) capped |
+| F20 | Linear, ~300 waypoints: seeded random, half-circle r=1600 1° chords, seeded random; ticks `(4000,8000)` | Globally fastest feasible track (`naxis_ref`): every vertex hit, envelope, `P ≤ R`, both path-stop and collinear-cruise joints, rebind on the arc (DDA master switches; `P`/`R` stay in path steps) | `test_26_f20.gnuplot` |
 
 F7 is the regression sibling of `examples/MoveTimed`. F5 is Linear
 lookahead. F6 / F6b is where `overshoot_max` and `P ≤ \|Δ\|` bite.
 F1 is the identity with `RampCalculator`. F11/F19 are lookahead
 **speed caps** (not errors, not silent starve). F18 is the
-“longest axis too fast for a slave” rebind.
+“longest axis too fast for a slave” time-law rebind (DDA master
+stays the longest `|Δ|`). F20 is the long-polyline probe of the
+globally fastest Linear reference (`naxis_ref.h`).
 
 ### 12.6 FAS adapter tests
 
@@ -1868,7 +2090,7 @@ is test-first on `extras/tests/pc_based`.
 
 | Phase | Delivers | Tests |
 |-------|----------|-------|
-| P0 | `RampCalculator` identity + `R` scan (end or direction change), no queues | F1 planner-only, F10 `R`, F19 speed cap, steps 2b–2g / 3b theory probes |
+| P0 | `RampCalculator` identity + `R` scan (end or direction change), no queues | F1 planner-only, F10 `R`, F19 speed cap, steps 2b–2g / 2ref / 3b theory probes |
 | P1 | Linear DDA + longest-then-rebind + `addQueueEntry` feeder | F1–F3, F5, F9, F12, F14–F18 |
 | P2 | gnuplot dumps (always) + HTML (`FAS_NAXIS_TRACE`) | F5, F8 Linear pages |
 | P3 | Overshoot ramps, `overshoot_max`, continuing-axis corners | F4, F4b, F6, F6b, F7 |
@@ -1889,7 +2111,10 @@ log2 ramp map** (`calculate_ticks(P)`). Lookahead is parsed until
 **end of path or a direction change**; that `R` is the cap on
 ramp-steps (`P ≤ R`). The path direction then implies the other
 axes’ speeds. Short lookahead **reduces speed**, it is not an
-error. Angle changes need motor accel/decel and therefore
+error (planner problem 1: as fast as possible). A later
+faithful-timed mode (problem 2) would take a polyline **plus
+time** and reject a request faster than that feasible track
+(§3.3). Angle changes need motor accel/decel and therefore
 preparation (v1 Linear path-stops; Overshoot prepares per axis).
 Execution is `addQueueEntry` commands with a shared tick sum.
 Reversals are planner-issued before/after DIR pauses plus
@@ -1898,9 +2123,10 @@ Production does not use float or integer division for planning.
 
 Two geometry modes, both hitting every trajectory point:
 
-- **Linear** — the longest-distance axis sets the speed; others
-  scale down, unless that would make a slave exceed its v/a
-  (then that slave binds). DDA on the chords. Path-stop at
+- **Linear** — the longest-distance axis walks DDA; others
+  scale down in steps, unless that would make a slave exceed
+  its v/a (then that slave lengthens `ticks_b` and the long
+  axis scales down in speed). DDA on the chords. Path-stop at
   non-collinear / reversing vertices.
 - **Overshoot** — per-axis ramps, slight chordal bulge capped by
   `overshoot_max`. Continuing axes keep `P` through a vertex;

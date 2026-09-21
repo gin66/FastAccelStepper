@@ -12,7 +12,7 @@ Rules for every step:
    No new `src/*.cpp`.
 3. No `float` / `double` / integer `/` in the production header.
    Period and accel use `log2_value_t` and `RampCalculator`.
-   No Isabelle. Theory is probed in steps 2b–2g and 3b.
+   No Isabelle. Theory is probed in steps 2b–2g, 2ref, and 3b.
 4. Each motion fixture writes `test_26_<id>.gnuplot` the way
    `test_02` writes `test_02_f5.gnuplot` (via a small helper modeled
    on `RampChecker::start_plot` / `finish_plot`). `make clean`
@@ -234,7 +234,8 @@ Still no queues. One committed block: binder runs `RampLaw` on
 
 **Implement:** `src/fas_naxis/linear.h` — one block, no ring, no
 `addQueueEntry`. Emit a per-binder-step trace `{ticks, step[NAXES]
-in {−1,0,1}}`. Reuse `Remaining::binder_axis` and the 2c walker.
+in {−1,0,1}}`. Reuse `Remaining::longest_axis` (DDA master) and
+the 2c walker. Time-law rebind is `ticks_floor`, not a DDA rebind.
 
 **Plot:** `test_26_f2d.gnuplot` — XY of `(20,8)` plus binder
 speed vs time.
@@ -259,9 +260,14 @@ only writes planner fields must fail here.
 - Envelope: every moving command `ticks ≥ ticks_i_cfg` (one-step
   slack, §12.4).
 
-Second hand case: `(20, 8)` with Y 4× slower (integer ticks). Y
-binds (rebind); reconstruction and envelope run on the *new*
-binder; X is DDA-scaled down.
+Second hand case: `(20, 8)` with Y 4× slower (integer ticks).
+Wall-clock rebind would pick Y, but the DDA master stays X
+(longest `|Δ|`). The time-law lengthens `ticks_b` to Y’s
+`ticks_cfg` (`ticks_floor`) so Y never exceeds `v_max`.
+Reconstruction and envelope run on X; issued `|steps|` per axis
+equals `|Δ|` (X is scaled down in speed, not in count). A third
+hand case `(5, 3)` with ticks `(4000, 8000)` is the 2g bite:
+Y wins wall-clock, X stays master and still issues 5 steps.
 
 **Implement:** a trace oracle in `test_26.cpp` (or a helper next
 to it). Production interpolator only needs to record issued
@@ -269,7 +275,93 @@ to it). Production interpolator only needs to record issued
 
 **Plot:** none required.
 
-**Done when:** both hand cases green without reading planner `P`.
+**Done when:** all three hand cases green without reading planner `P`;
+rebind cases still issue `|steps| == |Δ|` on every axis.
+
+---
+
+## Step 2ref — PC reference track (`naxis_ref.h`) ✅
+
+The globally fastest constraint-faithful Linear track **is**
+this reference (whitepaper §12.4.1). Same object as the
+proposal: on the chords, path speed 0 at a non-collinear
+vertex, `RampCalculator` + DDA. Not a second oracle, not a
+replay of `LinearBlock`. A faster trace that leaves the chord
+or misses a vertex is not Linear.
+
+PC-only. `double` allowed. Not production. Not included from
+`src/FasNAxis.h`. Must not read interpolator `P` / `R` fields.
+
+**Test first:** the three 2e hand cases as reference inputs
+(even though 2e already passed on `LinearBlock`):
+
+- issued `|steps_i| == |Δ_i|`; end is the vertex
+- DDA master is longest `|Δ|`; `ticks_floor` lengthens the
+  period when a slow short slave would exceed `v_max`
+- `P_issued = calculate_ramp_steps(ticks)` from
+  `RampCalculator` (the FAS map); `P_issued ≤ remaining`;
+  peak `P_issued < |Δ_master|` on these shorts
+- envelope: when axis `i` steps, `ticks ≥ ticks_i_cfg`
+- the existing 2d/2e interpolator must match this trace
+  within a few Δt (log2 / one-step slack), not the reverse
+
+Also the three 2f polylines, as *reference* traces (2f’s
+interpolator comes next):
+
+| Polyline | Assert |
+|----------|--------|
+| `(5,0)+(0,5)` | vertex `(5,0)` is a sample; `P → 0` there; Y is DDA master after the vertex |
+| `(3,3)+(2,2)` | collinear; end `(5,5)`; no rest at the joint |
+| `(5,0)+(−3,0)` | reversal; `P → 0` at `(5,0)`; then X the other way |
+
+**Implement:** `extras/tests/pc_based/naxis_ref.h`. Linear
+only (Overshoot `T_opt` is Step 11). Infinite `HORIZON`.
+`Remaining` scan + `longest_axis` / `ticks_floor` +
+`RampCalculator` + `dda_steps` / `DdaWalk`. Emit the same
+per-step `{ticks, step[NAXES] in {−1,0,1}}` as `LinearBlock`.
+
+Do **not** copy `LinearBlock` and call it a reference. The 1-D
+law is `RampCalculator` on remaining master-steps; DDA is the
+2c walker.
+
+**Plot:** optional overlay vs 2d on `(20,8)`.
+
+**Also F20** (several hundred waypoints, one polyline):
+
+- Seeded LCG (`seed = 26`): 80 random blocks `|Δ_i| ∈ [1,12]`,
+  then a connecting block to `(1600,0)`, then a half-circle
+  `r = 1600` in 180 chords of 1°, then 80 more random blocks.
+- `ticks = (4000, 8000)`, accel = 2000.
+- Assert: `n_blocks ≥ 200`; every vertex hit; envelope;
+  law `P ≤ R`; reconstructed `P` within a 2-step log2 band;
+  issued `|steps| == |Δ|`; at least one path-stop joint and
+  one collinear-cruise joint.
+- Plot: `test_26_f20.gnuplot`.
+
+On the arc the DDA master switches; `P`/`R` stay in **path
+steps** (one DDA tick per command), not per-axis remaining.
+A 1° rounded chord may be a 90° jog — that is a path-stop,
+not a reason to leave the vertex.
+
+**Done when:** `naxis_ref` emits the globally fastest Linear
+trace on the 2e hand cases, the three 2f rows, and F20,
+without reading interpolator fields. 2f/2g/2h compare the
+interpolator to this file.
+
+**Not this step:** a faster track that leaves the chord, cuts
+a corner, or skips a vertex. That is not Linear (Overshoot
+`T_opt` is Step 11). Nonzero corner speed on a kink is not
+constraint-faithful Linear: the unit tangent jumps. Faithful
+timed trajectory (whitepaper §3.3 problem 2) is not this
+step: `naxis_ref` is the bound, not a timed executor.
+
+**Done:** `extras/tests/pc_based/naxis_ref.h` walks a polyline
+with `RampMap` + `DdaWalk`. `P`/`R` are path steps (one DDA
+tick) so a collinear run may rebind the DDA master. One-block
+traces match `LinearBlock` (2e). Two-block L / collinear /
+reversal hold. F20 (341 blocks, seed 26, ticks 4000/8000):
+vertices, envelope, law `P ≤ R`, recon slack ≤ 2, both
+path-stop and cruise joints. Plot: `test_26_f20.gnuplot`.
 
 ---
 
@@ -290,9 +382,10 @@ rebind per block.
 Issued step sums equal the polyline. Envelope as in 2e. `P ≤ R`
 from issued periods, including at the vertex sample.
 
-**Implement:** extend `linear.h` to a two-block walk. DIR pauses
-are Step 9 (queues); here a reversal is only `P → 0` then the
-other sign.
+**Implement:** extend `linear.h` to a two-block walk. Compare
+the interpolator trace to `naxis_ref.h` (Step 2ref), not to
+planner `P` fields. DIR pauses are Step 9 (queues); here a
+reversal is only `P → 0` then the other sign.
 
 **Plot:** `test_26_f2f.gnuplot` — the L, vertices marked.
 
@@ -322,13 +415,34 @@ On every polyline:
 `|Δ| ≤ 5` is combinatorics (DDA / vertex / `P ≤ R`), not
 coasting. Do not assert `P_stop` cruise here.
 
-**Implement:** enumeration + the 2e/2f oracle. Interpolator must
-stay O(steps) so ~10⁶ polylines finish in a few seconds.
+**Implement:** enumeration + `naxis_ref.h` (Step 2ref) as the
+trace oracle. Interpolator must stay O(steps) so ~10⁶ polylines
+finish in a few seconds.
 
 **Plot:** none (too many). Optional one representative
 `test_26_f2g.gnuplot` if a failure needs a picture.
 
 **Done when:** exhaustive set is green.
+
+---
+
+## Step 2h — N-block interpolator vs F20
+
+`linear.h` still one- or two-block after 2f. This step walks
+an arbitrary polyline and must match `naxis_ref` on F20
+(tick-for-tick within log2 / one-step slack, vertices, envelope).
+
+**Test first:** F20 interpolator trace equals `naxis_ref`
+(same asserts as Step 2ref F20).
+
+**Implement:** generalize `linear.h` to N blocks (collinear
+`P` carries; path-stop resets `P`; `R` is remaining **path**
+steps in the Linear scan). DIR pauses still Step 9.
+
+**Plot:** overlay on `test_26_f20.gnuplot` or
+`test_26_f20_lin.gnuplot`.
+
+**Done when:** interpolator matches `naxis_ref` on F20.
 
 ---
 
@@ -375,9 +489,9 @@ on every axis at every sample (can still stop).
 cross-block `R` → F10 fails; disable rebind → F18 fails;
 disable vertex snap → F5 misses `(1600,0)`.
 
-**Done when:** the trace oracle is green on F1/F5/F10, and the
-three mutations are listed as comments (or `#if` hooks) next
-to those fixtures.
+**Done when:** the trace oracle (`naxis_ref.h` for Linear) is
+green on F1/F5/F10, and the three mutations are listed as
+comments (or `#if` hooks) next to those fixtures.
 
 ---
 
@@ -472,9 +586,10 @@ not underrun) green.
   the side, not in the last slice; every corner is a sample.
 - F9 `ticks_x = 10 * ticks_y` on a 45° line (equal `|Δ|`): X is
   slower so X binds; Y scaled down.
-- F18 `(10000, 9000)` with Y 40× slower: longest is X but Y would
-  exceed `v_max` if scaled to X; Y binds, X scaled down
-  (`|Δ_i|*ticks_i_cfg` compare).
+- F18 `(10000, 9000)` with Y 40× slower: longest is X (DDA
+  master) but Y would exceed `v_max` if X ran at `ticks_x`; Y
+  lengthens `ticks_b`, X scaled down in speed, both axes issue
+  full `|Δ|` (`|Δ_i|*ticks_i_cfg` compare).
 - F10 100-step micro-segments totalling 10000: `R` sees through;
   no rest at each joint (collinear test).
 
@@ -575,7 +690,9 @@ default.
 
 **Implement:** per-axis ramp, `T = max T_opt_i`, stretch by
 **lengthening** period (`log2_divide(log2_T, log2_|Δ|)`), never
-faster than the ramp, no delayed start.
+faster than the ramp, no delayed start. Extend `naxis_ref.h`
+(Step 2ref) with Overshoot `T_opt` so F4/F4b duration is
+compared to that oracle, not to interpolator fields.
 
 **Plots:** `test_26_f4.gnuplot`, `test_26_f4b.gnuplot` — XY with
 chord in grey.
@@ -676,7 +793,7 @@ SimPort-only — prefer one binary unless the link set fights
 |------------|------------------|---------------------------|
 | 1–3 | P0 | log2 + `R` + `P≤R` without queues |
 | 2b | P0 | theory probes (oracle, rebind, collinear, lookahead speed cap, mutations) |
-| 2c–2g | P0 | tiny Linear: DDA walk, one-block, issued-period `P≤R`, two-block, exhaustive |
+| 2c–2h | P0 | tiny Linear + PC reference + F20 long polyline vs interpolator |
 | 3b | P0 | trace stoppability on F1/F5/F10 |
 | 4–9 | P1 | Linear through `addQueueEntry`; F18 rebind |
 | 10 | P2 | gnuplot always; HTML optional |
@@ -696,5 +813,16 @@ same change as the test.
 - simavr / hardware / PlatformIO jobs for FasNAxis
 - Cubic start (`s_h`) overlay
 - Per-block feedrate `F`
+- Faithful timed trajectory (whitepaper §3.3 problem 2 /
+  §3.3.1, GitHub #363): polyline plus **speed at position**,
+  execute or `TimingNotAchievable`. Not Δpos per 1 ms frame
+  (`moveTimed(Δ, 1 ms)` hunts 1 kHz/2 kHz). v1 is as-fast-as-
+  possible only; `naxis_ref` is the duration bound; smoothness
+  is a second check (near-exact period, step-separated
+  commands)
 - Inverse kinematics
 - Running `pump()` from `manageSteppers()`
+- A Linear oracle that is faster by leaving the chord, cutting
+  a corner, or skipping a vertex (not constraint-faithful;
+  whitepaper §12.4.1). Overshoot is the mode that may leave
+  the chord.

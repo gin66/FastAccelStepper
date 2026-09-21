@@ -25,6 +25,8 @@
 // Compile-time hook (Step 2b mutation probe) proves the theory fails on a
 // wrong model:
 //   FAS_NAXIS_NO_REBIND  -> binder_axis is longest-distance only (drops ticks)
+// binder_axis is the time-law oracle (wall-clock). The interpolator DDA
+// master is longest_axis; ticks_floor lengthens the master's period.
 // Remaining-to-standstill is the ramp law (FAS_NAXIS_NO_REST_CAP lives in
 // ramp_law.h).
 class Remaining {
@@ -159,12 +161,58 @@ class Remaining {
   // same inputs. Integer compare only (no integer division in the binder
   // selection).
 
-  // Section 6.3 binder: the axis that would take the longest wall-clock at its
-  // own max speed, i.e. argmax over i of |delta_i| * ticks_i. "Longest
-  // |delta| first" when ticks are equal; "rebind if |delta_i|*ticks_i >
-  // |delta_b|*ticks_b" when a slow slave dominates. FAS_NAXIS_NO_REBIND drops
-  // the ticks factor (longest-distance only) so the rebind neighbourhood
-  // (item 3 of Step 2b) fails when the model is wrong.
+  // Section 6.3 DDA master: longest |delta|, tie-break on larger ticks_cfg
+  // (the slower motor). This is the interpolator loop bound. A shorter axis
+  // is never the master: DDA slaves take 0 or 1 step per master step, and
+  // issued |steps_i| equals |delta_i| (the vertex is hit). Time-law rebind
+  // does not change this axis; it lengthens ticks_b (ticks_floor).
+  static int longest_axis(const int32_t* block, const uint32_t* ticks,
+                          int n_axes) {
+    int b = 0;
+    int32_t best_ad = -1;
+    uint32_t best_t = 0;
+    for (int i = 0; i < n_axes; i++) {
+      int32_t ad = block[i] > 0 ? block[i] : -block[i];
+      if (ad == 0) {
+        continue;
+      }
+      uint32_t t = ticks ? ticks[i] : 0;
+      if (ad > best_ad || (ad == best_ad && t > best_t)) {
+        best_ad = ad;
+        best_t = t;
+        b = i;
+      }
+    }
+    return b;
+  }
+
+  // Section 6.3 time-law floor: max ticks_i_cfg over axes with delta_i != 0.
+  // Integer max, no division. Every shared command then satisfies every
+  // moving axis envelope (ticks >= ticks_i_cfg). When a slow short slave
+  // would lose the wall-clock compare, this lengthens the master's period
+  // ("lengthen ticks_b") instead of walking DDA on the short axis.
+  static uint32_t ticks_floor(const int32_t* block, const uint32_t* ticks,
+                              int n_axes) {
+    uint32_t t = 0;
+    for (int i = 0; i < n_axes; i++) {
+      if (block[i] == 0) {
+        continue;
+      }
+      if (ticks[i] > t) {
+        t = ticks[i];
+      }
+    }
+    return t;
+  }
+
+  // Section 6.3 time-law oracle: the axis that would take the longest
+  // wall-clock at its own max speed, i.e. argmax over i of |delta_i| *
+  // ticks_i. "Longest |delta| first" when ticks are equal; "rebind if
+  // |delta_i|*ticks_i > |delta_b|*ticks_b" when a slow slave dominates.
+  // This names who constrains the period, not who walks DDA (that is
+  // longest_axis). FAS_NAXIS_NO_REBIND drops the ticks factor
+  // (longest-distance only) so the rebind neighbourhood (item 3 of Step
+  // 2b) fails when the model is wrong.
   static int binder_axis(const int32_t* block, const uint32_t* ticks,
                          int n_axes) {
     int b = 0;

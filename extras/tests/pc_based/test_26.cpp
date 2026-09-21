@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <math.h>
+
 #include "fas_arch/test_pc.h"  // test() macro
 #include "fas_naxis/dda.h"
 #include "fas_naxis/linear.h"
@@ -20,6 +22,7 @@
 #include "fas_naxis/ramp_map.h"
 #include "fas_naxis/remaining.h"
 #include "naxis_plot.h"
+#include "naxis_ref.h"
 
 // The normal test_% rule links LIB_O (FastAccelStepper.o), which references the
 // PC interrupt hooks below. The other tests define these; Step 15's real-queue
@@ -433,10 +436,16 @@ void f2b_oracle() {
     test(Remaining::dda_steps(block[binder], block[0]) == 100,
          "F2b item1 DDA X (binder) issues 100 steps");
     // Rebind concept: with Y 4x slower (ticks 1600), Y's wall-clock
-    // |dy|*ticks_y (50*1600) beats X's (100*400), so Y binds.
+    // |dy|*ticks_y (50*1600) beats X's (100*400), so Y binds the
+    // time-law. DDA master stays X (longest |delta|); ticks_floor is
+    // Y's period (lengthen ticks_b), not a DDA rebind onto 50 steps.
     uint32_t ticks_slow[2] = {400, 1600};
     int binder_slow = Remaining::binder_axis(block, ticks_slow, 2);
     test(binder_slow == 1, "F2b item1 slow Y binds by wall-clock (rebind)");
+    test(Remaining::longest_axis(block, ticks_slow, 2) == 0,
+         "F2b item1 DDA master stays longest X");
+    test(Remaining::ticks_floor(block, ticks_slow, 2) == 1600,
+         "F2b item1 ticks_floor is the slow slave");
     // P <= R on the binder: a short R is remaining-to-stop, so the live
     // ramp must brake (peak P < R), not a precomputed min(P_stop, R/2).
     int32_t R = 30;
@@ -1005,39 +1014,46 @@ void f2d_linear_one_block() {
 // P<=R and envelope checks. Remaining after k binder steps is |delta_bind|-k
 // (the last buffered point is rest, section 8.1).
 //
-// Checks on the (20,8) trace:
-//  - P_issued <= remaining at every moving sample (P <= R from issued periods);
-//  - peak P_issued < |delta_bind| (live remaining-to-stop on this short block);
-//  - envelope: every moving command ticks >= ticks_cfg (one-step slack, 12.4);
-//  - slave step sums equal |delta| (DDA down-scaling on the new binder).
+// Checks on every hand case:
+//  - DDA master is longest |delta| (never a shorter axis);
+//  - issued |steps| per axis equals |delta| (vertex hit);
+//  - P_issued <= remaining at every moving sample;
+//  - peak P_issued < |delta_master| (live remaining-to-stop on these shorts);
+//  - envelope: when axis i steps, ticks >= ticks_i_cfg (one-step slack, 12.4).
 //
-// Second hand case: (20,8) with Y 4x slower (ticks_y = 16000, integer ticks).
-// Y wins the section 6.3 rebind and binds; X is DDA-scaled down to 8 steps
-// over Y's 8 binder steps. Reconstruction and the envelope run on the new
-// binder (Y at ticks_y).
+// Rebind hand cases (Y slower, wall-clock |dy|*ticks_y > |dx|*ticks_x):
+// Y constrains the time-law (ticks_floor = ticks_y) but X stays DDA master.
+// X is scaled down in speed, not in count -- walking DDA on Y would issue
+// only |dy| steps of X and miss the vertex (the 2g (4000,8000) bite).
 void f2e_issued_periods() {
   struct Case {
     const char* name;
     int32_t dx, dy;
     uint32_t ticks_x, ticks_y;
-    int expect_binder;
+    int expect_master;
+    int expect_time_binder;
   };
   Case cases[] = {
-      {"(20,8) X binds (equal ticks)", 20, 8, 4000, 4000, 0},
-      {"(20,8) Y binds (Y 4x slower)", 20, 8, 4000, 16000, 1},
+      {"(20,8) X binds (equal ticks)", 20, 8, 4000, 4000, 0, 0},
+      {"(20,8) Y 4x slower", 20, 8, 4000, 16000, 0, 1},
+      {"(5,3) Y 2x slower (2g bite)", 5, 3, 4000, 8000, 0, 1},
   };
-  for (int c = 0; c < 2; c++) {
+  for (int c = 0; c < 3; c++) {
     const Case& cs = cases[c];
     int32_t d[2] = {cs.dx, cs.dy};
     uint32_t ticks[2] = {cs.ticks_x, cs.ticks_y};
-    RampMap map(ticks[cs.expect_binder], 2000);  // the binder's own map
-    uint32_t ticks_cfg = ticks[cs.expect_binder];
+    uint32_t t_floor = Remaining::ticks_floor(d, ticks, 2);
+    int time_binder = Remaining::binder_axis(d, ticks, 2);
+    RampMap map(t_floor, 2000);
     LinearBlock block(4000, 2000, 2, d, ticks);
     char msg[80];
-    snprintf(msg, sizeof(msg), "2e binder for %s", cs.name);
-    test(block.binder == cs.expect_binder, msg);
+    snprintf(msg, sizeof(msg), "2e DDA master for %s", cs.name);
+    test(block.binder == cs.expect_master, msg);
+    snprintf(msg, sizeof(msg), "2e time-law binder for %s", cs.name);
+    test(time_binder == cs.expect_time_binder, msg);
+    test(block.law.ticks_cfg == t_floor, "2e time-law is ticks_floor");
 
-    uint32_t N = block.law.R;  // |delta_bind|
+    uint32_t N = block.law.R;  // |delta_master|
     int32_t issued[2] = {0, 0};
     uint32_t peak_issued = 0;
     int moving = 0;
@@ -1050,63 +1066,348 @@ void f2e_issued_periods() {
       issued[0] += step_out[0];
       issued[1] += step_out[1];
       uint32_t p_issued = map.calculate_ramp_steps(ticks_issued);
-      bool rest = (ticks_issued == ticks_cfg);  // last step: P==0 -> P_coast
+      bool rest = (ticks_issued == t_floor);  // last step: P==0 -> P_coast
       if (rest) {
         // Standstill marker (period() at P==0). Excluded from P<=R / envelope;
         // its reconstruction is the coast position P_coast, not a moving P.
-        test(map.calculate_ramp_steps(ticks_cfg) == map.P_coast(),
+        test(map.calculate_ramp_steps(t_floor) == map.P_coast(),
              "2e last record reconstructs to P_coast");
       } else {
         moving++;
-        uint32_t remaining = N - (uint32_t)k;  // |delta_bind| - k, k before
+        uint32_t remaining = N - (uint32_t)k;  // |delta_master| - k, k before
         if (p_issued > remaining) {
           ok_p_le_r = false;
         }
         if (p_issued > peak_issued) {
           peak_issued = p_issued;
         }
-        if (ticks_issued < ticks_cfg) {  // envelope: one-step slack
+        // Per-axis envelope: a command that steps axis i must not be faster
+        // than ticks_i_cfg (shared tick sum, one-step slack of 12.4).
+        if (step_out[0] != 0 && ticks_issued < ticks[0]) {
+          ok_envelope = false;
+        }
+        if (step_out[1] != 0 && ticks_issued < ticks[1]) {
           ok_envelope = false;
         }
       }
       k++;
     }
-    // P <= R from issued periods on every moving sample.
     snprintf(msg, sizeof(msg), "2e P_issued <= remaining for %s", cs.name);
     test(ok_p_le_r, msg);
-    // Peak P_issued < |delta_bind| (live remaining-to-stop, short block).
-    test(peak_issued < N, "2e peak P_issued < |delta_bind|");
-    // Envelope: every moving command ticks >= ticks_cfg.
-    test(ok_envelope, "2e envelope ticks >= ticks_cfg");
-    // Second hand case: (20,8) with Y 4x slower (ticks_y = 16000, integer
-    // ticks). Y wins the section 6.3 rebind and binds. Reconstruction and the
-    // envelope run on the new binder (Y at ticks_y). NOTE (v1): Y binds over
-    // its own 8 steps, so X is DDA-scaled down onto 8 binder steps -- the short
-    // axis (Y) determines the binder loop, which the whitepaper flags as an
-    // open item ("treat the slave as binder and scale the long-distance axis
-    // down" is not wired in one block yet). This case therefore asserts that Y
-    // binds and the reconstruction holds; the X short-count is a documented
-    // gap, not asserted as correct. The equal-ticks case below (X binds,
-    // longest |delta|) is the clean reconstruction.
-    if (cs.expect_binder == 0) {
-      // Clean case: X binds (longest |delta|, equal ticks); issued |steps|
-      // per axis equal |delta|.
-      int32_t ix = issued[0] > 0 ? issued[0] : -issued[0];
-      int32_t iy = issued[1] > 0 ? issued[1] : -issued[1];
-      int32_t ex = cs.dx > 0 ? cs.dx : -cs.dx;
-      int32_t ey = cs.dy > 0 ? cs.dy : -cs.dy;
-      test(ix == ex && iy == ey, "2e issued |steps| per axis == |delta|");
-    } else {
-      // Rebind case: Y binds; X is DDA-scaled onto Y's binder loop. Assert
-      // the rebind happened (Y is the binder) and that Y's reconstruction held.
-      test(block.binder == 1, "2e rebind: slow slave Y binds");
-      int32_t iy = issued[1] > 0 ? issued[1] : -issued[1];
-      test(iy == 8, "2e rebind: Y (binder) issues |delta_y| steps");
-    }
-    printf("F2e %s: binder=%d N=%u peak_P_issued=%u moving=%d\n", cs.name,
-           block.binder, N, peak_issued, moving);
+    test(peak_issued < N, "2e peak P_issued < |delta_master|");
+    test(ok_envelope, "2e envelope ticks >= ticks_i_cfg");
+    int32_t ix = issued[0] > 0 ? issued[0] : -issued[0];
+    int32_t iy = issued[1] > 0 ? issued[1] : -issued[1];
+    int32_t ex = cs.dx > 0 ? cs.dx : -cs.dx;
+    int32_t ey = cs.dy > 0 ? cs.dy : -cs.dy;
+    snprintf(msg, sizeof(msg), "2e issued |steps| == |delta| for %s", cs.name);
+    test(ix == ex && iy == ey, msg);
+    printf(
+        "F2e %s: master=%d time_binder=%d N=%u peak_P=%u moving=%d "
+        "issued=(%d,%d)\n",
+        cs.name, block.binder, time_binder, N, peak_issued, moving, issued[0],
+        issued[1]);
   }
   printf("F2e issued-period reconstruction: hand cases green\n");
+}
+
+static int32_t iround(double x) {
+  return (int32_t)(x >= 0.0 ? x + 0.5 : x - 0.5);
+}
+
+static uint32_t lcg_next(uint32_t* s) {
+  *s = *s * 1664525u + 1013904223u;
+  return *s;
+}
+
+static int32_t irand_inc(uint32_t* s, int32_t lo, int32_t hi) {
+  uint32_t span = (uint32_t)(hi - lo + 1);
+  return lo + (int32_t)(lcg_next(s) % span);
+}
+
+static void push_block(int32_t blocks[][2], int* n_blocks, int32_t* posx,
+                       int32_t* posy, int32_t dx, int32_t dy) {
+  if (dx == 0 && dy == 0) {
+    return;
+  }
+  blocks[*n_blocks][0] = dx;
+  blocks[*n_blocks][1] = dy;
+  *posx += dx;
+  *posy += dy;
+  (*n_blocks)++;
+}
+
+// Walk the Linear reference. Reconstruct P from issued periods (never from
+// NaxisRefLinear.P). At each block end, store the last moving P_issued.
+static void ref_walk_polyline(Remaining* rem, const uint32_t* ticks,
+                              uint32_t accel, int32_t* end_pos, int32_t* issued,
+                              bool* envelope_ok, bool* p_le_r_ok,
+                              uint32_t* vertex_p, int* n_vertex, int max_vertex,
+                              NaxisPlot* plot, uint32_t* recon_slack) {
+  NaxisRefLinear ref(rem, ticks, accel);
+  int32_t pos[2] = {0, 0};
+  issued[0] = 0;
+  issued[1] = 0;
+  *envelope_ok = true;
+  *p_le_r_ok = true;
+  *n_vertex = 0;
+  uint32_t last_moving_p = 0;
+  uint32_t slack = 0;
+  if (plot) {
+    double z[2] = {0.0, 0.0};
+    plot->row(0.0, 0.0, 0.0, 0.0, z, z, z, z);
+  }
+  while (!ref.done()) {
+    int step_out[2];
+    uint32_t ticks_issued = ref.step(step_out);
+    uint32_t t_law = ref.ticks_law;
+    uint32_t R_before = ref.R_before_cmd;
+    issued[0] += step_out[0];
+    issued[1] += step_out[1];
+    pos[0] += step_out[0];
+    pos[1] += step_out[1];
+    RampMap map(t_law, accel);
+    uint32_t p_issued = map.calculate_ramp_steps(ticks_issued);
+    bool rest = (ticks_issued == t_law);
+    if (!rest) {
+      // calculate_ramp_steps o calculate_ticks may land one step high
+      // (log2 inverse, section 12.4 one-step slack).
+      if (ref.P > R_before) {
+        *p_le_r_ok = false;
+      }
+      if (p_issued > R_before) {
+        uint32_t d = p_issued - R_before;
+        if (d > slack) {
+          slack = d;
+        }
+      }
+      last_moving_p = p_issued;
+      if (step_out[0] != 0 && ticks_issued < ticks[0]) {
+        *envelope_ok = false;
+      }
+      if (step_out[1] != 0 && ticks_issued < ticks[1]) {
+        *envelope_ok = false;
+      }
+    }
+    if (plot) {
+      double t = (double)ref.total_ticks / NAXIS_PLOT_TICKS_PER_S;
+      double v = (p_issued == 0 || rest)
+                     ? 0.0
+                     : NAXIS_PLOT_TICKS_PER_S / (double)ticks_issued;
+      double speed[2] = {ref.master == 0 ? v : 0.0, ref.master == 1 ? v : 0.0};
+      double Pcol[2] = {ref.master == 0 ? (double)p_issued : 0.0,
+                        ref.master == 1 ? (double)p_issued : 0.0};
+      double Rcol[2] = {ref.master == 0 ? (double)ref.R : 0.0,
+                        ref.master == 1 ? (double)ref.R : 0.0};
+      double tickscol[2] = {ref.master == 0 ? (double)ticks_issued : 0.0,
+                            ref.master == 1 ? (double)ticks_issued : 0.0};
+      plot->row(t, (double)pos[0], (double)pos[1], 0.0, speed, Pcol, Rcol,
+                tickscol);
+    }
+    if (ref.dda.done()) {
+      if (*n_vertex < max_vertex) {
+        vertex_p[*n_vertex] = last_moving_p;
+      }
+      (*n_vertex)++;
+      last_moving_p = 0;
+    }
+  }
+  end_pos[0] = pos[0];
+  end_pos[1] = pos[1];
+  if (recon_slack) {
+    *recon_slack = slack;
+  }
+}
+
+// Step 2ref: globally fastest constraint-faithful Linear track. One-block
+// traces match LinearBlock (2e). Two-block rows of 2f hold on the reference.
+// F20 is the long polyline (half-circle with seeded random before/after).
+void f2ref_reference() {
+  const uint32_t accel = 2000;
+  struct One {
+    const char* name;
+    int32_t dx, dy;
+    uint32_t tx, ty;
+  };
+  One ones[] = {
+      {"(20,8) equal ticks", 20, 8, 4000, 4000},
+      {"(20,8) Y 4x slower", 20, 8, 4000, 16000},
+      {"(5,3) Y 2x slower", 5, 3, 4000, 8000},
+  };
+  for (int c = 0; c < 3; c++) {
+    int32_t d[2] = {ones[c].dx, ones[c].dy};
+    uint32_t ticks[2] = {ones[c].tx, ones[c].ty};
+    LinearBlock block(4000, accel, 2, d, ticks);
+    Remaining rem(2, 1);
+    rem.set_block(0, d);
+    NaxisRefLinear ref(&rem, ticks, accel);
+    char msg[80];
+    while (!block.done() && !ref.done()) {
+      int a[2], b[2];
+      uint32_t ta = block.step(a);
+      uint32_t tb = ref.step(b);
+      test(ta == tb, "2ref one-block ticks match LinearBlock");
+      test(a[0] == b[0] && a[1] == b[1],
+           "2ref one-block steps match LinearBlock");
+    }
+    snprintf(msg, sizeof(msg), "2ref %s both done together", ones[c].name);
+    test(block.done() && ref.done(), msg);
+  }
+  printf("F2ref one-block identity with LinearBlock green\n");
+
+  struct Two {
+    const char* name;
+    int32_t a0, a1, b0, b1;
+    bool path_stop_joint;
+    int master1;
+  };
+  Two twos[] = {
+      {"(5,0)+(0,5) L", 5, 0, 0, 5, true, 1},
+      {"(3,3)+(2,2) collinear", 3, 3, 2, 2, false, 0},
+      {"(5,0)+(-3,0) reversal", 5, 0, -3, 0, true, 0},
+  };
+  uint32_t ticks_eq[2] = {4000, 4000};
+  for (int c = 0; c < 3; c++) {
+    Remaining rem(2, 2);
+    int32_t d0[2] = {twos[c].a0, twos[c].a1};
+    int32_t d1[2] = {twos[c].b0, twos[c].b1};
+    rem.set_block(0, d0);
+    rem.set_block(1, d1);
+    int32_t end_pos[2], issued[2];
+    bool env = true, plr = true;
+    uint32_t vp[8];
+    int nv = 0;
+    ref_walk_polyline(&rem, ticks_eq, accel, end_pos, issued, &env, &plr, vp,
+                      &nv, 8, NULL, NULL);
+    char msg[80];
+    snprintf(msg, sizeof(msg), "2ref %s envelope", twos[c].name);
+    test(env, msg);
+    snprintf(msg, sizeof(msg), "2ref %s P_issued <= R", twos[c].name);
+    test(plr, msg);
+    test(issued[0] == twos[c].a0 + twos[c].b0 &&
+             issued[1] == twos[c].a1 + twos[c].b1,
+         "2ref two-block issued == polyline");
+    test(end_pos[0] == issued[0] && end_pos[1] == issued[1],
+         "2ref two-block end is last vertex");
+    test(nv >= 2, "2ref two-block has a vertex sample per block");
+    if (twos[c].path_stop_joint) {
+      test(vp[0] <= 1, "2ref path-stop joint last moving P_issued <= 1");
+    } else {
+      test(vp[0] > 1, "2ref collinear joint does not rest");
+    }
+    printf("F2ref %s: vertices=%d joint_P=%u end=(%d,%d)\n", twos[c].name, nv,
+           vp[0], end_pos[0], end_pos[1]);
+    (void)twos[c].master1;
+  }
+  printf("F2ref two-block path-stop/collinear/reversal green\n");
+}
+
+// F20: several hundred waypoints — seeded random, half-circle, seeded random
+// — so the globally fastest Linear reference hits collinear cruise, Y-reversal
+// path-stop on the arc, rebind (ticks 4000/8000), idle-free kinks, and a long
+// connecting block. Constraint-faithful: vertices, envelope, P<=R,
+// |steps|==|Δ|.
+void f20_long_polyline() {
+  const uint32_t accel = 2000;
+  const uint32_t ticks[2] = {4000, 8000};
+  const int32_t r = 1600;
+  const int n_arc = 180;
+  const int n_rand = 80;
+  int32_t blocks[400][2];
+  int n_blocks = 0;
+  uint32_t rng = 26;
+  int32_t posx = 0;
+  int32_t posy = 0;
+
+  for (int i = 0; i < n_rand; i++) {
+    int32_t dx = 0;
+    int32_t dy = 0;
+    while (dx == 0 && dy == 0) {
+      dx = irand_inc(&rng, -12, 12);
+      dy = irand_inc(&rng, -12, 12);
+    }
+    push_block(blocks, &n_blocks, &posx, &posy, dx, dy);
+  }
+  push_block(blocks, &n_blocks, &posx, &posy, r - posx, 0 - posy);
+
+  int32_t ax = r;
+  int32_t ay = 0;
+  for (int i = 1; i <= n_arc; i++) {
+    double th = 3.14159265358979323846 * (double)i / (double)n_arc;
+    int32_t x = iround((double)r * cos(th));
+    int32_t y = iround((double)r * sin(th));
+    push_block(blocks, &n_blocks, &posx, &posy, x - ax, y - ay);
+    ax = x;
+    ay = y;
+  }
+
+  for (int i = 0; i < n_rand; i++) {
+    int32_t dx = 0;
+    int32_t dy = 0;
+    while (dx == 0 && dy == 0) {
+      dx = irand_inc(&rng, -12, 12);
+      dy = irand_inc(&rng, -12, 12);
+    }
+    push_block(blocks, &n_blocks, &posx, &posy, dx, dy);
+  }
+
+  test(n_blocks >= 200, "F20 several hundred waypoints");
+  Remaining rem(2, n_blocks);
+  int32_t sum[2] = {0, 0};
+  for (int b = 0; b < n_blocks; b++) {
+    rem.set_block(b, blocks[b]);
+    sum[0] += blocks[b][0];
+    sum[1] += blocks[b][1];
+  }
+  rem.horizon = 0xFFFFFFFFU;
+
+  NaxisPlot plot;
+  plot.start_plot("f20", "FasNAxis F20 half-circle + random", 2);
+  plot.poly_point(0.0, 0.0);
+  {
+    int32_t wx = 0, wy = 0;
+    for (int b = 0; b < n_blocks; b++) {
+      wx += blocks[b][0];
+      wy += blocks[b][1];
+      plot.poly_point((double)wx, (double)wy);
+    }
+  }
+  plot.poly_done();
+
+  int32_t end_pos[2], issued[2];
+  bool env = true, plr = true;
+  uint32_t vp[512];
+  int nv = 0;
+  uint32_t recon_slack = 0;
+  ref_walk_polyline(&rem, ticks, accel, end_pos, issued, &env, &plr, vp, &nv,
+                    512, &plot, &recon_slack);
+  plot.finish_plot();
+
+  test(env, "F20 envelope ticks >= ticks_i_cfg");
+  test(plr, "F20 law P <= R_before");
+  test(recon_slack <= 2, "F20 reconstructed P within 2-step log2 band of R");
+  test(issued[0] == sum[0] && issued[1] == sum[1],
+       "F20 issued |steps| == polyline");
+  test(end_pos[0] == sum[0] && end_pos[1] == sum[1],
+       "F20 end position is last vertex");
+  test(nv == n_blocks, "F20 a vertex sample at every waypoint");
+
+  int n_stop = 0;
+  int n_cruise = 0;
+  for (int i = 0; i < nv - 1; i++) {
+    if (vp[i] <= 1) {
+      n_stop++;
+    } else {
+      n_cruise++;
+    }
+  }
+  test(n_stop >= 1, "F20 has a Linear path-stop joint");
+  test(n_cruise >= 1, "F20 has a collinear cruise joint");
+  printf(
+      "F20 blocks=%d vertices=%d stop_joints=%d cruise_joints=%d "
+      "recon_slack=%u end=(%d,%d)\n",
+      n_blocks, nv, n_stop, n_cruise, recon_slack, end_pos[0], end_pos[1]);
+  printf("F20 long polyline plot written: test_26_f20.gnuplot\n");
 }
 
 int main() {
@@ -1119,6 +1420,8 @@ int main() {
   f3_ramp();
   f2d_linear_one_block();
   f2e_issued_periods();
+  f2ref_reference();
+  f20_long_polyline();
   printf("TEST_26 PASSED\n");
   return 0;
 }

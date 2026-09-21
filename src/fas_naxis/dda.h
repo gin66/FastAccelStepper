@@ -5,11 +5,13 @@
 
 // FasNAxis Linear DDA walk (whitepaper section 6.3).
 //
-// The binder is the axis that runs the FAS ramp (longest |delta|, rebind per
-// the section 6.3 ticks rule in Remaining::binder_axis). Every slave is scaled
-// down to the binder's step count: err_i += |delta_i|; when 2*err_i >=
-// |delta_bind| the slave steps (and err_i -= |delta_bind|). The path is the
-// chord because each slave step is locked to a binder step.
+// The DDA master is the longest |delta| (Remaining::longest_axis). Time-law
+// rebind lengthens that master's period; it does not make a shorter axis the
+// loop bound. Every slave is scaled down to the master's step count: err_i +=
+// |delta_i|; when 2*err_i >= |delta_bind| the slave steps (and err_i -=
+// |delta_bind|). The path is the chord because each slave step is locked to a
+// master step, and |delta_slave| <= |delta_bind| so the slave takes 0 or 1
+// step per master step and issued |steps| equals |delta|.
 //
 // This header *walks* that error accumulator one binder step at a time (Step
 // 2c). Each binder step issues 0 or 1 step per axis (never 2): the binder
