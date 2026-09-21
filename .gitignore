@@ -1,5 +1,6 @@
 *.swp
 *.o
+*.gnuplot
 .pio
 .dir
 .tested

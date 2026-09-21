@@ -1146,7 +1146,8 @@ static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
                           uint32_t accel, int32_t* end_pos, int32_t* issued,
                           bool* envelope_ok, bool* p_le_r_ok,
                           uint32_t* vertex_p, int* n_vertex, int max_vertex,
-                          NaxisPlot* plot, uint32_t* recon_slack) {
+                          NaxisPlot* plot, uint32_t* recon_slack,
+                          int32_t* vertex_pos) {
   int32_t pos[2] = {0, 0};
   issued[0] = 0;
   issued[1] = 0;
@@ -1209,6 +1210,10 @@ static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
     if (ref.dda.done()) {
       if (*n_vertex < max_vertex) {
         vertex_p[*n_vertex] = last_moving_p;
+        if (vertex_pos) {
+          vertex_pos[2 * *n_vertex] = pos[0];
+          vertex_pos[2 * *n_vertex + 1] = pos[1];
+        }
       }
       (*n_vertex)++;
       last_moving_p = 0;
@@ -1226,10 +1231,11 @@ static void ref_walk_polyline(Remaining* rem, const uint32_t* ticks,
                               uint32_t accel, int32_t* end_pos, int32_t* issued,
                               bool* envelope_ok, bool* p_le_r_ok,
                               uint32_t* vertex_p, int* n_vertex, int max_vertex,
-                              NaxisPlot* plot, uint32_t* recon_slack) {
+                              NaxisPlot* plot, uint32_t* recon_slack,
+                              int32_t* vertex_pos) {
   NaxisRefLinear ref(rem, ticks, accel);
   walk_polyline(ref, rem, ticks, accel, end_pos, issued, envelope_ok, p_le_r_ok,
-                vertex_p, n_vertex, max_vertex, plot, recon_slack);
+                vertex_p, n_vertex, max_vertex, plot, recon_slack, vertex_pos);
 }
 
 // Step 2ref: globally fastest constraint-faithful Linear track. One-block
@@ -1291,7 +1297,7 @@ void f2ref_reference() {
     uint32_t vp[8];
     int nv = 0;
     ref_walk_polyline(&rem, ticks_eq, accel, end_pos, issued, &env, &plr, vp,
-                      &nv, 8, NULL, NULL);
+                      &nv, 8, NULL, NULL, NULL);
     char msg[80];
     snprintf(msg, sizeof(msg), "2ref %s envelope", twos[c].name);
     test(env, msg);
@@ -1315,23 +1321,20 @@ void f2ref_reference() {
   printf("F2ref two-block path-stop/collinear/reversal green\n");
 }
 
-// F20: several hundred waypoints — seeded random, half-circle, seeded random
-// — so the globally fastest Linear reference hits collinear cruise, Y-reversal
-// path-stop on the arc, rebind (ticks 4000/8000), idle-free kinks, and a long
-// connecting block. Constraint-faithful: vertices, envelope, P<=R,
-// |steps|==|Δ|.
-void f20_long_polyline() {
-  const uint32_t accel = 2000;
-  const uint32_t ticks[2] = {4000, 8000};
+// F20 block layout shared by the oracle (Step 2ref) and the interpolator
+// (Step 2h): seeded random, a connecting block to (r,0), a half-circle of 1 deg
+// chords, then seeded random again. Same seed (26) => identical polyline,
+// so both walkers run over the same committed blocks.
+static int build_f20_blocks(int32_t blocks[][2], int32_t* sum) {
   const int32_t r = 1600;
   const int n_arc = 180;
   const int n_rand = 80;
-  int32_t blocks[400][2];
   int n_blocks = 0;
   uint32_t rng = 26;
   int32_t posx = 0;
   int32_t posy = 0;
-
+  sum[0] = 0;
+  sum[1] = 0;
   for (int i = 0; i < n_rand; i++) {
     int32_t dx = 0;
     int32_t dy = 0;
@@ -1342,7 +1345,6 @@ void f20_long_polyline() {
     push_block(blocks, &n_blocks, &posx, &posy, dx, dy);
   }
   push_block(blocks, &n_blocks, &posx, &posy, r - posx, 0 - posy);
-
   int32_t ax = r;
   int32_t ay = 0;
   for (int i = 1; i <= n_arc; i++) {
@@ -1353,7 +1355,6 @@ void f20_long_polyline() {
     ax = x;
     ay = y;
   }
-
   for (int i = 0; i < n_rand; i++) {
     int32_t dx = 0;
     int32_t dy = 0;
@@ -1363,14 +1364,27 @@ void f20_long_polyline() {
     }
     push_block(blocks, &n_blocks, &posx, &posy, dx, dy);
   }
+  sum[0] = posx;
+  sum[1] = posy;
+  return n_blocks;
+}
+
+// F20: several hundred waypoints — seeded random, half-circle, seeded random
+// — so the globally fastest Linear reference hits collinear cruise, Y-reversal
+// path-stop on the arc, rebind (ticks 4000/8000), idle-free kinks, and a long
+// connecting block. Constraint-faithful: vertices, envelope, P<=R,
+// |steps|==|Δ|.
+void f20_long_polyline() {
+  const uint32_t accel = 2000;
+  const uint32_t ticks[2] = {4000, 8000};
+  int32_t blocks[400][2];
+  int32_t sum[2];
+  int n_blocks = build_f20_blocks(blocks, sum);
 
   test(n_blocks >= 200, "F20 several hundred waypoints");
   Remaining rem(2, n_blocks);
-  int32_t sum[2] = {0, 0};
   for (int b = 0; b < n_blocks; b++) {
     rem.set_block(b, blocks[b]);
-    sum[0] += blocks[b][0];
-    sum[1] += blocks[b][1];
   }
   rem.horizon = 0xFFFFFFFFU;
 
@@ -1393,7 +1407,7 @@ void f20_long_polyline() {
   int nv = 0;
   uint32_t recon_slack = 0;
   ref_walk_polyline(&rem, ticks, accel, end_pos, issued, &env, &plr, vp, &nv,
-                    512, &plot, &recon_slack);
+                    512, &plot, &recon_slack, NULL);
   plot.finish_plot();
 
   test(env, "F20 envelope ticks >= ticks_i_cfg");
@@ -1430,6 +1444,166 @@ void f20_long_polyline() {
 // collinear run (P carries, no rest at the joint), and a reversal (P -> 0
 // then the other sign). P is reconstructed from issued periods; a wrong model
 // that only writes planner P fields must fail here.
+// Step 2g: exhaustive tiny Linear. Every 2-axis polyline with |delta_i| <= 5,
+// 3 vertices (2 blocks) and 4 vertices (3 blocks), across three integer ticks
+// pairs, compared to the naxis_ref oracle (independent of the interpolator P /
+// R fields). This is combinatorics (DDA / vertex / P <= R), not coasting, so
+// no P_stop cruise is asserted. Idle-then-move is included (a block may be 0);
+// the first block is never all-zero (a no-op move).
+//
+// Vertex invariant of the oracle: walk_polyline emits one vertex per walked
+// block, and a trailing zero block is not walked, so the count is
+// "highest non-zero block index + 1". Each vertex sample sits at a waypoint.
+// A joint between block i-1 and i is a path-stop (P -> 0) when the two
+// displacements are not the same 2 deg-collinear sense, and a collinear cruise
+// (P carries) otherwise.
+// Walks one committed polyline through the naxis_ref oracle and checks the
+// 2g invariants. `wp` holds the cumulative waypoint of each block start
+// (wp[2b] / wp[2b+1] = sum of blocks 0..b-1), wp[0..1] = origin.
+static void f2g_walk(Remaining* rem, const uint32_t* ticks, uint32_t accel,
+                     int n_blocks, int32_t* wp) {
+  int32_t end_pos[2], issued[2];
+  bool env = true, plr = true;
+  uint32_t vp[16];
+  int nv = 0;
+  uint32_t slack = 0;
+  int32_t vpos[32];
+  ref_walk_polyline(rem, ticks, accel, end_pos, issued, &env, &plr, vp, &nv, 16,
+                    NULL, &slack, vpos);
+  test(env, "2g envelope ticks >= ticks_i_cfg");
+  test(plr, "2g law P_issued <= R");
+  int32_t sum[2] = {0, 0};
+  for (int b = 0; b < n_blocks; b++) {
+    sum[0] += rem->delta_of(0, b);
+    sum[1] += rem->delta_of(1, b);
+  }
+  test(issued[0] == sum[0] && issued[1] == sum[1],
+       "2g issued |steps| == |delta|");
+  test(end_pos[0] == sum[0] && end_pos[1] == sum[1], "2g end is last vertex");
+  // Every emitted vertex lands exactly on a cumulative waypoint. A trailing
+  // no-op block makes the oracle emit a duplicate sample at the final position
+  // (the finished transition still has dda.done() true), so we check "on some
+  // waypoint" rather than a positional index.
+  for (int i = 0; i < nv; i++) {
+    bool on_waypoint = 0;
+    for (int b = 0; b < n_blocks; b++) {
+      if (vpos[2 * i] == wp[2 * b] && vpos[2 * i + 1] == wp[2 * b + 1]) {
+        on_waypoint = 1;
+      }
+    }
+    test(on_waypoint, "2g every vertex hits a cumulative waypoint");
+  }
+  // Joint P semantics. vertex_p[k] is the last moving P of block k. A joint
+  // between block i-1 and i is a path-stop (P -> 0) when the two
+  // displacements are not the same 2 deg-collinear sense, and a collinear
+  // cruise (P carries) otherwise. Idle blocks are not joints. A collinear
+  // joint only *must* be in cruise (P_issued > 1) once the live remaining
+  // path exceeds P_coast on a moving axis; below that the ramp is
+  // legitimately decelerating toward rest.
+  for (int i = 1; i < n_blocks; i++) {
+    int32_t da[2] = {rem->delta_of(0, i - 1), rem->delta_of(1, i - 1)};
+    int32_t db[2] = {rem->delta_of(0, i), rem->delta_of(1, i)};
+    int64_t ma = (int64_t)da[0] * da[0] + (int64_t)da[1] * da[1];
+    int64_t mb = (int64_t)db[0] * db[0] + (int64_t)db[1] * db[1];
+    if (ma == 0 || mb == 0) {
+      continue;  // an idle block is not a joint
+    }
+    int64_t dot = (int64_t)da[0] * db[0] + (int64_t)da[1] * db[1];
+    bool stop = (dot <= 0) || (dot * dot * 100000 < 99878 * ma * mb);
+    if (stop) {
+      test(vp[i - 1] <= 1, "2g path-stop joint P_issued <= 1");
+    } else {
+      int32_t r0 = 0, r1 = 0;
+      for (int b = i; b < n_blocks; b++) {
+        int32_t c[2] = {rem->delta_of(0, b), rem->delta_of(1, b)};
+        if (c[0] == 0 && c[1] == 0) {
+          continue;
+        }
+        int m = Remaining::longest_axis(c, ticks, 2);
+        int64_t a = c[m] > 0 ? c[m] : -c[m];
+        if (m == 0) {
+          r0 += a;
+        } else {
+          r1 += a;
+        }
+      }
+      uint32_t pc0 = RampMap(ticks[0], accel).P_coast();
+      uint32_t pc1 = RampMap(ticks[1], accel).P_coast();
+      bool cruise =
+          (r0 > 0 && (uint32_t)r0 > pc0) || (r1 > 0 && (uint32_t)r1 > pc1);
+      if (cruise) {
+        test(vp[i - 1] > 1, "2g collinear cruise joint does not rest");
+      }
+    }
+  }
+}
+
+void f2g_exhaustive() {
+  const uint32_t accel = 2000;
+  const uint32_t ticks_cases[3][2] = {{4000, 4000}, {4000, 8000}, {100, 99}};
+  int32_t vals[11];
+  for (int v = 0; v < 11; v++) {
+    vals[v] = (int32_t)v - 5;
+  }
+  long n_tested = 0, n_joint_stop = 0, n_joint_collinear = 0;
+  for (int t = 0; t < 3; t++) {
+    for (int i0 = 0; i0 < 11; i0++) {
+      for (int j0 = 0; j0 < 11; j0++) {
+        int32_t d0[2] = {vals[i0], vals[j0]};
+        if (d0[0] == 0 && d0[1] == 0) {
+          continue;  // all-zero first block is a no-op move; skip
+        }
+        for (int i1 = 0; i1 < 11; i1++) {
+          for (int j1 = 0; j1 < 11; j1++) {
+            int32_t d1[2] = {vals[i1], vals[j1]};
+            int32_t wp[4] = {d0[0], d0[1], d0[0] + d1[0], d0[1] + d1[1]};
+            Remaining rem2(2, 2);
+            rem2.set_block(0, d0);
+            rem2.set_block(1, d1);
+            f2g_walk(&rem2, ticks_cases[t], accel, 2, wp);
+            n_tested++;
+            if (d1[0] != 0 || d1[1] != 0) {
+              int64_t dot = (int64_t)d0[0] * d1[0] + (int64_t)d0[1] * d1[1];
+              int64_t ma = (int64_t)d0[0] * d0[0] + (int64_t)d0[1] * d0[1];
+              int64_t mb = (int64_t)d1[0] * d1[0] + (int64_t)d1[1] * d1[1];
+              bool stop = (dot <= 0) || (dot * dot * 100000 < 99878 * ma * mb);
+              if (stop) {
+                n_joint_stop++;
+              } else {
+                n_joint_collinear++;
+              }
+            }
+            for (int i2 = 0; i2 < 11; i2++) {
+              for (int j2 = 0; j2 < 11; j2++) {
+                int32_t d2[2] = {vals[i2], vals[j2]};
+                int32_t wp3[6] = {d0[0],
+                                  d0[1],
+                                  d0[0] + d1[0],
+                                  d0[1] + d1[1],
+                                  d0[0] + d1[0] + d2[0],
+                                  d0[1] + d1[1] + d2[1]};
+                Remaining rem3(2, 3);
+                rem3.set_block(0, d0);
+                rem3.set_block(1, d1);
+                rem3.set_block(2, d2);
+                f2g_walk(&rem3, ticks_cases[t], accel, 3, wp3);
+                n_tested++;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  printf(
+      "F2g exhaustive Linear: %ld polylines tested, %ld path-stop joints, "
+      "%ld collinear joints\n",
+      n_tested, n_joint_stop, n_joint_collinear);
+  test(n_tested > 0, "2g polylines were actually tested");
+  test(n_joint_stop > 0, "2g exercised a path-stop joint");
+  test(n_joint_collinear > 0, "2g exercised a collinear joint");
+  printf("F2g exhaustive tiny Linear green\n");
+}
 void f2f_two_block() {
   const uint32_t accel = 2000;
   uint32_t ticks_eq[2] = {4000, 4000};
@@ -1461,7 +1635,7 @@ void f2f_two_block() {
     int ref_nv = 0;
     uint32_t ref_slack = 0;
     ref_walk_polyline(&ref_rem, ticks_eq, accel, ref_end, ref_issued, &ref_env,
-                      &ref_plr, ref_vp, &ref_nv, 8, NULL, &ref_slack);
+                      &ref_plr, ref_vp, &ref_nv, 8, NULL, &ref_slack, NULL);
 
     // Interpolator walk (the production core under test).
     Remaining poly_rem(2, 2);
@@ -1474,8 +1648,8 @@ void f2f_two_block() {
     int poly_nv = 0;
     uint32_t poly_slack = 0;
     walk_polyline(poly, &poly_rem, ticks_eq, accel, poly_end, poly_issued,
-                  &poly_env, &poly_plr, poly_vp, &poly_nv, 8, NULL,
-                  &poly_slack);
+                  &poly_env, &poly_plr, poly_vp, &poly_nv, 8, NULL, &poly_slack,
+                  NULL);
 
     char msg[96];
     snprintf(msg, sizeof(msg), "2f %s envelope (interpolator)", r.name);
@@ -1568,6 +1742,107 @@ void f2f_two_block() {
   printf("F2f two-block Linear path-stop/collinear/reversal green\n");
 }
 
+void f2h_nblock_vs_f20() {
+  // Step 2h: the production N-block interpolator (LinearPoly) must match the
+  // globally fastest Linear reference (NaxisRefLinear) on F20, within a 2-step
+  // log2 band. Same committed blocks (shared build_f20_blocks, seed 26), so the
+  // two walks run tick-for-tick over the same polyline. A faster track that
+  // leaves the chord or skips a vertex is not Linear.
+  const uint32_t accel = 2000;
+  const uint32_t ticks[2] = {4000, 8000};
+  int32_t blocks[400][2];
+  int32_t sum[2];
+  int n_blocks = build_f20_blocks(blocks, sum);
+  test(n_blocks >= 200, "2h several hundred waypoints");
+
+  // Oracle walk (truth).
+  Remaining ref_rem(2, n_blocks);
+  for (int b = 0; b < n_blocks; b++) {
+    ref_rem.set_block(b, blocks[b]);
+  }
+  ref_rem.horizon = 0xFFFFFFFFU;
+  int32_t ref_end[2], ref_issued[2];
+  bool ref_env = true, ref_plr = true;
+  uint32_t ref_vp[512];
+  int ref_nv = 0;
+  uint32_t ref_slack = 0;
+  int32_t ref_vpos[1024];
+  NaxisPlot refplot;
+  refplot.start_plot("f20_lin", "FasNAxis F2h interpolator vs F20 reference",
+                     2);
+  refplot.poly_point(0.0, 0.0);
+  {
+    int32_t wx = 0, wy = 0;
+    for (int b = 0; b < n_blocks; b++) {
+      wx += blocks[b][0];
+      wy += blocks[b][1];
+      refplot.poly_point((double)wx, (double)wy);
+    }
+  }
+  refplot.poly_done();
+  ref_walk_polyline(&ref_rem, ticks, accel, ref_end, ref_issued, &ref_env,
+                    &ref_plr, ref_vp, &ref_nv, 512, &refplot, &ref_slack,
+                    ref_vpos);
+  refplot.finish_plot();
+
+  // Interpolator walk (the production core under test).
+  Remaining poly_rem(2, n_blocks);
+  for (int b = 0; b < n_blocks; b++) {
+    poly_rem.set_block(b, blocks[b]);
+  }
+  poly_rem.horizon = 0xFFFFFFFFU;
+  LinearPoly poly(&poly_rem, ticks, accel);
+  int32_t poly_end[2], poly_issued[2];
+  bool poly_env = true, poly_plr = true;
+  uint32_t poly_vp[512];
+  int poly_nv = 0;
+  uint32_t poly_slack = 0;
+  int32_t poly_vpos[1024];
+  walk_polyline(poly, &poly_rem, ticks, accel, poly_end, poly_issued, &poly_env,
+                &poly_plr, poly_vp, &poly_nv, 512, NULL, &poly_slack,
+                poly_vpos);
+
+  test(poly_env, "2h interpolator envelope ticks >= ticks_i_cfg");
+  test(poly_plr, "2h interpolator law P_issued <= R");
+  test(poly_slack <= 2,
+       "2h interpolator reconstructed P within 2-step log2 band");
+  test(poly_issued[0] == sum[0] && poly_issued[1] == sum[1],
+       "2h interpolator issued |steps| == polyline");
+  test(poly_end[0] == sum[0] && poly_end[1] == sum[1],
+       "2h interpolator end is last vertex");
+  test(poly_nv == ref_nv, "2h interpolator vertex count matches oracle");
+
+  // Same vertices, in the same order, as the oracle.
+  for (int i = 0; i < poly_nv; i++) {
+    test(poly_vpos[2 * i] == ref_vpos[2 * i] &&
+             poly_vpos[2 * i + 1] == ref_vpos[2 * i + 1],
+         "2h interpolator vertex i hits the same waypoint as the oracle");
+    uint32_t dvp = (poly_vp[i] > ref_vp[i]) ? poly_vp[i] - ref_vp[i]
+                                            : ref_vp[i] - poly_vp[i];
+    test(dvp <= 2, "2h interpolator joint P within 2-step log2 of oracle");
+  }
+
+  // Both kinds of joints must be exercised, matching the oracle counts.
+  int ref_stop = 0, poly_stop = 0;
+  for (int i = 0; i < ref_nv - 1; i++) {
+    if (ref_vp[i] <= 1) {
+      ref_stop++;
+    }
+    if (poly_vp[i] <= 1) {
+      poly_stop++;
+    }
+  }
+  test(ref_stop >= 1, "2h oracle has a Linear path-stop joint");
+  test(ref_stop > 0, "2h oracle has a collinear cruise joint");
+  test(poly_stop == ref_stop, "2h interpolator path-stop joints match oracle");
+
+  printf(
+      "2h interpolator vs F20 reference: blocks=%d vertices=%d "
+      "stop_joints ref=%d poly=%d end=(%d,%d)\n",
+      n_blocks, poly_nv, ref_stop, poly_stop, poly_end[0], poly_end[1]);
+  printf("F2h N-block interpolator matches F20 reference green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -1579,8 +1854,10 @@ int main() {
   f2d_linear_one_block();
   f2e_issued_periods();
   f2ref_reference();
+  f2g_exhaustive();
   f20_long_polyline();
   f2f_two_block();
+  f2h_nblock_vs_f20();
   printf("TEST_26 PASSED\n");
   return 0;
 }

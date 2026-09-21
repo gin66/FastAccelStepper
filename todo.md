@@ -406,7 +406,7 @@ and the two tracks agree within a 2-step log2 band. Plot:
 
 ---
 
-## Step 2g — exhaustive tiny Linear
+## Step 2g — exhaustive tiny Linear ✅
 
 No new production if 2c–2f are right. Nested loops in
 `test_26.cpp` only.
@@ -437,9 +437,19 @@ finish in a few seconds.
 
 **Done when:** exhaustive set is green.
 
+**Done:** `f2g_exhaustive()` in `test_26.cpp` walks every 2-axis polyline with
+`|Δ_i| ≤ 5`, 3 vertices (2 blocks) and 4 vertices (3 blocks), across three
+integer `ticks_cfg` pairs `(4000,4000)`, `(4000,8000)`, `(100,99)`, skipping the
+all-zero first block. `f2g_walk` checks, against the `naxis_ref` oracle, the
+envelope (`ticks ≥ ticks_i_cfg`), `P_issued ≤ R` from issued periods, issued
+`|steps| == |Δ|`, end is the last vertex, every emitted vertex lands on a
+cumulative waypoint, and the joint P semantics (path-stop `P_issued ≤ 1` vs
+collinear cruise `> 1` once the live remaining path exceeds `P_coast`). ~5.3 M
+polylines tested (42264 path-stop joints, 936 collinear joints).
+
 ---
 
-## Step 2h — N-block interpolator vs F20
+## Step 2h — N-block interpolator vs F20 ✅
 
 `linear.h` still one- or two-block after 2f. This step walks
 an arbitrary polyline and must match `naxis_ref` on F20
@@ -456,6 +466,15 @@ steps in the Linear scan). DIR pauses still Step 9.
 `test_26_f20_lin.gnuplot`.
 
 **Done when:** interpolator matches `naxis_ref` on F20.
+
+**Done:** `LinearPoly` (Step 2f) was already the N-block interpolator, so this
+step adds `f2h_nblock_vs_f20()`: the same F20 polyline is now built by the shared
+`build_f20_blocks` helper (seed 26), and both the `NaxisRefLinear` oracle and
+the `LinearPoly` interpolator walk it. Asserts envelope, `P_issued ≤ R`, 2-step
+log2 recon slack, issued `|steps| == |Δ|`, end is the last vertex, identical
+vertex count and per-vertex positions, joint P within 2-step log2, and matching
+path-stop joint count. 341 blocks, 341 vertices, 206 path-stop joints — both
+tracks agree. Plot: `test_26_f20_lin.gnuplot`.
 
 ---
 
