@@ -166,6 +166,38 @@ the engine. The periodic task will let the associated LED blink with 1 Hz
 ```cpp
   void setDebugLed(uint8_t ledPin);
 ```
+## Synchronized Multi-Axis Move
+
+moveAllToSync() moves several independent steppers - each to its own
+target position - so that all moves start together and reach
+standstill again at approximately the same time.
+
+This is not coordinated/interpolated motion: there is no enforced
+straight line between axes, each stepper still follows its own
+trapezoidal or S-curve ramp (see setLinearAcceleration()). Only the
+per-axis speed - and, for very short moves, the acceleration - is
+scaled down (never up) so the fastest axes are slowed to match the
+slowest one.
+
+Before calling, every stepper in `steppers` must already have
+setSpeedInHz() and setAcceleration() configured: these are used as
+each axis' allowed maximum and are reduced only for this move. A
+later, unrelated call to moveTo()/move() will keep using the reduced
+values, so reconfigure speed/acceleration again if the axis is moved
+individually afterwards.
+
+`steppers[i]` moves from its current position to `targetPositions[i]`,
+for i in 0..count-1. A NULL entry in `steppers` is skipped. `count` is
+capped to MAX_STEPPER.
+
+Returns the first non-OK result of the individual moveTo() calls, or
+MOVE_OK if all were started successfully. Even on error, moveTo() is
+still attempted for every axis - already started axes are not rolled
+back.
+```cpp
+  MoveResultCode moveAllToSync(FastAccelStepper* const* steppers,
+                               const int32_t* targetPositions, uint8_t count);
+```
 ### Return codes of calls to `move()` and `moveTo()`
 
 The defined preprocessor macros are MOVE_xxx:

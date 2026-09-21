@@ -18,6 +18,7 @@ init	KEYWORD2
 stepperConnectToPin	KEYWORD2
 setExternalCallForPin	KEYWORD2
 setDebugLed	KEYWORD2
+moveAllToSync	KEYWORD2
 manageSteppers	KEYWORD2
 task_rate	KEYWORD2
 initI2sMux	KEYWORD2

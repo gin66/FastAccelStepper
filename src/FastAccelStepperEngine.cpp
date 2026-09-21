@@ -1,4 +1,5 @@
 #include "FastAccelStepperEngine.h"
+#include <math.h>
 #include "FastAccelStepper.h"
 #include "fas_queue/stepper_queue.h"
 #if defined(SUPPORT_ESP32_I2S)
@@ -167,6 +168,87 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 void FastAccelStepperEngine::setDebugLed(uint8_t ledPin) {
   fas_ledPin = ledPin;
   PIN_OUTPUT(fas_ledPin, LOW);
+}
+
+MoveResultCode FastAccelStepperEngine::moveAllToSync(
+    FastAccelStepper* const* steppers, const int32_t* targetPositions,
+    uint8_t count) {
+  if (count > MAX_STEPPER) {
+    count = MAX_STEPPER;
+  }
+
+  // Pass 1: find how long the slowest axis would take at its own
+  // currently configured speed/acceleration. That duration becomes the
+  // common target duration for all axes.
+  float distance[MAX_STEPPER];
+  float target_time = 0;
+  for (uint8_t i = 0; i < count; i++) {
+    distance[i] = 0;
+    FastAccelStepper* s = steppers[i];
+    if (s == NULL) {
+      continue;
+    }
+    int32_t d = targetPositions[i] - s->getCurrentPosition();
+    distance[i] = (d < 0) ? (float)(-d) : (float)d;
+    float v = s->getSpeedInMilliHz() / 1000.0f;
+    float a = (float)s->getAcceleration();
+    if ((distance[i] <= 0) || (v <= 0) || (a <= 0)) {
+      continue;
+    }
+    // symmetric ramp up/down: distance covered while not at constant
+    // speed is v^2/a, taking time 2*v/a
+    float t_ramp = v / a;
+    float d_ramp = v * t_ramp;
+    float t = (distance[i] >= d_ramp)
+                  ? 2.0f * t_ramp + (distance[i] - d_ramp) / v
+                  : 2.0f * sqrt(a * distance[i]) / a;
+    if (t > target_time) {
+      target_time = t;
+    }
+  }
+
+  // Pass 2: slow every other axis down (speed first, and - for moves too
+  // short to ever reach that reduced speed - acceleration too) so its own
+  // move takes target_time, then start the move.
+  MoveResultCode first_error = MOVE_OK;
+  for (uint8_t i = 0; i < count; i++) {
+    FastAccelStepper* s = steppers[i];
+    if (s == NULL) {
+      continue;
+    }
+    float v = s->getSpeedInMilliHz() / 1000.0f;
+    float a = (float)s->getAcceleration();
+    if ((distance[i] > 0) && (target_time > 0) && (v > 0) && (a > 0)) {
+      float v_new = v;
+      float a_new = a;
+      float disc =
+          (a * target_time) * (a * target_time) - 4.0f * a * distance[i];
+      bool trapezoid = false;
+      if (disc >= 0) {
+        v_new = (a * target_time - sqrt(disc)) / 2.0f;
+        trapezoid = (distance[i] - (v_new * v_new) / a) >= 0;
+      }
+      if (!trapezoid) {
+        // move too short to ever cruise at a constant speed for
+        // target_time: shrink acceleration, so the triangular ramp itself
+        // takes exactly target_time
+        a_new = 4.0f * distance[i] / (target_time * target_time);
+        v_new = 2.0f * distance[i] / target_time;
+      }
+      // never exceed the axis' own configured maximum
+      if (v_new > v) v_new = v;
+      if (v_new < 1.0f) v_new = 1.0f;
+      if (a_new > a) a_new = a;
+      if (a_new < 1.0f) a_new = 1.0f;
+      s->setSpeedInHz((uint32_t)(v_new + 0.5f));
+      s->setAcceleration((int32_t)(a_new + 0.5f));
+    }
+    MoveResultCode res = s->moveTo(targetPositions[i]);
+    if ((first_error == MOVE_OK) && (res != MOVE_OK)) {
+      first_error = res;
+    }
+  }
+  return first_error;
 }
 
 void FastAccelStepperEngine::manageSteppers() {

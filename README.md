@@ -72,6 +72,7 @@ FastAccelStepper offers the following features:
 * No float calculation (log2 representation in range -64..64 with 16bit integer representation and 1/512th resolution)
 * Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
+* `FastAccelStepperEngine::moveAllToSync()` starts several independent steppers - each to its own target position - scaling down the per-axis speed/acceleration so they all reach standstill at approximately the same time
 
 ## Star History
 
