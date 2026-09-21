@@ -20,6 +20,7 @@ int main() {
   c.init();
   c.parameters.setAcceleration(ramp_acceleration);
   c.parameters.setSpeedInTicks(max_speed_in_ticks);
+  c.update();
 
   char fname[100];
   snprintf(fname, 100, "ramp.gnuplot");
@@ -50,11 +51,8 @@ int main() {
             err_ticks, err_speed, ideal_speed);
   }
   fprintf(gp_file, "EOF\n");
-  // fprintf(gp_file, "plot $data using 2:3 with linespoints\n");
-  // fprintf(gp_file, "set terminal pngcairo size 1024,768\n");
-  // fprintf(gp_file, "set output \"ramp.png\"\n");
-  fprintf(gp_file, "set terminal qt\n");
-  fprintf(gp_file, "set term qt size 1024,768\n");
+  fprintf(gp_file, "set terminal pngcairo size 1024,768\n");
+  fprintf(gp_file, "set output \"%s.png\"\n", fname);
   fprintf(gp_file,
           "set multiplot title \"Acceleration=%f max speed=%d steps/s\" layout "
           "2,2 columnsfirst margins 0.1,0.9,0.1,0.9 spacing 0.1 columnsfirst\n",
@@ -88,7 +86,6 @@ int main() {
 
   fprintf(gp_file, "unset multiplot\n");
 
-  fprintf(gp_file, "pause -1\n");
   fclose(gp_file);
   //	assert(false);
   return 0;
