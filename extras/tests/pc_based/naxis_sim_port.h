@@ -93,9 +93,8 @@ class SimPort {
   uint32_t getAcceleration() const { return accel_; }
   void setAcceleration(uint32_t a) { accel_ = a; }
   uint32_t clock() const { return clock_; }
-  // Ticks of the pause(s) the last call injected (0 for AQE_OK). This is what
-  // the feeder globalizes onto the other axes on a DirChangePauseInjected
-  // return (whitepaper section 4.4.2).
+  // Ticks of the pause the last call injected (0 for AQE_OK). An inject the
+  // plan did not carve is a planner failure (whitepaper section 4.4.3).
   uint16_t injectedPauseTicks() const { return injected_pause_ticks_; }
   bool isQueueEmpty() const { return read_idx_ == next_write_idx_; }
   // Pending command count, matching FastAccelStepper::queueEntries().

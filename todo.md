@@ -780,7 +780,7 @@ named there and nothing else:
 |------|------------------|-----------------------------------|
 | 8 | `void failNext(AqeResultCode rc)` | `AQE_QUEUE_FULL` is returned only when `isQueueFull()` is already true, and `pump()` refuses to call `addQueueEntry` in that case. Filling one axis by hand makes `all_have_room()` false, so no command is sent and the clocks cannot diverge. `failNext` returns `rc` once, enqueues nothing, and leaves `isQueueFull()` false. Default: off. |
 | 9 | `getDirChangeBeforeTicks()`, `getDirChangeBeforePauseCount()`, `getDirChangeAfterTicks()`, default 0. Setter `setDirChangeBudget(before, n_before, after)`. | `FasNAxis` must call the same names as `FastAccelStepper`. A default of 0 keeps today’s F5 reversal as a plain `count_up` flip. |
-| 9 | `void forceExtraBefore(uint16_t ticks)` | `InjectDirPauses` fires only when `count_up` disagrees with `queue_end`. After the planner has already issued the after-pause, the following step is not a reversal, so F12c’s extra before-pause never happens. One shot: the next `steps > 0` command enqueues a pause of `ticks` at the **old** `count_up`, sets `injectedPauseTicks()`, returns `AQE_DIR_CHANGE_PAUSE_INJECTED`, and does not enqueue the step. Then the flag clears. Use it with `InjectNone`. |
+| 9 | `void forceExtraBefore(uint16_t ticks)` | Proves F12c. One shot: the next `steps > 0` command enqueues a pause of `ticks` at the **old** `count_up`, sets `injectedPauseTicks()`, returns `AQE_DIR_CHANGE_PAUSE_INJECTED`, and does not enqueue the step. Then the flag clears. `pump()` must return `Error`. The other axis must not gain those ticks. Use it with `InjectNone`. |
 
 Steps 10–15 add nothing to `SimPort`. Step 14 is three `SimPort`
 objects. Step 15 uses real `FastAccelStepper` queues.
@@ -852,10 +852,10 @@ Implementation, only in `src/FasNAxis.h`:
   `waiting`. A retry code leaves `waiting` set and does not send
   a new plan step. When no `waiting` remains, `_slice_open` is
   false.
-- `AQE_ERROR_TICKS_TOO_LOW` and, until Step 9, both pause-injected
-  codes: set an error flag and return `PumpStatus::Error`. Do not
-  retry those. Mark the injected branch
-  `// Step 9: time bubble, not Error`.
+- `AQE_ERROR_TICKS_TOO_LOW` and both pause-injected codes: set an
+  error flag and return `PumpStatus::Error`. Do not retry those.
+  Step 9 does not turn an inject into a dwell on the other axes
+  (whitepaper §4.4.3).
 
 **8.3 Room.** `SimPort px(4000, 16), py(4000, 16)`. One long
 Linear move. `pump()` until it stops making progress, and do not
@@ -882,9 +882,9 @@ retryable code (`QueueFull`, `DirPinIsBusy`, `WaitForEnablePinActive`,
 `DeviceNotReady`). `feed_loop()` breaks out of a pump on a retryable flush, so
 one `pump()` never plans a second command past an unaccepted one; the next
 `pump()` re-sends the same held command and no new plan step is built until the
-slice closes. `AQE_ERROR_TICKS_TOO_LOW` and (until Step 9) both pause-injected
-codes latch `_error` and `pump()` returns `PumpStatus::Error`; the injected
-branch is marked `// Step 9: time bubble, not Error`. `all_have_room()` now
+slice closes. `AQE_ERROR_TICKS_TOO_LOW` and both pause-injected
+codes latch `_error` and `pump()` returns `PumpStatus::Error`. An injected
+pause stays an error (whitepaper §4.4.3). `all_have_room()` now
 reserves two slots (`queueEntries() + 2 >= QUEUE_LEN`) instead of trusting
 `isQueueFull()` (which allows `QUEUE_LEN - 1`). `SimPort` gained the one-shot
 `failNext(AqeResultCode)` hook (fires once on the next command, enqueues
@@ -900,13 +900,12 @@ entries and the `(8000,8000)` move completes. `make test` and
 
 ---
 
-## Step 9 — planner-issued before/after DIR pauses (F12, F12b, F12c)
+## Step 9 — carve DIR pauses from the reversing axis’s last step (F12, F12b, F12c)
 
-Do not change Step 8’s held-slice retry. DIR pauses are ordinary
-held commands (`steps = 0`) issued **before** the first
-outgoing-block step is built. Default budgets stay 0, so F5’s
-trace must still match `naxis_ref`. If a reversal emits a pause
-when both the config and the getters are 0, F5 is broken.
+Whitepaper §4.4. Do not change Step 8’s held-slice retry. Do not
+copy a DIR pause onto any other axis. Default budgets stay 0, so
+F5’s trace must still match `naxis_ref`. If a reversal emits a
+pause when both the config and the getters are 0, F5 is broken.
 
 **First edit:** `SimPort` methods from the table
 (`setDirChangeBudget`, the three getters, `forceExtraBefore`),
@@ -918,57 +917,75 @@ after `f8_feeder()`.
 `s->getDirChangeBeforeTicks()`. `τ_after` is the same with
 `dir_after_ticks` / `getDirChangeAfterTicks()`. `n_before` is
 `getDirChangeBeforePauseCount()`, or 1 when the config override
-is non-zero and the getter count is 0. A zero `τ` skips that
-pause.
+is non-zero and the getter count is 0. A zero component skips
+that pause. `τ = n_before * τ_before + τ_after`.
 
-**Sequence** at a vertex where the next step’s `count_up` differs
-from `_dir[i]`, and no outgoing step has been stored yet:
+**Speed and acceleration.** At the change the reversing axis’s
+last period `T_min` must satisfy `T_min >> τ`, and
+`T_min - τ >= max(MIN_CMD_TICKS, ticks_cfg)` so the shortened
+pulse stays a legal slow step. High acceleration shortens
+`calculate_ticks(1)`; max speed is lowered when the decel from
+cruise to `T_min` does not fit before the vertex. Replan the
+approach under those caps. The other axes follow that time law.
+They are not paused to absorb `τ`.
 
-1. `n_before` times: `{steps=0, ticks=τ_before, count_up=old}` on
-   the reversing axis, and the same tick value with **that**
-   axis’s unchanged `count_up` on every other axis.
-2. Once: `{steps=0, ticks=τ_after, count_up=new}` on the reversing
-   axis; other axes get the same ticks and their own unchanged
-   `count_up`.
-3. Only then build the next block’s step slice.
+**Carve**, at a vertex where the next step’s `count_up` differs
+from `_dir[i]`. The last old-direction command on i is one step
+(`steps = 1`) of period `T_min`. Do not shorten a multi-step
+command. Replace that command with:
 
-Credit: if the reversing axis’s previous command already has
-`ticks >= τ_before`, skip the before-pause (still issue the
-after-pause). SimPort with `InjectNone` must then accept the
-following step with `AQE_OK`.
+1. `{steps=1, ticks=T_min - τ, count_up=old}` on i only.
+2. `n_before` times `{steps=0, ticks=τ_before, count_up=old}`
+   on i only.
+3. Once, if `τ_after > 0`: `{steps=0, ticks=τ_after, count_up=new}`
+   on i only.
 
-**Injected, replacing the Step 8 error branch.** On
-`AQE_DIR_CHANGE_PAUSE_INJECTED` or `AQE_DIR_PIN_2MS_PAUSE_ADDED`:
-read `injectedPauseTicks()` — add that same method on
-`FastAccelStepper`, next to `getDirChangeAfterTicks`, returning
-`_queue()->_injected_pause_ticks`. Do not include the queue
-header from `FasNAxis.h`. Enqueue a timekeeping pause of exactly
-those ticks on every other axis (`count_up` unchanged) before any
-later step. Do not shorten a later period to catch up. If a
-non-pause step on another axis was already accepted for the
-outgoing block, return `PumpStatus::Error` (the test fails the
-run).
+The tick sum stays `T_min`. Other axes keep the commands already
+planned for those ticks. A period above 65535 is the §9.3
+stuffing: retarget those pauses into the before/after entries
+(the after-pause carries the new `count_up`) and shorten the
+step entry only for the remainder of `τ`. A long step does not
+credit pause-cmd counting; the `steps = 0` entries are what the
+driver counts. `n_before` separate pauses, not one merged pause.
+SimPort with `InjectNone` then accepts the following step with
+`AQE_OK` and `injectedPauseTicks() == 0`.
+
+**Injected stays an error.** On
+`AQE_DIR_CHANGE_PAUSE_INJECTED` or `AQE_DIR_PIN_2MS_PAUSE_ADDED`,
+`pump()` returns `PumpStatus::Error`. Do not enqueue those ticks
+on any other axis and do not add them to a clock. The Step 8
+comment in `flush_held()` already says this. `injectedPauseTicks()`
+on `FastAccelStepper` (next to `getDirChangeAfterTicks`, returning
+`_queue()->_injected_pause_ticks`) is for the test to read the
+injected length. Do not include the queue header from `FasNAxis.h`.
 
 **Fixtures:**
 
-- F12: square corner, `setDirChangeBudget(3200, 1, 3200)`. At the
-  first corner the trace shows a before-pause (old `count_up`)
-  then an after-pause (new `count_up`) on the reversing axis, and
-  pauses of those same tick sums on the other axis, before any
-  step of the next side. The following step returns without
-  `injectedPauseTicks() != 0`. Both axes end on the square.
-- F12b is Step 12’s dog-leg. Here, only the Linear square: the
-  other axis’s position does not change across the pause pair.
-  Leave a `// F12b: Overshoot continuing axis, Step 12` comment
-  and do not invent Overshoot in this step.
+- F12: Linear out-and-back on X, Y idle,
+  `setDirChangeBudget(3200, 1, 3200)`. At the reversal the trace
+  shows the shortened one-step command, then a before-pause (old
+  `count_up`, 3200) and an after-pause (new `count_up`, 3200),
+  and those three tick sums equal the original last-step ticks.
+  Y gains no pause from the budget. The following step returns
+  with `injectedPauseTicks() == 0`. Both axes end on target.
+  `clock()` equals the same move with a zero budget.
+- F12b is Step 12’s dog-leg. In this step leave a
+  `// F12b: Overshoot continuing axis keeps its planned steps, Step 12`
+  comment and do not invent Overshoot here. On the Linear
+  reversal, the idle axis’s position does not change across the
+  carved commands.
 - F12c: `InjectNone` plus `forceExtraBefore(8000)` armed at the
-  corner. After the injected return, the other axis has a pause
-  of 8000 and neither position has left the vertex. Final
-  `|clock_x - clock_y| <= 2`.
+  corner. `pump()` returns `Error`. Y does not gain a pause of
+  8000.
+- Tail too short: acceleration high enough, or a budget large
+  enough, that `calculate_ticks(1)` is not `>> τ`. The run still
+  finishes, at a lower acceleration or max speed, and the carve
+  has the F12 shape. Y still gains no DIR pause.
 
 Plot `test_26_f12.gnuplot` with `NaxisPlot` (XY plus the pause
-samples). **Done when:** F12 and F12c are green, F5 still matches
-`naxis_ref`, and `failNext` from Step 8 still retries.
+samples on the reversing axis). **Done when:** F12, F12c, and the
+short-tail case are green, F5 still matches `naxis_ref`, and
+`failNext` from Step 8 still retries.
 
 ---
 
@@ -1069,8 +1086,10 @@ Per axis, `R` is the sum of `|Δ_i|` while the sign stays the same
 that axis’s `R` to the current block only and forces its `P` to 0
 at the vertex. The other axis keeps `P`. `T` for the block is
 still `max T_opt_i` with those entry `P` values. Snap positions
-to the vertex before the next block’s steps (Step 9 pauses, if
-the budget is non-zero, sit between the two).
+to the vertex before the next block’s steps. A non-zero DIR
+budget carves the reversing axis’s last step (§4.4 / Step 9);
+the continuing axis keeps the steps already planned across
+those ticks.
 
 **Fixtures** (ticks 4000, accel 2000, `overshoot_max = 8`):
 
@@ -1088,10 +1107,11 @@ the budget is non-zero, sit between the two).
   axis whose sign flips has `P == 0` at that vertex. `d²` of
   each chord `<= 64`. Plot `test_26_f7.gnuplot`.
 
-Fill in the Step 9 `F12b` comment with this dog-leg: the
-continuing axis’s position is unchanged for `τ_before + τ_after`
-and its `P` after the bubble equals its `P` before the bubble.
-Budget `(3200, 1, 3200)`.
+Fill in the Step 9 `F12b` comment with this dog-leg. Budget
+`(3200, 1, 3200)`. The continuing axis keeps its planned steps
+through the reversing axis’s carved pauses. Its `P` is the same
+before and after that window. It is not given a `steps = 0`
+command because of the DIR budget.
 
 **Done when:** F6, F6b, F7, and F12b are green.
 

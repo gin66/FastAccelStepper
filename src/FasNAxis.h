@@ -377,7 +377,7 @@ class FasNAxis {
       if (rc == AqeResultCode::OK) {
         _held[i].waiting = false;
       } else if (aqeIsPauseInjected(rc)) {
-        // Step 9: time bubble, not Error
+        // Injected DIR pause: planner failure (whitepaper §4.4.3).
         _error = true;
       } else if (aqeRetry(rc)) {
         retry = rc;

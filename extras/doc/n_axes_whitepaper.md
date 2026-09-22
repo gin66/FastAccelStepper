@@ -162,7 +162,7 @@ horizon, and a PC-checkable oracle.
 | G2 | Hard constraints are the **currently configured** per-stepper period (`getSpeedInTicks()`) and acceleration (`getAcceleration()`), plus the device min-period `getMaxSpeedInTicks()` |
 | G3 | **v1 = as fast as possible** (§3.3 problem 1). Two geometry modes, both time-optimal **under G2 and that mode’s geometry** (§12.4.1). A faster track that violates G1/G2 or the mode geometry is not a reference. **Linear** (exact chords, shared time-law; path speed 0 at a non-collinear vertex) and **Overshoot** (per-axis ramps, slight chordal deviation, waypoints still hit) |
 | G4 | Parse lookahead until end or direction change → `R_i` is the cap on ramp-steps (`P_i ≤ R_i`). Path direction implies the other axes’ speeds. Short `R` **reduces speed**, it is not an error. Angle changes need accel/decel **preparation** (§8.4) |
-| G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner **issues** the driver’s before/after DIR pauses on a reversal (all axes share that time). Leftover injection is globalized, not ignored |
+| G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner carves the driver’s before/after DIR pauses out of the reversing axis’s last step, so the timeline does not grow and no other axis is paused (§4.4). An injected pause the plan did not carve is an error |
 | G6 | Tick-level timebase shared by all axes; lost sync is a hard error |
 | G7 | Tests run on the existing PC harness only — no simavr, no hardware, no PlatformIO job for this library |
 | G8 | 2D / 3D tests dump gnuplot (as `test_02` / `test_08` / `test_15` do) and may dump a self-contained HTML page |
@@ -361,7 +361,7 @@ Return codes:
 |------|----------------------|
 | `AQE_OK` (0) | Appended. Consume `ticks` or `ticks*steps`. |
 | `QueueFull` (1), `DirPinIsBusy` (2), `WaitForEnablePinActive` (3), `DeviceNotReady` (4) | Retry the whole coordinated slice later. |
-| `DirChangePauseInjected` (6) / `DirPin2msPauseAdded` (5) | A DIR pause was injected; **cmd was not enqueued**. Globalize those ticks onto every other axis (§4.4.2). `_injected_pause_ticks` holds the pause. |
+| `DirChangePauseInjected` (6) / `DirPin2msPauseAdded` (5) | A DIR pause was injected; **cmd was not enqueued**. The plan did not carve this pause (§4.4.3). `pump()` returns `Error`. Do not copy the ticks onto another axis. |
 | `ErrorTicksTooLow` (-1) | Period `< getMaxSpeedInTicks()`. Planner bug. |
 | `ErrorNoDirPinToToggle` (-3) | `count_up=false` without a DIR pin. |
 
@@ -414,150 +414,146 @@ practice 1 ms to leave margin for pauses.
 
 ### 4.4 Direction-change pauses
 
-A direction change is a pause command whose `count_up` differs
-from `queue_end.count_up`. Drivers may inject extra pauses in
-front to drain a buffered pipeline (ESP32 RMT/I2S). At most one
-pause is injected per `addQueueEntry()` call; `_injected_pause_ticks`
-is that pause, and the submitted command is **not** enqueued.
+A direction change needs a no-step gap on the **reversing axis
+only**. The planner carves that gap out of that axis’s own last
+step. The coordinated timeline does not grow, and no other axis
+is given a pause. A pause on an axis that is still moving forces
+that motor to decelerate and accelerate again.
 
-Before-pauses (pipeline drain) use the **old** `queue_end.count_up`.
-After-pauses and the external-pin 2 ms path use the **new**
-`cmd.count_up`; `queue_end` is then already the new DIR.
+The gap is the driver’s pause budget, read at `addAxis` /
+`setLimitsFromSteppers()`:
 
-On `pd_test`, `addDirChangePauseToQueue` returns `AQE_OK` for
-`steps == 0` (no inject). Reversing **step** commands still go
-through the injection path. The single-axis retry loop is
-uncoordinated; FasNAxis must not use it. The planner **prepares**
-DIR itself (§4.4.1) so a following reversing step should see
-`queue_end.count_up` already matching.
+```
+τ_before = s->getDirChangeBeforeTicks()       // 0 = none
+n_before = s->getDirChangeBeforePauseCount()  // RMT idf5/6: 2
+τ_after  = s->getDirChangeAfterTicks()        // user delay + driver after
+τ        = n_before * τ_before + τ_after
+```
 
-#### 4.4.1 Planner-issued before / after DIR pauses
-
-A direction change is two pauses, not one:
+`FasNAxisConfig::dir_before_ticks` / `dir_after_ticks` override
+when non-zero (tests). A zero `τ` carves nothing: the reversal
+is a plain `count_up` flip.
 
 | Pause | `count_up` | Role |
 |-------|------------|------|
-| **Before** | old DIR | Drain the driver’s output pipeline so no old-DIR step is still in flight (RMT/I2S/MCPWM). |
-| **After** | new DIR | The command that actually toggles the pin, plus the user `dir_change_delay`. |
+| **Before** | old DIR | `n_before` entries of `τ_before`. Drain the output pipeline so no old-DIR step is still in flight (RMT/I2S/MCPWM). |
+| **After** | new DIR | The command that toggles the pin, plus the user `dir_change_delay`. |
 
-Drivers insert **at most one** of these per `addQueueEntry` and
-return Injected without enqueueing the caller’s command. If FasNAxis
-only finds out then, the other axes have already been given the
-next slice and they **keep stepping** while the reversing axis
-sits — that is path deviation, not a time bubble.
-
-So the planner issues both pauses **on purpose**, at a snapped
-vertex, **before any next-block step** on **any** axis, and
-duplicates the tick sum as timekeeping pauses on every
-non-reversing axis.
-
-**Why this is feasible at reversal.** A reversing axis is not at
-configured max: Linear zeros path speed at a non-collinear /
-reversing vertex; Overshoot zeros `P` on that axis. The last
-commands on that axis are already long-period (decel tail, often
-`calculate_ticks(1)` ≫ `MIN_CMD_TICKS`). With
-`SUPPORT_PAUSE_CMD_COUNTING`, a last pause/step whose ticks
-already cover `BEFORE_DIR_CHANGE_DELAY_TICKS` means the driver
-will skip the before-inject. The planner still emits an explicit
-before-pause if the credited tail is short (buffered RMT can want
-**two** `MIN_CMD_TICKS` halves, idf5/6). The after-pause (new DIR)
-is always issued; it is the toggle.
-
-Continuing axes may still be at high `P` (Overshoot through a
-corner). They **dwell** for the same ticks. That does not lower
-their `P`; it is a sit-at-vertex, then they resume at the same
-period. If they were allowed to run during τ_dir they would leave
-the vertex and the chord would pick up unplanned bulge.
-
-Tick budgets (per reversing axis, then copied to the others):
-
-```
-τ_before = max(MIN_CMD_TICKS, BEFORE_DIR_CHANGE_DELAY_TICKS(q))
-           // 0 if the last command on this axis already
-           // counted as a pause ≥ that (pause-cmd counting)
-τ_after  = max(MIN_CMD_TICKS,
-               dir_change_delay_ticks,
-               AFTER_DIR_CHANGE_DELAY_TICKS(q))
-```
-
-Typical drivers (from `pd_esp32/esp32_queue.h` comments):
+Typical drivers (from `pd_esp32/esp32_queue.h`):
 
 | Driver | before | after (plus user delay) |
 |--------|--------|-------------------------|
-| AVR / Pico / SAM, delay 0 | 0 | 0 (toggle on the step command; FasNAxis still issues a min after-pause if `dir_change_delay_ticks > 0`) |
+| AVR / Pico / SAM, delay 0 | 0 | 0 (toggle on the next step command) |
 | RMT idf4 / MCPWM | 1 × `MIN_CMD_TICKS` | user delay |
 | RMT idf5/6 | 2 × `MIN_CMD_TICKS` | user delay |
 | I2S GPIO DIR | 2 × `I2S_BLOCK_TICKS` | user delay |
 | I2S mux DIR | 0 | `max(I2S_BLOCK_TICKS, user delay)` |
 | External DIR pin | drain until no steps | 2 ms (`US_TO_TICKS(2000)`) |
 
-Read the budget from the stepper at `addAxis` /
-`setLimitsFromSteppers()`:
+On `pd_test`, `addDirChangePauseToQueue` returns `AQE_OK` for
+`steps == 0`. A reversing **step** still goes through injection
+when the pauses were not queued first. The single-axis retry
+loop is uncoordinated; FasNAxis must not use it.
+
+#### 4.4.1 The budget constrains acceleration and max speed
+
+`calculate_ticks(P)` gets shorter as acceleration rises,
+including the last step `calculate_ticks(1)`. At the direction
+change the reversing axis must already be at a slow period
+`T_min` with
 
 ```
-τ_before = s->getDirChangeBeforeTicks()     // 0 = none
-n_before = s->getDirChangeBeforePauseCount()
-τ_after  = s->getDirChangeAfterTicks()      // user delay and driver after
+T_min >> τ
 ```
 
-Issue `n_before` pauses of `τ_before` (old DIR), then one
-`τ_after` (new DIR). `FasNAxisConfig::dir_before_ticks` /
-`dir_after_ticks` override when non-zero (tests). Wrong values ⇒
-leftover injection, handled next.
+That slow period is the minimum speed at the change. Two caps
+fall out of it. They tighten the approach only when the
+ordinary `P → 0` tail does not already satisfy the inequality.
 
-Sequence at vertex `p[k]`, axis i reversing, others not:
+- **Acceleration.** High `a` makes `calculate_ticks(1)` short.
+  Cap `a` so the tail can hold `τ` and the shortened pulse
+  stays slow: `T_min − τ` is at least
+  `max(MIN_CMD_TICKS, ticks_i_cfg)` and still in that tail,
+  not a fast step.
+- **Max speed.** From that `a`, the decel from cruise down to
+  `T_min` has to finish in the steps remaining before the
+  vertex. If it does not, lower cruise until it does.
 
-1. All axes have already issued the last command of the incoming
-   block (vertex is a sample). **No** outgoing-block steps yet.
-2. Before-pause on i: `{steps=0, ticks=τ_before, count_up=old}`.
-   Same tick sum, old `count_up`, on every other axis.
-3. After-pause on i: `{steps=0, ticks=τ_after, count_up=new}`.
-   Same tick sum, **unchanged** `count_up`, on every other axis.
-4. Only then: first commands of the next block (i steps the new
-   way; continuing axes resume at their `P`).
+The other axes follow the replanned time law. They are not
+paused in order to absorb `τ`.
 
-`pd_test` skips injection for `steps==0`; the explicit pauses
-still go on the queue and the following reversing step must
-return `AQE_OK` with no Injected.
+#### 4.4.2 Carve the last one-step command
 
-#### 4.4.2 Leftover injection: globalize, do not ignore
+A step fires at the start of its command, then the command
+waits `ticks` (§4.1.1). The last old-direction command is a
+**single** step of period `T_min`. Replace that one command
+with:
 
-If a call still returns `DirChangePauseInjected` /
-`DirPin2msPauseAdded`, the driver wanted a pause the planner did
-not fully pre-issue (under-counted RMT halves, external 2 ms,
-stale config). That pause is already on **one** axis.
+1. `{steps=1, ticks=T_min − τ, count_up=old}`
+2. `n_before` times `{steps=0, ticks=τ_before, count_up=old}`
+3. if `τ_after > 0`: `{steps=0, ticks=τ_after, count_up=new}`
 
-**Do not** continue the other axes. Immediate compensation:
+The tick sum is still `T_min`. The last old step and the first
+new step stay at the same instants. The pauses occupy the wait
+that was already trailing the last pulse.
 
-1. Read the injected ticks (`_injected_pause_ticks`).
-2. Enqueue a timekeeping pause of **exactly those ticks** on
-   every other participating axis (`count_up` unchanged).
-3. Add the ticks to every `T_i` and to `T_plan`.
-4. Inspect `queue_end.count_up` on the injecting axis (same
-   rule as before): old DIR ⇒ retry the planned pause/step
-   (more before-drain); new DIR ⇒ remaining after-pause is
-   timekeeping, do not XOR back.
-5. Then continue the planned sequence.
+Do not shorten a command with `steps > 1`. That speeds every
+step inside it. Isolate the final step, then carve.
 
-Effect: a **time bubble** at the vertex. All motors stationary,
-so the path does not pick up a chordal error from the injection.
-Clocks stay together. There is no later “catch up” by speeding
-one axis — that would be the path deviation the pauses were
-meant to avoid.
+`SUPPORT_PAUSE_CMD_COUNTING` clears its counters on
+`steps > 0` and on a direction change
+(`fas_queue/queue_add_entry.cpp`). A long step does not credit
+`τ_before`. The carved time has to be real `steps = 0`
+entries, and the before-pauses have to be `n_before` separate
+entries: RMT idf5/6 counts pause commands, not only ticks. One
+merged pause still makes the driver inject another. After this
+shape is queued, the following reversing step sees
+`queue_end.count_up` already matching and returns `AQE_OK`.
 
-If next-block steps were already queued on another axis, it is
-too late to globalize (those steps will run during the pause).
-That is a feeder bug: DIR sequence must precede any outgoing
-command. Tests fail if a non-revert `addQueueEntry` returns
-Injected.
+A period above 65535 is already one step entry plus pause
+stuffing (§9.3). That stuffing is the same slack. Retarget it
+into the before-pauses and the after-pause (the after-pause
+carries the new `count_up`). Shorten the step entry only for
+the part of `τ` the stuffing did not cover.
 
-#### 4.4.3 Tests (F12)
+Every other axis keeps the commands already planned for those
+same ticks. An Overshoot axis that is still at high `P` keeps
+stepping at that period. Its queue does not gain a gap.
 
-- F12: planner before+after; following step has no Injected.
-- F12b: Overshoot corner, continuing axis at high `P`; it must
-  not step during τ_dir (position frozen at the vertex).
-- F12c: SimPort injects one extra before-pause anyway; all axes
-  dwell it; XY does not leave the vertex; `|T_i−T_j|` still bound.
+#### 4.4.3 An injected pause is a planner failure
+
+Drivers insert at most one pause per `addQueueEntry` and return
+`DirChangePauseInjected` or `DirPin2msPauseAdded` without
+enqueueing the submitted command (`_injected_pause_ticks` is
+that pause). The issued shape did not cover the budget.
+`pump()` returns `PumpStatus::Error`.
+
+Do not copy those ticks onto the other axes, and do not add
+them to the planned clocks. Stopping a moving axis to match a
+surprise gap is the decel/reaccel §4.4.2 exists to avoid.
+
+#### 4.4.4 Tests (F12)
+
+- F12: Linear reversal, budget `(3200, 1, 3200)`. The last
+  old-direction one-step command is shortened by 6400 and
+  followed by a before-pause (old `count_up`, 3200) and an
+  after-pause (new `count_up`, 3200). Those three tick sums
+  equal the original last-step ticks. The other axis gains no
+  pause. The following step returns `AQE_OK` with no injected
+  ticks. Total `clock()` matches the same move with a zero
+  budget.
+- F12b: Overshoot corner, continuing axis at high `P`, same
+  budget. That axis keeps its planned steps through the window.
+  Its `P` is unchanged across the window. It is not given a
+  `steps = 0` command because of the DIR budget.
+- F12c: `forceExtraBefore` injects a pause the plan did not
+  carve. `pump()` returns `Error`. The other axis does not
+  gain that pause.
+- Tail too short: `calculate_ticks(1)` is not `>> τ` (high
+  acceleration, or a large budget). The approach runs at a
+  lower acceleration or max speed until the inequality holds,
+  then the carve has the same shape. Duration may grow because
+  the ramp changed. The other axis still has no copied pause.
 
 ### 4.5 Enable-on delay
 
@@ -1093,8 +1089,9 @@ compare.
 **Overshoot.** Each axis runs §7.1 on its own `R_i`. Segment
 time `T = max_i T_opt_i`. A short-`R` axis has a larger
 `T_opt` (triangle, long periods). That `T` lengthens every
-other axis’s period. DIR pauses at a reversal still freeze
-the continuing axes at the vertex (§4.4.1).
+other axis’s period. A DIR pause is carved from the reversing
+axis’s own last step (§4.4). The continuing axis keeps the
+period this time law already gave it.
 
 So: max steps in one direction → max `P` of that axis →
 path direction → max `P` / period of the related axes.
@@ -1121,7 +1118,7 @@ v1 preparation, by case:
 |--------------------------|-------------|
 | Nothing past the last point (path open) | Last n-dim point is rest. Prepared for *any* next angle, including reversal. Short buffer ⇒ low `P`. |
 | Collinear continuation (≤ 2°, §8.5) | No `P` change. `R` continues through the vertex. |
-| Axis reversal | That axis to `P = 0` at the vertex (`R` ends). Linear also zeros the path. |
+| Axis reversal | That axis to `P = 0` at the vertex (`R` ends), with last period `T_min >> τ` (§4.4.1). That can cap `a` and max speed. Linear also zeros the path. |
 | Finite path-angle change, no reversal | **Linear:** path-stop (`P → 0`). Maximum preparation, exact chords. **Overshoot:** only reversing / going-idle axes to 0; continuing axes keep `P`; bulge capped by `overshoot_max` (which may itself lower the continuing `P`). |
 
 Why this is tricky: a smoother junction would look *past*
@@ -1171,8 +1168,8 @@ A 90° corner where X continues and Y reverses: `P_x` may
 stay high, `P_y = 0`. Linear would have zeroed the binder,
 hence both. Overshoot is faster here, and the path through
 the vertex flattens, bounded by `overshoot_max`. Y’s DIR
-before/after pauses still freeze **X at the vertex** for
-τ_dir (§4.4.1); X does not keep stepping through the toggle.
+pauses are a split of Y’s own last step (§4.4). X keeps the
+steps already planned across those ticks.
 
 A 90° corner of an axis-aligned square: the “continuing”
 axis of the next side was idle (`Δ = 0`), so both `P` are
@@ -1260,7 +1257,7 @@ while t < T_block:
     emit one slice for this block only
     t += dt
 vertex sample: integer p equals p[k]
-if some axis reverses next: coordinated revert (§4.4.1)
+if some axis reverses next: carve that axis’s last step (§4.4)
 next block
 ```
 
@@ -1286,8 +1283,9 @@ remains to `p_i[k]`, duration is the remaining ticks of `T`.
 
 If every `Δsteps_i = 0`, the slice is still emitted as a pause
 command (`steps = 0`, `ticks = dt`) on **all** axes (a dwell).
-That happens at exact stops and during coordinated direction
-pauses.
+That happens at an exact stop. A direction pause is not this
+slice: it is a split of the reversing axis’s last step (§4.4),
+and the other axes keep their planned steps.
 
 ### 9.3 16-bit `steps` and queue stuffing
 
@@ -1312,7 +1310,8 @@ and `T - t_step` is stuffed as pause entries. Halving alone
 would send a step faster than `v_max` when `T < 2·ticks_i_cfg`
 (a slow axis just above the 16-bit boundary). A pause entry is
 a delay, not a step, so `MIN_CMD_TICKS` (not `ticks_i_cfg`) is
-its floor.
+its floor. On a reversing axis that stuffing is the slack §4.4.2
+retargets into the before-pauses and the after-pause.
 
 ### 9.4 Acceleration as a staircase
 
@@ -1338,21 +1337,21 @@ The feeder issues `addQueueEntry` only (§4.1).
 ### 10.1 Global time vs per-axis actual time
 
 Each accepted command contributes a known tick sum:
-`steps == 0 ? ticks : ticks * steps`. Injected DIR pauses add
-their ticks on the retry. FasNAxis keeps one **planned** clock
-`T_plan` and one **actual** clock `T_i` per axis:
+`steps == 0 ? ticks : ticks * steps`. FasNAxis keeps one
+**planned** clock `T_plan` and one **actual** clock `T_i` per
+axis:
 
 ```
 T_plan += dt
 cmd.ticks, cmd.steps chosen so the tick sum closes T_plan − T_i
 rc = addQueueEntry(&cmd, start)
-T_i += tick_sum(cmd) + extra_i_consumed
+T_i += tick_sum(cmd)          // accepted commands only
 ```
 
-`extra_i` is injected-pause ticks not yet folded into the
-coordinated timeline. After a successful append, `T_i` should
-equal `T_plan` within a few ticks. A growing `|T_i − T_j|` is a
-feeder bug.
+An injected DIR pause is not added to any clock. `pump()`
+returns `Error` (§4.4.3). After a successful append, `T_i`
+should equal `T_plan` within a few ticks. A growing
+`|T_i − T_j|` is a feeder bug.
 
 Idle axes in the same slice get pause commands of the same tick
 sum.
@@ -1360,24 +1359,23 @@ sum.
 ### 10.2 Coordinated direction-change pauses
 
 At a snapped vertex, if axis i’s next `count_up` disagrees with
-`queue_end.count_up`, run §4.4.1 **before** any outgoing-block
-command on any axis:
+`queue_end.count_up`, the feeder applies §4.4 to **i only**,
+before any outgoing-block step:
 
-1. Optional credit: if i’s last command already has
-   `steps==0` or a long period ≥ `τ_before`, skip the explicit
-   before-pause (the driver will too, via pause-cmd counting).
-2. Before-pause on i (old DIR) + matching timekeeping pauses
-   on every other axis.
-3. After-pause on i (new DIR) + matching timekeeping pauses
-   on every other axis.
-4. If any of those `addQueueEntry` calls returns Injected:
-   §4.4.2 — copy those ticks to every other axis immediately,
-   then retry. Do not speed anyone up later to “catch” the
-   lost time; that is path error.
-5. Only then issue the first reversing step / continuing steps.
+1. The approach has already reached `T_min >> τ` (§4.4.1).
+   The last old-direction command on i is one step of that
+   period.
+2. Replace it with the shortened step plus the before-pauses
+   (old `count_up`) and the after-pause (new `count_up`).
+   Tick sum unchanged (§4.4.2).
+3. Every other axis keeps the commands already planned for
+   those ticks. No pause is added on them.
+4. If any `addQueueEntry` returns Injected, `pump()` returns
+   `Error` (§4.4.3). Do not lengthen another axis to match.
 
-The continuing axis in Overshoot keeps its `P` across this
-bubble; it does not step during it.
+The first new-direction step then goes out at the instant the
+uncarved last step would have ended. An Overshoot axis that
+kept `P` is still stepping at that `P`.
 
 ### 10.3 Prefill and kick-off
 
@@ -1658,7 +1656,7 @@ removes `*.gnuplot`.
 - pause `steps=0` with explicit `count_up` (never implicit flip)
 - revert = pause with `count_up = !old_dir`; by default does
   **not** return Injected (match `pd_test`). A hook can inject
-  before/after pauses for F12.
+  one extra before-pause so F12c can require `Error`.
 - reversing step commands still inject if DIR was not prepared;
   FasNAxis tests must not take that path
 - `isQueueEmpty()` / `queueEntries()` / `isRampGeneratorActive()`
@@ -1826,9 +1824,9 @@ that violates G1/G2 does not count.
 | F9 | Asymmetric limits `ticks_x = 10*ticks_y`, Linear, equal `\|Δ\|` | X is slower so X is DDA master and time-law; Y scaled down in steps | XY |
 | F10 | Micro-segments totalling a long line, Linear | `R` sees through them; does not stop at each | v(t) no dips |
 | F11 | Streaming with `R < P_stop`, path open | speed capped by `R`; `pump()` `Running`; `isSpeedLimitedByLookahead()`; `P ≤ R`; cruise after `R` grows | v(t) capped then recovers |
-| F12 | Axis reversal + `dir_after` / `dir_before` | planner issues before (old DIR) + after (new DIR) on all axes; following step has no Injected | event marks |
-| F12b | Overshoot corner, X continues at high `P` | X does not step during τ_dir; vertex held; X resumes at same `P` | XY frozen at corner |
-| F12c | SimPort injects one extra before-pause | all axes dwell it; no XY leave-vertex; clocks together | event marks |
+| F12 | Axis reversal + `dir_after` / `dir_before` | last one-step command shortened by `τ`; before (old DIR) + after (new DIR) on that axis only; tick sum unchanged; other axis gains no pause; `clock()` matches the zero-budget run; following step has no Injected | event marks |
+| F12b | Overshoot corner, X continues at high `P` | X keeps its planned steps through Y’s carved pauses; `P_x` unchanged across the window; X is not given a DIR pause | XY, X still moving |
+| F12c | SimPort injects one extra before-pause | `pump()` returns `Error`; the other axis does not gain that pause | — |
 | F13 | Queue underrun (pump starved) | Flag set; plot still dumped | — |
 | F14 | Drift over 60 s simulated | `\|T_i − T_j\|` bounded by a few ticks | T_i − T_j |
 | F15 | Slice would exceed `ticks_min` | Planner rejects / clips at plan time, never `ErrorTicksTooLow` at feed | — |
@@ -2082,11 +2080,13 @@ paper refuses to paper over.
    unless a future FAS API starts a mask of queues in one
    interrupt-off section. FasNAxis documents the inherited skew
    (one `addQueueEntry(NULL, true)` call per axis).
-3. **Buffered ESP32 drivers inject extra drain pauses.**
-   `getDirChangeBeforePauseCount()` (RMT idf5/6: 2) plus
-   planner-issued pauses should cover it; leftover inject is
-   globalized (§4.4.2). The PC sim has this as a configurable
-   hook; it does not emulate RMT.
+3. **Buffered ESP32 drivers inject a drain pause** when the
+   queued shape does not cover `getDirChangeBeforePauseCount()`
+   / `getDirChangeBeforeTicks()` / `getDirChangeAfterTicks()`.
+   FasNAxis pre-carves that shape from the last step (§4.4).
+   An inject that still happens is `PumpStatus::Error`. The PC
+   sim exposes the budget and a one-shot extra inject; it does
+   not emulate RMT.
 
 None of these block a PC-tested v1 on `SimPort`.
 
@@ -2126,8 +2126,9 @@ time** and reject a request faster than that feasible track
 (§3.3). Angle changes need motor accel/decel and therefore
 preparation (v1 Linear path-stops; Overshoot prepares per axis).
 Execution is `addQueueEntry` commands with a shared tick sum.
-Reversals are planner-issued before/after DIR pauses plus
-matching dwells. Underrun is a hard error after kick-off.
+A reversal carves the before/after DIR pauses out of the
+reversing axis’s last step (§4.4); the other axes are not
+paused. Underrun is a hard error after kick-off.
 Production does not use float or integer division for planning.
 
 Two geometry modes, both hitting every trajectory point:
@@ -2140,8 +2141,8 @@ Two geometry modes, both hitting every trajectory point:
 - **Overshoot** — per-axis ramps, slight chordal bulge capped by
   `overshoot_max`. Continuing axes keep `P` through a vertex;
   reversing axes go through 0. DIR before/after pauses are
-  issued by the planner; leftover injection is a shared dwell,
-  not a one-axis time warp.
+  carved from the reversing axis’s last step; an inject the
+  plan did not carve is an error.
 
 Delivery is a single header (`src/FasNAxis.h`) with a class
 template. Include it when you need coordinated motion; omit it and
