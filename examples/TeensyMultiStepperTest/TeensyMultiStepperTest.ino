@@ -1,74 +1,69 @@
 #include "FastAccelStepper.h"
 
 // Multi-stepper test for the EXPERIMENTAL Teensy 4.0/4.1 backend
-// (src/pd_teensy). Verifies several steppers run independently and
-// correctly at the same time - in particular, crossing from the first
-// QuadTimer module (TMR1) into the second (TMR2), which nothing else in
-// this library's test sketches has exercised yet.
+// (src/pd_teensy). Defaults to the FULL claimed capacity - 16 steppers,
+// spanning all 4 QuadTimer modules (TMR1..TMR4) - to find out how many
+// this board actually drives, not just how many the code claims to
+// support.
 //
-// WHY THE MODULE BOUNDARY MATTERS: this backend allocates one QuadTimer
-// channel per stepper, 4 channels per module, in connection order. The
-// first 4 steppers you connect all land on module 0 (TMR1); the 5th is
-// the first one on module 1 (TMR2), with its own separate NVIC interrupt
-// vector and register block. If there were a bug specific to a non-first
-// module (wrong register base address, wrong IRQ number, ISR dispatch
-// mixing up modules...), it would only show up once a 5th stepper is
-// connected - so NUM_STEPPERS defaults to 5 here, not fewer.
+// WHY THIS MATTERS: this backend allocates one QuadTimer channel per
+// stepper, 4 channels per module, in connection order. Steppers 0-3 land
+// on module 0 (TMR1), 4-7 on module 1 (TMR2), 8-11 on module 2 (TMR3),
+// 12-15 on module 3 (TMR4) - each module has its own register block and
+// NVIC interrupt vector. A bug specific to a given module, or a resource
+// conflict once all 4 are active simultaneously, would only show up once
+// every module is actually exercised.
 //
-// Real motors are NOT required to validate this - the concern here is
-// software correctness (do all channels/modules run independently
-// without interfering with each other), not torque/missed-steps under
-// load (already measured separately per axis with
-// examples/TeensyMaxSpeedFinder). Driving raw pins into LEDs, a logic
-// analyzer, or nothing at all is enough. If you do have fewer than 5
-// motors/drivers, wire the remaining step pins to nothing (or an LED) -
-// stepperConnectToPin() doesn't need a load on the pin.
+// Real motors are NOT required - this tests software correctness (do all
+// 16 channels across all 4 modules run independently, with no missed
+// deadlines even under the combined interrupt load of all of them at
+// once), not torque/missed-steps under load (measured separately per
+// axis with examples/TeensyMaxSpeedFinder). Driving raw pins into LEDs,
+// a logic analyzer, or nothing at all is enough.
+//
+// PINS: 16 unique step pins and 16 unique dir pins are needed (step pins
+// specifically MUST be unique - each one claims its own QuadTimer
+// channel); the enable pin is shared across all 16 here (this library
+// supports sharing enable/dir pins between motors) to keep the pin count
+// within Teensy 4.0's 40 available pins. Change ENABLE_PIN or the arrays
+// below to match your wiring; set NUM_STEPPERS lower if you don't have
+// (or don't want to wire up) all 16.
 //
 // HOW TO USE:
-// 1. Adjust NUM_STEPPERS and the pins[] table below to what you have
-//    wired (keep NUM_STEPPERS >= 5 at least once, to cross the module
-//    boundary - you can drop back down afterwards).
+// 1. Set NUM_STEPPERS below (up to 16) and check the pin arrays match
+//    your wiring (or that the pins are simply safe to toggle/unconnected).
 // 2. Upload, open the Serial Monitor at 115200.
-// 3. Each stepper immediately starts an independent, continuous
-//    back-and-forth move at its own speed (deliberately different per
-//    axis, see SPEED_HZ[] / ACCEL[] below) - this maximizes the chance
-//    of exposing any cross-talk between channels/modules, since they're
-//    never in lockstep.
+// 3. Every stepper immediately starts an independent, continuous
+//    back-and-forth move at its own speed/acceleration/distance
+//    (deliberately different per axis, computed from its index so no two
+//    are ever in lockstep) - this maximizes the chance of exposing any
+//    cross-talk between channels/modules.
 // 4. A status table prints every 500 ms: one row per stepper, showing
 //    which TMR module/channel it's on, position, live speed, and
-//    queue/ramp state. All rows should update independently and none
-//    should ever show a stuck rampState or frozen position while
+//    queue/ramp state. Every row should keep updating independently;
+//    none should ever show a stuck rampState or frozen position while
 //    queueRunning=1 (that pattern is exactly the "stuck ramp" bug this
-//    library had - see CHANGELOG). Let it run for at least a few
-//    minutes and confirm every row keeps moving smoothly the whole time.
+//    library had - see CHANGELOG). Let it run for several minutes and
+//    confirm every row - especially the ones on modules 2-4 (index
+//    >= 4) - keeps moving smoothly the whole time.
 
-#define NUM_STEPPERS 5
-
-struct PinSet {
-  uint8_t step, dir, enable;
-};
+#define NUM_STEPPERS 16  // up to 16 (4 QuadTimer modules x 4 channels)
 
 // clang-format off
-const PinSet pins[NUM_STEPPERS] = {
-    {2,  3,  4},   // stepper 0 -> TMR1 channel 0
-    {5,  6,  7},   // stepper 1 -> TMR1 channel 1
-    {8,  9,  10},  // stepper 2 -> TMR1 channel 2
-    {11, 12, 24},  // stepper 3 -> TMR1 channel 3
-    {25, 26, 27},  // stepper 4 -> TMR2 channel 0 (first channel on the 2nd module)
-    // add more (up to 16 total) to reach TMR3/TMR4 too, e.g.:
-    // {28, 29, 30},  // stepper 5 -> TMR2 channel 1
+const uint8_t STEP_PIN[16] = {
+    2,  3,  4,  5,  6,  7,  8,  9,
+    10, 11, 12, 14, 15, 16, 17, 18,  // 13 skipped (onboard LED)
+};
+const uint8_t DIR_PIN[16] = {
+    19, 20, 21, 22, 23, 24, 25, 26,
+    27, 28, 29, 30, 31, 32, 33, 34,
 };
 // clang-format on
-
-// Deliberately different per axis, and not simple multiples of each
-// other, so the steppers are never in lockstep - makes any timing
-// cross-talk between channels/modules much easier to notice.
-const uint32_t SPEED_HZ[NUM_STEPPERS] = {2000, 3300, 4700, 6100, 7900};
-const uint32_t ACCEL[NUM_STEPPERS] = {4000, 6000, 9000, 12000, 16000};
-const int32_t TRAVEL_STEPS[NUM_STEPPERS] = {3200, 2800, 2400, 2000, 1600};
+#define ENABLE_PIN 35  // shared by all steppers - this library supports that
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *steppers[NUM_STEPPERS];
+int32_t travelSteps[NUM_STEPPERS];
 
 void setup() {
   Serial.begin(115200);
@@ -81,12 +76,12 @@ void setup() {
   engine.init();
 
   for (uint8_t i = 0; i < NUM_STEPPERS; i++) {
-    FastAccelStepper *s = engine.stepperConnectToPin(pins[i].step);
+    FastAccelStepper *s = engine.stepperConnectToPin(STEP_PIN[i]);
     steppers[i] = s;
     Serial.print("stepper ");
     Serial.print(i);
     Serial.print(" (step pin ");
-    Serial.print(pins[i].step);
+    Serial.print(STEP_PIN[i]);
     Serial.print(") -> TMR module ");
     Serial.print(i >> 2);
     Serial.print(" channel ");
@@ -97,12 +92,20 @@ void setup() {
       continue;
     }
     Serial.println("OK");
-    s->setDirectionPin(pins[i].dir);
-    s->setEnablePin(pins[i].enable);
+    s->setDirectionPin(DIR_PIN[i]);
+    s->setEnablePin(ENABLE_PIN);
     s->setAutoEnable(true);
-    s->setSpeedInHz(SPEED_HZ[i]);
-    s->setAcceleration(ACCEL[i]);
-    s->moveTo(TRAVEL_STEPS[i]);
+
+    // Deliberately different per axis, and not simple multiples of each
+    // other, so the steppers are never in lockstep - makes any timing
+    // cross-talk between channels/modules much easier to notice.
+    uint32_t speedHz = 2000 + (uint32_t)i * 733;
+    uint32_t accel = 4000 + (uint32_t)i * 1500;
+    travelSteps[i] = 1800 + (int32_t)(i % 5) * 300;
+
+    s->setSpeedInHz(speedHz);
+    s->setAcceleration(accel);
+    s->moveTo(travelSteps[i]);
   }
   Serial.println();
 }
@@ -126,8 +129,8 @@ void loop() {
     }
     if (!s->isRunning()) {
       // reverse direction and go again
-      int32_t target = (s->getCurrentPosition() <= 0) ? TRAVEL_STEPS[i]
-                                                       : -TRAVEL_STEPS[i];
+      int32_t target =
+          (s->getCurrentPosition() <= 0) ? travelSteps[i] : -travelSteps[i];
       s->moveTo(target);
     }
     char line[110];
