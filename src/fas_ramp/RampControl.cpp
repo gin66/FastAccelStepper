@@ -7,7 +7,7 @@
 #include "fas_arch/common.h"
 
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-// Definitions for the `extern` declarations in RampGenerator.h. Must have
+// Definitions for the `extern` declarations in RampCalculator.h. Must have
 // external linkage (no `static`): RampGenerator.cpp, a separate translation
 // unit, also uses these via the LOG2_TICKS_PER_S* macros in RampCalculator.h.
 log2_value_t log2_timer_freq;

@@ -24,10 +24,24 @@
 // the AVR backend uses a hardware compare match to time each edge).
 // ============================================================================
 
-#define TMR_PRESCALE 4  // divide by 2^4 = 16 -> 150MHz / 16 = 9.375 MHz
+// FAS_TEENSY_TMR_PRESCALE (0..7, default 4) lives in pd_config.h - it also
+// derives TICKS_PER_S, so the two must always move together.
 
 #define PULSE_TICKS \
   ((uint16_t)(((uint32_t)(FAS_TEENSY_PULSE_WIDTH_US) * TICKS_PER_S) / 1000000L))
+
+// NVIC priority, 0 (highest) .. 255 (lowest), in steps of 16 (Cortex-M7 on
+// i.MX RT1062 implements 4 priority bits; values not a multiple of 16 get
+// rounded down by the hardware, so stick to multiples of 16 to keep the
+// numbers meaningful). Step edges must preempt the ~4 ms ramp tick (queue
+// refill), or a slow/late refill under load could show up as timing jitter
+// on the step pin. Untested: worth confirming on a scope under load.
+#ifndef FAS_TEENSY_STEP_ISR_PRIORITY
+#define FAS_TEENSY_STEP_ISR_PRIORITY 16
+#endif
+#ifndef FAS_TEENSY_RAMP_TICK_PRIORITY
+#define FAS_TEENSY_RAMP_TICK_PRIORITY 208
+#endif
 
 static FastAccelStepperEngine* fas_engine = NULL;
 static IntervalTimer fas_ramp_timer;
@@ -41,6 +55,7 @@ static void fas_ramp_tick_isr() {
 void fas_init_engine(FastAccelStepperEngine* engine) {
   fas_engine = engine;
   fas_ramp_timer.begin(fas_ramp_tick_isr, (unsigned int)(DELAY_MS_BASE * 1000));
+  fas_ramp_timer.priority(FAS_TEENSY_RAMP_TICK_PRIORITY);
 }
 
 // ----------------------------------------------------------------------------
@@ -127,6 +142,12 @@ void StepperQueue::handleCompareMatch() {
   primeFromQueue(rp);
 }
 
+// The Cortex-M7 has a write buffer, so clearing CSCTRL.TCF1 is not
+// guaranteed to have reached the peripheral by the time the ISR returns -
+// without a barrier, the NVIC can see the interrupt as still pending and
+// the flag-clear can appear to "not have happened" from the next ISR's
+// point of view, corrupting the edge-toggle state machine. TeensyStep4's
+// TMRModule::ISR() carries the same barrier with the same reasoning.
 #define TEENSY_TMR_ISR(N)                                             \
   static void teensyTmrIsr##N() {                                     \
     for (uint8_t ch = 0; ch < 4; ch++) {                              \
@@ -140,6 +161,7 @@ void StepperQueue::handleCompareMatch() {
         q->handleCompareMatch();                                      \
       }                                                                \
     }                                                                  \
+    asm volatile("dsb");                                              \
   }
 
 TEENSY_TMR_ISR(0)
@@ -194,6 +216,7 @@ void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   static bool module_isr_attached[4] = {false, false, false, false};
   if (!module_isr_attached[mod]) {
     attachInterruptVector(tmr_module_irq[mod], tmr_module_isr[mod]);
+    NVIC_SET_PRIORITY(tmr_module_irq[mod], FAS_TEENSY_STEP_ISR_PRIORITY);
     NVIC_ENABLE_IRQ(tmr_module_irq[mod]);
     module_isr_attached[mod] = true;
   }
@@ -234,7 +257,8 @@ void StepperQueue::startQueue() {
 
   _regs->CSCTRL |= TMR_CSCTRL_TCF1EN;
   _regs->CTRL =
-      TMR_CTRL_CM(1) | TMR_CTRL_PCS(0b1000 | TMR_PRESCALE) | TMR_CTRL_LENGTH;
+      TMR_CTRL_CM(1) | TMR_CTRL_PCS(0b1000 | FAS_TEENSY_TMR_PRESCALE) |
+      TMR_CTRL_LENGTH;
 }
 
 void StepperQueue::forceStop() {

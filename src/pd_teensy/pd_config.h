@@ -32,15 +32,29 @@
 
 // The QuadTimer modules are clocked from the IPG peripheral clock, which
 // Teensyduino configures to 150 MHz regardless of F_CPU/overclocking
-// (confirmed via TeensyStep4's TMR.h). Prescaler divides by 16 (2^4),
-// giving a 9.375 MHz tick rate: up to 65535/9.375e6 =~ 7 ms per single
-// queue entry, comfortably above the 4 ms ramp tick period.
+// (confirmed via TeensyStep4's TMR.h). FAS_TEENSY_TMR_PRESCALE (0..7)
+// divides that by 2^prescale (see teensy_queue.cpp) to get the tick rate:
+//   0 -> 150 MHz    (65535 ticks =~ 0.44 ms per queue entry)
+//   4 -> 9.375 MHz  (default: =~ 7 ms per queue entry)
+//   7 -> 1.17 MHz   (=~ 56 ms per queue entry)
+// A smaller prescale gives finer timing resolution (matters most for very
+// high step rates and for how smoothly the ramp can approximate its curve),
+// at the cost of a shorter max duration per single queue entry - still
+// comfortably above the 4 ms ramp tick down to prescale 2 (37.5 MHz,
+// =~1.75 ms/entry). Untested: worth sweeping this while measuring actual
+// achievable step rate/jitter on a scope, see pd_teensy warning above.
+#ifndef FAS_TEENSY_TMR_PRESCALE
+#define FAS_TEENSY_TMR_PRESCALE 4
+#endif
+#if (FAS_TEENSY_TMR_PRESCALE < 0) || (FAS_TEENSY_TMR_PRESCALE > 7)
+#error "FAS_TEENSY_TMR_PRESCALE must be 0..7"
+#endif
 //
 // This does not match the two precomputed fast-path constants in
 // RampCalculator.h (16 MHz / 21 MHz), so the generic runtime log2 timer
 // frequency path is used automatically (see SUPPORT_LOG2_TIMER_FREQ_VARIABLES
 // in RampCalculator.h/RampControl.cpp) - no extra setup needed here.
-#define TICKS_PER_S 9375000L
+#define TICKS_PER_S (150000000L >> FAS_TEENSY_TMR_PRESCALE)
 #define MIN_CMD_TICKS (TICKS_PER_S / 5000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))
 #define MAX_DIR_DELAY_US (65535 / (TICKS_PER_S / 1000000))
