@@ -639,7 +639,7 @@ raising `MAX_STEPPER` or linking extra queues. `f16_skeleton()` in
 
 ---
 
-## Step 6 — Linear interpolator, one block (F1, F2, F3)
+## Step 6 — Linear interpolator, one block (F1, F2, F3) ✅
 
 **Test first:**
 
@@ -663,6 +663,30 @@ feeder without reversals.
 
 **Done when:** F1–F3 Linear green; F17 (first-fill empty queue is
 not underrun) green.
+
+**Done:** `src/FasNAxis.h` now plans and feeds one committed rest-to-rest
+segment. `addLine` commits the segment (delta from the current target);
+`endPath` closes the path. `pump()` runs the §10.4 loop: `feeder_start`
+picks the DDA master (`Remaining::longest_axis`) and the `RampLaw` at
+`ticks_floor`/`addAxis` accel, prefill appends with `start=false`, then
+each axis is kicked off with `addQueueEntry(NULL, true)` and later
+commands use `start=true`. `feed_one` emits at most one entry per axis per
+call so the axes stay in lockstep; a master period above 65535 is
+represented the FAS way as a half-period step entry plus pause entries
+(§4.2/§9.3), keeping the common clock. `pump` flags `Underrun` only after
+kick-off with the plan still moving, and clears the segment to `Idle` once
+the plan is done and the queues empty. Getters `performedRampUp`,
+`remainingToStop`, `lastTicks`, `masterAxis`, `isBusy`, `hasUnderrun` feed
+the oracle. `SimPort` gained duck-typed `getAcceleration`,
+`queueEntries`, `isQueueFull` (one reserved slot) and a `drain_one` that
+advances position/clock by exactly one command. `f6_linear_sim()` in
+`test_26.cpp` runs F1 `(10000,0)` (idle Y issues nothing), F2 `(1600,1600)`
+45° equal limits (a step on each axis every slice), F3 `(10000,100)` (X
+master, path within `0.5*sqrt(2)` of the chord) and F17 (first fill on an
+empty queue is not underrun). All issued sums equal the target, `P <= R`
+holds on every sample, and no run underruns. Plots: `test_26_f1_lin.gnuplot`,
+`test_26_f2.gnuplot`, `test_26_f3_lin.gnuplot` (`f1_map`/`f3` were already
+taken by Steps 1 and 3).
 
 ---
 

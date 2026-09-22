@@ -2141,6 +2141,215 @@ void f4_sim_port() {
   printf("F4 SimPort addQueueEntry contract green\n");
 }
 
+// Step 6: Linear interpolator, one committed block, through SimPort (F1, F2,
+// F3, F17). FasNAxis commits one rest-to-rest segment, prefills the queues with
+// start=false, then kicks off each axis (addQueueEntry(NULL, true)); later
+// commands use start=true. The test drains one command per axis per iteration
+// so the axes stay in lockstep. Checks: issued step sums == target, P <= R on
+// every committed sample, the realized path stays on the commanded chord
+// (section 12.4 rounding box), the first fill of an empty queue is not
+// underrun, and the run completes without underrun. Plots:
+// test_26_f1_lin.gnuplot, test_26_f2.gnuplot, test_26_f3_lin.gnuplot.
+struct SimSegmentResult {
+  int64_t issued[2];
+  int64_t bind_moves;
+  int64_t both_moves;
+  uint32_t max_P;
+  uint32_t min_R;
+  uint32_t max_ticks;
+  double max_dev;
+  bool p_le_r;
+  bool underrun;
+  bool first_fill_underrun;
+  int64_t n_iter;
+  PumpStatus first_pump;
+};
+
+static void run_linear_segment(SimPort& px, SimPort& py,
+                               FasNAxis<2, 64, SimPort>& path,
+                               const char* fixture, const char* title,
+                               int32_t tx, int32_t ty, bool do_plot,
+                               SimSegmentResult* res) {
+  res->issued[0] = 0;
+  res->issued[1] = 0;
+  res->bind_moves = 0;
+  res->both_moves = 0;
+  res->max_P = 0;
+  res->min_R = 0xFFFFFFFFu;
+  res->max_ticks = 0;
+  res->max_dev = 0.0;
+  res->p_le_r = true;
+  res->underrun = false;
+  res->first_fill_underrun = false;
+  res->n_iter = 0;
+
+  NaxisPlot plot;
+  if (do_plot) {
+    plot.start_plot(fixture, title, 2);
+    plot.poly_point((double)px.position(), (double)py.position());
+    plot.poly_point((double)tx, (double)ty);
+    plot.poly_done();
+  }
+
+  int32_t target[2] = {tx, ty};
+  path.addLine(target);
+  path.endPath();
+  res->first_pump = path.pump();
+  res->first_fill_underrun = path.hasUnderrun();
+
+  int master = path.masterAxis();
+  while (path.isBusy()) {
+    int64_t s0 = 0, s1 = 0;
+    bool u0 = true, u1 = true;
+    px.drain_one(&s0, &u0);
+    py.drain_one(&s1, &u1);
+    res->issued[0] += s0;
+    res->issued[1] += s1;
+    int64_t s_bind = (master == 0) ? s0 : s1;
+    int64_t s_slave = (master == 0) ? s1 : s0;
+    if (s_bind != 0) {
+      res->bind_moves++;
+      if (s_slave != 0) {
+        res->both_moves++;
+      }
+    }
+    uint32_t P = path.performedRampUp();
+    uint32_t R = path.remainingToStop();
+    uint32_t ticks = path.lastTicks();
+    if (P > res->max_P) {
+      res->max_P = P;
+    }
+    if (R < res->min_R) {
+      res->min_R = R;
+    }
+    if (ticks > res->max_ticks) {
+      res->max_ticks = ticks;
+    }
+    if (P > R) {
+      res->p_le_r = false;
+    }
+    double x = (double)px.position();
+    double y = (double)py.position();
+    double nx = -(double)ty;
+    double ny = (double)tx;
+    double nlen = sqrt(nx * nx + ny * ny);
+    double dev =
+        nlen > 0.0 ? fabs(nx * x + ny * y) / nlen : sqrt(x * x + y * y);
+    if (dev > res->max_dev) {
+      res->max_dev = dev;
+    }
+    if (do_plot && (res->n_iter % 4 == 0)) {
+      double t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      double v = ticks > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)ticks : 0.0;
+      double speed[2] = {v, v};
+      double Pcol[2] = {(double)P, (double)P};
+      double Rcol[2] = {(double)R, (double)R};
+      double tcol[2] = {(double)ticks, (double)ticks};
+      plot.row(t, x, y, dev, speed, Pcol, Rcol, tcol);
+    }
+    res->n_iter++;
+    path.pump();
+  }
+  res->underrun = path.hasUnderrun();
+  if (do_plot) {
+    plot.finish_plot();
+  }
+}
+
+void f6_linear_sim() {
+  // F1: one long axis, idle second axis (1-axis fixture run through the queue
+  // path). 10 000 steps at ticks_cfg 4000 / accel 2000 (section 14.1).
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F6 F1 addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F6 F1 addAxis(1)");
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    SimSegmentResult res;
+    run_linear_segment(px, py, path, "f1_lin",
+                       "FasNAxis F1 Linear (10000,0) via SimPort", 10000, 0,
+                       true, &res);
+    test(res.issued[0] == 10000, "F6 F1 issued X == 10000");
+    test(res.issued[1] == 0, "F6 F1 idle Y issues no steps");
+    test(res.p_le_r, "F6 F1 P <= R on every sample");
+    test(res.underrun == false, "F6 F1 no underrun");
+    test(res.first_fill_underrun == false, "F6 F17 first fill not underrun");
+    test(res.first_pump == PumpStatus::Running,
+         "F6 F1 first pump returns Running");
+    test(px.position() == 10000 && py.position() == 0,
+         "F6 F1 realized end == target");
+    printf(
+        "F6 F1 (10000,0): issued=(%lld,%lld) peak_P=%u max_ticks=%u "
+        "iter=%lld\n",
+        (long long)res.issued[0], (long long)res.issued[1], res.max_P,
+        res.max_ticks, (long long)res.n_iter);
+    printf("F1 Linear SimPort plot written: test_26_f1_lin.gnuplot\n");
+  }
+
+  // F2: 45 degree line, equal limits. X binds; every binder step is one step on
+  // each axis, so |delta_x| == |delta_y| every slice and the path is the chord.
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    SimSegmentResult res;
+    run_linear_segment(px, py, path, "f2", "FasNAxis F2 Linear 45 deg", 1600,
+                       1600, true, &res);
+    test(res.issued[0] == 1600 && res.issued[1] == 1600,
+         "F6 F2 both axes issue 1600");
+    test(res.bind_moves == 1600 && res.both_moves == res.bind_moves,
+         "F6 F2 equal |delta| every slice on a 45 deg line");
+    test(res.max_dev <= 0.5 * sqrt(2.0) + 1e-9,
+         "F6 F2 path stays on the chord (0.5 sqrt n box)");
+    test(res.p_le_r, "F6 F2 P <= R on every sample");
+    test(res.underrun == false, "F6 F2 no underrun");
+    test(px.position() == 1600 && py.position() == 1600,
+         "F6 F2 realized end == target");
+    printf("F6 F2 (1600,1600): issued=(%lld,%lld) max_dev=%.3f peak_P=%u\n",
+           (long long)res.issued[0], (long long)res.issued[1], res.max_dev,
+           res.max_P);
+    printf("F2 Linear SimPort plot written: test_26_f2.gnuplot\n");
+  }
+
+  // F3: (10000, 100). X binds; Y is a slow slave well below its own ramp and
+  // the realized path stays on the chord. Both endpoints (vertices) are hit.
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    SimSegmentResult res;
+    run_linear_segment(px, py, path, "f3_lin", "FasNAxis F3 Linear (10000,100)",
+                       10000, 100, true, &res);
+    test(path.masterAxis() == 0, "F6 F3 X is the DDA master");
+    test(res.issued[0] == 10000 && res.issued[1] == 100,
+         "F6 F3 issued == (10000,100)");
+    test(res.max_dev <= 0.5 * sqrt(2.0) + 1e-9,
+         "F6 F3 path stays on the chord (0.5 sqrt n box)");
+    test(res.p_le_r, "F6 F3 P <= R on every sample");
+    test(res.underrun == false, "F6 F3 no underrun");
+    test(px.position() == 10000 && py.position() == 100,
+         "F6 F3 vertex hit: realized end == target");
+    printf(
+        "F6 F3 (10000,100): issued=(%lld,%lld) master=%d max_dev=%.3f "
+        "peak_P=%u\n",
+        (long long)res.issued[0], (long long)res.issued[1], path.masterAxis(),
+        res.max_dev, res.max_P);
+    printf("F3 Linear SimPort plot written: test_26_f3_lin.gnuplot\n");
+  }
+
+  printf("F6/F17 Linear interpolator through SimPort green\n");
+}
+
 // F16 (whitepaper section 6 / 14 / F-table row F16): the header skeleton and
 // its registration contract. No motion yet (that is Step 6+). This pins:
 //    - FasNAxisConfig{} default member initializers, and the constructor's
@@ -2252,6 +2461,7 @@ int main() {
   f2h_nblock_vs_f20();
   f3b_stoppability();
   f4_sim_port();
+  f6_linear_sim();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;

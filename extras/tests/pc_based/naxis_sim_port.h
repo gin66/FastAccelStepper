@@ -36,6 +36,7 @@ class SimPort {
 
   SimPort(uint16_t max_speed_in_ticks = 80, int queue_len = 64)
       : max_speed_in_ticks_(max_speed_in_ticks),
+        accel_(2000),
         queue_len_(queue_len),
         inject_(InjectNone),
         inject_ticks_(8000),
@@ -79,12 +80,26 @@ class SimPort {
   // addAxis / setLimitsFromSteppers read the configured period through one
   // name, so SimPort exposes its max_speed_in_ticks under that name.
   uint16_t getMaxSpeedInTicks() const { return max_speed_in_ticks_; }
+  // Duck-type alias for the real FastAccelStepper::getAcceleration(): addAxis
+  // reads the per-axis acceleration through the same name (section 6.3).
+  uint32_t getAcceleration() const { return accel_; }
+  void setAcceleration(uint32_t a) { accel_ = a; }
   uint32_t clock() const { return clock_; }
   // Ticks of the pause(s) the last call injected (0 for AQE_OK). This is what
   // the feeder globalizes onto the other axes on a DirChangePauseInjected
   // return (whitepaper section 4.4.2).
   uint16_t injectedPauseTicks() const { return injected_pause_ticks_; }
   bool isQueueEmpty() const { return read_idx_ == next_write_idx_; }
+  // Pending command count, matching FastAccelStepper::queueEntries().
+  uint32_t queueEntries() const {
+    return (uint32_t)(next_write_idx_ - read_idx_);
+  }
+  // Duck-type alias for FastAccelStepper::isQueueFull(). One slot is reserved
+  // so a caller that checks this before a coordinated slice always has room
+  // for two entries (a pause-stuffed step, section 4.2).
+  bool isQueueFull() const {
+    return queueEntries() + 1 >= (uint32_t)queue_len_;
+  }
   // After a kick-off the queue running with an empty queue while the plan is
   // still open is an underrun; before a kick-off an empty queue is expected
   // (prefill) and is NOT an underrun.
@@ -107,6 +122,9 @@ class SimPort {
     }
     if (cmd->ticks < max_speed_in_ticks_) {
       return AQE_ERROR_TICKS_TOO_LOW;
+    }
+    if (isQueueFull()) {
+      return AQE_QUEUE_FULL;
     }
 
     // In inject mode a reversing step (steps > 0 and a new DIR) drives the
@@ -150,6 +168,30 @@ class SimPort {
     return AQE_OK;
   }
 
+  // Consume exactly one pending command (the front of the queue). Returns the
+  // tick sum of that command (0 if the queue is empty) and, optionally, its
+  // steps and count_up. Used by the FasNAxis feeder tests to drain the axes in
+  // lockstep, one coordinated command at a time.
+  uint32_t drain_one(int64_t* steps_out = NULL, bool* count_up_out = NULL) {
+    if (read_idx_ == next_write_idx_) {
+      return 0;
+    }
+    struct queue_entry& e = entry_[read_idx_ & queue_mask()];
+    uint32_t ticks = e.steps == 0 ? e.ticks : (uint32_t)e.steps * e.ticks;
+    if (e.steps != 0) {
+      position_ += e.count_up ? e.steps : -(int32_t)e.steps;
+    }
+    clock_ += ticks;
+    if (steps_out != NULL) {
+      *steps_out = e.steps;
+    }
+    if (count_up_out != NULL) {
+      *count_up_out = e.count_up;
+    }
+    read_idx_++;
+    return ticks;
+  }
+
   // Consume the whole pending queue: advance position (signed by count_up) and
   // the simulated clock (pause ticks + steps*ticks for step commands).
   uint32_t drain() { return drain_all(); }
@@ -190,6 +232,7 @@ class SimPort {
   };
 
   uint16_t max_speed_in_ticks_;
+  uint32_t accel_;
   int queue_len_;
   InjectMode inject_;
   uint16_t inject_ticks_;

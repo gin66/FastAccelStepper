@@ -86,7 +86,8 @@ test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
 # FasNAxis headers: test_26 includes them, so a header-only change must rebuild.
-test_26.o: naxis_plot.h naxis_sim_port.h \
+test_26.o: naxis_plot.h naxis_sim_port.h naxis_ref.h \
+	$(PRJ_ROOT)/src/FasNAxis.h \
 	$(PRJ_ROOT)/src/fas_naxis/remaining.h \
 	$(PRJ_ROOT)/src/fas_naxis/ramp_law.h \
 	$(PRJ_ROOT)/src/fas_naxis/ramp_map.h \
