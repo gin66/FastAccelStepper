@@ -182,8 +182,13 @@ void setup() {
 
   // Raise the ceiling so setSpeedInHz() up to the top test level is even
   // accepted - see pd_teensy/pd_config.h, SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING.
+  // Guarded here because this method only exists on platforms that define
+  // that macro (e.g. not atmelsam) - the CI build matrix compiles every
+  // example against every platform.
+#if defined(SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING)
   stepper->setAbsoluteSpeedLimit(
       (uint16_t)fas_max((uint32_t)1, TICKS_PER_S / 400000));
+#endif
 
   Serial.println(
       "Mark the shaft now if you haven't. Type 'y' <enter> when ready to "
