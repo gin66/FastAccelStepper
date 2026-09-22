@@ -5,9 +5,10 @@
 #include "fas_queue/base.h"
 #include "imxrt.h"
 
-// Teensy 4.x (i.MX RT1062) pulse driver. EXPERIMENTAL, not yet verified on
-// real hardware - see pd_config.h for context and pd_teensy/teensy_queue.cpp
-// for the implementation and its references.
+// Teensy 4.x (i.MX RT1062) pulse driver. EXPERIMENTAL - tested on real
+// hardware, but pulse width/edge timing not yet scope-verified - see
+// pd_config.h for context and pd_teensy/teensy_queue.cpp for the
+// implementation and its references.
 //
 // Each stepper claims one channel of one of the 4 QuadTimer (TMR) modules.
 // Unlike SAMD/SAM, the channel's own output pin is not used: the step (and,

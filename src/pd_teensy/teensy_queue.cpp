@@ -3,8 +3,9 @@
 #if defined(SUPPORT_TEENSY4)
 
 // ============================================================================
-// Teensy 4.x (i.MX RT1062) pulse driver. EXPERIMENTAL - NOT YET VERIFIED ON
-// REAL HARDWARE. See pd_teensy/pd_config.h for context.
+// Teensy 4.x (i.MX RT1062) pulse driver. EXPERIMENTAL - tested on real
+// hardware, but pulse width/edge timing not yet scope-verified. See
+// pd_teensy/pd_config.h for context.
 //
 // Register sequence (CTRL/CSCTRL/COMP1/CMPLD1 setup, the "two-phase" toggle
 // technique of alternating COMP1 between the pulse width and the remaining

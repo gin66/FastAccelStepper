@@ -21,7 +21,7 @@ Arduino core 3.1.0 will support ESP-IDF V5.3.0 (based on RC1)
 ## Overview
 
 This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560, ATmega32u4), atmelsam due, Microchip SAMD51, esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4, Raspberry pi pico and pico2, and (experimentally, not yet hardware-verified) Teensy 4.0/4.1.
+Supported are avr (ATmega 168/328/P, ATmega2560, ATmega32u4), atmelsam due, Microchip SAMD51, esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4, Raspberry pi pico and pico2, and (experimentally) Teensy 4.0/4.1.
 
 For memory footprint information across supported architectures, see [Memory Report](https://github.com/gin66/FastAccelStepper/blob/master/extras/doc/memory_report.md).
 
@@ -96,7 +96,7 @@ The `src/` directory is organized into the following subdirectories:
 | `pd_pico/` | RP2040/RP2350 pulse driver: PIO-based stepper control |
 | `pd_sam/` | SAM Due pulse driver: timer-based stepper control |
 | `pd_samd/` | SAMD51 pulse driver: TCC PWM-based stepper control |
-| `pd_teensy/` | Teensy 4.0/4.1 pulse driver: QuadTimer-based stepper control (EXPERIMENTAL, not yet hardware-verified) |
+| `pd_teensy/` | Teensy 4.0/4.1 pulse driver: QuadTimer-based stepper control (EXPERIMENTAL) |
 | `pd_test/` | Test platform pulse driver: PC-based testing simulation |
 | `fas_queue/` | Queue implementation: command queue management |
 | `fas_ramp/` | Ramp calculation: acceleration/deceleration curves |
@@ -292,13 +292,13 @@ Tested with max two stepper motors with 50 kHz step rate by clazarowitz
 * SAMD21 is not supported (compile error)
 * requires an Arduino SAMD51 core (uses the variant pin table); tested with the Adafruit SAMD core
 
-### Teensy 4.0/4.1 (EXPERIMENTAL - not yet verified on real hardware)
+### Teensy 4.0/4.1 (EXPERIMENTAL)
 
 * up to 16 stepper motors: 4 QuadTimer (TMR) modules x 4 channels each
 * step/dir pins are plain GPIO (toggled via `digitalWriteFast()`), not restricted to specific muxed pins - any digital pin works
 * two ISR calls per step (rising + falling edge), each hardware-timed by a QuadTimer compare match, the same principle this library's AVR backend uses
 * Steppers' command queue depth: 32
-* this port was written without access to real Teensy 4.x hardware or a compiler for it - see the warning at the top of [pd_teensy/pd_config.h](https://github.com/gin66/FastAccelStepper/blob/master/src/pd_teensy/pd_config.h). Please verify step timing/pulse width on a scope before relying on it, and report back what you find
+* tested on a real Teensy 4.0 with a DM556 industrial stepper driver: a single axis was speed-swept up to 200 kHz with no missed steps (verified by marking the shaft, since there is no pulse-counter/encoder feedback to check this in software), and all 16 steppers were run simultaneously across all 4 QuadTimer modules with no cross-talk between channels. Pulse width/edge timing has not been checked on a scope or logic analyzer yet - if you have one, please verify and report back what you find
 
 ## Usage
 
@@ -715,4 +715,5 @@ As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepp
 - Thanks Sam W for pull request (https://github.com/gin66/FastAccelStepper/pull/351) samx3-due: Fix null result from `tryAllocateQueue()`
 - Thanks drayde for pull request (https://github.com/gin66/FastAccelStepper/pull/366) Fix ESP-IDF 6 RMT header include
 - Thanks Loriland for the Microchip SAMD51 port (https://github.com/gin66/FastAccelStepper/issues/317)
+- Thanks ARDUTECH0 for the experimental Teensy 4.0/4.1 port (https://github.com/gin66/FastAccelStepper/pull/374)
 

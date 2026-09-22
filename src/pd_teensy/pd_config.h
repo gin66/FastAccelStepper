@@ -1,15 +1,20 @@
 // pd_teensy/pd_config.h - Teensy 4.x (i.MX RT1062) platform configuration
 //
-// !! EXPERIMENTAL / NOT YET VERIFIED ON REAL HARDWARE !!
-// This backend was written without access to a Teensy 4.x board, a
-// compiler for it, or an oscilloscope. It is adapted from two sources
-// that WERE verified on real hardware:
+// !! EXPERIMENTAL !!
+// This backend is adapted from two sources that were verified on real
+// hardware:
 //  - the register-level QuadTimer (TMR) sequence in luni64/TeensyStep4
 //    (MIT licensed), a proven stepper library for Teensy 4.x
 //  - the queue/ramp protocol already shipped here for SAMD51
 //    (src/pd_samd), which this backend's structure mirrors
-// Before relying on this in a real project: build it, and check step
-// timing/pulse width on a scope or logic analyzer at the speeds you need.
+// It has since been tested on a real Teensy 4.0 with a DM556 industrial
+// stepper driver: a single axis was speed-swept up to 200 kHz with no
+// missed steps (verified by marking the shaft - there is no pulse
+// counter/encoder feedback to check this in software), and all 16
+// steppers were run simultaneously across all 4 QuadTimer modules with
+// no cross-talk between channels. Pulse width/edge timing has not been
+// checked on a scope or logic analyzer yet - if you have one, please
+// verify and report back.
 //
 // This file defines Teensy-4.x-specific constants for the
 // FastAccelStepper library:
