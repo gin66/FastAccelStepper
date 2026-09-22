@@ -1059,7 +1059,7 @@ include. `make test` is green; `make test_26_trace` produces
 
 ---
 
-## Step 11 — Overshoot rest-to-rest (F4, F4b)
+## Step 11 — Overshoot rest-to-rest (F4, F4b) ✅
 
 Do not fold this into Linear `feed_one`. Linear mode must keep
 calling the current DDA path.
@@ -1113,6 +1113,30 @@ binding `RampLaw` only. Compare F4/F4b `clock()` to that sum,
 not to a field inside `FasNAxis`.
 
 **Done when:** F4, F4b, and the diagonal are green, and F1–F3
+Linear plots are unchanged.
+
+**Done:** `src/fas_naxis/overshoot.h` holds `OvershootBlock<NMAX>`, a
+rest-to-rest schedule generator. `init()` walks each axis's `RampLaw` over
+`|delta_i|`, takes the largest `T_opt` as the binding axis (lower index on a
+tie) and `T` as its duration. `step()` emits one command: the binding axis
+steps once at its `RampLaw` period; a binding non-binder axis
+(`T_opt_i == T`) also steps once; a non-binding axis follows the uniform
+schedule (`|delta_i| * t >= k * T`, integer multiply-compare), pulled one
+step at a time toward the chord until the integer squared distance
+`(|delta_b| * k - |delta_s| * x)^2 <= overshoot_max^2 * (|delta_b|^2 +
+|delta_s|^2)` holds (no sqrt, no division). `overshoot_max == 0` is Linear
+(the class is not constructed); `UINT16_MAX` is the raw uniform schedule.
+`FasNAxis::feed_one` calls `_ovs.step()` only when
+`mode == Overshoot && overshoot_max != 0` (set up by `start_overshoot()` in
+`feeder_start`); the Linear path is unchanged. `naxis_ref.h` gained
+`naxis_overshoot_duration()` (sum of the binding `RampLaw` only).
+`f11_overshoot_rest()` in `test_26.cpp`: F4 `(10000,100)` cap 8 ends exact,
+max `d^2 = 63.994 <= 64`, greater than the F3 Linear `d^2 = 0.25`, and both
+axis clocks equal the reference `T = 71571524`; F4b raw ends exact with the
+short axis (Y=50 of 100) still moving at mid-time and raw `d^2 = 177.9`; the
+lone diagonal `(1600,1600)` ends exact, `d^2 = 0`, and Overshoot `clock()`
+equals Linear `clock()` exactly (`28157808`). Plots: `test_26_f4.gnuplot`,
+`test_26_f4b.gnuplot`. `make test` and `make mutations` are green; F1–F3
 Linear plots are unchanged.
 
 ---

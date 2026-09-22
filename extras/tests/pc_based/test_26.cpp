@@ -3338,6 +3338,223 @@ void f9_dir_pauses() {
   printf("F12/F12b/F12c DIR pause carve green\n");
 }
 
+// ---------------------------------------------------------------------------
+// Step 11 — Overshoot rest-to-rest (F4, F4b, lone diagonal).
+//
+// One rest-to-rest segment through SimPort, FasNAxisConfig::Overshoot. The
+// binding axis (largest per-axis RampLaw duration) sets the wall clock; the
+// other axis is spread across it. F4 caps the chordal bulge at 8 steps, F4b is
+// the raw (UINT16_MAX) profile, and the lone diagonal is the same ramp on both
+// axes (d^2 ~ 0). The reference duration is naxis_overshoot_duration (sum of
+// the binding RampLaw only).
+// ---------------------------------------------------------------------------
+struct OvershootResult {
+  int64_t issued[2];
+  int32_t end[2];
+  double max_d2;
+  uint32_t clock0;
+  uint32_t clock1;
+  int32_t mid_short;
+  bool mid_seen;
+  bool underrun;
+};
+
+static void run_overshoot_segment(SimPort& px, SimPort& py,
+                                  FasNAxis<2, 64, SimPort>& path,
+                                  const char* fixture, const char* title,
+                                  int32_t tx, int32_t ty, uint64_t ref_T,
+                                  bool do_plot, OvershootResult* res) {
+  res->issued[0] = 0;
+  res->issued[1] = 0;
+  res->end[0] = 0;
+  res->end[1] = 0;
+  res->max_d2 = 0.0;
+  res->clock0 = 0;
+  res->clock1 = 0;
+  res->mid_short = -1;
+  res->mid_seen = false;
+  res->underrun = false;
+  int short_axis = (labs((long)tx) <= labs((long)ty)) ? 0 : 1;
+
+  NaxisPlot plot;
+  if (do_plot) {
+    plot.start_plot(fixture, title, 2);
+    plot.poly_point((double)px.position(), (double)py.position());
+    plot.poly_point((double)tx, (double)ty);
+    plot.poly_done();
+  }
+
+  int32_t target[2] = {tx, ty};
+  path.addLine(target);
+  path.endPath();
+  path.pump();
+
+  double nx = -(double)ty;
+  double ny = (double)tx;
+  double nlen = sqrt(nx * nx + ny * ny);
+  int64_t iter = 0;
+  while (path.isBusy()) {
+    int64_t s0 = 0, s1 = 0;
+    px.drain_one(&s0, NULL);
+    py.drain_one(&s1, NULL);
+    res->issued[0] += s0;
+    res->issued[1] += s1;
+    double x = (double)px.position();
+    double y = (double)py.position();
+    double dev =
+        nlen > 0.0 ? fabs(nx * x + ny * y) / nlen : sqrt(x * x + y * y);
+    if (dev * dev > res->max_d2) {
+      res->max_d2 = dev * dev;
+    }
+    if (!res->mid_seen && ref_T > 0 && (uint64_t)px.clock() >= ref_T / 2) {
+      res->mid_seen = true;
+      res->mid_short = short_axis == 0 ? px.position() : py.position();
+    }
+    if (do_plot && (iter % 4 == 0)) {
+      uint32_t P = path.performedRampUp();
+      uint32_t R = path.remainingToStop();
+      uint32_t ticks = path.lastTicks();
+      double t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      double v = ticks > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)ticks : 0.0;
+      double speed[2] = {v, v};
+      double Pcol[2] = {(double)P, (double)P};
+      double Rcol[2] = {(double)R, (double)R};
+      double tcol[2] = {(double)ticks, (double)ticks};
+      plot.row(t, x, y, dev, speed, Pcol, Rcol, tcol);
+    }
+    iter++;
+    path.pump();
+  }
+  res->underrun = path.hasUnderrun();
+  res->end[0] = px.position();
+  res->end[1] = py.position();
+  res->clock0 = px.clock();
+  res->clock1 = py.clock();
+  if (do_plot) {
+    plot.finish_plot();
+  }
+}
+
+void f11_overshoot_rest() {
+  const uint32_t ticks[2] = {4000, 4000};
+  const uint32_t accel[2] = {2000, 2000};
+
+  // F3 Linear baseline on the same segment: the F4 bulge must be larger.
+  double f3_max_d2 = 0.0;
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    SimSegmentResult lin;
+    run_linear_segment(px, py, path, "f11_f3", "FasNAxis F3 Linear (10000,100)",
+                       10000, 100, false, &lin);
+    f3_max_d2 = lin.max_dev * lin.max_dev;
+  }
+
+  // F4: (10000, 100), cap 8. End exact, max d^2 <= 64, bulge > Linear.
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    cfg.mode = FasNAxisConfig::Overshoot;
+    cfg.overshoot_max = 8;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F11 F4 addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F11 F4 addAxis(1)");
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t d[2] = {10000, 100};
+    uint64_t T = naxis_overshoot_duration(d, ticks, accel, 2);
+    OvershootResult res;
+    run_overshoot_segment(px, py, path, "f4",
+                          "FasNAxis F4 Overshoot (10000,100) cap 8", 10000, 100,
+                          T, true, &res);
+    test(res.end[0] == 10000 && res.end[1] == 100, "F11 F4 end exact");
+    test(res.issued[0] == 10000 && res.issued[1] == 100,
+         "F11 F4 issued == delta");
+    test(res.max_d2 <= 64.0 + 1e-9, "F11 F4 max d^2 <= 64");
+    test(res.max_d2 > f3_max_d2, "F11 F4 bulge greater than Linear");
+    test(res.clock0 == T && res.clock1 == T,
+         "F11 F4 clock == binding ramp on both axes");
+    test(res.underrun == false, "F11 F4 no underrun");
+    printf(
+        "F11 F4 (10000,100) cap8: max_d2=%.3f f3_d2=%.3f clocks=(%u,%u) "
+        "T=%llu\n",
+        res.max_d2, f3_max_d2, res.clock0, res.clock1, (unsigned long long)T);
+  }
+
+  // F4b: same segment, raw cap (UINT16_MAX). Short axis still moving at
+  // mid-time (not an early L); the raw bulge exceeds the cap 8.
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    cfg.mode = FasNAxisConfig::Overshoot;
+    cfg.overshoot_max = UINT16_MAX;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F11 F4b addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F11 F4b addAxis(1)");
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t d[2] = {10000, 100};
+    uint64_t T = naxis_overshoot_duration(d, ticks, accel, 2);
+    OvershootResult res;
+    run_overshoot_segment(px, py, path, "f4b",
+                          "FasNAxis F4b Overshoot (10000,100) raw", 10000, 100,
+                          T, true, &res);
+    test(res.end[0] == 10000 && res.end[1] == 100, "F11 F4b end exact");
+    test(res.mid_seen && res.mid_short > 0 && res.mid_short < 100,
+         "F11 F4b short axis still moving at mid-time (not an L)");
+    test(res.max_d2 > 64.0, "F11 F4b raw bulge exceeds cap 8");
+    test(res.clock0 == T && res.clock1 == T, "F11 F4b clock == binding ramp");
+    printf("F11 F4b (10000,100) raw: max_d2=%.3f mid_short=%d clocks=(%u,%u)\n",
+           res.max_d2, res.mid_short, res.clock0, res.clock1);
+  }
+
+  // Lone diagonal (1600, 1600): both axes are the binding ramp; Overshoot
+  // duration equals Linear within a couple of ticks and d^2 stays under 1.
+  {
+    SimPort lx(4000), ly(4000);
+    FasNAxisConfig lcfg;
+    FasNAxis<2, 64, SimPort> lpath(lcfg);
+    lpath.addAxis(0, &lx);
+    lpath.addAxis(1, &ly);
+    int32_t cur[2] = {0, 0};
+    lpath.setCurrentPosition(cur);
+    SimSegmentResult lres;
+    run_linear_segment(lx, ly, lpath, "f11_diag_lin", "diag linear", 1600, 1600,
+                       false, &lres);
+    uint32_t lin_clock = lx.clock();
+
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    cfg.mode = FasNAxisConfig::Overshoot;
+    cfg.overshoot_max = 8;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F11 diagonal addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F11 diagonal addAxis(1)");
+    path.setCurrentPosition(cur);
+    int32_t d[2] = {1600, 1600};
+    uint64_t T = naxis_overshoot_duration(d, ticks, accel, 2);
+    OvershootResult res;
+    run_overshoot_segment(px, py, path, "f11_diag",
+                          "FasNAxis Overshoot lone diagonal", 1600, 1600, T,
+                          false, &res);
+    test(res.end[0] == 1600 && res.end[1] == 1600, "F11 diagonal end exact");
+    test(res.max_d2 < 1.0, "F11 diagonal d^2 < 1");
+    test(labs((long)res.clock0 - (long)lin_clock) <= 2,
+         "F11 diagonal Overshoot clock == Linear clock");
+    test(labs((long)res.clock0 - (long)T) <= 2,
+         "F11 diagonal clock == reference duration");
+    printf("F11 diagonal: clocks ovs=%u lin=%u T=%llu max_d2=%.4f\n",
+           res.clock0, lin_clock, (unsigned long long)T, res.max_d2);
+  }
+
+  printf("F4/F4b/diagonal Overshoot rest-to-rest green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -3359,6 +3576,7 @@ int main() {
   f7_linear_lookahead();
   f8_feeder();
   f9_dir_pauses();
+  f11_overshoot_rest();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;

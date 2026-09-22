@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "fas_naxis/dda.h"
+#include "fas_naxis/ramp_law.h"
 #include "fas_naxis/ramp_map.h"
 #include "fas_naxis/remaining.h"
 
@@ -196,5 +197,31 @@ class NaxisRefLinear {
     return t;
   }
 };
+
+// Step 11 Overshoot duration oracle (whitepaper section 6.4 / 7.3): each axis
+// runs RampLaw over |delta_i| with its own ticks_cfg / accel; T is the largest
+// of those per-axis ramp durations (the binding axis). The Overshoot track's
+// wall clock must equal this sum -- it is the binding axis's ramp, never
+// shortened by the non-binding axes. PC-only, no FasNAxis state.
+static uint64_t naxis_overshoot_duration(const int32_t* d,
+                                         const uint32_t* ticks,
+                                         const uint32_t* accel, int n_axes) {
+  uint64_t T = 0;
+  for (int i = 0; i < n_axes; i++) {
+    int32_t ad = d[i] > 0 ? d[i] : -d[i];
+    if (ad == 0) {
+      continue;
+    }
+    RampLaw law(ticks[i], accel[i], (uint32_t)ad);
+    uint64_t s = 0;
+    while (!law.done()) {
+      s += law.step();
+    }
+    if (s > T) {
+      T = s;
+    }
+  }
+  return T;
+}
 
 #endif /* NAXIS_REF_H */

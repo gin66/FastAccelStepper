@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include "fas_arch/common.h"
+#include "fas_naxis/overshoot.h"
 #include "fas_naxis/ramp_law.h"
 #include "fas_naxis/ramp_map.h"
 #include "fas_naxis/remaining.h"
@@ -712,6 +713,40 @@ class FasNAxis {
     _ticks_last = 0;
   }
 
+  // Overshoot is selected only for the explicit mode with a non-zero cap
+  // (overshoot_max == 0 is the Linear limit, whitepaper section 6.5).
+  bool overshoot_mode() const {
+    return _cfg.mode == FasNAxisConfig::Overshoot && _cfg.overshoot_max != 0;
+  }
+
+  // Set up an Overshoot segment from block `b`: per-axis ramps decide the
+  // binding axis (largest T_opt) and every command lasts one of its periods.
+  // `_block_left` counts the binding commands; the non-binding axes ride along
+  // (whitepaper sections 6.4 / 7.3).
+  void start_overshoot(int b) {
+    int32_t d[NAXES] = {0};
+    uint32_t ac[NAXES] = {0};
+    for (uint8_t i = 0; i < NAXES; i++) {
+      d[i] = _blk[b][i];
+      ac[i] = _lim[i].accel;
+    }
+    _ovs.init(NAXES, d, _tick_cfg, ac, _cfg.overshoot_max);
+    _head = b;
+    _master = _ovs.binder;
+    _ticks_law = Remaining::ticks_floor(_blk[b], _tick_cfg, NAXES);
+    if (_ticks_law == 0) {
+      _ticks_law = _tick_cfg[_master] != 0 ? _tick_cfg[_master] : 1;
+    }
+    _block_left = _ovs.total[_master];
+    _pause_left = 0;
+    _P = 0;
+    _R = _block_left;
+    _ticks_last = 0;
+    for (uint8_t i = 0; i < NAXES; i++) {
+      _err[i] = 0;
+    }
+  }
+
   // The current block's DDA walk is exhausted.
   bool block_done() const { return _block_left == 0; }
 
@@ -733,6 +768,10 @@ class FasNAxis {
     _underrun = false;
     for (uint8_t i = 0; i < NAXES; i++) {
       _dir[i] = true;
+    }
+    if (overshoot_mode()) {
+      start_overshoot(_head);
+      return;
     }
     start_block(_head, true);
   }
@@ -776,28 +815,42 @@ class FasNAxis {
       }
     }
 
-    uint32_t T = _law.step();
-    _P = _law.P;
-    _R = _law.R;
-    _ticks_last = T;
-
+    uint32_t T;
     int32_t st[NAXES];
     for (uint8_t i = 0; i < NAXES; i++) {
       st[i] = 0;
     }
-    st[_master] = _blk[_head][_master] > 0 ? 1 : -1;
-    for (uint8_t i = 0; i < NAXES; i++) {
-      if (i == (uint8_t)_master) {
-        continue;
+    if (overshoot_mode()) {
+      // Overshoot: one command per binding RampLaw step; the non-binding axes
+      // ride along on the same tick sum (whitepaper sections 6.4 / 7.3).
+      T = _ovs.step(st);
+      if (T == 0) {
+        _done = true;
+        return;
       }
-      int64_t ad = abs_i64(_blk[_head][i]);
-      if (ad == 0) {
-        continue;
-      }
-      _err[i] += ad;
-      if (2 * _err[i] >= _abs_master) {
-        st[i] = _blk[_head][i] > 0 ? 1 : -1;
-        _err[i] -= _abs_master;
+      _P = _ovs.law.P;
+      _R = _block_left > 0 ? _block_left - 1 : 0;
+      _ticks_last = T;
+    } else {
+      T = _law.step();
+      _P = _law.P;
+      _R = _law.R;
+      _ticks_last = T;
+
+      st[_master] = _blk[_head][_master] > 0 ? 1 : -1;
+      for (uint8_t i = 0; i < NAXES; i++) {
+        if (i == (uint8_t)_master) {
+          continue;
+        }
+        int64_t ad = abs_i64(_blk[_head][i]);
+        if (ad == 0) {
+          continue;
+        }
+        _err[i] += ad;
+        if (2 * _err[i] >= _abs_master) {
+          st[i] = _blk[_head][i] > 0 ? 1 : -1;
+          _err[i] -= _abs_master;
+        }
       }
     }
 
@@ -821,7 +874,7 @@ class FasNAxis {
     // Only the 16-bit-representable tail is carved here; a longer tail keeps
     // the §9.3 stuffing path unchanged.
     bool carving = false;
-    if (_block_left == 1 && T <= 65535) {
+    if (!overshoot_mode() && _block_left == 1 && T <= 65535) {
       for (uint8_t i = 0; i < NAXES; i++) {
         if (!_registered[i] || st[i] == 0 || !reverses_at_end(_head, i)) {
           continue;
@@ -905,6 +958,7 @@ class FasNAxis {
   uint32_t _R;
   uint32_t _ticks_last;
   RampLaw _law;
+  OvershootBlock<NAXES> _ovs;
 };
 
 #endif /* FAS_NAXIS_H */
