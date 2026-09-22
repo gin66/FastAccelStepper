@@ -159,6 +159,12 @@ class NaxisRefLinear {
       int m = Remaining::longest_axis(d, ticks_axis, n_axes);
       s += abs_u(d[m]);
       started = 1;
+#ifdef FAS_NAXIS_NO_CROSS_BLOCK_R
+      // Mutation (Step 3b): a planner that only sees the current block does not
+      // sum R across collinear micro-segments. R is one block, so F10's
+      // coasting P rests at each joint and the collinear-joint check fails.
+      break;
+#endif
     }
     return s;
   }

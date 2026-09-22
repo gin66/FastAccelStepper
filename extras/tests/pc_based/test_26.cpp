@@ -1845,6 +1845,175 @@ void f2h_nblock_vs_f20() {
   printf("F2h N-block interpolator matches F20 reference green\n");
 }
 
+// Step 3b (whitepaper section 12.4 item 3b): stoppability from the command
+// trace. Ignore the planner's P / R fields. From the issued periods and the
+// leftover polyline, calculate_ramp_steps(current_ticks) <= remaining on every
+// axis at every sample: the plan can still stop. The oracle is NaxisRefLinear
+// (the Linear reference of Step 2ref); P is reconstructed from issued periods
+// and compared to the per-axis remaining scan (Remaining::remaining), never to
+// the walker's P / R fields.
+//
+// Three named fixtures:
+//   F1  1 axis, 10000 rest-to-rest: coasts to P_coast, P_issued <= R.
+//   F5  square 1600, Linear: P -> 0 at each 90deg corner (path-stop), decel
+//       starts on the side, P_issued <= R.
+//   F10 100 x 100-step collinear micro-segments: R sees through (no per-
+//       segment rest), coasts to P_coast, P_issued <= R.
+//
+// Three mutations are documented here and proven by
+// extras/tests/pc_based/prove_mutations.sh (`make mutations`):
+//   - FAS_NAXIS_NO_CROSS_BLOCK_R (naxis_ref.h): R is one block, not the
+//     collinear sum. F10's joints rest (P -> 0 per block) and the collinear-
+//     cruise check fails.
+//   - FAS_NAXIS_NO_REBIND (remaining.h): binder_axis ignores ticks. F5/F10
+//     (equal ticks) are unaffected, but the rebind neighbourhood of Step 2b
+//     fails, so the model is wrong.
+//   - FAS_NAXIS_NO_REST_CAP (ramp_law.h): ignore remaining-to-stop. A short
+//     open path no longer brakes (peak P is not < R); the F1/F5/F10 stoppable
+//     plan would over-run.
+//
+// Vertex snap: F5's corners are samples (the walker emits a vertex per block);
+// a planner that does not snap would miss (1600,0) etc.
+struct StoppableResult {
+  uint32_t peak_p;
+  uint32_t joint_p[512];
+  int n_joint;
+  int n_stop;
+  int n_cruise;
+  bool p_le_r;
+};
+
+// Walk a NaxisRefLinear oracle and check per-axis stoppability: at every
+// moving sample, the reconstructed P_issued must be <= the remaining scan on
+// every axis (the plan can still stop). Joint P samples (last moving P of each
+// block) classify path-stop (P -> 0) vs collinear cruise (P carries).
+static void check_stoppable(Remaining* rem, const uint32_t* ticks,
+                            uint32_t accel, StoppableResult* out,
+                            const char* name) {
+  NaxisRefLinear ref(rem, ticks, accel);
+  out->peak_p = 0;
+  out->n_joint = 0;
+  out->n_stop = 0;
+  out->n_cruise = 0;
+  out->p_le_r = true;
+  int32_t pos[2] = {0, 0};
+  uint32_t last_moving_p = 0;
+  while (!ref.done()) {
+    int step_out[2] = {0, 0};
+    uint32_t ticks_issued = ref.step(step_out);
+    if (ticks_issued == 0) {
+      continue;  // finished transition, not a command
+    }
+    pos[0] += step_out[0];
+    pos[1] += step_out[1];
+    RampMap map(ref.ticks_law, accel);
+    uint32_t p_issued = map.calculate_ramp_steps(ticks_issued);
+    bool rest = (ticks_issued == ref.ticks_law);
+    if (!rest) {
+      // Per-axis stoppability: the issued period must still allow a stop
+      // within the remaining scan on every axis. An idle axis has P = 0.
+      for (int i = 0; i < ref.n_axes; i++) {
+        uint32_t p_i = (step_out[i] != 0) ? p_issued : 0;
+        int32_t R_i = rem->remaining(i, ref.block);
+        // calculate_ramp_steps o calculate_ticks may land up to two steps
+        // high (log2 inverse, section 12.4 slack), as in walk_polyline.
+        if (R_i < 0 || p_i > (uint32_t)R_i + 2) {
+          out->p_le_r = false;
+          printf("DBG viol %s axis=%d p=%u R=%d block=%d ticks=%u\n", name, i,
+                 p_i, R_i, ref.block, ticks_issued);
+        }
+      }
+      if (p_issued > out->peak_p) {
+        out->peak_p = p_issued;
+      }
+      last_moving_p = p_issued;
+    }
+    if (ref.dda.done()) {
+      if (out->n_joint < 512) {
+        out->joint_p[out->n_joint] = last_moving_p;
+      }
+      out->n_joint++;
+      last_moving_p = 0;
+    }
+  }
+  for (int i = 0; i < out->n_joint; i++) {
+    if (out->joint_p[i] <= 1) {
+      out->n_stop++;
+    } else {
+      out->n_cruise++;
+    }
+  }
+}
+
+void f3b_stoppability() {
+  const uint32_t accel = 2000;
+  const uint32_t ticks_cfg = 4000;
+  uint32_t P_coast = RampMap(ticks_cfg, accel).P_coast();
+  test(P_coast >= 3900 && P_coast <= 4100, "F3b P_coast ~ 4000");
+
+  // --- F1: 1 axis, 10000 rest-to-rest. Coasts to P_coast, P_issued <= R. ---
+  {
+    Remaining rem(1, 1);
+    int32_t b0[1] = {10000};
+    rem.set_block(0, b0);
+    uint32_t ticks[2] = {ticks_cfg, ticks_cfg};
+    StoppableResult r;
+    check_stoppable(&rem, ticks, accel, &r, "F1");
+    test(r.p_le_r, "F3b F1 P_issued <= R on every sample (stoppable)");
+    test(r.peak_p >= P_coast - P_coast / 100 && r.peak_p <= P_coast,
+         "F3b F1 coasts to P_coast (10000/2 > P_stop)");
+    printf("F3b F1 1-axis 10000: peak_P=%u P_coast=%u stoppable\n", r.peak_p,
+           P_coast);
+  }
+
+  // --- F5: square 1600, Linear. P -> 0 at each 90deg corner (path-stop);
+  // --- decel starts on the side; P_issued <= R. Each side is 1600 < 2*P_coast,
+  // --- so no side coasts (peak P < P_coast). ---
+  {
+    Remaining rem(2, 4);
+    int32_t b0[2] = {0, 1600};
+    int32_t b1[2] = {1600, 0};
+    int32_t b2[2] = {0, -1600};
+    int32_t b3[2] = {-1600, 0};
+    rem.set_block(0, b0);
+    rem.set_block(1, b1);
+    rem.set_block(2, b2);
+    rem.set_block(3, b3);
+    uint32_t ticks[2] = {ticks_cfg, ticks_cfg};
+    StoppableResult r;
+    check_stoppable(&rem, ticks, accel, &r, "F5");
+    test(r.p_le_r, "F3b F5 P_issued <= R on every sample (stoppable)");
+    test(r.n_stop >= 4, "F3b F5 P -> 0 at each 90deg corner (path-stop)");
+    test(r.peak_p < P_coast,
+         "F3b F5 each side too short to coast (decel on side)");
+    printf("F3b F5 square 1600: peak_P=%u stop_joints=%d\n", r.peak_p,
+           r.n_stop);
+  }
+
+  // --- F10: 100 x 100-step collinear micro-segments. R sees through (no
+  // --- per-segment rest), coasts to P_coast, P_issued <= R. The collinear
+  // --- joints cruise (P > 1); the cross-block-R mutation makes them rest. ---
+  {
+    const int N = 100;
+    Remaining rem(2, N);
+    for (int i = 0; i < N; i++) {
+      int32_t blk[2] = {100, 100};
+      rem.set_block(i, blk);
+    }
+    uint32_t ticks[2] = {ticks_cfg, ticks_cfg};
+    StoppableResult r;
+    check_stoppable(&rem, ticks, accel, &r, "F10");
+    test(r.p_le_r, "F3b F10 P_issued <= R on every sample (stoppable)");
+    test(r.peak_p >= P_coast - P_coast / 100 && r.peak_p <= P_coast,
+         "F3b F10 coasts to P_coast (R sees through)");
+    test(r.n_cruise >= 1,
+         "F3b F10 collinear joints do not rest (R sees through)");
+    printf("F3b F10 100x100 collinear: peak_P=%u cruise_joints=%d\n", r.peak_p,
+           r.n_cruise);
+  }
+  printf("F3b stoppability from the command trace green\n");
+}
+
 // F4 — SimPort addQueueEntry contract (whitepaper section 4.1 / 4.1.1 /
 // 4.4.1). A self-contained section that exercises the duck-typed StepperQueue
 // stand-in without FasNAxis planning: the feeder talks to addQueueEntry() only.
@@ -2081,6 +2250,7 @@ int main() {
   f20_long_polyline();
   f2f_two_block();
   f2h_nblock_vs_f20();
+  f3b_stoppability();
   f4_sim_port();
   f16_skeleton();
   printf("TEST_26 PASSED\n");

@@ -218,7 +218,7 @@ test-only double confirms distance to the chord `<= 0.5*sqrt(n)`
 
 ---
 
-## Step 2d — Linear one-block rest-to-rest (binder ramp + DDA)
+## Step 2d — Linear one-block rest-to-rest (binder ramp + DDA) ✅
 
 Still no queues. One committed block: binder runs `RampLaw` on
 `|Δ_bind|`; each binder step is one DDA tick from 2c.
@@ -511,7 +511,7 @@ independent trapezoid, batched chunks land on the same P trajectory. Plot:
 
 ---
 
-## Step 3b — stoppability from the command trace
+## Step 3b — stoppability from the command trace ✅
 
 Ignore planner `P`. From issued periods and the leftover
 polyline, `calculate_ramp_steps(current_ticks) ≤ remaining`
@@ -524,6 +524,20 @@ disable vertex snap → F5 misses `(1600,0)`.
 **Done when:** the trace oracle (`naxis_ref.h` for Linear) is
 green on F1/F5/F10, and the three mutations are listed as
 comments (or `#if` hooks) next to those fixtures.
+
+**Done:** `f3b_stoppability()` in `test_26.cpp` walks the
+`NaxisRefLinear` oracle on F1 (1-axis `10000`), F5 (square `1600`)
+and F10 (100×100 collinear) and checks, at every moving sample,
+the per-axis reconstructed `P_issued = calculate_ramp_steps(ticks)
+≤ remaining(i, block)` with the documented two-step log2
+slack (§12.4, same convention as `walk_polyline`). F1/F10 coast to
+`P_coast` (within 1%), F5 path-stops at every 90° corner
+(`P → 0`) and each side is too short to coast. The three mutation
+hooks are documented next to the fixtures and proven by
+`make mutations`: `FAS_NAXIS_NO_CROSS_BLOCK_R` (naxis_ref.h, F10
+joints rest), `FAS_NAXIS_NO_REBIND` (remaining.h, Step 2b
+neighbourhood), `FAS_NAXIS_NO_REST_CAP` (ramp_law.h, peak `P` is
+not `< R`).
 
 ---
 
