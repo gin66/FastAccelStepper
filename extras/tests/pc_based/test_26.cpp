@@ -25,6 +25,9 @@
 #include "naxis_plot.h"
 #include "naxis_ref.h"
 #include "naxis_sim_port.h"
+#ifdef FAS_NAXIS_TRACE
+#include "naxis_html_dump.h"
+#endif
 
 // The normal test_% rule links LIB_O (FastAccelStepper.o), which references the
 // PC interrupt hooks below. The other tests define these; Step 15's real-queue
@@ -2538,6 +2541,27 @@ static void walk_prod_polyline(SimPort& px, SimPort& py,
   }
 }
 
+// Step 10: the gnuplot file NaxisPlot wrote is the plot. Confirm the bytes the
+// helper promises are actually on disk: the data heredoc opener, its closer,
+// and the multiplot layout. A missing one means the helper drifted.
+static bool gnuplot_has(const char* path, const char* needle) {
+  FILE* f = fopen(path, "r");
+  if (f == NULL) {
+    return false;
+  }
+  char buf[4096];
+  size_t n;
+  bool found = false;
+  while ((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+    if (strstr(buf, needle) != NULL) {
+      found = true;
+      break;
+    }
+  }
+  fclose(f);
+  return found;
+}
+
 // Step 7 (whitepaper section 8): Linear lookahead across blocks through the
 // real feeder. F5 pins path-stop corners (P -> 0, decel starts on the side),
 // F9/F18 pin the time-law rebind (DDA master stays the longest |delta| while a
@@ -2585,6 +2609,32 @@ void f7_linear_lookahead() {
     printf("F7 F5 square: vertices=%d peak_P=%u max_ticks(as T)=%llu\n",
            res.n_vertex, res.max_moving_p, (unsigned long long)res.total_ticks);
     printf("F5 Linear SimPort plot written: test_26_f5.gnuplot\n");
+
+    // Step 10: the gnuplot file is the plot. Confirm the bytes NaxisPlot
+    // promised are on disk before touching the helper further.
+    test(gnuplot_has("test_26_f5.gnuplot", "$data <<EOF"),
+         "F10 F5 gnuplot has the data heredoc opener");
+    test(gnuplot_has("test_26_f5.gnuplot", "EOF"),
+         "F10 F5 gnuplot has a heredoc closer");
+    test(gnuplot_has("test_26_f5.gnuplot", "set multiplot"),
+         "F10 F5 gnuplot has the multiplot layout");
+
+#ifdef FAS_NAXIS_TRACE
+    // Step 10: under the trace macro the same samples also land in an HTML
+    // viewer page. The dumper copies the checked-in template and embeds the
+    // (t, x, y) rows the gnuplot file already carries.
+    NaxisHtmlDump html("F5", "FasNAxis F5 square 1600 Linear");
+    for (int k = 0; k < res.n_vertex; k++) {
+      html.row((double)k, (double)res.vertex_pos[2 * k],
+               (double)res.vertex_pos[2 * k + 1]);
+    }
+    html.finish();
+    char html_path[256];
+    snprintf(html_path, sizeof(html_path), "%s/tests/out/F5.html",
+             NAXIS_HTML_ROOT);
+    test(gnuplot_has(html_path, "id=\"trace\""),
+         "F10 F5 HTML viewer page written under FAS_NAXIS_TRACE");
+#endif
   }
 
   // F9: 45 deg line, equal |delta|, ticks_x = 10 * ticks_y. The tie-break

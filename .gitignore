@@ -41,6 +41,7 @@ extras/tests/pc_based/ramp_helper
 extras/tests/pc_based/*.profraw
 extras/tests/pc_based/*.profdata
 extras/tests/pc_based/coverage_report/
+extras/n_axes/tests/out/
 .claude
 AGENTS.md
 extras/tests/pc_based/AGENTS.md

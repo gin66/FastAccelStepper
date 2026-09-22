@@ -86,13 +86,22 @@ test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
 # FasNAxis headers: test_26 includes them, so a header-only change must rebuild.
-test_26.o: naxis_plot.h naxis_sim_port.h naxis_ref.h \
+test_26.o: naxis_plot.h naxis_sim_port.h naxis_ref.h naxis_html_dump.h \
 	$(PRJ_ROOT)/src/FasNAxis.h \
 	$(PRJ_ROOT)/src/fas_naxis/remaining.h \
 	$(PRJ_ROOT)/src/fas_naxis/ramp_law.h \
 	$(PRJ_ROOT)/src/fas_naxis/ramp_map.h \
 	$(PRJ_ROOT)/src/fas_naxis/dda.h \
 	$(PRJ_ROOT)/src/fas_naxis/linear.h \
+
+# Step 10: the HTML viewer is behind -DFAS_NAXIS_TRACE. This target rebuilds
+# test_26 with the macro so the F5 run also writes extras/n_axes/tests/out/F5.html.
+# Not part of `make test`; the gnuplot file is the plot, the HTML is extra.
+.PHONY: test_26_trace
+test_26_trace: $(LIB_O)
+	g++ -c $(CXXFLAGS) -DFAS_NAXIS_TRACE -DNAXIS_HTML_ROOT=\"$(PRJ_ROOT)/extras/n_axes\" -o test_26.o test_26.cpp
+	g++ -o test_26 test_26.o $(LIB_O) $(LDLIBS)
+	./test_26
 
 # Step 2b theory-probe mutations. This is a test (rebuilds test_26 with a
 # wrong model and requires FAIL), not a library script. Not part of `make test`.

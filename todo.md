@@ -1015,7 +1015,7 @@ and `make mutations` are green.
 
 ---
 
-## Step 10 — gnuplot file check + HTML stub (P2)
+## Step 10 — gnuplot file check + HTML stub (P2) ✅
 
 `naxis_plot.h` already writes `$data <<EOF`, `EOF`, and
 `set multiplot layout 3,2` for F5 (`test_26_f5.gnuplot`). That
@@ -1039,6 +1039,23 @@ Without the macro, the html file is not created and
 
 **Done when:** `test_26` is green either way, and a rebuild with
 `-DFAS_NAXIS_TRACE` produces `F5.html`.
+
+**Done:** `f7_linear_lookahead()`’s F5 block now `test()`s that
+`test_26_f5.gnuplot` on disk carries the bytes `NaxisPlot`
+promises — `$data <<EOF`, a heredoc `EOF`, and `set multiplot`
+(a `gnuplot_has` helper scans the file; `naxis_plot.h` is left
+untouched). `extras/tests/pc_based/naxis_html_dump.h` holds
+`NaxisHtmlDump`, included from `test_26.cpp` only under
+`-DFAS_NAXIS_TRACE`: it copies the checked-in static page
+`extras/n_axes/viewer_template.html` (a `<pre id="trace">`
+placeholder) and splices the F5 vertex samples (t, x, y) into it,
+writing `extras/n_axes/tests/out/F5.html`. The asset root is a
+`NAXIS_HTML_ROOT` macro (the `test_26_trace` Makefile target passes
+an absolute `$(PRJ_ROOT)/extras/n_axes` so the page resolves from
+the test’s cwd); the generated `out/` is git-ignored. Without the
+macro the html is not created and `src/FasNAxis.h` has no viewer
+include. `make test` is green; `make test_26_trace` produces
+`F5.html`.
 
 ---
 
