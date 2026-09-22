@@ -120,7 +120,11 @@ class SimPort {
       kicked_off_ = true;
       return AQE_OK;
     }
-    if (cmd->ticks < max_speed_in_ticks_) {
+    // The max-speed floor is a planner contract for step timing: a step
+    // command faster than ticks_cfg is ErrorTicksTooLow. A pause (steps == 0)
+    // is a delay, not a step; the real queue only checks MIN_CMD_TICKS on it,
+    // so a slow axis's 65535 split may use a shorter pause than max_speed.
+    if (cmd->steps > 0 && cmd->ticks < max_speed_in_ticks_) {
       return AQE_ERROR_TICKS_TOO_LOW;
     }
     if (isQueueFull()) {

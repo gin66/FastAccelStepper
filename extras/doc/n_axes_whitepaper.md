@@ -1305,6 +1305,15 @@ for this `dt` (255 steps, or pause stuffing past `QUEUE_LEN-2`):
   planner must have issued a longer pause-only strategy (one step
   per several slices).
 
+A period above 65535 ticks is one step entry plus pause
+entries covering the remainder. The step entry must stay a legal
+step period: `t_step = max(T/2, ticks_i_cfg)`, clamped to 65535,
+and `T - t_step` is stuffed as pause entries. Halving alone
+would send a step faster than `v_max` when `T < 2·ticks_i_cfg`
+(a slow axis just above the 16-bit boundary). A pause entry is
+a delay, not a step, so `MIN_CMD_TICKS` (not `ticks_i_cfg`) is
+its floor.
+
 ### 9.4 Acceleration as a staircase
 
 A queue command is constant rate. Acceleration lives at command

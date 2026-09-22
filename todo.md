@@ -690,7 +690,7 @@ taken by Steps 1 and 3).
 
 ---
 
-## Step 7 — Linear lookahead across blocks (F5, F9, F10)
+## Step 7 — Linear lookahead across blocks (F5, F9, F10) ✅
 
 **Test first:**
 
@@ -714,6 +714,29 @@ corners), `test_26_f9.gnuplot`, `test_26_f18.gnuplot`,
 `test_26_f10.gnuplot` (v(t) with no per-segment dips).
 
 **Done when:** F5, F9, F10, F18 green.
+
+**Done:** `src/FasNAxis.h` now commits points into a block ring of up to
+`HORIZON` n-dim points (`addLine` appends; a full ring returns `false` for
+backpressure) and feeds the whole Linear path. The DDA master is the longest
+`|delta|` of the current block; `R` is `remaining_path_steps(head)` — remaining
+master steps to the next Linear path-stop, summed across collinear blocks — so
+a collinear run carries `P` and `R` across joints whereas a non-collinear vertex
+resets `P` (section 8.1/8.5/8.7). A path that catches up to the buffer re-opens
+when more points arrive. The 65535 split now keeps the step entry `>= ticks_law`
+(`max(T/2, ticks_law)`, remainder as pauses) — halving alone could send a step
+faster than `v_max` for a slow axis just above the 16-bit boundary; the
+whitepaper section 9.3 records this. `f7_linear_lookahead()` drives each fixture
+through `SimPort`, coalesces the split entries back to full periods, and
+compares the trace tick-for-tick with the `naxis_ref` oracle: F5 square 1600
+(`P -> 0` at every corner, decel starts on the side, exact four vertex samples),
+F9 45° with `ticks_x = 10·ticks_y` (X stays the DDA master, Y scaled down:
+shared period `>= ticks_x`), F18 `(10000,9000)` with Y 40x slower (X is DDA
+master, Y binds the time law: shared period `>= ticks_y`, both issue `|delta|`),
+and F10 100×100-step collinear (one vertex sample per micro-segment, no rest at
+any of the 99 collinear joints, coasts to `P_coast`). `SimPort`'s max-speed
+floor is now scoped to step commands (a pause is a delay, floor
+`MIN_CMD_TICKS`). Plots: `test_26_f5.gnuplot`, `test_26_f9.gnuplot`,
+`test_26_f18.gnuplot`, `test_26_f10.gnuplot`.
 
 ---
 

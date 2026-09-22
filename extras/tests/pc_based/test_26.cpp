@@ -2350,6 +2350,354 @@ void f6_linear_sim() {
   printf("F6/F17 Linear interpolator through SimPort green\n");
 }
 
+// One drained SimPort pair. A master period above 65535 is split into a
+// half-period step entry (s0/s1 nonzero on the master) plus pause entries
+// (s0 == s1 == 0) covering the remainder (section 4.2 / 9.3).
+struct ProdTraceEntry {
+  uint32_t t;
+  int s0;
+  int s1;
+};
+
+struct PolySimResult {
+  int64_t issued[2];
+  int32_t end_pos[2];
+  uint32_t vertex_p[256];
+  int32_t vertex_pos[512];
+  int n_vertex;
+  uint32_t max_moving_p;
+  uint32_t min_moving_ticks;
+  bool envelope_ok;
+  bool p_le_r_ok;
+  bool trace_match;
+  bool underrun;
+  bool first_fill_underrun;
+  uint64_t total_ticks;
+  int n_cmd;
+  int n_entry;
+};
+
+// Step 7: drive a committed polyline through FasNAxis/SimPort and compare the
+// produced Linear track command by command to the NaxisRefLinear oracle (Step
+// 2ref). Phase 1 drains the real queue into a trace; phase 2 coalesces the
+// 65535 splits back to full periods and checks tick-for-tick equality, the
+// per-axis envelope, issued |steps| == |delta|, and the joint P semantics. P is
+// reconstructed from the issued period (never from planner P fields); vertices
+// are located by the oracle's cumulative step position.
+template <uint16_t HZ>
+static void walk_prod_polyline(SimPort& px, SimPort& py,
+                               FasNAxis<2, HZ, SimPort>& path,
+                               const int32_t (*verts)[2], int n_verts,
+                               const uint32_t* ticks, uint32_t t_law,
+                               uint32_t accel, bool do_plot,
+                               const char* fixture, const char* title,
+                               PolySimResult* res) {
+  static ProdTraceEntry e[70000];
+  int n_blocks = n_verts - 1;
+  res->issued[0] = 0;
+  res->issued[1] = 0;
+  res->end_pos[0] = 0;
+  res->end_pos[1] = 0;
+  res->n_vertex = 0;
+  res->max_moving_p = 0;
+  res->min_moving_ticks = 0xFFFFFFFFu;
+  res->envelope_ok = true;
+  res->p_le_r_ok = true;
+  res->trace_match = true;
+  res->underrun = false;
+  res->first_fill_underrun = false;
+  res->total_ticks = 0;
+  res->n_cmd = 0;
+  res->n_entry = 0;
+
+  Remaining rem(2, n_blocks);
+  for (int b = 0; b < n_blocks; b++) {
+    int32_t d[2];
+    d[0] = verts[b + 1][0] - verts[b][0];
+    d[1] = verts[b + 1][1] - verts[b][1];
+    rem.set_block(b, d);
+  }
+
+  NaxisPlot plot;
+  if (do_plot) {
+    plot.start_plot(fixture, title, 2);
+    for (int v = 0; v < n_verts; v++) {
+      plot.poly_point((double)verts[v][0], (double)verts[v][1]);
+    }
+    plot.poly_done();
+  }
+
+  for (int v = 1; v < n_verts; v++) {
+    int32_t p[2] = {verts[v][0], verts[v][1]};
+    path.addLine(p);
+  }
+  path.endPath();
+
+  path.pump();
+  res->first_fill_underrun = path.hasUnderrun();
+  if (path.performedRampUp() > path.remainingToStop()) {
+    res->p_le_r_ok = false;
+  }
+  while (path.isBusy()) {
+    int64_t s0 = 0;
+    int64_t s1 = 0;
+    bool up0 = true;
+    bool up1 = true;
+    uint32_t t0 = px.drain_one(&s0, &up0);
+    py.drain_one(&s1, &up1);
+    if (res->n_entry < 70000) {
+      e[res->n_entry].t = t0;
+      e[res->n_entry].s0 = (int)(s0 == 0 ? 0 : (up0 ? s0 : -s0));
+      e[res->n_entry].s1 = (int)(s1 == 0 ? 0 : (up1 ? s1 : -s1));
+      res->n_entry++;
+    }
+    res->total_ticks += t0;
+    path.pump();
+    if (path.performedRampUp() > path.remainingToStop()) {
+      res->p_le_r_ok = false;
+    }
+  }
+  res->underrun = path.hasUnderrun();
+
+  RampMap map(t_law, accel);
+  NaxisRefLinear ref(&rem, ticks, accel);
+  int32_t pos[2] = {0, 0};
+  int next_vertex = 1;
+  uint32_t last_moving_p = 0;
+  int i = 0;
+  while (!ref.done()) {
+    int os[2];
+    uint32_t T_ref = ref.step(os);
+    while (i < res->n_entry && e[i].s0 == 0 && e[i].s1 == 0) {
+      i++;
+    }
+    if (i >= res->n_entry) {
+      res->trace_match = false;
+      break;
+    }
+    uint32_t T_prod = e[i].t;
+    int ps0 = e[i].s0;
+    int ps1 = e[i].s1;
+    i++;
+    while (i < res->n_entry && e[i].s0 == 0 && e[i].s1 == 0) {
+      T_prod += e[i].t;
+      i++;
+    }
+    if (ps0 != os[0] || ps1 != os[1] || T_prod != T_ref) {
+      res->trace_match = false;
+    }
+    uint32_t p_issued = map.calculate_ramp_steps(T_prod);
+    bool rest = (T_prod == t_law);  // period at P == 0
+    if (!rest) {
+      last_moving_p = p_issued;
+      if (p_issued > res->max_moving_p) {
+        res->max_moving_p = p_issued;
+      }
+      if (ps0 != 0 && T_prod + 1 < ticks[0]) {
+        res->envelope_ok = false;
+      }
+      if (ps1 != 0 && T_prod + 1 < ticks[1]) {
+        res->envelope_ok = false;
+      }
+    }
+    if (T_prod < res->min_moving_ticks) {
+      res->min_moving_ticks = T_prod;
+    }
+    pos[0] += ps0;
+    pos[1] += ps1;
+    res->issued[0] += ps0;
+    res->issued[1] += ps1;
+    res->n_cmd++;
+    if (do_plot) {
+      double t = (double)ref.total_ticks / NAXIS_PLOT_TICKS_PER_S;
+      double v = rest ? 0.0 : NAXIS_PLOT_TICKS_PER_S / (double)T_prod;
+      double speed[2] = {v, v};
+      double Pcol[2] = {(double)p_issued, (double)p_issued};
+      double Rcol[2] = {(double)ref.R, (double)ref.R};
+      double tcol[2] = {(double)T_prod, (double)T_prod};
+      plot.row(t, (double)pos[0], (double)pos[1], 0.0, speed, Pcol, Rcol, tcol);
+    }
+    if (ref.dda.done()) {
+      if (next_vertex < n_verts && pos[0] == verts[next_vertex][0] &&
+          pos[1] == verts[next_vertex][1]) {
+        if (res->n_vertex < 256) {
+          res->vertex_p[res->n_vertex] = last_moving_p;
+          res->vertex_pos[2 * res->n_vertex] = pos[0];
+          res->vertex_pos[2 * res->n_vertex + 1] = pos[1];
+        }
+        res->n_vertex++;
+        next_vertex++;
+      }
+    }
+  }
+  res->end_pos[0] = pos[0];
+  res->end_pos[1] = pos[1];
+  if (do_plot) {
+    plot.finish_plot();
+  }
+}
+
+// Step 7 (whitepaper section 8): Linear lookahead across blocks through the
+// real feeder. F5 pins path-stop corners (P -> 0, decel starts on the side),
+// F9/F18 pin the time-law rebind (DDA master stays the longest |delta| while a
+// slower short axis lengthens the period), and F10 pins that R sees through
+// collinear micro-segments (no rest at a joint, cruise when N/2 > P_stop).
+void f7_linear_lookahead() {
+  const uint32_t accel = 2000;
+  const uint32_t ticks_eq[2] = {4000, 4000};
+  const uint32_t P_coast = RampMap(4000, accel).P_coast();
+
+  // F5: square 1600 (returns to the origin), Linear path-stop at every 90 deg
+  // corner. Each side is shorter than P_stop, so P is a triangle and the decel
+  // starts on the side, not in the last slice.
+  {
+    int32_t verts[5][2] = {{0, 0}, {1600, 0}, {1600, 1600}, {0, 1600}, {0, 0}};
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    PolySimResult res;
+    walk_prod_polyline<64>(px, py, path, verts, 5, ticks_eq, 4000, accel, true,
+                           "f5", "FasNAxis F5 square 1600 Linear", &res);
+    test(res.trace_match, "F7 F5 trace matches naxis_ref");
+    test(res.issued[0] == 0 && res.issued[1] == 0,
+         "F7 F5 issued nets to the origin");
+    test(res.end_pos[0] == 0 && res.end_pos[1] == 0,
+         "F7 F5 realizes the square and returns");
+    test(res.n_vertex == 4, "F7 F5 every corner is a vertex sample");
+    bool corners_zero = true;
+    for (int k = 0; k < res.n_vertex; k++) {
+      if (res.vertex_p[k] > 1) {
+        corners_zero = false;
+      }
+    }
+    test(corners_zero, "F7 F5 P -> 0 at every corner");
+    test(res.max_moving_p > 1, "F7 F5 ramps up on a side");
+    test(res.max_moving_p < P_coast,
+         "F7 F5 peak P < P_stop (decel starts on the side)");
+    test(res.envelope_ok, "F7 F5 envelope ticks >= ticks_i_cfg");
+    test(res.p_le_r_ok, "F7 F5 P <= R on every sample");
+    test(!res.underrun && !res.first_fill_underrun, "F7 F5 no underrun");
+    printf("F7 F5 square: vertices=%d peak_P=%u max_ticks(as T)=%llu\n",
+           res.n_vertex, res.max_moving_p, (unsigned long long)res.total_ticks);
+    printf("F5 Linear SimPort plot written: test_26_f5.gnuplot\n");
+  }
+
+  // F9: 45 deg line, equal |delta|, ticks_x = 10 * ticks_y. The tie-break
+  // keeps X (slower) as the DDA master; ticks_floor lengthens the shared period
+  // to X, so Y is scaled down in speed (every Y step waits >= ticks_x).
+  {
+    int32_t verts[2][2] = {{0, 0}, {1600, 1600}};
+    uint32_t ticks9[2] = {40000, 4000};
+    SimPort px(40000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    PolySimResult res;
+    walk_prod_polyline<64>(px, py, path, verts, 2, ticks9, 40000, accel, true,
+                           "f9", "FasNAxis F9 45 deg, X 10x slower", &res);
+    test(res.trace_match, "F7 F9 trace matches naxis_ref");
+    test(path.masterAxis() == 0, "F7 F9 X is the DDA master (slower token)");
+    test(res.issued[0] == 1600 && res.issued[1] == 1600,
+         "F7 F9 both axes issue their full |delta|");
+    test(res.min_moving_ticks >= ticks9[0],
+         "F7 F9 X binds: shared period >= X ticks, Y scaled down");
+    test(res.envelope_ok, "F7 F9 envelope");
+    test(res.p_le_r_ok, "F7 F9 P <= R");
+    test(!res.underrun && !res.first_fill_underrun, "F7 F9 no underrun");
+    printf("F7 F9 45deg: master=%d issued=(%lld,%lld) min_ticks=%u\n",
+           path.masterAxis(), (long long)res.issued[0],
+           (long long)res.issued[1], res.min_moving_ticks);
+    printf("F9 Linear SimPort plot written: test_26_f9.gnuplot\n");
+  }
+
+  // F18: (10000, 9000) with Y 40x slower. Longest is X (DDA master), but Y
+  // would exceed v_max if X ran at ticks_x; Y lengthens ticks_b and X is scaled
+  // down in speed, both axes still issuing their full |delta|.
+  {
+    int32_t verts[2][2] = {{0, 0}, {10000, 9000}};
+    uint32_t ticks18[2] = {1000, 40000};
+    SimPort px(1000), py(40000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    PolySimResult res;
+    walk_prod_polyline<64>(px, py, path, verts, 2, ticks18, 40000, accel, true,
+                           "f18", "FasNAxis F18 (10000,9000), Y 40x slower",
+                           &res);
+    test(res.trace_match, "F7 F18 trace matches naxis_ref");
+    test(path.masterAxis() == 0,
+         "F7 F18 X is the DDA master (longest |delta|)");
+    test(res.issued[0] == 10000 && res.issued[1] == 9000,
+         "F7 F18 both axes issue their full |delta|");
+    test(res.min_moving_ticks >= ticks18[1],
+         "F7 F18 Y time-law binds: shared period >= Y ticks, X scaled down");
+    test(res.envelope_ok, "F7 F18 envelope");
+    test(res.p_le_r_ok, "F7 F18 P <= R");
+    test(res.end_pos[0] == 10000 && res.end_pos[1] == 9000,
+         "F7 F18 vertex hit");
+    test(!res.underrun && !res.first_fill_underrun, "F7 F18 no underrun");
+    printf("F7 F18: master=%d issued=(%lld,%lld) min_ticks=%u\n",
+           path.masterAxis(), (long long)res.issued[0],
+           (long long)res.issued[1], res.min_moving_ticks);
+    printf("F18 Linear SimPort plot written: test_26_f18.gnuplot\n");
+  }
+
+  // F10: 100 x 100-step collinear micro-segments totalling 10000. R sees
+  // through the joints: P cruises (N/2 > P_stop), no rest at any of the first
+  // 99 collinear joints, and the decel spans the tail across block boundaries.
+  {
+    int32_t verts[101][2];
+    for (int k = 0; k <= 100; k++) {
+      verts[k][0] = 100 * k;
+      verts[k][1] = 0;
+    }
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 128, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    PolySimResult res;
+    walk_prod_polyline<128>(
+        px, py, path, verts, 101, ticks_eq, 4000, accel, true, "f10",
+        "FasNAxis F10 100x100 collinear micro-segments", &res);
+    test(res.trace_match, "F7 F10 trace matches naxis_ref");
+    test(res.issued[0] == 10000 && res.issued[1] == 0,
+         "F7 F10 issued X == 10000, idle Y issues nothing");
+    test(res.n_vertex == 100, "F7 F10 one vertex sample per micro-segment");
+    bool joints_continue = true;
+    for (int k = 0; k < res.n_vertex - 1; k++) {
+      if (res.vertex_p[k] <= 1) {
+        joints_continue = false;
+      }
+    }
+    test(joints_continue, "F7 F10 no rest at a collinear joint");
+    test(res.vertex_p[res.n_vertex - 1] <= 1,
+         "F7 F10 the last buffered point is rest");
+    test(res.max_moving_p + 64 >= P_coast && res.max_moving_p <= P_coast,
+         "F7 F10 coasts because N/2 > P_stop");
+    test(res.envelope_ok, "F7 F10 envelope");
+    test(res.p_le_r_ok, "F7 F10 P <= R");
+    test(!res.underrun && !res.first_fill_underrun, "F7 F10 no underrun");
+    printf("F7 F10: vertices=%d peak_P=%u P_coast=%u\n", res.n_vertex,
+           res.max_moving_p, P_coast);
+    printf("F10 Linear SimPort plot written: test_26_f10.gnuplot\n");
+  }
+
+  printf("F7/F9/F10/F18 Linear lookahead across blocks green\n");
+}
+
 // F16 (whitepaper section 6 / 14 / F-table row F16): the header skeleton and
 // its registration contract. No motion yet (that is Step 6+). This pins:
 //    - FasNAxisConfig{} default member initializers, and the constructor's
@@ -2462,6 +2810,7 @@ int main() {
   f3b_stoppability();
   f4_sim_port();
   f6_linear_sim();
+  f7_linear_lookahead();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;

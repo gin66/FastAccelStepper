@@ -20,10 +20,13 @@ class FastAccelStepper;
 // planner). The hot path performs no float, double, or integer division; ramp
 // math lives in fas_naxis/ramp_map.h (log2_value_t) and RampCalculator.
 //
-// Step 5 (this file) is the skeleton: config, pump status, axis registration,
-// and current position. No motion is planned yet (that is Step 6+); the block
-// buffer exists but addLine only records the current position and the length
-// of a committed segment.
+// Step 7 (this file) is the Linear lookahead planner: addLine() commits points
+// into a block ring of up to HORIZON n-dim points, and pump() feeds the
+// committed Linear path through addQueueEntry(). The DDA master is the longest
+// |delta| of the current block; R is Remaining-style remaining master steps to
+// the next Linear path-stop (section 8.1 + 8.5). A non-collinear vertex resets
+// P; a collinear joint carries it. The last buffered point of an open path is
+// rest, so the ramp always stops there.
 
 // PumpStatus is the result of a pump() tick. Deliberately NO LookaheadTooShort:
 // a short lookahead slows the track (speed cap, G4/F11/F19) instead of
@@ -55,8 +58,7 @@ struct FasNAxisConfig {
 
 // Per-axis frozen limits, read from the stepper at addAxis (and on
 // setLimitsFromSteppers). ticks_cfg is the configured period; P_stop is the
-// performed ramp-up steps (calculate_ramp_steps(ticks_cfg)). No ramp math is
-// run here in Step 5; the fields exist for the planner in Step 6+.
+// performed ramp-up steps (calculate_ramp_steps(ticks_cfg)).
 struct AxisLimits {
   uint32_t ticks_cfg = 0;
   uint32_t P_stop = 0;
@@ -83,23 +85,27 @@ class FasNAxis {
       _lim[i].accel = 0;
       _tick_cfg[i] = 0;
       _p[i] = 0;
-      _seg[i] = 0;
-      _fed[i] = 0;
-      _err[i] = 0;
       _dir[i] = true;
+      _err[i] = 0;
+      for (uint16_t b = 0; b < HORIZON; b++) {
+        _blk[b][i] = 0;
+      }
     }
     _cfg = c;
     _position_synced = false;
     _block_count = 0;
-    _have_seg = false;
+    _n_blk = 0;
+    _head = 0;
     _path_closed = false;
     _feeding = false;
-    _done = false;
+    _done = true;
     _kicked_off = false;
     _underrun = false;
     _master = 0;
     _abs_master = 0;
+    _block_left = 0;
     _pause_left = 0;
+    _ticks_law = 1;
     _P = 0;
     _R = 0;
     _ticks_last = 0;
@@ -129,17 +135,20 @@ class FasNAxis {
     _lim[i].ticks_cfg = s->getMaxSpeedInTicks();
     _lim[i].accel = s->getAcceleration();
     _tick_cfg[i] = _lim[i].ticks_cfg;
+    RampMap map(_lim[i].ticks_cfg, _lim[i].accel);
+    _lim[i].P_stop = map.P_coast();
     return true;
   }
 
-  // Re-read ticks_cfg / accel from every registered stepper. (P_stop ramp math
-  // is Step 6+; the fields are refreshed here.)
+  // Re-read ticks_cfg / accel from every registered stepper and refresh P_stop.
   void setLimitsFromSteppers() {
     for (uint8_t i = 0; i < NAXES; i++) {
       if (_s[i] != NULL) {
         _lim[i].ticks_cfg = _s[i]->getMaxSpeedInTicks();
         _lim[i].accel = _s[i]->getAcceleration();
         _tick_cfg[i] = _lim[i].ticks_cfg;
+        RampMap map(_lim[i].ticks_cfg, _lim[i].accel);
+        _lim[i].P_stop = map.P_coast();
       }
     }
   }
@@ -151,6 +160,7 @@ class FasNAxis {
         _p[i] = _s[i]->getCurrentPosition();
       }
     }
+    clear_path();
     _position_synced = true;
   }
 
@@ -159,13 +169,16 @@ class FasNAxis {
     for (uint8_t i = 0; i < NAXES; i++) {
       _p[i] = p[i];
     }
+    clear_path();
     _position_synced = true;
   }
 
-  // Queue an absolute target position (steps). Illegal (returns false) before
-  // the position is synced. A target equal to the current position (every
-  // delta 0) is a dwell of 0 ticks: a no-op that records no block. Returns
-  // true when the call is accepted (including the no-op case).
+  // Queue an absolute target position (steps) by appending its delta to the
+  // block ring. Illegal (returns false) before the position is synced or when
+  // the ring is full (HORIZON points committed but not yet executed). A target
+  // equal to the current position (every delta 0) is a no-op that records no
+  // block and returns true. Appending after the plan already caught up with
+  // the buffer re-opens the plan (R may grow; section 8.7).
   bool addLine(const int32_t p[NAXES]) {
     if (!_position_synced) {
       return false;
@@ -179,36 +192,37 @@ class FasNAxis {
     if (!any) {
       return true;  // L = 0: dwell of 0 ticks, no block recorded
     }
+    if (_n_blk >= (int)HORIZON) {
+      return false;  // ring full: backpressure until pump() drains
+    }
     for (uint8_t i = 0; i < NAXES; i++) {
-      _seg[i] = p[i] - _p[i];
+      _blk[_n_blk][i] = p[i] - _p[i];
       _p[i] = p[i];
     }
-    _have_seg = true;
-    _feeding = false;
-    _done = false;
-    _kicked_off = false;
-    _underrun = false;
-    _pause_left = 0;
+    _n_blk++;
     _block_count++;
+    if (_done) {
+      // A plan that had caught up to the buffer now has more path: feed the
+      // unexecuted tail on the next pump() (replan, section 8.7).
+      _done = false;
+    }
     return true;
   }
 
-  // Number of motion blocks recorded by addLine (0 after a no-op). Test hook
-  // for the "addLine to current position is a no-op" contract.
+  // Number of motion blocks recorded by addLine (0 after a no-op / a sync).
   uint32_t block_count() const { return _block_count; }
 
-  // Close the path: the last committed point is rest (section 10.3). The
-  // one-block Step 6 feeder commits a rest-to-rest segment, so this only
-  // records that no further block is expected.
+  // Close the path: the last committed point is rest and R will not grow
+  // (section 10.3).
   void endPath() { _path_closed = true; }
 
-  // Plan and feed one committed Linear segment (section 10.4). Prefill every
-  // axis with start=false, then kick off with addQueueEntry(NULL, true); later
+  // Plan and feed the committed Linear path (section 10.4). Prefill every axis
+  // with start=false, then kick off with addQueueEntry(NULL, true); later
   // commands use start=true. An empty queue during prefill is expected and is
   // not underrun; after kick-off an empty queue while the plan still moves is
   // underrun (section 10.5).
   PumpStatus pump() {
-    if (_have_seg && !_feeding) {
+    if (!_feeding && _head < _n_blk) {
       feeder_start();
       while (!_done && all_have_room()) {
         feed_one();
@@ -236,17 +250,20 @@ class FasNAxis {
       return PumpStatus::Underrun;
     }
     if (_done && !any_queue_nonempty()) {
-      _have_seg = false;
+      _feeding = false;
+      _n_blk = 0;
+      _head = 0;
+      _path_closed = false;
       return PumpStatus::Idle;
     }
-    if (!_have_seg && !any_queue_nonempty()) {
+    if (!_feeding && !any_queue_nonempty()) {
       return PumpStatus::Idle;
     }
     return PumpStatus::Running;
   }
 
   bool isBusy() const {
-    if (_have_seg) {
+    if (_head < _n_blk || !_done) {
       return true;
     }
     return any_queue_nonempty();
@@ -256,15 +273,21 @@ class FasNAxis {
 
   // Performed ramp-up steps of the current segment's DDA master (section 7.1).
   uint32_t performedRampUp() const { return _P; }
-  // Live remaining-to-stop of the master in master steps (section 8.2).
+  // Live remaining-to-stop of the master in path steps (section 8.2).
   uint32_t remainingToStop() const { return _R; }
   // Period (ticks) of the last issued step entry.
   uint32_t lastTicks() const { return _ticks_last; }
-  // DDA master axis of the current segment (longest |delta|).
+  // DDA master axis of the current block (longest |delta|).
   uint8_t masterAxis() const { return (uint8_t)_master; }
+  // Number of blocks committed but not yet fully executed.
+  int pendingBlocks() const { return _n_blk - _head; }
 
  private:
   static int64_t abs_i64(int32_t d) { return d > 0 ? (int64_t)d : -(int64_t)d; }
+
+  static uint32_t abs_u32(int32_t d) {
+    return d > 0 ? (uint32_t)d : (uint32_t)(-(int64_t)d);
+  }
 
   bool any_queue_nonempty() const {
     for (uint8_t i = 0; i < NAXES; i++) {
@@ -284,33 +307,121 @@ class FasNAxis {
     return true;
   }
 
+  void clear_path() {
+    _n_blk = 0;
+    _head = 0;
+    _path_closed = false;
+    _feeding = false;
+    _done = true;
+    _kicked_off = false;
+    _underrun = false;
+    _block_count = 0;
+    _block_left = 0;
+    _pause_left = 0;
+    _P = 0;
+    _R = 0;
+    _ticks_last = 0;
+  }
+
   void send_to(uint8_t i, uint16_t ticks, uint8_t steps, bool count_up) {
     struct stepper_command_s cmd = {ticks, steps, count_up};
     _s[i]->addQueueEntry(&cmd, _kicked_off);
   }
 
-  // Initialize the one-block Linear ramp: DDA master is the longest |delta|
-  // (Remaining::longest_axis), the period law is RampLaw over master steps at
-  // ticks_floor (section 6.3).
-  void feeder_start() {
+  // Section 8.5 collinear, same sense between two full path directions.
+  //   (dot(d, d'))^2 * 100000  >=  99878 * |d|^2 * |d'|^2
+  //   (cos^2(2deg) ~= 0.99878). Integer mul/compare, no division, no sqrt.
+  bool collinear_same_sense(int a, int b) const {
+    int64_t dot = 0;
+    int64_t mag_a = 0;
+    int64_t mag_b = 0;
     for (uint8_t i = 0; i < NAXES; i++) {
-      _fed[i] = _p[i] - _seg[i];
-      _err[i] = 0;
-      _dir[i] = true;
+      int64_t da = _blk[a][i];
+      int64_t db = _blk[b][i];
+      dot += da * db;
+      mag_a += da * da;
+      mag_b += db * db;
     }
-    _master = Remaining::longest_axis(_seg, _tick_cfg, NAXES);
-    _abs_master = abs_i64(_seg[_master]);
-    uint32_t t_law = Remaining::ticks_floor(_seg, _tick_cfg, NAXES);
+    if (dot <= 0 || mag_a == 0 || mag_b == 0) {
+      return false;  // opposite sense or a zero vector
+    }
+    return dot * dot * 100000 >= 99878 * mag_a * mag_b;
+  }
+
+  // Remaining master steps from `head` to the next Linear path-stop: end of
+  // the buffer, or the first non-collinear vertex (sections 8.1 / 8.5). P and
+  // R live in these path-step units so a collinear run may rebind the DDA
+  // master without changing the ramp-step currency.
+  uint32_t remaining_path_steps(int head) const {
+    uint32_t s = 0;
+    int started = 0;
+    for (int b = head; b < _n_blk; b++) {
+      if (started && !collinear_same_sense(b - 1, b)) {
+        break;
+      }
+      int m = Remaining::longest_axis(_blk[b], _tick_cfg, NAXES);
+      s += abs_u32(_blk[b][m]);
+      started = 1;
+    }
+    return s;
+  }
+
+  // Set up the ramp law and DDA state for block `b`. `reset_P` is false at a
+  // collinear joint (P carries over); R is recomputed to the next path-stop.
+  void start_block(int b, bool reset_P) {
+    _head = b;
+    _master = Remaining::longest_axis(_blk[b], _tick_cfg, NAXES);
+    uint32_t t_law = Remaining::ticks_floor(_blk[b], _tick_cfg, NAXES);
     if (t_law == 0) {
       t_law = _tick_cfg[_master] != 0 ? _tick_cfg[_master] : 1;
     }
-    _law = RampLaw(t_law, _lim[_master].accel, (uint32_t)_abs_master);
+    _ticks_law = t_law;
+    int binder = Remaining::binder_axis(_blk[b], _tick_cfg, NAXES);
+    uint32_t accel = _lim[binder].accel;
+    uint32_t R_new = remaining_path_steps(b);
+    if (R_new == 0) {
+      R_new = abs_u32(_blk[b][_master]);
+    }
+    uint32_t carry = reset_P ? 0 : _law.P;
+    if (carry > R_new) {
+      carry = R_new;
+    }
+    _law = RampLaw(t_law, accel, R_new);
+    _law.P = carry;
+    _abs_master = abs_i64(_blk[b][_master]);
+    _block_left = abs_u32(_blk[b][_master]);
+    for (uint8_t i = 0; i < NAXES; i++) {
+      _err[i] = 0;
+    }
     _pause_left = 0;
-    _P = 0;
+    _P = _law.P;
     _R = _law.R;
     _ticks_last = 0;
-    _done = (_abs_master == 0);
+  }
+
+  // The current block's DDA walk is exhausted.
+  bool block_done() const { return _block_left == 0; }
+
+  // Move to the next committed block: path-stop resets P, collinear carries.
+  void advance_block() {
+    int prev = _head;
+    _head++;
+    if (_head >= _n_blk) {
+      _done = true;  // last buffered point is rest
+      return;
+    }
+    bool stop = !collinear_same_sense(prev, _head);
+    start_block(_head, stop);
+  }
+
+  void feeder_start() {
     _feeding = true;
+    _done = false;
+    _underrun = false;
+    for (uint8_t i = 0; i < NAXES; i++) {
+      _dir[i] = true;
+    }
+    start_block(_head, true);
   }
 
   // Emit at most one queue entry per registered axis per call, so the axes stay
@@ -335,10 +446,16 @@ class FasNAxis {
         }
       }
       _pause_left -= chunk;
-      if (_law.done() && _pause_left == 0) {
-        _done = true;
+      if (_pause_left == 0 && block_done()) {
+        advance_block();
       }
       return;
+    }
+    if (block_done()) {
+      advance_block();
+      if (_done) {
+        return;
+      }
     }
 
     uint32_t T = _law.step();
@@ -350,18 +467,18 @@ class FasNAxis {
     for (uint8_t i = 0; i < NAXES; i++) {
       st[i] = 0;
     }
-    st[_master] = _seg[_master] > 0 ? 1 : -1;
+    st[_master] = _blk[_head][_master] > 0 ? 1 : -1;
     for (uint8_t i = 0; i < NAXES; i++) {
-      if (i == _master) {
+      if (i == (uint8_t)_master) {
         continue;
       }
-      int64_t ad = abs_i64(_seg[i]);
+      int64_t ad = abs_i64(_blk[_head][i]);
       if (ad == 0) {
         continue;
       }
       _err[i] += ad;
       if (2 * _err[i] >= _abs_master) {
-        st[i] = _seg[i] > 0 ? 1 : -1;
+        st[i] = _blk[_head][i] > 0 ? 1 : -1;
         _err[i] -= _abs_master;
       }
     }
@@ -371,6 +488,12 @@ class FasNAxis {
       t_step = T >> 1;
       if (t_step > 65535) {
         t_step = 65535;
+      }
+      if (t_step < _ticks_law) {
+        t_step = _ticks_law;  // keep the step entry at or above the envelope
+        if (t_step > 65535) {
+          t_step = 65535;
+        }
       }
       _pause_left = T - t_step;
     }
@@ -384,10 +507,10 @@ class FasNAxis {
         _dir[i] = up;
       }
       send_to(i, (uint16_t)t_step, steps, up);
-      _fed[i] += st[i];
     }
-    if (_law.done() && _pause_left == 0) {
-      _done = true;
+    _block_left--;
+    if (_pause_left == 0 && block_done()) {
+      advance_block();
     }
   }
 
@@ -395,15 +518,15 @@ class FasNAxis {
   AxisLimits _lim[NAXES];
   uint32_t _tick_cfg[NAXES];
   int32_t _p[NAXES];
-  int32_t _seg[NAXES];
-  int32_t _fed[NAXES];
   int64_t _err[NAXES];
   bool _dir[NAXES];
+  int32_t _blk[HORIZON][NAXES];
   FasNAxisConfig _cfg;
   bool _registered[NAXES];
   bool _position_synced;
   uint32_t _block_count;
-  bool _have_seg;
+  int _n_blk;
+  int _head;
   bool _path_closed;
   bool _feeding;
   bool _done;
@@ -411,7 +534,9 @@ class FasNAxis {
   bool _underrun;
   int _master;
   int64_t _abs_master;
+  uint32_t _block_left;
   uint32_t _pause_left;
+  uint32_t _ticks_law;
   uint32_t _P;
   uint32_t _R;
   uint32_t _ticks_last;
