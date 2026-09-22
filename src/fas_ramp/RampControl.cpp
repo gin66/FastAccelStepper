@@ -7,7 +7,7 @@
 #include "fas_arch/common.h"
 
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-// Definitions for the `extern` declarations in RampGenerator.h. Must have
+// Definitions for the `extern` declarations in RampCalculator.h. Must have
 // external linkage (no `static`): RampGenerator.cpp, a separate translation
 // unit, also uses these via the LOG2_TICKS_PER_S* macros in RampCalculator.h.
 log2_value_t log2_timer_freq;
@@ -23,8 +23,17 @@ void ramp_rw_s::init() {
 void init_ramp_module() {
 #ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
   log2_timer_freq = log2_from((uint32_t)TICKS_PER_S);
-  log2_timer_freq_div_sqrt_of_2 =
-      log2_shr(log2_multiply(log2_timer_freq, log2_timer_freq), 1);
+  // freq / sqrt(2): -0.5 in log2 space. 1 raw unit = 1/512 (see
+  // Log2Representation.h), so -0.5 is -256 raw units. Previously this used
+  // log2_multiply(log2_timer_freq, log2_timer_freq) - a copy-paste of the
+  // line below, computing freq^2 instead - making this identical to
+  // log2_timer_freq_square_div_2 and producing wildly wrong (huge) tick
+  // counts for the small-steps/near-standstill case (calculate_ticks() /
+  // calculate_ramp_steps()'s non-cubic branch, only reachable when
+  // setLinearAcceleration() is unused, i.e. s_h == 0). This was the cause
+  // of the stepper "hanging" for minutes on a ramp start/reversal from
+  // standstill during Teensy 4.0 bring-up.
+  log2_timer_freq_div_sqrt_of_2 = (log2_value_t)(log2_timer_freq - 256);
   log2_timer_freq_square_div_2 = log2_shr(log2_square(log2_timer_freq), 1);
 #endif
 }

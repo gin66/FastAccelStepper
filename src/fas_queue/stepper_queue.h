@@ -13,6 +13,8 @@
 #include "pd_avr/avr_queue.h"
 #elif defined(TEST)
 #include "pd_test/test_queue.h"
+#elif defined(SUPPORT_TEENSY4)
+#include "pd_teensy/teensy_queue.h"
 #elif defined(SUPPORT_SAM)
 #include "pd_sam/sam_queue.h"
 #elif defined(SUPPORT_SAMD51)
