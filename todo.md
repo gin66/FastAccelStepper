@@ -793,7 +793,7 @@ must be a power of two.
 
 ---
 
-## Step 8 — feeder: drift, retry, room (F14, F15)
+## Step 8 — feeder: drift, retry, room (F14, F15) ✅
 
 Do not introduce a 2 ms slice. A slice is one `feed_one()`
 emission: one command per registered axis, `steps` 0 or 1, the
@@ -873,6 +873,30 @@ before `addQueueEntry`; this assert is the test).
 ```
 make -C extras/tests/pc_based test_26 && extras/tests/pc_based/test_26
 ```
+
+**Done:** `FasNAxis` now holds one command per axis (`Held{waiting, ticks,
+steps, count_up}` in `src/FasNAxis.h`) plus a `_slice_open` flag. `feed_one()`
+builds a slice and `hold()`s it without sending; `flush_held()` sends only the
+axes still `waiting`, clears `waiting` on `AQE_OK`, and leaves it set on a
+retryable code (`QueueFull`, `DirPinIsBusy`, `WaitForEnablePinActive`,
+`DeviceNotReady`). `feed_loop()` breaks out of a pump on a retryable flush, so
+one `pump()` never plans a second command past an unaccepted one; the next
+`pump()` re-sends the same held command and no new plan step is built until the
+slice closes. `AQE_ERROR_TICKS_TOO_LOW` and (until Step 9) both pause-injected
+codes latch `_error` and `pump()` returns `PumpStatus::Error`; the injected
+branch is marked `// Step 9: time bubble, not Error`. `all_have_room()` now
+reserves two slots (`queueEntries() + 2 >= QUEUE_LEN`) instead of trusting
+`isQueueFull()` (which allows `QUEUE_LEN - 1`). `SimPort` gained the one-shot
+`failNext(AqeResultCode)` hook (fires once on the next command, enqueues
+nothing, leaves the queue length untouched). `f8_feeder()` in `test_26.cpp`:
+8.1 F14 `(240000,0)` holds `max |clock_x - clock_y| <= 2`, X reaches the target
+and issues the full move, Y issues nothing, and `test_26_f14.gnuplot` records
+the clock delta every 1000th paired drain; 8.2 a `QueueFull` (then
+`DirPinIsBusy`) fault proves X gained exactly one command while Y held, then Y
+accepts the same held command on the next `pump()`, and the `(500,500)` move
+finishes in lockstep; 8.3 on `QUEUE_LEN=16` queues neither axis exceeds 14
+entries and the `(8000,8000)` move completes. `make test` and
+`make mutations` are green.
 
 ---
 

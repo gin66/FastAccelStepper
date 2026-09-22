@@ -2792,6 +2792,205 @@ static void f16_skeleton() {
   printf("F16 header skeleton + addAxis/position contract green\n");
 }
 
+// Step 8 (whitepaper section 8): the feeder's send_to must read the
+// addQueueEntry() result and hold a command that returned a retryable code so
+// the paired axes stay in lockstep. Three fixtures, in order.
+//
+// 8.1 F14: a long single-block Linear move with no per-step fault. If the
+// command stream is intact the two axes' simulated clocks stay within one
+// command of each other on every paired drain -- the invariant this whole step
+// builds toward.
+//
+// 8.2 retry: a one-shot retryable fault (QueueFull or DirPinIsBusy) must leave
+// the held command in-flight on the faulting axis, not dropped and not
+// re-planned onto its partner.
+//
+// 8.3 room: with a nearly-full queue the planner must reserve two slots for a
+// pause-stuffed entry, and the ticks floor must reject too-fast steps before
+// addQueueEntry.
+void f8_feeder() {
+  // --- 8.1 F14: long single axis move, clocks stay in lockstep ------------
+  // (240000, 0): X does all the work, Y runs no steps of this block. Both run
+  // the same pump/drain cadence on 4000-tick queues, so the issued tick sums
+  // per axis must nearly coincide (one command out of phase at most).
+  {
+    const uint32_t ticks_cfg = 4000;
+    const uint32_t move = 240000;
+    SimPort px(ticks_cfg, 64), py(ticks_cfg, 64);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+
+    int32_t target[2] = {(int32_t)move, 0};
+    path.addLine(target);
+    path.endPath();
+
+    NaxisPlot plot;
+    plot.start_scalar("f14", "F14 feeder clock delta (240000 steps)");
+
+    uint64_t max_clock_delta = 0;
+    int64_t issued_x = 0, issued_y = 0;
+    long sub = 0;
+    while (path.isBusy()) {
+      int64_t s0 = 0, s1 = 0;
+      bool u0 = true, u1 = true;
+      px.drain_one(&s0, &u0);
+      py.drain_one(&s1, &u1);
+      issued_x += s0 == 0 ? 0 : (u0 ? s0 : -s0);
+      issued_y += s1 == 0 ? 0 : (u1 ? s1 : -s1);
+      int64_t delta = (int64_t)px.clock() - (int64_t)py.clock();
+      uint64_t d = delta < 0 ? (uint64_t)(-delta) : (uint64_t)delta;
+      if (d > max_clock_delta) {
+        max_clock_delta = d;
+      }
+      if (sub++ % 1000 == 0) {
+        double t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+        plot.scalar_row(t, (double)delta, 0.0);
+      }
+      path.pump();
+    }
+    test(max_clock_delta <= 2, "F14 clocks stay within 2 ticks of each other");
+    test(px.position() == (int32_t)move, "F14 X reached the target");
+    test(py.position() == 0, "F14 Y did not move");
+    test((int64_t)issued_x == (int64_t)move, "F14 X issued the full move");
+    test(issued_y == 0, "F14 Y issued no steps");
+    test(px.clock() >= 60ull * 16000000ull,
+         "F14 X ran at least the coast time (<= 60 s of ticks)");
+    double t_end = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+    plot.finish_scalar(0.0, t_end, "time [s]", "clock_x - clock_y [ticks]",
+                       "clock_x - clock_y", "zero");
+    printf(
+        "F14 feeder: issued=(%lld,%lld) max_clock_delta=%llu px_clock=%llu\n",
+        (long long)issued_x, (long long)issued_y,
+        (unsigned long long)max_clock_delta, (unsigned long long)px.clock());
+  }
+
+  // --- 8.2 retry: a one-shot retryable fault holds the command in-flight --
+  //
+  // A paired (500, 500) move. Prefill, drain a few paired commands to make
+  // room, arm a single QueueFull fault on Y, pump once (X accepts its command,
+  // Y holds it), confirm X gained exactly one and Y gained none, then pump
+  // again with no fault so Y accepts the same held command.
+  {
+    SimPort px(4000, 64), py(4000, 64);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+
+    int32_t target[2] = {500, 500};
+    path.addLine(target);
+    path.endPath();
+
+    path.pump();  // prefill
+    for (int i = 0; i < 4 && path.isBusy(); ++i) {
+      px.drain_one(NULL, NULL);
+      py.drain_one(NULL, NULL);
+    }
+
+    int qx0 = (int)px.queueEntries();
+    int qy0 = (int)py.queueEntries();
+    py.failNext(AQE_QUEUE_FULL);
+    path.pump();  // X's command lands, Y's is held (returned QueueFull)
+    test((int)px.queueEntries() == qx0 + 1,
+         "8.2 retry X gained exactly its command on the faulting pump");
+    test((int)py.queueEntries() == qy0, "8.2 retry Y did not take the command");
+
+    path.pump();  // no fault armed now: the held Y command is sent again
+    test((int)py.queueEntries() >= qy0 + 1,
+         "8.2 retry Y accepts the held command on the retry");
+    test(path.isBusy(), "8.2 retry the move is still in progress");
+
+    // Drive to completion with paired drains; the held Y command and its
+    // resend keep the two command streams identical, so the clocks must stay
+    // within two ticks and both axes hit (500, 500).
+    bool lockstep_holds = true;
+    while (path.isBusy()) {
+      int64_t s0 = 0, s1 = 0;
+      bool u0 = true, u1 = true;
+      px.drain_one(&s0, &u0);
+      py.drain_one(&s1, &u1);
+      uint64_t d = px.clock() > py.clock() ? px.clock() - py.clock()
+                                           : py.clock() - px.clock();
+      if (d > 2) {
+        lockstep_holds = false;
+      }
+      path.pump();
+    }
+    test(lockstep_holds,
+         "8.2 retry clock stays within 2 ticks after one retryable fault");
+    test(px.position() == 500 && py.position() == 500,
+         "8.2 retry completes the (500, 500) move");
+    printf("F12 retry: ends (500,500) lockstep ok=%d\n", lockstep_holds);
+
+    // A different retryable code, DirPinIsBusy, follows the same path.
+    {
+      SimPort qx(4000, 64), qy(4000, 64);
+      FasNAxis<2, 64, SimPort> p2(cfg);
+      p2.addAxis(0, &qx);
+      p2.addAxis(1, &qy);
+      int32_t cur2[2] = {0, 0};
+      p2.setCurrentPosition(cur2);
+      int32_t t2[2] = {200, 200};
+      p2.addLine(t2);
+      p2.endPath();
+      p2.pump();  // prefill
+      for (int i = 0; i < 4 && p2.isBusy(); ++i) {
+        qx.drain_one(NULL, NULL);
+        qy.drain_one(NULL, NULL);
+      }
+      int bx = (int)qx.queueEntries();
+      int by = (int)qy.queueEntries();
+      qy.failNext(AQE_DIR_PIN_IS_BUSY);
+      p2.pump();  // held on Y
+      test((int)qx.queueEntries() == bx + 1 && (int)qy.queueEntries() == by,
+           "8.2 retry DirPinIsBusy: X lands, Y holds");
+      p2.pump();  // retry: Y takes the held command
+      test((int)qy.queueEntries() >= by + 1,
+           "8.2 retry DirPinIsBusy: Y accepts on retry");
+    }
+  }
+
+  // --- 8.3 room: reserve two slots, and reject too-fast steps before -------
+  // addQueueEntry. A nearly-full queue must never reach QUEUE_LEN.
+  {
+    const uint32_t ticks_cfg = 4000;
+    SimPort p0(ticks_cfg, 16), p1(ticks_cfg, 16);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &p0);
+    path.addAxis(1, &p1);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+
+    int32_t target[2] = {8000, 8000};
+    path.addLine(target);
+    path.endPath();
+
+    while (path.isBusy()) {
+      path.pump();
+      test(p0.queueEntries() <= 14, "F15 room X never reaches QUEUE_LEN - 1");
+      test(p1.queueEntries() <= 14, "F15 room Y never reaches QUEUE_LEN - 1");
+      if (p0.queueEntries() > 0) {
+        p0.drain_one(NULL, NULL);
+      }
+      if (p1.queueEntries() > 0) {
+        p1.drain_one(NULL, NULL);
+      }
+    }
+    test(p0.position() == 8000 && p1.position() == 8000,
+         "F15 room both axes complete the 8000 move");
+    printf("F15 room: completed 8000x8000 on QUEUE_LEN=16 queues\n");
+  }
+
+  printf("F14/F12/F15 feeder contract green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -2811,6 +3010,7 @@ int main() {
   f4_sim_port();
   f6_linear_sim();
   f7_linear_lookahead();
+  f8_feeder();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;

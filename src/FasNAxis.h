@@ -20,13 +20,18 @@ class FastAccelStepper;
 // planner). The hot path performs no float, double, or integer division; ramp
 // math lives in fas_naxis/ramp_map.h (log2_value_t) and RampCalculator.
 //
-// Step 7 (this file) is the Linear lookahead planner: addLine() commits points
-// into a block ring of up to HORIZON n-dim points, and pump() feeds the
-// committed Linear path through addQueueEntry(). The DDA master is the longest
-// |delta| of the current block; R is Remaining-style remaining master steps to
-// the next Linear path-stop (section 8.1 + 8.5). A non-collinear vertex resets
-// P; a collinear joint carries it. The last buffered point of an open path is
-// rest, so the ramp always stops there.
+// Step 7 is the Linear lookahead planner: addLine() commits points into a block
+// ring of up to HORIZON n-dim points, and pump() feeds the committed Linear
+// path through addQueueEntry(). The DDA master is the longest |delta| of the
+// current block; R is Remaining-style remaining master steps to the next Linear
+// path-stop (section 8.1 + 8.5). A non-collinear vertex resets P; a collinear
+// joint carries it. The last buffered point of an open path is rest, so the
+// ramp always stops there.
+//
+// Step 8 makes the feeder fault-tolerant: feed_one() stores a held command per
+// axis (one slice) and flush_held() sends it, retrying on a retryable
+// addQueueEntry result on the next pump() without re-planning the slice, and
+// reserving QUEUE_LEN - 2 slots so a pause-stuffed entry always fits.
 
 // PumpStatus is the result of a pump() tick. Deliberately NO LookaheadTooShort:
 // a short lookahead slows the track (speed cap, G4/F11/F19) instead of
@@ -87,6 +92,10 @@ class FasNAxis {
       _p[i] = 0;
       _dir[i] = true;
       _err[i] = 0;
+      _held[i].waiting = false;
+      _held[i].ticks = 0;
+      _held[i].steps = 0;
+      _held[i].count_up = true;
       for (uint16_t b = 0; b < HORIZON; b++) {
         _blk[b][i] = 0;
       }
@@ -101,6 +110,8 @@ class FasNAxis {
     _done = true;
     _kicked_off = false;
     _underrun = false;
+    _slice_open = false;
+    _error = false;
     _master = 0;
     _abs_master = 0;
     _block_left = 0;
@@ -224,9 +235,7 @@ class FasNAxis {
   PumpStatus pump() {
     if (!_feeding && _head < _n_blk) {
       feeder_start();
-      while (!_done && all_have_room()) {
-        feed_one();
-      }
+      feed_loop();
       bool started = false;
       for (uint8_t i = 0; i < NAXES; i++) {
         if (_registered[i] && !_s[i]->isQueueEmpty()) {
@@ -236,15 +245,16 @@ class FasNAxis {
       }
       _kicked_off = started;
     }
-    if (_kicked_off && !_done) {
+    if (!_error && _kicked_off && !_done) {
       for (uint8_t i = 0; i < NAXES; i++) {
         if (_registered[i] && _s[i]->isQueueEmpty()) {
           _underrun = true;
         }
       }
     }
-    while (!_done && all_have_room()) {
-      feed_one();
+    feed_loop();
+    if (_error) {
+      return PumpStatus::Error;
     }
     if (_underrun) {
       return PumpStatus::Underrun;
@@ -254,6 +264,7 @@ class FasNAxis {
       _n_blk = 0;
       _head = 0;
       _path_closed = false;
+      _slice_open = false;
       return PumpStatus::Idle;
     }
     if (!_feeding && !any_queue_nonempty()) {
@@ -298,9 +309,12 @@ class FasNAxis {
     return false;
   }
 
+  // Reserve two slots on every queue (QUEUE_LEN - 2) so a coordinated slice --
+  // and the pause-stuffed entry a long period may split into -- always fits.
+  // isQueueFull() alone allows QUEUE_LEN - 1 and cannot express this reserve.
   bool all_have_room() const {
     for (uint8_t i = 0; i < NAXES; i++) {
-      if (_registered[i] && _s[i]->isQueueFull()) {
+      if (_registered[i] && _s[i]->queueEntries() + 2 >= (uint32_t)QUEUE_LEN) {
         return false;
       }
     }
@@ -321,11 +335,82 @@ class FasNAxis {
     _P = 0;
     _R = 0;
     _ticks_last = 0;
+    _slice_open = false;
+    _error = false;
+    for (uint8_t i = 0; i < NAXES; i++) {
+      _held[i].waiting = false;
+    }
   }
 
-  void send_to(uint8_t i, uint16_t ticks, uint8_t steps, bool count_up) {
-    struct stepper_command_s cmd = {ticks, steps, count_up};
-    _s[i]->addQueueEntry(&cmd, _kicked_off);
+  // Store one axis's slot of the slice currently being emitted (Step 8). The
+  // command is not sent until flush_held(); that lets the paired axes re-send a
+  // held command without re-planning the slice.
+  void hold(uint8_t i, uint16_t ticks, uint8_t steps, bool count_up) {
+    _held[i].ticks = ticks;
+    _held[i].steps = steps;
+    _held[i].count_up = count_up;
+    _held[i].waiting = true;
+  }
+
+  bool any_waiting() const {
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_registered[i] && _held[i].waiting) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Send the held slice to every axis still waiting. AQE_OK clears waiting; a
+  // retryable code (QueueFull / DirPinIsBusy / WaitForEnablePinActive /
+  // DeviceNotReady) leaves it set so the next pump() re-sends the same command.
+  // The error codes are terminal: set _error and report it.
+  AqeResultCode flush_held() {
+    AqeResultCode retry = AqeResultCode::OK;
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (!_registered[i] || !_held[i].waiting) {
+        continue;
+      }
+      struct stepper_command_s cmd = {_held[i].ticks, _held[i].steps,
+                                      _held[i].count_up};
+      AqeResultCode rc = _s[i]->addQueueEntry(&cmd, _kicked_off);
+      if (rc == AqeResultCode::OK) {
+        _held[i].waiting = false;
+      } else if (aqeIsPauseInjected(rc)) {
+        // Step 9: time bubble, not Error
+        _error = true;
+      } else if (aqeRetry(rc)) {
+        retry = rc;
+      } else {
+        _error = true;  // TicksTooLow and any other terminal code
+      }
+    }
+    if (!any_waiting()) {
+      _slice_open = false;
+    }
+    return retry;
+  }
+
+  // Emit slices while there is room and the path is live. Building is one
+  // feed_one() per open slice; flushing is one flush_held() per slice. A
+  // retryable flush stops this pump() call (the held slice is retried on the
+  // next call) so a single pump never plans past an unaccepted command.
+  void feed_loop() {
+    while (!_error) {
+      if (!_slice_open) {
+        if (_done || !all_have_room()) {
+          break;
+        }
+        feed_one();
+        if (!_slice_open) {
+          break;
+        }
+      }
+      AqeResultCode rc = flush_held();
+      if (rc != AqeResultCode::OK || _done) {
+        break;
+      }
+    }
   }
 
   // Section 8.5 collinear, same sense between two full path directions.
@@ -429,7 +514,7 @@ class FasNAxis {
   // way: a half-period step entry followed by pause entries covering the
   // remainder (sections 4.2 / 9.3).
   void feed_one() {
-    if (_done) {
+    if (_done || _slice_open) {
       return;
     }
     if (_pause_left > 0) {
@@ -442,9 +527,10 @@ class FasNAxis {
       }
       for (uint8_t i = 0; i < NAXES; i++) {
         if (_registered[i]) {
-          send_to(i, (uint16_t)chunk, 0, _dir[i]);
+          hold(i, (uint16_t)chunk, 0, _dir[i]);
         }
       }
+      _slice_open = true;
       _pause_left -= chunk;
       if (_pause_left == 0 && block_done()) {
         advance_block();
@@ -506,13 +592,24 @@ class FasNAxis {
       if (steps != 0) {
         _dir[i] = up;
       }
-      send_to(i, (uint16_t)t_step, steps, up);
+      hold(i, (uint16_t)t_step, steps, up);
     }
+    _slice_open = true;
     _block_left--;
     if (_pause_left == 0 && block_done()) {
       advance_block();
     }
   }
+
+  // One held command per axis (Step 8): the slice being emitted. waiting stays
+  // set until addQueueEntry returns AQE_OK, so a retryable fault re-sends the
+  // same command on the next pump without re-planning the slice.
+  struct Held {
+    bool waiting;
+    uint16_t ticks;
+    uint8_t steps;
+    bool count_up;
+  };
 
   Stepper* _s[NAXES];
   AxisLimits _lim[NAXES];
@@ -532,6 +629,9 @@ class FasNAxis {
   bool _done;
   bool _kicked_off;
   bool _underrun;
+  bool _slice_open;
+  bool _error;
+  Held _held[NAXES];
   int _master;
   int64_t _abs_master;
   uint32_t _block_left;

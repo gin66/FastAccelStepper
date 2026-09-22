@@ -55,11 +55,19 @@ class SimPort {
     injected_pause_ticks_ = 0;
     before_done_ = false;
     after_done_ = false;
+    fail_rc_ = AQE_OK;
   }
 
   // --- inject / driver hook configuration ---
   void setInjectMode(InjectMode m) { inject_ = m; }
   void setInjectTicks(uint16_t ticks) { inject_ticks_ = ticks; }
+
+  // One-shot retryable fault for Step 8. The next addQueueEntry(non-NULL)
+  // returns `rc` once, enqueues nothing, and leaves isQueueFull() (and
+  // queueEntries()) unchanged. Used to prove the FasNAxis feeder holds a
+  // command that returned a retryable code and re-sends it on the next pump
+  // instead of dropping it or re-planning the partner axis.
+  void failNext(AqeResultCode rc) { fail_rc_ = rc; }
 
   // --- ramp generator idle contract (whitepaper section 4.6) ---
   // The feeder requires the FAS ramp generator to be idle; SimPort models
@@ -111,6 +119,13 @@ class SimPort {
   // --- the feeder's only entry point (whitepaper section 4.1) ---
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start) {
     injected_pause_ticks_ = 0;
+    // One-shot injected fault (Step 8): fire once on a command, enqueue
+    // nothing, and leave the queue length untouched.
+    if (cmd != NULL && fail_rc_ != AQE_OK) {
+      AqeResultCode rc = fail_rc_;
+      fail_rc_ = AQE_OK;
+      return rc;
+    }
     // Kick-off: addQueueEntry(NULL, true) starts the queue. On an empty queue
     // it is an error (there is nothing to start).
     if (cmd == NULL) {
@@ -252,6 +267,7 @@ class SimPort {
   uint16_t injected_pause_ticks_;
   bool before_done_;
   bool after_done_;
+  AqeResultCode fail_rc_;
 
   inline uint32_t queue_mask() const { return (uint32_t)queue_len_ - 1; }
 
