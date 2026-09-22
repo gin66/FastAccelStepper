@@ -13,9 +13,10 @@
 //    you can see its exact rotational position.
 // 2. Upload this sketch and open the Serial Monitor at 115200 baud.
 // 3. Type 'y' <enter> to start. For each speed level, the motor moves
-//    forward STEPS_PER_LEG steps, pauses, then moves back the same
-//    STEPS_PER_LEG steps - ending exactly where it started IF (and only
-//    if) no steps were lost in either direction. Watch the mark.
+//    forward far enough to actually reach and briefly cruise at that
+//    speed (see stepsForLeg()), pauses, then moves back the same
+//    distance - ending exactly where it started IF (and only if) no
+//    steps were lost in either direction. Watch the mark.
 //    While it runs, status lines print every 200ms - if those stop
 //    appearing, the last line printed pinpoints exactly where it got
 //    stuck; share it.
@@ -40,15 +41,28 @@
 #define dirPinStepper 3
 #define enablePinStepper 4
 
-// Net-zero per leg, so any shaft position error is due to lost steps -
-// not because the test itself asked for a different end position.
-#define STEPS_PER_LEG 2000
-#define ACCELERATION 20000  // steps/s^2 - modest, keep fixed while testing speed
+// Distance per leg is computed per speed level (see stepsForLeg()) - a
+// FIXED step count can't reach a high target speed at all: too short a
+// distance silently turns a high-speed level into a low triangular blip
+// that never actually reaches the speed being "tested", making the result
+// meaningless. Higher ACCELERATION here means less distance/time needed
+// to reach a given speed level (e.g. at 200000 steps/s^2, the 200000 Hz
+// level needs ~300000 steps and ~1.5s per leg; lower this and the
+// distance/time grows a lot - d,t ~ 1/ACCELERATION for a given speed).
+// This is a test default, not a claim about your motor's real max
+// acceleration - lower it if you suspect losses are from acceleration
+// being too aggressive for your torque, not from the step rate itself.
+// Lowered from 200000 to 20000 for round 2: round 1 (200000 steps/s^2)
+// found steps lost at 125000 Hz with a hard/fast ramp - this checks
+// whether that was a motor torque/acceleration limit rather than a real
+// step-rate ceiling, by giving the motor a much gentler ramp to the same
+// speeds. Legs will take longer now (t ~ 1/ACCELERATION for a given
+// speed) - expect several seconds per leg at the higher levels.
+#define ACCELERATION 20000  // steps/s^2
 
-// Speed levels to sweep, in Hz. Edit this list based on what you learn -
-// e.g. once 100000 works, add 125000, 150000... to narrow in further.
-const uint32_t speedLevels[] = {5000,   10000,  20000,  30000, 50000,
-                                75000,  100000, 150000, 200000, 300000};
+// Round 2: 5000-100000 Hz already confirmed good in round 1 (with an even
+// harder ramp), so start straight at 100000 to save time.
+const uint32_t speedLevels[] = {100000, 125000, 150000, 175000, 200000};
 const uint8_t numLevels = sizeof(speedLevels) / sizeof(speedLevels[0]);
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
@@ -67,6 +81,21 @@ TestState state = TestState::waitingToStart;
 uint8_t level = 0;
 uint32_t stateChangeMs = 0;
 uint32_t lastReportMs = 0;
+int32_t currentLegSteps = 0;
+
+// Distance needed to accelerate up to speedHz and back down to 0 is
+// speedHz^2 / ACCELERATION (both phases together); add 50% more so there
+// is an actual cruise segment at speedHz to observe, not just a triangular
+// peak that brushes the target speed for an instant.
+int32_t stepsForLeg(uint32_t speedHz) {
+  uint32_t accelDecelSteps =
+      (uint32_t)(((uint64_t)speedHz * speedHz) / ACCELERATION);
+  uint32_t steps = accelDecelSteps + accelDecelSteps / 2;
+  if (steps < 200) {
+    steps = 200;  // sane minimum for the lowest test levels
+  }
+  return (int32_t)steps;
+}
 
 void printStatus(const char *label) {
   Serial.print(label);
@@ -89,14 +118,17 @@ void printStatus(const char *label) {
 }
 
 void startLeg() {
+  currentLegSteps = stepsForLeg(speedLevels[level]);
   Serial.println();
   Serial.print("=== Testing ");
   Serial.print(speedLevels[level]);
-  Serial.println(" Hz ===");
+  Serial.print(" Hz, ");
+  Serial.print(currentLegSteps);
+  Serial.println(" steps per leg ===");
   Serial.println("Watch the shaft mark now.");
   stepper->setSpeedInHz(speedLevels[level]);
   stepper->setAcceleration(ACCELERATION);
-  MoveResultCode res = stepper->move(STEPS_PER_LEG);
+  MoveResultCode res = stepper->move(currentLegSteps);
   Serial.print("move() forward returned: ");
   Serial.println(toString(res));
   state = TestState::movingForward;
@@ -182,7 +214,7 @@ void loop() {
 
     case TestState::pausing:
       if (now - stateChangeMs >= 300) {
-        MoveResultCode res = stepper->move(-STEPS_PER_LEG);
+        MoveResultCode res = stepper->move(-currentLegSteps);
         Serial.print("move() back returned: ");
         Serial.println(toString(res));
         state = TestState::movingBack;
