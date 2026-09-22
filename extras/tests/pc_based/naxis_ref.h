@@ -182,7 +182,7 @@ class NaxisRefLinear {
     }
     uint32_t t;
     if (P == 0) {
-      t = ticks_law;
+      t = map.calculate_ticks(1);
     } else {
       t = map.calculate_ticks(P);
       if (t < ticks_law) {

@@ -53,7 +53,7 @@ class RampLaw {
   uint32_t period(uint32_t ticks_min = 0) const {
     uint32_t t;
     if (P == 0) {
-      t = ticks_cfg;
+      t = map.calculate_ticks(1);
     } else {
       t = map.calculate_ticks(P);
       if (t < ticks_cfg) {

@@ -40,7 +40,11 @@ class SimPort {
         queue_len_(queue_len),
         inject_(InjectNone),
         inject_ticks_(8000),
-        ramp_generator_active_(false) {
+        ramp_generator_active_(false),
+        dir_before_ticks_(0),
+        dir_before_count_(0),
+        dir_after_ticks_(0),
+        force_extra_before_(0) {
     reset();
   }
 
@@ -56,6 +60,7 @@ class SimPort {
     before_done_ = false;
     after_done_ = false;
     fail_rc_ = AQE_OK;
+    force_extra_before_ = 0;
   }
 
   // --- inject / driver hook configuration ---
@@ -68,6 +73,27 @@ class SimPort {
   // command that returned a retryable code and re-sends it on the next pump
   // instead of dropping it or re-planning the partner axis.
   void failNext(AqeResultCode rc) { fail_rc_ = rc; }
+
+  // --- DIR pause budget (whitepaper section 4.4, todo Step 9) ---
+  // The reversing axis must already be at a slow period long enough to hold
+  // the before/after pauses. FasNAxis reads these through the same names the
+  // real FastAccelStepper exposes, so the planner carves the carved shape on
+  // the reversing axis only. Default 0 = no pause (the current behaviour).
+  void setDirChangeBudget(uint16_t before, uint8_t n_before, uint16_t after) {
+    dir_before_ticks_ = before;
+    dir_before_count_ = n_before;
+    dir_after_ticks_ = after;
+  }
+  uint16_t getDirChangeBeforeTicks() const { return dir_before_ticks_; }
+  uint8_t getDirChangeBeforePauseCount() const { return dir_before_count_; }
+  uint16_t getDirChangeAfterTicks() const { return dir_after_ticks_; }
+
+  // One-shot "the driver injects one more before-pause the plan did not
+  // carve" hook (F12c). The next steps>0 command enqueues a pause of `ticks`
+  // at the OLD count_up, records it in injectedPauseTicks(), returns
+  // DirChangePauseInjected, and does NOT enqueue the step. Then the flag
+  // clears. Use with InjectNone.
+  void forceExtraBefore(uint16_t ticks) { force_extra_before_ = ticks; }
 
   // --- ramp generator idle contract (whitepaper section 4.6) ---
   // The feeder requires the FAS ramp generator to be idle; SimPort models
@@ -140,6 +166,15 @@ class SimPort {
     // so a slow axis's 65535 split may use a shorter pause than max_speed.
     if (cmd->steps > 0 && cmd->ticks < max_speed_in_ticks_) {
       return AQE_ERROR_TICKS_TOO_LOW;
+    }
+    // One-shot driver inject (F12c): enqueue a before-pause the plan did not
+    // carve, at the OLD count_up, and do not enqueue the step.
+    if (cmd->steps > 0 && force_extra_before_ != 0) {
+      uint16_t t = force_extra_before_;
+      force_extra_before_ = 0;
+      enqueue(t, 0, queue_end_count_up_);
+      injected_pause_ticks_ = t;
+      return AQE_DIR_CHANGE_PAUSE_INJECTED;
     }
     if (isQueueFull()) {
       return AQE_QUEUE_FULL;
@@ -267,6 +302,10 @@ class SimPort {
   bool before_done_;
   bool after_done_;
   AqeResultCode fail_rc_;
+  uint16_t dir_before_ticks_;
+  uint8_t dir_before_count_;
+  uint16_t dir_after_ticks_;
+  uint16_t force_extra_before_;
 
   inline uint32_t queue_mask() const { return (uint32_t)queue_len_ - 1; }
 

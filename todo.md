@@ -900,7 +900,7 @@ entries and the `(8000,8000)` move completes. `make test` and
 
 ---
 
-## Step 9 — carve DIR pauses from the reversing axis’s last step (F12, F12b, F12c)
+## Step 9 — carve DIR pauses from the reversing axis’s last step (F12, F12b, F12c) ✅
 
 Whitepaper §4.4. Do not change Step 8’s held-slice retry. Do not
 copy a DIR pause onto any other axis. Default budgets stay 0, so
@@ -986,6 +986,32 @@ Plot `test_26_f12.gnuplot` with `NaxisPlot` (XY plus the pause
 samples on the reversing axis). **Done when:** F12, F12c, and the
 short-tail case are green, F5 still matches `naxis_ref`, and
 `failNext` from Step 8 still retries.
+
+**Done:** `src/FasNAxis.h` reads the DIR budget at `addAxis` /
+`setLimitsFromSteppers` (`getDirChangeBeforeTicks` /
+`getDirChangeBeforePauseCount` / `getDirChangeAfterTicks`) and resolves the
+config overrides (`dir_before_ticks` / `dir_after_ticks`, `n_before` defaulting
+to 1). At the last binder step before a reversal it carves the reversing axis's
+own last step (`start_carve` / `carve_emit` / `feed_carve`): a shortened step of
+`T_min - tau` (old DIR), `n_before` before-pauses of `tau_before` (old DIR), and
+one after-pause of `tau_after` (new DIR), tick sum unchanged. Only the carving
+axis gets those commands; every other axis keeps the command it was already
+given. `_carve_then_advance` defers the next block until the sequence is
+flushed, and the carving axis's `_dir` is updated to the new direction so the
+first new step sees no inject. If the natural tail period is too short
+(`T_min < tau + max(MIN_CMD_TICKS, ticks_cfg)`), `start_block` halves the
+approach acceleration until `calculate_ticks(1)` holds the budget (section
+4.4.1); the carve then has the same shape. A `T > 65535` tail keeps the section
+9.3 stuffing path unchanged. The ramp law's last decel step now uses
+`calculate_ticks(1)` instead of `ticks_cfg` (`ramp_law.h`, `naxis_ref.h`,
+`f3`'s reference), matching section 7.1 ("`calculate_ticks(0)` is never
+called") and section 4.4.1's slow `T_min`. `naxis_sim_port.h` gained
+`setDirChangeBudget` / the three getters and the one-shot `forceExtraBefore`
+inject hook. `f9_dir_pauses()` runs F12 (carve shape, Y trace and clocks equal a
+zero-budget run), F12c (`forceExtraBefore(8000)` -> `pump()` Error, Y gains no
+8000 pause), the F12b Step-12 comment/idle-axis check, and the short-tail case
+(capped accel, carve shape, Y clean). Plot: `test_26_f12.gnuplot`. `make test`
+and `make mutations` are green.
 
 ---
 

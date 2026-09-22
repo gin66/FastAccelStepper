@@ -754,7 +754,8 @@ void f3_ramp() {
       } else if (P > 0) {
         P--;
       }
-      uint32_t t = (P == 0) ? ticks_cfg : map.calculate_ticks((uint32_t)P);
+      uint32_t t =
+          (P == 0) ? map.calculate_ticks(1) : map.calculate_ticks((uint32_t)P);
       if (t < ticks_cfg) {
         t = ticks_cfg;
       }
@@ -2991,6 +2992,302 @@ void f8_feeder() {
   printf("F14/F12/F15 feeder contract green\n");
 }
 
+// Step 9 (whitepaper section 4.4): the DIR pause is carved out of the reversing
+// axis's own last step, so the coordinated timeline does not grow and no other
+// axis is paused. The reversing axis arrives at a slow period T_min (section
+// 4.4.1); the last old-direction step of period T_min is replaced by a
+// shortened step of T_min - tau plus the before-pauses (old DIR) and the
+// after-pause (new DIR). An inject the plan did not carve is an Error.
+struct NaxisCmd {
+  uint16_t ticks;
+  uint8_t steps;
+  bool up;
+};
+struct RevSample {
+  double t;
+  int32_t x;
+  int32_t y;
+  uint16_t ticks;
+};
+struct RevTrace {
+  NaxisCmd x[6000];
+  int nx;
+  NaxisCmd y[6000];
+  int ny;
+  RevSample s[6000];
+  int ns;
+  int32_t pxe;
+  int32_t pye;
+  uint64_t clkx;
+  uint64_t clky;
+  bool error;
+};
+
+// Capped acceleration the planner picks for a reversal budget (section 4.4.1):
+// halve until calculate_ticks(1) holds tau + the legal step floor.
+static uint32_t cap_accel_for_budget(uint32_t ticks_cfg, uint32_t accel,
+                                     uint32_t need) {
+  uint32_t a = accel;
+  while (a > 1) {
+    RampMap m(ticks_cfg, a);
+    if (m.calculate_ticks(1) >= need) {
+      break;
+    }
+    a >>= 1;
+  }
+  return a;
+}
+
+// Run a Linear out-and-back on X with the given DIR budget; record the raw
+// command streams and the per-iteration XY/clock samples.
+static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
+                         uint32_t accel, int32_t move, uint32_t qlen,
+                         RevTrace* tr) {
+  SimPort px(4000, qlen), py(4000, qlen);
+  px.setAcceleration(accel);
+  py.setAcceleration(accel);
+  px.setDirChangeBudget((uint16_t)before, n_before, (uint16_t)after);
+  FasNAxisConfig cfg;
+  FasNAxis<2, 64, SimPort> path(cfg);
+  path.addAxis(0, &px);
+  path.addAxis(1, &py);
+  int32_t cur[2] = {0, 0};
+  path.setCurrentPosition(cur);
+  int32_t t1[2] = {move, 0};
+  path.addLine(t1);
+  int32_t t2[2] = {0, 0};
+  path.addLine(t2);
+  path.endPath();
+
+  tr->nx = 0;
+  tr->ny = 0;
+  tr->ns = 0;
+  tr->error = false;
+  if (path.pump() == PumpStatus::Error) {
+    tr->error = true;
+  }
+  while (path.isBusy()) {
+    int64_t s0 = 0, s1 = 0;
+    bool u0 = true, u1 = true;
+    uint32_t t0 = px.drain_one(&s0, &u0);
+    uint32_t t1b = py.drain_one(&s1, &u1);
+    if (t0 > 0 && tr->nx < 6000) {
+      tr->x[tr->nx].ticks = (uint16_t)t0;
+      tr->x[tr->nx].steps = (uint8_t)s0;
+      tr->x[tr->nx].up = u0;
+      tr->nx++;
+    }
+    if (t1b > 0 && tr->ny < 6000) {
+      tr->y[tr->ny].ticks = (uint16_t)t1b;
+      tr->y[tr->ny].steps = (uint8_t)s1;
+      tr->y[tr->ny].up = u1;
+      tr->ny++;
+    }
+    if (tr->ns < 6000) {
+      tr->s[tr->ns].t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      tr->s[tr->ns].x = px.position();
+      tr->s[tr->ns].y = py.position();
+      tr->s[tr->ns].ticks = (uint16_t)t0;
+      tr->ns++;
+    }
+    if (path.pump() == PumpStatus::Error) {
+      tr->error = true;
+    }
+  }
+  tr->pxe = px.position();
+  tr->pye = py.position();
+  tr->clkx = px.clock();
+  tr->clky = py.clock();
+}
+
+// Index of the last X step in the old direction (the carved step), or -1.
+static int last_old_step(const RevTrace* tr) {
+  int idx = -1;
+  for (int k = 0; k < tr->nx; k++) {
+    if (tr->x[k].steps != 0 && tr->x[k].up) {
+      idx = k;
+    }
+  }
+  return idx;
+}
+
+// True if any command in `c` is a pause of exactly `ticks`.
+static bool has_pause(const NaxisCmd* c, int n, uint16_t ticks) {
+  for (int k = 0; k < n; k++) {
+    if (c[k].steps == 0 && c[k].ticks == ticks) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void f9_dir_pauses() {
+  const uint32_t ticks_cfg = 4000;
+  const uint32_t accel = 80000;
+  const int32_t move = 400;
+  const uint16_t before = 3200;
+  const uint16_t after = 3200;
+  RampMap map(ticks_cfg, accel);
+  const uint32_t T_min = map.calculate_ticks(1);
+  const uint32_t tau = (uint32_t)before + after;  // n_before = 1
+
+  // --- F12: the carve, Y gains no pause, clock equals the zero-budget run ---
+  {
+    static RevTrace tr;
+    run_reversal(before, 1, after, accel, move, 64, &tr);
+    test(!tr.error, "F12 run does not error");
+    test(tr.pxe == 0 && tr.pye == 0, "F12 F12 both axes end on target");
+
+    int k = last_old_step(&tr);
+    test(k >= 0, "F12 there is a last old-direction X step");
+    // The carved last step is shortened by tau.
+    test(tr.x[k].ticks == T_min - tau,
+         "F12 last old step shortened by tau (T_min - tau)");
+    // Before-pause: old DIR, 3200. After-pause: new DIR, 3200.
+    test(k + 2 < tr.nx, "F12 the carve has before and after pauses");
+    test(
+        tr.x[k + 1].steps == 0 && tr.x[k + 1].up && tr.x[k + 1].ticks == before,
+        "F12 before-pause old DIR of 3200 on X only");
+    test(
+        tr.x[k + 2].steps == 0 && !tr.x[k + 2].up && tr.x[k + 2].ticks == after,
+        "F12 after-pause new DIR of 3200");
+    test((uint32_t)tr.x[k].ticks + tr.x[k + 1].ticks + tr.x[k + 2].ticks ==
+             T_min,
+         "F12 the three tick sums equal the original last-step ticks");
+    // The following X step is the new direction.
+    int k_next = k + 3;
+    test(k_next < tr.nx && tr.x[k_next].steps != 0 && !tr.x[k_next].up,
+         "F12 the following step is the new direction");
+
+    // Y gains no DIR pause: its trace is identical to a zero-budget run.
+    static RevTrace tr0;
+    run_reversal(0, 0, 0, accel, move, 64, &tr0);
+    bool y_same = (tr.ny == tr0.ny);
+    if (y_same) {
+      for (int j = 0; j < tr.ny; j++) {
+        if (tr.y[j].ticks != tr0.y[j].ticks ||
+            tr.y[j].steps != tr0.y[j].steps || tr.y[j].up != tr0.y[j].up) {
+          y_same = false;
+        }
+      }
+    }
+    test(y_same, "F12 idle Y trace is unchanged: no DIR pause copied onto Y");
+    test(tr.clkx == tr0.clkx && tr.clky == tr0.clky,
+         "F12 clock() equals the same move with a zero budget");
+
+    // The plot: XY plus the period samples on the reversing axis.
+    NaxisPlot plot;
+    plot.start_plot("f12", "FasNAxis F12 DIR carve on reversal", 2);
+    plot.poly_point(0.0, 0.0);
+    plot.poly_point((double)move, 0.0);
+    plot.poly_point(0.0, 0.0);
+    plot.poly_done();
+    for (int j = 0; j < tr.ns; j++) {
+      double v = tr.s[j].ticks > 0
+                     ? NAXIS_PLOT_TICKS_PER_S / (double)tr.s[j].ticks
+                     : 0.0;
+      double speed[2] = {v, 0.0};
+      double P[2] = {0.0, 0.0};
+      double R[2] = {0.0, 0.0};
+      double tickc[2] = {(double)tr.s[j].ticks, 0.0};
+      plot.row(tr.s[j].t, (double)tr.s[j].x, (double)tr.s[j].y, 0.0, speed, P,
+               R, tickc);
+    }
+    plot.finish_plot();
+    printf(
+        "F9 F12 carve: T_min=%u step=%u before=%u after=%u "
+        "clocks=(%llu,%llu)\n",
+        T_min, tr.x[k].ticks, tr.x[k + 1].ticks, tr.x[k + 2].ticks,
+        (unsigned long long)tr.clkx, (unsigned long long)tr.clky);
+    printf("F12 DIR carve plot written: test_26_f12.gnuplot\n");
+  }
+
+  // --- F12c: an inject the plan did not carve is an Error, Y gains no pause --
+  {
+    SimPort px(ticks_cfg, 64), py(ticks_cfg, 64);
+    px.setAcceleration(accel);
+    py.setAcceleration(accel);
+    px.setInjectMode(SimPort::InjectNone);
+    px.forceExtraBefore(8000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t1[2] = {1, 0};
+    path.addLine(t1);
+    int32_t t2[2] = {0, 0};
+    path.addLine(t2);
+    path.endPath();
+    PumpStatus st = path.pump();
+    test(st == PumpStatus::Error,
+         "F12c an uncarved injected pause returns Error");
+    // Y does not gain the 8000 pause.
+    static NaxisCmd ycmd[512];
+    int ny = 0;
+    while (ny < 512) {
+      int64_t s = 0;
+      uint32_t t = py.drain_one(&s, NULL);
+      if (t == 0 && s == 0) {
+        break;
+      }
+      ycmd[ny].ticks = (uint16_t)t;
+      ycmd[ny].steps = (uint8_t)s;
+      ycmd[ny].up = true;
+      ny++;
+    }
+    test(!has_pause(ycmd, ny, 8000),
+         "F12c the other axis does not gain the injected pause");
+    printf("F9 F12c uncarved inject -> Error, Y clean (ny=%d)\n", ny);
+  }
+
+  // --- F12b: Overshoot corner is Step 12; on the Linear reversal the idle
+  // axis's position does not change across the carved commands. -------------
+  // F12b: Overshoot continuing axis keeps its planned steps, Step 12.
+  {
+    static RevTrace tr;
+    run_reversal(before, 1, after, accel, move, 64, &tr);
+    int k = last_old_step(&tr);
+    test(k >= 0 && !tr.error, "F12b run reaches the carved reversal");
+    test(tr.pye == 0, "F12b the idle axis position does not change");
+  }
+
+  // --- Tail too short: a budget larger than the natural slow period. The
+  // planner caps acceleration so the last step still holds the budget; the
+  // carve keeps the F12 shape and Y gains no DIR pause. ---------------------
+  {
+    const uint16_t big_before = 50000;
+    const uint16_t big_after = 0;
+    uint32_t need = (uint32_t)big_before + ticks_cfg;  // tau + floor
+    uint32_t cap_accel = cap_accel_for_budget(ticks_cfg, accel, need);
+    uint32_t T_cap = RampMap(ticks_cfg, cap_accel).calculate_ticks(1);
+    test(T_cap >= need, "F12 short tail: capped accel holds tau + floor");
+    test(cap_accel < accel, "F12 short tail: acceleration was capped");
+
+    static RevTrace tr;
+    run_reversal(big_before, 1, big_after, accel, move, 64, &tr);
+    test(!tr.error, "F12 short tail run does not error");
+    test(tr.pxe == 0 && tr.pye == 0, "F12 short tail both axes end on target");
+    int k = last_old_step(&tr);
+    test(k >= 0, "F12 short tail has a last old-direction step");
+    test(tr.x[k].ticks == T_cap - big_before,
+         "F12 short tail shortened step = T_min_capped - tau");
+    test(k + 1 < tr.nx && tr.x[k + 1].steps == 0 && tr.x[k + 1].up &&
+             tr.x[k + 1].ticks == big_before,
+         "F12 short tail before-pause of tau on X only");
+    test((uint32_t)tr.x[k].ticks + tr.x[k + 1].ticks == T_cap,
+         "F12 short tail tick sum unchanged at T_min_capped");
+    // Y still gains no DIR pause: no pause of the budget length appears.
+    test(!has_pause(tr.y, tr.ny, big_before),
+         "F12 short tail: Y gains no DIR pause");
+    printf("F9 F12 short tail: cap_accel=%u T_cap=%u step=%u before=%u\n",
+           cap_accel, T_cap, tr.x[k].ticks, tr.x[k + 1].ticks);
+  }
+
+  printf("F12/F12b/F12c DIR pause carve green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -3011,6 +3308,7 @@ int main() {
   f6_linear_sim();
   f7_linear_lookahead();
   f8_feeder();
+  f9_dir_pauses();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;

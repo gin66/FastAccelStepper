@@ -68,6 +68,11 @@ struct AxisLimits {
   uint32_t ticks_cfg = 0;
   uint32_t P_stop = 0;
   uint32_t accel = 0;  // steps/s^2, read from the stepper at addAxis
+  // DIR pause budget (whitepaper section 4.4), read from the stepper:
+  // n_before entries of dir_before ticks (old DIR), then dir_after (new DIR).
+  uint16_t dir_before = 0;
+  uint8_t dir_n_before = 0;
+  uint16_t dir_after = 0;
 };
 
 template <uint8_t NAXES, uint16_t HORIZON = 64,
@@ -88,6 +93,9 @@ class FasNAxis {
       _lim[i].ticks_cfg = 0;
       _lim[i].P_stop = 0;
       _lim[i].accel = 0;
+      _lim[i].dir_before = 0;
+      _lim[i].dir_n_before = 0;
+      _lim[i].dir_after = 0;
       _tick_cfg[i] = 0;
       _p[i] = 0;
       _dir[i] = true;
@@ -96,6 +104,14 @@ class FasNAxis {
       _held[i].ticks = 0;
       _held[i].steps = 0;
       _held[i].count_up = true;
+      _carve_axis[i].active = false;
+      _carve_axis[i].phase = 0;
+      _carve_axis[i].step_left = 0;
+      _carve_axis[i].n_before = 0;
+      _carve_axis[i].before = 0;
+      _carve_axis[i].after = 0;
+      _carve_axis[i].old_up = true;
+      _carve_axis[i].new_up = true;
       for (uint16_t b = 0; b < HORIZON; b++) {
         _blk[b][i] = 0;
       }
@@ -112,6 +128,7 @@ class FasNAxis {
     _underrun = false;
     _slice_open = false;
     _error = false;
+    _carve_then_advance = false;
     _master = 0;
     _abs_master = 0;
     _block_left = 0;
@@ -145,6 +162,7 @@ class FasNAxis {
     _registered[i] = true;
     _lim[i].ticks_cfg = s->getMaxSpeedInTicks();
     _lim[i].accel = s->getAcceleration();
+    read_dir_budget(i);
     _tick_cfg[i] = _lim[i].ticks_cfg;
     RampMap map(_lim[i].ticks_cfg, _lim[i].accel);
     _lim[i].P_stop = map.P_coast();
@@ -157,6 +175,7 @@ class FasNAxis {
       if (_s[i] != NULL) {
         _lim[i].ticks_cfg = _s[i]->getMaxSpeedInTicks();
         _lim[i].accel = _s[i]->getAcceleration();
+        read_dir_budget(i);
         _tick_cfg[i] = _lim[i].ticks_cfg;
         RampMap map(_lim[i].ticks_cfg, _lim[i].accel);
         _lim[i].P_stop = map.P_coast();
@@ -236,14 +255,16 @@ class FasNAxis {
     if (!_feeding && _head < _n_blk) {
       feeder_start();
       feed_loop();
-      bool started = false;
-      for (uint8_t i = 0; i < NAXES; i++) {
-        if (_registered[i] && !_s[i]->isQueueEmpty()) {
-          _s[i]->addQueueEntry(NULL, true);
-          started = true;
+      if (!_error) {
+        bool started = false;
+        for (uint8_t i = 0; i < NAXES; i++) {
+          if (_registered[i] && !_s[i]->isQueueEmpty()) {
+            _s[i]->addQueueEntry(NULL, true);
+            started = true;
+          }
         }
+        _kicked_off = started;
       }
-      _kicked_off = started;
     }
     if (!_error && _kicked_off && !_done) {
       for (uint8_t i = 0; i < NAXES; i++) {
@@ -321,6 +342,186 @@ class FasNAxis {
     return true;
   }
 
+  // Read the DIR pause budget from the stepper (whitepaper section 4.4). The
+  // config override is applied at use time in reverse_budget(), not here.
+  void read_dir_budget(uint8_t i) {
+    _lim[i].dir_before = _s[i]->getDirChangeBeforeTicks();
+    _lim[i].dir_n_before = _s[i]->getDirChangeBeforePauseCount();
+    _lim[i].dir_after = _s[i]->getDirChangeAfterTicks();
+  }
+
+  // Resolve the reverse budget for axis i: config override when non-zero, else
+  // the stepper getter. n_before defaults to 1 when the config supplies a
+  // before period but the getter count is 0.
+  void reverse_budget(uint8_t i, uint16_t* before, uint8_t* n_before,
+                      uint16_t* after) const {
+    if (_cfg.dir_before_ticks != 0) {
+      *before = _cfg.dir_before_ticks;
+      *n_before = _lim[i].dir_n_before != 0 ? _lim[i].dir_n_before : 1;
+    } else {
+      *before = _lim[i].dir_before;
+      *n_before = _lim[i].dir_n_before;
+    }
+    *after =
+        _cfg.dir_after_ticks != 0 ? _cfg.dir_after_ticks : _lim[i].dir_after;
+  }
+
+  uint32_t reverse_tau(uint8_t i) const {
+    uint16_t before = 0;
+    uint8_t n = 0;
+    uint16_t after = 0;
+    reverse_budget(i, &before, &n, &after);
+    return (uint32_t)n * before + (uint32_t)after;
+  }
+
+  // Axis i reverses between block b and the next buffered block.
+  bool reverses_at_end(int b, uint8_t i) const {
+    if (b + 1 >= _n_blk) {
+      return false;
+    }
+    int32_t cur = _blk[b][i];
+    int32_t nxt = _blk[b + 1][i];
+    if (cur == 0 || nxt == 0) {
+      return false;
+    }
+    return (cur > 0) != (nxt > 0);
+  }
+
+  // One axis's pending DIR carve: a shortened last step (old DIR) plus n_before
+  // before-pauses (old DIR) plus one after-pause (new DIR), tick sum unchanged.
+  struct Carve {
+    bool active;
+    uint8_t phase;       // 0 shortened step, 1 before-pauses, 2 after-pause
+    uint32_t step_left;  // remaining wait of the shortened step
+    uint8_t n_before;    // remaining before-pauses
+    uint16_t before;
+    uint16_t after;
+    bool old_up;
+    bool new_up;
+  };
+
+  bool any_carve() const {
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_carve_axis[i].active) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Arm the carve on axis i for the last old-direction step of period T. The
+  // shortened step is T - tau when that stays a legal slow step; otherwise the
+  // tail was too short and the step is held at the floor (the slice grows).
+  void start_carve(uint8_t i, uint32_t T, bool new_up) {
+    uint16_t before = 0;
+    uint8_t n_before = 0;
+    uint16_t after = 0;
+    reverse_budget(i, &before, &n_before, &after);
+    uint32_t tau = (uint32_t)n_before * before + (uint32_t)after;
+    if (tau == 0) {
+      return;
+    }
+    uint32_t floor = _tick_cfg[i] > (uint32_t)MIN_CMD_TICKS
+                         ? _tick_cfg[i]
+                         : (uint32_t)MIN_CMD_TICKS;
+    uint32_t reduced;
+    if (T > tau && T - tau >= floor) {
+      reduced = T - tau;
+    } else {
+      reduced = floor;  // short tail: the carve lengthens the slice
+    }
+    Carve& c = _carve_axis[i];
+    c.active = true;
+    c.phase = 0;
+    c.step_left = reduced;
+    c.n_before = n_before;
+    c.before = before;
+    c.after = after;
+    c.old_up = _dir[i];
+    c.new_up = new_up;
+  }
+
+  // Emit one command of axis i's carve (at most one per call). `held` reports
+  // whether a command was placed in the slice.
+  void carve_emit(uint8_t i, bool* held) {
+    Carve& c = _carve_axis[i];
+    if (!c.active) {
+      return;
+    }
+    if (c.phase == 0) {
+      uint32_t left = c.step_left;
+      uint16_t t;
+      if (left > 65535) {
+        uint32_t half = left >> 1;
+        if (half > 65535) {
+          half = 65535;
+        }
+        if (half < _ticks_law) {
+          half = _ticks_law;
+        }
+        if (half > 65535) {
+          half = 65535;
+        }
+        t = (uint16_t)half;
+      } else {
+        t = (uint16_t)left;
+      }
+      hold(i, t, 1, c.old_up);
+      c.step_left -= t;
+      if (c.step_left == 0) {
+        c.phase = 1;
+      }
+      *held = true;
+      return;
+    }
+    if (c.phase == 1) {
+      if (c.n_before > 0) {
+        hold(i, c.before, 0, c.old_up);
+        c.n_before--;
+        *held = true;
+        return;
+      }
+      c.phase = 2;
+    }
+    if (c.phase == 2) {
+      if (c.after > 0) {
+        hold(i, c.after, 0, c.new_up);
+        c.after = 0;
+        *held = true;
+        return;
+      }
+      c.phase = 3;
+    }
+    if (c.phase >= 3) {
+      _dir[i] = c.new_up;
+      c.active = false;
+    }
+  }
+
+  // Drive every active carve one command per pass until at least one command is
+  // held. Only the carving axes are sent; every other axis keeps the command it
+  // was already given for those ticks.
+  void feed_carve() {
+    bool held = false;
+    for (uint8_t guard = 0; guard < 8; guard++) {
+      bool any = false;
+      for (uint8_t i = 0; i < NAXES; i++) {
+        if (_carve_axis[i].active) {
+          any = true;
+          carve_emit(i, &held);
+        }
+      }
+      if (!any || held) {
+        break;
+      }
+    }
+    if (!any_carve() && _carve_then_advance) {
+      _carve_then_advance = false;
+      advance_block();
+    }
+    _slice_open = held;
+  }
+
   void clear_path() {
     _n_blk = 0;
     _head = 0;
@@ -337,8 +538,10 @@ class FasNAxis {
     _ticks_last = 0;
     _slice_open = false;
     _error = false;
+    _carve_then_advance = false;
     for (uint8_t i = 0; i < NAXES; i++) {
       _held[i].waiting = false;
+      _carve_axis[i].active = false;
     }
   }
 
@@ -463,6 +666,31 @@ class FasNAxis {
     _ticks_law = t_law;
     int binder = Remaining::binder_axis(_blk[b], _tick_cfg, NAXES);
     uint32_t accel = _lim[binder].accel;
+    // If this block ends at a reversal with a DIR budget, the approach must
+    // reach a slow enough last period (§4.4.1). Cap the acceleration so the
+    // first-step period calculate_ticks(1) holds tau + the legal step floor.
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (!_registered[i] || !reverses_at_end(b, i)) {
+        continue;
+      }
+      uint32_t tau = reverse_tau(i);
+      if (tau == 0) {
+        continue;
+      }
+      uint32_t floor = _tick_cfg[i] > (uint32_t)MIN_CMD_TICKS
+                           ? _tick_cfg[i]
+                           : (uint32_t)MIN_CMD_TICKS;
+      uint32_t need = tau + floor;
+      uint32_t a = accel;
+      while (a > 1) {
+        RampMap probe(t_law, a);
+        if (probe.calculate_ticks(1) >= need) {
+          break;
+        }
+        a >>= 1;
+      }
+      accel = a;
+    }
     uint32_t R_new = remaining_path_steps(b);
     if (R_new == 0) {
       R_new = abs_u32(_blk[b][_master]);
@@ -515,6 +743,10 @@ class FasNAxis {
   // remainder (sections 4.2 / 9.3).
   void feed_one() {
     if (_done || _slice_open) {
+      return;
+    }
+    if (any_carve()) {
+      feed_carve();
       return;
     }
     if (_pause_left > 0) {
@@ -583,8 +815,32 @@ class FasNAxis {
       }
       _pause_left = T - t_step;
     }
+
+    // At the last binder step before a reversal with a DIR budget, carve the
+    // pause out of the reversing axis's own last step (whitepaper section 4.4).
+    // Only the 16-bit-representable tail is carved here; a longer tail keeps
+    // the §9.3 stuffing path unchanged.
+    bool carving = false;
+    if (_block_left == 1 && T <= 65535) {
+      for (uint8_t i = 0; i < NAXES; i++) {
+        if (!_registered[i] || st[i] == 0 || !reverses_at_end(_head, i)) {
+          continue;
+        }
+        if (reverse_tau(i) == 0) {
+          continue;
+        }
+        start_carve(i, T, _blk[_head + 1][i] > 0);
+        carving = true;
+      }
+    }
+
     for (uint8_t i = 0; i < NAXES; i++) {
       if (!_registered[i]) {
+        continue;
+      }
+      if (_carve_axis[i].active) {
+        bool h = false;
+        carve_emit(i, &h);
         continue;
       }
       uint8_t steps = st[i] != 0 ? 1 : 0;
@@ -596,6 +852,12 @@ class FasNAxis {
     }
     _slice_open = true;
     _block_left--;
+    if (carving) {
+      // The carve sequence is flushed over the next feed_one() calls; the next
+      // block only starts once every carving axis has finished.
+      _carve_then_advance = true;
+      return;
+    }
     if (_pause_left == 0 && block_done()) {
       advance_block();
     }
@@ -632,6 +894,8 @@ class FasNAxis {
   bool _slice_open;
   bool _error;
   Held _held[NAXES];
+  Carve _carve_axis[NAXES];
+  bool _carve_then_advance;
   int _master;
   int64_t _abs_master;
   uint32_t _block_left;
