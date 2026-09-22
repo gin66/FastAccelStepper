@@ -24,6 +24,10 @@ Rules for every step:
 7. Do not link `LIB_O` unless the step says so. Planner-only tests
    can be self-contained; 1–2 axis FAS golden runs use the default
    `test_%: test_%.o $(LIB_O)` rule.
+8. An open step is a patch. Make the edit named **First edit**
+   before reading further whitepaper sections. Do not replace
+   `feed_one` with a 2 ms multi-step slicer. Do not edit
+   `naxis_sim_port.h` unless that step lists a SimPort addition.
 
 Run one binary:
 
@@ -244,7 +248,7 @@ speed vs time.
 
 ---
 
-## Step 2e — `P ≤ R` from issued periods (not planner fields)
+## Step 2e — `P ≤ R` from issued periods (not planner fields) ✅
 
 Same interpolator as 2d. Ignore `RampLaw.P`. A wrong model that
 only writes planner fields must fail here.
@@ -277,6 +281,12 @@ to it). Production interpolator only needs to record issued
 
 **Done when:** all three hand cases green without reading planner `P`;
 rebind cases still issue `|steps| == |Δ|` on every axis.
+
+**Done:** `f2e_issued_periods()` in `test_26.cpp` replays the three
+hand cases on `LinearBlock`. `P_issued` comes from
+`RampMap::calculate_ramp_steps(ticks)`, not from `RampLaw.P`.
+Master stays the longest `|Δ|`; `ticks_floor` lengthens the period;
+issued `|steps| == |Δ|`.
 
 ---
 
@@ -740,185 +750,437 @@ floor is now scoped to step commands (a pause is a delay, floor
 
 ---
 
-## Step 8 — feeder: drift, busy, too-large, ticks_min (F14, F15)
+## SimPort — what stays, what each open step may add
 
-**Test first:**
+`extras/tests/pc_based/naxis_sim_port.h` is the stepper the
+feeder already talks to. Steps 0–7 are green on it. Do not
+rewrite it, and do not add a second clock, an undo, a multi-step
+packer, or an ISR.
 
-- F14: 60 s simulated two-axis Linear, `|T_i−T_j|` a few ticks.
-- F15: a slice that would violate `ticks_min` is rejected at plan
-  time; feeder never sees `ErrorTicksTooLow`.
-- `BUSY` / `QueueFull` / `DirPinIsBusy`: retry the **whole**
-  slice; clocks stay together.
-- Slice split when pause stuffing would exceed `QUEUE_LEN-2`.
+Already enough, leave these alone:
 
-**Implement:** §10.1 clocks, §9.3 split, retry class of §4.1.
+- `addQueueEntry`, kick-off `addQueueEntry(NULL, true)`,
+  `AQE_ERROR_TICKS_TOO_LOW` when `steps > 0` and
+  `ticks < max_speed_in_ticks`
+- `isQueueFull` / `isQueueEmpty` / `queueEntries` / `drain` /
+  `drain_one` / `clock()` / `position()`
+- `InjectNone` and `InjectDirPauses` (before-pause at the old
+  DIR, after-pause at the new DIR, step not enqueued until both
+  have been returned)
+- `injectedPauseTicks()`, `getMaxSpeedInTicks()`,
+  `getAcceleration()`, `getCurrentPosition()`,
+  `isRampGeneratorActive()`, `isRunning()`
+- `drain_one`’s returned tick sum **is** the period, because the
+  feeder issues `steps` of 0 or 1 only
 
-**Plot:** `test_26_f14.gnuplot` — `T_i−T_j` vs time.
+Not expressible today, so later steps add exactly the methods
+named there and nothing else:
 
-**Done when:** F14, F15 green.
+| Step | Add on `SimPort` | Why the current port cannot do it |
+|------|------------------|-----------------------------------|
+| 8 | `void failNext(AqeResultCode rc)` | `AQE_QUEUE_FULL` is returned only when `isQueueFull()` is already true, and `pump()` refuses to call `addQueueEntry` in that case. Filling one axis by hand makes `all_have_room()` false, so no command is sent and the clocks cannot diverge. `failNext` returns `rc` once, enqueues nothing, and leaves `isQueueFull()` false. Default: off. |
+| 9 | `getDirChangeBeforeTicks()`, `getDirChangeBeforePauseCount()`, `getDirChangeAfterTicks()`, default 0. Setter `setDirChangeBudget(before, n_before, after)`. | `FasNAxis` must call the same names as `FastAccelStepper`. A default of 0 keeps today’s F5 reversal as a plain `count_up` flip. |
+| 9 | `void forceExtraBefore(uint16_t ticks)` | `InjectDirPauses` fires only when `count_up` disagrees with `queue_end`. After the planner has already issued the after-pause, the following step is not a reversal, so F12c’s extra before-pause never happens. One shot: the next `steps > 0` command enqueues a pause of `ticks` at the **old** `count_up`, sets `injectedPauseTicks()`, returns `AQE_DIR_CHANGE_PAUSE_INJECTED`, and does not enqueue the step. Then the flag clears. Use it with `InjectNone`. |
+
+Steps 10–15 add nothing to `SimPort`. Step 14 is three `SimPort`
+objects. Step 15 uses real `FastAccelStepper` queues.
+
+`isQueueFull()` keeps reserving one slot. The `QUEUE_LEN - 2`
+reserve is a `FasNAxis` check on `queueEntries()`, not a new
+`SimPort` predicate. `QUEUE_LEN` is 16 (`pd_test/pd_config.h`).
+Construct `SimPort(ticks, 16)` when a test cares; the ring length
+must be a power of two.
+
+---
+
+## Step 8 — feeder: drift, retry, room (F14, F15)
+
+Do not introduce a 2 ms slice. A slice is one `feed_one()`
+emission: one command per registered axis, `steps` 0 or 1, the
+same tick sum on every axis. The 65535 split (`t_step =
+max(T/2, _ticks_law)`, remainder in `_pause_left`) already
+exists. If a new assert passes without editing that formula, do
+not edit it.
+
+`send_to` ignores the `addQueueEntry` result. That is the bug
+this step fixes. There is no undo: a command that returned
+`AQE_OK` stays in that axis’s queue.
+
+**First edit:** `extras/tests/pc_based/test_26.cpp`, new
+`f8_feeder()`, called from `main()` after `f7_linear_lookahead()`.
+Three fixtures, in this order. Run after each one.
+
+**8.1 F14, expect green with no `FasNAxis.h` change.** Linear
+`(240000, 0)`, both axes `SimPort(4000)`, accel 2000, `endPath`,
+pump/drain like `run_linear_segment`. Do not store a per-step
+array. After every paired `drain_one`, track
+`max |px.clock() - py.clock()|`. Assert that max is `<= 2`, both
+final positions are `(240000, 0)`, and `px.clock() >= 60ull *
+16000000ull` (240000 coast steps at 4000 ticks is 60 s; accel
+makes it longer). Plot `test_26_f14.gnuplot` with
+`NaxisPlot::start_scalar`: column 1 time in seconds, column 2
+`clock_x - clock_y`, subsample every 1000th pair. If this is
+already green, leave the command stream alone. Do not add
+`T_plan` inside `FasNAxis`.
+
+**8.2 Retry, this one requires a code change.** Add
+`SimPort::failNext` as in the table above. Test:
+
+1. Run a `(500, 500)` Linear move for a few paired drains.
+2. `py.failNext(AQE_QUEUE_FULL)`.
+3. `pump()` once.
+4. Assert X’s queue gained the new command and Y’s did not, and
+   `pump()` did not plan a second command onto X.
+5. `pump()` again with no fault. Y receives that same command.
+   Then paired `drain_one` (if one queue is empty, `pump()`
+   again instead of draining the other). Assert
+   `|px.clock() - py.clock()| <= 2` after every pair, and the
+   move still ends at `(500, 500)`.
+6. Repeat the fault with `AQE_DIR_PIN_IS_BUSY`. Same asserts.
+   One code path handles `QueueFull`, `DirPinIsBusy`,
+   `WaitForEnablePinActive`, and `DeviceNotReady`.
+
+Implementation, only in `src/FasNAxis.h`:
+
+- Add a held command per axis: `bool waiting`, `uint16_t ticks`,
+  `uint8_t steps`, `bool count_up`, plus `bool _slice_open`.
+- `feed_one` builds a command only when `!_slice_open`, using
+  today’s body (`_law.step()`, DDA, 65535 split), stores it, sets
+  `waiting` on registered axes, sets `_slice_open`. It must not
+  call `_law.step()` again until the held slice is done.
+- `flush_held()` sends only axes with `waiting`. `AQE_OK` clears
+  `waiting`. A retry code leaves `waiting` set and does not send
+  a new plan step. When no `waiting` remains, `_slice_open` is
+  false.
+- `AQE_ERROR_TICKS_TOO_LOW` and, until Step 9, both pause-injected
+  codes: set an error flag and return `PumpStatus::Error`. Do not
+  retry those. Mark the injected branch
+  `// Step 9: time bubble, not Error`.
+
+**8.3 Room.** `SimPort px(4000, 16), py(4000, 16)`. One long
+Linear move. `pump()` until it stops making progress, and do not
+drain. Assert `queueEntries() <= QUEUE_LEN - 2` (14) on both.
+Today `all_have_room()` uses `isQueueFull()`, which allows 15.
+Change it to `queueEntries() + 2 >= QUEUE_LEN`. Do not change
+`SimPort::isQueueFull`. Then drain to the end and assert the
+target is hit and no drained step has tick sum `< 4000`
+(F15: the `_ticks_law` floor already rejects a too-fast step
+before `addQueueEntry`; this assert is the test).
+
+**Done when:** 8.1, 8.2, and 8.3 are green and the existing
+`test_26` fixtures still pass.
+
+```
+make -C extras/tests/pc_based test_26 && extras/tests/pc_based/test_26
+```
 
 ---
 
 ## Step 9 — planner-issued before/after DIR pauses (F12, F12b, F12c)
 
-**Test first:**
+Do not change Step 8’s held-slice retry. DIR pauses are ordinary
+held commands (`steps = 0`) issued **before** the first
+outgoing-block step is built. Default budgets stay 0, so F5’s
+trace must still match `naxis_ref`. If a reversal emits a pause
+when both the config and the getters are 0, F5 is broken.
 
-- At a vertex, **before any next-block step**, the planner emits
-  a before-pause (`count_up = old`) then an after-pause
-  (`count_up = new`) on the reversing axis, and matching
-  timekeeping pauses (same ticks, DIR unchanged) on every other
-  axis. Reversal is at low `P` on that axis; continuing axes
-  may be fast — they still dwell.
-- Credit: if the last command on the reversing axis already
-  has ticks ≥ `dir_before`, the explicit before-pause may be
-  omitted; SimPort then must not Inject on the after/step.
-- Following reversing step: no Injected.
-- F12b: Overshoot dog-leg, X continuing at high `P`. X’s
-  position is frozen at the vertex for `τ_before+τ_after`;
-  then X resumes at the same period. Fail if X steps during
-  τ_dir (that is the uncoordinated-injection path error).
-- F12c: SimPort injects one extra before-pause anyway
-  (under-counted drain). Feeder copies those ticks to all
-  other axes **immediately**. XY does not leave the vertex.
-  No later speed-up to catch the time. `|T_i−T_j|` still bound.
-- Injected on a non-revert step command (next-block already
-  queued on another axis) fails the test.
+**First edit:** `SimPort` methods from the table
+(`setDirChangeBudget`, the three getters, `forceExtraBefore`),
+then `f9_dir_pauses()` in `test_26.cpp`, called from `main()`
+after `f8_feeder()`.
 
-**Implement:** §4.4.1 / §4.4.2 / §10.2. Read
-`getDirChangeBeforeTicks()` / `getDirChangeBeforePauseCount()` /
-`getDirChangeAfterTicks()` from the stepper. Config
-`dir_before_ticks` / `dir_after_ticks` override when non-zero.
+**Budget.** On the reversing axis, `τ_before` is
+`cfg.dir_before_ticks` when that field is non-zero, otherwise
+`s->getDirChangeBeforeTicks()`. `τ_after` is the same with
+`dir_after_ticks` / `getDirChangeAfterTicks()`. `n_before` is
+`getDirChangeBeforePauseCount()`, or 1 when the config override
+is non-zero and the getter count is 0. A zero `τ` skips that
+pause.
 
-**Plot:** `test_26_f12.gnuplot` — DIR, pauses, and XY at the
-vertex vs time; F12b overlay.
+**Sequence** at a vertex where the next step’s `count_up` differs
+from `_dir[i]`, and no outgoing step has been stored yet:
 
-**Done when:** F12, F12b, F12c green.
+1. `n_before` times: `{steps=0, ticks=τ_before, count_up=old}` on
+   the reversing axis, and the same tick value with **that**
+   axis’s unchanged `count_up` on every other axis.
+2. Once: `{steps=0, ticks=τ_after, count_up=new}` on the reversing
+   axis; other axes get the same ticks and their own unchanged
+   `count_up`.
+3. Only then build the next block’s step slice.
+
+Credit: if the reversing axis’s previous command already has
+`ticks >= τ_before`, skip the before-pause (still issue the
+after-pause). SimPort with `InjectNone` must then accept the
+following step with `AQE_OK`.
+
+**Injected, replacing the Step 8 error branch.** On
+`AQE_DIR_CHANGE_PAUSE_INJECTED` or `AQE_DIR_PIN_2MS_PAUSE_ADDED`:
+read `injectedPauseTicks()` — add that same method on
+`FastAccelStepper`, next to `getDirChangeAfterTicks`, returning
+`_queue()->_injected_pause_ticks`. Do not include the queue
+header from `FasNAxis.h`. Enqueue a timekeeping pause of exactly
+those ticks on every other axis (`count_up` unchanged) before any
+later step. Do not shorten a later period to catch up. If a
+non-pause step on another axis was already accepted for the
+outgoing block, return `PumpStatus::Error` (the test fails the
+run).
+
+**Fixtures:**
+
+- F12: square corner, `setDirChangeBudget(3200, 1, 3200)`. At the
+  first corner the trace shows a before-pause (old `count_up`)
+  then an after-pause (new `count_up`) on the reversing axis, and
+  pauses of those same tick sums on the other axis, before any
+  step of the next side. The following step returns without
+  `injectedPauseTicks() != 0`. Both axes end on the square.
+- F12b is Step 12’s dog-leg. Here, only the Linear square: the
+  other axis’s position does not change across the pause pair.
+  Leave a `// F12b: Overshoot continuing axis, Step 12` comment
+  and do not invent Overshoot in this step.
+- F12c: `InjectNone` plus `forceExtraBefore(8000)` armed at the
+  corner. After the injected return, the other axis has a pause
+  of 8000 and neither position has left the vertex. Final
+  `|clock_x - clock_y| <= 2`.
+
+Plot `test_26_f12.gnuplot` with `NaxisPlot` (XY plus the pause
+samples). **Done when:** F12 and F12c are green, F5 still matches
+`naxis_ref`, and `failNext` from Step 8 still retries.
 
 ---
 
-## Step 10 — gnuplot helper completeness + HTML stub (P2)
+## Step 10 — gnuplot file check + HTML stub (P2)
 
-**Test first:** F5 Linear writes a 2×2 gnuplot that gnuplot can
-parse (header `$data <<EOF`, `EOF`, `set multiplot`). Optional
-`-DFAS_NAXIS_TRACE` writes `extras/n_axes/tests/out/F5.html`
-from `extras/n_axes/viewer_template.html`.
+`naxis_plot.h` already writes `$data <<EOF`, `EOF`, and
+`set multiplot layout 3,2` for F5 (`test_26_f5.gnuplot`). That
+file is the plot. Do not rebuild `NaxisPlot` and do not change
+the layout to 2×2.
 
-**Implement:** `naxis_plot.h` finished; `naxis_html_dump.h` +
-checked-in viewer template. Production header unchanged unless
-`FAS_NAXIS_TRACE`.
+**First edit:** in `f7_linear_lookahead()`’s F5 block, after the
+run, open `test_26_f5.gnuplot` and `test()` that the bytes
+`$data <<EOF`, a line `EOF`, and `set multiplot` occur. If that
+passes, stop touching `naxis_plot.h`.
 
-**Done when:** F5 plot exists after `test_26`; HTML only when
-the macro is set; `src/FasNAxis.h` has no viewer include by
-default.
+**Then:** add `extras/tests/pc_based/naxis_html_dump.h` (test
+only, not included from `src/FasNAxis.h` unless
+`FAS_NAXIS_TRACE` is defined). Under that macro, F5 also writes
+`extras/n_axes/tests/out/F5.html` by copying
+`extras/n_axes/viewer_template.html` and embedding the same
+samples the gnuplot file already has (t, x, y). The template is
+a checked-in static page with a `<pre id="trace">` placeholder.
+Without the macro, the html file is not created and
+`src/FasNAxis.h` has no viewer include.
+
+**Done when:** `test_26` is green either way, and a rebuild with
+`-DFAS_NAXIS_TRACE` produces `F5.html`.
 
 ---
 
 ## Step 11 — Overshoot rest-to-rest (F4, F4b)
 
-**Test first:**
+Do not fold this into Linear `feed_one`. Linear mode must keep
+calling the current DDA path.
 
-- Same `(10000, 100)` as F3, mode Overshoot, `overshoot_max=8`:
-  both endpoints hit; `max d² ≤ 64`; bulge visible vs F3.
-- F4b cap `UINT16_MAX`: bulge order 10 steps, not an L (short
-  axis does not finish and wait).
-- Lone diagonal: `T` equals Linear `T` (binding axis).
+**First edit:** `extras/tests/pc_based/test_26.cpp` function
+`f11_overshoot_rest()`, and a new header
+`src/fas_naxis/overshoot.h` (no float, no integer `/`).
+`FasNAxis::feed_one` calls it only when
+`_cfg.mode == FasNAxisConfig::Overshoot`.
 
-**Implement:** per-axis ramp, `T = max T_opt_i`, stretch by
-**lengthening** period (`log2_divide(log2_T, log2_|Δ|)`), never
-faster than the ramp, no delayed start. Extend `naxis_ref.h`
-(Step 2ref) with Overshoot `T_opt` so F4/F4b duration is
-compared to that oracle, not to interpolator fields.
+`OvershootBlock` for one rest-to-rest segment, two axes:
 
-**Plots:** `test_26_f4.gnuplot`, `test_26_f4b.gnuplot` — XY with
-chord in grey.
+- Each axis: a `RampLaw` over `|Δ_i|` with that axis’s
+  `ticks_cfg`. `T_opt_i` is the sum of those periods (walk a
+  copy). `T = max T_opt_i`. The binding axis is the one whose
+  `T_opt` equals `T` (lower index on a tie).
+- Binding axis: one `RampLaw::step()` per command, duration =
+  that period. It never pauses and never waits at the end.
+- Other axis: exactly `|Δ_i|` steps spread across `T`, no
+  delayed start. Integer test only, multiply-compare, no `/`:
+  after binding time `t`, the short axis should have completed
+  `k` steps when `|Δ_short| * t >= k * T`. Catch-up inside one
+  binding period is `steps` on that command (1..255) or a split
+  of the same duration; it is not a pause after the short axis
+  has already finished. Sum of short-axis tick sums equals `T`
+  within a few ticks.
+- `overshoot_max == 0` is Linear (do not call this class).
+  `UINT16_MAX` is the raw schedule above. A finite cap mixes the
+  short axis toward the Linear DDA fraction by **lengthening**
+  its early periods (never shortening the binder) until the
+  test’s `d²` holds. `d²` in the test is double; production
+  compares an integer squared distance to
+  `overshoot_max * overshoot_max`.
 
-**Done when:** F4, F4b green.
+**Fixtures** (ticks 4000, accel 2000), same harness as
+`run_linear_segment`:
+
+- F4: `(10000, 100)`, `mode = Overshoot`, `overshoot_max = 8`.
+  End positions exact. `max d² <= 64`. `max d²` is greater than
+  F3’s (the bulge is visible). Plot `test_26_f4.gnuplot`.
+- F4b: same segment, `overshoot_max = UINT16_MAX`. Short axis
+  still has steps left at mid-time (not an L: it must not finish
+  and then pause). End positions exact. Plot
+  `test_26_f4b.gnuplot`.
+- Lone diagonal `(1600, 1600)`, both modes. Overshoot total
+  `clock()` equals Linear `clock()` within 2 ticks (same binding
+  ramp). `d²` stays under 1.
+
+Extend `naxis_ref.h` with an Overshoot duration: sum of the
+binding `RampLaw` only. Compare F4/F4b `clock()` to that sum,
+not to a field inside `FasNAxis`.
+
+**Done when:** F4, F4b, and the diagonal are green, and F1–F3
+Linear plots are unchanged.
 
 ---
 
 ## Step 12 — Overshoot corners and circle (F6, F6b, F7)
 
-**Test first:**
+`OvershootBlock` from Step 11 is one segment from rest. This step
+lets `P` cross a vertex.
 
-- F6 45° dog-leg: `P_x ≠ 0` at the vertex, `P_y = 0`, vertex is
-  a sample, `T_overshoot ≤ T_linear`, `d²` ≤ cap.
-- F6b `(0,0)→(4000,1)→(4000,4000)`: `P_y ≤ 1` after the first
-  block; vertex hit; cap holds; no “high v_out in 32 ms stretched
-  to 4 s at a_max”.
-- F7 circle r=1600, 1° chords: reversing axis only goes through
-  0; the other keeps `P`; `d²` per chord ≤ cap.
+**First edit:** `f12_overshoot_corners()` in `test_26.cpp`.
 
-**Implement:** `R` spanning same-sign blocks; `overshoot_max` mix
-toward Linear; snap + revert at extrema.
+Per axis, `R` is the sum of `|Δ_i|` while the sign stays the same
+(or the axis is idle). A sign change or a zero-length axis sets
+that axis’s `R` to the current block only and forces its `P` to 0
+at the vertex. The other axis keeps `P`. `T` for the block is
+still `max T_opt_i` with those entry `P` values. Snap positions
+to the vertex before the next block’s steps (Step 9 pauses, if
+the budget is non-zero, sit between the two).
 
-**Plots:** `test_26_f6.gnuplot`, `test_26_f6b.gnuplot`,
-`test_26_f7.gnuplot` (circle, colour by speed).
+**Fixtures** (ticks 4000, accel 2000, `overshoot_max = 8`):
 
-**Done when:** F6, F6b, F7 green.
+- F6: `(0,0) → (1600,1600) → (3200,0)`. At the vertex, sample
+  position is exactly `(1600, 1600)`, `P` of the reversing axis
+  is 0, `P` of the continuing axis is not 0. Total `clock()` is
+  `<=` the same polyline in Linear. `d²` per chord `<= 64`.
+  Plot `test_26_f6.gnuplot`.
+- F6b: `(0,0) → (4000,1) → (4000,4000)`. After the vertex,
+  `P` on Y is `<= 1`. Vertex position exact. `d² <= 64`. Y does
+  not spend the first block at a high rate and then stretch; its
+  single step is one long period. Plot `test_26_f6b.gnuplot`.
+- F7: circle radius 1600, 180 chords of 1° (integer `x,y` via
+  the same rounding F20 already uses in `test_26.cpp`). Only the
+  axis whose sign flips has `P == 0` at that vertex. `d²` of
+  each chord `<= 64`. Plot `test_26_f7.gnuplot`.
+
+Fill in the Step 9 `F12b` comment with this dog-leg: the
+continuing axis’s position is unchanged for `τ_before + τ_after`
+and its `P` after the bubble equals its `P` before the bubble.
+Budget `(3200, 1, 3200)`.
+
+**Done when:** F6, F6b, F7, and F12b are green.
 
 ---
 
 ## Step 13 — dwell, starve, underrun, lookahead speed cap (F11, F13, F19)
 
-**Test first:**
+The speed cap is already how `remaining_path_steps` treats the
+last buffered point as rest. This step exposes it and adds dwell
+plus a real underrun. Do not add a `LookaheadTooShort` status.
 
-- `addDwellTicks` mid-path: planned stop, wait, continue from
-  rest. Not a pause command at speed.
-- F11: dribble waypoints so `R < P_stop` while the path is still
-  open. Last point is rest. **Not** an error and **not** a
-  feed-hold: `pump()` returns `Running`,
-  `isSpeedLimitedByLookahead()` is true, `P ≤ R`, peak `P` fits
-  in `R` (about `R/2` from rest). After enough collinear
-  waypoints, `R` grows and cruise at `ticks_cfg` is allowed.
-  `lookaheadHint()` may name axis / `R` / `P_stop` / `HORIZON`
-  as a diagnostic, not as recovery advice that the caller must
-  act on before motion continues.
-- F13: starve `pump()` on purpose after kick-off; `hasUnderrun()`;
-  plot still written up to the fault.
-- F19: `HORIZON` too small to hold `P_stop` as micro-segments.
-  `addAxis` succeeds. `P` never reaches `P_stop`. Same
-  `HORIZON` with one long `addLine` *does* coast (`R` is steps,
-  not points).
+**First edit:** `f13_lookahead()` in `test_26.cpp`.
 
-**Implement:** zero-displacement blocks; §8.2 / §8.7 speed cap
-and replan; underrun flag after kick-off only. No
-`LookaheadTooShort` status.
+**Methods on `FasNAxis`:**
 
-**Plots:** `test_26_f11.gnuplot` (v(t) capped then recovers),
-`test_26_f13.gnuplot` (cut off at underrun event),
-`test_26_f19.gnuplot` (micro-segment cap vs long-line coast).
+- `bool addDwellTicks(uint32_t ticks)`. Legal only when the path
+  is synced. Inserts a zero-motion block that issues pauses of
+  `ticks` (split at 65535 the same way `_pause_left` already
+  does) on every axis, from rest to rest: `P` is 0 on the way in
+  and on the way out. It is not a pause stuffed into a moving
+  slice.
+- `bool isSpeedLimitedByLookahead() const`. True when the live
+  `R < P_stop` of the master while the path is still open
+  (`!_path_closed` and `_head < _n_blk`). False on a closed path
+  and when `R` is large enough to coast.
+- `void lookaheadHint(uint8_t* axis, uint32_t* R, uint32_t* P_stop, uint16_t* horizon) const`. Fills those four outs. No string, no heap.
 
-**Done when:** F11, F13, F19 green.
+**Fixtures** (ticks 4000, accel 2000; `P_stop` is
+`RampMap(4000, 2000).P_coast()`):
+
+- Dwell: `(0,0) → (400,0)`, `addDwellTicks(80000)`, then
+  `(800,0)`. Positions stay `(400, 0)` for exactly 80000 ticks
+  of `clock()`, and the second half starts at `P == 0`.
+- F11: `HORIZON` large. `addLine` one 800-step collinear chunk on
+  X, `pump` a few commands **without** `endPath`. Assert
+  `pump()` is `Running`, `isSpeedLimitedByLookahead()` is true,
+  `P <= R`, and peak `P` is about `R/2` (under `P_stop`). Then
+  `addLine` nine more 800-step collinear chunks so `R` at the
+  head is 8000. Assert a later moving sample reaches `P_stop`
+  (coast). Plot `test_26_f11.gnuplot`.
+- F13: start F1 `(10000, 0)`, `pump` once, kick-off has happened,
+  then drain both queues to empty and do **not** call `pump`.
+  Assert `hasUnderrun()` and `pump()` returns `Underrun`. Write
+  `test_26_f13.gnuplot` with the samples collected before the
+  drain.
+- F19: `FasNAxis<2, 4, SimPort>`. Four `addLine`s of 50 steps,
+  open path. `addAxis` returned true. Peak `P` stays below
+  `P_stop`. A second instance, same `HORIZON` 4, one `addLine`
+  of 10000 steps, `endPath`: peak `P` reaches `P_stop`. Plot
+  `test_26_f19.gnuplot` with both runs.
+
+**Done when:** those four asserts are green. F10 (closed
+collinear path) still coasts.
 
 ---
 
-## Step 14 — 3-axis SimPort + HTML (F8)
+## Step 14 — 3-axis SimPort (F8)
 
-**Test first:** helix on `FasNAxis<3, 4096, SimPort>`, both modes.
-No `MAX_STEPPER` change. Oracle: no axis above limits; vertices
-hit. HTML 3D overlay when `FAS_NAXIS_TRACE`.
+No `SimPort` change. No `MAX_STEPPER` change. No new queue
+objects beyond three `SimPort`s.
 
-**Plot:** `test_26_f8.gnuplot` (XY and XZ) + optional HTML.
+**First edit:** `f14_helix()` in `test_26.cpp` on
+`FasNAxis<3, 4096, SimPort>`.
 
-**Done when:** F8 green without linking extra queues.
+Helix: 180 chords, radius 1600, one full turn, `Z` increases by
+10 steps per chord (integer XY via the F20 rounding). Run it
+twice, `mode = Linear` and `mode = Overshoot` with
+`overshoot_max = 8`. Assert each vertex position is hit on all
+three axes, every drained step has tick sum `>= 4000`, and
+Overshoot `d²` in XY `<= 64`. Plot `test_26_f8.gnuplot` (the
+existing `NaxisPlot` XY panel plus a second scalar file
+`test_26_f8_xz.gnuplot` via `start_scalar` for X and Z). When
+`FAS_NAXIS_TRACE` is set, also write `extras/n_axes/tests/out/F8.html`
+through the Step 10 dumper (add Z as a third column; do not
+invent a new viewer).
+
+**Done when:** both modes finish at the last vertex and `test_26`
+still does not link a third hardware queue.
 
 ---
 
-## Step 15 — real `FastAccelStepper` 1–2 axis (P5)
+## Step 15 — real `FastAccelStepper`, 1–2 axis (P5)
 
-**Test first:** F1 and F2 again with default `Stepper =
-FastAccelStepper`, drain `fas_queue[]` like `test_16` /
-`RampChecker`. Step sums and duration class match SimPort; command
-streams need not be identical.
+`test_26.cpp` already provides `inject_fill_interrupt` /
+`noInterrupts` / `interrupts` and the Makefile already links
+`LIB_O`. Stay in this file.
 
-Link `LIB_O` (normal `test_%` rule). Skip if you split this into
-`test_27.cpp` that must link the library while `test_26` stays
-SimPort-only — prefer one binary unless the link set fights
-(then Makefile comments, same pattern as `test_24` / `test_25`).
+**First edit:** `#include "FastAccelStepper.h"` and
+`#include "fas_queue/stepper_queue.h"`, then `f15_fas()` called
+from `main()`. If that include fails to compile, move only
+`f15_fas` into `extras/tests/pc_based/test_27.cpp` and copy the
+`test_24` / `test_25` Makefile exception. Do not do that split
+until the include has actually failed.
 
-**Plots:** `test_26_f1_fas.gnuplot`, `test_26_f2_fas.gnuplot`.
+Copy the `test_16` setup: `fas_queue[i]._initVars()`,
+`FastAccelStepper s; s.init(NULL, i, 0)`, `setSpeedInTicks(4000)`,
+`setAcceleration(2000)`. `FasNAxis<2, 64>` (the default stepper
+type). `addAxis`, `setCurrentPosition({0,0})`, the F1 target
+`(10000, 0)` and the F2 target `(1600, 1600)`.
 
-**Done when:** F1/F2 identity-class green on real queues.
+Drain like `test_16`: while `isBusy()`, `pump()`, then if
+`fas_queue[i].read_idx != next_write_idx`, consume one entry and
+add `steps == 0 ? ticks : ticks * steps` to a per-axis clock.
+Assert issued step sums equal the target and
+`|clock_0 - clock_1| <= 2` at the end. Command bytes need not
+match `SimPort`. Dir-change getters on this `init(NULL, …)` path
+are 0, so no DIR pauses are required here.
+
+Plots: `test_26_f1_fas.gnuplot`, `test_26_f2_fas.gnuplot`,
+`start_scalar` of position vs time is enough.
+
+**Done when:** F1 and F2 step sums match and the SimPort half of
+`test_26` is still green.
 
 ---
 
