@@ -1411,3 +1411,4 @@ same change as the test.
   a corner, or skipping a vertex (not constraint-faithful;
   whitepaper §12.4.1). Overshoot is the mode that may leave
   the chord.
+- Generalize ramp generator and naxes using e.g. template class and associate with stepper. If a user needs only naxes, no need to compile ramp calculator. This should then automatically record pump() or the ramp generator equivalent in manageSteppers().

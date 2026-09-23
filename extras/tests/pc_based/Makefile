@@ -12,6 +12,11 @@ test: $(TESTS) log2_test rmc_test
 	rm -f test.log
 	$(addsuffix >>test.log &&,$(addprefix ./,$(TESTS))) echo "All tests passed" && rm test.log
 
+png: $(patsubst %.gnuplot,%.gnuplot.png,$(wildcard test_*.gnuplot))
+
+test_%.gnuplot.png: test_%.gnuplot
+	gnuplot $<
+
 COV_DIR=coverage_report
 COV_FLAGS=-fprofile-instr-generate -fcoverage-mapping
 PROFDATA=coverage.profdata
@@ -150,4 +155,4 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 VERSION=$(shell git rev-parse --short HEAD)
 
 clean: clean_coverage
-	rm -f *.o test_[0-9][0-9] test_26_FAS_NAXIS_* *.gnuplot* log2_test rmc_test test.log
+	rm -f *.o test_[0-9][0-9] test_26_FAS_NAXIS_* *.gnuplot *.png log2_test rmc_test test.log
