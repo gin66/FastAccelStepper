@@ -1141,7 +1141,7 @@ Linear plots are unchanged.
 
 ---
 
-## Step 12 — Overshoot corners and circle (F6, F6b, F7)
+## Step 12 — Overshoot corners and circle (F6, F6b, F7) ✅
 
 `OvershootBlock` from Step 11 is one segment from rest. This step
 lets `P` cross a vertex.
@@ -1181,6 +1181,33 @@ before and after that window. It is not given a `steps = 0`
 command because of the DIR budget.
 
 **Done when:** F6, F6b, F7, and F12b are green.
+
+**Done:** `src/fas_naxis/overshoot.h` is now `OvershootRun<NMAX>`, a multi-block
+run. Per axis it keeps a persistent `P` and the section-8.6 `R_i` (same-sign sum
+from `FasNAxis::remaining_axis_steps`); a sign change or an idle block resets
+`P_i`. For each block `T_opt_i` is the sum of that axis's periods (section 7.1),
+`T = max T_opt_i` (lower index on a tie), and an axis with `T_opt_i == T` rides
+its own ramp one step per command while a non-binding axis uses the uniform-time
+schedule with the squared-distance `overshoot_max` cap (section 6.5). `P`
+carries across a vertex and resets at the reversal/idle; the shared command
+duration is the binding period. `FasNAxis::advance_block` starts the next
+Overshoot block instead of the Linear one, `block_done` asks the run, and the
+feeder turns a multi-step catch-up into one command of `steps` pulses at
+`t_step / steps` ticks (log2 divide, section 9.3) so the wall clock is shared;
+`last_command()` (`x >= ncmd`) arms the Step-9 DIR carve on the reversing axis's
+own last step, so the continuing axis keeps its planned steps. `naxis_ref.h`
+gained `naxis_overshoot_vertices` (exit P and binding T per block, no command
+walk). `f12_overshoot_corners()` in `test_26.cpp`: F6 `(1600,1600)+(1600,-1600)`
+(the vertex is an exact sample; oracle `P_y == 0`, `P_x > 0`; `d^2 = 60.5 <= 64`;
+Overshoot clock `<=` Linear), F6b `(4000,1)+(0,3999)` (oracle `P_x == 0`,
+`P_y == 1`, `d^2 = 1`), and F7 a 360-chord circle r=1600 (every vertex sampled,
+both axes reverse at the extrema with `P == 0` only on the reversing axis,
+`d^2 = 0.995`). `f9_dir_pauses()`'s F12b placeholder is now an Overshoot
+dog-leg `(400,400)+(0,800)` with budget `(3200,1,3200)`: X is carved
+(shortened step + before/after pauses, tick sum `T_min`), the continuing Y is
+bit-identical to the zero-budget run and gains no DIR pause. Plots:
+`test_26_f6.gnuplot`, `test_26_f6b.gnuplot`, `test_26_f7.gnuplot`. `make test`
+and `make mutations` are green; F11 stays green.
 
 ---
 

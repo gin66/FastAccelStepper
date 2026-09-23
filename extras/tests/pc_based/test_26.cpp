@@ -3150,6 +3150,71 @@ static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
   tr->clky = py.clock();
 }
 
+// Step 12 F12b: an Overshoot dog-leg (0,0) -> (leg,leg) -> (0,2*leg) with a
+// DIR budget on the reversing X. X is the binder and carves its own last step;
+// the continuing Y keeps the steps already planned across those ticks (it is
+// not given a pauses=0 command by the budget).
+static void run_overshoot_rev(uint32_t before, uint8_t n_before, uint32_t after,
+                              uint32_t accel, int32_t leg, RevTrace* tr) {
+  SimPort px(4000, 64), py(4000, 64);
+  px.setAcceleration(accel);
+  py.setAcceleration(accel);
+  px.setDirChangeBudget((uint16_t)before, n_before, (uint16_t)after);
+  FasNAxisConfig cfg;
+  cfg.mode = FasNAxisConfig::Overshoot;
+  cfg.overshoot_max = 8;
+  FasNAxis<2, 64, SimPort> path(cfg);
+  path.addAxis(0, &px);
+  path.addAxis(1, &py);
+  int32_t cur[2] = {0, 0};
+  path.setCurrentPosition(cur);
+  int32_t t1[2] = {leg, leg};
+  path.addLine(t1);
+  int32_t t2[2] = {0, 2 * leg};
+  path.addLine(t2);
+  path.endPath();
+
+  tr->nx = 0;
+  tr->ny = 0;
+  tr->ns = 0;
+  tr->error = false;
+  if (path.pump() == PumpStatus::Error) {
+    tr->error = true;
+  }
+  while (path.isBusy()) {
+    int64_t s0 = 0, s1 = 0;
+    bool u0 = true, u1 = true;
+    uint32_t t0 = px.drain_one(&s0, &u0);
+    uint32_t t1b = py.drain_one(&s1, &u1);
+    if (t0 > 0 && tr->nx < 6000) {
+      tr->x[tr->nx].ticks = (uint16_t)t0;
+      tr->x[tr->nx].steps = (uint8_t)s0;
+      tr->x[tr->nx].up = u0;
+      tr->nx++;
+    }
+    if (t1b > 0 && tr->ny < 6000) {
+      tr->y[tr->ny].ticks = (uint16_t)t1b;
+      tr->y[tr->ny].steps = (uint8_t)s1;
+      tr->y[tr->ny].up = u1;
+      tr->ny++;
+    }
+    if (tr->ns < 6000) {
+      tr->s[tr->ns].t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      tr->s[tr->ns].x = px.position();
+      tr->s[tr->ns].y = py.position();
+      tr->s[tr->ns].ticks = (uint16_t)t0;
+      tr->ns++;
+    }
+    if (path.pump() == PumpStatus::Error) {
+      tr->error = true;
+    }
+  }
+  tr->pxe = px.position();
+  tr->pye = py.position();
+  tr->clkx = px.clock();
+  tr->clky = py.clock();
+}
+
 // Index of the last X step in the old direction (the carved step), or -1.
 static int last_old_step(const RevTrace* tr) {
   int idx = -1;
@@ -3292,15 +3357,48 @@ void f9_dir_pauses() {
     printf("F9 F12c uncarved inject -> Error, Y clean (ny=%d)\n", ny);
   }
 
-  // --- F12b: Overshoot corner is Step 12; on the Linear reversal the idle
-  // axis's position does not change across the carved commands. -------------
-  // F12b: Overshoot continuing axis keeps its planned steps, Step 12.
+  // --- F12b: Overshoot dog-leg. X reverses at the vertex and carves its own
+  // last step; the continuing Y keeps its planned steps (Step 12). ----------
   {
+    const int32_t leg = 400;
+    const uint32_t tau = (uint32_t)before + (uint32_t)after;
+    static RevTrace tr0;
+    run_overshoot_rev(0, 0, 0, accel, leg, &tr0);
     static RevTrace tr;
-    run_reversal(before, 1, after, accel, move, 64, &tr);
+    run_overshoot_rev(before, 1, after, accel, leg, &tr);
+    test(!tr.error, "F12b overshoot dog-leg does not error");
+    test(tr.pxe == 0 && tr.pye == 2 * leg, "F12b both axes end on target");
     int k = last_old_step(&tr);
-    test(k >= 0 && !tr.error, "F12b run reaches the carved reversal");
-    test(tr.pye == 0, "F12b the idle axis position does not change");
+    int k0 = last_old_step(&tr0);
+    test(k >= 0 && k0 >= 0, "F12b X has a last old-direction step");
+    test(tr.x[k].ticks == (uint32_t)tr0.x[k0].ticks - tau,
+         "F12b X last step shortened by tau");
+    test(k + 2 < tr.nx, "F12b X has the before and after pauses");
+    test(
+        tr.x[k + 1].steps == 0 && tr.x[k + 1].up && tr.x[k + 1].ticks == before,
+        "F12b before-pause old DIR on X only");
+    test(
+        tr.x[k + 2].steps == 0 && !tr.x[k + 2].up && tr.x[k + 2].ticks == after,
+        "F12b after-pause new DIR");
+    test((uint32_t)tr.x[k].ticks + tr.x[k + 1].ticks + tr.x[k + 2].ticks ==
+             (uint32_t)tr0.x[k0].ticks,
+         "F12b the carve keeps the last-step tick sum");
+    // Y gains no DIR pause of the budget length and is bit-identical to the
+    // zero-budget dog-leg: the continuing axis keeps its planned steps.
+    test(!has_pause(tr.y, tr.ny, (uint16_t)before),
+         "F12b continuing Y gains no before-pause");
+    test(!has_pause(tr.y, tr.ny, (uint16_t)after),
+         "F12b continuing Y gains no after-pause");
+    bool y_same = (tr.ny == tr0.ny);
+    for (int j = 0; j < tr.ny && y_same; j++) {
+      if (tr.y[j].ticks != tr0.y[j].ticks || tr.y[j].steps != tr0.y[j].steps ||
+          tr.y[j].up != tr0.y[j].up) {
+        y_same = false;
+      }
+    }
+    test(y_same, "F12b continuing Y is unchanged by the DIR carve");
+    printf("F12b overshoot dog-leg: nX=%d nY=%d k=%d step=%u T0=%u\n", tr.nx,
+           tr.ny, k, tr.x[k].ticks, tr0.x[k0].ticks);
   }
 
   // --- Tail too short: a budget larger than the natural slow period. The
@@ -3555,6 +3653,270 @@ void f11_overshoot_rest() {
   printf("F4/F4b/diagonal Overshoot rest-to-rest green\n");
 }
 
+// ---------------------------------------------------------------------------
+// Step 12 — Overshoot corners and circle (F6, F6b, F7).
+//
+// An Overshoot run crosses a vertex with P carrying on an axis that keeps its
+// sign and resetting on an axis that reverses or goes idle (section 8.6). The
+// shared wall clock is the binding ramp; the path may leave each chord by at
+// most overshoot_max. `run_overshoot_polyline` walks a polyline through
+// SimPort, samples the maximum squared distance to the current chord, records
+// the clock at every vertex and reports whether every vertex was hit. The
+// per-axis exit P at the vertices comes from `naxis_overshoot_vertices`.
+// ---------------------------------------------------------------------------
+struct OvershootPolyResult {
+  int32_t end[2];
+  int64_t issued[2];
+  double max_d2;
+  uint32_t vertex_clock[512];
+  int n_vertices;
+  bool all_vertices;
+  bool underrun;
+};
+
+template <uint16_t H>
+static void run_overshoot_polyline(SimPort& px, SimPort& py,
+                                   FasNAxis<2, H, SimPort>& path,
+                                   const int32_t* wp, int n_wp,
+                                   const char* fixture, const char* title,
+                                   bool do_plot, OvershootPolyResult* res) {
+  res->end[0] = 0;
+  res->end[1] = 0;
+  res->issued[0] = 0;
+  res->issued[1] = 0;
+  res->max_d2 = 0.0;
+  res->n_vertices = 0;
+  res->all_vertices = false;
+  res->underrun = false;
+
+  NaxisPlot plot;
+  if (do_plot) {
+    plot.start_plot(fixture, title, 2);
+    plot.poly_point((double)wp[0], (double)wp[1]);
+    for (int k = 1; k < n_wp; k++) {
+      plot.poly_point((double)wp[2 * k], (double)wp[2 * k + 1]);
+    }
+    plot.poly_done();
+  }
+
+  int32_t cur[2] = {wp[0], wp[1]};
+  path.setCurrentPosition(cur);
+  for (int k = 1; k < n_wp; k++) {
+    int32_t t[2] = {wp[2 * k], wp[2 * k + 1]};
+    path.addLine(t);
+  }
+  path.endPath();
+  path.pump();
+
+  int chord = 0;
+  int iter = 0;
+  while (path.isBusy()) {
+    int64_t s0 = 0, s1 = 0;
+    bool u0 = true, u1 = true;
+    px.drain_one(&s0, &u0);
+    py.drain_one(&s1, &u1);
+    res->issued[0] += u0 ? s0 : -s0;
+    res->issued[1] += u1 ? s1 : -s1;
+    int32_t x = px.position();
+    int32_t y = py.position();
+    if (chord < n_wp - 1) {
+      int32_t ax = wp[2 * chord] - wp[0], ay = wp[2 * chord + 1] - wp[1];
+      int32_t bx = wp[2 * chord + 2] - wp[0], by = wp[2 * chord + 3] - wp[1];
+      double vx = (double)(bx - ax), vy = (double)(by - ay);
+      double l2 = vx * vx + vy * vy;
+      if (l2 > 0.0) {
+        double cross = vx * (double)(y - ay) - vy * (double)(x - ax);
+        double d2 = cross * cross / l2;
+        if (d2 > res->max_d2) {
+          res->max_d2 = d2;
+        }
+      }
+      // SimPort positions are relative to the planner's start (wp[0]); `bx` /
+      // `by` are already in those port coordinates.
+      if (x == bx && y == by) {
+        if (res->n_vertices < 512) {
+          res->vertex_clock[res->n_vertices] = px.clock();
+        }
+        res->n_vertices++;
+        chord++;
+      }
+    }
+    if (do_plot && (iter % 4 == 0)) {
+      double t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      uint32_t ticks = path.lastTicks();
+      double v = ticks > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)ticks : 0.0;
+      double speed[2] = {v, v};
+      double Pcol[2] = {(double)path.performedRampUp(),
+                        (double)path.performedRampUp()};
+      double Rcol[2] = {(double)path.remainingToStop(),
+                        (double)path.remainingToStop()};
+      double tcol[2] = {(double)ticks, (double)ticks};
+      plot.row(t, (double)x, (double)y, 0.0, speed, Pcol, Rcol, tcol);
+    }
+    iter++;
+    path.pump();
+  }
+  res->underrun = path.hasUnderrun();
+  res->end[0] = px.position();
+  res->end[1] = py.position();
+  res->all_vertices = (chord == n_wp - 1);
+  if (do_plot) {
+    plot.finish_plot();
+  }
+}
+
+// Run a polyline in Linear mode and return the final clock (both axes share
+// it).
+static uint32_t linear_polyline_clock(const int32_t* wp, int n_wp) {
+  SimPort px(4000, 16), py(4000, 16);
+  FasNAxisConfig cfg;
+  FasNAxis<2, 64, SimPort> path(cfg);
+  path.addAxis(0, &px);
+  path.addAxis(1, &py);
+  OvershootPolyResult r;
+  run_overshoot_polyline(px, py, path, wp, n_wp, "f12_lin_unused", "linear",
+                         false, &r);
+  return px.clock();
+}
+
+static void f12_overshoot_corners() {
+  const uint32_t ticks[2] = {4000, 4000};
+  const uint32_t accel[2] = {2000, 2000};
+  const uint32_t cap = 8;
+
+  // --- F6: (0,0) -> (1600,1600) -> (3200,0). X continues, Y reverses. -------
+  {
+    const int32_t wp[6] = {0, 0, 1600, 1600, 3200, 0};
+    int32_t bx[2] = {1600, 1600};
+    int32_t by[2] = {1600, -1600};
+    uint64_t Tb[2];
+    uint32_t P0[2], P1[2];
+    naxis_overshoot_vertices(bx, by, 2, ticks, accel, cap, Tb, P0, P1);
+    test(P1[0] == 0, "F12 F6 reversing Y has P == 0 at the vertex");
+    test(P0[0] > 0, "F12 F6 continuing X keeps a nonzero P at the vertex");
+
+    SimPort px(4000, 16), py(4000, 16);
+    FasNAxisConfig cfg;
+    cfg.mode = FasNAxisConfig::Overshoot;
+    cfg.overshoot_max = (uint16_t)cap;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F12 F6 addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F12 F6 addAxis(1)");
+    OvershootPolyResult res;
+    run_overshoot_polyline(px, py, path, wp, 3, "f6",
+                           "FasNAxis F6 Overshoot continuing corner", true,
+                           &res);
+    test(res.end[0] == 3200 && res.end[1] == 0,
+         "F12 F6 end at the last vertex");
+    test(res.issued[0] == 3200 && res.issued[1] == 0, "F12 F6 issued == path");
+    test(res.all_vertices && res.n_vertices == 2,
+         "F12 F6 every vertex sampled");
+    test(res.max_d2 <= 64.0 + 1e-9, "F12 F6 chord d^2 <= 64");
+    test(res.underrun == false, "F12 F6 no underrun");
+    uint32_t lin = linear_polyline_clock(wp, 3);
+    test(px.clock() <= lin, "F12 F6 Overshoot clock <= Linear clock");
+    printf("F12 F6 ovs=%u lin=%u Tb=(%llu,%llu) max_d2=%.3f Px=%u Py=%u\n",
+           px.clock(), lin, (unsigned long long)Tb[0],
+           (unsigned long long)Tb[1], res.max_d2, P0[0], P1[0]);
+  }
+
+  // --- F6b: (0,0) -> (4000,1) -> (4000,4000). X ends, Y continues. ----------
+  {
+    const int32_t wp[6] = {0, 0, 4000, 1, 4000, 4000};
+    int32_t bx[2] = {4000, 0};
+    int32_t by[2] = {1, 3999};
+    uint64_t Tb[2];
+    uint32_t P0[2], P1[2];
+    naxis_overshoot_vertices(bx, by, 2, ticks, accel, cap, Tb, P0, P1);
+    test(P0[0] == 0, "F12 F6b idle X has P == 0 at the vertex");
+    test(P1[0] == 1, "F12 F6b Y P <= 1 after the single-step block");
+
+    SimPort px(4000, 16), py(4000, 16);
+    FasNAxisConfig cfg;
+    cfg.mode = FasNAxisConfig::Overshoot;
+    cfg.overshoot_max = (uint16_t)cap;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F12 F6b addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F12 F6b addAxis(1)");
+    OvershootPolyResult res;
+    run_overshoot_polyline(px, py, path, wp, 3, "f6b",
+                           "FasNAxis F6b anisotropic continuing corner", true,
+                           &res);
+    test(res.end[0] == 4000 && res.end[1] == 4000,
+         "F12 F6b end at the last vertex");
+    test(res.all_vertices && res.n_vertices == 2,
+         "F12 F6b every vertex sampled");
+    test(res.max_d2 <= 64.0 + 1e-9, "F12 F6b chord d^2 <= 64");
+    test(res.underrun == false, "F12 F6b no underrun");
+    printf("F12 F6b ovs=%u max_d2=%.3f Px=%u Py=%u\n", px.clock(), res.max_d2,
+           P0[0], P1[0]);
+  }
+
+  // --- F7: circle radius 1600, 360 chords of 1 degree. Only a reversing axis
+  // has P == 0 at a vertex; the continuing axis keeps P. --------------------
+  {
+    const int n = 360;
+    static int32_t wp[(360 + 1) * 2];
+    for (int k = 0; k <= n; k++) {
+      double a = 2.0 * M_PI * (double)k / (double)n;
+      wp[2 * k] = iround(1600.0 * cos(a));
+      wp[2 * k + 1] = iround(1600.0 * sin(a));
+    }
+    static int32_t bx[360], by[360];
+    for (int k = 0; k < n; k++) {
+      bx[k] = wp[2 * (k + 1)] - wp[2 * k];
+      by[k] = wp[2 * (k + 1) + 1] - wp[2 * k + 1];
+    }
+    static uint64_t Tb[360];
+    static uint32_t P0[360], P1[360];
+    naxis_overshoot_vertices(bx, by, n, ticks, accel, cap, Tb, P0, P1);
+    int fx = 0, fy = 0;
+    int last0 = 0, last1 = 0;
+    for (int pass = 0; pass < 2; pass++) {
+      for (int k = 0; k < n; k++) {
+        int nxt = (k + 1) % n;
+        int s0 = bx[nxt] > 0 ? 1 : (bx[nxt] < 0 ? -1 : 0);
+        int s1 = by[nxt] > 0 ? 1 : (by[nxt] < 0 ? -1 : 0);
+        if (s0 != 0) {
+          if (last0 != 0 && s0 != last0) {
+            fx++;
+            test(P0[k] == 0, "F12 F7 reversing X has P == 0");
+          }
+          last0 = s0;
+        }
+        if (s1 != 0) {
+          if (last1 != 0 && s1 != last1) {
+            fy++;
+            test(P1[k] == 0, "F12 F7 reversing Y has P == 0");
+          }
+          last1 = s1;
+        }
+      }
+    }
+    test(fx >= 2 && fy >= 2, "F12 F7 both axes reverse at the circle extrema");
+
+    SimPort px(4000, 16), py(4000, 16);
+    FasNAxisConfig cfg;
+    cfg.mode = FasNAxisConfig::Overshoot;
+    cfg.overshoot_max = (uint16_t)cap;
+    FasNAxis<2, 512, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F12 F7 addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F12 F7 addAxis(1)");
+    OvershootPolyResult res;
+    run_overshoot_polyline(px, py, path, wp, n + 1, "f7",
+                           "FasNAxis F7 Overshoot circle r=1600", true, &res);
+    test(res.end[0] == wp[2 * n] - wp[0] && res.end[1] == wp[2 * n + 1] - wp[1],
+         "F12 F7 closes the circle (net zero)");
+    test(res.all_vertices && res.n_vertices == n,
+         "F12 F7 every chord vertex sampled");
+    test(res.max_d2 <= 64.0 + 1e-9, "F12 F7 chord d^2 <= 64");
+    test(res.underrun == false, "F12 F7 no underrun");
+    printf("F12 F7 circle: ovs=%u max_d2=%.3f\n", px.clock(), res.max_d2);
+  }
+
+  printf("F6/F6b/F7 Overshoot corners green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -3577,6 +3939,7 @@ int main() {
   f8_feeder();
   f9_dir_pauses();
   f11_overshoot_rest();
+  f12_overshoot_corners();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;

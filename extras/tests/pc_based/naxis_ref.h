@@ -224,4 +224,137 @@ static uint64_t naxis_overshoot_duration(const int32_t* d,
   return T;
 }
 
+// Step 12 Overshoot vertex oracle (whitepaper sections 6.4 / 7.3 / 8.6). Per
+// axis, P evolves by the section 7.1 law over its own R_i (remaining steps in
+// the current direction); a sign change or an idle-after-moving block resets
+// P_i to 0 at that vertex. The exit P of an axis after a block depends only on
+// its own law, so this oracle needs no command walk. `T_block[b]` is the
+// binding duration max_i T_opt_i, and the shared wall clock at vertex b+1 is
+// the sum of T_block[0..b]. PC-only, no FasNAxis state.
+static uint32_t naxis_overshoot_law_step(const RampMap& map, uint32_t* P,
+                                         uint32_t* R, uint32_t ticks_cfg) {
+  uint32_t coast = map.P_coast();
+  if (*R > *P) {
+    if (*P < coast) {
+      (*P)++;
+    }
+  } else {
+    if (*P > 0) {
+      (*P)--;
+    }
+  }
+  uint32_t t;
+  if (*P == 0) {
+    t = map.calculate_ticks(1);
+  } else {
+    t = map.calculate_ticks(*P);
+    if (t < ticks_cfg) {
+      t = ticks_cfg;
+    }
+  }
+  if (*R > 0) {
+    (*R)--;
+  }
+  return t;
+}
+
+// Sum of the periods of `steps` law steps for one axis.
+static uint64_t naxis_overshoot_sim(const RampMap& map, uint32_t P_in,
+                                    uint32_t R_in, uint32_t ticks_cfg,
+                                    uint32_t steps) {
+  uint32_t p = P_in;
+  uint32_t r = R_in;
+  uint64_t sum = 0;
+  for (uint32_t s = 0; s < steps; s++) {
+    sum += naxis_overshoot_law_step(map, &p, &r, ticks_cfg);
+  }
+  return sum;
+}
+
+// `bx` / `by` are the per-block signed deltas of a 2-axis polyline. Fills
+// `T_block[b]` with the binding duration and `P0_out[b]` / `P1_out[b]` with
+// the per-axis exit P at vertex b+1. `cap` does not affect P, so it is unused.
+static void naxis_overshoot_vertices(const int32_t* bx, const int32_t* by,
+                                     int n_blocks, const uint32_t* ticks,
+                                     const uint32_t* accel, uint32_t cap,
+                                     uint64_t* T_block, uint32_t* P0_out,
+                                     uint32_t* P1_out) {
+  (void)cap;
+  RampMap m0(ticks[0], accel[0]);
+  RampMap m1(ticks[1], accel[1]);
+  uint32_t P0 = 0, P1 = 0;
+  int sgn0 = 0, sgn1 = 0;
+  for (int b = 0; b < n_blocks; b++) {
+    uint32_t R0 = 0, R1 = 0;
+    int s0 = 0, s1 = 0;
+    for (int k = b; k < n_blocks; k++) {
+      int32_t dx = bx[k];
+      if (dx == 0) {
+        if (s0 != 0) {
+          break;
+        }
+        continue;
+      }
+      int sg = dx > 0 ? 1 : -1;
+      if (s0 == 0) {
+        s0 = sg;
+      }
+      if (sg != s0) {
+        break;
+      }
+      R0 += dx > 0 ? (uint32_t)dx : (uint32_t)-dx;
+    }
+    for (int k = b; k < n_blocks; k++) {
+      int32_t dy = by[k];
+      if (dy == 0) {
+        if (s1 != 0) {
+          break;
+        }
+        continue;
+      }
+      int sg = dy > 0 ? 1 : -1;
+      if (s1 == 0) {
+        s1 = sg;
+      }
+      if (sg != s1) {
+        break;
+      }
+      R1 += dy > 0 ? (uint32_t)dy : (uint32_t)-dy;
+    }
+    int32_t dx = bx[b], dy = by[b];
+    int ns0 = dx > 0 ? 1 : (dx < 0 ? -1 : 0);
+    int ns1 = dy > 0 ? 1 : (dy < 0 ? -1 : 0);
+    if (ns0 == 0 || (sgn0 != 0 && ns0 != sgn0)) {
+      P0 = 0;
+    }
+    if (ns1 == 0 || (sgn1 != 0 && ns1 != sgn1)) {
+      P1 = 0;
+    }
+    uint32_t a0 = dx > 0 ? (uint32_t)dx : (uint32_t)-dx;
+    uint32_t a1 = dy > 0 ? (uint32_t)dy : (uint32_t)-dy;
+    uint64_t t0 = a0 > 0 ? naxis_overshoot_sim(m0, P0, R0, ticks[0], a0) : 0;
+    uint64_t t1 = a1 > 0 ? naxis_overshoot_sim(m1, P1, R1, ticks[1], a1) : 0;
+    // Advance the exit P (simulate above worked on copies).
+    if (a0 > 0) {
+      uint32_t p = P0, r = R0;
+      for (uint32_t s = 0; s < a0; s++) {
+        naxis_overshoot_law_step(m0, &p, &r, ticks[0]);
+      }
+      P0 = p;
+    }
+    if (a1 > 0) {
+      uint32_t p = P1, r = R1;
+      for (uint32_t s = 0; s < a1; s++) {
+        naxis_overshoot_law_step(m1, &p, &r, ticks[1]);
+      }
+      P1 = p;
+    }
+    T_block[b] = t0 > t1 ? t0 : t1;
+    P0_out[b] = P0;
+    P1_out[b] = P1;
+    sgn0 = ns0;
+    sgn1 = ns1;
+  }
+}
+
 #endif /* NAXIS_REF_H */

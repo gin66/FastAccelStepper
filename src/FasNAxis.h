@@ -655,6 +655,33 @@ class FasNAxis {
     return s;
   }
 
+  // Section 8.6 per-axis scan from `head`: sum |delta_i| while axis i keeps its
+  // sign, stopping at the first axis reversal or idle-after-moving, or at the
+  // last buffered block. This is the Overshoot R_i (remaining steps in the
+  // current direction), independent of the other axes.
+  uint32_t remaining_axis_steps(int axis, int head) const {
+    uint32_t s = 0;
+    int sign = 0;
+    for (int b = head; b < _n_blk; b++) {
+      int32_t d = _blk[b][axis];
+      if (d == 0) {
+        if (sign != 0) {
+          break;  // axis went idle after moving
+        }
+        continue;
+      }
+      int sg = d > 0 ? 1 : -1;
+      if (sign == 0) {
+        sign = sg;
+      }
+      if (sg != sign) {
+        break;  // reversal
+      }
+      s += abs_u32(d);
+    }
+    return s;
+  }
+
   // Set up the ramp law and DDA state for block `b`. `reset_P` is false at a
   // collinear joint (P carries over); R is recomputed to the next path-stop.
   void start_block(int b, bool reset_P) {
@@ -719,43 +746,52 @@ class FasNAxis {
     return _cfg.mode == FasNAxisConfig::Overshoot && _cfg.overshoot_max != 0;
   }
 
-  // Set up an Overshoot segment from block `b`: per-axis ramps decide the
-  // binding axis (largest T_opt) and every command lasts one of its periods.
-  // `_block_left` counts the binding commands; the non-binding axes ride along
-  // (whitepaper sections 6.4 / 7.3).
+  // Set up an Overshoot block from `b`: per-axis ramps decide the binding axis
+  // (largest T_opt) and every command lasts one of its periods. P carries
+  // across a continuing vertex and resets at a reversal/idle (section 8.6);
+  // the non-binding axes ride along on the same tick sum (sections 6.4 / 7.3).
   void start_overshoot(int b) {
     int32_t d[NAXES] = {0};
-    uint32_t ac[NAXES] = {0};
+    uint32_t rr[NAXES] = {0};
     for (uint8_t i = 0; i < NAXES; i++) {
       d[i] = _blk[b][i];
-      ac[i] = _lim[i].accel;
+      rr[i] = remaining_axis_steps(i, b);
     }
-    _ovs.init(NAXES, d, _tick_cfg, ac, _cfg.overshoot_max);
+    _ovs.start_block(d, rr);
     _head = b;
     _master = _ovs.binder;
     _ticks_law = Remaining::ticks_floor(_blk[b], _tick_cfg, NAXES);
     if (_ticks_law == 0) {
       _ticks_law = _tick_cfg[_master] != 0 ? _tick_cfg[_master] : 1;
     }
-    _block_left = _ovs.total[_master];
     _pause_left = 0;
-    _P = 0;
-    _R = _block_left;
+    _P = _ovs.P[_ovs.binder];
+    _R = _ovs.R[_ovs.binder];
     _ticks_last = 0;
     for (uint8_t i = 0; i < NAXES; i++) {
       _err[i] = 0;
     }
   }
 
-  // The current block's DDA walk is exhausted.
-  bool block_done() const { return _block_left == 0; }
+  // The current block's walk is exhausted.
+  bool block_done() const {
+    if (overshoot_mode()) {
+      return _ovs.done();
+    }
+    return _block_left == 0;
+  }
 
-  // Move to the next committed block: path-stop resets P, collinear carries.
+  // Move to the next committed block: an Overshoot run carries P per axis
+  // (section 8.6); Linear path-stop resets P, collinear carries it.
   void advance_block() {
     int prev = _head;
     _head++;
     if (_head >= _n_blk) {
       _done = true;  // last buffered point is rest
+      return;
+    }
+    if (overshoot_mode()) {
+      start_overshoot(_head);
       return;
     }
     bool stop = !collinear_same_sense(prev, _head);
@@ -770,6 +806,11 @@ class FasNAxis {
       _dir[i] = true;
     }
     if (overshoot_mode()) {
+      uint32_t ac[NAXES] = {0};
+      for (uint8_t i = 0; i < NAXES; i++) {
+        ac[i] = _lim[i].accel;
+      }
+      _ovs.configure(NAXES, _tick_cfg, ac, _cfg.overshoot_max);
       start_overshoot(_head);
       return;
     }
@@ -828,8 +869,8 @@ class FasNAxis {
         _done = true;
         return;
       }
-      _P = _ovs.law.P;
-      _R = _block_left > 0 ? _block_left - 1 : 0;
+      _P = _ovs.P[_ovs.binder];
+      _R = _ovs.R[_ovs.binder];
       _ticks_last = T;
     } else {
       T = _law.step();
@@ -873,14 +914,18 @@ class FasNAxis {
     // pause out of the reversing axis's own last step (whitepaper section 4.4).
     // Only the 16-bit-representable tail is carved here; a longer tail keeps
     // the §9.3 stuffing path unchanged.
+    bool last_cmd = overshoot_mode() ? _ovs.last_command() : (_block_left == 1);
     bool carving = false;
-    if (!overshoot_mode() && _block_left == 1 && T <= 65535) {
+    if (last_cmd && T <= 65535) {
       for (uint8_t i = 0; i < NAXES; i++) {
         if (!_registered[i] || st[i] == 0 || !reverses_at_end(_head, i)) {
           continue;
         }
         if (reverse_tau(i) == 0) {
           continue;
+        }
+        if (overshoot_mode() && (st[i] > 1 || st[i] < -1)) {
+          continue;  // a carve is a one-step split
         }
         start_carve(i, T, _blk[_head + 1][i] > 0);
         carving = true;
@@ -896,15 +941,35 @@ class FasNAxis {
         carve_emit(i, &h);
         continue;
       }
-      uint8_t steps = st[i] != 0 ? 1 : 0;
-      bool up = steps != 0 ? (st[i] > 0) : _dir[i];
-      if (steps != 0) {
+      uint8_t steps = st[i] > 0 ? (uint8_t)st[i] : (uint8_t)(-st[i]);
+      bool up = st[i] != 0 ? (st[i] > 0) : _dir[i];
+      if (st[i] != 0) {
         _dir[i] = up;
       }
-      hold(i, (uint16_t)t_step, steps, up);
+      // Overshoot catch-up: `steps` pulses in this slice must span the same
+      // t_step ticks as every other axis, so each pulse is t_step / steps
+      // (log2 divide, section 9.3), floored to the axis envelope.
+      uint16_t ticks_i = (uint16_t)t_step;
+      if (overshoot_mode() && steps > 1) {
+        uint32_t tt = log2_to_u32(
+            log2_divide(log2_from((uint32_t)t_step), log2_from(steps)));
+        if (tt < _tick_cfg[i]) {
+          tt = _tick_cfg[i];
+        }
+        if (tt < (uint32_t)MIN_CMD_TICKS) {
+          tt = (uint32_t)MIN_CMD_TICKS;
+        }
+        if (tt > 65535) {
+          tt = 65535;
+        }
+        ticks_i = (uint16_t)tt;
+      }
+      hold(i, ticks_i, steps, up);
     }
     _slice_open = true;
-    _block_left--;
+    if (!overshoot_mode()) {
+      _block_left--;
+    }
     if (carving) {
       // The carve sequence is flushed over the next feed_one() calls; the next
       // block only starts once every carving axis has finished.
@@ -958,7 +1023,7 @@ class FasNAxis {
   uint32_t _R;
   uint32_t _ticks_last;
   RampLaw _law;
-  OvershootBlock<NAXES> _ovs;
+  OvershootRun<NAXES> _ovs;
 };
 
 #endif /* FAS_NAXIS_H */
