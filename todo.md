@@ -1291,7 +1291,7 @@ HORIZON coasts at P_stop. Plots: `test_26_f11.gnuplot` (P/R scalar),
 
 ---
 
-## Step 14 — 3-axis SimPort (F8)
+## Step 14 — 3-axis SimPort (F8) ✅
 
 No `SimPort` change. No `MAX_STEPPER` change. No new queue
 objects beyond three `SimPort`s.
@@ -1313,6 +1313,27 @@ invent a new viewer).
 
 **Done when:** both modes finish at the last vertex and `test_26`
 still does not link a third hardware queue.
+
+**Done:** `f14_helix()` in `test_26.cpp` runs the 180-chord, radius-1600 helix
+(Z = 10 per chord, integer XY via the F20 rounding) through
+`FasNAxis<3, 4096, SimPort>`, once in Linear and once in Overshoot
+(`overshoot_max = 8`). The waypoints are relative to the first vertex so the
+SimPort's physical origin (0, which has no setter) is the path origin; the
+vertex scan counts each of the 180 destination vertices and requires the exact
+3-axis position on the command that reaches it. Every drained step command has
+tick sum `>= 4000`; Overshoot ends at the last vertex with XY `d^2 = 1.18 <=
+64`; neither run underruns. Plots: `test_26_f8.gnuplot` (XY multi-panel),
+`test_26_f8_xz.gnuplot` (`start_scalar`, X and Z) and an optional
+`test_26_f8_ovs.gnuplot`. Under `-DFAS_NAXIS_TRACE`, `F8.html` is written via
+the Step 10 dumper (a 4-column `row(t, x, y, z)` overload was added to
+`naxis_html_dump.h`; `naxis_ensure_html_out_dir()` creates the git-ignored
+`tests/out/` on a fresh checkout). `make test_26` and `make test_26_trace` are
+green; the Linear run adds ~0.4 s to the ~17 s suite. The earlier hang was a
+`SimPort(4000, 128)` whose `entry_[64]` backstore cannot hold a 128-ring
+(`queue_mask()` masked to 127); it now uses the default `QUEUE_LEN` 16. No
+third hardware queue is linked. The helix keeps the Step 14 size exactly (180
+chords, radius 1600): no reduced-size deviation was needed, since the full
+helix adds only ~0.4 s to the suite.
 
 ---
 

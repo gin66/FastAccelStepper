@@ -82,6 +82,25 @@ class NaxisHtmlDump {
     n_rows++;
   }
 
+  // One (t, x, y, z) row for 3-axis fixtures (Step 14). Z is appended as the
+  // third sample column; the viewer template renders the raw text unchanged.
+  void row(double t, double x, double y, double z) {
+    if (!open || n_rows >= NAXIS_HTML_MAX_ROWS) {
+      return;
+    }
+    char line[160];
+    int w = snprintf(line, sizeof(line), "%.6f %.6f %.6f %.6f\n", t, x, y, z);
+    if (w < 0 || (size_t)w >= sizeof(line)) {
+      return;
+    }
+    if (rows_len + (size_t)w > NAXIS_HTML_MAX_BYTES) {
+      return;
+    }
+    memcpy(rows_buf + rows_len, line, (size_t)w);
+    rows_len += (size_t)w;
+    n_rows++;
+  }
+
   // Splice the accumulated rows into the template's <pre id="trace"> and write
   // the page. A missing template or output dir leaves nothing on disk.
   void finish() {
@@ -140,5 +159,11 @@ class NaxisHtmlDump {
   int n_rows;
   bool open;
 };
+
+// The out/ directory is git-ignored, so it does not exist on a fresh checkout.
+// Create it before the dumps try to write (test-only; PC target).
+inline void naxis_ensure_html_out_dir() {
+  system("mkdir -p \"" NAXIS_HTML_ROOT "/tests/out\"");
+}
 
 #endif /* NAXIS_HTML_DUMP_H */

@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 #include <math.h>
 
@@ -1467,15 +1468,26 @@ void f20_long_polyline() {
 // 2g invariants. `wp` holds the cumulative waypoint of each block start
 // (wp[2b] / wp[2b+1] = sum of blocks 0..b-1), wp[0..1] = origin.
 static void f2g_walk(Remaining* rem, const uint32_t* ticks, uint32_t accel,
-                     int n_blocks, int32_t* wp) {
+                     int n_blocks, int32_t* wp, uint64_t* ref_time,
+                     uint64_t* wp_time, uint64_t* joint_time) {
   int32_t end_pos[2], issued[2];
   bool env = true, plr = true;
   uint32_t vp[16];
   int nv = 0;
   uint32_t slack = 0;
   int32_t vpos[32];
+  *ref_time = 0;
+  *wp_time = 0;
+  *joint_time = 0;
+
+  struct timeval t0, t1;
+  gettimeofday(&t0, NULL);
   ref_walk_polyline(rem, ticks, accel, end_pos, issued, &env, &plr, vp, &nv, 16,
                     NULL, &slack, vpos);
+  gettimeofday(&t1, NULL);
+  *ref_time = (uint64_t)(t1.tv_sec - t0.tv_sec) * 1000000ULL +
+              (uint64_t)(t1.tv_usec - t0.tv_usec);
+
   test(env, "2g envelope ticks >= ticks_i_cfg");
   test(plr, "2g law P_issued <= R");
   int32_t sum[2] = {0, 0};
@@ -1486,6 +1498,8 @@ static void f2g_walk(Remaining* rem, const uint32_t* ticks, uint32_t accel,
   test(issued[0] == sum[0] && issued[1] == sum[1],
        "2g issued |steps| == |delta|");
   test(end_pos[0] == sum[0] && end_pos[1] == sum[1], "2g end is last vertex");
+
+  gettimeofday(&t0, NULL);
   // Every emitted vertex lands exactly on a cumulative waypoint. A trailing
   // no-op block makes the oracle emit a duplicate sample at the final position
   // (the finished transition still has dda.done() true), so we check "on some
@@ -1499,6 +1513,11 @@ static void f2g_walk(Remaining* rem, const uint32_t* ticks, uint32_t accel,
     }
     test(on_waypoint, "2g every vertex hits a cumulative waypoint");
   }
+  gettimeofday(&t1, NULL);
+  *wp_time = (uint64_t)(t1.tv_sec - t0.tv_sec) * 1000000ULL +
+             (uint64_t)(t1.tv_usec - t0.tv_usec);
+
+  gettimeofday(&t0, NULL);
   // Joint P semantics. vertex_p[k] is the last moving P of block k. A joint
   // between block i-1 and i is a path-stop (P -> 0) when the two
   // displacements are not the same 2 deg-collinear sense, and a collinear
@@ -1542,6 +1561,9 @@ static void f2g_walk(Remaining* rem, const uint32_t* ticks, uint32_t accel,
       }
     }
   }
+  gettimeofday(&t1, NULL);
+  *joint_time = (uint64_t)(t1.tv_sec - t0.tv_sec) * 1000000ULL +
+                (uint64_t)(t1.tv_usec - t0.tv_usec);
 }
 
 void f2g_exhaustive() {
@@ -1552,7 +1574,16 @@ void f2g_exhaustive() {
     vals[v] = (int32_t)v - 5;
   }
   long n_tested = 0, n_joint_stop = 0, n_joint_collinear = 0;
+  struct Timing {
+    uint64_t ref_walk;
+    uint64_t waypoint_check;
+    uint64_t joint_check;
+  };
+  Timing total = {0, 0, 0};
   for (int t = 0; t < 3; t++) {
+    printf("F2g ticks_case[%d]: (%u,%u)\n", t, ticks_cases[t][0],
+           ticks_cases[t][1]);
+    struct Timing case_t = {0, 0, 0};
     for (int i0 = 0; i0 < 11; i0++) {
       for (int j0 = 0; j0 < 11; j0++) {
         int32_t d0[2] = {vals[i0], vals[j0]};
@@ -1566,7 +1597,12 @@ void f2g_exhaustive() {
             Remaining rem2(2, 2);
             rem2.set_block(0, d0);
             rem2.set_block(1, d1);
-            f2g_walk(&rem2, ticks_cases[t], accel, 2, wp);
+            uint64_t ref_t = 0, wp_t = 0, joint_t = 0;
+            f2g_walk(&rem2, ticks_cases[t], accel, 2, wp, &ref_t, &wp_t,
+                     &joint_t);
+            case_t.ref_walk += ref_t;
+            case_t.waypoint_check += wp_t;
+            case_t.joint_check += joint_t;
             n_tested++;
             if (d1[0] != 0 || d1[1] != 0) {
               int64_t dot = (int64_t)d0[0] * d1[0] + (int64_t)d0[1] * d1[1];
@@ -1592,7 +1628,12 @@ void f2g_exhaustive() {
                 rem3.set_block(0, d0);
                 rem3.set_block(1, d1);
                 rem3.set_block(2, d2);
-                f2g_walk(&rem3, ticks_cases[t], accel, 3, wp3);
+                ref_t = wp_t = joint_t = 0;
+                f2g_walk(&rem3, ticks_cases[t], accel, 3, wp3, &ref_t, &wp_t,
+                         &joint_t);
+                case_t.ref_walk += ref_t;
+                case_t.waypoint_check += wp_t;
+                case_t.joint_check += joint_t;
                 n_tested++;
               }
             }
@@ -1600,11 +1641,20 @@ void f2g_exhaustive() {
         }
       }
     }
+    total.ref_walk += case_t.ref_walk;
+    total.waypoint_check += case_t.waypoint_check;
+    total.joint_check += case_t.joint_check;
   }
   printf(
       "F2g exhaustive Linear: %ld polylines tested, %ld path-stop joints, "
       "%ld collinear joints\n",
       n_tested, n_joint_stop, n_joint_collinear);
+  uint64_t total_ns = total.ref_walk + total.waypoint_check + total.joint_check;
+  printf(
+      "F2g timing (mach_absolute_time units): ref_walk=%lu waypoint_check=%lu "
+      "joint_check=%lu total=%lu\n",
+      (unsigned long)total.ref_walk, (unsigned long)total.waypoint_check,
+      (unsigned long)total.joint_check, (unsigned long)total_ns);
   test(n_tested > 0, "2g polylines were actually tested");
   test(n_joint_stop > 0, "2g exercised a path-stop joint");
   test(n_joint_collinear > 0, "2g exercised a collinear joint");
@@ -4275,8 +4325,233 @@ void f13_lookahead() {
   printf("Dwell/F11/F13/F19 lookahead cap and underrun green\n");
 }
 
+// ---------------------------------------------------------------------------
+// Step 14 — 3-axis SimPort helix (F8).
+//
+// Helix: 180 chords, radius 1600, one full turn, Z increases by 10 steps per
+// chord. Run twice: mode = Linear and mode = Overshoot with overshoot_max = 8.
+// Assert each vertex is hit on all three axes, every drained step has tick sum
+// >= 4000, and Overshoot d² in XY <= 64.
+// ---------------------------------------------------------------------------
+void f14_helix() {
+  const int n_chords = 180;
+  const int32_t radius = 1600;
+  const uint32_t ticks = 4000;
+  const uint16_t cap = 8;
+
+  // Helix waypoints: integer XY via the F20 rounding, Z = 10 per chord. The
+  // points are relative to the first vertex so the SimPort's physical origin
+  // (0) is the path origin (Step 14; no SimPort setter).
+  static int32_t wp[(180 + 1) * 3];
+  const int32_t origin_x = iround(radius * cos(0.0));
+  const int32_t origin_y = iround(radius * sin(0.0));
+  for (int k = 0; k <= n_chords; k++) {
+    double a = 2.0 * M_PI * (double)k / (double)n_chords;
+    wp[3 * k] = iround(radius * cos(a)) - origin_x;
+    wp[3 * k + 1] = iround(radius * sin(a)) - origin_y;
+    wp[3 * k + 2] = 10 * k;
+  }
+
+  struct HelixResult {
+    int32_t end[3];
+    uint32_t clock;
+    int n_vertices;
+    bool all_vertices;
+    double max_d2_xy;
+    bool min_tick_ok;
+    bool underrun;
+  };
+
+  auto run_helix = [&](SimPort& px, SimPort& py, SimPort& pz,
+                       FasNAxisConfig::Mode mode, uint16_t overshoot_max,
+                       const char* fixture, bool do_plot, NaxisPlot* xzplot,
+                       const char* html_fixture, HelixResult* res) {
+    res->end[0] = 0;
+    res->end[1] = 0;
+    res->end[2] = 0;
+    res->clock = 0;
+    res->n_vertices = 0;
+    res->all_vertices = false;
+    res->max_d2_xy = 0.0;
+    res->min_tick_ok = true;
+    res->underrun = false;
+
+    FasNAxisConfig cfg;
+    if (mode == FasNAxisConfig::Overshoot) {
+      cfg.mode = FasNAxisConfig::Overshoot;
+      cfg.overshoot_max = overshoot_max;
+    }
+
+    FasNAxis<3, 4096, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F14 addAxis X");
+    test(path.addAxis(1, &py) == true, "F14 addAxis Y");
+    test(path.addAxis(2, &pz) == true, "F14 addAxis Z");
+
+    int32_t cur[3] = {wp[0], wp[1], wp[2]};
+    path.setCurrentPosition(cur);
+    for (int k = 1; k <= n_chords; k++) {
+      int32_t t[3] = {wp[3 * k], wp[3 * k + 1], wp[3 * k + 2]};
+      test(path.addLine(t) == true, "F14 addLine fits");
+    }
+    path.endPath();
+    path.pump();
+
+    NaxisPlot plot;
+    if (do_plot) {
+      plot.start_plot(fixture, "FasNAxis F8 helix 3-axis", 3);
+      plot.poly_point((double)wp[0], (double)wp[1]);
+      for (int k = 1; k <= n_chords; k++) {
+        plot.poly_point((double)wp[3 * k], (double)wp[3 * k + 1]);
+      }
+      plot.poly_done();
+    }
+#ifdef FAS_NAXIS_TRACE
+    NaxisHtmlDump html(html_fixture != NULL ? html_fixture : fixture,
+                       "FasNAxis F8 helix 3-axis");
+#endif
+
+    // chord is the index of the next vertex to reach (1..n_chords). All three
+    // axes land on the vertex together, so the check is per command.
+    int chord = 1;
+    int iter = 0;
+    while (path.isBusy()) {
+      int64_t s0 = 0, s1 = 0, s2 = 0;
+      bool u0 = true, u1 = true, u2 = true;
+      uint32_t t0 = px.drain_one(&s0, &u0);
+      uint32_t t1 = py.drain_one(&s1, &u1);
+      uint32_t t2 = pz.drain_one(&s2, &u2);
+
+      // Every drained step command must have a tick sum >= ticks_cfg.
+      if (s0 != 0 && t0 < ticks) res->min_tick_ok = false;
+      if (s1 != 0 && t1 < ticks) res->min_tick_ok = false;
+      if (s2 != 0 && t2 < ticks) res->min_tick_ok = false;
+
+      int32_t x = px.position();
+      int32_t y = py.position();
+      int32_t z = pz.position();
+
+      if (chord <= n_chords) {
+        int32_t ax = wp[3 * (chord - 1)];
+        int32_t ay = wp[3 * (chord - 1) + 1];
+        int32_t bx = wp[3 * chord];
+        int32_t by = wp[3 * chord + 1];
+        double vx = (double)(bx - ax), vy = (double)(by - ay);
+        double l2 = vx * vx + vy * vy;
+        if (l2 > 0.0) {
+          double cross = vx * (double)(y - ay) - vy * (double)(x - ax);
+          double d2 = cross * cross / l2;
+          if (d2 > res->max_d2_xy) {
+            res->max_d2_xy = d2;
+          }
+        }
+        if (x == bx && y == by && z == wp[3 * chord + 2]) {
+          res->n_vertices++;
+          chord++;
+        }
+      }
+
+      double tt = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      uint32_t lt = path.lastTicks();
+      if (do_plot && (iter % 4 == 0)) {
+        double v = lt > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)lt : 0.0;
+        double speed[3] = {v, v, v};
+        double Pcol[3] = {(double)path.performedRampUp(),
+                          (double)path.performedRampUp(),
+                          (double)path.performedRampUp()};
+        double Rcol[3] = {(double)path.remainingToStop(),
+                          (double)path.remainingToStop(),
+                          (double)path.remainingToStop()};
+        double tcol[3] = {(double)lt, (double)lt, (double)lt};
+        plot.row(tt, (double)x, (double)y, 0.0, speed, Pcol, Rcol, tcol);
+      }
+      if (xzplot != NULL && (iter % 4 == 0)) {
+        xzplot->scalar_row(tt, (double)x, (double)z);
+      }
+#ifdef FAS_NAXIS_TRACE
+      if (html_fixture != NULL && (iter % 4 == 0)) {
+        html.row(tt, (double)x, (double)y, (double)z);
+      }
+#endif
+      iter++;
+      path.pump();
+    }
+
+    if (do_plot) {
+      plot.finish_plot();
+    }
+#ifdef FAS_NAXIS_TRACE
+    if (html_fixture != NULL) {
+      html.finish();
+    }
+#endif
+    res->end[0] = px.position();
+    res->end[1] = py.position();
+    res->end[2] = pz.position();
+    res->clock = px.clock();
+    res->all_vertices = (chord == n_chords + 1);
+    res->underrun = path.hasUnderrun();
+  };
+
+  // --- Linear mode -----------------------------------------------------------
+  {
+    SimPort px(4000, 16), py(4000, 16), pz(4000, 16);
+    HelixResult res;
+    NaxisPlot xz;
+    xz.start_scalar("f8_xz", "FasNAxis F8 helix X vs Z");
+    run_helix(px, py, pz, FasNAxisConfig::Linear, 0, "f8", true, &xz, "F8",
+              &res);
+    xz.finish_scalar(0.0, (double)res.clock / NAXIS_PLOT_TICKS_PER_S,
+                     "time [s]", "steps", "X position", "Z position");
+
+    test(res.end[0] == wp[3 * n_chords] && res.end[1] == wp[3 * n_chords + 1] &&
+             res.end[2] == wp[3 * n_chords + 2],
+         "F14 Linear ends at last vertex on all axes");
+    test(res.all_vertices && res.n_vertices == n_chords,
+         "F14 Linear every vertex hit on all axes");
+    test(res.min_tick_ok, "F14 Linear every step has tick sum >= 4000");
+    test(res.underrun == false, "F14 Linear no underrun");
+    printf("F14 Linear helix: clock=%u vertices=%d/%d\n", res.clock,
+           res.n_vertices, n_chords);
+  }
+
+  // --- Overshoot mode --------------------------------------------------------
+  {
+    SimPort px(4000, 16), py(4000, 16), pz(4000, 16);
+    HelixResult res;
+    run_helix(px, py, pz, FasNAxisConfig::Overshoot, cap, "f8_ovs", true, NULL,
+              NULL, &res);
+
+    test(res.end[0] == wp[3 * n_chords] && res.end[1] == wp[3 * n_chords + 1] &&
+             res.end[2] == wp[3 * n_chords + 2],
+         "F14 Overshoot ends at last vertex on all axes");
+    test(res.all_vertices && res.n_vertices == n_chords,
+         "F14 Overshoot every vertex hit on all axes");
+    test(res.min_tick_ok, "F14 Overshoot every step has tick sum >= 4000");
+    test(res.max_d2_xy <= 64.0 + 1e-9, "F14 Overshoot d² in XY <= 64");
+    test(res.underrun == false, "F14 Overshoot no underrun");
+    printf("F14 Overshoot helix: clock=%u vertices=%d/%d max_d2=%.3f\n",
+           res.clock, res.n_vertices, n_chords, res.max_d2_xy);
+  }
+
+#ifdef FAS_NAXIS_TRACE
+  {
+    char html_path[256];
+    snprintf(html_path, sizeof(html_path), "%s/tests/out/F8.html",
+             NAXIS_HTML_ROOT);
+    test(gnuplot_has(html_path, "id=\"trace\""),
+         "F14 F8 HTML trace page written");
+    printf("F14 HTML trace written: %s\n", html_path);
+  }
+#endif
+
+  printf("F14 3-axis helix green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
+#ifdef FAS_NAXIS_TRACE
+  naxis_ensure_html_out_dir();
+#endif
   plot_smoke();
   f1_kernel();
   f2_remaining();
@@ -4299,6 +4574,7 @@ int main() {
   f11_overshoot_rest();
   f12_overshoot_corners();
   f13_lookahead();
+  f14_helix();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;
