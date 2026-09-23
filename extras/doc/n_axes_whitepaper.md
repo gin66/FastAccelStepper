@@ -1515,7 +1515,7 @@ class FasNAxis {
   void setCurrentPosition(const int32_t p[NAXES]);
 
   void addLine(const int32_t p[NAXES]);  // absolute positions, steps
-  void addDwellTicks(uint32_t ticks);    // zero-displacement block; v=0 at both ends
+  bool addDwellTicks(uint32_t ticks);    // zero-displacement block; v=0 at both ends
   void endPath();                        // decelerate to rest at last p
 
   PumpStatus pump();                     // plan + feed
@@ -1524,7 +1524,8 @@ class FasNAxis {
   bool isSpeedLimitedByLookahead() const;  // some R_i < kappa*P_stop, path open; not an error
   uint32_t stopDistanceSteps(uint8_t i) const;  // P_stop_i
   uint32_t remainingSteps(uint8_t i) const;     // R_i
-  const char* lookaheadHint() const;     // diagnostic: axis, R vs P_stop, HORIZON
+  void lookaheadHint(uint8_t* axis, uint32_t* R, uint32_t* P_stop,
+                     uint16_t* horizon) const;  // diagnostic outs: axis, R vs P_stop, HORIZON
 
 #if defined(FAS_NAXIS_TRACE)
   void enableTrace(Trace* t);

@@ -33,6 +33,12 @@ class FastAccelStepper;
 // axis (one slice) and flush_held() sends it, retrying on a retryable
 // addQueueEntry result on the next pump() without re-planning the slice, and
 // reserving QUEUE_LEN - 2 slots so a pause-stuffed entry always fits.
+//
+// Step 13 adds dwells and the lookahead diagnostics: addDwellTicks() commits a
+// zero-motion block whose pauses run on every axis from rest to rest (a
+// path-stop, whitepaper section 8.1), isSpeedLimitedByLookahead() reports the
+// live R < P_stop cap of an open path (F11/F19, never an error), and
+// lookaheadHint() fills the diagnostic outs.
 
 // PumpStatus is the result of a pump() tick. Deliberately NO LookaheadTooShort:
 // a short lookahead slows the track (speed cap, G4/F11/F19) instead of
@@ -115,6 +121,7 @@ class FasNAxis {
       _carve_axis[i].new_up = true;
       for (uint16_t b = 0; b < HORIZON; b++) {
         _blk[b][i] = 0;
+        _dwell[b] = 0;
       }
     }
     _cfg = c;
@@ -230,6 +237,7 @@ class FasNAxis {
       _blk[_n_blk][i] = p[i] - _p[i];
       _p[i] = p[i];
     }
+    _dwell[_n_blk] = 0;
     _n_blk++;
     _block_count++;
     if (_done) {
@@ -242,6 +250,33 @@ class FasNAxis {
 
   // Number of motion blocks recorded by addLine (0 after a no-op / a sync).
   uint32_t block_count() const { return _block_count; }
+
+  // Queue a dwell: a zero-motion block that issues pauses totalling `ticks`
+  // (split at 65535 like any long period) on every axis, from rest to rest
+  // (P is 0 on the way in and on the way out; the next addLine starts from
+  // rest). It is a planned stop-and-wait, not a pause stuffed into a moving
+  // slice. Legal only when the position is synced; ticks == 0 is a no-op.
+  bool addDwellTicks(uint32_t ticks) {
+    if (!_position_synced) {
+      return false;
+    }
+    if (ticks == 0) {
+      return true;
+    }
+    if (_n_blk >= (int)HORIZON) {
+      return false;  // ring full: backpressure until pump() drains
+    }
+    for (uint8_t i = 0; i < NAXES; i++) {
+      _blk[_n_blk][i] = 0;
+    }
+    _dwell[_n_blk] = ticks;
+    _n_blk++;
+    _block_count++;
+    if (_done) {
+      _done = false;
+    }
+    return true;
+  }
 
   // Close the path: the last committed point is rest and R will not grow
   // (section 10.3).
@@ -302,7 +337,51 @@ class FasNAxis {
     return any_queue_nonempty();
   }
 
-  bool hasUnderrun() const { return _underrun; }
+  bool hasUnderrun() const {
+    if (_underrun) {
+      return true;
+    }
+    if (!_kicked_off || _done) {
+      return false;  // prefill empty or plan settled: not an underrun
+    }
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_registered[i] && _s[i]->isQueueEmpty()) {
+        return true;  // starved after kick-off with the plan still moving
+      }
+    }
+    return false;
+  }
+
+  // Section 8.2 / 14.7: short lookahead is a speed cap, not an error. True
+  // while the path is still open (!_path_closed, executing head not past the
+  // buffer) and the live remaining-to-stop of the DDA master is below its
+  // P_stop (the configured max is unreachable from this buffer). False on a
+  // closed path and when R is large enough to coast.
+  bool isSpeedLimitedByLookahead() const {
+    if (_path_closed || _head >= _n_blk) {
+      return false;
+    }
+    uint8_t m = (uint8_t)_master;
+    return _R < _lim[m].P_stop;
+  }
+
+  // Diagnostic outs (no string, no heap): the DDA master axis, its live
+  // remaining-to-stop R, its P_stop, and the template HORIZON.
+  void lookaheadHint(uint8_t* axis, uint32_t* R, uint32_t* P_stop,
+                     uint16_t* horizon) const {
+    if (axis != NULL) {
+      *axis = (uint8_t)_master;
+    }
+    if (R != NULL) {
+      *R = _R;
+    }
+    if (P_stop != NULL) {
+      *P_stop = _lim[_master].P_stop;
+    }
+    if (horizon != NULL) {
+      *horizon = HORIZON;
+    }
+  }
 
   // Performed ramp-up steps of the current segment's DDA master (section 7.1).
   uint32_t performedRampUp() const { return _P; }
@@ -734,7 +813,7 @@ class FasNAxis {
     for (uint8_t i = 0; i < NAXES; i++) {
       _err[i] = 0;
     }
-    _pause_left = 0;
+    _pause_left = _dwell[b];  // a dwell block emits its pauses, then advances
     _P = _law.P;
     _R = _law.R;
     _ticks_last = 0;
@@ -775,6 +854,9 @@ class FasNAxis {
 
   // The current block's walk is exhausted.
   bool block_done() const {
+    if (_dwell[_head] > 0) {
+      return _pause_left == 0;  // dwell: done once its pauses are emitted
+    }
     if (overshoot_mode()) {
       return _ovs.done();
     }
@@ -782,7 +864,8 @@ class FasNAxis {
   }
 
   // Move to the next committed block: an Overshoot run carries P per axis
-  // (section 8.6); Linear path-stop resets P, collinear carries it.
+  // (section 8.6); Linear path-stop resets P, collinear carries it. A dwell
+  // block runs the zero-motion pauses on every axis and resets every P.
   void advance_block() {
     int prev = _head;
     _head++;
@@ -792,6 +875,9 @@ class FasNAxis {
     }
     if (overshoot_mode()) {
       start_overshoot(_head);
+      if (_dwell[_head] > 0) {
+        _pause_left = _dwell[_head];
+      }
       return;
     }
     bool stop = !collinear_same_sense(prev, _head);
@@ -812,6 +898,9 @@ class FasNAxis {
       }
       _ovs.configure(NAXES, _tick_cfg, ac, _cfg.overshoot_max);
       start_overshoot(_head);
+      if (_dwell[_head] > 0) {
+        _pause_left = _dwell[_head];
+      }
       return;
     }
     start_block(_head, true);
@@ -998,6 +1087,7 @@ class FasNAxis {
   int64_t _err[NAXES];
   bool _dir[NAXES];
   int32_t _blk[HORIZON][NAXES];
+  uint32_t _dwell[HORIZON];
   FasNAxisConfig _cfg;
   bool _registered[NAXES];
   bool _position_synced;

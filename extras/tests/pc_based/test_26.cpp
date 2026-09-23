@@ -3917,6 +3917,364 @@ static void f12_overshoot_corners() {
   printf("F6/F6b/F7 Overshoot corners green\n");
 }
 
+// ---------------------------------------------------------------------------
+// Step 13 — dwell, starve, underrun, lookahead speed cap (F11, F13, F19).
+//
+// The speed cap is how remaining_path_steps treats the last buffered point of
+// an open path as rest (section 8.2 / 14.7); this step exposes it through
+// isSpeedLimitedByLookahead() / lookaheadHint() and adds a dwell block plus a
+// real starve underrun. No LookaheadTooShort status: a short lookahead slows
+// the track (F11/F19), it does not error.
+// ---------------------------------------------------------------------------
+void f13_lookahead() {
+  const uint32_t accel = 2000;
+  const uint32_t P_coast = RampMap(4000, accel).P_coast();
+
+  // --- Dwell: (0,0) -> (400,0), 80000-tick dwell, then (800,0). -------------
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> unsynced(cfg);
+    unsynced.addAxis(0, &px);
+    unsynced.addAxis(1, &py);
+    test(unsynced.addDwellTicks(100) == false,
+         "F13 dwell addDwellTicks before a sync is illegal");
+
+    // Baseline: a standalone 400-step rest-to-rest run. The dwell fixture is
+    // two of those runs separated by exactly 80000 ticks of pauses, so the
+    // total clock pins both the dwell length and the P == 0 restart.
+    uint32_t base_clock = 0;
+    {
+      SimPort bx(4000), by(4000);
+      FasNAxis<2, 64, SimPort> bpath(cfg);
+      bpath.addAxis(0, &bx);
+      bpath.addAxis(1, &by);
+      int32_t cur[2] = {0, 0};
+      bpath.setCurrentPosition(cur);
+      int32_t t[2] = {400, 0};
+      bpath.addLine(t);
+      bpath.endPath();
+      bpath.pump();
+      while (bpath.isBusy()) {
+        bx.drain_one();
+        by.drain_one();
+        bpath.pump();
+      }
+      base_clock = bx.clock();
+      test(bx.position() == 400 && by.position() == 0,
+           "F13 dwell baseline ends at 400");
+    }
+
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F13 dwell addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F13 dwell addAxis(1)");
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t a[2] = {400, 0};
+    int32_t b[2] = {800, 0};
+    test(path.addLine(a) == true, "F13 dwell first addLine");
+    test(path.addDwellTicks(0) == true, "F13 dwell zero dwell is legal");
+    test(path.block_count() == 1, "F13 dwell zero dwell records no block");
+    test(path.addDwellTicks(80000) == true, "F13 dwell addDwellTicks");
+    test(path.addLine(b) == true, "F13 dwell second addLine");
+    test(path.block_count() == 3, "F13 dwell records 3 blocks");
+    path.endPath();
+    path.pump();
+    bool at_400 = false;
+    bool past_400 = false;
+    bool held_400 = true;
+    while (path.isBusy()) {
+      int64_t s0 = 0;
+      int64_t s1 = 0;
+      bool u0 = true;
+      bool u1 = true;
+      px.drain_one(&s0, &u0);
+      py.drain_one(&s1, &u1);
+      if (!at_400 && px.position() == 400) {
+        at_400 = true;
+      } else if (at_400 && !past_400 && s0 != 0) {
+        past_400 = true;
+      } else if (at_400 && !past_400 && px.position() != 400) {
+        held_400 = false;
+      }
+      path.pump();
+    }
+    test(at_400 && past_400, "F13 dwell reached 400 and left it");
+    test(held_400, "F13 dwell position holds (400,0) through the dwell");
+    test(px.clock() == 2 * base_clock + 80000,
+         "F13 dwell lasts exactly 80000 ticks of clock (two baseline halves)");
+    test(px.clock() == py.clock(), "F13 dwell axes stay in lockstep");
+    test(px.position() == 800 && py.position() == 0, "F13 dwell end on target");
+    test(path.hasUnderrun() == false, "F13 dwell no underrun");
+    printf("F13 dwell: base=%u dwell_run=%u (2*base+80000=%u)\n", base_clock,
+           px.clock(), 2 * base_clock + 80000);
+  }
+
+  // --- F11: one 800-step chunk caps the speed; ten chunks recover. ----------
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t[2] = {800, 0};
+    path.addLine(t);  // open path: no endPath
+    PumpStatus first = path.pump();
+    test(first == PumpStatus::Running,
+         "F13 F11 first pump returns Running on an open path");
+    test(path.isSpeedLimitedByLookahead(),
+         "F13 F11 one 800-step chunk caps the speed (R < P_stop)");
+    uint32_t peak = 0;
+    bool p_le_r = true;
+    while (path.isBusy()) {
+      px.drain_one();
+      py.drain_one();
+      uint32_t P = path.performedRampUp();
+      uint32_t R = path.remainingToStop();
+      if (P > peak) {
+        peak = P;
+      }
+      if (P > R) {
+        p_le_r = false;
+      }
+      path.pump();
+    }
+    test(p_le_r, "F13 F11 P <= R on every sample");
+    test(peak == 400, "F13 F11 peak P == R/2 (400 of 800, under P_stop)");
+    test(peak < P_coast, "F13 F11 capped peak stays under P_stop");
+    test(px.position() == 800 && py.position() == 0,
+         "F13 F11 capped run ends at the buffered point");
+    test(path.hasUnderrun() == false, "F13 F11 capped run has no underrun");
+    printf("F13 F11 capped: peak_P=%u (R/2=400) P_coast=%u\n", peak, P_coast);
+  }
+
+  // --- F11 recovery: ten 800-step chunks buffered, R at the head is 8000. ---
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t[2];
+    for (int k = 1; k <= 10; k++) {
+      t[0] = 800 * k;
+      t[1] = 0;
+      path.addLine(t);
+    }
+    path.pump();
+    test(path.performedRampUp() + path.remainingToStop() == 8000,
+         "F13 F11 R at the head is 8000");
+    test(path.remainingToStop() >= P_coast,
+         "F13 F11 R >= P_stop once ten chunks are buffered");
+    test(!path.isSpeedLimitedByLookahead(),
+         "F13 F11 R >= P_stop is not lookahead-limited");
+    uint8_t hint_axis = 0xFF;
+    uint32_t hint_R = 0;
+    uint32_t hint_stop = 0;
+    uint16_t hint_h = 0;
+    path.lookaheadHint(&hint_axis, &hint_R, &hint_stop, &hint_h);
+    test(hint_axis == path.masterAxis(),
+         "F13 F11 lookaheadHint axis == master");
+    test(hint_R == path.remainingToStop(), "F13 F11 lookaheadHint R");
+    test(hint_stop == P_coast, "F13 F11 lookaheadHint P_stop");
+    test(hint_h == 64, "F13 F11 lookaheadHint HORIZON");
+    NaxisPlot plot;
+    plot.start_scalar("f11", "FasNAxis F11 speed cap then recovery (P vs R)");
+    uint32_t peak = 0;
+    bool p_le_r = true;
+    while (path.isBusy()) {
+      px.drain_one();
+      py.drain_one();
+      uint32_t P = path.performedRampUp();
+      uint32_t R = path.remainingToStop();
+      if (P > peak) {
+        peak = P;
+      }
+      if (P > R) {
+        p_le_r = false;
+      }
+      plot.scalar_row((double)px.clock() / NAXIS_PLOT_TICKS_PER_S, (double)P,
+                      (double)R);
+      path.pump();
+    }
+    plot.finish_scalar(0.0, (double)px.clock() / NAXIS_PLOT_TICKS_PER_S,
+                       "time [s]", "steps", "P performed ramp-up",
+                       "R remaining to stop");
+    test(peak + 64 >= P_coast && peak <= P_coast,
+         "F13 F11 recovery reaches P_stop within the log2 band");
+    test(peak > 400, "F13 F11 recovery peak exceeds the capped peak");
+    test(p_le_r, "F13 F11 recovery P <= R on every sample");
+    test(px.position() == 8000 && py.position() == 0,
+         "F13 F11 recovery ends at 8000");
+    test(path.hasUnderrun() == false, "F13 F11 recovery has no underrun");
+    printf("F13 F11 recovery: peak_P=%u == P_coast=%u\n", peak, P_coast);
+    printf("F11 scalar plot written: test_26_f11.gnuplot\n");
+  }
+
+  // --- F13: starve the queues after kick-off, no pump in between. -----------
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t[2] = {10000, 0};
+    path.addLine(t);
+    path.endPath();
+    PumpStatus st = path.pump();
+    test(st == PumpStatus::Running, "F13 F1 first pump returns Running");
+    test(!px.isQueueEmpty() && !py.isQueueEmpty(),
+         "F13 kick-off has happened (queues are prefilled)");
+    NaxisPlot plot;
+    plot.start_plot("f13", "FasNAxis F13 underrun (samples before the starve)",
+                    2);
+    for (int k = 0; k < 200; k++) {
+      int64_t s0 = 0;
+      int64_t s1 = 0;
+      bool u0 = true;
+      bool u1 = true;
+      px.drain_one(&s0, &u0);
+      py.drain_one(&s1, &u1);
+      double tt = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      uint32_t ticks = path.lastTicks();
+      double v = ticks > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)ticks : 0.0;
+      double speed[2] = {v, v};
+      double Pcol[2] = {(double)path.performedRampUp(),
+                        (double)path.performedRampUp()};
+      double Rcol[2] = {(double)path.remainingToStop(),
+                        (double)path.remainingToStop()};
+      double tcol[2] = {(double)ticks, (double)ticks};
+      plot.row(tt, (double)px.position(), (double)py.position(), 0.0, speed,
+               Pcol, Rcol, tcol);
+      path.pump();
+    }
+    plot.finish_plot();
+    px.drain();
+    py.drain();
+    test(px.isQueueEmpty() && py.isQueueEmpty(),
+         "F13 both queues drained to empty without pump");
+    test(path.hasUnderrun(), "F13 hasUnderrun after the starve drain");
+    test(path.pump() == PumpStatus::Underrun,
+         "F13 pump() returns Underrun after the starve");
+    printf("F13 underrun plot written: test_26_f13.gnuplot\n");
+  }
+
+  // --- F19: HORIZON 4 micro-segments cap P; one long block still coasts. ----
+  {
+    static double f19_t_a[512];
+    static double f19_p_a[512];
+    int n_a = 0;
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 4, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true,
+         "F13 F19 addAxis(0) succeeds at HORIZON 4");
+    test(path.addAxis(1, &py) == true, "F13 F19 addAxis(1) succeeds");
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t[2];
+    for (int k = 1; k <= 4; k++) {
+      t[0] = 50 * k;
+      t[1] = 0;
+      test(path.addLine(t) == true, "F13 F19 addLine fits HORIZON 4");
+    }
+    path.pump();
+    test(path.isSpeedLimitedByLookahead(),
+         "F13 F19 HORIZON 4 micro-segments cap the speed");
+    uint32_t peak_a = 0;
+    bool p_le_r_a = true;
+    while (path.isBusy()) {
+      px.drain_one();
+      py.drain_one();
+      uint32_t P = path.performedRampUp();
+      uint32_t R = path.remainingToStop();
+      if (P > peak_a) {
+        peak_a = P;
+      }
+      if (P > R) {
+        p_le_r_a = false;
+      }
+      if (n_a < 512) {
+        f19_t_a[n_a] = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+        f19_p_a[n_a] = (double)P;
+        n_a++;
+      }
+      path.pump();
+    }
+    test(p_le_r_a, "F13 F19 micro-segment run P <= R");
+    test(peak_a < P_coast,
+         "F13 F19 micro-segments never reach P_stop (HORIZON caps R)");
+    test(px.position() == 200 && py.position() == 0,
+         "F13 F19 micro-segment run ends at 200");
+
+    static double f19_t_b[16384];
+    static double f19_p_b[16384];
+    int n_b = 0;
+    SimPort qx(4000), qy(4000);
+    FasNAxis<2, 4, SimPort> path2(cfg);
+    path2.addAxis(0, &qx);
+    path2.addAxis(1, &qy);
+    int32_t cur2[2] = {0, 0};
+    path2.setCurrentPosition(cur2);
+    int32_t big[2] = {10000, 0};
+    path2.addLine(big);
+    path2.endPath();
+    path2.pump();
+    test(path2.remainingToStop() >= P_coast,
+         "F13 F19 one long block has R >= P_stop at the same HORIZON");
+    uint32_t peak_b = 0;
+    bool p_le_r_b = true;
+    while (path2.isBusy()) {
+      qx.drain_one();
+      qy.drain_one();
+      uint32_t P = path2.performedRampUp();
+      uint32_t R = path2.remainingToStop();
+      if (P > peak_b) {
+        peak_b = P;
+      }
+      if (P > R) {
+        p_le_r_b = false;
+      }
+      if (n_b < 16384) {
+        f19_t_b[n_b] = (double)qx.clock() / NAXIS_PLOT_TICKS_PER_S;
+        f19_p_b[n_b] = (double)P;
+        n_b++;
+      }
+      path2.pump();
+    }
+    test(p_le_r_b, "F13 F19 long-block run P <= R");
+    test(peak_b == P_coast,
+         "F13 F19 one long block reaches P_stop (coast) at HORIZON 4");
+    test(qx.position() == 10000 && qy.position() == 0,
+         "F13 F19 long-block run ends at 10000");
+
+    NaxisPlot plot;
+    plot.start_scalar(
+        "f19", "FasNAxis F19 HORIZON 4: micro-segment cap vs long-block coast");
+    int n = n_b > n_a ? n_b : n_a;
+    for (int k = 0; k < n; k++) {
+      double x = k < n_b ? f19_t_b[k] : f19_t_b[n_b - 1];
+      double a = k < n_b ? f19_p_b[k] : 0.0;
+      double b = k < n_a ? f19_p_a[k] : 0.0;
+      plot.scalar_row(x, a, b);
+    }
+    plot.finish_scalar(0.0, f19_t_b[n_b - 1], "time [s]", "P [steps]",
+                       "P one 10000-step block (coasts)",
+                       "P four 50-step blocks (capped)");
+    printf("F13 F19: peak capped=%u peak long=%u P_coast=%u\n", peak_a, peak_b,
+           P_coast);
+    printf("F19 scalar plot written: test_26_f19.gnuplot\n");
+  }
+
+  printf("Dwell/F11/F13/F19 lookahead cap and underrun green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
   plot_smoke();
@@ -3940,6 +4298,7 @@ int main() {
   f9_dir_pauses();
   f11_overshoot_rest();
   f12_overshoot_corners();
+  f13_lookahead();
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;
