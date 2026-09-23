@@ -79,6 +79,11 @@ test_24: test_24.o
 test_25: test_25.o
 	g++ -o $@ $< $(LDLIBS)
 
+# test_27 links the physical_stepper audio recorder, which uses std::vector;
+# link it with g++ so libc++ is pulled in.
+test_27: test_27.o $(LIB_O)
+	g++ -o $@ $< $(LIB_O) $(LDLIBS)
+
 test_%: test_%.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
 
