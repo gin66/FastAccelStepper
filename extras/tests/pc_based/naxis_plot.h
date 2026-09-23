@@ -43,10 +43,19 @@ class NaxisPlot {
  public:
   int n_axes;
 
-  NaxisPlot() : open(false), title("FasNAxis"), n_axes(1) {}
+  NaxisPlot() : open(false), title("FasNAxis"), n_axes(1), has_yrange(false) {}
+
+  // Optional explicit y-range for scalar plots (e.g. frame a tolerance band).
+  // Without it gnuplot auto-ranges, which degenerates for an all-zero series.
+  void set_y_range(double lo, double hi) {
+    yrange_lo = lo;
+    yrange_hi = hi;
+    has_yrange = true;
+  }
 
   void start_plot(const char* fixture, const char* fixture_title, int axes) {
     n_axes = axes;
+    has_yrange = false;
     if (n_axes > NAXIS_PLOT_MAX) {
       n_axes = NAXIS_PLOT_MAX;
     }
@@ -68,6 +77,7 @@ class NaxisPlot {
   // series carry the same x so an overlay reads as flat agreement when the
   // wrapper forwards to the reference, and as a divergence when it does not.
   void start_scalar(const char* fixture, const char* fixture_title) {
+    has_yrange = false;
     snprintf(title, sizeof(title), "%s", fixture_title);
     snprintf(filename, sizeof(filename), "test_26_%s.gnuplot", fixture);
     gp = fopen(filename, "w");
@@ -99,6 +109,9 @@ class NaxisPlot {
     fprintf(gp, "set xlabel \"%s\"\n", x_label);
     fprintf(gp, "set ylabel \"%s\"\n", y_label);
     fprintf(gp, "set xrange [%.1f:%.1f]\n", x_min, x_max);
+    if (has_yrange) {
+      fprintf(gp, "set yrange [%.1f:%.1f]\n", yrange_lo, yrange_hi);
+    }
     fprintf(gp, "set title \"%s\"\n", title);
     fprintf(gp,
             "plot $sca using 1:2 with linespoints linewidth 2 lc rgb 'blue' "
@@ -215,6 +228,9 @@ class NaxisPlot {
   char plot[2048];
   FILE* gp;
   bool open;
+  bool has_yrange;
+  double yrange_lo;
+  double yrange_hi;
 
   // Emits one newline-terminated "plot <series>, <series> ..." statement into
   // `out`. Each (col, prefix) group contributes one series per axis

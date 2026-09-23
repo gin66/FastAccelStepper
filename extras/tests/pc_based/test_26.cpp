@@ -2961,6 +2961,7 @@ void f8_feeder() {
     test(px.clock() >= 60ull * 16000000ull,
          "F14 X ran at least the coast time (<= 60 s of ticks)");
     double t_end = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+    plot.set_y_range(-2.0, 2.0);
     plot.finish_scalar(0.0, t_end, "time [s]", "clock_x - clock_y [ticks]",
                        "clock_x - clock_y", "zero");
     printf(
@@ -4184,6 +4185,9 @@ void f13_lookahead() {
     NaxisPlot plot;
     plot.start_plot("f13", "FasNAxis F13 underrun (samples before the starve)",
                     2);
+    plot.poly_point(0.0, 0.0);
+    plot.poly_point((double)t[0], (double)t[1]);
+    plot.poly_done();
     for (int k = 0; k < 200; k++) {
       int64_t s0 = 0;
       int64_t s1 = 0;
@@ -4328,21 +4332,30 @@ void f13_lookahead() {
 // ---------------------------------------------------------------------------
 // Step 14 — 3-axis SimPort helix (F8).
 //
-// Helix: 180 chords, radius 1600, one full turn, Z increases by 10 steps per
+// Helix: 240 chords, radius 8000, one full turn, Z increases by 10 steps per
 // chord. Run twice: mode = Linear and mode = Overshoot with overshoot_max = 8.
 // Assert each vertex is hit on all three axes, every drained step has tick sum
-// >= 4000, and Overshoot d² in XY <= 64.
+// >= 4000, the Linear ring never path-stops at an interior vertex, both modes
+// keep the realized path speed within 2x between extrema (measured from the
+// drained steps/clock, not the binder-global lastTicks), and Overshoot d² in
+// XY <= 64.
 // ---------------------------------------------------------------------------
 void f14_helix() {
-  const int n_chords = 180;
-  const int32_t radius = 1600;
+  // A smooth ring must keep every joint inside the 2 deg collinear band after
+  // the integer rounding. At radius 1600 / 180 chords the nominal 2 deg step
+  // plus up to ~0.5 deg of rounding noise lands ~60% of the joints *outside*
+  // the band, so Linear path-stops at those vertices and the ring is not
+  // smooth. Radius 8000 / 240 chords puts the worst joint at 1.92 deg, safely
+  // inside the band, so the whole turn is one collinear cruise.
+  const int n_chords = 240;
+  const int32_t radius = 8000;
   const uint32_t ticks = 4000;
   const uint16_t cap = 8;
 
   // Helix waypoints: integer XY via the F20 rounding, Z = 10 per chord. The
   // points are relative to the first vertex so the SimPort's physical origin
   // (0) is the path origin (Step 14; no SimPort setter).
-  static int32_t wp[(180 + 1) * 3];
+  static int32_t wp[(n_chords + 1) * 3];
   const int32_t origin_x = iround(radius * cos(0.0));
   const int32_t origin_y = iround(radius * sin(0.0));
   for (int k = 0; k <= n_chords; k++) {
@@ -4360,6 +4373,9 @@ void f14_helix() {
     double max_d2_xy;
     bool min_tick_ok;
     bool underrun;
+    int rest_events;
+    double mid_speed_min;
+    double mid_speed_max;
   };
 
   auto run_helix = [&](SimPort& px, SimPort& py, SimPort& pz,
@@ -4375,6 +4391,9 @@ void f14_helix() {
     res->max_d2_xy = 0.0;
     res->min_tick_ok = true;
     res->underrun = false;
+    res->rest_events = 0;
+    res->mid_speed_min = 0.0;
+    res->mid_speed_max = 0.0;
 
     FasNAxisConfig cfg;
     if (mode == FasNAxisConfig::Overshoot) {
@@ -4414,6 +4433,15 @@ void f14_helix() {
     // axes land on the vertex together, so the check is per command.
     int chord = 1;
     int iter = 0;
+    const bool linear_mode = (mode != FasNAxisConfig::Overshoot);
+    bool have_p = false;
+    // Realized-speed sampling: positions/clock one plot sample back, so a
+    // per-axis speed comes from actual steps over actual ticks rather than the
+    // binder-global lastTicks()/performedRampUp() (which are not per-axis in
+    // Overshoot; non-binding axes issue multi-step catch-up commands).
+    int32_t ps_x = 0, ps_y = 0, ps_z = 0;
+    uint32_t ps_clock = 0;
+    bool have_sample = false;
     while (path.isBusy()) {
       int64_t s0 = 0, s1 = 0, s2 = 0;
       bool u0 = true, u1 = true, u2 = true;
@@ -4450,19 +4478,70 @@ void f14_helix() {
         }
       }
 
+      // Smoothness: on a collinear ring a continuing Linear run carries P
+      // across every interior joint, so performedRampUp() stays non-zero from
+      // the first ramped step until the final deceleration. A path-stop at an
+      // interior vertex shows up as P == 0 here.
+      if (linear_mode) {
+        uint32_t P_now = path.performedRampUp();
+        if (P_now > 0) {
+          have_p = true;
+        } else if (have_p && chord < n_chords) {
+          res->rest_events++;
+        }
+      }
+
       double tt = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
-      uint32_t lt = path.lastTicks();
-      if (do_plot && (iter % 4 == 0)) {
-        double v = lt > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)lt : 0.0;
-        double speed[3] = {v, v, v};
-        double Pcol[3] = {(double)path.performedRampUp(),
-                          (double)path.performedRampUp(),
-                          (double)path.performedRampUp()};
-        double Rcol[3] = {(double)path.remainingToStop(),
-                          (double)path.remainingToStop(),
-                          (double)path.remainingToStop()};
-        double tcol[3] = {(double)lt, (double)lt, (double)lt};
-        plot.row(tt, (double)x, (double)y, 0.0, speed, Pcol, Rcol, tcol);
+      // Sample realized per-axis speed/period (and the path speed) every 32nd
+      // command from the actual position/clock advance. lastTicks() /
+      // performedRampUp() are binder-global and not per-axis in Overshoot, so
+      // plotting them per axis shows fictitious jumps; the drained steps over
+      // the elapsed clock are the real motion. A 32-command window spans the
+      // Overshoot catch-up bursts (up to the 65535-tick split), so the window
+      // speed is the path's real speed rather than its per-command aliasing.
+      if (iter % 32 == 0) {
+        uint32_t clk = px.clock();
+        if (have_sample) {
+          double dt = (double)(clk - ps_clock) / NAXIS_PLOT_TICKS_PER_S;
+          double ddx = (double)(x - ps_x);
+          double ddy = (double)(y - ps_y);
+          double ddz = (double)(z - ps_z);
+          double dist = sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+          double path_v = dt > 0.0 ? dist / dt : 0.0;
+          // Middle half of the turn: excludes the start/end ramps, includes
+          // the X and Y extrema. A smooth ring keeps the path speed from
+          // collapsing there.
+          if (chord >= n_chords / 4 && chord <= (3 * n_chords) / 4) {
+            if (res->mid_speed_max == 0.0 || path_v < res->mid_speed_min) {
+              res->mid_speed_min = path_v;
+            }
+            if (path_v > res->mid_speed_max) {
+              res->mid_speed_max = path_v;
+            }
+          }
+          if (do_plot) {
+            double d[3] = {ddx, ddy, ddz};
+            double speed[3];
+            double tcol[3];
+            for (int i = 0; i < 3; i++) {
+              speed[i] = dt > 0.0 ? d[i] / dt : 0.0;
+              tcol[i] =
+                  d[i] != 0.0 ? dt * NAXIS_PLOT_TICKS_PER_S / fabs(d[i]) : 0.0;
+            }
+            double Pcol[3] = {(double)path.performedRampUp(),
+                              (double)path.performedRampUp(),
+                              (double)path.performedRampUp()};
+            double Rcol[3] = {(double)path.remainingToStop(),
+                              (double)path.remainingToStop(),
+                              (double)path.remainingToStop()};
+            plot.row(tt, (double)x, (double)y, 0.0, speed, Pcol, Rcol, tcol);
+          }
+        }
+        ps_x = x;
+        ps_y = y;
+        ps_z = z;
+        ps_clock = clk;
+        have_sample = true;
       }
       if (xzplot != NULL && (iter % 4 == 0)) {
         xzplot->scalar_row(tt, (double)x, (double)z);
@@ -4509,9 +4588,15 @@ void f14_helix() {
     test(res.all_vertices && res.n_vertices == n_chords,
          "F14 Linear every vertex hit on all axes");
     test(res.min_tick_ok, "F14 Linear every step has tick sum >= 4000");
+    test(res.rest_events == 0,
+         "F14 Linear ring never rests between interior vertices (smooth)");
+    test(
+        res.mid_speed_max > 0.0 && res.mid_speed_min * 2.0 >= res.mid_speed_max,
+        "F14 Linear path speed stays smooth between extrema");
     test(res.underrun == false, "F14 Linear no underrun");
-    printf("F14 Linear helix: clock=%u vertices=%d/%d\n", res.clock,
-           res.n_vertices, n_chords);
+    printf("F14 Linear helix: clock=%u vertices=%d/%d rest=%d v=[%.0f:%.0f]\n",
+           res.clock, res.n_vertices, n_chords, res.rest_events,
+           res.mid_speed_min, res.mid_speed_max);
   }
 
   // --- Overshoot mode --------------------------------------------------------
@@ -4528,9 +4613,15 @@ void f14_helix() {
          "F14 Overshoot every vertex hit on all axes");
     test(res.min_tick_ok, "F14 Overshoot every step has tick sum >= 4000");
     test(res.max_d2_xy <= 64.0 + 1e-9, "F14 Overshoot d² in XY <= 64");
+    printf(
+        "F14 Overshoot helix: clock=%u vertices=%d/%d max_d2=%.3f "
+        "v=[%.0f:%.0f]\n",
+        res.clock, res.n_vertices, n_chords, res.max_d2_xy, res.mid_speed_min,
+        res.mid_speed_max);
+    test(
+        res.mid_speed_max > 0.0 && res.mid_speed_min * 2.0 >= res.mid_speed_max,
+        "F14 Overshoot path speed stays smooth between extrema");
     test(res.underrun == false, "F14 Overshoot no underrun");
-    printf("F14 Overshoot helix: clock=%u vertices=%d/%d max_d2=%.3f\n",
-           res.clock, res.n_vertices, n_chords, res.max_d2_xy);
   }
 
 #ifdef FAS_NAXIS_TRACE
