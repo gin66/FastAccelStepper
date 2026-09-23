@@ -1260,6 +1260,35 @@ plus a real underrun. Do not add a `LookaheadTooShort` status.
 **Done when:** those four asserts are green. F10 (closed
 collinear path) still coasts.
 
+**Done:** `src/FasNAxis.h` gained `addDwellTicks(ticks)` (a zero-motion
+block whose pauses total `ticks`, split at 65535 like any long period,
+on every axis from rest to rest; illegal before a sync, `ticks == 0`
+is a no-op, and the lookahead treats it as a path-stop so the next
+`addLine` starts from rest), `isSpeedLimitedByLookahead()` (true only
+while the path is open — `!_path_closed && _head < _n_blk` — and the
+live master `R < P_stop`; false on a closed path or when `R` can
+coast), and `lookaheadHint(axis, R, P_stop, horizon)` (diagnostic
+outs, no string, no heap). `hasUnderrun()` now also reports a live
+starve: after a kick-off, with the plan still open, any registered
+queue being empty is an underrun even before the next `pump()`.
+`f13_lookahead()` in `test_26.cpp`: the dwell fixture proves
+`(400,0) → dwell 80000 → (800,0)` holds position through the dwell
+and its clock equals `2 * baseline + 80000` (two standalone 400-step
+rest-to-rest runs), so the dwell lasts exactly 80000 ticks and the
+second half restarts from `P == 0`; F11 pins the cap (`pump()`
+`Running`, `isSpeedLimitedByLookahead()` true, `P <= R`, peak 400 ==
+R/2 < P_stop) and the recovery (ten 800-step chunks, `P + R == 8000`
+at the head, peak reaches P_stop within the log2 band);
+F13 starves the queues after kick-off (`hasUnderrun()` true without a
+pump, then `pump()` returns `Underrun`, plot from the pre-starve
+samples); F19 runs `FasNAxis<2, 4, SimPort>` — four 50-step chunks
+cap peak P at 100 (< P_stop) while one 10000-step block at the same
+HORIZON coasts at P_stop. Plots: `test_26_f11.gnuplot` (P/R scalar),
+`test_26_f13.gnuplot` (pre-starve samples), `test_26_f19.gnuplot`
+(cap vs coast overlay). The whitepaper API sketch now matches the
+`bool addDwellTicks` / `lookaheadHint` signatures. `make test` and
+`make mutations` are green; F10 still coasts.
+
 ---
 
 ## Step 14 — 3-axis SimPort (F8)
