@@ -1,11 +1,5 @@
-Unreleased:
-- Teensy 4.0/4.1 support (EXPERIMENTAL): new pd_teensy backend, up to 16 steppers via the i.MX RT1062's QuadTimer modules
-- fix: teensy_queue.cpp step-timing ISR missing Cortex-M7 `dsb` memory barrier
-- fix: RampControl.cpp static variable conflicting with extern declaration
-- fix: moved extern declarations from RampGenerator.h to RampCalculator.h
-- fix: `log2_timer_freq_div_sqrt_of_2` used wrong formula (squared instead of sqrt(2))
-
-pre-1.3.4:
+1.3.4:
+- Teensy 4.0/4.1 support (EXPERIMENTAL): new pd_teensy backend, up to 16 steppers via the i.MX RT1062 QuadTimer modules
 - getDirChangeBeforeTicks() / getDirChangeBeforePauseCount() / getDirChangeAfterTicks(): planner-facing DIR pause budget (driver drain + user dir_change_delay from setDirectionPin())
 
 1.3.3:
