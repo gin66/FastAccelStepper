@@ -164,7 +164,7 @@ horizon, and a PC-checkable oracle.
 | G4 | Parse lookahead until end or direction change → `R_i` is the cap on ramp-steps (`P_i ≤ R_i`). Path direction implies the other axes’ speeds. Short `R` **reduces speed**, it is not an error. Angle changes need accel/decel **preparation** (§8.4) |
 | G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner inserts the driver’s before/after DIR pauses after the reversing axis’s last step (period kept, so the step rate never jumps); only that axis’s timeline grows, no other axis is paused (§4.4). An injected pause the plan did not carve is an error |
 | G6 | Tick-level timebase shared by all axes; lost sync is a hard error |
-| G7 | Tests run on the existing PC harness only — no simavr, no hardware, no PlatformIO job for this library |
+| G7 | Host PC harness is the primary check (exhaustive); on-target validation (simavr, hardware) runs `examples/naxes/` |
 | G8 | 2D / 3D tests dump gnuplot (as `test_02` / `test_08` / `test_15` do) and may dump a self-contained HTML page |
 | G9 | **Header-only.** One public include, pulled in only by sketches that need it. No extra `.cpp` in `src/`, not referenced from `FastAccelStepper.h` |
 | G10 | Production header: **no `float`**, **no integer `/` in kinematics**. Period, speed, and accel use `log2_value_t` and `RampCalculator` (same as the single-axis generator). PC oracles may use double under `FAS_NAXIS_TRACE` |
@@ -174,9 +174,10 @@ horizon, and a PC-checkable oracle.
 - Replacing the FAS single-axis ramp generator, or calling it
   concurrently with FasNAxis on the same stepper.
 - Running the planner in the FAS `~4 ms` manage-steppers interrupt.
-- Hardware-in-the-loop or simavr coverage for FasNAxis.
-- Inverse kinematics (CoreXY, SCARA, …) as a built-in. An affine
-  motor-map can be added later; v1 plans in step space.
+- Inverse kinematics (CoreXY, SCARA, …) as a built-in, or any affine
+  motor-map. Both are the caller's transform: v1 plans in step space;
+  the application maps Cartesian waypoints to motor steps before
+  handing them over.
 - True circular/NURBS interpolation. Arcs are the caller’s polyline.
 - S-curve / jerk limits. v1 uses the existing FAS trapezoid (optional
   cubic start is a later overlay of `s_h`).
@@ -186,7 +187,8 @@ horizon, and a PC-checkable oracle.
 - **Faithful timed trajectory** (§3.3 problem 2): polyline plus
   time data, execute that timing or error if not achievable.
   v1 is problem 1 only (as fast as possible). A per-block
-  feedrate `F` without a feasibility error is also not v1.
+  feedrate `F` without a feasibility error is also not v1. A
+  later separate planner, not a FasNAxis mode.
 - A `LookaheadTooShort` / feed-hold error when `R < P_stop`.
   Short lookahead is a speed cap (G4), not a fault.
 - Feed holds, jogging, or on-the-fly waypoint edits other than
@@ -1586,14 +1588,12 @@ three axes.
 
 ---
 
-## 12. PC-only test strategy
+## 12. Test strategy
 
-### 12.1 Why PC exclusive
+### 12.1 Test strategy
 
-The planner is discrete math plus a deterministic feeder. Hardware
-adds driver drain pauses, interrupt jitter, and RMT/I2S buffering —
-already covered by FAS’s own tests (`test_24`, `test_25`, Issue 370
-replay). FasNAxis asserts:
+The planner is discrete math plus a deterministic feeder, so the host
+PC tests are the primary and exhaustive check:
 
 - constraint satisfaction of the **plan** (`P ≤ R`, period ≥
   `ticks_min` / `ticks_cfg`)
@@ -1604,7 +1604,8 @@ replay). FasNAxis asserts:
 - optionally, 1- and 2-axis identity with real `pd_test` queues
 - gnuplot of path and per-axis period, same workflow as `test_02`
 
-None of that needs an MCU.
+On-target validation (simavr, hardware) runs the example; that work is
+tracked outside this whitepaper.
 
 ### 12.2 Layout
 
