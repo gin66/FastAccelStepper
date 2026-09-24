@@ -162,7 +162,7 @@ horizon, and a PC-checkable oracle.
 | G2 | Hard constraints are the **currently configured** per-stepper period (`getSpeedInTicks()`) and acceleration (`getAcceleration()`), plus the device min-period `getMaxSpeedInTicks()` |
 | G3 | **v1 = as fast as possible** (§3.3 problem 1). Two geometry modes, both time-optimal **under G2 and that mode’s geometry** (§12.4.1). A faster track that violates G1/G2 or the mode geometry is not a reference. **Linear** (exact chords, shared time-law; path speed 0 at a non-collinear vertex) and **Overshoot** (per-axis ramps, slight chordal deviation, waypoints still hit) |
 | G4 | Parse lookahead until end or direction change → `R_i` is the cap on ramp-steps (`P_i ≤ R_i`). Path direction implies the other axes’ speeds. Short `R` **reduces speed**, it is not an error. Angle changes need accel/decel **preparation** (§8.4) |
-| G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner carves the driver’s before/after DIR pauses out of the reversing axis’s last step, so the timeline does not grow and no other axis is paused (§4.4). An injected pause the plan did not carve is an error |
+| G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner inserts the driver’s before/after DIR pauses after the reversing axis’s last step (period kept, so the step rate never jumps); only that axis’s timeline grows, no other axis is paused (§4.4). An injected pause the plan did not carve is an error |
 | G6 | Tick-level timebase shared by all axes; lost sync is a hard error |
 | G7 | Tests run on the existing PC harness only — no simavr, no hardware, no PlatformIO job for this library |
 | G8 | 2D / 3D tests dump gnuplot (as `test_02` / `test_08` / `test_15` do) and may dump a self-contained HTML page |
@@ -415,10 +415,11 @@ practice 1 ms to leave margin for pauses.
 ### 4.4 Direction-change pauses
 
 A direction change needs a no-step gap on the **reversing axis
-only**. The planner carves that gap out of that axis’s own last
-step. The coordinated timeline does not grow, and no other axis
-is given a pause. A pause on an axis that is still moving forces
-that motor to decelerate and accelerate again.
+only**. The planner appends that gap after that axis’s own last
+step, which keeps its period; only the reversing axis’s timeline
+grows by the gap, and no other axis is given a pause. A pause on
+an axis that is still moving forces that motor to decelerate and
+accelerate again.
 
 The gap is the driver’s pause budget, read at `addAxis` /
 `setLimitsFromSteppers()`:
@@ -455,50 +456,36 @@ On `pd_test`, `addDirChangePauseToQueue` returns `AQE_OK` for
 when the pauses were not queued first. The single-axis retry
 loop is uncoordinated; FasNAxis must not use it.
 
-#### 4.4.1 The budget constrains acceleration and max speed
+#### 4.4.1 No acceleration cap for the DIR pause
 
-`calculate_ticks(P)` gets shorter as acceleration rises,
-including the last step `calculate_ticks(1)`. At the direction
-change the reversing axis must already be at a slow period
-`T_min` with
+The DIR pause is inserted **after** the last old-direction step
+(§4.4.2), so the approach ramp is untouched: the last step keeps
+the period `T_min` the ordinary `P → 0` tail reaches. No
+acceleration or max-speed cap is needed for the pause. (An
+earlier design carved the pause out of the step, which forced a
+`T_min >> τ` cap; that made the period jump and the step rate
+speed up at the vertex, and is no longer done.)
 
-```
-T_min >> τ
-```
+The other axes follow the plan as committed. They are not paused
+in order to absorb `τ`.
 
-That slow period is the minimum speed at the change. Two caps
-fall out of it. They tighten the approach only when the
-ordinary `P → 0` tail does not already satisfy the inequality.
-
-- **Acceleration.** High `a` makes `calculate_ticks(1)` short.
-  Cap `a` so the tail can hold `τ` and the shortened pulse
-  stays slow: `T_min − τ` is at least
-  `max(MIN_CMD_TICKS, ticks_i_cfg)` and still in that tail,
-  not a fast step.
-- **Max speed.** From that `a`, the decel from cruise down to
-  `T_min` has to finish in the steps remaining before the
-  vertex. If it does not, lower cruise until it does.
-
-The other axes follow the replanned time law. They are not
-paused in order to absorb `τ`.
-
-#### 4.4.2 Carve the last one-step command
+#### 4.4.2 Insert the pause after the last one-step command
 
 A step fires at the start of its command, then the command
 waits `ticks` (§4.1.1). The last old-direction command is a
-**single** step of period `T_min`. Replace that one command
-with:
+**single** step of period `T_min`. Keep it, and append:
 
-1. `{steps=1, ticks=T_min − τ, count_up=old}`
+1. `{steps=1, ticks=T_min, count_up=old}`
 2. `n_before` times `{steps=0, ticks=τ_before, count_up=old}`
 3. if `τ_after > 0`: `{steps=0, ticks=τ_after, count_up=new}`
 
-The tick sum is still `T_min`. The last old step and the first
-new step stay at the same instants. The pauses occupy the wait
-that was already trailing the last pulse.
+The step period never jumps and the reversing axis's timeline
+grows by `τ` — this is what the normal ramp generator does for a
+DIR change. Because both the retired and the new DIR appear on
+the reversing axis only, no other axis gains a pause.
 
-Do not shorten a command with `steps > 1`. That speeds every
-step inside it. Isolate the final step, then carve.
+Do not split a command with `steps > 1` for a DIR pause. Isolate
+the final step, then append the pauses.
 
 `SUPPORT_PAUSE_CMD_COUNTING` clears its counters on
 `steps > 0` and on a direction change
@@ -535,13 +522,14 @@ surprise gap is the decel/reaccel §4.4.2 exists to avoid.
 #### 4.4.4 Tests (F12)
 
 - F12: Linear reversal, budget `(3200, 1, 3200)`. The last
-  old-direction one-step command is shortened by 6400 and
+  old-direction one-step command keeps its period `T_min` and is
   followed by a before-pause (old `count_up`, 3200) and an
-  after-pause (new `count_up`, 3200). Those three tick sums
-  equal the original last-step ticks. The other axis gains no
-  pause. The following step returns `AQE_OK` with no injected
-  ticks. Total `clock()` matches the same move with a zero
-  budget.
+  after-pause (new `count_up`, 3200). The period never jumps
+  (the step rate never speeds up); the carve adds 6400 after the
+  full step. The other axis gains no pause. The following step
+  returns `AQE_OK` with no injected ticks. The reversing axis’s
+  `clock()` grows by exactly 6400 over the zero-budget run; every
+  other axis is unchanged.
 - F12b: Overshoot corner, continuing axis at high `P`, same
   budget. That axis keeps its planned steps through the window.
   Its `P` is unchanged across the window. It is not given a
@@ -549,11 +537,10 @@ surprise gap is the decel/reaccel §4.4.2 exists to avoid.
 - F12c: `forceExtraBefore` injects a pause the plan did not
   carve. `pump()` returns `Error`. The other axis does not
   gain that pause.
-- Tail too short: `calculate_ticks(1)` is not `>> τ` (high
-  acceleration, or a large budget). The approach runs at a
-  lower acceleration or max speed until the inequality holds,
-  then the carve has the same shape. Duration may grow because
-  the ramp changed. The other axis still has no copied pause.
+- Long pause: a budget larger than `T_min` keeps the step at its
+  natural period and appends the (longer) pause. No acceleration
+  cap is applied; only the reversing axis’s timeline grows. The
+  other axis still has no copied pause.
 
 ### 4.5 Enable-on delay
 
@@ -1365,9 +1352,9 @@ before any outgoing-block step:
 1. The approach has already reached `T_min >> τ` (§4.4.1).
    The last old-direction command on i is one step of that
    period.
-2. Replace it with the shortened step plus the before-pauses
-   (old `count_up`) and the after-pause (new `count_up`).
-   Tick sum unchanged (§4.4.2).
+2. Append the before-pauses (old `count_up`) and the after-pause
+   (new `count_up`) after the step, which keeps its period
+   (§4.4.2).
 3. Every other axis keeps the commands already planned for
    those ticks. No pause is added on them.
 4. If any `addQueueEntry` returns Injected, `pump()` returns
@@ -1793,10 +1780,15 @@ be this generator (no `float`, no `/`). `naxis_ref.h` is not
 included from `src/FasNAxis.h`.
 
 F20 is the long-polyline probe of this reference: a half-circle
-of 1° chords sandwiched in a seeded random walk (several
-hundred waypoints, anisotropic ticks). Rounding the arc
-produces collinear cruise, Y-reversal path-stops, and DDA
-master switches; `P`/`R` are **path steps** (one DDA tick) so a
+sandwiched in a seeded random walk (several
+hundred waypoints, anisotropic ticks). The arc chords must be
+long enough that integer rounding keeps every joint inside the
+2° collinear band (r=4800 / 190 chords, max joint 1.61°): a
+1° chord at r=1600 is only ~28 steps, the quantisation makes
+~60% of joints >2°, and the arc path-stops at every chord —
+a sawtooth, not the intended single ramp. The random walk
+either side supplies the path-stops, reversals and DDA master
+switches; `P`/`R` are **path steps** (one DDA tick) so a
 master change does not change the ramp-step currency. The
 interpolator must match this trace once it walks N blocks
 (todo Step 2h).
@@ -1825,7 +1817,7 @@ that violates G1/G2 does not count.
 | F9 | Asymmetric limits `ticks_x = 10*ticks_y`, Linear, equal `\|Δ\|` | X is slower so X is DDA master and time-law; Y scaled down in steps | XY |
 | F10 | Micro-segments totalling a long line, Linear | `R` sees through them; does not stop at each | v(t) no dips |
 | F11 | Streaming with `R < P_stop`, path open | speed capped by `R`; `pump()` `Running`; `isSpeedLimitedByLookahead()`; `P ≤ R`; cruise after `R` grows | v(t) capped then recovers |
-| F12 | Axis reversal + `dir_after` / `dir_before` | last one-step command shortened by `τ`; before (old DIR) + after (new DIR) on that axis only; tick sum unchanged; other axis gains no pause; `clock()` matches the zero-budget run; following step has no Injected | event marks |
+| F12 | Axis reversal + `dir_after` / `dir_before` | last one-step command keeps its period; before (old DIR) + after (new DIR) appended on that axis only; period never jumps; other axis gains no pause; reversing `clock()` grows by `τ`; following step has no Injected | event marks |
 | F12b | Overshoot corner, X continues at high `P` | X keeps its planned steps through Y’s carved pauses; `P_x` unchanged across the window; X is not given a DIR pause | XY, X still moving |
 | F12c | SimPort injects one extra before-pause | `pump()` returns `Error`; the other axis does not gain that pause | — |
 | F13 | Queue underrun (pump starved) | Flag set; plot still dumped | — |
@@ -1835,7 +1827,7 @@ that violates G1/G2 does not count.
 | F17 | First fill on empty queue | Not underrun; path completes | — |
 | F18 | Linear `(10000, 9000)`, Y 40× slower | Longest is X (DDA master) but Y would exceed `v_max` if X ran at `ticks_x`; Y lengthens `ticks_b`, X scaled down in speed; both axes issue full `\|Δ\|` | XY + v(t) |
 | F19 | `HORIZON` too small to hold `P_stop` as micro-segments | `addAxis` succeeds; `P` never reaches `P_stop`; same `HORIZON` with one long `addLine` *does* coast | v(t) capped |
-| F20 | Linear, ~300 waypoints: seeded random, half-circle r=1600 1° chords, seeded random; ticks `(4000,8000)` | Globally fastest feasible track (`naxis_ref`): every vertex hit, envelope, `P ≤ R`, both path-stop and collinear-cruise joints, rebind on the arc (DDA master switches; `P`/`R` stay in path steps) | `test_26_f20.gnuplot` |
+| F20 | Linear, ~350 waypoints: seeded random, collinear half-circle r=4800 / 190 chords (max joint 1.61°), seeded random; ticks `(4000,8000)` | Globally fastest feasible track (`naxis_ref`): every vertex hit, envelope, `P ≤ R`, path-stop joints on the random walk, collinear-cruise arc, rebind on the arc (DDA master switches; `P`/`R` stay in path steps) | `test_26_f20.gnuplot` |
 
 F7 is the regression sibling of `examples/MoveTimed`. F5 is Linear
 lookahead. F6 / F6b is where `overshoot_max` and `P ≤ \|Δ\|` bite.

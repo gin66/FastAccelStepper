@@ -279,6 +279,42 @@ Tests;
   3. Each failing moveTimed() call must enqueue at most one entry
   4. The final drift must account for all injected pause ticks (actual+extra)
 
+- test_26
+  FasNAxis TDD suite — multi-axis stepper planner built against the
+  white-paper steps in extras/doc/n_axes_whitepaper.md.
+  See extras/tests/pc_based/README_naxes.md for a full description of the
+  F1…F21 fixtures (ramp map kernel, remaining-steps lookahead, DDA walk,
+  Linear interpolator through SimPort, long polyline, rotordynamic plant).
+
+- test 27
+  PhysicalStepper rotordynamic plant test drive — exercises the opt-in
+  PhysicalStepper class (physical_stepper.h) against a shared 8-second
+  rest-to-rest profile:
+    accelerate 0 → 2000 step/s    (0.5 s), hold 2000 (1 s),
+    accelerate 2000 → 10000 step/s (0.5 s), coast 10000 (1 s),
+    coast 10000 (1 s) [stall case: half/full-step rotor slip],
+    decelerate 10000 → 2000, hold 2000 (3 s), decelerate 2000 → 0.
+
+  Core tests:
+   T1 – single pause (dwell): no stall, speed decays near zero
+   T2 – single slow step: rotor settles onto the command
+   T3 – gentle burst (64 steps @ 16000 ticks): never stalls
+   T4 – too-fast burst (80 steps @ 1 tick): reported as stall
+   T5 – forward-then-reversal position correct, no stall
+   T6 – canonical profile: never stalls, sim time matches, rotor lands
+        on commanded position, wav renders the whole move
+   T7 – weak motor (Fmax=2e-3) loses synchronism under same profile
+   T8 – over-drive outruns the rotor (emergent stall)
+   T9 – re-engagement latches onto a whole-step detent after stall
+   T10 – wav synthesis: RIFF header valid for moving and stalled plant
+   T12 – half-step slip (-32 steps) mid-coast stalls, then re-joins
+         the field at small speed and stops with it
+   T13 – full-step slip (-64 steps) loses exactly one step; rotor
+         keeps tracking (no runaway)
+
+  Output: gnuplot traces (test_27_trapezoid.dat / test_27_coast_stall.dat),
+  PNG plots, and .wav audio of the motor behaviour.
+
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration
   Usage: make ramp_helper && ./ramp_helper <speed_us> <acceleration> <steps>

@@ -339,13 +339,18 @@ law is `RampCalculator` on remaining master-steps; DDA is the
 **Also F20** (several hundred waypoints, one polyline):
 
 - Seeded LCG (`seed = 26`): 80 random blocks `|Δ_i| ∈ [1,12]`,
-  then a connecting block to `(1600,0)`, then a half-circle
-  `r = 1600` in 180 chords of 1°, then 80 more random blocks.
+  then a connecting block to `(4800,0)`, then a collinear
+  half-circle `r = 4800` in 190 chords, then 80 more random
+  blocks. The arc geometry must keep every integer joint inside
+  the 2° band (r=4800/190: max 1.61°, 0 path-stops); a 1° chord
+  at r=1600 is ~28 steps and ~60% of joints exceed 2°, so the arc
+  path-stops at every chord (a sawtooth, not a ramp).
 - `ticks = (4000, 8000)`, accel = 2000.
 - Assert: `n_blocks ≥ 200`; every vertex hit; envelope;
   law `P ≤ R`; reconstructed `P` within a 2-step log2 band;
   issued `|steps| == |Δ|`; at least one path-stop joint and
-  one collinear-cruise joint.
+  one collinear-cruise joint; the half-circle is collinear
+  (`Remaining::collinear_same_sense` on every interior arc joint).
 - Plot: `test_26_f20.gnuplot`.
 
 On the arc the DDA master switches; `P`/`R` stay in **path
@@ -1379,6 +1384,51 @@ read):**
   faded with a rotor-speed envelope (`kAudioW0`), so a move no longer fades in
   and out of a clipped/low-frequency rumble at the start and end of each ramp.
   `audio_sample_count()` / `audio_sample()` expose the PCM for the stereo mix.
+
+---
+
+## Step 14c — plot truth and arc smoothness (review round 2) ✅
+
+Review of the F7/F8/F12/F20 plots. Motion was correct; the reports were
+misleading or the fixture geometry was wrong. TDD: a failing assert per item,
+then the fix.
+
+- **F20 half-circle** — a 1° chord at r=1600 is ~28 steps, so integer
+  rounding pushed ~48/179 joints past the 2° collinear band and the arc
+  path-stopped at every chord (a sawtooth). Failing test:
+  `Remaining::collinear_same_sense` on every interior arc joint. Fix:
+  `build_f20_blocks` uses r=4800 / 190 chords (max joint 1.61°, arc length
+  < 2·P_stop) so the arc is one cruise and X/Y show the 0→max→0 ramp.
+- **F7/F8 performed ramp-up** — `performedRampUp()` is the *binder's* P, so
+  mirroring it on every axis jumped whenever the binder switched. Failing
+  test: per-axis P bounded and `p_per_axis`. Fix: `FasNAxis::
+  performedRampUpAxis(i)` / `remainingToStopAxis(i)` (Overshoot returns
+  `_ovs.P[i]` / `_ovs.R[i]`, Linear the shared path value); the F7/F8 plots
+  use the per-axis value.
+- **F12 DIR carve** — the carve shortens the last step by τ and pays it back
+  as a pause (tick sum `T_min`, §4.4.2), so the *commanded axis speed* (time
+  between step pulses) is unchanged; the plot showed the shortened period as a
+  one-command pulse. Failing test: no speed sample at the vertex above the
+  `T_min` speed. Fix: the F12 speed panel merges each step with its following
+  pauses (`1 / total ticks`), the period panel still shows the carved command.
+- The F10/F20_lin/F12 coast/pause zeroing and the F7 commanded-polyline offset
+  from the first review round are in the commit before this one.
+
+**Second review round (same step):**
+
+- **F12 period jump** — the carve shortened the last step by τ, so the period
+  dropped at the vertex (a one-step speed-up). Now the step keeps `T_min` and
+  the DIR pauses are appended (timeline grows by τ), matching the normal ramp
+  generator; the acceleration cap in `start_block` is gone. Tests: period never
+  drops; carve adds τ after the full step; reversing `clock()` = zero-budget +
+  τ; long-pause case.
+- **F21 physical panels** — the realized path / rotor speed plot is joined by
+  `test_26_f21_phys.gnuplot` (position, speed, step error, magnetic force,
+  friction, stall) from the plants' `trace_dump()` `.dat` files, test_27 style.
+- **F20 stereo wav** — `f20_physical_wav()` feeds the F20 polyline to a plant
+  per axis and writes `test_26_f20.wav` (X left, Y right).
+
+`make test` and `make mutations` are green.
 
 ---
 

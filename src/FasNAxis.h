@@ -387,6 +387,22 @@ class FasNAxis {
   uint32_t performedRampUp() const { return _P; }
   // Live remaining-to-stop of the master in path steps (section 8.2).
   uint32_t remainingToStop() const { return _R; }
+  // Per-axis diagnostics for the plots. Overshoot keeps one persistent P per
+  // axis (section 8.6), so two axes can differ at the same instant and a single
+  // scalar is only the binder's; Linear's P is the shared path ramp, so every
+  // axis reports the same value.
+  uint32_t performedRampUpAxis(uint8_t i) const {
+    if (i >= NAXES) {
+      return 0;
+    }
+    return overshoot_mode() ? _ovs.P[i] : _law.P;
+  }
+  uint32_t remainingToStopAxis(uint8_t i) const {
+    if (i >= NAXES) {
+      return 0;
+    }
+    return overshoot_mode() ? _ovs.R[i] : _law.R;
+  }
   // Period (ticks) of the last issued step entry.
   uint32_t lastTicks() const { return _ticks_last; }
   // DDA master axis of the current block (longest |delta|).
@@ -490,8 +506,10 @@ class FasNAxis {
   }
 
   // Arm the carve on axis i for the last old-direction step of period T. The
-  // shortened step is T - tau when that stays a legal slow step; otherwise the
-  // tail was too short and the step is held at the floor (the slice grows).
+  // step keeps its period T and the DIR pause (tau) is inserted after it, so
+  // the period never jumps and the reversing axis's timeline grows by tau. This
+  // matches the normal ramp generator (which injects a DIR pause rather than
+  // shortening a step). Section 4.4.2.
   void start_carve(uint8_t i, uint32_t T, bool new_up) {
     uint16_t before = 0;
     uint8_t n_before = 0;
@@ -501,19 +519,10 @@ class FasNAxis {
     if (tau == 0) {
       return;
     }
-    uint32_t floor = _tick_cfg[i] > (uint32_t)MIN_CMD_TICKS
-                         ? _tick_cfg[i]
-                         : (uint32_t)MIN_CMD_TICKS;
-    uint32_t reduced;
-    if (T > tau && T - tau >= floor) {
-      reduced = T - tau;
-    } else {
-      reduced = floor;  // short tail: the carve lengthens the slice
-    }
     Carve& c = _carve_axis[i];
     c.active = true;
     c.phase = 0;
-    c.step_left = reduced;
+    c.step_left = T;
     c.n_before = n_before;
     c.before = before;
     c.after = after;
@@ -772,32 +781,10 @@ class FasNAxis {
     }
     _ticks_law = t_law;
     int binder = Remaining::binder_axis(_blk[b], _tick_cfg, NAXES);
+    // The DIR pause is inserted *after* the last step (like the normal ramp
+    // generator), not carved out of it, so no acceleration cap is needed: the
+    // step keeps the period the ramp reaches and the pause is added (§4.4.2).
     uint32_t accel = _lim[binder].accel;
-    // If this block ends at a reversal with a DIR budget, the approach must
-    // reach a slow enough last period (§4.4.1). Cap the acceleration so the
-    // first-step period calculate_ticks(1) holds tau + the legal step floor.
-    for (uint8_t i = 0; i < NAXES; i++) {
-      if (!_registered[i] || !reverses_at_end(b, i)) {
-        continue;
-      }
-      uint32_t tau = reverse_tau(i);
-      if (tau == 0) {
-        continue;
-      }
-      uint32_t floor = _tick_cfg[i] > (uint32_t)MIN_CMD_TICKS
-                           ? _tick_cfg[i]
-                           : (uint32_t)MIN_CMD_TICKS;
-      uint32_t need = tau + floor;
-      uint32_t a = accel;
-      while (a > 1) {
-        RampMap probe(t_law, a);
-        if (probe.calculate_ticks(1) >= need) {
-          break;
-        }
-        a >>= 1;
-      }
-      accel = a;
-    }
     uint32_t R_new = remaining_path_steps(b);
     if (R_new == 0) {
       R_new = abs_u32(_blk[b][_master]);

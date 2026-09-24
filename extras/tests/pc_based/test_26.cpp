@@ -1370,8 +1370,15 @@ void f2ref_reference() {
 // chords, then seeded random again. Same seed (26) => identical polyline,
 // so both walkers run over the same committed blocks.
 static int build_f20_blocks(int32_t blocks[][2], int32_t* sum) {
-  const int32_t r = 1600;
-  const int n_arc = 180;
+  // r=4800 / 190 chords: a chord is ~79 steps, so the integer quantisation
+  // error (~1 step) stays under the 2 deg collinear band (max joint 1.61 deg)
+  // and the half-circle is one cruise. At r=1600 / 180 chords a 1 deg chord is
+  // only ~28 steps, the quantisation makes ~60% of joints >2 deg, and the arc
+  // path-stops at every chord. r=4800 also keeps the arc length (~15080) under
+  // 2*P_stop (~16000), so the path is a triangle (no coast plateau): a clean
+  // 0 -> max -> 0 ramp.
+  const int32_t r = 4800;
+  const int n_arc = 190;
   const int n_rand = 80;
   int n_blocks = 0;
   uint32_t rng = 26;
@@ -1421,7 +1428,7 @@ static int build_f20_blocks(int32_t blocks[][2], int32_t* sum) {
 void f20_long_polyline() {
   const uint32_t accel = 2000;
   const uint32_t ticks[2] = {4000, 8000};
-  int32_t blocks[400][2];
+  int32_t blocks[512][2];
   int32_t sum[2];
   int n_blocks = build_f20_blocks(blocks, sum);
 
@@ -1474,6 +1481,24 @@ void f20_long_polyline() {
   }
   test(n_stop >= 1, "F20 has a Linear path-stop joint");
   test(n_cruise >= 1, "F20 has a collinear cruise joint");
+  // The half-circle must be a single smooth arc: every interior arc joint is
+  // collinear, so `R` sees through the whole arc and the path cruises (X and Y
+  // speeds are one sine-like ramp 0 -> max -> 0). A 1 deg chord rounded to
+  // integers at r=1600 is only ~28 steps, so the quantisation makes ~60% of
+  // joints >2 deg and the arc path-stops at every chord -- a sawtooth, not a
+  // ramp. The generator must keep every arc joint inside the 2 deg band.
+  {
+    const int arc_first = 80 + 1;  // 80 random + 1 connecting block
+    const int arc_len = 190;
+    int arc_nonsmooth = 0;
+    for (int i = arc_first; i < arc_first + arc_len - 1; i++) {
+      if (!rem.collinear_same_sense(i, i + 1)) {
+        arc_nonsmooth++;
+      }
+    }
+    test(arc_nonsmooth == 0,
+         "F20 half-circle is collinear (no path-stop joint on the arc)");
+  }
   printf(
       "F20 blocks=%d vertices=%d stop_joints=%d cruise_joints=%d "
       "recon_slack=%u end=(%d,%d)\n",
@@ -1843,7 +1868,7 @@ void f2h_nblock_vs_f20() {
   // leaves the chord or skips a vertex is not Linear.
   const uint32_t accel = 2000;
   const uint32_t ticks[2] = {4000, 8000};
-  int32_t blocks[400][2];
+  int32_t blocks[512][2];
   int32_t sum[2];
   int n_blocks = build_f20_blocks(blocks, sum);
   test(n_blocks >= 200, "2h several hundred waypoints");
@@ -2673,6 +2698,50 @@ static bool gnuplot_has(const char* path, const char* needle) {
   return found;
 }
 
+// Max value of column `col` (1-based) among the data rows whose column 2 equals
+// `x` (within 0.5). Used to inspect a plotted speed at a known position, e.g.
+// the F12 reversal vertex.
+static double gnuplot_col_max_at_x(const char* path, double x, int col) {
+  FILE* f = fopen(path, "r");
+  if (f == NULL) {
+    return 0.0;
+  }
+  char line[512];
+  bool in_data = false;
+  double best = 0.0;
+  while (fgets(line, sizeof(line), f) != NULL) {
+    if (!in_data) {
+      if (strstr(line, "$data <<EOF") != NULL) {
+        in_data = true;
+      }
+      continue;
+    }
+    if (strncmp(line, "EOF", 3) == 0) {
+      break;
+    }
+    double c[12];
+    int n = 0;
+    char* p = line;
+    while (n < 12) {
+      char* end = NULL;
+      double v = strtod(p, &end);
+      if (end == p) {
+        break;
+      }
+      c[n++] = v;
+      p = end;
+    }
+    if (n >= col && fabs(c[1] - x) < 0.5) {
+      double v = fabs(c[col - 1]);
+      if (v > best) {
+        best = v;
+      }
+    }
+  }
+  fclose(f);
+  return best;
+}
+
 // Step 7 (whitepaper section 8): Linear lookahead across blocks through the
 // real feeder. F5 pins path-stop corners (P -> 0, decel starts on the side),
 // F9/F18 pin the time-law rebind (DDA master stays the longest |delta| while a
@@ -3186,21 +3255,6 @@ struct RevTrace {
   bool error;
 };
 
-// Capped acceleration the planner picks for a reversal budget (section 4.4.1):
-// halve until calculate_ticks(1) holds tau + the legal step floor.
-static uint32_t cap_accel_for_budget(uint32_t ticks_cfg, uint32_t accel,
-                                     uint32_t need) {
-  uint32_t a = accel;
-  while (a > 1) {
-    RampMap m(ticks_cfg, a);
-    if (m.calculate_ticks(1) >= need) {
-      break;
-    }
-    a >>= 1;
-  }
-  return a;
-}
-
 // Run a Linear out-and-back on X with the given DIR budget; record the raw
 // command streams and the per-iteration XY/clock samples.
 static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
@@ -3370,9 +3424,12 @@ void f9_dir_pauses() {
 
     int k = last_old_step(&tr);
     test(k >= 0, "F12 there is a last old-direction X step");
-    // The carved last step is shortened by tau.
-    test(tr.x[k].ticks == T_min - tau,
-         "F12 last old step shortened by tau (T_min - tau)");
+    // The last old-direction step keeps its ramp period (like the normal ramp
+    // generator): the DIR pause is inserted *after* it, not carved out of it.
+    test(tr.x[k].ticks == T_min,
+         "F12 last old step is not shortened (period stays T_min)");
+    test(k >= 1 && tr.x[k].ticks >= tr.x[k - 1].ticks,
+         "F12 no period jump at the reversal (period never drops)");
     // Before-pause: old DIR, 3200. After-pause: new DIR, 3200.
     test(k + 2 < tr.nx, "F12 the carve has before and after pauses");
     test(
@@ -3382,8 +3439,8 @@ void f9_dir_pauses() {
         tr.x[k + 2].steps == 0 && !tr.x[k + 2].up && tr.x[k + 2].ticks == after,
         "F12 after-pause new DIR of 3200");
     test((uint32_t)tr.x[k].ticks + tr.x[k + 1].ticks + tr.x[k + 2].ticks ==
-             T_min,
-         "F12 the three tick sums equal the original last-step ticks");
+             T_min + tau,
+         "F12 the carve adds tau after the full last step");
     // The following X step is the new direction.
     int k_next = k + 3;
     test(k_next < tr.nx && tr.x[k_next].steps != 0 && !tr.x[k_next].up,
@@ -3402,8 +3459,10 @@ void f9_dir_pauses() {
       }
     }
     test(y_same, "F12 idle Y trace is unchanged: no DIR pause copied onto Y");
-    test(tr.clkx == tr0.clkx && tr.clky == tr0.clky,
-         "F12 clock() equals the same move with a zero budget");
+    // The reversing axis's clock grows by exactly tau (the DIR pause); the idle
+    // axis is untouched (the timeline added only the pause, no shortened step).
+    test(tr.clkx == tr0.clkx + tau && tr.clky == tr0.clky,
+         "F12 reversing clock grows by tau; the other axis is unchanged");
 
     // The plot: XY plus the period samples on the reversing axis.
     NaxisPlot plot;
@@ -3412,13 +3471,31 @@ void f9_dir_pauses() {
     plot.poly_point((double)move, 0.0);
     plot.poly_point(0.0, 0.0);
     plot.poly_done();
+    // The speed panel shows the *axis* speed (time between consecutive step
+    // pulses). The carve keeps the last step at T_min and inserts the DIR pause
+    // after it, so the next step comes after T_min + tau and the speed at the
+    // reversal is lower, never a pulse. Merge each step with the pauses that
+    // follow it; the period panel still shows the full step then the pauses.
+    static double vs[6000];
     for (int j = 0; j < tr.ns; j++) {
-      // A pause (steps == 0) is a delay, not motion: the carve's 3200-tick
-      // before/after pauses must not plot as 5000 step/s.
-      double v = (tr.s[j].steps > 0 && tr.s[j].ticks > 0)
-                     ? NAXIS_PLOT_TICKS_PER_S / (double)tr.s[j].ticks
-                     : 0.0;
-      double speed[2] = {v, 0.0};
+      vs[j] = 0.0;
+    }
+    for (int j = 0; j < tr.ns;) {
+      if (tr.s[j].steps == 0) {
+        j++;
+        continue;
+      }
+      uint32_t sum = tr.s[j].ticks;
+      int nxt = j + 1;
+      while (nxt < tr.ns && tr.s[nxt].steps == 0) {
+        sum += tr.s[nxt].ticks;
+        nxt++;
+      }
+      vs[j] = sum > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)sum : 0.0;
+      j = nxt;
+    }
+    for (int j = 0; j < tr.ns; j++) {
+      double speed[2] = {vs[j], 0.0};
       double P[2] = {0.0, 0.0};
       double R[2] = {0.0, 0.0};
       double tickc[2] = {(double)tr.s[j].ticks, 0.0};
@@ -3426,11 +3503,19 @@ void f9_dir_pauses() {
                R, tickc);
     }
     plot.finish_plot();
+    // No axis-speed pulse at the carve: the plotted speed at the vertex must
+    // stay at the slow T_min speed, not spike.
+    double v_ref = NAXIS_PLOT_TICKS_PER_S / (double)T_min;
+    double v_carve =
+        gnuplot_col_max_at_x("test_26_f12.gnuplot", (double)move, 5);
+    test(v_carve <= v_ref * 1.05,
+         "F12 plot: axis speed at the carve respects the pause (no pulse)");
     printf(
         "F9 F12 carve: T_min=%u step=%u before=%u after=%u "
-        "clocks=(%llu,%llu)\n",
+        "clocks=(%llu,%llu) v_at_vertex=%.1f v_ref=%.1f\n",
         T_min, tr.x[k].ticks, tr.x[k + 1].ticks, tr.x[k + 2].ticks,
-        (unsigned long long)tr.clkx, (unsigned long long)tr.clky);
+        (unsigned long long)tr.clkx, (unsigned long long)tr.clky, v_carve,
+        v_ref);
     printf("F12 DIR carve plot written: test_26_f12.gnuplot\n");
   }
 
@@ -3488,8 +3573,8 @@ void f9_dir_pauses() {
     int k = last_old_step(&tr);
     int k0 = last_old_step(&tr0);
     test(k >= 0 && k0 >= 0, "F12b X has a last old-direction step");
-    test(tr.x[k].ticks == (uint32_t)tr0.x[k0].ticks - tau,
-         "F12b X last step shortened by tau");
+    test(tr.x[k].ticks == (uint32_t)tr0.x[k0].ticks,
+         "F12b X last step keeps its period (not shortened)");
     test(k + 2 < tr.nx, "F12b X has the before and after pauses");
     test(
         tr.x[k + 1].steps == 0 && tr.x[k + 1].up && tr.x[k + 1].ticks == before,
@@ -3498,8 +3583,8 @@ void f9_dir_pauses() {
         tr.x[k + 2].steps == 0 && !tr.x[k + 2].up && tr.x[k + 2].ticks == after,
         "F12b after-pause new DIR");
     test((uint32_t)tr.x[k].ticks + tr.x[k + 1].ticks + tr.x[k + 2].ticks ==
-             (uint32_t)tr0.x[k0].ticks,
-         "F12b the carve keeps the last-step tick sum");
+             (uint32_t)tr0.x[k0].ticks + tau,
+         "F12b the carve adds tau after the full last step");
     // Y gains no DIR pause of the budget length and is bit-identical to the
     // zero-budget dog-leg: the continuing axis keeps its planned steps.
     test(!has_pause(tr.y, tr.ny, (uint16_t)before),
@@ -3518,36 +3603,27 @@ void f9_dir_pauses() {
            tr.ny, k, tr.x[k].ticks, tr0.x[k0].ticks);
   }
 
-  // --- Tail too short: a budget larger than the natural slow period. The
-  // planner caps acceleration so the last step still holds the budget; the
-  // carve keeps the F12 shape and Y gains no DIR pause. ---------------------
+  // --- Budget larger than the natural slow period: the step keeps its period
+  // and the (longer) DIR pause is added after it, no acceleration cap. -------
   {
     const uint16_t big_before = 50000;
     const uint16_t big_after = 0;
-    uint32_t need = (uint32_t)big_before + ticks_cfg;  // tau + floor
-    uint32_t cap_accel = cap_accel_for_budget(ticks_cfg, accel, need);
-    uint32_t T_cap = RampMap(ticks_cfg, cap_accel).calculate_ticks(1);
-    test(T_cap >= need, "F12 short tail: capped accel holds tau + floor");
-    test(cap_accel < accel, "F12 short tail: acceleration was capped");
-
     static RevTrace tr;
     run_reversal(big_before, 1, big_after, accel, move, 64, &tr);
-    test(!tr.error, "F12 short tail run does not error");
-    test(tr.pxe == 0 && tr.pye == 0, "F12 short tail both axes end on target");
+    test(!tr.error, "F12 long pause run does not error");
+    test(tr.pxe == 0 && tr.pye == 0, "F12 long pause both axes end on target");
     int k = last_old_step(&tr);
-    test(k >= 0, "F12 short tail has a last old-direction step");
-    test(tr.x[k].ticks == T_cap - big_before,
-         "F12 short tail shortened step = T_min_capped - tau");
+    test(k >= 0, "F12 long pause has a last old-direction step");
+    test(tr.x[k].ticks == T_min,
+         "F12 long pause: step keeps its natural period");
     test(k + 1 < tr.nx && tr.x[k + 1].steps == 0 && tr.x[k + 1].up &&
              tr.x[k + 1].ticks == big_before,
-         "F12 short tail before-pause of tau on X only");
-    test((uint32_t)tr.x[k].ticks + tr.x[k + 1].ticks == T_cap,
-         "F12 short tail tick sum unchanged at T_min_capped");
+         "F12 long pause before-pause of tau on X only");
     // Y still gains no DIR pause: no pause of the budget length appears.
     test(!has_pause(tr.y, tr.ny, big_before),
-         "F12 short tail: Y gains no DIR pause");
-    printf("F9 F12 short tail: cap_accel=%u T_cap=%u step=%u before=%u\n",
-           cap_accel, T_cap, tr.x[k].ticks, tr.x[k + 1].ticks);
+         "F12 long pause: Y gains no DIR pause");
+    printf("F9 F12 long pause: T_min=%u step=%u before=%u\n", T_min,
+           tr.x[k].ticks, tr.x[k + 1].ticks);
   }
 
   printf("F12/F12b/F12c DIR pause carve green\n");
@@ -3789,6 +3865,9 @@ struct OvershootPolyResult {
   int n_vertices;
   bool all_vertices;
   bool underrun;
+  uint32_t max_axis_p[2];  // peak per-axis performed ramp-up
+  bool p_per_axis;         // the two axes had different P at some sample
+  bool scalar_eq_binder;   // performedRampUp() == performedRampUpAxis(master)
 };
 
 template <uint16_t H>
@@ -3805,6 +3884,10 @@ static void run_overshoot_polyline(SimPort& px, SimPort& py,
   res->n_vertices = 0;
   res->all_vertices = false;
   res->underrun = false;
+  res->max_axis_p[0] = 0;
+  res->max_axis_p[1] = 0;
+  res->p_per_axis = false;
+  res->scalar_eq_binder = true;
 
   NaxisPlot plot;
   if (do_plot) {
@@ -3872,6 +3955,27 @@ static void run_overshoot_polyline(SimPort& px, SimPort& py,
         chord++;
       }
     }
+    // Per-axis performed ramp-up: in Overshoot each axis rides its own
+    // persistent P, while performedRampUp() reports only the *binding* axis.
+    // A plot that mirrors that single scalar on every axis jumps whenever the
+    // binder switches; collect the per-axis value instead.
+    {
+      uint32_t pa = path.performedRampUpAxis(0);
+      uint32_t pb = path.performedRampUpAxis(1);
+      if (pa > res->max_axis_p[0]) {
+        res->max_axis_p[0] = pa;
+      }
+      if (pb > res->max_axis_p[1]) {
+        res->max_axis_p[1] = pb;
+      }
+      if (pa != pb) {
+        res->p_per_axis = true;
+      }
+      if (path.performedRampUp() !=
+          path.performedRampUpAxis(path.masterAxis())) {
+        res->scalar_eq_binder = false;
+      }
+    }
     if (do_plot) {
       uint32_t clk = px.clock();
       double dt = (double)(clk - last_clock) / NAXIS_PLOT_TICKS_PER_S;
@@ -3886,10 +3990,10 @@ static void run_overshoot_polyline(SimPort& px, SimPort& py,
       if ((iter % kPlotStride) == 0 && have_sample) {
         double speed[2] = {ema_v[0], ema_v[1]};
         uint32_t ticks = path.lastTicks();
-        double Pcol[2] = {(double)path.performedRampUp(),
-                          (double)path.performedRampUp()};
-        double Rcol[2] = {(double)path.remainingToStop(),
-                          (double)path.remainingToStop()};
+        double Pcol[2] = {(double)path.performedRampUpAxis(0),
+                          (double)path.performedRampUpAxis(1)};
+        double Rcol[2] = {(double)path.remainingToStopAxis(0),
+                          (double)path.remainingToStopAxis(1)};
         double tcol[2] = {(double)ticks, (double)ticks};
         plot.row((double)clk / NAXIS_PLOT_TICKS_PER_S, (double)x, (double)y,
                  0.0, speed, Pcol, Rcol, tcol);
@@ -4053,7 +4157,21 @@ static void f12_overshoot_corners() {
          "F12 F7 every chord vertex sampled");
     test(res.max_d2 <= 64.0 + 1e-9, "F12 F7 chord d^2 <= 64");
     test(res.underrun == false, "F12 F7 no underrun");
-    printf("F12 F7 circle: ovs=%u max_d2=%.3f\n", px.clock(), res.max_d2);
+    // Per-axis performed ramp-up: the reported P must not be a single binder
+    // scalar mirrored onto both axes (that is what made the F7/F8 plot jump at
+    // every chord). Each axis has its own P, bounded by its own P_stop.
+    {
+      uint32_t pc0 = RampMap(ticks[0], accel[0]).P_coast();
+      uint32_t pc1 = RampMap(ticks[1], accel[1]).P_coast();
+      test(res.max_axis_p[0] <= pc0 + 2 && res.max_axis_p[1] <= pc1 + 2,
+           "F12 F7 per-axis P is bounded by that axis's P_stop");
+      test(res.p_per_axis, "F12 F7 performed ramp-up is per-axis");
+      test(res.scalar_eq_binder,
+           "F12 F7 performedRampUp() is the binder axis's P");
+    }
+    printf("F12 F7 circle: ovs=%u max_d2=%.3f maxP=(%u,%u) per_axis=%d\n",
+           px.clock(), res.max_d2, res.max_axis_p[0], res.max_axis_p[1],
+           res.p_per_axis ? 1 : 0);
   }
 
   printf("F6/F6b/F7 Overshoot corners green\n");
@@ -4619,12 +4737,14 @@ void f14_helix() {
               tcol[i] =
                   d[i] != 0.0 ? dt * NAXIS_PLOT_TICKS_PER_S / fabs(d[i]) : 0.0;
             }
-            double Pcol[3] = {(double)path.performedRampUp(),
-                              (double)path.performedRampUp(),
-                              (double)path.performedRampUp()};
-            double Rcol[3] = {(double)path.remainingToStop(),
-                              (double)path.remainingToStop(),
-                              (double)path.remainingToStop()};
+            // Per-axis P/R: in Overshoot each axis has its own P, so mirroring
+            // the binder scalar would jump at every chord.
+            double Pcol[3] = {(double)path.performedRampUpAxis(0),
+                              (double)path.performedRampUpAxis(1),
+                              (double)path.performedRampUpAxis(2)};
+            double Rcol[3] = {(double)path.remainingToStopAxis(0),
+                              (double)path.remainingToStopAxis(1),
+                              (double)path.remainingToStopAxis(2)};
             plot.row(tt, (double)x, (double)y, 0.0, speed, Pcol, Rcol, tcol);
           }
         }
@@ -4803,6 +4923,46 @@ static bool write_stereo_wav(const char* path, const PhysicalStepper& left,
   return true;
 }
 
+// Physical-motor multi-panel figure for F21, from the two plants' traces
+// (test_27 style). Dat columns: 1:t 2:x 3:x_c 4:delta 5:w 6:a 7:tau
+// 8:friction 9:stall 10:phase.
+static void write_phys_gnuplot() {
+  FILE* g = fopen("test_26_f21_phys.gnuplot", "w");
+  if (g == NULL) {
+    return;
+  }
+  fprintf(
+      g,
+      "set term pngcairo size 1600,1400\n"
+      "set output \"test_26_f21_phys.gnuplot.png\"\n"
+      "set multiplot layout 3,2 title \"F21 PhysicalStepper: X (left) / Y "
+      "(right) rotor\"\n"
+      "set xlabel \"t [s]\"\n"
+      "set title \"rotor and commanded position [steps]\"\n"
+      "plot \"test_26_f21_x.dat\" using 1:2 with lines title \"X rotor\", "
+      "\"test_26_f21_y.dat\" using 1:2 with lines title \"Y rotor\", "
+      "\"test_26_f21_x.dat\" using 1:3 with lines dt 2 title \"X cmd\", "
+      "\"test_26_f21_y.dat\" using 1:3 with lines dt 2 title \"Y cmd\"\n"
+      "set title \"rotor speed [steps/s]\"\n"
+      "plot \"test_26_f21_x.dat\" using 1:5 with lines title \"X w\", "
+      "\"test_26_f21_y.dat\" using 1:5 with lines title \"Y w\"\n"
+      "set title \"step error x - x_c [steps]\"\n"
+      "plot \"test_26_f21_x.dat\" using 1:4 with lines title \"X delta\", "
+      "\"test_26_f21_y.dat\" using 1:4 with lines title \"Y delta\"\n"
+      "set title \"magnetic force tau\"\n"
+      "plot \"test_26_f21_x.dat\" using 1:7 with lines title \"X tau\", "
+      "\"test_26_f21_y.dat\" using 1:7 with lines title \"Y tau\"\n"
+      "set title \"friction force\"\n"
+      "plot \"test_26_f21_x.dat\" using 1:8 with lines title \"X friction\", "
+      "\"test_26_f21_y.dat\" using 1:8 with lines title \"Y friction\"\n"
+      "set title \"stall observation (1 = slipping)\"\n"
+      "set yrange [0:1.1]\nset ytics 0,0.5,1\n"
+      "plot \"test_26_f21_x.dat\" using 1:9 with lines title \"X stall\", "
+      "\"test_26_f21_y.dat\" using 1:9 with lines title \"Y stall\"\n"
+      "unset yrange\nunset multiplot\nunset output\n");
+  fclose(g);
+}
+
 // F21 (physical_stepper_whitepaper sections 2.2 / 13.3): couple the FasNAxis
 // planner to the opt-in rotordynamic plant. Each axis's SimPort gets a
 // PhysicalStepper, so the commands the feeder emits drive a real rotor: the
@@ -4810,9 +4970,11 @@ static bool write_stereo_wav(const char* path, const PhysicalStepper& left,
 // the plant supplies the realized, lagging position and the acoustic
 // emission. The F5 Linear square (1600 steps per side, ticks 4000, accel
 // 2000) is driven with a plant on X and Y; the realized path, the
-// commanded-minus-realized deviation and the rotor speeds are plotted, and
-// each axis's audio is rendered to its own wav. F21 is the only fixture that
-// attaches a plant, so the default suite stays bit-identical.
+// commanded-minus-realized deviation and the rotor speeds are plotted
+// (test_26_f21.gnuplot), the full physical trace (position/error/speed/accel/
+// force/friction/stall) is written to test_26_f21_phys.gnuplot, and the audio
+// is one stereo wav (X left, Y right). F21 is the only fixture that attaches a
+// plant, so the default suite stays bit-identical.
 void f21_physical() {
   int32_t verts[5][2] = {{0, 0}, {1600, 0}, {1600, 1600}, {0, 1600}, {0, 0}};
 
@@ -4844,6 +5006,10 @@ void f21_physical() {
   double max_dx = 0.0, max_dy = 0.0, max_dev = 0.0;
   double max_vx = 0.0, max_vy = 0.0;
   int64_t iter = 0;
+  // Record the rotordynamic traces (position/error/speed/accel/force/friction/
+  // stall) for the physical-motor figure.
+  rotor_x.trace_begin(2);
+  rotor_y.trace_begin(2);
   // Drain the two queues in lockstep, exactly as run_linear_segment does; the
   // plant advances once per consumed command, so its clock tracks px.clock().
   while (path.isBusy()) {
@@ -4885,9 +5051,16 @@ void f21_physical() {
   }
   plot.finish_plot();
 
-  // One stereo wav: X on the left channel, Y on the right.
+  // Physical-motor panels (test_27 style) and the stereo wav (X left, Y right).
+  size_t rows_x = rotor_x.trace_dump("test_26_f21_x.dat");
+  size_t rows_y = rotor_y.trace_dump("test_26_f21_y.dat");
+  write_phys_gnuplot();
   bool wav = write_stereo_wav("test_26_f21.wav", rotor_x, rotor_y);
   int peak = phys_wav_peak("test_26_f21.wav");
+  test(rows_x > 100 && rows_y > 100,
+       "F21 physical trace rows written for both rotors");
+  printf("F21 physical panels: test_26_f21_phys.gnuplot (%zu/%zu rows)\n",
+         rows_x, rows_y);
 
   printf(
       "F21 physical square: max|dx|=%.3f max|dy|=%.3f max_dev=%.3f "
@@ -4910,6 +5083,46 @@ void f21_physical() {
   printf(
       "F21 plot written: test_26_f21.gnuplot; wav (stereo X=left Y=right): "
       "test_26_f21.wav\n");
+}
+
+// F20 through the physical plant: the same polyline (random walk + collinear
+// half-circle + random walk) is fed to a plant on each axis solely to render
+// the motor sound. test_26_f20.wav is stereo (X left, Y right).
+static void f20_physical_wav() {
+  int32_t blocks[512][2];
+  int32_t sum[2];
+  int n_blocks = build_f20_blocks(blocks, sum);
+
+  SimPort px(4000), py(8000);
+  PhysicalStepper rotor_x, rotor_y;
+  px.setPhysicalStepper(&rotor_x);
+  py.setPhysicalStepper(&rotor_y);
+  FasNAxisConfig cfg;
+  FasNAxis<2, 512, SimPort> path(cfg);
+  test(path.addAxis(0, &px) == true, "F20 phys addAxis(0)");
+  test(path.addAxis(1, &py) == true, "F20 phys addAxis(1)");
+  int32_t cur[2] = {0, 0};
+  path.setCurrentPosition(cur);
+  int32_t wx = 0, wy = 0;
+  for (int b = 0; b < n_blocks; b++) {
+    wx += blocks[b][0];
+    wy += blocks[b][1];
+    int32_t t[2] = {wx, wy};
+    test(path.addLine(t) == true, "F20 phys addLine fits");
+  }
+  path.endPath();
+  while (path.isBusy()) {
+    px.drain_one();
+    py.drain_one();
+    path.pump();
+  }
+  bool wav = write_stereo_wav("test_26_f20.wav", rotor_x, rotor_y);
+  int peak = phys_wav_peak("test_26_f20.wav");
+  test(wav && peak > 1000, "F20 stereo wav written and audible");
+  test(!rotor_x.stall_ever() && !rotor_y.stall_ever(),
+       "F20 physical run does not stall");
+  printf("F20 physical wav: test_26_f20.wav peak=%d blocks=%d\n", peak,
+         n_blocks);
 }
 #endif  // FAS_PHYSICAL_STEPPER_ENABLED
 
@@ -4942,6 +5155,7 @@ int main() {
   f13_lookahead();
   f14_helix();
 #ifdef FAS_PHYSICAL_STEPPER_ENABLED
+  f20_physical_wav();
   f21_physical();
 #endif
   f16_skeleton();
