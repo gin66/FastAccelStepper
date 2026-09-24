@@ -20,6 +20,13 @@
 #define TICKS_TO_US(u32) ((u32) / 21)
 #else
 #define SUPPORT_LOG2_TIMER_FREQ_VARIABLES
+// Declared here (not in RampGenerator.h, which includes this file before
+// its own copy of these declarations) because the inline methods below -
+// evaluated as soon as this header is parsed - already need them.
+// Defined (non-static, exactly once) in RampControl.cpp.
+extern log2_value_t log2_timer_freq;
+extern log2_value_t log2_timer_freq_div_sqrt_of_2;
+extern log2_value_t log2_timer_freq_square_div_2;
 #define LOG2_TICKS_PER_S log2_timer_freq
 #define LOG2_TICKS_PER_S_DIV_SQRT_OF_2 log2_timer_freq_div_sqrt_of_2
 #define LOG2_ACCEL_FACTOR log2_timer_freq_square_div_2

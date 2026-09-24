@@ -1,4 +1,5 @@
-pre-1.3.4:
+1.3.4:
+- Teensy 4.0/4.1 support (EXPERIMENTAL): new pd_teensy backend, up to 16 steppers via the i.MX RT1062 QuadTimer modules
 - getDirChangeBeforeTicks() / getDirChangeBeforePauseCount() / getDirChangeAfterTicks(): planner-facing DIR pause budget (driver drain + user dir_change_delay from setDirectionPin())
 
 1.3.3:

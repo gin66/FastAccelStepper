@@ -7,11 +7,9 @@
 
 class FastAccelStepper;
 
-#ifdef SUPPORT_LOG2_TIMER_FREQ_VARIABLES
-extern log2_value_t log2_timer_freq;
-extern log2_value_t log2_timer_freq_div_sqrt_of_2;
-extern log2_value_t log2_timer_freq_square_div_2;
-#endif
+// log2_timer_freq and friends (when SUPPORT_LOG2_TIMER_FREQ_VARIABLES is
+// defined) are declared in RampCalculator.h, included above - that header's
+// own inline methods need them declared before this point, not after.
 
 class RampGenerator {
  private:

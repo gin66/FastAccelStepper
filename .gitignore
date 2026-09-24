@@ -25,6 +25,8 @@ extras/tests/pc_based/*.gnuplot
 extras/tests/pc_based/*_test
 extras/tests/pc_based/test.log
 extras/tests/pc_based/*.png
+extras/tests/pc_based/*.wav
+extras/tests/pc_based/*.dat
 extras/tests/simavr_based/*/FastAccelStepper
 extras/tests/simavr_based/*/result.txt
 extras/tests/simavr_based/*/x.vcd
