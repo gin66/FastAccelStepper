@@ -84,14 +84,22 @@ test_24: test_24.o
 test_25: test_25.o
 	g++ -o $@ $< $(LDLIBS)
 
-# test_27 links the physical_stepper audio recorder, which uses std::vector;
-# link it with g++ so libc++ is pulled in.
+# The physical stepper test_26 build links the plant, which uses std::vector,
+# so it links with g++ (not the plain gcc test_% rule), pulling in libc++.
 test_27: test_27.o $(LIB_O)
 	g++ -o $@ $< $(LIB_O) $(LDLIBS)
 
 # The plant header must be a dependency so edits to it rebuild the test.
 test_27.o: test_27.cpp physical_stepper.h $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
+
+test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
+	g++ -c $(CXXFLAGS) -o $@ $<
+
+# The test_26 build links the plant (std::vector), so it must link with g++
+# rather than the plain gcc test_% rule.
+test_26: test_26.o $(LIB_O)
+	g++ -o $@ $< $(LIB_O) $(LDLIBS)
 
 test_%: test_%.o $(LIB_O)
 	gcc -o $@ $< $(LIB_O) $(LDLIBS)
@@ -101,6 +109,7 @@ test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 
 # FasNAxis headers: test_26 includes them, so a header-only change must rebuild.
 test_26.o: naxis_plot.h naxis_sim_port.h naxis_ref.h naxis_html_dump.h \
+	physical_stepper.h \
 	$(PRJ_ROOT)/src/FasNAxis.h \
 	$(PRJ_ROOT)/src/fas_naxis/remaining.h \
 	$(PRJ_ROOT)/src/fas_naxis/ramp_law.h \
@@ -164,4 +173,4 @@ StepperISR_test.o: StepperISR_test.cpp $(SRC_LIB_H)
 VERSION=$(shell git rev-parse --short HEAD)
 
 clean: clean_coverage
-	rm -f *.o test_[0-9][0-9] test_26_FAS_NAXIS_* *.gnuplot *.png log2_test rmc_test test.log
+	rm -f *.o test_[0-9][0-9] test_26_FAS_NAXIS_* *.gnuplot *.png *.wav *.dat log2_test rmc_test test.log

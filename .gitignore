@@ -1,6 +1,7 @@
 *.swp
 *.o
 *.gnuplot
+*.wav
 .pio
 .dir
 .tested

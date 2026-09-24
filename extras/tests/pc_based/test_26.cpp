@@ -9,6 +9,18 @@
 // Later steps add F1..F19 sections to main() in order; each writes
 // test_26_fN.gnuplot via NaxisPlot. Failure aborts the run through the
 // test() macro.
+//
+// Opt into the rotordynamic plant (physical_stepper_whitepaper section 3.1 /
+// 13.3) so F21 can attach a PhysicalStepper to each axis's SimPort. Only F21
+// attaches a plant; every other fixture keeps the ideal SimPort counter
+// bit-identical. The plant is header-only and uses std::vector, so the
+// Makefile links test_26 with g++ rather than the plain gcc test_% rule.
+#define FAS_PHYSICAL_STEPPER_ENABLED 1
+// <vector> (pulled in by physical_stepper.h) must precede the PC test shim's
+// function-like `test` macro: libc++'s <atomic> reaches <vector> and the macro
+// would corrupt std::atomic_flag member names.
+#include <vector>
+
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -1163,9 +1175,24 @@ static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
   *n_vertex = 0;
   uint32_t last_moving_p = 0;
   uint32_t slack = 0;
+  // Plot speed smoothing. The per-command pulse rate is noisy: the DDA master
+  // alternates, a multi-step catch-up is one short command, and the old code
+  // zeroed speed whenever the issued period equalled ticks_cfg -- which is
+  // exactly a coast, so every cruise looked like a stop. Track each axis's
+  // position delta per command and low-pass it (EMA, time constant
+  // kSpeedTau_s), sampling the smoothed value every kPlotStride commands.
+  // P and R are path-level (path steps), the DDA binder's currency.
+  const int kPlotStride = 8;
+  const double kSpeedTau_s = 0.02;
+  int sample_n = 0;
+  int32_t last_pos[2] = {0, 0};
+  uint64_t last_ticks = 0;
+  double ema_v[2] = {0.0, 0.0};
+  bool have_sample = false;
   if (plot) {
     double z[2] = {0.0, 0.0};
     plot->row(0.0, 0.0, 0.0, 0.0, z, z, z, z);
+    have_sample = true;
   }
   while (!ref.done()) {
     int step_out[2];
@@ -1177,7 +1204,11 @@ static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
     pos[0] += step_out[0];
     pos[1] += step_out[1];
     RampMap map(t_law, accel);
-    uint32_t p_issued = map.calculate_ramp_steps(ticks_issued);
+    uint32_t p_issued =
+        ticks_issued > 0 ? map.calculate_ramp_steps(ticks_issued) : 0;
+    // A coast issues the max-speed period, which is not a "rest"; the original
+    // `rest` classification (period == max) stays for the assertion gating, but
+    // it must no longer drive the plot speed (that is what zeroed every coast).
     bool rest = (ticks_issued == t_law);
     if (!rest) {
       // calculate_ramp_steps o calculate_ticks may land one step high
@@ -1200,20 +1231,26 @@ static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
       }
     }
     if (plot) {
-      double t = (double)ref.total_ticks / NAXIS_PLOT_TICKS_PER_S;
-      double v = (p_issued == 0 || rest)
-                     ? 0.0
-                     : NAXIS_PLOT_TICKS_PER_S / (double)ticks_issued;
-      double speed[2] = {ref.master == 0 ? v : 0.0, ref.master == 1 ? v : 0.0};
-      double Pcol[2] = {ref.master == 0 ? (double)p_issued : 0.0,
-                        ref.master == 1 ? (double)p_issued : 0.0};
-      double Rcol[2] = {ref.master == 0 ? (double)ref.R : 0.0,
-                        ref.master == 1 ? (double)ref.R : 0.0};
-      double tickscol[2] = {ref.master == 0 ? (double)ticks_issued : 0.0,
-                            ref.master == 1 ? (double)ticks_issued : 0.0};
-      plot->row(t, (double)pos[0], (double)pos[1], 0.0, speed, Pcol, Rcol,
-                tickscol);
+      uint64_t now_ticks = ref.total_ticks;
+      double dt = (double)(now_ticks - last_ticks) / NAXIS_PLOT_TICKS_PER_S;
+      if (dt > 0.0) {
+        double alpha = dt / (kSpeedTau_s + dt);
+        ema_v[0] += alpha * ((double)(pos[0] - last_pos[0]) / dt - ema_v[0]);
+        ema_v[1] += alpha * ((double)(pos[1] - last_pos[1]) / dt - ema_v[1]);
+      }
+      last_pos[0] = pos[0];
+      last_pos[1] = pos[1];
+      last_ticks = now_ticks;
+      if ((sample_n % kPlotStride) == 0 && have_sample) {
+        double speed[2] = {ema_v[0], ema_v[1]};
+        double Pcol[2] = {(double)p_issued, (double)p_issued};
+        double Rcol[2] = {(double)ref.R, (double)ref.R};
+        double tickscol[2] = {(double)ticks_issued, (double)ticks_issued};
+        plot->row((double)now_ticks / NAXIS_PLOT_TICKS_PER_S, (double)pos[0],
+                  (double)pos[1], 0.0, speed, Pcol, Rcol, tickscol);
+      }
     }
+    sample_n++;
     if (ref.dda.done()) {
       if (*n_vertex < max_vertex) {
         vertex_p[*n_vertex] = last_moving_p;
@@ -2519,6 +2556,15 @@ static void walk_prod_polyline(SimPort& px, SimPort& py,
   int next_vertex = 1;
   uint32_t last_moving_p = 0;
   int i = 0;
+  // EMA-smoothed per-axis realized speed (see walk_polyline): a per-command
+  // pulse rate is noisy, and the old `rest = (T == t_law)` zeroed every coast.
+  const int kPlotStride = 8;
+  const double kSpeedTau_s = 0.02;
+  int sample_n = 0;
+  int32_t last_pos[2] = {0, 0};
+  uint64_t last_ticks = 0;
+  double ema_v[2] = {0.0, 0.0};
+  bool have_sample = true;
   while (!ref.done()) {
     int os[2];
     uint32_t T_ref = ref.step(os);
@@ -2541,8 +2587,11 @@ static void walk_prod_polyline(SimPort& px, SimPort& py,
       res->trace_match = false;
     }
     uint32_t p_issued = map.calculate_ramp_steps(T_prod);
-    bool rest = (T_prod == t_law);  // period at P == 0
-    if (!rest) {
+    // The coalesced command always carries motion (zero-step entries were
+    // skipped above); `is_pause` is the real "no motion" test, unlike the old
+    // `T_prod == t_law`, which is a coast.
+    bool is_pause = (ps0 == 0 && ps1 == 0);
+    if (!is_pause) {
       last_moving_p = p_issued;
       if (p_issued > res->max_moving_p) {
         res->max_moving_p = p_issued;
@@ -2563,14 +2612,26 @@ static void walk_prod_polyline(SimPort& px, SimPort& py,
     res->issued[1] += ps1;
     res->n_cmd++;
     if (do_plot) {
-      double t = (double)ref.total_ticks / NAXIS_PLOT_TICKS_PER_S;
-      double v = rest ? 0.0 : NAXIS_PLOT_TICKS_PER_S / (double)T_prod;
-      double speed[2] = {v, v};
-      double Pcol[2] = {(double)p_issued, (double)p_issued};
-      double Rcol[2] = {(double)ref.R, (double)ref.R};
-      double tcol[2] = {(double)T_prod, (double)T_prod};
-      plot.row(t, (double)pos[0], (double)pos[1], 0.0, speed, Pcol, Rcol, tcol);
+      uint64_t now_ticks = ref.total_ticks;
+      double dt = (double)(now_ticks - last_ticks) / NAXIS_PLOT_TICKS_PER_S;
+      if (dt > 0.0) {
+        double alpha = dt / (kSpeedTau_s + dt);
+        ema_v[0] += alpha * ((double)(pos[0] - last_pos[0]) / dt - ema_v[0]);
+        ema_v[1] += alpha * ((double)(pos[1] - last_pos[1]) / dt - ema_v[1]);
+      }
+      last_pos[0] = pos[0];
+      last_pos[1] = pos[1];
+      last_ticks = now_ticks;
+      if ((sample_n % kPlotStride) == 0 && have_sample) {
+        double speed[2] = {ema_v[0], ema_v[1]};
+        double Pcol[2] = {(double)p_issued, (double)p_issued};
+        double Rcol[2] = {(double)ref.R, (double)ref.R};
+        double tcol[2] = {(double)T_prod, (double)T_prod};
+        plot.row((double)now_ticks / NAXIS_PLOT_TICKS_PER_S, (double)pos[0],
+                 (double)pos[1], 0.0, speed, Pcol, Rcol, tcol);
+      }
     }
+    sample_n++;
     if (ref.dda.done()) {
       if (next_vertex < n_verts && pos[0] == verts[next_vertex][0] &&
           pos[1] == verts[next_vertex][1]) {
@@ -3109,6 +3170,7 @@ struct RevSample {
   int32_t x;
   int32_t y;
   uint16_t ticks;
+  uint8_t steps;
 };
 struct RevTrace {
   NaxisCmd x[6000];
@@ -3189,6 +3251,7 @@ static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
       tr->s[tr->ns].x = px.position();
       tr->s[tr->ns].y = py.position();
       tr->s[tr->ns].ticks = (uint16_t)t0;
+      tr->s[tr->ns].steps = (uint8_t)s0;
       tr->ns++;
     }
     if (path.pump() == PumpStatus::Error) {
@@ -3254,6 +3317,7 @@ static void run_overshoot_rev(uint32_t before, uint8_t n_before, uint32_t after,
       tr->s[tr->ns].x = px.position();
       tr->s[tr->ns].y = py.position();
       tr->s[tr->ns].ticks = (uint16_t)t0;
+      tr->s[tr->ns].steps = (uint8_t)s0;
       tr->ns++;
     }
     if (path.pump() == PumpStatus::Error) {
@@ -3349,7 +3413,9 @@ void f9_dir_pauses() {
     plot.poly_point(0.0, 0.0);
     plot.poly_done();
     for (int j = 0; j < tr.ns; j++) {
-      double v = tr.s[j].ticks > 0
+      // A pause (steps == 0) is a delay, not motion: the carve's 3200-tick
+      // before/after pauses must not plot as 5000 step/s.
+      double v = (tr.s[j].steps > 0 && tr.s[j].ticks > 0)
                      ? NAXIS_PLOT_TICKS_PER_S / (double)tr.s[j].ticks
                      : 0.0;
       double speed[2] = {v, 0.0};
@@ -3742,10 +3808,15 @@ static void run_overshoot_polyline(SimPort& px, SimPort& py,
 
   NaxisPlot plot;
   if (do_plot) {
+    // The SimPort origin is the planner's first waypoint (setCurrentPosition is
+    // not a SimPort position setter), so the realized positions are relative to
+    // wp[0]. Draw the commanded polyline in the same port-relative coordinates,
+    // otherwise a path that does not start at (0,0) is offset from its trace.
     plot.start_plot(fixture, title, 2);
-    plot.poly_point((double)wp[0], (double)wp[1]);
+    plot.poly_point(0.0, 0.0);
     for (int k = 1; k < n_wp; k++) {
-      plot.poly_point((double)wp[2 * k], (double)wp[2 * k + 1]);
+      plot.poly_point((double)(wp[2 * k] - wp[0]),
+                      (double)(wp[2 * k + 1] - wp[1]));
     }
     plot.poly_done();
   }
@@ -3761,6 +3832,15 @@ static void run_overshoot_polyline(SimPort& px, SimPort& py,
 
   int chord = 0;
   int iter = 0;
+  // EMA-smoothed realized-speed sampling (see walk_polyline): the per-command
+  // lastTicks()/performedRampUp() are binder-global and a multi-step catch-up
+  // command has a short period, so a per-command rate spikes.
+  const int kPlotStride = 8;
+  const double kSpeedTau_s = 0.02;
+  int32_t last_x = 0, last_y = 0;
+  uint32_t last_clock = 0;
+  double ema_v[2] = {0.0, 0.0};
+  bool have_sample = true;
   while (path.isBusy()) {
     int64_t s0 = 0, s1 = 0;
     bool u0 = true, u1 = true;
@@ -3792,17 +3872,28 @@ static void run_overshoot_polyline(SimPort& px, SimPort& py,
         chord++;
       }
     }
-    if (do_plot && (iter % 4 == 0)) {
-      double t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
-      uint32_t ticks = path.lastTicks();
-      double v = ticks > 0 ? NAXIS_PLOT_TICKS_PER_S / (double)ticks : 0.0;
-      double speed[2] = {v, v};
-      double Pcol[2] = {(double)path.performedRampUp(),
-                        (double)path.performedRampUp()};
-      double Rcol[2] = {(double)path.remainingToStop(),
-                        (double)path.remainingToStop()};
-      double tcol[2] = {(double)ticks, (double)ticks};
-      plot.row(t, (double)x, (double)y, 0.0, speed, Pcol, Rcol, tcol);
+    if (do_plot) {
+      uint32_t clk = px.clock();
+      double dt = (double)(clk - last_clock) / NAXIS_PLOT_TICKS_PER_S;
+      if (dt > 0.0) {
+        double alpha = dt / (kSpeedTau_s + dt);
+        ema_v[0] += alpha * ((double)(x - last_x) / dt - ema_v[0]);
+        ema_v[1] += alpha * ((double)(y - last_y) / dt - ema_v[1]);
+      }
+      last_x = x;
+      last_y = y;
+      last_clock = clk;
+      if ((iter % kPlotStride) == 0 && have_sample) {
+        double speed[2] = {ema_v[0], ema_v[1]};
+        uint32_t ticks = path.lastTicks();
+        double Pcol[2] = {(double)path.performedRampUp(),
+                          (double)path.performedRampUp()};
+        double Rcol[2] = {(double)path.remainingToStop(),
+                          (double)path.remainingToStop()};
+        double tcol[2] = {(double)ticks, (double)ticks};
+        plot.row((double)clk / NAXIS_PLOT_TICKS_PER_S, (double)x, (double)y,
+                 0.0, speed, Pcol, Rcol, tcol);
+      }
     }
     iter++;
     path.pump();
@@ -4638,6 +4729,190 @@ void f14_helix() {
   printf("F14 3-axis helix green\n");
 }
 
+#ifdef FAS_PHYSICAL_STEPPER_ENABLED
+// Peak absolute PCM sample in a wav file's data chunk (0 if silent/absent).
+static int phys_wav_peak(const char* path) {
+  FILE* f = fopen(path, "rb");
+  if (f == NULL) {
+    return 0;
+  }
+  char hdr[44];
+  if (fread(hdr, 1, 44, f) != 44) {
+    fclose(f);
+    return 0;
+  }
+  int peak = 0;
+  int16_t s;
+  while (fread(&s, 2, 1, f) == 1) {
+    int v = s < 0 ? -s : s;
+    if (v > peak) {
+      peak = v;
+    }
+  }
+  fclose(f);
+  return peak;
+}
+
+static void wav_u16le(FILE* f, uint16_t v) {
+  fputc((int)(v & 0xff), f);
+  fputc((int)((v >> 8) & 0xff), f);
+}
+static void wav_u32le(FILE* f, uint32_t v) {
+  fputc((int)(v & 0xff), f);
+  fputc((int)((v >> 8) & 0xff), f);
+  fputc((int)((v >> 16) & 0xff), f);
+  fputc((int)((v >> 24) & 0xff), f);
+}
+
+// Mix two axes' recorded PCM into one 16-bit stereo wav: X is the left channel,
+// Y the right. Both plants run on the same SimPort clock so their sample
+// streams are time-aligned; a shorter one is zero-padded.
+static bool write_stereo_wav(const char* path, const PhysicalStepper& left,
+                             const PhysicalStepper& right,
+                             uint32_t sr = 44100) {
+  uint32_t n = left.audio_sample_count();
+  if (right.audio_sample_count() > n) {
+    n = right.audio_sample_count();
+  }
+  FILE* fp = fopen(path, "wb");
+  if (fp == NULL) {
+    return false;
+  }
+  const uint16_t bps = 16, ch = 2;
+  const uint32_t byteRate = sr * ch * bps / 8;
+  const uint16_t blockAlign = ch * bps / 8;
+  const uint32_t dataSize = n * ch * bps / 8;
+  fwrite("RIFF", 1, 4, fp);
+  wav_u32le(fp, 36 + dataSize);
+  fwrite("WAVE", 1, 4, fp);
+  fwrite("fmt ", 1, 4, fp);
+  wav_u32le(fp, 16);
+  wav_u16le(fp, 1);  // PCM
+  wav_u16le(fp, ch);
+  wav_u32le(fp, sr);
+  wav_u32le(fp, byteRate);
+  wav_u16le(fp, blockAlign);
+  wav_u16le(fp, bps);
+  fwrite("data", 1, 4, fp);
+  wav_u32le(fp, dataSize);
+  for (uint32_t i = 0; i < n; i++) {
+    wav_u16le(fp, (uint16_t)left.audio_sample(i));
+    wav_u16le(fp, (uint16_t)right.audio_sample(i));
+  }
+  fclose(fp);
+  return true;
+}
+
+// F21 (physical_stepper_whitepaper sections 2.2 / 13.3): couple the FasNAxis
+// planner to the opt-in rotordynamic plant. Each axis's SimPort gets a
+// PhysicalStepper, so the commands the feeder emits drive a real rotor: the
+// planner still binds against the ideal commanded count (position()), while
+// the plant supplies the realized, lagging position and the acoustic
+// emission. The F5 Linear square (1600 steps per side, ticks 4000, accel
+// 2000) is driven with a plant on X and Y; the realized path, the
+// commanded-minus-realized deviation and the rotor speeds are plotted, and
+// each axis's audio is rendered to its own wav. F21 is the only fixture that
+// attaches a plant, so the default suite stays bit-identical.
+void f21_physical() {
+  int32_t verts[5][2] = {{0, 0}, {1600, 0}, {1600, 1600}, {0, 1600}, {0, 0}};
+
+  SimPort px(4000), py(4000);
+  PhysicalStepper rotor_x, rotor_y;
+  px.setPhysicalStepper(&rotor_x);
+  py.setPhysicalStepper(&rotor_y);
+  test(px.hasPhysical() && py.hasPhysical(), "F21 plant attached to both axes");
+
+  FasNAxisConfig cfg;
+  FasNAxis<2, 64, SimPort> path(cfg);
+  test(path.addAxis(0, &px) == true, "F21 addAxis(0)");
+  test(path.addAxis(1, &py) == true, "F21 addAxis(1)");
+  int32_t cur[2] = {0, 0};
+  path.setCurrentPosition(cur);
+
+  NaxisPlot plot;
+  plot.start_plot("f21", "FasNAxis F21 physical-stepper square 1600 Linear", 2);
+  for (int k = 0; k < 5; k++) {
+    plot.poly_point((double)verts[k][0], (double)verts[k][1]);
+  }
+  plot.poly_done();
+
+  for (int k = 1; k < 5; k++) {
+    test(path.addLine(verts[k]) == true, "F21 addLine fits");
+  }
+  path.endPath();
+
+  double max_dx = 0.0, max_dy = 0.0, max_dev = 0.0;
+  double max_vx = 0.0, max_vy = 0.0;
+  int64_t iter = 0;
+  // Drain the two queues in lockstep, exactly as run_linear_segment does; the
+  // plant advances once per consumed command, so its clock tracks px.clock().
+  while (path.isBusy()) {
+    int64_t s0 = 0, s1 = 0;
+    bool u0 = true, u1 = true;
+    px.drain_one(&s0, &u0);
+    py.drain_one(&s1, &u1);
+
+    double cx = (double)px.position();
+    double cy = (double)py.position();
+    double rx = rotor_x.x();
+    double ry = rotor_y.x();
+    double dx = cx - rx;
+    double dy = cy - ry;
+    double dev = sqrt(dx * dx + dy * dy);
+    if (fabs(dx) > max_dx) max_dx = fabs(dx);
+    if (fabs(dy) > max_dy) max_dy = fabs(dy);
+    if (dev > max_dev) max_dev = dev;
+    double vx = rotor_x.speed();
+    double vy = rotor_y.speed();
+    if (vx > max_vx) max_vx = vx;
+    if (vy > max_vy) max_vy = vy;
+
+    if (iter % 4 == 0) {
+      uint32_t P = path.performedRampUp();
+      uint32_t R = path.remainingToStop();
+      uint32_t ticks = path.lastTicks();
+      double t = (double)px.clock() / NAXIS_PLOT_TICKS_PER_S;
+      double speed[2] = {vx, vy};
+      double Pcol[2] = {(double)P, (double)P};
+      double Rcol[2] = {(double)R, (double)R};
+      double tcol[2] = {(double)ticks, (double)ticks};
+      // Panel 1 draws the realized rotor path ($data 2:3) on top of the grey
+      // commanded polyline; column 4 is the commanded-minus-realized radius.
+      plot.row(t, rx, ry, dev, speed, Pcol, Rcol, tcol);
+    }
+    iter++;
+    path.pump();
+  }
+  plot.finish_plot();
+
+  // One stereo wav: X on the left channel, Y on the right.
+  bool wav = write_stereo_wav("test_26_f21.wav", rotor_x, rotor_y);
+  int peak = phys_wav_peak("test_26_f21.wav");
+
+  printf(
+      "F21 physical square: max|dx|=%.3f max|dy|=%.3f max_dev=%.3f "
+      "peak_v=(%.0f,%.0f) stall=(%d,%d) wav_peak=%d\n",
+      max_dx, max_dy, max_dev, max_vx, max_vy, rotor_x.stall_ever() ? 1 : 0,
+      rotor_y.stall_ever() ? 1 : 0, peak);
+
+  test(!rotor_x.stall_ever() && !rotor_y.stall_ever(),
+       "F21 no rotor loses synchronism on the square");
+  test(max_dx < 64.0 && max_dy < 64.0,
+       "F21 per-axis lag stays under one full step");
+  test(max_vx > 1000.0 && max_vy > 1000.0,
+       "F21 both rotors reach a real square-side speed");
+  test(abs(rotor_x.getCurrentPosition()) <= 2 &&
+           abs(rotor_y.getCurrentPosition()) <= 2,
+       "F21 realized position returns to the origin");
+  test(path.hasUnderrun() == false, "F21 no underrun");
+  test(wav, "F21 the stereo wav was written");
+  test(peak > 1000, "F21 the recorded wav carries audible signal, not silence");
+  printf(
+      "F21 plot written: test_26_f21.gnuplot; wav (stereo X=left Y=right): "
+      "test_26_f21.wav\n");
+}
+#endif  // FAS_PHYSICAL_STEPPER_ENABLED
+
 int main() {
   puts("FasNAxis TDD");
 #ifdef FAS_NAXIS_TRACE
@@ -4666,6 +4941,9 @@ int main() {
   f12_overshoot_corners();
   f13_lookahead();
   f14_helix();
+#ifdef FAS_PHYSICAL_STEPPER_ENABLED
+  f21_physical();
+#endif
   f16_skeleton();
   printf("TEST_26 PASSED\n");
   return 0;

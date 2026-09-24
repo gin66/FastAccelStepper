@@ -6,6 +6,13 @@
 #include "fas_arch/common.h"
 #include "fas_arch/result_codes.h"
 
+#ifdef FAS_PHYSICAL_STEPPER_ENABLED
+// The coupling to the rotordynamic plant (physical_stepper_whitepaper section
+// 3.1 / 13.3) is opt-in: only the -DFAS_PHYSICAL_STEPPER_ENABLED build pulls
+// in the plant, so the default suite keeps the ideal stepper bit-identical.
+#include "physical_stepper.h"
+#endif
+
 // SimPort — a duck-typed stand-in for the platform StepperQueue that the
 // FasNAxis feeder talks to through addQueueEntry() (whitepaper section 4.1).
 //
@@ -141,6 +148,28 @@ class SimPort {
   // and it has not settled to a no-motion state.
   bool isRunning() const { return kicked_off_; }
 
+#ifdef FAS_PHYSICAL_STEPPER_ENABLED
+    // --- opt-in rotordynamic coupling (whitepaper section 3.1 / 13.3) ---
+    // When a plant is attached, drain_one() advances the rotor with the very
+    // command the ideal counter consumes, so the plant's physical position is
+    // the axis's *realized* position (it lags during accel, runs ahead during
+    // decel, and stalls when the ramp outruns it). position() keeps the ideal
+    // commanded count the planner's DDA binds against; realizedPosition() is
+    // the diverging physical count that makes step loss visible to the binder.
+  void setPhysicalStepper(PhysicalStepper* plant) { plant_ = plant; }
+  bool hasPhysical() const { return plant_ != NULL; }
+    // The plant's physical (rotor) observables, exposed to the coupling test.
+  int32_t realizedPosition() const {
+    return plant_ ? plant_->getCurrentPosition() : 0;
+    }
+  double realizedSpeed() const { return plant_ ? plant_->speed() : 0.0; }
+  double realizedDelta() const { return plant_ ? plant_->delta() : 0.0; }
+  double peakRealizedDelta() const {
+    return plant_ ? plant_->peak_abs_delta() : 0.0;
+    }
+  bool realizedStalled() const { return plant_ ? plant_->stall_ever() : false; }
+#endif
+
   // --- the feeder's only entry point (whitepaper section 4.1) ---
   AqeResultCode addQueueEntry(const struct stepper_command_s* cmd, bool start) {
     injected_pause_ticks_ = 0;
@@ -235,6 +264,14 @@ class SimPort {
       position_ += e.count_up ? e.steps : -(int32_t)e.steps;
     }
     clock_ += ticks;
+#ifdef FAS_PHYSICAL_STEPPER_ENABLED
+    // The plant sees the same command the ideal counter consumed (a split long
+    // period feeds as a step entry then pause entries, exactly as the planner
+    // splits it), so its clock stays in lockstep with position().
+    if (plant_ != NULL) {
+      plant_->step((int)e.steps, e.count_up, e.ticks);
+    }
+#endif
     if (steps_out != NULL) {
       *steps_out = e.steps;
     }
@@ -306,6 +343,9 @@ class SimPort {
   uint8_t dir_before_count_;
   uint16_t dir_after_ticks_;
   uint16_t force_extra_before_;
+#ifdef FAS_PHYSICAL_STEPPER_ENABLED
+  PhysicalStepper* plant_ = NULL;      // opt-in rotordynamic coupling
+#endif
 
   inline uint32_t queue_mask() const { return (uint32_t)queue_len_ - 1; }
 

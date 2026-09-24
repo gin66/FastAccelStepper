@@ -206,7 +206,7 @@ horizon, and a PC-checkable oracle.
   port, or heap-allocated lookahead. The class is a header template
   with member arrays.
 - Isabelle or other machine-checked proofs. Theory is probed by
-  PC tests (todo.md steps 2b–2g / 2ref / 3b), not a prover.
+  theory probes (Steps 2b–2g / 2ref / 3b), not a prover.
 
 ### 3.3 Two planner problems
 
@@ -1760,7 +1760,7 @@ without DDA lock also leaves the chord: that is uncapped
 Overshoot, not Linear.
 
 **The reference is that fastest track.** PC-only header
-`extras/tests/pc_based/naxis_ref.h` (todo.md Step 2ref). Given
+`extras/tests/pc_based/naxis_ref.h` (Step 2ref). Given
 waypoints + `ticks_cfg` / accel + mode, emit the globally
 fastest feasible per-step trace `{ticks, step[NAXES] in
 {−1,0,1}}` and its total tick sum:
@@ -2095,7 +2095,7 @@ None of these block a PC-tested v1 on `SimPort`.
 
 ## 16. Implementation phasing (concept only)
 
-Not a commitment. Matches `todo.md` at the repo root. Each phase
+Not a commitment. Each phase
 is test-first on `extras/tests/pc_based`.
 
 | Phase | Delivers | Tests |

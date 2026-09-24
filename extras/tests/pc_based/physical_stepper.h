@@ -149,6 +149,7 @@ class PhysicalStepper {
     peak_abs_delta_ = 0.0;
     slip_f_ = 0.0;
     stall_ever_ = false;
+    cur_env_ = 0.0;
     audio_.clear();
     audio_written_ = 0;
     trace_.clear();
@@ -428,6 +429,13 @@ class PhysicalStepper {
   // length).
   uint32_t audio_samples() const { return (uint32_t)audio_.size(); }
 
+  // Raw recorded PCM, so a test can mix several axes into one stereo wav.
+  // Out-of-range reads are silence.
+  uint32_t audio_sample_count() const { return (uint32_t)audio_.size(); }
+  int16_t audio_sample(uint32_t i) const {
+    return i < audio_.size() ? audio_[i] : (int16_t)0;
+  }
+
  private:
   // Fixed audio sample rate for the recording grid.
   enum { kAudioSr = 44100 };
@@ -439,6 +447,11 @@ class PhysicalStepper {
   // is a stall, while sub-threshold ring or a direction-change transient is not.
   static constexpr double kSlipTau = 0.05;
   static constexpr double kSlipThreshold = 100.0;
+  // Sum of the humming-partial amplitudes in record_audio (normalization).
+  static constexpr double kHarmSum = 2.28;
+  // Speed at which the audio envelope is at half amplitude (steps/s): below
+  // this the hum fades toward silence, so a near-rest rotor does not rumble.
+  static constexpr double kAudioW0 = 400.0;
 
   // Update the dynamic stall observation from the current rotor/field speed
   // mismatch. The slip is low-pass filtered (time constant kSlipTau) so a
@@ -482,6 +495,13 @@ class PhysicalStepper {
     // no “grip lost” branch — the force runs for any delta, and the motor
     // simply cannot keep up, so |delta| grows past D.
     cur_stalled_ = last_.stall ? 1.0 : 0.0;
+    // Speed envelope. The hum is gated by the magnetic force, which is *large*
+    // at low speed (the rotor lags most while accelerating) — so without this a
+    // move fades in and out of a loud low-frequency rumble at the start and end
+    // of every ramp ("strange noise"). Fade the source with rotor speed so a
+    // near-rest rotor is silent and the tone rises/falls with it.
+    const double w = fabs(state_.w);
+    cur_env_ = w / (w + kAudioW0);
   }
 
   // Emit every audio sample whose time has now been reached.
@@ -499,7 +519,12 @@ class PhysicalStepper {
       for (int k = 0; k < 5; k++) {
         s += amp[k] * sin((double)(k + 1) * phase_);
       }
-      s = cur_gate_ * s + 0.1 * cur_disp_;
+      // Normalize the harmonic sum (Σamp = 2.28) so the hum no longer clips for
+      // most of a move; the ×3 lift keeps it out of the int16 rounding floor.
+      s = cur_gate_ * (s / kHarmSum) + 0.1 * cur_disp_;
+      // Fade the hum with rotor speed: a near-rest rotor is silent, so a ramp
+      // does not fade in/out of a loud low-frequency rumble.
+      s *= cur_env_;
       // A stalled rotor (§5.5 — |delta| has drifted a full step) draws a lot
       // of holding current and buzzes, so a low-frequency buzz rides on top of
       // the hum. The recording therefore never goes silent on a stall.
@@ -508,8 +533,6 @@ class PhysicalStepper {
                                       (double)kAudioSr);
         s += 0.4 * buzz;
       }
-      // The gated hum is small (gate ~ |delta|/D), so scale it up out of the
-      // int16 rounding floor before clipping.
       s *= 3.0;
       double q = fas_clamp(s, -1.0, 1.0) * 32767.0;
       audio_.push_back((int16_t)lround(q));
@@ -542,6 +565,7 @@ class PhysicalStepper {
   double slip_f_;                       // low-passed rotor/field speed mismatch
   bool stall_ever_;                     // slipped at any time since reset
   double cur_f_, cur_gate_, cur_disp_, cur_stalled_;  // audio source
+  double cur_env_;                      // speed envelope [0:1]
   double phase_;                        // continuous hum phase (rad)
   std::vector<int16_t> audio_;          // recorded PCM samples
   uint32_t audio_written_;              // samples already emitted
@@ -585,6 +609,9 @@ class PhysicalStepper {
   size_t trace_dump(const char*) { return 0; }
   size_t trace_rows() const { return 0; }
   bool to_wav(const char*, uint32_t) { return false; }
+  uint32_t audio_samples() const { return 0; }
+  uint32_t audio_sample_count() const { return 0; }
+  int16_t audio_sample(uint32_t) const { return 0; }
 
  private:
   static observed_s& zero() {

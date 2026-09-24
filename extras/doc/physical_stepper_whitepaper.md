@@ -919,6 +919,30 @@ gnuplot traces so they can be compared on equal footing.
 step error, speed, **raw rotor acceleration**, force/friction, and the stall
 observation — exactly the parameters the review asked to see.
 
+### 12.2 FasNAxis coupling (`test_26.cpp` F21)
+
+`SimPort` (`naxis_sim_port.h`) is the n-axis suite's duck-typed queue. Its
+opt-in `setPhysicalStepper(&plant)` attaches a plant to one axis: `drain_one()`
+feeds the plant the very command the ideal counter consumes, so the plant's
+rotor is that axis's *realized* position while `position()` stays the ideal
+commanded count the planner's DDA binds against. `realizedPosition()` /
+`realizedSpeed()` / `realizedDelta()` / `realizedStall()` expose the plant's
+observables to the test.
+
+F21 drives the F5 Linear square (1600 steps per side, ticks 4000, accel 2000)
+through `FasNAxis<2, 64, SimPort>` with a plant on X and Y. It writes
+`test_26_f21.gnuplot` (the realized rotor path on the commanded square, per-axis
+rotor speed, P/R, period, and the commanded-minus-realized deviation) and one
+16-bit PCM **stereo** wav (`test_26_f21.wav`, X on the left channel, Y on the
+right): the two plants' `audio_sample()` streams are interleaved. The asserts
+are that neither rotor loses synchronism, the per-axis lag stays under one full
+step, both reach a real side speed, the realized position returns to the
+origin, and the wav carries audible signal.
+
+The hum is normalized (so it no longer clips for most of a move) and faded with
+a rotor-speed envelope, so a ramp does not fade in and out of a clipped,
+low-frequency rumble at the start and end of every side.
+
 ---
 
 ## 13. Open questions
@@ -928,9 +952,11 @@ observation — exactly the parameters the review asked to see.
    of the *single* `τ(delta)` curve, not a second curve.
 2. **Stick-slip / detent.** A small sawtooth ripple on `τ(delta)` could model
    the detent tooth and the step-to-step ripple in the `position` trace.
-3. **Coupling to FasNAxis.** The six-axis planner (`test_26.cpp`) already
-   tracks commanded vs realized per axis; `physical_stepper::getCurrentPosition()`
-   drops straight into that loop, making step loss *visible to the binder*.
+3. **Coupling to FasNAxis.** Realized (see §12.2): `test_26.cpp` F21 attaches
+   a plant to each `SimPort` axis, so `physical_stepper::getCurrentPosition()`
+   supplies the realized position while the planner still binds against the
+   ideal commanded count. Open: make step loss *visible to the binder* (a
+   re-sync / error response), rather than only observable in the test.
 4. **Fixed-point port.** Convert §9's `double` model to the `log2/` table
    style; validate bit-identical stall detection.
 

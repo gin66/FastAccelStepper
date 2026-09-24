@@ -1337,6 +1337,51 @@ helix adds only ~0.4 s to the suite.
 
 ---
 
+## Step 14b — physical plant coupling (F21) ✅
+
+Optional, after Step 14. Uses the merged `physical_stepper.h`
+(phys_stepper_simulation) and the opt-in `SimPort::setPhysicalStepper()`
+coupling (`naxis_sim_port.h`, whitepaper §3.1 / §12.2). Does not change any
+Step 0–14 fixture.
+
+**Test first:** `f21_physical()` in `test_26.cpp` on `FasNAxis<2, 64,
+SimPort>` drives the F5 Linear square (1600 steps/side, ticks 4000, accel
+2000) with a `PhysicalStepper` attached to X and Y. Asserts: neither rotor
+loses synchronism, per-axis lag stays under one full step, both reach a real
+square-side speed, the realized position returns to the origin, no underrun,
+and both per-axis wavs carry audible signal.
+
+**Plots:** `test_26_f21.gnuplot` (realized rotor path on the commanded square,
+rotor speed, P/R, period, commanded-minus-realized deviation) plus one 16-bit
+PCM **stereo** wav (`test_26_f21.wav`, X = left, Y = right).
+
+**Done:** `test_26.cpp` defines `FAS_PHYSICAL_STEPPER_ENABLED` (with `<vector>`
+before the PC `test` macro) and the Makefile links `test_26` with g++ and
+depends on `physical_stepper.h`. F21 attaches a plant per axis; the planner
+still binds against the ideal `position()`, the plant supplies the realized
+rotor (`x()`, `speed()`, `delta()`, `stall_ever()`). The stereo wav mixes the
+two plants' recorded PCM (`audio_sample()`). Results: max per-axis lag 1.29
+steps, peak speed 1788 step/s, no stall, origin recovered within 2 steps.
+`make test` and `make mutations` are green; F1–F20 outputs are unchanged.
+
+**Plot/diagnostic fixes in the same change (the plots are how the physics is
+read):**
+
+- `walk_polyline` / `walk_prod_polyline` / `run_overshoot_polyline` no longer
+  treat a coast (`period == ticks_cfg`) as a rest, and no longer plot a pause
+  (`steps == 0`, e.g. the F12 DIR carve's 3200-tick before/after pauses) as
+  5000 step/s. Speed is the EMA-smoothed per-axis position delta, so F10/F20_lin
+  coasts and F12's carve read correctly.
+- `run_overshoot_polyline` draws the commanded polyline in port-relative
+  coordinates, so the F7 circle coincides with its trace instead of being
+  offset by the start waypoint.
+- `physical_stepper.h` audio: the harmonic sum is normalized and the hum is
+  faded with a rotor-speed envelope (`kAudioW0`), so a move no longer fades in
+  and out of a clipped/low-frequency rumble at the start and end of each ramp.
+  `audio_sample_count()` / `audio_sample()` expose the PCM for the stereo mix.
+
+---
+
 ## Step 15 — real `FastAccelStepper`, 1–2 axis (P5)
 
 `test_26.cpp` already provides `inject_fill_interrupt` /
