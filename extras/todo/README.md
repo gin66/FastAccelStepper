@@ -6,10 +6,15 @@ The test-driven implementation plan (Steps 0–14) is complete; its
 tests live in `extras/tests/pc_based/test_26.cpp`. Remaining work is
 tracked here, one file per item.
 
-## Tracked entries
+## Tracked entries (priority order)
 
-- [Cubic start (`s_h`) overlay](cubic_start.md)
-- [Faithful timed trajectory](timed_trajectory.md)
+| Priority | Item | Why now |
+|----------|------|---------|
+| **P1** | [Linear junction carry](linear_junction_carry.md) | Core smoothness fix; unblocks the committed `test_naxes` `path-stops` check. |
+| **P2** | [Feeder command batching](feeder_command_batching.md) | AVR/ESP32 queue-drain safety; prerequisite for the example on hardware. |
+| **P3** | [naxes example smoothness](naxes_example_smoothness.md) | End-to-end simavr/hardware check; depends on P1 + P2. |
+| **P4** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
+| **P5** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
 
 ## Out-of-scope log
 

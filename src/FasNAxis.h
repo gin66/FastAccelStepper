@@ -25,9 +25,10 @@ class FastAccelStepper;
 // ring of up to HORIZON n-dim points, and pump() feeds the committed Linear
 // path through addQueueEntry(). The DDA master is the longest |delta| of the
 // current block; R is Remaining-style remaining master steps to the next Linear
-// path-stop (section 8.1 + 8.5). A non-collinear vertex resets P; a collinear
-// joint carries it. The last buffered point of an open path is rest, so the
-// ramp always stops there.
+// path-stop: a master-sense reversal or the path end. P carries across every
+// other joint, including a master-role change (section 6.3/8.5); the 2 deg
+// collinear test is diagnostic only. The last buffered point of an open path is
+// rest, so the ramp always stops there.
 //
 // Step 8 makes the feeder fault-tolerant: feed_one() stores a held command per
 // axis (one slice) and flush_held() sends it, retrying on a retryable

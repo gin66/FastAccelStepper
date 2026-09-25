@@ -120,8 +120,10 @@ If `R` is short, speed is low — motion continues. A
 Angle changes of the path (a new `Δ'` that is not collinear with
 `Δ`) are the remaining hard part: the implied per-axis speeds
 jump, so motors must accel/decel, and that needs distance
-**before** the vertex. v1’s preparation is conservative and is
-specified in §8.4; it is not an error code.
+**before** the vertex. v1’s preparation is specified in §8.4;
+it is not an error code. In Linear the master carries its ramp
+across the joint and only a master-sense reversal / the path end
+forces a stop; a master-role change prepares a deceleration.
 
 (4) is the mode switch. Independent FAS `moveTo()` on each axis is
 the uncontrolled version of overshoot: the short axis finishes first
@@ -160,7 +162,7 @@ horizon, and a PC-checkable oracle.
 |----|------|
 | G1 | n-axis motion through a sequence of trajectory points, n ≥ 1, native space = stepper steps |
 | G2 | Hard constraints are the **currently configured** per-stepper period (`getSpeedInTicks()`) and acceleration (`getAcceleration()`), plus the device min-period `getMaxSpeedInTicks()` |
-| G3 | **v1 = as fast as possible** (§3.3 problem 1). Two geometry modes, both time-optimal **under G2 and that mode’s geometry** (§12.4.1). A faster track that violates G1/G2 or the mode geometry is not a reference. **Linear** (exact chords, shared time-law; path speed 0 at a non-collinear vertex) and **Overshoot** (per-axis ramps, slight chordal deviation, waypoints still hit) |
+| G3 | **v1 = as fast as possible** (§3.3 problem 1). Two geometry modes, both time-optimal **under G2 and that mode’s geometry** (§12.4.1). A faster track that violates G1/G2 or the mode geometry is not a reference. **Linear** (exact chords, shared time-law; the DDA master carries its ramp across joints and only path-stops when its own sense reverses or the path ends — a master-role change prepares a deceleration but not a stop; §6.3) and **Overshoot** (per-axis ramps, slight chordal deviation, waypoints still hit) |
 | G4 | Parse lookahead until end or direction change → `R_i` is the cap on ramp-steps (`P_i ≤ R_i`). Path direction implies the other axes’ speeds. Short `R` **reduces speed**, it is not an error. Angle changes need accel/decel **preparation** (§8.4) |
 | G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner inserts the driver’s before/after DIR pauses after the reversing axis’s last step (period kept, so the step rate never jumps); only that axis’s timeline grows, no other axis is paused (§4.4). An injected pause the plan did not carve is an error |
 | G6 | Tick-level timebase shared by all axes; lost sync is a hard error |
@@ -193,12 +195,13 @@ horizon, and a PC-checkable oracle.
   Short lookahead is a speed cap (G4), not a fault.
 - Feed holds, jogging, or on-the-fly waypoint edits other than
   “append more blocks” / “end path” / “dwell at rest”.
-- A blended non-zero junction speed at a finite path-angle
-  change (GRBL-style). Staying on both chords at a kink at
-  nonzero path speed is not constraint-faithful (the unit
-  tangent jumps; §12.4.1). v1 Linear therefore path-stops;
-  Overshoot prepares per axis via `R` and may leave the chord.
-  Smoother `ΔP` junctions are a later overlay, still G1/G2.
+- A GRBL-style corner blend that *leaves* the chords or cuts a
+  corner. Linear always stays on the chords; it accelerates /
+  decelerates along them, so a finite path-angle change is taken
+  at a nonzero (or zero) path speed that the incoming remaining
+  steps and the per-axis envelopes allow (§8.4). It does not
+  path-stop at every joint: `P` carries unless the DDA master’s
+  own sense reverses or the path ends (§6.3).
 - A Linear oracle that is faster by **leaving the chord**,
   cutting a corner, or skipping a vertex. That track is not
   Linear. Overshoot is the mode that may leave the chord
@@ -403,16 +406,59 @@ absurdly long slices.
 
 ### 4.3 `MIN_CMD_TICKS`
 
-On the PC-test / ESP32 / Pico path:
-
 ```
-MIN_CMD_TICKS = TICKS_PER_S / 5000 = 3200 ticks ≈ 200 µs
+PC-test / ESP32 / Pico / SAM:  TICKS_PER_S / 5000 = 3200 ticks ≈ 200 µs
+AVR:                           TICKS_PER_S / 25000 = 640 ticks  ≈ 40 µs
 ```
 
 A command with `steps > 0` must satisfy `ticks * steps ≥ MIN_CMD_TICKS`.
 Very short slices with few steps fail this. FasNAxis therefore has a
 **minimum slice duration** of at least `MIN_CMD_TICKS`, and in
 practice 1 ms to leave margin for pauses.
+
+### 4.3.1 Command length vs pump interval (queue drain safety)
+
+The feeder must keep a queue non-empty between two `pump()` calls.
+With `QUEUE_LEN` slots, the **worst case** queue content is
+`(QUEUE_LEN - 2) * MIN_CMD_TICKS` if every accepted command is as short
+as allowed:
+
+| Platform | `MIN_CMD_TICKS` | `QUEUE_LEN - 2` | Worst-case queue |
+|----------|----------------|-----------------|------------------|
+| AVR | 640 (40 µs) | 14 | 560 µs |
+| ESP32 / Pico / SAM | 3200 (200 µs) | 30 | 6 ms |
+
+So if an application calls `pump()` only every `pump_interval`, the
+**average accepted command must last at least**
+
+```
+command_ticks >= pump_interval / (QUEUE_LEN - 2)
+```
+
+or the queue drains before the next `pump()`. On AVR at a 4 ms
+`pump_interval`: `4 ms / 14 ≈ 286 µs` (about 7 master steps at 40 µs),
+well above the 40 µs floor. ESP32’s 200 µs floor already covers a
+4 ms interval at `QUEUE_LEN = 32`.
+
+A one-master-step command (the natural Linear slice) is therefore
+**too short to run at AVR/ESP32 speed without a periodic pump near the
+step rate**. The feeder must **batch several master steps into one
+command** (`steps > 1`, constant period across the batch) so each
+accepted command spans `command_ticks`.
+
+Batching costs path accuracy: a batch holds one period while the ramp
+would have varied it over the batch. For a batch of `n` master steps
+the period changes by `Δτ ≈ τ'·n`, so the path lags/leads by up to
+`~n·Δτ` master-step times — the Linear chord is still hit at the
+batch boundary, but the in-batch DDA spacing is the batch period. Keep
+`n` small enough that `n·Δτ` is a small fraction of a step at the
+slave axes, and never let batching overshoot the joint-speed
+preparation (a batch must not cross a master-role switch or a
+path-stop unprepared).
+
+This is the same granularity trade FAS makes (2 ms planning chunks);
+FasNAxis needs it stated as a feeder rule, not hidden in `pump()`
+frequency.
 
 ### 4.4 Direction-change pauses
 
@@ -662,8 +708,8 @@ path = chord                       path leaves the chord, still hits p0 and p1
 | Time-law | One ramp, slaved DDA | One ramp per axis, common `T` |
 | Who binds | Longest `\|Δ\|` walks DDA; rebind lengthens `ticks_b` if a slave would exceed its v/a (§6.3) | Each axis binds on its own remaining steps; `T` is the slowest axis |
 | Non-binding axes | DDA along the chord — scaled **down** in steps relative to the master; the master may also be scaled down in speed | May run *slower* than their ramp (longer period) so they occupy all of `T`; never faster |
-| Sharp corner | Whole path speed → 0 unless collinear | Only axes that reverse go through 0; continuing axes keep ramp-steps |
-| Typical use | Plotter, laser, exact contour | Faster point-to-point, circles, shallow corners |
+| Junction | Path speed is continuous along the chords; `P` carries across joints. It goes to 0 only at a master-sense reversal or path end; a master-role change prepares a deceleration but not a stop (§6.3) | Only axes that reverse go through 0; continuing axes keep ramp-steps |
+| Typical use | Plotter, laser, exact contour; a sampled circle cruises | Faster point-to-point, large-angle corners, chordal tolerance |
 
 One-axis motion is identical in both modes (and matches a FAS
 single-axis ramp of the same `ticks_cfg` / `a` over the same
@@ -685,6 +731,17 @@ finish in the same time (DDA onto the master’s step count).
 Because `|Δ_slave| ≤ |Δ_master|`, each slave takes 0 or 1 step
 per master step, issued `|steps_i| = |Δ_i|`, and the vertex is
 hit. A shorter axis is never the DDA loop bound.
+
+**The master role is tied to the ramp.** “Largest `|Δ|` on the
+block” is the same as “larger path-projected speed”, so on a
+sampled circle the role changes exactly where the two axes’
+projected ramp levels cross (the 45° points), not at an arbitrary
+block boundary. The switch is therefore a ramp-level event: `P`
+(the shared path ramp) is continuous across it and no stop is
+implied. Only when the incoming `R` cannot afford the outgoing
+axis’s implied ramp does the joint prepare a deceleration (§8.4).
+The same tie-in is what makes the feeder batching of §4.3.1 safe:
+batches must not span a role switch unprepared.
 
 **Who sets the speed (time-law).** Scaling down is in steps, not
 in that slave’s own v/a envelope. If the master coasts at
@@ -732,10 +789,27 @@ F18 longest X, Y 40× slower: X stays DDA master, Y lengthens
 `ticks_b`, X scaled down in speed; both axes issue full `|Δ|`.
 
 Once the DDA master is known, it runs the FAS ramp (period
-lengthened if a slave constrains the time-law) against remaining
-steps until the next path-stop (§8): a non-collinear vertex, an
-axis reversal, `endPath()`, or the **last buffered waypoint**
-(open path: unknown next angle, last point is rest). Slaves:
+lengthened if a slave constrains the time-law) against the
+remaining master-steps `R` to the next **Linear path-stop**. A
+Linear path-stop is now only:
+
+1. the DDA master **axis reverses sense**, or
+2. `endPath()`, or the **last buffered waypoint** of an open path
+   (unknown next angle, so the last point is rest).
+
+An angle change where the master keeps its sense is **not** a
+path-stop. The path direction changes, but the master’s `P` is
+carried across the joint and the ramp continues (only the slave
+DDA ratios change). A joint where the **DDA master role** moves
+to another axis also is not a stop: the new master takes over
+with `P` carried, and the outgoing master becomes a slave. If
+the new master’s envelope, or its own short remaining-to-stop,
+cannot sustain the carried `P`, the joint **prepares**: the
+incoming ramp decelerates to the allowed `P` over the steps
+already available before the joint — but not necessarily to 0
+(that is the “back pressure” of §6.3’s envelope compare).
+
+Slaves:
 
 ```
 err_i += |Δ_i|
@@ -749,10 +823,22 @@ That lock **is** the path-direction implication: the master’s `P`
 (already capped by `R`) sets every slave’s step rate. A short
 lookahead on the polyline lowers the master, hence every axis.
 
-A path-stop corner (Linear `v = 0`) is any vertex that is not
-collinear in the same sense (§8.5), plus the last buffered point
-while the path is open. Remaining steps for the master is the
-sum of `|Δ_master|` over blocks up to that stop.
+Remaining steps for the master is the sum of `|Δ_master|` over
+blocks up to the next master-sense reversal (or the path end),
+**including blocks whose DDA master role has moved to another
+axis**; `R` is not cut at those joints.
+
+**Worked model — a sampled circle in X/Y, matched steppers.** The
+path speed can stay continuous: the master is the axis with the
+larger velocity component, so it changes at the 45° points while
+the *other* axis passes through its cardinal. At a cardinal the
+non-master axis reverses (velocity 0) and the master is at its
+fastest; the path never needs to stop. Each axis therefore runs
+from 0 to `v_max` over a quarter turn and back, and the master
+reaches `v_max` exactly when the other axis reverses. The old
+“Linear path-stops at every >2° chord” behaviour would instead
+stop all 48 chords of one turn — the regression `test_naxes`
+counts as path stops (`detect_geometry.py`).
 
 ### 6.4 Overshoot
 
@@ -914,8 +1000,9 @@ taken after the `P` update: first step from rest is
 
 The DDA master of §6.3 (longest `|Δ|`; time-law lengthens
 `ticks_b` if a slave would exceed v/a) runs §7.1 with `R` =
-remaining master-steps until the next Linear path-stop (angle
-change, reversal, last point, or `endPath()`). Each planning
+remaining master-steps until the next Linear path-stop
+(master-sense reversal, last point, or `endPath()`; a master-role
+change rebinds without cutting `R`, §6.3/§8.5). Each planning
 chunk of `planning_steps` (same 2 ms rule FAS uses) is one
 interpolator slice: one `addQueueEntry` on the master at
 `calculate_ticks(P)`, DDA slaves take 0 or 1 step per master
@@ -998,8 +1085,13 @@ When more waypoints arrive, `R` may grow and the unexecuted
 tail is replanned faster. `R` is therefore exact for the
 current buffer, not a lower bound the planner waits to fill.
 
-Linear additionally ends the *binder’s* `R` at a non-collinear
-vertex (§8.5), even if that axis would not reverse there.
+For **Linear** the *binder’s* `R` is the remaining master-steps to
+the next master-sense reversal or the path end (§6.3); it does
+**not** end at a non-collinear vertex, and it does not end when
+the DDA master role moves to another axis (the run rebinds). The
+2° `collinear_same_sense()` test is a diagnostic only (§8.5): it
+reports whether a joint is within the near-collinear band, but it
+no longer cuts `R`.
 
 ### 8.2 `R` is the cap on ramp-steps
 
@@ -1063,8 +1155,8 @@ Integer, no `/`.
 cap limits the others.
 
 **Linear.** One ramp, DDA slaves (§6.3). The master’s `R`
-is remaining master-steps to the next path-stop (including
-the last buffered point). Master `P ≤ R` sets the time-law;
+is remaining master-steps to the next master-sense reversal /
+path end (including the last buffered point). Master `P ≤ R` sets the time-law;
 every slave steps in lock with the master. Short lookahead
 on the polyline therefore slows **every** axis, in the
 ratios of `Δ`. Rebind still applies: if a slave would exceed
@@ -1106,19 +1198,18 @@ v1 preparation, by case:
 | What the lookahead shows | Preparation |
 |--------------------------|-------------|
 | Nothing past the last point (path open) | Last n-dim point is rest. Prepared for *any* next angle, including reversal. Short buffer ⇒ low `P`. |
-| Collinear continuation (≤ 2°, §8.5) | No `P` change. `R` continues through the vertex. |
-| Axis reversal | That axis to `P = 0` at the vertex (`R` ends), with last period `T_min >> τ` (§4.4.1). That can cap `a` and max speed. Linear also zeros the path. |
-| Finite path-angle change, no reversal | **Linear:** path-stop (`P → 0`). Maximum preparation, exact chords. **Overshoot:** only reversing / going-idle axes to 0; continuing axes keep `P`; bulge capped by `overshoot_max` (which may itself lower the continuing `P`). |
+| Joint, master axis keeps its sense (collinear or not) | **Linear:** no `P` reset. `R` continues through the joint; the DDA ratios change, the master’s ramp does not. **Overshoot:** per-axis, as before. |
+| Joint, DDA master role moves to another axis | **Linear:** rebind the master with `P` carried. If the new master’s envelope or its remaining-to-stop cannot sustain `P`, **prepare** a deceleration to the allowed `P` over the incoming steps — not necessarily to 0. **Overshoot:** n/a (per-axis `P`). |
+| Master axis reversal | Master to `P = 0` at the vertex (`R` ends), with last period `T_min >> τ` (§4.4.1). In Linear this *is* the path-stop: the whole path is at 0 there. |
+| Axis reversal of a **slave** | The slave’s `P` is not the path ramp; the DDA simply takes it through 0 and back (a cusp on that axis, continuous path speed). The path need not stop — the sampled-circle case. |
 
-Why this is tricky: a smoother junction would look *past*
-the vertex at `Δ'`, compute each `P_i'` from the new
-direction, and require `|P_i − P_i'|` to fit in the
-incoming remaining steps — a partial-speed blend, not a
-full stop. v1 does **not** do that. Linear’s 2° test is
-the “angle change is negligible” threshold; anything
-larger path-stops. Overshoot pays with chordal bulge
-instead of a blended Linear speed. A `ΔP` junction is a
-later overlay, not a reason to raise `LookaheadTooShort`.
+The Linear joint at a master-role change looks *past* the
+vertex: the new master’s implied `P` is taken (carried) and, if
+`|P − P'|` does not fit in the incoming remaining steps, the
+incoming ramp is pulled down over those steps. Only a master
+reversal (or the path end) forces `P → 0`. Overshoot instead
+pays with chordal bulge on continuing axes. A `ΔP` junction is
+never a reason to raise `LookaheadTooShort`.
 
 FasNAxis does **not** use slice length `Δt` to invent a
 corner speed. Inside-corner shortcuts (GRBL `δ`) miss the
@@ -1126,22 +1217,26 @@ vertex and are not v1.
 
 ### 8.5 Junction — Linear
 
-Collinear, same sense (keep cruising):
+Junction handling is driven by the DDA master, not by the path
+angle:
 
-- no axis reverses: `sign(Δ_i)` matches `sign(Δ'_i)` for
-  every i with either component nonzero, **and**
-- the unsigned angle is ≤ 2° so 1° sampled arcs count as
-  collinear and 90° corners do not:
+- **Master axis keeps its sense** (its `Δ_b` does not flip): the
+  joint is not a stop. `R` continues through it and `P` carries.
+  The slave DDA ratios change; the master ramp does not.
+- **Master role moves to another axis**: rebind the master with
+  `P` carried and continue; prepare a deceleration only as far as
+  the new master’s envelope / remaining-to-stop require (§8.4).
+- **Master axis reverses sense**: `R` ends here, `P → 0`.
+
+The 2° test
 
 ```
 (Δ · Δ')² * 100000  >=  99878 * |Δ|² * |Δ'|²
 ```
 
-(`cos²(2°) ≈ 0.99878`. Integer mul/compare, no division, no
-sqrt.) `ε` is this test; it is not a free real.
-
-Otherwise the vertex is a path-stop: binder `R` ends here,
-`P` must reach 0. That *is* the preparation of §8.4.
+(`cos²(2°) ≈ 0.99878`, integer mul/compare) is now a
+**diagnostic** — it reports near-collinear joints — and no longer
+cuts `R` or forces a stop.
 
 ### 8.6 Junction — Overshoot
 
@@ -1167,9 +1262,8 @@ already 0. Linear and Overshoot match.
 ### 8.7 What is committed
 
 Feed a **stoppable** plan to the last path-stop in the
-current buffer (reversal, Linear non-collinear vertex,
-`endPath()`, or last buffered point). Do not wait for
-`R ≥ P_stop` before moving.
+current buffer (master-sense reversal, `endPath()`, or last
+buffered point). Do not wait for `R ≥ P_stop` before moving.
 
 Commands already in the hardware queues stay. The
 unexecuted tail is **replanned** when `R` grows (more
@@ -1194,22 +1288,27 @@ the same `HORIZON`, which *can* reach `P_stop`.
 ### 8.8 Reversals of a single axis
 
 Even on a smooth polyline an axis can reverse (a circle’s X
-axis at the left and right extrema). That is a direction
-change in the scan of §8.1, and an angle change of the path
-(§8.4).
+axis at the left and right extrema). That is a sign flip of
+`Δ_i`, and for Overshoot it ends that axis’s `R_i` (§8.1).
 
-**Linear:** at the extremum some `Δ_i` changes sign, which
-fails §8.5, so the path stops. A sampled circle would stop
-twice per revolution. That is correct for exact chords, and
-the wrong mode for a circle. (1° chords *without* a sign
-change pass the 2° collinear test, so Linear does not stop
-at every chord.)
+**Linear — the master/slave distinction matters.** The
+reversing axis of a sampled circle is the *slave* at its
+extremum: at X’s cardinal, Y is the DDA master (larger velocity
+component), so X’s sign flip does not end the master’s `R`. The
+path does **not** stop; the DDA takes X through 0 and back and
+the path speed is continuous. This is exactly the mental model
+of §6.3 (the master reaches `v_max` when the slave reverses).
+The path stops only if the **master** reverses sense (e.g. the
+straight return-to-origin line reaching a cusp) or the path
+ends.
 
-**Overshoot:** only the reversing axis has `R → 0`; the
-others keep `P`. A sampled circle is the motivating case.
+**Overshoot:** per axis; only the reversing axis has `R → 0`,
+the others keep `P`.
 
-True arc blocks remain v2. v1 tests a coarse square in
-Linear (must stop) and a fine circle in Overshoot (must not).
+True arc blocks remain v2. Tests: Linear square (axis-aligned
+corners: the continuing axis of the next side was idle, so both
+stop) and Linear sampled circle (cruises, master/slave
+reversals handled).
 
 ---
 
@@ -1626,7 +1725,7 @@ examples/naxes/                // 3-axis example: helix -> hexagon -> square -> 
 pio_dirs/naxes/                // generated CI wrapper (build-pio-dirs.sh)
 extras/tests/simavr_based/
   test_naxes/                  // simavr run of the example + geometry judge
-  detect_geometry.py           // reconstruct the curve from the Step/Dir VCD
+    detect_geometry.py         // reconstruct the curve, count path stops
 ```
 
 `test_??.cpp` is already in the pc_based `TESTS` wildcard. No
@@ -1741,16 +1840,17 @@ stretched. v1 does not implement (2).
 
 | Mode | Feasible set (on top of G1/G2/G6) | Fastest constraint-faithful track | PC truth? |
 |--|--|--|--|
-| **Linear** | On the chords. At a non-collinear vertex the unit tangent jumps, so path speed must be 0 there (incoming and outgoing chords cannot share a nonzero velocity). Collinear (≤2°, §8.5) may cruise. A reversing axis is at 0. | DDA on longest `\|Δ\|`, `ticks_b` lengthened if a slave would exceed v/a, FAS ramp on remaining master-steps to the next path-stop. This **is** the globally fastest Linear track, and **is** `naxis_ref`. | `naxis_ref.h` (Step 2ref) |
+| **Linear** | On the chords. The path speed is continuous along the chords; the DDA master carries `P` across joints. It reaches 0 only when the master axis reverses sense or the path ends. A joint where the master role moves to another axis rebinds with `P` carried (preparing a deceleration only if the new master needs one, not necessarily to 0). A reversing **slave** is taken through 0 by the DDA without stopping the path (§8.8). | DDA on longest `\|Δ\|`, `ticks_b` lengthened if a slave would exceed v/a, FAS ramp on remaining master-steps to the next master-sense reversal / path end. This **is** the globally fastest Linear track, and **is** `naxis_ref`. | `naxis_ref.h` (Step 2ref) |
 | **Overshoot** | May leave the chord within `overshoot_max`. Continuing axes need not zero `P`. Reversing / going-idle axes still at 0. | Per-axis FAS ramp over `R_i` (until that axis reverses); `T = max T_opt_i`; slower axes stretch. | Same header, Step 11 |
 
-Linear path-stop at >2° is not extra conservatism relative to
-G1+Linear+finite speed: it is required for a constraint-faithful
-Linear track. A CNC/TOPP timing with nonzero corner speed
-**rounds or cuts** the vertex; that is a different geometry, so
-it is not a Linear bound. “Each motor as fast as it can”
-without DDA lock also leaves the chord: that is uncapped
-Overshoot, not Linear.
+Linear’s path speed is now continuous through any joint where
+the master keeps its sense; the outgoing chord’s implied speed
+is reached along the outgoing block, not by stopping at the
+vertex. This stays a constraint-faithful Linear track (it never
+leaves the chords). A CNC/TOPP timing with nonzero corner speed
+that **rounds or cuts** the vertex is a different geometry, not
+a Linear bound. “Each motor as fast as it can” without DDA lock
+also leaves the chord: that is uncapped Overshoot, not Linear.
 
 **The reference is that fastest track.** PC-only header
 `extras/tests/pc_based/naxis_ref.h` (Step 2ref). Given
@@ -1758,14 +1858,18 @@ waypoints + `ticks_cfg` / accel + mode, emit the globally
 fastest feasible per-step trace `{ticks, step[NAXES] in
 {−1,0,1}}` and its total tick sum:
 
-1. Parse `R` as in §8 (end, idle-after-move, sign flip; Linear
-   also stops at non-collinear vertices). Last buffered point
-   is rest (end of path, or open path: next angle unknown, so
-   prepared for reversal). Infinite `HORIZON`.
+1. Parse `R` as in §8 (end, idle-after-move, sign flip). For
+   **Linear** the binder’s `R` ends at a master-sense reversal
+   or the path end; a master-role change rebinds without
+   cutting `R`, and non-collinear joints do not stop. Last
+   buffered point is rest (end of path, or open path: next
+   angle unknown, so prepared for reversal). Infinite
+   `HORIZON`.
 2. **Linear:** DDA master = longest `|Δ|`; `ticks_b' = max`
    moving `ticks_i`; 1-D time-law from `RampCalculator` (never
    from interpolator `P` fields). Issued `|steps_i| = |Δ_i|`.
-   Concatenate blocks; collinear joints do not rest.
+   Concatenate blocks; joints where the master keeps its sense
+   (and master-role changes) do not rest.
 3. **Overshoot:** `T_opt_i` = duration of axis `i`’s FAS ramp
    over that block’s `|Δ_i|` with `P_in` / `P_out` from its own
    `R_i`; `T = max T_opt_i`; non-binding axes lengthen period.
@@ -1787,17 +1891,15 @@ included from `src/FasNAxis.h`.
 
 F20 is the long-polyline probe of this reference: a half-circle
 sandwiched in a seeded random walk (several
-hundred waypoints, anisotropic ticks). The arc chords must be
-long enough that integer rounding keeps every joint inside the
-2° collinear band (r=4800 / 190 chords, max joint 1.61°): a
-1° chord at r=1600 is only ~28 steps, the quantisation makes
-~60% of joints >2°, and the arc path-stops at every chord —
-a sawtooth, not the intended single ramp. The random walk
-either side supplies the path-stops, reversals and DDA master
-switches; `P`/`R` are **path steps** (one DDA tick) so a
-master change does not change the ramp-step currency. The
-interpolator must match this trace once it walks N blocks
-(todo Step 2h).
+hundred waypoints, anisotropic ticks). The arc cruises because
+the DDA master’s sense is continuous through it (the 2° test is
+now only diagnostic, §8.5), so the realized speed is one ramp
+across the arc; a finer chord (1° at r=1600, ~28 steps) no
+longer turns it into a sawtooth. The random walk either side
+supplies the master-sense reversals and DDA master switches;
+`P`/`R` are **path steps** (one DDA tick) so a master change
+does not change the ramp-step currency. The interpolator must
+match this trace once it walks N blocks (todo Step 2h).
 
 **Mode comparison (still constraint-faithful):** Overshoot with
 `overshoot_max = ∞` is a lower bound on Linear duration only
@@ -1833,7 +1935,7 @@ that violates G1/G2 does not count.
 | F17 | First fill on empty queue | Not underrun; path completes | — |
 | F18 | Linear `(10000, 9000)`, Y 40× slower | Longest is X (DDA master) but Y would exceed `v_max` if X ran at `ticks_x`; Y lengthens `ticks_b`, X scaled down in speed; both axes issue full `\|Δ\|` | XY + v(t) |
 | F19 | `HORIZON` too small to hold `P_stop` as micro-segments | `addAxis` succeeds; `P` never reaches `P_stop`; same `HORIZON` with one long `addLine` *does* coast | v(t) capped |
-| F20 | Linear, ~350 waypoints: seeded random, collinear half-circle r=4800 / 190 chords (max joint 1.61°), seeded random; ticks `(4000,8000)` | Globally fastest feasible track (`naxis_ref`): every vertex hit, envelope, `P ≤ R`, path-stop joints on the random walk, collinear-cruise arc, rebind on the arc (DDA master switches; `P`/`R` stay in path steps) | `test_26_f20.gnuplot` |
+| F20 | Linear, ~350 waypoints: seeded random, half-circle r=4800 / 190 chords, seeded random; ticks `(4000,8000)` | Globally fastest feasible track (`naxis_ref`): every vertex hit, envelope, `P ≤ R`, master-sense-reversal path-stops on the random walk, cruise through the arc, rebind on the arc (DDA master switches; `P`/`R` stay in path steps) | `test_26_f20.gnuplot` |
 
 F7 is the regression sibling of `examples/MoveTimed`. F5 is Linear
 lookahead. F6 / F6b is where `overshoot_max` and `P ≤ \|Δ\|` bite.
@@ -1945,8 +2047,8 @@ needed, while the oracle still sees every command.
   polyline; realized path on top. In Overshoot, a hair at the
   sample of `max d(t)` and a dashed circle of radius
   `overshoot_max`. Linear runs should lie on the grey line.
-  Vertices marked; in Linear, path-stop corners are a distinct
-  mark.
+  Vertices marked; in Linear, the master-sense reversals / path
+  ends are a distinct mark (most joints are carried, not stopped).
 - **3D (`n ≥ 3`):** the same with a drag-to-orbit canvas 2D
   projection. No WebGL required.
 - **Strip charts:** period and `P_i(t)` / `R_i(t)`, `ticks_cfg`
@@ -1995,8 +2097,9 @@ T_side ≈ 1.789 s
 T_loop ≈ 7.156 s
 ```
 
-Lookahead does not shorten this in Linear: every corner fails
-§8.5 (axis-aligned 90°), so `R` ends at the vertex and `P → 0`.
+Lookahead does not shorten this in Linear: at each axis-aligned
+corner the outgoing side moves a different axis while the
+incoming one goes idle, so the corner is a genuine stop (`P → 0`).
 It only ensures the triangle is planned *before* the side starts.
 Overshoot on the same square is numerically the same path (idle
 axis ⇒ everyone at rest at the corner).
@@ -2006,20 +2109,23 @@ axis ⇒ everyone at rest at the corner).
 Radius 1600, 360 chords of 1°, same limits. Chord length
 `2 * 1600 * sin(0.5°) ≈ 27.9` steps.
 
-Linear would stop at the four axis extrema (`Δ_x` or `Δ_y` changes
-sign). Overshoot only zeros the reversing axis; the other keeps
-`P`. Chordal error per 1° is a fraction of a step — under a
+In Linear the four axis extrema are **slave** reversals (the DDA
+master is the other axis there), so the path does not stop; the
+master rebinds at the 45° points with `P` carried and the circle
+cruises. Overshoot also only zeros the reversing axis; the other
+keeps `P`. Chordal error per 1° is a fraction of a step — under a
 default `overshoot_max = 8`.
 
 ### 14.4 Horizon size, Linear
 
 Long axis 10 000 steps at 4000 step/s, 2000 step/s², then a 90°
-corner into a 100-step stub, Linear. `R` of the binder ends at
-the corner (angle change → path-stop, preparation = full stop).
-Decel distance 4000 steps, so `P` must start falling by
-`s = 6000`. Split into 100-step blocks: without summing `R`
-across them the planner would not see the corner in time. F10 is
-that test.
+corner into a 100-step stub, Linear. The corner forces a stop
+only if the outgoing stub moves a different axis (the incoming
+one goes idle) — a master-sense reversal / idle, not merely an
+angle change. Decel distance 4000 steps, so `P` must start
+falling by `s = 6000` before such a stop. Split into 100-step
+blocks: without summing `R` across them the planner would not
+see the stop in time. F10 is that test.
 
 ### 14.5 Overshoot bulge on (10000, 100)
 
@@ -2122,8 +2228,11 @@ axes’ speeds. Short lookahead **reduces speed**, it is not an
 error (planner problem 1: as fast as possible). A later
 faithful-timed mode (problem 2) would take a polyline **plus
 time** and reject a request faster than that feasible track
-(§3.3). Angle changes need motor accel/decel and therefore
-preparation (v1 Linear path-stops; Overshoot prepares per axis).
+(§3.3). Joints need motor accel/decel and therefore preparation:
+Linear carries the master’s `P` across a joint and only stops at a
+master-sense reversal / the path end (a master-role change
+rebinds with a prepared deceleration, not a stop); Overshoot
+prepares per axis.
 Execution is `addQueueEntry` commands with a shared tick sum.
 A reversal carves the before/after DIR pauses out of the
 reversing axis’s last step (§4.4); the other axes are not
@@ -2135,8 +2244,10 @@ Two geometry modes, both hitting every trajectory point:
 - **Linear** — the longest-distance axis walks DDA; others
   scale down in steps, unless that would make a slave exceed
   its v/a (then that slave lengthens `ticks_b` and the long
-  axis scales down in speed). DDA on the chords. Path-stop at
-  non-collinear / reversing vertices.
+  axis scales down in speed). DDA on the chords. The master’s
+  `P` carries across joints; the path stops only at a
+  master-sense reversal or the path end. A master-role change
+  rebinds with a prepared deceleration (not necessarily to 0).
 - **Overshoot** — per-axis ramps, slight chordal bulge capped by
   `overshoot_max`. Continuing axes keep `P` through a vertex;
   reversing axes go through 0. DIR before/after pauses are

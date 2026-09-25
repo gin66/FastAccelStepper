@@ -1,5 +1,7 @@
 # Faithful timed trajectory
 
+Priority: **P5** — later implementation, not v1.
+
 Status: later implementation, not v1.
 
 ## Separation
