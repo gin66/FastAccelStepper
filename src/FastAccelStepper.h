@@ -844,9 +844,6 @@ class FastAccelStepper {
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;
-  // Last stop cause, set by the stop API and cleared by takeStopCause().
-  // volatile because stopMove()/forceStop() may be called from an interrupt.
-  volatile uint8_t _stop_cause;
   uint8_t _stepPin;
   uint8_t _dirPin;
   bool _dirHighCountsUp;
@@ -873,6 +870,16 @@ class FastAccelStepper {
 #if (TEST_MEASURE_ISR_SINGLE_FILL == 1)
   uint32_t max_micros;
 #endif
+
+  // Last stop cause, set by the stop API and cleared by takeStopCause().
+  // volatile because stopMove()/forceStop() may be called from an interrupt.
+  //
+  // Keep this at the end of the member list. Adding it in the middle shifted
+  // the byte members above and measurably changed AVR FillISR/StepISR timing
+  // (test_sd_04_timing_2560: StepA Total High 355083us -> 451756us). Layout is
+  // semantically irrelevant, so it lives at the tail to keep the hot members'
+  // offsets stable.
+  volatile uint8_t _stop_cause;
 
   friend class FastAccelStepperEngine;
   friend class FastAccelStepperTest;
