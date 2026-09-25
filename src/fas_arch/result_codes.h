@@ -13,7 +13,7 @@
 // Cause of a stop, for a planner that co-drives the same queue. Set by
 // FastAccelStepper::stopMove()/forceStop()/forceStopAndNewPosition() and
 // read-and-cleared via FastAccelStepper::takeStopCause(); see
-// extras/todo/engine_sources.md. Shared here so a duck-typed n-axis planner
+// extras/doc/engine_sources.md. Shared here so a duck-typed n-axis planner
 // and the test SimPort can name the type without including FastAccelStepper.h.
 enum class StepperStopCause : uint8_t {
   None = 0,

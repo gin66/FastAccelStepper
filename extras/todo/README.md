@@ -12,7 +12,6 @@ tracked here, one file per item.
 - [Cubic start (`s_h`) overlay](cubic_start.md)
 - [AFAP vs timed — two implementations](planner_modes.md)
 - [Faithful timed trajectory](timed_trajectory.md)
-- [Pluggable motion sources — engine generalization](engine_sources.md)
 
 ## Out-of-scope log
 
@@ -32,7 +31,8 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
   the affine motor-map is caller-side too (the caller transforms
   waypoints; FasNAxis stays in step space).
 - **Running `pump()` from `manageSteppers()` and generalizing the ramp
-  generator / naxes — merged and tracked** (see `engine_sources.md`).
+  generator / naxes — implemented.** Design record moved to
+  `extras/doc/engine_sources.md` (Path A single driver + stop hook).
 - **A Linear oracle that is faster by leaving the chord / cutting a
   corner / skipping a vertex — not tracked.** Not a backlog item: such a
   track is not constraint-faithful, so it is not a faster Linear

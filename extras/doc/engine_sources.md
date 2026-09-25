@@ -1,10 +1,8 @@
 # Pluggable motion sources — engine generalization
 
-Status: design + in-progress implementation, not v1. A prototype of the
-two-class direction (`FastAccelStepperBase`, `FastAccelStepperNaxes`,
-`FastAccelStepperEngineBase`, `FastAccelStepperEngineT`, `test_28`) is in
-the working tree and passes all PC tests, but several open points below
-must be resolved before this is the final shape.
+Status: implemented design record. The decision (Path A, single driver)
+and the stop/emergency-stop design are in the code and covered by the PC
+tests (F22). The two-class prototype was reverted.
 
 Replaces the former items "Running `pump()` from `manageSteppers()`"
 (item 7) and "Generalize ramp generator and naxes" (item 9).
@@ -137,28 +135,26 @@ Consequences:
   is **not** required for now; if added later it may only do light,
   ISR-safe work (see the backend table above).
 
-Implemented driver-side stop hook (`FastAccelStepper`): `StepperStopCause`
-{None, StopMove, ForceStop, ForceStopAndNewPosition}, set by
-`stopMove()`/`forceStop()`/`forceStopAndNewPosition()` and read-and-cleared
-by `takeStopCause()`. PC tests stay green.
+Implemented:
 
-Planner wiring still to do (see Open items below).
+- Driver: `StepperStopCause` lives in `fas_arch/result_codes.h` (shared
+  with the duck-typed planner) and is set by
+  `stopMove()`/`forceStop()`/`forceStopAndNewPosition()`, read-and-cleared
+  by `FastAccelStepper::takeStopCause()`.
+- Planner: `FasNAxis::pump()` polls each member's `takeStopCause()`; a
+  non-None cause aborts the plan and returns `PumpStatus::Stopped`
+  (`isFaulted()`), positions untrusted until re-synced. `addAxis()`
+  discards a pre-registration cause. `emergencyStop()` force-stops every
+  member (no re-entrancy); `clearFault()` resets without re-syncing.
+- Test helper `SimPort` models the hook (`takeStopCause()`, plus
+  `setStopCause()`/`forceStop()` injection); `test_26` case F22 exercises
+  the injected cause, a member `forceStop()`, and `emergencyStop()`.
 
-## Open items
+## Not done (deliberate)
 
-- `FasNAxis`: poll each axis's `takeStopCause()` in `pump()`; a non-None
-  cause means a member was stopped outside the planner → enter a fault,
-  abort the plan, positions untrusted. Needs a decision on how a
-  duck-typed `FasNAxis` (which must not include `FastAccelStepper.h`)
-  names the cause type, and whether to add a `PumpStatus::Stopped` or
-  reuse `Error`.
-- `FasNAxis::emergencyStop()`: `forceStop()` every member with a
-  re-entrancy guard; the group E-stop.
-- Driver: `addAxis` should clear a stale `_stop_cause` from a prior
-  homing `stopMove()` so the planner does not see a pre-registration stop.
-- Test helper `SimPort` needs `takeStopCause()` (default None) plus an
-  injection hook to exercise the fault path; default behaviour of the
-  existing `test_26` cases must be unchanged.
+- A `manageSteppers()` registration hook for auto-feed. `FasNAxis` stays
+  caller-pumped; if a hook is added later it may only do light, ISR-safe
+  work (see the backend table above).
 
 ## References
 

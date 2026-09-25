@@ -150,7 +150,7 @@ class SimPort {
   // and it has not settled to a no-motion state.
   bool isRunning() const { return kicked_off_; }
 
-  // --- external stop modelling (extras/todo/engine_sources.md) ---
+  // --- external stop modelling (extras/doc/engine_sources.md) ---
   // Duck-type alias for FastAccelStepper::takeStopCause(): FasNAxis polls this
   // each pump(); default None keeps the existing cases unchanged. A test
   // injects a stop through setStopCause() or forceStop().
