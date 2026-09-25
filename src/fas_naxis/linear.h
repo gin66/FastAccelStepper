@@ -76,9 +76,7 @@ class LinearBlock {
   }
 
  private:
-  static uint32_t abs_delta(int32_t d) {
-    return d > 0 ? (uint32_t)d : (uint32_t)(-(int64_t)d);
-  }
+  static uint32_t abs_delta(int32_t d) { return Remaining::u32_abs(d); }
 };
 
 // FasNAxis Linear multi-block interpolator (Step 2f / 2h, whitepaper section
@@ -109,7 +107,7 @@ class LinearPoly {
   uint32_t P;
   uint32_t R;
   uint32_t R_before_cmd;  // R at the start of the last issued command
-  uint64_t total_ticks;
+  uint32_t total_ticks;
   bool finished;
 
   LinearPoly(Remaining* rem_, const uint32_t* ticks_, uint32_t accel_)
@@ -171,9 +169,7 @@ class LinearPoly {
   }
 
  private:
-  static uint32_t abs_u(int32_t d) {
-    return d > 0 ? (uint32_t)d : (uint32_t)(-(int64_t)d);
-  }
+  static uint32_t abs_u(int32_t d) { return Remaining::u32_abs(d); }
 
   int next_moving(int from) const {
     for (int b = from; b < rem->n_blocks; b++) {

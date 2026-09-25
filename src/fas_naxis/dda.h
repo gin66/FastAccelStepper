@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "fas_naxis/remaining.h"
+
 // FasNAxis Linear DDA walk (whitepaper section 6.3).
 //
 // The DDA master is the longest |delta| (Remaining::longest_axis). Time-law
@@ -29,21 +31,21 @@ class DdaWalk {
   DdaWalk(int32_t bind, int32_t slave)
       : bind(bind),
         slave(slave),
-        abs_bind(bind > 0 ? bind : -bind),
-        abs_slave(slave > 0 ? slave : -slave),
+        abs_bind(Remaining::u32_abs(bind)),
+        abs_slave(Remaining::u32_abs(slave)),
         bind_dir(bind < 0 ? -1 : 1),
         slave_dir(slave < 0 ? -1 : 1),
         err(0),
         k(0) {}
 
-  int32_t bind;       // signed binder displacement
-  int32_t slave;      // signed slave displacement
-  int64_t abs_bind;   // |bind|, the loop bound
-  int64_t abs_slave;  // |slave|, the error increment
-  int bind_dir;       // +1 / -1
-  int slave_dir;      // +1 / -1
-  int64_t err;        // Bresenham error accumulator
-  int k;              // binder steps consumed so far
+  int32_t bind;        // signed binder displacement
+  int32_t slave;       // signed slave displacement
+  uint32_t abs_bind;   // |bind|, the loop bound
+  uint32_t abs_slave;  // |slave|, the error increment
+  int bind_dir;        // +1 / -1
+  int slave_dir;       // +1 / -1
+  int32_t err;         // Bresenham remainder; stays within ±|bind|/2
+  uint32_t k;          // binder steps consumed so far
 
   bool done() const { return k >= abs_bind; }
 
@@ -52,10 +54,10 @@ class DdaWalk {
   // chord invariant |2*err| <= |bind| holds after every step.
   void step(int* bind_out, int* slave_out) {
     int s = 0;
-    err += abs_slave;
-    if (2 * err >= abs_bind) {
+    err += (int32_t)abs_slave;
+    if (err > 0 && Remaining::u32_twice_ge((uint32_t)err, abs_bind)) {
       s = slave_dir;
-      err -= abs_bind;
+      err -= (int32_t)abs_bind;
     }
     if (bind_out) {
       *bind_out = bind_dir;
@@ -68,11 +70,15 @@ class DdaWalk {
 
   // The chord invariant: |2*err| <= |bind| after a step.
   bool on_chord() const {
-    int64_t e = err;
+    int32_t e = err < 0 ? -err : err;
     if (e < 0) {
-      e = -e;
+      return false;
     }
-    return 2 * e <= abs_bind;
+    uint32_t ue = (uint32_t)e;
+    if (ue >= 0x80000000u) {
+      return false;
+    }
+    return (ue << 1) <= abs_bind;
   }
 };
 

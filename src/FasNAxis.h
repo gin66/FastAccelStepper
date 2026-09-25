@@ -18,8 +18,9 @@ class FastAccelStepper;
 // one polyline so the axes stay time-synchronized (whitepaper
 // extras/doc/n_axes_whitepaper.md). Header-only: no new src/*.cpp, and it is
 // NOT included from FastAccelStepper.h (the stepper has no dependency on the
-// planner). The hot path performs no float, double, or integer division; ramp
-// math lives in fas_naxis/ramp_map.h (log2_value_t) and RampCalculator.
+// planner). The hot path performs no float, double, integer division, or
+// 64-bit integer type; ramp math lives in fas_naxis/ramp_map.h
+// (log2_value_t) and RampCalculator.
 //
 // Step 7 is the Linear lookahead planner: addLine() commits points into a block
 // ring of up to HORIZON n-dim points, and pump() feeds the committed Linear
@@ -461,11 +462,7 @@ class FasNAxis {
   int pendingBlocks() const { return _n_blk - _head; }
 
  private:
-  static int64_t abs_i64(int32_t d) { return d > 0 ? (int64_t)d : -(int64_t)d; }
-
-  static uint32_t abs_u32(int32_t d) {
-    return d > 0 ? (uint32_t)d : (uint32_t)(-(int64_t)d);
-  }
+  static uint32_t abs_u32(int32_t d) { return Remaining::u32_abs(d); }
 
   bool any_queue_nonempty() const {
     for (uint8_t i = 0; i < NAXES; i++) {
@@ -826,7 +823,7 @@ class FasNAxis {
       carry = R_new;
     }
     _law.P = carry;
-    _abs_master = abs_i64(_blk[b][_master]);
+    _abs_master = abs_u32(_blk[b][_master]);
     _block_left = abs_u32(_blk[b][_master]);
     for (uint8_t i = 0; i < NAXES; i++) {
       _err[i] = 0;
@@ -925,10 +922,183 @@ class FasNAxis {
     start_block(_head, true);
   }
 
+  // True when a DIR carve must keep the block's last master step as its own
+  // one-step command.
+  bool leave_last_for_carve() const {
+    if (_block_left <= 1) {
+      return false;
+    }
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (!_registered[i] || !reverses_at_end(_head, i)) {
+        continue;
+      }
+      if (reverse_tau(i) > 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Per-axis per-step ticks for a batch of `n` master steps at period `T`
+  // with signed net `net[i]`. Idle axes get one pause of `n * T`. A moving
+  // axis gets `ticks * |net| == n * T` exactly (multiply check, no `/`).
+  // Returns false when that product is not exact or does not fit in 16 bits.
+  bool linear_batch_ticks(const int32_t* net, uint32_t n, uint32_t T,
+                          uint16_t* ticks_out) const {
+    uint32_t total = n * T;
+    if (n == 0 || total == 0 || total > 65535u) {
+      return false;
+    }
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (!_registered[i]) {
+        continue;
+      }
+      int32_t v = net[i];
+      if (v == 0) {
+        ticks_out[i] = (uint16_t)total;
+        continue;
+      }
+      uint32_t k = v > 0 ? (uint32_t)v : (uint32_t)(-v);
+      if (k > 255u) {
+        return false;
+      }
+      uint32_t ts = T;
+      if (k != n) {
+        ts = log2_to_u32(log2_divide(log2_from(total), log2_from(k)));
+        if (ts == 0 || ts * k != total) {
+          return false;
+        }
+      }
+      if (ts > 65535u || ts < _tick_cfg[i]) {
+        return false;
+      }
+      ticks_out[i] = (uint16_t)ts;
+    }
+    return true;
+  }
+
+  // One Bresenham step of the current block, applied to `err` / `net`.
+  void linear_dda_step(int32_t* err, int32_t* net) const {
+    int master_sign = _blk[_head][_master] > 0 ? 1 : -1;
+    net[_master] += master_sign;
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (i == (uint8_t)_master) {
+        continue;
+      }
+      uint32_t ad = abs_u32(_blk[_head][i]);
+      if (ad == 0) {
+        continue;
+      }
+      err[i] += (int32_t)ad;
+      if (err[i] > 0 &&
+          Remaining::u32_twice_ge((uint32_t)err[i], _abs_master)) {
+        net[i] += _blk[_head][i] > 0 ? 1 : -1;
+        err[i] -= (int32_t)_abs_master;
+      }
+    }
+  }
+
+  void law_restore(uint32_t p, uint32_t r, uint32_t total) {
+    _law.P = p;
+    _law.R = r;
+    _law.total_ticks = total;
+  }
+
+  // Ramp-generator batch: when the step period is under 1 ms, pack equal
+  // periods into one command of about 2 ms (TICKS_PER_S / 500), and stop
+  // before a DIR carve or a period change. Returns 0 when fewer than two
+  // steps fit, leaving the law and the DDA untouched. The law is stepped
+  // and rolled back; there is no second copy of the ramp state.
+  uint32_t plan_linear_batch(int st[NAXES], uint16_t* ticks_out,
+                             uint32_t* period_out) {
+    if (_block_left < 2) {
+      return 0;
+    }
+    uint32_t p0 = _law.P;
+    uint32_t r0 = _law.R;
+    uint32_t tot0 = _law.total_ticks;
+    uint32_t T = _law.step();
+    law_restore(p0, r0, tot0);
+    uint32_t one_ms = (uint32_t)(TICKS_PER_S / 1000);
+    if (T == 0 || T >= one_ms || T > 65535u) {
+      return 0;
+    }
+    uint32_t budget = (uint32_t)(TICKS_PER_S / 500);
+    if (budget > 65535u) {
+      budget = 65535u;
+    }
+    uint32_t room = _block_left;
+    if (leave_last_for_carve() && room > 0) {
+      room--;
+    }
+    if (room < 2) {
+      return 0;
+    }
+    uint32_t max_n = 1;
+    uint32_t acc_ticks = T;
+    while (max_n < room && max_n < 255u && acc_ticks + T <= budget) {
+      max_n++;
+      acc_ticks += T;
+    }
+    if (max_n < 2) {
+      return 0;
+    }
+
+    int32_t err[NAXES];
+    int32_t net[NAXES];
+    uint16_t ticks_ok[NAXES];
+    for (uint8_t i = 0; i < NAXES; i++) {
+      err[i] = _err[i];
+      net[i] = 0;
+      ticks_ok[i] = 0;
+    }
+    uint32_t n_ok = 0;
+    for (uint32_t s = 0; s < max_n; s++) {
+      uint32_t ps = _law.P;
+      uint32_t rs = _law.R;
+      uint32_t ts = _law.total_ticks;
+      uint32_t t = _law.step();
+      if (t != T) {
+        law_restore(ps, rs, ts);
+        break;
+      }
+      int32_t err_try[NAXES];
+      int32_t net_try[NAXES];
+      uint16_t ticks_try[NAXES];
+      for (uint8_t i = 0; i < NAXES; i++) {
+        err_try[i] = err[i];
+        net_try[i] = net[i];
+      }
+      linear_dda_step(err_try, net_try);
+      if (!linear_batch_ticks(net_try, s + 1, T, ticks_try)) {
+        law_restore(ps, rs, ts);
+        break;
+      }
+      for (uint8_t i = 0; i < NAXES; i++) {
+        err[i] = err_try[i];
+        net[i] = net_try[i];
+        ticks_ok[i] = ticks_try[i];
+      }
+      n_ok = s + 1;
+    }
+    if (n_ok < 2) {
+      law_restore(p0, r0, tot0);
+      return 0;
+    }
+    for (uint8_t i = 0; i < NAXES; i++) {
+      _err[i] = err[i];
+      st[i] = net[i];
+      ticks_out[i] = ticks_ok[i];
+    }
+    _block_left -= n_ok;
+    *period_out = T;
+    return n_ok;
+  }
+
   // Emit at most one queue entry per registered axis per call, so the axes stay
-  // in lockstep. A master step with a period above 65535 is represented the FAS
-  // way: a half-period step entry followed by pause entries covering the
-  // remainder (sections 4.2 / 9.3).
+  // in lockstep. A fast coast is one multi-step command (section 4.3.1). A
+  // master step with a period above 65535 is a half-period step entry followed
+  // by pause entries covering the remainder (sections 4.2 / 9.3).
   void feed_one() {
     if (_done || _slice_open) {
       return;
@@ -966,8 +1136,11 @@ class FasNAxis {
 
     uint32_t T;
     int st[NAXES];
+    uint16_t batch_ticks[NAXES];
+    bool batched = false;
     for (uint8_t i = 0; i < NAXES; i++) {
       st[i] = 0;
+      batch_ticks[i] = 0;
     }
     if (overshoot_mode()) {
       // Overshoot: one command per binding RampLaw step; the non-binding axes
@@ -980,26 +1153,23 @@ class FasNAxis {
       _Pramp = _ovs.P[_ovs.binder];
       _Rstop = _ovs.R[_ovs.binder];
       _ticks_last = T;
+    } else if (plan_linear_batch(st, batch_ticks, &T) >= 2) {
+      batched = true;
+      _Pramp = _law.P;
+      _Rstop = _law.R;
+      _ticks_last = T;
     } else {
       T = _law.step();
       _Pramp = _law.P;
       _Rstop = _law.R;
       _ticks_last = T;
-
-      st[_master] = _blk[_head][_master] > 0 ? 1 : -1;
+      int32_t net[NAXES];
       for (uint8_t i = 0; i < NAXES; i++) {
-        if (i == (uint8_t)_master) {
-          continue;
-        }
-        int64_t ad = abs_i64(_blk[_head][i]);
-        if (ad == 0) {
-          continue;
-        }
-        _err[i] += ad;
-        if (2 * _err[i] >= _abs_master) {
-          st[i] = _blk[_head][i] > 0 ? 1 : -1;
-          _err[i] -= _abs_master;
-        }
+        net[i] = 0;
+      }
+      linear_dda_step(_err, net);
+      for (uint8_t i = 0; i < NAXES; i++) {
+        st[i] = net[i];
       }
     }
 
@@ -1022,7 +1192,9 @@ class FasNAxis {
     // pause out of the reversing axis's own last step (whitepaper section 4.4).
     // Only the 16-bit-representable tail is carved here; a longer tail keeps
     // the §9.3 stuffing path unchanged.
-    bool last_cmd = overshoot_mode() ? _ovs.last_command() : (_block_left == 1);
+    bool last_cmd =
+        batched ? false
+                : (overshoot_mode() ? _ovs.last_command() : (_block_left == 1));
     bool carving = false;
     if (last_cmd && T <= 65535) {
       for (uint8_t i = 0; i < NAXES; i++) {
@@ -1057,7 +1229,7 @@ class FasNAxis {
       // Overshoot catch-up: `steps` pulses in this slice must span the same
       // t_step ticks as every other axis, so each pulse is t_step / steps
       // (log2 divide, section 9.3), floored to the axis envelope.
-      uint16_t ticks_i = (uint16_t)t_step;
+      uint16_t ticks_i = batched ? batch_ticks[i] : (uint16_t)t_step;
       if (overshoot_mode() && steps > 1) {
         uint32_t tt = log2_to_u32(
             log2_divide(log2_from((uint32_t)t_step), log2_from(steps)));
@@ -1075,7 +1247,7 @@ class FasNAxis {
       hold(i, ticks_i, steps, up);
     }
     _slice_open = true;
-    if (!overshoot_mode()) {
+    if (!overshoot_mode() && !batched) {
       _block_left--;
     }
     if (carving) {
@@ -1103,7 +1275,7 @@ class FasNAxis {
   AxisLimits _lim[NAXES];
   uint32_t _tick_cfg[NAXES];
   int32_t _p[NAXES];
-  int64_t _err[NAXES];
+  int32_t _err[NAXES];
   bool _dir[NAXES];
   int32_t _blk[HORIZON][NAXES];
   uint32_t _dwell[HORIZON];
@@ -1125,7 +1297,7 @@ class FasNAxis {
   Carve _carve_axis[NAXES];
   bool _carve_then_advance;
   int _master;
-  int64_t _abs_master;
+  uint32_t _abs_master;
   uint32_t _block_left;
   uint32_t _pause_left;
   uint32_t _ticks_law;

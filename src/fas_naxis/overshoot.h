@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 
+#include "fas_naxis/remaining.h"
 #include "fas_ramp/RampCalculator.h"
 
 // FasNAxis Overshoot run (whitepaper sections 6.4 / 6.5 / 7.3 / 8.6, todo
@@ -94,19 +95,19 @@ class OvershootRun {
   // block onward (the section 8.6 scan). A sign change or a zero block resets
   // P_i; a continuation keeps it. `n` must equal the configured axis count.
   void start_block(const int32_t* d, const uint32_t* Rrem) {
-    uint64_t Tmax = 0;
+    uint32_t Tmax = 0;
     int b = 0;
     bool any = false;
     for (int i = 0; i < n_axes; i++) {
       int32_t di = d[i];
-      tot[i] = di > 0 ? (uint32_t)di : (uint32_t)(-(int64_t)di);
+      tot[i] = Remaining::u32_abs(di);
       sgn[i] = di > 0 ? 1 : (di < 0 ? -1 : 0);
       issued[i] = 0;
       if (tot[i] == 0 || (prev[i] != 0 && sgn[i] != 0 && sgn[i] != prev[i])) {
         P[i] = 0;
       }
       R[i] = Rrem[i];
-      uint64_t opt = 0;
+      uint32_t opt = 0;
       if (tot[i] > 0) {
         opt = simulate(i);
       }
@@ -161,7 +162,7 @@ class OvershootRun {
         // t_step / steps ticks each (section 9.3), so the shared wall clock is
         // preserved.
         uint32_t k = issued[i];
-        while (k < tot[i] && (uint64_t)tot[i] * t >= (uint64_t)(k + 1) * T) {
+        while (k < tot[i] && Remaining::u32_mul_cmp(tot[i], t, k + 1, T) >= 0) {
           k++;
         }
         if (cap != 0 && cap != 0xFFFFu && tot[binder] > 0) {
@@ -188,13 +189,13 @@ class OvershootRun {
   uint32_t P[NMAX];  // performed ramp-up steps (persistent across blocks)
   uint32_t R[NMAX];  // remaining steps in the current direction
   int binder;        // axis with the largest T_opt
-  uint64_t T;        // binding block duration in ticks
+  uint32_t T;        // binding block duration in ticks
   uint32_t ncmd;     // binding commands in the current block
   uint32_t x;        // binding commands issued in the current block
 
  private:
   bool binding[NMAX];   // T_opt_i == T for this block
-  uint64_t Topt[NMAX];  // per-axis ramp duration for this block
+  uint32_t Topt[NMAX];  // per-axis ramp duration for this block
   ramp_config_s cfg[NMAX];
   uint32_t tick[NMAX];
   uint32_t accel[NMAX];
@@ -203,7 +204,7 @@ class OvershootRun {
   int8_t sgn[NMAX];
   int8_t prev[NMAX];
   uint32_t issued[NMAX];
-  uint64_t t;
+  uint32_t t;
   bool done_;
 
   // Apply the section 7.1 law to axis i, then return the period at the new P.
@@ -239,10 +240,10 @@ class OvershootRun {
 
   // Sum of the periods axis i would take for this block's |delta_i| steps,
   // without touching the live P / R.
-  uint64_t simulate(int i) const {
+  uint32_t simulate(int i) const {
     uint32_t p = P[i];
     uint32_t r = R[i];
-    uint64_t sum = 0;
+    uint32_t sum = 0;
     for (uint32_t s = 0; s < tot[i]; s++) {
       if (r > p) {
         if (p < coast[i]) {
@@ -253,15 +254,17 @@ class OvershootRun {
           p--;
         }
       }
+      uint32_t tt;
       if (p == 0) {
-        sum += cfg[i].calculate_ticks(1);
+        tt = cfg[i].calculate_ticks(1);
       } else {
-        uint32_t tt = cfg[i].calculate_ticks(p);
+        tt = cfg[i].calculate_ticks(p);
         if (tt < tick[i]) {
           tt = tick[i];
         }
-        sum += tt;
       }
+      uint32_t next = sum + tt;
+      sum = next < sum ? 0xffffffffu : next;
       if (r > 0) {
         r--;
       }
@@ -271,18 +274,43 @@ class OvershootRun {
 
   // Pull a uniform candidate `k` for axis i back toward the chord until the
   // integer squared distance fits the cap. No sqrt, no division.
-  uint32_t apply_cap(int i, uint32_t k) const {
-    int64_t nb = tot[binder];
-    int64_t ns = tot[i];
-    int64_t c2 = (int64_t)cap * cap * (nb * nb + ns * ns);
-    int64_t num = nb * (int64_t)k - ns * (int64_t)x;
-    while (k > issued[i] && num > 0 && num * num > c2) {
-      k--;
-      num -= nb;
+  bool outside_cap(uint32_t nb, uint32_t ns, uint32_t k) const {
+    int side = Remaining::u32_mul_cmp(nb, k, ns, x);
+    if (side == 0) {
+      return false;
     }
-    while (k < tot[i] && num < 0 && num * num > c2) {
+    Remaining::U32p left = Remaining::u32_mul(nb, k);
+    Remaining::U32p right = Remaining::u32_mul(ns, x);
+    Remaining::U32p diff = side > 0 ? Remaining::u32p_sub(left, right)
+                                    : Remaining::u32p_sub(right, left);
+    if (diff.hi != 0) {
+      return true;
+    }
+    Remaining::U32p cap2 = Remaining::u32_mul(cap, cap);
+    if (cap2.hi != 0) {
+      return false;
+    }
+    Remaining::U32p nb2 = Remaining::u32_mul(nb, nb);
+    Remaining::U32p ns2 = Remaining::u32_mul(ns, ns);
+    Remaining::U32p sumsq = Remaining::u32p_add(nb2, ns2);
+    Remaining::U32p c2;
+    Remaining::U32p sq = Remaining::u32_mul(diff.lo, diff.lo);
+    if (sumsq.hi != 0 || !Remaining::u32p_mul_u32(sumsq, cap2.lo, &c2)) {
+      return false;
+    }
+    return Remaining::u32p_cmp(sq, c2) > 0;
+  }
+
+  uint32_t apply_cap(int i, uint32_t k) const {
+    uint32_t nb = tot[binder];
+    uint32_t ns = tot[i];
+    while (k > issued[i] && Remaining::u32_mul_cmp(nb, k, ns, x) > 0 &&
+           outside_cap(nb, ns, k)) {
+      k--;
+    }
+    while (k < tot[i] && Remaining::u32_mul_cmp(nb, k, ns, x) < 0 &&
+           outside_cap(nb, ns, k)) {
       k++;
-      num += nb;
     }
     return k;
   }

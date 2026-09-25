@@ -47,6 +47,87 @@
 // ramp_law.h).
 class Remaining {
  public:
+  // Two uint32 halves of a product. Not a 64-bit type: productive code has
+  // none. hi is the upper half.
+  struct U32p {
+    uint32_t hi;
+    uint32_t lo;
+  };
+
+  static uint32_t u32_abs(int32_t d) {
+    uint32_t u = (uint32_t)d;
+    return d < 0 ? (0u - u) : u;
+  }
+
+  // 2*err >= master, without a widening multiply. err >= 2^31 implies
+  // 2*err >= 2^32 > master.
+  static bool u32_twice_ge(uint32_t err, uint32_t master) {
+    if (err >= 0x80000000u) {
+      return true;
+    }
+    return (err << 1) >= master;
+  }
+
+  static U32p u32_mul(uint32_t a, uint32_t b) {
+    uint32_t al = a & 0xffffu;
+    uint32_t ah = a >> 16;
+    uint32_t bl = b & 0xffffu;
+    uint32_t bh = b >> 16;
+    uint32_t p0 = al * bl;
+    uint32_t p1 = al * bh;
+    uint32_t p2 = ah * bl;
+    uint32_t p3 = ah * bh;
+    uint32_t mid = (p0 >> 16) + (p1 & 0xffffu) + (p2 & 0xffffu);
+    U32p r;
+    r.lo = (p0 & 0xffffu) | (mid << 16);
+    r.hi = p3 + (p1 >> 16) + (p2 >> 16) + (mid >> 16);
+    return r;
+  }
+
+  static int u32p_cmp(U32p a, U32p b) {
+    if (a.hi != b.hi) {
+      return a.hi > b.hi ? 1 : -1;
+    }
+    if (a.lo != b.lo) {
+      return a.lo > b.lo ? 1 : -1;
+    }
+    return 0;
+  }
+
+  static U32p u32p_add(U32p a, U32p b) {
+    U32p r;
+    r.lo = a.lo + b.lo;
+    r.hi = a.hi + b.hi + (r.lo < a.lo ? 1u : 0u);
+    return r;
+  }
+
+  static U32p u32p_sub(U32p a, U32p b) {
+    U32p r;
+    r.lo = a.lo - b.lo;
+    r.hi = a.hi - b.hi - (a.lo < b.lo ? 1u : 0u);
+    return r;
+  }
+
+  static bool u32p_is_zero(U32p a) { return a.hi == 0 && a.lo == 0; }
+
+  // a * m into 64 bits of magnitude. False when a third limb would be set.
+  static bool u32p_mul_u32(U32p a, uint32_t m, U32p* out) {
+    U32p p0 = u32_mul(a.lo, m);
+    U32p p1 = u32_mul(a.hi, m);
+    uint32_t hi = p0.hi + p1.lo;
+    if (hi < p0.hi || p1.hi != 0) {
+      return false;
+    }
+    out->lo = p0.lo;
+    out->hi = hi;
+    return true;
+  }
+
+  // >0 when a*b > c*d.
+  static int u32_mul_cmp(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    return u32p_cmp(u32_mul(a, b), u32_mul(c, d));
+  }
+
 #ifdef FAS_NAXIS_REFERENCE
   int n_axes;
   int n_blocks;
@@ -126,22 +207,47 @@ class Remaining {
   //   (cos^2(2deg) ~= 0.99878). Integer mul/compare, no division, no sqrt.
   //  The dot sign keeps "same sense": opposite senses fail.
   bool collinear_same_sense(int block_a, int block_b) const {
-    int64_t dot = 0;
-    int64_t mag_a = 0;
-    int64_t mag_b = 0;
+    bool dot_neg = false;
+    U32p dot = {0, 0};
+    U32p mag_a = {0, 0};
+    U32p mag_b = {0, 0};
     for (int i = 0; i < n_axes; i++) {
-      int64_t da = delta_of(i, block_a);
-      int64_t db = delta_of(i, block_b);
-      dot += da * db;
-      mag_a += da * da;
-      mag_b += db * db;
+      int32_t da = delta_of(i, block_a);
+      int32_t db = delta_of(i, block_b);
+      bool neg = (da < 0) != (db < 0);
+      uint32_t ua = u32_abs(da);
+      uint32_t ub = u32_abs(db);
+      U32p prod = u32_mul(ua, ub);
+      if (u32p_is_zero(dot)) {
+        dot = prod;
+        dot_neg = neg && !u32p_is_zero(prod);
+      } else if (dot_neg == neg) {
+        dot = u32p_add(dot, prod);
+      } else if (u32p_cmp(dot, prod) >= 0) {
+        dot = u32p_sub(dot, prod);
+      } else {
+        dot = u32p_sub(prod, dot);
+        dot_neg = !dot_neg;
+      }
+      mag_a = u32p_add(mag_a, u32_mul(ua, ua));
+      mag_b = u32p_add(mag_b, u32_mul(ub, ub));
     }
-    if (dot <= 0 || mag_a == 0 || mag_b == 0) {
-      return false;  // opposite sense or a zero vector
+    if (dot_neg || u32p_is_zero(dot) || u32p_is_zero(mag_a) ||
+        u32p_is_zero(mag_b)) {
+      return false;
     }
-    int64_t lhs = dot * dot * 100000;
-    int64_t rhs = 99878 * mag_a * mag_b;
-    return lhs >= rhs;
+    if (dot.hi != 0 || mag_a.hi != 0 || mag_b.hi != 0) {
+      return false;
+    }
+    U32p dot2 = u32_mul(dot.lo, dot.lo);
+    U32p mag = u32_mul(mag_a.lo, mag_b.lo);
+    U32p lhs;
+    U32p rhs;
+    if (!u32p_mul_u32(dot2, 100000u, &lhs) ||
+        !u32p_mul_u32(mag, 99878u, &rhs)) {
+      return false;
+    }
+    return u32p_cmp(lhs, rhs) >= 0;
   }
 #endif /* FAS_NAXIS_REFERENCE */
 
@@ -333,20 +439,33 @@ class Remaining {
   static int binder_axis(const int32_t* block, const uint32_t* ticks,
                          int n_axes) {
     int b = 0;
-    int64_t best = -1;
+    uint32_t best_ad = 0;
+    uint32_t best_t = 0;
+    bool any = false;
     for (int i = 0; i < n_axes; i++) {
-      int64_t ad = block[i] > 0 ? block[i] : -block[i];
-      if (ad == 0) {
+      if (block[i] == 0) {
         continue;
       }
-      int64_t score;
+      uint32_t ad = u32_abs(block[i]);
 #ifdef FAS_NAXIS_NO_REBIND
-      score = ad;  // longest-distance only: rebind disabled
+      uint32_t t = 0;
 #else
-      score = ad * (int64_t)ticks[i];  // wall-clock: rebind to slow motor
+      uint32_t t = ticks[i];
 #endif
-      if (score > best) {
-        best = score;
+      if (!any) {
+        any = true;
+        best_ad = ad;
+        best_t = t;
+        b = i;
+        continue;
+      }
+#ifdef FAS_NAXIS_NO_REBIND
+      if (ad > best_ad) {
+#else
+      if (u32_mul_cmp(ad, t, best_ad, best_t) > 0) {
+#endif
+        best_ad = ad;
+        best_t = t;
         b = i;
       }
     }
@@ -359,18 +478,18 @@ class Remaining {
   // magnitude == bind) issues |delta_bind| steps; an idle slave issues 0.
   // Used by the PC reference tests.
   static int dda_steps(int delta_bind, int delta_slave) {
-    int64_t abs_bind = delta_bind > 0 ? delta_bind : -delta_bind;
-    int64_t abs_slave = delta_slave > 0 ? delta_slave : -delta_slave;
+    uint32_t abs_bind = u32_abs(delta_bind);
+    uint32_t abs_slave = u32_abs(delta_slave);
     if (abs_bind == 0) {
       return 0;
     }
-    int64_t err = 0;
+    int32_t err = 0;
     int steps = 0;
-    for (int i = 0; i < abs_bind; i++) {
-      err += abs_slave;
-      if (2 * err >= abs_bind) {
+    for (uint32_t i = 0; i < abs_bind; i++) {
+      err += (int32_t)abs_slave;
+      if (err > 0 && u32_twice_ge((uint32_t)err, abs_bind)) {
         steps++;
-        err -= abs_bind;
+        err -= (int32_t)abs_bind;
       }
     }
     return steps;

@@ -3,9 +3,10 @@
 Priority: **P3** — end-to-end validation; depends on P1 and P2.
 
 Status: detector in place (`detect_geometry.py` `path-stops` check).
-The planner now cruises a 7.5° helix (PC). simavr `test_naxes` has not
-been re-run since that change; it last failed with `stops=156`.
-Depends on `feeder_command_batching.md` as well.
+The planner cruises a 7.5° helix (PC, and on hardware after P1). The
+feeder batches fast equal-period steps (P2, PC). simavr `test_naxes`
+has not been re-run since those changes; it last failed with
+`stops=156`.
 
 ## Problem
 

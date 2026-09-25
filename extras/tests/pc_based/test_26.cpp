@@ -2397,9 +2397,9 @@ static void run_linear_segment(SimPort& px, SimPort& py,
     int64_t s_bind = (master == 0) ? s0 : s1;
     int64_t s_slave = (master == 0) ? s1 : s0;
     if (s_bind != 0) {
-      res->bind_moves++;
-      if (s_slave != 0) {
-        res->both_moves++;
+      res->bind_moves += s_bind;
+      if (s_slave == s_bind) {
+        res->both_moves += s_bind;
       }
     }
     uint32_t P = path.performedRampUp();
@@ -2477,8 +2477,8 @@ void f6_linear_sim() {
     printf("F1 Linear SimPort plot written: test_26_f1_lin.gnuplot\n");
   }
 
-  // F2: 45 degree line, equal limits. X binds; every binder step is one step on
-  // each axis, so |delta_x| == |delta_y| every slice and the path is the chord.
+  // F2: 45 degree line, equal limits. X binds; every slice moves both axes by
+  // the same step count, so the path stays on the chord (a batch included).
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
@@ -2567,12 +2567,13 @@ struct PolySimResult {
 };
 
 // Step 7: drive a committed polyline through FasNAxis/SimPort and compare the
-// produced Linear track command by command to the NaxisRefLinear oracle (Step
-// 2ref). Phase 1 drains the real queue into a trace; phase 2 coalesces the
-// 65535 splits back to full periods and checks tick-for-tick equality, the
-// per-axis envelope, issued |steps| == |delta|, and the joint P semantics. P is
-// reconstructed from the issued period (never from planner P fields); vertices
-// are located by the oracle's cumulative step position.
+// produced Linear track to the NaxisRefLinear oracle (Step 2ref). Phase 1
+// drains the real queue into a trace; phase 2 coalesces the 65535 splits back
+// to full periods. One production command may be several master steps at one
+// period (section 4.3.1); it matches the sum of that many reference steps.
+// Envelope, issued |steps| == |delta|, and joint P are checked from the
+// per-step period, never from planner P fields. Vertices are located by the
+// oracle's cumulative step position.
 template <uint16_t HZ>
 static void walk_prod_polyline(SimPort& px, SimPort& py,
                                FasNAxis<2, HZ, SimPort>& path,
@@ -2663,14 +2664,11 @@ static void walk_prod_polyline(SimPort& px, SimPort& py,
   uint64_t last_ticks = 0;
   double ema_v[2] = {0.0, 0.0};
   bool have_sample = true;
-  while (!ref.done()) {
-    int os[2];
-    uint32_t T_ref = ref.step(os);
+  while (res->trace_match && i < res->n_entry) {
     while (i < res->n_entry && e[i].s0 == 0 && e[i].s1 == 0) {
       i++;
     }
     if (i >= res->n_entry) {
-      res->trace_match = false;
       break;
     }
     uint32_t T_prod = e[i].t;
@@ -2681,67 +2679,84 @@ static void walk_prod_polyline(SimPort& px, SimPort& py,
       T_prod += e[i].t;
       i++;
     }
-    if (ps0 != os[0] || ps1 != os[1] || T_prod != T_ref) {
+    uint32_t T_acc = 0;
+    int s_acc0 = 0;
+    int s_acc1 = 0;
+    bool matched = false;
+    for (int guard = 0; guard < 256 && !ref.done(); guard++) {
+      int os[2];
+      uint32_t T_ref = ref.step(os);
+      T_acc += T_ref;
+      s_acc0 += os[0];
+      s_acc1 += os[1];
+      pos[0] += os[0];
+      pos[1] += os[1];
+      uint32_t p_issued = map.calculate_ramp_steps(T_ref);
+      if (os[0] != 0 || os[1] != 0) {
+        last_moving_p = p_issued;
+        if (p_issued > res->max_moving_p) {
+          res->max_moving_p = p_issued;
+        }
+        if (T_ref < res->min_moving_ticks) {
+          res->min_moving_ticks = T_ref;
+        }
+      }
+      if (os[0] != 0 && T_ref + 1 < ticks[0]) {
+        res->envelope_ok = false;
+      }
+      if (os[1] != 0 && T_ref + 1 < ticks[1]) {
+        res->envelope_ok = false;
+      }
+      if (do_plot) {
+        uint64_t now_ticks = ref.total_ticks;
+        double dt = (double)(now_ticks - last_ticks) / NAXIS_PLOT_TICKS_PER_S;
+        if (dt > 0.0) {
+          double alpha = dt / (kSpeedTau_s + dt);
+          ema_v[0] += alpha * ((double)(pos[0] - last_pos[0]) / dt - ema_v[0]);
+          ema_v[1] += alpha * ((double)(pos[1] - last_pos[1]) / dt - ema_v[1]);
+        }
+        last_pos[0] = pos[0];
+        last_pos[1] = pos[1];
+        last_ticks = now_ticks;
+        if ((sample_n % kPlotStride) == 0 && have_sample) {
+          double speed[2] = {ema_v[0], ema_v[1]};
+          double Pcol[2] = {(double)p_issued, (double)p_issued};
+          double Rcol[2] = {(double)ref.R, (double)ref.R};
+          double tcol[2] = {(double)T_ref, (double)T_ref};
+          plot.row((double)now_ticks / NAXIS_PLOT_TICKS_PER_S, (double)pos[0],
+                   (double)pos[1], 0.0, speed, Pcol, Rcol, tcol);
+        }
+      }
+      sample_n++;
+      if (ref.dda.done()) {
+        if (next_vertex < n_verts && pos[0] == verts[next_vertex][0] &&
+            pos[1] == verts[next_vertex][1]) {
+          if (res->n_vertex < 256) {
+            res->vertex_p[res->n_vertex] = last_moving_p;
+            res->vertex_pos[2 * res->n_vertex] = pos[0];
+            res->vertex_pos[2 * res->n_vertex + 1] = pos[1];
+          }
+          res->n_vertex++;
+          next_vertex++;
+        }
+      }
+      if (T_acc == T_prod && s_acc0 == ps0 && s_acc1 == ps1) {
+        matched = true;
+        break;
+      }
+      if (T_acc > T_prod) {
+        break;
+      }
+    }
+    if (!matched) {
       res->trace_match = false;
     }
-    uint32_t p_issued = map.calculate_ramp_steps(T_prod);
-    // The coalesced command always carries motion (zero-step entries were
-    // skipped above); `is_pause` is the real "no motion" test, unlike the old
-    // `T_prod == t_law`, which is a coast.
-    bool is_pause = (ps0 == 0 && ps1 == 0);
-    if (!is_pause) {
-      last_moving_p = p_issued;
-      if (p_issued > res->max_moving_p) {
-        res->max_moving_p = p_issued;
-      }
-      if (ps0 != 0 && T_prod + 1 < ticks[0]) {
-        res->envelope_ok = false;
-      }
-      if (ps1 != 0 && T_prod + 1 < ticks[1]) {
-        res->envelope_ok = false;
-      }
-    }
-    if (T_prod < res->min_moving_ticks) {
-      res->min_moving_ticks = T_prod;
-    }
-    pos[0] += ps0;
-    pos[1] += ps1;
     res->issued[0] += ps0;
     res->issued[1] += ps1;
     res->n_cmd++;
-    if (do_plot) {
-      uint64_t now_ticks = ref.total_ticks;
-      double dt = (double)(now_ticks - last_ticks) / NAXIS_PLOT_TICKS_PER_S;
-      if (dt > 0.0) {
-        double alpha = dt / (kSpeedTau_s + dt);
-        ema_v[0] += alpha * ((double)(pos[0] - last_pos[0]) / dt - ema_v[0]);
-        ema_v[1] += alpha * ((double)(pos[1] - last_pos[1]) / dt - ema_v[1]);
-      }
-      last_pos[0] = pos[0];
-      last_pos[1] = pos[1];
-      last_ticks = now_ticks;
-      if ((sample_n % kPlotStride) == 0 && have_sample) {
-        double speed[2] = {ema_v[0], ema_v[1]};
-        double Pcol[2] = {(double)p_issued, (double)p_issued};
-        double Rcol[2] = {(double)ref.R, (double)ref.R};
-        double tcol[2] = {(double)T_prod, (double)T_prod};
-        plot.row((double)now_ticks / NAXIS_PLOT_TICKS_PER_S, (double)pos[0],
-                 (double)pos[1], 0.0, speed, Pcol, Rcol, tcol);
-      }
-    }
-    sample_n++;
-    if (ref.dda.done()) {
-      if (next_vertex < n_verts && pos[0] == verts[next_vertex][0] &&
-          pos[1] == verts[next_vertex][1]) {
-        if (res->n_vertex < 256) {
-          res->vertex_p[res->n_vertex] = last_moving_p;
-          res->vertex_pos[2 * res->n_vertex] = pos[0];
-          res->vertex_pos[2 * res->n_vertex + 1] = pos[1];
-        }
-        res->n_vertex++;
-        next_vertex++;
-      }
-    }
+  }
+  if (!ref.done()) {
+    res->trace_match = false;
   }
   res->end_pos[0] = pos[0];
   res->end_pos[1] = pos[1];
@@ -3291,6 +3306,44 @@ void f8_feeder() {
     test(p0.position() == 8000 && p1.position() == 8000,
          "F15 room both axes complete the 8000 move");
     printf("F15 room: completed 8000x8000 on QUEUE_LEN=16 queues\n");
+  }
+
+  // A 4 ms pump gap must not empty a QUEUE_LEN=16 queue. One step at 4000
+  // ticks is 0.25 ms, so 14 single steps are 3.5 ms; a coast batch is about
+  // 2 ms and the filled queue outlasts the gap.
+  {
+    const uint32_t ticks_cfg = 4000;
+    const uint32_t gap = 4u * (uint32_t)(TICKS_PER_S / 1000);
+    SimPort p0(ticks_cfg, 16), p1(ticks_cfg, 16);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &p0);
+    path.addAxis(1, &p1);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t target[2] = {20000, 0};
+    path.addLine(target);
+    path.endPath();
+    path.pump();
+    int max_steps = 0;
+    while (path.isBusy()) {
+      uint32_t got = 0;
+      while (got < gap && !p0.isQueueEmpty()) {
+        int64_t s0 = 0;
+        uint32_t dt = p0.drain_one(&s0, NULL);
+        p1.drain_one(NULL, NULL);
+        if (s0 > max_steps) {
+          max_steps = (int)s0;
+        }
+        got += dt;
+      }
+      path.pump();
+    }
+    test(max_steps > 1, "F15 4 ms pump saw a multi-step coast command");
+    test(path.hasUnderrun() == false, "F15 4 ms pump does not underrun");
+    test(p0.position() == 20000 && p1.position() == 0,
+         "F15 4 ms pump ends at 20000");
+    printf("F15 4 ms pump: max_steps=%d gap=%u\n", max_steps, gap);
   }
 
   printf("F14/F12/F15 feeder contract green\n");

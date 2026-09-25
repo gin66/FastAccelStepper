@@ -35,7 +35,7 @@ class RampLaw {
   uint32_t ticks_cfg;
   uint32_t P;  // performed ramp-up steps
   uint32_t R;  // remaining steps in the current direction
-  uint64_t total_ticks;
+  uint32_t total_ticks;
 
   // `total` is the move length S (== R at start). The planner drives R down to
   // 0, one command (step) at a time.
@@ -94,9 +94,8 @@ class RampLaw {
     return ticks;
   }
 
-  // Issue `n` consecutive steps as one planning chunk. FAS batches slow
-  // commands (the 2 ms rule of section 4.2); each step re-applies the law so a
-  // batched chunk lands on exactly the same P trajectory as n single steps.
+  // Issue `n` consecutive steps as one planning chunk. Each step re-applies
+  // the law, so the chunk lands on the same P trajectory as n single steps.
   void step_chunk(uint32_t n, uint32_t ticks_min = 0) {
     for (uint32_t i = 0; i < n; i++) {
       step(ticks_min);

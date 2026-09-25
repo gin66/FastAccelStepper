@@ -3,7 +3,13 @@
 Priority: **P2** — AVR/ESP32 queue-drain safety; needed for the naxes
 example to run on hardware without underrun.
 
-Status: design agreed, not implemented.
+Status: **implemented**. A fast step (period under 1 ms) is packed with
+following equal-period steps into one command of about 2 ms
+(`TICKS_PER_S / 500`), stopping before a period change or a DIR carve.
+`test_26` F15 drains a `QUEUE_LEN=16` queue for 4 ms without underrun;
+the coast command is 8 steps. Productive code has no 64-bit integers.
+`pio run -e nanoatmega328` in `pio_dirs/naxes` is 27384 bytes, under
+the 30720-byte limit.
 
 ## Problem
 
@@ -45,9 +51,18 @@ in-batch DDA spacing uses the batch period. Keep `n` small enough that
 `n * delta tau` is a small fraction of a slave step, and cap the batch at
 the next prepared boundary.
 
-This is the same granularity trade FAS makes with its 2 ms planning
-chunks; it must be a stated feeder rule, not hidden in a `pump()`
-frequency assumption.
+A command's duration is `ticks * steps` for that command. The ramp
+generator does not plan in fixed 2 ms chunks. It sizes each command
+to about 1 ms: one step when the step period is already at least 1 ms,
+and, when the step period is shorter than 1 ms
+(`curr_ticks < TICKS_PER_S / 1000`), enough steps that the command is
+about 2 ms (`TICKS_PER_S / 500` in `getNextCommand`). Forward planning
+is `fill_queue()`: it keeps adding those commands until the queue
+covers 20 ms (`_forward_planning_in_ticks`, default `TICKS_PER_S / 50`),
+it already holds at least two commands, or the queue is full. A
+FasNAxis batch is one ramp-generator command of that size, and only
+while the period stays constant. State it as a feeder rule, not as a
+`pump()` frequency.
 
 ## Implementation surface
 

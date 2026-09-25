@@ -10,8 +10,7 @@ tracked here, one file per item.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **P2** | [Feeder command batching](feeder_command_batching.md) | AVR/ESP32 queue-drain safety; prerequisite for the example on hardware. |
-| **P3** | [naxes example smoothness](naxes_example_smoothness.md) | End-to-end simavr/hardware check; depends on P1 + P2. |
+| **P3** | [naxes example smoothness](naxes_example_smoothness.md) | End-to-end simavr/hardware check; P1 and P2 are in. |
 | **P4** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
 | **P5** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
 
@@ -24,6 +23,13 @@ tracked here, one file per item.
   [linear_junction_carry.md](linear_junction_carry.md) and whitepaper
   §8.5. `test_naxes` still needs a simavr re-run (P3) to confirm
   `MAX_PATH_STOPS`.
+- **Feeder command batching — implemented.** The ramp generator's
+  command size: one step when the period is already at least 1 ms, and
+  about 2 ms of equal-period steps when it is shorter. Productive code
+  uses 32-bit integers only; `naxes` on the ATmega328 is 27384 bytes
+  (limit 30720). See
+  [feeder_command_batching.md](feeder_command_batching.md) and
+  whitepaper §4.3.1.
 
 ## Out-of-scope log
 

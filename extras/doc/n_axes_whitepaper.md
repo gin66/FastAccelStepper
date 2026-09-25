@@ -28,7 +28,8 @@ track. v1 never treats “too fast a request” as an error
 because it chooses the speed.
 
 Planning reuses the FAS ramp map, in **log2** (`RampCalculator`):
-period ↔ ramp-steps, no float and no integer division on the hot path.
+period ↔ ramp-steps, no float, no integer division, and no 64-bit
+integer type on the hot path.
 Lookahead is parsed until **end of path or a direction change**.
 That remaining-step count `R_i` is the upper limit on ramp-steps
 (`P_i ≤ R_i`) and therefore on speed. The **path direction** then
@@ -456,9 +457,18 @@ slave axes, and never let batching overshoot the joint-speed
 preparation (a batch must not cross a master-role switch or a
 path-stop unprepared).
 
-This is the same granularity trade FAS makes (2 ms planning chunks);
-FasNAxis needs it stated as a feeder rule, not hidden in `pump()`
-frequency.
+A command's duration is `ticks * steps` for that command. The ramp
+generator does not plan in fixed 2 ms chunks. It sizes each command
+to about 1 ms: one step when the step period is already at least 1 ms,
+and, when the step period is shorter than 1 ms, enough steps that the
+command is about 2 ms (`TICKS_PER_S / 500` in `getNextCommand`). Forward
+planning is `fill_queue()`: it keeps adding those commands until the
+queue covers 20 ms (`_forward_planning_in_ticks`, default
+`TICKS_PER_S / 50`), it already holds at least two commands, or the
+queue is full. A FasNAxis batch is one ramp-generator command of that
+size, and only while the period stays constant, so a batch does not
+cross a period change, a master-role switch, or a path-stop. It is a
+feeder rule, not a `pump()` frequency.
 
 ### 4.4 Direction-change pauses
 
@@ -2244,7 +2254,8 @@ Execution is `addQueueEntry` commands with a shared tick sum.
 A reversal carves the before/after DIR pauses out of the
 reversing axis’s last step (§4.4); the other axes are not
 paused. Underrun is a hard error after kick-off.
-Production does not use float or integer division for planning.
+Production does not use float, integer division, or 64-bit integer
+types for planning.
 
 Two geometry modes, both hitting every trajectory point:
 
