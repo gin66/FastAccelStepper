@@ -1,6 +1,10 @@
 # Pluggable motion sources — engine generalization
 
-Status: design decision, not v1.
+Status: design + in-progress implementation, not v1. A prototype of the
+two-class direction (`FastAccelStepperBase`, `FastAccelStepperNaxes`,
+`FastAccelStepperEngineBase`, `FastAccelStepperEngineT`, `test_28`) is in
+the working tree and passes all PC tests, but several open points below
+must be resolved before this is the final shape.
 
 Replaces the former items "Running `pump()` from `manageSteppers()`"
 (item 7) and "Generalize ramp generator and naxes" (item 9).
@@ -59,8 +63,106 @@ Constraints:
   source's tick. The whitepaper §4.6 idle precondition still applies on
   the ramp side (ramp and naxes never share a queue).
 
+## Stop and emergency stop
+
+Per-axis and group stop must be first-class, not inferred from timing.
+
+Current state: `forceStop()` / `stopMove()` exist only on
+`FastAccelStepper` (the ramp class); `FastAccelStepperNaxes` has **no**
+stop API. `forceStop()` only sets `q->ignore_commands = true` and calls
+`_rg.forceStop()`; `fill_queue()` clears `ignore_commands`, so it is a
+transient latch, not a queryable event. A planner therefore cannot
+reliably detect a per-axis stop from existing state.
+
+Design:
+
+- Move `forceStop()` / `stopMove()` down to `FastAccelStepperBase` (all
+  steppers need a stop path).
+  - `Base::forceStop()` — immediate: `ignore_commands = true`,
+    `q->forceStop()`, then notify the observer.
+  - `FastAccelStepper::stopMove()` — `_rg.initiateStop()` (controlled
+    decel). `FastAccelStepperNaxes::stopMove()` — notify the planner,
+    which plans the coordinated group stop.
+- Per-stepper back-pointer to a motion observer (`MotionObserver*
+  _observer`, set at `addAxis`). One pointer of RAM per stepper; the
+  observer's vtable exists once (the planner), so no per-stepper vtable.
+- Per-axis E-stop → `_observer->onAxisStopped(this, kind)`. The planner
+  then runs the group E-stop: `forceStop()` on every member with a
+  re-entrancy guard, mark fault, positions **untrusted** (re-home before
+  re-assembling).
+- Group E-stop: `FasNAxis::emergencyStop()` / an engine-level
+  `emergencyStopAll()` calling the same base primitive.
+- ISR-safety: a limit-switch handler may call `forceStop()` from an ISR.
+  The immediate per-axis abort is queue-level and ISR-safe; the planner
+  reaction should be either tiny (urgent global abort only) or deferred
+  via a `volatile` flag consumed in `pump()` (latency < one pump).
+
+## `manageSteppers()` context per backend
+
+Where the tick actually runs determines what a registration hook may do:
+
+| Backend | Call site | Context |
+|---|---|---|
+| AVR | `pd_avr/avr_queue.cpp:210` inside `StepperISR` with `sei()` | ISR, nested IRQs enabled |
+| ESP32 | `pd_esp32/esp32_queue.cpp:451` `StepperTask` | RTOS task |
+| Pico | `pd_pico/pico_queue.cpp:272` `StepperTask` | RTOS task |
+| SAM | `pd_sam/sam_queue.cpp:38` `TC5_Handler` | ISR |
+| SAMD | `pd_samd/samd_queue.cpp:52` `FAS_TC_HANDLER` | ISR |
+| Teensy | `pd_teensy/teensy_queue.cpp:50` `fas_ramp_tick_isr` | ISR |
+
+4 of 6 are ISR (AVR nested, SAM, SAMD, Teensy). Any `manageSteppers()`
+hook may therefore only do **light, ISR-safe** work; heavy planner
+planning stays caller-pumped (`pump()` from `loop()`), matching
+whitepaper §10.4.
+
+## Decision: single driver (Path A)
+
+Chosen over the two-class prototype. The two-class direction
+(`FastAccelStepperBase`, `FastAccelStepperNaxes`,
+`FastAccelStepperEngineBase`, `FastAccelStepperEngineT`, `test_28`) was
+reverted: an application's physical axis must be **ramp-homed first, then
+join a group**, and a no-ramp `FastAccelStepperNaxes` cannot do the
+homing. Keeping `FastAccelStepper` as the one driver lets the same object
+home with its ramp and later be driven by the planner through
+`addQueueEntry()` while the ramp is idle (§4.6). The ramp is always
+linked — acceptable, since homing uses it.
+
+Consequences:
+
+- No `FastAccelStepperNaxes`; `FasNAxis` keeps `Stepper =
+  FastAccelStepper` as its production default.
+- No config-typed engine and no engine `virtual`; the C++-runtime link
+  cost of the prototype is avoided.
+- `FasNAxis` stays caller-pumped. A `manageSteppers()` registration hook
+  is **not** required for now; if added later it may only do light,
+  ISR-safe work (see the backend table above).
+
+Implemented driver-side stop hook (`FastAccelStepper`): `StepperStopCause`
+{None, StopMove, ForceStop, ForceStopAndNewPosition}, set by
+`stopMove()`/`forceStop()`/`forceStopAndNewPosition()` and read-and-cleared
+by `takeStopCause()`. PC tests stay green.
+
+Planner wiring still to do (see Open items below).
+
+## Open items
+
+- `FasNAxis`: poll each axis's `takeStopCause()` in `pump()`; a non-None
+  cause means a member was stopped outside the planner → enter a fault,
+  abort the plan, positions untrusted. Needs a decision on how a
+  duck-typed `FasNAxis` (which must not include `FastAccelStepper.h`)
+  names the cause type, and whether to add a `PumpStatus::Stopped` or
+  reuse `Error`.
+- `FasNAxis::emergencyStop()`: `forceStop()` every member with a
+  re-entrancy guard; the group E-stop.
+- Driver: `addAxis` should clear a stale `_stop_cause` from a prior
+  homing `stopMove()` so the planner does not see a pre-registration stop.
+- Test helper `SimPort` needs `takeStopCause()` (default None) plus an
+  injection hook to exercise the fault path; default behaviour of the
+  existing `test_26` cases must be unchanged.
+
 ## References
 
+- `src/FastAccelStepper.h` — `StepperStopCause`, `takeStopCause()`.
 - `src/FastAccelStepperEngine.cpp:172` — `manageSteppers()`.
-- `src/FastAccelStepper.cpp:85` — `fill_queue()` and the member `_rg`.
+- `src/FastAccelStepper.cpp:48` — `fill_queue()` and the member `_rg`.
 - `extras/doc/n_axes_whitepaper.md` §3.2, §4.6, §10.4.

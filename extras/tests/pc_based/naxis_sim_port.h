@@ -51,7 +51,8 @@ class SimPort {
         dir_before_ticks_(0),
         dir_before_count_(0),
         dir_after_ticks_(0),
-        force_extra_before_(0) {
+        force_extra_before_(0),
+        stop_cause_(StepperStopCause::None) {
     reset();
   }
 
@@ -68,6 +69,7 @@ class SimPort {
     after_done_ = false;
     fail_rc_ = AQE_OK;
     force_extra_before_ = 0;
+    stop_cause_ = StepperStopCause::None;
   }
 
   // --- inject / driver hook configuration ---
@@ -147,6 +149,23 @@ class SimPort {
   // Modelled from FastAccelStepper::isRunning(): a kick-off started the queue
   // and it has not settled to a no-motion state.
   bool isRunning() const { return kicked_off_; }
+
+  // --- external stop modelling (extras/todo/engine_sources.md) ---
+  // Duck-type alias for FastAccelStepper::takeStopCause(): FasNAxis polls this
+  // each pump(); default None keeps the existing cases unchanged. A test
+  // injects a stop through setStopCause() or forceStop().
+  StepperStopCause takeStopCause() {
+    StepperStopCause c = stop_cause_;
+    stop_cause_ = StepperStopCause::None;
+    return c;
+  }
+  void setStopCause(StepperStopCause c) { stop_cause_ = c; }
+  // Model FastAccelStepper::forceStop(): abort the queue and report ForceStop.
+  void forceStop() {
+    kicked_off_ = false;
+    read_idx_ = next_write_idx_;
+    stop_cause_ = StepperStopCause::ForceStop;
+  }
 
 #ifdef FAS_PHYSICAL_STEPPER_ENABLED
     // --- opt-in rotordynamic coupling (whitepaper section 3.1 / 13.3) ---
@@ -343,6 +362,7 @@ class SimPort {
   uint8_t dir_before_count_;
   uint16_t dir_after_ticks_;
   uint16_t force_extra_before_;
+  StepperStopCause stop_cause_;
 #ifdef FAS_PHYSICAL_STEPPER_ENABLED
   PhysicalStepper* plant_ = NULL;      // opt-in rotordynamic coupling
 #endif

@@ -433,6 +433,15 @@ class FastAccelStepper {
   // provided and will be set as current position after stop.
   void forceStopAndNewPosition(int32_t new_pos);
 
+  // Return the cause of the last stop and clear it. For a planner that shares
+  // the queue with the ramp API: it polls this to notice that a member axis
+  // was stopped manually (stopMove) or abruptly (forceStop /
+  // forceStopAndNewPosition) and then aborts the coordinated plan.
+  StepperStopCause takeStopCause();
+  StepperStopCause getStopCause() const {
+    return (StepperStopCause)_stop_cause;
+  }
+
   // get the target position for the current move.
   // As of now, this position is the view of the stepper task.
   // This means, the value will stay unchanged after a move/moveTo until the
@@ -835,6 +844,9 @@ class FastAccelStepper {
 
   FastAccelStepperEngine* _engine;
   RampGenerator _rg;
+  // Last stop cause, set by the stop API and cleared by takeStopCause().
+  // volatile because stopMove()/forceStop() may be called from an interrupt.
+  volatile uint8_t _stop_cause;
   uint8_t _stepPin;
   uint8_t _dirPin;
   bool _dirHighCountsUp;

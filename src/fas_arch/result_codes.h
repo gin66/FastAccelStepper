@@ -1,12 +1,26 @@
 #ifndef FAS_RESULT_CODES_H
 #define FAS_RESULT_CODES_H
 
+#include <stdint.h>
+
 #if defined(__AVR__)
 #include <avr/pgmspace.h>
 #define FAS_PSTR(s) (reinterpret_cast<const char*>(PSTR(s)))
 #else
 #define FAS_PSTR(s) (s)
 #endif
+
+// Cause of a stop, for a planner that co-drives the same queue. Set by
+// FastAccelStepper::stopMove()/forceStop()/forceStopAndNewPosition() and
+// read-and-cleared via FastAccelStepper::takeStopCause(); see
+// extras/todo/engine_sources.md. Shared here so a duck-typed n-axis planner
+// and the test SimPort can name the type without including FastAccelStepper.h.
+enum class StepperStopCause : uint8_t {
+  None = 0,
+  StopMove = 1,
+  ForceStop = 2,
+  ForceStopAndNewPosition = 3,
+};
 
 // ### Result codes for addQueueEntry() function of FastAccelStepper
 enum class AqeResultCode : int8_t {

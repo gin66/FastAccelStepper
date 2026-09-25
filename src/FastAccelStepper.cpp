@@ -411,7 +411,10 @@ MoveResultCode FastAccelStepper::move(int32_t move, bool blocking) {
   return res;
 }
 void FastAccelStepper::keepRunning() { _rg.setKeepRunning(); }
-void FastAccelStepper::stopMove() { _rg.initiateStop(); }
+void FastAccelStepper::stopMove() {
+  _stop_cause = (uint8_t)StepperStopCause::StopMove;
+  _rg.initiateStop();
+}
 void FastAccelStepper::applySpeedAcceleration() {
   _rg.applySpeedAcceleration();
 }
@@ -441,6 +444,8 @@ MoveResultCode FastAccelStepper::moveByAcceleration(int32_t acceleration,
 void FastAccelStepper::forceStop() {
   StepperQueue* q = _queue();
 
+  _stop_cause = (uint8_t)StepperStopCause::ForceStop;
+
   // ensure no more commands are added to the queue
   q->ignore_commands = true;
 
@@ -449,6 +454,8 @@ void FastAccelStepper::forceStop() {
 }
 void FastAccelStepper::forceStopAndNewPosition(int32_t new_pos) {
   StepperQueue* q = _queue();
+
+  _stop_cause = (uint8_t)StepperStopCause::ForceStopAndNewPosition;
 
   // ensure no more commands are added to the queue
   q->ignore_commands = true;
@@ -462,6 +469,11 @@ void FastAccelStepper::forceStopAndNewPosition(int32_t new_pos) {
   // set the new position. This should be safe
   q->queue_end.pos = new_pos;
   _rg.setTargetPosition(new_pos);
+}
+StepperStopCause FastAccelStepper::takeStopCause() {
+  StepperStopCause cause = (StepperStopCause)_stop_cause;
+  _stop_cause = (uint8_t)StepperStopCause::None;
+  return cause;
 }
 bool FastAccelStepper::setEnablePinState(uint8_t pin, uint8_t active_state) {
   if (pin == PIN_UNDEFINED) {

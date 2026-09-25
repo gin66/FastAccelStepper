@@ -47,7 +47,10 @@ enum class PumpStatus : int {
   Idle = 0,      // no block pending, queue settled
   Running = 1,   // a block is being planned / fed
   Underrun = 2,  // queue ran dry after a kick-off (F13)
-  Error = 3      // a contract violation the caller must fix
+  Error = 3,     // a contract violation the caller must fix
+  Stopped = 4    // a member axis was stopped outside the planner (stopMove /
+                 // forceStop / e-stop); the plan is aborted, positions
+                 // untrusted. Recover with syncFromSteppers().
 };
 
 // Configuration. Default member initializers make FasNAxisConfig{} a valid
@@ -136,6 +139,7 @@ class FasNAxis {
     _underrun = false;
     _slice_open = false;
     _error = false;
+    _fault = false;
     _carve_then_advance = false;
     _master = 0;
     _abs_master = 0;
@@ -166,6 +170,9 @@ class FasNAxis {
     if (s->isRampGeneratorActive() || s->isRunning()) {
       return false;
     }
+    // Discard any stop cause left over from pre-registration use (e.g. the
+    // homing stopMove), so pump() does not fault on it.
+    s->takeStopCause();
     _s[i] = s;
     _registered[i] = true;
     _lim[i].ticks_cfg = s->getMaxSpeedInTicks();
@@ -288,6 +295,19 @@ class FasNAxis {
   // not underrun; after kick-off an empty queue while the plan still moves is
   // underrun (section 10.5).
   PumpStatus pump() {
+    // An external stop of a member axis (manual stopMove, forceStop, e-stop)
+    // invalidates the coordinated plan: abort and report Stopped. Positions
+    // are untrusted until the caller re-homes and syncFromSteppers().
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_registered[i] &&
+          _s[i]->takeStopCause() != StepperStopCause::None) {
+        _fault = true;
+        _feeding = false;
+      }
+    }
+    if (_fault) {
+      return PumpStatus::Stopped;
+    }
     if (!_feeding && _head < _n_blk) {
       feeder_start();
       feed_loop();
@@ -350,6 +370,36 @@ class FasNAxis {
       }
     }
     return false;
+  }
+
+  // True after a detected external stop (pump() returned Stopped) until the
+  // caller re-syncs (syncFromSteppers()/setCurrentPosition()/clearFault()).
+  bool isFaulted() const { return _fault; }
+
+  // Clear the fault without re-syncing positions. Use only when the caller is
+  // certain of the axis positions; otherwise prefer syncFromSteppers().
+  void clearFault() {
+    _fault = false;
+    _underrun = false;
+    _error = false;
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_registered[i]) {
+        _s[i]->takeStopCause();
+      }
+    }
+  }
+
+  // Group emergency stop: forceStop() every member immediately, abort the plan
+  // and mark positions untrusted. Re-entrancy safe: it does not call pump().
+  void emergencyStop() {
+    _fault = true;
+    _feeding = false;
+    _kicked_off = false;
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_registered[i]) {
+        _s[i]->forceStop();
+      }
+    }
   }
 
   // Section 8.2 / 14.7: short lookahead is a speed cap, not an error. True
@@ -627,6 +677,7 @@ class FasNAxis {
     _ticks_last = 0;
     _slice_open = false;
     _error = false;
+    _fault = false;
     _carve_then_advance = false;
     for (uint8_t i = 0; i < NAXES; i++) {
       _held[i].waiting = false;
@@ -1088,6 +1139,7 @@ class FasNAxis {
   bool _underrun;
   bool _slice_open;
   bool _error;
+  bool _fault;
   Held _held[NAXES];
   Carve _carve_axis[NAXES];
   bool _carve_then_advance;
