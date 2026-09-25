@@ -21,7 +21,7 @@ tracked here, one file per item.
   P3 also found and fixed the block ring not sliding past `HORIZON`
   (`FasNAxis::compact_ring()`), which had chunked any path longer than
   `HORIZON` into per-ring ramp-to-rest segments. See
-  [naxes_example_smoothness.md](naxes_example_smoothness.md).
+  [naxes_example_smoothness.md](../doc/implemented/naxes_example_smoothness.md).
 - **naxes log2 product compares — implemented.** The production naxes
   planner no longer schoolbook-multiplies: the `binder_axis` tie-break and
   the Overshoot uniform schedule / cap-side sign checks compare products
@@ -38,14 +38,14 @@ tracked here, one file per item.
   reversal, an idle or tied outgoing axis, a dwell, or the path end.
   `P` carries across every other joint, so a sampled helix cruises and
   the axis-aligned square still stops. See
-  [linear_junction_carry.md](linear_junction_carry.md) and whitepaper
+  [linear_junction_carry.md](../doc/implemented/linear_junction_carry.md) and whitepaper
   §8.5.
 - **Feeder command batching — implemented.** The ramp generator's
   command size: one step when the period is already at least 1 ms, and
   about 2 ms of equal-period steps when it is shorter. Productive code
   uses 32-bit integers only; `naxes` on the ATmega328 is 27384 bytes
   (limit 30720). See
-  [feeder_command_batching.md](feeder_command_batching.md) and
+  [feeder_command_batching.md](../doc/implemented/feeder_command_batching.md) and
   whitepaper §4.3.1.
 
 ## Out-of-scope log
