@@ -11,8 +11,10 @@ tracked here, one file per item.
 | Priority | Item | Why now |
 |----------|------|---------|
 | **P3** | [naxes example smoothness](naxes_example_smoothness.md) | End-to-end simavr/hardware check; P1 and P2 are in. |
-| **P4** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
-| **P5** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
+| **P4** | [naxes log2 instead of 16/32-bit multiply](naxes_log2_mul.md) | Hot path still schoolbook-multiplies; the ramp map is already log2. |
+| **P5** | [Engine synchronized start](engine_synchronized_start.md) | Kick-off is still one `addQueueEntry(NULL, true)` per axis. |
+| **P6** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
+| **P7** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
 
 ## Done
 
