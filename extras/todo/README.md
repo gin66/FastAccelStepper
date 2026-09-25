@@ -10,11 +10,20 @@ tracked here, one file per item.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **P1** | [Linear junction carry](linear_junction_carry.md) | Core smoothness fix; unblocks the committed `test_naxes` `path-stops` check. |
 | **P2** | [Feeder command batching](feeder_command_batching.md) | AVR/ESP32 queue-drain safety; prerequisite for the example on hardware. |
 | **P3** | [naxes example smoothness](naxes_example_smoothness.md) | End-to-end simavr/hardware check; depends on P1 + P2. |
 | **P4** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
 | **P5** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
+
+## Done
+
+- **Linear junction carry — implemented.** `R` ends at a master-sense
+  reversal, an idle or tied outgoing axis, a dwell, or the path end.
+  `P` carries across every other joint, so a sampled helix cruises and
+  the axis-aligned square still stops. See
+  [linear_junction_carry.md](linear_junction_carry.md) and whitepaper
+  §8.5. `test_naxes` still needs a simavr re-run (P3) to confirm
+  `MAX_PATH_STOPS`.
 
 ## Out-of-scope log
 

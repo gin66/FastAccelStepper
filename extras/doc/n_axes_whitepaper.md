@@ -1227,6 +1227,11 @@ angle:
   `P` carried and continue; prepare a deceleration only as far as
   the new master’s envelope / remaining-to-stop require (§8.4).
 - **Master axis reverses sense**: `R` ends here, `P → 0`.
+- **An axis tied with the master** (`|Δ|` equal) reverses or goes
+  idle: also a hard stop. The tie-break that named the other axis
+  master did not make this a shorter-slave cusp (the F6 dog-leg).
+  A strictly shorter slave that reverses is the circle cardinal:
+  the DDA takes it through 0 and `R` does not end (§8.8).
 
 The 2° test
 
@@ -1248,12 +1253,14 @@ Per axis, the scan of §8.1 **is** the junction rule:
   the axis that does not reverse): `R_i` includes the next
   blocks, so `P_i` may stay high
 
-A 90° corner where X continues and Y reverses: `P_x` may
-stay high, `P_y = 0`. Linear would have zeroed the binder,
-hence both. Overshoot is faster here, and the path through
-the vertex flattens, bounded by `overshoot_max`. Y’s DIR
-pauses are a split of Y’s own last step (§4.4). X keeps the
-steps already planned across those ticks.
+A 90° corner where X continues and Y reverses with `|Δ_y| =
+|Δ_x|` (F6): `P_x` may stay high, `P_y = 0`. Linear treats that
+tied reversal as a hard stop, so both axes are at 0, and
+Overshoot is faster. A strictly shorter slave reversal does not
+stop Linear (§8.5). The path through the Overshoot vertex
+flattens, bounded by `overshoot_max`. Y’s DIR pauses are a
+split of Y’s own last step (§4.4). X keeps the steps already
+planned across those ticks.
 
 A 90° corner of an axis-aligned square: the “continuing”
 axis of the next side was idle (`Δ = 0`), so both `P` are

@@ -2,9 +2,10 @@
 
 Priority: **P3** — end-to-end validation; depends on P1 and P2.
 
-Status: detector in place (`detect_geometry.py` `path-stops` check, and
-the simavr `test_naxes` fails with `stops=156`); depends on
-`linear_junction_carry.md`.
+Status: detector in place (`detect_geometry.py` `path-stops` check).
+The planner now cruises a 7.5° helix (PC). simavr `test_naxes` has not
+been re-run since that change; it last failed with `stops=156`.
+Depends on `feeder_command_batching.md` as well.
 
 ## Problem
 

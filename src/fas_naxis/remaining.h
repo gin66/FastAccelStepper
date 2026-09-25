@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#include "fas_naxis/ramp_map.h"
+
 // FasNAxis remaining-steps scan R and DDA / time-law oracle (whitepaper
 // sections 6.3 and 8).
 //
@@ -18,8 +20,12 @@
 // R is the lookahead kernel: per axis it is the sum of |delta_i| over the
 // block ring until the first of (path end, that axis going idle after it
 // moved, or a sign flip of that axis). The last buffered point of an open
-// path is rest, so the scan simply ends at the last buffered block. A
-// non-collinear vertex (section 8.5) additionally ends the *Linear* scan.
+// path is rest, so the scan simply ends at the last buffered block.
+//
+// Linear's binder R (sections 6.3 / 8.5) sums DDA-master steps until a hard
+// stop: the master's sense ends, the outgoing master was idle, a dwell, or
+// the path end. A non-collinear joint does not end it, and neither does a
+// master-role change. collinear_same_sense() is diagnostic only.
 //
 // This is pure parse: integer add / abs / sign only. No float, double, or
 // integer division is formed in the scan. The live speed cap is the ramp
@@ -104,44 +110,15 @@ class Remaining {
     return R;
   }
 
-  // Linear binder path-stop (sections 8.1 + 8.5): scan `axis` from `head`,
-  // but the first non-collinear vertex ends the scan even when the axis
-  // would continue (a square's side is one R-budget, not the perimeter).
-  // HORIZON caps the points.
+  // Linear binder R from `head`: DDA-master steps to the next hard stop
+  // (section 8.5). `axis` is unused; the currency is master steps, not one
+  // axis's |delta|. HORIZON caps the points. Ticks/accel are unknown here, so
+  // the slower-envelope preparation is not applied (call linear_remaining).
   int32_t remaining_linear_binder(int axis, int head) const {
-    if (n_axes == 1 || head + 1 >= n_blocks) {
-      return remaining(axis, head);
-    }
-    int32_t R = 0;
-    int sign = 0;
-    int count = 0;
-    for (int b = head; b < n_blocks; b++) {
-      int32_t d = delta_of(axis, b);
-      if (d == 0) {
-        if (sign != 0) {
-          break;
-        }
-      } else {
-        int s = (d > 0) ? 1 : -1;
-        if (sign == 0) {
-          sign = s;
-        }
-        if (s != sign) {
-          break;  // reversal
-        }
-      }
-      if (b > head && !collinear_same_sense(b - 1, b)) {
-        break;  // non-collinear vertex: Linear path-stop
-      }
-      R += (d > 0) ? d : -d;
-      if (horizon != 0 && horizon != 0xFFFFFFFFU) {
-        count++;
-        if (count >= (int)horizon) {
-          break;
-        }
-      }
-    }
-    return R;
+    (void)axis;
+    return (int32_t)linear_remaining<8>(
+        head, n_blocks, n_axes, NULL, NULL, horizon,
+        [this](int b, int ax) -> int32_t { return delta_of(ax, b); });
   }
 
   // Section 8.5 collinear, same sense between two full path directions.
@@ -167,6 +144,134 @@ class Remaining {
     return lhs >= rhs;
   }
 #endif /* FAS_NAXIS_REFERENCE */
+
+  // True when every axis of the block is idle (a dwell, or a zero vector).
+  static bool block_idle(const int32_t* block, int n_axes) {
+    for (int i = 0; i < n_axes; i++) {
+      if (block[i] != 0) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Section 8.5 hard stop between block A and block B. P goes to 0 here.
+  // The 2 deg collinear test is not consulted.
+  static bool linear_joint_stops(const int32_t* a, const int32_t* b,
+                                 const uint32_t* ticks, int n_axes) {
+    if (block_idle(a, n_axes) || block_idle(b, n_axes)) {
+      return true;
+    }
+    int ma = longest_axis(a, ticks, n_axes);
+    int mb = longest_axis(b, ticks, n_axes);
+    int sa = a[ma] > 0 ? 1 : -1;
+    int sb = b[ma] > 0 ? 1 : (b[ma] < 0 ? -1 : 0);
+    if (sb != sa) {
+      return true;  // master reverses or goes idle
+    }
+    if (a[mb] == 0) {
+      return true;  // outgoing master was idle
+    }
+    // An axis tied with the master (|delta| equal) that reverses or goes
+    // idle is a full-speed reversal. The tie-break that named the other
+    // axis master does not make that reversal a slave cusp (F6).
+    int32_t adm = a[ma] > 0 ? a[ma] : -a[ma];
+    for (int i = 0; i < n_axes; i++) {
+      if (i == ma) {
+        continue;
+      }
+      int32_t adi = a[i] > 0 ? a[i] : -a[i];
+      if (adi != adm || adi == 0) {
+        continue;
+      }
+      int so = b[i] > 0 ? 1 : (b[i] < 0 ? -1 : 0);
+      int si = a[i] > 0 ? 1 : -1;
+      if (so != si) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  // Linear R from `head`: master steps to the next hard stop. When `ticks`
+  // and `accel` are both set, a role change that raises ticks_floor shortens
+  // R so the incoming ramp reaches the outgoing period before the vertex
+  // (P_match = calculate_ramp_steps(ticks_floor_out) on the incoming map).
+  // `horizon` 0 or 0xFFFFFFFF means unbounded. `Delta` is (block, axis).
+  // N is the maximum axis count the caller will pass.
+  template <int N, typename Delta>
+  static uint32_t linear_remaining(int head, int n_blocks, int n_axes,
+                                   const uint32_t* ticks, const uint32_t* accel,
+                                   uint32_t horizon, Delta delta) {
+    if (head >= n_blocks || n_axes <= 0 || n_axes > N) {
+      return 0;
+    }
+    int32_t blk[N];
+    int32_t nxt[N];
+    for (int i = 0; i < N; i++) {
+      blk[i] = 0;
+      nxt[i] = 0;
+    }
+    for (int i = 0; i < n_axes; i++) {
+      blk[i] = delta(head, i);
+    }
+    if (block_idle(blk, n_axes)) {
+      return 0;
+    }
+    uint32_t sum = 0;
+    uint32_t best = 0xFFFFFFFFU;
+    int included = 0;
+    bool limit_h = horizon != 0 && horizon != 0xFFFFFFFFU;
+    for (int b = head; b < n_blocks; b++) {
+      if (b != head) {
+        for (int i = 0; i < n_axes; i++) {
+          blk[i] = delta(b, i);
+        }
+        if (block_idle(blk, n_axes)) {
+          break;
+        }
+      }
+      int m = longest_axis(blk, ticks, n_axes);
+      int32_t ad = blk[m] > 0 ? blk[m] : -blk[m];
+      sum += (uint32_t)ad;
+      included++;
+#ifdef FAS_NAXIS_NO_CROSS_BLOCK_R
+      best = sum;
+      break;
+#endif
+      if (limit_h && included >= (int)horizon) {
+        break;
+      }
+      if (b + 1 >= n_blocks) {
+        break;
+      }
+      for (int i = 0; i < n_axes; i++) {
+        nxt[i] = delta(b + 1, i);
+      }
+      if (linear_joint_stops(blk, nxt, ticks, n_axes)) {
+        break;
+      }
+      if (ticks != NULL && accel != NULL) {
+        int mb = longest_axis(nxt, ticks, n_axes);
+        if (m != mb) {
+          uint32_t tin = ticks_floor(blk, ticks, n_axes);
+          uint32_t tout = ticks_floor(nxt, ticks, n_axes);
+          if (tout > tin && tin > 0) {
+            int binder = binder_axis(blk, ticks, n_axes);
+            RampMap map(tin, accel[binder]);
+            uint32_t capped = sum + map.calculate_ramp_steps(tout);
+            if (capped < best) {
+              best = capped;
+            }
+          }
+        }
+      }
+    }
+    if (best < sum) {
+      return best;
+    }
+    return sum;
+  }
 
   // ---- DDA / time-law oracle (whitepaper section 6.3 / 8.3) --------------
   // Pure static functions, no state. The planner must match these on the

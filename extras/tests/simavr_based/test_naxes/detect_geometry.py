@@ -68,11 +68,14 @@ TOL_Z = 4
 # a single stop, not two.
 STOP_GAP_FACTOR = 200
 STOP_MERGE_EVENTS = 4
-# A smooth path stops only where the geometry forces it: from rest at the start,
-# at the axis-aligned square corners (an axis has to reverse or go idle), and
-# when it lands back at the origin. Linear mode instead path-stops at every
-# non-collinear addLine vertex, so the helix alone contributes
-# HELIX_TURNS * 4 * NAXES_QSAMPLES = 144 stops.
+# A smooth path stops only where the geometry forces it: from rest at the
+# start, at the line that meets the helix (the entry master reverses), at
+# hexagon corners where an axis goes idle, at the axis-aligned square
+# corners, and at the return to the origin. The helix chords are 7.5 deg
+# and are not collinear; Linear still cruises them (whitepaper §8.5). The
+# old per-chord stop was HELIX_TURNS * 4 * NAXES_QSAMPLES = 144. 16 covers
+# the legitimate stops with margin. P3 re-runs simavr and tightens this if
+# the measured count is lower.
 MAX_PATH_STOPS = 16
 
 
@@ -270,8 +273,8 @@ def check_stops(times, results):
     n = count_stops(times)
     ok = n <= MAX_PATH_STOPS
     results.append(("path-stops", ok,
-                    "stops=%d max=%d (one per non-collinear addLine vertex in "
-                    "Linear: helix alone would be %d)" %
+                    "stops=%d max=%d (helix cruises; a per-chord stop would "
+                    "be %d)" %
                     (n, MAX_PATH_STOPS,
                      HELIX_TURNS * 4 * HELIX_QSAMPLES)))
 

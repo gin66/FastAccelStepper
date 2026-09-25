@@ -757,42 +757,17 @@ class FasNAxis {
     }
   }
 
-  // Section 8.5 collinear, same sense between two full path directions.
-  //   (dot(d, d'))^2 * 100000  >=  99878 * |d|^2 * |d'|^2
-  //   (cos^2(2deg) ~= 0.99878). Integer mul/compare, no division, no sqrt.
-  bool collinear_same_sense(int a, int b) const {
-    int64_t dot = 0;
-    int64_t mag_a = 0;
-    int64_t mag_b = 0;
-    for (uint8_t i = 0; i < NAXES; i++) {
-      int64_t da = _blk[a][i];
-      int64_t db = _blk[b][i];
-      dot += da * db;
-      mag_a += da * da;
-      mag_b += db * db;
-    }
-    if (dot <= 0 || mag_a == 0 || mag_b == 0) {
-      return false;  // opposite sense or a zero vector
-    }
-    return dot * dot * 100000 >= 99878 * mag_a * mag_b;
-  }
-
-  // Remaining master steps from `head` to the next Linear path-stop: end of
-  // the buffer, or the first non-collinear vertex (sections 8.1 / 8.5). P and
-  // R live in these path-step units so a collinear run may rebind the DDA
-  // master without changing the ramp-step currency.
+  // Remaining master steps from `head` to the next Linear hard stop
+  // (section 8.5): master-sense reversal, outgoing master that was idle,
+  // dwell, or the last buffered point. P carries across every other joint.
   uint32_t remaining_path_steps(int head) const {
-    uint32_t s = 0;
-    int started = 0;
-    for (int b = head; b < _n_blk; b++) {
-      if (started && !collinear_same_sense(b - 1, b)) {
-        break;
-      }
-      int m = Remaining::longest_axis(_blk[b], _tick_cfg, NAXES);
-      s += abs_u32(_blk[b][m]);
-      started = 1;
+    uint32_t acc[NAXES];
+    for (uint8_t i = 0; i < NAXES; i++) {
+      acc[i] = _lim[i].accel;
     }
-    return s;
+    return Remaining::linear_remaining<NAXES>(
+        head, _n_blk, NAXES, _tick_cfg, acc, 0xFFFFFFFFU,
+        [this](int b, int axis) -> int32_t { return _blk[b][axis]; });
   }
 
   // Section 8.6 per-axis scan from `head`: sum |delta_i| while axis i keeps its
@@ -822,8 +797,8 @@ class FasNAxis {
     return s;
   }
 
-  // Set up the ramp law and DDA state for block `b`. `reset_P` is false at a
-  // collinear joint (P carries over); R is recomputed to the next path-stop.
+  // Set up the ramp law and DDA state for block `b`. `reset_P` is false when
+  // the joint is not a hard stop (P carries); R is recomputed from `b`.
   void start_block(int b, bool reset_P) {
     _head = b;
     _master = Remaining::longest_axis(_blk[b], _tick_cfg, NAXES);
@@ -842,10 +817,14 @@ class FasNAxis {
       R_new = abs_u32(_blk[b][_master]);
     }
     uint32_t carry = reset_P ? 0 : _law.P;
+    _law = RampLaw(t_law, accel, R_new);
+    uint32_t coast = _law.map.P_coast();
+    if (carry > coast) {
+      carry = coast;
+    }
     if (carry > R_new) {
       carry = R_new;
     }
-    _law = RampLaw(t_law, accel, R_new);
     _law.P = carry;
     _abs_master = abs_i64(_blk[b][_master]);
     _block_left = abs_u32(_blk[b][_master]);
@@ -902,9 +881,9 @@ class FasNAxis {
     return _block_left == 0;
   }
 
-  // Move to the next committed block: an Overshoot run carries P per axis
-  // (section 8.6); Linear path-stop resets P, collinear carries it. A dwell
-  // block runs the zero-motion pauses on every axis and resets every P.
+  // Move to the next committed block. Overshoot carries P per axis
+  // (section 8.6). Linear resets P only at a hard stop (section 8.5) and
+  // carries it across every other joint, including a master-role change.
   void advance_block() {
     int prev = _head;
     _head++;
@@ -919,7 +898,8 @@ class FasNAxis {
       }
       return;
     }
-    bool stop = !collinear_same_sense(prev, _head);
+    bool stop = Remaining::linear_joint_stops(_blk[prev], _blk[_head],
+                                              _tick_cfg, NAXES);
     start_block(_head, stop);
   }
 

@@ -87,18 +87,11 @@ class LinearBlock {
 // (Remaining::longest_axis, tie-break slower ticks_cfg). Each master step is
 // one DDA tick (the 2c walker) that also advances 0 or 1 step of the slave.
 //
-// The ramp law (P vs R) is run per block. R is
-// Remaining::remaining_linear_binder from the current block: end or
-// non-collinear vertex (Linear path-stop of section 8.5). P is live; P <= R at
-// every step. At a path-stop vertex the DDA master may switch to the next
-// block's longest axis, but R remains in path-step units (the total number of
-// DDA ticks to the next stop) so a collinear run can rebind the DDA master
-// without changing the ramp currency.
-//
-// At a path-stop joint P starts from 0 at the new block. At a collinear joint
-// P carries over (the ramp does not reset). This is what distinguishes path-
-// stop from collinear: P -> 0 at a non-collinear vertex; P continues at a
-// collinear joint.
+// The ramp law (P vs R) is run per block. R is master steps to the next hard
+// stop (section 8.5): master-sense reversal, outgoing master that was idle,
+// dwell, or path end. P is live; P <= R at every step. At a hard stop P starts
+// from 0. Across every other joint, including a non-collinear bend and a
+// master-role change, P carries and R stays in path-step units.
 //
 // DIR pauses (before/after reversal) are Step 9 (queues). Here a reversal is
 // only P -> 0 then the new sign on the next block.
@@ -150,8 +143,16 @@ class LinearPoly {
       step_out[i] = 0;
     }
     while (!finished && dda.done()) {
-      bool last = (block + 1 >= rem->n_blocks);
-      bool stop = last || !rem->collinear_same_sense(block, block + 1);
+      bool stop = true;
+      if (block + 1 < rem->n_blocks) {
+        int32_t a[2];
+        int32_t b[2];
+        a[0] = rem->delta_of(0, block);
+        a[1] = n_axes > 1 ? rem->delta_of(1, block) : 0;
+        b[0] = rem->delta_of(0, block + 1);
+        b[1] = n_axes > 1 ? rem->delta_of(1, block + 1) : 0;
+        stop = Remaining::linear_joint_stops(a, b, ticks, n_axes);
+      }
       start_block(block + 1, stop);
     }
     if (finished) {
@@ -208,49 +209,37 @@ class LinearPoly {
     int32_t bind = d[master];
     int32_t slave = n_axes > 1 ? d[1 - master] : 0;
     dda = DdaWalk(bind, slave);
+    R = remaining_path_steps(b);
+    if (R == 0) {
+      R = abs_u(bind);
+    }
     if (reset_P) {
       P = 0;
-      R = remaining_path_steps(b);
-      if (R == 0) {
-        R = abs_u(bind);
-      }
     } else {
-      // Collinear joint: P carries over, recompute R to the next path-stop
-      // (the run may continue into more blocks). R is in path-step units so
-      // a master switch does not change the currency.
-      R = remaining_path_steps(b);
-      if (R == 0) {
-        R = abs_u(bind);
+      uint32_t coast = map.P_coast();
+      if (P > coast) {
+        P = coast;
+      }
+      if (P > R) {
+        P = R;
       }
     }
     block = b;
     finished = false;
   }
 
-  // Remaining DDA/master steps to the next Linear path-stop from head `head`.
-  // P and R live in these units (one DDA tick per command) so a collinear run
+  // Master steps to the next hard stop. P and R live in these units so a run
   // may rebind the DDA master without changing the ramp-step currency.
   uint32_t remaining_path_steps(int head) const {
-    uint32_t s = 0;
-    int started = 0;
-    for (int b = head; b < rem->n_blocks; b++) {
-      int32_t d[2];
-      d[0] = rem->delta_of(0, b);
-      d[1] = n_axes > 1 ? rem->delta_of(1, b) : 0;
-      if (d[0] == 0 && d[1] == 0) {
-        if (started) {
-          break;
-        }
-        continue;
-      }
-      if (started && !rem->collinear_same_sense(b - 1, b)) {
-        break;
-      }
-      int m = Remaining::longest_axis(d, ticks, n_axes);
-      s += abs_u(d[m]);
-      started = 1;
-    }
-    return s;
+    uint32_t acc[2] = {accel, accel};
+    return Remaining::linear_remaining<2>(head, rem->n_blocks, n_axes, ticks,
+                                          acc, rem->horizon,
+                                          [this](int b, int ax) -> int32_t {
+                                            if (ax >= n_axes) {
+                                              return 0;
+                                            }
+                                            return rem->delta_of(ax, b);
+                                          });
   }
 
   uint32_t apply_law() {
@@ -266,7 +255,7 @@ class LinearPoly {
     }
     uint32_t t;
     if (P == 0) {
-      t = ticks_law;
+      t = map.calculate_ticks(1);
     } else {
       t = map.calculate_ticks(P);
       if (t < ticks_law) {

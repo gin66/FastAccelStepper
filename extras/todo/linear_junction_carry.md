@@ -3,8 +3,9 @@
 Priority: **P1** — blocks the committed `test_naxes` `path-stops` check
 and is the core smoothness fix.
 
-Status: design agreed, not implemented. Splits the old
-"v1 Linear path-stops at every non-collinear vertex" model.
+Status: **implemented**. `R` is master steps to the next hard stop.
+`P` carries across every other joint. Judged by `naxis_ref`
+(F2, F2f, F20, the naxes 7.5° helix, F14).
 
 ## Problem
 
@@ -52,11 +53,25 @@ was idle (the allowed joint speed is 0). The sampled circle cruises.
   `MAX_PATH_STOPS` tuned to the legitimate stops once the example
   cruises.
 
-## Open point
+## Joint rule (pinned)
 
-The exact joint-speed preparation (how much of `|delta P|` must fit the
-incoming `R`, and the tie-break when the outgoing axis was idle) is the
-part to pin down test-first; the reference oracle is the judge.
+A joint is a hard stop (`R` ends, `P → 0`) when:
+
+- the incoming master reverses or goes idle, or
+- the outgoing master was idle on the incoming block, or
+- an axis tied with the master (`|Δ|` equal) reverses or goes idle
+  (F6; the tie-break must not turn a full-speed reversal into a cusp), or
+- the next block is a dwell or the path ends.
+
+Otherwise `P` carries, including a non-collinear bend and a role switch
+where both axes are already moving (sampled circle / naxes helix). A
+role switch that raises `ticks_floor` shortens incoming `R` to
+`steps_through_the_block + P_match`, with `P_match =
+calculate_ramp_steps(ticks_floor_out)` on the incoming map (F2
+role-change: `P_match = 250`, `R = 8250`). A strictly shorter slave
+reversal does not end `R`.
+
+Whitepaper §8.5.
 
 ## References
 

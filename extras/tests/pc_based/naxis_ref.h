@@ -11,18 +11,19 @@
 // PC reference track (whitepaper section 12.4.1, todo Step 2ref).
 //
 // This is the globally fastest constraint-faithful Linear track: G1/G2/G6,
-// on the chords, path speed 0 at a non-collinear vertex, DDA on longest
-// |delta|, ticks_b lengthened if a slave would exceed v_max, FAS ramp on
-// remaining master-steps to the next Linear path-stop. It is the truth the
-// interpolator must match (log2 / one-step slack). Not a replay of
+// on the chords, path speed 0 only at a hard stop (master-sense reversal,
+// outgoing master that was idle, dwell, or path end), DDA on longest |delta|,
+// ticks_b lengthened if a slave would exceed v_max, FAS ramp on remaining
+// master-steps to that stop. P carries across every other joint. It is the
+// truth the interpolator must match (log2 / one-step slack). Not a replay of
 // LinearBlock fields.
 //
 // PC tests only. double is allowed in callers, not here. Not included from
 // src/FasNAxis.h. Overshoot T_opt is Step 11.
 //
 // 1-D law is RampCalculator via RampMap (same P vs R as RampLaw). DDA is
-// DdaWalk. R is Remaining::remaining_linear_binder. Infinite HORIZON unless
-// the Remaining object sets one.
+// DdaWalk. R is Remaining::linear_remaining. Infinite HORIZON unless the
+// Remaining object sets one.
 class NaxisRefLinear {
  public:
   Remaining* rem;
@@ -69,8 +70,16 @@ class NaxisRefLinear {
       step_out[i] = 0;
     }
     while (!finished && dda.done()) {
-      bool last = (block + 1 >= rem->n_blocks);
-      bool stop = last || !rem->collinear_same_sense(block, block + 1);
+      bool stop = true;
+      if (block + 1 < rem->n_blocks) {
+        int32_t a[2];
+        int32_t b[2];
+        a[0] = rem->delta_of(0, block);
+        a[1] = n_axes > 1 ? rem->delta_of(1, block) : 0;
+        b[0] = rem->delta_of(0, block + 1);
+        b[1] = n_axes > 1 ? rem->delta_of(1, block + 1) : 0;
+        stop = Remaining::linear_joint_stops(a, b, ticks_axis, n_axes);
+      }
       start_block(block + 1, stop);
     }
     if (finished) {
@@ -127,47 +136,38 @@ class NaxisRefLinear {
     int32_t bind = d[master];
     int32_t slave = n_axes > 1 ? d[1 - master] : 0;
     dda = DdaWalk(bind, slave);
+    R = remaining_path_steps(b);
+    if (R == 0) {
+      R = abs_u(bind);
+    }
     if (reset_P) {
       P = 0;
-      R = remaining_path_steps(b);
-      if (R == 0) {
-        R = abs_u(bind);
+    } else {
+      uint32_t coast = map.P_coast();
+      if (P > coast) {
+        P = coast;
+      }
+      if (P > R) {
+        P = R;
       }
     }
     block = b;
     finished = false;
   }
 
-  // Remaining DDA/master steps to the next Linear path-stop. P and R live in
-  // these units so a collinear run may rebind the DDA master without
-  // changing the ramp-step currency (a 1 deg arc switches longest axis).
+  // Master steps to the next hard stop. P and R live in these units so a run
+  // may rebind the DDA master without changing the ramp-step currency.
+  // FAS_NAXIS_NO_CROSS_BLOCK_R (inside linear_remaining) cuts R to one block.
   uint32_t remaining_path_steps(int head) const {
-    uint32_t s = 0;
-    int started = 0;
-    for (int b = head; b < rem->n_blocks; b++) {
-      int32_t d[2];
-      d[0] = rem->delta_of(0, b);
-      d[1] = n_axes > 1 ? rem->delta_of(1, b) : 0;
-      if (d[0] == 0 && d[1] == 0) {
-        if (started) {
-          break;
-        }
-        continue;
-      }
-      if (started && !rem->collinear_same_sense(b - 1, b)) {
-        break;
-      }
-      int m = Remaining::longest_axis(d, ticks_axis, n_axes);
-      s += abs_u(d[m]);
-      started = 1;
-#ifdef FAS_NAXIS_NO_CROSS_BLOCK_R
-      // Mutation (Step 3b): a planner that only sees the current block does not
-      // sum R across collinear micro-segments. R is one block, so F10's
-      // coasting P rests at each joint and the collinear-joint check fails.
-      break;
-#endif
-    }
-    return s;
+    uint32_t acc[2] = {accel, accel};
+    return Remaining::linear_remaining<2>(head, rem->n_blocks, n_axes,
+                                          ticks_axis, acc, rem->horizon,
+                                          [this](int b, int ax) -> int32_t {
+                                            if (ax >= n_axes) {
+                                              return 0;
+                                            }
+                                            return rem->delta_of(ax, b);
+                                          });
   }
 
   uint32_t apply_law() {

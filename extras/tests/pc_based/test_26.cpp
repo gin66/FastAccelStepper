@@ -42,6 +42,7 @@
 #include "naxis_plot.h"
 #include "naxis_ref.h"
 #include "naxis_sim_port.h"
+#include "../../../examples/naxes/naxes_path.h"
 #ifdef FAS_NAXIS_TRACE
 #include "naxis_html_dump.h"
 #endif
@@ -239,10 +240,9 @@ void f2_remaining() {
     test(r.remaining(0, 1) == 100, "F2 move block alone R = 100");
   }
 
-  // --- table row 5: Linear path-stop, 2-D square corner. The binder's R ends
-  // --- at the 90-degree vertex even though that axis would continue: a
-  // square's
-  // --- side is one R-budget, not the 4-side perimeter. ---
+  // --- table row 5: Linear hard stop, 2-D square corner. The outgoing master
+  // --- was idle, so R ends at the corner: a side is one R-budget, not the
+  // --- perimeter. ---
   {
     Remaining r(2, 4);
     int32_t b0[2] = {0, 1600};
@@ -294,8 +294,9 @@ void f2_remaining() {
     test(r.remaining(1, 0) == 4000, "F2 F6b R_y = 4000 continues");
   }
 
-  // --- section 8.5 collinear boundary: 1 degree passes, 2 degree is the edge,
-  // --- 3 degree and 90 degree stop (angle change => path-stop). ---
+  // --- section 8.5: the 2 deg test is diagnostic. A 3 deg bend whose master
+  // --- keeps its sense does not end R; a 90 deg corner (outgoing master was
+  // --- idle) does. ---
   {
     Remaining r(2, 2);
     int32_t a1[2] = {1000, 17};  // ~1 degree off the x-axis
@@ -311,10 +312,54 @@ void f2_remaining() {
     test(r.collinear_same_sense(0, 1) == true, "F2 2 degree edge is collinear");
     r.set_block(0, a3);
     r.set_block(1, ax);
-    test(r.collinear_same_sense(0, 1) == false, "F2 3 degree stops");
+    test(r.collinear_same_sense(0, 1) == false, "F2 3 degree is not collinear");
+    test(r.remaining_linear_binder(0, 0) == 2000,
+         "F2 3 degree bend does not end Linear R");
     r.set_block(0, a90);
     r.set_block(1, ax);
-    test(r.collinear_same_sense(0, 1) == false, "F2 90 degree stops");
+    test(r.collinear_same_sense(0, 1) == false,
+         "F2 90 degree is not collinear");
+    test(r.remaining_linear_binder(1, 0) == 1000,
+         "F2 90 degree corner ends Linear R at one side");
+    // F6 dog-leg: equal |delta|, Y reverses. Tie-break keeps X as master,
+    // but Y is not a shorter slave, so the reversal is a hard stop.
+    int32_t dog0[2] = {1600, 1600};
+    int32_t dog1[2] = {1600, -1600};
+    r.set_block(0, dog0);
+    r.set_block(1, dog1);
+    test(r.remaining_linear_binder(0, 0) == 1600,
+         "F2 F6 equal-|delta| reversal ends Linear R");
+    // Strictly shorter slave reversal (circle cardinal): R continues.
+    int32_t cusp0[2] = {1000, 10};
+    int32_t cusp1[2] = {1000, -10};
+    r.set_block(0, cusp0);
+    r.set_block(1, cusp1);
+    test(r.remaining_linear_binder(0, 0) == 2000,
+         "F2 shorter-slave reversal does not end Linear R");
+  }
+
+  // Role change onto an already-moving axis, with a slower third axis joining.
+  // Not a hard stop: R is steps of the incoming block plus the P that matches
+  // the outgoing period, not the sum of both blocks and not zero.
+  {
+    Remaining r(3, 2);
+    int32_t b0[3] = {8000, 3000, 0};
+    int32_t b1[3] = {3000, 8000, 100};
+    r.set_block(0, b0);
+    r.set_block(1, b1);
+    uint32_t ticks3[3] = {4000, 4000, 16000};
+    uint32_t acc3[3] = {2000, 2000, 2000};
+    uint32_t R = Remaining::linear_remaining<8>(
+        0, 2, 3, ticks3, acc3, 0xFFFFFFFFU,
+        [&](int b, int ax) -> int32_t { return r.delta_of(ax, b); });
+    RampMap incoming(4000, 2000);
+    uint32_t p_match = incoming.calculate_ramp_steps(16000);
+    test(p_match > 0 && p_match < 8000, "F2 role-change P_match is interior");
+    test(R == 8000 + p_match,
+         "F2 role change prepares down to the slower ticks_floor");
+    test(R > 8000, "F2 role-change preparation is not a full stop");
+    test(R < 16000, "F2 role change does not ignore the slower envelope");
+    printf("F2 role-change preparation: P_match=%u R=%u\n", p_match, R);
   }
 
   // --- section 8.2 / F19: a small HORIZON of micro-segments caps P below
@@ -505,10 +550,10 @@ void f2b_oracle() {
     printf("F2b item3 rebind neighbourhood checked\n");
   }
 
-  // --- item 4: collinear boundary -------------------------------------
-  // 1 degree must pass, 2 degree is the documented edge, 3 and 90 degree
-  // must stop (angle change => Linear path-stop). Include n=3 with one tiny
-  // component (the tiny axis must not change the 2-D collinearity verdict).
+  // --- item 4: collinear boundary (diagnostic) ------------------------
+  // 1 degree passes, 2 degree is the edge, 3 and 90 degree are not collinear.
+  // The 2 deg test does not cut Linear R: a 3 deg same-master bend carries,
+  // a 90 deg corner (outgoing master idle) ends R. Include n=3.
   {
     Remaining r2(2, 2);
     int32_t one[2] = {1000, 17};
@@ -522,11 +567,18 @@ void f2b_oracle() {
     r2.set_block(0, edge);
     test(r2.collinear_same_sense(0, 1) == true, "F2b item4 2 deg edge passes");
     r2.set_block(0, three);
-    test(r2.collinear_same_sense(0, 1) == false, "F2b item4 3 deg stops");
+    test(r2.collinear_same_sense(0, 1) == false,
+         "F2b item4 3 deg is not collinear");
+    test(r2.remaining_linear_binder(0, 0) == 2000,
+         "F2b item4 3 deg bend does not end Linear R");
     r2.set_block(0, right);
-    test(r2.collinear_same_sense(0, 1) == false, "F2b item4 90 deg stops");
-    // n=3 collinearity is the 3-D dot test, so a tiny perpendicular
-    // component does not by itself force a path-stop, while a
+    r2.set_block(1, axis);
+    test(r2.collinear_same_sense(0, 1) == false,
+         "F2b item4 90 deg is not collinear");
+    test(r2.remaining_linear_binder(1, 0) == 1000,
+         "F2b item4 90 deg corner ends Linear R");
+    // n=3 collinearity is the 3-D dot test. A same-master bend is not
+    // collinear and still does not end Linear R.
     Remaining r3(3, 2);
     int32_t collinear0[3] = {100, 50, 10};
     int32_t collinear1[3] = {200, 100, 20};  // exact multiple: collinear
@@ -541,7 +593,9 @@ void f2b_oracle() {
     r3.set_block(0, bend0);
     r3.set_block(1, bend1);
     test(r3.collinear_same_sense(0, 1) == false,
-         "F2b item4 n=3 non-collinear pair stops");
+         "F2b item4 n=3 bend is not collinear");
+    test(r3.remaining_linear_binder(0, 0) == 200,
+         "F2b item4 n=3 same-master bend does not end Linear R");
     r3.set_block(0, tiny0);
     r3.set_block(1, tiny1);
     test(r3.collinear_same_sense(0, 1) == true,
@@ -1213,7 +1267,12 @@ static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
     // A coast issues the max-speed period, which is not a "rest"; the original
     // `rest` classification (period == max) stays for the assertion gating, but
     // it must no longer drive the plot speed (that is what zeroed every coast).
+    // ticks == t_law is a coast, not a standstill. The joint sample must
+    // record it, or a cruising chord looks like a path-stop.
     bool rest = (ticks_issued == t_law);
+    if (ticks_issued > 0) {
+      last_moving_p = p_issued;
+    }
     if (!rest) {
       // calculate_ramp_steps o calculate_ticks may land one step high
       // (log2 inverse, section 12.4 one-step slack).
@@ -1226,7 +1285,6 @@ static void walk_polyline(Walker& ref, Remaining* rem, const uint32_t* ticks,
           slack = d;
         }
       }
-      last_moving_p = p_issued;
       if (step_out[0] != 0 && ticks_issued < ticks[0]) {
         *envelope_ok = false;
       }
@@ -1484,13 +1542,12 @@ void f20_long_polyline() {
     }
   }
   test(n_stop >= 1, "F20 has a Linear path-stop joint");
-  test(n_cruise >= 1, "F20 has a collinear cruise joint");
-  // The half-circle must be a single smooth arc: every interior arc joint is
-  // collinear, so `R` sees through the whole arc and the path cruises (X and Y
-  // speeds are one sine-like ramp 0 -> max -> 0). A 1 deg chord rounded to
-  // integers at r=1600 is only ~28 steps, so the quantisation makes ~60% of
-  // joints >2 deg and the arc path-stops at every chord -- a sawtooth, not a
-  // ramp. The generator must keep every arc joint inside the 2 deg band.
+  test(n_cruise >= 1, "F20 has a cruise joint");
+  // The half-circle cruises because the DDA master does not reverse along it.
+  // The 2 deg test is only a check that the chords stayed smooth. A 1 deg
+  // chord rounded to integers at r=1600 is only ~28 steps, so the quantisation
+  // makes ~60% of joints >2 deg; that used to sawtooth the arc. r=4800 keeps
+  // the chords smooth, and the carry rule cruises them either way.
   {
     const int arc_first = 80 + 1;  // 80 random + 1 connecting block
     const int arc_len = 190;
@@ -1501,7 +1558,17 @@ void f20_long_polyline() {
       }
     }
     test(arc_nonsmooth == 0,
-         "F20 half-circle is collinear (no path-stop joint on the arc)");
+         "F20 half-circle chords stay inside the 2 deg band");
+    // The arc cruises because the master does not reverse. Skip the joints
+    // where the random walk hands off and where the arc ends (those may be
+    // real stops). Every interior arc joint keeps P.
+    int arc_rest = 0;
+    for (int i = arc_first + 2; i < arc_first + arc_len - 3; i++) {
+      if (i < nv - 1 && vp[i] <= 1) {
+        arc_rest++;
+      }
+    }
+    test(arc_rest == 0, "F20 half-circle interior joints cruise");
   }
   printf(
       "F20 blocks=%d vertices=%d stop_joints=%d cruise_joints=%d "
@@ -1527,9 +1594,9 @@ void f20_long_polyline() {
 // Vertex invariant of the oracle: walk_polyline emits one vertex per walked
 // block, and a trailing zero block is not walked, so the count is
 // "highest non-zero block index + 1". Each vertex sample sits at a waypoint.
-// A joint between block i-1 and i is a path-stop (P -> 0) when the two
-// displacements are not the same 2 deg-collinear sense, and a collinear cruise
-// (P carries) otherwise.
+// A joint between block i-1 and i is a hard stop (P -> 0) when the master
+// sense ends or the outgoing master was idle, and a carry (P continues)
+// otherwise. The 2 deg test does not decide it.
 // Walks one committed polyline through the naxis_ref oracle and checks the
 // 2g invariants. `wp` holds the cumulative waypoint of each block start
 // (wp[2b] / wp[2b+1] = sum of blocks 0..b-1), wp[0..1] = origin.
@@ -1585,11 +1652,10 @@ static void f2g_walk(Remaining* rem, const uint32_t* ticks, uint32_t accel,
 
   gettimeofday(&t0, NULL);
   // Joint P semantics. vertex_p[k] is the last moving P of block k. A joint
-  // between block i-1 and i is a path-stop (P -> 0) when the two
-  // displacements are not the same 2 deg-collinear sense, and a collinear
-  // cruise (P carries) otherwise. Idle blocks are not joints. A collinear
-  // joint only *must* be in cruise (P_issued > 1) once the live remaining
-  // path exceeds P_coast on a moving axis; below that the ramp is
+  // is a hard stop (P -> 0) when the master sense ends or the outgoing
+  // master was idle. Every other joint carries P. Idle blocks are not
+  // joints. A carry joint only *must* be in cruise (P_issued > 1) once the
+  // live remaining path exceeds P_coast; below that the ramp is
   // legitimately decelerating toward rest.
   for (int i = 1; i < n_blocks; i++) {
     int32_t da[2] = {rem->delta_of(0, i - 1), rem->delta_of(1, i - 1)};
@@ -1599,8 +1665,7 @@ static void f2g_walk(Remaining* rem, const uint32_t* ticks, uint32_t accel,
     if (ma == 0 || mb == 0) {
       continue;  // an idle block is not a joint
     }
-    int64_t dot = (int64_t)da[0] * db[0] + (int64_t)da[1] * db[1];
-    bool stop = (dot <= 0) || (dot * dot * 100000 < 99878 * ma * mb);
+    bool stop = Remaining::linear_joint_stops(da, db, ticks, 2);
     if (stop) {
       test(vp[i - 1] <= 1, "2g path-stop joint P_issued <= 1");
     } else {
@@ -1671,10 +1736,8 @@ void f2g_exhaustive() {
             case_t.joint_check += joint_t;
             n_tested++;
             if (d1[0] != 0 || d1[1] != 0) {
-              int64_t dot = (int64_t)d0[0] * d1[0] + (int64_t)d0[1] * d1[1];
-              int64_t ma = (int64_t)d0[0] * d0[0] + (int64_t)d0[1] * d0[1];
-              int64_t mb = (int64_t)d1[0] * d1[0] + (int64_t)d1[1] * d1[1];
-              bool stop = (dot <= 0) || (dot * dot * 100000 < 99878 * ma * mb);
+              bool stop =
+                  Remaining::linear_joint_stops(d0, d1, ticks_cases[t], 2);
               if (stop) {
                 n_joint_stop++;
               } else {
@@ -1713,7 +1776,7 @@ void f2g_exhaustive() {
   }
   printf(
       "F2g exhaustive Linear: %ld polylines tested, %ld path-stop joints, "
-      "%ld collinear joints\n",
+      "%ld carry joints\n",
       n_tested, n_joint_stop, n_joint_collinear);
   uint64_t total_ns = total.ref_walk + total.waypoint_check + total.joint_check;
   printf(
@@ -1723,7 +1786,7 @@ void f2g_exhaustive() {
       (unsigned long)total.joint_check, (unsigned long)total_ns);
   test(n_tested > 0, "2g polylines were actually tested");
   test(n_joint_stop > 0, "2g exercised a path-stop joint");
-  test(n_joint_collinear > 0, "2g exercised a collinear joint");
+  test(n_joint_collinear > 0, "2g exercised a carry joint");
   printf("F2g exhaustive tiny Linear green\n");
 }
 void f2f_two_block() {
@@ -1739,8 +1802,11 @@ void f2f_two_block() {
       {"(5,0)+(0,5) L", 5, 0, 0, 5, true, 1},
       {"(3,3)+(2,2) collinear", 3, 3, 2, 2, false, 0},
       {"(5,0)+(-3,0) reversal", 5, 0, -3, 0, true, 0},
+      {"(1000,52)+(1000,0) 3deg", 1000, 52, 1000, 0, false, 0},
+      {"(8000,3000)+(3000,8000) role", 8000, 3000, 3000, 8000, false, 1},
   };
-  for (int c = 0; c < 3; c++) {
+  const int n_rows = (int)(sizeof(rows) / sizeof(rows[0]));
+  for (int c = 0; c < n_rows; c++) {
     const Row& r = rows[c];
     int32_t sum0 = r.a0 + r.b0;
     int32_t sum1 = r.a1 + r.b1;
@@ -1954,8 +2020,9 @@ void f2h_nblock_vs_f20() {
       poly_stop++;
     }
   }
+  int ref_cruise = (ref_nv > 0) ? (ref_nv - 1 - ref_stop) : 0;
   test(ref_stop >= 1, "2h oracle has a Linear path-stop joint");
-  test(ref_stop > 0, "2h oracle has a collinear cruise joint");
+  test(ref_cruise > 0, "2h oracle has a cruise joint");
   test(poly_stop == ref_stop, "2h interpolator path-stop joints match oracle");
 
   printf(
@@ -1982,9 +2049,9 @@ void f2h_nblock_vs_f20() {
 //
 // Three mutations are documented here and proven by
 // extras/tests/pc_based/prove_mutations.sh (`make mutations`):
-//   - FAS_NAXIS_NO_CROSS_BLOCK_R (naxis_ref.h): R is one block, not the
-//     collinear sum. F10's joints rest (P -> 0 per block) and the collinear-
-//     cruise check fails.
+//   - FAS_NAXIS_NO_CROSS_BLOCK_R (remaining.h linear_remaining): R is one
+//     block, not the run to the next hard stop. F10's joints rest (P -> 0
+//     per block) and the cruise check fails.
 //   - FAS_NAXIS_NO_REBIND (remaining.h): binder_axis ignores ticks. F5/F10
 //     (equal ticks) are unaffected, but the rebind neighbourhood of Step 2b
 //     fails, so the model is wrong.
@@ -2029,6 +2096,9 @@ static void check_stoppable(Remaining* rem, const uint32_t* ticks,
     RampMap map(ref.ticks_law, accel);
     uint32_t p_issued = map.calculate_ramp_steps(ticks_issued);
     bool rest = (ticks_issued == ref.ticks_law);
+    if (ticks_issued > 0) {
+      last_moving_p = p_issued;
+    }
     if (!rest) {
       // Per-axis stoppability: the issued period must still allow a stop
       // within the remaining scan on every axis. An idle axis has P = 0.
@@ -2046,7 +2116,6 @@ static void check_stoppable(Remaining* rem, const uint32_t* ticks,
       if (p_issued > out->peak_p) {
         out->peak_p = p_issued;
       }
-      last_moving_p = p_issued;
     }
     if (ref.dda.done()) {
       if (out->n_joint < 512) {
@@ -5203,6 +5272,73 @@ static void f22_external_stop() {
   printf("F22 external stop / emergencyStop green\n");
 }
 
+// One turn of the naxes example helix (12 chords per quarter, 7.5 deg, not
+// collinear). The master does not reverse at those chords, so the turn
+// cruises. The square-corner stop is a different joint and is not in this
+// polyline.
+static int32_t naxes_q_axis(int q, int16_t mag, int16_t rad, bool x_axis) {
+  if (x_axis) {
+    switch (q) {
+      case 0:
+        return rad;
+      case 1:
+        return -mag;
+      case 2:
+        return -rad;
+      default:
+        return mag;
+    }
+  }
+  switch (q) {
+    case 0:
+      return mag;
+    case 1:
+      return rad;
+    case 2:
+      return -mag;
+    default:
+      return -rad;
+  }
+}
+
+static void f_coarse_helix_cruises() {
+  const int n = 4 * NAXES_QSAMPLES;
+  int32_t pts[49][2];
+  for (int i = 0; i <= n; i++) {
+    int j = i % n;
+    int q = j / NAXES_QSAMPLES;
+    int k = j % NAXES_QSAMPLES;
+    pts[i][0] = naxes_q_axis(q, NAXES_SIN_Q[k], NAXES_COS_Q[k], true);
+    pts[i][1] = naxes_q_axis(q, NAXES_SIN_Q[k], NAXES_COS_Q[k], false);
+  }
+  Remaining rem(2, n);
+  for (int i = 0; i < n; i++) {
+    int32_t d[2] = {pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]};
+    rem.set_block(i, d);
+  }
+  test(rem.collinear_same_sense(0, 1) == false,
+       "naxes helix chord is outside the 2 deg band");
+  const uint32_t ticks[2] = {4000, 4000};
+  const uint32_t accel = 2000;
+  int32_t end_pos[2], issued[2];
+  bool env = true, plr = true;
+  uint32_t vp[64];
+  int nv = 0;
+  ref_walk_polyline(&rem, ticks, accel, end_pos, issued, &env, &plr, vp, &nv,
+                    64, NULL, NULL, NULL);
+  test(env && plr, "naxes helix envelope and P <= R");
+  test(nv == n, "naxes helix has one sample per chord");
+  int rests = 0;
+  for (int i = 2; i < n - 2; i++) {
+    if (vp[i] <= 1) {
+      rests++;
+    }
+  }
+  test(rests == 0, "naxes helix interior chords cruise");
+  printf("naxes helix: chords=%d interior_rests=%d joint_P_mid=%u\n", n, rests,
+         vp[n / 2]);
+}
+
 int main() {
   puts("FasNAxis TDD");
 #ifdef FAS_NAXIS_TRACE
@@ -5219,6 +5355,7 @@ int main() {
   f2ref_reference();
   f2g_exhaustive();
   f20_long_polyline();
+  f_coarse_helix_cruises();
   f2f_two_block();
   f2h_nblock_vs_f20();
   f3b_stoppability();
