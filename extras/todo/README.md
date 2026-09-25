@@ -10,7 +10,6 @@ tracked here, one file per item.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **P3** | [naxes example smoothness](naxes_example_smoothness.md) | End-to-end simavr/hardware check; P1 and P2 are in. |
 | **P4** | [naxes log2 instead of 16/32-bit multiply](naxes_log2_mul.md) | Hot path still schoolbook-multiplies; the ramp map is already log2. |
 | **P5** | [Engine synchronized start](engine_synchronized_start.md) | Kick-off is still one `addQueueEntry(NULL, true)` per axis. |
 | **P6** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
@@ -18,13 +17,18 @@ tracked here, one file per item.
 
 ## Done
 
+- **naxes example smoothness — implemented.** simavr `test_naxes` passes
+  with 11 legitimate stops (`MAX_PATH_STOPS = 11`); no helix chord stops.
+  P3 also found and fixed the block ring not sliding past `HORIZON`
+  (`FasNAxis::compact_ring()`), which had chunked any path longer than
+  `HORIZON` into per-ring ramp-to-rest segments. See
+  [naxes_example_smoothness.md](naxes_example_smoothness.md).
 - **Linear junction carry — implemented.** `R` ends at a master-sense
   reversal, an idle or tied outgoing axis, a dwell, or the path end.
   `P` carries across every other joint, so a sampled helix cruises and
   the axis-aligned square still stops. See
   [linear_junction_carry.md](linear_junction_carry.md) and whitepaper
-  §8.5. `test_naxes` still needs a simavr re-run (P3) to confirm
-  `MAX_PATH_STOPS`.
+  §8.5.
 - **Feeder command batching — implemented.** The ramp generator's
   command size: one step when the period is already at least 1 ms, and
   about 2 ms of equal-period steps when it is shorter. Productive code

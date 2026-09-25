@@ -72,11 +72,14 @@ STOP_MERGE_EVENTS = 4
 # start, at the line that meets the helix (the entry master reverses), at
 # hexagon corners where an axis goes idle, at the axis-aligned square
 # corners, and at the return to the origin. The helix chords are 7.5 deg
-# and are not collinear; Linear still cruises them (whitepaper §8.5). The
-# old per-chord stop was HELIX_TURNS * 4 * NAXES_QSAMPLES = 144. 16 covers
-# the legitimate stops with margin. P3 re-runs simavr and tightens this if
-# the measured count is lower.
-MAX_PATH_STOPS = 16
+# and are not collinear; Linear still cruises them (whitepaper §8.5). P3
+# re-ran simavr after the sliding block ring landed and measured exactly
+# these 11: start, helix entry, four hexagon corners, four square corners,
+# and the return to the origin. Any stop on a helix chord is a regression
+# (the old per-chord stop was HELIX_TURNS * 4 * NAXES_QSAMPLES = 144, and a
+# chunked plan that ramps to rest every HORIZON points showed up as extra
+# stops), so the budget is the measured count with no slack.
+MAX_PATH_STOPS = 11
 
 
 def reconstruct_from_vcd(path):

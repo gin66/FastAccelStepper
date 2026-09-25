@@ -240,7 +240,10 @@ class FasNAxis {
       return true;  // L = 0: dwell of 0 ticks, no block recorded
     }
     if (_n_blk >= (int)HORIZON) {
-      return false;  // ring full: backpressure until pump() drains
+      compact_ring();  // drop executed blocks so the ring slides
+      if (_n_blk >= (int)HORIZON) {
+        return false;  // ring full: backpressure until pump() drains
+      }
     }
     for (uint8_t i = 0; i < NAXES; i++) {
       _blk[_n_blk][i] = p[i] - _p[i];
@@ -273,7 +276,10 @@ class FasNAxis {
       return true;
     }
     if (_n_blk >= (int)HORIZON) {
-      return false;  // ring full: backpressure until pump() drains
+      compact_ring();  // drop executed blocks so the ring slides
+      if (_n_blk >= (int)HORIZON) {
+        return false;  // ring full: backpressure until pump() drains
+      }
     }
     for (uint8_t i = 0; i < NAXES; i++) {
       _blk[_n_blk][i] = 0;
@@ -482,6 +488,28 @@ class FasNAxis {
       }
     }
     return true;
+  }
+
+  // Drop blocks the feeder has fully executed, rebasing the executing head to
+  // 0 so the block array is a sliding window of at most HORIZON *pending*
+  // points (whitepaper section 8). Without this the array only grows, addLine
+  // backpressures once HORIZON points have *ever* been appended, and a path
+  // longer than HORIZON runs in chunks that each ramp to rest. Live state
+  // indexes _blk[_head] / _blk[_head + 1] by the rebased head, so it stays
+  // valid across the shift.
+  void compact_ring() {
+    if (_head <= 0) {
+      return;
+    }
+    int pending = _n_blk - _head;
+    for (int b = 0; b < pending; b++) {
+      for (uint8_t i = 0; i < NAXES; i++) {
+        _blk[b][i] = _blk[_head + b][i];
+      }
+      _dwell[b] = _dwell[_head + b];
+    }
+    _n_blk = pending;
+    _head = 0;
   }
 
   // Read the DIR pause budget from the stepper (whitepaper section 4.4). The

@@ -5392,6 +5392,76 @@ static void f_coarse_helix_cruises() {
          vp[n / 2]);
 }
 
+// P3: the block array must be a sliding window of at most HORIZON *pending*
+// points, not a buffer that back-pressures after HORIZON points have ever
+// been appended. Otherwise any path longer than HORIZON is executed in
+// chunks that each ramp to rest, which is what made the naxes example stop
+// on helix chords in simavr.
+static void f_sliding_ring() {
+  const int horizon = 4;
+  SimPort px(4000), py(4000);
+  FasNAxisConfig cfg;
+  FasNAxis<2, (uint16_t)horizon, SimPort> path(cfg);
+  test(path.addAxis(0, &px) == true, "F23 sliding-ring addAxis(0)");
+  test(path.addAxis(1, &py) == true, "F23 sliding-ring addAxis(1)");
+  int32_t cur[2] = {0, 0};
+  path.setCurrentPosition(cur);
+
+  // Fill the ring to HORIZON with one-step blocks. The pump then feeds every
+  // block (the head advances to HORIZON) while the commands sit in the queue.
+  int32_t x = 0;
+  for (int k = 0; k < horizon; k++) {
+    int32_t t[2] = {x + 1, 0};
+    test(path.addLine(t) == true, "F23 addLine fills the ring");
+    x += 1;
+  }
+  path.pump();
+
+  // The executed prefix is dropped, so addLine is legal again even though
+  // HORIZON points have already been appended in total.
+  int32_t next[2] = {x + 1, 0};
+  test(path.addLine(next) == true,
+       "F23 ring slides: addLine is legal past HORIZON total points");
+  x += 1;
+  test(path.pendingBlocks() <= horizon, "F23 pending stays within HORIZON");
+
+  // A path much longer than HORIZON keeps accepting points and reaches the
+  // end without a chunked ramp-to-rest.
+  const int total = 40;
+  bool have_p = false;
+  int rests = 0;
+  int added = 1;
+  while (added < total || path.isBusy()) {
+    if (added < total) {
+      int32_t t[2] = {x + 1, 0};
+      if (path.addLine(t)) {
+        x += 1;
+        added++;
+        if (added == total) {
+          path.endPath();
+        }
+      }
+    }
+    path.pump();
+    int64_t s0 = 0;
+    px.drain_one(&s0, NULL);
+    py.drain_one(NULL, NULL);
+    uint32_t P = path.performedRampUp();
+    if (P > 0) {
+      have_p = true;
+    } else if (have_p && added < total) {
+      rests++;
+      have_p = false;
+    }
+    test(path.pendingBlocks() <= horizon, "F23 pending stays within HORIZON");
+  }
+  test(added == total, "F23 sliding ring accepts a path longer than HORIZON");
+  test(px.position() == x, "F23 sliding ring reaches the end");
+  test(rests == 0, "F23 sliding ring has no mid-path chunk-boundary rest");
+  printf("F23 sliding ring: horizon=%d total=%d x=%d rests=%d\n", horizon,
+         total, x, rests);
+}
+
 int main() {
   puts("FasNAxis TDD");
 #ifdef FAS_NAXIS_TRACE
@@ -5409,6 +5479,7 @@ int main() {
   f2g_exhaustive();
   f20_long_polyline();
   f_coarse_helix_cruises();
+  f_sliding_ring();
   f2f_two_block();
   f2h_nblock_vs_f20();
   f3b_stoppability();
