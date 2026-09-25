@@ -45,6 +45,14 @@ do
 		  echo $p: Skipping $i for $p due to space constraints
 		  continue
 		fi
+		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/naxes" ]; then
+		  echo $p: Skipping $i for $p due to space constraints
+		  continue
+		fi
+		if [ "$p" = "atmega32u4" ] && [ "$i" = "pio_dirs/naxes" ]; then
+		  echo $p: Skipping $i for $p due to space constraints
+		  continue
+		fi
 		echo $p: $i
 		(cd $i;pio run -s -e $p)
 	done

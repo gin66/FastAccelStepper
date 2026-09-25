@@ -1,0 +1,19 @@
+# Multi-axis naxes example: the curve is validated by the NEW geometry
+# detector (detect_geometry.py), not by judge.awk against this file.
+#
+# This expect.txt exists only to satisfy the generic top-level harness
+# prerequisite (test_*/expect.txt). It is NOT fed to judge.awk.
+#
+# The run is judged by the pin trace: detect_geometry.py reconstructs
+# (X,Y,Z) position over time from the StepA/B and DirA/B edges and checks
+#   - no underrun (a non-trivial number of steps were emitted)
+#   - helix radius ~ RADIUS during the Z-climbing phase
+#   - helix Z-climb reaches HELIX_TURNS * HELIX_Z_PER_TURN
+#   - all six hexagon corners are reached
+#   - all four square corners are reached
+#   - the run closes back at the origin
+#
+# All checks passing => exit 0 => .tested is created.
+#
+# Path: helix -> hexagon -> square -> return to origin.
+# Fixed, deterministic, so every run is comparable.

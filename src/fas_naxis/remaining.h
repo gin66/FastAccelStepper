@@ -3,7 +3,17 @@
 
 #include <stdint.h>
 
-// FasNAxis remaining-steps scan R (whitepaper section 8).
+// FasNAxis remaining-steps scan R and DDA / time-law oracle (whitepaper
+// sections 6.3 and 8).
+//
+// The DDA / time-law functions (longest_axis, ticks_floor, binder_axis,
+// dda_steps) are stateless and are used by the production planner and by the
+// PC reference tests.
+//
+// The stateful remaining-steps scan R and the collinearity test are used only
+// by the PC reference track (extras/tests/pc_based). They are compiled only
+// when FAS_NAXIS_REFERENCE is defined, so a target build carries no Remaining
+// object and, in particular, no backing store for the reference scan.
 //
 // R is the lookahead kernel: per axis it is the sum of |delta_i| over the
 // block ring until the first of (path end, that axis going idle after it
@@ -17,10 +27,10 @@
 // remaining-to-standstill). Remaining.h does not estimate a peak as
 // min(P_stop, R/2).
 //
-// HORIZON (a public field, default INT32_MAX so an unbounded scan is the
-// norm) caps the number of *points* the scan may touch: section 8.2 / F19
-// (a small HORIZON of micro-segments caps P below P_stop; the same HORIZON
-// with one long block still coasts because R is steps, not points).
+// HORIZON (a public field, default unbounded) caps the number of *points*
+// the scan may touch: section 8.2 / F19 (a small HORIZON of micro-segments
+// caps P below P_stop; the same HORIZON with one long block still coasts
+// because R is steps, not points).
 //
 // Compile-time hook (Step 2b mutation probe) proves the theory fails on a
 // wrong model:
@@ -31,16 +41,17 @@
 // ramp_law.h).
 class Remaining {
  public:
+#ifdef FAS_NAXIS_REFERENCE
   int n_axes;
   int n_blocks;
   int32_t* deltas;   // n_axes x n_blocks, row-major [axis * n_blocks + block]
   uint32_t horizon;  // max points scanned (0 or INT32_MAX = unbounded)
 
-  // Backed by a static ring so a call site can keep the object in a local
-  // scope while feeding its own local delta arrays through set_block.
+  // The backing store is sized for the reference caller (the PC test block
+  // rings are at most 512 n-dim blocks).
   Remaining(int axes, int blocks)
       : n_axes(axes), n_blocks(blocks), horizon(0xFFFFFFFFU) {
-    static int32_t store[1024 * 1024];
+    static int32_t store[1024];
     deltas = store;
     for (int i = 0; i < n_axes * n_blocks; i++) {
       store[i] = 0;
@@ -155,9 +166,10 @@ class Remaining {
     int64_t rhs = 99878 * mag_a * mag_b;
     return lhs >= rhs;
   }
+#endif /* FAS_NAXIS_REFERENCE */
 
-  // ---- Reference oracle (whitepaper section 6.3 / 8.3) -------------------
-  // Pure functions, no FasNAxis state. The planner must match these on the
+  // ---- DDA / time-law oracle (whitepaper section 6.3 / 8.3) --------------
+  // Pure static functions, no state. The planner must match these on the
   // same inputs. Integer compare only (no integer division in the binder
   // selection).
 
@@ -240,6 +252,7 @@ class Remaining {
   // issues over the binder's |delta_bind| steps (err += |slave|; if
   // 2*err >= |bind| then step and err -= |bind|). The binder itself (slave
   // magnitude == bind) issues |delta_bind| steps; an idle slave issues 0.
+  // Used by the PC reference tests.
   static int dda_steps(int delta_bind, int delta_slave) {
     int64_t abs_bind = delta_bind > 0 ? delta_bind : -delta_bind;
     int64_t abs_slave = delta_slave > 0 ? delta_slave : -delta_slave;

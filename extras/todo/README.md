@@ -8,7 +8,6 @@ tracked here, one file per item.
 
 ## Tracked entries
 
-- [naxes hardware/simavr validation](naxes_hw_validation.md)
 - [Cubic start (`s_h`) overlay](cubic_start.md)
 - [Faithful timed trajectory](timed_trajectory.md)
 
@@ -20,8 +19,13 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
 - **Raising `pd_test` `MAX_STEPPER` — dropped.** Not debt but a design
   decision: n > 2 PC tests use `FasNAxis<N, HORIZON, SimPort>`; 1- and
   2-axis golden paths use real FAS queues (whitepaper §4.7).
-- **simavr / hardware / PlatformIO jobs for FasNAxis — tracked**
-  (see `naxes_hw_validation.md`).
+- **simavr / hardware / PlatformIO jobs for FasNAxis — implemented.**
+  `examples/naxes/` (helix → hexagon → square → origin, one
+  `FastAccelStepper` per axis) builds for every CI architecture;
+  `extras/tests/simavr_based/test_naxes/` runs it on the ATmega328p and
+  `detect_geometry.py` judges the reconstructed curve. The 16 KB
+  ATmega168 and the ATmega32u4 are skipped by `build-platformio.sh` for
+  space.
 - **Per-block feedrate `F` — not a separate item.** It is a requested
   speed, hence timed-world input; it belongs to `timed_trajectory.md`
   (no AFAP `F`-as-cap variant).

@@ -1622,6 +1622,11 @@ extras/tests/pc_based/
 extras/n_axes/
   viewer_template.html
   tests/out/                   // generated HTML, gitignored
+examples/naxes/                // 3-axis example: helix -> hexagon -> square -> origin
+pio_dirs/naxes/                // generated CI wrapper (build-pio-dirs.sh)
+extras/tests/simavr_based/
+  test_naxes/                  // simavr run of the example + geometry judge
+  detect_geometry.py           // reconstruct the curve from the Step/Dir VCD
 ```
 
 `test_??.cpp` is already in the pc_based `TESTS` wildcard. No

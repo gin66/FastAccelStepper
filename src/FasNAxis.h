@@ -146,8 +146,8 @@ class FasNAxis {
     _block_left = 0;
     _pause_left = 0;
     _ticks_law = 1;
-    _P = 0;
-    _R = 0;
+    _Pramp = 0;
+    _Rstop = 0;
     _ticks_last = 0;
   }
 
@@ -299,8 +299,7 @@ class FasNAxis {
     // invalidates the coordinated plan: abort and report Stopped. Positions
     // are untrusted until the caller re-homes and syncFromSteppers().
     for (uint8_t i = 0; i < NAXES; i++) {
-      if (_registered[i] &&
-          _s[i]->takeStopCause() != StepperStopCause::None) {
+      if (_registered[i] && _s[i]->takeStopCause() != StepperStopCause::None) {
         _fault = true;
         _feeding = false;
       }
@@ -412,7 +411,7 @@ class FasNAxis {
       return false;
     }
     uint8_t m = (uint8_t)_master;
-    return _R < _lim[m].P_stop;
+    return _Rstop < _lim[m].P_stop;
   }
 
   // Diagnostic outs (no string, no heap): the DDA master axis, its live
@@ -423,7 +422,7 @@ class FasNAxis {
       *axis = (uint8_t)_master;
     }
     if (R != NULL) {
-      *R = _R;
+      *R = _Rstop;
     }
     if (P_stop != NULL) {
       *P_stop = _lim[_master].P_stop;
@@ -434,9 +433,9 @@ class FasNAxis {
   }
 
   // Performed ramp-up steps of the current segment's DDA master (section 7.1).
-  uint32_t performedRampUp() const { return _P; }
+  uint32_t performedRampUp() const { return _Pramp; }
   // Live remaining-to-stop of the master in path steps (section 8.2).
-  uint32_t remainingToStop() const { return _R; }
+  uint32_t remainingToStop() const { return _Rstop; }
   // Per-axis diagnostics for the plots. Overshoot keeps one persistent P per
   // axis (section 8.6), so two axes can differ at the same instant and a single
   // scalar is only the binder's; Linear's P is the shared path ramp, so every
@@ -481,7 +480,8 @@ class FasNAxis {
   // isQueueFull() alone allows QUEUE_LEN - 1 and cannot express this reserve.
   bool all_have_room() const {
     for (uint8_t i = 0; i < NAXES; i++) {
-      if (_registered[i] && _s[i]->queueEntries() + 2 >= (uint32_t)QUEUE_LEN) {
+      if (_registered[i] &&
+          ((uint32_t)_s[i]->queueEntries() + 2) >= (uint32_t)QUEUE_LEN) {
         return false;
       }
     }
@@ -672,8 +672,8 @@ class FasNAxis {
     _block_count = 0;
     _block_left = 0;
     _pause_left = 0;
-    _P = 0;
-    _R = 0;
+    _Pramp = 0;
+    _Rstop = 0;
     _ticks_last = 0;
     _slice_open = false;
     _error = false;
@@ -852,8 +852,8 @@ class FasNAxis {
       _err[i] = 0;
     }
     _pause_left = _dwell[b];  // a dwell block emits its pauses, then advances
-    _P = _law.P;
-    _R = _law.R;
+    _Pramp = _law.P;
+    _Rstop = _law.R;
     _ticks_last = 0;
   }
 
@@ -882,8 +882,8 @@ class FasNAxis {
       _ticks_law = _tick_cfg[_master] != 0 ? _tick_cfg[_master] : 1;
     }
     _pause_left = 0;
-    _P = _ovs.P[_ovs.binder];
-    _R = _ovs.R[_ovs.binder];
+    _Pramp = _ovs.P[_ovs.binder];
+    _Rstop = _ovs.R[_ovs.binder];
     _ticks_last = 0;
     for (uint8_t i = 0; i < NAXES; i++) {
       _err[i] = 0;
@@ -984,7 +984,7 @@ class FasNAxis {
     }
 
     uint32_t T;
-    int32_t st[NAXES];
+    int st[NAXES];
     for (uint8_t i = 0; i < NAXES; i++) {
       st[i] = 0;
     }
@@ -996,13 +996,13 @@ class FasNAxis {
         _done = true;
         return;
       }
-      _P = _ovs.P[_ovs.binder];
-      _R = _ovs.R[_ovs.binder];
+      _Pramp = _ovs.P[_ovs.binder];
+      _Rstop = _ovs.R[_ovs.binder];
       _ticks_last = T;
     } else {
       T = _law.step();
-      _P = _law.P;
-      _R = _law.R;
+      _Pramp = _law.P;
+      _Rstop = _law.R;
       _ticks_last = T;
 
       st[_master] = _blk[_head][_master] > 0 ? 1 : -1;
@@ -1148,8 +1148,8 @@ class FasNAxis {
   uint32_t _block_left;
   uint32_t _pause_left;
   uint32_t _ticks_law;
-  uint32_t _P;
-  uint32_t _R;
+  uint32_t _Pramp;
+  uint32_t _Rstop;
   uint32_t _ticks_last;
   RampLaw _law;
   OvershootRun<NAXES> _ovs;

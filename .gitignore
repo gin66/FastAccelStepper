@@ -32,6 +32,7 @@ extras/tests/simavr_based/*/FastAccelStepper
 extras/tests/simavr_based/*/result.txt
 extras/tests/simavr_based/*/x.vcd
 extras/tests/simavr_based/test*sd*/src
+extras/tests/simavr_based/test_naxes/src
 extras/tests/simavr_based/simavr
 extras/tests/simavr_based/test_sd*/Makefile
 extras/tests/simavr_based/test_seq*/Makefile
@@ -52,3 +53,4 @@ extras/Esp32StepperDemo/lib/FastAccelStepper/src
 extras/tests/esp32_hw_based/.test_*
 extras/tests/esp32_hw_based/__pycache__
 examples/StepperDemo/StepperDemo.ino-e
+extras/tests/simavr_based/__pycache__

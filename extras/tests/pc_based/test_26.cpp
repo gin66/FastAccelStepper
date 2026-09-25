@@ -28,6 +28,10 @@
 
 #include <math.h>
 
+// Enables the stateful reference scan in fas_naxis/remaining.h
+// (test-only; production builds omit it).
+#define FAS_NAXIS_REFERENCE
+
 #include "FasNAxis.h"
 #include "fas_arch/test_pc.h"  // test() macro
 #include "fas_naxis/dda.h"
@@ -5127,9 +5131,10 @@ static void f20_physical_wav() {
 #endif  // FAS_PHYSICAL_STEPPER_ENABLED
 
 // --- F22: external stop of a member axis aborts the coordinated plan. -------
-// extras/doc/engine_sources.md stop design: FastAccelStepper exposes a stop cause
-// (StepperStopCause) that FasNAxis polls in pump(); a stop outside the planner
-// must abort the plan (PumpStatus::Stopped, isFaulted()) rather than continue.
+// extras/doc/engine_sources.md stop design: FastAccelStepper exposes a stop
+// cause (StepperStopCause) that FasNAxis polls in pump(); a stop outside the
+// planner must abort the plan (PumpStatus::Stopped, isFaulted()) rather than
+// continue.
 static void f22_external_stop() {
   // A manual stopMove-style stop (injected cause) aborts the plan.
   {
