@@ -47,6 +47,7 @@ F2f–F2h, F3b) are self-contained and compare against `naxis_ref.h`.
 | **F19**        | `f13_lookahead`                               | 19            | Small `HORIZON` caps P below `P_stop`; same HORIZON with one long block coasts |
 | **F20**        | `f20_long_polyline`, `f2h_nblock_vs_f20`, `f20_physical_wav` | 2ref / 12.5 | Seeded random walk + collinear half-circle (r=4800, 190 chords) + random walk, ticks `(4000,8000)`: every vertex, envelope, `P ≤ R`, path-stops on the random walk, cruise on the arc, DDA rebind; stereo wav |
 | **F21**        | `f21_physical`                                | 3.1 / 13.3    | PhysicalStepper on each axis's SimPort: rotor path vs commanded, speed, force, friction, stall, stereo wav |
+| **F22**        | `f22_external_stop`                           | —             | External stop of a member axis (`setStopCause` / `forceStop` / `emergencyStop`): `pump()` `Stopped`, `isFaulted()`, queue aborted |
 
 ## Plots and audio
 

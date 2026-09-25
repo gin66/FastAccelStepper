@@ -5126,6 +5126,78 @@ static void f20_physical_wav() {
 }
 #endif  // FAS_PHYSICAL_STEPPER_ENABLED
 
+// --- F22: external stop of a member axis aborts the coordinated plan. -------
+// engine_sources.md stop design: FastAccelStepper exposes a stop cause
+// (StepperStopCause) that FasNAxis polls in pump(); a stop outside the planner
+// must abort the plan (PumpStatus::Stopped, isFaulted()) rather than continue.
+static void f22_external_stop() {
+  // A manual stopMove-style stop (injected cause) aborts the plan.
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    test(path.addAxis(0, &px) == true, "F22 addAxis(0)");
+    test(path.addAxis(1, &py) == true, "F22 addAxis(1)");
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t[2] = {10000, 10000};
+    path.addLine(t);
+    path.endPath();
+    test(path.pump() == PumpStatus::Running, "F22 first pump Running");
+    test(!path.isFaulted(), "F22 not faulted while running");
+
+    px.setStopCause(StepperStopCause::StopMove);
+    test(path.pump() == PumpStatus::Stopped,
+         "F22 pump returns Stopped on an injected stop cause");
+    test(path.isFaulted(), "F22 isFaulted after external stop");
+    test(path.pump() == PumpStatus::Stopped, "F22 stays Stopped while faulted");
+  }
+
+  // A real abrupt stop of one member (forceStop) aborts the plan.
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t[2] = {10000, 0};
+    path.addLine(t);
+    path.endPath();
+    test(path.pump() == PumpStatus::Running, "F22 forceStop setup Running");
+
+    px.forceStop();
+    test(path.pump() == PumpStatus::Stopped,
+         "F22 pump returns Stopped after a member forceStop");
+    test(px.isQueueEmpty(), "F22 forceStop aborted the member queue");
+  }
+
+  // emergencyStop() forceStops every member and faults the plan.
+  {
+    SimPort px(4000), py(4000);
+    FasNAxisConfig cfg;
+    FasNAxis<2, 64, SimPort> path(cfg);
+    path.addAxis(0, &px);
+    path.addAxis(1, &py);
+    int32_t cur[2] = {0, 0};
+    path.setCurrentPosition(cur);
+    int32_t t[2] = {10000, 0};
+    path.addLine(t);
+    path.endPath();
+    path.pump();
+    path.emergencyStop();
+    test(path.isFaulted(), "F22 emergencyStop faults the plan");
+    test(px.takeStopCause() == StepperStopCause::ForceStop,
+         "F22 emergencyStop forceStops axis 0");
+    test(py.takeStopCause() == StepperStopCause::ForceStop,
+         "F22 emergencyStop forceStops axis 1");
+    test(path.pump() == PumpStatus::Stopped,
+         "F22 pump Stopped after emergencyStop");
+  }
+  printf("F22 external stop / emergencyStop green\n");
+}
+
 int main() {
   puts("FasNAxis TDD");
 #ifdef FAS_NAXIS_TRACE
@@ -5159,6 +5231,7 @@ int main() {
   f21_physical();
 #endif
   f16_skeleton();
+  f22_external_stop();
   printf("TEST_26 PASSED\n");
   return 0;
 }
