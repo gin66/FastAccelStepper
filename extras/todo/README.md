@@ -10,7 +10,6 @@ tracked here, one file per item.
 
 - [naxes hardware/simavr validation](naxes_hw_validation.md)
 - [Cubic start (`s_h`) overlay](cubic_start.md)
-- [AFAP vs timed — two implementations](planner_modes.md)
 - [Faithful timed trajectory](timed_trajectory.md)
 
 ## Out-of-scope log
@@ -33,6 +32,10 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
 - **Running `pump()` from `manageSteppers()` and generalizing the ramp
   generator / naxes — implemented.** Design record moved to
   `extras/doc/engine_sources.md` (Path A single driver + stop hook).
+- **AFAP vs timed — decided.** `FasNAxis` stays AFAP-only; the faithful
+  timed trajectory is a separate implementation (tracked in
+  `timed_trajectory.md`). Design record moved to
+  `extras/doc/planner_modes.md`.
 - **A Linear oracle that is faster by leaving the chord / cutting a
   corner / skipping a vertex — not tracked.** Not a backlog item: such a
   track is not constraint-faithful, so it is not a faster Linear

@@ -4,7 +4,7 @@ Status: later implementation, not v1.
 
 ## Separation
 
-Per `planner_modes.md` this is a **complete distinct implementation**,
+Per `extras/doc/planner_modes.md` this is a **complete distinct implementation**,
 not a `FasNAxis` mode: its own lookahead/block planner, interpolator and
 feeder. Architecturally separate, but code reuse is intended where it
 makes sense — shared conventions (`addQueueEntry` contract, pin setup),
@@ -29,7 +29,7 @@ copied.
 ## Errors
 
 A feasibility error can occur **only** with a time-constrained
-trajectory (see `planner_modes.md`):
+trajectory (see `extras/doc/planner_modes.md`):
 
 - Faster than the AFAP track, or needs a/v the motors cannot do
   smoothly → `TimingNotAchievable` (not `LookaheadTooShort`, not a
