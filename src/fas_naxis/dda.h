@@ -2,6 +2,7 @@
 #define FAS_NAXIS_DDA_H
 
 #include <stdint.h>
+#include "fas_arch/common.h"
 
 #include "fas_naxis/remaining.h"
 
@@ -31,8 +32,8 @@ class DdaWalk {
   DdaWalk(int32_t bind, int32_t slave)
       : bind(bind),
         slave(slave),
-        abs_bind(Remaining::u32_abs(bind)),
-        abs_slave(Remaining::u32_abs(slave)),
+        abs_bind(fas_abs(bind)),
+        abs_slave(fas_abs(slave)),
         bind_dir(bind < 0 ? -1 : 1),
         slave_dir(slave < 0 ? -1 : 1),
         err(0),

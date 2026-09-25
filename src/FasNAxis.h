@@ -462,8 +462,6 @@ class FasNAxis {
   int pendingBlocks() const { return _n_blk - _head; }
 
  private:
-  static uint32_t abs_u32(int32_t d) { return Remaining::u32_abs(d); }
-
   bool any_queue_nonempty() const {
     for (uint8_t i = 0; i < NAXES; i++) {
       if (_registered[i] && !_s[i]->isQueueEmpty()) {
@@ -789,7 +787,7 @@ class FasNAxis {
       if (sg != sign) {
         break;  // reversal
       }
-      s += abs_u32(d);
+      s += fas_abs(d);
     }
     return s;
   }
@@ -811,7 +809,7 @@ class FasNAxis {
     uint32_t accel = _lim[binder].accel;
     uint32_t R_new = remaining_path_steps(b);
     if (R_new == 0) {
-      R_new = abs_u32(_blk[b][_master]);
+      R_new = fas_abs(_blk[b][_master]);
     }
     uint32_t carry = reset_P ? 0 : _law.P;
     _law = RampLaw(t_law, accel, R_new);
@@ -823,8 +821,8 @@ class FasNAxis {
       carry = R_new;
     }
     _law.P = carry;
-    _abs_master = abs_u32(_blk[b][_master]);
-    _block_left = abs_u32(_blk[b][_master]);
+    _abs_master = fas_abs(_blk[b][_master]);
+    _block_left = fas_abs(_blk[b][_master]);
     for (uint8_t i = 0; i < NAXES; i++) {
       _err[i] = 0;
     }
@@ -985,7 +983,7 @@ class FasNAxis {
       if (i == (uint8_t)_master) {
         continue;
       }
-      uint32_t ad = abs_u32(_blk[_head][i]);
+      uint32_t ad = fas_abs(_blk[_head][i]);
       if (ad == 0) {
         continue;
       }

@@ -51,6 +51,5 @@ AGENTS.md
 extras/tests/pc_based/AGENTS.md
 extras/Esp32StepperDemo/lib/FastAccelStepper/src
 extras/tests/esp32_hw_based/.test_*
-extras/tests/esp32_hw_based/__pycache__
+__pycache__
 examples/StepperDemo/StepperDemo.ino-e
-extras/tests/simavr_based/__pycache__

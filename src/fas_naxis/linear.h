@@ -2,6 +2,7 @@
 #define FAS_NAXIS_LINEAR_H
 
 #include <stdint.h>
+#include "fas_arch/common.h"
 
 #include "fas_naxis/dda.h"
 #include "fas_naxis/ramp_law.h"
@@ -76,7 +77,7 @@ class LinearBlock {
   }
 
  private:
-  static uint32_t abs_delta(int32_t d) { return Remaining::u32_abs(d); }
+  static uint32_t abs_delta(int32_t d) { return fas_abs(d); }
 };
 
 // FasNAxis Linear multi-block interpolator (Step 2f / 2h, whitepaper section
@@ -169,7 +170,7 @@ class LinearPoly {
   }
 
  private:
-  static uint32_t abs_u(int32_t d) { return Remaining::u32_abs(d); }
+  static uint32_t abs_u(int32_t d) { return fas_abs(d); }
 
   int next_moving(int from) const {
     for (int b = from; b < rem->n_blocks; b++) {

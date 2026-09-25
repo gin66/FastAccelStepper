@@ -2,6 +2,7 @@
 #define FAS_NAXIS_OVERSHOOT_H
 
 #include <stdint.h>
+#include "fas_arch/common.h"
 
 #include "fas_naxis/remaining.h"
 #include "fas_ramp/RampCalculator.h"
@@ -100,7 +101,7 @@ class OvershootRun {
     bool any = false;
     for (int i = 0; i < n_axes; i++) {
       int32_t di = d[i];
-      tot[i] = Remaining::u32_abs(di);
+      tot[i] = fas_abs(di);
       sgn[i] = di > 0 ? 1 : (di < 0 ? -1 : 0);
       issued[i] = 0;
       if (tot[i] == 0 || (prev[i] != 0 && sgn[i] != 0 && sgn[i] != prev[i])) {

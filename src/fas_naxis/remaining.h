@@ -2,6 +2,7 @@
 #define FAS_NAXIS_REMAINING_H
 
 #include <stdint.h>
+#include "fas_arch/common.h"
 
 #include "fas_naxis/ramp_map.h"
 
@@ -53,11 +54,6 @@ class Remaining {
     uint32_t hi;
     uint32_t lo;
   };
-
-  static uint32_t u32_abs(int32_t d) {
-    uint32_t u = (uint32_t)d;
-    return d < 0 ? (0u - u) : u;
-  }
 
   // 2*err >= master, without a widening multiply. err >= 2^31 implies
   // 2*err >= 2^32 > master.
@@ -215,8 +211,8 @@ class Remaining {
       int32_t da = delta_of(i, block_a);
       int32_t db = delta_of(i, block_b);
       bool neg = (da < 0) != (db < 0);
-      uint32_t ua = u32_abs(da);
-      uint32_t ub = u32_abs(db);
+      uint32_t ua = fas_abs(da);
+      uint32_t ub = fas_abs(db);
       U32p prod = u32_mul(ua, ub);
       if (u32p_is_zero(dot)) {
         dot = prod;
@@ -446,7 +442,7 @@ class Remaining {
       if (block[i] == 0) {
         continue;
       }
-      uint32_t ad = u32_abs(block[i]);
+      uint32_t ad = fas_abs(block[i]);
 #ifdef FAS_NAXIS_NO_REBIND
       uint32_t t = 0;
 #else
@@ -478,8 +474,8 @@ class Remaining {
   // magnitude == bind) issues |delta_bind| steps; an idle slave issues 0.
   // Used by the PC reference tests.
   static int dda_steps(int delta_bind, int delta_slave) {
-    uint32_t abs_bind = u32_abs(delta_bind);
-    uint32_t abs_slave = u32_abs(delta_slave);
+    uint32_t abs_bind = fas_abs(delta_bind);
+    uint32_t abs_slave = fas_abs(delta_slave);
     if (abs_bind == 0) {
       return 0;
     }
