@@ -10,7 +10,6 @@ tracked here, one file per item.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **P4** | [naxes log2 instead of 16/32-bit multiply](naxes_log2_mul.md) | Hot path still schoolbook-multiplies; the ramp map is already log2. |
 | **P5** | [Engine synchronized start](engine_synchronized_start.md) | Kick-off is still one `addQueueEntry(NULL, true)` per axis. |
 | **P6** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
 | **P7** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
@@ -23,6 +22,18 @@ tracked here, one file per item.
   (`FasNAxis::compact_ring()`), which had chunked any path longer than
   `HORIZON` into per-ring ramp-to-rest segments. See
   [naxes_example_smoothness.md](naxes_example_smoothness.md).
+- **naxes log2 product compares — implemented.** The production naxes
+  planner no longer schoolbook-multiplies: the `binder_axis` tie-break and
+  the Overshoot uniform schedule / cap-side sign checks compare products
+  as log2 sums (`Remaining::log2_mul_cmp`; sums of `log2_from`, the
+  sanctioned slack per section 6.3), and `u32_mul_cmp` is gone. The exact
+  `U32p` product stays where a quantum would flip a step: `outside_cap`'s
+  chord-cap geometry against the hard `overshoot_max` bound (6.5 / 12.4.1
+  G7) and the reference `collinear_same_sense` probe; `u32_twice_ge`
+  is a shift, not a product. The F2b rebind neighbourhood, all
+  F11/F12/F14 cap bounds, and the `FAS_NAXIS_NO_REBIND` /
+  `FAS_NAXIS_NO_REST_CAP` mutation proofs still hold. See
+  whitepaper §6.3 / §6.6.
 - **Linear junction carry — implemented.** `R` ends at a master-sense
   reversal, an idle or tied outgoing axis, a dwell, or the path end.
   `P` carries across every other joint, so a sampled helix cruises and

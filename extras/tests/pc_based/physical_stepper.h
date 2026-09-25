@@ -444,7 +444,8 @@ class PhysicalStepper {
   static constexpr double kMaxDt = 2.5e-4;
   // Stall slip detector: the rotor/field speed mismatch is low-passed with time
   // constant kSlipTau (s); a sustained mismatch above kSlipThreshold (steps/s)
-  // is a stall, while sub-threshold ring or a direction-change transient is not.
+  // is a stall, while sub-threshold ring or a direction-change transient is
+  // not.
   static constexpr double kSlipTau = 0.05;
   static constexpr double kSlipThreshold = 100.0;
   // Sum of the humming-partial amplitudes in record_audio (normalization).
@@ -553,26 +554,26 @@ class PhysicalStepper {
 
   struct {
     double x, x_c, w;
-  } state_;    // x (rotor), x_c (cmd), w
-  uint8_t D_;  // steps per full step — the force-curve period
-  double J_;     // rotor moment of inertia
-  double Fmax_;  // peak magnetic torque
+  } state_;                  // x (rotor), x_c (cmd), w
+  uint8_t D_;                // steps per full step — the force-curve period
+  double J_;                 // rotor moment of inertia
+  double Fmax_;              // peak magnetic torque
   double friction_static_;   // Coulomb friction floor (absolute)
   double friction_viscous_;  // friction increase per step/s (absolute)
-  uint32_t ticks_;                      // accumulated wall clock
-  double sim_time_;                     // accumulated simulated time (s)
-  double peak_abs_delta_;               // peak |x - x_c| since reset
-  double slip_f_;                       // low-passed rotor/field speed mismatch
-  bool stall_ever_;                     // slipped at any time since reset
+  uint32_t ticks_;           // accumulated wall clock
+  double sim_time_;          // accumulated simulated time (s)
+  double peak_abs_delta_;    // peak |x - x_c| since reset
+  double slip_f_;            // low-passed rotor/field speed mismatch
+  bool stall_ever_;          // slipped at any time since reset
   double cur_f_, cur_gate_, cur_disp_, cur_stalled_;  // audio source
-  double cur_env_;                      // speed envelope [0:1]
-  double phase_;                        // continuous hum phase (rad)
-  std::vector<int16_t> audio_;          // recorded PCM samples
-  uint32_t audio_written_;              // samples already emitted
-  std::vector<Trace> trace_;            // decimated gnuplot rows
-  unsigned long trace_decim_;           // emit 1 row per this many sub-steps
-  unsigned long trace_n_;               // sub-steps seen since trace_begin
-  int trace_phase_;                     // test-labelled phase tag
+  double cur_env_;                                    // speed envelope [0:1]
+  double phase_;                // continuous hum phase (rad)
+  std::vector<int16_t> audio_;  // recorded PCM samples
+  uint32_t audio_written_;      // samples already emitted
+  std::vector<Trace> trace_;    // decimated gnuplot rows
+  unsigned long trace_decim_;   // emit 1 row per this many sub-steps
+  unsigned long trace_n_;       // sub-steps seen since trace_begin
+  int trace_phase_;             // test-labelled phase tag
   observed_s last_;
 };
 
@@ -582,7 +583,9 @@ class PhysicalStepper {
 class PhysicalStepper {
  public:
   PhysicalStepper(uint8_t = 64, double = 0, double = 0, double = 0,
-                  double = 0) { reset(); }
+                  double = 0) {
+    reset();
+  }
   void reset() {}
   observed_s step(int, bool, uint16_t) { return zero(); }
   struct Cmd {

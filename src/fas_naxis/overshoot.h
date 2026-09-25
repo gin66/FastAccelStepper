@@ -161,9 +161,15 @@ class OvershootRun {
         // Uniform-in-time candidate for a non-binding axis. The feeder turns a
         // multi-step catch-up into one command of `steps` pulses at
         // t_step / steps ticks each (section 9.3), so the shared wall clock is
-        // preserved.
+        // preserved. The quotient (steps issued = tot[i] * t / T) is a log2
+        // approximation: sums of logs, no wide multiply or overflow check.
+        // At the block's last command (t == T) the last step compares equal
+        // in log2 (log2_from(tot[i]) + log2_from(T) vs itself), so issued[i]
+        // always reaches tot[i] and the axis lands on the vertex (G1).
         uint32_t k = issued[i];
-        while (k < tot[i] && Remaining::u32_mul_cmp(tot[i], t, k + 1, T) >= 0) {
+        int32_t lt_t = (int32_t)log2_from(tot[i]) + log2_from(t);
+        int32_t lt_T = log2_from(T);
+        while (k < tot[i] && lt_t >= (int32_t)log2_from(k + 1) + lt_T) {
           k++;
         }
         if (cap != 0 && cap != 0xFFFFu && tot[binder] > 0) {
@@ -274,9 +280,13 @@ class OvershootRun {
   }
 
   // Pull a uniform candidate `k` for axis i back toward the chord until the
-  // integer squared distance fits the cap. No sqrt, no division.
+  // integer squared distance fits the cap. No sqrt, no division. Bit-exact:
+  // overshoot_max is a hard geometric bound, so the cap test uses exact U32p
+  // products (a log2 slack could flip one step across the cap boundary).
   bool outside_cap(uint32_t nb, uint32_t ns, uint32_t k) const {
-    int side = Remaining::u32_mul_cmp(nb, k, ns, x);
+    // log2 sign for the residual direction only; the products below stay
+    // bit-exact U32p (cap geometry, see class comment).
+    int side = Remaining::log2_mul_cmp(nb, k, ns, x);
     if (side == 0) {
       return false;
     }
@@ -305,11 +315,14 @@ class OvershootRun {
   uint32_t apply_cap(int i, uint32_t k) const {
     uint32_t nb = tot[binder];
     uint32_t ns = tot[i];
-    while (k > issued[i] && Remaining::u32_mul_cmp(nb, k, ns, x) > 0 &&
+    // Log2 direction for the walk; the exact outside_cap() gate always
+    // stops the walk in the true cap region, so the sign slack cannot pull
+    // the step outside overshoot_max.
+    while (k > issued[i] && Remaining::log2_mul_cmp(nb, k, ns, x) > 0 &&
            outside_cap(nb, ns, k)) {
       k--;
     }
-    while (k < tot[i] && Remaining::u32_mul_cmp(nb, k, ns, x) < 0 &&
+    while (k < tot[i] && Remaining::log2_mul_cmp(nb, k, ns, x) < 0 &&
            outside_cap(nb, ns, k)) {
       k++;
     }

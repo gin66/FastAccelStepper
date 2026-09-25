@@ -5,6 +5,7 @@
 #include "fas_arch/common.h"
 
 #include "fas_naxis/ramp_map.h"
+#include "log2/Log2Representation.h"
 
 // FasNAxis remaining-steps scan R and DDA / time-law oracle (whitepaper
 // sections 6.3 and 8).
@@ -29,10 +30,13 @@
 // master-role change. collinear_same_sense() is diagnostic only.
 //
 // This is pure parse: integer add / abs / sign only. No float, double, or
-// integer division is formed in the scan. The live speed cap is the ramp
-// law in ramp_law.h (P starts at 0, increases, clipped by P_coast and by
-// remaining-to-standstill). Remaining.h does not estimate a peak as
-// min(P_stop, R/2).
+// integer division is formed in the scan. Product comparisons are log2 sums
+// (log2_mul_cmp) - no floating point, no division; the log2 slack is the
+// sanctioned approximation (whitepaper section 6.3). The bit-exact U32p
+// helper (u32_mul) stays for chord-cap geometry where a quantum would flip
+// a step. The live speed cap is the ramp law in ramp_law.h (P starts at 0,
+// increases, clipped by P_coast and by remaining-to-standstill).
+// Remaining.h does not estimate a peak as min(P_stop, R/2).
 //
 // HORIZON (a public field, default unbounded) caps the number of *points*
 // the scan may touch: section 8.2 / F19 (a small HORIZON of micro-segments
@@ -119,9 +123,25 @@ class Remaining {
     return true;
   }
 
-  // >0 when a*b > c*d.
-  static int u32_mul_cmp(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
-    return u32p_cmp(u32_mul(a, b), u32_mul(c, d));
+  // a*b vs c*d as log2 sums (whitepaper section 6.3): the production
+  // product compares are sums of logs and may move one log2 quantum out of
+  // tolerance. That slack is acceptable for the binder tie-break
+  // (binder_axis) and the Overshoot uniform schedule / cap-side sign checks
+  // (overshoot.h): the decision is a scheduler, and every geometric bound
+  // is still enforced bit-exact below. Bit-exact U32p products remain only
+  // where a quantum would flip a step: overshoot.h outside_cap (the chord
+  // cap against the hard overshoot_max bound) and the FAS_NAXIS_REFERENCE
+  // collinearity probe. zero product is -infinity: it loses to any positive
+  // product.
+  static int log2_mul_cmp(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
+    bool first = a != 0 && b != 0;
+    bool second = c != 0 && d != 0;
+    if (!first || !second) {
+      return first - second;
+    }
+    int32_t la = (int32_t)log2_from(a) + log2_from(b);
+    int32_t lc = (int32_t)log2_from(c) + log2_from(d);
+    return la > lc ? 1 : (la < lc ? -1 : 0);
   }
 
 #ifdef FAS_NAXIS_REFERENCE
@@ -458,7 +478,7 @@ class Remaining {
 #ifdef FAS_NAXIS_NO_REBIND
       if (ad > best_ad) {
 #else
-      if (u32_mul_cmp(ad, t, best_ad, best_t) > 0) {
+      if (log2_mul_cmp(ad, t, best_ad, best_t) > 0) {
 #endif
         best_ad = ad;
         best_t = t;

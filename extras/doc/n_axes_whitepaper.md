@@ -938,6 +938,12 @@ Production (`src/FasNAxis.h` and anything it includes):
   integer.
 - Remaining-steps sums, DDA error, sign tests, `d²` compares:
   integer add/sub/mul/compare only.
+- Product compares use log2 sums (zero factor = `−∞`; the sanctioned
+  slack of §6.3): `Remaining::log2_mul_cmp`. A bit-exact `U32p` product
+  stays only where a log2 quantum would flip a step: `outside_cap`'s
+  chord-cap geometry against the hard `overshoot_max` bound and the
+  reference `collinear_same_sense` probe; `u32_twice_ge` is a shift,
+  not a product.
 - No `float`, no `double`, no integer `/` on the hot path.
 
 PC tests and `FAS_NAXIS_TRACE` oracles may use double to plot

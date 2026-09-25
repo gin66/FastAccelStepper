@@ -387,5 +387,4 @@ int main() {
       "TEST_25 PASSED (moveTimed pause ticks reported via "
       "*actual_duration; pauses inherit DIR; prepare_revert)\n");
   return 0;
-
 }

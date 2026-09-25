@@ -168,24 +168,24 @@ class SimPort {
   }
 
 #ifdef FAS_PHYSICAL_STEPPER_ENABLED
-    // --- opt-in rotordynamic coupling (whitepaper section 3.1 / 13.3) ---
-    // When a plant is attached, drain_one() advances the rotor with the very
-    // command the ideal counter consumes, so the plant's physical position is
-    // the axis's *realized* position (it lags during accel, runs ahead during
-    // decel, and stalls when the ramp outruns it). position() keeps the ideal
-    // commanded count the planner's DDA binds against; realizedPosition() is
-    // the diverging physical count that makes step loss visible to the binder.
+  // --- opt-in rotordynamic coupling (whitepaper section 3.1 / 13.3) ---
+  // When a plant is attached, drain_one() advances the rotor with the very
+  // command the ideal counter consumes, so the plant's physical position is
+  // the axis's *realized* position (it lags during accel, runs ahead during
+  // decel, and stalls when the ramp outruns it). position() keeps the ideal
+  // commanded count the planner's DDA binds against; realizedPosition() is
+  // the diverging physical count that makes step loss visible to the binder.
   void setPhysicalStepper(PhysicalStepper* plant) { plant_ = plant; }
   bool hasPhysical() const { return plant_ != NULL; }
-    // The plant's physical (rotor) observables, exposed to the coupling test.
+  // The plant's physical (rotor) observables, exposed to the coupling test.
   int32_t realizedPosition() const {
     return plant_ ? plant_->getCurrentPosition() : 0;
-    }
+  }
   double realizedSpeed() const { return plant_ ? plant_->speed() : 0.0; }
   double realizedDelta() const { return plant_ ? plant_->delta() : 0.0; }
   double peakRealizedDelta() const {
     return plant_ ? plant_->peak_abs_delta() : 0.0;
-    }
+  }
   bool realizedStalled() const { return plant_ ? plant_->stall_ever() : false; }
 #endif
 
@@ -364,7 +364,7 @@ class SimPort {
   uint16_t force_extra_before_;
   StepperStopCause stop_cause_;
 #ifdef FAS_PHYSICAL_STEPPER_ENABLED
-  PhysicalStepper* plant_ = NULL;      // opt-in rotordynamic coupling
+  PhysicalStepper* plant_ = NULL;  // opt-in rotordynamic coupling
 #endif
 
   inline uint32_t queue_mask() const { return (uint32_t)queue_len_ - 1; }

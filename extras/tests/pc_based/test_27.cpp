@@ -83,18 +83,18 @@ static const uint32_t SETTLE_TICKS = 12u * 16000000u;
 
 // The shared move profile.
 static const double VMAX = 10000.0;
-static const double VSMALL = 2000.0;            // speed the stall can re-join
-static const double ACCEL = 10000.0;            // deceleration rate
-static const double T_SPIN1 = 0.5;              // 0 -> vsmall
-static const double T_SPIN_HOLD = 1.0;          // hold vsmall
-static const double T_SPIN2 = 0.5;              // vsmall -> vmax
-static const double A_SPIN1 = VSMALL / T_SPIN1;             // 4000
-static const double A_SPIN2 = (VMAX - VSMALL) / T_SPIN2;    // 16000
+static const double VSMALL = 2000.0;             // speed the stall can re-join
+static const double ACCEL = 10000.0;             // deceleration rate
+static const double T_SPIN1 = 0.5;               // 0 -> vsmall
+static const double T_SPIN_HOLD = 1.0;           // hold vsmall
+static const double T_SPIN2 = 0.5;               // vsmall -> vmax
+static const double A_SPIN1 = VSMALL / T_SPIN1;  // 4000
+static const double A_SPIN2 = (VMAX - VSMALL) / T_SPIN2;  // 16000
 static const double T_COAST = 1.0;
-static const double T_COAST_SMALL = 3.0;        // hold the slow speed for 3 s
-static const double T_TOTAL = T_SPIN1 + T_SPIN_HOLD + T_SPIN2 +
-                              2.0 * T_COAST + (VMAX - VSMALL) / ACCEL +
-                              T_COAST_SMALL + VSMALL / ACCEL;  // = 7.0 s
+static const double T_COAST_SMALL = 3.0;  // hold the slow speed for 3 s
+static const double T_TOTAL = T_SPIN1 + T_SPIN_HOLD + T_SPIN2 + 2.0 * T_COAST +
+                              (VMAX - VSMALL) / ACCEL + T_COAST_SMALL +
+                              VSMALL / ACCEL;  // = 7.0 s
 
 // Test-labelled trace phases (column 10 of the .dat).
 enum { PH_ACCEL = 0, PH_COAST = 1, PH_DECEL = 2, PH_SLIP = 3 };
@@ -198,9 +198,9 @@ static double run_move(PhysicalStepper& p, double slip_steps, bool trace,
   const int ncs = (int)llround(T_COAST_SMALL * VSMALL);
 
   if (trace) p.trace_set_phase(PH_ACCEL);
-  issue_ramp(p, spin1, true);  // 0 -> vsmall (0.5 s)
+  issue_ramp(p, spin1, true);                          // 0 -> vsmall (0.5 s)
   for (int i = 0; i < nch; i++) p.step(1, true, cts);  // hold vsmall (1 s)
-  issue_ramp(p, spin2, true);  // vsmall -> vmax (0.5 s)
+  issue_ramp(p, spin2, true);                          // vsmall -> vmax (0.5 s)
 
   if (trace) p.trace_set_phase(PH_COAST);
   for (int i = 0; i < ncv; i++) p.step(1, true, ct);
@@ -328,7 +328,8 @@ static int wav_peak(const char* path) {
 
 // ---- T6: the canonical rest-to-rest profile --------------------------------
 static void test_canonical_profile() {
-  printf("=== T6: canonical profile (accel 1s, coast, decel, small, stop) ===\n");
+  printf(
+      "=== T6: canonical profile (accel 1s, coast, decel, small, stop) ===\n");
   g_plant.reset();
   g_plant.trace_begin(4);
   move_probe probe;
@@ -362,9 +363,8 @@ static void test_weak_motor_stalls() {
   g_weak.reset();
   run_move(g_weak, 0.0, false, nullptr);
   dwell(g_weak, SETTLE_TICKS);
-  printf("  stall_ever=%d final pos=%d peak|delta|=%.1f\n",
-         g_weak.stall_ever(), g_weak.getCurrentPosition(),
-         g_weak.peak_abs_delta());
+  printf("  stall_ever=%d final pos=%d peak|delta|=%.1f\n", g_weak.stall_ever(),
+         g_weak.getCurrentPosition(), g_weak.peak_abs_delta());
   check(g_weak.stall_ever(), "an under-torqued motor loses synchronism");
 }
 
@@ -432,7 +432,8 @@ static void test_half_step_slip_stalls() {
   check(fabs(probe.delta_stalled) > 64.0,
         "the slip runs |delta| past a full step");
   // The small-speed coast: the rotor follows the field again.
-  check(fabs(small_advance - VSMALL * T_COAST_SMALL) < 0.2 * VSMALL * T_COAST_SMALL,
+  check(fabs(small_advance - VSMALL * T_COAST_SMALL) <
+            0.2 * VSMALL * T_COAST_SMALL,
         "the stalled rotor re-joins and follows the field at the small speed");
   check(fabs(probe.w_small_end - VSMALL) < 0.3 * VSMALL,
         "the rotor speed matches the small speed");
@@ -451,13 +452,14 @@ static void test_full_step_slip_loses_one_step() {
   run_move(g_stall, -64.0, false, &probe);
   dwell(g_stall, SETTLE_TICKS);
   double off = g_stall.delta() / 64.0;
-  printf("  stalled: |delta|=%.1f w=%.0f | final delta=%.1f (%.2f full steps)\n",
-         fabs(probe.delta_stalled), probe.w_stalled, g_stall.delta(), off);
+  printf(
+      "  stalled: |delta|=%.1f w=%.0f | final delta=%.1f (%.2f full steps)\n",
+      fabs(probe.delta_stalled), probe.w_stalled, g_stall.delta(), off);
   check(probe.w_stalled > 9000.0,
         "a full-step slip keeps the rotor tracking (no runaway)");
   check(fabs(off + 1.0) < 0.15, "it ends exactly one full step behind");
-  check(fabs((probe.x_small_end - probe.x_small_start) - VSMALL * T_COAST_SMALL) <
-            0.2 * VSMALL * T_COAST_SMALL,
+  check(fabs((probe.x_small_end - probe.x_small_start) -
+             VSMALL * T_COAST_SMALL) < 0.2 * VSMALL * T_COAST_SMALL,
         "the rotor followed the field through the small-speed coast");
 }
 
@@ -500,43 +502,44 @@ static void test_wav_generation(const char* good_wav, const char* bad_wav) {
 static void write_gnuplot_asset() {
   FILE* g = fopen("test_27.gnuplot", "w");
   if (!g) return;
-  fprintf(g,
-          "set term pngcairo size 1600,1400\n"
-          "set output \"test_27_coast_stall.png\"\n"
-          "set multiplot layout 3,2 title "
-          "\"PhysicalStepper: reference vs half-step-slip stall (same ramp)\"\n"
-          "set xlabel \"t [s]\"\n"
-          "D=64.0\n"
-          "set title \"position [steps]\"\n"
-          "plot \"test_27_trapezoid.dat\" using 1:2 with lines title "
-          "\"ref x\", \"test_27_trapezoid.dat\" using 1:3 with lines dt 2 "
-          "title \"ref x_c\", \"test_27_coast_stall.dat\" using 1:2 with "
-          "lines title \"stall x\", \"test_27_coast_stall.dat\" using 1:3 with "
-          "lines dt 2 title \"stall x_c\"\n"
-          "set title \"step error delta [steps]\"\n"
-          "plot \"test_27_coast_stall.dat\" using 1:4 with lines title "
-          "\"stall delta\", \"test_27_trapezoid.dat\" using 1:4 with lines dt 2 "
-          "title \"ref delta\", D lt 0 title \"+D\", -D lt 0 notitle\n"
-          "set title \"rotor speed [steps/s]\"\n"
-          "plot \"test_27_coast_stall.dat\" using 1:5 with lines title "
-          "\"stall w\", \"test_27_trapezoid.dat\" using 1:5 with lines dt 2 "
-          "title \"ref w\"\n"
-          "set title \"raw rotor acceleration [steps/s^2]\"\n"
-          "plot \"test_27_coast_stall.dat\" using 1:6 with lines title "
-          "\"stall a\", \"test_27_trapezoid.dat\" using 1:6 with lines dt 2 "
-          "title \"ref a\"\n"
-          "set title \"magnetic force and friction\"\n"
-          "plot \"test_27_coast_stall.dat\" using 1:7 with lines title "
-          "\"tau\", \"test_27_coast_stall.dat\" using 1:8 with lines title "
-          "\"friction\"\n"
-          "set title \"stall observation (1 = rotor slipping)\"\n"
-          "set yrange [0:1.1]\n"
-          "set ytics 0,0.5,1\n"
-          "plot \"test_27_coast_stall.dat\" using 1:9 with lines title "
-          "\"stall\"\n"
-          "unset yrange\n"
-          "unset multiplot\n"
-          "unset output\n");
+  fprintf(
+      g,
+      "set term pngcairo size 1600,1400\n"
+      "set output \"test_27_coast_stall.png\"\n"
+      "set multiplot layout 3,2 title "
+      "\"PhysicalStepper: reference vs half-step-slip stall (same ramp)\"\n"
+      "set xlabel \"t [s]\"\n"
+      "D=64.0\n"
+      "set title \"position [steps]\"\n"
+      "plot \"test_27_trapezoid.dat\" using 1:2 with lines title "
+      "\"ref x\", \"test_27_trapezoid.dat\" using 1:3 with lines dt 2 "
+      "title \"ref x_c\", \"test_27_coast_stall.dat\" using 1:2 with "
+      "lines title \"stall x\", \"test_27_coast_stall.dat\" using 1:3 with "
+      "lines dt 2 title \"stall x_c\"\n"
+      "set title \"step error delta [steps]\"\n"
+      "plot \"test_27_coast_stall.dat\" using 1:4 with lines title "
+      "\"stall delta\", \"test_27_trapezoid.dat\" using 1:4 with lines dt 2 "
+      "title \"ref delta\", D lt 0 title \"+D\", -D lt 0 notitle\n"
+      "set title \"rotor speed [steps/s]\"\n"
+      "plot \"test_27_coast_stall.dat\" using 1:5 with lines title "
+      "\"stall w\", \"test_27_trapezoid.dat\" using 1:5 with lines dt 2 "
+      "title \"ref w\"\n"
+      "set title \"raw rotor acceleration [steps/s^2]\"\n"
+      "plot \"test_27_coast_stall.dat\" using 1:6 with lines title "
+      "\"stall a\", \"test_27_trapezoid.dat\" using 1:6 with lines dt 2 "
+      "title \"ref a\"\n"
+      "set title \"magnetic force and friction\"\n"
+      "plot \"test_27_coast_stall.dat\" using 1:7 with lines title "
+      "\"tau\", \"test_27_coast_stall.dat\" using 1:8 with lines title "
+      "\"friction\"\n"
+      "set title \"stall observation (1 = rotor slipping)\"\n"
+      "set yrange [0:1.1]\n"
+      "set ytics 0,0.5,1\n"
+      "plot \"test_27_coast_stall.dat\" using 1:9 with lines title "
+      "\"stall\"\n"
+      "unset yrange\n"
+      "unset multiplot\n"
+      "unset output\n");
   fclose(g);
 }
 
