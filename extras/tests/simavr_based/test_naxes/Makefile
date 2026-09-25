@@ -43,9 +43,9 @@ endif
 test: .tested
 
 # The geometry detector is the judge: exit 0 (all checks pass) gates .tested.
-.tested: x.vcd ../detect_geometry.py
+.tested: x.vcd detect_geometry.py
 	rm -f .tested
-	python3 ../detect_geometry.py x.vcd
+	python3 detect_geometry.py x.vcd
 	touch .tested
 
 # Build the firmware and run it under the simulator, capturing the Step/Dir

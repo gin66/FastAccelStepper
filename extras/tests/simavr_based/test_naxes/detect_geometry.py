@@ -23,6 +23,10 @@
 #    5. square corners  -- the four square corners are all reached.
 #    6. closed loop     -- the run ends back at the origin (the "return to
 #                          origin" segment lands at (0,0,0)).
+#    7. path stops      -- the path does not stop at every helix chord. A stop
+#                          is a run of step gaps far above the fastest gap in
+#                          the run; a path-stop per vertex shows up as one stop
+#                          per addLine target (see count_stops()).
 #
 # Usage:
 #   detect_geometry.py <x.vcd>          parse a simavr VCD and validate
@@ -39,6 +43,7 @@ import sys
 RADIUS = 400
 HELIX_TURNS = 3
 HELIX_Z_PER_TURN = 100
+HELIX_QSAMPLES = 12   # naxes_path.h NAXES_QSAMPLES: chords per quarter turn
 HELIX_Z_MAX = HELIX_TURNS * HELIX_Z_PER_TURN
 SQUARE_HALF = 300
 HEX_R = RADIUS
@@ -54,14 +59,32 @@ TOL_RADIUS = 8        # helix vertices on the circle (rounding + chord sag)
 TOL_CORNER = 4        # corner vertices are hit exactly; allow a little slack
 TOL_Z = 4
 
+# Path-stop detection (check 7). A "stop" is a maximal run of consecutive
+# inter-step gaps longer than STOP_GAP_FACTOR times the fastest gap seen in the
+# run, i.e. the path speed collapses to a small fraction of its peak. The run is
+# timebase-independent (both the threshold and the gaps scale with the simavr
+# clock). Two stops separated by at most STOP_MERGE_EVENTS step events are
+# merged, because the ramp tail and the ramp head on either side of a vertex are
+# a single stop, not two.
+STOP_GAP_FACTOR = 200
+STOP_MERGE_EVENTS = 4
+# A smooth path stops only where the geometry forces it: from rest at the start,
+# at the axis-aligned square corners (an axis has to reverse or go idle), and
+# when it lands back at the origin. Linear mode instead path-stops at every
+# non-collinear addLine vertex, so the helix alone contributes
+# HELIX_TURNS * 4 * NAXES_QSAMPLES = 144 stops.
+MAX_PATH_STOPS = 16
+
 
 def reconstruct_from_vcd(path):
     """Reconstruct per-axis position over time from a simavr VCD.
 
     A rising edge of Step<A|B|C> is one step on that axis; the axis increments
     when its Dir pin is high (every naxes axis is wired
-    direction_high_count_up) and decrements otherwise. Returns a list of
-    (x, y, z) position tuples, one per step edge, in time order.
+    direction_high_count_up) and decrements otherwise. Returns
+    (trace, times, names): the (x, y, z) position tuples, the VCD timestamp of
+    each, and the step channel names, in time order. times is what count_stops()
+    needs; the geometry checks ignore it.
     """
     sym = {}
     name_to_val = {}
@@ -70,6 +93,8 @@ def reconstruct_from_vcd(path):
     pos = {"A": 0, "B": 0, "C": 0}
     names = []
     trace = []
+    times = []
+    t = 0
 
     with open(path) as f:
         for line in f:
@@ -87,6 +112,7 @@ def reconstruct_from_vcd(path):
                     names.append(name[4:])
                 continue
             if line.startswith("#"):
+                t = int(line[1:])
                 continue
             # A value change line is VALUE+SYMBOL (e.g. "1\"" = value 1 on
             # the symbol \"). The value is the first char, the symbol the second.
@@ -108,11 +134,17 @@ def reconstruct_from_vcd(path):
                     up = dir_state.get(dir_val, 0) == 1
                     pos[ch] = pos.get(ch, 0) + (1 if up else -1)
                     trace.append((pos["A"], pos["B"], pos.get("C", 0)))
-    return trace, names
+                    times.append(t)
+    return trace, times, names
 
 
 def parse_trace(path):
-    """Read a "x y z" per-line trace (the self-test / external feed format)."""
+    """Read a "x y z" per-line trace (the self-test / external feed format).
+
+    The lines carry no timestamps, so a synthetic 1-per-line clock is returned.
+    The stop check needs a real clock (a flat clock would read as one giant
+    stop), so --trace runs skip it.
+    """
     trace = []
     with open(path) as f:
         for line in f:
@@ -124,7 +156,8 @@ def parse_trace(path):
                 trace.append((int(p[0]), int(p[1]), int(p[2])))
             elif len(p) == 2:
                 trace.append((int(p[0]), int(p[1]), 0))
-    return trace, ["A", "B"]
+    times = None
+    return trace, times, ["A", "B"]
 
 
 def check_no_underrun(trace, results):
@@ -185,7 +218,65 @@ def check_closed_loop(trace, tol, results):
                     "end=(%d,%d,%d) expected~(0,0,0)" % (x, y, z)))
 
 
-def run_checks(trace, results, three_axis=True):
+def count_stops(times):
+    """Count how often the path comes to a halt, from the step-event clock.
+
+    A step event is a rising Step edge on any axis. Between two events the
+    path moves by one step; so a long inter-event gap means the path is slow,
+    and a gap far above the fastest gap in the run means the path has stopped.
+    During smooth motion at least one axis is stepping, so inter-event gaps stay
+    near the fast period even when the other axis is near its extremum.
+
+    A stop is a maximal run of gaps above STOP_GAP_FACTOR * fastest, with runs
+    that are within STOP_MERGE_EVENTS events of each other merged (the ramp tail
+    and the ramp head around one vertex are one stop).
+    """
+    if times is None or len(times) < 3:
+        return 0
+    gaps = [times[i] - times[i - 1] for i in range(1, len(times))]
+    gaps = [g for g in gaps if g > 0]
+    if not gaps:
+        return 0
+    fastest = min(gaps)
+    if fastest <= 0:
+        return 0
+    thr = STOP_GAP_FACTOR * fastest
+
+    runs = []
+    i = 0
+    n = len(gaps)
+    while i < n:
+        if gaps[i] > thr:
+            j = i
+            while j < n and gaps[j] > thr:
+                j += 1
+            runs.append([i, j])
+            i = j
+        else:
+            i += 1
+
+    stops = 0
+    end = None
+    for (start, stop) in runs:
+        if end is not None and start - end <= STOP_MERGE_EVENTS:
+            end = stop
+        else:
+            stops += 1
+            end = stop
+    return stops
+
+
+def check_stops(times, results):
+    n = count_stops(times)
+    ok = n <= MAX_PATH_STOPS
+    results.append(("path-stops", ok,
+                    "stops=%d max=%d (one per non-collinear addLine vertex in "
+                    "Linear: helix alone would be %d)" %
+                    (n, MAX_PATH_STOPS,
+                     HELIX_TURNS * 4 * HELIX_QSAMPLES)))
+
+
+def run_checks(trace, results, three_axis=True, times=None):
     if len(trace) == 0:
         results.append(("trace", False, "no position trace produced"))
         return
@@ -204,6 +295,8 @@ def run_checks(trace, results, three_axis=True):
         check_landmark(trace, (sx, sy), TOL_CORNER,
                        "square(%d,%d)" % (sx, sy), results)
     check_closed_loop(trace, TOL_ORIGIN, results)
+    if times is not None:
+        check_stops(times, results)
 
 
 def make_good_trace(three_axis=True):
@@ -331,9 +424,9 @@ def selftest_vcd():
         f.write(synth_vcd(good, True))
         vcd_path = f.name
     try:
-        trace, names = reconstruct_from_vcd(vcd_path)
+        trace, times, names = reconstruct_from_vcd(vcd_path)
         results = []
-        run_checks(trace, results, three_axis=True)
+        run_checks(trace, results, three_axis=True, times=times)
         ok = print_results("vcd-good3d", results)
     finally:
         os.unlink(vcd_path)
@@ -348,19 +441,19 @@ def main(argv):
 
     if "--trace" in argv:
         i = argv.index("--trace")
-        trace, names = parse_trace(argv[i + 1])
+        trace, times, names = parse_trace(argv[i + 1])
         three_axis = any(z != 0 for (_, _, z) in trace)
         results = []
-        run_checks(trace, results, three_axis=three_axis)
+        run_checks(trace, results, three_axis=three_axis, times=times)
         ok = print_results("trace", results)
         return 0 if ok else 1
 
     if len(argv) >= 2:
         vcd = argv[1]
-        trace, names = reconstruct_from_vcd(vcd)
+        trace, times, names = reconstruct_from_vcd(vcd)
         three_axis = "C" in names
         results = []
-        run_checks(trace, results, three_axis=three_axis)
+        run_checks(trace, results, three_axis=three_axis, times=times)
         ok = print_results("vcd", results)
         return 0 if ok else 1
 
