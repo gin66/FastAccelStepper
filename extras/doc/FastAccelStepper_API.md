@@ -166,6 +166,19 @@ the engine. The periodic task will let the associated LED blink with 1 Hz
 ```cpp
   void setDebugLed(uint8_t ledPin);
 ```
+### Synchronized start
+
+Starts the queues of the steppers in steppers[] in one engine operation,
+so their first command starts on one event. The implementation lives in
+the pd_*/pd_*.cpp file of the build, so the platform decides how.
+A stepper already running is skipped; an empty queue does not stop the
+others.
+Returns AqeResultCode::OK or the first non-OK code of a per-stepper
+addQueueEntry(NULL, true) call.
+```cpp
+  AqeResultCode synchronizedStart(FastAccelStepper** const steppers,
+                                  uint8_t cnt);
+```
 ### Return codes of calls to `move()` and `moveTo()`
 
 The defined preprocessor macros are MOVE_xxx:
@@ -605,6 +618,16 @@ provided and will be set as current position after stop.
 ```cpp
   void forceStopAndNewPosition(int32_t new_pos);
 ```
+Return the cause of the last stop and clear it. For a planner that shares
+the queue with the ramp API: it polls this to notice that a member axis
+was stopped manually (stopMove) or abruptly (forceStop /
+forceStopAndNewPosition) and then aborts the coordinated plan.
+```cpp
+  StepperStopCause takeStopCause();
+  StepperStopCause getStopCause() const {
+    return (StepperStopCause)_stop_cause;
+  }
+```
 get the target position for the current move.
 As of now, this position is the view of the stepper task.
 This means, the value will stay unchanged after a move/moveTo until the
@@ -771,11 +794,11 @@ If the queue is not running, then the start parameter defines starting it
 or not. The latter case is of interest to first fill the queue and then
 start it.
 
-The call addQueueEntry(NULL, true) just starts the queue. This is intended
-to achieve a near synchronous start of several steppers. Consequently it
-should be called with interrupts disabled and return very fast.
-Actually this is necessary, too, in case the queue is full and not
-started.
+The call addQueueEntry(NULL, true) just starts the queue. A synchronized
+start of several steppers is the single engine operation
+FastAccelStepperEngine::synchronizedStart(), which releases the listed
+queues in one engine operation. The per-stepper call should still return
+very fast, too, in case the queue is full and not started.
 ### Direction Change Delay Enforcement
 
 If the new command's direction differs from the previous command,
@@ -1007,4 +1030,15 @@ stepper. Only available on ESP32 when multiple driver types are supported.
   FasDriver driverType() const;
   const char* driverTypeString() const;
 #endif
+```
+Last stop cause, set by the stop API and cleared by takeStopCause().
+volatile because stopMove()/forceStop() may be called from an interrupt.
+
+Keep this at the end of the member list. Adding it in the middle shifted
+the byte members above and measurably changed AVR FillISR/StepISR timing
+(test_sd_04_timing_2560: StepA Total High 355083us -> 451756us). Layout is
+semantically irrelevant, so it lives at the tail to keep the hot members'
+offsets stable.
+```cpp
+  volatile uint8_t _stop_cause;
 ```
