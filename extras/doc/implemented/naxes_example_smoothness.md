@@ -21,9 +21,9 @@ points land exactly on the helix vertices and the run is underrun-free
 
 After P1 and P2 the simavr run still showed 15 stops, and the excess four
 were not ramp or geometry: they sat on helix vertices 63/64 and 127/128.
-`FasNAxis`'s block array only grew (`_n_blk++` in `addLine`) and was
+`FasNAxis`'s block array only grew (`_n_blk++` in `addWaypoint`) and was
 never compacted, so after `HORIZON` points had *ever* been appended
-`addLine` back-pressured until the whole buffered plan drained and
+`addWaypoint` back-pressured until the whole buffered plan drained and
 `pump()` reset the ring. The 155-point path was therefore executed in
 chunks of `HORIZON = 64`, each ramping to rest at its end (the entry
 into the next chunk re-accelerated from 0). `compact_ring()` now drops
@@ -36,7 +36,7 @@ window of at most `HORIZON` *pending* points as whitepaper §8 describes.
    masters keep `P`); the square corners stay legitimate stops. Done.
 2. `feeder_command_batching.md` keeps AVR/ESP32 queues from draining at
    the application's `pump()` interval. Done.
-3. `FasNAxis::addLine()` slides the block ring, so a path longer than
+3. `FasNAxis::addWaypoint()` slides the block ring, so a path longer than
    `HORIZON` no longer ramps to rest at each ring boundary. Done.
 4. Re-run `extras/tests/simavr_based/test_naxes` and tune
    `MAX_PATH_STOPS` in `detect_geometry.py` to the legitimate stops

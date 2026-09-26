@@ -41,7 +41,7 @@ F2f–F2h, F3b) are self-contained and compare against `naxis_ref.h`.
 | **F13**        | `f13_lookahead`                               | 13            | Queue starve after kick-off: `hasUnderrun()` and `pump()` `Underrun`; pre-starve plot |
 | **F14**        | `f8_feeder`                                   | 14            | Drift over a 240 000-step move: `|clock_x − clock_y| ≤ 2` |
 | **F15**        | `f8_feeder`                                   | 15            | Queue room: `queueEntries() ≤ QUEUE_LEN−2`; move completes on `QUEUE_LEN=16` |
-| **F16**        | `f16_skeleton`                                | —             | `addAxis`/`addLine` legality, config defaults, no-op zero delta, SimPort-backed queries |
+| **F16**        | `f16_skeleton`                                | —             | `addAxis`/`addWaypoint` legality, config defaults, no-op zero delta, SimPort-backed queries |
 | **F17**        | `f6_linear_sim`                               | 17            | First fill on an empty queue is not underrun |
 | **F18**        | `f7_linear_lookahead`                         | 18            | `(10000,9000)` with Y 40× slower: X DDA master, Y time-law binds, both issue full `\|Δ\|` |
 | **F19**        | `f13_lookahead`                               | 19            | Small `HORIZON` caps P below `P_stop`; same HORIZON with one long block coasts |

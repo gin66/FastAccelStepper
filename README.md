@@ -93,9 +93,11 @@ The full ESP32 driver comparison (MCPWM/PCNT vs RMT vs I2S Mux) is in
 * Command queue can be filled with commands and then started. This allows near
   synchronous start of several steppers for multi axis applications.
 * **EXPERIMENTAL** multi-axis planner `FasNAxis` (`src/FasNAxis.h`): drives N
-  stepper queues from one polyline so the axes stay time-synchronized. See the
-  [n-axis whitepaper](extras/doc/n_axes_whitepaper.md) and the
-  [naxes example](examples/naxes/README.md).
+  stepper queues from one polyline so the axes stay time-synchronized. API not
+  stable yet; timed trajectories are still TODO. See the
+  [n-axis whitepaper](extras/doc/n_axes_whitepaper.md), the
+  [naxes example](examples/naxes/README.md), and the
+  [todo list](extras/todo/README.md).
 
 ## Quick Start
 
@@ -130,6 +132,69 @@ void loop() {
 More details in [Usage](extras/doc/usage.md) and the
 [UsageExample.ino](examples/UsageExample/UsageExample.ino).
 
+## Multi-axis planner (FasNAxis)
+
+> **Experimental.** The `FasNAxis` API is **not stable yet** and may change
+> without notice. It is AFAP-only today (AFAP = "as fast as possible": run the
+> polyline as fast as the motors and geometry allow, with no requested speed or
+> time). A faithful trajectory **with time steps** (requested feedrate / speed
+> at each point) is tracked in
+> [`extras/todo/timed_trajectory.md`](extras/todo/timed_trajectory.md). The
+> library-wide [open items list](extras/todo/README.md) currently holds only
+> n-axis entries, but is not limited to them.
+
+For coordinated motion, `FasNAxis` drives N stepper queues from one polyline
+so the axes stay time-synchronized. The hot path has no float, division, or
+64-bit integers. Full example: [examples/naxes](examples/naxes/README.md); the
+theory is in the [n-axis whitepaper](extras/doc/n_axes_whitepaper.md).
+
+`FasNAxis` is `FasNAxis<NAXES, HORIZON = 64, Stepper = FastAccelStepper,
+Engine = FastAccelStepperEngine>` (`src/FasNAxis.h`). `HORIZON` caps how many
+future polyline points are buffered and planned: a small value slows the track
+(a speed cap, never an error — see `isSpeedLimitedByLookahead()`), a larger one
+smooths the ramp at the cost of RAM.
+
+```cpp
+#include "FastAccelStepper.h"
+#include "FasNAxis.h"   // not pulled in by FastAccelStepper.h
+
+FastAccelStepperEngine engine = FastAccelStepperEngine();
+FastAccelStepper* axes[2] = {NULL, NULL};
+FasNAxis<2, 32> planner(FasNAxisConfig{}, engine);   // 2 axes, HORIZON = 32
+
+void setup() {
+   engine.init();
+   axes[0] = engine.stepperConnectToPin(9);
+   axes[1] = engine.stepperConnectToPin(10);
+   for (uint8_t i = 0; i < 2; i++) {
+      axes[i]->setDirectionPin(5 + i);
+      axes[i]->setSpeedInHz(4000);      // steps/s
+      axes[i]->setAcceleration(2000);   // steps/s²
+      planner.addAxis(i, axes[i]);
+   }
+   planner.setLimitsFromSteppers();     // freeze v_max / a_max per axis
+
+   int32_t origin[2] = {0, 0};
+   planner.setCurrentPosition(origin);  // open the path at the current position
+}
+
+void loop() {
+   // Append exact-chord target vertices; backpressures when HORIZON is full.
+   static const int32_t path[][2] = {
+       {1000, 0}, {1000, 1000}, {0, 1000}, {0, 0}};
+   static uint8_t wp = 0;
+   if (wp < 4) {
+      if (planner.addWaypoint(path[wp])) {
+         wp++;
+      }
+      if (wp == 4) {
+         planner.endPath();              // last point is rest
+      }
+   }
+   planner.pump();   // plan and feed the committed path into the queues
+}
+```
+
 ## Documentation
 
 | Topic | Document |
@@ -147,6 +212,7 @@ More details in [Usage](extras/doc/usage.md) and the
 | Pico PIO program flow | [pico_pio.md](extras/doc/pico_pio.md) |
 | SAMD51 design notes | [samd51/CONTEXT.md](extras/doc/samd51/CONTEXT.md) |
 | n-axis whitepaper | [n_axes_whitepaper.md](extras/doc/n_axes_whitepaper.md) |
+| Open items (TODO) | [extras/todo/README.md](extras/todo/README.md) |
 | Physical stepper simulation | [physical_stepper_whitepaper.md](extras/doc/physical_stepper_whitepaper.md) |
 | Test strategy | [testing.md](extras/doc/testing.md) |
 | Troubleshooting | [troubleshooting.md](extras/doc/troubleshooting.md) |

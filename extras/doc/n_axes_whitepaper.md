@@ -1156,7 +1156,7 @@ integer `R`, not 500 slices.
 
 `HORIZON` (the second template argument, default 64 on MCU)
 is the max number of **n-dim points**, not of steps. One
-10 000-step `addLine` with `HORIZON = 8` still has `R = 10000`
+10 000-step `addWaypoint` with `HORIZON = 8` still has `R = 10000`
 and can reach `P_stop`. A stream of 1-step micro-segments
 cannot: `R ≤ HORIZON`, so `P` stays small. That is the
 lookahead–speed relation. It is **not** a configuration
@@ -1311,7 +1311,7 @@ Tests: F11 dribbles waypoints so `R < P_stop` while the
 path is open — motion continues at the `R`-capped speed,
 `pump()` stays `Running`, `P ≤ R`, cruise only after `R`
 grows. F19 is a small `HORIZON` of micro-segments: same
-cap, `addAxis` succeeds; contrast one long `addLine` with
+cap, `addAxis` succeeds; contrast one long `addWaypoint` with
 the same `HORIZON`, which *can* reach `P_stop`.
 
 ### 8.8 Reversals of a single axis
@@ -1631,7 +1631,7 @@ class FasNAxis {
   void syncFromSteppers();               // p[] from stepper positions
   void setCurrentPosition(const int32_t p[NAXES]);
 
-  void addLine(const int32_t p[NAXES]);  // absolute positions, steps
+  void addWaypoint(const int32_t p[NAXES]);  // absolute positions, steps
   bool addDwellTicks(uint32_t ticks);    // zero-displacement block; v=0 at both ends
   void endPath();                        // decelerate to rest at last p
 
@@ -1661,10 +1661,10 @@ zeroed config still means “default slice”, not a zero-duration
 slice). Same for `kappa_stop_q8 == 0` → 320 (diagnostic only).
 `overshoot_max == 0` is Linear-like cap and is legal.
 
-`addLine` to the current position (`L = 0`, every `Δ_i = 0`) is a
+`addWaypoint` to the current position (`L = 0`, every `Δ_i = 0`) is a
 dwell of 0 ticks (no-op). `addDwellTicks` appends a
 zero-displacement block: lookahead treats it as a path-stop,
-dwells, then the next `addLine` starts from rest. Calling it
+dwells, then the next `addWaypoint` starts from rest. Calling it
 mid-path is therefore a planned stop-and-wait, not a pause
 command while still moving at speed.
 
@@ -1693,7 +1693,7 @@ void setup() {
   path.addAxis(1, y);
   path.syncFromSteppers();
   int32_t a[2] = {10000, 100};
-  path.addLine(a);
+  path.addWaypoint(a);
   path.endPath();
 }
 
@@ -1702,7 +1702,7 @@ void loop() {
 }
 ```
 
-The first `addLine` is illegal until `syncFromSteppers()` or
+The first `addWaypoint` is illegal until `syncFromSteppers()` or
 `setCurrentPosition()`. FAS positions default to 0, so a machine
 that is not at the origin must sync.
 
@@ -1963,7 +1963,7 @@ that violates G1/G2 does not count.
 | F16 | `addAxis` while ramp active | `addAxis` fails; no race with `manageSteppers` | — |
 | F17 | First fill on empty queue | Not underrun; path completes | — |
 | F18 | Linear `(10000, 9000)`, Y 40× slower | Longest is X (DDA master) but Y would exceed `v_max` if X ran at `ticks_x`; Y lengthens `ticks_b`, X scaled down in speed; both axes issue full `\|Δ\|` | XY + v(t) |
-| F19 | `HORIZON` too small to hold `P_stop` as micro-segments | `addAxis` succeeds; `P` never reaches `P_stop`; same `HORIZON` with one long `addLine` *does* coast | v(t) capped |
+| F19 | `HORIZON` too small to hold `P_stop` as micro-segments | `addAxis` succeeds; `P` never reaches `P_stop`; same `HORIZON` with one long `addWaypoint` *does* coast | v(t) capped |
 | F20 | Linear, ~350 waypoints: seeded random, half-circle r=4800 / 190 chords, seeded random; ticks `(4000,8000)` | Globally fastest feasible track (`naxis_ref`): every vertex hit, envelope, `P ≤ R`, master-sense-reversal path-stops on the random walk, cruise through the arc, rebind on the arc (DDA master switches; `P`/`R` stay in path steps) | `test_26_f20.gnuplot` |
 
 F7 is the regression sibling of `examples/MoveTimed`. F5 is Linear
@@ -2192,7 +2192,7 @@ After ten chunks are buffered (`R = 8000` at the head, collinear
 so the scan does not stop), `R ≥ P_stop` and the head may coast.
 F11 is that recovery. F19 is the same cap with `HORIZON` too
 small to ever hold 4000 steps of micro-segments: `addAxis`
-succeeds; contrast one 10 000-step `addLine` at the same
+succeeds; contrast one 10 000-step `addWaypoint` at the same
 `HORIZON`, which *can* coast because `R` is steps, not points.
 
 A 2-axis first chunk `(800, 400)`, Linear: binder X, `R = 800`

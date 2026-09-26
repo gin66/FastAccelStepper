@@ -2408,7 +2408,7 @@ static void run_linear_segment(
   }
 
   int32_t target[2] = {tx, ty};
-  path.addLine(target);
+  path.addWaypoint(target);
   path.endPath();
   res->first_pump = path.pump();
   res->first_fill_underrun = path.hasUnderrun();
@@ -2645,7 +2645,7 @@ static void walk_prod_polyline(
 
   for (int v = 1; v < n_verts; v++) {
     int32_t p[2] = {verts[v][0], verts[v][1]};
-    path.addLine(p);
+    path.addWaypoint(p);
   }
   path.endPath();
 
@@ -3050,8 +3050,8 @@ void f7_linear_lookahead() {
 //    - PumpStatus has Idle/Running/Underrun/Error and NO LookaheadTooShort.
 //    - addAxis fails on i >= NAXES, a null pointer, or a running/ramp-active
 //      stepper; a small HORIZON relative to P_stop is NOT an addAxis failure.
-//    - addLine before any position sync is illegal; after sync it is legal.
-//    - addLine to the current position (every delta 0) is a no-op.
+//    - addWaypoint before any position sync is illegal; after sync it is legal.
+//    - addWaypoint to the current position (every delta 0) is a no-op.
 // Backed by SimPort so we exercise the same query surface the real
 // FastAccelStepper uses (isRampGeneratorActive / isRunning), without raising
 // MAX_STEPPER or linking extra queues.
@@ -3107,33 +3107,36 @@ static void f16_skeleton() {
   test(r.addAxis(0, &px) == true, "F16: addAxis on idle port succeeds");
   test(r.addAxis(1, &ramping) == false, "F16: addAxis while ramp active fails");
 
-  // Position sync: addLine is illegal before a sync; legal after.
+  // Position sync: addWaypoint is illegal before a sync; legal after.
   FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> p(cfg, sim_engine);
   p.addAxis(0, &px);
   p.addAxis(1, &py);
   int32_t at[2] = {10, 20};
-  test(p.addLine(at) == false, "F16: addLine before sync is illegal");
+  test(p.addWaypoint(at) == false, "F16: addWaypoint before sync is illegal");
   p.syncFromSteppers();
-  test(p.addLine(at) == true, "F16: addLine after sync is legal");
+  test(p.addWaypoint(at) == true, "F16: addWaypoint after sync is legal");
 
   // setCurrentPosition opens the same door as syncFromSteppers().
   FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> q(cfg, sim_engine);
   q.addAxis(0, &px);
   q.addAxis(1, &py);
   int32_t cur[2] = {0, 0};
-  test(q.addLine(cur) == false,
-       "F16: addLine before setCurrentPosition illegal");
+  test(q.addWaypoint(cur) == false,
+       "F16: addWaypoint before setCurrentPosition illegal");
   q.setCurrentPosition(cur);
-  test(q.addLine(cur) == true, "F16: addLine after setCurrentPosition legal");
+  test(q.addWaypoint(cur) == true,
+       "F16: addWaypoint after setCurrentPosition legal");
 
-  // addLine to the current position (every delta 0) is a no-op, not a motion.
+  // addWaypoint to the current position (every delta 0) is a no-op, not a
+  // motion.
   FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> s(cfg, sim_engine);
   s.addAxis(0, &px);
   s.addAxis(1, &py);
   int32_t here[2] = {100, 200};
   s.setCurrentPosition(here);
-  test(s.addLine(here) == true, "F16: addLine at current position is legal");
-  test(s.block_count() == 0, "F16: addLine to current position is a no-op");
+  test(s.addWaypoint(here) == true,
+       "F16: addWaypoint at current position is legal");
+  test(s.block_count() == 0, "F16: addWaypoint to current position is a no-op");
 
   printf("F16 header skeleton + addAxis/position contract green\n");
 }
@@ -3171,7 +3174,7 @@ void f8_feeder() {
     path.setCurrentPosition(cur);
 
     int32_t target[2] = {(int32_t)move, 0};
-    path.addLine(target);
+    path.addWaypoint(target);
     path.endPath();
 
     NaxisPlot plot;
@@ -3231,7 +3234,7 @@ void f8_feeder() {
     path.setCurrentPosition(cur);
 
     int32_t target[2] = {500, 500};
-    path.addLine(target);
+    path.addWaypoint(target);
     path.endPath();
 
     path.pump();  // prefill
@@ -3284,7 +3287,7 @@ void f8_feeder() {
       int32_t cur2[2] = {0, 0};
       p2.setCurrentPosition(cur2);
       int32_t t2[2] = {200, 200};
-      p2.addLine(t2);
+      p2.addWaypoint(t2);
       p2.endPath();
       p2.pump();  // prefill
       for (int i = 0; i < 4 && p2.isBusy(); ++i) {
@@ -3316,7 +3319,7 @@ void f8_feeder() {
     path.setCurrentPosition(cur);
 
     int32_t target[2] = {8000, 8000};
-    path.addLine(target);
+    path.addWaypoint(target);
     path.endPath();
 
     while (path.isBusy()) {
@@ -3349,7 +3352,7 @@ void f8_feeder() {
     int32_t cur[2] = {0, 0};
     path.setCurrentPosition(cur);
     int32_t target[2] = {20000, 0};
-    path.addLine(target);
+    path.addWaypoint(target);
     path.endPath();
     path.pump();
     int max_steps = 0;
@@ -3424,9 +3427,9 @@ static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
   int32_t cur[2] = {0, 0};
   path.setCurrentPosition(cur);
   int32_t t1[2] = {move, 0};
-  path.addLine(t1);
+  path.addWaypoint(t1);
   int32_t t2[2] = {0, 0};
-  path.addLine(t2);
+  path.addWaypoint(t2);
   path.endPath();
 
   tr->nx = 0;
@@ -3490,9 +3493,9 @@ static void run_overshoot_rev(uint32_t before, uint8_t n_before, uint32_t after,
   int32_t cur[2] = {0, 0};
   path.setCurrentPosition(cur);
   int32_t t1[2] = {leg, leg};
-  path.addLine(t1);
+  path.addWaypoint(t1);
   int32_t t2[2] = {0, 2 * leg};
-  path.addLine(t2);
+  path.addWaypoint(t2);
   path.endPath();
 
   tr->nx = 0;
@@ -3686,9 +3689,9 @@ void f9_dir_pauses() {
     int32_t cur[2] = {0, 0};
     path.setCurrentPosition(cur);
     int32_t t1[2] = {1, 0};
-    path.addLine(t1);
+    path.addWaypoint(t1);
     int32_t t2[2] = {0, 0};
-    path.addLine(t2);
+    path.addWaypoint(t2);
     path.endPath();
     PumpStatus st = path.pump();
     test(st == PumpStatus::Error,
@@ -3829,7 +3832,7 @@ static void run_overshoot_segment(
   }
 
   int32_t target[2] = {tx, ty};
-  path.addLine(target);
+  path.addWaypoint(target);
   path.endPath();
   path.pump();
 
@@ -4062,7 +4065,7 @@ static void run_overshoot_polyline(
   path.setCurrentPosition(cur);
   for (int k = 1; k < n_wp; k++) {
     int32_t t[2] = {wp[2 * k], wp[2 * k + 1]};
-    path.addLine(t);
+    path.addWaypoint(t);
   }
   path.endPath();
   path.pump();
@@ -4368,7 +4371,7 @@ void f13_lookahead() {
       int32_t cur[2] = {0, 0};
       bpath.setCurrentPosition(cur);
       int32_t t[2] = {400, 0};
-      bpath.addLine(t);
+      bpath.addWaypoint(t);
       bpath.endPath();
       bpath.pump();
       while (bpath.isBusy()) {
@@ -4388,11 +4391,11 @@ void f13_lookahead() {
     path.setCurrentPosition(cur);
     int32_t a[2] = {400, 0};
     int32_t b[2] = {800, 0};
-    test(path.addLine(a) == true, "F13 dwell first addLine");
+    test(path.addWaypoint(a) == true, "F13 dwell first addWaypoint");
     test(path.addDwellTicks(0) == true, "F13 dwell zero dwell is legal");
     test(path.block_count() == 1, "F13 dwell zero dwell records no block");
     test(path.addDwellTicks(80000) == true, "F13 dwell addDwellTicks");
-    test(path.addLine(b) == true, "F13 dwell second addLine");
+    test(path.addWaypoint(b) == true, "F13 dwell second addWaypoint");
     test(path.block_count() == 3, "F13 dwell records 3 blocks");
     path.endPath();
     path.pump();
@@ -4436,7 +4439,7 @@ void f13_lookahead() {
     int32_t cur[2] = {0, 0};
     path.setCurrentPosition(cur);
     int32_t t[2] = {800, 0};
-    path.addLine(t);  // open path: no endPath
+    path.addWaypoint(t);  // open path: no endPath
     PumpStatus first = path.pump();
     test(first == PumpStatus::Running,
          "F13 F11 first pump returns Running on an open path");
@@ -4479,7 +4482,7 @@ void f13_lookahead() {
     for (int k = 1; k <= 10; k++) {
       t[0] = 800 * k;
       t[1] = 0;
-      path.addLine(t);
+      path.addWaypoint(t);
     }
     path.pump();
     test(path.performedRampUp() + path.remainingToStop() == 8000,
@@ -4541,7 +4544,7 @@ void f13_lookahead() {
     int32_t cur[2] = {0, 0};
     path.setCurrentPosition(cur);
     int32_t t[2] = {10000, 0};
-    path.addLine(t);
+    path.addWaypoint(t);
     path.endPath();
     PumpStatus st = path.pump();
     test(st == PumpStatus::Running, "F13 F1 first pump returns Running");
@@ -4601,7 +4604,7 @@ void f13_lookahead() {
     for (int k = 1; k <= 4; k++) {
       t[0] = 50 * k;
       t[1] = 0;
-      test(path.addLine(t) == true, "F13 F19 addLine fits HORIZON 4");
+      test(path.addWaypoint(t) == true, "F13 F19 addWaypoint fits HORIZON 4");
     }
     path.pump();
     test(path.isSpeedLimitedByLookahead(),
@@ -4642,7 +4645,7 @@ void f13_lookahead() {
     int32_t cur2[2] = {0, 0};
     path2.setCurrentPosition(cur2);
     int32_t big[2] = {10000, 0};
-    path2.addLine(big);
+    path2.addWaypoint(big);
     path2.endPath();
     path2.pump();
     test(path2.remainingToStop() >= P_coast,
@@ -4776,7 +4779,7 @@ void f14_helix() {
     path.setCurrentPosition(cur);
     for (int k = 1; k <= n_chords; k++) {
       int32_t t[3] = {wp[3 * k], wp[3 * k + 1], wp[3 * k + 2]};
-      test(path.addLine(t) == true, "F14 addLine fits");
+      test(path.addWaypoint(t) == true, "F14 addWaypoint fits");
     }
     path.endPath();
     path.pump();
@@ -5156,7 +5159,7 @@ void f21_physical() {
   plot.poly_done();
 
   for (int k = 1; k < 5; k++) {
-    test(path.addLine(verts[k]) == true, "F21 addLine fits");
+    test(path.addWaypoint(verts[k]) == true, "F21 addWaypoint fits");
   }
   path.endPath();
 
@@ -5265,7 +5268,7 @@ static void f20_physical_wav() {
     wx += blocks[b][0];
     wy += blocks[b][1];
     int32_t t[2] = {wx, wy};
-    test(path.addLine(t) == true, "F20 phys addLine fits");
+    test(path.addWaypoint(t) == true, "F20 phys addWaypoint fits");
   }
   path.endPath();
   while (path.isBusy()) {
@@ -5299,7 +5302,7 @@ static void f22_external_stop() {
     int32_t cur[2] = {0, 0};
     path.setCurrentPosition(cur);
     int32_t t[2] = {10000, 10000};
-    path.addLine(t);
+    path.addWaypoint(t);
     path.endPath();
     test(path.pump() == PumpStatus::Running, "F22 first pump Running");
     test(!path.isFaulted(), "F22 not faulted while running");
@@ -5321,7 +5324,7 @@ static void f22_external_stop() {
     int32_t cur[2] = {0, 0};
     path.setCurrentPosition(cur);
     int32_t t[2] = {10000, 0};
-    path.addLine(t);
+    path.addWaypoint(t);
     path.endPath();
     test(path.pump() == PumpStatus::Running, "F22 forceStop setup Running");
 
@@ -5341,7 +5344,7 @@ static void f22_external_stop() {
     int32_t cur[2] = {0, 0};
     path.setCurrentPosition(cur);
     int32_t t[2] = {10000, 0};
-    path.addLine(t);
+    path.addWaypoint(t);
     path.endPath();
     path.pump();
     path.emergencyStop();
@@ -5444,16 +5447,16 @@ static void f_sliding_ring() {
   int32_t x = 0;
   for (int k = 0; k < horizon; k++) {
     int32_t t[2] = {x + 1, 0};
-    test(path.addLine(t) == true, "F23 addLine fills the ring");
+    test(path.addWaypoint(t) == true, "F23 addWaypoint fills the ring");
     x += 1;
   }
   path.pump();
 
-  // The executed prefix is dropped, so addLine is legal again even though
+  // The executed prefix is dropped, so addWaypoint is legal again even though
   // HORIZON points have already been appended in total.
   int32_t next[2] = {x + 1, 0};
-  test(path.addLine(next) == true,
-       "F23 ring slides: addLine is legal past HORIZON total points");
+  test(path.addWaypoint(next) == true,
+       "F23 ring slides: addWaypoint is legal past HORIZON total points");
   x += 1;
   test(path.pendingBlocks() <= horizon, "F23 pending stays within HORIZON");
 
@@ -5466,7 +5469,7 @@ static void f_sliding_ring() {
   while (added < total || path.isBusy()) {
     if (added < total) {
       int32_t t[2] = {x + 1, 0};
-      if (path.addLine(t)) {
+      if (path.addWaypoint(t)) {
         x += 1;
         added++;
         if (added == total) {

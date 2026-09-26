@@ -26,7 +26,7 @@
 #    7. path stops      -- the path does not stop at every helix chord. A stop
 #                          is a run of step gaps far above the fastest gap in
 #                          the run; a path-stop per vertex shows up as one stop
-#                          per addLine target (see count_stops()).
+#                          per addWaypoint target (see count_stops()).
 #
 # Usage:
 #   detect_geometry.py <x.vcd>          parse a simavr VCD and validate
@@ -50,7 +50,7 @@ HEX_R = RADIUS
 HEX_Y = RADIUS * 866 // 1000   # 0.866*R, integer, as in naxes_path.h
 
 # Tolerances (steps). The DDA chord makes the realized curve land within a few
-# steps of the commanded vertices; the corner points are addLine targets and are
+# steps of the commanded vertices; the corner points are addWaypoint targets and are
 # hit exactly, so tight tolerances are fine. The helix vertices sit on the
 # circle to within the quarter-sine table rounding (< 1 step) plus the chord sag
 # (< 1 step), so the radius band is tight.

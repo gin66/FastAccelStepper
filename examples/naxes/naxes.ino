@@ -66,8 +66,8 @@ FastAccelStepper* naxes_s[NAXES_HW] = {NULL};
 // two-axis build and 48 on the three-axis one.
 FasNAxis<NAXES_HW, NAXES_HORIZON> naxes_planner(FasNAxisConfig{}, engine);
 
-// Index of the waypoint currently being commanded. 0 is the first addLine after
-// the origin; the run finishes when it reaches total_waypoints().
+// Index of the waypoint currently being commanded. 0 is the first addWaypoint
+// after the origin; the run finishes when it reaches total_waypoints().
 static uint16_t naxes_wp_index = 0;
 // The path is fully emitted and the queues have drained.
 static bool naxes_done = false;
@@ -108,8 +108,9 @@ static int32_t q_axis(int q, int16_t mag, int16_t rad, bool x_axis) {
 
 // Absolute target (one entry per axis) of the i-th waypoint of the fixed path,
 // computed on the fly so the whole curve costs only a few words of RAM. The
-// origin (index 0 of the addLine sequence) is established by setCurrentPosition
-// in setup(); total_waypoints() counts the addLine targets that follow.
+// origin (index 0 of the addWaypoint sequence) is established by
+// setCurrentPosition in setup(); total_waypoints() counts the addWaypoint
+// targets that follow.
 void waypoint_target(uint16_t i, int32_t* t) {
   t[0] = 0;
   t[1] = 0;
@@ -236,12 +237,12 @@ void setup() {
 void loop() {
   if (!naxes_done) {
     // Feed the next waypoint target, but only when the planner's ring has room.
-    // addLine() drains as the queues run, so this one target per pass keeps the
-    // ring from filling.
+    // addWaypoint() drains as the queues run, so this one target per pass keeps
+    // the ring from filling.
     if (naxes_wp_index < total_waypoints()) {
       int32_t t[NAXES_HW] = {0};
       waypoint_target(naxes_wp_index, t);
-      if (naxes_planner.addLine(t)) {
+      if (naxes_planner.addWaypoint(t)) {
         naxes_wp_index++;
         if (naxes_wp_index >= total_waypoints()) {
           naxes_planner.endPath();

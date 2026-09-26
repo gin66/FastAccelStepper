@@ -19,7 +19,7 @@ The path is fixed and deterministic, so a run is comparable to the next:
   cube footprint on a two-axis build).
 * **return to origin** — a direct line back to the start position.
 
-The planner runs in **Linear** mode: each `addLine()` target is an exact-chord
+The planner runs in **Linear** mode: each `addWaypoint()` target is an exact-chord
 vertex, so the realized curve is the polygon through the vertices. The geometry
 detector reconstructs that polygon from the `Step`/`Dir` pin traces.
 

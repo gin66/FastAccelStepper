@@ -1,10 +1,12 @@
-# FasNAxis — open items
+# Open items (TODO)
 
-Source of truth: `extras/doc/n_axes_whitepaper.md`.
+Library-wide open items, one file per item. The list is not
+FasNAxis-specific, even though at the moment every tracked entry below
+happens to be n-axis work.
 
-The test-driven implementation plan (Steps 0–14) is complete; its
-tests live in `extras/tests/pc_based/test_26.cpp`. Remaining work is
-tracked here, one file per item.
+Source of truth for the n-axis items: `extras/doc/n_axes_whitepaper.md`.
+Their test-driven implementation plan (Steps 0–14) is complete; its
+tests live in `extras/tests/pc_based/test_26.cpp`.
 
 ## Tracked entries (priority order)
 

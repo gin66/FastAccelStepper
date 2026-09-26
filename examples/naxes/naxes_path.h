@@ -14,10 +14,11 @@
 //                   build this is the "cube" degenerate, still four corners).
 //   4. return     - a direct line back to the origin, the start of the path.
 //
-// The geometry is exact-chord (Line mode): each addLine() target is a vertex,
-// so the realized curve is the polygon through the vertices. The simavr/PC test
-// reconstructs this polygon from the Step/Dir pin traces and checks that the
-// realized vertices match NAXES_PATH[] and that the run ends at the origin.
+// The geometry is exact-chord (Line mode): each addWaypoint() target is a
+// vertex, so the realized curve is the polygon through the vertices. The
+// simavr/PC test reconstructs this polygon from the Step/Dir pin traces and
+// checks that the realized vertices match NAXES_PATH[] and that the run ends at
+// the origin.
 
 // Circle / polygon radius in steps.
 #define NAXES_RADIUS 400
@@ -49,7 +50,7 @@
 #define NAXES_HEX_Y (NAXES_RADIUS * 866L / 1000)
 
 // The path is built at runtime in naxes.ino from these constants so the same
-// constants drive both the commanded addLine() targets and the expected
+// constants drive both the commanded addWaypoint() targets and the expected
 // reconstruction, keeping the two sides identical.
 
 // The helix is emitted as a table of vertices by the caller; this file only

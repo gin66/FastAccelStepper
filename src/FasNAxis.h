@@ -24,14 +24,14 @@ class FastAccelStepperEngine;
 // 64-bit integer type; ramp math lives in fas_naxis/ramp_map.h
 // (log2_value_t) and RampCalculator.
 //
-// Step 7 is the Linear lookahead planner: addLine() commits points into a block
-// ring of up to HORIZON n-dim points, and pump() feeds the committed Linear
-// path through addQueueEntry(). The DDA master is the longest |delta| of the
-// current block; R is Remaining-style remaining master steps to the next Linear
-// path-stop: a master-sense reversal or the path end. P carries across every
-// other joint, including a master-role change (section 6.3/8.5); the 2 deg
-// collinear test is diagnostic only. The last buffered point of an open path is
-// rest, so the ramp always stops there.
+// Step 7 is the Linear lookahead planner: addWaypoint() commits points into a
+// block ring of up to HORIZON n-dim points, and pump() feeds the committed
+// Linear path through addQueueEntry(). The DDA master is the longest |delta| of
+// the current block; R is Remaining-style remaining master steps to the next
+// Linear path-stop: a master-sense reversal or the path end. P carries across
+// every other joint, including a master-role change (section 6.3/8.5); the 2
+// deg collinear test is diagnostic only. The last buffered point of an open
+// path is rest, so the ramp always stops there.
 //
 // Step 8 makes the feeder fault-tolerant: feed_one() stores a held command per
 // axis (one slice) and flush_held() sends it, retrying on a retryable
@@ -204,7 +204,7 @@ class FasNAxis {
     }
   }
 
-  // Set the current position from the steppers and open addLine.
+  // Set the current position from the steppers and open addWaypoint.
   void syncFromSteppers() {
     for (uint8_t i = 0; i < NAXES; i++) {
       if (_s[i] != NULL) {
@@ -215,7 +215,7 @@ class FasNAxis {
     _position_synced = true;
   }
 
-  // Set the current position from a caller-supplied array and open addLine.
+  // Set the current position from a caller-supplied array and open addWaypoint.
   void setCurrentPosition(const int32_t p[NAXES]) {
     for (uint8_t i = 0; i < NAXES; i++) {
       _p[i] = p[i];
@@ -230,7 +230,7 @@ class FasNAxis {
   // equal to the current position (every delta 0) is a no-op that records no
   // block and returns true. Appending after the plan already caught up with
   // the buffer re-opens the plan (R may grow; section 8.7).
-  bool addLine(const int32_t p[NAXES]) {
+  bool addWaypoint(const int32_t p[NAXES]) {
     if (!_position_synced) {
       return false;
     }
@@ -262,12 +262,12 @@ class FasNAxis {
     return true;
   }
 
-  // Number of motion blocks recorded by addLine (0 after a no-op / a sync).
+  // Number of motion blocks recorded by addWaypoint (0 after a no-op / a sync).
   uint32_t block_count() const { return _block_count; }
 
   // Queue a dwell: a zero-motion block that issues pauses totalling `ticks`
   // (split at 65535 like any long period) on every axis, from rest to rest
-  // (P is 0 on the way in and on the way out; the next addLine starts from
+  // (P is 0 on the way in and on the way out; the next addWaypoint starts from
   // rest). It is a planned stop-and-wait, not a pause stuffed into a moving
   // slice. Legal only when the position is synced; ticks == 0 is a no-op.
   bool addDwellTicks(uint32_t ticks) {
@@ -498,11 +498,11 @@ class FasNAxis {
 
   // Drop blocks the feeder has fully executed, rebasing the executing head to
   // 0 so the block array is a sliding window of at most HORIZON *pending*
-  // points (whitepaper section 8). Without this the array only grows, addLine
-  // backpressures once HORIZON points have *ever* been appended, and a path
-  // longer than HORIZON runs in chunks that each ramp to rest. Live state
-  // indexes _blk[_head] / _blk[_head + 1] by the rebased head, so it stays
-  // valid across the shift.
+  // points (whitepaper section 8). Without this the array only grows,
+  // addWaypoint backpressures once HORIZON points have *ever* been appended,
+  // and a path longer than HORIZON runs in chunks that each ramp to rest. Live
+  // state indexes _blk[_head] / _blk[_head + 1] by the rebased head, so it
+  // stays valid across the shift.
   void compact_ring() {
     if (_head <= 0) {
       return;
