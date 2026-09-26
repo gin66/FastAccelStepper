@@ -2,9 +2,9 @@ name: Run pc-based tests
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, naxes ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, naxes ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

@@ -400,9 +400,9 @@ workflows:
     name: Build examples
     "on":
       push:
-        branches: [master]
+        branches: [master, naxes]
       pull_request:
-        branches: [master]
+        branches: [master, naxes]
     matrix:
       - versioned_groups:
           - esp32_werror_deprecated
@@ -436,9 +436,9 @@ workflows:
     name: Build idf examples
     "on":
       push:
-        branches: [master]
+        branches: [master, naxes]
       pull_request:
-        branches: [master]
+        branches: [master, naxes]
     comments:
       - "The versions here are defined by platformio:"
       - "   https://github.com/platformio/platform-espressif32/releases"

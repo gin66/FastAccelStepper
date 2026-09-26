@@ -228,12 +228,11 @@ def generate_workflow_yml(
     if "on" in workflow_config:
         lines.append("on:")
         on_config = workflow_config["on"]
-        if "push" in on_config:
-            lines.append("  push:")
-            lines.append("    branches: [ master ]")
-        if "pull_request" in on_config:
-            lines.append("  pull_request:")
-            lines.append("    branches: [ master ]")
+        for event in ("push", "pull_request"):
+            if event in on_config:
+                branches = on_config[event].get("branches", ["master"])
+                lines.append(f"  {event}:")
+                lines.append(f"    branches: [ {', '.join(branches)} ]")
         lines.append("")
 
     lines.extend(
