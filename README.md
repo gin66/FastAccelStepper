@@ -1,331 +1,95 @@
-# FastAccelStepper 
+# FastAccelStepper
+
 ![GitHub tag](https://img.shields.io/github/v/tag/gin66/FastAccelStepper.svg?sort=semver&no_cache_0.28.1)
 [![PlatformIO Registry](https://badges.registry.platformio.org/packages/gin66/library/FastAccelStepper.svg)](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
 [![arduino-library-badge](https://www.ardu-badge.com/badge/FastAccelStepper.svg?)](https://www.ardu-badge.com/FastAccelStepper)
-
 ![Run tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests/badge.svg?no_cache_0.28.1)
 ![Simvar tests](https://github.com/gin66/FastAccelStepper/workflows/Run%20tests%20with%20simavr/badge.svg?no_cache_0.28.1)
-
-## Matrix build for arduino using platformio (esp32, esp32c3, atmega328, pico2,...)
 [![Build examples](https://github.com/gin66/FastAccelStepper/actions/workflows/build_arduino_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_arduino_examples_matrix.yml)
-
-## Matrix build for espidf using platformio
 [![Build espidf](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml/badge.svg)](https://github.com/gin66/FastAccelStepper/actions/workflows/build_idf_examples_matrix.yml)
-
-## Arduino and esp32
-
-Arduino core v3.0.x are using esp-idf v5.0 up to v5.1 and FastAccelStepper will fail to compile.
-
-Arduino core 3.1.0 will support ESP-IDF V5.3.0 (based on RC1)
 
 ## Overview
 
-This is a high speed alternative for the [AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
-Supported are avr (ATmega 168/328/P, ATmega2560, ATmega32u4), atmelsam due, Microchip SAMD51, esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4, Raspberry pi pico and pico2, and (experimentally) Teensy 4.0/4.1.
+This is a high speed alternative for the
+[AccelStepper library](http://www.airspayce.com/mikem/arduino/AccelStepper/).
+Supported are avr (ATmega 168/328/P, ATmega2560, ATmega32u4), atmelsam due,
+Microchip SAMD51, esp32, esp32s2, esp32s3, esp32c3, esp32c6, esp32p4, Raspberry
+pi pico and pico2, and (experimentally) Teensy 4.0/4.1.
 
-For memory footprint information across supported architectures, see [Memory Report](https://github.com/gin66/FastAccelStepper/blob/master/extras/doc/memory_report.md).
+The stepper motors are connected via a driver IC (like A4988) with a 1, 2 or
+3-wire connection (step / direction / enable). See
+[Hardware & Pin Connection](extras/doc/hardware.md) for the pin restrictions of
+each platform.
 
-The stepper motors should be connected via a driver IC (like A4988) with a 1, 2 or 3-wire connection:
-* Step Signal
-  - avr atmega168/328/p: only Pin 9 and 10.
-  - avr atmega32u4: only Pin 9, 10 and 11.
-  - avr atmega2560: only Pin 6, 7 and 8.
-      On platformio, this can be changed to other triples: 11/12/13 Timer 1, 5/2/3 Timer 3 or 46/45/44 Timer 5 with `FAS_TIMER_MODULE` setting.
-  - esp32: This can be any output capable port pin, or use I2S for additional steppers:
-    * I2S Mux mode: up to 32 additional steppers via external demultiplexer (IDF ≥5.3)
-    * I2S Direct mode: 1-3 additional steppers using I2S controllers directly (IDF ≥5.3)
-  - pico: Any GPIO up to 31
-  - atmel sam due: This can be one of each group of pins: 34/67/74/35, 17/36/72/37/42, 40/64/69/41, 9, 8/44, 7/45, 6
-  - samd51: Any pin with a TCC waveform output in the board's variant table (checked at `stepperConnectToPin()`), one stepper per TCC instance
-  - Step should be done on transition Low to High. High time will be only a few us.
-  On esp32 the high time is for slow speed fixed to ~2ms and high speed to 50% duty cycle.
-  For pico direction delay is recommended
-* Direction Signal (optional)
-  - This can be any output capable port pin.
-  - esp32: Can also use I2S Mux slots for direction control (IDF ≥5.3)
-  - pico: Any GPIO up to 31
-  - Position counting up on direction pin high or low, as per optional parameter to setDirectionPin(). Default is high.
-  - With external callback on esp32 derivates, even shift register outputs can be used
-* Enable Signal (optional)
-  - This can be any output capable port pin.
-  - esp32: Can also use I2S Mux slots for enable control (IDF ≥5.3)
-  - Stepper will be enabled on pin high or low, as per optional parameter to setEnablePin(). Default is low.
-  - With external callback, even shift register outputs can be used
+There is an excellent AI-generated description of FastAccelStepper with deep
+implementation details and diagrams at
+[deepwiki.com/gin66/FastAccelStepper](https://deepwiki.com/gin66/FastAccelStepper).
+For memory footprint information across supported architectures, see the
+[Memory Report](extras/doc/memory_report.md).
 
-FastAccelStepper offers the following features:
+## Supported platforms
+
+| Platform | Max steps/s | Steppers | Queue | Doc |
+|----------|-------------|----------|-------|-----|
+| AVR ATmega 168/328 | 50000 | 1-2 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| AVR ATmega32u4 | 50000 | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| AVR ATmega2560 | 50000 | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| ESP32 (IDF 4.x) | 200000 | 14 | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32 (IDF 5.3+) | 200000 | 14 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-S2 | 200000 | 4 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-S3 | 200000 | 4 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-C3 | 200000 | 2 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-C6 | 200000 | 2 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-P4 | 200000 | 4 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| Raspberry Pi Pico | 200000 | 4 (8 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Raspberry Pi Pico 2 | 200000 | 8 (12 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Atmel SAM Due | 50000 | 6 | 32 | [sam.md](extras/doc/platforms/sam.md) |
+| Microchip SAMD51 | — | 3-5 | 32 | [samd51.md](extras/doc/platforms/samd51.md) |
+| Teensy 4.0/4.1 (exp.) | 200000 | 16 | 32 | [teensy.md](extras/doc/platforms/teensy.md) |
+
+The full ESP32 driver comparison (MCPWM/PCNT vs RMT vs I2S Mux) is in
+[platforms/esp32.md](extras/doc/platforms/esp32.md).
+
+## Features
+
 * 1-pin operation for e.g. peristaltic pump => only positive move
 * 2-pin operation for e.g. axis control
 * 3-pin operation to reduce power dissipation of driver/stepper
-* Lower limit of 260s per step @ 16MHz aka one step every four minute (esp32/avr/samd51), 198s for sam due
+* Lower limit of 260s per step @ 16MHz aka one step every four minute
+  (esp32/avr/samd51), 198s for sam due
 * fully interrupt/task driven - no periodic function to be called from application loop
 * supports acceleration and deceleration with per stepper max speed/acceleration
-* Allows the motor to continuously run in the current direction until stopMove() is called.
-* speed/acceleration can be varied while stepper is running (call to functions move or moveTo is needed in order to apply the new values)
-* Constant acceleration control: In this mode the motor can be controled by acceleration values and with acceleration=0 will keep current speed
-* Linear acceleration increase from/to standstill using cubic speed function - configurable by `setLinearAcceleration()`
+* Allows the motor to continuously run in the current direction until `stopMove()` is called.
+* speed/acceleration can be varied while stepper is running (call to `move` or
+  `moveTo` is needed in order to apply the new values)
+* Constant acceleration control: In this mode the motor can be controled by
+  acceleration values and with acceleration=0 will keep current speed
+* Linear acceleration increase from/to standstill using cubic speed function -
+  configurable by `setLinearAcceleration()`
 * Jump start from standstill - configurable by `setJumpStart()`
-* Auto enable mode: stepper motor is enabled before movement and disabled afterwards with configurable delays
+* Auto enable mode: stepper motor is enabled before movement and disabled
+  afterwards with configurable delays
 * Enable pins can be shared between motors
 * Direction pins can be shared between motors
 * Configurable delay between direction change and following step
-* External callback function can be used to drive the enable pins (e.g. connected to shift register) and, only esp32 derivates: the direction pins
-* No float calculation (log2 representation in range -64..64 with 16bit integer representation and 1/512th resolution)
-* Provide API to each steppers' command queue. Those commands are tied to timer ticks aka the CPU frequency!
-* Command queue can be filled with commands and then started. This allows near synchronous start of several steppers for multi axis applications.
+* External callback function can be used to drive the enable pins (e.g. connected
+  to shift register) and, only esp32 derivates: the direction pins
+* No float calculation (log2 representation in range -64..64 with 16bit integer
+  representation and 1/512th resolution)
+* Provide API to each steppers' command queue. Those commands are tied to timer
+  ticks aka the CPU frequency!
+* Command queue can be filled with commands and then started. This allows near
+  synchronous start of several steppers for multi axis applications.
 
-## Star History
+## Quick Start
 
-[![Star History Chart](https://star-history.dera.page/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.dera.page/#gin66/FastAccelStepper&Date)
-
-
-## AI generated documentation
-
-I have stumbled over an excellent AI-generated description of FastAccelStepper, which provides surprisingly deep and (mostly) correct implementation details.
-It would have costed me many days to write an equally good description with so many details and diagrams.
-This docu can be found [here](https://deepwiki.com/gin66/FastAccelStepper).
-
-## Source Code Structure
-
-The `src/` directory is organized into the following subdirectories:
-
-| Directory | Purpose |
-|-----------|---------|
-| `fas_arch/` | Platform abstraction: compiler/framework detection, interrupt macros, Arduino-like polyfills |
-| `pd_avr/` | AVR pulse driver: timer-based stepper control for ATmega chips |
-| `pd_esp32/` | ESP32 pulse driver: RMT, MCPWM/PCNT, and I2S-based stepper control |
-| `pd_pico/` | RP2040/RP2350 pulse driver: PIO-based stepper control |
-| `pd_sam/` | SAM Due pulse driver: timer-based stepper control |
-| `pd_samd/` | SAMD51 pulse driver: TCC PWM-based stepper control |
-| `pd_teensy/` | Teensy 4.0/4.1 pulse driver: QuadTimer-based stepper control (EXPERIMENTAL) |
-| `pd_test/` | Test platform pulse driver: PC-based testing simulation |
-| `fas_queue/` | Queue implementation: command queue management |
-| `fas_ramp/` | Ramp calculation: acceleration/deceleration curves |
-| `log2/` | Log2 representation: fixed-point arithmetic for speed calculations |
-
-Platform-specific configuration constants (queue sizes, timing, feature flags) are defined in `pd_*/pd_config.h` files, which are included by `fas_arch/common.h` during the platform dispatch.
-
-## General behaviour of Moves
-* The desired end position to move to is set by calls to moveTo() and move()
-* The desired end position is in case of moveTo() given as absolute position
-* For move() the delta is added to the latest desired end position
-* The stepper tries to reach the given desired end position as fast as possible with adherence to acceleration/deceleration
-* If the stepper is e.g. running towards position 1000 and moveTo(0) is called at position 500, then the stepper will 
-    1. decelerate, which means it will overshoot position 500 
-    2. stop and accelerate towards 0
-    3. eventually coast for a while and then decelerate
-    4. stop
-* The stepper position is a 32bit integer variable, which wraps around for continuous movement.
-  Example:
-	- Assume counting up turns stepper clockwise, and counting down, anti-clockwise.
-    - Current position is -2.000.000.000, move to 2.000.000.000.
-    - Apparently the position has to count up, and count should run clockwise.
-    - Implementation is done via difference of 32bit signed numbers, which can overflow (being legit).
-    - The calculation is then:
-			2.000.000.000 - (-2.000.000.000) = 4.000.000.000
-	- But 4.000.000.000 interpreted as signed 32bit is -294.967.296 => count down, turn anti-clockwise
-	  Means the position will count:
-```
-		-2.000.000.000
-		-2.000.000.001
-		-2.000.000.002
-			:
-		-2.147.483.647
-		-2.147.483.648
-		 2.147.483.647
-		 2.147.483.646
-		 2.147.483.645
-			:
-		 2.000.000.000
-```
-Comments to pin sharing:
-* Enable pin sharing: the common pin will be enabled for as long as one motor is running + delay off.
-  Every motor will adhere to its auto enable delay, even if other motors already have enabled the pin.
-* Direction pin sharing: The direction pin will be exclusively driven by one motor. If one motor is operating, another motor will wait until the direction pin comes available
-
-### AVR ATMega 168/168P/328/328P
-
-* allows up to 50000 generated steps per second for single stepper operation, 37000 for dual stepper
-* supports up to two stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
-* Steppers' command queue depth: 16
-
-### AVR ATMega 32u4
-
-* allows up to 50000 generated steps per second for single stepper operation, 37000 for dual stepper and 20000 for three steppers
-* supports up to three stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
-* Steppers' command queue depth: 16
-
-### AVR ATMega 2560
-
-* allows up to 50000 generated steps per second for single stepper operation, 37000 for dual stepper and 20000 for three steppers
-* supports up to three stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Uses `F_CPU` Macro for the relation tick value to time, so it should now not be limited to 16 MHz CPU frequency (untested)
-* Steppers' command queue depth: 16
-* This device has four 16 bit timers, so extension up to 12 steppers should be possible (not implemented)
-
-### ESP32 Variants Overview
-
-| Variant     | IDF 4.x Driver     | IDF 4.x Max | IDF 5.3+ Driver            | IDF 5.3+ Max               | I2S Ctrl | I2S Mux | I2S Direct |
-|-------------|--------------------|-------------|---------------------------|----------------------------|----------|---------|------------|
-| ESP32       | MCPWM/PCNT + RMT   | 14 (6+8)    | MCPWM/PCNT + RMT + I2S    | 14 (6+8) + 32              | 2        | 32 pins | 2 ch       |
-| ESP32-S2    | RMT                | 4           | RMT + I2S                 | 4 + 32                     | 2        | 32 pins | 2 ch       |
-| ESP32-S3    | MCPWM/PCNT + RMT   | 8           | MCPWM/PCNT + RMT + I2S    | 4 (4) + 32                  | 2        | 32 pins | 2 ch       |
-| ESP32-C3    | RMT                | 2           | RMT + I2S                 | 2 + 32                     | 1        | 32 pins | 1 ch       |
-| ESP32-C6    | -                  | -           | MCPWM/PCNT + RMT + I2S    | 2 (2) + 32                  | 1        | 32 pins | 1 ch       |
-| ESP32-P4    | -                  | -           | RMT + I2S                 | 4 + 32                     | 3        | 32 pins | 3 ch       |
-
-**Notes:**
-- IDF 5.3+ Max = MCPWM/PCNT + RMT channels + I2S Mux slots (can be combined)
-- MCPWM/PCNT is available on IDF 5.3+ and IDF 6.1 for ESP32, ESP32-S3, ESP32-C6, ESP32-H2
-- I2S Mux requires ESP-IDF >=5.3 and uses one I2S controller
-- I2S Mux slots are shared: if step/dir/enable all use I2S Mux, each stepper consumes 1-3 slots
-  - Step only: up to 32 steppers
-  - Step + Dir: up to 16 steppers
-  - Step + Dir + Enable: up to 10 steppers
-- I2S Direct channels = number of I2S controllers (experimental)
-- C6 and P4 require IDF >=5.3 (no IDF 4.x support)
-
-#### ESP-IDF version 4.x.y:
-* allows up to 200000 generated steps per second
-* supports up to 14 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Steppers' command queue depth: 32
-
-#### ESP-IDF version >=5.3.0:
-* allows up to 200000 generated steps per second for RMT. 40kHz for I2S-MUX.
-* supports up to 8+32 stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Steppers' command queue depth: 32
-
-#### ESP32 I2S Mux Driver (ESP-IDF >=5.3.0 only)
-
-The I2S Mux driver provides an alternative approach for driving multiple stepper motors using the ESP32's I2S peripheral. This is especially useful when you need more steppers than RMT channels provide.
-
-**Overview:**
-The I2S transmitter outputs a 32-bit data word at 250kHz. Each bit corresponds to one output slot (0-31). These signals can be used in two ways:
-
-1. **With external demultiplexer**: Connect a decoder IC (e.g., 74HC154, 74HC138 cascade, or shift registers like 74HC595) to the I2S data pin to decode the 32-bit stream into individual output pins for step, direction, and enable signals.
-
-2. **Direct connection**: Use individual I2S output slots directly as stepper driver inputs. Each slot provides one output signal that toggles at the I2S frame rate.
-
-**Key Features:**
-* Up to 32 output pins from a single I2S transmitter
-* I2S runs at 250kHz sample rate (4µs frame time)
-* Step, direction, and enable pins can all use I2S outputs
-* Suitable for applications requiring many coordinated steppers
-
-**Limitations:**
-* Requires ESP-IDF 5.3 or later (I2S driver API changed significantly)
-* Minimum speed for I2S Mux is 25µs period (40kHz max step rate)
-* Minimum speed for I2S Direct is 5µs period (200kHz max step rate)
-* Step pulse width is 2.5us for I2S Direct and 4us for I2S MUX
-* I2S Direct: stepper speed adjustable in 1/8us deltas.
-* I2S MUX: stepper speed adjustable in 4us deltas e.g. speed 50us will be 52/48/52/48...
-* `forceStop()` will still emit commands already in the DMA buffer (up to ~500µs latency)
-* Direction change: GPIO DIR needs ~1 ms of pause before the change
-  (`2*I2S_BLOCK_TICKS`, both DMA blocks without steps). Mux-slot DIR
-  (`PIN_I2S_FLAG`) needs 500 µs after the change (mask applies to the next
-  block). Not inserted if the caller already queued enough pause.
-
-**I2S Direct vs I2S Mux:**
-* **I2S Mux**: Single I2S transmitter drives up to 32 pins. All pins share the same timing.
-* **I2S Direct**: Each stepper gets its own I2S channel. Higher precision timing.
-
-**Initialization:**
 ```cpp
-// Initialize I2S Mux with data, bclk, and word select pins
-// Not needed, if I2S direct mode is used
-engine.initI2sMux(data_pin, bclk_pin, ws_pin);
-
-// Connect stepper to I2S mux slot (0-31)
-// PIN_I2S_FLAG automatically selects I2S Mux mode
-stepper = engine.stepperConnectToPin(slot | PIN_I2S_FLAG);
-
-// Direction and enable can also use I2S mux slots
-stepper->setDirectionPin(dir_slot | PIN_I2S_FLAG, dirHighCountsUp);
-stepper->setEnablePin(enable_slot | PIN_I2S_FLAG, activeLow);
-```
-
-**Pin Allocation:**
-The I2S mux uses slot numbers 0-31, which are output on the I2S data line. These can be used in two ways:
-* **With external demultiplexer**: Connect a decoder (e.g., 74HC154, 74HC138 cascade) to the I2S data pin to decode the 32-bit frame into 32 individual output pins for step/direction/enable signals
-* **Direct connection**: Use the I2S data pin directly as a step signal
-
-**Testing and Demo Application:**
-A comprehensive platformio test application with web interface is available in `extras/Esp32StepperDemo/`. 
-This demonstrates:
-* Configuration of multiple steppers via Web UI
-* Real-time position and status monitoring via WebSocket
-* Each I2S slot can be toggled individually
-* I2S mux pin management
-* serial console 115200 asks at startup for Wifi credentials.
-* Sequence automation (not tested)
-
-To build and test:
-```bash
-cd extras/Esp32StepperDemo
-pio run -t upload && pio device monitor
-```
-
-This test application was AI crafted....
-
-
-### Raspberry pi pico/pico 2
-
-* allows up to 200000 generated steps per second
-* In theory supports up to eight stepper motors for pico and twelve stepper motors for pico 2. Using arduino framework and arm core, only four for pico and eight for pico 2 can be allocated. riscv should be able to allocate all steppers.
-* Steppers' command queue depth: 32
-
-### Atmel SAM Due
-
-* allows up to 50000 generated steps per second
-* supports up to six stepper motors using Step/Direction/Enable Control (Direction and Enable is optional)
-* Steppers' command queue depth: 32
-
-Tested with max two stepper motors with 50 kHz step rate by clazarowitz
-
-### Microchip SAMD51
-
-* one stepper per TCC instance: 3 steppers on SAMD51G, up to 5 on SAMD51J/N/P
-* step pin must have a TCC waveform output in the board's variant table; direction/enable can be any output pin
-* one overflow interrupt per step; pulse edges are hardware-timed, so step timing is exact regardless of interrupt latency
-* Steppers' command queue depth: 32
-* SAMD21 is not supported (compile error)
-* requires an Arduino SAMD51 core (uses the variant pin table); tested with the Adafruit SAMD core
-
-### Teensy 4.0/4.1 (EXPERIMENTAL)
-
-* up to 16 stepper motors: 4 QuadTimer (TMR) modules x 4 channels each
-* step/dir pins are plain GPIO (toggled via `digitalWriteFast()`), not restricted to specific muxed pins - any digital pin works
-* two ISR calls per step (rising + falling edge), each hardware-timed by a QuadTimer compare match, the same principle this library's AVR backend uses
-* Steppers' command queue depth: 32
-* tested on a real Teensy 4.0 with a DM556 industrial stepper driver: a single axis was speed-swept up to 200 kHz with no missed steps (verified by marking the shaft, since there is no pulse-counter/encoder feedback to check this in software), and all 16 steppers were run simultaneously across all 4 QuadTimer modules with no cross-talk between channels. Pulse width/edge timing has not been checked on a scope or logic analyzer yet - if you have one, please verify and report back what you find
-
-## Usage
-
-The library is in use with A4988, but other driver ICs should work, too.
-
-For the API definition please consult the header file [FastAccelStepper.h](https://github.com/gin66/FastAccelStepper/blob/master/src/FastAccelStepper.h). Or a generated [markdown file](https://github.com/gin66/FastAccelStepper/blob/master/extras/doc/FastAccelStepper_API.md)
-
-Please check the examples for application and how to use the low level interface.
-Some info is [Issue #86](https://github.com/gin66/FastAccelStepper/issues/86).
-
-The module defines the global variable `fas_queue`. Do not use or redefine this variable.
-
-Using the high level interface with ramp up/down as in [UsageExample.ino](https://github.com/gin66/FastAccelStepper/blob/master/examples/UsageExample/UsageExample.ino).
-
-```
 #include "FastAccelStepper.h"
 #include "AVRStepperPins.h" // Only required for AVR controllers
 
 #define dirPinStepper    5
 #define enablePinStepper 6
 #define stepPinStepper   9
-
-// If using an AVR device use the definitons provided in AVRStepperPins
-//    stepPinStepper1A
-//
-// or even shorter (for 2560 the correct pin on the chosen timer is selected):
-//    stepPinStepperA
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;
@@ -348,372 +112,70 @@ void loop() {
 }
 ```
 
-Few comments to auto enable/disable:
-
-* If the motor is operated with micro stepping, then the disable/enable will cause the stepper to jump to/from the closest full step position.
-* Some drivers need time to e.g. stabilize voltages until stepping should start. For this the start on delay has been added. See [issue #5](https://github.com/gin66/FastAccelStepper/issues/5).
-* The turn off delay is realized in the cyclic task for esp32 or cyclic interrupt for avr. The esp32 task uses 4ms delay, while the avr repeats every ~4 ms at 16 MHz and atmel sam due every 2ms at 21MHz. Thus the turn off delay is a multiple (n>=2) of those period times and actual turning off takes place approx [(n-1)..n] * 4 ms resp. 2ms after the last step.
-* The turn on delay is minimal `MIN_CMD_TICKS`.
-* More than one stepper can be connected to one auto enable pin. Behaviour is like this:
-	1. If stepper #1 needs enable, then it will enable it with its defined on delay time.
-    2. If stepper #2, which is connected to same enable pin, starts after stepper one, then it still will wait its defined on delay time and set the enable pin, again (no-op).
-       The stepper #2 is not aware, that another stepper (stepper #1) has enabled the outputs already.
-    3. If e.g. stepper #1 stops, then stepper #1's delay off counter is started.
-    4. When stepper #1's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to stepper #1's disable request.
-       If stepper #2 is still running, then stepper #2 will not agree and the output will stay enabled.
-    5. When stepper #2 stops, then stepper #2's delay off counter is started.
-    6. When stepper #2's counter is finished, then the FastAccelStepperEngine will ask all steppers, if they agree to stepper #2's disable request.
-       Stepper #1 agrees, because it is not running. So the engine will call Stepper #2's _AND_ Stepper #1's disableOutputs().
-
-  The library does not consider the case, that Low/High Active enable may be mixed.
-  This means stepper #1 uses the enable pin as High Active and stepper #2 the same pin as Low Active.
-  => This situation will not be identified and will lead to unexpected behaviour
-
-## Behind the curtains
-
-### AVR ATmega168/328 and Atmega32u4
-
-The timer 1 is used with prescaler 1. With the arduino nano running at 16 MHz, timer overflow interrupts are generated every ~4 ms. This timer overflow interrupt is used for adjusting the speed. 
-
-The timer compare unit toggles the step pin from Low to High precisely. The transition High to Low is done in the timer compare interrupt routine, thus the High state is only few us.
-
-After stepper movement is completed, the timer compare unit is disconnected from the step pin. Thus the application could change the state freely, while the stepper is not controlled by this library.
-
-Measurement of the acceleration/deacceleration aka timer overflow interrupt yields: one calculation round needs around 300us. Thus it can keep up with the chosen 10 ms planning ahead time.
-
-### AVR ATmega2560
-
-Similar to ATmega328, but instead of timer 1, timer 4 is used.
-
-For users of platformio, the used timer can be changed to either 1, 3, 4 or 5. For e.g. timer module 3 add to platformio.ini under `build_flags`:
-```
-build_flags = -DFAS_TIMER_MODULE=3
-```
-
-or better:
-```
-build_flags = -Werror -Wall -DFAS_TIMER_MODULE=3
-```
-
-For arduino users, the same can be done by defining the flag *before* including the `FastAccelStepperEngine.h` header (as per info ixil), but apparently to [issue #50](https://github.com/gin66/FastAccelStepper/issues/50), this approach does not work for everyone:
-e.g.
-```
-sketch.ino
-----------
-#include <Arduino.h>
-#define FAS_TIMER_MODULE 3
-#include <FastAccelStepper.h>
-/* ... */
-```
-
-### ESP32
-
-#### ESP-IDF version 4.x.y:
-This stepper driver uses mcpwm modules of the esp32: for the first three stepper motors mcpwm0, and mcpwm1 for the steppers four to six.  In addition, the pulse counter module is used starting from `unit_0` to `unit_5`. This driver uses the `pcnt_isr_service`, so unallocated modules can still be used by the application. The mcpwm modules' outputs are fed into the pulse counter by direct gpio-matrix-modification.
-
-For the other stepper motors, the rmt module comes into use.
-
-#### ESP-IDF version >=5.3.0:
-
-RMT, I2S Mux/Direct, and MCPWM/PCNT (ESP32, ESP32-S3, ESP32-C6, ESP32-H2) drivers are supported.
-
-MCPWM/PCNT works on both ESP-IDF 5.3+ and ESP-IDF 6.1; the ESP-IDF 6.1 API uses a dedicated ISR (`StepperISR_idf6_esp32_mcpwm_pcnt.cpp`) and the split `mcpwm_timer/oper/cmpr/gen` plus `hal/mcpwm_ll` and `pulse_cnt` headers. All three driver families (MCPWM/PCNT, RMT and I2S) are available and tested on ESP32/ESP32-S3 with ESP-IDF 6.1.
-
-#### I2S Mux Driver Implementation
-
-The I2S Mux driver uses the ESP32's I2S transmitter in 16-bit stereo mode at 250kHz sample rate. Each I2S frame (32 bits = 16-bit left + 16-bit right channel) represents one time slot, with each bit corresponding to one output pin.
-
-**Technical Details:**
-* Sample rate: 250kHz, giving 4µs per frame (64 ticks at 16MHz reference)
-* 32 output slots per frame, each slot is one bit
-* Bits are transmitted MSB-first within each byte
-* DMA buffers are filled in the I2S TX-done callback
-* Direction and enable pins are stored in a 32-bit state word, written to each frame's data
-
-**Timing Considerations:**
-* Minimum step period: 25µs for I2S Mux, 5µs for I2S Direct
-* Direction/enable changes have up to 4µs latency
-* All steppers sharing I2S mux are inherently synchronized (same DMA buffer)
-
-#### Both ESP-IDF versions
-A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one interrupt per command in the command queue. This is much less interrupt rate than for avr. Nevertheless at 200kSteps/s the switch from one command to the next one should be ideally serviced before the next step. This means within 5us. As this cannot be guaranteed, the driver remedies an overrun (at least by design) to deduct the overrun pulses from the next command. The overrun pulses will then be run at the former command's tick rate. For real life stepper application, this should be ok. To be considered for raw access: Do not run many steps at high rate e.g. 200kSteps/s followed by a pause. 
-
-What are the differences between mcpwm/pcnt, rmt, and i2s mux?
-
-|                            | mcpwm/pcnt                              | rmt                                                                           | i2s mux                         |
-|:---------------------------|:----------------------------------------|:------------------------------------------------------------------------------|:--------------------------------|
-|Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed | one interrupt per 500µs (all)   |
-|Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          | 500µs for all steppers combined |
-|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           | 1 i2s                           |
-|Max steppers                | 6 + 8 rmt                               | 8 (ESP32), 4 (ESP32S3)                                                        | 32 (I2S slots) + rmt            |
-|esp32 notes                 | available pcnt modules can be connected | no pcnt module used, so can be attached to rmt output as realtime position    | synchronized outputs            |
-|Min step period             | ~5µs                                    | ~5µs                                                                          | ~25µs                           |
-
-If the interrupt load is not an issue, then rmt is the better choice. With rmt the below (multi-axis application) mentioned loss of synchonicity at high speeds can be avoided. The rmt driver is - besides some rmt modules perks - less complex and way more straightforward.
-
-As of now, allocation of steppers on esp32 are: first all 6 mcpwm/pcnt drivers and then the 8 rmt drivers. In future this may be under application control. Starting with 0.29.2, the module can be directly selected on call of `stepperConnectToPin()`. So the allocation gets more flexible.
-
-One specific note for the rmt: If a direction pin toggle is needed directly after a command with steps, then the driver will add before that direction pin toggle another pause of `MIN_CMD_TICKS` ticks.
-
-MCPWM/PCNT inserts one `MIN_CMD_TICKS` pause (old DIR) before a direction change. `apply_command()` (and DIR) runs at MCPWM compare tick 1 (TEA), when STEP has just gone high and stays high until TEP. The pause defers the DIR toggle until STEP is low (#370). Independent of `dir_change_delay_us`. ESP-IDF 5+ additionally latches generator actions at TEZ/TEP; `startQueue` applies the first command immediately so leftover step action cannot pulse during a leading pause.
-
-### ESP32S2
-
-This stepper driver uses rmt module only.
-
-### ESP32S3
-
-The ESP32S3's rmt module is similar to esp32c3 with 4 instead of 2 channels and with different register names.
-
-#### ESP-IDF version 4.x.y:
-This stepper driver uses mcpwm/pcnt + rmt modules. Can drive up to 8 motors. Tested with 6 motors (not by me). 
-#### ESP-IDF version >=5.3.0:
-This stepper driver uses rmt modules. Can drive up to 4 motors.
-MCPWM/PCNT is available on ESP32-S3 with IDF 5.3+ (4 steppers).
-I2S Mux driver is also available with same capabilities as ESP32 (see ESP32 I2S Mux section above). 
-
-### ESP32C3
-
-This stepper driver uses rmt module and can drive up to 2 motors. Not thoroughly tested, so only experimental support.
-
-### ESP32P4
-
-This stepper driver uses rmt module and can drive up to 4 motors. Not thoroughly tested, so only experimental support.
-
-### ESP32-MINI-1
-
-Compatibility with ESP32-MINI-1: At least mcpwm and pulse counter modules are listed in the datasheet. So there are chances, that this lib works.
-
-### Raspberry pi pico/pico 2
-
-Uses the pio module. Pico (rp2040) offers two pios and pico 2 (rp2350) offers three pios. Each pio contains four state machines and every state machine can drive one stepper. So in theory can allocate 8 steppers for pico and 12 steppers for pico 2.
-
-Arduino framework allocates one pio module, if not compiled for [riscv](https://github.com/earlephilhower/arduino-pico/blob/b8864711cd7801b7062c10f6b84d67f90284723b/cores/rp2040/RP2040Support.h#L206). Then only 4 resp. 8 steppers are available. SoftwareSerial is implemented via pio, too. So the number of available steppers depends on the sw configuration.
-
-Integration with applications using pio: FastAccelStepper claims always a complete pio. This means all four state machines are not available for the app. The second pio will be claimed, when allocating a fifth stepper. The third - on pico 2, when allocating the nineth stepper. Unused state machines of a pio cannot be used, because FastAccelStepper's pio code needs 100% of the available program space (32 words - none left).
-
-Important: Without direction delay set up, the time between a direction transition to step low to high transition can be 50ns @ 80 MHz. Best to call `setDirectionPin()` with time parameter for delay.
-
-Important to note: The standard pico platform appears to not work with pio (#339). So please use an alternative platform for rp2040 like:
-
-```
-[env:rpipico]
-platform = https://github.com/maxgerhardt/platform-raspberrypi.git
-framework = arduino
-board = rpipico
-build_flags = -Wall -Wextra -D__FREERTOS=1
-```
-
-and for rp2350:
-
-```
-[env:rpipico2]
-platform = https://github.com/maxgerhardt/platform-raspberrypi.git
-framework = arduino
-board = rpipico2
-build_flags = -Wall -Wextra -D__FREERTOS=1
-```
-
-### Atmel SAM Due
-
-This is supported by clazarowitz
-
-**Note:** The SAM platform cannot be tested in CI. An audit against the SAM3X8E datasheet has identified [6 open issues](https://github.com/gin66/FastAccelStepper/blob/master/extras/doc/ai_improvements/05_sam_platform_audit.md) (4 critical, 2 minor), including invalid pin mappings and a wrong timer register value. Any changes to the SAM code must be cross-checked against that document.
-
-### Microchip SAMD51
-
-The step pin's TCC runs in normal PWM mode with buffered registers: `PERBUF` holds the next
-step interval and `CCBUF` the pulse width, so pulse edges are generated by hardware and are
-tick-exact regardless of interrupt latency. One overflow interrupt per step decrements the
-current queue entry and stages the next command at command boundaries — the same design as
-the AVR port, but with the timer's double buffering removing the edge-timing race.
-
-The timebase is exactly 16 MHz (DFLL48M divided by 3) on a dedicated generic clock
-generator, matching the AVR/ESP32/Pico tick rate so the precomputed ramp constants apply.
-The ~4 ms ramp tick (`manageSteppers()`) runs from a plain TC instance. Defaults can be
-overridden at compile time if your project claims these peripherals:
-
-```
--DFAS_SAMD_GCLK_GEN=6         // generic clock generator for the 16 MHz timebase
--DFAS_SAMD_RAMP_TC=3          // TC instance for the ramp tick (TC0 is used by tone())
--DFAS_SAMD_PULSE_WIDTH_US=2   // step pulse high time
-```
-
-The implementation contains a workaround for silicon erratum DS80000748 (2.20.1): clearing
-`STATUS.PERBUFV`/`CCBUFV` releases SYNCBUSY before the buffer registers are actually
-restored, so the flags are cleared twice with SYNCBUSY waits — otherwise a write to `PER`
-right after an aborted buffered update can wedge the synchronization bridge permanently.
-
-### ALL
-
-The used formula is just s = 1/2 * a * t² = v² / (2 a) with s = steps, a = acceleration, v = speed and t = time. In order to determine the speed for a given step, the calculation is v = sqrt(2 * a * s). The performed square root is an 8 bit table lookup using log2/pow2. Sufficient exact for this purpose.
-
-For the linear acceleration from/to standstill the used formula is s = 1/2 * j * t³. The variable j is calculated from acceleration and steps of linear acceleration, which is set by `setLinearAcceleration()`.
-
-The compare interrupt routines use 16bit tick counters, which translates to approx. 4ms. For longer time between pulses, pauses without step output can be added. With this approach the ramp generation supports up to one step per 268s. 
-
-The low level command queue for each stepper allows direct speed control - when high level ramp generation is not operating. This allows precise control of the stepper, if the code, generating the commands, can cope with the stepper speed (beware of any Serial.print in your hot path).
-
-The chosen approach has few limitations for esp32. With acceleration = 1 step/s², the maximum speed is approx. 92 kStep/s. The max. supported speed for esp32 will be reachable only with acceleration >= 5 step/s².
-
-## Usage for multi-axis applications
-
-For coordinated movement of two or more axis, the current ramp generation will not provide good results. The planning of steps needs to take into consideration max.speed/acceleration of all steppers and eventually the net speed/acceleration of the resulting movement together with its restrictions. Nice example of multi-axis forward planning can be found within the [marlin-project](https://github.com/MarlinFirmware/Marlin/tree/2.0.x/Marlin/src/module). If this kind of multi-dimensional planning is used, then FastAccelStepper is a good solution to execute the raw commands (without ramp generation) with near-synchronous start of involved steppers. With the tick-exact execution of commands, the synchronization will not be lost as long as the command queues are not running out of commands. And for esp32, second requirement is, that the interrupts can be serviced on time (no pulses issued with previous command's pulse period time)
-
-To keep up the synchronization of two steppers please keep in mind:
-* The stepper queue will on initial start, if configured, add pauses to the command queue to implement enable delay.
-  => Perhaps best to not use enable on delay
-* If the stepper is configured for delays for direction change, then one pause is added to the command queue for each direction change together with a step.
-  => Execute direction change together with a pause or do not configure direction change delay
-
-Note for esp32 RMT and I2S drivers:
-- Buffered output needs pauses before a direction change so no step in the old
-  direction is still in flight when DIR changes. Tick-exact execution of
-  commands cannot be assumed if those pauses are not generated by the
-  application. `addQueueEntry()` / `moveTimed()` / the ramp generator insert
-  them only when `SUPPORT_PAUSE_CMD_COUNTING` shows they are still missing;
-  see extras/doc/esp32_i2s_driver.md.
-
-## TODO
-
-See [project](https://github.com/gin66/FastAccelStepper/projects/1)
-
-## Arduino
-
-[Arduino library manager log](https://downloads.arduino.cc/libraries/logs/github.com/gin66/FastAccelStepper/)
-
-## PLATFORMIO
-
-[Library on platformio](https://registry.platformio.org/libraries/gin66/FastAccelStepper)
-
-If you prefer platformio and you are running Linux, then platformio version of the examples are created by executing
-
-```
-ci/build-platformio.sh
-```
-
-This will create a directory pio_dirs, which contains all examples. Can be executed by e.g.
-
-```
-cd pio_dirs/StepperDemo
-pio run -e avr --target upload --upload-port /dev/ttyUSB0
-```
-
-## ESP-IDF
-
-A `CMakeLists.txt` is provided to use FastAccelStepper as an ESP-IDF component. Clone it into the `components/` directory in the root of your project and build as usual. You must have Arduino available as a component. [See this](https://docs.espressif.com/projects/arduino-esp32/en/latest/esp-idf_component.html) for instructions on how to set that up. Tested as ESP-IDF component on PlatformIO Espressif32 Platform v3.3.2.
-
-For any questions/support please contact [gagank1](https://github.com/gagank1), as I do not use esp-idf
-
-## TEST STRATEGY
-
-The library is tested with different kind of tests:
-* PC only (sub folder `./tests/pc_based`)
-
-  These tests focussing primarily the ramp generator and part of the API
-* simavr based for avr (sub folder `./tests/simavr_based`)
-
-  The simavr is an excellent simulator for avr microcontrollers. This allows to check the avr implementation thoroughly: number of steps generated, virtual stepper position and even timing. Tested code is mainly the StepperDemo, which gets fed in a one line sequence of commands to execute. These tests are focused on avr, but help to check the whole library code, used by esp32, too.
-* esp32 tests with another pulse counter attached (e.g. `test_seq_08` in StepperDemo)
-
-  The FastAccelStepper-API supports to attach another free pulse counter to a stepper's step and dir pins. This counter counts in the range of -16383 to 16383 with wrap around to 0. The test condition is, that the library's view of the position should match the independently counted one. These tests are still evolving
-
-* Test for pulse generation using examples/Pulses
-
-  This has been intensively used to debug the esp32 ISR code
-
-* esp32 hw tests
-
-  These tests live under sub folder `./tests/esp32_hw_based`
-
-* manual tests using examples/StepperDemo
-
-  These are unstructured tests with listening to the motor and observing the behavior
-
-## Test sequences from StepperDemo
-
-Short info, what the test sequences, embedded in StepperDemo in the test mode, do:
-
-- 01 - Run the stepper like a clock for one minute
-- 02 - Run the stepper towards positive position and back to zero repeatedly
-- 03/04 - same like 02, both different speed/acceleration
-- 05 - Perform 800 times a single step and then 800 steps back in one command
-- 06 - Run 32000 steps with speed changes every 100ms in order to reproduce issue #24
-
-All those tests have no internal test passed/failed criteria. Those are used for automated tests with `./tests/simavr_based` and `./tests/esp32_hw_based`. The test pass criteria are: They should run smoothly without hiccups and return to start position.
-
-- 07 - measures timing of several moveByAcceleration(). Should stop at position zero. (should be started from position 0).
-- 08 - is an endless running test to check on esp32, if the generated pulses are successfully counted by a second pulse counter. The moves should be all executed in one second with alternating direction and varying speed/acceleration
-- 09 - is an endless running test with starting a ramp with random speed/acceleration/direction, which after 1s is stopped with forceStopAndNewPosition(). It contains no internal test criteria, but looking at the log, the match of generated and sent pulses can be checked. And the needed steps for a forceStopAndNewPosition() can be derived out of this
-- 10 - runs the stepper forward and every 200 ms changes speed with increasing positive speed deltas and then decreasing negative speed deltas.
-- 11 - runs the stepper to position 1000000 and back to 0. This tests, if getCurrentPosition() is counting monotonously up or down respectively.
-- 14 - ESP32 pulse counter only. Replays the Issue370 sampled stroke via `moveTimed()` (motor running). Pass if PCNT is -592 and the ramp finishes in < 1s.
-
-## CHANGELOG
-
-See [changelog](https://github.com/gin66/FastAccelStepper/blob/master/CHANGELOG)
-
-## ISSUES
-
-* There is an issue with the esp32 mcpwm: as soon as the mcpwm timer is running, on every cycle an interrupt is serviced - even though no interrupt is enabled. If several steppers are running at high step rate, the interrupt load for this nonsense interrupt could be quite high for the CPU. Need further investigation, but till now haven't found the root cause.
-* Compilation using esp-idf 4.4 will yield a deprecation warning for `mcpwm_isr_register()`. This has been raised as [issue](https://github.com/espressif/esp-idf/issues/7890) at espressif
-* `framework-arduinoespressif32 @ 3.10006.210326` and later will lead to compile error for esp32, if using compiler options `-Werror -Wall` !!! The problem can be circumvented by applying `-Wno-error=incompatible-pointer-types`
-
-
-## Error investigation
-
-In case the stepper does not run smoothly, then StepperDemo contains commands to simulate two type of error causes. For avr the commands are `r` and `e`. For esp32 only `e` can be used.
-- `r`: The digitalRead() of arduino is a fancy implementation, which checks, if the pin being read is connected to a timer to generate PWM and if yes, turns this off (actually IMHO a broken implementation: only 1 of the needed 2 bits are cleared, and the activation by force compare is missing). As FastAccelStepper controls the step pin, the digitalRead can disturb the step pin (even though I have expected step loss, only difference in noise can be heard). The error simulation in StepperDemo reads the pins in the main loop(), thus the symptom occurs quite reliably.
-- `e`: This blocks repeatedly interrupts for ~100us during 64ms out of 256ms. On AVR to see this problem popping up, the stepper rate has to be <~106 us (avr, one stepper running). >~106us it runs quite smoothly. The 106us = 100us block + ~6us ISR runtime. For ESP32 this has no effect.
-
-For avr: cause of long interrupt being blocked can be e.g.:
-- long section of codes between `noInterrupts()/interrupts()` in the application (or used libraries)
-- long interrupt service routines in the application (or used libraries).
-- port interrupts connected to noisy/bouncy switches causing bursts of interrupts
-
-Especially in interrupt service routines, the `digitalRead()/digitalWrite()` must be avoided. Alternative solution is described e.g. here: [blog](https://masteringarduino.blogspot.com/2013/10/fastest-and-smallest-digitalread-and.html), or [digitalWriteFast](https://github.com/NicksonYap/digitalWriteFast), or [fast versions](https://forum.arduino.cc/index.php?topic=46896.0).
-
-This feature of StepperDemo allows to compare non-smooth running stepper in an application with these error types.
-
-## Lessons Learned
-
-* Spent more than half a day debugging the esp32-code, till I have found out, that just the cable to the stepper was broken.
-* In one setup, operating A4988 without microsteps has led to erratic behaviour at some specific low speed (erratic means step forward/backward, while DIR is kept low). No issue with 16 microstep. These two youtube videos show similar behavior: [hard disc stepper](https://youtu.be/DsYgw3GFHZo) and [axes movement](https://youtu.be/Nw18B81Ylhk)
-* The pulse counters in esp32 have several comparators to trigger interrupts. What the documentation does not mention: All those reference values are only forwarded to the actual comparator on pulse counter reset. Thus the pulse counters cannot be used as lower 16bit of the position, unfortunately.
-* The [issue #60](https://github.com/gin66/FastAccelStepper/issues/60) was raised due to wrong position on negative moves with esp32. Apparently the issue was with proper ground and/or power lines to the stepper driver. If similar issue is encountered, please check on this issue
-* ESP32C3: USBSerial works only under Arduino IDE. platformio support for USBSerial is missing
-
-## 3rd party videos in action
-
-Found on youtube:
-
-* [Testing on NEMA-17](https://www.youtube.com/watch?v=yUTXTRjAOak)
-* [high speed Closed Loop nema 34 12nm stepper motor, esp32 FastAccelStepper, SBH860H driver](https://www.youtube.com/watch?v=hPxJekex5zM)
-* [Neck mechanism](https://www.youtube.com/watch?v=rY7NDBnz7Cw)
-* [Stepper motor at 1500RPM with ESP32 and A4988](https://www.youtube.com/watch?v=sQqezEsiuUU)
-* [DIY 3 AXIS CAMERA SLIDER | MOTORIZED CAMERA SLIDER](https://youtu.be/7TkybpSQULk)
-* [NEMA 17 Servo: Final Accuracy Test & New Speed Record!! - N-Gnoid TV](https://www.youtube.com/watch?v=EHHDuI3xK94)
-
-As mentioned by kthod861 in [Issue #110](https://github.com/gin66/FastAccelStepper/issues/110):
-* [22 01 2021 Stepper POC3](https://youtu.be/fm2_VkUG10k)
-
-## Contribution
-
-- Thanks ixil for pull request (https://github.com/gin66/FastAccelStepper/pull/19) for ATmega2560
-- Thanks gagank1 for esp-idf integration by adding CMakeLists.txt (https://github.com/gin66/FastAccelStepper/pull/81)
-- Thanks clazarowitz for the amazing atmel sam due port (https://github.com/gin66/FastAccelStepper/pull/82)
-- Thanks HeldeReis for the awesome ESP32-S3 port (https://github.com/gin66/FastAccelStepper/pull/162)
-- Thanks DaAwesomeP for the extension to ATmega 168/168P/328 (https://github.com/gin66/FastAccelStepper/pull/179)
-- Thanks turley for the patch for missing `_stepper_cnt` initialization (https://github.com/gin66/FastAccelStepper/pull/204)
-- Thanks GarmischWg for adding rmt-support to ESP32-S3 (https://github.com/gin66/FastAccelStepper/pull/225)
-- Thanks SHWotever for avr patch to fix missing direction pin toggle (https://github.com/gin66/FastAccelStepper/pull/252)
-- Thanks HalfVoxel for pull requests (https://github.com/gin66/FastAccelStepper/pull/270) and (https://github.com/gin66/FastAccelStepper/pull/271): improved doc and missing parenthesis in preprocessor macros
-- Thanks pvginkel for pull request (https://github.com/gin66/FastAccelStepper/pull/300): fix race condition in engine init
-- Thanks freelancer1845 for instructions to resolve stray link to arduino-esp32 for espidf only projects (https://github.com/gin66/FastAccelStepper/discussions/217). 
-- Thanks viteo for pull request (https://github.com/gin66/FastAccelStepper/pull/319): add dir pin input to `attachToPulseCounter()`
-- Thanks Magnus for pico sdk support and code improvement hints (#334)
-- Thanks Sam W for pull request (https://github.com/gin66/FastAccelStepper/pull/351) samx3-due: Fix null result from `tryAllocateQueue()`
-- Thanks drayde for pull request (https://github.com/gin66/FastAccelStepper/pull/366) Fix ESP-IDF 6 RMT header include
-- Thanks Loriland for the Microchip SAMD51 port (https://github.com/gin66/FastAccelStepper/issues/317)
-- Thanks ARDUTECH0 for the experimental Teensy 4.0/4.1 port (https://github.com/gin66/FastAccelStepper/pull/374)
-
+More details in [Usage](extras/doc/usage.md) and the
+[UsageExample.ino](examples/UsageExample/UsageExample.ino).
+
+## Documentation
+
+| Topic | Document |
+|-------|----------|
+| Installation (Arduino / PlatformIO / ESP-IDF) | [installation.md](extras/doc/installation.md) |
+| Hardware & pin connection | [hardware.md](extras/doc/hardware.md) |
+| Usage & auto enable | [usage.md](extras/doc/usage.md) |
+| Move semantics & position wraparound | [move_semantics.md](extras/doc/move_semantics.md) |
+| Multi-axis applications | [multi_axis.md](extras/doc/multi_axis.md) |
+| API reference | [FastAccelStepper_API.md](extras/doc/FastAccelStepper_API.md), [FastAccelStepper.h](src/FastAccelStepper.h) |
+| Driver architecture | [driver_architecture.md](extras/doc/driver_architecture.md) |
+| Ramp generator | [ramp.md](extras/doc/ramp.md), [ramp_cubic_quadratic.md](extras/doc/ramp_cubic_quadratic.md) |
+| Planner modes (AFAP vs timed) | [planner_modes.md](extras/doc/planner_modes.md) |
+| ESP32 I2S driver | [esp32_i2s_driver.md](extras/doc/esp32_i2s_driver.md) |
+| Pico PIO program flow | [pico_pio.md](extras/doc/pico_pio.md) |
+| SAMD51 design notes | [samd51/CONTEXT.md](extras/doc/samd51/CONTEXT.md) |
+| n-axis whitepaper | [n_axes_whitepaper.md](extras/doc/n_axes_whitepaper.md) |
+| Physical stepper simulation | [physical_stepper_whitepaper.md](extras/doc/physical_stepper_whitepaper.md) |
+| Test strategy | [testing.md](extras/doc/testing.md) |
+| Troubleshooting | [troubleshooting.md](extras/doc/troubleshooting.md) |
+| Showcase (videos) | [showcase.md](extras/doc/showcase.md) |
+| Contributors & supporters | [contributors.md](extras/doc/contributors.md) |
+| Memory footprint | [memory_report.md](extras/doc/memory_report.md) |
+| Changelog | [CHANGELOG.md](CHANGELOG.md) |
+| TODO / roadmap | [GitHub project](https://github.com/gin66/FastAccelStepper/projects/1) |
+
+## Source Code Structure
+
+| Directory | Purpose |
+|-----------|---------|
+| `fas_arch/` | Platform abstraction: compiler/framework detection, interrupt macros, Arduino-like polyfills |
+| `pd_avr/` | AVR pulse driver: timer-based stepper control for ATmega chips |
+| `pd_esp32/` | ESP32 pulse driver: RMT, MCPWM/PCNT, and I2S-based stepper control |
+| `pd_pico/` | RP2040/RP2350 pulse driver: PIO-based stepper control |
+| `pd_sam/` | SAM Due pulse driver: timer-based stepper control |
+| `pd_samd/` | SAMD51 pulse driver: TCC PWM-based stepper control |
+| `pd_teensy/` | Teensy 4.0/4.1 pulse driver: QuadTimer-based stepper control (EXPERIMENTAL) |
+| `pd_test/` | Test platform pulse driver: PC-based testing simulation |
+| `fas_queue/` | Queue implementation: command queue management |
+| `fas_ramp/` | Ramp calculation: acceleration/deceleration curves |
+| `log2/` | Log2 representation: fixed-point arithmetic for speed calculations |
+
+Platform-specific configuration constants (queue sizes, timing, feature flags)
+are defined in `pd_*/pd_config.h` files, which are included by
+`fas_arch/common.h` during the platform dispatch. See
+[driver_architecture.md](extras/doc/driver_architecture.md) for details.
+
+## Project status
+
+* Arduino core v3.0.x uses esp-idf v5.0 up to v5.1 and FastAccelStepper will fail
+  to compile. Arduino core 3.1.0 supports ESP-IDF V5.3.0 (based on RC1).
+* TODO / roadmap: [GitHub project](https://github.com/gin66/FastAccelStepper/projects/1)
+* Known issues and debugging tips: [troubleshooting.md](extras/doc/troubleshooting.md)
+
+## Star History
+
+[![Star History Chart](https://star-history.dera.page/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.dera.page/#gin66/FastAccelStepper&Date)
+
+## Contributing
+
+Contributions are welcome. See
+[contributors.md](extras/doc/contributors.md) for the list of people who helped.
+Before committing, format the code with `bash extras/scripts/format_code.sh` and
+run the PC-based tests with `make test` in `extras/tests/pc_based`.
