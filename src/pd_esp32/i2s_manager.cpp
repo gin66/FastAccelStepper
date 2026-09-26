@@ -98,7 +98,7 @@ bool I2sManager::init() {
 }
 
 void IRAM_ATTR I2sManager::init_mux_buffer(uint8_t* buf) {
-  uint32_t* b = static_cast<uint32_t*>(buf);
+  uint32_t* b = reinterpret_cast<uint32_t*>(buf);
   uint8_t i = I2S_BYTES_PER_BLOCK / 4;
   do {
     b[--i] = _mux_state;

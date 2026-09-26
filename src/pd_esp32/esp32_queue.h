@@ -321,7 +321,7 @@ static inline uint8_t esp32_before_pause_count(const StepperQueue* q) {
   return 0;
 }
 
-static inline bool esp32_i2s_dir_is_mux_slot(StepperQueue* q) {
+static inline bool esp32_i2s_dir_is_mux_slot(const StepperQueue* q) {
 #if defined(SUPPORT_ESP32_I2S)
   if (!esp32_driver_is_i2s(q) || ((q->dirPin & PIN_I2S_FLAG) == 0)) {
     return false;
