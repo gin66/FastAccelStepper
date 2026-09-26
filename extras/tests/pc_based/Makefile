@@ -93,6 +93,14 @@ test_27: test_27.o $(LIB_O)
 test_27.o: test_27.cpp physical_stepper.h $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
+# test_28 (NEMA-17/A4988 pull-out fit) is header-only on the plant and uses
+# std::vector, so it links with g++ and needs no library objects.
+test_28: test_28.o
+	g++ -o $@ $< $(LDLIBS)
+
+test_28.o: test_28.cpp physical_stepper.h
+	g++ -c $(CXXFLAGS) -o $@ $<
+
 test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 

@@ -918,8 +918,6 @@ The hum is normalized (so it no longer clips for most of a move) and faded with
 a rotor-speed envelope, so a ramp does not fade in and out of a clipped,
 low-frequency rumble at the start and end of every side.
 
----
-
 ## 13. Open questions
 
 1. **Load-dependent pull-out.** Should `D` or `Fmax` shrink with the external
@@ -934,4 +932,221 @@ low-frequency rumble at the start and end of every side.
    re-sync / error response), rather than only observable in the test.
 4. **Fixed-point port.** Convert §9's `double` model to the `log2/` table
    style; validate bit-identical stall detection.
+
+---
+
+## 14. Experimental validation — NEMA-17 + A4988 on an ESP32
+
+The parameters of §5.2 and §10.1 describe a *reference* plant tuned to show
+the right qualitative behaviour; they correspond to no particular motor. This
+section takes a single real setup — a NEMA-17 stepper on an A4988 driver
+driven by an ESP32 running the FastAccelStepper **stepperdemo** through the
+MCPWM/PCNT path at ≈19 V — measures its pull-out boundary, and then *finds* the
+plant parameters that reproduce that boundary (`test_28.cpp`).
+
+### 14.1 The hardware and its unit convention
+
+| Property | Value |
+|----------|-------|
+| Motor | NEMA-17, 200 full steps/rev (1.8°/full step) |
+| Rotor type | hybrid (inferred from the 1.8° step angle — see note) |
+| Driver | A4988, set to **16× microstepping** |
+| Resolution | 3200 microsteps/rev ⇒ **D = 16 microsteps per full step** |
+| Controller | ESP32, MCPWM/PCNT driver |
+| Supply | ≈19 V power supply (A4988 VMOT) |
+| Demo | `extras/Esp32StepperDemo`, `setSpeedInUs()` + `setAcceleration()` |
+
+**On "hybrid".** The motor type is not stated in the measurement notes; it is
+*inferred* from the step angle. A 200-step/rev (1.8°) motor is almost always a
+hybrid stepper: permanent-magnet (PM) steppers are built at much coarser step
+angles (typically 7.5°, i.e. 48 steps/rev) and variable-reluctance motors are
+coarser still, so a 1.8° two-phase motor with a holding detent is the hybrid
+construction (axially magnetised rotor with two toothed cups interacting with
+a toothed stator). If the 200-steps/rev figure is wrong — e.g. the motor is a
+48-step/rev PM unit — then "hybrid" is wrong *and* every full-step/RPM number
+below rescales, so the inference should be confirmed against the nameplate.
+The microstep resolution `D = 16` is independent of this: it comes from the
+A4988 strapping, not from the motor type.
+
+A FastAccelStepper "step" is one driver **pulse**, i.e. one microstep: the
+library never knows about microstepping. The stepperdemo reports speed through
+`getCurrentSpeedInMilliHz()`, i.e. in **millisteps/s** (1 mstep/s = 0.001
+steps/s), so
+
+```
+speed[μstep/s]  = speed[mstep/s] / 1000
+full-step rate  = speed[μstep/s] / 16      (D = 16)
+RPM             = full-step rate × 60 / 200
+```
+
+### 14.2 Raw measurements
+
+Every measurement started from **standstill** and let the motor run **forward**;
+a run is "works" if the rotor kept synchronism for the whole forward move and
+"stalls" otherwise. Two boundary probes use the step-period `V` directly; two
+are speed sweeps at a fixed acceleration. `A` is the commanded acceleration in
+microsteps/s².
+
+**A = 10⁷ μstep/s²** (the ramp reaches the target almost instantly):
+
+| V | Result |
+|---|--------|
+| 47 μs/step (= 21 277 μstep/s) | runs |
+| 48 μs/step (= 20 833 μstep/s) | stalls |
+
+**A = 10⁵ μstep/s²**:
+
+| V | Result |
+|---|--------|
+| 9 μs/step (= 111 111 μstep/s) | runs |
+| 8 μs/step (= 125 000 μstep/s) | spins up and stalls |
+
+**A = 10⁶ μstep/s²**:
+
+| Commanded speed (mstep/s) | Result | μstep/s | full-step/s | RPM |
+|---------------------------|--------|---------|-------------|-----|
+| 110 344 828 | works  | 110 345 | 6 897 | 2 069 |
+| 120 300 752 | works  | 120 301 | 7 519 | 2 256 |
+| 122 137 405 | works  | 122 137 | 7 634 | 2 290 |
+| 124 031 008 | stalls | 124 031 | 7 752 | 2 326 |
+| 125 000 000 | stalls | 125 000 | 7 813 | 2 344 |
+| 130 081 301 | stalls | 130 081 | 8 130 | 2 439 |
+
+**A = 10⁴ μstep/s²**:
+
+| Commanded speed (mstep/s) | Result | μstep/s | full-step/s | RPM |
+|---------------------------|--------|---------|-------------|-----|
+| 130 081 301 | works  | 130 081 | 8 130 | 2 439 |
+| 133 333 333 | works  | 133 333 | 8 333 | 2 500 |
+| 134 453 782 | stalls | 134 454 | 8 403 | 2 521 |
+| 135 593 220 | stalls | 135 593 | 8 475 | 2 542 |
+
+### 14.3 Pull-out boundaries
+
+| Acceleration (μstep/s²) | Pull-out (μstep/s) | Pull-out (full-step/s) | Pull-out (RPM) |
+|-------------------------|--------------------|------------------------|----------------|
+| 10⁷ | ≈ 21 000 | ≈ 1 313 | ≈ 394 |
+| 10⁶ | ≈ 123 000 | ≈ 7 688 | ≈ 2 306 |
+| 10⁵ | ≈ 118 000 | ≈ 7 375 | ≈ 2 213 |
+| 10⁴ | ≈ 134 000 | ≈ 8 375 | ≈ 2 513 |
+
+Two regimes are visible:
+
+1. **Steady-state pull-out (A ≤ 10⁶).** The boundary sits at a nearly constant
+   `≈120 000–134 000 μstep/s` (≈ `2 200–2 500 RPM`), i.e. `7 500–8 400` full
+   steps/s. This is a *torque balance*: the drive torque equals the load, so
+   the rotor speed plateaus and `|delta|` runs away — exactly the emergent
+   stall of §5.5. The ≈9 % spread with acceleration is small and, on this
+   evidence, not monotonic (the 10⁵ point is a two-sample bracket,
+   111 111 runs / 125 000 stalls).
+2. **Acceleration-limited collapse (A = 10⁷).** The usable speed falls by a
+   factor of ≈6, to `≈21 000 μstep/s` (≈394 RPM). The ramp demands an angular
+   acceleration the rotor cannot supply, so the rotor loses grip *while
+   ramping*, long before any steady-state speed limit is reached. This is the
+   same `J·dw/dt = τ` balance of §5.2, but in the acceleration-limited rather
+   than the friction-limited regime.
+
+### 14.4 Constraining the plant to this motor (`test_28.cpp`)
+
+`test_28.cpp` keeps the plant's structure (§5.2) and **finds** two parameters
+from the measured boundaries, since the other two are fixed by the datasheet
+and the driver:
+
+* the **microstep resolution** `D = 16`;
+* the peak magnetic torque `Fmax = 0.4 N·m` (datasheet holding torque);
+* a Coulomb floor `friction_static = 0.04 N·m` (10 % of `Fmax`);
+* `friction_viscous` is *fitted* so the A = 10⁶ pull-out matches ≈123 000
+  μstep/s (the steady-state balance `v_max = (Fmax − fs)/fv`);
+* the effective plant inertia `J_plant` is *fitted* so the A = 10⁷ pull-out
+  matches ≈21 000 μstep/s (the acceleration limit `Fmax/J`).
+
+The plant's coordinate is the microstep, so its inertia is the mechanical
+inertance expressed in microstep units,
+
+```
+J_plant = J_eff · θ_μ ,   θ_μ = 1.8°/16 = 1.9635e-3 rad
+```
+
+`test_28` bisects first on `friction_viscous`, then on `J_plant`, repeating
+once so the two constraints settle. The fit found
+
+| Parameter | Fitted value |
+|-----------|--------------|
+| `friction_viscous` | ≈ 2.76e-6 N·m·s |
+| `J_plant` | ≈ 2.8e-8 |
+| `J_eff = J_plant/θ_μ` | ≈ 1.4e-5 kg·m² (≈ 140 g·cm²) |
+| `v_max` | ≈ 130 600 μstep/s |
+
+and reproduces the whole measured boundary table:
+
+| Acceleration (μstep/s²) | Measured (μstep/s) | Simulated (μstep/s) | Ratio |
+|-------------------------|--------------------|---------------------|-------|
+| 10⁴ | ≈ 134 000 | ≈ 125 500 | 0.94 |
+| 10⁵ | ≈ 118 000 | ≈ 128 500 | 1.09 |
+| 10⁶ | ≈ 123 000 | ≈ 123 600 | 1.01 |
+| 10⁷ | ≈ 21 000 | ≈ 21 000 | 1.00 |
+
+How to read this table. Each row is an independent simulation: the plant is
+reset to standstill, commanded to accelerate at the row's `A` up to a top
+speed, then run forward, and the *simulated* column is the speed at which that
+move flips from tracking to slipping (found by bisection). The *measured*
+column is the hardware boundary from §14.3, and *ratio* = simulated / measured.
+A ratio of 1.00 is exact agreement. The two ends of the table are the two
+physical mechanisms, and the fit hits both: the A = 10⁶ row is pinned by
+`friction_viscous` (the steady-state torque balance), and the A = 10⁷ row is
+pinned by `J_plant` (the `Fmax/J` acceleration limit). The A = 10⁴ and 10⁵ rows
+are *predictions* from those two fitted constants, not separate fits — they
+come out 6 % low and 9 % high, i.e. within the ≈9 % measurement spread already
+present at A ≤ 10⁶. Note the measured A = 10⁵ figure is a two-sample bracket
+(111 111 μstep/s runs, 125 000 stalls), so its "measured" value of ≈118 000 is
+the midpoint of a genuinely uncertain interval; the model's 128 500 sits just
+above the bracket's stall edge.
+
+The plant also classifies the individual measured points correctly at a clear
+margin: A = 10⁶ at 110 000 μstep/s runs and at 140 000 stalls; A = 10⁷ at
+10 000 runs and at 45 000 stalls. `test_28` asserts each of these.
+
+The fitted `J_eff ≈ 140 g·cm²` is **larger than a bare NEMA-17 rotor**
+(≈54–82 g·cm²), yet the motor was **unloaded** — it was only sitting on the
+table, with no pulley, belt or coupling on the shaft. The excess cannot be a
+reflected load, so the correct reading is the fit's degeneracy: the
+acceleration-limited collapse depends only on the **ratio** `Fmax/J`, and two
+parameter pairs give the identical trajectory. Anchoring `Fmax = 0.4 N·m`
+(datasheet-like holding torque) forces `J_eff ≈ 140 g·cm²`; anchoring the
+inertia at the bare-rotor value gives instead an **effective torque**
+
+```
+Fmax_eff = Fmax · J_bare / J_eff  ≈  0.15 … 0.23 N·m
+           (for J_bare ≈ 54 … 82 g·cm²)
+```
+
+with `friction_viscous` rescaled to keep `v_max` fixed. Since the rotor is
+truly unloaded, the second reading is the physically relevant one: the data
+say this motor produced only ≈0.15–0.23 N·m of holding torque under the test
+conditions, i.e. the A4988 current limit (`Vref`/sense resistor) was set well
+below the motor's rated current, and/or the motor's rated holding torque is
+below the 0.4 N·m assumed. The fit constrains `Fmax/J` only; it cannot decide
+between the two, so the report should quote the pair, not `J_eff` alone.
+
+### 14.5 What the model does and does not capture
+
+* **It does capture** the two regimes of §14.3 from the *same* integration:
+  the steady-state friction balance (A ≤ 10⁶) and the acceleration-limited
+  collapse (A = 10⁷), with no stall latch and no special-case code (§5.5).
+  This is the strongest evidence so far that the plant's single periodic force
+  curve plus inertia is the right level of abstraction.
+* **It does not model** speed-dependent drive torque (back-EMF and winding
+  `L/R` current build-up). The plant's torque is speed-independent, so the
+  subtle, non-monotonic ≈9 % spread of the steady-state boundary with
+  acceleration is only weakly reproduced. The sharp A = 10⁷ boundary is also
+  a knife-edge in `Fmax/J_eff`: because it depends on the ratio, the fit is
+  well-conditioned in the ratio but not in `Fmax` and `J_eff` separately.
+* **It does not model** mid-band resonance (§5.7), which for this plant sits
+  near ≈610 Hz (well above the claimed 50–100 Hz band); the real driver's
+  low-frequency resonance is an electrical/closed-loop effect outside the
+  one-body mechanical model.
+
+The data set, the harness and the fit live in `test_28.cpp`; the pull-out
+boundary and the runs/stalls classifications above are asserted there and run
+as part of the normal PC test suite.
 

@@ -315,6 +315,49 @@ Tests;
   Output: gnuplot traces (test_27_trapezoid.dat / test_27_coast_stall.dat),
   PNG plots, and .wav audio of the motor behaviour.
 
+- test 28
+  NEMA-17 / A4988 pull-out fit — calibrates the opt-in PhysicalStepper plant
+  (physical_stepper.h) against measured hardware pull-out data and checks the
+  model against the whitepaper §14 benchmark.
+
+  Hardware (whitepaper §14): NEMA-17 (200 full steps/rev, 1.8°), A4988 at
+  16× microstepping (3200 microsteps/rev, D = 16), ESP32 MCPWM/PCNT, ≈19 V.
+  Every measurement started from standstill and ran forward.
+  The stepperdemo reports getCurrentSpeedInMilliHz(), so the sweep values are
+  in millisteps/s (μstep/s = mstep/s / 1000); full-step rate = μstep/s / 16.
+
+  P1 – find the motor parameters: runs the plant from standstill and bisects
+       friction_viscous so the A = 10⁶ μstep/s² pull-out matches the measured
+       ≈123 000 μstep/s (steady-state friction balance), then bisects the
+       plant inertia J_plant so the A = 10⁷ collapse matches ≈21 000 μstep/s
+       (acceleration limit Fmax/J). Reports J_plant, J_eff = J_plant/θ_μ and
+       v_max. Since only the ratio Fmax/J is constrained and the motor was
+       unloaded, it also reports the bare-rotor equivalent (J≈54 g·cm² =>
+       Fmax_eff≈0.15 N·m), which is the physically relevant reading.
+  P2 – simulated vs measured pull-out boundary for A = 10⁴…10⁷ μstep/s²
+       (all within tolerance; the 10⁷ point within 35 %, the rest within 20 %).
+  P3 – asserts the high-acceleration collapse: A = 10⁷ pull-out is < 45 % of
+       the A = 10⁶ pull-out (measured ≈6× drop).
+  P4 – concrete scenarios: A = 10⁶ @110 k runs / @140 k stalls; A = 10⁷ @10 k
+       runs / @45 k stalls; A = 10⁴ @120 k runs.
+  P5 – unit-conversion sanity (123 k μstep/s = 7688 full-steps/s = 2306 RPM).
+  P6 – physical artifacts, with real assertions on their content:
+         * test_28_run.dat / _stall.dat / _collapse.dat: six-panel plant
+           traces (t x x_c delta w a tau friction stall phase) for three
+           scenarios — a clean run (A=10⁶@110 k), a steady-state stall
+           (A=10⁶@140 k) and a high-acceleration collapse (A=10⁷@45 k).
+           The scenarios are run to the end of the coast even after slipping,
+           so the run-away divergence is visible.
+         * test_28_run.wav / _stall.wav / _collapse.wav: 16-bit PCM audio of
+           each scenario (the stalled ones carry the stall buzz).
+         * test_28_boundary.dat + test_28.gnuplot -> test_28.png: the
+           simulated-vs-measured pull-out boundary over A = 10⁴…10⁷.
+       Asserts the run trace does not stall, the other two do, every file is
+       non-empty, and each wav is valid non-silent PCM.
+
+  The plant is header-only and self-contained; the test links with g++ (uses
+  std::vector) and needs no library objects.
+
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration
   Usage: make ramp_helper && ./ramp_helper <speed_us> <acceleration> <steps>
