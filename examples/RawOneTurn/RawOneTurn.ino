@@ -18,9 +18,9 @@ void setup() {
     stepper->enableOutputs();
   }
 
-  uint16_t lframes[] = {107, 107, 107, 107, 107, 107, 107, 107, 107, 107,
-                        107, 107, 107, 107, 107, 107, 107, 107, 107, 107,
-                        107, 107, 107, 107, 107, 107, 107, 107, 107, 97};
+  const uint16_t lframes[] = {107, 107, 107, 107, 107, 107, 107, 107, 107, 107,
+                              107, 107, 107, 107, 107, 107, 107, 107, 107, 107,
+                              107, 107, 107, 107, 107, 107, 107, 107, 107, 97};
   // a representation of a 360 degree rot at 30 fps
   uint16_t lenAnim = 30;
 
@@ -110,7 +110,6 @@ void setup() {
               .ticks = this_cmd_ticks, .steps = 0, .count_up = true};
 
           // and add it to the queue
-          AqeResultCode rc;
           do {
             rc = stepper->addQueueEntry(&cmd_pause);
             if (aqeRetry(rc)) {

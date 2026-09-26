@@ -61,7 +61,7 @@ bool FastAccelStepperEngine::isDirPinBusy(uint8_t dir_pin,
                                           uint8_t except_stepper) {
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
     if (i != except_stepper) {
-      FastAccelStepper* s = _stepper[i];
+      const FastAccelStepper* s = _stepper[i];
       if (s) {
         if (s->getDirectionPin() == dir_pin) {
           if (s->isQueueRunning()) {

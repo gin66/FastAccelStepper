@@ -1,4 +1,4 @@
-#include <cinttypes>
+#include <inttypes.h>
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
@@ -109,7 +109,7 @@ void RampGenerator::advanceTargetPosition(int32_t delta) {
 
 void RampGenerator::afterCommandEnqueued(const NextCommand* command) {
 #ifdef TEST
-  printf("after Command Enqueued: performed ramp up steps = %" PRIu32 
+  printf("after Command Enqueued: performed ramp up steps = %" PRIu32
          " pause left = %" PRIu32 ", curr_ticks = %" PRIu32 "\n",
          command->rw.performed_ramp_up_steps, command->rw.pause_ticks_left,
          command->rw.curr_ticks);

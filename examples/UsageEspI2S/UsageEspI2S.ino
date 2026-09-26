@@ -47,7 +47,7 @@ void setup() {
 
   if (mux_ok) {
     // Connect stepper 0 to MUX slot 0
-    stepperMux0 = engine.stepperConnectToPin(0 | PIN_I2S_FLAG, DRIVER_I2S_MUX);
+    stepperMux0 = engine.stepperConnectToPin(PIN_I2S_FLAG, DRIVER_I2S_MUX);
     if (stepperMux0) {
       stepperMux0->setAutoEnable(true);
       stepperMux0->setSpeedInUs(100);

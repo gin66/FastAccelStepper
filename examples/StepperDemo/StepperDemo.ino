@@ -32,7 +32,7 @@
 #endif
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper* stepper[MAX_STEPPER];
+FastAccelStepper* steppers[MAX_STEPPER];
 const struct stepper_config_s* active_stepper_config = NULL;
 
 enum { normal, test, config } mode = normal;
@@ -629,7 +629,7 @@ void setup() {
     } else {
       break;
     }
-    stepper[i] = s;
+    steppers[i] = s;
   }
 
   usage();
@@ -771,7 +771,7 @@ void usage() {
 void output_info(bool only_running) {
   bool need_ln = false;
   for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-    if (stepper[i]) {
+    if (steppers[i]) {
       if (!only_running) {
         if (i == selected) {
           PRINT(">> ");
@@ -779,15 +779,15 @@ void output_info(bool only_running) {
           PRINT("   ");
         }
       }
-      if (!only_running || stepper[i]->isRunning()) {
+      if (!only_running || steppers[i]->isRunning()) {
         PRINTCH('M');
         PRINTU8(i + 1);
         PRINT(": ");
-        info(stepper[i], !only_running);
+        info(steppers[i], !only_running);
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-        if (!stepper[i]->isRunning()) {
+        if (!steppers[i]->isRunning()) {
           PRINT(" ");
-          PRINT(stepper[i]->driverTypeString());
+          PRINT(steppers[i]->driverTypeString());
         }
 #endif
         if (!only_running) {
@@ -822,7 +822,7 @@ void esp_reset() {
 #define MODE(mode, CMD) ((mode << 8) + CMD)
 
 int32_t val_n[3];
-int8_t get_val1_val2_val3(char* cmd) {
+int8_t get_val1_val2_val3(const char* cmd) {
   char* endptr;
   for (uint8_t i = 0; i < 3; i++) {
     val_n[i] = strtol(cmd, &endptr, 10);
@@ -841,7 +841,7 @@ int8_t get_val1_val2_val3(char* cmd) {
 }
 
 bool process_cmd(char* cmd) {
-  FastAccelStepper* stepper_selected = stepper[selected];
+  FastAccelStepper* stepper_selected = steppers[selected];
   uint16_t s = *cmd++;
   char* endptr;
   int8_t res;
@@ -854,7 +854,7 @@ bool process_cmd(char* cmd) {
     case MODE(config, 'M'):
       if (get_val1_val2_val3(cmd) == 1) {
         if ((val_n[0] > 0) && (val_n[0] <= (int32_t)MAX_STEPPER) &&
-            stepper[val_n[0] - 1] != NULL) {
+            steppers[val_n[0] - 1] != NULL) {
           output_msg(MSG_SELECT_STEPPER);
           selected = val_n[0] - 1;
           PRINTI16(selected + 1);
@@ -1407,7 +1407,7 @@ void loop() {
       for (uint8_t i = 0; i < MAX_STEPPER; i++) {
         struct test_seq_s* s = &test_seq[i];
         if ((s->test != NULL) && (s->state != TEST_STATE_ERROR)) {
-          bool res = s->test(stepper[i], &test_seq[i], ms);
+          bool res = s->test(steppers[i], &test_seq[i], ms);
           if (res) {
             s->test = NULL;
           }
@@ -1444,8 +1444,8 @@ void loop() {
   } else {
     bool running = false;
     for (uint8_t i = 0; i < MAX_STEPPER; i++) {
-      if (stepper[i]) {
-        running |= stepper[i]->isRunning();
+      if (steppers[i]) {
+        running |= steppers[i]->isRunning();
       }
     }
     if (running) {

@@ -248,7 +248,8 @@ static void IRAM_ATTR init_stop(StepperQueue* q) {
   // and after the last command aka running out of commands.
   const struct mapping_s* mapping = (const struct mapping_s*)q->driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  (volatile mcpwm_dev_t)* mcpwm =
+      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
@@ -472,7 +473,8 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect_mcpwm_pcnt() {
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_gpio_init(mcpwm_unit, mapping->pwm_output_pin, _step_pin);
   // Doesn't work with gpio_matrix_in
@@ -510,7 +512,8 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
 #endif
   const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  (volatile mcpwm_dev_t)* mcpwm =
+      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 
   // apply_command() assumes the pcnt counter to contain executed steps
@@ -540,7 +543,8 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   }
   const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  (volatile mcpwm_dev_t)* mcpwm =
+      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 #ifndef __ESP32_IDF_V44__
   if (mcpwm->timer[timer].status.value > 1) {

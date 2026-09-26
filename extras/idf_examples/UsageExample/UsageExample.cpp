@@ -1,6 +1,6 @@
 #include "FastAccelStepper.h"
 
-#include <cinttypes>
+#include <inttypes.h>
 
 // As in StepperDemo for Motor 1 on ESP32
 #define dirPinStepper 18
