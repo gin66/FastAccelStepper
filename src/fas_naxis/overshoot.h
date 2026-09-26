@@ -25,12 +25,13 @@
 // them; a slow short axis is never finished early and then paused.
 //
 // overshoot_max caps how far the path may leave the chord. The production test
-// is the integer squared distance
-//     (|delta_binder| * k - |delta_i| * x)^2
-//         <= overshoot_max^2 * (|delta_binder|^2 + |delta_i|^2)
-// (no sqrt, no division), with x the binding steps issued so far. When the
-// uniform schedule would exceed the cap it is pulled one integer step at a
-// time toward the chord -- that is the "mix toward Linear" of section 6.5.
+// uses the conservative product bound
+//     abs(nb*k - ns*x) <= overshoot_max * max(nb, ns)
+// (nb = |delta_binder|, ns = |delta_i|, x = binding steps issued so far),
+// which implies the exact squared-distance bound; no sqrt, no division, no
+// 64-bit. When the uniform schedule would exceed the cap it is pulled one
+// integer step at a time toward the chord -- the "mix toward Linear" of
+// section 6.5.
 // overshoot_max == 0 is Linear (this class is not used then); UINT16_MAX is the
 // raw uniform schedule (the cap never binds).
 //
@@ -279,45 +280,52 @@ class OvershootRun {
     return sum;
   }
 
-  // Pull a uniform candidate `k` for axis i back toward the chord until the
-  // integer squared distance fits the cap. No sqrt, no division. Bit-exact:
-  // overshoot_max is a hard geometric bound, so the cap test uses exact U32p
-  // products (a log2 slack could flip one step across the cap boundary).
+  // True when the uniform candidate `k` for axis i lies outside the
+  // overshoot_max cap around the chord. No sqrt, no division, no 64-bit:
+  // the perpendicular distance is D / sqrt(nb^2+ns^2) with D = |nb*k -
+  // ns*x|. The test uses the conservative bound D <= cap * max(nb, ns),
+  // which is >= cap * sqrt(nb^2+ns^2), split into two product compares
+  // (Remaining::log2_mul_diff) so the realized distance never exceeds the
+  // hard cap. The bound is tight when one axis dominates and at most
+  // sqrt(2) tighter on a diagonal.
+  //
+  // log2_mul_diff rounds by up to four log2 units; a comparison within
+  // kCapSlack of equality is treated as outside so the guarantee survives
+  // the rounding (a one-step move changes D by up to max(nb,ns), so a
+  // near-tie would otherwise be decided the wrong way).
   bool outside_cap(uint32_t nb, uint32_t ns, uint32_t k) const {
-    // log2 sign for the residual direction only; the products below stay
-    // bit-exact U32p (cap geometry, see class comment).
-    int side = Remaining::log2_mul_cmp(nb, k, ns, x);
-    if (side == 0) {
+    const int32_t kCapSlack = 4;
+    if (nb == 0 || ns == 0) {
       return false;
     }
-    Remaining::U32p left = Remaining::u32_mul(nb, k);
-    Remaining::U32p right = Remaining::u32_mul(ns, x);
-    Remaining::U32p diff = side > 0 ? Remaining::u32p_sub(left, right)
-                                    : Remaining::u32p_sub(right, left);
-    if (diff.hi != 0) {
-      return true;
+    if (nb >= ns) {
+      // inside <=> nb*(k-cap) <= ns*x  and  ns*x <= nb*(k+cap)
+      if (k >= cap &&
+          Remaining::log2_mul_diff(nb, k - cap, ns, x) > -kCapSlack) {
+        return true;
+      }
+      if (Remaining::log2_mul_diff(ns, x, nb, k + cap) > -kCapSlack) {
+        return true;
+      }
+    } else {
+      // inside <=> nb*k <= ns*(x+cap)  and  ns*(x-cap) <= nb*k
+      if (Remaining::log2_mul_diff(nb, k, ns, x + cap) > -kCapSlack) {
+        return true;
+      }
+      if (x >= cap &&
+          Remaining::log2_mul_diff(ns, x - cap, nb, k) > -kCapSlack) {
+        return true;
+      }
     }
-    Remaining::U32p cap2 = Remaining::u32_mul(cap, cap);
-    if (cap2.hi != 0) {
-      return false;
-    }
-    Remaining::U32p nb2 = Remaining::u32_mul(nb, nb);
-    Remaining::U32p ns2 = Remaining::u32_mul(ns, ns);
-    Remaining::U32p sumsq = Remaining::u32p_add(nb2, ns2);
-    Remaining::U32p c2;
-    Remaining::U32p sq = Remaining::u32_mul(diff.lo, diff.lo);
-    if (sumsq.hi != 0 || !Remaining::u32p_mul_u32(sumsq, cap2.lo, &c2)) {
-      return false;
-    }
-    return Remaining::u32p_cmp(sq, c2) > 0;
+    return false;
   }
 
   uint32_t apply_cap(int i, uint32_t k) const {
     uint32_t nb = tot[binder];
     uint32_t ns = tot[i];
-    // Log2 direction for the walk; the exact outside_cap() gate always
-    // stops the walk in the true cap region, so the sign slack cannot pull
-    // the step outside overshoot_max.
+    // Log2 direction for the walk; the conservative outside_cap() gate
+    // stops the walk inside the cap region, so neither the sign slack nor
+    // the bound slack can pull the step outside overshoot_max.
     while (k > issued[i] && Remaining::log2_mul_cmp(nb, k, ns, x) > 0 &&
            outside_cap(nb, ns, k)) {
       k--;

@@ -59,6 +59,26 @@ void interrupts() {}
 // FastAccelStepperEngine.
 static TestFastAccelStepperEngine sim_engine;
 
+// Diagnostic 2 deg collinearity probe (whitepaper section 8.5): same sense and
+// cos^2(d, d') >= 0.99878. Test-only, so double is allowed here; production
+// carries no wide arithmetic. dot <= 0 means opposite sense, which fails.
+static bool collinear_same_sense(const Remaining& r, int block_a, int block_b) {
+  double dot = 0.0;
+  double mag_a = 0.0;
+  double mag_b = 0.0;
+  for (int i = 0; i < r.n_axes; i++) {
+    double da = (double)r.delta_of(i, block_a);
+    double db = (double)r.delta_of(i, block_b);
+    dot += da * db;
+    mag_a += da * da;
+    mag_b += db * db;
+  }
+  if (dot <= 0.0 || mag_a == 0.0 || mag_b == 0.0) {
+    return false;
+  }
+  return dot * dot * 100000.0 >= 99878.0 * mag_a * mag_b;
+}
+
 // Peak performed ramp-up over a rest-to-rest move of S steps. This is the
 // outcome of RampLaw (P starts at 0, live remaining-to-stop), not a
 // precomputed min(P_stop, R/2). Used by F19 / F2b item 5 instead of a
@@ -265,7 +285,7 @@ void f2_remaining() {
     test(r.remaining_linear_binder(1, 0) < 6400,
          "F2 Linear square R does not span the perimeter");
     // The non-collinear test itself: adjacent square sides are perpendicular.
-    test(r.collinear_same_sense(0, 1) == false,
+    test(collinear_same_sense(r, 0, 1) == false,
          "F2 adjacent square sides are not collinear");
   }
 
@@ -311,18 +331,18 @@ void f2_remaining() {
     int32_t a90[2] = {0, 1000};  // 90 degree
     r.set_block(0, a1);
     r.set_block(1, ax);
-    test(r.collinear_same_sense(0, 1) == true, "F2 1 degree is collinear");
+    test(collinear_same_sense(r, 0, 1) == true, "F2 1 degree is collinear");
     r.set_block(0, a2);
     r.set_block(1, ax);
-    test(r.collinear_same_sense(0, 1) == true, "F2 2 degree edge is collinear");
+    test(collinear_same_sense(r, 0, 1) == true, "F2 2 degree edge is collinear");
     r.set_block(0, a3);
     r.set_block(1, ax);
-    test(r.collinear_same_sense(0, 1) == false, "F2 3 degree is not collinear");
+    test(collinear_same_sense(r, 0, 1) == false, "F2 3 degree is not collinear");
     test(r.remaining_linear_binder(0, 0) == 2000,
          "F2 3 degree bend does not end Linear R");
     r.set_block(0, a90);
     r.set_block(1, ax);
-    test(r.collinear_same_sense(0, 1) == false,
+    test(collinear_same_sense(r, 0, 1) == false,
          "F2 90 degree is not collinear");
     test(r.remaining_linear_binder(1, 0) == 1000,
          "F2 90 degree corner ends Linear R at one side");
@@ -568,17 +588,17 @@ void f2b_oracle() {
     int32_t axis[2] = {1000, 0};
     r2.set_block(0, one);
     r2.set_block(1, axis);
-    test(r2.collinear_same_sense(0, 1) == true, "F2b item4 1 deg passes");
+    test(collinear_same_sense(r2, 0, 1) == true, "F2b item4 1 deg passes");
     r2.set_block(0, edge);
-    test(r2.collinear_same_sense(0, 1) == true, "F2b item4 2 deg edge passes");
+    test(collinear_same_sense(r2, 0, 1) == true, "F2b item4 2 deg edge passes");
     r2.set_block(0, three);
-    test(r2.collinear_same_sense(0, 1) == false,
+    test(collinear_same_sense(r2, 0, 1) == false,
          "F2b item4 3 deg is not collinear");
     test(r2.remaining_linear_binder(0, 0) == 2000,
          "F2b item4 3 deg bend does not end Linear R");
     r2.set_block(0, right);
     r2.set_block(1, axis);
-    test(r2.collinear_same_sense(0, 1) == false,
+    test(collinear_same_sense(r2, 0, 1) == false,
          "F2b item4 90 deg is not collinear");
     test(r2.remaining_linear_binder(1, 0) == 1000,
          "F2b item4 90 deg corner ends Linear R");
@@ -593,17 +613,17 @@ void f2b_oracle() {
     int32_t tiny1[3] = {1000, 0, 0};  // a tiny z stays in the 2-deg cone
     r3.set_block(0, collinear0);
     r3.set_block(1, collinear1);
-    test(r3.collinear_same_sense(0, 1) == true,
+    test(collinear_same_sense(r3, 0, 1) == true,
          "F2b item4 n=3 proportional vectors are collinear");
     r3.set_block(0, bend0);
     r3.set_block(1, bend1);
-    test(r3.collinear_same_sense(0, 1) == false,
+    test(collinear_same_sense(r3, 0, 1) == false,
          "F2b item4 n=3 bend is not collinear");
     test(r3.remaining_linear_binder(0, 0) == 200,
          "F2b item4 n=3 same-master bend does not end Linear R");
     r3.set_block(0, tiny0);
     r3.set_block(1, tiny1);
-    test(r3.collinear_same_sense(0, 1) == true,
+    test(collinear_same_sense(r3, 0, 1) == true,
          "F2b item4 n=3 tiny component stays collinear");
   }
 
@@ -1558,7 +1578,7 @@ void f20_long_polyline() {
     const int arc_len = 190;
     int arc_nonsmooth = 0;
     for (int i = arc_first; i < arc_first + arc_len - 1; i++) {
-      if (!rem.collinear_same_sense(i, i + 1)) {
+      if (!collinear_same_sense(rem, i, i + 1)) {
         arc_nonsmooth++;
       }
     }
@@ -5374,7 +5394,7 @@ static void f_coarse_helix_cruises() {
     int32_t d[2] = {pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1]};
     rem.set_block(i, d);
   }
-  test(rem.collinear_same_sense(0, 1) == false,
+  test(collinear_same_sense(rem, 0, 1) == false,
        "naxes helix chord is outside the 2 deg band");
   const uint32_t ticks[2] = {4000, 4000};
   const uint32_t accel = 2000;

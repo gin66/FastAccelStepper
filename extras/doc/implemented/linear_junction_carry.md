@@ -40,8 +40,9 @@ was idle (the allowed joint speed is 0). The sampled circle cruises.
 
 ## Implementation surface
 
-- `src/fas_naxis/remaining.h`: `remaining_linear_binder()` and the
-  `collinear_same_sense()` role (diagnostic only).
+- `src/fas_naxis/remaining.h`: `remaining_linear_binder()` (the
+  `collinear_same_sense()` diagnostic role lives in the PC test harness
+  `test_26.cpp`).
 - `src/FasNAxis.h`: `remaining_path_steps()`, `start_block()`,
   `advance_block()`.
 - `extras/tests/pc_based/naxis_ref.h`: the reference track moves to the

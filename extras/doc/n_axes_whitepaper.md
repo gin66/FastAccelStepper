@@ -936,20 +936,26 @@ Production (`src/FasNAxis.h` and anything it includes):
 - Reuse `ramp_config_s::calculate_ticks` /
   `calculate_ramp_steps`. Do not re-derive `v = sqrt(2 a s)` in
   integer.
-- Remaining-steps sums, DDA error, sign tests, `d²` compares:
-  integer add/sub/mul/compare only.
-- Product compares use log2 sums (zero factor = `−∞`; the sanctioned
-  slack of §6.3): `Remaining::log2_mul_cmp`. A bit-exact `U32p` product
-  stays only where a log2 quantum would flip a step: `outside_cap`'s
-  chord-cap geometry against the hard `overshoot_max` bound and the
-  reference `collinear_same_sense` probe; `u32_twice_ge` is a shift,
-  not a product.
+- Remaining-steps sums, DDA error, sign tests: integer
+  add/sub/mul/compare only.
+- No 64-bit integer type and no emulated 64-bit product, anywhere:
+  every product compare is a log2 sum (zero factor = `−∞`; the
+  sanctioned slack of §6.3), `Remaining::log2_mul_cmp` for a sign and
+  `Remaining::log2_mul_diff` for a margin. The Overshoot cap
+  (`outside_cap`) uses the conservative bound
+  `abs(nb*k − ns*x) ≤ overshoot_max · max(nb, ns)`, which is at
+  least the exact `overshoot_max · sqrt(nb²+ns²)`, split into two
+  log2 product compares with a four-unit margin, so the realized
+  `d² ≤ overshoot_max²` holds. `u32_twice_ge` is a shift, not a
+  product.
 - No `float`, no `double`, no integer `/` on the hot path.
 
 PC tests and `FAS_NAXIS_TRACE` oracles may use double to plot
 steps/s and Euclidean `d(t)`, and the PC reference track of
 §12.4.1 may use double for duration compares. That code is not
-in the production header.
+in the production header. The 2 deg `collinear_same_sense`
+diagnostic lives in the PC test harness (`test_26.cpp`), not in
+production.
 
 ---
 

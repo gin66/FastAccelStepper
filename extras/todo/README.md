@@ -34,17 +34,18 @@ tracked here, one file per item.
   `HORIZON` into per-ring ramp-to-rest segments. See
   [naxes_example_smoothness.md](../doc/implemented/naxes_example_smoothness.md).
 - **naxes log2 product compares — implemented.** The production naxes
-  planner no longer schoolbook-multiplies: the `binder_axis` tie-break and
-  the Overshoot uniform schedule / cap-side sign checks compare products
-  as log2 sums (`Remaining::log2_mul_cmp`; sums of `log2_from`, the
-  sanctioned slack per section 6.3), and `u32_mul_cmp` is gone. The exact
-  `U32p` product stays where a quantum would flip a step: `outside_cap`'s
-  chord-cap geometry against the hard `overshoot_max` bound (6.5 / 12.4.1
-  G7) and the reference `collinear_same_sense` probe; `u32_twice_ge`
-  is a shift, not a product. The F2b rebind neighbourhood, all
-  F11/F12/F14 cap bounds, and the `FAS_NAXIS_NO_REBIND` /
-  `FAS_NAXIS_NO_REST_CAP` mutation proofs still hold. See
-  whitepaper §6.3 / §6.6.
+  planner has no 64-bit type and no fake 64-bit emulation: the `binder_axis`
+  tie-break, the Overshoot uniform schedule, and the Overshoot cap compare
+  products as log2 sums (`Remaining::log2_mul_cmp` / `log2_mul_diff`, sums
+  of `log2_from`, the sanctioned slack per section 6.3). `outside_cap` uses
+  the conservative bound `abs(nb*k - ns*x) <= cap*max(nb,ns)` (>= the exact
+  cap) with a four-unit log2 margin, so the realized distance stays under
+  the hard `overshoot_max` bound (6.5 / 12.4.1 G7). The 2 deg
+  `collinear_same_sense` diagnostic moved to the PC test harness
+  (`test_26.cpp`, double); `u32_twice_ge` is a shift, not a product. The F2b
+  rebind neighbourhood, all F11/F12/F14 cap bounds, and the
+  `FAS_NAXIS_NO_REBIND` / `FAS_NAXIS_NO_REST_CAP` mutation proofs still
+  hold. See whitepaper §6.3 / §6.6.
 - **Linear junction carry — implemented.** `R` ends at a master-sense
   reversal, an idle or tied outgoing axis, a dwell, or the path end.
   `P` carries across every other joint, so a sampled helix cruises and

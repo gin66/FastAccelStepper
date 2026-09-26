@@ -27,16 +27,16 @@
 // Linear's binder R (sections 6.3 / 8.5) sums DDA-master steps until a hard
 // stop: the master's sense ends, the outgoing master was idle, a dwell, or
 // the path end. A non-collinear joint does not end it, and neither does a
-// master-role change. collinear_same_sense() is diagnostic only.
+// master-role change. The 2 deg collinear diagnostic lives in the PC test
+// harness (naxis_ref.h), not in production.
 //
 // This is pure parse: integer add / abs / sign only. No float, double, or
-// integer division is formed in the scan. Product comparisons are log2 sums
-// (log2_mul_cmp) - no floating point, no division; the log2 slack is the
-// sanctioned approximation (whitepaper section 6.3). The bit-exact U32p
-// helper (u32_mul) stays for chord-cap geometry where a quantum would flip
-// a step. The live speed cap is the ramp law in ramp_law.h (P starts at 0,
-// increases, clipped by P_coast and by remaining-to-standstill).
-// Remaining.h does not estimate a peak as min(P_stop, R/2).
+// integer division is formed in the scan. Every product comparison is a log2
+// sum (log2_mul_cmp) - no floating point, no division, no 64-bit type; the
+// log2 slack is the sanctioned approximation (whitepaper section 6.3). The
+// live speed cap is the ramp law in ramp_law.h (P starts at 0, increases,
+// clipped by P_coast and by remaining-to-standstill). Remaining.h does not
+// estimate a peak as min(P_stop, R/2).
 //
 // HORIZON (a public field, default unbounded) caps the number of *points*
 // the scan may touch: section 8.2 / F19 (a small HORIZON of micro-segments
@@ -52,13 +52,6 @@
 // ramp_law.h).
 class Remaining {
  public:
-  // Two uint32 halves of a product. Not a 64-bit type: productive code has
-  // none. hi is the upper half.
-  struct U32p {
-    uint32_t hi;
-    uint32_t lo;
-  };
-
   // 2*err >= master, without a widening multiply. err >= 2^31 implies
   // 2*err >= 2^32 > master.
   static bool u32_twice_ge(uint32_t err, uint32_t master) {
@@ -68,71 +61,9 @@ class Remaining {
     return (err << 1) >= master;
   }
 
-  static U32p u32_mul(uint32_t a, uint32_t b) {
-    uint32_t al = a & 0xffffu;
-    uint32_t ah = a >> 16;
-    uint32_t bl = b & 0xffffu;
-    uint32_t bh = b >> 16;
-    uint32_t p0 = al * bl;
-    uint32_t p1 = al * bh;
-    uint32_t p2 = ah * bl;
-    uint32_t p3 = ah * bh;
-    uint32_t mid = (p0 >> 16) + (p1 & 0xffffu) + (p2 & 0xffffu);
-    U32p r;
-    r.lo = (p0 & 0xffffu) | (mid << 16);
-    r.hi = p3 + (p1 >> 16) + (p2 >> 16) + (mid >> 16);
-    return r;
-  }
-
-  static int u32p_cmp(U32p a, U32p b) {
-    if (a.hi != b.hi) {
-      return a.hi > b.hi ? 1 : -1;
-    }
-    if (a.lo != b.lo) {
-      return a.lo > b.lo ? 1 : -1;
-    }
-    return 0;
-  }
-
-  static U32p u32p_add(U32p a, U32p b) {
-    U32p r;
-    r.lo = a.lo + b.lo;
-    r.hi = a.hi + b.hi + (r.lo < a.lo ? 1u : 0u);
-    return r;
-  }
-
-  static U32p u32p_sub(U32p a, U32p b) {
-    U32p r;
-    r.lo = a.lo - b.lo;
-    r.hi = a.hi - b.hi - (a.lo < b.lo ? 1u : 0u);
-    return r;
-  }
-
-  static bool u32p_is_zero(U32p a) { return a.hi == 0 && a.lo == 0; }
-
-  // a * m into 64 bits of magnitude. False when a third limb would be set.
-  static bool u32p_mul_u32(U32p a, uint32_t m, U32p* out) {
-    U32p p0 = u32_mul(a.lo, m);
-    U32p p1 = u32_mul(a.hi, m);
-    uint32_t hi = p0.hi + p1.lo;
-    if (hi < p0.hi || p1.hi != 0) {
-      return false;
-    }
-    out->lo = p0.lo;
-    out->hi = hi;
-    return true;
-  }
-
-  // a*b vs c*d as log2 sums (whitepaper section 6.3): the production
-  // product compares are sums of logs and may move one log2 quantum out of
-  // tolerance. That slack is acceptable for the binder tie-break
-  // (binder_axis) and the Overshoot uniform schedule / cap-side sign checks
-  // (overshoot.h): the decision is a scheduler, and every geometric bound
-  // is still enforced bit-exact below. Bit-exact U32p products remain only
-  // where a quantum would flip a step: overshoot.h outside_cap (the chord
-  // cap against the hard overshoot_max bound) and the FAS_NAXIS_REFERENCE
-  // collinearity probe. zero product is -infinity: it loses to any positive
-  // product.
+  // a*b vs c*d as log2 sums (whitepaper section 6.3): every product compare
+  // is a sum of logs and may move one log2 quantum out of tolerance. The
+  // zero product is -infinity: it loses to any positive product.
   static int log2_mul_cmp(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     bool first = a != 0 && b != 0;
     bool second = c != 0 && d != 0;
@@ -142,6 +73,21 @@ class Remaining {
     int32_t la = (int32_t)log2_from(a) + log2_from(b);
     int32_t lc = (int32_t)log2_from(c) + log2_from(d);
     return la > lc ? 1 : (la < lc ? -1 : 0);
+  }
+
+  // log2(a*b) - log2(c*d) in the 9-bit log2 unit, for a caller that needs a
+  // conservative margin rather than a bare sign. A zero factor is -infinity
+  // (some +-0x4000). The value is a sum of four log2_from, so it carries up
+  // to four units of rounding.
+  static int32_t log2_mul_diff(uint32_t a, uint32_t b, uint32_t c,
+                               uint32_t d) {
+    bool first = a != 0 && b != 0;
+    bool second = c != 0 && d != 0;
+    if (!first || !second) {
+      return (first ? 0x4000 : 0) - (second ? 0x4000 : 0);
+    }
+    return (int32_t)log2_from(a) + (int32_t)log2_from(b) -
+           (int32_t)log2_from(c) - (int32_t)log2_from(d);
   }
 
 #ifdef FAS_NAXIS_REFERENCE
@@ -218,53 +164,6 @@ class Remaining {
         [this](int b, int ax) -> int32_t { return delta_of(ax, b); });
   }
 
-  // Section 8.5 collinear, same sense between two full path directions.
-  //   (dot(d, d'))^2 * 100000    >=   99878 * |d|^2 * |d'|^2
-  //   (cos^2(2deg) ~= 0.99878). Integer mul/compare, no division, no sqrt.
-  //  The dot sign keeps "same sense": opposite senses fail.
-  bool collinear_same_sense(int block_a, int block_b) const {
-    bool dot_neg = false;
-    U32p dot = {0, 0};
-    U32p mag_a = {0, 0};
-    U32p mag_b = {0, 0};
-    for (int i = 0; i < n_axes; i++) {
-      int32_t da = delta_of(i, block_a);
-      int32_t db = delta_of(i, block_b);
-      bool neg = (da < 0) != (db < 0);
-      uint32_t ua = fas_abs(da);
-      uint32_t ub = fas_abs(db);
-      U32p prod = u32_mul(ua, ub);
-      if (u32p_is_zero(dot)) {
-        dot = prod;
-        dot_neg = neg && !u32p_is_zero(prod);
-      } else if (dot_neg == neg) {
-        dot = u32p_add(dot, prod);
-      } else if (u32p_cmp(dot, prod) >= 0) {
-        dot = u32p_sub(dot, prod);
-      } else {
-        dot = u32p_sub(prod, dot);
-        dot_neg = !dot_neg;
-      }
-      mag_a = u32p_add(mag_a, u32_mul(ua, ua));
-      mag_b = u32p_add(mag_b, u32_mul(ub, ub));
-    }
-    if (dot_neg || u32p_is_zero(dot) || u32p_is_zero(mag_a) ||
-        u32p_is_zero(mag_b)) {
-      return false;
-    }
-    if (dot.hi != 0 || mag_a.hi != 0 || mag_b.hi != 0) {
-      return false;
-    }
-    U32p dot2 = u32_mul(dot.lo, dot.lo);
-    U32p mag = u32_mul(mag_a.lo, mag_b.lo);
-    U32p lhs;
-    U32p rhs;
-    if (!u32p_mul_u32(dot2, 100000u, &lhs) ||
-        !u32p_mul_u32(mag, 99878u, &rhs)) {
-      return false;
-    }
-    return u32p_cmp(lhs, rhs) >= 0;
-  }
 #endif /* FAS_NAXIS_REFERENCE */
 
   // True when every axis of the block is idle (a dwell, or a zero vector).
