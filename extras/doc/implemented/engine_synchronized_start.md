@@ -1,6 +1,6 @@
 # Engine synchronized start
 
-Priority: **P5** — several steppers should begin on one start, not
+Priority: **050** — several steppers should begin on one start, not
 one after another.
 
 Status: **implemented**. `FasNAxis::pump()` kick-off goes through
@@ -9,12 +9,12 @@ as an engine reference in its constructor. Every platform implements it
 today as one critical section around a per-stepper
 `addQueueEntry(NULL, true)` loop. The per-platform native mechanisms are
 tracked in `extras/todo/`:
-[AVR](../../todo/avr_synchronized_start.md),
-[SAM (Due)](../../todo/sam_synchronized_start.md),
-[SAMD51](../../todo/samd51_synchronized_start.md),
-[Teensy](../../todo/teensy_synchronized_start.md),
-[ESP32](../../todo/esp32_synchronized_start.md),
-[Pico](../../todo/pico_synchronized_start.md).
+[AVR](../../todo/050_avr_synchronized_start.md),
+[SAM (Due)](../../todo/050_sam_synchronized_start.md),
+[SAMD51](../../todo/050_samd51_synchronized_start.md),
+[Teensy](../../todo/050_teensy_synchronized_start.md),
+[ESP32](../../todo/050_esp32_synchronized_start.md),
+[Pico](../../todo/050_pico_synchronized_start.md).
 
 ## Problem
 
@@ -60,12 +60,12 @@ The critical-section fallback is in place for every platform. Whether it
 is the final mechanism, or a native start primitive should replace it, is
 tracked one file per platform in `extras/todo/`:
 
-- [AVR](../../todo/avr_synchronized_start.md)
-- [SAM (Due)](../../todo/sam_synchronized_start.md)
-- [SAMD51](../../todo/samd51_synchronized_start.md)
-- [Teensy](../../todo/teensy_synchronized_start.md)
-- [ESP32](../../todo/esp32_synchronized_start.md)
-- [Pico](../../todo/pico_synchronized_start.md)
+- [AVR](../../todo/050_avr_synchronized_start.md)
+- [SAM (Due)](../../todo/050_sam_synchronized_start.md)
+- [SAMD51](../../todo/050_samd51_synchronized_start.md)
+- [Teensy](../../todo/050_teensy_synchronized_start.md)
+- [ESP32](../../todo/050_esp32_synchronized_start.md)
+- [Pico](../../todo/050_pico_synchronized_start.md)
 
 ## References
 

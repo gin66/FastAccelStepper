@@ -1,6 +1,6 @@
 # SAMD51 synchronized start
 
-Priority: **P5** — platform-specific part of the engine synchronized start
+Priority: **050** — platform-specific part of the engine synchronized start
 (one item per open platform).
 
 Status: generic fallback active on SAMD51

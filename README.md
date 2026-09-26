@@ -94,10 +94,10 @@ The full ESP32 driver comparison (MCPWM/PCNT vs RMT vs I2S Mux) is in
   synchronous start of several steppers for multi axis applications.
 * **EXPERIMENTAL** multi-axis planner `FasNAxis` (`src/FasNAxis.h`): drives N
   stepper queues from one polyline so the axes stay time-synchronized. API not
-  stable yet; timed trajectories are still TODO. See the
+  stable yet. See the
   [n-axis whitepaper](extras/doc/n_axes_whitepaper.md), the
-  [naxes example](examples/naxes/README.md), and the
-  [todo list](extras/todo/README.md).
+  [naxes example](examples/naxes/README.md), and
+  [Future work](#future-work).
 
 ## Quick Start
 
@@ -135,13 +135,9 @@ More details in [Usage](extras/doc/usage.md) and the
 ## Multi-axis planner (FasNAxis)
 
 > **Experimental.** The `FasNAxis` API is **not stable yet** and may change
-> without notice. It is AFAP-only today (AFAP = "as fast as possible": run the
-> polyline as fast as the motors and geometry allow, with no requested speed or
-> time). A faithful trajectory **with time steps** (requested feedrate / speed
-> at each point) is tracked in
-> [`extras/todo/timed_trajectory.md`](extras/todo/timed_trajectory.md). The
-> library-wide [open items list](extras/todo/README.md) currently holds only
-> n-axis entries, but is not limited to them.
+> without notice. It runs a polyline as fast as the motors and geometry allow,
+> with no requested speed or time. A trajectory that carries its own timing,
+> and the rest of the open work, is listed under [Future work](#future-work).
 
 For coordinated motion, `FasNAxis` drives N stepper queues from one polyline
 so the axes stay time-synchronized. The hot path has no float, division, or
@@ -212,7 +208,7 @@ void loop() {
 | Pico PIO program flow | [pico_pio.md](extras/doc/pico_pio.md) |
 | SAMD51 design notes | [samd51/CONTEXT.md](extras/doc/samd51/CONTEXT.md) |
 | n-axis whitepaper | [n_axes_whitepaper.md](extras/doc/n_axes_whitepaper.md) |
-| Open items (TODO) | [extras/todo/README.md](extras/todo/README.md) |
+| Future work | [extras/todo/README.md](extras/todo/README.md) |
 | Physical stepper simulation | [physical_stepper_whitepaper.md](extras/doc/physical_stepper_whitepaper.md) |
 | Test strategy | [testing.md](extras/doc/testing.md) |
 | Troubleshooting | [troubleshooting.md](extras/doc/troubleshooting.md) |
@@ -250,6 +246,19 @@ are defined in `pd_*/pd_config.h` files, which are included by
   to compile. Arduino core 3.1.0 supports ESP-IDF V5.3.0 (based on RC1).
 * TODO / roadmap: [GitHub project](https://github.com/gin66/FastAccelStepper/projects/1)
 * Known issues and debugging tips: [troubleshooting.md](extras/doc/troubleshooting.md)
+
+## Future work
+
+Open work is one file per item in
+[`extras/todo`](extras/todo/README.md). The filename prefix is the priority,
+three digits wide (`050_name.md`). Numbers step by 10, so a new item can take
+a free number between two existing ones.
+
+The list is library-wide. It currently covers per-platform synchronized
+start, a cubic ramp start, a timed multi-axis trajectory, delta-step input
+for `FasNAxis`, a single-axis `moveTo` with an arrival in ticks, and a smooth
+stop at the end of a path. The n-axis design is the
+[whitepaper](extras/doc/n_axes_whitepaper.md).
 
 ## Star History
 

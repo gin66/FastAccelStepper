@@ -1,8 +1,13 @@
 # Open items (TODO)
 
 Library-wide open items, one file per item. The list is not
-FasNAxis-specific, even though at the moment every tracked entry below
-happens to be n-axis work.
+FasNAxis-specific: the ramp-generator arrival (080) is single-axis,
+and the rest is n-axis work.
+
+The filename prefix is the priority, three digits wide
+(`050_name.md`). Numbers step by 10, so a new item takes a free
+number between two existing ones (`055_` sits between `050_` and
+`060_`). Items that share a priority share the prefix.
 
 Source of truth for the n-axis items: `extras/doc/n_axes_whitepaper.md`.
 Their test-driven implementation plan (Steps 0–14) is complete; its
@@ -12,14 +17,17 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **P5** | [ESP32 synchronized start](esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
-| **P5** | [Pico synchronized start](pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
-| **P5** | [AVR synchronized start](avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |
-| **P5** | [SAM synchronized start](sam_synchronized_start.md) | PWM/TC common release point to be identified. |
-| **P5** | [SAMD51 synchronized start](samd51_synchronized_start.md) | TCC cross-instance release to be identified. |
-| **P5** | [Teensy synchronized start](teensy_synchronized_start.md) | TMR within/cross-module release to be decided. |
-| **P6** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
-| **P7** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
+| **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
+| **050** | [Pico synchronized start](050_pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
+| **050** | [AVR synchronized start](050_avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |
+| **050** | [SAM synchronized start](050_sam_synchronized_start.md) | PWM/TC common release point to be identified. |
+| **050** | [SAMD51 synchronized start](050_samd51_synchronized_start.md) | TCC cross-instance release to be identified. |
+| **050** | [Teensy synchronized start](050_teensy_synchronized_start.md) | TMR within/cross-module release to be decided. |
+| **060** | [Cubic start (`s_h`) overlay](060_cubic_start.md) | Later feature, not v1. |
+| **070** | [Faithful timed trajectory](070_timed_trajectory.md) | Later implementation, not v1. Input is `int16_t` delta steps and one `uint32_t` delta ticks per chunk. |
+| **080** | [Delta steps](080_delta_steps.md) | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
+| **080** | [Ramp time and moveTo eta](080_move_to_eta.md) | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
+| **090** | [Smooth stop at end of path](090_end_path_decel.md) | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
 
 ## Done
 
@@ -78,7 +86,7 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
   ATmega168 and the ATmega32u4 are skipped by `build-platformio.sh` for
   space.
 - **Per-block feedrate `F` — not a separate item.** It is a requested
-  speed, hence timed-world input; it belongs to `timed_trajectory.md`
+  speed, hence timed-world input; it belongs to `070_timed_trajectory.md`
   (no AFAP `F`-as-cap variant).
 - **Inverse kinematics — not tracked.** Application concern, not a
   library feature. Keep the whitepaper §3.2 non-goal, but clarify that
@@ -89,7 +97,7 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
   `extras/doc/engine_sources.md` (Path A single driver + stop hook).
 - **AFAP vs timed — decided.** `FasNAxis` stays AFAP-only; the faithful
   timed trajectory is a separate implementation (tracked in
-  `timed_trajectory.md`). Design record moved to
+  `070_timed_trajectory.md`). Design record moved to
   `extras/doc/planner_modes.md`.
 - **A Linear oracle that is faster by leaving the chord / cutting a
   corner / skipping a vertex — not tracked.** Not a backlog item: such a
@@ -100,4 +108,8 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
 
 ## Under discussion
 
-(none)
+- **How a short path comes to rest.** `endPath()` today can freeze
+  fewer steps than the current ramp, and the last steps then go out
+  at speed. The coordinated fix is a decel tail after the last
+  waypoint; handing each axis to the ramp generator leaves the chord.
+  See [090_end_path_decel.md](090_end_path_decel.md).

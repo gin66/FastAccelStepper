@@ -1,6 +1,6 @@
 # Cubic start (`s_h`) overlay
 
-Priority: **P6** — later feature, not v1.
+Priority: **060** — later feature, not v1.
 
 Status: later feature, not v1.
 
