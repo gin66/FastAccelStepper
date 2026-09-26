@@ -10,12 +10,23 @@ tracked here, one file per item.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **P5** | [Engine synchronized start](engine_synchronized_start.md) | Kick-off is still one `addQueueEntry(NULL, true)` per axis. |
+| **P5** | [ESP32 synchronized start](esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
+| **P5** | [Pico synchronized start](pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
+| **P5** | [AVR synchronized start](avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |
+| **P5** | [SAM synchronized start](sam_synchronized_start.md) | PWM/TC common release point to be identified. |
+| **P5** | [SAMD51 synchronized start](samd51_synchronized_start.md) | TCC cross-instance release to be identified. |
+| **P5** | [Teensy synchronized start](teensy_synchronized_start.md) | TMR within/cross-module release to be decided. |
 | **P6** | [Cubic start (`s_h`) overlay](cubic_start.md) | Later feature, not v1. |
 | **P7** | [Faithful timed trajectory](timed_trajectory.md) | Later implementation, not v1. |
 
 ## Done
 
+- **Engine synchronized start (generic layer) — implemented.** The engine
+  exposes a plain non-static `synchronizedStart()` member, `FasNAxis`
+  receives the engine in its constructor (defaulted `Engine` template
+  parameter), and the kick-off releases all active queues in one engine
+  operation. The per-platform native mechanisms remain tracked above. See
+  [engine_synchronized_start.md](../doc/implemented/engine_synchronized_start.md).
 - **naxes example smoothness — implemented.** simavr `test_naxes` passes
   with 11 legitimate stops (`MAX_PATH_STOPS = 11`); no helix chord stops.
   P3 also found and fixed the block ring not sliding past `HORIZON`
@@ -54,8 +65,8 @@ Decisions taken item by item. Items without an entry are documented as
 non-goals in the whitepaper §3.2 and are not tracked separately.
 
 - **Raising `pd_test` `MAX_STEPPER` — dropped.** Not debt but a design
-  decision: n > 2 PC tests use `FasNAxis<N, HORIZON, SimPort>`; 1- and
-  2-axis golden paths use real FAS queues (whitepaper §4.7).
+  decision: n > 2 PC tests use `FasNAxis<N, HORIZON, SimPort>`;
+  1- and 2-axis golden paths use real FAS queues (whitepaper §4.7).
 - **simavr / hardware / PlatformIO jobs for FasNAxis — implemented.**
   `examples/naxes/` (helix → hexagon → square → origin, one
   `FastAccelStepper` per axis) builds for every CI architecture;

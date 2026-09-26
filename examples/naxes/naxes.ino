@@ -64,7 +64,7 @@ FastAccelStepper* naxes_s[NAXES_HW] = {NULL};
 // The planner. HORIZON must hold enough of the path for a smooth ramp while
 // still fitting the small AVR parts; NAXES_HORIZON is 64 points on the
 // two-axis build and 48 on the three-axis one.
-FasNAxis<NAXES_HW, NAXES_HORIZON> naxes_planner(FasNAxisConfig{});
+FasNAxis<NAXES_HW, NAXES_HORIZON> naxes_planner(FasNAxisConfig{}, engine);
 
 // Index of the waypoint currently being commanded. 0 is the first addLine after
 // the origin; the run finishes when it reaches total_waypoints().

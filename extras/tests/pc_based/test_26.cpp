@@ -54,6 +54,11 @@ void inject_fill_interrupt(int mark) {}
 void noInterrupts() {}
 void interrupts() {}
 
+// The engine every test planner is constructed with. Its synchronizedStart()
+// releases the active SimPorts' queues in one call, mirroring the production
+// FastAccelStepperEngine.
+static TestFastAccelStepperEngine sim_engine;
+
 // Peak performed ramp-up over a rest-to-rest move of S steps. This is the
 // outcome of RampLaw (P starts at 0, live remaining-to-stop), not a
 // precomputed min(P_stop, R/2). Used by F19 / F2b item 5 instead of a
@@ -2355,7 +2360,7 @@ struct SimSegmentResult {
 };
 
 static void run_linear_segment(SimPort& px, SimPort& py,
-                               FasNAxis<2, 64, SimPort>& path,
+                               FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine>& path,
                                const char* fixture, const char* title,
                                int32_t tx, int32_t ty, bool do_plot,
                                SimSegmentResult* res) {
@@ -2451,7 +2456,7 @@ void f6_linear_sim() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F6 F1 addAxis(0)");
     test(path.addAxis(1, &py) == true, "F6 F1 addAxis(1)");
     int32_t cur[2] = {0, 0};
@@ -2482,7 +2487,7 @@ void f6_linear_sim() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -2511,7 +2516,7 @@ void f6_linear_sim() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -2576,7 +2581,7 @@ struct PolySimResult {
 // oracle's cumulative step position.
 template <uint16_t HZ>
 static void walk_prod_polyline(SimPort& px, SimPort& py,
-                               FasNAxis<2, HZ, SimPort>& path,
+                               FasNAxis<2, HZ, SimPort, TestFastAccelStepperEngine>& path,
                                const int32_t (*verts)[2], int n_verts,
                                const uint32_t* ticks, uint32_t t_law,
                                uint32_t accel, bool do_plot,
@@ -2847,7 +2852,7 @@ void f7_linear_lookahead() {
     int32_t verts[5][2] = {{0, 0}, {1600, 0}, {1600, 1600}, {0, 1600}, {0, 0}};
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -2913,7 +2918,7 @@ void f7_linear_lookahead() {
     uint32_t ticks9[2] = {40000, 4000};
     SimPort px(40000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -2944,7 +2949,7 @@ void f7_linear_lookahead() {
     uint32_t ticks18[2] = {1000, 40000};
     SimPort px(1000), py(40000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -2982,7 +2987,7 @@ void f7_linear_lookahead() {
     }
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 128, SimPort> path(cfg);
+    FasNAxis<2, 128, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -3050,7 +3055,7 @@ static void f16_skeleton() {
   FasNAxisConfig zeroed;
   zeroed.dt_ticks = 0;
   zeroed.kappa_stop_q8 = 0;
-  FasNAxis<2, 8, SimPort> recovered(zeroed);
+  FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> recovered(zeroed, sim_engine);
   test(recovered.dt_ticks() == 32000, "F16: dt_ticks 0 recovers to 32000");
   test(recovered.kappa_stop_q8() == 320,
        "F16: kappa_stop_q8 0 recovers to 320");
@@ -3058,7 +3063,7 @@ static void f16_skeleton() {
   // addAxis rejects the out-of-range index.
   SimPort px(4000);
   SimPort py(4000);
-  FasNAxis<2, 8, SimPort> ok(cfg);
+  FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> ok(cfg, sim_engine);
   test(ok.addAxis(0, &px) == true, "F16: addAxis(0) succeeds");
   test(ok.addAxis(1, &py) == true, "F16: addAxis(1) succeeds");
   test(ok.addAxis(2, &px) == false, "F16: addAxis(i>=NAXES) fails");
@@ -3068,7 +3073,7 @@ static void f16_skeleton() {
 
   // A small HORIZON relative to P_stop is NOT an addAxis failure: the same
   // HORIZON that later caps the ramp (F19) still registers cleanly.
-  FasNAxis<2, 2, SimPort> tiny(cfg);
+  FasNAxis<2, 2, SimPort, TestFastAccelStepperEngine> tiny(cfg, sim_engine);
   test(tiny.addAxis(0, &px) == true, "F16: small HORIZON addAxis succeeds");
   test(tiny.addAxis(1, &py) == true, "F16: small HORIZON addAxis succeeds");
 
@@ -3076,12 +3081,12 @@ static void f16_skeleton() {
   // running (no race with manageSteppers / a prior moveTo).
   SimPort ramping(4000);
   ramping.setRampGeneratorActive(true);
-  FasNAxis<2, 8, SimPort> r(cfg);
+  FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> r(cfg, sim_engine);
   test(r.addAxis(0, &px) == true, "F16: addAxis on idle port succeeds");
   test(r.addAxis(1, &ramping) == false, "F16: addAxis while ramp active fails");
 
   // Position sync: addLine is illegal before a sync; legal after.
-  FasNAxis<2, 8, SimPort> p(cfg);
+  FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> p(cfg, sim_engine);
   p.addAxis(0, &px);
   p.addAxis(1, &py);
   int32_t at[2] = {10, 20};
@@ -3090,7 +3095,7 @@ static void f16_skeleton() {
   test(p.addLine(at) == true, "F16: addLine after sync is legal");
 
   // setCurrentPosition opens the same door as syncFromSteppers().
-  FasNAxis<2, 8, SimPort> q(cfg);
+  FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> q(cfg, sim_engine);
   q.addAxis(0, &px);
   q.addAxis(1, &py);
   int32_t cur[2] = {0, 0};
@@ -3100,7 +3105,7 @@ static void f16_skeleton() {
   test(q.addLine(cur) == true, "F16: addLine after setCurrentPosition legal");
 
   // addLine to the current position (every delta 0) is a no-op, not a motion.
-  FasNAxis<2, 8, SimPort> s(cfg);
+  FasNAxis<2, 8, SimPort, TestFastAccelStepperEngine> s(cfg, sim_engine);
   s.addAxis(0, &px);
   s.addAxis(1, &py);
   int32_t here[2] = {100, 200};
@@ -3137,7 +3142,7 @@ void f8_feeder() {
     const uint32_t move = 240000;
     SimPort px(ticks_cfg, 64), py(ticks_cfg, 64);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -3197,7 +3202,7 @@ void f8_feeder() {
   {
     SimPort px(4000, 64), py(4000, 64);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -3251,7 +3256,7 @@ void f8_feeder() {
     // A different retryable code, DirPinIsBusy, follows the same path.
     {
       SimPort qx(4000, 64), qy(4000, 64);
-      FasNAxis<2, 64, SimPort> p2(cfg);
+      FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> p2(cfg, sim_engine);
       p2.addAxis(0, &qx);
       p2.addAxis(1, &qy);
       int32_t cur2[2] = {0, 0};
@@ -3282,7 +3287,7 @@ void f8_feeder() {
     const uint32_t ticks_cfg = 4000;
     SimPort p0(ticks_cfg, 16), p1(ticks_cfg, 16);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &p0);
     path.addAxis(1, &p1);
     int32_t cur[2] = {0, 0};
@@ -3316,7 +3321,7 @@ void f8_feeder() {
     const uint32_t gap = 4u * (uint32_t)(TICKS_PER_S / 1000);
     SimPort p0(ticks_cfg, 16), p1(ticks_cfg, 16);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &p0);
     path.addAxis(1, &p1);
     int32_t cur[2] = {0, 0};
@@ -3391,7 +3396,7 @@ static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
   py.setAcceleration(accel);
   px.setDirChangeBudget((uint16_t)before, n_before, (uint16_t)after);
   FasNAxisConfig cfg;
-  FasNAxis<2, 64, SimPort> path(cfg);
+  FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
   path.addAxis(0, &px);
   path.addAxis(1, &py);
   int32_t cur[2] = {0, 0};
@@ -3457,7 +3462,7 @@ static void run_overshoot_rev(uint32_t before, uint8_t n_before, uint32_t after,
   FasNAxisConfig cfg;
   cfg.mode = FasNAxisConfig::Overshoot;
   cfg.overshoot_max = 8;
-  FasNAxis<2, 64, SimPort> path(cfg);
+  FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
   path.addAxis(0, &px);
   path.addAxis(1, &py);
   int32_t cur[2] = {0, 0};
@@ -3653,7 +3658,7 @@ void f9_dir_pauses() {
     px.setInjectMode(SimPort::InjectNone);
     px.forceExtraBefore(8000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -3777,7 +3782,7 @@ struct OvershootResult {
 };
 
 static void run_overshoot_segment(SimPort& px, SimPort& py,
-                                  FasNAxis<2, 64, SimPort>& path,
+                                  FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine>& path,
                                   const char* fixture, const char* title,
                                   int32_t tx, int32_t ty, uint64_t ref_T,
                                   bool do_plot, OvershootResult* res) {
@@ -3861,7 +3866,7 @@ void f11_overshoot_rest() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -3878,7 +3883,7 @@ void f11_overshoot_rest() {
     FasNAxisConfig cfg;
     cfg.mode = FasNAxisConfig::Overshoot;
     cfg.overshoot_max = 8;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F11 F4 addAxis(0)");
     test(path.addAxis(1, &py) == true, "F11 F4 addAxis(1)");
     int32_t cur[2] = {0, 0};
@@ -3910,7 +3915,7 @@ void f11_overshoot_rest() {
     FasNAxisConfig cfg;
     cfg.mode = FasNAxisConfig::Overshoot;
     cfg.overshoot_max = UINT16_MAX;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F11 F4b addAxis(0)");
     test(path.addAxis(1, &py) == true, "F11 F4b addAxis(1)");
     int32_t cur[2] = {0, 0};
@@ -3935,7 +3940,7 @@ void f11_overshoot_rest() {
   {
     SimPort lx(4000), ly(4000);
     FasNAxisConfig lcfg;
-    FasNAxis<2, 64, SimPort> lpath(lcfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> lpath(lcfg, sim_engine);
     lpath.addAxis(0, &lx);
     lpath.addAxis(1, &ly);
     int32_t cur[2] = {0, 0};
@@ -3949,7 +3954,7 @@ void f11_overshoot_rest() {
     FasNAxisConfig cfg;
     cfg.mode = FasNAxisConfig::Overshoot;
     cfg.overshoot_max = 8;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F11 diagonal addAxis(0)");
     test(path.addAxis(1, &py) == true, "F11 diagonal addAxis(1)");
     path.setCurrentPosition(cur);
@@ -3998,7 +4003,7 @@ struct OvershootPolyResult {
 
 template <uint16_t H>
 static void run_overshoot_polyline(SimPort& px, SimPort& py,
-                                   FasNAxis<2, H, SimPort>& path,
+                                   FasNAxis<2, H, SimPort, TestFastAccelStepperEngine>& path,
                                    const int32_t* wp, int n_wp,
                                    const char* fixture, const char* title,
                                    bool do_plot, OvershootPolyResult* res) {
@@ -4142,7 +4147,7 @@ static void run_overshoot_polyline(SimPort& px, SimPort& py,
 static uint32_t linear_polyline_clock(const int32_t* wp, int n_wp) {
   SimPort px(4000, 16), py(4000, 16);
   FasNAxisConfig cfg;
-  FasNAxis<2, 64, SimPort> path(cfg);
+  FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
   path.addAxis(0, &px);
   path.addAxis(1, &py);
   OvershootPolyResult r;
@@ -4171,7 +4176,7 @@ static void f12_overshoot_corners() {
     FasNAxisConfig cfg;
     cfg.mode = FasNAxisConfig::Overshoot;
     cfg.overshoot_max = (uint16_t)cap;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F12 F6 addAxis(0)");
     test(path.addAxis(1, &py) == true, "F12 F6 addAxis(1)");
     OvershootPolyResult res;
@@ -4207,7 +4212,7 @@ static void f12_overshoot_corners() {
     FasNAxisConfig cfg;
     cfg.mode = FasNAxisConfig::Overshoot;
     cfg.overshoot_max = (uint16_t)cap;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F12 F6b addAxis(0)");
     test(path.addAxis(1, &py) == true, "F12 F6b addAxis(1)");
     OvershootPolyResult res;
@@ -4271,7 +4276,7 @@ static void f12_overshoot_corners() {
     FasNAxisConfig cfg;
     cfg.mode = FasNAxisConfig::Overshoot;
     cfg.overshoot_max = (uint16_t)cap;
-    FasNAxis<2, 512, SimPort> path(cfg);
+    FasNAxis<2, 512, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F12 F7 addAxis(0)");
     test(path.addAxis(1, &py) == true, "F12 F7 addAxis(1)");
     OvershootPolyResult res;
@@ -4320,7 +4325,7 @@ void f13_lookahead() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> unsynced(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> unsynced(cfg, sim_engine);
     unsynced.addAxis(0, &px);
     unsynced.addAxis(1, &py);
     test(unsynced.addDwellTicks(100) == false,
@@ -4332,7 +4337,7 @@ void f13_lookahead() {
     uint32_t base_clock = 0;
     {
       SimPort bx(4000), by(4000);
-      FasNAxis<2, 64, SimPort> bpath(cfg);
+      FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> bpath(cfg, sim_engine);
       bpath.addAxis(0, &bx);
       bpath.addAxis(1, &by);
       int32_t cur[2] = {0, 0};
@@ -4351,7 +4356,7 @@ void f13_lookahead() {
            "F13 dwell baseline ends at 400");
     }
 
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F13 dwell addAxis(0)");
     test(path.addAxis(1, &py) == true, "F13 dwell addAxis(1)");
     int32_t cur[2] = {0, 0};
@@ -4400,7 +4405,7 @@ void f13_lookahead() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -4440,7 +4445,7 @@ void f13_lookahead() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -4505,7 +4510,7 @@ void f13_lookahead() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -4561,7 +4566,7 @@ void f13_lookahead() {
     int n_a = 0;
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 4, SimPort> path(cfg);
+    FasNAxis<2, 4, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true,
          "F13 F19 addAxis(0) succeeds at HORIZON 4");
     test(path.addAxis(1, &py) == true, "F13 F19 addAxis(1) succeeds");
@@ -4606,7 +4611,7 @@ void f13_lookahead() {
     static double f19_p_b[16384];
     int n_b = 0;
     SimPort qx(4000), qy(4000);
-    FasNAxis<2, 4, SimPort> path2(cfg);
+    FasNAxis<2, 4, SimPort, TestFastAccelStepperEngine> path2(cfg, sim_engine);
     path2.addAxis(0, &qx);
     path2.addAxis(1, &qy);
     int32_t cur2[2] = {0, 0};
@@ -4736,7 +4741,7 @@ void f14_helix() {
       cfg.overshoot_max = overshoot_max;
     }
 
-    FasNAxis<3, 4096, SimPort> path(cfg);
+    FasNAxis<3, 4096, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F14 addAxis X");
     test(path.addAxis(1, &py) == true, "F14 addAxis Y");
     test(path.addAxis(2, &pz) == true, "F14 addAxis Z");
@@ -5111,7 +5116,7 @@ void f21_physical() {
   test(px.hasPhysical() && py.hasPhysical(), "F21 plant attached to both axes");
 
   FasNAxisConfig cfg;
-  FasNAxis<2, 64, SimPort> path(cfg);
+  FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
   test(path.addAxis(0, &px) == true, "F21 addAxis(0)");
   test(path.addAxis(1, &py) == true, "F21 addAxis(1)");
   int32_t cur[2] = {0, 0};
@@ -5224,7 +5229,7 @@ static void f20_physical_wav() {
   px.setPhysicalStepper(&rotor_x);
   py.setPhysicalStepper(&rotor_y);
   FasNAxisConfig cfg;
-  FasNAxis<2, 512, SimPort> path(cfg);
+  FasNAxis<2, 512, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
   test(path.addAxis(0, &px) == true, "F20 phys addAxis(0)");
   test(path.addAxis(1, &py) == true, "F20 phys addAxis(1)");
   int32_t cur[2] = {0, 0};
@@ -5262,7 +5267,7 @@ static void f22_external_stop() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     test(path.addAxis(0, &px) == true, "F22 addAxis(0)");
     test(path.addAxis(1, &py) == true, "F22 addAxis(1)");
     int32_t cur[2] = {0, 0};
@@ -5284,7 +5289,7 @@ static void f22_external_stop() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -5304,7 +5309,7 @@ static void f22_external_stop() {
   {
     SimPort px(4000), py(4000);
     FasNAxisConfig cfg;
-    FasNAxis<2, 64, SimPort> path(cfg);
+    FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
     path.addAxis(0, &px);
     path.addAxis(1, &py);
     int32_t cur[2] = {0, 0};
@@ -5401,7 +5406,7 @@ static void f_sliding_ring() {
   const int horizon = 4;
   SimPort px(4000), py(4000);
   FasNAxisConfig cfg;
-  FasNAxis<2, (uint16_t)horizon, SimPort> path(cfg);
+  FasNAxis<2, (uint16_t)horizon, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
   test(path.addAxis(0, &px) == true, "F23 sliding-ring addAxis(0)");
   test(path.addAxis(1, &py) == true, "F23 sliding-ring addAxis(1)");
   int32_t cur[2] = {0, 0};

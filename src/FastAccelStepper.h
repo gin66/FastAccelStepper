@@ -603,11 +603,11 @@ class FastAccelStepper {
   // or not. The latter case is of interest to first fill the queue and then
   // start it.
   //
-  // The call addQueueEntry(NULL, true) just starts the queue. This is intended
-  // to achieve a near synchronous start of several steppers. Consequently it
-  // should be called with interrupts disabled and return very fast.
-  // Actually this is necessary, too, in case the queue is full and not
-  // started.
+  // The call addQueueEntry(NULL, true) just starts the queue. A synchronized
+  // start of several steppers is the single engine operation
+  // FastAccelStepperEngine::synchronizedStart(), which releases the listed
+  // queues in one engine operation. The per-stepper call should still return
+  // very fast, too, in case the queue is full and not started.
   // ### Direction Change Delay Enforcement
   //
   // If the new command's direction differs from the previous command,

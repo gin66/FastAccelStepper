@@ -1,5 +1,6 @@
 pre-1.4.0:
 - naxes: experimental multi-axis planner (EXPERIMENTAL): header-only FasNAxis driving N time-synchronized FastAccelStepper queues from one polyline, Linear/Overshoot lookahead with no float/int division in the hot path, dwells, and external stop-cause hook with planner abort
+- naxes: FasNAxis takes the engine in its constructor and kicks off via FastAccelStepperEngine::synchronizedStart(), releasing all active queues in one engine operation
 
 1.3.4:
 - Teensy 4.0/4.1 support (EXPERIMENTAL): new pd_teensy backend, up to 16 steppers via the i.MX RT1062 QuadTimer modules

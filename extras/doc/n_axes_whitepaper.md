@@ -1682,7 +1682,7 @@ void setup() {
 
   FasNAxisConfig cfg;
   cfg.mode = FasNAxisConfig::Linear;
-  FasNAxis<2> path(cfg);
+  FasNAxis<2> path(cfg, engine);
   path.addAxis(0, x);
   path.addAxis(1, y);
   path.syncFromSteppers();

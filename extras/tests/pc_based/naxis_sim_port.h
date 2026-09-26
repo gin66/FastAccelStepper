@@ -394,4 +394,22 @@ class SimPort {
   }
 };
 
+// TestFastAccelStepperEngine — the test-world stand-in for
+// FastAccelStepperEngine as far as the FasNAxis kick-off is concerned.
+// synchronizedStart() releases every listed SimPort queue in one call,
+// mirroring the production engine's contract for duck-typed steppers.
+class TestFastAccelStepperEngine {
+ public:
+  AqeResultCode synchronizedStart(SimPort** const steppers, uint8_t cnt) {
+    AqeResultCode rc = AqeResultCode::OK;
+    for (uint8_t i = 0; i < cnt; i++) {
+      AqeResultCode e = steppers[i]->addQueueEntry(NULL, true);
+      if (rc == AqeResultCode::OK && e != AqeResultCode::OK) {
+        rc = e;
+      }
+    }
+    return rc;
+  }
+};
+
 #endif  // FAS_NAXIS_SIM_PORT_H

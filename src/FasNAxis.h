@@ -9,10 +9,12 @@
 #include "fas_naxis/ramp_map.h"
 #include "fas_naxis/remaining.h"
 
-// The default stepper type. Only its name is needed to parse the template
-// (tests supply SimPort; production supplies the real FastAccelStepper from
+// The default stepper and engine types. Only their names are needed to parse
+// the template (tests supply SimPort/TestFastAccelStepperEngine; production
+// supplies the real FastAccelStepper/FastAccelStepperEngine from
 // <FastAccelStepper.h>, which this header deliberately does not include).
 class FastAccelStepper;
+class FastAccelStepperEngine;
 
 // FasNAxis — a multi-axis planner that drives N FastAccelStepper queues from
 // one polyline so the axes stay time-synchronized (whitepaper
@@ -88,10 +90,12 @@ struct AxisLimits {
 };
 
 template <uint8_t NAXES, uint16_t HORIZON = 64,
-          typename Stepper = FastAccelStepper>
+          typename Stepper = FastAccelStepper,
+          typename Engine = FastAccelStepperEngine>
 class FasNAxis {
  public:
-  explicit FasNAxis(const FasNAxisConfig& cfg) : _law(1, 1, 0) {
+  explicit FasNAxis(const FasNAxisConfig& cfg, Engine& engine)
+      : _engine(&engine), _law(1, 1, 0) {
     FasNAxisConfig c = cfg;  // copy so the default recovery is observable
     if (c.dt_ticks == 0) {
       c.dt_ticks = 32000;
@@ -298,10 +302,12 @@ class FasNAxis {
   void endPath() { _path_closed = true; }
 
   // Plan and feed the committed Linear path (section 10.4). Prefill every axis
-  // with start=false, then kick off with addQueueEntry(NULL, true); later
-  // commands use start=true. An empty queue during prefill is expected and is
-  // not underrun; after kick-off an empty queue while the plan still moves is
-  // underrun (section 10.5).
+  // with start=false, then kick off with the engine's synchronized start
+  // (FastAccelStepperEngine::synchronizedStart()): all active queues are
+  // released in one engine operation instead of one addQueueEntry(NULL, true)
+  // per axis. Later commands use start=true. An empty queue during prefill is
+  // expected and is not underrun; after kick-off an empty queue while the plan
+  // still moves is underrun (section 10.5).
   PumpStatus pump() {
     // An external stop of a member axis (manual stopMove, forceStop, e-stop)
     // invalidates the coordinated plan: abort and report Stopped. Positions
@@ -319,14 +325,18 @@ class FasNAxis {
       feeder_start();
       feed_loop();
       if (!_error) {
-        bool started = false;
+        Stepper* active[NAXES];
+        uint8_t n_active = 0;
         for (uint8_t i = 0; i < NAXES; i++) {
           if (_registered[i] && !_s[i]->isQueueEmpty()) {
-            _s[i]->addQueueEntry(NULL, true);
-            started = true;
+            active[n_active++] = _s[i];
           }
         }
-        _kicked_off = started;
+        AqeResultCode rc = _engine->synchronizedStart(active, n_active);
+        _kicked_off = (n_active > 0);
+        if (rc != AqeResultCode::OK) {
+          _error = true;
+        }
       }
     }
     if (!_error && _kicked_off && !_done) {
@@ -1315,6 +1325,7 @@ class FasNAxis {
   bool _feeding;
   bool _done;
   bool _kicked_off;
+  Engine* _engine;
   bool _underrun;
   bool _slice_open;
   bool _error;

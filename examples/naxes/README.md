@@ -46,7 +46,17 @@ Following the StepperDemo pattern, the pin table is selected by architecture via
 low-active and set manually so it is settled before the planner kicks off
 (whitepaper §4.5).
 
-## Building and testing
+## Kick-off synchronization
+
+The planner is constructed with the engine
+(`FasNAxis<NAXES_HW, NAXES_HORIZON> naxes_planner(FasNAxisConfig{}, engine)`)
+and its kick-off uses the engine's synchronized start: when a committed path
+is released, every active axis queue is started by one engine operation
+instead of one `addQueueEntry(NULL, true)` per axis, so the axes share a
+single start event. Today each platform implements that operation as a single
+critical section around the per-stepper starts; platform-specific mechanisms
+(see `extras/todo/engine_synchronized_start.md`) replace it as they are
+written.
 
 * **CI / PlatformIO** — `pio_dirs/naxes/` is a symlink wrapper (like
   `pio_dirs/MoveTimed/`): `platformio.ini` → `extras/ci/platformio.ini`,

@@ -295,4 +295,18 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   return nullptr;
 }
 
+AqeResultCode FastAccelStepperEngine::synchronizedStart(
+    FastAccelStepper** const steppers, uint8_t cnt) {
+  AqeResultCode rc = AqeResultCode::OK;
+  fasDisableInterrupts();
+  for (uint8_t i = 0; i < cnt; i++) {
+    AqeResultCode e = steppers[i]->addQueueEntry(NULL, true);
+    if (rc == AqeResultCode::OK && e != AqeResultCode::OK) {
+      rc = e;
+    }
+  }
+  fasEnableInterrupts();
+  return rc;
+}
+
 #endif  // SUPPORT_TEENSY4

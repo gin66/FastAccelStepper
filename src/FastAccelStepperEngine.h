@@ -184,6 +184,18 @@ class FastAccelStepperEngine {
   /* This should be only called from ISR or stepper task. So do not call it */
   void manageSteppers();
 
+  // ### Synchronized start
+  //
+  // Starts the queues of the steppers in steppers[] in one engine operation,
+  // so their first command starts on one event. The implementation lives in
+  // the pd_*/pd_*.cpp file of the build, so the platform decides how.
+  // A stepper already running is skipped; an empty queue does not stop the
+  // others.
+  // Returns AqeResultCode::OK or the first non-OK code of a per-stepper
+  // addQueueEntry(NULL, true) call.
+  AqeResultCode synchronizedStart(FastAccelStepper** const steppers,
+                                  uint8_t cnt);
+
  private:
   bool isDirPinBusy(uint8_t dirPin, uint8_t except_stepper);
 
