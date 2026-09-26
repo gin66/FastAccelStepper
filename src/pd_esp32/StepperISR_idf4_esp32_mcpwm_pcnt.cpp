@@ -113,8 +113,7 @@ static void IRAM_ATTR apply_command(StepperQueue* queue,
   const struct mapping_s* mapping =
       static_cast<const struct mapping_s*>(queue->driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  (volatile mcpwm_dev_t)* mcpwm =
-      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  volatile mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
@@ -192,6 +191,7 @@ static void IRAM_ATTR apply_command(StepperQueue* queue,
       // => mcwpm status info is not reliable, so clear again
       if (val1 != val2) {
         // Clear flag again. No pulse can be expected between val2 and here
+        // cppcheck-suppress redundantAssignment
         mcpwm->int_clr.val = mapping->cmpr_tea_int_clr;
       }
 
@@ -250,8 +250,7 @@ static void IRAM_ATTR init_stop(StepperQueue* q) {
   const struct mapping_s* mapping =
       static_cast<const struct mapping_s*>(q->driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  (volatile mcpwm_dev_t)* mcpwm =
-      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  volatile mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 #ifndef __ESP32_IDF_V44__
   mcpwm->timer[timer].mode.start = 0;  // 0: stop at TEZ
@@ -351,7 +350,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   _step_pin = step_pin;
 
   const struct mapping_s* mapping = &channel2mapping[channel_num];
-  driver_data = static_cast<void*>(mapping);
+  driver_data = static_cast<const void*>(mapping);
 
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -515,8 +514,7 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
   const struct mapping_s* mapping =
       static_cast<const struct mapping_s*>(driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  (volatile mcpwm_dev_t)* mcpwm =
-      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  volatile mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 
   // apply_command() assumes the pcnt counter to contain executed steps
@@ -547,8 +545,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   const struct mapping_s* mapping =
       static_cast<const struct mapping_s*>(driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  (volatile mcpwm_dev_t)* mcpwm =
-      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  const mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   uint8_t timer = mapping->timer;
 #ifndef __ESP32_IDF_V44__
   if (mcpwm->timer[timer].status.value > 1) {
