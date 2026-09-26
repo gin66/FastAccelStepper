@@ -6,9 +6,9 @@ name: Build examples
 
 on:
   push:
-    branches: [ master, naxes ]
+    branches: [ master ]
   pull_request:
-    branches: [ master, naxes ]
+    branches: [ master ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
