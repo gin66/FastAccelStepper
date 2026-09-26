@@ -26,7 +26,10 @@ Arduino core 3.1.0 will support ESP-IDF V5.3.0 (based on RC1).
 
 - IDF 5.3+ Max = MCPWM/PCNT + RMT channels + I2S Mux slots (can be combined)
 - MCPWM/PCNT is available on IDF 5.3+ and IDF 6.1 for ESP32, ESP32-S3, ESP32-C6, ESP32-H2
+  - ESP32-S2 has PCNT but no MCPWM, ESP32-C3 has neither, so only RMT/I2S are available there
+  - ESP32-P4 has both (2 MCPWM groups, 4 PCNT units in IDF 5.3+), but MCPWM/PCNT is not implemented for P4 yet
 - I2S Mux requires ESP-IDF >=5.3 and uses one I2S controller
+- Step rate: 200 kHz applies to MCPWM/PCNT and RMT. I2S Mux is limited to 40 kHz, I2S Direct reaches up to 200 kHz
 - I2S Mux slots are shared: if step/dir/enable all use I2S Mux, each stepper consumes 1-3 slots
   - Step only: up to 32 steppers
   - Step + Dir: up to 16 steppers

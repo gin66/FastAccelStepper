@@ -21,17 +21,10 @@ Using the high level interface with ramp up/down as in
 
 ```
 #include "FastAccelStepper.h"
-#include "AVRStepperPins.h" // Only required for AVR controllers
 
 #define dirPinStepper    5
 #define enablePinStepper 6
 #define stepPinStepper   9
-
-// If using an AVR device use the definitons provided in AVRStepperPins
-//    stepPinStepper1A
-//
-// or even shorter (for 2560 the correct pin on the chosen timer is selected):
-//    stepPinStepperA
 
 FastAccelStepperEngine engine = FastAccelStepperEngine();
 FastAccelStepper *stepper = NULL;

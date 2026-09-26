@@ -29,23 +29,35 @@ For memory footprint information across supported architectures, see the
 
 ## Supported platforms
 
-| Platform | Max steps/s | Steppers | Queue | Doc |
-|----------|-------------|----------|-------|-----|
-| AVR ATmega 168/328 | 50000 | 1-2 | 16 | [avr.md](extras/doc/platforms/avr.md) |
-| AVR ATmega32u4 | 50000 | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
-| AVR ATmega2560 | 50000 | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
-| ESP32 (IDF 4.x) | 200000 | 14 | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32 (IDF 5.3+) | 200000 | 14 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-S2 | 200000 | 4 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-S3 | 200000 | 4 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-C3 | 200000 | 2 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-C6 | 200000 | 2 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-P4 | 200000 | 4 + 32 (I2S) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| Raspberry Pi Pico | 200000 | 4 (8 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
-| Raspberry Pi Pico 2 | 200000 | 8 (12 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
-| Atmel SAM Due | 50000 | 6 | 32 | [sam.md](extras/doc/platforms/sam.md) |
-| Microchip SAMD51 | — | 3-5 | 32 | [samd51.md](extras/doc/platforms/samd51.md) |
-| Teensy 4.0/4.1 (exp.) | 200000 | 16 | 32 | [teensy.md](extras/doc/platforms/teensy.md) |
+| Platform | Max step rate | Steppers | Cmd queue depth | Doc |
+|----------|---------------|----------|-----------------|-----|
+| AVR ATmega 168/328 | 50 kSteps/s | 1-2 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| AVR ATmega32u4 | 50 kSteps/s | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| AVR ATmega2560 | 50 kSteps/s | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| ESP32 (IDF 4.x) | 200 kSteps/s | 14 (6 MCPWM/PCNT + 8 RMT) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32 (IDF 5.3+) | 200 kSteps/s [1] | 14 (6 MCPWM/PCNT + 8 RMT) + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-S2 | 200 kSteps/s [1] | 4 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-S3 | 200 kSteps/s [1] | 4 MCPWM/PCNT + 4 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-C3 | 200 kSteps/s [1] | 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-C6 | 200 kSteps/s [1] | 2 MCPWM/PCNT + 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-P4 | 200 kSteps/s [1] | 4 RMT + 32 I2S * [2] | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| Raspberry Pi Pico | 200 kSteps/s | 4 (8 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Raspberry Pi Pico 2 | 200 kSteps/s | 8 (12 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Atmel SAM Due | 50 kSteps/s | 6 | 32 | [sam.md](extras/doc/platforms/sam.md) |
+| Microchip SAMD51 | 100 kSteps/s | 3-5 | 32 | [samd51.md](extras/doc/platforms/samd51.md) |
+| Teensy 4.0/4.1 (exp.) | 200 kSteps/s | 16 | 32 | [teensy.md](extras/doc/platforms/teensy.md) |
+
+Notes:
+
+1. 200 kSteps/s applies to the MCPWM/PCNT and RMT drivers. I2S Mux is
+   limited to 40 kSteps/s; I2S Direct channels reach up to 200 kSteps/s.
+2. The ESP32-P4 hardware provides 2 MCPWM groups and 4 PCNT units, but
+   MCPWM/PCNT is not implemented for P4 yet. ESP32-S2 has PCNT but no MCPWM,
+   ESP32-C3 has neither, so only RMT/I2S are available there.
+
+\* The 32 I2S steppers require an external demultiplexer (e.g. 74HC154, or a
+74HC138 cascade / 74HC595 shift registers) on the I2S data line. Using I2S
+slots directly (I2S Direct mode) provides only 1-3 extra steppers.
 
 The full ESP32 driver comparison (MCPWM/PCNT vs RMT vs I2S Mux) is in
 [platforms/esp32.md](extras/doc/platforms/esp32.md).
@@ -80,12 +92,15 @@ The full ESP32 driver comparison (MCPWM/PCNT vs RMT vs I2S Mux) is in
   ticks aka the CPU frequency!
 * Command queue can be filled with commands and then started. This allows near
   synchronous start of several steppers for multi axis applications.
+* **EXPERIMENTAL** multi-axis planner `FasNAxis` (`src/FasNAxis.h`): drives N
+  stepper queues from one polyline so the axes stay time-synchronized. See the
+  [n-axis whitepaper](extras/doc/n_axes_whitepaper.md) and the
+  [naxes example](examples/naxes/README.md).
 
 ## Quick Start
 
 ```cpp
 #include "FastAccelStepper.h"
-#include "AVRStepperPins.h" // Only required for AVR controllers
 
 #define dirPinStepper    5
 #define enablePinStepper 6
@@ -155,6 +170,7 @@ More details in [Usage](extras/doc/usage.md) and the
 | `pd_test/` | Test platform pulse driver: PC-based testing simulation |
 | `fas_queue/` | Queue implementation: command queue management |
 | `fas_ramp/` | Ramp calculation: acceleration/deceleration curves |
+| `fas_naxis/` | Experimental multi-axis planner (`FasNAxis`), header-only |
 | `log2/` | Log2 representation: fixed-point arithmetic for speed calculations |
 
 Platform-specific configuration constants (queue sizes, timing, feature flags)

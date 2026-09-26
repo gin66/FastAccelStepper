@@ -8,6 +8,8 @@ The SAMD51 port was contributed by Loriland (see
 ## Usage limits
 
 * one stepper per TCC instance: 3 steppers on SAMD51G, up to 5 on SAMD51J/N/P
+* default max speed 100000 steps/s (10 µs/step), keeping the per-step ISR load
+  below ~10% per running stepper; overridable with `setAbsoluteSpeedLimit()`
 * step pin must have a TCC waveform output in the board's variant table;
   direction/enable can be any output pin
 * one overflow interrupt per step; pulse edges are hardware-timed, so step timing
