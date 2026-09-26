@@ -63,7 +63,7 @@ NAXES_SRC=$(PRJ_ROOT)/examples/naxes
 src/.naxes: $(wildcard $(NAXES_SRC)/*)
 	mkdir -p src
 	for f in $(NAXES_SRC)/*; do ln -sf "$$f" src/; done
-	ln -s .dir $@
+	ln -sf .dir $@
 
 clean:
 	rm -fR .pio .tested x.vcd result.txt

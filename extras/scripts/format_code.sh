@@ -9,7 +9,21 @@ FILES_SRC=`find ${PRJ_ROOT}/src ${PRJ_ROOT}/examples -type f -a \( -name '*.ino'
 echo ${FILES_SRC}
 
 clang-format -style=file -i $FILES
-cppcheck --enable=style --rule-file=naming_rules.xml --suppress=invalidPrintfArgType_sint --suppress=unusedStructMember --suppress=noConstructor --force --check-level=exhaustive --language=c++ --std=c++11 ${FILES_SRC}
+cppcheck \
+  --enable=style \
+  --suppress=invalidPrintfArgType_sint \
+  --suppress=unusedStructMember \
+  --suppress=noConstructor \
+  --suppress=ctuOneDefinitionRuleViolation \
+  --suppress=unknownMacro \
+  --suppress=knownConditionTrueFalse \
+  -DPROGMEM= \
+  --force \
+  --check-level=exhaustive \
+  --language=c++ \
+  --std=c++11 \
+  --addon=namingng.json \
+  ${FILES_SRC}
 
 echo ${VERSION}
 sed -i -e 's/#define VERSION.*$$/#define VERSION "post-$(VERSION)"/' ${PRJ_ROOT}/examples/StepperDemo/StepperDemo.ino
