@@ -94,7 +94,7 @@ static const double T_COAST = 1.0;
 static const double T_COAST_SMALL = 3.0;  // hold the slow speed for 3 s
 static const double T_TOTAL = T_SPIN1 + T_SPIN_HOLD + T_SPIN2 + 2.0 * T_COAST +
                               (VMAX - VSMALL) / ACCEL + T_COAST_SMALL +
-                              VSMALL / ACCEL;  // = 7.0 s
+                              VSMALL / ACCEL;  // = 8.0 s
 
 // Test-labelled trace phases (column 10 of the .dat).
 enum { PH_ACCEL = 0, PH_COAST = 1, PH_DECEL = 2, PH_SLIP = 3 };

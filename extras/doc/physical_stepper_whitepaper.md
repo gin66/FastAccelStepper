@@ -1,10 +1,6 @@
 # Physical Stepper Simulation — A Whitepaper
 
-## On replacing the ideal stepper in the PC-based test suite with a
-# rotordynamic, step-loss-aware plant model
-
-*Author: the FastAccelStepper TDD effort*
-*Status: concept whitepaper*
+## A rotordynamic, step-loss-aware plant model for the PC-based test suite
 
 ---
 
@@ -37,16 +33,11 @@ a **stable detent once per full step**; as long as `|Δ| < D` the rotor tracks
 the field, but once the field out-runs it the periodic detent force *averages
 itself out* over a period and the rotor can no longer keep up — friction slows
 it and `|Δ|` grows. That growth of the rotor/field position difference is the
-only 100 % error condition. The decisive case is a **half-step slip during
-coasting**: a momentary mechanical hold that parks the rotor on the separatrix
-between two detents — the field then out-runs it and it stalls; a *full-step*
-slip parks it on the next detent and it only loses one step. Re-engagement is
-likewise not implemented: as the field decelerates the same integration
-re-captures the rotor onto the nearest whole-step detent. Every run can be
-rendered to
-gnuplot as position / speed / acceleration / force / step-error / stall, and the
-model emits a sample-per-step time series — the same visualisation the FasNAxis
-suite already uses (`test_26.cpp` via `naxis_plot.h`).
+only 100 % error condition; the decisive slip cases are treated in §5.5 and the
+re-capture behaviour in §5.5.1. Every run can be rendered to gnuplot as
+position / speed / acceleration / force / step-error / stall — a sample-per-step
+time series, the same visualisation the FasNAxis suite already uses
+(`test_26.cpp` via `naxis_plot.h`).
 
 ### 1.1 Unit convention
 
@@ -186,11 +177,6 @@ The consequence is deliberately conservative:
   // ideal stepper — unchanged everywhere else
 #endif
 ```
-
-So the ideal model is the **baseline every test already gets**; the plant is a
-**layer a test opts onto**. This keeps the kinematic suite bit-identical while
-giving dynamics-focused tests (`test_26` and friends) a physically real rotor
-they can assert stalling on.
 
 ---
 
@@ -481,12 +467,9 @@ number of full steps, and it runs smoothly again once the driver slows down.
 
 ### 5.6 Friction and holding torque
 
-Friction is the **only inverse force** to the motor, and it is an *independent
-mechanical load* — it does not scale with `Fmax` (a stronger motor does not
-have more bearing/load friction). It is a Coulomb floor plus a viscous term,
-capped at `Fmax`, and the pull-out speed `v_max = (Fmax − static)/viscous` is
-where it balances the field. This gives the two behaviours the review asked
-for:
+The friction model is defined in §5.2 (Coulomb floor plus viscous term, capped
+at `Fmax`, an independent mechanical load that does not scale with `Fmax`),
+with the pull-out speed `v_max = (Fmax − friction_static) / friction_viscous`. It gives the two required behaviours:
 
 * **Friction is small at small speeds** (a fraction of `Fmax`), so the detent
   force can spin the rotor up from standstill and hold it in a detent against
@@ -495,14 +478,7 @@ for:
   the motor has reached its pull-out speed. Because the load is independent, a
   stronger motor (`Fmax` up) simply gets a higher `v_max`.
 
-A **half-step slip** is what forces the stall (§5.5). A momentary mechanical
-hold displaces the rotor half a full step; that parks it on the separatrix,
-where the restoring force vanishes and it can no longer follow the field. A
-full-step displacement instead parks it on the next detent, so it only loses
-one step. Once a runaway has begun, the detent force self-averages and friction
-is left as the only net retarding force, so the rotor drifts while the field
-runs on — until the field slows enough (during deceleration) for the detent to
-re-capture the rotor onto the nearest whole-step detent.
+The half-step/full-step slip cases are §5.5; re-engagement is §5.5.1.
 
 ### 5.7 Mid-band resonance (why a stalled rotor rings)
 
@@ -599,8 +575,8 @@ of §10.1 runs for 8 s, so its WAV is
 8 s × 44100 samples/s × 2 bytes = 705600 bytes   (+ a 44-byte header)
 ```
 
-which is exactly the "around 441000 bytes" a test asserts. This is the natural
-companion to the gnuplot traces in §7 and needs no external tool.
+which is exactly the `705600`-byte (plus header) payload a test asserts. This is
+the natural companion to the gnuplot traces in §7 and needs no external tool.
 
 ---
 
@@ -620,7 +596,7 @@ smoothness), giving a full time series:
 | `a` | rotor acceleration, steps/s² (raw, to the rotor) | accel |
 | `tau` | magnetic force `−Fmax·sin(2π·delta/D)` (scaled) | force |
 | `friction` | friction force, signed against the motion | force |
-| `stall` | `1` while `\|delta\| ≥ D` — stall *observation* (§5.5) | steploss / stall |
+| `stall` | `1` while `\|delta\| > D` and still slipping (`w ≠ v_field`) — stall *observation* (§5.5) | steploss / stall |
 
 These are exactly the six panels requested: **pos / speed / accel / force /
 steploss / stall**.
@@ -648,9 +624,9 @@ The produced figure has:
    sine's changing sign and the ring-down in the detent,
 5. **force** — `τ`, the magnetic torque curve, together with the signed
    `friction` force (the only inverse force),
-6. **stall** — the `stall` flag, high while `\|delta\| ≥ D` (§5.5): a
-   continuous observation of the rotor/field position difference running away,
-   not a counted event.
+6. **stall** — the `stall` flag, high while `\|delta\| > D` and the rotor is
+   still slipping (`w ≠ v_field`, §5.5): a continuous observation of the
+   rotor/field position difference running away, not a counted event.
 
 For the stall case the trapezoid's own trace is plotted alongside, so the
 shared acceleration ramp and the divergent ending can be read off directly.
@@ -722,8 +698,8 @@ or if the command keeps racing past the rotor, the rotor/field position
 difference runs away and the `stall` panel fires — the
 emergent stall of §5.5.
 
-Because the move lasts exactly `7 s`, its `.wav` (§5.9) is `7 · 44100 · 2 =
-617400` bytes of PCM — the test renders it and checks the file is that size,
+Because the move lasts exactly `8 s`, its `.wav` (§5.9) is `8 · 44100 · 2 =
+705600` bytes of PCM — the test renders it and checks the file is that size,
 which proves the acoustic stream really spans the whole simulation and not
 just a snippet.
 
@@ -771,11 +747,10 @@ integration carrying it forward.
 
 ## 11. Specimen API
 
-All of the code below is behind an **opt-in gate**. `physical_stepper.h`
-defines `FAS_PHYSICAL_STEPPER_ENABLED` (default 0); the header compiles an
-inert stub while the macro is 0, so no build can lose the ideal stepper by
-accident. Only a test that *wants* dynamics turns it on — one `#define` at the
-top of its file — so every kinematic test keeps the ideal model untouched.
+All of the code below is behind an **opt-in gate**: `physical_stepper.h`
+defines `FAS_PHYSICAL_STEPPER_ENABLED` (default 0); while 0 the header compiles
+an inert stub, so no build can lose the ideal stepper, and only a test that
+*wants* dynamics adds a `#define` at the top of its file.
 
 ```cpp
 #ifndef FAS_PHYSICAL_STEPPER_H
@@ -917,7 +892,7 @@ gnuplot traces so they can be compared on equal footing.
 `test_27.gnuplot` multiplot beside them. Columns are
 `t x x_c delta w a tau friction stall phase`; the six panels are position,
 step error, speed, **raw rotor acceleration**, force/friction, and the stall
-observation — exactly the parameters the review asked to see.
+observation.
 
 ### 12.2 FasNAxis coupling (`test_26.cpp` F21)
 
@@ -960,33 +935,3 @@ low-frequency rumble at the start and end of every side.
 4. **Fixed-point port.** Convert §9's `double` model to the `log2/` table
    style; validate bit-identical stall detection.
 
----
-
-## 14. Summary
-
-`physical_stepper` is a header-only, deterministic, rotordynamic plant that
-replaces the ideal stepper *at the queue boundary*. Its public vocabulary is
-**steps**; the full-step span `D` is the plant's private business. It models
-inertia (`J`), a **single friction force** that grows with speed from a small
-Coulomb floor and saturates at `Fmax` (there is *no* separate viscous-drag
-term), and a **bounded, sinusoidal magnetic
-coupling**
-`τ(delta) = −Fmax·sin(π·delta/D)`
-between the commanded and actual rotor positions — zero at the command, peak
-opposition at half a full step, and zero again one full step away (and
-periodic thereafter). The 100 % error condition is no longer a separate rule:
-it is the *observation* that the rotor/field position difference
-§5.5 (a full step behind and still slipping). Because the force is periodic,
-a command that outruns the
-rotor makes that force self-average to zero, friction slows the rotor, and
-`|delta|` runs away — the stall. A pause is the decisive case: the detent force
-stays in full effect on the frozen command, brakes the coasting rotor hard, and
-the resumed command then out-runs `Fmax`. Re-engagement (§5.5.1) is likewise not
-implemented: slow the command again and the same integration re-captures the
-rotor onto the nearest whole-step detent — the lost steps stay lost. A hybrid
-acoustic model derives the emitted hum from the actual rotor position, gated by
-the force curve, and writes it to a playable `.wav`. It reports position,
-speed, acceleration, force/friction and the stall observation as a gnuplot time
-series, giving the PC test suite the
-same *physical* failure modes a real motor exhibits — without a timer, without
-hardware, and without non-determinism.
