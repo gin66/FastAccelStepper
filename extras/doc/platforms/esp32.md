@@ -200,16 +200,16 @@ be run at the former command's tick rate. For real life stepper application, thi
 should be ok. To be considered for raw access: Do not run many steps at high rate
 e.g. 200kSteps/s followed by a pause.
 
-What are the differences between mcpwm/pcnt, rmt, and i2s mux?
+What are the differences between mcpwm/pcnt, rmt, i2s mux, and i2s direct?
 
-|                            | mcpwm/pcnt                              | rmt                                                                           | i2s mux                         |
-|:---------------------------|:----------------------------------------|:------------------------------------------------------------------------------|:--------------------------------|
-|Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed | one interrupt per 500µs (all)   |
-|Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          | 500µs for all steppers combined |
-|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           | 1 i2s                           |
-|Max steppers                | 6 + 8 rmt                               | 8 (ESP32), 4 (ESP32S3)                                                        | 32 (I2S slots) + rmt            |
-|esp32 notes                 | available pcnt modules can be connected | no pcnt module used, so can be attached to rmt output as realtime position    | synchronized outputs            |
-|Min step period             | ~5µs                                    | ~5µs                                                                          | ~25µs                           |
+|                            | mcpwm/pcnt                              | rmt                                                                           | i2s mux                         | i2s direct                          |
+|:---------------------------|:----------------------------------------|:------------------------------------------------------------------------------|:--------------------------------|:------------------------------------|
+|Interrupt rate/stepper      | one interrupt per command               | min: one interrupt per command, max: one interrupt per 31 steps at high speed | one interrupt per 500µs (all)   | one interrupt per 500µs (per ch)    |
+|Required interrupt response | at high speed: time between two steps   | at high speed: time between 31 steps                                          | 500µs for all steppers combined | 500µs per stepper                   |
+|Module usage                | 1 or 2 mcpcms, up to 6 channels of pcnt | rmt                                                                           | 1 i2s                           | 1 i2s controller per stepper        |
+|Max steppers                | 6                                       | 8 (ESP32), 4 (ESP32S3)                                                        | 32 (I2S slots) + rmt            | 1-3 (I2S controllers)               |
+|esp32 notes                 | available pcnt modules can be connected | no pcnt module used, so can be attached to rmt output as realtime position    | synchronized outputs            | bit-level timing, one controller per stepper |
+|Min step period             | ~5µs                                    | ~5µs                                                                          | ~25µs                           | ~5µs                                |
 
 If the interrupt load is not an issue, then rmt is the better choice. With rmt
 the multi-axis mention of loss of synchonicity at high speeds can be avoided. The

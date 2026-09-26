@@ -29,23 +29,23 @@ For memory footprint information across supported architectures, see the
 
 ## Supported platforms
 
-| Platform | Max step rate | Steppers | Cmd queue depth | Doc |
-|----------|---------------|----------|-----------------|-----|
-| AVR ATmega 168/328 | 50 kSteps/s | 1-2 | 16 | [avr.md](extras/doc/platforms/avr.md) |
-| AVR ATmega32u4 | 50 kSteps/s | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
-| AVR ATmega2560 | 50 kSteps/s | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
-| ESP32 (IDF 4.x) | 200 kSteps/s | 14 (6 MCPWM/PCNT + 8 RMT) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32 (IDF 5.3+) | 200 kSteps/s [1] | 14 (6 MCPWM/PCNT + 8 RMT) + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-S2 | 200 kSteps/s [1] | 4 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-S3 | 200 kSteps/s [1] | 4 MCPWM/PCNT + 4 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-C3 | 200 kSteps/s [1] | 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-C6 | 200 kSteps/s [1] | 2 MCPWM/PCNT + 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| ESP32-P4 | 200 kSteps/s [1] | 4 RMT + 32 I2S * [2] | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| Raspberry Pi Pico | 200 kSteps/s | 4 (8 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
-| Raspberry Pi Pico 2 | 200 kSteps/s | 8 (12 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
-| Atmel SAM Due | 50 kSteps/s | 6 | 32 | [sam.md](extras/doc/platforms/sam.md) |
-| Microchip SAMD51 | 100 kSteps/s | 3-5 | 32 | [samd51.md](extras/doc/platforms/samd51.md) |
-| Teensy 4.0/4.1 (exp.) | 200 kSteps/s | 16 | 32 | [teensy.md](extras/doc/platforms/teensy.md) |
+| Platform | Max step rate [kSteps/s] | Steppers | Cmd queue depth | Doc |
+|----------|--------------------------|----------|-----------------|-----|
+| AVR ATmega 168/328 | 50 | 1-2 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| AVR ATmega32u4 | 50 | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| AVR ATmega2560 | 50 | 3 | 16 | [avr.md](extras/doc/platforms/avr.md) |
+| ESP32 (IDF 4.x) | 200 | 14 (6 MCPWM/PCNT + 8 RMT) | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32 (IDF 5.3+) | 200 [1] | 14 (6 MCPWM/PCNT + 8 RMT) + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-S2 | 200 [1] | 4 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-S3 | 200 [1] | 4 MCPWM/PCNT + 4 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-C3 | 200 [1] | 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-C6 | 200 [1] | 2 MCPWM/PCNT + 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| ESP32-P4 | 200 [1] | 4 RMT + 32 I2S * [2] | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
+| Raspberry Pi Pico | 200 | 4 (8 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Raspberry Pi Pico 2 | 200 | 8 (12 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Atmel SAM Due | 50 | 6 | 32 | [sam.md](extras/doc/platforms/sam.md) |
+| Microchip SAMD51 | 100 | 3-5 | 32 | [samd51.md](extras/doc/platforms/samd51.md) |
+| Teensy 4.0/4.1 (exp.) | 200 | 16 | 32 | [teensy.md](extras/doc/platforms/teensy.md) |
 
 Notes:
 
