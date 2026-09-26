@@ -29,55 +29,46 @@ Td ... deceleration time.
 The total ramp time is Ta + Tc + Td = T 
 
 Due to acceleration = deceleration, the related times Ta and Td are same.
-$$
-T=2*Ta+Tc
-$$
+Since Ta = Td:
+
+    T = 2*Ta + Tc
 
 The steps executed in coasting are simply:
-$$
-steps_{coasting} = v * Tc
-$$
+
+    steps_coasting = v * Tc
 
 The steps executed during acceleration and deceleration are:
-$$
-steps_{acceleration} = 0.5 * a * Ta²
-$$
+
+    steps_acceleration = 0.5 * a * Ta²
 
 The total steps are:
-$$
-\begin{align}
-steps &= steps_{acceleration} + steps_{coasting} + steps_{deceleration} \\
-      &= 2 * steps_{acceleration} + steps_{coasting}                    \\
-      &= a * Ta² + v * Tc                                               \\
-      &= a * Ta² + (a * Ta) * Tc                                        \\
-      &= a * Ta * (Ta + Tc)                                             \\
-      &= a * Ta * (T - Ta)
-\end{align}
-$$
+
+    steps = steps_acceleration + steps_coasting + steps_deceleration
+            = 2 * steps_acceleration + steps_coasting
+            = a * Ta² + v * Tc
+            = a * Ta² + (a * Ta) * Tc
+            = a * Ta * (Ta + Tc)
+            = a * Ta * (T - Ta)
 This can be rearranged to calculate the required acceleration to perform `steps` during the total ramp time T and acceleration time Ta:
-$$
-a = \frac{steps}{ Ta * (T - Ta) }
-$$
+
+    a = steps / (Ta * (T - Ta))
 
 # Calculation example
 
 The stepper motor should perform 32000 steps in 10s.
 
 The required acceleration and speed for different acceleration times are calculated as this:
-$$
-\begin{align}
-Ta = 1s => a &= \frac{32000}{1 * 9}  steps/s² = 3556 steps/s² \\
-           v &= a*Ta = 3556 steps/s => 281us/step \\
-Ta = 2s => a &= \frac{32000}{2 * 8} steps/s² = 2000 steps/s² \\
-           v &= a*Ta = 4000 steps/s => 250us/step \\
-Ta = 3s => a &= \frac{32000}{3 * 7} steps/s² = 1524 steps/s² \\
-           v &= a*Ta = 4571 steps/s => 218us/step \\
-Ta = 4s => a &= \frac{32000}{4 * 6} steps/s² = 1333 steps/s² \\
-           v &= a*Ta = 5333 steps/s => 188us/step \\
-Ta = 5s => a &= \frac{32000}{5 * 5} steps/s² = 1280 steps/s² \\
-           v &= a*Ta = 6400 steps/s => 156us/step
-\end{align}
-$$
+
+    Ta = 1s => a = 32000 / (1 * 9) steps/s² = 3556 steps/s²
+               v = a*Ta = 3556 steps/s => 281us/step
+    Ta = 2s => a = 32000 / (2 * 8) steps/s² = 2000 steps/s²
+               v = a*Ta = 4000 steps/s => 250us/step
+    Ta = 3s => a = 32000 / (3 * 7) steps/s² = 1524 steps/s²
+               v = a*Ta = 4571 steps/s => 218us/step
+    Ta = 4s => a = 32000 / (4 * 6) steps/s² = 1333 steps/s²
+               v = a*Ta = 5333 steps/s => 188us/step
+    Ta = 5s => a = 32000 / (5 * 5) steps/s² = 1280 steps/s²
+               v = a*Ta = 6400 steps/s => 156us/step
 
 As commands for the StepperDemo:
 ```
@@ -96,22 +87,17 @@ that any command issued to the command queue meets this requirement.
 With high acceleration this can get problematic coming from or going to stand still.
 
 The required condition to meet this requirement is:
-$$
-    steps * \frac{1}{v} \ge T_{CMD}
-$$
 
-From stand still the speed after `MIN_CMD_TICKS`is:
-$$
-    v_{start} = a * T_{CMD}
-$$
+    steps * (1/v) ≥ T_CMD
+
+From stand still the speed after `MIN_CMD_TICKS` is:
+
+    v_start = a * T_CMD
 
 So the related condition for steps is:
-$$
-\begin{align}
-    steps * \frac{1}{a * T_{CMD}} &\ge T_{CMD}  \\
-    steps &\ge a * T_{CMD}^2 
-\end{align}
-$$
+
+    steps * (1 / (a * T_CMD)) ≥ T_CMD
+    steps ≥ a * T_CMD²
 
 Based on this there can be deducted two problems:
 
