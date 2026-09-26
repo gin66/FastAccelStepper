@@ -9,7 +9,7 @@ static IRAM_ATTR bool i2s_tx_done_callback(i2s_chan_handle_t handle,
                                            i2s_event_data_t* event,
                                            void* user_ctx) {
   I2sManager* mgr = static_cast<I2sManager*>(user_ctx);
-  uint8_t* buf = (uint8_t*)event->dma_buf;
+  uint8_t* buf = static_cast<uint8_t*>(event->dma_buf);
   mgr->handleTxDone(buf);
   return false;
 }
@@ -98,7 +98,7 @@ bool I2sManager::init() {
 }
 
 void IRAM_ATTR I2sManager::init_mux_buffer(uint8_t* buf) {
-  uint32_t* b = (uint32_t*)buf;
+  uint32_t* b = static_cast<uint32_t*>(buf);
   uint8_t i = I2S_BYTES_PER_BLOCK / 4;
   do {
     b[--i] = _mux_state;

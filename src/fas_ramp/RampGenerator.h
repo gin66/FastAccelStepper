@@ -37,7 +37,7 @@ class RampGenerator {
   inline uint32_t getSpeedInTicks() const {
     return _parameters.min_travel_ticks;
   }
-  uint32_t divForMilliHz(uint32_t f) const {
+  static uint32_t divForMilliHz(uint32_t f) {
     uint32_t base = (uint32_t)250 * TICKS_PER_S;
     uint32_t res = base / f;
     base -= res * f;
@@ -47,7 +47,7 @@ class RampGenerator {
     res += base / f;
     return res;
   }
-  uint32_t divForHz(uint32_t f) const {
+  static uint32_t divForHz(uint32_t f) {
     uint32_t base = TICKS_PER_S;
     base += f / 2;  // add rounding
     uint32_t res = base / f;

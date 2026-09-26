@@ -124,7 +124,7 @@ static bool push_command(StepperQueue* q) {
   if (pio_sm_is_tx_fifo_full(q->pio, q->sm)) {
     return false;
   }
-  struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+  const struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
   uint8_t steps = e_curr->steps;
   uint16_t ticks = e_curr->ticks;
   bool dirHigh = e_curr->dirPinState == 1;
@@ -270,7 +270,8 @@ static void pio2_fifo_irq_handler() { pio_fifo_irq_handler(pio2); }
 #endif
 
 void StepperTask(void* parameter) {
-  FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
+  FastAccelStepperEngine* engine =
+      static_cast<FastAccelStepperEngine*>(parameter);
   while (true) {
     engine->manageSteppers();
     const TickType_t delay_time =

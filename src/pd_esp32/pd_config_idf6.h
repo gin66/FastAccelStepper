@@ -127,6 +127,7 @@
 //
 //==========================================================================
 #else
+// cppcheck-suppress preprocessorErrorDirective
 #error "Unsupported derivate"
 #endif
 
@@ -161,6 +162,7 @@
 #ifdef NEED_RMT_HEADERS
 #include <driver/rmt_tx.h>
 #include <esp_idf_version.h>
+// cppcheck-suppress syntaxError
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(6, 0, 0)
 #include <hal/rmt_periph.h>
 #else

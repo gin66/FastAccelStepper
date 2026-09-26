@@ -76,7 +76,7 @@ void PWM_Handler(void) {
       continue;
     }
     PWMCHANNELMAPPING* mapping = &gChannelMap[queue_num];
-    q->driver_data = (void*)mapping;
+    q->driver_data = static_cast<void*>(mapping);
 
     Pio* port = mapping->port;
 
@@ -85,7 +85,7 @@ void PWM_Handler(void) {
       continue;
     }
     rp = ++q->read_idx;
-    struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];
+    const struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];
     if (rp == q->next_write_idx) {
       q->_hasISRactive = false;
       q->_pauseCommanded = false;
@@ -136,62 +136,62 @@ inline void attachPWMPeripheral(Pio* port, uint8_t pin, uint32_t channelMask) {
 #define ISRQueueName(Q) Queue##Q##ISR
 #define ISRQueueNameStr(Q) "Queue" #Q "ISR"
 
-#define DUE_STEPPER_ISR(Q)                                              \
-  void Queue##Q##ISR() {                                                \
-    static StepperQueue* const q = &fas_queue[Q];                       \
-    const PWMCHANNELMAPPING* mapping =                                  \
-        static_cast<const PWMCHANNELMAPPING*> fas_queue[Q].driver_data; \
-    static uint32_t channel = mapping->channel;                         \
-    static uint32_t samPin = g_APinDescription[mapping->pin].ulPin;     \
-    static Pio* port = mapping->port;                                   \
-    if (!q->_hasISRactive || q->_pauseCommanded) {                      \
-      return;                                                           \
-    }                                                                   \
-    IncrementQueue(Q);                                                  \
-    uint8_t rp = q->read_idx;                                           \
-    if (rp == q->next_write_idx) {                                      \
-      return;                                                           \
-    }                                                                   \
-    struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];             \
-    uint8_t s = --e->steps;                                             \
-    if (s == 0) {                                                       \
-      if (e->toggle_dir) {                                              \
-        e->toggle_dir = 0;                                              \
-        *q->_dirPinPort ^= q->_dirPinMask;                              \
-      }                                                                 \
-      rp++;                                                             \
-      if (rp == q->next_write_idx) {                                    \
-        delayMicroseconds(10);                                          \
-        disconnectPWMPeripheral(mapping->port, mapping->pin,            \
-                                mapping->channelMask);                  \
-        q->_hasISRactive = false;                                       \
-        q->_connected = false;                                          \
-        q->read_idx = rp;                                               \
-        return;                                                         \
-      }                                                                 \
-      e = &q->entry[rp & QUEUE_LEN_MASK];                               \
-      q->read_idx = rp;                                                 \
-      if (e->steps == 0 || !e->hasSteps) {                              \
-        delayMicroseconds(7);                                           \
-        q->_pauseCommanded = true;                                      \
-        q->timePWMInterruptEnabled = micros();                          \
-        PWM_INTERFACE->PWM_IER1 = mapping->channelMask;                 \
-        port->PIO_CODR = samPin;                                        \
-        port->PIO_OER = samPin;                                         \
-        port->PIO_PER = samPin;                                         \
-        port->PIO_IDR = samPin;                                         \
-        PWM_INTERFACE->PWM_CH_NUM[channel].PWM_CPRDUPD = e->ticks;      \
-        return;                                                         \
-      }                                                                 \
-      AddToTotalSteps(Q, e->steps);                                     \
-      PWM_INTERFACE->PWM_CH_NUM[channel].PWM_CPRDUPD = e->ticks;        \
-      if (e->toggle_dir) {                                              \
-        e->toggle_dir = 0;                                              \
-        *q->_dirPinPort ^= q->_dirPinMask;                              \
-        delayMicroseconds(30);                                          \
-      }                                                                 \
-      return;                                                           \
-    }                                                                   \
+#define DUE_STEPPER_ISR(Q)                                               \
+  void Queue##Q##ISR() {                                                 \
+    static StepperQueue* const q = &fas_queue[Q];                        \
+    const PWMCHANNELMAPPING* mapping =                                   \
+        static_cast<const PWMCHANNELMAPPING*>(fas_queue[Q].driver_data); \
+    static uint32_t channel = mapping->channel;                          \
+    static uint32_t samPin = g_APinDescription[mapping->pin].ulPin;      \
+    static Pio* port = mapping->port;                                    \
+    if (!q->_hasISRactive || q->_pauseCommanded) {                       \
+      return;                                                            \
+    }                                                                    \
+    IncrementQueue(Q);                                                   \
+    uint8_t rp = q->read_idx;                                            \
+    if (rp == q->next_write_idx) {                                       \
+      return;                                                            \
+    }                                                                    \
+    struct queue_entry* e = &q->entry[rp & QUEUE_LEN_MASK];              \
+    uint8_t s = --e->steps;                                              \
+    if (s == 0) {                                                        \
+      if (e->toggle_dir) {                                               \
+        e->toggle_dir = 0;                                               \
+        *q->_dirPinPort ^= q->_dirPinMask;                               \
+      }                                                                  \
+      rp++;                                                              \
+      if (rp == q->next_write_idx) {                                     \
+        delayMicroseconds(10);                                           \
+        disconnectPWMPeripheral(mapping->port, mapping->pin,             \
+                                mapping->channelMask);                   \
+        q->_hasISRactive = false;                                        \
+        q->_connected = false;                                           \
+        q->read_idx = rp;                                                \
+        return;                                                          \
+      }                                                                  \
+      e = &q->entry[rp & QUEUE_LEN_MASK];                                \
+      q->read_idx = rp;                                                  \
+      if (e->steps == 0 || !e->hasSteps) {                               \
+        delayMicroseconds(7);                                            \
+        q->_pauseCommanded = true;                                       \
+        q->timePWMInterruptEnabled = micros();                           \
+        PWM_INTERFACE->PWM_IER1 = mapping->channelMask;                  \
+        port->PIO_CODR = samPin;                                         \
+        port->PIO_OER = samPin;                                          \
+        port->PIO_PER = samPin;                                          \
+        port->PIO_IDR = samPin;                                          \
+        PWM_INTERFACE->PWM_CH_NUM[channel].PWM_CPRDUPD = e->ticks;       \
+        return;                                                          \
+      }                                                                  \
+      AddToTotalSteps(Q, e->steps);                                      \
+      PWM_INTERFACE->PWM_CH_NUM[channel].PWM_CPRDUPD = e->ticks;         \
+      if (e->toggle_dir) {                                               \
+        e->toggle_dir = 0;                                               \
+        *q->_dirPinPort ^= q->_dirPinMask;                               \
+        delayMicroseconds(30);                                           \
+      }                                                                  \
+      return;                                                            \
+    }                                                                    \
   }
 
 DUE_STEPPER_ISR(0)
@@ -240,7 +240,7 @@ inline uint32_t pinToChannel(uint32_t pin) {
 
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
   _queue_num = queue_num;
-  driver_data = (void*)&gChannelMap[queue_num];
+  driver_data = static_cast<void*>(&gChannelMap[queue_num]);
   _step_pin = step_pin;
   channelsUsed[pinToChannel(step_pin)] = true;
   numChannels++;
@@ -295,7 +295,7 @@ void StepperQueue::connect() {
                 g_APinDescription[_step_pin].ulPin,
                 g_APinDescription[_step_pin].ulPinConfiguration);
   const PWMCHANNELMAPPING* mapping =
-      static_cast<const PWMCHANNELMAPPING*> driver_data;
+      static_cast<const PWMCHANNELMAPPING*>(driver_data);
   PWMC_ConfigureChannel(PWM_INTERFACE, mapping->channel, PWM_CMR_CPRE_MCK_DIV_4,
                         0, 0);
 
@@ -342,8 +342,7 @@ void StepperQueue::connect() {
 
 void StepperQueue::disconnect() {
   const PWMCHANNELMAPPING* mapping =
-
-      (const PWMCHANNELMAPPING*)driver_data;
+      static_cast<const PWMCHANNELMAPPING*>(driver_data);
   PWMC_DisableChannel(PWM_INTERFACE, mapping->channel);
   PWM_INTERFACE->PWM_DIS = PWM_INTERFACE->PWM_DIS & (~mapping->channelMask);
   _connected = false;

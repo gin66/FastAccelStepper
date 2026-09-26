@@ -118,6 +118,11 @@ class Remaining {
     return deltas[axis * n_blocks + block];
   }
 
+  // Adapts delta_of to the (block, axis) order used by linear_remaining.
+  static int32_t delta_at(const Remaining& r, int b, int axis) {
+    return r.delta_of(axis, b);
+  }
+
   // Section 8.1 per-axis parse from head block `head`. Walks forward,
   // summing |delta| until idle-after-move or a sign flip; HORIZON caps the
   // number of blocks touched. The last buffered point is rest, so an open
@@ -158,9 +163,8 @@ class Remaining {
   // the slower-envelope preparation is not applied (call linear_remaining).
   int32_t remaining_linear_binder(int axis, int head) const {
     (void)axis;
-    return (int32_t)linear_remaining<8>(
-        head, n_blocks, n_axes, NULL, NULL, horizon,
-        [this](int b, int ax) -> int32_t { return delta_of(ax, b); });
+    return (int32_t)linear_remaining<8>(head, n_blocks, n_axes, NULL, NULL,
+                                        horizon, *this);
   }
 
 #endif /* FAS_NAXIS_REFERENCE */
@@ -213,6 +217,18 @@ class Remaining {
     return false;
   }
 
+  // The delta source is either a 2D block array or a callable (block, axis).
+  // Overloading lets the array be passed directly without wrapping it in a
+  // lambda at the call site.
+  template <int N>
+  static int32_t delta_at(const int32_t (*blk)[N], int b, int axis) {
+    return blk[b][axis];
+  }
+  template <typename Delta>
+  static int32_t delta_at(const Delta& delta, int b, int axis) {
+    return delta(b, axis);
+  }
+
   // Linear R from `head`: master steps to the next hard stop. When `ticks`
   // and `accel` are both set, a role change that raises ticks_floor shortens
   // R so the incoming ramp reaches the outgoing period before the vertex
@@ -227,25 +243,31 @@ class Remaining {
       return 0;
     }
     int32_t blk[N];
+#ifndef FAS_NAXIS_NO_CROSS_BLOCK_R
     int32_t nxt[N];
+#endif
     for (int i = 0; i < N; i++) {
       blk[i] = 0;
+#ifndef FAS_NAXIS_NO_CROSS_BLOCK_R
       nxt[i] = 0;
+#endif
     }
     for (int i = 0; i < n_axes; i++) {
-      blk[i] = delta(head, i);
+      blk[i] = delta_at(delta, head, i);
     }
     if (block_idle(blk, n_axes)) {
       return 0;
     }
     uint32_t sum = 0;
     uint32_t best = 0xFFFFFFFFU;
+#ifndef FAS_NAXIS_NO_CROSS_BLOCK_R
     int included = 0;
     bool limit_h = horizon != 0 && horizon != 0xFFFFFFFFU;
+#endif
     for (int b = head; b < n_blocks; b++) {
       if (b != head) {
         for (int i = 0; i < n_axes; i++) {
-          blk[i] = delta(b, i);
+          blk[i] = delta_at(delta, b, i);
         }
         if (block_idle(blk, n_axes)) {
           break;
@@ -254,11 +276,11 @@ class Remaining {
       int m = longest_axis(blk, ticks, n_axes);
       int32_t ad = blk[m] > 0 ? blk[m] : -blk[m];
       sum += (uint32_t)ad;
-      included++;
 #ifdef FAS_NAXIS_NO_CROSS_BLOCK_R
       best = sum;
       break;
-#endif
+#else
+      included++;
       if (limit_h && included >= (int)horizon) {
         break;
       }
@@ -266,7 +288,7 @@ class Remaining {
         break;
       }
       for (int i = 0; i < n_axes; i++) {
-        nxt[i] = delta(b + 1, i);
+        nxt[i] = delta_at(delta, b + 1, i);
       }
       if (linear_joint_stops(blk, nxt, ticks, n_axes)) {
         break;
@@ -286,6 +308,7 @@ class Remaining {
           }
         }
       }
+#endif
     }
     if (best < sum) {
       return best;

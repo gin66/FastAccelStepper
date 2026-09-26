@@ -230,13 +230,7 @@ class LinearPoly {
   uint32_t remaining_path_steps(int head) const {
     uint32_t acc[2] = {accel, accel};
     return Remaining::linear_remaining<2>(head, rem->n_blocks, n_axes, ticks,
-                                          acc, rem->horizon,
-                                          [this](int b, int ax) -> int32_t {
-                                            if (ax >= n_axes) {
-                                              return 0;
-                                            }
-                                            return rem->delta_of(ax, b);
-                                          });
+                                          acc, rem->horizon, *rem);
   }
 
   uint32_t apply_law() {

@@ -89,11 +89,11 @@ static struct mapping_s channel2mapping[NUM_QUEUES] = {
 };
 
 static void IRAM_ATTR prepare_for_next_command(
-    StepperQueue* queue, const struct queue_entry* e_next) {
+    const StepperQueue* queue, const struct queue_entry* e_next) {
   uint8_t next_steps = e_next->steps;
   if (next_steps > 0) {
     const struct mapping_s* mapping =
-        (const struct mapping_s*)queue->driver_data;
+        static_cast<const struct mapping_s*>(queue->driver_data);
     pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
     // is updated only on zero
 #ifndef HAVE_ESP32S3_PULSE_COUNTER
@@ -110,7 +110,8 @@ static void IRAM_ATTR prepare_for_next_command(
 
 static void IRAM_ATTR apply_command(StepperQueue* queue,
                                     const struct queue_entry* e) {
-  const struct mapping_s* mapping = (const struct mapping_s*)queue->driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(queue->driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   (volatile mcpwm_dev_t)* mcpwm =
       mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -246,7 +247,8 @@ static void IRAM_ATTR init_stop(StepperQueue* q) {
   // init stop is normally called after the first command,
   // because the second command is entered too late
   // and after the last command aka running out of commands.
-  const struct mapping_s* mapping = (const struct mapping_s*)q->driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(q->driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   (volatile mcpwm_dev_t)* mcpwm =
       mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -273,11 +275,11 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
     rp++;
     q->read_idx = rp;
     if (rp != q->next_write_idx) {
-      struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+      const struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
       if (!isPrepared) {
         prepare_for_next_command(q, e_curr);  // a no-op for pause command
         const struct mapping_s* mapping =
-            (const struct mapping_s*)q->driver_data;
+            static_cast<const struct mapping_s*>(q->driver_data);
         isr_pcnt_counter_clear(mapping->pcnt_unit);
       }
       apply_command(q, e_curr);
@@ -287,7 +289,7 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
         // pauses, so prefetching after a pause leaves the previous step
         // count active (e.g. -26, pause, +10 ran as +26). The next ISR
         // prepares and clears instead.
-        struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
+        const struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
         q->_nextCommandIsPrepared = true;
         prepare_for_next_command(q, e_next);  // a no-op for pause command
       }
@@ -299,7 +301,7 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
 }
 
 static void IRAM_ATTR pcnt_isr_service(void* arg) {
-  StepperQueue* q = (StepperQueue*)arg;
+  StepperQueue* q = static_cast<StepperQueue*>(arg);
   what_is_next(q);
 }
 
@@ -349,7 +351,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   _step_pin = step_pin;
 
   const struct mapping_s* mapping = &channel2mapping[channel_num];
-  driver_data = (void*)mapping;
+  driver_data = static_cast<void*>(mapping);
 
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -388,7 +390,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
     PCNT.int_clr.val = PCNT.int_st.val;
     pcnt_isr_service_install(ESP_INTR_FLAG_SHARED | ESP_INTR_FLAG_IRAM);
   }
-  pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, (void*)this);
+  pcnt_isr_handler_add(pcnt_unit, pcnt_isr_service, static_cast<void*>(this));
 
   if (timer == 0) {
     // Init mcwpm module for use
@@ -510,7 +512,8 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
   // The time used by this command can have an impact
   digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
 #endif
-  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   (volatile mcpwm_dev_t)* mcpwm =
       mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -541,7 +544,8 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   if (isRunning()) {
     return true;
   }
-  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   (volatile mcpwm_dev_t)* mcpwm =
       mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -562,7 +566,8 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   // #endif                                           /* __ESP32_IDF_V44__ */
 }
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() const {
-  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
 #ifndef HAVE_ESP32S3_PULSE_COUNTER
   return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
 #else

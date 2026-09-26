@@ -179,7 +179,7 @@ class FastAccelStepperEngine {
   // If blinking of a LED is required to indicate, the stepper controller is
   // still running, then the port. to which the LED is connected, can be told to
   // the engine. The periodic task will let the associated LED blink with 1 Hz
-  void setDebugLed(uint8_t ledPin);
+  static void setDebugLed(uint8_t ledPin);
 
   /* This should be only called from ISR or stepper task. So do not call it */
   void manageSteppers();

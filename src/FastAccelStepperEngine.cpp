@@ -138,7 +138,7 @@ FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
 #else
 FastAccelStepper* FastAccelStepperEngine::stepperConnectToPin(
     uint8_t step_pin) {
-  StepperQueue* q = StepperQueue::tryAllocateQueue(this, step_pin);
+  const StepperQueue* q = StepperQueue::tryAllocateQueue(this, step_pin);
 #endif
   if (q == nullptr) {
     return nullptr;

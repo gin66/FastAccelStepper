@@ -310,7 +310,7 @@ static inline bool esp32_driver_is_i2s(const StepperQueue* q) {
 #endif
 }
 
-static inline uint8_t esp32_before_pause_count(StepperQueue* q) {
+static inline uint8_t esp32_before_pause_count(const StepperQueue* q) {
   if (esp32_driver_is_rmt(q)) {
 #if defined(SUPPORT_ESP32_RMT_V2)
     return 2;
@@ -338,7 +338,7 @@ static inline bool esp32_i2s_dir_is_mux_slot(StepperQueue* q) {
 #endif
 }
 
-static inline uint16_t esp32_before_pause_ticks(StepperQueue* q) {
+static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
   if (esp32_driver_is_rmt(q)) {
     return MIN_CMD_TICKS;
   }

@@ -62,6 +62,8 @@ class OvershootRun {
       sgn[i] = 0;
       prev[i] = 0;
       issued[i] = 0;
+      binding[i] = false;
+      Topt[i] = 0;
     }
   }
 

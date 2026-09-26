@@ -84,11 +84,11 @@ static inline mcpwm_dev_t* _mcpwm_for_timer(int timer_num) {
 }
 
 static void IRAM_ATTR prepare_for_next_command(
-    StepperQueue* queue, const struct queue_entry* e_next) {
+    const StepperQueue* queue, const struct queue_entry* e_next) {
   uint8_t next_steps = e_next->steps;
   if (next_steps > 0) {
     const struct mapping_s* mapping =
-        (const struct mapping_s*)queue->driver_data;
+        static_cast<const struct mapping_s*>(queue->driver_data);
     uint8_t pcnt_unit_id = mapping->pcnt_unit_id;
     PCNT.conf_unit[pcnt_unit_id].conf2.FAS_CNT_H_LIM = next_steps;
   }
@@ -96,7 +96,8 @@ static void IRAM_ATTR prepare_for_next_command(
 
 static void IRAM_ATTR apply_command(StepperQueue* queue,
                                     const struct queue_entry* e) {
-  const struct mapping_s* mapping = (const struct mapping_s*)queue->driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(queue->driver_data);
   mcpwm_dev_t* mcpwm = mapping->mcpwm;
   uint8_t pcnt_unit_id = mapping->pcnt_unit_id;
   uint8_t timer = mapping->timer_in_group;
@@ -142,7 +143,8 @@ static void IRAM_ATTR apply_command(StepperQueue* queue,
 }
 
 static void IRAM_ATTR init_stop(StepperQueue* q) {
-  const struct mapping_s* mapping = (const struct mapping_s*)q->driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(q->driver_data);
   mcpwm_dev_t* mcpwm = mapping->mcpwm;
   uint8_t timer = mapping->timer_in_group;
   mcpwm->timer[timer].timer_cfg1.timer_start = 0;
@@ -159,17 +161,17 @@ static void IRAM_ATTR what_is_next(StepperQueue* q) {
     rp++;
     q->read_idx = rp;
     if (rp != q->next_write_idx) {
-      struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
+      const struct queue_entry* e_curr = &q->entry[rp & QUEUE_LEN_MASK];
       if (!isPrepared) {
         prepare_for_next_command(q, e_curr);
         const struct mapping_s* mapping =
-            (const struct mapping_s*)q->driver_data;
+            static_cast<const struct mapping_s*>(q->driver_data);
         isr_pcnt_counter_clear(mapping->pcnt_unit_id);
       }
       apply_command(q, e_curr);
       rp++;
       if ((rp != q->next_write_idx) && (e_curr->steps != 0)) {
-        struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
+        const struct queue_entry* e_next = &q->entry[rp & QUEUE_LEN_MASK];
         q->_nextCommandIsPrepared = true;
         prepare_for_next_command(q, e_next);
       }
@@ -199,7 +201,7 @@ static void IRAM_ATTR pcnt_isr_handler(void* arg) {
 static bool IRAM_ATTR mcpwm_on_reach(mcpwm_cmpr_handle_t cmpr,
                                      const mcpwm_compare_event_data_t* edata,
                                      void* user_ctx) {
-  what_is_next((StepperQueue*)user_ctx);
+  what_is_next(static_cast<StepperQueue*>(user_ctx));
   return false;
 }
 
@@ -207,7 +209,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   _step_pin = step_pin;
 
   struct mapping_s* mapping = &channel2mapping[channel_num];
-  driver_data = (void*)mapping;
+  driver_data = static_cast<void*>(mapping);
 
   int timer_num = channel_num;
   uint8_t group_id = _group_for_timer(timer_num);
@@ -236,8 +238,9 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
       pcnt_channel_set_edge_action(pcnt_chan, PCNT_CHANNEL_EDGE_ACTION_INCREASE,
                                    PCNT_CHANNEL_EDGE_ACTION_HOLD));
 
-  mapping->pcnt_unit_id =
-      ((struct pcnt_unit_internal*)mapping->pcnt_unit)->unit_id;
+  struct pcnt_unit_internal* unit =
+      reinterpret_cast<struct pcnt_unit_internal*>(mapping->pcnt_unit);
+  mapping->pcnt_unit_id = unit->unit_id;
   mapping->timer_in_group = timer_in_group;
 
   PCNT.conf_unit[pcnt_unit_id].conf2.FAS_CNT_H_LIM = 1;
@@ -299,7 +302,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 
   mcpwm_comparator_event_callbacks_t cmpr_cbs = {.on_reach = mcpwm_on_reach};
   ESP_ERROR_CHECK_WITHOUT_ABORT(mcpwm_comparator_register_event_callbacks(
-      mapping->cmpr, &cmpr_cbs, (void*)this));
+      mapping->cmpr, &cmpr_cbs, static_cast<void*>(this)));
 
   mcpwm_dev_t* mcpwm = _mcpwm_for_timer(timer_num);
   mapping->mcpwm = mcpwm;
@@ -341,7 +344,8 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect_mcpwm_pcnt() {
-  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
   uint8_t step_pin = _step_pin;
   uint8_t pcnt_unit_id = mapping->pcnt_unit_id;
 
@@ -372,7 +376,8 @@ void StepperQueue::disconnect_mcpwm_pcnt() {
 }
 
 void StepperQueue::startQueue_mcpwm_pcnt() {
-  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
   ESP_ERROR_CHECK_WITHOUT_ABORT(pcnt_unit_clear_count(mapping->pcnt_unit));
 
   _isRunning = true;
@@ -396,7 +401,8 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   if (isRunning()) {
     return true;
   }
-  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
   uint8_t timer = mapping->timer_in_group;
   if (mapping->mcpwm->timer[timer].timer_status.timer_value > 1) {
     return false;
@@ -405,7 +411,8 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
 }
 
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() const {
-  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
+  const struct mapping_s* mapping =
+      static_cast<const struct mapping_s*>(driver_data);
   return PCNT.cnt_unit[mapping->pcnt_unit_id].FAS_CNT_VAL;
 }
 

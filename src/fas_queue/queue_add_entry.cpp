@@ -51,7 +51,9 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   struct queue_entry* e = &entry[wp & QUEUE_LEN_MASK];
   bool dir = (cmd->count_up == dirHighCountsUp);
   bool toggle_dir = false;
+#if defined(SUPPORT_PAUSE_CMD_COUNTING)
   bool dir_changed = false;
+#endif
 #if defined(SUPPORT_RP_PICO)
   if (isQueueEmpty() && !isRunning()) {
     // store the offset from pico sm's step count and position
@@ -59,6 +61,9 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   }
 #endif
   if (dirPin != PIN_UNDEFINED) {
+#if !defined(SUPPORT_PAUSE_CMD_COUNTING)
+    bool dir_changed;
+#endif
     dir_changed = (dir != queue_end.dir);
     if ((isQueueEmpty() && !isRunning()) &&
         ((dirPin & PIN_EXTERNAL_FLAG) == 0)) {

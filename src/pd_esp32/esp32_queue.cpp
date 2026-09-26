@@ -449,7 +449,8 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
 #endif  // SUPPORT_SELECT_DRIVER_TYPE && !SUPPORT_DYNAMIC_ALLOCATION
 
 void StepperTask(void* parameter) {
-  FastAccelStepperEngine* engine = (FastAccelStepperEngine*)parameter;
+  FastAccelStepperEngine* engine =
+      static_cast<FastAccelStepperEngine*>(parameter);
   while (true) {
     engine->manageSteppers();
 #if ESP_IDF_VERSION_MAJOR == 4
@@ -482,8 +483,6 @@ int32_t StepperQueue::getCurrentPosition() const {
     fasEnableInterrupts();
   }
   if (!is_empty) {
-    int16_t adjust = 0;
-
     uint16_t pos16 = pos & 0xffff;
     uint8_t transition = ((pos16 >> 12) & 0x0c) | (pos_last16 >> 14);
     switch (transition) {
@@ -513,11 +512,7 @@ int32_t StepperQueue::getCurrentPosition() const {
     pos = (int32_t)((pos & 0xffff0000) | pos_last16);
 
     if (steps != 0) {
-      if (e->countUp) {
-        adjust = done_p;
-      } else {
-        adjust = -done_p;
-      }
+      int16_t adjust = e->countUp ? done_p : -done_p;
       pos += adjust;
     }
   }

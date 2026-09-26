@@ -18,6 +18,7 @@ cppcheck \
   --suppress=unknownMacro \
   --suppress=knownConditionTrueFalse \
   --suppress=shadowFunction \
+  --inline-suppr \
   -DPROGMEM= \
   --force \
   --check-level=exhaustive \

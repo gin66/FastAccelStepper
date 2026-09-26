@@ -8,7 +8,7 @@
 static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
                                  const rmt_tx_done_event_data_t* edata,
                                  void* user_ctx) {
-  StepperQueue* q = (StepperQueue*)user_ctx;
+  StepperQueue* q = static_cast<StepperQueue*>(user_ctx);
   q->_isRunning = false;
   return false;
 }
@@ -35,7 +35,7 @@ static size_t IRAM_ATTR encode_commands(const void* data, size_t data_size,
   // this printf causes Guru Meditation
   // printf("encode commands\n");
 
-  StepperQueue* q = (StepperQueue*)arg;
+  StepperQueue* q = static_cast<StepperQueue*>(arg);
 
   *done = false;
   if (symbols_free < PART_SIZE) {

@@ -256,11 +256,9 @@ class FasNAxis {
     _dwell[_n_blk] = 0;
     _n_blk++;
     _block_count++;
-    if (_done) {
-      // A plan that had caught up to the buffer now has more path: feed the
-      // unexecuted tail on the next pump() (replan, section 8.7).
-      _done = false;
-    }
+    // A plan that had caught up to the buffer now has more path: feed the
+    // unexecuted tail on the next pump() (replan, section 8.7).
+    _done = false;
     return true;
   }
 
@@ -291,9 +289,7 @@ class FasNAxis {
     _dwell[_n_blk] = ticks;
     _n_blk++;
     _block_count++;
-    if (_done) {
-      _done = false;
-    }
+    _done = false;
     return true;
   }
 
@@ -798,9 +794,8 @@ class FasNAxis {
     for (uint8_t i = 0; i < NAXES; i++) {
       acc[i] = _lim[i].accel;
     }
-    return Remaining::linear_remaining<NAXES>(
-        head, _n_blk, NAXES, _tick_cfg, acc, 0xFFFFFFFFU,
-        [this](int b, int axis) -> int32_t { return _blk[b][axis]; });
+    return Remaining::linear_remaining<NAXES>(head, _n_blk, NAXES, _tick_cfg,
+                                              acc, 0xFFFFFFFFU, _blk);
   }
 
   // Section 8.6 per-axis scan from `head`: sum |delta_i| while axis i keeps its
