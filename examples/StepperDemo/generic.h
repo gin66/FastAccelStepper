@@ -63,11 +63,11 @@ uart_param_config(uart_num, &config);
 #endif
 
 #define PRINTLN puts
-#define PRINTU8(v) printf("%u", (unsigned)(v))
-#define PRINTU16(v) printf("%u", v)
-#define PRINTI16(v) printf("%d", v)
-#define PRINTU32(v) printf("%" PRIu32, v)
-#define PRINTI32(v) printf("%" PRIi32, v)
+#define PRINTU8(v) printf("%" PRIu8, (uint8_t)(v))
+#define PRINTU16(v) printf("%" PRIu16, (uint16_t)(v))
+#define PRINTI16(v) printf("%" PRId16, (int16_t)(v))
+#define PRINTU32(v) printf("%" PRIu32, (uint32_t)(v))
+#define PRINTI32(v) printf("%" PRIi32, (int32_t)(v))
 #define PRINTCH(ch) printf("%c", ch)
 #define PRINT(s) printf("%s", s)
 #define POLL_CHAR_IF_ANY(ch) \

@@ -170,7 +170,8 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
           uint32_t rmt_entry = ticks_low;
           rmt_entry <<= 16;
           rmt_entry |= ticks_high | 0x8000;  // with step
-          for (uint8_t i = 1; i <= steps_to_do; i++) {
+          // reuse existing i
+          for (i = 1; i <= steps_to_do; i++) {
             *data++ = rmt_entry;
           }
         }

@@ -32,9 +32,10 @@ static inline log2_value_t log2_pow_div_3(log2_value_t x) {
   uint16_t xu;
   xu = x < 0 ? -x : x;
   xu /= 2;        // x/2
-  xu += xu / 4;    // x/2 + x/8
-  xu += xu / 16;   // x/2 + x/8 + x/32 + x/128
-  xu += xu / 256;  // x/2 + x/8 + x/32 + x/128 + x/512 + x/2048 + x/8192 + x/32768
+  xu += xu / 4;   // x/2 + x/8
+  xu += xu / 16;  // x/2 + x/8 + x/32 + x/128
+  xu +=
+      xu / 256;  // x/2 + x/8 + x/32 + x/128 + x/512 + x/2048 + x/8192 + x/32768
   xu += 1;
   xu /= 2;
   x = (x < 0) ? -(int16_t)xu : xu;

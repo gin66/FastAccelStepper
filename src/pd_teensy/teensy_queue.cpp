@@ -85,8 +85,8 @@ void StepperQueue::primeFromQueue(uint8_t rp) {
   }
   if (e->hasSteps) {
     _remaining_ticks = (e->ticks > _pulse_ticks)
-                          ? (uint16_t)(e->ticks - _pulse_ticks)
-                          : (uint16_t)1;
+                           ? (uint16_t)(e->ticks - _pulse_ticks)
+                           : (uint16_t)1;
     digitalWriteFast(_step_pin, HIGH);
     _pulse_phase = true;
     _regs->COMP1 = _pulse_ticks;
@@ -149,20 +149,20 @@ void StepperQueue::handleCompareMatch() {
 // the flag-clear can appear to "not have happened" from the next ISR's
 // point of view, corrupting the edge-toggle state machine. TeensyStep4's
 // TMRModule::ISR() carries the same barrier with the same reasoning.
-#define TEENSY_TMR_ISR(N)                                             \
-  static void teensyTmrIsr##N() {                                     \
-    for (uint8_t ch = 0; ch < 4; ch++) {                              \
-      StepperQueue* q = queue_for_channel[N][ch];                     \
-      if (q == NULL) {                                                \
-        continue;                                                     \
-      }                                                                \
-      IMXRT_TMR_CH_t* regs = &tmr_module_regs[N]->CH[ch];             \
-      if (regs->CSCTRL & TMR_CSCTRL_TCF1) {                           \
-        regs->CSCTRL &= ~TMR_CSCTRL_TCF1;                             \
-        q->handleCompareMatch();                                      \
-      }                                                                \
-    }                                                                  \
-    asm volatile("dsb");                                              \
+#define TEENSY_TMR_ISR(N)                                 \
+  static void teensyTmrIsr##N() {                         \
+    for (uint8_t ch = 0; ch < 4; ch++) {                  \
+      StepperQueue* q = queue_for_channel[N][ch];         \
+      if (q == NULL) {                                    \
+        continue;                                         \
+      }                                                   \
+      IMXRT_TMR_CH_t* regs = &tmr_module_regs[N]->CH[ch]; \
+      if (regs->CSCTRL & TMR_CSCTRL_TCF1) {               \
+        regs->CSCTRL &= ~TMR_CSCTRL_TCF1;                 \
+        q->handleCompareMatch();                          \
+      }                                                   \
+    }                                                     \
+    asm volatile("dsb");                                  \
   }
 
 TEENSY_TMR_ISR(0)
@@ -257,9 +257,9 @@ void StepperQueue::startQueue() {
   primeFromQueue(rp);
 
   _regs->CSCTRL |= TMR_CSCTRL_TCF1EN;
-  _regs->CTRL =
-      TMR_CTRL_CM(1) | TMR_CTRL_PCS(0b1000 | FAS_TEENSY_TMR_PRESCALE) |
-      TMR_CTRL_LENGTH;
+  _regs->CTRL = TMR_CTRL_CM(1) |
+                TMR_CTRL_PCS(0b1000 | FAS_TEENSY_TMR_PRESCALE) |
+                TMR_CTRL_LENGTH;
 }
 
 void StepperQueue::forceStop() {

@@ -1,3 +1,4 @@
+#include <cinttypes>
 #include <stdint.h>
 
 #include "FastAccelStepper.h"
@@ -39,7 +40,8 @@ MoveResultCode RampGenerator::startRun(bool countUp) {
   _rw.startRampIfNotRunning();
 #ifdef DEBUG
   char buf[256];
-  sprintf(buf, "Ramp data: curr_ticks = %lu travel_ticks = %lu\n",
+  sprintf(buf,
+          "Ramp data: curr_ticks = %" PRIu32 " travel_ticks = %" PRIu32 "\n",
           _rw.curr_ticks, _parameters.min_travel_ticks);
   Serial.println(buf);
 #endif
@@ -55,7 +57,8 @@ void RampGenerator::_startMove(bool position_changed) {
   }
 
 #ifdef TEST
-  printf("Ramp data: go to %s %d  curr_ticks = %u travel_ticks = %u prus=%u\n",
+  printf("Ramp data: go to %s %" PRId32 " curr_ticks = %" PRIu32
+         " travel_ticks = %" PRIu32 " prus=%" PRIu32 "\n",
          _parameters.move_absolute ? "ABS" : "REL", _parameters.move_value,
          _rw.curr_ticks, _ro.config.parameters.min_travel_ticks,
          _rw.performed_ramp_up_steps);
@@ -63,8 +66,8 @@ void RampGenerator::_startMove(bool position_changed) {
 #ifdef DEBUG
   char buf[256];
   sprintf(buf,
-          "Ramp data: go to = %s %ld  curr_ticks = %lu travel_ticks = %lu "
-          "prus=%lu\n",
+          "Ramp data: go to = %s %" PRId32 "  curr_ticks = %" PRIu32
+          " travel_ticks = %" PRIu32 " prus=%" PRIu32 "\n",
           _parameters.move_absolute ? "ABS" : "REL", _parameters.move_value,
           _rw.curr_ticks, _ro.config.parameters.min_travel_ticks,
           _rw.performed_ramp_up_steps);
@@ -106,11 +109,10 @@ void RampGenerator::advanceTargetPosition(int32_t delta) {
 
 void RampGenerator::afterCommandEnqueued(const NextCommand* command) {
 #ifdef TEST
-  printf(
-      "after Command Enqueued: performed ramp up steps = %u, pause left = %u, "
-      "curr_ticks = %u\n",
-      command->rw.performed_ramp_up_steps, command->rw.pause_ticks_left,
-      command->rw.curr_ticks);
+  printf("after Command Enqueued: performed ramp up steps = %" PRIu32 
+         " pause left = %" PRIu32 ", curr_ticks = %" PRIu32 "\n",
+         command->rw.performed_ramp_up_steps, command->rw.pause_ticks_left,
+         command->rw.curr_ticks);
 #endif
   _rw = command->rw;
 }
@@ -189,15 +191,16 @@ void RampGenerator::getNextCommand(const struct queue_end_s* queue_end,
     uint32_t performed_ramp_up_steps =
         _ro.config.calculate_ramp_steps(curr_ticks);
 #ifdef TEST
-    printf("Recalculate performed_ramp_up_steps from %d to %d from %d ticks\n",
+    printf("Recalculate performed_ramp_up_steps from %" PRIu32 " to %" PRIu32
+           " from %" PRIu32 " ticks\n",
            _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
 #endif
 #ifdef DEBUG
     char buf[100];
-    sprintf(
-        buf,
-        "Recalculate performed_ramp_up_steps from %lu to %lu from %lu ticks\n",
-        _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
+    sprintf(buf,
+            "Recalculate performed_ramp_up_steps from %" PRIu32 " to %" PRIu32
+            " from %" PRIu32 " ticks\n",
+            _rw.performed_ramp_up_steps, performed_ramp_up_steps, curr_ticks);
     Serial.print(buf);
 #endif
     _rw.performed_ramp_up_steps = performed_ramp_up_steps;
@@ -212,12 +215,15 @@ void RampGenerator::getNextCommand(const struct queue_end_s* queue_end,
       target_pos -= _rw.performed_ramp_up_steps;
     }
 #ifdef TEST
-    printf("Force stop: adjust target position from %d to %d\n", _ro.target_pos,
-           target_pos);
+    printf("Force stop: adjust target position from %" PRIu32 " to %" PRIu32
+           "\n",
+           _ro.target_pos, target_pos);
 #endif
 #ifdef DEBUG
     char buf[100];
-    sprintf(buf, "Force stop: adjust target position from %ld to %ld\n",
+    sprintf(buf,
+            "Force stop: adjust target position from %" PRIu32 " to %" PRIu32
+            "\n",
             _ro.target_pos, target_pos);
     Serial.print(buf);
 #endif

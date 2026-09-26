@@ -79,8 +79,7 @@ class Remaining {
   // conservative margin rather than a bare sign. A zero factor is -infinity
   // (some +-0x4000). The value is a sum of four log2_from, so it carries up
   // to four units of rounding.
-  static int32_t log2_mul_diff(uint32_t a, uint32_t b, uint32_t c,
-                               uint32_t d) {
+  static int32_t log2_mul_diff(uint32_t a, uint32_t b, uint32_t c, uint32_t d) {
     bool first = a != 0 && b != 0;
     bool second = c != 0 && d != 0;
     if (!first || !second) {

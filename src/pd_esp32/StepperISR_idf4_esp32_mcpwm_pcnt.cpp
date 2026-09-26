@@ -112,7 +112,8 @@ static void IRAM_ATTR apply_command(StepperQueue* queue,
                                     const struct queue_entry* e) {
   const struct mapping_s* mapping = (const struct mapping_s*)queue->driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
-  mcpwm_dev_t* mcpwm = mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
+  (volatile mcpwm_dev_t)* mcpwm =
+      mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
   pcnt_unit_t pcnt_unit = mapping->pcnt_unit;
   uint8_t timer = mapping->timer;
   uint8_t steps = e->steps;
