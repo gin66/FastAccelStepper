@@ -341,7 +341,7 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
 }
 
 void StepperQueue::connect_mcpwm_pcnt() {
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
   uint8_t step_pin = _step_pin;
   uint8_t pcnt_unit_id = mapping->pcnt_unit_id;
 
@@ -370,7 +370,7 @@ void StepperQueue::disconnect_mcpwm_pcnt() {
 }
 
 void StepperQueue::startQueue_mcpwm_pcnt() {
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
   ESP_ERROR_CHECK_WITHOUT_ABORT(pcnt_unit_clear_count(mapping->pcnt_unit));
 
   _isRunning = true;
@@ -394,7 +394,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   if (isRunning()) {
     return true;
   }
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
   uint8_t timer = mapping->timer_in_group;
   if (mapping->mcpwm->timer[timer].timer_status.timer_value > 1) {
     return false;
@@ -403,7 +403,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
 }
 
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() const {
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
   return PCNT.cnt_unit[mapping->pcnt_unit_id].FAS_CNT_VAL;
 }
 

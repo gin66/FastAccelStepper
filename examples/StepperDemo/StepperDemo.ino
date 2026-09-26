@@ -840,7 +840,7 @@ int8_t get_val1_val2_val3(const char* cmd) {
   return -1;
 }
 
-bool process_cmd(char* cmd) {
+bool process_cmd(const char* cmd) {
   FastAccelStepper* stepper_selected = steppers[selected];
   uint16_t s = *cmd++;
   char* endptr;

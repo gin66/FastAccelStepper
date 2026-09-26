@@ -17,6 +17,7 @@ cppcheck \
   --suppress=ctuOneDefinitionRuleViolation \
   --suppress=unknownMacro \
   --suppress=knownConditionTrueFalse \
+  --suppress=shadowFunction \
   -DPROGMEM= \
   --force \
   --check-level=exhaustive \

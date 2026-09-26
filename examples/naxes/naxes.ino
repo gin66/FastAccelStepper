@@ -163,7 +163,7 @@ void waypoint_target(uint16_t i, int32_t* t) {
 #endif
     return;
   }
-  i -= 4;
+  // i -= 4;
 
   // ---- return to origin.
   t[0] = 0;

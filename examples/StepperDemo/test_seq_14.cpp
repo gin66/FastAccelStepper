@@ -111,9 +111,6 @@ bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
 #else
 bool test_seq_14(FastAccelStepper* stepper, struct test_seq_s* seq,
                  uint32_t time_ms) {
-  (void)stepper;
-  (void)seq;
-  (void)time_ms;
-  return true;
+  return test_seq_01(stepper, seq, time_ms);
 }
 #endif

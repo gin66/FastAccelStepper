@@ -510,7 +510,7 @@ void StepperQueue::startQueue_mcpwm_pcnt() {
   // The time used by this command can have an impact
   digitalWrite(TEST_PROBE, digitalRead(TEST_PROBE) == HIGH ? LOW : HIGH);
 #endif
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   (volatile mcpwm_dev_t)* mcpwm =
       mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -541,7 +541,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   if (isRunning()) {
     return true;
   }
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
   mcpwm_unit_t mcpwm_unit = mapping->mcpwm_unit;
   (volatile mcpwm_dev_t)* mcpwm =
       mcpwm_unit == MCPWM_UNIT_0 ? &MCPWM0 : &MCPWM1;
@@ -562,7 +562,7 @@ bool StepperQueue::isReadyForCommands_mcpwm_pcnt() const {
   // #endif                                           /* __ESP32_IDF_V44__ */
 }
 uint16_t StepperQueue::_getPerformedPulses_mcpwm_pcnt() const {
-  const struct mapping_s* mapping = (const struct mapping_s*)driver_data;
+  const struct mapping_s* mapping = static_cast<const struct mapping_s*>driver_data;
 #ifndef HAVE_ESP32S3_PULSE_COUNTER
   return PCNT.cnt_unit[mapping->pcnt_unit].cnt_val;
 #else

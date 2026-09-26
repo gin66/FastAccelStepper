@@ -267,7 +267,7 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 // needed_pause_ticks = MIN_CMD_TICKS: pause TEA at compare=1 applies the
 // following command (DIR) at the start of that pause, after STEP has gone
 // low at TEP of the last step.
-static inline bool esp32_driver_is_rmt(StepperQueue* q) {
+static inline bool esp32_driver_is_rmt(const StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_ESP32_RMT)
   return q->_driver_type == FasDriver::RMT;
@@ -281,7 +281,7 @@ static inline bool esp32_driver_is_rmt(StepperQueue* q) {
 #endif
 }
 
-static inline bool esp32_driver_is_mcpwm(StepperQueue* q) {
+static inline bool esp32_driver_is_mcpwm(const StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_ESP32_MCPWM_PCNT)
   return q->_driver_type == FasDriver::MCPWM_PCNT;
@@ -295,7 +295,7 @@ static inline bool esp32_driver_is_mcpwm(StepperQueue* q) {
 #endif
 }
 
-static inline bool esp32_driver_is_i2s(StepperQueue* q) {
+static inline bool esp32_driver_is_i2s(const StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_ESP32_I2S)
   return q->_driver_type == FasDriver::I2S_DIRECT ||
