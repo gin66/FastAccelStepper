@@ -1141,10 +1141,84 @@ between the two, so the report should quote the pair, not `J_eff` alone.
   acceleration is only weakly reproduced. The sharp A = 10⁷ boundary is also
   a knife-edge in `Fmax/J_eff`: because it depends on the ratio, the fit is
   well-conditioned in the ratio but not in `Fmax` and `J_eff` separately.
-* **It does not model** mid-band resonance (§5.7), which for this plant sits
-  near ≈610 Hz (well above the claimed 50–100 Hz band); the real driver's
-  low-frequency resonance is an electrical/closed-loop effect outside the
-  one-body mechanical model.
+* **It does not model** the *driver-level* mid-band instability: the
+  closed-loop/constant-current effect that makes a stepper growl and lose
+  torque in a band of step rates. That is outside the one-body mechanical
+  model. It is, however, a *different* thing from the rotor-detent mode of
+  §5.7, which the model **does** reproduce once `Fmax` is the effective
+  torque rather than the datasheet holding torque: a rough direct measurement
+  on the unloaded motor (§14.6) puts that mode near ≈335 Hz, against the
+  model's ≈380 Hz (fitted `J_eff`) / 304–465 Hz (effective-torque bracket).
+  The earlier ≈610 Hz figure — the bare-rotor prediction from the full
+  0.4 N·m holding torque — is not seen on the hardware.
+
+### 14.6 The rotor-detent resonance, measured
+
+§5.7 does not have to be taken on faith from datasheet numbers: the rotor
+mode can be **measured** on the same rig. The excitation that drives it is
+the full-step torque ripple (§5.4, §5.9), so the mode is excited when
+
+```
+full-step (excitation) rate = f_r / n,   n = 1, 2, 3, …
+```
+
+and a constant-speed sweep therefore shows a train of peaks at step periods
+
+```
+V_peak = 62 500 · n / f_r      (µs, for D = 16 µsteps/full step)
+```
+
+The peaks are evenly spaced in `V`; the **smallest-`V`** peak is the
+fundamental (`n = 1`) and gives `f_r` directly, while the `n ≥ 2` peaks are
+subharmonics — broader, and easier to feel by hand because the rotor swings
+at large amplitude at half the drive frequency.
+
+On the NEMA-17/A4988 rig of §14.1 (`D = 16`), a coarse hand sweep from ~150
+to ~600 µs/step (constant speed; listening to the motor and feeling the
+mount) was loud/feelable at two step periods:
+
+| V | full-step rate | tentative role | implied `f_r` | character |
+|---|----------------|----------------|---------------|-----------|
+| ≈188 µs | 332 Hz | fundamental (`n = 1`) | ≈332 Hz | sharp, audible |
+| ≈365 µs | 171 Hz | subharmonic (`n = 2`) | ≈342 Hz | broad, felt by hand |
+
+This is a **first look, not a calibrated measurement**: neither peak centre
+was found by search and neither width was measured, so the numbers below
+carry at least several-percent uncertainty, and the fundamental/subharmonic
+assignment rests only on the single ≈2:1 spacing plus the qualitative
+"broader" observation. Taken at face value the two points are consistent
+with one mode near
+
+```
+f_r ≈ 335 Hz (rough).
+```
+
+The mode is mechanical and repeatable — not a one-off electrical glitch —
+and it brackets the model's prediction. Inverting
+`f_r = (1/2π)√(2π·Fmax/(J·θ_full))` (with `Fmax = 0.4 N·m`, `θ_full = 1.8°`):
+
+| `f_r` reading | implied `J` | matches |
+|---------------|-------------|---------|
+| 335 Hz (measured) | ≈ 1.7–1.8e-5 kg·m² (170–180 g·cm²) at `Fmax = 0.4` | §14.4 fit `J_eff` ≈ 1.4e-5 |
+| 380 Hz (model, fitted `J_eff`) | 1.4e-5 (140 g·cm²) | — |
+| 335 Hz at `Fmax_eff = 0.15–0.23` | ≈ 0.68–1.04e-5 (68–104 g·cm²) | bare rotor (54–82 g·cm²) |
+
+Even at this coarse resolution two things line up. First, the observed
+≈335 Hz is within roughly 10–15 % of the model's ≈380 Hz using the §14.4
+fit — the model does *not* put the rotor mode out of reach. Second, the
+mode is better explained by the effective-torque reading of §14.4
+(`Fmax_eff ≈ 0.15–0.23 N·m`, bare-rotor inertia) than by the 0.4 N·m
+holding torque with a 140 g·cm² inertia; the hardware is at least
+consistent with effective torque and gives no sign of the bare-rotor
+≈610 Hz figure.
+
+To turn this into a real number the peak must be *characterised*, not merely
+noticed: (a) search each candidate `V` finely to locate the **centre** of
+the response (maximum loudness/vibration), and (b) measure its **half-power
+width** to obtain the damping factor `Q`. A ring-down of the phase current
+with the driver energized, or a shaft encoder, yields both `f_r` and the
+width without the harmonic ambiguity. Until then the value here should be
+read as order-of-magnitude.
 
 The data set, the harness and the fit live in `test_28.cpp`; the pull-out
 boundary and the runs/stalls classifications above are asserted there and run
