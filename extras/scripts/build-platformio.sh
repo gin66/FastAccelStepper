@@ -45,11 +45,11 @@ do
 		  echo $p: Skipping $i for $p due to space constraints
 		  continue
 		fi
-		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/naxes" ]; then
+		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/NaxesAFAP" ]; then
 		  echo $p: Skipping $i for $p due to space constraints
 		  continue
 		fi
-		if [ "$p" = "atmega32u4" ] && [ "$i" = "pio_dirs/naxes" ]; then
+		if [ "$p" = "atmega32u4" ] && [ "$i" = "pio_dirs/NaxesAFAP" ]; then
 		  echo $p: Skipping $i for $p due to space constraints
 		  continue
 		fi

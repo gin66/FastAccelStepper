@@ -372,7 +372,8 @@ Tests;
 
   The closing fixture streams a square through a ring of 8 chunks. Each
   side rises from about 440 Hz to 2500 Hz over about a second, then falls
-  back to a stop over about a second. The ladder is examples/timed/timed_ramp.h.
+  back to a stop over about a second. The ladder is
+  examples/NaxesTimed/NaxesTimed_ramp.h.
   It writes test_29.dat,
   test_29.gnuplot (path, position, speed), and test_29.wav (stereo: first
   motor left, second motor right).

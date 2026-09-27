@@ -167,7 +167,7 @@ horizon, and a PC-checkable oracle.
 | G4 | Parse lookahead until end or direction change → `R_i` is the cap on ramp-steps (`P_i ≤ R_i`). Path direction implies the other axes’ speeds. Short `R` **reduces speed**, it is not an error. Angle changes need accel/decel **preparation** (§8.4) |
 | G5 | Execution through `addQueueEntry()`. Timekeeping pauses never flip DIR. The planner inserts the driver’s before/after DIR pauses after the reversing axis’s last step (period kept, so the step rate never jumps); only that axis’s timeline grows, no other axis is paused (§4.4). An injected pause the plan did not carve is an error |
 | G6 | Tick-level timebase shared by all axes; lost sync is a hard error |
-| G7 | Host PC harness is the primary check (exhaustive); on-target validation (simavr, hardware) runs `examples/naxes/` |
+| G7 | Host PC harness is the primary check (exhaustive); on-target validation (simavr, hardware) runs `examples/NaxesAFAP/` |
 | G8 | 2D / 3D tests dump gnuplot (as `test_02` / `test_08` / `test_15` do) and may dump a self-contained HTML page |
 | G9 | **Header-only.** One public include, pulled in only by sketches that need it. No extra `.cpp` in `src/`, not referenced from `FastAccelStepper.h` |
 | G10 | Production header: **no `float`**, **no integer `/` in kinematics**. Period, speed, and accel use `log2_value_t` and `RampCalculator` (same as the single-axis generator). PC oracles may use double under `FAS_NAXIS_TRACE` |
@@ -851,7 +851,7 @@ fastest; the path never needs to stop. Each axis therefore runs
 from 0 to `v_max` over a quarter turn and back, and the master
 reaches `v_max` exactly when the other axis reverses. The old
 “Linear path-stops at every >2° chord” behaviour would instead
-stop all 48 chords of one turn — the regression `test_naxes`
+stop all 48 chords of one turn — the regression `test_NaxesAFAP`
 counts as path stops (`detect_geometry.py`).
 
 ### 6.4 Overshoot
@@ -1754,10 +1754,10 @@ extras/tests/pc_based/
 extras/n_axes/
   viewer_template.html
   tests/out/                   // generated HTML, gitignored
-examples/naxes/                // 3-axis example: helix -> hexagon -> square -> origin
-pio_dirs/naxes/                // generated CI wrapper (build-pio-dirs.sh)
+examples/NaxesAFAP/            // 3-axis example: helix -> hexagon -> square -> origin
+pio_dirs/NaxesAFAP/            // generated CI wrapper (build-pio-dirs.sh)
 extras/tests/simavr_based/
-  test_naxes/                  // simavr run of the example + geometry judge
+  test_NaxesAFAP/              // simavr run of the example + geometry judge
     detect_geometry.py         // reconstruct the curve, count path stops
 ```
 

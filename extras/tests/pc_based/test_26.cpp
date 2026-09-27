@@ -42,7 +42,7 @@
 #include "naxis_plot.h"
 #include "naxis_ref.h"
 #include "naxis_sim_port.h"
-#include "../../../examples/naxes/naxes_path.h"
+#include "../../../examples/NaxesAFAP/NaxesAFAP_path.h"
 #ifdef FAS_NAXIS_TRACE
 #include "naxis_html_dump.h"
 #endif
@@ -5359,11 +5359,11 @@ static void f22_external_stop() {
   printf("F22 external stop / emergencyStop green\n");
 }
 
-// One turn of the naxes example helix (12 chords per quarter, 7.5 deg, not
+// One turn of the NaxesAFAP example helix (12 chords per quarter, 7.5 deg, not
 // collinear). The master does not reverse at those chords, so the turn
 // cruises. The square-corner stop is a different joint and is not in this
 // polyline.
-static int32_t naxes_q_axis(int q, int16_t mag, int16_t rad, bool x_axis) {
+static int32_t NaxesAFAP_q_axis(int q, int16_t mag, int16_t rad, bool x_axis) {
   if (x_axis) {
     switch (q) {
       case 0:
@@ -5395,8 +5395,8 @@ static void f_coarse_helix_cruises() {
     int j = i % n;
     int q = j / NAXES_QSAMPLES;
     int k = j % NAXES_QSAMPLES;
-    pts[i][0] = naxes_q_axis(q, NAXES_SIN_Q[k], NAXES_COS_Q[k], true);
-    pts[i][1] = naxes_q_axis(q, NAXES_SIN_Q[k], NAXES_COS_Q[k], false);
+    pts[i][0] = NaxesAFAP_q_axis(q, NAXES_SIN_Q[k], NAXES_COS_Q[k], true);
+    pts[i][1] = NaxesAFAP_q_axis(q, NAXES_SIN_Q[k], NAXES_COS_Q[k], false);
   }
   Remaining rem(2, n);
   for (int i = 0; i < n; i++) {
@@ -5404,7 +5404,7 @@ static void f_coarse_helix_cruises() {
     rem.set_block(i, d);
   }
   test(collinear_same_sense(rem, 0, 1) == false,
-       "naxes helix chord is outside the 2 deg band");
+       "NaxesAFAP helix chord is outside the 2 deg band");
   const uint32_t ticks[2] = {4000, 4000};
   const uint32_t accel = 2000;
   int32_t end_pos[2], issued[2];
@@ -5413,23 +5413,23 @@ static void f_coarse_helix_cruises() {
   int nv = 0;
   ref_walk_polyline(&rem, ticks, accel, end_pos, issued, &env, &plr, vp, &nv,
                     64, NULL, NULL, NULL);
-  test(env && plr, "naxes helix envelope and P <= R");
-  test(nv == n, "naxes helix has one sample per chord");
+  test(env && plr, "NaxesAFAP helix envelope and P <= R");
+  test(nv == n, "NaxesAFAP helix has one sample per chord");
   int rests = 0;
   for (int i = 2; i < n - 2; i++) {
     if (vp[i] <= 1) {
       rests++;
     }
   }
-  test(rests == 0, "naxes helix interior chords cruise");
-  printf("naxes helix: chords=%d interior_rests=%d joint_P_mid=%u\n", n, rests,
-         vp[n / 2]);
+  test(rests == 0, "NaxesAFAP helix interior chords cruise");
+  printf("NaxesAFAP helix: chords=%d interior_rests=%d joint_P_mid=%u\n", n,
+         rests, vp[n / 2]);
 }
 
 // P3: the block array must be a sliding window of at most HORIZON *pending*
 // points, not a buffer that back-pressures after HORIZON points have ever
 // been appended. Otherwise any path longer than HORIZON is executed in
-// chunks that each ramp to rest, which is what made the naxes example stop
+// chunks that each ramp to rest, which is what made the NaxesAFAP example stop
 // on helix chords in simavr.
 static void f_sliding_ring() {
   const int horizon = 4;

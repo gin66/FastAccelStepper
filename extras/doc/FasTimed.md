@@ -20,7 +20,7 @@ queued (default 8). `Stepper` and `Engine` default to `FastAccelStepper`
 and `FastAccelStepperEngine`.
 
 A hardware sketch that plays a one-second rise and a one-second fall on
-each side of a square is [examples/timed](../../examples/timed/README.md).
+each side of a diamond is [examples/NaxesTimed](../../examples/NaxesTimed/README.md).
 
 Each chunk is already one queue command, so the ring stays small. A longer
 move adds chunks, calls `pump` when `addDelta` returns `Rejected`, and

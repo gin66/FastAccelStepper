@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# detect_geometry.py -- naxes geometry detector.
+# detect_geometry.py -- NaxesAFAP geometry detector.
 #
-# The simavr run of examples/naxes emits a VCD (x.vcd) of the step / dir pins
+# The simavr run of examples/NaxesAFAP emits a VCD (x.vcd) of the step / dir pins
 # for each axis (StepA/DirA, StepB/DirB, and on three-axis builds
 # StepC/DirC). This tool reconstructs each axis's integer position over time
 # from the step edges and the direction level at each edge -- the same
@@ -38,16 +38,16 @@
 import math
 import sys
 
-# Geometry constants, kept identical to examples/naxes/naxes_path.h so the
+# Geometry constants, kept identical to examples/NaxesAFAP/NaxesAFAP_path.h so the
 # expected landmarks match what the sketch commands.
 RADIUS = 400
 HELIX_TURNS = 3
 HELIX_Z_PER_TURN = 100
-HELIX_QSAMPLES = 12   # naxes_path.h NAXES_QSAMPLES: chords per quarter turn
+HELIX_QSAMPLES = 12   # NaxesAFAP_path.h NAXES_QSAMPLES: chords per quarter turn
 HELIX_Z_MAX = HELIX_TURNS * HELIX_Z_PER_TURN
 SQUARE_HALF = 300
 HEX_R = RADIUS
-HEX_Y = RADIUS * 866 // 1000   # 0.866*R, integer, as in naxes_path.h
+HEX_Y = RADIUS * 866 // 1000   # 0.866*R, integer, as in NaxesAFAP_path.h
 
 # Tolerances (steps). The DDA chord makes the realized curve land within a few
 # steps of the commanded vertices; the corner points are addWaypoint targets and are
@@ -86,7 +86,7 @@ def reconstruct_from_vcd(path):
     """Reconstruct per-axis position over time from a simavr VCD.
 
     A rising edge of Step<A|B|C> is one step on that axis; the axis increments
-    when its Dir pin is high (every naxes axis is wired
+    when its Dir pin is high (every NaxesAFAP axis is wired
     direction_high_count_up) and decrements otherwise. Returns
     (trace, times, names): the (x, y, z) position tuples, the VCD timestamp of
     each, and the step channel names, in time order. times is what count_stops()

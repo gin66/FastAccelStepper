@@ -1,4 +1,4 @@
-# Multi-axis naxes example: the curve is validated by the NEW geometry
+# Multi-axis NaxesAFAP example: the curve is validated by the NEW geometry
 # detector (detect_geometry.py), not by judge.awk against this file.
 #
 # This expect.txt exists only to satisfy the generic top-level harness

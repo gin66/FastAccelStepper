@@ -1,8 +1,8 @@
-# naxes example smoothness (hardware / simavr)
+# NaxesAFAP example smoothness (hardware / simavr)
 
 Priority: **P3** — end-to-end validation; depends on P1 and P2.
 
-Status: **implemented**. simavr `test_naxes` runs under the geometry
+Status: **implemented**. simavr `test_NaxesAFAP` runs under the geometry
 detector and passes with `stops=11` (`MAX_PATH_STOPS = 11`). The 11 are
 the legitimate stops: rest at the start, the helix entry (the incoming
 master reverses), the four hexagon corners where an in-line axis goes
@@ -11,7 +11,7 @@ origin. No helix chord stops.
 
 ## Problem
 
-On hardware the `examples/naxes/` run stops both motors at every helix
+On hardware the `examples/NaxesAFAP/` run stops both motors at every helix
 chord (`~1 stop/s`); the square alternates the axes. This is the Linear
 per-vertex path-stop, not pump timing or an AVR speed problem — the slow
 points land exactly on the helix vertices and the run is underrun-free
@@ -38,7 +38,7 @@ window of at most `HORIZON` *pending* points as whitepaper §8 describes.
    the application's `pump()` interval. Done.
 3. `FasNAxis::addWaypoint()` slides the block ring, so a path longer than
    `HORIZON` no longer ramps to rest at each ring boundary. Done.
-4. Re-run `extras/tests/simavr_based/test_naxes` and tune
+4. Re-run `extras/tests/simavr_based/test_NaxesAFAP` and tune
    `MAX_PATH_STOPS` in `detect_geometry.py` to the legitimate stops
    (11, not the 144 helix chords). Done.
 5. Re-check on hardware; keep the fixed path/geometry constants. Open —
@@ -46,5 +46,5 @@ window of at most `HORIZON` *pending* points as whitepaper §8 describes.
 
 ## References
 
-- `examples/naxes/`, `extras/tests/simavr_based/test_naxes/`
+- `examples/NaxesAFAP/`, `extras/tests/simavr_based/test_NaxesAFAP/`
 - `extras/doc/n_axes_whitepaper.md` §6.3 worked circle model

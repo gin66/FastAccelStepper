@@ -1,17 +1,17 @@
-#ifndef NAXES_PINS_AVR_H
-#define NAXES_PINS_AVR_H
+#ifndef NAXES_AFAP_PINS_AVR_H
+#define NAXES_AFAP_PINS_AVR_H
 
 #include "StepperConfig.h"
 
-// One unified config array, naxes_config_0, regardless of platform.
+// One unified config array, NaxesAFAP_config_0, regardless of platform.
 // ATmega168/328/328p expose only two step channels (OC1A / OC1B), so the third
 // axis is omitted and NAXES_HW becomes 2. ATmega2560 and the 32U4 expose
 // OC1A/OC1B/OC1C, giving a full three-axis config.
 
 #if defined(__AVR_ATmega328P__) || defined(__AVR_ATmega328__) || \
     defined(__AVR_ATmega168__)
-const uint8_t naxes_led_pin = PIN_UNDEFINED;
-const struct stepper_config_s naxes_config_0[] = {
+const uint8_t NaxesAFAP_led_pin = PIN_UNDEFINED;
+const struct stepper_config_s NaxesAFAP_config_0[] = {
     {
       step : stepPinStepper1A,  // OC1A, digital 9
       enable_low_active : 6,    // PD6
@@ -39,8 +39,8 @@ const struct stepper_config_s naxes_config_0[] = {
 
 #else
 // ATmega2560 / ATmega32U4: three step channels OC1A / OC1B / OC1C.
-const uint8_t naxes_led_pin = PIN_UNDEFINED;
-const struct stepper_config_s naxes_config_0[] = {
+const uint8_t NaxesAFAP_led_pin = PIN_UNDEFINED;
+const struct stepper_config_s NaxesAFAP_config_0[] = {
     {
       step : stepPinStepper1A,  // OC1A
       enable_low_active : PIN_UNDEFINED,

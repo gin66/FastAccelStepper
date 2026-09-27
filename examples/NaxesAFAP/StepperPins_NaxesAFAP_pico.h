@@ -1,13 +1,13 @@
-#ifndef NAXES_PINS_PICO_H
-#define NAXES_PINS_PICO_H
+#ifndef NAXES_AFAP_PINS_PICO_H
+#define NAXES_AFAP_PINS_PICO_H
 
 #include "StepperConfig.h"
 
 // Raspberry Pi Pico / Pico W / nanorp2040connect: GPIO is not fixed to a timer
 // channel, so three axes are wired freely. Placeholder assignments to be
 // adapted to the actual wiring.
-const uint8_t naxes_led_pin = LED_BUILTIN;
-const struct stepper_config_s naxes_config_0[] = {
+const uint8_t NaxesAFAP_led_pin = LED_BUILTIN;
+const struct stepper_config_s NaxesAFAP_config_0[] = {
     {
       step : 14,
       enable_low_active : 13,

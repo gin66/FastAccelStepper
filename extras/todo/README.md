@@ -43,12 +43,12 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
   parameter), and the kick-off releases all active queues in one engine
   operation. The per-platform native mechanisms remain tracked above. See
   [engine_synchronized_start.md](../doc/implemented/engine_synchronized_start.md).
-- **naxes example smoothness — implemented.** simavr `test_naxes` passes
+- **NaxesAFAP example smoothness — implemented.** simavr `test_NaxesAFAP` passes
   with 11 legitimate stops (`MAX_PATH_STOPS = 11`); no helix chord stops.
   P3 also found and fixed the block ring not sliding past `HORIZON`
   (`FasNAxis::compact_ring()`), which had chunked any path longer than
   `HORIZON` into per-ring ramp-to-rest segments. See
-  [naxes_example_smoothness.md](../doc/implemented/naxes_example_smoothness.md).
+  [NaxesAFAP_example_smoothness.md](../doc/implemented/NaxesAFAP_example_smoothness.md).
 - **naxes log2 product compares — implemented.** The production naxes
   planner has no 64-bit type and no fake 64-bit emulation: the `binder_axis`
   tie-break, the Overshoot uniform schedule, and the Overshoot cap compare
@@ -71,7 +71,7 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 - **Feeder command batching — implemented.** The ramp generator's
   command size: one step when the period is already at least 1 ms, and
   about 2 ms of equal-period steps when it is shorter. Productive code
-  uses 32-bit integers only; `naxes` on the ATmega328 is 27384 bytes
+  uses 32-bit integers only; `NaxesAFAP` on the ATmega328 is 27384 bytes
   (limit 30720). See
   [feeder_command_batching.md](../doc/implemented/feeder_command_batching.md) and
   whitepaper §4.3.1.
@@ -85,9 +85,9 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
   decision: n > 2 PC tests use `FasNAxis<N, HORIZON, SimPort>`;
   1- and 2-axis golden paths use real FAS queues (whitepaper §4.7).
 - **simavr / hardware / PlatformIO jobs for FasNAxis — implemented.**
-  `examples/naxes/` (helix → hexagon → square → origin, one
+  `examples/NaxesAFAP/` (helix → hexagon → square → origin, one
   `FastAccelStepper` per axis) builds for every CI architecture;
-  `extras/tests/simavr_based/test_naxes/` runs it on the ATmega328p and
+  `extras/tests/simavr_based/test_NaxesAFAP/` runs it on the ATmega328p and
   `detect_geometry.py` judges the reconstructed curve. The 16 KB
   ATmega168 and the ATmega32u4 are skipped by `build-platformio.sh` for
   space.

@@ -1,4 +1,4 @@
-// naxes — a three-axis FasNAxis example (whitepaper
+// NaxesAFAP — a three-axis FasNAxis example (whitepaper
 // extras/doc/n_axes_whitepaper.md). One FastAccelStepper per axis X/Y/Z, no
 // gantry, driven in time-synchronized lockstep by a single FasNAxis planner.
 //
@@ -11,32 +11,32 @@
 // platform wires three axes.
 //
 // The stepper pin table is selected by architecture, following the StepperDemo
-// pattern: each platform header provides the naxes_config_0[] array.
+// pattern: each platform header provides the NaxesAFAP_config_0[] array.
 
 // FastAccelStepper.h must come first: it defines PIN_UNDEFINED / FasDriver,
 // which StepperConfig.h (pulled in by every pin table) uses.
 #include "FastAccelStepper.h"
 
 #if defined(ARDUINO_ARCH_AVR)
-#include "StepperPins_naxes_avr.h"
+#include "StepperPins_NaxesAFAP_avr.h"
 #elif defined(ARDUINO_ARCH_SAMD)
-#include "StepperPins_naxes_sam.h"
+#include "StepperPins_NaxesAFAP_sam.h"
 #elif defined(ARDUINO_ARCH_SAM)
-#include "StepperPins_naxes_sam.h"
+#include "StepperPins_NaxesAFAP_sam.h"
 #elif defined(ARDUINO_ARCH_RP2040)
-#include "StepperPins_naxes_pico.h"
+#include "StepperPins_NaxesAFAP_pico.h"
 #elif defined(ARDUINO_ARCH_RP2350)
-#include "StepperPins_naxes_pico.h"
+#include "StepperPins_NaxesAFAP_pico.h"
 #elif defined(ARDUINO_ARCH_ESP32)
-#include "StepperPins_naxes_esp32.h"
+#include "StepperPins_NaxesAFAP_esp32.h"
 #else
-#error "naxes: no pin table for this platform"
+#error "NaxesAFAP: no pin table for this platform"
 #endif
 
 #include "StepperConfig.h"
 #include "generic.h"
 #include "FasNAxis.h"
-#include "naxes_path.h"
+#include "NaxesAFAP_path.h"
 
 #ifdef SIMULATOR
 #include <avr/sleep.h>
@@ -59,18 +59,18 @@
 // FastAccelStepperEngine owns the steppers and the cyclic fill ISR that keeps
 // the planner-fed queues alive.
 FastAccelStepperEngine engine = FastAccelStepperEngine();
-FastAccelStepper* naxes_s[NAXES_HW] = {NULL};
+FastAccelStepper* NaxesAFAP_s[NAXES_HW] = {NULL};
 
 // The planner. HORIZON must hold enough of the path for a smooth ramp while
 // still fitting the small AVR parts; NAXES_HORIZON is 64 points on the
 // two-axis build and 48 on the three-axis one.
-FasNAxis<NAXES_HW, NAXES_HORIZON> naxes_planner(FasNAxisConfig{}, engine);
+FasNAxis<NAXES_HW, NAXES_HORIZON> NaxesAFAP_planner(FasNAxisConfig{}, engine);
 
 // Index of the waypoint currently being commanded. 0 is the first addWaypoint
 // after the origin; the run finishes when it reaches total_waypoints().
-static uint16_t naxes_wp_index = 0;
+static uint16_t NaxesAFAP_wp_index = 0;
 // The path is fully emitted and the queues have drained.
-static bool naxes_done = false;
+static bool NaxesAFAP_done = false;
 
 // Quarter index q in 0..3, within-quarter sample k in 0..NAXES_QSAMPLES-1.
 // mag = R*sin(k*90/Q), rad = R*cos(k*90/Q). The four quarters place a vertex
@@ -185,28 +185,29 @@ void setup() {
 
   // Connect one stepper per axis. The pin table carries NAXES_HW valid
   // entries followed by the STEPPER_CONFIG_END sentinel.
-  const struct stepper_config_s* cfg = naxes_config_0;
+  const struct stepper_config_s* cfg = NaxesAFAP_config_0;
   for (uint8_t i = 0; i < NAXES_HW; i++) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-    naxes_s[i] = engine.stepperConnectToPin(cfg[i].step, cfg[i].driver_type);
+    NaxesAFAP_s[i] =
+        engine.stepperConnectToPin(cfg[i].step, cfg[i].driver_type);
 #else
-    naxes_s[i] = engine.stepperConnectToPin(cfg[i].step);
+    NaxesAFAP_s[i] = engine.stepperConnectToPin(cfg[i].step);
 #endif
-    if (naxes_s[i] == NULL) {
+    if (NaxesAFAP_s[i] == NULL) {
       // No Serial here: it would drag Print/println into the flash image and
       // the small AVR parts have no room for it.
       while (1) {
       }
     }
-    naxes_s[i]->setDirectionPin(cfg[i].direction,
-                                cfg[i].direction_high_count_up);
+    NaxesAFAP_s[i]->setDirectionPin(cfg[i].direction,
+                                    cfg[i].direction_high_count_up);
     if (cfg[i].enable_low_active != PIN_UNDEFINED) {
-      naxes_s[i]->setEnablePin(cfg[i].enable_low_active);
+      NaxesAFAP_s[i]->setEnablePin(cfg[i].enable_low_active);
     }
-    naxes_s[i]->setAutoEnable(cfg[i].auto_enable);
+    NaxesAFAP_s[i]->setAutoEnable(cfg[i].auto_enable);
     // A gentle but brisk profile so the whole path runs in a few seconds.
-    naxes_s[i]->setSpeedInHz(400);
-    naxes_s[i]->setAcceleration(1200);
+    NaxesAFAP_s[i]->setSpeedInHz(400);
+    NaxesAFAP_s[i]->setAcceleration(1200);
   }
 
   // Without auto enable the outputs must be enabled and settled before the
@@ -217,35 +218,35 @@ void setup() {
     DELAY_US(cfg[0].on_delay_us);
   }
   for (uint8_t i = 0; i < NAXES_HW; i++) {
-    naxes_s[i]->enableOutputs();
+    NaxesAFAP_s[i]->enableOutputs();
   }
   DELAY_US(100);
-  naxes_planner.addAxis(0, naxes_s[0]);
+  NaxesAFAP_planner.addAxis(0, NaxesAFAP_s[0]);
 #if NAXES_HW >= 2
-  naxes_planner.addAxis(1, naxes_s[1]);
+  NaxesAFAP_planner.addAxis(1, NaxesAFAP_s[1]);
 #endif
 #if NAXES_HW >= 3
-  naxes_planner.addAxis(2, naxes_s[2]);
+  NaxesAFAP_planner.addAxis(2, NaxesAFAP_s[2]);
 #endif
-  naxes_planner.setLimitsFromSteppers();
+  NaxesAFAP_planner.setLimitsFromSteppers();
 
   // Start at the origin and open the path.
   int32_t origin[NAXES_HW] = {0};
-  naxes_planner.setCurrentPosition(origin);
+  NaxesAFAP_planner.setCurrentPosition(origin);
 }
 
 void loop() {
-  if (!naxes_done) {
+  if (!NaxesAFAP_done) {
     // Feed the next waypoint target, but only when the planner's ring has room.
     // addWaypoint() drains as the queues run, so this one target per pass keeps
     // the ring from filling.
-    if (naxes_wp_index < total_waypoints()) {
+    if (NaxesAFAP_wp_index < total_waypoints()) {
       int32_t t[NAXES_HW] = {0};
-      waypoint_target(naxes_wp_index, t);
-      if (naxes_planner.addWaypoint(t)) {
-        naxes_wp_index++;
-        if (naxes_wp_index >= total_waypoints()) {
-          naxes_planner.endPath();
+      waypoint_target(NaxesAFAP_wp_index, t);
+      if (NaxesAFAP_planner.addWaypoint(t)) {
+        NaxesAFAP_wp_index++;
+        if (NaxesAFAP_wp_index >= total_waypoints()) {
+          NaxesAFAP_planner.endPath();
         }
       }
     }
@@ -254,14 +255,14 @@ void loop() {
   // Plan and feed the committed path into the stepper queues. The engine's
   // cyclic ISR (manageSteppers, via the timer) emits the step / dir pins;
   // pump() keeps the queues fed.
-  naxes_planner.pump();
+  NaxesAFAP_planner.pump();
 
-  if (!naxes_planner.isBusy() && naxes_wp_index >= total_waypoints()) {
+  if (!NaxesAFAP_planner.isBusy() && NaxesAFAP_wp_index >= total_waypoints()) {
 #ifdef SIMULATOR
     noInterrupts();
     sleep_cpu();
 #else
-    naxes_done = true;
+    NaxesAFAP_done = true;
 #endif
   }
 }

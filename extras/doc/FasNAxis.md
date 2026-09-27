@@ -19,7 +19,7 @@ FasNAxis<NAXES, HORIZON, Stepper, Engine>
 ahead of the motion (default 64). `Stepper` and `Engine` default to
 `FastAccelStepper` and `FastAccelStepperEngine`.
 
-A full sketch is in [examples/naxes](../../examples/naxes/README.md). The
+A full sketch is in [examples/NaxesAFAP](../../examples/NaxesAFAP/README.md). The
 motion rules are in the [whitepaper](n_axes_whitepaper.md).
 
 ## Setup

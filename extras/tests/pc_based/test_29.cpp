@@ -18,7 +18,7 @@
 #include "FasTimed.h"
 #include "fas_arch/test_pc.h"
 #include "naxis_sim_port.h"
-#include "../../../examples/timed/timed_ramp.h"
+#include "../../../examples/NaxesTimed/NaxesTimed_ramp.h"
 
 void inject_fill_interrupt(int mark) {}
 void noInterrupts() {}
@@ -475,7 +475,7 @@ static void t_stop_and_inject() {
 }
 
 // A square streamed through a ring of 8 chunks. The pitch ladder is
-// examples/timed/timed_ramp.h: about one second rising from 440 Hz to
+// examples/NaxesTimed/NaxesTimed_ramp.h: about one second rising from 440 Hz to
 // 2500 Hz, then about one second falling back to a stop. The trace is
 // test_29.dat / test_29.gnuplot; the first two motors are the left and
 // right channels of test_29.wav.
@@ -519,13 +519,14 @@ static void push_hold(Seg* s, int* n, int axis, int sign, uint16_t period,
 }
 
 static void push_side(Seg* s, int* n, int axis, int sign) {
-  for (unsigned i = 0; i < sizeof(kTimedUpPeriod) / sizeof(kTimedUpPeriod[0]);
-       i++) {
-    push_hold(s, n, axis, sign, kTimedUpPeriod[i], kTimedUpHold);
+  for (unsigned i = 0;
+       i < sizeof(kNaxesTimedUpPeriod) / sizeof(kNaxesTimedUpPeriod[0]); i++) {
+    push_hold(s, n, axis, sign, kNaxesTimedUpPeriod[i], kNaxesTimedUpHold);
   }
   for (unsigned i = 0;
-       i < sizeof(kTimedDownPeriod) / sizeof(kTimedDownPeriod[0]); i++) {
-    push_hold(s, n, axis, sign, kTimedDownPeriod[i], kTimedDownHold);
+       i < sizeof(kNaxesTimedDownPeriod) / sizeof(kNaxesTimedDownPeriod[0]);
+       i++) {
+    push_hold(s, n, axis, sign, kNaxesTimedDownPeriod[i], kNaxesTimedDownHold);
   }
 }
 
@@ -730,8 +731,8 @@ static void t_square_trace() {
 
   SimPort x(500, 64);
   SimPort y(500, 64);
-  x.setAcceleration(kTimedAccel);
-  y.setAcceleration(kTimedAccel);
+  x.setAcceleration(kNaxesTimedAccel);
+  y.setAcceleration(kNaxesTimedAccel);
   FasTimed<2, 8, SimPort, TestFastAccelStepperEngine> plan(g_engine);
   test(plan.addAxis(0, &x), "trace add X");
   test(plan.addAxis(1, &y), "trace add Y");

@@ -1,11 +1,11 @@
 # Linear junction carry
 
-Priority: **P1** — blocks the committed `test_naxes` `path-stops` check
+Priority: **P1** — blocks the committed `test_NaxesAFAP` `path-stops` check
 and is the core smoothness fix.
 
 Status: **implemented**. `R` is master steps to the next hard stop.
 `P` carries across every other joint. Judged by `naxis_ref`
-(F2, F2f, F20, the naxes 7.5° helix, F14).
+(F2, F2f, F20, the NaxesAFAP 7.5° helix, F14).
 
 ## Problem
 
@@ -50,7 +50,7 @@ was idle (the allowed joint speed is 0). The sampled circle cruises.
 - `extras/tests/pc_based/test_26.cpp`: F5 (square, still stops), F7/F8
   (circle/helix cruise), F20 (arc cruise), F2/F2b/F2f/F2g/F2h (junction
   probes), F14 helix.
-- `extras/tests/simavr_based/test_naxes/detect_geometry.py`:
+- `extras/tests/simavr_based/test_NaxesAFAP/detect_geometry.py`:
   `MAX_PATH_STOPS` tuned to the legitimate stops once the example
   cruises.
 
@@ -65,7 +65,7 @@ A joint is a hard stop (`R` ends, `P → 0`) when:
 - the next block is a dwell or the path ends.
 
 Otherwise `P` carries, including a non-collinear bend and a role switch
-where both axes are already moving (sampled circle / naxes helix). A
+where both axes are already moving (sampled circle / NaxesAFAP helix). A
 role switch that raises `ticks_floor` shortens incoming `R` to
 `steps_through_the_block + P_match`, with `P_match =
 calculate_ramp_steps(ticks_floor_out)` on the incoming map (F2

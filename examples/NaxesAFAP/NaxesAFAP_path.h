@@ -1,9 +1,9 @@
-#ifndef NAXES_PATH_H
-#define NAXES_PATH_H
+#ifndef NAXES_AFAP_PATH_H
+#define NAXES_AFAP_PATH_H
 
 #include <stdint.h>
 
-// Fixed, deterministic path for the naxes example. Coordinates are absolute
+// Fixed, deterministic path for the NaxesAFAP example. Coordinates are absolute
 // stepper positions in steps. The path runs, in order:
 //
 //   1. helix      - a full circle in the XY plane while Z climbs steadily,
@@ -49,13 +49,13 @@
 // overflow on 16-bit-int platforms (AVR).
 #define NAXES_HEX_Y (NAXES_RADIUS * 866L / 1000)
 
-// The path is built at runtime in naxes.ino from these constants so the same
-// constants drive both the commanded addWaypoint() targets and the expected
-// reconstruction, keeping the two sides identical.
+// The path is built at runtime in NaxesAFAP.ino from these constants so the
+// same constants drive both the commanded addWaypoint() targets and the
+// expected reconstruction, keeping the two sides identical.
 
 // The helix is emitted as a table of vertices by the caller; this file only
-// carries the constants. The caller (naxes.ino) generates the helix vertices
-// with a fixed quarter-sine table (NAXES_SIN_QUAD, 91 entries, like
+// carries the constants. The caller (NaxesAFAP.ino) generates the helix
+// vertices with a fixed quarter-sine table (NAXES_SIN_QUAD, 91 entries, like
 // MoveTimed.ino) so it stays float-free and deterministic.
 
 // Quarter sine / cosine tables for a radius of NAXES_RADIUS, sampled at

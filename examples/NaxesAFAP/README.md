@@ -1,4 +1,4 @@
-# naxes — three-axis FasNAxis example
+# NaxesAFAP — three-axis FasNAxis example
 
 A hardware example for the multi-axis planner `FasNAxis`
 (see `extras/doc/n_axes_whitepaper.md`). One `FastAccelStepper` drives each
@@ -13,7 +13,7 @@ The path is fixed and deterministic, so a run is comparable to the next:
 
 * **helix** — `NAXES_HELIX_TURNS` full revolutions in the XY plane while Z
   climbs `NAXES_HELIX_Z_PER_TURN` per turn, sampled from a quarter-sine table
-  (`naxes_path.h`, float-free).
+  (`NaxesAFAP_path.h`, float-free).
 * **hexagon** — six corners of a regular hexagon in the XY plane.
 * **square** — four corners of an axis-aligned square in the XY plane (the
   cube footprint on a two-axis build).
@@ -40,8 +40,8 @@ wires three axes:
 ## Pin configuration
 
 Following the StepperDemo pattern, the pin table is selected by architecture via
-`StepperPins_naxes_<plat>.h` (avr, sam, pico, esp32). Each header defines the
-`naxes_config_0[]` array of `stepper_config_s` (from `StepperConfig.h`), with
+`StepperPins_NaxesAFAP_<plat>.h` (avr, sam, pico, esp32). Each header defines the
+`NaxesAFAP_config_0[]` array of `stepper_config_s` (from `StepperConfig.h`), with
 `NAXES_HW` valid entries plus the `STEPPER_CONFIG_END` sentinel. Enable is
 low-active and set manually so it is settled before the planner kicks off
 (whitepaper §4.5).
@@ -49,7 +49,7 @@ low-active and set manually so it is settled before the planner kicks off
 ## Kick-off synchronization
 
 The planner is constructed with the engine
-(`FasNAxis<NAXES_HW, NAXES_HORIZON> naxes_planner(FasNAxisConfig{}, engine)`)
+(`FasNAxis<NAXES_HW, NAXES_HORIZON> NaxesAFAP_planner(FasNAxisConfig{}, engine)`)
 and its kick-off uses the engine's synchronized start: when a committed path
 is released, every active axis queue is started by one engine operation
 instead of one `addQueueEntry(NULL, true)` per axis, so the axes share a
@@ -58,11 +58,11 @@ critical section around the per-stepper starts; platform-specific mechanisms
 (see `extras/todo/engine_synchronized_start.md`) replace it as they are
 written.
 
-* **CI / PlatformIO** — `pio_dirs/naxes/` is a symlink wrapper (like
+* **CI / PlatformIO** — `pio_dirs/NaxesAFAP/` is a symlink wrapper (like
   `pio_dirs/MoveTimed/`): `platformio.ini` → `extras/ci/platformio.ini`,
-  `FastAccelStepper/src` → the library, and `src/naxes.ino` → this sketch.
+  `FastAccelStepper/src` → the library, and `src/NaxesAFAP.ino` → this sketch.
   The example is built for every architecture in `extras/ci/build_matrix.yaml`.
-* **SimAVR** — `extras/tests/simavr_based/test_naxes/` builds this example for
+* **SimAVR** — `extras/tests/simavr_based/test_NaxesAFAP/` builds this example for
   the ATmega328p (two axes), runs it to completion under `run_avr`, and the
   geometry detector validates the reconstructed helix/hexagon/square/origin
   curve.

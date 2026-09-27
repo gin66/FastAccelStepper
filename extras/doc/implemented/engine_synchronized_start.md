@@ -51,8 +51,8 @@ together.
   (`extras/tests/pc_based/StepperISR_test.cpp`). A stepper already running is
   skipped; an empty queue does not stop the others (see
   `synchronizedStart()` doc).
-- The naxes example constructs the planner with the engine:
-  `FasNAxis<NAXES_HW, NAXES_HORIZON> naxes_planner(FasNAxisConfig{}, engine)`.
+- The NaxesAFAP example constructs the planner with the engine:
+  `FasNAxis<NAXES_HW, NAXES_HORIZON> NaxesAFAP_planner(FasNAxisConfig{}, engine)`.
 
 ## Platform-specific follow-ups
 
@@ -72,7 +72,7 @@ tracked one file per platform in `extras/todo/`:
 - `src/FastAccelStepper.h` — `addQueueEntry(NULL, true)` near-sync note.
 - `src/FasNAxis.h` — `pump()` kick-off, engine constructor argument.
 - `src/FastAccelStepperEngine.h` — `synchronizedStart()`.
-- `examples/naxes/naxes.ino` — planner constructed with the engine.
+- `examples/NaxesAFAP/NaxesAFAP.ino` — planner constructed with the engine.
 - `extras/tests/pc_based/StepperISR_test.cpp` — PC implementation.
 - `extras/tests/pc_based/naxis_sim_port.h` —
   `TestFastAccelStepperEngine`.

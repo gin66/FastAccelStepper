@@ -96,7 +96,7 @@ The full ESP32 driver comparison (MCPWM/PCNT vs RMT vs I2S Mux) is in
   stepper queues from one polyline so the axes stay time-synchronized. API not
   stable yet. See the
   [n-axis whitepaper](extras/doc/n_axes_whitepaper.md), the
-  [naxes example](examples/naxes/README.md), and
+  [NaxesAFAP example](examples/NaxesAFAP/README.md), and
   [Future work](#future-work).
 
 ## Quick Start
@@ -143,7 +143,7 @@ More details in [Usage](extras/doc/usage.md) and the
 
 For coordinated motion, `FasNAxis` drives N stepper queues from one polyline
 so the axes stay time-synchronized. The hot path has no float, division, or
-64-bit integers. Full example: [examples/naxes](examples/naxes/README.md); the
+64-bit integers. Full example: [examples/NaxesAFAP](examples/NaxesAFAP/README.md); the
 theory is in the [n-axis whitepaper](extras/doc/n_axes_whitepaper.md).
 
 `FasNAxis` is `FasNAxis<NAXES, HORIZON = 64, Stepper = FastAccelStepper,
@@ -204,7 +204,7 @@ void loop() {
 | Multi-axis applications | [multi_axis.md](extras/doc/multi_axis.md) |
 | Stepper and engine API | [FastAccelStepper_API.md](extras/doc/FastAccelStepper_API.md), from `header2markdown.sh` on [FastAccelStepper.h](src/FastAccelStepper.h) and [FastAccelStepperEngine.h](src/FastAccelStepperEngine.h) |
 | FasNAxis calls | [FasNAxis.md](extras/doc/FasNAxis.md) |
-| FasTimed calls | [FasTimed.md](extras/doc/FasTimed.md), example [timed](examples/timed/README.md) |
+| FasTimed calls | [FasTimed.md](extras/doc/FasTimed.md), example [NaxesTimed](examples/NaxesTimed/README.md) |
 | Driver architecture | [driver_architecture.md](extras/doc/driver_architecture.md) |
 | Ramp generator | [ramp.md](extras/doc/ramp.md), [ramp_cubic_quadratic.md](extras/doc/ramp_cubic_quadratic.md) |
 | Planner modes (AFAP vs timed) | [planner_modes.md](extras/doc/planner_modes.md) |
@@ -220,7 +220,6 @@ void loop() {
 | Contributors & supporters | [contributors.md](extras/doc/contributors.md) |
 | Memory footprint | [memory_report.md](extras/doc/memory_report.md) |
 | Changelog | [CHANGELOG.md](CHANGELOG.md) |
-| TODO / roadmap | [GitHub project](https://github.com/gin66/FastAccelStepper/projects/1) |
 
 ## Source Code Structure
 
