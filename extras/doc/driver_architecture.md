@@ -37,7 +37,6 @@ struct queue_entry {
     uint8_t steps;           // Number of steps
     uint8_t toggle_dir : 1;  // Direction changed mid-command
     uint8_t countUp : 1;     // Direction
-    uint8_t moreThanOneStep : 1;
     uint8_t hasSteps : 1;    // Has steps vs pause
     uint16_t ticks;          // Period between steps
     // Optional platform-specific fields follow

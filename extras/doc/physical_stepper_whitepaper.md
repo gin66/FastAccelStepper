@@ -190,7 +190,6 @@ struct queue_entry {
   uint8_t steps;            // if 0, the command only adds a delay (pause)
   uint8_t toggle_dir : 1;
   uint8_t countUp : 1;      // +1 / −1 direction
-  uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
   uint8_t dirPinState : 1;
   uint16_t ticks;           // period between steps, in TICKS_PER_S units

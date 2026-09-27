@@ -38,7 +38,6 @@ struct queue_entry {
   uint8_t steps;
   uint8_t toggle_dir : 1;      // Flag: toggle direction pin before this entry
   uint8_t countUp : 1;
-  uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
   // ...
 };
@@ -272,7 +271,6 @@ struct queue_entry {
   uint8_t steps;
   uint8_t toggle_dir : 1;      // Flag: toggle direction pin before this entry
   uint8_t countUp : 1;
-  uint8_t moreThanOneStep : 1;
   uint8_t hasSteps : 1;
   uint8_t dirPinState : 1;     // Direction pin state for this entry
   uint16_t ticks;

@@ -165,7 +165,6 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   e->dirPinState = dir;
   e->toggle_dir = toggle_dir;
   e->countUp = cmd->count_up ? 1 : 0;
-  e->moreThanOneStep = steps > 1 ? 1 : 0;
   e->hasSteps = steps > 0 ? 1 : 0;
   e->ticks = period;
   struct queue_end_s next_queue_end = queue_end;

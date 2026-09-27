@@ -65,7 +65,7 @@ bool StepperQueue::getActualTicksWithDirection(
   if (e->hasSteps) {
     speed->count_up = e->countUp;
     speed->ticks = e->ticks;
-    if (e->moreThanOneStep) {
+    if (e->steps > 1) {
       return true;
     }
     if (wp != ++rp) {
