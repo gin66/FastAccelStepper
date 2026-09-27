@@ -361,7 +361,7 @@ static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
   return 0;
 }
 
-static inline uint16_t esp32_after_pause_ticks(StepperQueue* q) {
+static inline uint16_t esp32_after_pause_ticks(const StepperQueue* q) {
 #if defined(SUPPORT_ESP32_I2S)
   if (esp32_driver_is_i2s(q) && esp32_i2s_dir_is_mux_slot(q)) {
     return I2S_BLOCK_TICKS;
@@ -427,7 +427,10 @@ inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
 //==========================================================================
 
 // Per-stepper arm phase: called from synchronizedStart() with interrupts off.
-// Each driver handles its own arm logic.
+// Each driver handles its own arm logic. The parameter cannot be const: the
+// arm methods write the driver registers. In a build without any of the
+// driver macros below, q is deliberately unused.
+// cppcheck-suppress constParameterPointer
 static inline void esp32_syncStart_arm(StepperQueue* q) {
 #if defined(SUPPORT_ESP32_RMT)
   if (esp32_driver_is_rmt(q)) {

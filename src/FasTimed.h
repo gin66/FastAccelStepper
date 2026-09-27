@@ -52,7 +52,7 @@ template <uint8_t NAXES, uint16_t HORIZON = 8,
           typename Engine = FastAccelStepperEngine>
 class FasTimed {
  public:
-  explicit FasTimed(Engine& engine) : _engine(&engine) {
+  explicit FasTimed(Engine& engine) : _engine(&engine), _chunk{} {
     for (uint8_t i = 0; i < NAXES; i++) {
       _s[i] = NULL;
       _min_period[i] = 0;
@@ -325,7 +325,7 @@ class FasTimed {
     return span >= (uint32_t)MIN_CMD_TICKS;
   }
 
-  bool realizable(uint16_t steps, uint16_t dur, uint32_t min_period) const {
+  static bool realizable(uint16_t steps, uint16_t dur, uint32_t min_period) {
     if (dur < MIN_CMD_TICKS) {
       return false;
     }
@@ -540,7 +540,7 @@ class FasTimed {
     return true;
   }
 
-  bool chunk_done(const Chunk* c) const {
+  static bool chunk_done(const Chunk* c) {
     for (uint8_t i = 0; i < NAXES; i++) {
       if (c->sent[i] < c->ncmd[i]) {
         return false;

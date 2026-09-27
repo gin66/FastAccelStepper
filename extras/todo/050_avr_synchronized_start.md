@@ -3,16 +3,22 @@
 Priority: **050** — platform-specific part of the engine synchronized start
 (one item per open platform).
 
-Status: **implemented** (EXPERIMENTAL).
+Status: **implemented**.
 
 A native AVR release is implemented for all platforms:
 
-- 328P / 168P (no channel C): two-phase arm + trigger — write 20-tick
-  offset to both `OCRnA` and `OCRnB`, then clear both flags and enable
-  both compare interrupts in one critical section (328P has exactly two
-  steppers, no bitmask needed).
+- 328P / 168P (no channel C): two-phase arm + trigger — arm both `OCRnA`
+  and `OCRnB` with one shared compare value, then clear both flags and
+  enable both compare interrupts in one critical section (328P has exactly
+  two steppers, no bitmask needed).
 - 2560 / 32U4 (with channel C): bitmask approach — any 2 or all 3
   channels, same two-phase arm + trigger.
+
+All channels share one `FAS_TIMER_MODULE`. The arm loop writes one target
+captured from the counter (`AVR_SYNC_TARGET(T) + AVR_SYNC_ARM_DELAY`, both
+in `src/pd_avr/avr_queue.cpp`) into every participating `OCRnX`, so the
+compare matches fall on the same timer tick. The delay only has to exceed
+the arm loop and moves the start by that many ticks.
 
 The generic fallback remains the `test` platform.
 
@@ -23,22 +29,12 @@ generic contract.
 
 On AVR the two/three step channels share one timer (Timer1, Timer3 or
 Timer5). The timer runs continuously and `startQueue()` only arms the
-channel's compare register and enables its compare interrupt. Because all
-channels count the same counter, enabling the compare interrupts under one
-critical section should already align the first compare events to within the
-interrupt-enable latency. There is no per-channel timer restart to
-synchronize, so the critical section may be the final mechanism.
-
-## Work items
-
-- Confirm the shared-counter argument: all participating channels use one
-  `FAS_TIMER_MODULE` and only the compare interrupt enable differs per
-  channel.
-- If confirmed, keep the critical section, document it as final, and close
-  this item.
-- If a cheaper group arm exists (write all `OCRnx` first, then set all
-  compare-enable bits with one masked write), use it and drop the critical
-  section.
+channel's compare register and enables its compare interrupt. Enabling all
+compare interrupts under one critical section is not sufficient by itself:
+arming each channel with `TCNT + offset` leaves the first compare events
+separated by the time the arm loop needs between the channels (measured as
+~47 ticks on the 328P and ~112 on the 2560). Arming all channels with one
+captured target removes that skew.
 
 ## References
 
