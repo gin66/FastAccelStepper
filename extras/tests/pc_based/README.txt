@@ -358,6 +358,25 @@ Tests;
   The plant is header-only and self-contained; the test links with g++ (uses
   std::vector) and needs no library objects.
 
+- test_29
+  FasTimed — faithful timed trajectory, separate from FasNAxis.
+  A waypoint is per-axis delta steps in [-128, 128] and one shared
+  duration in [MIN_CMD_TICKS, 65535] driver ticks. One call is one
+  constant rate. SimPort only.
+
+  Covers rejected ranges, dwells, an exact two-axis cruise, a split
+  slave, duration quantization onto legal queue commands, too-fast
+  and ramp-step failures, reversal only from ramp-step 0, a held
+  QueueFull retry, underrun on a short queue, horizon backpressure,
+  an external stop, and an injected DIR pause reported as Error.
+
+  The closing fixture streams a square through a ring of 8 chunks. Each
+  side rises from about 440 Hz to 2500 Hz over about a second, then falls
+  back to a stop over about a second. The ladder is examples/timed/timed_ramp.h.
+  It writes test_29.dat,
+  test_29.gnuplot (path, position, speed), and test_29.wav (stereo: first
+  motor left, second motor right).
+
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration
   Usage: make ramp_helper && ./ramp_helper <speed_us> <acceleration> <steps>

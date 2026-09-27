@@ -187,11 +187,10 @@ horizon, and a PC-checkable oracle.
 - Missing trajectory points. Overshoot leaves the *chord*, it does
   not skip or round past a waypoint. Corner-cutting junction
   deviation (`δ`) is a different mechanism and is not a v1 mode.
-- **Faithful timed trajectory** (§3.3 problem 2): polyline plus
-  time data, execute that timing or error if not achievable.
-  v1 is problem 1 only (as fast as possible). A per-block
-  feedrate `F` without a feasibility error is also not v1. A
-  later separate planner, not a FasNAxis mode.
+- **Faithful timed trajectory** (§3.3 problem 2) inside `FasNAxis`.
+  v1 is problem 1 only. The timed planner is the separate
+  `FasTimed` class. A per-block feedrate `F` without a feasibility
+  error is also not v1.
 - A `LookaheadTooShort` / feed-hold error when `R < P_stop`.
   Short lookahead is a speed cap (G4), not a fault.
 - Feed holds, jogging, or on-the-fly waypoint edits other than
@@ -219,7 +218,7 @@ horizon, and a PC-checkable oracle.
 Same G1/G2/G6, same Linear/Overshoot geometry. Different
 **input** and **error policy**.
 
-| | **(1) As fast as possible — v1** | **(2) Faithful timed — later** |
+| | **(1) As fast as possible — v1** | **(2) Faithful timed — `FasTimed`** |
 |--|--|--|
 | Input | Polyline (waypoints only) | Polyline **plus time and speed at each point** (not Δpos per 1 ms frame; §3.3.1) |
 | Output | The globally fastest constraint-faithful track (§12.4.1) | That same geometry at the **requested** timing, with **near-exact step period** |
@@ -235,8 +234,13 @@ same lengthen-period idea Overshoot already uses on
 non-binding axes.
 
 v1 implements (1). `naxis_ref` is therefore both the v1
-reference output and the later **duration** bound for (2).
+reference output and the **duration** bound for (2).
 Smoothness of (2) is a second constraint: see §3.3.1.
+
+(2) is `FasTimed` (`src/FasTimed.h`), not a `FasNAxis` mode. A
+waypoint is a per-axis step delta of at most 128 and one shared
+duration from `MIN_CMD_TICKS` to 65535 driver ticks. One call is
+one constant rate. PC coverage is `extras/tests/pc_based/test_29.cpp`.
 
 ### 3.3.1 Timed waypoints: control speed, not 1 ms frames
 

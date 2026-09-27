@@ -136,8 +136,10 @@ More details in [Usage](extras/doc/usage.md) and the
 
 > **Experimental.** The `FasNAxis` API is **not stable yet** and may change
 > without notice. It runs a polyline as fast as the motors and geometry allow,
-> with no requested speed or time. A trajectory that carries its own timing,
-> and the rest of the open work, is listed under [Future work](#future-work).
+> with no requested speed or time. The call list is
+> [FasNAxis.md](extras/doc/FasNAxis.md). A waypoint that carries its own
+> duration is [FasTimed](extras/doc/FasTimed.md). Other open work is listed
+> under [Future work](#future-work).
 
 For coordinated motion, `FasNAxis` drives N stepper queues from one polyline
 so the axes stay time-synchronized. The hot path has no float, division, or
@@ -200,7 +202,9 @@ void loop() {
 | Usage & auto enable | [usage.md](extras/doc/usage.md) |
 | Move semantics & position wraparound | [move_semantics.md](extras/doc/move_semantics.md) |
 | Multi-axis applications | [multi_axis.md](extras/doc/multi_axis.md) |
-| API reference | [FastAccelStepper_API.md](extras/doc/FastAccelStepper_API.md), [FastAccelStepper.h](src/FastAccelStepper.h) |
+| Stepper and engine API | [FastAccelStepper_API.md](extras/doc/FastAccelStepper_API.md), from `header2markdown.sh` on [FastAccelStepper.h](src/FastAccelStepper.h) and [FastAccelStepperEngine.h](src/FastAccelStepperEngine.h) |
+| FasNAxis calls | [FasNAxis.md](extras/doc/FasNAxis.md) |
+| FasTimed calls | [FasTimed.md](extras/doc/FasTimed.md), example [timed](examples/timed/README.md) |
 | Driver architecture | [driver_architecture.md](extras/doc/driver_architecture.md) |
 | Ramp generator | [ramp.md](extras/doc/ramp.md), [ramp_cubic_quadratic.md](extras/doc/ramp_cubic_quadratic.md) |
 | Planner modes (AFAP vs timed) | [planner_modes.md](extras/doc/planner_modes.md) |
@@ -255,9 +259,9 @@ three digits wide (`050_name.md`). Numbers step by 10, so a new item can take
 a free number between two existing ones.
 
 The list is library-wide. It currently covers per-platform synchronized
-start, a cubic ramp start, a timed multi-axis trajectory, delta-step input
-for `FasNAxis`, a single-axis `moveTo` with an arrival in ticks, and a smooth
-stop at the end of a path. The n-axis design is the
+start, a cubic ramp start, delta-step input for `FasNAxis`, a single-axis
+`moveTo` with an arrival in ticks, and a smooth stop at the end of a path.
+Timed chunks are [FasTimed](extras/doc/FasTimed.md). The n-axis design is the
 [whitepaper](extras/doc/n_axes_whitepaper.md).
 
 ## Star History

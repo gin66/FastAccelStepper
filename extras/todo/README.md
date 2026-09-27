@@ -24,13 +24,19 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 | **050** | [SAMD51 synchronized start](050_samd51_synchronized_start.md) | TCC cross-instance release to be identified. |
 | **050** | [Teensy synchronized start](050_teensy_synchronized_start.md) | TMR within/cross-module release to be decided. |
 | **060** | [Cubic start (`s_h`) overlay](060_cubic_start.md) | Later feature, not v1. |
-| **070** | [Faithful timed trajectory](070_timed_trajectory.md) | Later implementation, not v1. Input is `int16_t` delta steps and one `uint32_t` delta ticks per chunk. |
+| **070** | [Common head speed](070_common_head_speed.md) | Later planner. One acceleration and one max path speed for an x/y/z/… head. Waypoints are `dx, dy, dz, …, v`. |
 | **080** | [Delta steps](080_delta_steps.md) | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
 | **080** | [Ramp time and moveTo eta](080_move_to_eta.md) | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
 | **090** | [Smooth stop at end of path](090_end_path_decel.md) | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
 
 ## Done
 
+- **Faithful timed trajectory — implemented.** Separate from
+  `FasNAxis`: `FasTimed::addDelta` takes per-axis delta steps in
+  [-128, 128] and one shared duration in [MIN_CMD_TICKS, 65535]
+  ticks. One call is one rate. A rate the motors cannot reach is
+  `TimingNotAchievable`. PC test `extras/tests/pc_based/test_29.cpp`.
+  See [timed_trajectory.md](../doc/implemented/timed_trajectory.md).
 - **Engine synchronized start (generic layer) — implemented.** The engine
   exposes a plain non-static `synchronizedStart()` member, `FasNAxis`
   receives the engine in its constructor (defaulted `Engine` template
@@ -86,7 +92,8 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
   ATmega168 and the ATmega32u4 are skipped by `build-platformio.sh` for
   space.
 - **Per-block feedrate `F` — not a separate item.** It is a requested
-  speed, hence timed-world input; it belongs to `070_timed_trajectory.md`
+  speed, hence timed-world input; it belongs to
+  `extras/doc/implemented/timed_trajectory.md`
   (no AFAP `F`-as-cap variant).
 - **Inverse kinematics — not tracked.** Application concern, not a
   library feature. Keep the whitepaper §3.2 non-goal, but clarify that
@@ -96,8 +103,8 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
   generator / naxes — implemented.** Design record moved to
   `extras/doc/engine_sources.md` (Path A single driver + stop hook).
 - **AFAP vs timed — decided.** `FasNAxis` stays AFAP-only; the faithful
-  timed trajectory is a separate implementation (tracked in
-  `070_timed_trajectory.md`). Design record moved to
+  timed trajectory is a separate implementation. Design record
+  moved to `extras/doc/implemented/timed_trajectory.md` and
   `extras/doc/planner_modes.md`.
 - **A Linear oracle that is faster by leaving the chord / cutting a
   corner / skipping a vertex — not tracked.** Not a backlog item: such a

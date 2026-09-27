@@ -115,6 +115,11 @@ test_%: test_%.o $(LIB_O)
 test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
+# FasTimed is header-only. test_29 includes it directly.
+test_29.o: test_29.cpp naxis_sim_port.h \
+	$(PRJ_ROOT)/src/FasTimed.h \
+	$(PRJ_ROOT)/src/fas_naxis/ramp_map.h
+
 # FasNAxis headers: test_26 includes them, so a header-only change must rebuild.
 test_26.o: naxis_plot.h naxis_sim_port.h naxis_ref.h naxis_html_dump.h \
 	physical_stepper.h \

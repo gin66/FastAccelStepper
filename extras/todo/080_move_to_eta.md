@@ -91,7 +91,7 @@ down as already planned.
 - **FasNAxis forecast.** The coordinated planner can expose the
   same "ticks still to go" from its binder ramp (issued tick sum
   plus the symmetric decel). A deadline on `endPath` belongs to
-  `070_timed_trajectory.md`, not to a speed cap inside `FasNAxis`.
+  `extras/doc/implemented/timed_trajectory.md`, not to a speed cap inside `FasNAxis`.
 
 ## References
 
@@ -101,4 +101,4 @@ down as already planned.
   performed step count after each command
 - `src/FastAccelStepper.h` — `moveTo`, `MoveResultCode`
 - `extras/todo/060_cubic_start.md` — cubic reverse is a different sum
-- `extras/todo/070_timed_trajectory.md` — path-level deadline
+- `extras/doc/implemented/timed_trajectory.md` — path-level deadline

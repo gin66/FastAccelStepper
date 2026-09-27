@@ -34,7 +34,10 @@ is two calls.
 The caller streams motor steps. One call cannot carry a segment of
 hundreds of thousands of steps, so lookahead sees the path at the
 grain the application produced. The timed implementation uses the
-same step vector plus a tick count (`070_timed_trajectory.md`).
+same step vector plus a tick count
+(`extras/doc/implemented/timed_trajectory.md`). The timed call
+caps each component at ±128 and the shared duration at
+[MIN_CMD_TICKS, 65535], which is tighter than this AFAP chunk.
 
 ## Variations
 
@@ -55,4 +58,4 @@ same step vector plus a tick count (`070_timed_trajectory.md`).
 
 - `src/FasNAxis.h` — `addWaypoint`, `_blk`, `_p`
 - `src/FastAccelStepper.h` — `moveTimed(int16_t steps, ...)`
-- `extras/todo/070_timed_trajectory.md` — same step vector plus ticks
+- `extras/doc/implemented/timed_trajectory.md` — same step vector plus ticks

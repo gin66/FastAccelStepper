@@ -24,7 +24,10 @@ same axis set.
 ## Consequences
 
 - `FasNAxis` public API stays AFAP-only; the timed trajectory runs
-  under its own class/module.
+  under its own class, `FasTimed` (`src/FasTimed.h`). A waypoint is
+  per-axis delta steps in [-128, 128] and one shared duration in
+  [MIN_CMD_TICKS, 65535] driver ticks. The call lists are
+  [FasNAxis.md](FasNAxis.md) and [FasTimed.md](FasTimed.md).
 - Shared between the two: geometry conventions, the `addQueueEntry`
   contract, `SimPort`, the PC test rig, and the whitepaper theory.
   Optionally the same axis/pin setup.
