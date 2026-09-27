@@ -3,7 +3,7 @@
 # Verify that synchronizedStart() produces synchronous pulses on
 # StepA (Timer1 OC1A) and StepB (Timer1 OC1B).
 
-SRC=$(shell find ../../src -type f) $(wildcard src/*)
+SRC=$(shell find ../../../src -type f) $(wildcard src/*)
 
 DUT=$(shell gawk '/env:/{print(substr($$1,6,length($$1)-6))}' platformio.ini)
 
