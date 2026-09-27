@@ -274,6 +274,47 @@ bool isRunning() {
 | SAM Due | 21,000,000 | 4200 | 200 µs |
 | Pico | 16,000,000 | 3200 | 200 µs |
 
+The precomputed log2 constants in `fas_ramp/RampCalculator.h` only exist for
+`16000000L` and `21000000L`. Any other `TICKS_PER_S` falls back to the generic
+runtime-variable path (`log2_timer_freq*` in `RampControl.cpp`). That path works,
+but it costs a little RAM and compute per conversion.
+
+**Recommendation for a new driver: add another precomputed constant** instead of
+relying on the generic path. Add the three constants for your `TICKS_PER_S` to
+`log2/Log2RepresentationConst.h` (regenerate with `extras/gen_log2_const`) and a
+matching `#elif (TICKS_PER_S == ...)` branch in `RampCalculator.h` supplying:
+
+- `LOG2_TICKS_PER_S` — log2 of `TICKS_PER_S`
+- `LOG2_TICKS_PER_S_DIV_SQRT_OF_2` — log2 of `TICKS_PER_S / sqrt(2)`
+- `LOG2_ACCEL_FACTOR` — log2 of `TICKS_PER_S^2 / 2`
+
+and the `US_TO_TICKS` / `TICKS_TO_US` conversions. Follow the existing 16 MHz and
+21 MHz branches as templates.
+
+### TICKS_PER_S Upper Bound (subtle indirect requirement)
+
+`queue_entry::ticks` and `stepper_command_s::ticks` are `uint16_t`, and several
+internal pipeline constants express fixed time spans (1 ms and 2 ms) that are
+stored in 16-bit variables:
+
+```cpp
+uint16_t max_speed_in_ticks = TICKS_PER_S / 1000;  // base.h, 1 ms
+uint16_t ps = TICKS_PER_S / 500;                   // RampControl.cpp, 2 ms
+```
+
+For these to be representable, `TICKS_PER_S / 500` must fit in 16 bits:
+`TICKS_PER_S <= 65535 * 500 ≈ 32.7 MHz`. At 16 MHz / 21 MHz the values fit
+comfortably; at e.g. 72 MHz, `TICKS_PER_S / 500 == 144000` silently overflows.
+
+This requirement is **indirect**: no compile-time assertion enforces it, so a
+port that sets `TICKS_PER_S` to the raw CPU/timer clock (e.g. 72 MHz) can compile
+but produce wrong motion.
+
+**Therefore keep `TICKS_PER_S` near 16 MHz.** If the timer clock is much higher,
+divide it down with a hardware prescaler and set `TICKS_PER_S` to the *prescaled*
+frequency (as the Pico effectively does with its 80 MHz clock, and STM32 must do
+via the TIM prescaler) instead of passing the raw clock.
+
 ---
 
 ## Preprocessor Defines by Architecture
@@ -479,7 +520,7 @@ void fas_init_engine(FastAccelStepperEngine* engine) {
 ### Common Pitfalls
 
 - **Missing interrupt macros**: `fasDisableInterrupts()`/`fasEnableInterrupts()` must be defined
-- **Wrong TICKS_PER_S**: Must match your timer/counter frequency, not CPU frequency
+- **Wrong TICKS_PER_S**: Must match your timer/counter frequency, not CPU frequency, and must stay below ~32.7 MHz so the pipeline's 1 ms/2 ms constants fit in `uint16_t` (see Timing Constants above)
 - **Queue overflow**: Ensure `QUEUE_LEN` is power of 2 and matches queue index masking
 - **Position drift**: Verify `getCurrentPosition()` accounts for commands in progress
 - **Pin validation**: `isValidStepPin()` must reject pins your hardware cannot drive
