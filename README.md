@@ -269,7 +269,8 @@ Timed chunks are [FasTimed](extras/doc/FasTimed.md). The n-axis design is the
 
 ## A Bit of Nostalgia
 
-For FastAccelStepper, the way software is developed is changing fundamentally. It has been a long way from 2020 to today. Back then, I simply needed a fast stepper driver for AVR, and with my embedded know-how I went for it, hand-optimizing the ISR code until I was satisfied. Then I added ESP32 support and found several ways to generate the pulses. Today I no longer write the implementation code myself; LLMs and coding agents are increasingly doing that work. My role is shifting toward defining requirements, designing the architecture, reviewing the generated code, and testing it.
+
+For FastAccelStepper, the way software is developed is changing fundamentally. It has been a long way from 2020 to today. Back then, I simply needed a fast stepper driver for AVR, and with my embedded know-how I went for it, hand-optimizing the ISR code until I was satisfied. Then I added ESP32 support and found several ways to generate the pulses. Today I no longer write the documentation and implementation code myself; LLMs and coding agents are increasingly doing that work. Almost inadvertently, my role is shifting toward defining requirements, consulting on the architecture, selectively reviewing the generated code, and testing it.
 
 Nowadays, coding agents can understand the existing code base surprisingly well and carry out most of the required modifications. This makes implementing new features significantly faster.
 
