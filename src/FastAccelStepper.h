@@ -594,6 +594,28 @@ class FastAccelStepper {
 
   // ## Low Level Stepper Queue Management (low level access)
   //
+  // This interface bypasses the ramp generator and writes raw commands into
+  // the per-stepper queue. It gives full control over position, speed and
+  // direction, but the application is responsible for the ramp. It is meant
+  // for applications doing their own motion planning, e.g. a G-code
+  // interpreter.
+  //
+  // The high level interface always ends a move at speed ~0 at the target
+  // position and does not expose the exact position/speed/acceleration
+  // relation while running. To chain segments without stopping in between,
+  // this low level interface (or a planner built on it) is required.
+  //
+  // For coordinated multi-axis motion prefer the planners that sit on top of
+  // this interface: FasNAxis (polyline, as fast as possible) and FasTimed
+  // (constant speed for a given duration). They use the queues below and
+  // complement the raw interface, so they should be the first choice unless
+  // fully custom commands are needed.
+  //
+  // To stay tick-exact, the queue must not run empty and interrupts must be
+  // serviced in time. Do not block interrupts for long. On esp32, do not write
+  // to flash while a stepper is running (e.g. an OTA update): motion continues
+  // but is noticeably bumpy.
+  //
   // If the queue is already running, then the start parameter is obsolete.
   // But the queue may run out of commands while executing addQueueEntry,
   // so it is better to set start=true to automatically restart/continue
@@ -663,6 +685,31 @@ class FastAccelStepper {
   // 4. Exactly 1ms after the second step, the third step
   // 5. The stepper waits for 1ms
   // 6. The next command is processed
+  //
+  // A command with steps=N and ticks=T occupies N*T ticks: N steps spaced T
+  // apart, plus a trailing wait of T after the last step. The next command
+  // then starts right after that, so its first step is T ticks after the last
+  // step of the previous command.
+  //
+  // ### Slow step rates and the uint16_t ticks limit
+  //
+  // `ticks` is a uint16_t, so the longest gap between two steps is 65535
+  // ticks (~4.1ms at 16MHz). Slower stepping is done by inserting pause
+  // commands (steps = 0) between steps, because the queue time is the sum of
+  // all commands. Example: 3 steps every 10ms at TICKS_PER_S=16MHz:
+  //
+  // - ticks=40000, steps=1, count_up=true   (first step)
+  // - ticks=40000, steps=0, count_up=true   (pause)
+  // - ticks=40000, steps=0, count_up=true   (pause)
+  // - ticks=40000, steps=0, count_up=true   (pause)
+  // - ticks=40000, steps=1, count_up=true   (second step)
+  // - ... and so on for the third step
+  //
+  // The 16 bit limit is deliberate: the esp32 pulse generator registers are
+  // 16 bit and this keeps AVR and esp32 on the same code path. The queue holds
+  // only ~10ms of commands, so the application can react to position, speed
+  // and acceleration changes almost instantly; wider tick values would only
+  // make the driver slower.
   //
   // ### AqeResultCode - Return codes for addQueueEntry()
   //

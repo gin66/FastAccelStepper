@@ -9,7 +9,10 @@ For the API definition please consult the header file
 [markdown file](FastAccelStepper_API.md).
 
 Please check the examples for application and how to use the low level interface.
-Some info is in [Issue #86](https://github.com/gin66/FastAccelStepper/issues/86).
+The [low level queue API](FastAccelStepper_API.md#low-level-stepper-queue-management-low-level-access)
+documents the command semantics. For coordinated multi-axis motion the planners
+`FasNAxis` ([polyline](FasNAxis.md)) and `FasTimed` ([constant speed](FasTimed.md))
+are built on top of it and should be preferred.
 
 The module defines the global variable `fas_queue`. Do not use or redefine this
 variable.

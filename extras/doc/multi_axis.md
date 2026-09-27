@@ -25,6 +25,15 @@ To keep up the synchronization of two steppers please keep in mind:
   added to the command queue for each direction change together with a step.
   => Execute direction change together with a pause or do not configure direction
   change delay
+* Do not block interrupts for long and keep the command queues fed. On esp32, do
+  not write to the flash while a stepper is running (e.g. an OTA update): motion
+  continues, but is noticeably bumpy.
+
+This raw queue access is the lowest level. For coordinated multi-axis motion the
+planners built on top of it should be preferred: `FasNAxis` for a polyline run as
+fast as the geometry allows and `FasTimed` for a constant speed over a requested
+duration. They handle the per-axis feed, direction pauses and synchronized start.
+See [FasNAxis](FasNAxis.md) and [FasTimed](FasTimed.md).
 
 Note for esp32 RMT and I2S drivers:
 

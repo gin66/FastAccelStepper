@@ -30,6 +30,13 @@ struct stepper_command_s {
 - `steps = 0`: Creates a pause for `ticks` duration (no pulses)
 - `steps > 0`: Generates `steps` pulses, each `ticks` apart
 
+`ticks` is deliberately 16 bit: the esp32 pulse generator registers are 16 bit
+and this keeps AVR and esp32 on the same code path. The queue is only filled for
+~10 ms ahead, so the application can react to position/speed/acceleration changes
+almost instantly; wider tick values would only make the driver slower. Step rates
+slower than 65535 ticks per step are produced by inserting `steps = 0` pause
+commands between the step commands.
+
 ### Internal Queue Entry
 
 ```cpp
