@@ -74,6 +74,7 @@
 #define EnableCompareInterrupt(T, X) TIMSK##T |= _BV(OCIE##T##X)
 #define ClearInterruptFlag(T, X) TIFR##T = _BV(OCF##T##X)
 #define SetTimerCompareRelative(T, X, D) OCR##T##X = TCNT##T + D
+#define SetTimerCompareAbsolute(T, X, V) OCR##T##X = (V)
 #define InterruptFlagIsSet(T, X) ((TIFR##T & _BV(OCF##T##X)) != 0)
 
 #define ConfigureTimer(T)                                                 \
@@ -355,6 +356,33 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   return &fas_queue[idx];
 }
 
+// synchronizedStart() calls the timer macros directly. Those paste the timer
+// module into the register name with ##, which suppresses expansion of the
+// argument, so FAS_TIMER_MODULE would end up literal in the register name.
+// These wrappers expand the timer module first, as the AVR_START_QUEUE style
+// intermediates do.
+//
+// All channels are armed with one shared compare value, so their compare
+// matches fall on the same timer tick. The value has to be far enough in the
+// future that the whole arm loop finishes before it is reached.
+#define AVR_SYNC_ARM_DELAY 400
+#define AVR_SYNC_TARGET(T) AVR_SYNC_TARGET_(T)
+#define AVR_SYNC_TARGET_(T) (TCNT##T)
+#define AVR_SYNC_ARM(T, X, TARGET)         \
+  {                                        \
+    if (e->steps > 0) {                    \
+      Stepper_One(T, X);                   \
+    } else {                               \
+      Stepper_Zero(T, X);                  \
+    }                                      \
+    SetTimerCompareAbsolute(T, X, TARGET); \
+  }
+#define AVR_SYNC_TRIGGER(T, X)    \
+  {                               \
+    ClearInterruptFlag(T, X);     \
+    EnableCompareInterrupt(T, X); \
+  }
+
 // Fast path: single stepper -> normal startQueue() is sufficient.
 #if defined(stepPinStepperC)
 // 2560/32U4 (with channel C): bitmask approach — any 2 or all 3 channels.
@@ -376,7 +404,7 @@ AqeResultCode FastAccelStepperEngine::synchronizedStart(
     if (q->isRunning() || q->isQueueEmpty()) {
       continue;
     }
-    mask |= (1 << q->channel);
+    mask |= (1 << (uint8_t)q->channel);
   }
 
   if (mask == 0) {
@@ -385,66 +413,44 @@ AqeResultCode FastAccelStepperEngine::synchronizedStart(
 
   fasDisableInterrupts();
 
-  // Phase 1: arm - write same 20-tick offset to all participating OCRs
+  // Phase 1: arm - write the shared compare value to all participating OCRs
+  uint16_t target = AVR_SYNC_TARGET(FAS_TIMER_MODULE) + AVR_SYNC_ARM_DELAY;
   for (uint8_t i = 0; i < cnt; i++) {
     StepperQueue* q = steppers[i]->_queue();
     if (q->isRunning() || q->isQueueEmpty()) {
       continue;
     }
     uint8_t rp;
+    const struct queue_entry* e;
     switch ((uint8_t)q->channel) {
       case 0:  // channel A
-        {
-          GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
-          PREPARE_DIRECTION_PIN(A)
-          if (e->steps > 0) {
-            Stepper_One(FAS_TIMER_MODULE, A);
-          } else {
-            Stepper_Zero(FAS_TIMER_MODULE, A);
-          }
-          SetTimerCompareRelative(FAS_TIMER_MODULE, A, 20);
-        }
+        GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
+        PREPARE_DIRECTION_PIN(A)
+        AVR_SYNC_ARM(FAS_TIMER_MODULE, A, target)
         break;
       case 1:  // channel B
-        {
-          GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
-          PREPARE_DIRECTION_PIN(B)
-          if (e->steps > 0) {
-            Stepper_One(FAS_TIMER_MODULE, B);
-          } else {
-            Stepper_Zero(FAS_TIMER_MODULE, B);
-          }
-          SetTimerCompareRelative(FAS_TIMER_MODULE, B, 20);
-        }
+        GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
+        PREPARE_DIRECTION_PIN(B)
+        AVR_SYNC_ARM(FAS_TIMER_MODULE, B, target)
         break;
       case 2:  // channel C
-        {
-          GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
-          PREPARE_DIRECTION_PIN(C)
-          if (e->steps > 0) {
-            Stepper_One(FAS_TIMER_MODULE, C);
-          } else {
-            Stepper_Zero(FAS_TIMER_MODULE, C);
-          }
-          SetTimerCompareRelative(FAS_TIMER_MODULE, C, 20);
-        }
+        GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
+        PREPARE_DIRECTION_PIN(C)
+        AVR_SYNC_ARM(FAS_TIMER_MODULE, C, target)
         break;
     }
   }
 
   // Phase 2: trigger - clear flags, enable all compare interrupts
   if (mask & (1 << 0)) {
-    ClearInterruptFlag(FAS_TIMER_MODULE, A);
-    EnableCompareInterrupt(FAS_TIMER_MODULE, A);
+    AVR_SYNC_TRIGGER(FAS_TIMER_MODULE, A)
   }
   if (mask & (1 << 1)) {
-    ClearInterruptFlag(FAS_TIMER_MODULE, B);
-    EnableCompareInterrupt(FAS_TIMER_MODULE, B);
+    AVR_SYNC_TRIGGER(FAS_TIMER_MODULE, B)
   }
 #if stepPinStepperC != PIN_UNDEFINED
   if (mask & (1 << 2)) {
-    ClearInterruptFlag(FAS_TIMER_MODULE, C);
-    EnableCompareInterrupt(FAS_TIMER_MODULE, C);
+    AVR_SYNC_TRIGGER(FAS_TIMER_MODULE, C)
   }
 #endif
 
@@ -467,37 +473,20 @@ AqeResultCode FastAccelStepperEngine::synchronizedStart(
   // cnt==2 means A+B (the only two steppers on 328P)
   fasDisableInterrupts();
 
-  // Phase 1: arm - write same 20-tick offset to both OCRs
-  {
-    StepperQueue* q = steppers[0]->_queue();
-    uint8_t rp;
-    GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
-    PREPARE_DIRECTION_PIN(A)
-    if (e->steps > 0) {
-      Stepper_One(FAS_TIMER_MODULE, A);
-    } else {
-      Stepper_Zero(FAS_TIMER_MODULE, A);
-    }
-    SetTimerCompareRelative(FAS_TIMER_MODULE, A, 20);
-  }
-  {
-    StepperQueue* q = steppers[1]->_queue();
-    uint8_t rp;
-    GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
-    PREPARE_DIRECTION_PIN(B)
-    if (e->steps > 0) {
-      Stepper_One(FAS_TIMER_MODULE, B);
-    } else {
-      Stepper_Zero(FAS_TIMER_MODULE, B);
-    }
-    SetTimerCompareRelative(FAS_TIMER_MODULE, B, 20);
-  }
+  // Phase 1: arm - write the shared compare value to both OCRs
+  uint16_t target = AVR_SYNC_TARGET(FAS_TIMER_MODULE) + AVR_SYNC_ARM_DELAY;
+  uint8_t rp;
+  const struct queue_entry* e;
+  GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
+  PREPARE_DIRECTION_PIN(A)
+  AVR_SYNC_ARM(FAS_TIMER_MODULE, A, target)
+  GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
+  PREPARE_DIRECTION_PIN(B)
+  AVR_SYNC_ARM(FAS_TIMER_MODULE, B, target)
 
   // Phase 2: trigger - clear flags, enable both compare interrupts
-  ClearInterruptFlag(FAS_TIMER_MODULE, A);
-  ClearInterruptFlag(FAS_TIMER_MODULE, B);
-  EnableCompareInterrupt(FAS_TIMER_MODULE, A);
-  EnableCompareInterrupt(FAS_TIMER_MODULE, B);
+  AVR_SYNC_TRIGGER(FAS_TIMER_MODULE, A)
+  AVR_SYNC_TRIGGER(FAS_TIMER_MODULE, B)
 
   fasEnableInterrupts();
   return rc;
