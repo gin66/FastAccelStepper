@@ -6,10 +6,11 @@ Priority: **050** — platform-specific part of the engine synchronized start
 Status: **implemented** (EXPERIMENTAL).
 
 The generic fallback remains active on all ESP32 builds.
-A native RMT synchronized release is implemented for IDF5/6 only
-(`rmt_new_sync_manager()` + `rmt_sync_reset()`;
+A native RMT synchronized release is implemented for IDF5/6 targets with
+`SOC_RMT_SUPPORT_TX_SYNCHRO` (`rmt_new_sync_manager()`; ESP32 classic has the
+RMT V2 driver API but no sync manager and keeps the fallback;
 see [engine_synchronized_start.md](engine_synchronized_start.md),
-`src/pd_esp32/esp32_queue.cpp:597-666`).
+`src/pd_esp32/esp32_queue.cpp:593-683`).
 Drivers I2S direct, MCPWM/PCNT, and RMT (IDF4) still use the generic fallback.
 
 ## Background
@@ -38,7 +39,7 @@ constraint of this document.
 |-------|--------|--------------|------------------|-------------|
 | A1 — I2S mux | `FasDriver::I2S_MUX` | all targets with `SOC_I2S_NUM >= 1` (incl. ESP32-C6, ESP32-H2) | all mux steppers share the single global `StepperQueue::_i2s_mux_manager` (`esp32_queue.cpp:15-17`) | fallback already sufficient (deferred DMA callback); no separate trigger needed |
 | A2 — I2S direct | `FasDriver::I2S_DIRECT` | same as above | one `I2sManager*` per stepper, own DMA channel | none (no cross-channel trigger) |
-| C — RMT | `FasDriver::RMT` | ESP32, S2, S3, C3, C6, H2, P4 (`pd_config_idf*.h`) | all channels share one RMT peripheral/clock; each stepper has its own channel (numeric in IDF4, handle in IDF5/6) | IDF5/6: `rmt_new_sync_manager()` + `rmt_sync_reset()`; IDF4: no public API |
+| C — RMT | `FasDriver::RMT` | ESP32, S2, S3, C3, C6, H2, P4 (`pd_config_idf*.h`) | all channels share one RMT peripheral/clock; each stepper has its own channel (numeric in IDF4, handle in IDF5/6) | IDF5/6 with `SOC_RMT_SUPPORT_TX_SYNCHRO`: `rmt_new_sync_manager()` over the armed channels; IDF4 and ESP32 classic: no public API |
 | D — MCPWM/PCNT | `FasDriver::MCPWM_PCNT` | ESP32, S3, C6, H2 | one MCPWM timer + one PCNT unit per stepper | none implemented; MCPWM global SYNC groups are an open investigation |
 
 Correction of an earlier assumption: **ESP32-C6 and ESP32-H2 support both RMT
@@ -72,7 +73,7 @@ engine uses the two phases.
 |--------|-----|---------|
 | I2S mux | set `_isRunning = true` (sets `_fill_state` ready; first steps appear in the next DMA callback) | no-op |
 | I2S direct | set `_isRunning = true` | no-op (per-stepper DMA; fallback) |
-| RMT IDF5/6 | do the dir-pin toggle + `apply_command`/encoder reset, enable the channel, register it with the sync manager, call `rmt_transmit()` (held by the sync manager) | `rmt_sync_reset()` once for the group |
+| RMT IDF5/6 | do the dir-pin toggle + `apply_command`/encoder reset, enable the channel, collect the channel for the group trigger | create one sync manager over the armed channels, call `rmt_transmit()` on all of them (the last one starts the group), then delete the manager |
 | RMT IDF4 | run the existing `startQueue_rmt()` | no-op (fallback) |
 | MCPWM/PCNT | run the existing `startQueue_mcpwm_pcnt()` | no-op (fallback) |
 
@@ -120,7 +121,7 @@ AqeResultCode FastAccelStepperEngine::synchronizedStart(
   // Phase 2: one native trigger per group; groups without a native
   // trigger (I2S direct, MCPWM, RMT IDF4) did their trigger in arm().
   esp32_sync_trigger_i2s_mux();  // no-op today (documented)
-  esp32_sync_trigger_rmt();      // rmt_sync_reset() on the shared manager
+  esp32_sync_trigger_rmt();      // create/start/delete the group sync manager
 
   fasEnableInterrupts();
   return rc;
@@ -134,16 +135,20 @@ existing `startQueue()` dispatch in `esp32_queue.cpp` / `esp32_queue.h`.
 
 1. **RMT IDF5/6 (the real win).**
    - Split `startQueue_rmt()` (`StepperISR_idf5_esp32_rmt.cpp:128-203`) into an
-     arm part (dir toggle, encoder reset, channel enable, `rmt_transmit`) and a
-     trigger part (`rmt_sync_reset`).
-   - Own one `rmt_sync_manager_handle_t` for all RMT channels. Create it after
-     the first channel is enabled and add channels as they connect; delete on
-     disconnect. Channels must use the same clock source/resolution (they do:
-     `RMT_CLK_SRC_DEFAULT`, `resolution_hz = TICKS_PER_S`,
-     `StepperISR_idf5_esp32_rmt.cpp:102-103`).
-   - Verify `rmt_transmit()` actually holds until `rmt_sync_reset()` (prototype
-     first; the IDF docs describe the sync manager as starting all managed
-     channels together).
+     arm part (dir toggle, encoder reset, channel enable; collect the channel)
+     and a trigger part (create a sync manager over the armed channels, call
+     `rmt_transmit()` on each, delete the manager).
+   - The IDF sync manager is created with the complete set of managed channels
+     and puts each of them in a waiting state until `rmt_transmit()` has been
+     called on all of them. There is no add/remove-channel API, and all channels
+     must be enabled before creation, so the manager cannot be kept alive
+     across `connect`/`disconnect`. Instead it is created on demand for exactly
+     the channels armed in one `synchronizedStart()` call and deleted right
+     after the group has started. Channels must use the same clock
+     source/resolution (they do: `RMT_CLK_SRC_DEFAULT`,
+     `resolution_hz = TICKS_PER_S`, `StepperISR_idf5_esp32_rmt.cpp:102-103`).
+   - `SOC_RMT_SUPPORT_TX_SYNCHRO` gates the native path; targets without it
+     (ESP32 classic) keep the arm==trigger fallback via `syncStart_arm_rmt()`.
 2. **Dispatch layer.** Add `syncStart_arm()` and (for RMT) the group trigger in
    `esp32_queue.h` / `esp32_queue.cpp`, mirroring `startQueue()`.
 3. **Engine.** Rewrite the ESP32 `synchronizedStart()` (`esp32_queue.cpp:541-553`)
@@ -169,8 +174,10 @@ existing `startQueue()` dispatch in `esp32_queue.cpp` / `esp32_queue.h`.
 - **Arm/trigger vs. running state.** Arm sets `_isRunning = true` before the
   group trigger. With interrupts off no other code observes this half-state, but
   it must be documented and kept consistent with `isReadyForCommands()`.
-- **Sync manager lifetime.** Adding/removing RMT channels changes the managed
-  set; recreate or amend the manager on `connect_rmt()`/`disconnect_rmt()`.
+- **Sync manager lifetime.** The manager is created on demand for the armed
+  channels and deleted once the group has started; it is not kept alive across
+  `connect_rmt()`/`disconnect_rmt()`, because IDF offers no add/remove-channel
+  API and requires all managed channels to be enabled at creation time.
 - **IDF4 RMT.** No public sync-manager API in IDF4; register-level sync is not
   supported by this plan.
 - **MCPWM.** Global sync feasibility is unproven; keep the fallback until

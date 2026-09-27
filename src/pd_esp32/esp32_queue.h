@@ -102,9 +102,11 @@ class StepperQueue : public StepperQueueBase {
   uint16_t _getPerformedPulses_rmt() const;
   void connect_rmt();
   void disconnect_rmt();
+#if defined(SUPPORT_ESP32_RMT_SYNC)
+  void syncStart_prepare_rmt();
+  void syncStart_transmit_rmt();
+#else
   void syncStart_arm_rmt();
-#if ESP_IDF_VERSION_MAJOR >= 5
-  void syncStart_group_trigger_rmt();
 #endif
 #endif
 #ifdef SUPPORT_ESP32_I2S
@@ -434,7 +436,11 @@ inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
 static inline void esp32_syncStart_arm(StepperQueue* q) {
 #if defined(SUPPORT_ESP32_RMT)
   if (esp32_driver_is_rmt(q)) {
+#if defined(SUPPORT_ESP32_RMT_SYNC)
+    q->syncStart_prepare_rmt();
+#else
     q->syncStart_arm_rmt();
+#endif
     return;
   }
 #endif
@@ -454,15 +460,11 @@ static inline void esp32_syncStart_arm(StepperQueue* q) {
 }
 
 // Group trigger: one call per group with shared resources.
-#if defined(SUPPORT_ESP32_RMT_V2)
+#if defined(SUPPORT_ESP32_RMT_SYNC)
 void esp32_sync_trigger_rmt(void);
-// Register a newly created RMT channel with the global sync manager.
-void esp32_sync_mgr_register_channel(rmt_channel_handle_t tx_chan);
-// Unregister a channel from the sync manager (before deleting it).
-void esp32_sync_mgr_unregister_channel(rmt_channel_handle_t tx_chan);
 #else
 static inline void esp32_sync_trigger_rmt(void) {}
-#endif  // SUPPORT_ESP32_RMT_V2
+#endif  // SUPPORT_ESP32_RMT_SYNC
 #if defined(SUPPORT_ESP32_I2S)
 static inline void esp32_sync_trigger_i2s_mux(void) {}
 #endif  // SUPPORT_ESP32_I2S

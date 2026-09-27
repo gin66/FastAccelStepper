@@ -590,10 +590,100 @@ void StepperQueue::syncStart_arm_rmt() { startQueue_rmt(); }
 #endif
 #endif
 
-#ifdef SUPPORT_ESP32_RMT_V2
-// Per-stepper arm for RMT on IDF5/6: prepare everything except the
-// group trigger.  The RMT sync manager holds the transmitted data
-// until rmt_sync_reset() is called.
+#if defined(SUPPORT_ESP32_RMT_SYNC)
+// Per-stepper prepare for RMT on IDF5/6 with hardware sync support: do
+// everything except starting the transmission. The channels are collected
+// and started together by esp32_sync_trigger_rmt().
+//
+// IDF's RMT sync manager is created with the complete set of TX channels to
+// be managed: every managed channel is put in a waiting state until
+// rmt_transmit() has been called on all of them, then they start together.
+// There is no add/remove-channel API, so the manager is created on demand
+// for exactly the channels armed in this synchronizedStart() call.
+static StepperQueue* _sync_rmt_queues[QUEUES_RMT];
+static uint8_t _sync_rmt_cnt = 0;
+
+void StepperQueue::syncStart_prepare_rmt() {
+  if (channel == nullptr) {
+    return;
+  }
+
+  // Direction pin toggle (same as startQueue_rmt)
+  uint8_t rp = read_idx;
+  if (rp == next_write_idx) {
+    return;
+  }
+  if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
+    LL_TOGGLE_PIN(dirPin);
+    entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
+  }
+
+  _isRunning = true;
+  _rmtStopped = false;
+
+  // Reset the encoder (same as startQueue_rmt)
+  _tx_encoder->reset(_tx_encoder);
+
+  // Enable channel if not already enabled. The sync manager requires all
+  // managed channels to be enabled before rmt_new_sync_manager().
+  if (!_channel_enabled) {
+    rmt_enable(channel);
+    _channel_enabled = true;
+  }
+
+  if (_sync_rmt_cnt < QUEUES_RMT) {
+    _sync_rmt_queues[_sync_rmt_cnt++] = this;
+  }
+}
+
+void StepperQueue::syncStart_transmit_rmt() {
+  int payload = 0;
+  rmt_transmit_config_t tx_config;
+  tx_config.loop_count = 0;
+  tx_config.flags.eot_level = 0;  // output level at end of transmission
+  tx_config.flags.queue_nonblocking = 1;
+  esp_err_t rc = rmt_transmit(channel, _tx_encoder, &payload, 1, &tx_config);
+  (void)rc;
+}
+
+// Group trigger for RMT (IDF5/6): create one sync manager for all armed
+// channels, kick off every transmission (held by the manager) and release
+// the manager again so the channels continue independently afterwards.
+void esp32_sync_trigger_rmt() {
+  uint8_t cnt = _sync_rmt_cnt;
+  _sync_rmt_cnt = 0;
+  if (cnt == 0) {
+    return;
+  }
+
+  rmt_sync_manager_handle_t sync_mgr = nullptr;
+  rmt_channel_handle_t channels[QUEUES_RMT];
+  for (uint8_t i = 0; i < cnt; i++) {
+    channels[i] = _sync_rmt_queues[i]->channel;
+  }
+
+  // A single channel does not need a sync manager. On error (e.g. channels
+  // spread over several RMT groups) fall back to unsynchronized starts.
+  if (cnt > 1) {
+    rmt_sync_manager_config_t sync_config = {.tx_channel_array = channels,
+                                             .array_size = cnt};
+    if (rmt_new_sync_manager(&sync_config, &sync_mgr) != ESP_OK) {
+      sync_mgr = nullptr;
+    }
+  }
+
+  // The last rmt_transmit() starts all managed channels simultaneously.
+  for (uint8_t i = 0; i < cnt; i++) {
+    _sync_rmt_queues[i]->syncStart_transmit_rmt();
+  }
+
+  if (sync_mgr != nullptr) {
+    rmt_del_sync_manager(sync_mgr);
+  }
+}
+
+#elif defined(SUPPORT_ESP32_RMT_V2)
+// IDF5/6 without hardware sync (e.g. ESP32 classic): arm and start directly.
 void StepperQueue::syncStart_arm_rmt() {
   if (channel == nullptr) {
     return;
@@ -622,48 +712,7 @@ void StepperQueue::syncStart_arm_rmt() {
     _channel_enabled = true;
   }
 
-  // Start the transmission — the sync manager holds it.
   rmt_transmit(channel, _tx_encoder, &payload, 1, nullptr);
-}
-
-// Group trigger for RMT (IDF5/6): release all queued transmissions
-// simultaneously via the sync manager.
-static rmt_sync_manager_handle_t _rmt_sync_mgr = nullptr;
-
-void esp32_sync_trigger_rmt() {
-  if (_rmt_sync_mgr == nullptr) {
-    return;  // No sync manager yet, nothing to trigger.
-  }
-  rmt_sync_reset(_rmt_sync_mgr);
-}
-
-// Register a channel with the global RMT sync manager.  Must be
-// called once per connected channel (during connect_rmt) and is a
-// no-op when the sync manager has not been created yet.
-void esp32_sync_mgr_register_channel(rmt_channel_handle_t tx_chan) {
-  if (tx_chan == nullptr) {
-    return;
-  }
-  esp_err_t rc = rmt_new_sync_manager(&tx_chan, 1, &_rmt_sync_mgr);
-  if (rc == ESP_OK && _rmt_sync_mgr != nullptr) {
-    // First channel: create the manager.
-    return;
-  }
-  if (_rmt_sync_mgr != nullptr) {
-    // Subsequent channels: amend the managed set.
-    (void)rmt_sync_manager_add_channel(_rmt_sync_mgr, tx_chan);
-  }
-}
-
-// Unregister a channel from the sync manager (during disconnect).
-void esp32_sync_mgr_unregister_channel(rmt_channel_handle_t tx_chan) {
-  if (_rmt_sync_mgr == nullptr || tx_chan == nullptr) {
-    return;
-  }
-  (void)rmt_sync_manager_del_channel(_rmt_sync_mgr, tx_chan);
-  // Recreate the manager without this channel.
-  rmt_del_sync_manager(_rmt_sync_mgr);
-  _rmt_sync_mgr = nullptr;
 }
 #endif
 

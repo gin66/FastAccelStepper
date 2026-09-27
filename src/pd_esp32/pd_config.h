@@ -31,6 +31,14 @@
 #pragma "Last supported by FastAccelStepper 0.30.15"
 #endif
 
+// The RMT sync manager (rmt_new_sync_manager()/rmt_sync_reset()) is only
+// available on targets with SOC_RMT_SUPPORT_TX_SYNCHRO. The ESP32 classic
+// has the RMT V2 driver API but no sync manager, so it falls back to the
+// generic (arm == trigger) path.
+#if defined(SUPPORT_ESP32_RMT_V2) && defined(SOC_RMT_SUPPORT_TX_SYNCHRO)
+#define SUPPORT_ESP32_RMT_SYNC
+#endif
+
 // Esp32 queue definitions
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
 #if defined(SUPPORT_ESP32_I2S)
