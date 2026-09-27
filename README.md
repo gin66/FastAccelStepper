@@ -290,3 +290,5 @@ With implementation becoming faster, testing is increasingly becoming the bottle
 The current architecture makes it straightforward to add new multi-axes planners and test them on a PC. Adding a new pulse driver, however, requires testing on real hardware. Any contribution that introduces a new PD instance must therefore include confirmation that it has been tested on the relevant hardware.
 
 It would be great to see the introduction of more cycle-accurate, embeddable emulators that can run in GitHub Actions. `simavr` was, and still is, extremely valuable to me.
+
+Having said that, I want to point out that contributions using float, double, or 64-bit arithmetic in production code will not make it into the codebase.
