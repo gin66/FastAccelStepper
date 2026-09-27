@@ -115,12 +115,17 @@ void StepperQueue::connect_rmt() {
   rmt_tx_register_event_callbacks(channel, &callbacks, this);
 
   _channel_enabled = false;
+
+  // Register with the global sync manager (tracked in esp32_queue.cpp).
+  esp32_sync_mgr_register_channel(channel);
 }
 
 void StepperQueue::disconnect_rmt() {
   if (_channel_enabled || _isRunning || !_rmtStopped) {
     return;
   }
+  // Unregister from the sync manager before deleting the channel.
+  esp32_sync_mgr_unregister_channel(channel);
   rmt_del_channel(channel);
   channel = NULL;
 }

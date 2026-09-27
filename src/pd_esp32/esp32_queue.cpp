@@ -542,14 +542,129 @@ AqeResultCode FastAccelStepperEngine::synchronizedStart(
     FastAccelStepper** const steppers, uint8_t cnt) {
   AqeResultCode rc = AqeResultCode::OK;
   fasDisableInterrupts();
+
+  // Phase 1: arm every not-yet-running stepper (no hardware trigger).
+  // Skip running queues; an empty queue must not abort the others.
   for (uint8_t i = 0; i < cnt; i++) {
-    AqeResultCode e = steppers[i]->addQueueEntry(NULL, true);
-    if (rc == AqeResultCode::OK && e != AqeResultCode::OK) {
-      rc = e;
+    StepperQueue* q = steppers[i]->_queue();
+    if (q == nullptr || q->isRunning()) {
+      continue;
     }
+    if (q->isQueueEmpty()) {
+      continue;  // matches generic contract: empty does not stop the others
+    }
+    esp32_syncStart_arm(q);
   }
+
+  // Phase 2: one native trigger per group; groups without a native
+  // trigger (I2S direct, MCPWM, RMT IDF4) did their trigger in arm().
+  esp32_sync_trigger_rmt();  // rmt_sync_reset() on the shared manager
+
   fasEnableInterrupts();
   return rc;
 }
+
+#ifdef SUPPORT_ESP32_I2S
+void StepperQueue::syncStart_arm_i2s() {
+  // I2S mux/direct: set _isRunning = true; first steps appear in the next DMA
+  // callback. The trigger is effectively the DMA done callback, which already
+  // groups all mux steppers on one shared manager. No separate trigger needed.
+  _isRunning = true;
+}
+#endif
+
+#ifdef SUPPORT_ESP32_MCPWM_PCNT
+void StepperQueue::syncStart_arm_mcpwm_pcnt() {
+  // MCPWM/PCNT: trigger = arm (startQueue performs the actual start).
+  // The synchronizedStart arm phase just calls startQueue directly.
+  startQueue_mcpwm_pcnt();
+}
+#endif
+
+#ifdef SUPPORT_ESP32_RMT
+#if ESP_IDF_VERSION_MAJOR == 4
+// IDF4 RMT: trigger = arm (startQueue starts the hardware directly).
+// The syncStart_arm just calls the existing startQueue.
+// esp32_sync_trigger_rmt is a no-op (declared in header).
+void StepperQueue::syncStart_arm_rmt() { startQueue_rmt(); }
+#endif
+#endif
+
+#ifdef SUPPORT_ESP32_RMT_V2
+// Per-stepper arm for RMT on IDF5/6: prepare everything except the
+// group trigger.  The RMT sync manager holds the transmitted data
+// until rmt_sync_reset() is called.
+void StepperQueue::syncStart_arm_rmt() {
+  if (channel == nullptr) {
+    return;
+  }
+
+  // Direction pin toggle (same as startQueue_rmt)
+  uint8_t rp = read_idx;
+  if (rp == next_write_idx) {
+    return;
+  }
+  if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
+    LL_TOGGLE_PIN(dirPin);
+    entry[rp & QUEUE_LEN_MASK].toggle_dir = false;
+  }
+
+  _isRunning = true;
+  _rmtStopped = false;
+
+  // Reset the encoder (same as startQueue_rmt)
+  int payload = 0;
+  _tx_encoder->reset(_tx_encoder);
+
+  // Enable channel if not already enabled (same as startQueue_rmt)
+  if (!_channel_enabled) {
+    rmt_enable(channel);
+    _channel_enabled = true;
+  }
+
+  // Start the transmission — the sync manager holds it.
+  rmt_transmit(channel, _tx_encoder, &payload, 1, nullptr);
+}
+
+// Group trigger for RMT (IDF5/6): release all queued transmissions
+// simultaneously via the sync manager.
+static rmt_sync_manager_handle_t _rmt_sync_mgr = nullptr;
+
+void esp32_sync_trigger_rmt() {
+  if (_rmt_sync_mgr == nullptr) {
+    return;  // No sync manager yet, nothing to trigger.
+  }
+  rmt_sync_reset(_rmt_sync_mgr);
+}
+
+// Register a channel with the global RMT sync manager.  Must be
+// called once per connected channel (during connect_rmt) and is a
+// no-op when the sync manager has not been created yet.
+void esp32_sync_mgr_register_channel(rmt_channel_handle_t tx_chan) {
+  if (tx_chan == nullptr) {
+    return;
+  }
+  esp_err_t rc = rmt_new_sync_manager(&tx_chan, 1, &_rmt_sync_mgr);
+  if (rc == ESP_OK && _rmt_sync_mgr != nullptr) {
+    // First channel: create the manager.
+    return;
+  }
+  if (_rmt_sync_mgr != nullptr) {
+    // Subsequent channels: amend the managed set.
+    (void)rmt_sync_manager_add_channel(_rmt_sync_mgr, tx_chan);
+  }
+}
+
+// Unregister a channel from the sync manager (during disconnect).
+void esp32_sync_mgr_unregister_channel(rmt_channel_handle_t tx_chan) {
+  if (_rmt_sync_mgr == nullptr || tx_chan == nullptr) {
+    return;
+  }
+  (void)rmt_sync_manager_del_channel(_rmt_sync_mgr, tx_chan);
+  // Recreate the manager without this channel.
+  rmt_del_sync_manager(_rmt_sync_mgr);
+  _rmt_sync_mgr = nullptr;
+}
+#endif
 
 #endif
