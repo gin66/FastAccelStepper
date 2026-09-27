@@ -267,9 +267,26 @@ Timed chunks are [FasTimed](extras/doc/FasTimed.md). The n-axis design is the
 
 [![Star History Chart](https://star-history.dera.page/svg?repos=gin66/FastAccelStepper&type=Date)](https://star-history.dera.page/#gin66/FastAccelStepper&Date)
 
+## A Bit of Nostalgia
+
+For FastAccelStepper, the way software is developed is changing fundamentally. It has been a long way from 2020 to today. Back then, I simply needed a fast stepper driver for AVR, and with my embedded know-how I went for it, hand-optimizing the ISR code until I was satisfied. Then I added ESP32 support and found several ways to generate the pulses. Today I no longer write the implementation code myself; LLMs and coding agents are increasingly doing that work. My role is shifting toward defining requirements, designing the architecture, reviewing the generated code, and testing it.
+
+Nowadays, coding agents can understand the existing code base surprisingly well and carry out most of the required modifications. This makes implementing new features significantly faster.
+
+That said, I still take pride in hand-writing the Pico PIO code. There is something deeply satisfying about getting all the required functionality for a step/direction pin into just 50 words of PIO code. That kind of low-level optimization and craftsmanship is something I value.
+
+Perhaps there is also a little nostalgia in this. It feels like one of those moments when a craft that has shaped the way you have worked throughout your lifetime is slowly becoming obsolete — not because it has lost its value, but because there is now a faster and more powerful way of achieving the same result. Like the expert typist who could produce flawless pages at remarkable speed, the old skills don't necessarily become less beautiful; they simply become less necessary.
+
+Those 50 words of PIO code are perhaps one of the last pieces of FastAccelStepper where I can say, quite honestly, *I wrote every word myself.*
+
 ## Contributing
 
-Contributions are welcome. See
-[contributors.md](extras/doc/contributors.md) for the list of people who helped.
-Before committing, format the code with `bash extras/scripts/format_code.sh` and
-run the PC-based tests with `make test` in `extras/tests/pc_based`.
+Contributions are welcome. See [contributors.md](extras/doc/contributors.md) for the list of people who have helped.
+
+Before committing, format the code with `bash extras/scripts/format_code.sh` and run the PC-based tests with `make test` in `extras/tests/pc_based`.
+
+With implementation becoming faster, testing is increasingly becoming the bottleneck for maintaining quality. Any new feature idea should therefore ideally come with a patch and some level of automated testing—preferably in a `pc_based` or `simavr_based` form.
+
+The current architecture makes it straightforward to add new multi-axes planners and test them on a PC. Adding a new pulse driver, however, requires testing on real hardware. Any contribution that introduces a new PD instance must therefore include confirmation that it has been tested on the relevant hardware.
+
+It would be great to see the introduction of more cycle-accurate, embeddable emulators that can run in GitHub Actions. `simavr` was, and still is, extremely valuable to me.
