@@ -355,19 +355,154 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   return &fas_queue[idx];
 }
 
+// Fast path: single stepper -> normal startQueue() is sufficient.
+#if defined(stepPinStepperC)
+// 2560/32U4 (with channel C): bitmask approach — any 2 or all 3 channels.
 AqeResultCode FastAccelStepperEngine::synchronizedStart(
     FastAccelStepper** const steppers, uint8_t cnt) {
   AqeResultCode rc = AqeResultCode::OK;
-  fasDisableInterrupts();
+
+  // Fast path: single stepper -> normal startQueue() is sufficient
+  if (cnt == 1) {
+    rc = steppers[0]->addQueueEntry(NULL, true);
+    return rc;
+  }
+
+  // Build mask of participating channels (matching generic contract:
+  // skip running queues and empty queues).
+  uint8_t mask = 0;
   for (uint8_t i = 0; i < cnt; i++) {
-    AqeResultCode e = steppers[i]->addQueueEntry(NULL, true);
-    if (rc == AqeResultCode::OK && e != AqeResultCode::OK) {
-      rc = e;
+    StepperQueue* q = steppers[i]->_queue();
+    if (q->isRunning() || q->isQueueEmpty()) {
+      continue;
+    }
+    mask |= (1 << q->channel);
+  }
+
+  if (mask == 0) {
+    return rc;  // no steppers to sync
+  }
+
+  fasDisableInterrupts();
+
+  // Phase 1: arm - write same 20-tick offset to all participating OCRs
+  for (uint8_t i = 0; i < cnt; i++) {
+    StepperQueue* q = steppers[i]->_queue();
+    if (q->isRunning() || q->isQueueEmpty()) {
+      continue;
+    }
+    uint8_t rp;
+    switch ((uint8_t)q->channel) {
+      case 0:  // channel A
+        {
+          GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
+          PREPARE_DIRECTION_PIN(A)
+          if (e->steps > 0) {
+            Stepper_One(FAS_TIMER_MODULE, A);
+          } else {
+            Stepper_Zero(FAS_TIMER_MODULE, A);
+          }
+          SetTimerCompareRelative(FAS_TIMER_MODULE, A, 20);
+        }
+        break;
+      case 1:  // channel B
+        {
+          GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
+          PREPARE_DIRECTION_PIN(B)
+          if (e->steps > 0) {
+            Stepper_One(FAS_TIMER_MODULE, B);
+          } else {
+            Stepper_Zero(FAS_TIMER_MODULE, B);
+          }
+          SetTimerCompareRelative(FAS_TIMER_MODULE, B, 20);
+        }
+        break;
+      case 2:  // channel C
+        {
+          GET_ENTRY_PTR(FAS_TIMER_MODULE, C)
+          PREPARE_DIRECTION_PIN(C)
+          if (e->steps > 0) {
+            Stepper_One(FAS_TIMER_MODULE, C);
+          } else {
+            Stepper_Zero(FAS_TIMER_MODULE, C);
+          }
+          SetTimerCompareRelative(FAS_TIMER_MODULE, C, 20);
+        }
+        break;
     }
   }
+
+  // Phase 2: trigger - clear flags, enable all compare interrupts
+  if (mask & (1 << 0)) {
+    ClearInterruptFlag(FAS_TIMER_MODULE, A);
+    EnableCompareInterrupt(FAS_TIMER_MODULE, A);
+  }
+  if (mask & (1 << 1)) {
+    ClearInterruptFlag(FAS_TIMER_MODULE, B);
+    EnableCompareInterrupt(FAS_TIMER_MODULE, B);
+  }
+#if stepPinStepperC != PIN_UNDEFINED
+  if (mask & (1 << 2)) {
+    ClearInterruptFlag(FAS_TIMER_MODULE, C);
+    EnableCompareInterrupt(FAS_TIMER_MODULE, C);
+  }
+#endif
+
   fasEnableInterrupts();
   return rc;
 }
+#else
+// 328P (no channel C): cnt==2 always means A+B — two phases,
+// no bitmask needed because there are exactly two steppers.
+AqeResultCode FastAccelStepperEngine::synchronizedStart(
+    FastAccelStepper** const steppers, uint8_t cnt) {
+  AqeResultCode rc = AqeResultCode::OK;
+
+  // Fast path: single stepper -> normal startQueue() is sufficient
+  if (cnt == 1) {
+    rc = steppers[0]->addQueueEntry(NULL, true);
+    return rc;
+  }
+
+  // cnt==2 means A+B (the only two steppers on 328P)
+  fasDisableInterrupts();
+
+  // Phase 1: arm - write same 20-tick offset to both OCRs
+  {
+    StepperQueue* q = steppers[0]->_queue();
+    uint8_t rp;
+    GET_ENTRY_PTR(FAS_TIMER_MODULE, A)
+    PREPARE_DIRECTION_PIN(A)
+    if (e->steps > 0) {
+      Stepper_One(FAS_TIMER_MODULE, A);
+    } else {
+      Stepper_Zero(FAS_TIMER_MODULE, A);
+    }
+    SetTimerCompareRelative(FAS_TIMER_MODULE, A, 20);
+  }
+  {
+    StepperQueue* q = steppers[1]->_queue();
+    uint8_t rp;
+    GET_ENTRY_PTR(FAS_TIMER_MODULE, B)
+    PREPARE_DIRECTION_PIN(B)
+    if (e->steps > 0) {
+      Stepper_One(FAS_TIMER_MODULE, B);
+    } else {
+      Stepper_Zero(FAS_TIMER_MODULE, B);
+    }
+    SetTimerCompareRelative(FAS_TIMER_MODULE, B, 20);
+  }
+
+  // Phase 2: trigger - clear flags, enable both compare interrupts
+  ClearInterruptFlag(FAS_TIMER_MODULE, A);
+  ClearInterruptFlag(FAS_TIMER_MODULE, B);
+  EnableCompareInterrupt(FAS_TIMER_MODULE, A);
+  EnableCompareInterrupt(FAS_TIMER_MODULE, B);
+
+  fasEnableInterrupts();
+  return rc;
+}
+#endif  // stepPinStepperC
 
 void fas_init_engine(FastAccelStepperEngine* engine) { fas_engine = engine; }
 #endif
