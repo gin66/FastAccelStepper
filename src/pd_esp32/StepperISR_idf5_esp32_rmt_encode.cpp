@@ -10,7 +10,7 @@
 static void IRAM_ATTR emit_pause_symbols(uint32_t* data, uint16_t ticks) {
   for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
     *data++ = 0x00040004;
-    ticks = (uint16_t)(ticks - 8);
+    ticks -= 8;
   }
   uint16_t ticks_l = (uint16_t)(ticks >> 1);
   uint16_t ticks_r = (uint16_t)(ticks - ticks_l);
@@ -20,11 +20,18 @@ static void IRAM_ATTR emit_pause_symbols(uint32_t* data, uint16_t ticks) {
   *data = last;
 }
 
-static void IRAM_ATTR emit_step_symbols(uint32_t* data, uint16_t ticks) {
+static uint8_t IRAM_ATTR emit_step_symbols(uint32_t* data, uint16_t ticks,
+                                           uint32_t symbols_free) {
   if (ticks == 0xffff) {
+    if (symbols_free < 2) {
+      return 0;
+    }
     data[0] = 0x40007fff | 0x8000;
     data[1] = 0x20002000;
-    return;
+    return 2;
+  }
+  if (symbols_free < 1) {
+    return 0;
   }
   uint16_t ticks_high = (uint16_t)(ticks >> 1);
   uint16_t ticks_low = (uint16_t)(ticks - ticks_high);
@@ -32,6 +39,7 @@ static void IRAM_ATTR emit_step_symbols(uint32_t* data, uint16_t ticks) {
   symbol <<= 16;
   symbol |= (uint16_t)(ticks_high | 0x8000);
   data[0] = symbol;
+  return 1;
 }
 
 uint32_t IRAM_ATTR rmt_encode_queue(StepperQueue* q, uint32_t* symbols,
@@ -66,13 +74,15 @@ uint32_t IRAM_ATTR rmt_encode_queue(StepperQueue* q, uint32_t* symbols,
       LL_TOGGLE_PIN(q->dirPin);
       e->toggle_dir = 0;
     }
-    uint8_t per = (e->ticks == 0xffff) ? 2 : 1;
     uint8_t steps_left = e->steps;
     uint8_t steps_done = 0;
-    while (steps_left > 0 && symbols_free >= per) {
-      emit_step_symbols(symbols + written, e->ticks);
-      written += per;
-      symbols_free -= per;
+    while (steps_left > 0) {
+      uint8_t n = emit_step_symbols(symbols + written, e->ticks, symbols_free);
+      if (n == 0) {
+        break;
+      }
+      written += n;
+      symbols_free -= n;
       steps_left--;
       steps_done++;
     }

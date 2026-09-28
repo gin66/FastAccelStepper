@@ -17,6 +17,7 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 
 | Priority | Item | Why now |
 |----------|------|---------|
+| **040** | [IDF 6 RMT runs sequence 02 slow](040_idf6_rmt_slow.md) | Pin trace is 120.8 s vs 91.6 s, same step count. A ~10 ms hole every 20 ms of motion. |
 | **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **050** | [Pico synchronized start](050_pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
 | **050** | [AVR synchronized start](050_avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |
