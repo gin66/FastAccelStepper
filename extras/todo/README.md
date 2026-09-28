@@ -17,6 +17,7 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 
 | Priority | Item | Why now |
 |----------|------|---------|
+| **040** | [ESP32 RMT: one spurious step at end of move](040_esp32_rmt_extra_step.md) | Pulse counter out of sync, `seq_03` fails; output has an odd pulse count. |
 | **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **050** | [Pico synchronized start](050_pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
 | **050** | [AVR synchronized start](050_avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |

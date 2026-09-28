@@ -4,6 +4,7 @@
 - FastAccelStepperEngine::synchronizedStart(FastAccelStepper** const, uint8_t): start several steppers' queues in one engine operation, so their first steps share one start event
 - avr: AVR synchronized start: two-phase arm + trigger — arm all channels with one shared compare value, then clear all flags and enable all compare interrupts in one critical section (328P: two steppers A/B directly; 2560/32U4: bitmask for A/B/C)
 - esp32: experimental RMT synchronized start (EXPERIMENTAL): IDF5/6 native release via `rmt_new_sync_manager()` + `rmt_sync_reset()` — all RMT channels on one peripheral trigger simultaneously
+- esp32: Identified bug: ESP-IDF 5/6 RMT driver can emit one sporadic extra step (pulse counter drifts by ±1)
 - naxes: FasNAxis takes the engine in its constructor and uses the engine's synchronized start for its kick-off
 
 1.3.4:
