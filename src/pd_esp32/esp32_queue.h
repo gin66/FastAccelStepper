@@ -75,7 +75,7 @@ class StepperQueue : public StepperQueueBase {
 #if ESP_IDF_VERSION_MAJOR >= 5
       bool _channel_enabled;
 #endif
-      struct rmt_fill_state _fill_state;
+      struct rmt_fill_state _rmt_fill_state;
 #endif
     };
 #endif
@@ -170,8 +170,8 @@ void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
 void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
 #endif
 #if defined(SUPPORT_ESP32_RMT_V2)
-uint32_t rmt_encode_queue(StepperQueue* q, uint32_t* symbols,
-                          uint32_t symbols_free);
+// F2 read-ahead bound encoder: walks the queue and emits the low phase
+// in pieces.  Every sub-entry is capped at RMT_MAX_SYMBOL_TICKS.
 uint32_t rmt_encode_fill(StepperQueue* q, struct rmt_fill_state* state,
                          uint32_t* symbols, uint32_t symbols_free);
 #endif
@@ -240,7 +240,9 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //
 //   driver        drain pauses before dir change     dir change/delay pause
 //   RMT (idf4)    1 x MIN_CMD_TICKS                  user dir_change_delay
-//   RMT (idf5/6)  2 x MIN_CMD_TICKS                  user dir_change_delay
+//   RMT (idf5/6)  1 x 3*RMT_BLOCK_TICKS (ticks,       user dir_change_delay
+//                 covers 2*PART_SIZE + min_chunk
+//                 symbols at RMT_MAX_SYMBOL_TICKS)
 //   I2S GPIO DIR  1 x 2*I2S_BLOCK_TICKS (old dir)    user dir_change_delay
 //                 both DMA blocks must be pause:
 //                 GPIO DIR is async at fill time
@@ -261,7 +263,7 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //                 would otherwise emit a step at the
 //                 first TEA of a leading pause.
 //
-// IDF4 vs IDF5 RMT pause count is not a guess: it is the number of PART_SIZE
+// IDF4 RMT pause count is not a guess: it is the number of PART_SIZE
 // halves the hardware fills ahead of the wire. Each queue pause occupies
 // exactly one half, so N pauses put a pause in the other half when the
 // toggle command is filled — the same slot the 1.2.7 fill-time inject used.
@@ -273,8 +275,10 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //   A second pause shifts the toggle one half later, so DIR no longer
 //   sits on the pause that immediately follows the last steps.
 //
-//   IDF5/6's encoder is invoked two PART_SIZE chunks ahead, so two pauses
-//   are required for the same "other half is a pause" condition.
+//   IDF5/6 (F2) no longer fills fixed halves: rmt_encode_fill() emits
+//   variable-length symbols and the queue can be several commands deep, so
+//   the drain is expressed in ticks (3*RMT_BLOCK_TICKS), covering the
+//   worst-case in-flight including the overflow buffer, not in pause count.
 //
 // The fill path must not insert pauses of its own: extra ticks would be
 // invisible to addQueueEntry()/moveTimed().
@@ -338,7 +342,9 @@ static inline bool esp32_driver_is_i2s(const StepperQueue* q) {
 static inline uint8_t esp32_before_pause_count(const StepperQueue* q) {
   if (esp32_driver_is_rmt(q)) {
 #if defined(SUPPORT_ESP32_RMT_V2)
-    return 2;
+    // F2: tick-based drain (count 0).  The tick value below covers the
+    // full worst-case in-flight, including the overflow buffer.
+    return 0;
 #else
     return 1;
 #endif
@@ -365,7 +371,15 @@ static inline bool esp32_i2s_dir_is_mux_slot(const StepperQueue* q) {
 
 static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
   if (esp32_driver_is_rmt(q)) {
+#if defined(SUPPORT_ESP32_RMT_V2)
+    // F2: tick-based drain covering the full worst-case in-flight,
+    // including the overflow buffer (min_chunk_size = PART_SIZE).
+    // Bound = (2*PART_SIZE + PART_SIZE) * RMT_MAX_SYMBOL_TICKS
+    //       = 3 * RMT_BLOCK_TICKS = 24000 ticks (1.5 ms).
+    return (uint16_t)(3 * RMT_BLOCK_TICKS);
+#else
     return MIN_CMD_TICKS;
+#endif
   }
 #if defined(SUPPORT_ESP32_MCPWM_PCNT)
   if (esp32_driver_is_mcpwm(q)) {

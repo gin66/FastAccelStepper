@@ -196,11 +196,13 @@ empty, and stop or under-run (that is the 040 bug).
 | ESP32 MCPWM/PCNT | ~one command (generator latches at TEZ/TEP) |
 | ESP32 I2S | `I2S_BLOCK_COUNT*I2S_BLOCK_TICKS` = 2 x 500 us = 1 ms |
 | ESP32 RMT (IDF4) | `2*PART_SIZE` symbols (RMT memory half ping-pong) |
-| ESP32 RMT (IDF5/6) | target (040 F2): `RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` = 2 x 500 us = 1 ms, with each symbol `<= RMT_BLOCK_TICKS/PART_SIZE` (I2S-referenced; commands may span blocks, needs partial state) |
+| ESP32 RMT (IDF5/6) | `(2*PART_SIZE + min_chunk_size) * RMT_MAX_SYMBOL_TICKS` = `3*RMT_BLOCK_TICKS` = 24000 t = 1.5 ms; every sub-entry `<= RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` (so one RMT half is `<= 2*RMT_BLOCK_TICKS` = 1 ms) |
 
-The IDF5/6 RMT row is the open one: as written, the encoder can fill the
-whole buffer with a few long symbols, so the in-flight time can exceed
-`forward_planning_ticks` and the queue drains. See `todo/040_idf6_rmt_slow.md`.
+The IDF5/6 RMT row is the 040 F2 fix: `rmt_encode_fill()` splits each step's
+low phase so every RMT sub-entry is capped, bounding the buffer's playback time
+well below `forward_planning_ticks`. The direction-change drain uses the same
+`3*RMT_BLOCK_TICKS`. Before F2 the encoder could pack long symbols and drain the
+queue; see `todo/040_idf6_rmt_slow.md`.
 
 ### Driver Responsibilities
 

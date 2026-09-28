@@ -3,10 +3,11 @@
 Priority: **040** — high. The pin trace is longer, not a harness
 artifact. Ahead of the 050 platform work.
 
-Status: **root cause confirmed (H1); F2 encoder implemented and PC-tested;
-driver integration and hardware validation open.** Encoded time is proven
-exact (91.46 s); the pin trace shows the ~29 s is ~3250 stretched **low**
-phases of ~9 ms, one per ~21 ms.
+Status: **F2 implemented, wired and hardware-timing confirmed; extra-step
+sweep open.** Encoded time is proven exact (91.46 s); the pin trace shows the
+~29 s is ~3250 stretched **low** phases of ~9 ms, one per ~21 ms. Hardware
+(`esp32_idf_V6_9_0`, IDF 5.3.1, M1 RMT) `seq_03_02` dropped from 123 s to
+94 s (matching the other drivers); all `seq_03` passed.
 
 Governing principle: with the ramp generator running, `fill_queue()` keeps
 the queue filled to `_forward_planning_in_ticks` (20 ms), so **the queue
@@ -766,11 +767,11 @@ mandatory before the fix can be considered done. The encoder itself is
 implemented and PC-green (Phase 1); the `encode_commands()` wiring and the
 hardware re-check are Phase 2/3 (see "Implementation status").
 
-TODO(040): once Phase 2 wires the fill in, replace the placeholder ESP32 RMT
-IDF5/6 in-flight line in the `FastAccelStepper.h` driver-contract comment (and
-in `extras/doc/driver_architecture.md`) with the measured bound
-(`RMT_MAX_INFLIGHT_TICKS = 2*RMT_BLOCK_TICKS = 16000 t = 1 ms`). RMT IDF4 and
-MCPWM/PCNT are already stated there; IDF5/6 is the only one still open.
+DONE(040): the ESP32 RMT IDF5/6 in-flight line in the `FastAccelStepper.h`
+driver-contract comment and in `extras/doc/driver_architecture.md` now states
+the implemented bound (`(2*PART_SIZE + min_chunk_size)*RMT_MAX_SYMBOL_TICKS =
+3*RMT_BLOCK_TICKS = 24000 t = 1.5 ms`, every sub-entry
+`<= RMT_MAX_SYMBOL_TICKS`).
 
 ### Drain (in-flight) contract (I2S-referenced)
 
@@ -780,42 +781,45 @@ queue before the pin outputs it. Model it on I2S's fixed blocks:
 ```
 RMT_BLOCK_COUNT        = 2
 RMT_BLOCK_TICKS        = 8000                  (500 us, matches I2S_BLOCK_TICKS)
-RMT_MAX_INFLIGHT_TICKS = RMT_BLOCK_COUNT * RMT_BLOCK_TICKS = 16000 t = 1 ms
 RMT_MAX_SYMBOL_TICKS   = RMT_BLOCK_TICKS / PART_SIZE = 250 (P=32) / 333 (P=24)
-# worst case incl. ovf: (2*PART_SIZE + min_chunk_size)*RMT_MAX_SYMBOL_TICKS
+# one RMT half (PART_SIZE symbols, each <= 2*RMT_MAX_SYMBOL_TICKS):
+#   2*PART_SIZE*RMT_MAX_SYMBOL_TICKS = 2*RMT_BLOCK_TICKS = 16000 t = 1 ms
+# worst case incl. ovf (min_chunk_size = PART_SIZE):
+#   (2*PART_SIZE + min_chunk_size)*RMT_MAX_SYMBOL_TICKS = 3*RMT_BLOCK_TICKS
+#   = 24000 t = 1.5 ms
 ```
 
-Contract: `forward_planning_ticks > RMT_MAX_INFLIGHT_TICKS` (20 ms default ->
-~20x margin). The IDF overflow buffer is a *transient* staging area for the
-symbols that did not fit the RMT memory; **if `min_chunk_size` stays at
-`PART_SIZE`, it can hold up to `PART_SIZE` more symbols that were already
-drained from the queue**, so the true bound is
-`(2*PART_SIZE + min_chunk_size)*RMT_MAX_SYMBOL_TICKS` (~1.5 ms for P=32) —
-still far below the lookahead, but not exactly
-`RMT_BLOCK_COUNT*RMT_BLOCK_TICKS`. Set `min_chunk_size` to 1-2 to make the
-declared bound exact (the resumable fill always makes progress with one free
-symbol). The symbol-count framing had to add a `3*` factor for the same
-buffer; making the bound exact here is the cleaner choice.
+Contract: `forward_planning_ticks` (20 ms default) > in-flight (1.5 ms) -> ~13x
+margin. The implemented choice is option (a): keep `min_chunk_size = PART_SIZE`
+so the stop pause always fits; the IDF overflow buffer can then hold up to
+`PART_SIZE` more symbols already drained from the queue, so the DIR drain and
+the declared in-flight bound are `3*RMT_BLOCK_TICKS`. The alternative (resumable
+stop pause, `min_chunk_size` 1-2) would make `2*RMT_BLOCK_TICKS` exact but is
+not used.
 
 Consequences that come with this reference:
 
-- a block holds only 500 us of low, so a legal command no longer fits one half.
-  A max pause (65535 t) is ~263 low symbols (P=32) and spans ~8 blocks. The
-  encoder must carry partial-command state across calls (just
+- a half spans up to 1 ms, so a legal command no longer fits one half. A max
+  pause (65535 t) is ~263 symbols (P=32, each <= 2*RMT_MAX_SYMBOL_TICKS) and
+  spans ~8 blocks. The encoder carries partial-command state across calls (just
   `remaining_low_ticks`; the capped high needs no state); the per-entry `steps`
   write-back is replaced by a tick-based remainder (a command is still consumed
   whole-command, but may be consumed before its tail low has played).
-- the direction drain becomes tick-based like I2S (sized to the ovf-inclusive
-  in-flight bound), not "two `PART_SIZE` pauses". This changes
+- the direction drain is tick-based, sized to the ovf-inclusive in-flight bound
+  (`3*RMT_BLOCK_TICKS`), not "two `PART_SIZE` pauses". This changes
   `esp32_before_pause_*()` on the RMT path.
-- even a 40 us step (640 t) splits into ~4 symbols (`ceil(320/250)+ceil(320/250)`),
-  so the symbol layout changes at all speeds. This is exactly the layout the
-  extra-step H8 half-replay depends on, so HW re-validation is mandatory.
+- a 40 us step (640 t) becomes `[HIGH 250][LOW 250]` plus one `[LOW 70][LOW 70]`
+  symbol (2 symbols), so the symbol layout changes at all speeds. This is
+  exactly the layout the extra-step H8 half-replay depends on, so HW
+  re-validation is mandatory.
 
-Enforce, don't just document: expose `RMT_MAX_INFLIGHT_TICKS` in `pd_config.h`
-and have `setForwardPlanningTimeInMs()` clamp/assert against it, so a too-small
+Enforce, don't just document: expose the in-flight bound in `pd_config.h` and
+have `setForwardPlanningTimeInMs()` clamp/assert against it, so a too-small
 forward planning fails loudly instead of draining the queue. This is the RMT
 IDF5/6 row of the driver in-flight contract in `driver_architecture.md`.
+(`RMT_MAX_INFLIGHT_TICKS` = `2*RMT_BLOCK_TICKS` is the one-half window bound
+used by `test_30`; the driver's full in-flight/drain bound is
+`3*RMT_BLOCK_TICKS`.)
 
 ### Test plan (`test_30`)
 
@@ -853,21 +857,33 @@ not evidence that H8 did not return.
 - [x] `test_30`: simple `PART_SIZE`-window invariant + exactness, green for
   `PART_SIZE` 32 and 24.
 
-**Phase 2 — driver integration: OPEN.**
-- [ ] **Wire it up:** `encode_commands()` still calls the old
-  `rmt_encode_queue()`; switch it to the fill and drop
-  `emit_step_symbols()`/`emit_pause_symbols()`/`rmt_encode_queue()`.
-- [ ] Empty-queue stop: treat the queue as empty only when
-  `read_idx == next_write_idx` **and** `remaining_low_ticks == 0`; reset
-  `rmt_fill_state` in `startQueue_rmt()`/`forceStop_rmt()`.
-- [ ] Direction drain: tick-based for the IDF5/6 path
-  (`esp32_before_pause_count()/_ticks()`), `SUPPORT_ESP32_RMT_V2`-guarded so
-  IDF4 keeps its count-based drain.
-- [ ] `min_chunk_size` / ovf reconciliation (anti-regression constraint 3).
+**Phase 2 — driver integration: DONE (code complete).**
+- [x] **Wire it up:** `encode_commands()` now calls `rmt_encode_fill()`
+  with a persistent `_rmt_fill_state`. The old `rmt_encode_queue()`,
+  `emit_step_symbols()`, and `emit_pause_symbols()` are removed.
+- [x] Empty-queue stop: the queue is treated as empty only when
+  `read_idx == next_write_idx` **and** `remaining_low_ticks == 0`, checked
+  *before* encoding so a drain within a call does not arm the stop;
+  `_rmt_fill_state.remaining_low_ticks` is zeroed in `init_rmt()`,
+  `startQueue_rmt()` and `forceStop_rmt()`. A stop-pause filler (PART_SIZE
+  symbols) is emitted when the queue is truly empty, keeping
+  `min_chunk_size = PART_SIZE`.
+- [x] Direction drain: tick-based for the IDF5/6 path
+  (`esp32_before_pause_count()` returns 0, `esp32_before_pause_ticks()`
+  returns `3 * RMT_BLOCK_TICKS` = 24 000 ticks) guarded by
+  `SUPPORT_ESP32_RMT_V2` so IDF4 keeps its count-based drain.
+- [x] `min_chunk_size` / ovf reconciliation (option a): kept at `PART_SIZE`
+  so the stop pause always fits.  The DIR drain is sized from the
+  ovf-inclusive bound
+  `(2*PART_SIZE + PART_SIZE)*RMT_MAX_SYMBOL_TICKS = 3*RMT_BLOCK_TICKS`.
+  The exact `2*RMT_BLOCK_TICKS` bound is no longer achievable because the
+  overflow buffer can hold an extra `PART_SIZE` symbols.
 
-**Phase 3 — hardware validation: OPEN.**
-- [ ] Re-validate with `FAS_RMT_DEBUG_COUNT` off: `seq_02`/`check_pcnt_sync`
-  and the `seq_15` sweep, both `PART_SIZE`; confirm no extra step and no 29 s.
+**Phase 3 — hardware validation.**
+- [x] Timing: idf5 M1 RMT `seq_03_02` dropped 123 s -> 94 s, matching the
+  other drivers; all `seq_03` passed (2026-09-28 23:00 run, `test_all.log`).
+- [ ] Extra-step sweep: `seq_02`/`check_pcnt_sync` and the `seq_15` sweep with
+  `FAS_RMT_DEBUG_COUNT` off, both `PART_SIZE`.
 
 ### Anti-regression vs `esp32_rmt_extra_step.md` (mandatory)
 
@@ -978,6 +994,9 @@ F2 does not touch IDF4's path, so the IDF4 control stays valid.
   IDF driver and cannot reproduce the ping-pong race.
 
 ### Open questions / risks
+
+Most items below were implemented in Phase 2; the remaining open ones are the
+on-target checks in "Probe/experiment design" and the `seq_15` sweep.
 
 - Threshold/prelude behaviour: under F2 a pause is split into many small
   symbols and no longer keeps the `PART_SIZE` count or the 8-tick prelude, so

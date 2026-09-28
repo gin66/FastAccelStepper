@@ -242,3 +242,24 @@
 2026-09-28 16:38:04  arduino_latest  M9 seq_03 passed
 2026-09-28 16:38:04  PASS arduino_latest      pio=esp32_V7_1_2
 2026-09-28 16:38:04  DONE  test_all
+2026-09-28 23:00:54  idf5  M1 seq_04 passed
+2026-09-28 23:00:56  idf5  M1 seq_05 passed
+2026-09-28 23:00:58  idf5  M1 seq_06 passed
+2026-09-28 23:01:01  idf5  M1 seq_01a passed
+2026-09-28 23:01:05  idf5  M1 seq_01b passed
+2026-09-28 23:01:08  idf5  M1 seq_02 passed
+2026-09-28 23:01:10  idf5  M1 seq_07a passed
+2026-09-28 23:01:12  idf5  M1 seq_07b passed
+2026-09-28 23:01:14  idf5  M1 seq_07c passed
+2026-09-28 23:01:17  idf5  M1 seq_08 passed
+2026-09-28 23:01:18  idf5  M1 seq_03_13 passed
+2026-09-28 23:01:21  idf5  M1 seq_03_14 passed
+2026-09-28 23:02:26  idf5  M1 seq_03_01 passed
+2026-09-28 23:04:00  idf5  M1 seq_03_02 passed
+2026-09-28 23:04:30  idf5  M1 seq_03_03 passed
+2026-09-28 23:04:41  idf5  M1 seq_03_04 passed
+2026-09-28 23:04:51  idf5  M1 seq_03_06 passed
+2026-09-28 23:04:59  idf5  M1 seq_03_07 passed
+2026-09-28 23:09:16  idf5  M1 seq_03_10 passed
+2026-09-28 23:10:48  idf5  M1 seq_03_11 passed
+2026-09-28 23:10:48  idf5  M1 seq_03 passed

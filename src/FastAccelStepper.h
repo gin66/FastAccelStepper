@@ -499,16 +499,16 @@ class FastAccelStepper {
   //     half per threshold; the RMT memory holds two halves, so in-flight is
   //     the playback time of 2*PART_SIZE symbols (bounded by the command
   //     periods, which the fill routine limits).
-  //   - ESP32 RMT (IDF5/6): the simple encoder can fill the entire RMT
-  //     memory (2*PART_SIZE symbols) in one transaction fill, so in-flight
-  //     is the playback time of that buffer. This is the 040 bug: a long
-  //     symbol (e.g. a 4 ms slow step as one symbol) makes that span
-  //     hundreds of ms, far above the 20 ms lookahead, and the queue is
-  //     drained. The fix (040, F2) bounds it like I2S: two blocks of
-  //     RMT_BLOCK_TICKS (=I2S_BLOCK_TICKS=500 us), so in-flight is
-  //     RMT_BLOCK_COUNT*RMT_BLOCK_TICKS = 16000 ticks = 1 ms, with each
-  //     symbol <= RMT_BLOCK_TICKS/PART_SIZE. TODO(040): replace with the
-  //     measured bound once F2 lands (see extras/todo/040_idf6_rmt_slow.md).
+  //   - ESP32 RMT (IDF5/6): rmt_encode_fill() caps every RMT sub-entry (the
+  //     step high and every low chunk) at RMT_MAX_SYMBOL_TICKS
+  //     (= RMT_BLOCK_TICKS/PART_SIZE). A symbol is therefore at most
+  //     2*RMT_MAX_SYMBOL_TICKS and one RMT half (PART_SIZE symbols) spans at
+  //     most 2*PART_SIZE*RMT_MAX_SYMBOL_TICKS = 2*RMT_BLOCK_TICKS =
+  //     16000 ticks = 1 ms. Including the driver's overflow buffer
+  //     (min_chunk_size = PART_SIZE) the worst-case in-flight is
+  //     (2*PART_SIZE + min_chunk_size)*RMT_MAX_SYMBOL_TICKS =
+  //     3*RMT_BLOCK_TICKS = 24000 ticks = 1.5 ms. The direction-change drain
+  //     uses the same 3*RMT_BLOCK_TICKS. See extras/todo/040_idf6_rmt_slow.md.
   //
   // Attention:
   // - This is only for advanced users: no error checking is implemented.

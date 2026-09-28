@@ -13,28 +13,15 @@ static bool IRAM_ATTR queue_done(rmt_channel_handle_t tx_chan,
   return false;
 }
 
-#define ENTER_PAUSE(ticks)                                          \
-  {                                                                 \
-    uint16_t remaining_ticks = ticks;                               \
-    uint16_t half_ticks_per_symbol = ticks / (2 * PART_SIZE);       \
-    uint32_t main_symbol = 0x00010001 * half_ticks_per_symbol;      \
-    for (uint8_t i = 0; i < PART_SIZE - 1; i++) {                   \
-      (*symbols++).val = main_symbol;                               \
-    }                                                               \
-    remaining_ticks -= 2 * (PART_SIZE - 1) * half_ticks_per_symbol; \
-    uint16_t first_ticks = remaining_ticks / 2;                     \
-    remaining_ticks -= first_ticks;                                 \
-    symbols->val = 0x00010000 * first_ticks + remaining_ticks;      \
-  }
-
+// F2 fill encoder callback: uses rmt_encode_fill() with a persistent
+// rmt_fill_state. The queue is treated as done only when read_idx ==
+// next_write_idx AND remaining_low_ticks == 0 (the fill state is fully
+// drained), so the eager _rmtStopped stop cannot fire mid-split-low.
 static size_t IRAM_ATTR encode_commands(const void* data, size_t data_size,
                                         size_t symbols_written,
                                         size_t symbols_free,
                                         rmt_symbol_word_t* symbols, bool* done,
                                         void* arg) {
-  // this printf causes Guru Meditation
-  // printf("encode commands\n");
-
   StepperQueue* q = static_cast<StepperQueue*>(arg);
 
   *done = false;
@@ -42,18 +29,34 @@ static size_t IRAM_ATTR encode_commands(const void* data, size_t data_size,
     *done = true;
     return 0;
   }
-  uint8_t rp = q->read_idx;
-  if (rp == q->next_write_idx) {
+
+  struct rmt_fill_state* fs = &q->_rmt_fill_state;
+
+  // Check emptiness *before* encoding. A drain that happens within this call
+  // must not arm the stop (that is the eager stop); the next call sees the
+  // empty queue and arms it.
+  if (q->read_idx == q->next_write_idx && fs->remaining_low_ticks == 0) {
     if (symbols_free < PART_SIZE) {
       return 0;
     }
     // if we return done already here, then single stepping fails
     q->_rmtStopped = true;
-    // Not sure if this pause is really needed
-    ENTER_PAUSE(MIN_CMD_TICKS);
+    // Emit ENTER_PAUSE(MIN_CMD_TICKS) as PART_SIZE symbols so the channel
+    // reaches a known state; min_chunk_size stays PART_SIZE for this.
+    uint16_t remaining_ticks = MIN_CMD_TICKS;
+    uint16_t half_ticks_per_symbol = remaining_ticks / (2 * PART_SIZE);
+    uint32_t main_symbol = 0x00010001 * half_ticks_per_symbol;
+    for (uint8_t i = 0; i < PART_SIZE - 1; i++) {
+      (symbols++)->val = main_symbol;
+    }
+    remaining_ticks -= 2 * (PART_SIZE - 1) * half_ticks_per_symbol;
+    uint16_t first_ticks = remaining_ticks / 2;
+    remaining_ticks -= first_ticks;
+    symbols->val = 0x00010000 * first_ticks + remaining_ticks;
     return PART_SIZE;
   }
-  return rmt_encode_queue(q, &symbols[0].val, (uint32_t)symbols_free);
+
+  return rmt_encode_fill(q, fs, &symbols[0].val, (uint32_t)symbols_free);
 }
 
 void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
@@ -82,6 +85,9 @@ void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {
   _step_pin = step_pin;
   pinMode(step_pin, OUTPUT);
   digitalWrite(step_pin, LOW);
+
+  // Zero-fill the fill state (F2 persistent state).
+  _rmt_fill_state.remaining_low_ticks = 0;
 
   rmt_simple_encoder_config_t enc_config = {
       .callback = encode_commands, .arg = this, .min_chunk_size = PART_SIZE};
@@ -180,6 +186,9 @@ void StepperQueue::startQueue_rmt() {
   _isRunning = true;
   _rmtStopped = false;
 
+  // Reset the fill state at every transaction boundary (F2).
+  _rmt_fill_state.remaining_low_ticks = 0;
+
   // payload and payload bytes must not be 0
   int payload = 0;
   rmt_transmit_config_t tx_config;
@@ -206,6 +215,9 @@ void StepperQueue::forceStop_rmt() {
   _channel_enabled = false;
   _isRunning = false;
   _rmtStopped = true;
+
+  // Reset the fill state at transaction boundary (F2).
+  _rmt_fill_state.remaining_low_ticks = 0;
 
   // and empty the buffer
   read_idx = next_write_idx;
