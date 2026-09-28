@@ -263,7 +263,7 @@ def generate_workflow_yml(
             "",
             "    steps:",
             "    - name: Checkout",
-            "      uses: actions/checkout@v5",
+            "      uses: actions/checkout@v7",
             "    - name: Make directories",
             "      run: bash extras/scripts/build-pio-dirs.sh",
             "    - name: Build on PlatformIO",
