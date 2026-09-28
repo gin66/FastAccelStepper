@@ -88,6 +88,7 @@ static void window_add(uint32_t ticks) {
 // --- one command: fill until the queue and the fill state are drained ------
 static uint64_t commanded_ticks, emitted_ticks;
 static uint32_t emitted_edges, expected_edges;
+static uint16_t min_subentry;
 static bool last_level;
 
 static void emit(const uint32_t* sym, uint32_t n) {
@@ -95,6 +96,8 @@ static void emit(const uint32_t* sym, uint32_t n) {
     uint16_t d0, d1;
     bool l0, l1;
     decode(sym[i], &d0, &l0, &d1, &l1);
+    if (d0 < min_subentry) min_subentry = d0;
+    if (d1 < min_subentry) min_subentry = d1;
     if (l0 && !last_level) emitted_edges++;
     last_level = l0;
     if (l1 && !last_level) emitted_edges++;
@@ -111,6 +114,7 @@ static void run_case(uint8_t steps, uint16_t ticks, bool toggle) {
   emitted_ticks = 0;
   emitted_edges = 0;
   expected_edges = steps;
+  min_subentry = 0xffff;
   last_level = false;
 
   push(steps, ticks, toggle);
@@ -134,6 +138,7 @@ static void run_case(uint8_t steps, uint16_t ticks, bool toggle) {
   expect(emitted_ticks == commanded_ticks, "symbol ticks == commanded ticks");
   expect(emitted_edges == expected_edges, "one rising edge per step");
   expect(state.remaining_low_ticks == 0, "fill state drained");
+  expect(min_subentry >= 2, "every sub-entry >= 2 ticks (relation 1)");
   expect(win_max <= RMT_MAX_INFLIGHT_TICKS,
          "every PART_SIZE-symbol window <= RMT_MAX_INFLIGHT_TICKS");
 }

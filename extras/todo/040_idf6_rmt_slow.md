@@ -3,9 +3,10 @@
 Priority: **040** — high. The pin trace is longer, not a harness
 artifact. Ahead of the 050 platform work.
 
-Status: **root cause confirmed (H1)**. Encoded time is proven exact
-(91.46 s); the pin trace shows the ~29 s is ~3250 stretched **low** phases
-of ~9 ms, one per ~21 ms.
+Status: **root cause confirmed (H1); F2 encoder implemented and PC-tested;
+driver integration and hardware validation open.** Encoded time is proven
+exact (91.46 s); the pin trace shows the ~29 s is ~3250 stretched **low**
+phases of ~9 ms, one per ~21 ms.
 
 Governing principle: with the ramp generator running, `fill_queue()` keeps
 the queue filled to `_forward_planning_in_ticks` (20 ms), so **the queue
@@ -280,12 +281,13 @@ than 1 or 2 symbols for long periods.
 
 **Candidate condition 2 (time per symbol) — the one that becomes the design.**
 Instead of counting symbols, bound the *time* each symbol may represent. The
-chosen form is the I2S-referenced block cap: the low per low-only symbol is
-`RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` (=250/333 ticks) and the
-step high is capped at `RMT_MAX_SYMBOL_TICKS`; the RMT buffer's low then covers
-at most `2*RMT_BLOCK_TICKS` = 16000 ticks = 1 ms, i.e. far less than the 20 ms
-lookahead. (The earlier looser value `65536/PART_SIZE`
-gave an 8.192 ms buffer and only a ~2.4x margin; the I2S shape is preferred.)
+chosen form is the I2S-referenced sub-entry cap: every sub-entry (low chunks and
+the step high) is `RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` (=250/333
+ticks), so every symbol is at most `2*RMT_MAX_SYMBOL_TICKS` and every
+`PART_SIZE`-symbol window covers at most `2*PART_SIZE*RMT_MAX_SYMBOL_TICKS` =
+16000 ticks = 1 ms, i.e. far less than the 20 ms lookahead. (The earlier looser
+value `65536/PART_SIZE` gave an 8.192 ms buffer and only a ~2.4x margin; the
+I2S shape is preferred.)
 The tension noted here — bounding the buffer time *above* helps the
 queue-drain (read-ahead) problem but *hurts* the starvation problem — is
 resolved by the margin: at 1 ms in flight and 20 ms of lookahead the buffer
@@ -586,28 +588,26 @@ threshold/end ISR (`StepperISR_idf4_esp32_rmt.cpp` pattern).
   with F2's per-command floor); a time-only floor still fits in the RMT. Keep
   it as the secondary half of F2, not as a fix by itself.
 
-**Gating (do not skip).** F2 must not be implemented or merged until
-(a) P1 confirms the queue-empty/eager-stop mechanism with the HW event
-counters below, and (b) the F2 symbol-layout change re-passes the
-extra-step hardware reproduction with `FAS_RMT_DEBUG_SLOW`/`FAS_RMT_DEBUG_COUNT`
-off. A green `test_30` is not sufficient: F2 rewrites the exact symbol
-layout that the H8 replay depends on, and a misdiagnosis of the 29 s would
-re-expose the extra-step bug. Treat "P1 done" and "extra-step re-check
-done" as hard milestones before any F2 merge; no calendar deadline is set
-here because the gating is evidence-based, not time-based.
+**Gating (do not skip).** Phase 1 (the encoder rewrite) is implemented and
+`test_30` is green, but F2 must not be **wired in or merged** until (a) the
+queue-empty/eager-stop mechanism is confirmed with the HW event counters below,
+and (b) the new symbol layout re-passes the extra-step hardware reproduction
+with `FAS_RMT_DEBUG_SLOW`/`FAS_RMT_DEBUG_COUNT` off. A green `test_30` is not
+sufficient: F2 rewrites the exact symbol layout that the H8 replay depends on,
+and a misdiagnosis of the 29 s would re-expose the extra-step bug. Treat "P1
+done" and "extra-step re-check done" as hard milestones before Phase 2/3 land;
+no calendar deadline is set here because the gating is evidence-based.
 
-**Recommendation.** F2 is chosen (design below): split the low phase and cap
-the low per low-only symbol at `RMT_MAX_SYMBOL_TICKS =
-RMT_BLOCK_TICKS/PART_SIZE` (250 for PART_SIZE 32, 333 for 24), with the step
-high capped at `RMT_MAX_SYMBOL_TICKS`, which makes the RMT buffer's low span at
-most `RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` = 16000 ticks (1 ms), far less than the
-20 ms lookahead, so the queue stays non-empty while running. F5 is
-unavailable under IDF 5/6, so F2 is the only option that attacks the cause
-directly; F3/F4 remain fallbacks/stop-gaps and F1/F6 are rejected.
+**Recommendation.** F2 is chosen and implemented (Phase 1): cap every sub-entry
+at `RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` (250 for PART_SIZE 32,
+333 for 24), including the step high, which makes every `PART_SIZE`-symbol
+window span at most `2*PART_SIZE*RMT_MAX_SYMBOL_TICKS` = 16000 ticks (1 ms),
+far less than the 20 ms lookahead, so the queue stays non-empty while running.
+F5 is unavailable under IDF 5/6, so F2 is the only option that attacks the
+cause directly; F3/F4 remain fallbacks/stop-gaps and F1/F6 are rejected.
 
-P1 is still run first as a cheap confirmation and to validate the
-`RMT_MAX_SYMBOL_TICKS` choice: at each pin idle record
-`read_idx == next_write_idx` (queue empty?)
+P1 is still run as a cheap confirmation of the mechanism before wiring the fix
+in: at each pin idle record `read_idx == next_write_idx` (queue empty?)
 and the number of symbols still resident in RMT memory. Expected after F2:
 queue never empty mid-move. If P1 instead shows the buffer dry with a
 non-empty queue, fall back to F3.
@@ -757,18 +757,20 @@ Constraints / follow-ups:
   reset `rmt_fill_state` at every transaction boundary (mirror the
   `i2s_fill_state` lifecycle).
 - `pd_config_idf5.h`/`pd_config_idf6.h`: define `RMT_BLOCK_TICKS`,
-  `RMT_MAX_INFLIGHT_TICKS`, `RMT_MAX_SYMBOL_TICKS` (max low per low-only
-  symbol) and `RMT_MAX_SYMBOL_TICKS` (cap on the step high pulse).
+  `RMT_MAX_INFLIGHT_TICKS`, `RMT_MAX_SYMBOL_TICKS` (cap for every sub-entry,
+  including the step high). Done in Phase 1.
 
 This is a full encoder rewrite (partial state, tick-based drain) and it
 invalidates the current H8/extra-step validation, so the hardware re-check is
-mandatory before F2 can be considered done.
+mandatory before the fix can be considered done. The encoder itself is
+implemented and PC-green (Phase 1); the `encode_commands()` wiring and the
+hardware re-check are Phase 2/3 (see "Implementation status").
 
-TODO(040): once F2 lands, replace the placeholder ESP32 RMT IDF5/6 in-flight
-line in the `FastAccelStepper.h` driver-contract comment (and in
-`extras/doc/driver_architecture.md`) with the measured bound
-(`RMT_BLOCK_COUNT*RMT_BLOCK_TICKS = 16000 t = 1 ms`). RMT IDF4 and MCPWM/PCNT
-are already stated there; IDF5/6 is the only one still open.
+TODO(040): once Phase 2 wires the fill in, replace the placeholder ESP32 RMT
+IDF5/6 in-flight line in the `FastAccelStepper.h` driver-contract comment (and
+in `extras/doc/driver_architecture.md`) with the measured bound
+(`RMT_MAX_INFLIGHT_TICKS = 2*RMT_BLOCK_TICKS = 16000 t = 1 ms`). RMT IDF4 and
+MCPWM/PCNT are already stated there; IDF5/6 is the only one still open.
 
 ### Drain (in-flight) contract (I2S-referenced)
 
@@ -824,8 +826,9 @@ commands and assert the one invariant plus exactness.
   symbols, the sum of every `PART_SIZE` consecutive symbol durations is
   `<= RMT_MAX_INFLIGHT_TICKS` (= 1 ms). Because every sub-entry is capped at
   `RMT_MAX_SYMBOL_TICKS`, this is exactly `2*PART_SIZE*RMT_MAX_SYMBOL_TICKS`.
-- **Exactness:** symbol ticks == commanded ticks (steps and pauses), one
-  rising edge per step, and the fill state drains to zero.
+- **Exactness and floor:** symbol ticks == commanded ticks (steps and pauses),
+  one rising edge per step, the fill state drains to zero, and every sub-entry
+  is `>= 2` ticks (relation 1).
 - Sweep `ticks in {4,5,8,99,250,251,500,640,3200,5000,7500,10000,20000,32767,65535}`
   x `steps in {1,2,5,51,255}`, plus pauses (3200, 65535) and a direction toggle.
 - Run for both `PART_SIZE` 32 and 24.
@@ -841,6 +844,7 @@ not evidence that H8 did not return.
 
 ### Implementation status
 
+**Phase 1 — encoder rewrite: DONE (PC).**
 - [x] Interface/config: `RMT_BLOCK_TICKS`, `RMT_MAX_INFLIGHT_TICKS`,
   `RMT_MAX_SYMBOL_TICKS`, `struct rmt_fill_state { remaining_low_ticks; }`.
 - [x] `rmt_encode_fill()`: low-phase state machine, every sub-entry
@@ -848,6 +852,8 @@ not evidence that H8 did not return.
   tick-exact, sub-entry floor handled (remainder never `1..3`).
 - [x] `test_30`: simple `PART_SIZE`-window invariant + exactness, green for
   `PART_SIZE` 32 and 24.
+
+**Phase 2 — driver integration: OPEN.**
 - [ ] **Wire it up:** `encode_commands()` still calls the old
   `rmt_encode_queue()`; switch it to the fill and drop
   `emit_step_symbols()`/`emit_pause_symbols()`/`rmt_encode_queue()`.
@@ -858,7 +864,10 @@ not evidence that H8 did not return.
   (`esp32_before_pause_count()/_ticks()`), `SUPPORT_ESP32_RMT_V2`-guarded so
   IDF4 keeps its count-based drain.
 - [ ] `min_chunk_size` / ovf reconciliation (anti-regression constraint 3).
-- [ ] Hardware re-validation with `FAS_RMT_DEBUG_COUNT` off.
+
+**Phase 3 — hardware validation: OPEN.**
+- [ ] Re-validate with `FAS_RMT_DEBUG_COUNT` off: `seq_02`/`check_pcnt_sync`
+  and the `seq_15` sweep, both `PART_SIZE`; confirm no extra step and no 29 s.
 
 ### Anti-regression vs `esp32_rmt_extra_step.md` (mandatory)
 
@@ -1100,28 +1109,24 @@ make `encode_commands` keep the transaction alive when the queue is empty
 calls) so the ramp can catch up. If the 29 s disappears with no other
 change, H1 is proven. Keep the current code as the control.
 
-**P4 — Force a minimum-period violation (tests H2).** Extend `test_30`
-with an assertion that every emitted half-period is >= 2 and that the
-symbol immediately before the EOF is >= 4, and sweep pauses 2..249,
-step periods 1..8 ticks and odd periods. This enumerates every violator
-off-target. Then feed one computed violator on-target and look for a
-transaction abort / extra idle. If the target never sees a half < 2 for
-seq_02, H2 is excluded for this item.
+**P4 — Minimum-period check (H2).** `test_30` asserts the `PART_SIZE`-window
+bound, exactness, and that every sub-entry is `>= 2` (relation 1). On target,
+feed the shortest reachable command and look for a transaction abort / extra
+idle. If the target never sees a half `< 2` for seq_02, H2 stays excluded for
+this item.
 
-**P5 — Extend the `test_30` model (tests H1 vs reality).** The current
-`run_move_model` restarts within the same task tick. Parameterise the
-per-stop latency `L` and solve for the `L` that reproduces 120.760 s
-from the known encoded stream and stop count. If `L` lands on
-~2 x `DELAY_MS_BASE`, the model closes; then use P1/P3 to explain why
-the real restart takes those two ticks.
+**P5 — Stop/restart timing (H1 vs reality).** The old `run_move_model` and the
+seq_02 hole model were removed with the simple `test_30`. Measure the per-stop
+latency directly on hardware via P1 instead: if the PROBE_2 -> PROBE_1 gap is
+~2 task ticks, H1's magnitude closes; use P1/P3 to explain it once the fill is
+wired in.
 
 **P6 — IDF A/B (tests H4).** Build the identical app with
 `esp32_idf_V6_9_0` (IDF 5.3.1) and an IDF 6 env on one board, timestamp
 the build, capture STEP, and confirm the hole count vs hole size. This
 also removes the file-name generation ambiguity (H5).
 
-Order: P6 (freeze the baseline) -> P1 (see the loop) -> P3 (causality) ->
-P2/P5 (model) -> P4 (close the latent min-period gap). The fix work then
-follows F2 (the read-ahead bound, with F7's symbol-based floor) once P1/P3
-confirm H1; F3 (if the buffer is dry) or F2 (if the queue empties) is the
-fix; F4c a stop-gap. F5 is unavailable under IDF 5/6.
+Order: Phase 1 (encoder rewrite) is done (`test_30` green). Before wiring it in
+(Phase 2): P6 (freeze the baseline) -> P1 (confirm the loop) -> P3 (causality)
+-> P2 (model). P4 closes the latent min-period gap. Phase 3 (hardware
+re-validation) gates the merge. F5 is unavailable under IDF 5/6.
