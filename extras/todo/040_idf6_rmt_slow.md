@@ -3,21 +3,30 @@
 Priority: **040** — high. The pin trace is longer, not a harness
 artifact. Ahead of the 050 platform work.
 
-Status: open, lead identified. Encoded time is proven exact (91.46 s);
-the pin trace shows the ~29 s is ~3250 stretched **low** phases of ~9 ms,
-one per ~21 ms. The lead is the eager `_rmtStopped` stop in
-`encode_commands()` on a *transiently* empty queue (H1): the whole queue
-fits in the RMT buffer, the encoder drains it, stops, and restart costs a
-task period plus async latency. The exact per-stop cost (~9 ms vs the
-model's ~0.7 ms) is still unexplained (H3/H4). A new `test_30` condition,
-"every queue command contributes >= PART_SIZE/2 RMT symbols", fails and
-captures the read-ahead requirement. The chosen fix is F2: cap the RMT
-symbol duration (`ceil(65535/PART_SIZE)` ticks) so the RMT buffer spans
-less time than the lookahead and the encoder cannot drain the queue while
-running; F1 is rejected, F5 unavailable under IDF 5/6. F2 rewrites the
-symbol layout, so it must not regress the confirmed extra-step fix
+Status: **root cause confirmed (H1)**. Encoded time is proven exact
+(91.46 s); the pin trace shows the ~29 s is ~3250 stretched **low** phases
+of ~9 ms, one per ~21 ms.
+
+Governing principle: with the ramp generator running, `fill_queue()` keeps
+the queue filled to `_forward_planning_in_ticks` (20 ms), so **the queue
+must not run low while the motor is running**. It does. Hardware event
+counters (`FAS_RMT_DEBUG_SLOW`) show `encode_commands()` finds
+`read_idx == next_write_idx` repeatedly mid-move and takes the eager
+`_rmtStopped` stop (`stopped ~= empty - 46`, through both ACC and RED). The
+eager stop is the symptom; the contract violation is that the encoder can
+drain the whole queue into the RMT buffer because the buffer holds less
+time than the lookahead, and "empty" is then treated as "done" instead of
+"waiting for the ramp". That is enough to call H1 confirmed; the exact
+per-stop cost (~9 ms vs the model's ~0.7 ms) is no longer load-bearing and
+stays as a secondary question (H3/H4).
+
+The chosen fix is F2: cap the RMT symbol duration
+(`ceil(65535/PART_SIZE)` ticks) so the RMT buffer spans less time than the
+20 ms lookahead and the encoder can never drain the queue while running;
+F1 is rejected, F5 unavailable under IDF 5/6. F2 rewrites the symbol
+layout, so it must not regress the confirmed extra-step fix
 (`extras/doc/implemented/esp32_rmt_extra_step.md`, H8 ping-pong replay)
-and needs re-validation on hardware with `FAS_RMT_DEBUG_COUNT` off. The
+and needs re-validation on hardware with the debug macro off. The
 min-symbol-period gap is latent, not the 29 s (seq_02 min half = 4). See
 "F2 design".
 
@@ -214,13 +223,25 @@ not check it:
 
 ### RMT refill invariants (`test_30` conditions)
 
-The root failure is that `encode_commands()` sets `_rmtStopped` whenever it is
-invoked and the queue is empty. It is invoked with `2*PART_SIZE` free at
-transaction start and `PART_SIZE` free at each threshold, and
-`rmt_encode_queue()` drains commands into the RMT until the RMT is full *or
-the queue is empty*. So the stop fires precisely when **the whole queue fits
-in the RMT buffer**. The invariant that prevents it is a bound on the
-encoder's read-ahead.
+Governing principle: while the ramp generator is running it keeps the queue
+filled to `_forward_planning_in_ticks` (20 ms), so **the queue must never run
+low mid-move**. The failure is that it does, and that `encode_commands()`
+then treats "empty" as "done" (sets `_rmtStopped`) instead of waiting for the
+ramp. It is invoked with `2*PART_SIZE` free at transaction start and
+`PART_SIZE` free at each threshold, and `rmt_encode_queue()` drains commands
+into the RMT until the RMT is full *or the queue is empty*. So the stop fires
+precisely when **the whole queue fits in the RMT buffer**. The invariant that
+prevents it is a bound on the encoder's read-ahead: the RMT buffer must span
+less time than the lookahead.
+
+This is a general driver-architecture contract, now documented on
+`setForwardPlanningTimeInMs()` in `FastAccelStepper.h`: a driver must state
+how much it drains out of the queue at most (in flight), and
+`forward_planning_ticks` must exceed that. Per driver: AVR/SAM/SAMD/Teensy/
+Pico consume at most one command at a time; ESP32 I2S drains up to the DMA
+block being filled (`~I2S_BLOCK_TICKS`); ESP32 RMT (idf5/6) can drain the
+whole `2*PART_SIZE`-symbol buffer, which is why the symbol cap below is the
+driver's declared in-flight bound.
 
 **Primary condition (symbols per command).** Every queue command must
 contribute at least `PART_SIZE/2` RMT symbols. Then the full RMT buffer
@@ -314,14 +335,15 @@ one hole per ~20 ms, each hole a single low interval of (transaction end
 has no holes. Matches all capture numbers except the exact 9 ms, which
 implies the restart needs ~2 task ticks, not <= 1.
 
-*Judgement: strongest, and the one to pursue first.* The mechanism lives
-in our own code (`encode_commands()`), it reproduces the cadence
-(~one hole per planning window), it explains the idf4 vs idf5/6 split
-(the eager `_rmtStopped` is new), and the new read-ahead condition
-(`test_30`) fails exactly where the holes are. It is the only hypothesis
-that is directly actionable without new hardware measurements. Weakness:
-the per-stop cost is not yet explained (model undercounts by ~13x), so
-P1/P3 must pin the restart latency before concluding.
+*Judgement: confirmed (root cause).* The mechanism lives in our own code
+(`encode_commands()`); it reproduces the cadence (~one hole per planning
+window) and the idf4 vs idf5/6 split; the read-ahead condition (`test_30`)
+fails exactly where the holes are; and the HW event counters show the
+queue emptying at the callback mid-move on essentially every invocation
+that finds it empty. Independently of the exact per-stop cost, the queue
+running low while the ramp generator is active is itself the contract
+violation. The per-stop magnitude is a secondary question (H3/H4) and no
+longer gates the conclusion.
 
 H2 — RMT minimum-period violation (the user's observation). If a step or
 pause symbol carries a half-period of 0, the RMT reads it as a stop
@@ -378,7 +400,12 @@ The `rmt_tx_mark_eof` call in `rmt_isr_handle_tx_threshold()` exists in
 new IDF 6 step. Predicted signature: same app code, only the framework
 version changes; the hole count stays, the per-hole cost changes.
 Whether these small driver changes actually cause the 92 s vs 121 s is
-what P6 must measure, not assume.
+what P6 must measure, not assume. Of the four, only the
+`RMT_ENCODING_MEM_FULL` / `is_done` change can plausibly alter how our
+callback interacts with the driver (it decides whether EOF is marked in
+this round or deferred to the threshold); the byte offset, `WITH_EOF` and
+the DMA plumbing are inert for the simple encoder. H4 confidence is
+therefore low and it is one concrete, testable difference, not four.
 
 *Judgement: necessary to explain the IDF-version split, but weak on its
 own.* H1 explains why a hole exists; H4 could explain why IDF 6's holes
@@ -428,7 +455,7 @@ judgements below are therefore conditional.
 | F1 | keep transaction alive | restart latency only | rejected as a solution (queue still empties while running) |
 | F2 | read-ahead bound: cap symbol duration at `ceil(65535/PART_SIZE)` t | quantity (1) queue content | **chosen**; design below |
 | F3 | bigger RMT buffer | quantity (2) buffer playback time | strong lever if (2) is the cause; needs F1/F4b |
-| F4 | cheaper restart | restart latency | mitigation only |
+| F4 | cheaper restart: (a) faster task, (b) unblock ramp while `_rmtStopped`, (c) restart from TX-done / queued transaction | restart latency | mitigation only |
 | F5 | idf4-style synchronous ISR refill | read-ahead by construction | rejected: not allowed under IDF 5/6 |
 | F6 | continuous / DMA feed | - | rejected |
 | F7 | ramp lookahead floor | quantity (1), in time | insufficient alone; part of F2 |
@@ -539,6 +566,16 @@ threshold/end ISR (`StepperISR_idf4_esp32_rmt.cpp` pattern).
   with F2's per-command floor); a time-only floor still fits in the RMT. Keep
   it as the secondary half of F2, not as a fix by itself.
 
+**Gating (do not skip).** F2 must not be implemented or merged until
+(a) P1 confirms the queue-empty/eager-stop mechanism with the HW event
+counters below, and (b) the F2 symbol-layout change re-passes the
+extra-step hardware reproduction with `FAS_RMT_DEBUG_SLOW`/`FAS_RMT_DEBUG_COUNT`
+off. A green `test_30` is not sufficient: F2 rewrites the exact symbol
+layout that the H8 replay depends on, and a misdiagnosis of the 29 s would
+re-expose the extra-step bug. Treat "P1 done" and "extra-step re-check
+done" as hard milestones before any F2 merge; no calendar deadline is set
+here because the gating is evidence-based, not time-based.
+
 **Recommendation.** F2 is chosen (design below): cap every RMT symbol at
 `MAX_TICKS = 65536/PART_SIZE`, which makes the RMT buffer span less time than
 the 20 ms lookahead and keeps the queue non-empty while running. F5 is
@@ -634,7 +671,13 @@ Constraints:
 - a single step or pause must fit in one `PART_SIZE` half: guaranteed by
   `MAX >= 65535/PART_SIZE`, so it can always be written into the threshold
   half or the IDF overflow buffer without carrying a partial step across
-  calls.
+  calls;
+- **exact tick preservation.** Splitting a phase of `T` ticks into `n = ceil(T/MAX)`
+  symbols must sum exactly to `T`: give the first `T mod n` symbols one extra
+  tick (`T/n`, `T/n + 1`). The pause is spread over exactly `PART_SIZE` symbols
+  the same way, summing to the original `ENTER_PAUSE(MIN_CMD_TICKS)` ticks even
+  when it is not a multiple of `PART_SIZE`. `test_30`'s "total symbol ticks ==
+  commanded" check is the guard against accumulated rounding drift.
 
 ### Changes
 
@@ -653,6 +696,12 @@ Constraints:
 - `min_chunk_size = PART_SIZE` overflow buffer still works: with
   `MAX >= 65535/PART_SIZE` the largest step/pause is `PART_SIZE` symbols, so it
   fits the overflow buffer and no step is split across calls.
+
+TODO(040): once F2 lands, replace the placeholder ESP32 RMT IDF5/6 in-flight
+line in the `FastAccelStepper.h` driver-contract comment (and in
+`extras/doc/driver_architecture.md`) with the measured bound
+(`2*PART_SIZE*ceil(65535/PART_SIZE)` ticks ~ 8.2 ms). RMT IDF4 and
+MCPWM/PCNT are already stated there; IDF5/6 is the only one still open.
 
 ### Test plan (`test_30`)
 
@@ -761,6 +810,42 @@ in the RMT memory. Queue empty + buffer dry => quantity (1)/(2) both; queue
 empty + buffer non-empty but the transaction still stopped => the eager stop
 (H1) is the trigger; queue non-empty but pin idle => neither F2 nor F3, look
 at H3/H4.
+
+### HW event counters (implemented; the cheapest form of P1)
+
+`FAS_RMT_DEBUG_SLOW` in `pd_esp32/pd_config.h` is on. It counts, inside
+`encode_commands()` (`StepperISR_idf5_esp32_rmt.cpp`):
+
+- `empty=`: callbacks that found `read_idx == next_write_idx` (queue empty);
+- `stopped=`: callbacks that set `_rmtStopped` (the eager stop).
+
+They are read by `fas_rmt_debug_empty_events()` / `..._stopped_events()` and
+printed inline in StepperDemo's `info()`:
+
+```
+M1: @53 => 230 QueueEnd=53 v=3074us/49184ticks ACC empty=<e> stopped=<s>
+```
+
+Read it as:
+- `empty` climbing while `@`/`QueueEnd` is still moving mid-move => the queue
+  really is drained mid-move (H1 confirmed, quantity (1)); F2 is the fix.
+- `stopped` climbing in step with the observed holes => the eager stop fires;
+  compare the hole count to the `stopped` delta over the same move.
+- both flat while holes occur => H1 is not the trigger; the pin idles for
+  another reason (H3/H4, or quantity (2) -> F3).
+Reset with `fas_rmt_debug_reset()` at the start of a move (or reboot). The
+debug build must be **off** for the final extra-step validation, per
+`esp32_rmt_extra_step.md` (the added work shifts the timing).
+
+**First HW result (early, seq_02):** `empty` and `stopped` rise together
+(`stopped ~= empty - 45...47`) through both `ACC` and `RED`, i.e. almost
+every callback that finds an empty queue immediately takes the eager stop,
+mid-move, at the right order of magnitude (a few per status line vs ~47
+holes/s in the capture). This confirms H1's *trigger* (queue drains ->
+eager stop) but not the *cost*: a stop is not yet shown to be a 9 ms pin
+hole, which needs the Saleae correlation (one hole per `stopped` delta).
+The small, slowly growing `empty - stopped` offset is the
+`symbols_free < PART_SIZE` early return (H9 path) and should be watched.
 
 **P2 — Perturb the planning window (tests H1).** Rebuild with
 `_forward_planning_in_ticks` and/or `DELAY_MS_BASE` changed and re-run

@@ -477,11 +477,45 @@ class FastAccelStepper {
   // Due to this the forward planning time can be adjusted with the following
   // API call for each stepper individually.
   //
+  // ### Driver in-flight (read-ahead) contract
+  // `fill_queue()` fills the queue to `_forward_planning_in_ticks` (default
+  // 20 ms), and while a move is running the queue MUST NOT run low. A pulse
+  // driver, though, drains commands out of the queue into its own hardware
+  // pipeline "in flight" ahead of the pin, so the queue only needs to keep
+  // commands for *that* pipeline fed. The contract is therefore:
+  //
+  //   forward_planning_ticks  >  driver's maximum in-flight time
+  //
+  // Otherwise the driver can drain the whole queue mid-move, find it empty
+  // and stop/under-run. Each driver must state how much it will drain at
+  // most (in flight):
+  //   - AVR / SAM / SAMD / Teensy / Pico: no buffered pipeline; at most one
+  //     command at a time is consumed, so in-flight is one command.
+  //   - ESP32 I2S: up to the DMA block(s) being filled, ~I2S_BLOCK_TICKS.
+  //   - ESP32 MCPWM/PCNT: generator actions latch at TEZ/TEP, so the timer
+  //     holds about one command in its shadow/active registers plus the
+  //     period being generated; in-flight is ~one command.
+  //   - ESP32 RMT (IDF4): the half filler ping-pongs one PART_SIZE-symbol
+  //     half per threshold; the RMT memory holds two halves, so in-flight is
+  //     the playback time of 2*PART_SIZE symbols (bounded by the command
+  //     periods, which the fill routine limits).
+  //   - ESP32 RMT (IDF5/6): the simple encoder can fill the entire RMT
+  //     memory (2*PART_SIZE symbols) in one transaction fill, so in-flight
+  //     is the playback time of that buffer. This is the 040 bug: a long
+  //     symbol (e.g. a 4 ms slow step as one symbol) makes that buffer span
+  //     hundreds of ms, far above the 20 ms lookahead, and the queue is
+  //     drained. The fix (040, F2) caps every RMT symbol at
+  //     `ceil(65535/PART_SIZE)` ticks so the buffer time stays below the
+  //     forward planning time. TODO(040): update this line with the measured
+  //     in-flight bound once F2 lands (status in extras/todo/040_idf6_rmt_slow.md).
+  //
   // Attention:
   // - This is only for advanced users: no error checking is implemented.
   // - Only change the forward planning time, if the stepper is not running.
+  // - It must stay above the used driver's maximum in-flight time, otherwise
+  //   the queue can drain mid-move.
   // - Too small values bear the risk of a stepper running at full speed
-  // suddenly stopping
+  //   suddenly stopping
   //   due to lack of commands in the queue.
   inline void setForwardPlanningTimeInMs(uint8_t ms) {
     _forward_planning_in_ticks = ms;

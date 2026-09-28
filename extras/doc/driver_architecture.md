@@ -174,6 +174,34 @@ been fully consumed (all steps emitted or pause duration elapsed). The ramp
 generator only advances `next_write_idx` after writing a new queue entry.
 The queue is empty when `read_idx == next_write_idx`.
 
+### Buffer Depth / In-Flight (Read-Ahead) Contract
+
+A pulse driver may consume commands out of the queue into its own hardware
+pipeline ahead of the pin ("in flight"). The ramp generator fills the queue to
+`_forward_planning_in_ticks` (default 20 ms, set with
+`setForwardPlanningTimeInMs()`), so **while a move is running the queue must
+not run low**. The contract is:
+
+```
+forward_planning_ticks  >  driver maximum in-flight time
+```
+
+Each driver must state how much it can drain at most; a driver that buffers
+more than the forward planning time can drain the queue mid-move, find it
+empty, and stop or under-run (that is the 040 bug).
+
+| Driver | Maximum in-flight (read-ahead) |
+|--------|--------------------------------|
+| AVR / SAM / SAMD / Teensy / Pico | one command (no buffered pipeline) |
+| ESP32 MCPWM/PCNT | ~one command (generator latches at TEZ/TEP) |
+| ESP32 I2S | up to the DMA block(s) being filled, `~I2S_BLOCK_TICKS` |
+| ESP32 RMT (IDF4) | `2*PART_SIZE` symbols (RMT memory half ping-pong) |
+| ESP32 RMT (IDF5/6) | whole RMT memory, `2*PART_SIZE` symbols; bounded by capping each symbol at `ceil(65535/PART_SIZE)` ticks (040 F2, in progress) |
+
+The IDF5/6 RMT row is the open one: as written, the encoder can fill the
+whole buffer with a few long symbols, so the in-flight time can exceed
+`forward_planning_ticks` and the queue drains. See `todo/040_idf6_rmt_slow.md`.
+
 ### Driver Responsibilities
 
 Each pulse driver must:
