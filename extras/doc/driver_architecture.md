@@ -194,9 +194,9 @@ empty, and stop or under-run (that is the 040 bug).
 |--------|--------------------------------|
 | AVR / SAM / SAMD / Teensy / Pico | one command (no buffered pipeline) |
 | ESP32 MCPWM/PCNT | ~one command (generator latches at TEZ/TEP) |
-| ESP32 I2S | up to the DMA block(s) being filled, `~I2S_BLOCK_TICKS` |
+| ESP32 I2S | `I2S_BLOCK_COUNT*I2S_BLOCK_TICKS` = 2 x 500 us = 1 ms |
 | ESP32 RMT (IDF4) | `2*PART_SIZE` symbols (RMT memory half ping-pong) |
-| ESP32 RMT (IDF5/6) | whole RMT memory, `2*PART_SIZE` symbols; bounded by capping each symbol at `ceil(65535/PART_SIZE)` ticks (040 F2, in progress) |
+| ESP32 RMT (IDF5/6) | target (040 F2): `RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` = 2 x 500 us = 1 ms, with each symbol `<= RMT_BLOCK_TICKS/PART_SIZE` (I2S-referenced; commands may span blocks, needs partial state) |
 
 The IDF5/6 RMT row is the open one: as written, the encoder can fill the
 whole buffer with a few long symbols, so the in-flight time can exceed

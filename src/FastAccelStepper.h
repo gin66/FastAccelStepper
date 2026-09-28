@@ -491,7 +491,7 @@ class FastAccelStepper {
   // most (in flight):
   //   - AVR / SAM / SAMD / Teensy / Pico: no buffered pipeline; at most one
   //     command at a time is consumed, so in-flight is one command.
-  //   - ESP32 I2S: up to the DMA block(s) being filled, ~I2S_BLOCK_TICKS.
+  //   - ESP32 I2S: the DMA blocks, I2S_BLOCK_COUNT*I2S_BLOCK_TICKS = 1 ms.
   //   - ESP32 MCPWM/PCNT: generator actions latch at TEZ/TEP, so the timer
   //     holds about one command in its shadow/active registers plus the
   //     period being generated; in-flight is ~one command.
@@ -502,12 +502,13 @@ class FastAccelStepper {
   //   - ESP32 RMT (IDF5/6): the simple encoder can fill the entire RMT
   //     memory (2*PART_SIZE symbols) in one transaction fill, so in-flight
   //     is the playback time of that buffer. This is the 040 bug: a long
-  //     symbol (e.g. a 4 ms slow step as one symbol) makes that buffer span
+  //     symbol (e.g. a 4 ms slow step as one symbol) makes that span
   //     hundreds of ms, far above the 20 ms lookahead, and the queue is
-  //     drained. The fix (040, F2) caps every RMT symbol at
-  //     `ceil(65535/PART_SIZE)` ticks so the buffer time stays below the
-  //     forward planning time. TODO(040): update this line with the measured
-  //     in-flight bound once F2 lands (status in extras/todo/040_idf6_rmt_slow.md).
+  //     drained. The fix (040, F2) bounds it like I2S: two blocks of
+  //     RMT_BLOCK_TICKS (=I2S_BLOCK_TICKS=500 us), so in-flight is
+  //     RMT_BLOCK_COUNT*RMT_BLOCK_TICKS = 16000 ticks = 1 ms, with each
+  //     symbol <= RMT_BLOCK_TICKS/PART_SIZE. TODO(040): replace with the
+  //     measured bound once F2 lands (see extras/todo/040_idf6_rmt_slow.md).
   //
   // Attention:
   // - This is only for advanced users: no error checking is implemented.
