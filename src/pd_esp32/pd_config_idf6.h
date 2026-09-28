@@ -176,13 +176,16 @@
 // PART_SIZE shall be even.
 #define PART_SIZE (RMT_SIZE >> 1)
 
-// RMT V2 fill model: cap symbol duration so the RMT buffer spans less
-// time than the ramp lookahead (forward_planning_ticks).
-// 2*PART_SIZE symbols * RMT_MAX_SYMBOL_TICKS < forward_planning_ticks.
+// RMT V2 fill model: split the low phase of long steps so the RMT buffer
+// spans less time than the ramp lookahead (forward_planning_ticks). The step
+// high is min(ticks>>1, RMT_MAX_HIGH_TICKS) so it always fits one sub-entry
+// and needs no carried state. RMT_MAX_SYMBOL_TICKS is the max low per
+// low-only symbol; 2*PART_SIZE*RMT_MAX_SYMBOL_TICKS = RMT_MAX_INFLIGHT_TICKS.
 #define RMT_BLOCK_COUNT 2
 #define RMT_BLOCK_TICKS 8000
 #define RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT * RMT_BLOCK_TICKS)
 #define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / PART_SIZE)
+#define RMT_MAX_HIGH_TICKS 5000
 #endif
 
 #include <hal/i2s_ll.h>

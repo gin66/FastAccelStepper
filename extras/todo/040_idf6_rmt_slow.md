@@ -20,11 +20,12 @@ time than the lookahead, and "empty" is then treated as "done" instead of
 per-stop cost (~9 ms vs the model's ~0.7 ms) is no longer load-bearing and
 stays as a secondary question (H3/H4).
 
-The chosen fix is F2: cap the RMT symbol duration
-(`RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` ticks, the I2S block
-model) so the RMT buffer spans at most `RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` =
-16000 ticks (1 ms), far less than the 20 ms lookahead, and the encoder can
-never drain the queue while running;
+The chosen fix is F2: split the low phase of long steps and cap the step high
+(`RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` low per low-only symbol,
+`RMT_MAX_HIGH_TICKS` for the pulse, the I2S block model) so the RMT buffer's
+low spans at most `RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` = 16000 ticks (1 ms),
+far less than the 20 ms lookahead, and the encoder can never drain the queue
+while running;
 F1 is rejected, F5 unavailable under IDF 5/6. F2 rewrites the symbol
 layout, so it must not regress the confirmed extra-step fix
 (`extras/doc/implemented/esp32_rmt_extra_step.md`, H8 ping-pong replay)
@@ -279,10 +280,11 @@ than 1 or 2 symbols for long periods.
 
 **Candidate condition 2 (time per symbol) — the one that becomes the design.**
 Instead of counting symbols, bound the *time* each symbol may represent. The
-chosen form is the I2S-referenced block cap
-`RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` (=250/333 ticks): the full
-RMT buffer then covers at most `2*RMT_BLOCK_TICKS` = 16000 ticks = 1 ms, i.e.
-far less than the 20 ms lookahead. (The earlier looser value `65536/PART_SIZE`
+chosen form is the I2S-referenced block cap: the low per low-only symbol is
+`RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` (=250/333 ticks) and the
+step high is capped at `RMT_MAX_HIGH_TICKS`; the RMT buffer's low then covers
+at most `2*RMT_BLOCK_TICKS` = 16000 ticks = 1 ms, i.e. far less than the 20 ms
+lookahead. (The earlier looser value `65536/PART_SIZE`
 gave an 8.192 ms buffer and only a ~2.4x margin; the I2S shape is preferred.)
 The tension noted here — bounding the buffer time *above* helps the
 queue-drain (read-ahead) problem but *hurts* the starvation problem — is
@@ -306,8 +308,9 @@ case time until the task refills", rather than on symbol counts.
 
 **Resolved by the F2 design below:** the I2S-referenced block model *is* that
 idea. It states the requirement in time — at most
-`RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` (=16000 ticks) in flight, with each symbol
-`<= RMT_BLOCK_TICKS/PART_SIZE` (=250/333 ticks) — which is deterministic and
+`RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` (=16000 ticks) of low in flight, the low per
+low-only symbol `<= RMT_BLOCK_TICKS/PART_SIZE` (=250/333 ticks) and the step
+high capped at `RMT_MAX_HIGH_TICKS` — which is deterministic and
 does not depend on the ramp producing a minimum number of commands. The
 symbol-count condition (candidate 1) is kept only as a secondary check. The
 tension noted above is resolved by making the *time* bound the contract and
@@ -469,7 +472,7 @@ judgements below are therefore conditional.
 | # | fix | targets | rating |
 |---|---|---|---|
 | F1 | keep transaction alive | restart latency only | rejected as a solution (queue still empties while running) |
-| F2 | read-ahead bound: cap symbol duration at `RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` t (I2S block model) | quantity (1) queue content | **chosen**; design below |
+| F2 | read-ahead bound: split the low and cap it at `RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE`, cap the step high at `RMT_MAX_HIGH_TICKS` (I2S block model) | quantity (1) queue content | **chosen**; design below |
 | F3 | bigger RMT buffer | quantity (2) buffer playback time | strong lever if (2) is the cause; needs F1/F4b |
 | F4 | cheaper restart: (a) faster task, (b) unblock ramp while `_rmtStopped`, (c) restart from TX-done / queued transaction | restart latency | mitigation only |
 | F5 | idf4-style synchronous ISR refill | read-ahead by construction | rejected: not allowed under IDF 5/6 |
@@ -593,10 +596,11 @@ re-expose the extra-step bug. Treat "P1 done" and "extra-step re-check
 done" as hard milestones before any F2 merge; no calendar deadline is set
 here because the gating is evidence-based, not time-based.
 
-**Recommendation.** F2 is chosen (design below): cap every RMT symbol at
-`RMT_MAX_SYMBOL_TICKS = RMT_BLOCK_TICKS/PART_SIZE` (250 for PART_SIZE 32,
-333 for 24), which makes the RMT buffer span at most
-`RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` = 16000 ticks (1 ms), far less than the
+**Recommendation.** F2 is chosen (design below): split the low phase and cap
+the low per low-only symbol at `RMT_MAX_SYMBOL_TICKS =
+RMT_BLOCK_TICKS/PART_SIZE` (250 for PART_SIZE 32, 333 for 24), with the step
+high capped at `RMT_MAX_HIGH_TICKS`, which makes the RMT buffer's low span at
+most `RMT_BLOCK_COUNT*RMT_BLOCK_TICKS` = 16000 ticks (1 ms), far less than the
 20 ms lookahead, so the queue stays non-empty while running. F5 is
 unavailable under IDF 5/6, so F2 is the only option that attacks the cause
 directly; F3/F4 remain fallbacks/stop-gaps and F1/F6 are rejected.
@@ -620,11 +624,14 @@ queued commands, so `encode_commands()` never sees an empty queue and the eager
 
 ### Invariants
 
-- **I1 (time cap, primary):** every RMT symbol covers at most
-  `RMT_MAX_SYMBOL_TICKS` ticks, with
-  `2*PART_SIZE*RMT_MAX_SYMBOL_TICKS < _forward_planning_in_ticks`. Then the
-  full buffer spans less time than the lookahead. I1 does not depend on the
-  ramp producing a minimum number of commands.
+- **I1 (low-phase cap, primary):** every low-only RMT symbol carries at most
+  `RMT_MAX_SYMBOL_TICKS` of low, with
+  `2*PART_SIZE*RMT_MAX_SYMBOL_TICKS < _forward_planning_in_ticks`. A step's
+  high is capped at `RMT_MAX_HIGH_TICKS` (e.g. 5000) and is a single sub-entry
+  on the step-start symbol, so it too stays well within one sub-entry and needs
+  no carried state. Capping the high removes the only uncapped part of a
+  symbol; capping it at all is a deliberate waveform change (a slow step no
+  longer holds the pin high for `ticks/2`).
 - **I2 (command floor, secondary):** every queue command contributes at least
   `PART_SIZE/2` RMT symbols, so the buffer holds at most four commands. This is
   the form `test_30` has checked so far. It is only a secondary/informational
@@ -645,8 +652,10 @@ I2S max in-flight = I2S_BLOCK_COUNT * I2S_BLOCK_TICKS = 16000 t = 1 ms
 ```
 
 The RMT IDF5/6 driver adopts the same model. A "block" is one
-`PART_SIZE`-symbol half and holds a fixed time, so a symbol is capped to that
-block time divided by the symbol count:
+`PART_SIZE`-symbol half of low-only symbols, and each low-only symbol carries
+`RMT_MAX_SYMBOL_TICKS` of low, so a half holds `RMT_BLOCK_TICKS` of low. The
+step-start symbol additionally carries the step's high as its first sub-entry;
+that is one sub-entry per step and is not part of the block budget:
 
 ```
 RMT_BLOCK_COUNT        = 2
@@ -674,41 +683,58 @@ drained by symbol count but by the 1 ms in-flight time bound.
 ### Encoder: I2S-style fill state (chosen mechanism)
 
 Mirror `i2s_fill_buffer_direct()` (`i2s_fill.cpp:72-159`): a per-queue state
-machine that tracks the high and low time of the current step and walks the
-queue, instead of "one step per symbol". This is what lets any legal command
-(`steps<=255`, `ticks<=65535`, e.g. `steps=100, ticks=65535` = 409.6 ms) be
-split so every RMT symbol stays `<= RMT_MAX_SYMBOL_TICKS`.
+machine that walks the queue and emits the low phase in pieces, instead of
+"one command per symbol". This lets any legal command (`steps<=255`,
+`ticks<=65535`, e.g. `steps=100, ticks=65535` = 409.6 ms) be split.
 
-State (per `StepperQueue`, exactly like `i2s_fill_state`):
+**Only the low phase is carried in state.** A step's high pulse is
+`min(ticks >> 1, RMT_MAX_HIGH_TICKS)` (e.g. 5000 ticks). There is no point in
+letting a slow step hold the pin high for up to 32767 ticks; capping it keeps
+the pulse well inside one 15-bit RMT sub-entry and bounds the step-start
+symbol. The rest of the period is low. Only the low can be longer than a
+symbol, so it is the only thing split and the only state:
 
 ```c
 struct rmt_fill_state {
-  uint16_t remaining_low_ticks;   // low time left in the current period
-  uint16_t remaining_high_ticks;  // high time (pulse) left in the current step
-  uint8_t  off_ticks;             // sub-symbol remainder
+  uint16_t remaining_low_ticks;   // low time left in the current step/pause
 };
 ```
 
+There is no `remaining_high_ticks` and no `off_ticks`: RMT sub-entries take
+arbitrary tick counts (no fixed frame like I2S), and the capped high is
+emitted atomically. Total ticks are preserved because `low = ticks - high`.
+
 Fill, per call with the given `symbols_free`:
 
-1. While `remaining_high_ticks`/`remaining_low_ticks` are non-zero, emit RMT
-   symbols that consume them (high run first, then low run), each symbol total
-   `<= RMT_MAX_SYMBOL_TICKS` and each sub-entry in `[2, 32767]`; save state and
-   return when `symbols_free` is used up.
-2. When both counters hit zero: advance the current entry's `steps` or
-   `read_idx` (dir toggle when an entry starts, as in `esp32_queue.h`); load the
-   next entry and set the counters from `ticks` (pulse width + rest). A pause
-   (`steps==0`) is just a low run of `ticks`.
+1. If `remaining_low_ticks > 0` (and no step start is pending), emit low-only
+   RMT symbols, each carrying at most `RMT_MAX_SYMBOL_TICKS` of low in total
+   (split across its two sub-entries), until `remaining_low_ticks` is consumed
+   or `symbols_free` runs out; save state and return.
+2. When `remaining_low_ticks` hits zero: advance the entry's `steps` (or
+   `read_idx`, with the dir toggle when an entry starts, as in
+   `esp32_queue.h`). Load the next entry:
+   - **step** (`steps > 0`): `high = min(ticks >> 1, RMT_MAX_HIGH_TICKS)`,
+     `low = ticks - high`; emit one symbol
+     `[HIGH high][LOW min(low, RMT_MAX_SYMBOL_TICKS)]` and set
+     `remaining_low_ticks = low - that`; then continue with low-only symbols.
+   - **pause** (`steps == 0`): `remaining_low_ticks = ticks`, then low-only
+     symbols.
 3. Queue empty: save state and return; the existing idle/stop handling is
    unchanged.
 
 Why this satisfies the contract and the long-command case:
 
-- every symbol `<= RMT_MAX_SYMBOL_TICKS`, so the whole buffer (`2*PART_SIZE`
-  symbols) spans `<= 2*PART_SIZE*RMT_MAX_SYMBOL_TICKS = RMT_MAX_INFLIGHT_TICKS`
-  for *any* command;
-- `steps=100, ticks=65535` becomes ~264 symbols per step across ~8 blocks, not
-  one symbol; nothing has to exceed `RMT_MAX_SYMBOL_TICKS`;
+- The read-ahead is bounded: the buffer holds `2*PART_SIZE` symbols, each
+  carrying at most `RMT_MAX_SYMBOL_TICKS` of low, so at most
+  `2*PART_SIZE*RMT_MAX_SYMBOL_TICKS = RMT_MAX_INFLIGHT_TICKS` = 16000 ticks
+  (1 ms) of low. A step-start symbol adds at most `RMT_MAX_HIGH_TICKS` (5000,
+  ~0.3 ms), and there is at most one step start per step. Since every started
+  step also spends its (≥ high) low in the buffer, the number of starts in the
+  buffer is small; the full-buffer span stays well under the 20 ms lookahead.
+  The `test_seq_02_holes` model (stops==0) is the empirical proof.
+- `steps=100, ticks=65535` becomes one capped high (5000) plus ~242 low symbols
+  per step, not one symbol; no sub-entry exceeds 32767 and the step-start
+  symbol is at most `RMT_MAX_HIGH_TICKS + RMT_MAX_SYMBOL_TICKS` = 5250.
 - exact tick preservation falls out of the counters (`test_30` guards it).
 
 This replaces `emit_step_symbols()`/`emit_pause_symbols()`'s whole-command
@@ -728,8 +754,9 @@ Constraints / follow-ups:
 
 ### Changes (files)
 
-- `pd_esp32/esp32_queue.h`: add `struct rmt_fill_state` (in the RMT union with
-  `_tx_encoder`/`channel`), mirroring `i2s_fill_state`.
+- `pd_esp32/esp32_queue.h`: add `struct rmt_fill_state` (just
+  `remaining_low_ticks`; in the RMT union with `_tx_encoder`/`channel`),
+  analogous to `i2s_fill_state` but without high/off state.
 - `pd_esp32/StepperISR_idf5_esp32_rmt_encode.cpp`: replace
   `emit_step_symbols()`/`emit_pause_symbols()`/`rmt_encode_queue()` with the
   I2S-style fill (`rmt_encode_fill(q, state, symbols, symbols_free)`; distinct
@@ -749,7 +776,8 @@ Constraints / follow-ups:
   reset `rmt_fill_state` at every transaction boundary (mirror the
   `i2s_fill_state` lifecycle).
 - `pd_config_idf5.h`/`pd_config_idf6.h`: define `RMT_BLOCK_TICKS`,
-  `RMT_MAX_INFLIGHT_TICKS`, `RMT_MAX_SYMBOL_TICKS`.
+  `RMT_MAX_INFLIGHT_TICKS`, `RMT_MAX_SYMBOL_TICKS` (max low per low-only
+  symbol) and `RMT_MAX_HIGH_TICKS` (cap on the step high pulse).
 
 This is a full encoder rewrite (partial state, tick-based drain) and it
 invalidates the current H8/extra-step validation, so the hardware re-check is
@@ -788,12 +816,12 @@ buffer; making the bound exact here is the cleaner choice.
 
 Consequences that come with this reference:
 
-- a block holds only 500 us, so a legal command no longer fits one half. A max
-  pause (65535 t) is ~263 symbols (P=32) and spans ~8 blocks. The encoder must
-  carry partial-command state across calls (like `i2s_fill_state` with
-  `remaining_low_ticks` / `remaining_high_ticks`); the per-entry `steps`
+- a block holds only 500 us of low, so a legal command no longer fits one half.
+  A max pause (65535 t) is ~263 low symbols (P=32) and spans ~8 blocks. The
+  encoder must carry partial-command state across calls (just
+  `remaining_low_ticks`; the capped high needs no state); the per-entry `steps`
   write-back is replaced by a tick-based remainder (a command is still consumed
-  whole-command, but may be consumed before its tail ticks have played).
+  whole-command, but may be consumed before its tail low has played).
 - the direction drain becomes tick-based like I2S (sized to the ovf-inclusive
   in-flight bound), not "two `PART_SIZE` pauses". This changes
   `esp32_before_pause_*()` on the RMT path.
@@ -808,8 +836,9 @@ IDF5/6 row of the driver in-flight contract in `driver_architecture.md`.
 
 ### Test plan (`test_30`)
 
-- assert I1: every emitted symbol total `<= RMT_MAX_SYMBOL_TICKS`
-  (= `RMT_BLOCK_TICKS/PART_SIZE`) (new `any_symbol_above`);
+- assert I1: every low-only emitted symbol's low `<= RMT_MAX_SYMBOL_TICKS`
+  (= `RMT_BLOCK_TICKS/PART_SIZE`) and every step's high equals
+  `min(ticks>>1, RMT_MAX_HIGH_TICKS)` (new `any_symbol_above` variants);
 - keep I2 (`min symbols/command >= PART_SIZE/2`) only as a secondary,
   informational check. With `RMT_MAX_SYMBOL_TICKS` a command of `T` ticks
   yields ~`T/RMT_MAX_SYMBOL_TICKS` symbols, so I2 holds for commands with
@@ -818,9 +847,10 @@ IDF5/6 row of the driver in-flight contract in `driver_architecture.md`.
   not asserted as a hard requirement after F2;
 - keep the exactness checks: total symbol ticks == commanded, one edge per
   step, no zero/one-tick sub-entry, no write past the reported count;
-- expected readings for seq_02 after the change: largest step 65535 ->
-  `ceil(65535/250) = 263` symbols (P=32); a 4 ms step (~64000 t) -> 256
-  symbols; every symbol `<= 250`;
+- expected readings for seq_02 after the change: largest step 65535 -> one
+  capped-high symbol (`RMT_MAX_HIGH_TICKS`) plus `ceil((65535-5000)/250) = 243`
+  low symbols (P=32); a 4 ms step (~64000 t) -> 244 symbols; every low-only
+  symbol low `<= 250`;
 - the `test_seq_02_holes` model should then never report a stop (queue never
   empties), which is the end-to-end proof for the mechanism;
 - **hardware re-validation for the extra-step fix** (cannot be done on PC):
@@ -842,14 +872,15 @@ integer-constant expressions.
 
 **Phase 0 — interface/config freeze (new tests compile, all RED)**
 - [x] 0.1 Define `RMT_BLOCK_COUNT 2`, `RMT_BLOCK_TICKS 8000`,
-  `RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT*RMT_BLOCK_TICKS)` (=16000) and
-  `RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS/PART_SIZE)` in `pd_config_idf5.h` /
+  `RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT*RMT_BLOCK_TICKS)` (=16000),
+  `RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS/PART_SIZE)` and
+  `RMT_MAX_HIGH_TICKS` (step high cap) in `pd_config_idf5.h` /
   `pd_config_idf6.h` (and a `pd_test` fallback so test_30 sees them).
-- [x] 0.2 Add `struct rmt_fill_state { uint16_t remaining_low_ticks;
-  uint16_t remaining_high_ticks; uint8_t off_ticks; }` to the RMT union in
-  `esp32_queue.h`; declare `uint32_t rmt_encode_fill(StepperQueue*, struct
-  rmt_fill_state*, uint32_t* symbols, uint32_t symbols_free);` and stub it to
-  `return 0`.
+- [x] 0.2 Add `struct rmt_fill_state { uint16_t remaining_low_ticks; }` to the
+  RMT union in `esp32_queue.h` (no high/off state: the capped high needs no
+  carrying, and RMT sub-entries have no fixed frame); declare
+  `uint32_t rmt_encode_fill(StepperQueue*, struct rmt_fill_state*,
+  uint32_t* symbols, uint32_t symbols_free);` and stub it to `return 0`.
 - [x] 0.3 Retire the tests bound to the old whole-command model (they are the
   RED baseline): `test_pause_fills_one_half`,
   `test_pause_needs_a_full_half`, `test_short_step_is_one_symbol`,
@@ -860,15 +891,19 @@ integer-constant expressions.
   state, and `test_remaining_steps_written_back` after re-expressing it as a
   tick remainder.
 
-**Phase 1 — I1, the symbol-duration cap (primary invariant)**
-- [ ] 1.1 `test_symbol_cap_single_step`: `push(1, 65535)`; fill with a large
-  free count; assert every symbol total `<= RMT_MAX_SYMBOL_TICKS`, sum of
-  symbol ticks `== 65535`, exactly one rising edge.
-- [ ] 1.2 `test_symbol_cap_pause`: `push(0, 65535)`; assert all-low, every
-  symbol `<= cap`, sum `== 65535`.
-- [ ] 1.3 `test_symbol_cap_sweep`: for `steps in {0,1,2,255}` and `ticks in
-  {2,3,4,5,7,8,99,250,251,320,639,640,3200,32767,65535}` assert cap, exact tick
-  sum and edge count.
+**Phase 1 — I1, the low-phase cap (primary invariant)**
+- [ ] 1.1 `test_high_cap_and_low_cap`: `push(1, 65535)`; fill with a large free
+  count; assert the first (step-start) symbol's HIGH sub-entry equals
+  `min(65535>>1, RMT_MAX_HIGH_TICKS)`, every low-only symbol's low is
+  `<= RMT_MAX_SYMBOL_TICKS`, the step-start symbol total is
+  `<= RMT_MAX_HIGH_TICKS + RMT_MAX_SYMBOL_TICKS`, the sum of symbol ticks
+  `== 65535`, and exactly one rising edge.
+- [ ] 1.2 `test_pause_cap`: `push(0, 65535)`; assert all-low, every symbol
+  low `<= RMT_MAX_SYMBOL_TICKS`, sum `== 65535`.
+- [ ] 1.3 `test_cap_sweep`: for `steps in {0,1,2,255}` and `ticks in
+  {2,3,4,5,7,8,99,250,251,320,639,640,3200,10000,32767,65535}` assert the high
+  is `min(ticks>>1, RMT_MAX_HIGH_TICKS)`, the low-only cap holds, and the tick
+  sum and edge count are exact.
 - [ ] 1.4 `test_cap_relation`: assert
   `2*PART_SIZE*RMT_MAX_SYMBOL_TICKS < _forward_planning_in_ticks` with the
   default forward planning (`TICKS_PER_S/50`).
@@ -881,15 +916,18 @@ integer-constant expressions.
 **Phase 2 — exactness, edges, sub-entry floor**
 - [ ] 2.1 `test_long_step_exact`: `steps=100, ticks=65535`; sum `== 100*65535`,
   rising edges `== 100`.
-- [ ] 2.2 `test_fast_step_split`: `steps=1, ticks=640`; sum `== 640`, one edge,
-  `~4` symbols, every sub-entry `>= 2`.
+- [ ] 2.2 `test_fast_step_split`: `steps=1, ticks=640`; `high=320 <
+  RMT_MAX_HIGH_TICKS`, `low=320`; assert sum `== 640`, one edge, every
+  sub-entry `>= 2`, and the low is split into `<= RMT_MAX_SYMBOL_TICKS`
+  pieces (2 symbols here).
 - [ ] 2.3 `test_no_short_sub_entry`: for `ticks in {2,3,5}` and odd values,
   and for run lengths `k*RMT_MAX_SYMBOL_TICKS + {1,2,3}` with `symbols_free`
   cutoffs at 1, 2 and exactly-full, assert no sub-entry is 0 or 1 and the sum
   stays exact (the relation-1 floor, including across calls).
 - [ ] 2.4 `test_level_run_shape`: decode the emitted sequence and assert each
-  step is exactly one contiguous HIGH run followed by one contiguous LOW run
-  (no level flip inside a pulse), while a split may span several symbols.
+  step is exactly one contiguous HIGH run (width
+  `min(ticks>>1, RMT_MAX_HIGH_TICKS)`) followed by one contiguous LOW run
+  (no level flip inside a pulse), while the low split may span several symbols.
 
 **Phase 3 — partial state and resumability**
 - [ ] 3.1 `test_split_across_calls_equals_one_call`: fill the same long step
@@ -897,8 +935,8 @@ integer-constant expressions.
   the concatenated symbol streams are identical.
 - [ ] 3.2 `test_state_pending_after_queue_empty`: after the last command is
   loaded but its ticks are still being emitted, `read_idx == next_write_idx`
-  while `remaining_high_ticks || remaining_low_ticks`; the encoder must not be
-  treated as "done". This is also the Phase 5 stop-predicate.
+  while `remaining_low_ticks > 0`; the encoder must not be treated as "done".
+  This is also the Phase 5 stop-predicate.
 - [ ] 3.3 `test_read_idx_advance_once`: a command is consumed exactly once
   (no duplicated or skipped entry) as the tick remainder crosses zero; assert
   `read_idx` after each call.
@@ -929,9 +967,10 @@ integer-constant expressions.
 **Phase 6 — end-to-end seq_02 (oracle / no-regression)**
 - [ ] 6.1 Update `test_seq_02_total_ticks`: total symbols `== 1463342840`,
   edges `== 65988`, `zero_durations == 0`, `overrun == 0`,
-  `global_min >= 2`, and new `global_max_symbol <= RMT_MAX_SYMBOL_TICKS`.
-  Drop the hard `min symbols/command >= PART_SIZE/2` assertion; print it as
-  informational only.
+  `global_min >= 2`, `global_max_high <= RMT_MAX_HIGH_TICKS`, and
+  `global_max_low_only <= RMT_MAX_SYMBOL_TICKS`. Drop the hard
+  `min symbols/command >= PART_SIZE/2` assertion; print it as informational
+  only.
 - [ ] 6.2 Rewrite/port `test_seq_02_holes` onto the new fill (the current model
   calls `rmt_encode_queue`): with the capped buffer the model must report
   `stops == 0` and `injected == 0` (queue never empties), while the encoded
@@ -1029,15 +1068,14 @@ Constraints F2 must obey:
    `mem_off`/`mem_end` phase must match the symbols actually written; the
    fill must report exactly what it wrote, so the return-count bug fixed above
    is required by F2, not optional.
-5. **Re-check the half-replay exposure.** A saturated slow step's high is now
-   `ceil(32767/RMT_MAX_SYMBOL_TICKS) ~= 132` symbols (P=32). The more symbols
-   a pulse spans, the more ways a half replay can reproduce part of it; this is
-   the central risk of adopting the I2S block model. F2 does remove the exact
-   object H8 replayed: there is no `0x4000FFFF` word (high `0x7fff`) any more,
-   because no symbol exceeds `RMT_MAX_SYMBOL_TICKS`, so the observed H8
-   signature (one extra ~2047.9 us high) can no longer come from replaying a
-   single symbol. What remains is a replay of a *partial run* of the split
-   pulse (potentially one extra edge of <=15.6 us), which is why the HW
+5. **Re-check the half-replay exposure.** A slow step's pulse is now a single
+   capped high symbol (`min(ticks>>1, RMT_MAX_HIGH_TICKS)`), so a pulse no
+   longer spans many symbols and a half replay can at worst reproduce a full
+   capped high (5000 ticks) or a partial low. F2 removes the exact object H8
+   replayed: there is no `0x4000FFFF` word (high `0x7fff`) any more, so the
+   observed H8 signature (one extra ~2047.9 us high) can no longer occur
+   (the capped high is ~312 us). What remains is a replay of a low-only or
+   step-start symbol after the original played; this is why the HW
    re-validation is mandatory and cannot be replaced by the PC edge-count test.
 6. **Re-validate on hardware with the debug macro off.** `test_30` (PC) cannot
    see the timing race. Run `seq_02` / `check_pcnt_sync` and the `seq_15`
@@ -1053,7 +1091,8 @@ F2 does not touch IDF4's path, so the IDF4 control stays valid.
   possible, `steps` written back, `read_idx` only when `steps == 0`, toggle on
   entry start, empty-queue stop before the short-buffer return". F2 keeps the
   last three; it replaces whole-step packing with tick state, so "short as
-  possible" becomes "each symbol `<= RMT_MAX_SYMBOL_TICKS`". The entry is still
+  possible" becomes "every low-only symbol `<= RMT_MAX_SYMBOL_TICKS` and the
+  step high capped at `RMT_MAX_HIGH_TICKS`". The entry is still
   consumed whole (all `steps` loaded before `read_idx` advances), matching
   `i2s_fill.cpp`.
 - The extra-step remedy required a pause to be exactly `PART_SIZE` symbols and
@@ -1083,33 +1122,35 @@ F2 does not touch IDF4's path, so the IDF4 control stays valid.
   pulse spans several symbols; confirm a half cannot become a self-contained
   step pulse, or that the replay path stays unreachable.
 - ISR load: more symbols per unit time means the encoder callback and the
-  threshold ISR run more often; at the slow end a 65535-tick step is ~264
-  symbols instead of 1-2, so the symbol rate rises - acceptable at slow step
-  rates, needs a sanity check at the fast end (a 40 us step is ~4 symbols vs 1).
+  threshold ISR run more often; at the slow end a 65535-tick step is ~243
+  symbols (1 high + 242 low) instead of 1-2, so the symbol rate rises -
+  acceptable at slow step rates, needs a sanity check at the fast end (a 40 us
+  step is 2 symbols vs 1).
 - Command consumption is whole-command, not whole-period: `read_idx` advances
   only after all of an entry's `steps` are loaded, but it may advance while the
   entry's tail ticks are still pending in `rmt_fill_state`. Confirm with the
   existing `test_remaining_steps_written_back`-style cases extended to long
-  steps (a 65535-tick step now spans ~264 symbols).
-- **Sub-entry floor across call boundaries.** The relation-1 floor is 2 ticks,
-  so a run remainder/tail of 0 or 1 tick must be merged into the neighbouring
-  sub-entry. The fill must guarantee that for *any* `symbols_free` cutoff,
-  i.e. it cannot simply split a run at every `RMT_MAX_SYMBOL_TICKS` boundary
-  and leave a 1-tick tail for the next call. Either carry the remainder in
-  `rmt_fill_state` (like `i2s_fill_state.off_ticks`) or hold one symbol in
-  reserve so the tail can be merged before the symbol is submitted. Otherwise
-  the driver writes a 0/1-tick half, which is the stop pattern / stretched
-  symbol (H2/H9). Test with `symbols_free == 1` and with run lengths of
-  `k*RMT_MAX_SYMBOL_TICKS + {1,2,3}`.
+  steps (a 65535-tick step now spans ~243 symbols).
+- **Sub-entry floor at the low split.** The relation-1 floor is 2 ticks, so a
+  low split must not leave a 0/1-tick sub-entry. A greedy `min(R,
+  RMT_MAX_SYMBOL_TICKS)` cut leaves 1 only when the remaining low is
+  `k*RMT_MAX_SYMBOL_TICKS + 1`; shift the cut by one (emit one less) so the
+  remainder is 2, and do the same on the final cut before a call returns for
+  lack of `symbols_free`. This keeps the single-field state; add a small
+  remainder field only if that proves awkward. Otherwise the driver writes a
+  0/1-tick half (the stop pattern / stretched symbol, H2/H9). Test with
+  `symbols_free == 1` and run lengths `k*RMT_MAX_SYMBOL_TICKS + {1,2,3}`.
+  Steps below `MIN_CMD_TICKS` (e.g. 2-3 ticks) cannot satisfy relation 1 at
+  all; that latent gap is out of contract and is why `addQueueEntry` rejects
+  them.
 - **Pending fill state vs. the empty-queue check (correctness).** Unlike the
   current whole-command emitter, the new fill advances `read_idx` as soon as a
   command is *loaded* and then emits its ticks over subsequent calls, so
   `read_idx == next_write_idx` can be true while `rmt_fill_state` still holds
-  `remaining_high_ticks`/`remaining_low_ticks`. `encode_commands()` must
-  therefore treat the queue as empty only when the queue is empty **and** the
-  fill state is drained (both counters zero). Otherwise the eager
-  `_rmtStopped` stop fires even earlier (mid-split-symbol), making the bug
-  worse. This check is also the `done` condition.
+  `remaining_low_ticks > 0`. `encode_commands()` must therefore treat the queue
+  as empty only when the queue is empty **and** `remaining_low_ticks == 0`.
+  Otherwise the eager `_rmtStopped` stop fires even earlier (mid-split-low),
+  making the bug worse. This check is also the `done` condition.
 - **Reset the fill state at transaction boundaries.** `rmt_fill_state` must be
   zeroed in `startQueue_rmt()` (new transaction) and in `forceStop_rmt()`
   (aborted transaction); otherwise leftovers from a previous transaction leak
@@ -1129,7 +1170,9 @@ F2 does not touch IDF4's path, so the IDF4 control stays valid.
   document which one the contract uses.
 - Choose `RMT_MAX_SYMBOL_TICKS` as a `pd_config.h` constant (per platform) as
   `RMT_BLOCK_TICKS/PART_SIZE` (250 for P=32, 333 for P=24), *not*
-  `65535/PART_SIZE`.
+  `65535/PART_SIZE`, and `RMT_MAX_HIGH_TICKS` as the step-high cap (e.g. 5000;
+  smaller shrinks the step-start symbol, larger keeps a longer pulse for the
+  driver). Both are runtime expressions if `PART_SIZE` is `debug_part_size`.
 
 ## Probe/experiment design (confirmation)
 

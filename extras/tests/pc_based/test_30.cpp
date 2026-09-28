@@ -53,21 +53,6 @@ static bool any_zero_duration(const uint32_t* words, uint32_t count) {
   return false;
 }
 
-// The RMT relation 1 floor is 2 ticks per sub-entry; anything below makes the
-// hardware stretch the symbol, and 0 is the stop pattern.
-static bool any_half_below(const uint32_t* words, uint32_t count,
-                           uint16_t floor) {
-  for (uint32_t i = 0; i < count; i++) {
-    bool l0, l1;
-    uint16_t d0, d1;
-    decode(words[i], &l0, &d0, &l1, &d1);
-    if (d0 < floor || d1 < floor) {
-      return true;
-    }
-  }
-  return false;
-}
-
 static bool all_low(const uint32_t* words, uint32_t count) {
   for (uint32_t i = 0; i < count; i++) {
     bool l0, l1;
@@ -124,42 +109,9 @@ static void push(uint8_t steps, uint16_t ticks, bool toggle) {
   fas_queue[0].next_write_idx++;
 }
 
-// Retired: these tests exercise the old whole-command model
-// (one pause = PART_SIZE symbols, one step = 1-2 symbols).
-// They will be rewritten for the tick-based fill in later phases.
-static void test_pause_fills_one_half() {
-  printf("[RETIRED] pause is PART_SIZE symbols (whole-command model)\n");
-}
-
-static void test_pause_needs_a_full_half() {
-  printf("[RETIRED] pause waits for PART_SIZE free symbols (whole-command model)\n");
-}
-
-static void test_short_step_is_one_symbol() {
-  printf("[RETIRED] short step uses one symbol (whole-command model)\n");
-}
-
-static void test_max_tick_step_is_two_symbols() {
-  printf("[RETIRED] 65535-tick step uses two symbols (whole-command model)\n");
-}
-
-static void test_step_needs_two_free_symbols() {
-  printf("[RETIRED] step entry needs two free symbols (whole-command model)\n");
-}
-
-static void test_remaining_steps_written_back() {
-  printf("[RETIRED] partial step entry keeps the remainder (whole-command model)\n");
-}
-
-static void test_max_tick_steps_pack_by_two() {
-  printf("[RETIRED] 65535-tick steps stop when one symbol remains (whole-command model)\n");
-}
-
-static void test_two_symbol_cases_report_their_count() {
-  printf("[RETIRED] 1-or-2 symbol cases report count (whole-command model)\n");
-}
-
-
+// The whole-command tests (one pause = PART_SIZE symbols, one step = 1-2
+// symbols) were removed here. They are rewritten for the low/tick-based fill
+// in Phase 1 of extras/todo/040_idf6_rmt_slow.md; see the TDD to-do list.
 static void test_pause_then_steps_share_a_call() {
   printf("pause and following steps share one call\n");
   reset_queue();
