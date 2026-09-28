@@ -18,9 +18,9 @@
 #endif
 
 // RMT V2 fill model constants (test fallback).
-// Match the IDF5/6 definitions: 2 blocks of 8000 ticks, cap the low per
-// low-only symbol at RMT_BLOCK_TICKS/PART_SIZE and the step high at
-// RMT_MAX_HIGH_TICKS, so the full buffer spans well below the 20 ms window.
+// Cap every RMT sub-entry (including the step high) at
+// RMT_BLOCK_TICKS/PART_SIZE, so any PART_SIZE-symbol window spans at most
+// RMT_MAX_INFLIGHT_TICKS = 1 ms, well below the 20 ms planning window.
 #ifndef RMT_BLOCK_COUNT
 #define RMT_BLOCK_COUNT 2
 #endif
@@ -32,9 +32,6 @@
 #endif
 #ifndef RMT_MAX_SYMBOL_TICKS
 #define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / PART_SIZE)
-#endif
-#ifndef RMT_MAX_HIGH_TICKS
-#define RMT_MAX_HIGH_TICKS 5000
 #endif
 
 #define TICKS_PER_S 16000000L

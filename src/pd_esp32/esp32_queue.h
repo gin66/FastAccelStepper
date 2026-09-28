@@ -12,10 +12,10 @@
 #endif
 
 #if defined(SUPPORT_ESP32_RMT) && defined(SUPPORT_ESP32_RMT_V2)
-// The high pulse of a step is min(ticks >> 1, RMT_MAX_HIGH_TICKS), so it
-// always fits in a single 15-bit RMT sub-entry and needs no carried state.
-// Only the low phase can exceed a symbol and is split, tracked by
-// remaining_low_ticks.
+// The high pulse of a step is min(ticks >> 1, RMT_MAX_SYMBOL_TICKS), i.e. it is
+// just another sub-entry and needs no carried state. Only the low phase can
+// span more than one symbol and is split, tracked by remaining_low_ticks.
+#define RMT_FILL_STATE_DEFINED
 struct rmt_fill_state {
   uint16_t remaining_low_ticks;
 };
