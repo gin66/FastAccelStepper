@@ -38,24 +38,22 @@ static size_t IRAM_ATTR encode_commands(const void* data, size_t data_size,
   StepperQueue* q = static_cast<StepperQueue*>(arg);
 
   *done = false;
-  if (symbols_free < PART_SIZE) {
-    // not sufficient space for the symbols
-    return 0;
-  }
   if (q->_rmtStopped) {
     *done = true;
     return 0;
   }
   uint8_t rp = q->read_idx;
-  if ((rp == q->next_write_idx) || q->_rmtStopped) {
+  if (rp == q->next_write_idx) {
+    if (symbols_free < PART_SIZE) {
+      return 0;
+    }
     // if we return done already here, then single stepping fails
     q->_rmtStopped = true;
     // Not sure if this pause is really needed
     ENTER_PAUSE(MIN_CMD_TICKS);
     return PART_SIZE;
   }
-  rmt_fill_buffer(q, true, &symbols[0].val);
-  return PART_SIZE;
+  return rmt_encode_queue(q, &symbols[0].val, (uint32_t)symbols_free);
 }
 
 void StepperQueue::init_rmt(uint8_t channel_num, uint8_t step_pin) {

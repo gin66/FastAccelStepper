@@ -1,5 +1,5 @@
 #include "fas_queue/stepper_queue.h"
-#if defined(SUPPORT_ESP32_RMT)
+#if defined(SUPPORT_ESP32_RMT) && !defined(SUPPORT_ESP32_RMT_V2)
 
 #if (PART_SIZE & 1) != 0
 #error "PART_SIZE must be even"

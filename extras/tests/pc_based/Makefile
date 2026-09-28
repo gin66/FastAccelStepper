@@ -115,6 +115,9 @@ test_%: test_%.o $(LIB_O)
 test_%.o: test_%.cpp $(SRC_LIB_H) RampChecker.h
 	g++ -c $(CXXFLAGS) -o $@ $<
 
+# IDF5/6 RMT translator. test_30 includes the encoder directly.
+test_30.o: $(PRJ_ROOT)/src/pd_esp32/StepperISR_idf5_esp32_rmt_encode.cpp
+
 # FasTimed is header-only. test_29 includes it directly.
 test_29.o: test_29.cpp naxis_sim_port.h \
 	$(PRJ_ROOT)/src/FasTimed.h \

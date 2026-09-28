@@ -3,9 +3,16 @@
 Priority: **040** — high: digital anomaly, pulse counter out of sync, test
 fails. Above the 050 platform features.
 
-Status: **open, seen on IDF5, not on IDF4** — observed on `idf5`
-(`esp32_idf_V6_9_0`, ESP-IDF 5.3.1), classic ESP32, driver `RMT`, on the
-committed code. Three pin captures so far (`digital_bad.csv`,
+Status: **open, culprit localised** — seen on IDF5, not on IDF4. The
+`FAS_RMT_DEBUG_COUNT` run split the fault (3 of 3 runs failed): the
+filler/queue encodes exactly the commanded steps (`enc net == position`),
+`short == 0` (no early return, no `ovf_buf`), yet the pin is short by 2
+(`pcnt == net − 2`). The extra edges are therefore born **after**
+`encode_commands()`, in the IDF5/6 ping-pong driver (`rmt_tx.c` /
+`rmt_encode_simple`) — H8. See "Counter-split result".
+
+Historical detail: observed on `idf5` (`esp32_idf_V6_9_0`, ESP-IDF 5.3.1),
+classic ESP32, driver `RMT`. Three pin captures (`digital_bad.csv`,
 `digital.bad2.csv`, `digital.bad3.csv`). IDF4 ran ~40 large pairs clean.
 While hunting on IDF5: `seq_15` ×1 pass, `seq_02` ×7 pass, then `seq_02`
 failed again (`digital.bad3.csv`, `@0 [-1]`). The hit rate is still low.
@@ -281,7 +288,7 @@ it and 126522 ticks of extra. A fixed "6th chunk" or "first `read_idx`
 advance" does not predict that. Keep both the long 6621 run and the
 shorter `seq_02` moves; the failure is not specific to 6621.
 
-### H8 — IDF5 ping-pong repeats two chunks (leading)
+### H8 — IDF5 ping-pong repeats two chunks (CONFIRMED as locus)
 
 Classic ESP32, IDF5: `mem_block_symbols = 64`, `PART_SIZE = 32`, so the
 channel is two halves and each `encode_commands()` call fills exactly one
@@ -322,7 +329,7 @@ after the original chunks have already played. Two walks, the second
 stale, can do that; a single-half late refill cannot. The per-callback
 log below is what distinguishes them.
 
-### H9 — short free space returns 0 without stopping, and one symbol is repeated
+### H9 — short free space returns 0 without stopping, and one symbol is repeated (ruled out)
 
 `encode_commands()` bails out before it looks at the queue:
 
@@ -396,7 +403,7 @@ Net: keep it as the description of the edge (one symbol, word 0) and as
 a real hole in the early return. It is a weak account of the gap, and
 weaker than H8 as the reason a fixed command stream gains a pulse.
 
-### H1 — cross-core ISR race on the queue (secondary)
+### H1 — cross-core ISR race on the queue (ruled out for this symptom)
 
 `fasDisableInterrupts()` on ESP32 is `noInterrupts()` →
 `portDISABLE_INTERRUPTS()`, which masks interrupts on the **current core
@@ -453,7 +460,7 @@ refused right after a restart.
 
 Test: make it `volatile` (plus a barrier) and A/B the build.
 
-### H4 — one-step command executed twice in the stretch branch
+### H4 — one-step command executed twice in the stretch branch (ruled out)
 
 In the `ticks == 0xffff` branch a one-step command is emitted, `steps` is
 driven to 0 and `read_idx` advances. If the function is entered twice for the
@@ -525,12 +532,16 @@ IDF `rmt_encoder.c` / `rmt_tx.c`), not at the shared queue. The assumption
 is that longer IDF4 time stays clean. IDF5 with M1=RMT is the config that
 fails.
 
-## Debug build (proposal, not implemented)
+## Debug build (implemented)
 
-One IDF5 RMT build of StepperDemo, then full `seq_02` until the next
-`@0 [±1]`. `seq_15` is out of this hunt. No GPIO, no printf in the
-callback: both would move the timing of the bug we are trying to catch.
-The ramp and the queue bytes stay as they are.
+Enable with `#define FAS_RMT_DEBUG_COUNT` in `src/pd_esp32/pd_config.h`
+(takes effect only with `SUPPORT_ESP32_RMT_V2`, i.e. IDF5/6 RMT). The
+counters live in `src/pd_esp32/rmt_debug.h`, are filled from
+`rmt_fill_buffer()` / `encode_commands()`, and are reset in the demo when
+the pulse counter is attached. One IDF5 RMT build of StepperDemo, then full
+`seq_02` until the next `@0 [±1]`. `seq_15` is out of this hunt. No GPIO, no
+printf in the callback: both would move the timing of the bug we are trying to
+catch. The ramp and the queue bytes stay as they are.
 
 ### What is counted
 
@@ -602,6 +613,68 @@ pulse counter is the point to pin `StepperTask` and the RMT interrupt
 to one core and to replace the ESP32 `fasDisableInterrupts()` around
 the queue with a spinlock.
 
+### Counter-split result
+
+Two failing `seq_02` runs on IDF5.3.1, classic ESP32, RMT, M1, with
+`FAS_RMT_DEBUG_COUNT`:
+
+```
+M1: @40 [39] enc +32994 -32954 net 40 short 0@-1 => 0 QueueEnd=33 ...
+M1: @17 [16] enc +32994 -32977 net 17 short 0@-1 => 0 QueueEnd=13 ...
+M1: @3 [2]   enc +32994 -32991 net 3  short 0@-1 => 0 QueueEnd=2 ...
+>> M1: @0 [-2] enc +32994 -32994 net 0 short 0@-1 acceleration ... RMT
+```
+
+```
+M1: @1 [-1] enc +65988 -65987 net 1 short 0@-1 => 0 QueueEnd=0 ...
+>> M1: @0 [-2] enc +65988 -65988 net 0 short 0@-1 acceleration ... RMT
+```
+
+```
+M1: @22 [21] enc +98982 -98960 net 22 short 0@-1 => 0 QueueEnd=18 ...
+M1: @6 [5]   enc +98982 -98976 net 6  short 0@-1 => 0 QueueEnd=4 ...
+M1: @0 [-2]  enc +98982 -98982 net 0  short 0@-1 => 0 QueueEnd=0 ...
+>> M1: @0 [-2] enc +98982 -98982 net 0 short 0@-1 acceleration ... RMT
+```
+
+All three end `@0` with `enc net == 0` and `short == 0`, but `pcnt == -2`:
+the pin has **two** extra backward edges that the encoder never
+produced. `short == 0` means every callback saw a full half (32) or
+the initial double fill (64); the `symbols_free < PART_SIZE` early
+return never ran and the overflow buffer was never used. So on these
+runs:
+
+- H1 / H4 (queue/callback double walk): **ruled out**. Encoded net
+  tracks the ramp (`@40` net 40, `@17` net 17, `@3` net 3, `@0` net 0).
+- H9 (short free space / unstopped early return): **ruled out**.
+  `short` stayed 0 for the whole run.
+- H8 (IDF5 ping-pong / simple encoder repeats a half): **confirmed as
+  the locus**. Net equal to position with the pin ahead by 2 puts the
+  extra edges after our filler returns, inside IDF 5.3.1 `rmt_tx.c` /
+  `rmt_encode_simple`.
+
+The magnitude is 2 here, not the ±1 of the earlier captures, and the
+first run already shows the divergence mid-move (`@40` pos 40, pcnt 39),
+so the duplicate is emitted during the move, not only at a move
+boundary.
+
+Consequence: the core-pin/spinlock/`volatile` work (H1/H3) does not
+address this failure, and the IDF4 control stays clean because it never
+enters the simple encoder. The fix is the translator below.
+
+**Hit rate with the debug build.** All **three of three** `seq_02` runs
+with `FAS_RMT_DEBUG_COUNT` failed (pcnt −2), where the undecorated
+firmware passed seven runs before the next failure. The debug build adds work inside
+the encoder callback (a call plus a volatile read-modify-write in
+`rmt_fill_buffer()` / `encode_commands()`), which shifts the callback
+timing relative to the driver's threshold ISR. That it turns a rare race
+into a near-certain one is itself evidence that the fault is a timing
+race inside the IDF5 driver. The failure *mode* is unchanged
+(`enc net == position`, `short == 0`, pin behind by 2), so the split is
+representative; the injected timing only makes it easy to catch. A fix
+should be validated with the macro **off**, or the added latency will
+mask/alter the race.
+
 ## Possible remedy — IDF5/6 translator, not the IDF4 half filler
 
 The IDF5/6 simple encoder is a translator. Each call of
@@ -625,27 +698,32 @@ pulse.
 
 Remedy idea, IDF5/6 only. Leave `StepperISR_esp32xx_rmt.cpp` to IDF4.
 A new filler, called only from `encode_commands()`, translates the
-queue into the buffer it was given:
+queue into the buffer it was given. Two entry shapes:
 
-- Walk from `read_idx` while `symbols_free` remains.
-- Emit as many symbols of the current entry as fit. A pause entry is
-  only low symbols. A step entry emits its rising-edge symbol and the
-  low symbols that belong to that step.
-- When the entry is fully represented, advance `read_idx`.
-- When the free space runs out in the middle of an entry, write the
-  remainder back onto that entry and return. For a multi-step entry
-  the remainder is `steps` (the count still to do). For a single step
-  whose symbols do not all fit, the remainder is the unsent ticks of
-  that step, with `steps` left at 1 only if the rising edge has not
-  been stored yet. Writing `steps = 1` again after the rising edge
-  was already stored would emit word 0 a second time, which is the
-  pulse in these captures.
-- Direction toggle happens when the entry is started, not when a
+- A pause (`steps == 0`) is always exactly `PART_SIZE` symbols, which
+  is half the RMT block (`mem_block_symbols / 2`). Same footprint the
+  IDF4 half filler uses, so two injected drain pauses still fill the
+  whole in-flight memory and the direction toggle on the next entry
+  stays safe without reading the RMT. Start a pause only when
+  `symbols_free >= PART_SIZE`. If this call would also reach a
+  `toggle_dir` entry, return after the pause and toggle on the next
+  call.
+- A step entry is encoded as short as possible. One step needs two
+  free symbols (high and low; a 65535-tick step does not fit in one).
+  If `symbols_free < 2`, return 0 and do not touch the entry. Emit as
+  many whole steps as fit, then write the remaining `steps` back on
+  that queue entry. Advance `read_idx` only when `steps` reaches 0.
+  Direction toggle happens when the entry is started, not when a
   later call continues it.
-- `min_chunk_size` drops to the smallest emit that makes progress
-  (one symbol, or the two symbols of a step high plus its low). The
-  `symbols_free < PART_SIZE` early return goes away, and so does the
-  path that skips the empty-queue stop.
+
+`min_chunk_size` stays `PART_SIZE`. The driver may then call with
+fewer free symbols, and returning 0 is allowed; the simple encoder
+retries with a full half. A promise of `PART_SIZE` free symbols is
+also the smallest promise on which a pause can always start, so the
+callback never has to return 0 when the driver forbids it. Inside a
+fill that is large enough, steps are then taken two symbols at a time.
+The empty-queue stop is checked before a short-buffer return, so the
+channel is not left running.
 
 An empty queue still ends the transaction (`_rmtStopped`, then
 `done` once the pause or the EOF has been handed over), instead of
@@ -659,19 +737,25 @@ return that H9 leaves unstopped.
 
 ## Work items
 
-- Implement the debug build above, then run full `seq_02` on IDF5 RMT
-  until the next `@0 [±1]`. `seq_15` is dropped from this hunt.
+- ~~Implement the debug build above, then run full `seq_02` on IDF5 RMT
+  until the next `@0 [±1]`.~~ Done: two failures captured. Both show
+  `enc net == position` and `short == 0` with `pcnt == net − 2` → H8,
+  after the encoder. See "Counter-split result".
 - The 50…743 sweep has not hit. The moves that have failed are the
   1733-step and 6621-step moves inside `seq_02`.
 - Do not bisect the ramp. The command stream matches on pass and fail.
-- Core pin, spinlock, and `volatile` on `_rmtStopped` wait on the
-  counter split. They address H1/H3, which are secondary.
+- Core pin, spinlock, and `volatile` on `_rmtStopped`: **dropped**. The
+  counter split ruled out H1/H3 for this symptom.
 - IDF4 remains the control (direct register writes, same filler).
-- Possible remedy, not started: an IDF5/6 translator in its own file,
-  instead of `rmt_fill_buffer()`'s fixed `PART_SIZE` half. It encodes
-  as many symbols as `symbols_free` allows and writes the unfinished
-  entry back (`steps`, or remaining ticks once the rising edge is
-  already stored). See "Possible remedy" above.
+- Translator is in `StepperISR_idf5_esp32_rmt_encode.cpp` and
+  `encode_commands()` calls it. PC coverage is `test_30` (PART_SIZE 24
+  and 32). The half filler in `StepperISR_esp32xx_rmt.cpp` stays the
+  IDF4 path. A fix still has to be checked on hardware with
+  `FAS_RMT_DEBUG_COUNT` off.
+- Optional confirmation inside IDF 5.3.1: the per-callback RAM ring
+  (experiment 2) around `rmt_tx_do_transaction()` / `rmt_encode_simple`
+  to pin the exact replay (`mem_off`/`mem_end` phase vs. the overflow
+  copy). Not required to start the translator.
 
 ## References
 
@@ -685,4 +769,5 @@ return that H9 leaves unstopped.
 - `examples/StepperDemo/test_seq_15.cpp` — reproduction sequence.
 - `src/pd_esp32/StepperISR_idf5_esp32_rmt.cpp` — `encode_commands()`.
 - `src/pd_esp32/StepperISR_esp32xx_rmt.cpp` — `rmt_fill_buffer()`.
+- `src/pd_esp32/rmt_debug.h` — `FAS_RMT_DEBUG_COUNT` counters.
 - `extras/tests/esp32_hw_based/serial_session.py` — `check_pcnt_sync()`.

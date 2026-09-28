@@ -23,7 +23,9 @@ BEGIN {
 	if (api > pcnt) {
 		delta = api - pcnt
 	}
-	if ((delta > 66) && (delta < 32767-66)) {
+	# 128: IDF5/6 can commit 64 channel symbols + one 32-symbol chunk
+	# before the pin catches up. Stopped ">> M" lines stay exact.
+	if ((delta > 128) && (delta < 32767-128)) {
 	    print
 		print api, pcnt
 		pass = 0

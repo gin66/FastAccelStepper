@@ -1,10 +1,10 @@
 #ifndef PD_ESP32_QUEUE_H
 #define PD_ESP32_QUEUE_H
 
+#include <hal/gpio_ll.h>
+
 #include "FastAccelStepper.h"
 #include "fas_queue/base.h"
-
-#include <hal/gpio_ll.h>
 
 #if defined(SUPPORT_ESP32_I2S)
 #include "pd_esp32/i2s_fill.h"
@@ -154,9 +154,13 @@ class StepperQueue : public StepperQueueBase {
   static bool isValidStepPin(uint8_t step_pin);
 };
 
-#if defined(SUPPORT_ESP32_RMT)
+#if defined(SUPPORT_ESP32_RMT) && !defined(SUPPORT_ESP32_RMT_V2)
 void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
 void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
+#endif
+#if defined(SUPPORT_ESP32_RMT_V2)
+uint32_t rmt_encode_queue(StepperQueue* q, uint32_t* symbols,
+                          uint32_t symbols_free);
 #endif
 
 //==========================================================================

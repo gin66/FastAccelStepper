@@ -234,12 +234,15 @@ class SerialSession:
                 return True
         raise RuntimeError(f"Pattern not found in log: {pattern}")
 
-    def check_pcnt_sync(self, tolerance=66):
+    def check_pcnt_sync(self, tolerance=128):
         """Validate pulse counter synchronisation.
 
-        Python equivalent of ``judge_pcnt_sync.awk``.  Checks that
-        every motor status line has the API-reported position matching
-        the hardware pulse counter reading within *tolerance* steps.
+        Python equivalent of ``judge_pcnt_sync.awk``.  While a move is
+        running, the API position counts steps the RMT encoder has
+        already committed. On IDF 5/6 that can be the 64-symbol channel
+        plus one 32-symbol overflow chunk ahead of the pin (81 steps
+        was measured on seq_03 test 14). 128 covers that lead. The
+        stopped ``>> M`` line is still required to match exactly.
 
         Only meaningful after a ``p<n>`` command has attached a pulse
         counter.

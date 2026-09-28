@@ -378,6 +378,14 @@ Tests;
   test_29.gnuplot (path, position, speed), and test_29.wav (stereo: first
   motor left, second motor right).
 
+- test_30
+  IDF5/6 RMT translator (StepperISR_idf5_esp32_rmt_encode.cpp).
+  A pause is exactly PART_SIZE symbols. A step is one symbol, or two
+  when ticks is 65535, and is started only when two symbols are free.
+  A partial entry writes the remaining steps back. A direction toggle
+  is not encoded in the same call as the drain pauses before it.
+  PART_SIZE 24 and 32.
+
 - ramp_helper
   Helper tool to generate and dump ramp commands for given speed and acceleration
   Usage: make ramp_helper && ./ramp_helper <speed_us> <acceleration> <steps>
