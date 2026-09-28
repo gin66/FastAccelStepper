@@ -202,7 +202,7 @@ The IDF5/6 RMT row is the 040 F2 fix: `rmt_encode_fill()` splits each step's
 low phase so every RMT sub-entry is capped, bounding the buffer's playback time
 well below `forward_planning_ticks`. The direction-change drain uses the same
 `3*RMT_BLOCK_TICKS`. Before F2 the encoder could pack long symbols and drain the
-queue; see `todo/040_idf6_rmt_slow.md`.
+queue; see `implemented/040_idf6_rmt_slow.md`.
 
 ### Driver Responsibilities
 

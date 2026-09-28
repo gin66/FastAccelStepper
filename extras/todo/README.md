@@ -17,7 +17,6 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **040** | [IDF 6 RMT runs sequence 02 slow](040_idf6_rmt_slow.md) | Pin trace is 120.8 s vs 91.6 s, same step count. A ~10 ms hole every 20 ms of motion. |
 | **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **050** | [Pico synchronized start](050_pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
 | **050** | [AVR synchronized start](050_avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |
@@ -34,6 +33,11 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 
 ## Done
 
+- **IDF 6 RMT sequence 02 slow — implemented.** F2 caps every RMT sub-entry
+  (`rmt_encode_fill()`), so the RMT buffer spans less time than the ramp
+  lookahead and the queue is no longer drained mid-move. HW (IDF 5.3.1, M1 RMT)
+  `seq_03_02` dropped 123 s -> 94 s. See
+  [040_idf6_rmt_slow.md](../doc/implemented/040_idf6_rmt_slow.md).
 - **ESP32 RMT extra step — implemented.** IDF5/6 translates queue
   commands in `StepperISR_idf5_esp32_rmt_encode.cpp` instead of filling
   fixed RMT halves. 20× `seq_02` and 20× `seq_03` passed on IDF5 RMT.

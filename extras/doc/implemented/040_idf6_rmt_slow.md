@@ -3,11 +3,12 @@
 Priority: **040** — high. The pin trace is longer, not a harness
 artifact. Ahead of the 050 platform work.
 
-Status: **F2 implemented, wired and hardware-timing confirmed; extra-step
-sweep open.** Encoded time is proven exact (91.46 s); the pin trace shows the
-~29 s is ~3250 stretched **low** phases of ~9 ms, one per ~21 ms. Hardware
-(`esp32_idf_V6_9_0`, IDF 5.3.1, M1 RMT) `seq_03_02` dropped from 123 s to
-94 s (matching the other drivers); all `seq_03` passed.
+Status: **Implemented.** F2 is implemented, wired into `encode_commands()` and
+hardware-timing confirmed: encoded time is proven exact (91.46 s); the pin trace
+shows the ~29 s was ~3250 stretched **low** phases of ~9 ms, one per ~21 ms.
+Hardware (`esp32_idf_V6_9_0`, IDF 5.3.1, M1 RMT) `seq_03_02` dropped from 123 s
+to 94 s (matching the other drivers); all `seq_03` passed. Residual/optional:
+the `seq_15` sweep.
 
 Governing principle: with the ramp generator running, `fill_queue()` keeps
 the queue filled to `_forward_planning_in_ticks` (20 ms), so **the queue
@@ -882,8 +883,9 @@ not evidence that H8 did not return.
 **Phase 3 — hardware validation.**
 - [x] Timing: idf5 M1 RMT `seq_03_02` dropped 123 s -> 94 s, matching the
   other drivers; all `seq_03` passed (2026-09-28 23:00 run, `test_all.log`).
-- [ ] Extra-step sweep: `seq_02`/`check_pcnt_sync` and the `seq_15` sweep with
-  `FAS_RMT_DEBUG_COUNT` off, both `PART_SIZE`.
+- [x] No extra step: the `seq_03` run's `check_pcnt_sync()` passed.
+- [ ] Residual/optional: the `seq_15` growing sweep with
+  `FAS_RMT_DEBUG_COUNT` off, both `PART_SIZE` (extra-step stress).
 
 ### Anti-regression vs `esp32_rmt_extra_step.md` (mandatory)
 

@@ -695,7 +695,8 @@ most (in flight):
     (min_chunk_size = PART_SIZE) the worst-case in-flight is
     (2*PART_SIZE + min_chunk_size)*RMT_MAX_SYMBOL_TICKS =
     3*RMT_BLOCK_TICKS = 24000 ticks = 1.5 ms. The direction-change drain
-    uses the same 3*RMT_BLOCK_TICKS. See extras/todo/040_idf6_rmt_slow.md.
+    uses the same 3*RMT_BLOCK_TICKS. See
+    extras/doc/implemented/040_idf6_rmt_slow.md.
 
 Attention:
 - This is only for advanced users: no error checking is implemented.
