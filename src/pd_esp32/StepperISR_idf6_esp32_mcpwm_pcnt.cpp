@@ -216,13 +216,15 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   uint8_t timer_in_group = timer_num % SOC_MCPWM_TIMERS_PER_GROUP;
   uint8_t pcnt_unit_id = timer_num;
 
-  pcnt_unit_config_t pcnt_cfg = {
-      .clk_src = PCNT_CLK_SRC_DEFAULT,
-      .low_limit = -32768,
-      .high_limit = 32767,
-      .intr_priority = 1,
-      .flags = {.accum_count = 0},
-  };
+  // A designated initializer warns on IDF 6.1+ because group_id is
+  // missing, and naming group_id fails on IDF 6.0 where the field does
+  // not exist. Zero-init sets group_id to 0 when the field is present.
+  pcnt_unit_config_t pcnt_cfg = {};
+  pcnt_cfg.clk_src = PCNT_CLK_SRC_DEFAULT;
+  pcnt_cfg.low_limit = -32768;
+  pcnt_cfg.high_limit = 32767;
+  pcnt_cfg.intr_priority = 1;
+  pcnt_cfg.flags.accum_count = 0;
   ESP_ERROR_CHECK_WITHOUT_ABORT(pcnt_new_unit(&pcnt_cfg, &mapping->pcnt_unit));
 
   pcnt_chan_config_t chan_cfg = {.edge_gpio_num = step_pin,

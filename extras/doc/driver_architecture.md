@@ -317,6 +317,20 @@ via the TIM prescaler) instead of passing the raw clock.
 
 ---
 
+## SUPPORT_ macros
+
+Chip and framework detection stays in `fas_arch/` and `pd_*/pd_config.h`.
+Those headers are the only place that tests `ARDUINO_ARCH_*`,
+`ESP_IDF_VERSION`, `__AVR__`, and the other toolchain macros. From that
+they define one `SUPPORT_...` macro per capability the build actually
+has, such as `SUPPORT_ESP32_RMT` or `SUPPORT_QUEUE_ENTRY_END_POS_U16`.
+
+The rest of `src/` — the ramp, the queue, `FastAccelStepper` — tests
+those `SUPPORT_` macros and does not test the architecture again. A
+new behavior difference is a new flag in the platform header, not
+another chip test in the shared file. Production code then compiles
+the same way for every target that offers the capability.
+
 ## Preprocessor Defines by Architecture
 
 | Define | AVR | ESP32 MCPWM | ESP32 RMT | ESP32 I2S | SAM | Pico |

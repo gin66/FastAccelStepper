@@ -15,5 +15,9 @@ Replace that with `SUPPORT_RMT_V1` for the IDF4 path
 (`StepperISR_esp32xx_rmt.cpp`, `rmt_fill_buffer()` /
 `rmt_apply_command()`) and `SUPPORT_RMT_V2` for the IDF5/6 path
 (`StepperISR_idf5_esp32_rmt.cpp`,
-`StepperISR_idf5_esp32_rmt_encode.cpp`). Rename the files to match.
-No change to the encoding.
+`StepperISR_idf5_esp32_rmt_encode.cpp`). The IDF version test stays
+in `pd_config_idf4.h` / `pd_config_idf5.h`, which are what define the
+flag. Shared code keeps testing `SUPPORT_RMT_V1` / `SUPPORT_RMT_V2`
+and does not grow an `ESP_IDF_VERSION` check. See
+`extras/doc/driver_architecture.md`, "SUPPORT_ macros". Rename the
+files to match. No change to the encoding.
