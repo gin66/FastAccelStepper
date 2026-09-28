@@ -1,265 +1,244 @@
 
-# test_all 2026-09-28 14:43:07
-2026-09-28 14:43:07  DUT arduino_espidf4     pio=esp32_V6_8_1  Arduino 2.0.17 / IDF 4.4.7
-2026-09-28 14:43:45  arduino_espidf4  M1 seq_04 passed
-2026-09-28 14:43:47  arduino_espidf4  M1 seq_05 passed
-2026-09-28 14:43:48  arduino_espidf4  M1 seq_06 passed
-2026-09-28 14:43:52  arduino_espidf4  M1 seq_01a passed
-2026-09-28 14:43:55  arduino_espidf4  M1 seq_01b passed
-2026-09-28 14:43:58  arduino_espidf4  M1 seq_02 passed
-2026-09-28 14:44:00  arduino_espidf4  M1 seq_07a passed
-2026-09-28 14:44:02  arduino_espidf4  M1 seq_07b passed
-2026-09-28 14:44:03  arduino_espidf4  M1 seq_07c passed
-2026-09-28 14:44:06  arduino_espidf4  M1 seq_08 passed
-2026-09-28 14:44:07  arduino_espidf4  M1 seq_03_13 passed
-2026-09-28 14:44:10  arduino_espidf4  M1 seq_03_14 passed
-2026-09-28 14:45:17  arduino_espidf4  M1 seq_03_01 passed
-2026-09-28 14:46:51  arduino_espidf4  M1 seq_03_02 passed
-2026-09-28 14:47:22  arduino_espidf4  M1 seq_03_03 passed
-2026-09-28 14:47:34  arduino_espidf4  M1 seq_03_04 passed
-2026-09-28 14:47:44  arduino_espidf4  M1 seq_03_06 passed
-2026-09-28 14:47:53  arduino_espidf4  M1 seq_03_07 passed
-2026-09-28 14:52:11  arduino_espidf4  M1 seq_03_10 passed
-2026-09-28 14:53:44  arduino_espidf4  M1 seq_03_11 passed
-2026-09-28 14:53:44  arduino_espidf4  M1 seq_03 passed
-2026-09-28 14:53:46  arduino_espidf4  M9 seq_04 passed
-2026-09-28 14:53:48  arduino_espidf4  M9 seq_05 passed
-2026-09-28 14:53:49  arduino_espidf4  M9 seq_06 passed
-2026-09-28 14:53:52  arduino_espidf4  M9 seq_01a passed
-2026-09-28 14:53:56  arduino_espidf4  M9 seq_01b passed
-2026-09-28 14:53:58  arduino_espidf4  M9 seq_02 passed
-2026-09-28 14:54:01  arduino_espidf4  M9 seq_07a passed
-2026-09-28 14:54:03  arduino_espidf4  M9 seq_07b passed
-2026-09-28 14:54:04  arduino_espidf4  M9 seq_07c passed
-2026-09-28 14:54:07  arduino_espidf4  M9 seq_08 passed
-2026-09-28 14:54:08  arduino_espidf4  M9 seq_03_13 passed
-2026-09-28 14:54:11  arduino_espidf4  M9 seq_03_14 passed
-2026-09-28 14:55:18  arduino_espidf4  M9 seq_03_01 passed
-2026-09-28 14:56:52  arduino_espidf4  M9 seq_03_02 passed
-2026-09-28 14:57:23  arduino_espidf4  M9 seq_03_03 passed
-2026-09-28 14:57:35  arduino_espidf4  M9 seq_03_04 passed
-2026-09-28 14:57:46  arduino_espidf4  M9 seq_03_06 passed
-2026-09-28 14:57:54  arduino_espidf4  M9 seq_03_07 passed
-2026-09-28 15:02:13  arduino_espidf4  M9 seq_03_10 passed
-2026-09-28 15:03:46  arduino_espidf4  M9 seq_03_11 passed
-2026-09-28 15:03:46  arduino_espidf4  M9 seq_03 passed
-2026-09-28 15:03:46  PASS arduino_espidf4     pio=esp32_V6_8_1
-2026-09-28 15:03:46  DUT arduino_3           pio=esp32_pioarduino_V53_03_11  Arduino 3.1.1 / IDF 5.3.2
-2026-09-28 15:04:28  arduino_3  M1 seq_04 passed
-2026-09-28 15:04:30  arduino_3  M1 seq_05 passed
-2026-09-28 15:04:31  arduino_3  M1 seq_06 passed
-2026-09-28 15:04:35  arduino_3  M1 seq_01a passed
-2026-09-28 15:04:38  arduino_3  M1 seq_01b passed
-2026-09-28 15:04:41  arduino_3  M1 seq_02 passed
-2026-09-28 15:04:43  arduino_3  M1 seq_07a passed
-2026-09-28 15:04:45  arduino_3  M1 seq_07b passed
-2026-09-28 15:04:46  arduino_3  M1 seq_07c passed
-2026-09-28 15:04:49  arduino_3  M1 seq_08 passed
-2026-09-28 15:04:50  arduino_3  M1 seq_03_13 passed
-2026-09-28 15:04:52  arduino_3  M1 seq_03_14 passed
-2026-09-28 15:05:58  arduino_3  M1 seq_03_01 passed
-2026-09-28 15:07:40  arduino_3  M1 seq_03_02 passed
-2026-09-28 15:08:13  arduino_3  M1 seq_03_03 passed
-2026-09-28 15:08:24  arduino_3  M1 seq_03_04 passed
-2026-09-28 15:08:33  arduino_3  M1 seq_03_06 passed
-2026-09-28 15:08:40  arduino_3  M1 seq_03_07 passed
-2026-09-28 15:12:58  arduino_3  M1 seq_03_10 passed
-2026-09-28 15:14:30  arduino_3  M1 seq_03_11 passed
-2026-09-28 15:14:30  arduino_3  M1 seq_03 passed
-2026-09-28 15:14:31  arduino_3  M9 seq_04 passed
-2026-09-28 15:14:33  arduino_3  M9 seq_05 passed
-2026-09-28 15:14:34  arduino_3  M9 seq_06 passed
-2026-09-28 15:14:38  arduino_3  M9 seq_01a passed
-2026-09-28 15:14:41  arduino_3  M9 seq_01b passed
-2026-09-28 15:14:43  arduino_3  M9 seq_02 passed
-2026-09-28 15:14:46  arduino_3  M9 seq_07a passed
-2026-09-28 15:14:48  arduino_3  M9 seq_07b passed
-2026-09-28 15:14:49  arduino_3  M9 seq_07c passed
-2026-09-28 15:14:52  arduino_3  M9 seq_08 passed
-2026-09-28 15:14:53  arduino_3  M9 seq_03_13 passed
-2026-09-28 15:14:55  arduino_3  M9 seq_03_14 passed
-2026-09-28 15:16:00  arduino_3  M9 seq_03_01 passed
-2026-09-28 15:17:33  arduino_3  M9 seq_03_02 passed
-2026-09-28 15:18:03  arduino_3  M9 seq_03_03 passed
-2026-09-28 15:18:14  arduino_3  M9 seq_03_04 passed
-2026-09-28 15:18:23  arduino_3  M9 seq_03_06 passed
-2026-09-28 15:18:30  arduino_3  M9 seq_03_07 passed
-2026-09-28 15:22:47  arduino_3  M9 seq_03_10 passed
-2026-09-28 15:24:19  arduino_3  M9 seq_03_11 passed
-2026-09-28 15:24:19  arduino_3  M9 seq_03 passed
-2026-09-28 15:24:19  PASS arduino_3           pio=esp32_pioarduino_V53_03_11
-2026-09-28 15:24:19  DUT idf5                pio=esp32_idf_V6_9_0  ESP-IDF 5.3.1
-2026-09-28 15:25:30  idf5  M1 seq_04 passed
-2026-09-28 15:25:32  idf5  M1 seq_05 passed
-2026-09-28 15:25:33  idf5  M1 seq_06 passed
-2026-09-28 15:25:37  idf5  M1 seq_01a passed
-2026-09-28 15:25:41  idf5  M1 seq_01b passed
-2026-09-28 15:25:44  idf5  M1 seq_02 passed
-2026-09-28 15:25:46  idf5  M1 seq_07a passed
-2026-09-28 15:25:48  idf5  M1 seq_07b passed
-2026-09-28 15:25:50  idf5  M1 seq_07c passed
-2026-09-28 15:25:53  idf5  M1 seq_08 passed
-2026-09-28 15:25:55  idf5  M1 seq_03_13 passed
-2026-09-28 15:25:57  idf5  M1 seq_03_14 passed
-2026-09-28 15:27:04  idf5  M1 seq_03_01 passed
-2026-09-28 15:29:07  idf5  M1 seq_03_02 passed
-2026-09-28 15:29:44  idf5  M1 seq_03_03 passed
-2026-09-28 15:29:56  idf5  M1 seq_03_04 passed
-2026-09-28 15:30:06  idf5  M1 seq_03_06 passed
-2026-09-28 15:30:14  idf5  M1 seq_03_07 passed
-2026-09-28 15:34:33  idf5  M1 seq_03_10 passed
-2026-09-28 15:36:05  idf5  M1 seq_03_11 passed
-2026-09-28 15:36:05  idf5  M1 seq_03 passed
-2026-09-28 15:36:07  idf5  M9 seq_04 passed
-2026-09-28 15:36:09  idf5  M9 seq_05 passed
-2026-09-28 15:36:10  idf5  M9 seq_06 passed
-2026-09-28 15:36:14  idf5  M9 seq_01a passed
-2026-09-28 15:36:18  idf5  M9 seq_01b passed
-2026-09-28 15:36:20  idf5  M9 seq_02 passed
-2026-09-28 15:36:23  idf5  M9 seq_07a passed
-2026-09-28 15:36:25  idf5  M9 seq_07b passed
-2026-09-28 15:36:27  idf5  M9 seq_07c passed
-2026-09-28 15:36:30  idf5  M9 seq_08 passed
-2026-09-28 15:36:32  idf5  M9 seq_03_13 passed
-2026-09-28 15:36:34  idf5  M9 seq_03_14 passed
-2026-09-28 15:37:40  idf5  M9 seq_03_01 passed
-2026-09-28 15:39:13  idf5  M9 seq_03_02 passed
-2026-09-28 15:39:43  idf5  M9 seq_03_03 passed
-2026-09-28 15:39:54  idf5  M9 seq_03_04 passed
-2026-09-28 15:40:04  idf5  M9 seq_03_06 passed
-2026-09-28 15:40:12  idf5  M9 seq_03_07 passed
-2026-09-28 15:44:29  idf5  M9 seq_03_10 passed
-2026-09-28 15:46:01  idf5  M9 seq_03_11 passed
-2026-09-28 15:46:01  idf5  M9 seq_03 passed
-2026-09-28 15:46:01  PASS idf5                pio=esp32_idf_V6_9_0
-2026-09-28 15:46:01  DUT idf6_1              pio=esp32_idf_V7_1_2  ESP-IDF 6.1.0 / Driver-Types M1=RMT M2=I2S
-2026-09-28 15:47:21  idf6_cfg1  M1 seq_04 config=1 passed
-2026-09-28 15:47:23  idf6_cfg1  M1 seq_05 config=1 passed
-2026-09-28 15:47:24  idf6_cfg1  M1 seq_06 config=1 passed
-2026-09-28 15:47:27  idf6_cfg1  M1 seq_01a config=1 passed
-2026-09-28 15:47:31  idf6_cfg1  M1 seq_01b config=1 passed
-2026-09-28 15:47:33  idf6_cfg1  M1 seq_02 config=1 passed
-2026-09-28 15:47:35  idf6_cfg1  M1 seq_07a config=1 passed
-2026-09-28 15:47:37  idf6_cfg1  M1 seq_07b config=1 passed
-2026-09-28 15:47:38  idf6_cfg1  M1 seq_07c config=1 passed
-2026-09-28 15:47:42  idf6_cfg1  M1 seq_08 config=1 passed
-2026-09-28 15:47:42  idf6_cfg1  M1 seq_03_13 config=1 passed
-2026-09-28 15:47:44  idf6_cfg1  M1 seq_03_14 config=1 passed
-2026-09-28 15:48:51  idf6_cfg1  M1 seq_03_01 config=1 passed
-2026-09-28 15:50:53  idf6_cfg1  M1 seq_03_02 config=1 passed
-2026-09-28 15:51:30  idf6_cfg1  M1 seq_03_03 config=1 passed
-2026-09-28 15:51:41  idf6_cfg1  M1 seq_03_04 config=1 passed
-2026-09-28 15:51:51  idf6_cfg1  M1 seq_03_06 config=1 passed
-2026-09-28 15:51:58  idf6_cfg1  M1 seq_03_07 config=1 passed
-2026-09-28 15:56:17  idf6_cfg1  M1 seq_03_10 config=1 passed
-2026-09-28 15:57:49  idf6_cfg1  M1 seq_03_11 config=1 passed
-2026-09-28 15:57:49  idf6_cfg1  M1 seq_03 config=1 passed
-2026-09-28 15:57:50  idf6_cfg1  M2 seq_04 config=1 passed
-2026-09-28 15:57:52  idf6_cfg1  M2 seq_05 config=1 passed
-2026-09-28 15:57:53  idf6_cfg1  M2 seq_06 config=1 passed
-2026-09-28 15:57:56  idf6_cfg1  M2 seq_01a config=1 passed
-2026-09-28 15:57:59  idf6_cfg1  M2 seq_01b config=1 passed
-2026-09-28 15:58:02  idf6_cfg1  M2 seq_02 config=1 passed
-2026-09-28 15:58:04  idf6_cfg1  M2 seq_07a config=1 passed
-2026-09-28 15:58:06  idf6_cfg1  M2 seq_07b config=1 passed
-2026-09-28 15:58:07  idf6_cfg1  M2 seq_07c config=1 passed
-2026-09-28 15:58:10  idf6_cfg1  M2 seq_08 config=1 passed
-2026-09-28 15:58:11  idf6_cfg1  M2 seq_03_13 config=1 passed
-2026-09-28 15:58:13  idf6_cfg1  M2 seq_03_14 config=1 passed
-2026-09-28 15:59:18  idf6_cfg1  M2 seq_03_01 config=1 passed
-2026-09-28 16:00:51  idf6_cfg1  M2 seq_03_02 config=1 passed
-2026-09-28 16:01:21  idf6_cfg1  M2 seq_03_03 config=1 passed
-2026-09-28 16:01:31  idf6_cfg1  M2 seq_03_04 config=1 passed
-2026-09-28 16:01:41  idf6_cfg1  M2 seq_03_06 config=1 passed
-2026-09-28 16:01:48  idf6_cfg1  M2 seq_03_07 config=1 passed
-2026-09-28 16:06:05  idf6_cfg1  M2 seq_03_10 config=1 passed
-2026-09-28 16:07:36  idf6_cfg1  M2 seq_03_11 config=1 passed
-2026-09-28 16:07:37  idf6_cfg1  M2 seq_03 config=1 passed
-2026-09-28 16:07:38  idf6_cfg1  M3 seq_04 config=1 passed
-2026-09-28 16:07:39  idf6_cfg1  M3 seq_05 config=1 passed
-2026-09-28 16:07:40  idf6_cfg1  M3 seq_06 config=1 passed
-2026-09-28 16:07:44  idf6_cfg1  M3 seq_01a config=1 passed
-2026-09-28 16:07:47  idf6_cfg1  M3 seq_01b config=1 passed
-2026-09-28 16:07:49  idf6_cfg1  M3 seq_02 config=1 passed
-2026-09-28 16:07:51  idf6_cfg1  M3 seq_07a config=1 passed
-2026-09-28 16:07:53  idf6_cfg1  M3 seq_07b config=1 passed
-2026-09-28 16:07:55  idf6_cfg1  M3 seq_07c config=1 passed
-2026-09-28 16:07:58  idf6_cfg1  M3 seq_08 config=1 passed
-2026-09-28 16:07:58  idf6_cfg1  M3 seq_03_13 config=1 passed
-2026-09-28 16:08:00  idf6_cfg1  M3 seq_03_14 config=1 passed
-2026-09-28 16:09:06  idf6_cfg1  M3 seq_03_01 config=1 passed
-2026-09-28 16:10:38  idf6_cfg1  M3 seq_03_02 config=1 passed
-2026-09-28 16:11:09  idf6_cfg1  M3 seq_03_03 config=1 passed
-2026-09-28 16:11:19  idf6_cfg1  M3 seq_03_04 config=1 passed
-2026-09-28 16:11:28  idf6_cfg1  M3 seq_03_06 config=1 passed
-2026-09-28 16:11:35  idf6_cfg1  M3 seq_03_07 config=1 passed
-2026-09-28 16:15:52  idf6_cfg1  M3 seq_03_10 config=1 passed
-2026-09-28 16:17:24  idf6_cfg1  M3 seq_03_11 config=1 passed
-2026-09-28 16:17:24  idf6_cfg1  M3 seq_03 config=1 passed
-2026-09-28 16:17:24  PASS idf6_1              pio=esp32_idf_V7_1_2
-2026-09-28 16:17:24  DUT arduino_latest      pio=esp32_V7_1_2  Arduino 2.0.17 / PIO 7.1.2
-2026-09-28 16:18:04  arduino_latest  M1 seq_04 passed
-2026-09-28 16:18:06  arduino_latest  M1 seq_05 passed
-2026-09-28 16:18:07  arduino_latest  M1 seq_06 passed
-2026-09-28 16:18:10  arduino_latest  M1 seq_01a passed
-2026-09-28 16:18:14  arduino_latest  M1 seq_01b passed
-2026-09-28 16:18:16  arduino_latest  M1 seq_02 passed
-2026-09-28 16:18:18  arduino_latest  M1 seq_07a passed
-2026-09-28 16:18:20  arduino_latest  M1 seq_07b passed
-2026-09-28 16:18:22  arduino_latest  M1 seq_07c passed
-2026-09-28 16:18:25  arduino_latest  M1 seq_08 passed
-2026-09-28 16:18:26  arduino_latest  M1 seq_03_13 passed
-2026-09-28 16:18:29  arduino_latest  M1 seq_03_14 passed
-2026-09-28 16:19:36  arduino_latest  M1 seq_03_01 passed
-2026-09-28 16:21:10  arduino_latest  M1 seq_03_02 passed
-2026-09-28 16:21:41  arduino_latest  M1 seq_03_03 passed
-2026-09-28 16:21:53  arduino_latest  M1 seq_03_04 passed
-2026-09-28 16:22:03  arduino_latest  M1 seq_03_06 passed
-2026-09-28 16:22:12  arduino_latest  M1 seq_03_07 passed
-2026-09-28 16:26:30  arduino_latest  M1 seq_03_10 passed
-2026-09-28 16:28:03  arduino_latest  M1 seq_03_11 passed
-2026-09-28 16:28:03  arduino_latest  M1 seq_03 passed
-2026-09-28 16:28:04  arduino_latest  M9 seq_04 passed
-2026-09-28 16:28:06  arduino_latest  M9 seq_05 passed
-2026-09-28 16:28:07  arduino_latest  M9 seq_06 passed
-2026-09-28 16:28:11  arduino_latest  M9 seq_01a passed
-2026-09-28 16:28:14  arduino_latest  M9 seq_01b passed
-2026-09-28 16:28:17  arduino_latest  M9 seq_02 passed
-2026-09-28 16:28:19  arduino_latest  M9 seq_07a passed
-2026-09-28 16:28:21  arduino_latest  M9 seq_07b passed
-2026-09-28 16:28:22  arduino_latest  M9 seq_07c passed
-2026-09-28 16:28:26  arduino_latest  M9 seq_08 passed
-2026-09-28 16:28:27  arduino_latest  M9 seq_03_13 passed
-2026-09-28 16:28:30  arduino_latest  M9 seq_03_14 passed
-2026-09-28 16:29:37  arduino_latest  M9 seq_03_01 passed
-2026-09-28 16:31:11  arduino_latest  M9 seq_03_02 passed
-2026-09-28 16:31:42  arduino_latest  M9 seq_03_03 passed
-2026-09-28 16:31:54  arduino_latest  M9 seq_03_04 passed
-2026-09-28 16:32:04  arduino_latest  M9 seq_03_06 passed
-2026-09-28 16:32:13  arduino_latest  M9 seq_03_07 passed
-2026-09-28 16:36:31  arduino_latest  M9 seq_03_10 passed
-2026-09-28 16:38:04  arduino_latest  M9 seq_03_11 passed
-2026-09-28 16:38:04  arduino_latest  M9 seq_03 passed
-2026-09-28 16:38:04  PASS arduino_latest      pio=esp32_V7_1_2
-2026-09-28 16:38:04  DONE  test_all
-2026-09-28 23:00:54  idf5  M1 seq_04 passed
-2026-09-28 23:00:56  idf5  M1 seq_05 passed
-2026-09-28 23:00:58  idf5  M1 seq_06 passed
-2026-09-28 23:01:01  idf5  M1 seq_01a passed
-2026-09-28 23:01:05  idf5  M1 seq_01b passed
-2026-09-28 23:01:08  idf5  M1 seq_02 passed
-2026-09-28 23:01:10  idf5  M1 seq_07a passed
-2026-09-28 23:01:12  idf5  M1 seq_07b passed
-2026-09-28 23:01:14  idf5  M1 seq_07c passed
-2026-09-28 23:01:17  idf5  M1 seq_08 passed
-2026-09-28 23:01:18  idf5  M1 seq_03_13 passed
-2026-09-28 23:01:21  idf5  M1 seq_03_14 passed
-2026-09-28 23:02:26  idf5  M1 seq_03_01 passed
-2026-09-28 23:04:00  idf5  M1 seq_03_02 passed
-2026-09-28 23:04:30  idf5  M1 seq_03_03 passed
-2026-09-28 23:04:41  idf5  M1 seq_03_04 passed
-2026-09-28 23:04:51  idf5  M1 seq_03_06 passed
-2026-09-28 23:04:59  idf5  M1 seq_03_07 passed
-2026-09-28 23:09:16  idf5  M1 seq_03_10 passed
-2026-09-28 23:10:48  idf5  M1 seq_03_11 passed
-2026-09-28 23:10:48  idf5  M1 seq_03 passed
+# test_all 2026-09-28 23:16:14
+2026-09-28 23:16:14  DUT arduino_espidf4     pio=esp32_V6_8_1  Arduino 2.0.17 / IDF 4.4.7
+2026-09-28 23:16:51  arduino_espidf4  M1 seq_04 passed
+2026-09-28 23:16:53  arduino_espidf4  M1 seq_05 passed
+2026-09-28 23:16:54  arduino_espidf4  M1 seq_06 passed
+2026-09-28 23:16:58  arduino_espidf4  M1 seq_01a passed
+2026-09-28 23:17:01  arduino_espidf4  M1 seq_01b passed
+2026-09-28 23:17:04  arduino_espidf4  M1 seq_02 passed
+2026-09-28 23:17:06  arduino_espidf4  M1 seq_07a passed
+2026-09-28 23:17:08  arduino_espidf4  M1 seq_07b passed
+2026-09-28 23:17:09  arduino_espidf4  M1 seq_07c passed
+2026-09-28 23:17:12  arduino_espidf4  M1 seq_08 passed
+2026-09-28 23:17:13  arduino_espidf4  M1 seq_03_13 passed
+2026-09-28 23:17:16  arduino_espidf4  M1 seq_03_14 passed
+2026-09-28 23:18:23  arduino_espidf4  M1 seq_03_01 passed
+2026-09-28 23:19:57  arduino_espidf4  M1 seq_03_02 passed
+2026-09-28 23:20:28  arduino_espidf4  M1 seq_03_03 passed
+2026-09-28 23:20:40  arduino_espidf4  M1 seq_03_04 passed
+2026-09-28 23:20:51  arduino_espidf4  M1 seq_03_06 passed
+2026-09-28 23:20:59  arduino_espidf4  M1 seq_03_07 passed
+2026-09-28 23:25:17  arduino_espidf4  M1 seq_03_10 passed
+2026-09-28 23:26:50  arduino_espidf4  M1 seq_03_11 passed
+2026-09-28 23:26:51  arduino_espidf4  M1 seq_03 passed
+2026-09-28 23:26:52  arduino_espidf4  M9 seq_04 passed
+2026-09-28 23:26:54  arduino_espidf4  M9 seq_05 passed
+2026-09-28 23:26:55  arduino_espidf4  M9 seq_06 passed
+2026-09-28 23:26:58  arduino_espidf4  M9 seq_01a passed
+2026-09-28 23:27:02  arduino_espidf4  M9 seq_01b passed
+2026-09-28 23:27:04  arduino_espidf4  M9 seq_02 passed
+2026-09-28 23:27:07  arduino_espidf4  M9 seq_07a passed
+2026-09-28 23:27:09  arduino_espidf4  M9 seq_07b passed
+2026-09-28 23:27:10  arduino_espidf4  M9 seq_07c passed
+2026-09-28 23:27:13  arduino_espidf4  M9 seq_08 passed
+2026-09-28 23:27:14  arduino_espidf4  M9 seq_03_13 passed
+2026-09-28 23:27:17  arduino_espidf4  M9 seq_03_14 passed
+2026-09-28 23:28:24  arduino_espidf4  M9 seq_03_01 passed
+2026-09-28 23:29:58  arduino_espidf4  M9 seq_03_02 passed
+2026-09-28 23:30:29  arduino_espidf4  M9 seq_03_03 passed
+2026-09-28 23:30:41  arduino_espidf4  M9 seq_03_04 passed
+2026-09-28 23:30:52  arduino_espidf4  M9 seq_03_06 passed
+2026-09-28 23:31:00  arduino_espidf4  M9 seq_03_07 passed
+2026-09-28 23:35:19  arduino_espidf4  M9 seq_03_10 passed
+2026-09-28 23:36:52  arduino_espidf4  M9 seq_03_11 passed
+2026-09-28 23:36:52  arduino_espidf4  M9 seq_03 passed
+2026-09-28 23:36:52  PASS arduino_espidf4     pio=esp32_V6_8_1
+2026-09-28 23:36:52  DUT arduino_3           pio=esp32_pioarduino_V53_03_11  Arduino 3.1.1 / IDF 5.3.2
+2026-09-28 23:37:34  arduino_3  M1 seq_04 passed
+2026-09-28 23:37:36  arduino_3  M1 seq_05 passed
+2026-09-28 23:37:37  arduino_3  M1 seq_06 passed
+2026-09-28 23:37:41  arduino_3  M1 seq_01a passed
+2026-09-28 23:37:44  arduino_3  M1 seq_01b passed
+2026-09-28 23:37:46  arduino_3  M1 seq_02 passed
+2026-09-28 23:37:49  arduino_3  M1 seq_07a passed
+2026-09-28 23:37:50  arduino_3  M1 seq_07b passed
+2026-09-28 23:37:52  arduino_3  M1 seq_07c passed
+2026-09-28 23:37:55  arduino_3  M1 seq_08 passed
+2026-09-28 23:37:56  arduino_3  M1 seq_03_13 passed
+2026-09-28 23:37:58  arduino_3  M1 seq_03_14 passed
+2026-09-28 23:39:03  arduino_3  M1 seq_03_01 passed
+2026-09-28 23:40:36  arduino_3  M1 seq_03_02 passed
+2026-09-28 23:41:06  arduino_3  M1 seq_03_03 passed
+2026-09-28 23:41:16  arduino_3  M1 seq_03_04 passed
+2026-09-28 23:41:26  arduino_3  M1 seq_03_06 passed
+2026-09-28 23:41:33  arduino_3  M1 seq_03_07 passed
+2026-09-28 23:45:50  arduino_3  M1 seq_03_10 passed
+2026-09-28 23:47:22  arduino_3  M1 seq_03_11 passed
+2026-09-28 23:47:22  arduino_3  M1 seq_03 passed
+2026-09-28 23:47:23  arduino_3  M9 seq_04 passed
+2026-09-28 23:47:25  arduino_3  M9 seq_05 passed
+2026-09-28 23:47:26  arduino_3  M9 seq_06 passed
+2026-09-28 23:47:30  arduino_3  M9 seq_01a passed
+2026-09-28 23:47:33  arduino_3  M9 seq_01b passed
+2026-09-28 23:47:36  arduino_3  M9 seq_02 passed
+2026-09-28 23:47:38  arduino_3  M9 seq_07a passed
+2026-09-28 23:47:40  arduino_3  M9 seq_07b passed
+2026-09-28 23:47:41  arduino_3  M9 seq_07c passed
+2026-09-28 23:47:44  arduino_3  M9 seq_08 passed
+2026-09-28 23:47:45  arduino_3  M9 seq_03_13 passed
+2026-09-28 23:47:47  arduino_3  M9 seq_03_14 passed
+2026-09-28 23:48:52  arduino_3  M9 seq_03_01 passed
+2026-09-28 23:50:25  arduino_3  M9 seq_03_02 passed
+2026-09-28 23:50:55  arduino_3  M9 seq_03_03 passed
+2026-09-28 23:51:06  arduino_3  M9 seq_03_04 passed
+2026-09-28 23:51:15  arduino_3  M9 seq_03_06 passed
+2026-09-28 23:51:22  arduino_3  M9 seq_03_07 passed
+2026-09-28 23:55:40  arduino_3  M9 seq_03_10 passed
+2026-09-28 23:57:11  arduino_3  M9 seq_03_11 passed
+2026-09-28 23:57:11  arduino_3  M9 seq_03 passed
+2026-09-28 23:57:11  PASS arduino_3           pio=esp32_pioarduino_V53_03_11
+2026-09-28 23:57:11  DUT idf5                pio=esp32_idf_V6_9_0  ESP-IDF 5.3.1
+2026-09-28 23:58:23  idf5  M1 seq_04 passed
+2026-09-28 23:58:25  idf5  M1 seq_05 passed
+2026-09-28 23:58:27  idf5  M1 seq_06 passed
+2026-09-28 23:58:30  idf5  M1 seq_01a passed
+2026-09-28 23:58:34  idf5  M1 seq_01b passed
+2026-09-28 23:58:37  idf5  M1 seq_02 passed
+2026-09-28 23:58:39  idf5  M1 seq_07a passed
+2026-09-28 23:58:41  idf5  M1 seq_07b passed
+2026-09-28 23:58:43  idf5  M1 seq_07c passed
+2026-09-28 23:58:46  idf5  M1 seq_08 passed
+2026-09-28 23:58:47  idf5  M1 seq_03_13 passed
+2026-09-28 23:58:50  idf5  M1 seq_03_14 passed
+2026-09-28 23:59:55  idf5  M1 seq_03_01 passed
+2026-09-29 00:01:29  idf5  M1 seq_03_02 passed
+2026-09-29 00:01:59  idf5  M1 seq_03_03 passed
+2026-09-29 00:02:10  idf5  M1 seq_03_04 passed
+2026-09-29 00:02:20  idf5  M1 seq_03_06 passed
+2026-09-29 00:02:28  idf5  M1 seq_03_07 passed
+2026-09-29 00:06:45  idf5  M1 seq_03_10 passed
+2026-09-29 00:08:17  idf5  M1 seq_03_11 passed
+2026-09-29 00:08:17  idf5  M1 seq_03 passed
+2026-09-29 00:08:19  idf5  M9 seq_04 passed
+2026-09-29 00:08:21  idf5  M9 seq_05 passed
+2026-09-29 00:08:22  idf5  M9 seq_06 passed
+2026-09-29 00:08:26  idf5  M9 seq_01a passed
+2026-09-29 00:08:30  idf5  M9 seq_01b passed
+2026-09-29 00:08:33  idf5  M9 seq_02 passed
+2026-09-29 00:08:35  idf5  M9 seq_07a passed
+2026-09-29 00:08:37  idf5  M9 seq_07b passed
+2026-09-29 00:08:39  idf5  M9 seq_07c passed
+2026-09-29 00:08:42  idf5  M9 seq_08 passed
+2026-09-29 00:08:44  idf5  M9 seq_03_13 passed
+2026-09-29 00:08:46  idf5  M9 seq_03_14 passed
+2026-09-29 00:09:52  idf5  M9 seq_03_01 passed
+2026-09-29 00:11:25  idf5  M9 seq_03_02 passed
+2026-09-29 00:11:56  idf5  M9 seq_03_03 passed
+2026-09-29 00:12:07  idf5  M9 seq_03_04 passed
+2026-09-29 00:12:16  idf5  M9 seq_03_06 passed
+2026-09-29 00:12:24  idf5  M9 seq_03_07 passed
+2026-09-29 00:16:41  idf5  M9 seq_03_10 passed
+2026-09-29 00:18:13  idf5  M9 seq_03_11 passed
+2026-09-29 00:18:13  idf5  M9 seq_03 passed
+2026-09-29 00:18:13  PASS idf5                pio=esp32_idf_V6_9_0
+2026-09-29 00:18:13  DUT idf6_1              pio=esp32_idf_V7_1_2  ESP-IDF 6.1.0 / Driver-Types M1=RMT M2=I2S
+2026-09-29 00:19:33  idf6_cfg1  M1 seq_04 config=1 passed
+2026-09-29 00:19:34  idf6_cfg1  M1 seq_05 config=1 passed
+2026-09-29 00:19:35  idf6_cfg1  M1 seq_06 config=1 passed
+2026-09-29 00:19:39  idf6_cfg1  M1 seq_01a config=1 passed
+2026-09-29 00:19:42  idf6_cfg1  M1 seq_01b config=1 passed
+2026-09-29 00:19:44  idf6_cfg1  M1 seq_02 config=1 passed
+2026-09-29 00:19:46  idf6_cfg1  M1 seq_07a config=1 passed
+2026-09-29 00:19:48  idf6_cfg1  M1 seq_07b config=1 passed
+2026-09-29 00:19:49  idf6_cfg1  M1 seq_07c config=1 passed
+2026-09-29 00:19:53  idf6_cfg1  M1 seq_08 config=1 passed
+2026-09-29 00:19:53  idf6_cfg1  M1 seq_03_13 config=1 passed
+2026-09-29 00:19:55  idf6_cfg1  M1 seq_03_14 config=1 passed
+2026-09-29 00:21:00  idf6_cfg1  M1 seq_03_01 config=1 passed
+2026-09-29 00:22:33  idf6_cfg1  M1 seq_03_02 config=1 passed
+2026-09-29 00:23:04  idf6_cfg1  M1 seq_03_03 config=1 passed
+2026-09-29 00:23:14  idf6_cfg1  M1 seq_03_04 config=1 passed
+2026-09-29 00:23:23  idf6_cfg1  M1 seq_03_06 config=1 passed
+2026-09-29 00:23:31  idf6_cfg1  M1 seq_03_07 config=1 passed
+2026-09-29 00:27:47  idf6_cfg1  M1 seq_03_10 config=1 passed
+2026-09-29 00:29:19  idf6_cfg1  M1 seq_03_11 config=1 passed
+2026-09-29 00:29:19  idf6_cfg1  M1 seq_03 config=1 passed
+2026-09-29 00:29:20  idf6_cfg1  M2 seq_04 config=1 passed
+2026-09-29 00:29:22  idf6_cfg1  M2 seq_05 config=1 passed
+2026-09-29 00:29:23  idf6_cfg1  M2 seq_06 config=1 passed
+2026-09-29 00:29:26  idf6_cfg1  M2 seq_01a config=1 passed
+2026-09-29 00:29:30  idf6_cfg1  M2 seq_01b config=1 passed
+2026-09-29 00:29:32  idf6_cfg1  M2 seq_02 config=1 passed
+2026-09-29 00:29:34  idf6_cfg1  M2 seq_07a config=1 passed
+2026-09-29 00:29:36  idf6_cfg1  M2 seq_07b config=1 passed
+2026-09-29 00:29:37  idf6_cfg1  M2 seq_07c config=1 passed
+2026-09-29 00:29:40  idf6_cfg1  M2 seq_08 config=1 passed
+2026-09-29 00:29:41  idf6_cfg1  M2 seq_03_13 config=1 passed
+2026-09-29 00:29:43  idf6_cfg1  M2 seq_03_14 config=1 passed
+2026-09-29 00:30:48  idf6_cfg1  M2 seq_03_01 config=1 passed
+2026-09-29 00:32:21  idf6_cfg1  M2 seq_03_02 config=1 passed
+2026-09-29 00:32:51  idf6_cfg1  M2 seq_03_03 config=1 passed
+2026-09-29 00:33:02  idf6_cfg1  M2 seq_03_04 config=1 passed
+2026-09-29 00:33:11  idf6_cfg1  M2 seq_03_06 config=1 passed
+2026-09-29 00:33:18  idf6_cfg1  M2 seq_03_07 config=1 passed
+2026-09-29 00:37:35  idf6_cfg1  M2 seq_03_10 config=1 passed
+2026-09-29 00:39:07  idf6_cfg1  M2 seq_03_11 config=1 passed
+2026-09-29 00:39:07  idf6_cfg1  M2 seq_03 config=1 passed
+2026-09-29 00:39:08  idf6_cfg1  M3 seq_04 config=1 passed
+2026-09-29 00:39:10  idf6_cfg1  M3 seq_05 config=1 passed
+2026-09-29 00:39:11  idf6_cfg1  M3 seq_06 config=1 passed
+2026-09-29 00:39:14  idf6_cfg1  M3 seq_01a config=1 passed
+2026-09-29 00:39:17  idf6_cfg1  M3 seq_01b config=1 passed
+2026-09-29 00:39:20  idf6_cfg1  M3 seq_02 config=1 passed
+2026-09-29 00:39:22  idf6_cfg1  M3 seq_07a config=1 passed
+2026-09-29 00:39:24  idf6_cfg1  M3 seq_07b config=1 passed
+2026-09-29 00:39:25  idf6_cfg1  M3 seq_07c config=1 passed
+2026-09-29 00:39:28  idf6_cfg1  M3 seq_08 config=1 passed
+2026-09-29 00:39:29  idf6_cfg1  M3 seq_03_13 config=1 passed
+2026-09-29 00:39:31  idf6_cfg1  M3 seq_03_14 config=1 passed
+2026-09-29 00:40:36  idf6_cfg1  M3 seq_03_01 config=1 passed
+2026-09-29 00:42:09  idf6_cfg1  M3 seq_03_02 config=1 passed
+2026-09-29 00:42:39  idf6_cfg1  M3 seq_03_03 config=1 passed
+2026-09-29 00:42:49  idf6_cfg1  M3 seq_03_04 config=1 passed
+2026-09-29 00:42:58  idf6_cfg1  M3 seq_03_06 config=1 passed
+2026-09-29 00:43:06  idf6_cfg1  M3 seq_03_07 config=1 passed
+2026-09-29 00:47:23  idf6_cfg1  M3 seq_03_10 config=1 passed
+2026-09-29 00:48:54  idf6_cfg1  M3 seq_03_11 config=1 passed
+2026-09-29 00:48:54  idf6_cfg1  M3 seq_03 config=1 passed
+2026-09-29 00:48:54  PASS idf6_1              pio=esp32_idf_V7_1_2
+2026-09-29 00:48:54  DUT arduino_latest      pio=esp32_V7_1_2  Arduino 2.0.17 / PIO 7.1.2
+2026-09-29 00:49:33  arduino_latest  M1 seq_04 passed
+2026-09-29 00:49:35  arduino_latest  M1 seq_05 passed
+2026-09-29 00:49:36  arduino_latest  M1 seq_06 passed
+2026-09-29 00:49:39  arduino_latest  M1 seq_01a passed
+2026-09-29 00:49:43  arduino_latest  M1 seq_01b passed
+2026-09-29 00:49:45  arduino_latest  M1 seq_02 passed
+2026-09-29 00:49:47  arduino_latest  M1 seq_07a passed
+2026-09-29 00:49:49  arduino_latest  M1 seq_07b passed
+2026-09-29 00:49:50  arduino_latest  M1 seq_07c passed
+2026-09-29 00:49:54  arduino_latest  M1 seq_08 passed
+2026-09-29 00:49:55  arduino_latest  M1 seq_03_13 passed
+2026-09-29 00:49:58  arduino_latest  M1 seq_03_14 passed
+2026-09-29 00:51:04  arduino_latest  M1 seq_03_01 passed
+2026-09-29 00:52:38  arduino_latest  M1 seq_03_02 passed
+2026-09-29 00:53:10  arduino_latest  M1 seq_03_03 passed
+2026-09-29 00:53:21  arduino_latest  M1 seq_03_04 passed
+2026-09-29 00:53:32  arduino_latest  M1 seq_03_06 passed
+2026-09-29 00:53:41  arduino_latest  M1 seq_03_07 passed
+2026-09-29 00:57:59  arduino_latest  M1 seq_03_10 passed
+2026-09-29 00:59:32  arduino_latest  M1 seq_03_11 passed
+2026-09-29 00:59:32  arduino_latest  M1 seq_03 passed
+2026-09-29 00:59:33  arduino_latest  M9 seq_04 passed
+2026-09-29 00:59:35  arduino_latest  M9 seq_05 passed
+2026-09-29 00:59:36  arduino_latest  M9 seq_06 passed
+2026-09-29 00:59:40  arduino_latest  M9 seq_01a passed
+2026-09-29 00:59:43  arduino_latest  M9 seq_01b passed
+2026-09-29 00:59:46  arduino_latest  M9 seq_02 passed
+2026-09-29 00:59:48  arduino_latest  M9 seq_07a passed
+2026-09-29 00:59:50  arduino_latest  M9 seq_07b passed
+2026-09-29 00:59:51  arduino_latest  M9 seq_07c passed
+2026-09-29 00:59:55  arduino_latest  M9 seq_08 passed
+2026-09-29 00:59:56  arduino_latest  M9 seq_03_13 passed
+2026-09-29 00:59:59  arduino_latest  M9 seq_03_14 passed
+2026-09-29 01:01:05  arduino_latest  M9 seq_03_01 passed
+2026-09-29 01:02:39  arduino_latest  M9 seq_03_02 passed
+2026-09-29 01:03:11  arduino_latest  M9 seq_03_03 passed
+2026-09-29 01:03:23  arduino_latest  M9 seq_03_04 passed
+2026-09-29 01:03:33  arduino_latest  M9 seq_03_06 passed
+2026-09-29 01:03:42  arduino_latest  M9 seq_03_07 passed
+2026-09-29 01:08:00  arduino_latest  M9 seq_03_10 passed
+2026-09-29 01:09:33  arduino_latest  M9 seq_03_11 passed
+2026-09-29 01:09:33  arduino_latest  M9 seq_03 passed
+2026-09-29 01:09:33  PASS arduino_latest      pio=esp32_V7_1_2
+2026-09-29 01:09:33  DONE  test_all
