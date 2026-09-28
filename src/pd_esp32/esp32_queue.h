@@ -11,6 +11,14 @@
 #include "pd_esp32/i2s_manager.h"
 #endif
 
+#if defined(SUPPORT_ESP32_RMT) && defined(SUPPORT_ESP32_RMT_V2)
+struct rmt_fill_state {
+  uint16_t remaining_low_ticks;
+  uint16_t remaining_high_ticks;
+  uint8_t off_ticks;
+};
+#endif
+
 class StepperQueue : public StepperQueueBase {
  public:
 #include "../fas_queue/protocol.h"
@@ -65,6 +73,7 @@ class StepperQueue : public StepperQueueBase {
 #if ESP_IDF_VERSION_MAJOR >= 5
       bool _channel_enabled;
 #endif
+      struct rmt_fill_state _fill_state;
 #endif
     };
 #endif
@@ -161,6 +170,8 @@ void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
 #if defined(SUPPORT_ESP32_RMT_V2)
 uint32_t rmt_encode_queue(StepperQueue* q, uint32_t* symbols,
                           uint32_t symbols_free);
+uint32_t rmt_encode_fill(StepperQueue* q, struct rmt_fill_state* state,
+                         uint32_t* symbols, uint32_t symbols_free);
 #endif
 
 //==========================================================================

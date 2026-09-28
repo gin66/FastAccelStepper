@@ -17,6 +17,23 @@
 #define PART_SIZE debug_part_size
 #endif
 
+// RMT V2 fill model constants (test fallback).
+// Match the IDF5/6 definitions: 2 blocks of 8000 ticks, cap symbol at
+// RMT_BLOCK_TICKS/PART_SIZE so the full buffer spans < 1 ms,
+// well below the 20 ms forward planning window.
+#ifndef RMT_BLOCK_COUNT
+#define RMT_BLOCK_COUNT 2
+#endif
+#ifndef RMT_BLOCK_TICKS
+#define RMT_BLOCK_TICKS 8000
+#endif
+#ifndef RMT_MAX_INFLIGHT_TICKS
+#define RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT * RMT_BLOCK_TICKS)
+#endif
+#ifndef RMT_MAX_SYMBOL_TICKS
+#define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / PART_SIZE)
+#endif
+
 #define TICKS_PER_S 16000000L
 #define MIN_CMD_TICKS (TICKS_PER_S / 5000)
 #define MIN_DIR_DELAY_US (MIN_CMD_TICKS / (TICKS_PER_S / 1000000))

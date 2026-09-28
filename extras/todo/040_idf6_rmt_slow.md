@@ -841,16 +841,16 @@ array sizing must be runtime expressions (`RMT_BLOCK_TICKS / PART_SIZE`), not
 integer-constant expressions.
 
 **Phase 0 — interface/config freeze (new tests compile, all RED)**
-- [ ] 0.1 Define `RMT_BLOCK_COUNT 2`, `RMT_BLOCK_TICKS 8000`,
+- [x] 0.1 Define `RMT_BLOCK_COUNT 2`, `RMT_BLOCK_TICKS 8000`,
   `RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT*RMT_BLOCK_TICKS)` (=16000) and
   `RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS/PART_SIZE)` in `pd_config_idf5.h` /
   `pd_config_idf6.h` (and a `pd_test` fallback so test_30 sees them).
-- [ ] 0.2 Add `struct rmt_fill_state { uint16_t remaining_low_ticks;
+- [x] 0.2 Add `struct rmt_fill_state { uint16_t remaining_low_ticks;
   uint16_t remaining_high_ticks; uint8_t off_ticks; }` to the RMT union in
   `esp32_queue.h`; declare `uint32_t rmt_encode_fill(StepperQueue*, struct
   rmt_fill_state*, uint32_t* symbols, uint32_t symbols_free);` and stub it to
   `return 0`.
-- [ ] 0.3 Retire the tests bound to the old whole-command model (they are the
+- [x] 0.3 Retire the tests bound to the old whole-command model (they are the
   RED baseline): `test_pause_fills_one_half`,
   `test_pause_needs_a_full_half`, `test_short_step_is_one_symbol`,
   `test_max_tick_step_is_two_symbols`, `test_step_needs_two_free_symbols`,

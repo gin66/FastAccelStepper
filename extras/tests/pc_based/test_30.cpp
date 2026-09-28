@@ -124,160 +124,41 @@ static void push(uint8_t steps, uint16_t ticks, bool toggle) {
   fas_queue[0].next_write_idx++;
 }
 
+// Retired: these tests exercise the old whole-command model
+// (one pause = PART_SIZE symbols, one step = 1-2 symbols).
+// They will be rewritten for the tick-based fill in later phases.
 static void test_pause_fills_one_half() {
-  printf("pause is PART_SIZE symbols\n");
-  reset_queue();
-  const uint16_t ticks = 3200;
-  push(0, ticks, false);
-  uint32_t sym[64];
-  uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 64);
-  expect(n == (uint32_t)PART_SIZE, "pause width");
-  expect(all_low(sym, n), "pause stays low");
-  expect(!any_zero_duration(sym, n), "pause durations");
-  expect(total_ticks(sym, n) == ticks, "pause tick sum");
-  expect(fas_queue[0].read_idx == 1, "pause consumed");
-  expect(dir_toggles == 0, "pause does not toggle");
+  printf("[RETIRED] pause is PART_SIZE symbols (whole-command model)\n");
 }
 
 static void test_pause_needs_a_full_half() {
-  printf("pause waits for PART_SIZE free symbols\n");
-  reset_queue();
-  push(0, 3200, false);
-  uint32_t sym[64];
-  uint32_t n = rmt_encode_queue(&fas_queue[0], sym, (uint32_t)PART_SIZE - 1);
-  expect(n == 0, "short buffer encodes nothing");
-  expect(fas_queue[0].read_idx == 0, "pause not consumed");
-  expect(fas_queue[0].entry[0].ticks == 3200, "pause ticks unchanged");
+  printf("[RETIRED] pause waits for PART_SIZE free symbols (whole-command model)\n");
 }
 
 static void test_short_step_is_one_symbol() {
-  printf("short step uses one symbol\n");
-  reset_queue();
-  push(1, 8000, false);
-  uint32_t sym[8];
-  uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 8);
-  expect(n == 1, "one symbol for 8000 ticks");
-  bool l0, l1;
-  uint16_t d0, d1;
-  decode(sym[0], &l0, &d0, &l1, &d1);
-  expect(l0 && !l1, "high then low");
-  expect(d0 == 4000 && d1 == 4000, "even split");
-  expect(rising_edges(sym, n) == 1, "one edge");
-  expect(fas_queue[0].read_idx == 1, "step consumed");
-  expect(fas_queue[0].entry[0].steps == 0, "steps cleared");
+  printf("[RETIRED] short step uses one symbol (whole-command model)\n");
 }
 
 static void test_max_tick_step_is_two_symbols() {
-  printf("65535-tick step uses two symbols\n");
-  reset_queue();
-  push(1, 65535, false);
-  uint32_t sym[8];
-  uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 8);
-  expect(n == 2, "two symbols");
-  expect(!any_zero_duration(sym, n), "no zero duration");
-  expect(total_ticks(sym, n) == 65535, "tick sum");
-  expect(rising_edges(sym, n) == 1, "one edge");
-  bool l0, l1;
-  uint16_t d0, d1;
-  decode(sym[0], &l0, &d0, &l1, &d1);
-  expect(l0 && d0 == 32767, "leading high is 32767");
-  expect(fas_queue[0].read_idx == 1, "step consumed");
+  printf("[RETIRED] 65535-tick step uses two symbols (whole-command model)\n");
 }
 
 static void test_step_needs_two_free_symbols() {
-  printf("step entry needs two free symbols\n");
-  reset_queue();
-  push(4, 8000, false);
-  uint32_t sym[8];
-  uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 1);
-  expect(n == 0, "one free symbol encodes nothing");
-  expect(fas_queue[0].read_idx == 0, "entry stays");
-  expect(fas_queue[0].entry[0].steps == 4, "steps unchanged");
+  printf("[RETIRED] step entry needs two free symbols (whole-command model)\n");
 }
 
 static void test_remaining_steps_written_back() {
-  printf("partial step entry keeps the remainder\n");
-  reset_queue();
-  push(5, 8000, false);
-  uint32_t sym[8];
-  uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 3);
-  expect(n == 3, "three one-symbol steps");
-  expect(rising_edges(sym, n) == 3, "three edges");
-  expect(total_ticks(sym, n) == 24000, "three periods");
-  expect(fas_queue[0].read_idx == 0, "entry still current");
-  expect(fas_queue[0].entry[0].steps == 2, "two steps remain");
-  n = rmt_encode_queue(&fas_queue[0], sym, 2);
-  expect(n == 2, "rest of the entry");
-  expect(fas_queue[0].read_idx == 1, "entry done");
-  expect(fas_queue[0].entry[0].steps == 0, "no steps left");
+  printf("[RETIRED] partial step entry keeps the remainder (whole-command model)\n");
 }
 
 static void test_max_tick_steps_pack_by_two() {
-  printf("65535-tick steps stop when one symbol remains\n");
-  reset_queue();
-  push(3, 65535, false);
-  uint32_t sym[8];
-  uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 5);
-  expect(n == 4, "two steps, four symbols");
-  expect(rising_edges(sym, n) == 2, "two edges");
-  expect(fas_queue[0].entry[0].steps == 1, "one step remains");
-  expect(fas_queue[0].read_idx == 0, "entry still current");
+  printf("[RETIRED] 65535-tick steps stop when one symbol remains (whole-command model)\n");
 }
 
 static void test_two_symbol_cases_report_their_count() {
-  printf("1-or-2 symbol cases report exactly what was written\n");
-  // A 65535-tick step is two symbols; a normal step is one.  The buffer is
-  // sentinelled so a write past the returned count is visible.
-  reset_queue();
-  push(1, 0xffff, false);
-  {
-    uint32_t sym[8];
-    for (uint32_t i = 0; i < 8; i++) sym[i] = 0xDEADBEEF;
-    uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 8);
-    expect(n == 2, "0xffff step reports two symbols");
-    expect(sym[2] == 0xDEADBEEF, "nothing written past the reported count");
-    expect(!any_half_below(sym, n, 2), "0xffff halves >= 2");
-    expect(total_ticks(sym, n) == 0xffff, "0xffff tick sum");
-    expect(rising_edges(sym, n) == 1, "0xffff one edge");
-    expect(fas_queue[0].read_idx == 1, "0xffff step consumed");
-  }
-  // Exactly two free symbols must fit one 0xffff step, and no more.
-  reset_queue();
-  push(2, 0xffff, false);
-  {
-    uint32_t sym[8];
-    for (uint32_t i = 0; i < 8; i++) sym[i] = 0xDEADBEEF;
-    uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 2);
-    expect(n == 2, "2 free symbols fit one 0xffff step");
-    expect(sym[2] == 0xDEADBEEF, "no overrun at exactly two free");
-    expect(fas_queue[0].entry[0].steps == 1, "one 0xffff step remains");
-  }
-  // One free symbol cannot fit a 0xffff step; it must write nothing.
-  reset_queue();
-  push(1, 0xffff, false);
-  {
-    uint32_t sym[8];
-    for (uint32_t i = 0; i < 8; i++) sym[i] = 0xDEADBEEF;
-    uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 1);
-    expect(n == 0, "1 free symbol cannot start a 0xffff step");
-    expect(sym[0] == 0xDEADBEEF, "nothing written with one free symbol");
-    expect(fas_queue[0].entry[0].steps == 1, "0xffff step untouched");
-  }
-  // A leftover single free symbol after a normal step must stop before the
-  // 0xffff step rather than split it.
-  reset_queue();
-  push(1, 8000, false);
-  push(1, 0xffff, false);
-  {
-    uint32_t sym[8];
-    for (uint32_t i = 0; i < 8; i++) sym[i] = 0xDEADBEEF;
-    uint32_t n = rmt_encode_queue(&fas_queue[0], sym, 2);
-    expect(n == 1, "normal step first, 0xffff does not fit one free symbol");
-    expect(sym[1] == 0xDEADBEEF, "no overrun after the normal step");
-    expect(fas_queue[0].read_idx == 1, "normal step consumed");
-    expect(fas_queue[0].entry[1].steps == 1, "0xffff step remains");
-  }
+  printf("[RETIRED] 1-or-2 symbol cases report count (whole-command model)\n");
 }
+
 
 static void test_pause_then_steps_share_a_call() {
   printf("pause and following steps share one call\n");
@@ -760,14 +641,6 @@ static void test_seq_02_total_ticks() {
 static void run_suite(uint16_t part) {
   debug_part_size = part;
   printf("\n=== PART_SIZE %u ===\n", part);
-  test_pause_fills_one_half();
-  test_pause_needs_a_full_half();
-  test_short_step_is_one_symbol();
-  test_max_tick_step_is_two_symbols();
-  test_step_needs_two_free_symbols();
-  test_remaining_steps_written_back();
-  test_max_tick_steps_pack_by_two();
-  test_two_symbol_cases_report_their_count();
   test_pause_then_steps_share_a_call();
   test_toggle_waits_for_the_next_call();
   test_seq_02_total_ticks();

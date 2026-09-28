@@ -175,6 +175,14 @@
 // #define FAS_RMT_MEM(channel) ((uint32_t *)RMTMEM.chan[channel].data32)
 // PART_SIZE shall be even.
 #define PART_SIZE (RMT_SIZE >> 1)
+
+// RMT V2 fill model: cap symbol duration so the RMT buffer spans less
+// time than the ramp lookahead (forward_planning_ticks).
+// 2*PART_SIZE symbols * RMT_MAX_SYMBOL_TICKS < forward_planning_ticks.
+#define RMT_BLOCK_COUNT 2
+#define RMT_BLOCK_TICKS 8000
+#define RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT * RMT_BLOCK_TICKS)
+#define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / PART_SIZE)
 #endif
 
 #include <hal/i2s_ll.h>

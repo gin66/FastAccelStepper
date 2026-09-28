@@ -101,4 +101,13 @@ uint32_t IRAM_ATTR rmt_encode_queue(StepperQueue* q, uint32_t* symbols,
   return written;
 }
 
+uint32_t IRAM_ATTR rmt_encode_fill(StepperQueue* q, struct rmt_fill_state* state,
+                                   uint32_t* symbols, uint32_t symbols_free) {
+  (void)q;
+  (void)state;
+  (void)symbols;
+  (void)symbols_free;
+  return 0;
+}
+
 #endif
