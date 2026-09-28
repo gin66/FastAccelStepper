@@ -5,6 +5,7 @@
 .pio
 .dir
 .tested
+*.ino-e
 run_avr
 pio_dirs
 pio_espidf
