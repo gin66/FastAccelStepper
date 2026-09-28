@@ -3,7 +3,7 @@
 # Verify that synchronizedStart() produces synchronous pulses on
 # StepA (OC1A) and StepB (OC1B).
 
-SRC=$(shell find ../../../src -type f) $(wildcard src/*)
+SRC=$(shell find ../../../../src -type f) $(wildcard src/*)
 
 DUT=$(shell gawk '/env:/{print(substr($$1,6,length($$1)-6))}' platformio.ini)
 
@@ -44,7 +44,7 @@ result.txt: x.vcd
 	cat expect.txt
 
 x.vcd: $(SRC) ../run_avr platformio.ini FastAccelStepper
-	pio run -e $(DUT)
+	~/.platformio/penv/bin/pio run -e $(DUT) || ~/.local/bin/pio run -e $(DUT) || env pio run -e $(DUT)
 	../run_avr $(FIRMWARE) -m $(DEVICE) -o x.vcd $(TRACES)
 
 clean:
