@@ -346,12 +346,18 @@ has several ms of jitter.
   void setDelayToDisable(uint16_t delay_ms);
 ```
 ## Stepper Position
-Retrieve the current position of the stepper
+Retrieve the current position of the stepper.
 
-Comment for esp32 with rmt module:
-The actual position may be off by the number of steps in the ongoing
-command. If precise real time position is needed, attaching a pulse counter
-may be of help.
+While a move is running, this value leads the step pin. The driver
+accepts steps into its pipeline before those pulses are emitted. At
+high speed the lead is large: on ESP32 RMT one step can be a single
+symbol, and a full symbol block plus the next chunk can already be
+committed. getCurrentPosition() does not estimate how far that
+pipeline has played out.
+
+If the pulses that have already left the pin are what matters,
+attach a pulse counter and use readPulseCounter(). Counters 6 and 7
+are not used by the stepper drivers.
 ```cpp
   int32_t getCurrentPosition() const;
 ```
@@ -1016,10 +1022,11 @@ Pulse counter 6 and 7 are not used by the stepper library and are judged as
 available. If only five steppers are defined, then 5 gets available. If
 four steppers are defined, then 4 is usable,too.
 
-These functions are intended primarily for testing, because the library
-should always output the correct amount of pulses. Possible application
-usage would be an immediate and interrupt friendly version for
-getCurrentPosition()
+These functions are the way to read the pulses that have already left
+the step pin. getCurrentPosition() leads that pin while a move is
+running, because the driver pipelines steps. readPulseCounter() is
+the count of edges already emitted. The same hooks are used by the
+hardware tests.
 
 The pulse counter counts up towards high_value.
 If the high_value is reached, then the pulse counter is reset to 0.

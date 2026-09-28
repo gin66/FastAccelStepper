@@ -17,7 +17,6 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 
 | Priority | Item | Why now |
 |----------|------|---------|
-| **040** | [ESP32 RMT: one spurious step at end of move](040_esp32_rmt_extra_step.md) | Pulse counter out of sync, `seq_03` fails; output has an odd pulse count. |
 | **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **050** | [Pico synchronized start](050_pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
 | **050** | [AVR synchronized start](050_avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |
@@ -29,9 +28,15 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 | **080** | [Delta steps](080_delta_steps.md) | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
 | **080** | [Ramp time and moveTo eta](080_move_to_eta.md) | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
 | **090** | [Smooth stop at end of path](090_end_path_decel.md) | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
+| **100** | [Pipeline position estimate](100_position_pipeline_estimate.md) | Low priority. Estimate how far a pipelined driver has played out, so `getCurrentPosition()` can lead the pin by less. A pulse counter remains the real position. |
+| **110** | [RMT V1/V2 file split](110_rmt_v1_v2_split.md) | Low hanging fruit. `SUPPORT_RMT_V1` / `SUPPORT_RMT_V2` instead of one flag for both and `V2` only for IDF5/6. |
 
 ## Done
 
+- **ESP32 RMT extra step — implemented.** IDF5/6 translates queue
+  commands in `StepperISR_idf5_esp32_rmt_encode.cpp` instead of filling
+  fixed RMT halves. 20× `seq_02` and 20× `seq_03` passed on IDF5 RMT.
+  See [esp32_rmt_extra_step.md](../doc/implemented/esp32_rmt_extra_step.md).
 - **Faithful timed trajectory — implemented.** Separate from
   `FasNAxis`: `FasTimed::addDelta` takes per-axis delta steps in
   [-128, 128] and one shared duration in [MIN_CMD_TICKS, 65535]

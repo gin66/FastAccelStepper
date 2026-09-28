@@ -1,15 +1,34 @@
 # ESP32 RMT: one spurious step pulse at end of a move
 
-Priority: **040** — high: digital anomaly, pulse counter out of sync, test
-fails. Above the 050 platform features.
+Status: **closed, implemented**.
 
-Status: **open, culprit localised** — seen on IDF5, not on IDF4. The
-`FAS_RMT_DEBUG_COUNT` run split the fault (3 of 3 runs failed): the
+IDF5/6 no longer fills fixed RMT halves. `encode_commands()` calls
+`rmt_encode_queue()` in `StepperISR_idf5_esp32_rmt_encode.cpp`. A pause
+is `PART_SIZE` symbols. A step is one symbol, or two when `ticks` is
+65535, and the unfinished `steps` count is written back. The IDF4 half
+filler in `StepperISR_esp32xx_rmt.cpp` is not compiled when
+`SUPPORT_ESP32_RMT_V2` is set. PC coverage is `test_30`.
+
+On IDF5 RMT hardware, after that translator: **20× `seq_02` passed** and
+**20× `seq_03` passed**. The extra step did not recur.
+
+`getCurrentPosition()` still leads the step pin by the steps already
+committed to the pipeline. That is documented on the method. Reading
+the pulses already emitted is `readPulseCounter()` after
+`attachToPulseCounter()`. Two follow-ups are open, not part of this
+fix: a time-based estimate of the played-out position
+(`100_position_pipeline_estimate.md`), and RMT file names plus
+`SUPPORT_RMT_V1` / `SUPPORT_RMT_V2`
+(`110_rmt_v1_v2_split.md`).
+
+## What the counters showed
+
+The `FAS_RMT_DEBUG_COUNT` run split the fault (3 of 3 runs failed): the
 filler/queue encodes exactly the commanded steps (`enc net == position`),
 `short == 0` (no early return, no `ovf_buf`), yet the pin is short by 2
-(`pcnt == net − 2`). The extra edges are therefore born **after**
+(`pcnt == net − 2`). The extra edges were born after
 `encode_commands()`, in the IDF5/6 ping-pong driver (`rmt_tx.c` /
-`rmt_encode_simple`) — H8. See "Counter-split result".
+`rmt_encode_simple`).
 
 Historical detail: observed on `idf5` (`esp32_idf_V6_9_0`, ESP-IDF 5.3.1),
 classic ESP32, driver `RMT`. Three pin captures (`digital_bad.csv`,
