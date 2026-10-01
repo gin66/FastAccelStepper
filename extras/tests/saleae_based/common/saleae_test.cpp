@@ -25,8 +25,15 @@
 
 #define SALEAE_PIN_COUNT 8
 
+// 8 identification pins. On ESP32 these match the white paper §3.3 channel
+// map. On other targets use a contiguous, always-valid range that avoids the
+// UART pins (0/1 on AVR) so the serial control channel keeps working.
+#if defined(ARDUINO_ARCH_ESP32)
 static const int saleae_pins[SALEAE_PIN_COUNT] = {2, 0,  4,  16,
                                                   17, 5, 18, 19};
+#else
+static const int saleae_pins[SALEAE_PIN_COUNT] = {2, 3, 4, 5, 6, 7, 8, 9};
+#endif
 
 // High time in milliseconds for a fixed 1000 ms (1 Hz) period.
 static const uint16_t saleae_high_ms[SALEAE_PIN_COUNT] = {

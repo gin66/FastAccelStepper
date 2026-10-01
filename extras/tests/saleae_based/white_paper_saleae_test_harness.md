@@ -618,7 +618,7 @@ seconds, verifies the waveform on every channel, then sends `STOP`.
 | **SR_08** | `duty_cycle_symmetry` | Check high/low symmetry across speeds. | Duty cycle deviation < 5%. |
 | **SR_09** | `abrupt_speed_change` | Jump from max speed to min speed (and back). | No glitches. No missed/doubled pulses. |
 | **SR_10** | `min_tick_boundary` | Test at MIN_CMD_TICKS boundary. | No underflow. Correct minimum pulse width. |
-| **SR_11** | `max_speed_discovery` | **Find the driver's maximum achievable speed** (minimum inter-step period). There is no fixed value: the limit depends on the driver (RMT / MCPWM+PCNT / I2S / PIO / timer), the tick source and its divider, and the number of active channels. The host sweeps the commanded speed from slow to fast until pulses drop, merge or glitch. | The fastest speed at which every commanded pulse is still emitted cleanly. Reported as the *measured* max speed / min inter-step period (a per-platform/driver baseline, **not** a fixed pass/fail bound). |
+| **SR_11** | `max_speed_discovery` | **Find the driver's maximum achievable speed** (minimum inter-step period). There is no fixed value: the limit is **both processor- and driver-specific** — it depends on the processor (MCU clock and timer/tick source), the driver engine (RMT / MCPWM+PCNT / I2S / PIO / timer) and its divider, and the number of active channels. The host sweeps the commanded speed from slow to fast until pulses drop, merge or glitch. | The fastest speed at which every commanded pulse is still emitted cleanly. Reported as the *measured* max speed / min inter-step period, keyed per {processor, driver} (a baseline, **not** a fixed pass/fail bound). |
 | **SR_12** | `queue_fill_latency` | Measure time from enqueue to first step pulse during burst. | Latency < documented maximum. |
 
 ### 5.3 Category: Synchronized Start Tests (mapped from PC-based test_13–test_17)
@@ -771,7 +771,7 @@ inter-step period) is the canonical case:
     "SR_11_max_speed": {
       "baseline_min_inter_step_us": 0.4,
       "baseline_max_frequency_khz": 2500,
-      "description": "Measured clean-pulse limit; depends on driver, tick divider, and active channel count. Baseline only, re-measured per platform/driver."
+      "description": "Measured clean-pulse limit; processor- and driver-specific (MCU clock + driver engine/divider + active channels). Baseline only, re-measured per processor/driver."
     }
   }
 }
@@ -779,13 +779,18 @@ inter-step period) is the canonical case:
 
 The max speed is limited by, among others:
 
-- the driver engine (RMT symbol rate, MCPWM/PCNT timer clock, I2S bit clock,
-  PIO SM clock, or the CPU timer tick) and its divider,
+- the **processor** — MCU clock frequency and the resolution of the timer/tick
+  source it provides (e.g. 16 MHz timer tick vs. 240 MHz SoC clock),
+- the **driver engine** — RMT symbol rate, MCPWM/PCNT timer clock, I2S bit
+  clock, PIO SM clock, or a CPU timer — and its divider,
 - the number of simultaneously active channels sharing that clock,
 - the minimum command tick (`MIN_CMD_TICKS`) and the step high/low encoding.
 
-Because of this, SR_11 reports the discovered limit and flags a **regression**
-only if it drops below the stored baseline by more than a tolerance.
+Because the limit is **processor- and driver-specific**, SR_11 is measured and
+stored per `{processor (arch), driver}` — the same tag key used for all results
+(`{arch}_{driver}_{channel_config}`). It reports the discovered limit and flags
+a **regression** only if it drops below the stored baseline by more than a
+tolerance.
 
 ### 7.2 Per-Test Spec Comparison
 

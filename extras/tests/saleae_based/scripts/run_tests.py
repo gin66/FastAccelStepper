@@ -41,13 +41,26 @@ import capture as cap  # noqa: E402
 import signal_parser as sp  # noqa: E402
 
 # Implemented tests, in run order. SR_00 must pass before the others run.
-IMPLEMENTED = ["SR_00", "SR_01"]
+IMPLEMENTED = ["SR_00", "SR_01", "SR_17"]
 ALL_TESTS = [f"SR_{i:02d}" for i in range(0, 41)]
 
 # Pin roles (white paper §3.3): CH0 = step, CH1 = dir for stepper A.
 STEP_CH = "D0"
 DIR_CH = "D1"
 CAPTURE_CHANNELS = "D0,D1,D2,D3,D4,D5,D6,D7"
+
+# Step channels for steppers A..D (white paper §3.3).
+STEP_CHANNELS = ["D0", "D2", "D4", "D6"]
+
+
+def config_command(args):
+    """Build the CONFIG serial command from --channel-config/--drivers."""
+    name = getattr(args, "channel_config", "4ch_rmt")
+    drivers = getattr(args, "drivers", None)
+    cmd = f"CONFIG {name}"
+    if drivers:
+        cmd += f" {drivers}"
+    return cmd
 
 
 def open_board(port, baud, timeout=4.0):
@@ -80,15 +93,32 @@ def send_and_wait(ser, cmd, expect, timeout=5.0):
     return buf.decode(errors="replace")
 
 
-def start_capture(args, output, seconds):
+def start_capture(args, output, seconds, rate):
     devices, driver = cap.detect_analyzer("auto")
-    cmd = cap.build_command(driver, args.sample_rate, CAPTURE_CHANNELS,
-                            int(seconds * 1000), output, None)
+    cmd = cap.build_command(driver, rate, CAPTURE_CHANNELS,
+                            int(seconds * 1000), output, None, "srzip")
     return subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
 
 
-def serial_capture(args, capture_file, seconds, pre_commands, commands):
+def load_capture_for_eval(capture_file):
+    """Load a recorded capture as channels + rate.
+
+    The capture is recorded as .sr (compact, lossless). It is converted to a
+    VCD — value changes only, viewable in GTKWave — and evaluated from there.
+    """
+    sr_file = Path(str(capture_file).rsplit(".", 1)[0] + ".sr")
+    if sr_file.exists():
+        capture_file = sr_file
+    vcd_file = cap.sr_to_vcd(capture_file,
+                             Path(str(capture_file).rsplit(".", 1)[0] + ".vcd"))
+    if vcd_file is not None:
+        return sp.load_vcd(str(vcd_file))
+    return sp.load_capture(str(capture_file))
+
+
+def serial_capture(args, capture_file, seconds, pre_commands, commands,
+                   rate):
     """Capture around a serial-triggered test.
 
     Order (the capture must be running before the test starts and must
@@ -105,7 +135,7 @@ def serial_capture(args, capture_file, seconds, pre_commands, commands):
         for c in pre_commands:
             replies += send_and_wait(ser, c, "OK", timeout=2.0)
 
-        proc = start_capture(args, str(capture_file), seconds)
+        proc = start_capture(args, str(capture_file), seconds, rate)
         time.sleep(0.3)  # let sigrok-cli start sampling
 
         for c in commands:
@@ -127,10 +157,11 @@ def serial_capture(args, capture_file, seconds, pre_commands, commands):
 
 def run_sr00(tag_key, args):
     """Capture the SR_00 pin pattern (started by the host, not on boot)."""
-    capture_file = Path("/tmp") / f"sr00_{tag_key}.csv"
-    serial_capture(args, capture_file, args.seconds, [], ["SR00"])
+    capture_file = Path("/tmp") / f"sr00_{tag_key}.sr"
+    rate = getattr(args, "sr00_sample_rate", 1_000_000)
+    serial_capture(args, capture_file, args.seconds, [], ["SR00"], rate)
 
-    channels, sample_rate = sp.load_csv(str(capture_file))
+    channels, sample_rate = load_capture_for_eval(capture_file)
     passed, channel_results = analyze_csv.evaluate_sr00(channels, sample_rate)
     return ("passed" if passed else "failed"), {
         "sample_rate_hz": sample_rate,
@@ -140,14 +171,16 @@ def run_sr00(tag_key, args):
 
 def run_sr01(tag_key, args):
     """Capture a constant-speed move and count the step pulses."""
-    capture_file = Path("/tmp") / f"sr01_{tag_key}.csv"
-    # Capture must cover the whole move: steps * us/step plus ramp margin.
+    capture_file = Path("/tmp") / f"sr01_{tag_key}.sr"
+    # Capture must cover the whole move; keep it bounded (high rates!).
     move_s = args.steps * args.speed_us / 1_000_000.0
-    seconds = max(args.seconds, move_s + 1.0)
-    reply = serial_capture(args, capture_file, seconds, ["STOP"],
-                           [f"SR01 {args.steps} {args.speed_us}"])
+    seconds = max(1.0, move_s + 0.5)
+    reply = serial_capture(args, capture_file, seconds,
+                           ["STOP", config_command(args)],
+                           [f"SR01 {args.steps} {args.speed_us}"],
+                           args.sample_rate)
 
-    channels, sample_rate = sp.load_csv(str(capture_file))
+    channels, sample_rate = load_capture_for_eval(capture_file)
     step_count = len(sp.rising_edges(channels.get(STEP_CH, [])))
     dir_edges = len(sp.detect_edges(channels.get(DIR_CH, [])))
     passed = (step_count == args.steps)
@@ -160,7 +193,41 @@ def run_sr01(tag_key, args):
     }
 
 
-RUNNERS = {"SR_00": run_sr00, "SR_01": run_sr01}
+def run_sr17(tag_key, args):
+    """SR_17 sync cross-driver: mixed drivers moving together."""
+    drivers = getattr(args, "drivers", None) or "rmt,mcpwm"
+    args.drivers = drivers
+    n = len([d for d in drivers.split(",") if d.strip()])
+    capture_file = Path("/tmp") / f"sr17_{tag_key}.sr"
+    move_s = args.steps * args.speed_us / 1_000_000.0
+    seconds = max(1.0, move_s + 0.5)
+
+    reply = serial_capture(args, capture_file, seconds,
+                           ["STOP", f"CONFIG mixed {drivers}"],
+                           [f"MOVEALL {args.steps} {args.speed_us}"],
+                           args.sample_rate)
+
+    channels, sample_rate = load_capture_for_eval(capture_file)
+    counts = []
+    firsts = []
+    for i in range(n):
+        edges = sp.rising_edges(channels.get(STEP_CHANNELS[i], []))
+        counts.append(len(edges))
+        if edges:
+            firsts.append(edges[0])
+    skew_us = ((max(firsts) - min(firsts)) * (1_000_000.0 / sample_rate)
+               if len(firsts) > 1 else 0.0)
+    passed = all(c == args.steps for c in counts)
+    return ("passed" if passed else "failed"), {
+        "steps_expected": args.steps,
+        "steps_measured": counts,
+        "drivers": drivers,
+        "cross_channel_skew_us": round(skew_us, 3),
+        "reply": reply.strip(),
+    }
+
+
+RUNNERS = {"SR_00": run_sr00, "SR_01": run_sr01, "SR_17": run_sr17}
 
 
 def load_index(index_file):
@@ -263,8 +330,8 @@ def main():
     p.add_argument("--sample-rate", type=int, default=1_000_000)
     p.add_argument("--seconds", type=float, default=5.0,
                    help="capture seconds (SR_00)")
-    p.add_argument("--capture", default="capture.csv",
-                   help="SR_00 capture file (default: capture.csv)")
+    p.add_argument("--capture", default="capture.sr",
+                   help="capture file (default: capture.sr)")
     p.add_argument("--results-dir", default="results")
     p.add_argument("--port", default="/dev/cu.usbserial-0001")
     p.add_argument("--baud", type=int, default=115200)

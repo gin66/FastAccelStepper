@@ -3,11 +3,18 @@
 capture.py — reliable waveform capture via sigrok-cli.
 
 Captures raw digital channels from a sigrok-compatible logic analyzer
-(fx2lafw / Saleae) to CSV so it can be evaluated with analyze_csv.py.
+(fx2lafw / Saleae) into a .sr file (sigrok srzip: one packed byte per sample,
+so a capture is orders of magnitude smaller than CSV and is not truncated by
+the output stage).
+
+With --vcd the capture is additionally converted to a VCD by sigrok-cli. A VCD
+holds only value changes, so it stays small and is directly readable in
+GTKWave; sigrok picks $timescale from the sample rate (1 us at 1 MHz, 100 ps
+at 48 MHz), so no timing information is lost.
 
 The sample rate and measurement time are configurable. The script probes the
 connected devices first, then runs sigrok-cli with the correct options and
-verifies that a non-empty CSV with the expected number of channels was
+verifies that a non-empty capture with the expected number of channels was
 produced.
 
 Note: a requested sample rate may not be sustainable — the analyzer's USB
@@ -17,11 +24,14 @@ Check the supported rates with: sigrok-cli -d <driver> --show
 Reference: https://sigrok.org/wiki/Sigrok-cli
 
 Examples:
-    # 8 channels, 4 MHz, 5 seconds
-    python3 capture.py --sample-rate 4000000 --seconds 5 --output capture.csv
+    # 8 channels, 4 MHz, 5 seconds -> capture.sr + capture.vcd
+    python3 capture.py --sample-rate 4000000 --seconds 5 --vcd
 
     # 1 MHz, 2.5 s, channels 0-3
     python3 capture.py --sample-rate 1000000 --seconds 2.5 --channels 0,1,2,3
+
+    # CSV still available for inspection
+    python3 capture.py --format csv --output capture.csv
 
     # List connected devices
     python3 capture.py --list-devices
@@ -32,6 +42,7 @@ import os
 import subprocess
 import sys
 import time
+import zipfile
 from pathlib import Path
 
 DEFAULT_CHANNELS = "0,1,2,3,4,5,6,7"
@@ -119,14 +130,15 @@ def normalize_channels(channels):
     return ",".join(names)
 
 
-def build_command(driver, sample_rate, channels, time_ms, output, trigger):
+def build_command(driver, sample_rate, channels, time_ms, output, trigger,
+                  output_format="srzip"):
     cmd = [
         "sigrok-cli",
         "-d", driver,
         "-c", f"samplerate={sample_rate}",
         "-C", channels,
         "--time", str(time_ms),
-        "-O", "csv",
+        "-O", output_format,
         "-o", output,
     ]
     if trigger:
@@ -135,11 +147,14 @@ def build_command(driver, sample_rate, channels, time_ms, output, trigger):
 
 
 def verify_output(output, expected_channels, sample_rate):
-    """Sanity-check the produced CSV. Returns number of data lines or None."""
+    """Sanity-check a produced capture. Returns the sample count or None."""
     path = Path(output)
     if not path.exists() or path.stat().st_size == 0:
         print(f"ERROR: sigrok-cli produced no data at {output}", file=sys.stderr)
         return None
+
+    if output.endswith(".sr"):
+        return _verify_srzip(path)
 
     data_lines = 0
     header_channels = None
@@ -164,6 +179,48 @@ def verify_output(output, expected_channels, sample_rate):
     return data_lines
 
 
+def _verify_srzip(path):
+    """Count the samples in a .sr capture from its ZIP members."""
+    unitsize = 1
+    prefix = "logic-1-"
+    n_bytes = 0
+    with zipfile.ZipFile(path) as z:
+        for line in z.read("metadata").decode(errors="replace").splitlines():
+            line = line.strip()
+            if line.startswith("unitsize="):
+                unitsize = int(line.split("=", 1)[1])
+            elif line.startswith("capturefile="):
+                prefix = line.split("=", 1)[1].strip() + "-"
+        for name in z.namelist():
+            if name.startswith(prefix) and name[len(prefix):].isdigit():
+                n_bytes += z.getinfo(name).file_size
+
+    samples = n_bytes // unitsize
+    if samples == 0:
+        print(f"ERROR: {path} contains no samples.", file=sys.stderr)
+        return None
+    return samples
+
+
+def sr_to_vcd(sr_file, vcd_file):
+    """Convert a .sr capture to a VCD containing only value changes.
+
+    sigrok-cli picks the $timescale from the sample rate (1 us at 1 MHz, 100 ps
+    at 48 MHz), so no timestamps are lost and the file stays small enough to
+    open in GTKWave.
+    """
+    cmd = ["sigrok-cli", "-I", "srzip", "-i", str(sr_file),
+           "-O", "vcd", "-o", str(vcd_file)]
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+    if result.returncode != 0 or not Path(vcd_file).exists():
+        print(f"ERROR: sr -> vcd conversion failed for {sr_file}",
+              file=sys.stderr)
+        if result.stderr.strip():
+            print(result.stderr.strip(), file=sys.stderr)
+        return None
+    return Path(vcd_file)
+
+
 def run_capture(args):
     devices, driver = detect_analyzer(args.driver)
     print(f"Device:      {driver} — {devices.get(driver, '')}")
@@ -175,7 +232,7 @@ def run_capture(args):
         sys.exit(1)
 
     cmd = build_command(driver, args.sample_rate, channels, time_ms,
-                        args.output, args.trigger)
+                        args.output, args.trigger, args.format)
     print(f"Channels:    {channels}")
     print(f"Sample rate: {args.sample_rate} Hz")
     print(f"Duration:    {args.seconds} s ({time_ms} ms)")
@@ -216,13 +273,22 @@ def run_capture(args):
         if args.strict:
             return 1
 
+    if args.vcd:
+        vcd = Path(str(args.output).rsplit(".", 1)[0] + ".vcd")
+        if sr_to_vcd(args.output, vcd) is None:
+            return 1
+        vcd_kb = vcd.stat().st_size / 1024
+        n_changes = sum(1 for line in vcd.open() if line.startswith("#"))
+        print(f"VCD:         {vcd} (~{vcd_kb:.1f} KB, "
+              f"{n_changes} value changes — open in GTKWave)")
+
     print("Capture OK")
     return 0
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Reliable sigrok-cli waveform capture to CSV."
+        description="Reliable sigrok-cli waveform capture to .sr (+ VCD)."
     )
     parser.add_argument("--sample-rate", type=int, default=4000000,
                         help="Sample rate in Hz (default: 4000000)")
@@ -232,8 +298,13 @@ def main():
                         help=f"Channels, e.g. 0,1 or D0,D1 (default: {DEFAULT_CHANNELS})")
     parser.add_argument("--driver", default="auto",
                         help="sigrok driver (default: auto -> fx2lafw/saleae)")
-    parser.add_argument("--output", default="capture.csv",
-                        help="Output CSV path (default: capture.csv)")
+    parser.add_argument("--output", default="capture.sr",
+                        help="Output .sr path (default: capture.sr)")
+    parser.add_argument("--format", default="srzip",
+                        choices=("srzip", "csv"),
+                        help="sigrok-cli output format (default: srzip)")
+    parser.add_argument("--vcd", action="store_true",
+                        help="also convert the capture to a change-only VCD")
     parser.add_argument("--trigger", default=None,
                         help="Optional sigrok trigger, e.g. 'D0=r'")
     parser.add_argument("--list-devices", action="store_true",
@@ -241,6 +312,14 @@ def main():
     parser.add_argument("--strict", action="store_true",
                         help="Fail if the capture is shorter than requested")
     args = parser.parse_args()
+
+    if args.vcd and args.format != "srzip":
+        print("ERROR: --vcd needs the .sr format.", file=sys.stderr)
+        return 1
+    if args.format == "srzip" and not args.output.endswith(".sr"):
+        print("ERROR: --output must end in .sr for the srzip format.",
+              file=sys.stderr)
+        return 1
 
     if args.list_devices:
         for name, desc in list_devices().items():

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-analyze_csv.py — SR_00 evaluation of a sigrok CSV capture.
+analyze_csv.py — SR_00 evaluation of a capture (.sr / .vcd / .csv).
 
 SR_00 (connection verification) expects all 8 identification pins to toggle at
 exactly 1 Hz, each with a distinct asymmetric duty (5 %..40 %). Since no channel
@@ -103,11 +103,11 @@ def print_report(channels, sample_rate_hz, results):
 
 
 def main():
-    csv_file = sys.argv[1] if len(sys.argv) > 1 else "capture.csv"
+    capture_file = sys.argv[1] if len(sys.argv) > 1 else "capture.sr"
     output_dir = sys.argv[2] if len(sys.argv) > 2 else "./results"
 
-    print(f"Loading: {csv_file}")
-    channels, sample_rate = sp.load_csv(csv_file)
+    print(f"Loading: {capture_file}")
+    channels, sample_rate = sp.load_capture(capture_file)
     print(f"Channels: {sorted(channels.keys())}")
     print(f"Sample rate: {sample_rate} Hz")
     print(f"Samples per channel: {len(next(iter(channels.values())))}")
@@ -119,7 +119,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results = {
-        "capture_file": csv_file,
+        "capture_file": capture_file,
         "timestamp": datetime.now().isoformat() + "Z",
         "sample_rate_hz": sample_rate,
         "sr_00_passed": all_passed,

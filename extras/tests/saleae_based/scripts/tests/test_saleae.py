@@ -7,6 +7,8 @@ Run from extras/tests/saleae_based:
 """
 
 import os
+import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -81,6 +83,50 @@ class TestSignalParser(unittest.TestCase):
             self.assertEqual(rate, 1_000_000)
             self.assertEqual(channels["D0"], [0, 1, 0])
             self.assertEqual(channels["D1"], [1, 0, 1])
+
+    def test_parse_timescale(self):
+        self.assertAlmostEqual(sp.parse_timescale("1 us"), 1000.0)
+        self.assertAlmostEqual(sp.parse_timescale("100 ps"), 0.1)
+        self.assertAlmostEqual(sp.parse_timescale("1 ns"), 1.0)
+
+    def test_load_vcd_expands_changes(self):
+        # 1 MHz -> sigrok writes a 1 us timescale; changes only, no repeats.
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "capture.vcd")
+            with open(path, "w") as f:
+                f.write("$timescale 1 us $end\n")
+                f.write("$scope module libsigrok $end\n")
+                f.write("$var wire 1 ! D0 $end\n")
+                f.write("$var wire 1 \" D1 $end\n")
+                f.write("$upscope $end\n$enddefinitions $end\n")
+                f.write("#0 1! 0\"\n")
+                f.write("#2 0!\n")
+                f.write("#5 1!\n")
+            channels, rate = sp.load_vcd(path)
+            self.assertEqual(rate, 1_000_000)
+            self.assertEqual(channels["D0"], [1, 1, 0, 0, 0, 1])
+            self.assertEqual(channels["D1"], [0, 0, 0, 0, 0, 0])
+
+    def test_sr_to_vcd_matches_sr(self):
+        """sigrok-cli .sr -> VCD must reproduce the samples exactly."""
+        sr_path = Path(__file__).resolve().parents[2] / "capture.sr"
+        if not sr_path.exists() or not shutil.which("sigrok-cli"):
+            self.skipTest("no capture.sr or sigrok-cli")
+        with tempfile.TemporaryDirectory() as tmp:
+            vcd = os.path.join(tmp, "capture.vcd")
+            result = subprocess.run(
+                ["sigrok-cli", "-I", "srzip", "-i", str(sr_path),
+                 "-O", "vcd", "-o", vcd],
+                capture_output=True, text=True, timeout=60)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            sr_channels, sr_rate = sp.load_sr(str(sr_path))
+            vcd_channels, vcd_rate = sp.load_vcd(vcd)
+            self.assertEqual(vcd_rate, sr_rate)
+            # The VCD holds changes only, so it can end before the last
+            # constant stretch of the capture.
+            n = min(len(samples) for samples in vcd_channels.values())
+            for name, samples in sr_channels.items():
+                self.assertEqual(samples[:n], vcd_channels[name], name)
 
 
 class TestSR00(unittest.TestCase):

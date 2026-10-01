@@ -21,7 +21,7 @@ saleae_based/
 │   ├── arduino/saleae_app.ino       ← setup() / loop()
 │   └── espidf/saleae_app.cpp        ← app_main()
 ├── scripts/
-│   ├── capture.py                   ← reliable sigrok-cli capture (CSV)
+│   ├── capture.py                   ← reliable sigrok-cli capture (.sr + VCD)
 │   └── analyze_csv.py               ← SR_00 evaluation
 ├── results/                         ← generated JSON results
 ├── README.md
@@ -74,8 +74,8 @@ Capture and evaluate (single test, by hand):
 
 ```bash
 cd extras/tests/saleae_based
-python3 scripts/capture.py --sample-rate 1000000 --seconds 5 --output capture.csv
-python3 scripts/analyze_csv.py capture.csv results/
+python3 scripts/capture.py --sample-rate 1000000 --seconds 5 --output capture.sr --vcd
+python3 scripts/analyze_csv.py capture.sr results/
 ```
 
 ### Test orchestration
@@ -179,7 +179,7 @@ On the original 8-channel Saleae Logic (`fx2lafw`) this is 48 MHz / n:
 ```
 
 Each listed rate is produced exactly, but above a device-dependent rate/duration
-the acquisition is truncated. Measured here with `--time` (8 channels, CSV):
+the acquisition is truncated. Measured here with `--time` (8 channels, CSV output):
 
 | rate | requested | captured samples | effective duration |
 |------|-----------|------------------|--------------------|
@@ -202,7 +202,15 @@ samples, not on the rate: `--samples` is honoured exactly up to the cap
 
 The sigrok-cli docs additionally recommend capturing to a binary format at high
 sample rates, because CSV output is expensive (sigrok-cli is single-threaded and
-can terminate early).
+can terminate early). This harness records `.sr` (sigrok srzip — one packed
+byte per sample) for that reason; `--format csv` is still available.
+
+A `.sr` capture is evaluated through a VCD, which sigrok-cli derives from it
+(`-I srzip -O vcd`, `--vcd` on `capture.py`). The VCD holds **only value
+changes**, so it stays small and opens directly in GTKWave; sigrok picks
+`$timescale` from the sample rate (1 us at 1 MHz, 100 ps at 48 MHz), so nothing
+is lost. A 2 Msample 8-channel capture is 26 KB as `.sr` versus 80 MB as CSV
+and 6 KB as VCD.
 
 `scripts/capture.py` verifies the captured length and warns when it is shorter
 than requested; pass `--strict` to make that a failure.
