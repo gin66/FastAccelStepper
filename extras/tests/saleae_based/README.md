@@ -1,106 +1,99 @@
 # Saleae-Based Test Harness
 
-Hardware-in-the-loop test harness for verifying stepper-motor signal integrity on real ESP32 (and other) hardware using a Saleae (or sigrok-compatible) logic analyzer.
+Hardware-in-the-loop test harness for verifying stepper-motor signals on real
+hardware using a Saleae (or sigrok-compatible) logic analyzer.
 
-## Quick Start
+The harness is intentionally small: one shared, platform-independent test
+module, thin Arduino/ESP-IDF entry points, and a capture + analysis script.
+Today it implements **SR_00 (connection verification)**; the wider SR_01–SR_40
+catalogue exists only as a design/roadmap in the white paper.
 
-### Prerequisites
-- Saleae Logic Analyzer (or sigrok-compatible USB logic analyzer)
-- ESP32 development board (DevKitC, S3 DevKitC, etc.)
-- sigrok CLI tools: `sigrok-cli`
-- Python 3.8+ with libsigrok bindings (optional, for advanced analysis)
-
-### Installation
-
-```bash
-# Install sigrok CLI (macOS)
-brew install sigrok
-
-# Install Python dependencies (optional, for advanced analysis)
-pip install python-libsigrok4
-
-# Verify sigrok detects your analyzer
-sigrok-cli --driver saleae --list-devices
-```
-
-### Running SR_00 (Connection Verification)
-
-SR_00 runs **before** any other test to verify wiring:
-
-```bash
-# 1. Build and flash firmware (ESP32 example)
-cd extras/tests/saleae_based
-./build-saleae.sh espidf
-
-# 2. Connect Saleae channels to ESP32 GPIOs:
-#    CH 0–7: Step/Dir pins (GPIO 2, 0, 4, 16, 17, 5, 18, 19)
-#    CH 8: Test marker (GPIO 25 — toggled at startQueue)
-#    CH 9: Queue empty (GPIO 26)
-
-# 3. Run capture
-python3 scripts/capture.py \
-  --channels 0,1,2,3,4,5,6,7,8,9 \
-  --sample-rate 1000000 \
-  --trigger 'channel.8 rising' \
-  --seconds 2
-
-# 4. Analyze results
-python3 scripts/analyze.py capture_*.sr --channels 0,1,2,3,4,5,6,7,8,9 --output results/
-```
-
-## Directory Structure
+## Layout
 
 ```
 saleae_based/
-├── white_paper_saleae_test_harness.md  ← Design document (renamed from 120_...)
-├── README.md                           ← This file
-├── tag_schema.json                     ← Tag schema definition
-├── design_specs.json                   ← Design specs per platform/driver
-├── build-saleae.sh                     ← Build script
+├── common/                          ← shared, platform-independent code
+│   ├── saleae_test.h / .cpp         ← SR_00 test logic (uses the HAL)
+│   ├── saleae_hal.h                 ← tiny gpio/millis/delay abstraction
+│   ├── saleae_hal_arduino.cpp       ← HAL for Arduino (ESP32, Pico, ...)
+│   └── saleae_hal_espidf.cpp        ← HAL for plain ESP-IDF
+├── apps/
+│   ├── arduino/saleae_app.ino       ← setup() / loop()
+│   └── espidf/saleae_app.cpp        ← app_main()
 ├── scripts/
-│   ├── capture.py                      ← sigrok-cli wrapper
-│   ├── analyze.py                      ← Signal analyzer
-│   └── config/
-│       ├── channel_configs.py          ← Channel config presets
-│       └── test_cases.py               ← Test case definitions
-├── firmware/
-│   ├── platformio.ini                  ← Arduino PlatformIO
-│   ├── platformio_idf.ini              ← ESP-IDF PlatformIO
-│   └── src/
-│       ├── main.cpp                    ← Entry point
-│       ├── serial_protocol.cpp         ← Command protocol
-│       ├── command_executor.cpp        ← Queue command handler
-│       └── serial_reporter.cpp         ← Metrics reporter
-├── results/                            ← JSON results (generated)
-├── capture/                            ← .sr capture files (generated)
-└── reports/                            ← Markdown reports (generated)
+│   ├── capture.py                   ← reliable sigrok-cli capture (CSV)
+│   └── analyze_csv.py               ← SR_00 evaluation
+├── results/                         ← generated JSON results
+├── README.md
+└── white_paper_saleae_test_harness.md  ← design/roadmap (aspirational)
 ```
 
-## Test Cases
+The same `common/saleae_test.cpp` is used by both entry points; only the HAL
+and the entry point differ. `build-pio-dirs.sh` assembles the PlatformIO
+projects from these sources using symlinks (nothing is copied, and the
+generated `pio_dirs/` and `pio_espidf/` are git-ignored):
 
-41 test cases (SR_00–SR_40) organized by category:
+- `pio_dirs/saleae` — Arduino: `common/*` + `apps/arduino/*`
+- `pio_espidf/saleae` — ESP-IDF: `common/*` + `apps/espidf/*`
 
-| Category | Tests | Description |
-|----------|-------|-------------|
-| Connection | SR_00 | Pin toggle sanity check (runs first) |
-| Basic Ramp | SR_01–SR_05 | Forward/reverse, acceleration, multi-phase |
-| Timing | SR_06–SR_12 | Direction delay, pulse width, duty cycle, boundaries |
-| Synchronized | SR_13–SR_17 | Multi-stepper sync (same/delayed/different speeds) |
-| Queue | SR_18–SR_24 | Queue full/empty, moveTimed, pause, drift |
-| Driver | SR_25–SR_30 | RMT, MCPWM, I2S driver-specific tests |
-| Stress | SR_31–SR_35 | Channel config stress tests |
-| Edge | SR_36–SR_40 | Pin reuse, interrupt load, overflow, emergency stop |
+## Prerequisites
+
+- sigrok CLI (`brew install sigrok`) and a connected logic analyzer
+- PlatformIO (`pio`)
+- Python 3.8+
+
+```bash
+sigrok-cli --scan                 # detect analyzers
+sigrok-cli -d fx2lafw --show      # device options / supported sample rates
+```
+
+## Running SR_00 (connection verification)
+
+SR_00 toggles all 8 identification pins at exactly 1 Hz, each with a distinct
+asymmetric duty (5 %..40 %), so a mis-wired or inverted channel is immediately
+visible. Connect the analyzer channels to:
+
+```
+D0..D7 → GPIO 2, 0, 4, 16, 17, 5, 18, 19
+```
+
+Build and flash (Arduino framework):
+
+```bash
+bash extras/scripts/build-pio-dirs.sh
+pio run -d pio_dirs/saleae -e esp32 -t upload --upload-port /dev/cu.usbserial-0001
+```
+
+Or build the plain ESP-IDF variant (no Arduino component needed):
+
+```bash
+pio run -d pio_espidf/saleae -e esp32_idf_V5_3_0 -t upload --upload-port /dev/cu.usbserial-0001
+```
+
+Capture and evaluate:
+
+```bash
+cd extras/tests/saleae_based
+python3 scripts/capture.py --sample-rate 1000000 --seconds 5 --output capture.csv
+python3 scripts/analyze_csv.py capture.csv results/
+```
+
+RP2040/RP2350 use the same Arduino entry point. The CI envs are `rpipico` and
+`rpipico2` (see `.github/workflows/build_arduino_examples_matrix.yml`); the same
+GPIO map (2, 0, 4, 16, 17, 5, 18, 19) is valid on Pico:
+
+```bash
+pio run -d pio_dirs/saleae -e rpipico
+pio run -d pio_dirs/saleae -e rpipico2
+```
 
 ## Proven: ESP32 hardware pinning
 
-**Status: verified correct (2026-10-01).** The `simple_test.cpp` self-test was
-flashed to an ESP32-DevKitC and captured with a Saleae Logic (fx2lafw) at
-1 MHz. Every configured pin toggles at exactly 1 Hz with the intended duty,
-proving that the analyzer channel ↔ GPIO mapping below is correct and that
-`simple_test.cpp` and the capture/analysis chain can be trusted.
-
-Firmware: `firmware/src/simple_test.cpp` (8 pins, all 1 Hz, asymmetric duty so
-an inverted channel is detected as the complement duty).
+**Status: verified correct (2026-10-01), re-verified after the shared-code
+refactor.** Flashed to an ESP32-DevKitC and captured with a Saleae Logic
+(fx2lafw) at 1 MHz. Every pin toggles at exactly 1 Hz with the intended duty,
+proving the analyzer channel ↔ GPIO mapping below and that the
+capture/analysis chain can be trusted.
 
 | Saleae | GPIO | Expected duty | Measured duty | Freq | Glitches |
 |--------|------|---------------|---------------|------|----------|
@@ -113,19 +106,7 @@ an inverted channel is detected as the complement duty).
 | D6 | GPIO 18 | 35 % | 35.0 % | 1.00 Hz | 0 |
 | D7 | GPIO 19 | 40 % | 40.0 % | 1.00 Hz | 0 |
 
-Result: `sr_00_passed: true` in `results/20261001_193507_sr00_analysis.json`.
-
-Reproduce:
-
-```bash
-# flash the self-test
-bash extras/scripts/build-pio-dirs.sh
-pio run -d pio_dirs/saleae_simple -e esp32 -t upload --upload-port /dev/cu.usbserial-0001
-
-# capture (configurable rate/time) and evaluate
-python3 scripts/capture.py --sample-rate 1000000 --seconds 5 --output capture.csv
-python3 scripts/analyze_csv.py capture.csv results/
-```
+Result: `sr_00_passed: true` (see `results/`).
 
 ## Capture notes (sample-rate restrictions)
 
@@ -162,8 +143,6 @@ samples, not on the rate: `--samples` is honoured exactly up to the cap
 (e.g. at 4 MHz, 1,000,000 and 2,000,000 are exact; 3,000,000 returns
 2,224,640). Use `--samples` for an exact, bounded acquisition.
 
-Two ways to bound an acquisition:
-
 - `--time <ms>` / `--time 2s` — sample for a duration
 - `--samples 3m` — acquire an exact sample count (`k`/`m`/`g` suffixes)
 
@@ -180,21 +159,13 @@ Reference: <https://sigrok.org/wiki/Sigrok-cli>
 
 | Item | Minimum | Recommended |
 |------|---------|-------------|
-| Logic Analyzer | 8 channels, 100 MS/s | 16+ channels, 500 MS/s+ (Saleae Logic 8/Pro 8) |
-| ESP32 Board | Any dev kit | ESP32-DevKitC, ESP32-S3-DevKitC |
+| Logic Analyzer | 8 channels, 1 MS/s | 8+ channels, 24 MS/s |
+| MCU Board | ESP32 / Pico dev kit | ESP32-DevKitC, ESP32-S3-DevKitC |
 | Stepper Drivers | A4988 / TMC2209 | TMC5160 (high-speed testing) |
 | Power Supply | 12V stepper supply | Regulated, current-limited |
 
-## Integration with Existing Tests
+## Roadmap
 
-| Layer | Tool | Purpose |
-|-------|------|---------|
-| Unit tests | PC-based `test_XX` | Algorithm validation |
-| Simulation | SimAVR `test_sd_*` | AVR-specific timing |
-| Hardware validation | Saleae-based `SR_XX` | Real signal integrity |
-| CI | SimAVR stub | Every commit (no hardware) |
-| Release | Full Saleae suite | Release candidates |
-
-## See Also
-
-- **Design document**: `white_paper_saleae_test_harness.md` (complete architecture, test catalogue, implementation phases)
+SR_01–SR_40 (ramp, timing, sync, queue, driver, stress, edge) are described in
+`white_paper_saleae_test_harness.md`. They are not implemented; the shared
+`common/` module is the intended home for their logic.

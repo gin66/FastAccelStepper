@@ -77,6 +77,18 @@ do
 	)
 done
 
+# Saleae test app (ESP-IDF): same common test code + app_main() entry.
+mkdir -p pio_espidf/saleae/src
+cd pio_espidf/saleae
+ln -s ../../extras/ci/platformio.ini .
+cd src
+for f in saleae_test.cpp saleae_test.h saleae_hal.h saleae_hal_espidf.cpp
+do
+	ln -s ../../../extras/tests/saleae_based/common/$f .
+done
+ln -s ../../../extras/tests/saleae_based/apps/espidf/saleae_app.cpp .
+cd ../../..
+
 # Make one directory to test Log2Representation on simulator
 mkdir pio_dirs/LOG2_test
 mkdir pio_dirs/LOG2_test/src
@@ -90,13 +102,16 @@ ln -s ../../../extras/tests/pc_based/test_03.h .
 ln -s ../../../extras/tests/pc_based/LOG2_test.ino LOG2_test.ino
 cd ../../..
 
-# Saleae connection test: 8 pins, all 1 Hz, distinct duty cycles.
-# Pure GPIO, no library needed — used for channel/wiring identification.
-mkdir -p pio_dirs/saleae_simple/src
-cd pio_dirs/saleae_simple
+# Saleae test app (Arduino): shared common test code + Arduino setup()/loop().
+mkdir -p pio_dirs/saleae/src
+cd pio_dirs/saleae
 ln -s ../../extras/ci/platformio.ini .
 cd src
-ln -s ../../../extras/tests/saleae_based/firmware/src/simple_test.cpp .
+for f in saleae_test.cpp saleae_test.h saleae_hal.h saleae_hal_arduino.cpp
+do
+	ln -s ../../../extras/tests/saleae_based/common/$f .
+done
+ln -s ../../../extras/tests/saleae_based/apps/arduino/saleae_app.ino .
 cd ../../..
 
 ls -al pio_*
