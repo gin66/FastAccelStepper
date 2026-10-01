@@ -712,7 +712,18 @@ void StepperQueue::syncStart_arm_rmt() {
     _channel_enabled = true;
   }
 
-  rmt_transmit(channel, _tx_encoder, &payload, 1, nullptr);
+  // config must not be NULL: rmt_transmit() guards all five of
+  // {channel, encoder, payload, payload_bytes, config} and returns
+  // ESP_ERR_INVALID_ARG for a NULL config, so passing nullptr here made every
+  // first synchronizedStart() on ESP32 classic log
+  // "rmt: rmt_transmit(530): invalid argument" and start no transmission.
+  // Match the values startQueue_rmt() uses. The return value is deliberately
+  // ignored here, as it is there: the RMT fill takes over from this point.
+  rmt_transmit_config_t tx_config;
+  tx_config.loop_count = 0;
+  tx_config.flags.eot_level = 0;  // output level at end of transmission
+  tx_config.flags.queue_nonblocking = 1;
+  rmt_transmit(channel, _tx_encoder, &payload, 1, &tx_config);
 }
 #endif
 
