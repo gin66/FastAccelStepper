@@ -15,21 +15,34 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
 
 ## Tracked entries (priority order)
 
-| Priority | Item | Why now |
-|----------|------|---------|
-| **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
-| **050** | [Pico synchronized start](050_pico_synchronized_start.md) | PIO block-start HW sync for multiple steppers to be verified. |
-| **050** | [AVR synchronized start](050_avr_synchronized_start.md) | Shared-timer start likely final; verify and close. |
-| **050** | [SAM synchronized start](050_sam_synchronized_start.md) | PWM/TC common release point to be identified. |
-| **050** | [SAMD51 synchronized start](050_samd51_synchronized_start.md) | TCC cross-instance release to be identified. |
-| **050** | [Teensy synchronized start](050_teensy_synchronized_start.md) | TMR within/cross-module release to be decided. |
-| **060** | [Cubic start (`s_h`) overlay](060_cubic_start.md) | Later feature, not v1. |
-| **070** | [Common head speed](070_common_head_speed.md) | Later planner. One acceleration and one max path speed for an x/y/z/… head. Waypoints are `dx, dy, dz, …, v`. |
-| **080** | [Delta steps](080_delta_steps.md) | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
-| **080** | [Ramp time and moveTo eta](080_move_to_eta.md) | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
-| **090** | [Smooth stop at end of path](090_end_path_decel.md) | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
-| **100** | [Pipeline position estimate](100_position_pipeline_estimate.md) | Low priority. Estimate how far a pipelined driver has played out, so `getCurrentPosition()` can lead the pin by less. A pulse counter remains the real position. |
-| **110** | [RMT V1/V2 file split](110_rmt_v1_v2_split.md) | Low hanging fruit. `SUPPORT_RMT_V1` / `SUPPORT_RMT_V2` instead of one flag for both and `V2` only for IDF5/6. |
+Tokens = estimated LLM token cost to develop and test each item (input +
+output, including iterative refinement).  Effort = human time for a
+**professional embedded C++ developer** already familiar with the codebase.
+A hobbyist should multiply the effort column by **2–3×** (new items by
+**3–5×**) to account for ramp-up on platform-specific driver architecture,
+timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
+
+| Priority | Item | Tokens | Effort | Why now |
+|----------|------|--------|--------|---------|
+| **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
+| **050** | [Pico synchronized start](050_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
+| **050** | [AVR synchronized start](050_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
+| **050** | [SAM synchronized start](050_sam_synchronized_start.md) | ~20 k | 1–2 d | PWM/TC common release point to be identified. |
+| **050** | [SAMD51 synchronized start](050_samd51_synchronized_start.md) | ~20 k | 1–2 d | TCC cross-instance release to be identified. |
+| **050** | [Teensy synchronized start](050_teensy_synchronized_start.md) | ~20 k | 1–2 d | TMR within/cross-module release to be decided. |
+| **060** | [Cubic start (`s_h`) overlay](060_cubic_start.md) | ~200 k | 1–2 w | Later feature, not v1. |
+| **070** | [Common head speed](070_common_head_speed.md) | ~300 k | 1–2 w | Later planner. One acceleration and one max path speed for an x/y/z/… head. Waypoints are `dx, dy, dz, …, v`. |
+| **080** | [Delta steps](080_delta_steps.md) | ~400 k | 1–2 w | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
+| **080** | [Ramp time and moveTo eta](080_move_to_eta.md) | ~400 k | 1–2 w | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
+| **090** | [Smooth stop at end of path](090_end_path_decel.md) | ~200 k | 1 w | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
+| **100** | [Pipeline position estimate](100_position_pipeline_estimate.md) | ~100 k | 2–3 d | Low priority. Estimate how far a pipelined driver has played out, so `getCurrentPosition()` can lead the pin by less. A pulse counter remains the real position. |
+| **110** | [RMT V1/V2 file split](110_rmt_v1_v2_split.md) | ~100 k | 0.5 d | Low hanging fruit. `SUPPORT_RMT_V1` / `SUPPORT_RMT_V2` instead of one flag for both and `V2` only for IDF5/6. |
+| **120** | [Saleae-based test harness](120_saleae_based_test_harness.md) | ~1 M | 2–3 w | Hardware + software: Saleae bridge, signal parser, multi-platform synchronized-start verification. |
+| **130** | [Interrupt slow steps](130_interrupt_slow_steps.md) | ~500 k | 1–2 w | Periodic interrupt check in timer ISR, safe abort point, per-platform driver updates. |
+| **140** | [Modular ramp generator](140_modular_ramp_generator.md) | ~2 M | 3–4 w | Major refactor: extract 4 modules, write PC tests, documentation, regression suite. |
+| **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
+| **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
+| **total** | 20 items (13 existing + 7 new) | ~7 M | 18–25 w | All priorities 050–160. |
 
 ## Done
 
@@ -37,7 +50,7 @@ tests live in `extras/tests/pc_based/test_26.cpp`.
   (`rmt_encode_fill()`), so the RMT buffer spans less time than the ramp
   lookahead and the queue is no longer drained mid-move. HW (IDF 5.3.1, M1 RMT)
   `seq_03_02` dropped 123 s -> 94 s. See
-  [040_idf6_rmt_slow.md](../doc/implemented/040_idf6_rmt_slow.md).
+  [idf6_rmt_slow.md](../doc/implemented/idf6_rmt_slow.md).
 - **ESP32 RMT extra step — implemented.** IDF5/6 translates queue
   commands in `StepperISR_idf5_esp32_rmt_encode.cpp` instead of filling
   fixed RMT halves. 20× `seq_02` and 20× `seq_03` passed on IDF5 RMT.
