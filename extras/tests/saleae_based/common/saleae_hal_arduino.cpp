@@ -4,6 +4,9 @@
  * Used by the ESP32 (Arduino framework) and RP2040/Pico builds.
  */
 
+// See the note in saleae_hal_espidf.cpp: both HALs are linked everywhere.
+#if !defined(ESP_PLATFORM)
+
 #include "saleae_hal.h"
 
 #include <Arduino.h>
@@ -24,4 +27,8 @@ extern "C" int saleae_hal_serial_read(void) {
   return Serial.available() ? Serial.read() : -1;
 }
 
-extern "C" void saleae_hal_serial_write(const char *text) { Serial.print(text); }
+extern "C" void saleae_hal_serial_write(const char* text) {
+  Serial.print(text);
+}
+
+#endif  // !ESP_PLATFORM

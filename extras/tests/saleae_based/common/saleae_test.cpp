@@ -29,15 +29,14 @@
 // map. On other targets use a contiguous, always-valid range that avoids the
 // UART pins (0/1 on AVR) so the serial control channel keeps working.
 #if defined(ARDUINO_ARCH_ESP32)
-static const int saleae_pins[SALEAE_PIN_COUNT] = {2, 0,  4,  16,
-                                                  17, 5, 18, 19};
+static const int saleae_pins[SALEAE_PIN_COUNT] = {2, 0, 4, 16, 17, 5, 18, 19};
 #else
 static const int saleae_pins[SALEAE_PIN_COUNT] = {2, 3, 4, 5, 6, 7, 8, 9};
 #endif
 
 // High time in milliseconds for a fixed 1000 ms (1 Hz) period.
-static const uint16_t saleae_high_ms[SALEAE_PIN_COUNT] = {
-    50, 100, 150, 200, 250, 300, 350, 400};
+static const uint16_t saleae_high_ms[SALEAE_PIN_COUNT] = {50,  100, 150, 200,
+                                                          250, 300, 350, 400};
 
 void saleae_test_setup(void) {
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {

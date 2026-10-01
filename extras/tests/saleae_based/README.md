@@ -219,15 +219,29 @@ Reference: <https://sigrok.org/wiki/Sigrok-cli>
 
 ## Hardware Requirements
 
+You need a board and a logic analyzer. The harness reads the step and dir pins,
+which are plain MCU outputs, so the analyzer connects directly to them.
+
+> **⚠ Do not connect a stepper, motor, or driver board.** The generated
+> commands are synthetic probe patterns, not motor-safe motion: the fast ones
+> command 25–40 kHz from standstill with a ~1 µs pulse, which a real stepper
+> cannot follow. It would stall and overheat its driver, and the measurement —
+> which is the pin signal — would be unchanged. Full reasoning in white paper
+> §10.
+
 | Item | Minimum | Recommended |
 |------|---------|-------------|
-| Logic Analyzer | 8 channels, 1 MS/s | 8+ channels, 24 MS/s |
-| MCU Board | ESP32 / Pico dev kit | ESP32-DevKitC, ESP32-S3-DevKitC |
-| Stepper Drivers | A4988 / TMC2209 | TMC5160 (high-speed testing) |
-| Power Supply | 12V stepper supply | Regulated, current-limited |
+| MCU Board | Any supported arch, powered over USB | ESP32-DevKitC, ESP32-S3-DevKitC |
+| Logic Analyzer | 4 channels, 4 MS/s | 8+ channels, 24 MS/s |
+| USB cable | For the serial console | — |
 
-## Roadmap
+Two channels per stepper (step + dir), so `1ch` needs 2, `2ch` needs 4, and the
+4-stepper configs need 8. Wiring and the full rationale are in white paper §10.
 
-SR_01–SR_40 (ramp, timing, sync, queue, driver, stress, edge) are described in
-`white_paper_saleae_test_harness.md`. They are not implemented; the shared
-`common/` module is the intended home for their logic.
+## Where things are
+
+| | |
+|---|---|
+| Design reference | `white_paper_saleae_test_harness.md` — what is built, how, why |
+| Task list and status | [`extras/todo/120_saleae_based_test_harness.md`](../../../todo/120_saleae_based_test_harness.md) — the only one |
+| Test catalogue | white paper §5, `SR_00`–`SR_26` |

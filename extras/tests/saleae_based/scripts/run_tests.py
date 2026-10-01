@@ -1,32 +1,31 @@
 #!/usr/bin/env python3
 """
-run_tests.py — SR_xx test orchestrator.
+run_tests.py — addQueueEntry() characterization orchestrator.
 
-Runs the implemented Saleae tests for one hardware tag key, records each result
-as a JSON file, and updates a tag index so already-passed tests are skipped on
-the next run (idempotent, hardware-friendly: a full matrix can be resumed).
+Drives the Saleae harness: it programs a bounded segment list on the DUT,
+kicks it off, captures the step/dir pins, and evaluates the measured waveform.
 
-Tag key (white paper §2.3.3) = {arch}_{driver}_{channel_config}, e.g.
-`esp32_rmt_v2_8ch_step_only`. It is the index key: a result belongs to the
-combination of hardware/driver/config it was measured on.
+Everything the DUT is asked to do is expressed in **timer ticks**, because
+`stepper_command_s.ticks` is a raw 16-bit queue period. The DUT's tick rate is
+therefore not an assumption — it is read back from the firmware with `QINFO`
+and stored in every result. Never hardcode 16 MHz: it differs per platform
+(Teensy, for example, prescaled) and AVR's speed floor additionally depends on
+the number of connected steppers.
+
+A tag key ({arch}_{driver}_{channel_config}) indexes results so an already
+passed test is skipped on the next run, and so the same measurement on
+different silicon stays separate.
 
 Usage:
     python3 scripts/run_tests.py --list
-    python3 scripts/run_tests.py --tag-key esp32_rmt_v2_8ch_step_only
-    python3 scripts/run_tests.py --tag-key esp32_rmt_v2_8ch_step_only --tests SR_01
+    python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch
+    python3 scripts/run_tests.py --tag-key ... --tests SR_01,SR_05
     python3 scripts/run_tests.py --tag-key ... --force
-
-Behaviour:
-    * tests already recorded `passed` for the tag key are skipped (unless
-      --force); use --force to re-measure.
-    * one capture per test.
-    * SR_00 is the standard pre-check and always runs first; if it fails,
-      later tests are recorded `skipped`.
-    * results live in results/<tag_key>_<test>.json and results/tag_index.json.
 """
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -40,31 +39,24 @@ import analyze_csv  # noqa: E402
 import capture as cap  # noqa: E402
 import signal_parser as sp  # noqa: E402
 
-# Implemented tests, in run order. SR_00 must pass before the others run.
-IMPLEMENTED = ["SR_00", "SR_01", "SR_17"]
-ALL_TESTS = [f"SR_{i:02d}" for i in range(0, 41)]
-
-# Pin roles (white paper §3.3): CH0 = step, CH1 = dir for stepper A.
-STEP_CH = "D0"
-DIR_CH = "D1"
-CAPTURE_CHANNELS = "D0,D1,D2,D3,D4,D5,D6,D7"
+ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 27)]
 
 # Step channels for steppers A..D (white paper §3.3).
-STEP_CHANNELS = ["D0", "D2", "D4", "D6"]
+STEP_CHANNELS = {"A": "D0", "B": "D2", "C": "D4", "D": "D6"}
+DIR_CHANNELS = {"A": "D1", "B": "D3", "C": "D5", "D": "D7"}
+
+# Default capture rate. 4 MS/s is the practical minimum to resolve a pulse a
+# few us wide at 16 MHz (see README).
+DEFAULT_RATE = 4_000_000
 
 
-def config_command(args):
-    """Build the CONFIG serial command from --channel-config/--drivers."""
-    name = getattr(args, "channel_config", "4ch_rmt")
-    drivers = getattr(args, "drivers", None)
-    cmd = f"CONFIG {name}"
-    if drivers:
-        cmd += f" {drivers}"
-    return cmd
+# ---------------------------------------------------------------------------
+# Serial
+# ---------------------------------------------------------------------------
 
 
-def open_board(port, baud, timeout=4.0):
-    """Open the serial port (resets the board) and wait for READY."""
+def open_board(port, baud, timeout=6.0):
+    """Open the serial port (which resets the board) and wait for READY."""
     import serial
     ser = serial.Serial(port, baud, timeout=0.1)
     deadline = time.time() + timeout
@@ -79,37 +71,80 @@ def open_board(port, baud, timeout=4.0):
     return ser
 
 
-def send_and_wait(ser, cmd, expect, timeout=5.0):
-    """Send a line and read until `expect` appears. Returns the reply text."""
-    ser.write((cmd + "\n").encode())
-    deadline = time.time() + timeout
+def send_line(ser, line, settle=0.05):
+    ser.write((line + "\n").encode())
+    time.sleep(settle)
+
+
+def drain(ser, seconds=0.3):
     buf = b""
+    deadline = time.time() + seconds
     while time.time() < deadline:
-        data = ser.read(256)
+        data = ser.read(4096)
         if data:
             buf += data
-            if expect.encode() in buf:
-                return buf.decode(errors="replace")
     return buf.decode(errors="replace")
 
 
-def start_capture(args, output, seconds, rate):
+def reply_of(ser, line):
+    send_line(ser, line)
+    return drain(ser, 0.2)
+
+
+QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxspeed=(\d+)")
+
+
+def read_qinfo(ser):
+    """Read the DUT's tick rate and queue limits.
+
+    Returns a dict with ticks_per_s, min_cmd_ticks, queue_len and the
+    per-stepper speed floor. These are the numbers every expectation below is
+    derived from.
+    """
+    for _ in range(5):
+        text = reply_of(ser, "QINFO")
+        m = QINFO_RE.search(text)
+        if m:
+            return {
+                "ticks_per_s": int(m.group(1)),
+                "min_cmd_ticks": int(m.group(2)),
+                "queue_len": int(m.group(3)),
+                "max_speed_ticks": int(m.group(4)),
+            }
+        time.sleep(0.1)
+    raise RuntimeError(f"no QINFO reply, got: {text!r}")
+
+
+def program(ser, segments):
+    """Send QCLR followed by one QSEG per segment. Returns False on error."""
+    text = reply_of(ser, "QCLR")
+    if "OK QCLR" not in text:
+        return False
+    for steps, ticks, count_up in segments:
+        text = reply_of(ser, f"QSEG {steps} {ticks} {1 if count_up else 0}")
+        if "OK QSEG" not in text:
+            print(f"    QSEG {steps} {ticks} rejected: {text.strip()}")
+            return False
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Capture
+# ---------------------------------------------------------------------------
+
+
+def start_capture(output, seconds, rate):
     devices, driver = cap.detect_analyzer("auto")
-    cmd = cap.build_command(driver, rate, CAPTURE_CHANNELS,
+    channels = ",".join(sorted(set(list(STEP_CHANNELS.values()) +
+                                   list(DIR_CHANNELS.values()))))
+    cmd = cap.build_command(driver, rate, channels,
                             int(seconds * 1000), output, None, "srzip")
     return subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                             stderr=subprocess.DEVNULL)
 
 
 def load_capture_for_eval(capture_file):
-    """Load a recorded capture as channels + rate.
-
-    The capture is recorded as .sr (compact, lossless). It is converted to a
-    VCD — value changes only, viewable in GTKWave — and evaluated from there.
-    """
-    sr_file = Path(str(capture_file).rsplit(".", 1)[0] + ".sr")
-    if sr_file.exists():
-        capture_file = sr_file
+    """Load a recorded .sr as channels + rate, via its change-only VCD."""
     vcd_file = cap.sr_to_vcd(capture_file,
                              Path(str(capture_file).rsplit(".", 1)[0] + ".vcd"))
     if vcd_file is not None:
@@ -117,117 +152,433 @@ def load_capture_for_eval(capture_file):
     return sp.load_capture(str(capture_file))
 
 
-def serial_capture(args, capture_file, seconds, pre_commands, commands,
-                   rate):
-    """Capture around a serial-triggered test.
+def scenario_seconds(segments, ticks_per_s):
+    """Exact duration of a program: sum of ticks*steps (or ticks for a pause).
 
-    Order (the capture must be running before the test starts and must
-    outlive it so the full waveform is recorded):
-        1. open the port (resets the board) and run any pre_commands
-        2. start the capture
-        3. send the test command(s)
-        4. wait for the capture to complete
-        5. drain the serial replies
+    There is no ramp here, so this is exact rather than an estimate.
     """
-    ser = open_board(args.port, args.baud)
-    replies = ""
-    try:
-        for c in pre_commands:
-            replies += send_and_wait(ser, c, "OK", timeout=2.0)
+    total = 0
+    for steps, ticks, _ in segments:
+        total += ticks * (steps if steps else 1)
+    return total / float(ticks_per_s)
 
-        proc = start_capture(args, str(capture_file), seconds, rate)
-        time.sleep(0.3)  # let sigrok-cli start sampling
 
-        for c in commands:
-            ser.write((c + "\n").encode())
-            time.sleep(0.05)
+# ---------------------------------------------------------------------------
+# Scenarios
+# ---------------------------------------------------------------------------
+#
+# Each scenario returns (config, segments_fn, mask). segments_fn takes the
+# QINFO limits so it can address the exact boundaries (the speed floor,
+# ticks == 65535) without hardcoding platform constants.
 
-        proc.wait()  # capture owns the timing; wait for all of it
 
-        time.sleep(0.2)
-        while True:
-            data = ser.read(4096)
-            if not data:
-                break
-            replies += data.decode(errors="replace")
-    finally:
-        ser.close()
-    return replies
+def seg_period(n, ticks, count_up=True):
+    return [(n, ticks, count_up)]
+
+
+def sc_period_exact(info):
+    # Comfortably fast, but well inside the 16-bit range.
+    return seg_period(8, max(info["max_speed_ticks"], 160))
+
+
+def sc_steps_per_command(info):
+    return seg_period(255, max(info["max_speed_ticks"], 160))
+
+
+def sc_single_step(info):
+    # steps == 1 is not just the low end of the SR_02 sweep: it takes the other
+    # branch in the ISR (`e->steps > 1` is false, so the read pointer advances
+    # and the next entry is stepped in the same interrupt), and it is the only
+    # command that produces no inter-step period at all.
+    return seg_period(1, max(info["max_speed_ticks"], 160))
+
+
+def sc_ticks_min(info):
+    return seg_period(8, info["max_speed_ticks"])
+
+
+def sc_ticks_max(info):
+    return seg_period(4, 65535)
+
+
+def sc_pulse_high_time(info):
+    # 16 steps is enough to measure a stable high time and still short.
+    return seg_period(16, max(info["max_speed_ticks"], 160))
+
+
+def sc_trailing_wait(info):
+    t = max(info["max_speed_ticks"], 160)
+    return [(2, t, True), (2, t, True)]
+
+
+def sc_long_run(info):
+    return seg_period(2000, max(info["max_speed_ticks"], 160))
+
+
+def sc_queue_full(info):
+    return seg_period(4000, max(info["max_speed_ticks"], 160))
+
+
+def sc_pause(info):
+    t = max(info["max_speed_ticks"], 160)
+    pause = min(65535, t * 20)
+    return [(5, t, True), (0, pause, True), (5, t, True)]
+
+
+def sc_dir_change(info):
+    t = max(info["max_speed_ticks"], 160)
+    return [(20, t, True), (20, t, False)]
+
+
+def sc_sync_start(info):
+    t = max(info["max_speed_ticks"], 160)
+    return seg_period(2000, t)
+
+
+# test id -> (config, segment builder, mask, human name)
+SCENARIOS = {
+    "SR_01": ("1ch", sc_period_exact, 1, "inter-step period equals ticks"),
+    "SR_02": ("1ch", sc_steps_per_command, 1, "255 steps in one command"),
+    "SR_03": ("1ch", sc_ticks_min, 1, "at the speed floor"),
+    "SR_04": ("1ch", sc_ticks_max, 1, "ticks = 65535 (16-bit max)"),
+    "SR_05": ("1ch", sc_pulse_high_time, 1, "pulse high time"),
+    "SR_06": ("1ch", sc_trailing_wait, 1, "trailing wait after last step"),
+    "SR_07": ("1ch", sc_long_run, 1, "2000 steps, no underrun"),
+    "SR_08": ("1ch", sc_queue_full, 1, "4000 steps, QueueFull retry"),
+    "SR_09": ("1ch", sc_pause, 1, "pause command"),
+    "SR_10": ("1ch", sc_dir_change, 1, "dir change -> first step"),
+    "SR_14": ("2ch", sc_sync_start, 3, "2 steppers, synchronized start"),
+    "SR_27": ("1ch", sc_single_step, 1, "single step in one command"),
+}
+
+
+# ---------------------------------------------------------------------------
+# Evaluation
+# ---------------------------------------------------------------------------
+
+
+def check_pin_invariants(channels, rate):
+    """Rules that must hold for *every* capture, whatever the scenario.
+
+    Currently one: the direction pin must never change while the step pin is
+    high. A driver latches the direction on the STEP edge, so a DIR transition
+    inside the pulse window can make it decode the new direction for that step,
+    and the transition itself can glitch the DIR input while the coil is being
+    driven. The library orders `Stepper_ToggleDirection()` before
+    `Stepper_One()` precisely so the direction settles first, so any occurrence
+    is a defect.
+
+    This is checked across all steppers, on every test, rather than only in the
+    direction-change scenario: a DIR edge during a high STEP would be a bug
+    anywhere in the program, and a per-scenario check would only catch it in the
+    one scenario that happens to change direction.
+    """
+    per_stepper = {}
+    total = 0
+    for name, step_ch in STEP_CHANNELS.items():
+        dir_ch = DIR_CHANNELS.get(name)
+        if step_ch not in channels or dir_ch not in channels:
+            continue
+        conflicts = sp.dir_changes_during_step_high(
+            channels[dir_ch], channels[step_ch], rate)
+        if conflicts:
+            per_stepper[name] = conflicts
+        total += len(conflicts)
+    return {
+        "n_dir_while_step_high": total,
+        "dir_while_step_high": per_stepper,
+        "ok": total == 0,
+    }
+
+
+def evaluate(test_id, channels, rate, segments, info):
+    """Run a scenario's evaluator, then the global invariants.
+
+    Every result carries the invariant block, and a violation fails the test
+    regardless of what the scenario's own checks concluded.
+    """
+    ok, detail = EVALUATORS[test_id](channels, rate, segments, info)
+    inv = check_pin_invariants(channels, rate)
+    detail = dict(detail)
+    detail["invariants"] = inv
+    return ok and inv["ok"], detail
+
+
+def eval_period_exact(channels, rate, segments, info):
+    """Inter-step period must equal the commanded ticks, in microseconds."""
+    ticks = segments[0][1]
+    expect_us = ticks * 1e6 / info["ticks_per_s"]
+    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    detail = sp.period_defects(m.inter_step_us, expect_us)
+    counts = sp.step_count_defects(m.step_count, segments[0][0])
+    # ISR-driven architectures set the step pin from inside a timer interrupt,
+    # so the achieved rate is systematically below the commanded one. That is
+    # invisible to a step count and to a gross-period check.
+    adherence = sp.rate_adherence(m.inter_step_us, expect_us)
+    return detail["ok"] and counts["ok"] and adherence["ok"], {
+        "ticks": ticks,
+        "ticks_per_s": info["ticks_per_s"],
+        "period": detail,
+        "steps": counts,
+        "adherence": adherence,
+    }
+
+
+def eval_step_count(channels, rate, segments, info):
+    ticks = segments[0][1]
+    expect_us = ticks * 1e6 / info["ticks_per_s"]
+    n = sum(steps for steps, _, _ in segments)
+    step = channels[STEP_CHANNELS["A"]]
+    m = sp.channel_metrics(step, rate)
+    counts = sp.step_count_defects(m.step_count, n)
+    detail = sp.period_defects(m.inter_step_us, expect_us)
+    return counts["ok"] and detail["ok"], {
+        "ticks": ticks,
+        "steps": counts,
+        "period": detail,
+    }
+
+
+def eval_pulse_width(channels, rate, segments, info):
+    """The primary characterization output: high time and duty at one speed."""
+    ticks = segments[0][1]
+    expect_us = ticks * 1e6 / info["ticks_per_s"]
+    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    counts = sp.step_count_defects(m.step_count, segments[0][0])
+    detail = sp.period_defects(m.inter_step_us, expect_us)
+    adherence = sp.rate_adherence(m.inter_step_us, expect_us)
+    return counts["ok"] and detail["ok"] and adherence["ok"], {
+        "ticks": ticks,
+        "ticks_per_s": info["ticks_per_s"],
+        "expected_period_us": round(expect_us, 4),
+        "min_pulse_high_us": round(min(m.high_widths_us), 4)
+                             if m.high_widths_us else None,
+        "avg_high_us": round(m.avg_high_us, 4),
+        "avg_low_us": round(m.avg_low_us, 4),
+        "duty_percent": round(m.duty_cycle_percent, 2),
+        "frequency_hz": round(m.frequency_hz, 2),
+        "steps": counts,
+        "period": detail,
+        "adherence": adherence,
+    }
+
+
+def eval_pause(channels, rate, segments, info):
+    """A pause (steps=0) must produce exactly its tick count of silence.
+
+    A pause far shorter than commanded means pulses arrived during it, which is
+    a defect rather than a measurement.
+    """
+    ticks = segments[0][1]
+    pause_ticks = segments[1][1]
+    pause_us = pause_ticks * 1e6 / info["ticks_per_s"]
+    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    # A pause shows up as one long inter-step period, not as a wide pulse: it
+    # is a stretch of silence, so searching the high widths would be looking in
+    # the wrong place entirely.
+    #
+    # The observed gap is longer than the pause itself. A command of n steps
+    # spaced `ticks` apart occupies n*ticks, so the pause begins one full
+    # period after the last step of the phase before it (avr_queue.cpp:192
+    # schedules the next entry's first step one period later).
+    expected_gap_us = (ticks + pause_ticks) * 1e6 / info["ticks_per_s"]
+    ok = any(abs(w - expected_gap_us) <= expected_gap_us * 0.05 + 1.0
+             for w in m.inter_step_us)
+    expected_steps = sum(steps for steps, _, _ in segments)
+    counts = sp.step_count_defects(m.step_count, expected_steps)
+    return ok and counts["ok"], {
+        "ticks": ticks,
+        "pause_ticks": pause_ticks,
+        "pause_us": round(pause_us, 4),
+        "expected_gap_us": round(expected_gap_us, 4),
+        "measured_gaps_us": [round(w, 4) for w in m.inter_step_us
+                             if w > m.avg_high_us + 1.0][:8],
+        "pause_found": ok,
+        "steps": counts,
+    }
+
+
+def eval_dir_change(channels, rate, segments, info):
+    """Measure the delay from the dir edge to the first step of phase 2.
+
+    The value is **reported, not gated on** (white paper 1.3): it is set by how
+    the driver starts stepping, and the platforms differ by three orders of
+    magnitude -- the Pico's PIO sets DIR and STEP from adjacent instructions
+    (~50 ns), while ESP32 MCPWM/PCNT spends a whole MIN_CMD_TICKS pause (~200 us)
+    settling the direction first. Asserting one number would assert a platform
+    characteristic. What is asserted is that a delay exists at all, and that
+    every commanded step arrived.
+
+    `sample_us` is reported because this measurement can fall below the capture
+    resolution: one sample at 4 MS/s is 250 ns, which cannot resolve a 50 ns
+    Pico delay. A reading of 0 or 1 sample means "faster than we can see", not
+    "zero".
+    """
+    expected_steps = sum(steps for steps, _, _ in segments)
+    step = channels[STEP_CHANNELS["A"]]
+    dir_ch = channels[DIR_CHANNELS["A"]]
+    delays = sp.dir_to_first_step_us(dir_ch, step, rate)
+    counts = sp.step_count_defects(len(sp.rising_edges(step)), expected_steps)
+    sample_us = 1e6 / rate
+    dir_edges = sp.detect_edges(dir_ch)
+    resolved = [d for d in delays if d >= sample_us]
+
+    # A delay of 0.0 means DIR and STEP landed in the same sample: the
+    # separation is real but smaller than this capture can resolve. That is the
+    # Pico case, where the PIO sets both from adjacent instructions (~50 ns),
+    # and it is a good capture, not a failure. It must be flagged rather than
+    # silently reported as 0 us, or a Pico run reads as "no delay at all" and
+    # nobody notices the measurement was never taken.
+    ok = bool(delays) and counts["ok"]
+    return ok, {
+        "dir_to_first_step_us": [round(d, 4) for d in delays[:8]],
+        "dir_to_first_step_min_us": round(min(delays), 4) if delays else None,
+        "capture_rate_hz": rate,
+        "sample_us": round(sample_us, 4),
+        "below_capture_resolution": bool(delays) and not resolved,
+        "dir_edges": len(dir_edges),
+        "steps": counts,
+    }
+
+
+def eval_sync_start(channels, rate, segments, info):
+    """Measure how well the steppers start together, and check the step counts.
+
+    The skew is **measured and reported, not gated on**. `synchronizedStart()`
+    asks each stepper to begin, but how closely they actually begin is a
+    property of the pulse driver and of what the processor is doing at that
+    instant, not a correctness property of the queue:
+
+      * RMT and MCPWM arm their hardware compare units, so the offset is a
+        fixed few microseconds.
+      * PCNT and the AVR timer ISR step the pin from an interrupt, so the
+        offset grows with interrupt latency and with how much other work the
+        uC is doing.
+      * With several drivers mixed, the steppers are not even on the same kind
+        of timer.
+
+    A stepper that starts a few microseconds late has not malfunctioned, and
+    failing the test for it would report a platform characteristic as a bug.
+    So the number goes into the result and is compared across architectures and
+    drivers, where a regression *is* meaningful.
+
+    The step counts, in contrast, are a hard requirement: a swallowed or
+    spurious step is a real defect on any platform.
+    """
+    counts = {}
+    firsts = {}
+    for name, ch in STEP_CHANNELS.items():
+        if ch not in channels:
+            continue
+        edges = sp.rising_edges(channels[ch])
+        counts[name] = len(edges)
+        if edges:
+            firsts[name] = edges[0]
+    skew_us = 0.0
+    if len(firsts) > 1:
+        skew_us = (max(firsts.values()) - min(firsts.values())) * 1e6 / rate
+    expected = segments[0][0]
+    period_us = segments[0][1] * 1e6 / info["ticks_per_s"]
+    defects = {k: sp.step_count_defects(v, expected)
+               for k, v in counts.items()}
+    return all(d["ok"] for d in defects.values()), {
+        "steps_per_stepper": defects,
+        # Reported, not asserted. See the docstring.
+        "first_step_skew_us": round(skew_us, 4),
+        "skew_periods": round(skew_us / period_us, 4) if period_us else None,
+        "period_us": round(period_us, 4),
+        "first_step_us": {k: round(v * 1e6 / rate, 4)
+                          for k, v in firsts.items()},
+    }
+
+
+EVALUATORS = {
+    "SR_01": eval_period_exact,
+    "SR_02": eval_step_count,
+    "SR_03": eval_step_count,
+    "SR_04": eval_step_count,
+    "SR_05": eval_pulse_width,
+    "SR_06": eval_step_count,
+    "SR_07": eval_step_count,
+    "SR_08": eval_step_count,
+    "SR_09": eval_pause,
+    "SR_10": eval_dir_change,
+    "SR_14": eval_sync_start,
+    "SR_27": eval_period_exact,
+}
+
+
+# ---------------------------------------------------------------------------
+# Runner
+# ---------------------------------------------------------------------------
 
 
 def run_sr00(tag_key, args):
-    """Capture the SR_00 pin pattern (started by the host, not on boot)."""
-    capture_file = Path("/tmp") / f"sr00_{tag_key}.sr"
-    rate = getattr(args, "sr00_sample_rate", 1_000_000)
-    serial_capture(args, capture_file, args.seconds, [], ["SR00"], rate)
+    """Capture the SR_00 pin pattern. Not a queue test; it gates the rest."""
+    capture_file = Path(args.capture_dir) / f"sr00_{tag_key}.sr"
+    rate = args.sr00_sample_rate
+    ser = open_board(args.port, args.baud)
+    try:
+        proc = start_capture(capture_file, args.seconds, rate)
+        time.sleep(0.3)
+        send_line(ser, "SR00")
+        proc.wait()
+        replies = drain(ser, 0.3)
+    finally:
+        send_line(ser, "STOP")
+        ser.close()
 
     channels, sample_rate = load_capture_for_eval(capture_file)
     passed, channel_results = analyze_csv.evaluate_sr00(channels, sample_rate)
     return ("passed" if passed else "failed"), {
         "sample_rate_hz": sample_rate,
         "channels": channel_results,
+        "reply": replies.strip(),
     }
 
 
-def run_sr01(tag_key, args):
-    """Capture a constant-speed move and count the step pulses."""
-    capture_file = Path("/tmp") / f"sr01_{tag_key}.sr"
-    # Capture must cover the whole move; keep it bounded (high rates!).
-    move_s = args.steps * args.speed_us / 1_000_000.0
-    seconds = max(1.0, move_s + 0.5)
-    reply = serial_capture(args, capture_file, seconds,
-                           ["STOP", config_command(args)],
-                           [f"SR01 {args.steps} {args.speed_us}"],
-                           args.sample_rate)
+def run_scenario(tag_key, test_id, args):
+    """Program a scenario, capture it, and evaluate the waveform."""
+    config, builder, mask, _desc = SCENARIOS[test_id]
+    ser = open_board(args.port, args.baud)
+    try:
+        text = reply_of(ser, f"CONFIG {config}")
+        if "OK CONFIG" not in text:
+            return "failed", {"error": text.strip()}
+        info = read_qinfo(ser)
+
+        segments = builder(info)
+        if not program(ser, segments):
+            return "failed", {"error": "QSEG rejected", "segments": segments}
+
+        seconds = scenario_seconds(segments, info["ticks_per_s"]) + 0.5
+        rate = args.sample_rate
+        capture_file = Path(args.capture_dir) / f"{test_id.lower()}_{tag_key}.sr"
+
+        proc = start_capture(capture_file, seconds, rate)
+        time.sleep(0.3)  # let sigrok-cli start sampling
+        send_line(ser, f"QRUN {mask}")
+        proc.wait()
+        replies = drain(ser, 0.4)
+        send_line(ser, "POS")
+        replies += drain(ser, 0.2)
+    finally:
+        send_line(ser, "QCLR")
+        ser.close()
 
     channels, sample_rate = load_capture_for_eval(capture_file)
-    step_count = len(sp.rising_edges(channels.get(STEP_CH, [])))
-    dir_edges = len(sp.detect_edges(channels.get(DIR_CH, [])))
-    passed = (step_count == args.steps)
-    return ("passed" if passed else "failed"), {
-        "steps_expected": args.steps,
-        "steps_measured": step_count,
-        "speed_us": args.speed_us,
-        "dir_edges": dir_edges,
-        "reply": reply.strip(),
-    }
-
-
-def run_sr17(tag_key, args):
-    """SR_17 sync cross-driver: mixed drivers moving together."""
-    drivers = getattr(args, "drivers", None) or "rmt,mcpwm"
-    args.drivers = drivers
-    n = len([d for d in drivers.split(",") if d.strip()])
-    capture_file = Path("/tmp") / f"sr17_{tag_key}.sr"
-    move_s = args.steps * args.speed_us / 1_000_000.0
-    seconds = max(1.0, move_s + 0.5)
-
-    reply = serial_capture(args, capture_file, seconds,
-                           ["STOP", f"CONFIG mixed {drivers}"],
-                           [f"MOVEALL {args.steps} {args.speed_us}"],
-                           args.sample_rate)
-
-    channels, sample_rate = load_capture_for_eval(capture_file)
-    counts = []
-    firsts = []
-    for i in range(n):
-        edges = sp.rising_edges(channels.get(STEP_CHANNELS[i], []))
-        counts.append(len(edges))
-        if edges:
-            firsts.append(edges[0])
-    skew_us = ((max(firsts) - min(firsts)) * (1_000_000.0 / sample_rate)
-               if len(firsts) > 1 else 0.0)
-    passed = all(c == args.steps for c in counts)
-    return ("passed" if passed else "failed"), {
-        "steps_expected": args.steps,
-        "steps_measured": counts,
-        "drivers": drivers,
-        "cross_channel_skew_us": round(skew_us, 3),
-        "reply": reply.strip(),
-    }
-
-
-RUNNERS = {"SR_00": run_sr00, "SR_01": run_sr01, "SR_17": run_sr17}
+    passed, detail = evaluate(test_id, channels, sample_rate, segments, info)
+    detail.update({
+        "capture": str(capture_file),
+        "sample_rate_hz": sample_rate,
+        "capture_seconds_requested": round(seconds, 3),
+        "segments": segments,
+        "reply": replies.strip(),
+    })
+    # The DUT's tick rate is what makes the ticks in `segments` interpretable,
+    # so it travels with every result.
+    detail["dut"] = info
+    return ("passed" if passed else "failed"), detail
 
 
 def load_index(index_file):
@@ -257,13 +608,13 @@ def record(index, index_file, tag_key, test_id, result, result_file, extra=None)
 
 def run(tag_key, tests, args):
     results_dir = Path(args.results_dir)
+    Path(args.capture_dir).mkdir(parents=True, exist_ok=True)
     index_file = results_dir / "tag_index.json"
     index = load_index(index_file)
 
-    # SR_00 is the standard pre-check that all I/Os work. Always run it first
-    # (one capture per test), so a later test cannot be measured on dead or
-    # mis-wired channels.
-    if "SR_00" not in tests and any(t != "SR_00" for t in tests):
+    # SR_00 is the wiring pre-check. Always run it first (one capture per test),
+    # so a later test cannot be measured on dead or mis-wired channels.
+    if any(t != "SR_00" for t in tests):
         tests = ["SR_00"] + tests
 
     sr00_failed = False
@@ -273,7 +624,7 @@ def run(tag_key, tests, args):
             print(f"{test_id}: SKIP (already passed {prev['timestamp']})")
             continue
 
-        if test_id not in IMPLEMENTED:
+        if test_id != "SR_00" and test_id not in SCENARIOS:
             print(f"{test_id}: SKIP (not implemented)")
             record(index, index_file, tag_key, test_id, "skipped", None,
                    {"reason": "not implemented"})
@@ -286,7 +637,11 @@ def run(tag_key, tests, args):
             continue
 
         print(f"{test_id}: running ...")
-        result, extra = RUNNERS[test_id](tag_key, args)
+        if test_id == "SR_00":
+            result, extra = run_sr00(tag_key, args)
+        else:
+            result, extra = run_scenario(tag_key, test_id, args)
+
         result_file = results_dir / f"{tag_key}_{test_id}.json"
         with open(result_file, "w") as f:
             json.dump({
@@ -324,19 +679,21 @@ def parse_tests(text):
 
 
 def main():
-    p = argparse.ArgumentParser(description="Saleae SR_xx test orchestrator.")
+    p = argparse.ArgumentParser(
+        description="addQueueEntry() characterization orchestrator.")
     p.add_argument("--tag-key", help="tag key {arch}_{driver}_{channel_config}")
     p.add_argument("--tests", help="comma list (default: all)")
-    p.add_argument("--sample-rate", type=int, default=1_000_000)
-    p.add_argument("--seconds", type=float, default=5.0,
-                   help="capture seconds (SR_00)")
-    p.add_argument("--capture", default="capture.sr",
-                   help="capture file (default: capture.sr)")
+    p.add_argument("--sample-rate", type=int, default=DEFAULT_RATE,
+                   help=f"capture rate in Hz (default: {DEFAULT_RATE})")
+    p.add_argument("--sr00-sample-rate", type=int, default=1_000_000,
+                   help="SR_00 needs no more than 1 MS/s (default: 1000000)")
+    p.add_argument("--seconds", type=float, default=6.0,
+                   help="SR_00 capture seconds")
+    p.add_argument("--capture-dir", default="capture",
+                   help="where .sr/.vcd captures go")
     p.add_argument("--results-dir", default="results")
     p.add_argument("--port", default="/dev/cu.usbserial-0001")
     p.add_argument("--baud", type=int, default=115200)
-    p.add_argument("--steps", type=int, default=400, help="SR_01 steps")
-    p.add_argument("--speed-us", type=int, default=400, help="SR_01 us/step")
     p.add_argument("--force", action="store_true",
                    help="re-run even if a passed result exists")
     p.add_argument("--list", action="store_true",

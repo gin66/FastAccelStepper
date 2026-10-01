@@ -2,93 +2,247 @@
 
 ## Goal
 
-Build a PC-based / hardware test harness that uses a **Saleae Logic Analyzer**
-to verify stepper-motor signal integrity at the pin level.  All eight channels
-are used persistently, each bound to a fixed test-hardware role.
+Build a hardware-in-the-loop harness that uses a **Saleae Logic Analyzer** (or
+any sigrok-compatible analyzer) to **characterize `addQueueEntry()` at the pin
+level**, on every supported architecture.
+
+All eight channels are used persistently, each bound to a fixed test-hardware
+role.
 
 ## Scope
 
-### Core verification targets
+### The one thing under test
 
-| Area | What to check |
-|------|---------------|
-| **`addQueueEntry()` abrupt tick changes** | Signal does not glitch when the tick interval changes
-sharply (e.g. max → min speed).  Verify step/dir edges remain clean,
-no spuriously missed or doubled pulses. |
-| **Dir/step pin timing** | Measure the exact time between a direction
-change and the first step pulse after it.  Verify it matches the
-documented `directionDelay` / platform defaults. |
-| **Counting correctness** | Feed a known sequence of steps (forward,
-reverse, mixed) and compare the Logic-analyzer-reconstructed count
-against `getCurrentPosition()`. |
-| **Runtime behaviour characterization** | Systematic measurement of: |
-| | • Time from `dir` edge to first step pulse (tick-dependent?) |
-| | • Step pulse length variation across tick values |
-| | • Step high/low duty-cycle symmetry |
-| | • Queue-fill latency under burst conditions |
-| **Synchronized start (n-axis)** | Verify that multiple steppers start
-their first step on the same timer tick (or within a documented
-platform tolerance).  Covers every platform tracked in the 050-series
-items (AVR, ESP32, Pico, SAM, SAMD51, Teensy).  Measures cross-channel
-skew at the synchronized-start release point, and validates the engine
-synchronized-start mechanism (050). |
+`FastAccelStepper::addQueueEntry()`, the ring queue behind it, and the pulse
+driver. The question is always: *given these exact `stepper_command_s` values,
+what step/dir waveform comes out of the pin?*
 
-### Channel assignment (example — configurable)
+### Explicitly **not** in scope
+
+| Not here | Why | Lives in |
+|----------|-----|----------|
+| Ramp generator (`move()`, `setAcceleration()`) | Pure integer math. The analyzer only measures the arithmetic back. | `pc_based` test_02/05/09/10 |
+| `moveTimed()` | Nothing but an `addQueueEntry()` loop. | `pc_based` test_20/24/25 |
+| n-axis planner (`FasNAxis`) | Planner logic; its pin output is only interesting once the per-stepper queue is characterized. | `pc_based` test_23–26 |
+
+A test that only drives `move()` or `moveTimed()` and counts pulses belongs in
+`pc_based`. The only way to earn a Saleae test is to show that the pin waveform
+carries information the arithmetic does not already determine.
+
+### Characterization targets
+
+1. **Step pulse high time / duty vs speed** — how wide is the pulse the driver
+   emits, and how does it scale with the commanded `ticks`?
+2. **Step timing vs speed and vs stepper count** — is the inter-step period
+   exactly `ticks`, at 1…255 steps per command, at `ticks` = 1 and 65535? Does a
+   second stepper perturb the first one's timing?
+3. **Dir change → first step** — how long after the dir edge does the first
+   step of the reversed phase appear?
+4. **Driver edge behaviour** — MCPWM/PCNT counter-limit overrun, pause commands,
+   synchronized start.
+
+### Channel assignment (configurable)
 
 ```
-CH 0 — Step  (stepper A)
-CH 1 — Dir   (stepper A)
-CH 2 — Step  (stepper B)
-CH 3 — Dir   (stepper B)
-CH 4 — Step  (stepper C)
-CH 5 — Dir   (stepper C)
-CH 6 — Step  (stepper D)
-CH 7 — Dir   (stepper D)
+CH 0 — Step A    CH 1 — Dir A
+CH 2 — Step B    CH 3 — Dir B
+CH 4 — Step C    CH 5 — Dir C
+CH 6 — Step D    CH 7 — Dir D
 ```
 
-Additional trigger channels (e.g. queue-start, test-marker) can be added
-as needed.
+## Rules that apply to everything below
+
+- **`ticks` is a raw 16-bit queue period, not microseconds.** That is what
+  makes the interesting boundaries addressable (`ticks` = 1 and 65535,
+  `steps` = 1…255). The host reads `TICKS_PER_S` from the firmware with `QINFO`
+  and converts. **Never hardcode 16 MHz** — it differs per platform (Teensy
+  prescales), and the AVR speed floor additionally depends on the number of
+  connected steppers.
+- **A spurious or swallowed pulse is a defect, not a statistic.** There is no
+  tolerance and no "glitch count" to trade off: it is a test failure. This is
+  why the analyzer's metrics are `missing_steps` / `extra_steps` /
+  `short_periods` / `long_periods`, each with an explicit threshold.
+- **The firmware owns the command program.** 115200 baud needs ~0.3 s for a few
+  hundred entries, and the stepper would move long before the last one arrives,
+  so streaming a plan is not viable; a large static plan does not fit in AVR RAM
+  either. The host sends one short line per segment (`QSEG`), the firmware keeps
+  ≤ 8 segments (48 B, shared) plus an 8 B cursor per stepper.
+- **Every scenario is a handful of commands.** No per-test firmware.
 
 ## Implementation plan
 
+Position: **steps 1–4 done, step 5 in progress.** The analyzer has never yet
+been run against a known-bad waveform, which is the only way to know it can
+fail.
+
 1. **Saleae bridge** — `scripts/capture.py`: sigrok-cli wrapper, device
-   auto-detect, configurable rate/time, output + duration verification.
+   auto-detect, configurable rate/time, output + duration verification. Records
+   `.sr` (compact, one packed byte per sample) and derives a change-only **VCD**
+   for evaluation (`--vcd`); sigrok picks `$timescale` from the capture rate.
    **Done.**
-2. **Signal parser** — `scripts/signal_parser.py`: edges, pulse widths,
-   inter-step period, duty, glitch count, step count, dir→step delay,
-   cross-channel skew. `scripts/analyze_csv.py` holds the SR_00 expectations.
-   Hardware-free unit tests in `scripts/tests/`. **Done.**
-3. **Test scenarios** — Reproduce PC-based `test_01`–`test_17` with the
-   analyzer as oracle.
-   - [x] SR_00 connection verification (8 pins, 1 Hz, distinct duty) on
-     ESP32 Arduino and ESP32 ESP-IDF; proven on hardware.
-   - [x] Host→device control channel: newline text protocol (`SR00`, `SR01
-     <steps> <speed_us>`, `POS`, `STOP`), FastAccelStepper integrated into both
-     saleae pio dirs, host client `scripts/control.py`.
-   - [x] SR_01 basic move forward: constant-speed move, step pulses counted on
-     the analyzer vs `steps` (passes on ESP32 Arduino). Orchestrated end-to-end
-     by `run_tests.py` (serial + capture + analysis).
-   - [ ] SR_02–SR_40.
-4. **Synchronized-start tests** — Multi-stepper `synchronizedStart()`: first
-   step alignment, cross-channel skew, per-platform tolerance (feeds the
-   050-series items). _Pending._
-5. **Reporting** — CSV + markdown/HTML summary with spec comparison.
-   _Pending._
+2. **Signal parser** — `scripts/signal_parser.py`. **Done.**
+   - [x] edges, pulse widths, inter-step period, duty, step count,
+         dir→step delay, cross-channel skew
+   - [x] `load_sr` (dependency-free srzip), `load_vcd`, `load_capture`;
+         `load_vcd` takes the rate from sigrok's `$comment`
+   - [x] defect checks: `period_defects`, `step_count_defects`,
+         `rate_adherence` (sag / jitter / per-step deviation -- catches the ISR
+         overhead that a step count and a gross period check both miss)
+   - [x] `analyze_csv.py` SR_00 expectations
+3. **addQueueEntry() feeder** — `common/saleae_app.cpp`. **Done.**
+   - [x] `QSEG` / `QRUN` / `QINFO` / `QCLR`, DIR-pause retry
+   - [x] prefill to half depth, `synchronizedStart()` kick-off
+   - [x] `1ch` / `2ch` / `4ch_rmt` / `4ch_mcpwm` / `mixed` configs
+   - [x] AVR step pins via `stepPinStepperA/B`; `SALEAE_MAX_STEPPERS` from
+         `MAX_STEPPER`
+4. **Golden VCD fixtures** — `scripts/tests/vcd_fixtures.py` +
+   `make_fixtures.py`. **11 fixtures committed.** **Done (initial set).**
+4b. **Global pin invariants** — `run_tests.check_pin_invariants()`, applied by
+   `evaluate()` to every capture. **Done.**
+   - [x] DIR must never change while STEP is high (a driver latches direction on
+         the STEP edge). Checked on every stepper, on every test, not only in the
+         direction-change scenario
+   - [x] a DIR change on the rise or fall sample is a boundary, not a violation
+   - [x] `bad_dir_during_step_high` fixture is clean on step count, period and
+         rate adherence, and fails only on the invariant — so a per-scenario
+         verdict could not catch it
+
+5. **Analyzer negative testing** — `scripts/tests/test_analyzer_fixtures.py`.
+   **Done.** The evaluators are now proven able to fail.
+   - [x] the real `run_tests.py` evaluators run over the real VCDs, parsed by
+         the real `load_vcd` -- nothing stubbed
+   - [x] good fixtures must pass; bad fixtures must be rejected with the named
+         defect present in the result
+   - [x] anti-rot: every rule has ≥ 1 failing fixture, every fixture is
+         reachable from a scenario, and each fixture still matches the segment
+         list its scenario actually sends
+   - [x] mutation-checked: forcing each defect check to always pass turns the
+         suite red, one rule at a time
+6. **Scenario wiring** — `scripts/run_tests.py`: scenario table + evaluators.
+   - [x] scenario table for SR_01–SR_14, `QINFO` plumbing
+   - [x] every implemented evaluator proven against fixtures (SR_01–SR_05,
+         SR_09, SR_10, SR_14)
+   - [x] SR_27 `single_step` — `steps == 1` takes the other ISR branch and is
+         the only command with no inter-step period to measure
+   - [ ] SR_01–SR_13 verified against the fixtures, then on hardware
+   - [ ] SR_14 / SR_16 (synchronized start, multi-stepper timing impact)
+   - [ ] SR_17 cross-driver (ESP32 only)
+   - [ ] SR_18–SR_20 MCPWM/PCNT overrun
+   - [ ] SR_21–SR_24 driver-specific; SR_25 / SR_26
+7. **Parameter sweeps** — SR_02 over `steps` = 1…255, SR_05 over the whole
+   `ticks` range. `_Pending._`
+8. **Reporting** — markdown/CSV summaries, cross-architecture comparison.
+   `_Pending._`
+
+## Analyzer negative testing — why the fixtures exist
+
+**The tests are written by LLM agents, so a garbage test suite can look green.**
+Concretely: if an analyzer assertion is vacuous, if a fixture is never loaded,
+or if the evaluator simply returns "pass" for everything, the suite stays green
+while measuring nothing. There is no reviewer in the loop to notice.
+
+The defence is **negative testing**: every rule the analyzer enforces must have
+at least one fixture that *must fail*, so that a broken analyzer makes the suite
+red. `scripts/tests/vcd_fixtures.py` holds one spec per golden waveform — the
+change list, the DUT limits from `QINFO`, and the verdict the analyzer must
+reach — and `scripts/tests/test_analyzer_fixtures.py` asserts **both**
+directions:
+
+- a good waveform must pass,
+- a corrupted waveform must be rejected, and the named defect must appear in
+  the result (`extra_steps`, `n_short`, `n_long`, `pause_found`, …),
+- every fixture in the manifest must be exercised by a test, and every rule
+  must have at least one failing fixture.
+
+That last check is the anti-rot one: it fails if someone adds an evaluator
+rule without a negative case, or adds a fixture no test loads.
+
+The fixtures are change-only VCDs in exactly the format `sigrok-cli` emits, at
+a realistic 4 MS/s capture rate, so they exercise the same parser that runs on
+real captures. Regenerate with:
+
+```bash
+python3 scripts/tests/make_fixtures.py
+```
+
+Current fixtures — good: `good_period_8_steps`, `good_steps_255`,
+`good_ticks_max`, `good_rate_adherence`, `good_pause`, `good_dir_change`;
+bad: `bad_merged_pulse`, `bad_dropped_step`, `bad_extra_pulse`,
+`bad_rate_sag`, `bad_short_pause`, `bad_dir_change`, `bad_single_step`,
+`bad_sync_missing_step`, `bad_dir_during_step_high`; plus `skew_three_periods`, which must **pass** while
+reporting its known skew — the measured-but-not-gated category.
+
+Good fixtures are *rendered from* the live `sc_*()` scenario builders rather
+than recorded, so a scenario change makes the fixtures stale and the suite
+fails. Only the injected faults are hand-written.
+
+Two evaluator bugs this surfaced, both of which had been silently passing:
+
+- `eval_pause` searched pulse *high* widths for a pause. A pause is a stretch
+  of *silence*, so it appears as one long inter-step period, not a wide pulse.
+- `eval_sync_start` measured first-step skew and then ignored it: the pass
+  verdict depended on step counts alone, so a `synchronizedStart()` that lined
+  nothing up passed. It now requires the first steps to land within one
+  commanded period of each other.
+
+`eval_sync_start` was the opposite mistake: it enforced that the steppers start
+together. The general rule is now white paper §1.3, "Measured vs asserted":
+where a value is limited by what the hardware can do rather than by whether the
+queue is correct, it is recorded and compared across architectures instead of
+deciding pass/fail. Skew is a **measurement, not a defect** — RMT and MCPWM arm a hardware
+compare, while PCNT and the AVR ISR step the pin from an interrupt, so the
+offset depends on the driver *and* on what the uC is doing at that moment. A
+few microseconds of skew is a platform characteristic, and gating on it would
+fail every PCNT and AVR target by construction. It now reports the skew, each
+stepper's first-step time, and the skew in step periods; the step counts stay a
+hard requirement. A `skew_three_periods` fixture with a *known* 3-period offset
+must still **pass** while reporting exactly 3 periods — that pins the metric
+down without making the value a pass criterion, which is what stops it silently
+reading 0.0 forever.
+
+A third, subtler one: the rate-sag fixture was originally 25 % off, which
+`period_defects` caught on its own. A fixture that a cruder check already
+rejects proves nothing about the finer check, so the sag is now sized between
+the two tolerances (24 ticks = 3.75 %, above rate adherence's 2 % and below the
+gross period check's 5 %). Forcing `rate_adherence` to always pass now turns
+the suite red.
+
+## Architecture notes that shape the plan
+
+- **AVR speed floor depends on the stepper count.**
+  `StepperQueue::adjustSpeedToStepperCount()` sets `max_speed_in_ticks` to
+  `TICKS_PER_S/50000` with one stepper but **426** with two, because the ISR
+  needs ~14 µs. So `1ch` and `2ch` must both be characterized on the same board,
+  and a sweep done only at `1ch` reports a speed the board cannot sustain with
+  two steppers connected.
+- **AVR step pin is not a free choice.** It must be the pin the library maps to
+  the timer compare output (`stepPinStepperA` / `stepPinStepperB` in
+  `src/AVRStepperPins.h`), and which physical pin that is depends on
+  `FAS_TIMER_MODULE`. `MAX_STEPPER` is 2 on a 328P, so `CONFIG 4ch_*` cannot
+  work there.
+- **I2S drivers are ESP32-only** (`SUPPORT_ESP32_I2S`), so those tests are
+  simply not run elsewhere. Everything else is architecture-independent and
+  must be run on every target — that comparison is where the value is.
 
 ## Orchestration
 
-`scripts/run_tests.py` runs the implemented tests for a hardware tag key
-(`{arch}_{driver}_{channel_config}`, white paper §2.3.3). It captures,
-evaluates, writes `results/<tag_key>_<test>.json`, and maintains
-`results/tag_index.json`. Each test does **one capture** (start capture →
-trigger the test over serial → wait for the capture to finish → analyze). Tests
+`scripts/run_tests.py` runs the implemented scenarios for one hardware tag key
+(`{arch}_{driver}_{channel_config}`, white paper §2.3.3). Per test it:
+`CONFIG` → `QINFO` (read the DUT limits) → `QSEG` lines → start capture →
+`QRUN` → wait → convert `.sr` to VCD → evaluate → write
+`results/<tag_key>_<test>.json` and update `results/tag_index.json`. Tests
 already recorded `passed` for a tag key are skipped unless `--force`; **SR_00 is
-the standard pre-check and always runs first**, gating the rest; unimplemented
-tests are recorded `skipped`. This makes a hardware matrix resumable.
-**Done (SR_00, SR_01).**
+the pre-check and always runs first**, gating the rest; unimplemented tests are
+recorded `skipped`. This makes a hardware matrix resumable.
+
+Every result carries the DUT's `ticks_per_s` / `min_cmd_ticks` / `queue_len` /
+`max_speed_ticks`, because without the tick rate the `ticks` in the program are
+not interpretable.
 
 ## Status
 
-_Prototype._ Shared test code (`common/` + `apps/`, Arduino + ESP-IDF),
-reliable capture, signal parser, unit tests, and the orchestrator are in place;
-SR_00 verified on ESP32 (Arduino and IDF5.3). SR_01–SR_40 not implemented.
+_Prototype._ Capture pipeline, signal parser, addQueueEntry feeder, unit tests,
+the analyzer fixture suite and the orchestrator are in place. SR_00 verified on
+hardware (ESP32 Arduino + IDF 5.3). The SR_01–SR_13 scenarios are written but
+not yet validated against fixtures, and not yet run on hardware. Everything
+from SR_14 on is unimplemented.

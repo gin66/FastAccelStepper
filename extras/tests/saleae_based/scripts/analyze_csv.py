@@ -5,7 +5,8 @@ analyze_csv.py — SR_00 evaluation of a capture (.sr / .vcd / .csv).
 SR_00 (connection verification) expects all 8 identification pins to toggle at
 exactly 1 Hz, each with a distinct asymmetric duty (5 %..40 %). Since no channel
 is 50 %, a mis-wired or inverted channel reads back as the complement duty and
-is flagged.
+is flagged. The transition count must match the commanded square wave exactly:
+a spurious pulse is an extra edge and is a failure, never a tolerated count.
 
 The signal reconstruction itself lives in signal_parser.py; this module only
 applies the SR_00 expectations and writes the JSON result.
@@ -34,6 +35,24 @@ GPIO_MAP = {
 EXPECTED_FREQ_HZ = 1.0
 FREQ_TOLERANCE_HZ = 0.05
 DUTY_TOLERANCE_PCT = 1.5
+PERIOD_MS = 1000
+
+EXPECTED_HIGH_MS = {
+    "D0": 50,
+    "D1": 100,
+    "D2": 150,
+    "D3": 200,
+    "D4": 250,
+    "D5": 300,
+    "D6": 350,
+    "D7": 400,
+}
+
+# A measured width may differ from the commanded one by at most 2 ms (the
+# firmware updates its pins on a 1 ms loop); anything else is an extra or a
+# missing transition.
+EXPECTED_WIDTH_TOL_US = 2000.0
+
 EXPECTED_DUTY = {
     "D0": 5.0,
     "D1": 10.0,
@@ -60,8 +79,27 @@ def evaluate_sr00(channels, sample_rate_hz):
             abs(metrics.duty_cycle_percent - exp_duty) <= DUTY_TOLERANCE_PCT
         inverted = exp_duty is not None and \
             abs(metrics.duty_cycle_percent - (100.0 - exp_duty)) <= DUTY_TOLERANCE_PCT
-        passed = (metrics.glitch_count == 0 and freq_ok and duty_ok and
-                  not inverted)
+        # A spurious pulse shows up as an edge whose interval is neither the
+        # commanded high time nor the commanded low time. Every measured width
+        # must be one of exactly those two; there is no tolerance for an extra
+        # or missing transition.
+        exp_high = EXPECTED_HIGH_MS.get(ch_name)
+        exp_low = (PERIOD_MS - exp_high) if exp_high is not None else None
+        widths_ok = True
+        bad_widths = []
+        if exp_high is not None:
+            # channel_metrics reports microseconds.
+            hi_us, lo_us = exp_high * 1000.0, exp_low * 1000.0
+            for w in metrics.high_widths_us:
+                if abs(w - hi_us) > EXPECTED_WIDTH_TOL_US:
+                    widths_ok = False
+                    bad_widths.append(round(w, 1))
+            for w in metrics.low_widths_us:
+                if abs(w - lo_us) > EXPECTED_WIDTH_TOL_US:
+                    widths_ok = False
+                    bad_widths.append(round(w, 1))
+        edges_ok = widths_ok
+        passed = freq_ok and duty_ok and not inverted and widths_ok
 
         all_passed = all_passed and passed
         channel_results[ch_name] = {
@@ -70,7 +108,11 @@ def evaluate_sr00(channels, sample_rate_hz):
             "duty_cycle_percent": round(metrics.duty_cycle_percent, 1),
             "expected_duty_percent": exp_duty,
             "inverted": inverted,
-            "glitch_count": metrics.glitch_count,
+            "edge_count": metrics.edge_count,
+            "expected_high_ms": exp_high,
+            "expected_low_ms": exp_low,
+            "unexpected_widths_ms": bad_widths[:8],
+            "widths_ok": widths_ok,
             "passed": passed,
         }
 
@@ -83,6 +125,10 @@ def print_report(channels, sample_rate_hz, results):
         metrics = sp.channel_metrics(channels[ch_name], sample_rate_hz)
         print(f"=== {ch_name} ({r['gpio']}) ===")
         print(f"  Edges:        {metrics.edge_count}")
+        print(f"  Edges:        {r['edge_count']} "
+              f"(high {r['expected_high_ms']} ms / low {r['expected_low_ms']} ms)")
+        if r["unexpected_widths_ms"]:
+            print(f"  Unexpected:   {r['unexpected_widths_ms']} ms")
         print(f"  Step count:   {metrics.step_count}")
         print(f"  Frequency:    {r['frequency_hz']:.2f} Hz "
               f"(expected {EXPECTED_FREQ_HZ:.1f})")
@@ -91,9 +137,10 @@ def print_report(channels, sample_rate_hz, results):
                   f"(expected {r['expected_duty_percent']:.0f}%)")
         else:
             print(f"  Duty cycle:   {r['duty_cycle_percent']:.1f}%")
-        print(f"  Glitches:     {r['glitch_count']}")
         if r["inverted"]:
             status = "✗ FAIL (inverted duty)"
+        elif not r["widths_ok"]:
+            status = "✗ FAIL (unexpected transition)"
         elif not r["passed"]:
             status = "✗ FAIL"
         else:

@@ -34,11 +34,29 @@ class TestSignalParser(unittest.TestCase):
         m = sp.channel_metrics(samples, 1_000_000)
         self.assertAlmostEqual(m.frequency_hz, 1000.0, delta=1.0)
         self.assertAlmostEqual(m.duty_cycle_percent, 10.0, delta=0.5)
-        self.assertEqual(m.glitch_count, 0)
         # Starts HIGH, so the first pulse has no rising edge in-capture:
         # 4 rising edges over 5000 samples.
         self.assertEqual(m.step_count, 4)
         self.assertAlmostEqual(m.avg_high_us, 100.0, delta=0.5)
+        self.assertTrue(
+            sp.period_defects(m.inter_step_us, 1000.0)["ok"])
+
+    def test_period_defects_flags_merged_and_dropped(self):
+        # Two steps collapsed into one 500 us period, then a 2000 us gap
+        # because one step never arrived.
+        d = sp.period_defects([1000.0, 500.0, 1000.0, 2000.0], 1000.0)
+        self.assertEqual(d["n_short"], 1)
+        self.assertEqual(d["n_long"], 1)
+        self.assertFalse(d["ok"])
+
+    def test_step_count_defects(self):
+        self.assertTrue(sp.step_count_defects(10, 10)["ok"])
+        extra = sp.step_count_defects(11, 10)
+        self.assertEqual(extra["extra_steps"], 1)
+        self.assertFalse(extra["ok"])
+        missing = sp.step_count_defects(9, 10)
+        self.assertEqual(missing["missing_steps"], 1)
+        self.assertFalse(missing["ok"])
 
     def test_pulse_widths_are_full_intervals(self):
         samples = square(1000, 250, 3000)

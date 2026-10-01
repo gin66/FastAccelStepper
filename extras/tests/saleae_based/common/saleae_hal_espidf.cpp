@@ -5,6 +5,10 @@
  * Arduino API, so the ESP-IDF build does not depend on the Arduino component.
  */
 
+// Both HALs are linked into every build (see scripts/link_app.sh), so each
+// compiles to nothing on the platform it does not serve.
+#if defined(ESP_PLATFORM)
+
 #include "saleae_hal.h"
 
 #include <string.h>
@@ -56,6 +60,8 @@ extern "C" int saleae_hal_serial_read(void) {
   return uart_read_bytes(SALEAE_UART, &c, 1, 0) == 1 ? c : -1;
 }
 
-extern "C" void saleae_hal_serial_write(const char *text) {
+extern "C" void saleae_hal_serial_write(const char* text) {
   uart_write_bytes(SALEAE_UART, text, strlen(text));
 }
+
+#endif  // ESP_PLATFORM

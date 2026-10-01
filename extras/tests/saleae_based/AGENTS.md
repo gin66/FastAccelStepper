@@ -1,10 +1,16 @@
 # Saleae-based harness — agent guide
 
-Hardware-in-the-loop verification of **stepper-motor signals at the pin level**,
-using a Saleae / sigrok-compatible logic analyzer as the oracle. It complements
-the PC-based (`extras/tests/pc_based`) and SimAVR tests: those validate the
-algorithm, this validates what actually comes out of the driver on real silicon
-(pulse shape, dir→step timing, glitch-free edges, cross-driver skew).
+Hardware-in-the-loop verification of the **step and dir pins** using a Saleae /
+sigrok-compatible logic analyzer as the oracle. It complements the PC-based
+(`extras/tests/pc_based`) and SimAVR tests: those validate the algorithm, this
+validates what actually comes out of the MCU on real silicon (pulse shape,
+dir→step timing, spurious or swallowed steps, cross-stepper skew, and how
+closely the emitted step rate follows the commanded one).
+
+The analyzer connects straight to the step and dir pins, which are ordinary
+push-pull outputs. **⚠ Do not connect a stepper, motor, or driver board**: the
+generated commands are synthetic probe patterns (25–40 kHz from standstill,
+~1 µs pulses) and are not motor-safe. Reasoning in white paper §10.
 
 ## Motivation / why it exists
 
@@ -38,15 +44,30 @@ results/                   generated JSON results + tag_index.json (git-ignored)
 capture.sr, capture.vcd     generated captures (git-ignored)
 ```
 
+The firmware is a thin **addQueueEntry() driver**, not a test library: it holds
+a small segment program and feeds it into the queue. See "What is under test"
+below.
+
 The **same `common/` code** is compiled by both the Arduino and the ESP-IDF
-entry points; only the HAL and the entry differ. `build-pio-dirs.sh` assembles
-`pio_dirs/saleae` (Arduino) and `pio_espidf/saleae` (ESP-IDF) from `common/` +
-`apps/` using symlinks (the generated dirs are git-ignored; **never commit
-symlinks**).
+entry points; only the HAL and the entry differ. Each HAL compiles to nothing on
+the platform it does not serve, so both can be linked into every build.
+
+`apps/arduino/platformio.ini` is self-contained. `scripts/link_app.sh` creates
+the generated symlinks it needs — the `common/` sources into `src/`, and the
+library into `FastAccelStepper/` — so there is one copy of the firmware. Those
+symlinks and `.pio/` are git-ignored; **never commit symlinks**.
 
 ## How it runs
 
-1. Build/flash: `build-pio-dirs.sh` then `pio run -d <dir> -e <env>`.
+1. Build/flash:
+   ```bash
+   bash extras/tests/saleae_based/scripts/link_app.sh
+   pio run -d extras/tests/saleae_based/apps/arduino -e saleae_avr
+   pio run -d extras/tests/saleae_based/apps/arduino -e saleae_esp32
+   ```
+   `saleae_avr` (328P) is the interesting one to build first: it is the
+   tightest target for RAM, and its step pins are the Timer1 compare outputs, so
+   it is where a pin-map mistake shows up.
 2. **One capture per test** (start capture → trigger the test over serial →
    wait for the capture to finish → analyze). The capture must start before the
    test and outlive it.
@@ -63,49 +84,104 @@ python3 -m unittest discover -s scripts/tests -v
 
 # high-level: pick target + test; --flash builds+flashes first
 python3 scripts/harness.py --arch esp32 --framework idf --version 5.3 \
-    --driver mcpwm_pcnt --channel-config 4ch_rmt --tests SR_01 \
-    --steps 4000 --speed-us 5 --flash
-python3 scripts/harness.py --arch nanoatmega328 --driver timer \
-    --tests SR_01 --speed-us 25 --flash          # 40 kSteps/s AVR
-python3 scripts/harness.py --arch rpipico --driver pio \
-    --tests SR_01 --speed-us 5 --flash           # 200 kHz Pico
+    --driver mcpwm_pcnt --channel-config 2ch --tests SR_01 --flash
+python3 scripts/harness.py --arch nanoatmega328 --channel-config 1ch --flash
+python3 scripts/harness.py --arch rpipico --driver pio --channel-config 2ch --flash
 
 # low-level (firmware already flashed; you supply the tag key)
-python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_4ch_rmt \
-    --tests SR_01 --steps 400 --speed-us 400
+python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch --tests SR_01
 
-# manual serial
-python3 scripts/control.py --send "STOP;CONFIG mixed rmt,mcpwm;MOVEALL 300 400" --read 2
+# manual serial: read the limits, then run a program
+python3 scripts/control.py --send "CONFIG 1ch" --read 2
+python3 scripts/control.py --send "QINFO" --read 1
+python3 scripts/control.py --send "QCLR;QSEG 255 80 1;QSEG 0 1600 1;QSEG 1 80 1;QRUN 1" --read 6
 ```
+
+## What is under test
+
+**`addQueueEntry()` and nothing else.** This harness exists to characterize
+the queue layer at the pin level: the step/dir waveform that actually comes
+out of `addQueueEntry()` plus the driver. It deliberately does **not** use the
+ramp generator (`move()`) or `moveTimed()` — those are covered by the PC-based
+and SimAVR tests, and a logic analyzer adds nothing to them. Any SR test that
+only exercises `move()`/`moveTimed()` belongs in `pc_based`, not here.
+
+What a Saleae capture uniquely adds over the other suites is the **measured
+waveform**: pulse high time, dir→first-step delay, and inter-step jitter at
+high speed, on real silicon.
+
+### Firmware protocol (the whole surface)
+
+The firmware builds queue commands itself. 115200 baud needs ~0.3 s for a few
+hundred commands and the stepper would move long before the last one arrives,
+so streaming a plan over serial is not an option; and a large static plan does
+not fit in AVR RAM. Instead the host sends one short line per segment and the
+firmware keeps a bounded program of at most `QE_MAX_SEG` (8) segments — 48 B,
+shared once by all steppers — plus an 8 B cursor per stepper. The whole
+scenario cost is ~50 B regardless of length, and sweeping a parameter needs no
+recompile.
+
+```
+SR00                        SR_00 pin self-test (8 pins, 1 Hz)
+CONFIG <name> [drv,drv,..]  1ch | 2ch | 4ch_rmt | 4ch_mcpwm | mixed <drv,..>
+QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, per-stepper floor
+QCLR                        drop the program and stop
+QSEG <steps> <ticks> <dir>  append a segment; steps=0 means "pause <ticks>"
+QRUN <mask>                 run on the steppers in the bitmask, synced start
+POS | STOP
+```
+
+`ticks` is the **raw queue period in timer ticks, not microseconds**, so the
+host can address the 16-bit boundaries exactly (1 and 65535). Always read
+`QINFO` first and use its values; never hardcode a tick rate.
+
+`QRUN <mask>` is the multi-stepper selector: `QRUN 1` is one stepper, `QRUN 3`
+is steppers A and B together (synchronized start).
+
+Example — 255 steps at max speed, a pause, then a single step, which is the
+case that exposes MCPWM/PCNT counter-limit overrun handling:
+
+```
+QCLR
+QSEG 255 80 1      # ticks = the max-speed floor from QINFO
+QSEG 0 1600 1      # pause
+QSEG 1 80 1        # single step after the pause
+QRUN 1
+```
+
+## Characterization scenarios
+
+Every scenario is a handful of `QSEG` lines. The ones that matter, by goal:
+
+| Goal | Program | What the capture must show |
+|------|---------|---------------------------|
+| Pulse high time / duty vs speed | `QSEG 1 <ticks> 1`, sweep `ticks` | high time shrinks as ticks drop; no pulse merges |
+| 1..255 steps per command | `QSEG <n> <ticks> 1`, n = 1..255 | exactly n pulses, inter-step period = ticks, no glitch at the last step |
+| `ticks` = 65535 | `QSEG 1 65535 1` | longest period the 16-bit field allows |
+| dir change → first step | `QSEG 10 <ticks> 1` then `QSEG 10 <ticks> 0` | dir edge settles before the first step of phase 2; measure the delay |
+| Pause command | `QSEG 5 <ticks> 1`, `QSEG 0 <p> 1`, `QSEG 5 <ticks> 1` | gap of exactly p ticks, dir must not flip on a pause |
+| MCPWM overrun | `QSEG 255 <max> 1`, `QSEG 0 <p> 1`, `QSEG 1 <max> 1` | 255 pulses, gap, then exactly 1 — no lost or extra step |
+| Multi-stepper max speed | `CONFIG 2ch`, `QSEG <n> <max> 1`, `QRUN 3` | does the second stepper perturb the first step's timing |
+| Sync start | `CONFIG 2ch`, `QSEG <n> <ticks> 1`, `QRUN 3` | time from kick-off to each stepper's first step; all within tolerance |
+
+The last two interact on AVR: `max_speed_in_ticks` is
+`TICKS_PER_S/50000` with one stepper but 426 with two
+(`adjustSpeedToStepperCount`, `src/pd_avr/avr_queue.cpp`), so `1ch` and `2ch`
+must both be characterized on the same board.
 
 ## Capabilities (today)
 
 - **SR_00** connection self-test: 8 pins, 1 Hz, distinct asymmetric duty so an
   inverted channel reads as the complement duty. Proven on ESP32 (Arduino and
-  IDF5.3).
-- **SR_01** basic move forward: constant-speed move, step pulses counted vs
-  `steps`.
-- **SR_17** synchronized start cross-driver: `mixed` config moving RMT + MCPWM
-  together; reports per-channel step counts and cross-channel skew.
-- Channel configs configurable over serial: `CONFIG 4ch_rmt`, `CONFIG 4ch_mcpwm`,
-  `CONFIG mixed <drv0,drv1,...>` (drivers: `rmt`, `mcpwm`, `i2s`, `i2s_mux`,
-  `auto`). `MOVEALL` moves all configured steppers.
-- Serial protocol (`common/saleae_app.cpp`): `SR00`, `CONFIG`, `SR01`,
-  `MOVEALL`, `POS`, `STOP`. Responses are `OK …` / `DONE …` / `ERR …`.
+  IDF5.3). Runs first; if it fails the rest are skipped.
+- The `QSEG`/`QRUN` feeder itself: segment program, prefill, synchronized
+  kick-off, DIR-pause retry, pause commands. Implemented in
+  `common/saleae_app.cpp` (`qe_pump`/`qe_feed`).
+- Characterization scenarios above are runnable by hand with `control.py`; the
+  orchestrated SR ids that consume them are still being wired up in
+  `run_tests.py`.
 
-SR_02–SR_40 are not implemented (see the white paper).
-
-## Target/driver notes
-
-- ESP32: `stepperConnectToPin(pin, DRIVER_{RMT,MCPWM_PCNT,I2S_*})`
-  (`SUPPORT_SELECT_DRIVER_TYPE`). I2S only on IDF5/6 (`SUPPORT_ESP32_I2S`).
-  `i2s_mux` needs `engine.initI2sMux(...)`.
-- AVR: Timer-based; the step pin must be timer-capable (Timer1 OC1A = pin 9).
-- Pico: PIO; ordinary GPIOs.
-- Max achievable speed is **processor- and driver-specific** (SR_11 discovers
-  it; see white paper §7.1.1). Never assume a fixed value.
-
-## Capture format
+## Target/driver notes## Capture format
 
 Record `.sr` (sigrok srzip, one packed byte per sample), never CSV: a 2 Msample
 8-channel capture is 26 KB as `.sr` and 80 MB as CSV. `capture.py --vcd` derives
@@ -124,10 +200,10 @@ back, so a VCD may end before the last constant stretch of the capture.
 - For edge/step counting ~20 samples per step period is enough. For pulse-width
   / duty tests (SR_07/SR_08) the rate must resolve the **pulse width** (a few
   µs or less), i.e. MHz–tens of MHz — not just the period.
-- **Acceleration matters**: a small `setAcceleration` makes a move far longer
-  than `steps × speed_us`, so the capture window ends before the move does and
-  step counts come up short. The app scales acceleration to the target speed
-  (~0.1 s ramp) so moves are effectively constant-speed.
+- A scenario's duration is exactly `steps × ticks / TICKS_PER_S` (plus the
+  trailing `ticks` of the last command), because the feeder drives
+  `addQueueEntry()` directly — there is no ramp to stretch the move. Size the
+  capture window from that.
 
 ## Conventions
 
