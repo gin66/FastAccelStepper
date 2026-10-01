@@ -51,19 +51,36 @@ as needed.
 
 ## Implementation plan
 
-1. **Saleae bridge** — Python or C++ library to talk to Saleae Logic
-   (either the CLI `saleae` or the C API).  Acquire persistent captures.
-2. **Signal parser** — Reconstruct step/dir edges from raw capture data;
-   compute timing metrics (pulse width, inter-step gaps, dir→step delay).
-3. **Test scenarios** — Reproduce existing PC-based test cases (`test_01`
-   through `test_17`) but with Saleae as the oracle.
-4. **Synchronized-start tests** — Multi-stepper `synchronizedStart()`
-   scenarios: verify first-step alignment across all channels, measure
-   per-platform cross-channel skew, and validate the engine-level
-   synchronized-start mechanism (see 050-series items).
-5. **Reporting** — Generate a human-readable summary (CSV + HTML) with
-   timing histograms and pass/fail per metric.
+1. **Saleae bridge** — `scripts/capture.py`: sigrok-cli wrapper, device
+   auto-detect, configurable rate/time, output + duration verification.
+   **Done.**
+2. **Signal parser** — `scripts/signal_parser.py`: edges, pulse widths,
+   inter-step period, duty, glitch count, step count, dir→step delay,
+   cross-channel skew. `scripts/analyze_csv.py` holds the SR_00 expectations.
+   Hardware-free unit tests in `scripts/tests/`. **Done.**
+3. **Test scenarios** — Reproduce PC-based `test_01`–`test_17` with the
+   analyzer as oracle.
+   - [x] SR_00 connection verification (8 pins, 1 Hz, distinct duty) on
+     ESP32 Arduino and ESP32 ESP-IDF; proven on hardware.
+   - [ ] SR_01–SR_40 (needs a host→device control channel + FastAccelStepper
+     integration in the saleae pio dirs).
+4. **Synchronized-start tests** — Multi-stepper `synchronizedStart()`: first
+   step alignment, cross-channel skew, per-platform tolerance (feeds the
+   050-series items). _Pending._
+5. **Reporting** — CSV + markdown/HTML summary with spec comparison.
+   _Pending._
+
+## Orchestration
+
+`scripts/run_tests.py` runs the implemented tests for a hardware tag key
+(`{arch}_{driver}_{channel_config}`, white paper §2.3.3). It captures,
+evaluates, writes `results/<tag_key>_<test>.json`, and maintains
+`results/tag_index.json`. Tests already recorded `passed` for a tag key are
+skipped unless `--force`; SR_00 gates the rest; unimplemented tests are recorded
+`skipped`. This makes a hardware matrix resumable. **Done (SR_00).**
 
 ## Status
 
-_idea — not started_
+_Prototype._ Shared test code (`common/` + `apps/`, Arduino + ESP-IDF),
+reliable capture, signal parser, unit tests, and the orchestrator are in place;
+SR_00 verified on ESP32 (Arduino and IDF5.3). SR_01–SR_40 not implemented.

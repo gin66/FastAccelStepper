@@ -87,6 +87,7 @@ do
 	ln -s ../../../extras/tests/saleae_based/common/$f .
 done
 ln -s ../../../extras/tests/saleae_based/apps/espidf/saleae_app.cpp .
+ln -s ../../../extras/tests/saleae_based/apps/espidf/CMakeLists.txt CMakeLists.txt
 cd ../../..
 
 # Make one directory to test Log2Representation on simulator

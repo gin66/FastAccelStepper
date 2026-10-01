@@ -50,3 +50,4 @@ extras/Esp32StepperDemo/lib/FastAccelStepper/src
 extras/tests/esp32_hw_based/.test_*
 __pycache__
 extras/tests/saleae_based/capture*
+extras/tests/saleae_based/results/

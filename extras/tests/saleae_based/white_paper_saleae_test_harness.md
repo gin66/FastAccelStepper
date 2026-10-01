@@ -618,7 +618,7 @@ seconds, verifies the waveform on every channel, then sends `STOP`.
 | **SR_08** | `duty_cycle_symmetry` | Check high/low symmetry across speeds. | Duty cycle deviation < 5%. |
 | **SR_09** | `abrupt_speed_change` | Jump from max speed to min speed (and back). | No glitches. No missed/doubled pulses. |
 | **SR_10** | `min_tick_boundary` | Test at MIN_CMD_TICKS boundary. | No underflow. Correct minimum pulse width. |
-| **SR_11** | `max_speed_boundary` | Test at maximum speed (minimum ticks). | Step pulses present. No dropped pulses. |
+| **SR_11** | `max_speed_discovery` | **Find the driver's maximum achievable speed** (minimum inter-step period). There is no fixed value: the limit depends on the driver (RMT / MCPWM+PCNT / I2S / PIO / timer), the tick source and its divider, and the number of active channels. The host sweeps the commanded speed from slow to fast until pulses drop, merge or glitch. | The fastest speed at which every commanded pulse is still emitted cleanly. Reported as the *measured* max speed / min inter-step period (a per-platform/driver baseline, **not** a fixed pass/fail bound). |
 | **SR_12** | `queue_fill_latency` | Measure time from enqueue to first step pulse during burst. | Latency < documented maximum. |
 
 ### 5.3 Category: Synchronized Start Tests (mapped from PC-based test_13–test_17)
@@ -663,7 +663,7 @@ at 4 MS/s the measurable tolerance is ~250 ns.
 
 | Test ID | Name | Description | Saleae Check |
 |---------|------|-------------|--------------|
-| **SR_31** | `8ch_step_only_max_speed` | 8 steppers, all at max speed. | All 8 step channels active. No cross-talk. |
+| **SR_31** | `8ch_step_only_max_speed` | 8 steppers, all at the SR_11 discovered max speed (the per-driver limit is lower with 8 channels active). | All 8 step channels active. No cross-talk; the measured max speed may be below the single-channel SR_11 baseline. |
 | **SR_32** | `7ch_shared_dir_consistency` | 7 steppers sharing one Dir line. | All steppers see same Dir edge. |
 | **SR_33** | `mixed_driver_interference` | RMT + MCPWM + I2S running simultaneously. | No signal corruption between driver families. |
 | **SR_34** | `i2s_extender_scaling` | 4→8 steppers on I2S extender. | Each stepper gets correct step pulses. |
@@ -696,7 +696,7 @@ at 4 MS/s the measurable tolerance is ~250 ns.
 | `test_09` (ramp plot) | SR_05 | Multi-phase speed (with gnuplot equivalent) |
 | `test_10` (abrupt change) | SR_09 | Abrupt speed change |
 | `test_11` (min tick) | SR_10 | Minimum tick boundary |
-| `test_12` (max speed) | SR_11 | Maximum speed boundary |
+| `test_12` (max speed) | SR_11 | Discover the driver's max speed — not fixed, platform/driver dependent |
 | `test_13` (sync start) | SR_13 | Synchronized start |
 | `test_14` (sync delayed) | SR_14 | Synchronized delayed start |
 | `test_15` (sync different speeds) | SR_15 | Synchronized different speeds |
@@ -711,7 +711,7 @@ at 4 MS/s the measurable tolerance is ~250 ns.
 | `test_25` (moveTimed pause) | SR_22 | Pause command insertion |
 | `test_26` (pause reporting) | SR_22 | Pause command reporting |
 | `test_27` (overflow) | SR_40 | Overflow wraparound |
-| `test_28` (speed limit) | SR_11 | Speed limit boundary |
+| `test_28` (speed limit) | SR_11 | Speed limit — see SR_11 (driver max speed is measured, not fixed) |
 | `test_29` (queue fill latency) | SR_12 | Queue fill latency |
 | `test_30` (mixed direction) | SR_03 | Mixed direction ramp |
 
@@ -756,6 +756,36 @@ per platform/driver combination. The design specs are stored in
   }
 }
 ```
+
+### 7.1.1 Baseline-only metrics (no fixed expected value)
+
+Some metrics have **no absolute design bound** because they are properties of
+the platform/driver rather than of the library. These are recorded as
+*measured baselines* and compared against the stored baseline for the same
+platform/driver, not against a fixed number. `SR_11` (driver max speed / min
+inter-step period) is the canonical case:
+
+```json
+{
+  "esp32_rmt_v2": {
+    "SR_11_max_speed": {
+      "baseline_min_inter_step_us": 0.4,
+      "baseline_max_frequency_khz": 2500,
+      "description": "Measured clean-pulse limit; depends on driver, tick divider, and active channel count. Baseline only, re-measured per platform/driver."
+    }
+  }
+}
+```
+
+The max speed is limited by, among others:
+
+- the driver engine (RMT symbol rate, MCPWM/PCNT timer clock, I2S bit clock,
+  PIO SM clock, or the CPU timer tick) and its divider,
+- the number of simultaneously active channels sharing that clock,
+- the minimum command tick (`MIN_CMD_TICKS`) and the step high/low encoding.
+
+Because of this, SR_11 reports the discovered limit and flags a **regression**
+only if it drops below the stored baseline by more than a tolerance.
 
 ### 7.2 Per-Test Spec Comparison
 

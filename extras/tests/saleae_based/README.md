@@ -70,12 +70,37 @@ Or build the plain ESP-IDF variant (no Arduino component needed):
 pio run -d pio_espidf/saleae -e esp32_idf_V5_3_0 -t upload --upload-port /dev/cu.usbserial-0001
 ```
 
-Capture and evaluate:
+Capture and evaluate (single test, by hand):
 
 ```bash
 cd extras/tests/saleae_based
 python3 scripts/capture.py --sample-rate 1000000 --seconds 5 --output capture.csv
 python3 scripts/analyze_csv.py capture.csv results/
+```
+
+### Test orchestration
+
+`scripts/run_tests.py` runs the implemented tests for one hardware tag key
+(`{arch}_{driver}_{channel_config}`, white paper §2.3.3) and records results:
+
+```bash
+python3 scripts/run_tests.py --list
+python3 scripts/run_tests.py --tag-key esp32_idf5_conn_8ch_step_only
+python3 scripts/run_tests.py --tag-key esp32_idf5_conn_8ch_step_only --force
+```
+
+It captures, evaluates, writes `results/<tag_key>_<test>.json` and updates
+`results/tag_index.json`. Tests already recorded `passed` for that tag key are
+**skipped** (unless `--force`), so a hardware matrix can be resumed without
+re-measuring. SR_00 gates the rest: if it fails, later tests are recorded
+`skipped`. Tests not yet implemented are recorded `skipped (not implemented)`.
+
+### Unit tests
+
+The signal parser and SR_00 evaluation are covered by hardware-free tests:
+
+```bash
+python3 -m unittest discover -s scripts/tests -v
 ```
 
 RP2040/RP2350 use the same Arduino entry point. The CI envs are `rpipico` and
