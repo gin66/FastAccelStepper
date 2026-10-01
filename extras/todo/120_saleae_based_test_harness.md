@@ -142,8 +142,23 @@ fail.
    - [x] **on hardware** — ESP32 + Saleae clone (fx2lafw) at 24 MS/s. SR_01,
          SR_03, SR_06, SR_09 and SR_27 all accepted by their real evaluators.
          SR_09's pause measures 839 us, matching (640 + 12800) ticks.
-   - [ ] remaining scenarios on hardware: SR_02, SR_04, SR_05, SR_07, SR_08,
-         SR_10, SR_14
+   - [x] every wired scenario run on hardware — **12/12 accepted** by their own
+         evaluators: SR_01 (8 @ 640), SR_02 (255, uint8_t max), SR_03 (speed
+         floor), SR_04 (ticks=65535, 4092 us periods), SR_05, SR_06 (the
+         inter-command gap), SR_07 (2000 steps), SR_08 (4000 steps), SR_09
+         (pause, 839 us), SR_10 (direction change), SR_14 (2 steppers,
+         2000 each, aligned), SR_27 (single step). No DIR change during STEP
+         high in any capture.
+   - [x] two measurement traps found while doing this, both worth remembering:
+         **`QRUN` takes a channel mask** — sending `QRUN 1` for a 2ch scenario
+         silently excludes stepper B, so its pin stays idle while its queue
+         still reports the full step count. And **the fx2lafw loses a channel
+         on a sparse selection**: `-C D0,D2` reports nothing on D2, while
+         `-C D0,D1,D2` is correct. Always capture a contiguous channel run.
+   - [x] triggering on the first STEP edge costs exactly one step from the
+         count (that edge becomes sample 0). SR_02 reads 254/255 triggered and
+         255/255 untriggered. Use an untriggered window sized to contain the
+         run when the step count is what is being checked.
    - [x] **measured, not assumed: the inter-command gap is ONE period.** Two
          2-step commands at ticks=1600 measured 99.917 us across the boundary
          against 99.917 us within a command — ratio 1.000. There is no trailing
