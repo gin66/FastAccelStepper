@@ -2,10 +2,17 @@
  * saleae_hal_arduino.cpp — Arduino HAL for the Saleae test apps.
  *
  * Used by the ESP32 (Arduino framework) and RP2040/Pico builds.
+ *
+ * The discriminator is `ARDUINO`, not `ESP_PLATFORM`. Both HALs are linked into
+ * every build, and the Arduino ESP32 core defines ESP_PLATFORM as well, so
+ * guarding on ESP_PLATFORM let the ESP-IDF HAL win in the Arduino build: the
+ * wrong `saleae_hal_write` and `saleae_hal_delay_ms` were linked there, and
+ * they behaved differently enough to matter (the ESP-IDF ones busy-wait and
+ * ignore sub-millisecond arguments).
  */
 
 // See the note in saleae_hal_espidf.cpp: both HALs are linked everywhere.
-#if !defined(ESP_PLATFORM)
+#if defined(ARDUINO)
 
 #include "saleae_hal.h"
 

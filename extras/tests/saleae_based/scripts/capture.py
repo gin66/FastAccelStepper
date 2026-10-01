@@ -130,8 +130,56 @@ def normalize_channels(channels):
     return ",".join(names)
 
 
+def trigger_hint(trigger):
+    """Plain-language description of a sigrok trigger spec.
+
+    sigrok accepts several forms (`D0=r`, `0=1`, `r`, `D0&!D1`, ...) and its
+    error text names none of them, so a timeout says which one was expected
+    instead of just "no trigger".
+    """
+    if not trigger:
+        return "no trigger configured"
+    words = {"r": "rising edge", "f": "falling edge", "e": "any edge",
+             "1": "logic high", "0": "logic low", "c": "counter match",
+             "a": "analog threshold", "t": "timeout only"}
+    parts = []
+    for clause in str(trigger).split(","):
+        spec = clause.split("=")[-1] if "=" in clause else clause
+        for ch in reversed(spec.lower()):
+            if ch in words:
+                parts.append(words[ch])
+                break
+        else:
+            parts.append(clause)
+    return ", ".join(dict.fromkeys(parts)) or str(trigger)
+
+
 def build_command(driver, sample_rate, channels, time_ms, output, trigger,
-                  output_format="srzip"):
+                  output_format="srzip", wait_trigger=False):
+    """Build the sigrok-cli argv.
+
+    Note the option spellings: sigrok-cli 0.7.x takes the sample rate as a
+    device config option (`-c samplerate=`) rather than a `--sample-rate`
+    flag, and writes to `-o/--output-file` with the format given separately by
+    `-O/--output-format`. Passing the older `--sample-rate` or `--output`
+    spellings fails with "Unbekannte Option" / "superfluous option".
+
+    `--wait-trigger` (-w) makes the device hold the capture open until the
+    trigger fires instead of starting the acquisition immediately. That is
+    what makes a capture start *at* the first step edge rather than at an
+    arbitrary offset, so a scenario can be armed and then triggered over
+    serial with no sleep-and-hope in between.
+
+    Caveat, and it is inherent to triggering on an edge: acquisition begins
+    *at* the trigger transition, so that edge is the capture's first sample
+    rather than a 0->1 change inside the data. A step counter reading the
+    VCD therefore sees one fewer step than the device emitted -- exactly one,
+    every time, for a trigger on the first step. The pulse is real (the pin is
+    high in sample 0 and the high width is measurable) but it has no preceding
+    low sample to be a rise against. Either pre-arm the scenario and trigger
+    on something other than the first step, or add the one step back when
+    counting.
+    """
     cmd = [
         "sigrok-cli",
         "-d", driver,
@@ -143,6 +191,10 @@ def build_command(driver, sample_rate, channels, time_ms, output, trigger,
     ]
     if trigger:
         cmd += ["--triggers", trigger]
+    if wait_trigger:
+        if not trigger:
+            raise ValueError("--wait-trigger needs --trigger")
+        cmd += ["--wait-trigger"]
     return cmd
 
 
@@ -231,18 +283,34 @@ def run_capture(args):
         print("ERROR: --seconds must be > 0.", file=sys.stderr)
         sys.exit(1)
 
-    cmd = build_command(driver, args.sample_rate, channels, time_ms,
-                        args.output, args.trigger, args.format)
+    try:
+        cmd = build_command(driver, args.sample_rate, channels, time_ms,
+                            args.output, args.trigger, args.format,
+                            args.wait_trigger)
+    except ValueError as exc:
+        print(f"ERROR: {exc}.", file=sys.stderr)
+        return 1
     print(f"Channels:    {channels}")
     print(f"Sample rate: {args.sample_rate} Hz")
     print(f"Duration:    {args.seconds} s ({time_ms} ms)")
     print(f"Command:     {' '.join(cmd)}")
 
+    # With --wait-trigger the device idles until the trigger arrives, which is
+    # however long the host takes to send the command that produces it. That
+    # wait is the point of the mode, so it gets its own budget instead of being
+    # squeezed into the post-trigger one.
+    budget = args.seconds + (args.arm_timeout if args.wait_trigger else 30)
     try:
         result = subprocess.run(cmd, capture_output=True, text=True,
-                                timeout=args.seconds + 30)
+                                timeout=budget)
     except subprocess.TimeoutExpired:
-        print("ERROR: capture timed out.", file=sys.stderr)
+        if args.wait_trigger:
+            print(f"ERROR: no trigger within {args.arm_timeout:g} s "
+                  f"({trigger_hint(args.trigger)}). The device was armed and "
+                  f"waiting; the scenario never produced that edge.",
+                  file=sys.stderr)
+        else:
+            print("ERROR: capture timed out.", file=sys.stderr)
         return 1
 
     if result.returncode != 0:
@@ -307,12 +375,23 @@ def main():
                         help="also convert the capture to a change-only VCD")
     parser.add_argument("--trigger", default=None,
                         help="Optional sigrok trigger, e.g. 'D0=r'")
+    parser.add_argument("--wait-trigger", action="store_true",
+                        help="Arm the capture and hold it until the trigger "
+                             "fires, instead of starting immediately. Pairs "
+                             "with --trigger; lets a scenario be triggered "
+                             "over serial with no fixed sleep.")
+    parser.add_argument("--arm-timeout", type=float, default=20.0,
+                        help="Seconds to wait for the trigger when "
+                             "--wait-trigger is set (default: 20)")
     parser.add_argument("--list-devices", action="store_true",
                         help="List connected devices and exit")
     parser.add_argument("--strict", action="store_true",
                         help="Fail if the capture is shorter than requested")
     args = parser.parse_args()
 
+    if args.wait_trigger and not args.trigger:
+        print("ERROR: --wait-trigger needs --trigger.", file=sys.stderr)
+        return 1
     if args.vcd and args.format != "srzip":
         print("ERROR: --vcd needs the .sr format.", file=sys.stderr)
         return 1

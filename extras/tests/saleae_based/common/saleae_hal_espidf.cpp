@@ -7,7 +7,7 @@
 
 // Both HALs are linked into every build (see scripts/link_app.sh), so each
 // compiles to nothing on the platform it does not serve.
-#if defined(ESP_PLATFORM)
+#if defined(ESP_PLATFORM) && !defined(ARDUINO)
 
 #include "saleae_hal.h"
 
