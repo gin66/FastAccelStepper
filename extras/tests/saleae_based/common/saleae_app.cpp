@@ -140,6 +140,9 @@ static uint8_t program_len = 0;
 
 static bool sr00_active = false;
 static bool done_pending = false;
+// Set once DONE has been reported for the current program, so an idle loop
+// does not restart the completion path. Cleared when a new program is armed.
+static bool done_announced = false;
 static char linebuf[SALEAE_LINE_MAX];
 static uint8_t linelen = 0;
 
@@ -169,6 +172,7 @@ static void stop_all(void) {
   }
   program_len = 0;
   done_pending = false;
+  done_announced = false;
 }
 
 static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
@@ -570,6 +574,7 @@ static void handle_qrun(char* mask_text) {
   }
 
   done_pending = false;
+  done_announced = false;
   qe_pump();
   reply("OK QRUN\n");
 }
@@ -653,7 +658,12 @@ extern "C" void saleae_app_loop(void) {
     saleae_hal_delay_ms(1);
   }
 
-  if (!done_pending && !sr00_active && !any_active() && !any_running()) {
+  // `done_announced` latches completion. Without it `qe_finish()` re-arms
+  // done_pending on every idle pass through the loop, so DONE is reprinted
+  // forever and floods the host: once a program ends, the queue is empty and
+  // not running, which is exactly the condition that re-enters qe_finish().
+  if (!done_pending && !done_announced && !sr00_active && !any_active() &&
+      !any_running()) {
     qe_finish();
   }
 
@@ -669,5 +679,6 @@ extern "C" void saleae_app_loop(void) {
     snprintf(buf + len, sizeof(buf) - len, "\n");
     reply(buf);
     done_pending = false;
+    done_announced = true;
   }
 }
