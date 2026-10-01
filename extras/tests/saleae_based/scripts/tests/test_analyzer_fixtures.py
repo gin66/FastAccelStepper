@@ -80,6 +80,80 @@ class TestGoodFixtures(unittest.TestCase):
                         f"{json.dumps(detail, sort_keys=True)}")
 
 
+class TestLongRuns(unittest.TestCase):
+    """SR_07 (2000 steps) and SR_08 (4000 steps) at full size.
+
+    These two are not committed as fixtures: a 4000-step change-only VCD is
+    ~300 KB of committed bytes that buys one assertion -- the analyzer counts
+    every step of a long run. Generating them keeps the same coverage against
+    the same real evaluators, at the real step counts, for no repo weight.
+
+    The point is scale. A waveform this long is where an off-by-one in a
+    window, a cap on how many periods are examined, or an assumption that all
+    segments share one period shows up -- none of which a 16-step fixture
+    would reach.
+    """
+
+    def _render(self, scenario, mutate=None):
+        import tempfile
+
+        info = vf.Dut().info()
+        segs = vf.SCENARIO_BUILDERS[scenario](info)
+        step, dirs = vf.render(segs)
+        if mutate:
+            step = mutate(step)
+        fx = vf.Fixture(name=f"tmp_{scenario}", scenario=scenario, why="",
+                        step=step, dirs=dirs, expect_pass=True)
+        # Write to a scratch dir: these are too large to keep in the repo, and
+        # the evaluator still reads them back from disk through load_vcd, so
+        # the path is exercised exactly as it is for a real capture.
+        with tempfile.TemporaryDirectory() as tmp:
+            vf.FIXTURE_DIR = Path(tmp)
+            try:
+                fx.write()
+                return evaluate(fx)
+            finally:
+                vf.FIXTURE_DIR = HERE / "fixtures"
+
+    def test_long_run_counts_every_step(self):
+        for scenario, expect in (("SR_07", 2000), ("SR_08", 4000)):
+            with self.subTest(scenario=scenario):
+                ok, detail = self._render(scenario)
+                self.assertTrue(ok, f"{scenario} rejected a correct long run: "
+                                    f"{json.dumps(detail, sort_keys=True)}")
+                self.assertEqual(detail["steps"]["steps_measured"], expect)
+                self.assertEqual(detail["steps"]["steps_expected"], expect)
+
+    def test_long_run_periods_are_all_checked(self):
+        """Every intra-command period must be examined, not a window of them.
+
+        Guards against a cap in the period check: with 1999 periods in SR_07,
+        truncating to the first few would pass a run whose tail is wrong.
+        """
+        for scenario, expect_periods in (("SR_07", 1999), ("SR_08", 3999)):
+            with self.subTest(scenario=scenario):
+                _ok, detail = self._render(scenario)
+                self.assertEqual(detail["period"]["periods_measured"],
+                                 expect_periods)
+
+    def test_a_dropped_step_at_the_end_of_a_long_run_is_caught(self):
+        """The last step, not the first.
+
+        A defect at the tail of a long run is the one a bounded window misses,
+        and the tail is where a queue that ran dry underflows.
+        """
+        def drop_last(step):
+            rises = [t for t, v in step if v == 1]
+            victim = rises[-1]
+            ticks = rises[1] - rises[0]
+            return [ev for ev in step
+                    if not (victim <= ev[0] < victim + ticks)]
+
+        ok, detail = self._render("SR_07", drop_last)
+        self.assertFalse(ok, "a dropped final step in a long run was accepted")
+        self.assertEqual(detail["steps"]["missing_steps"], 1)
+
+
 class TestBadFixtures(unittest.TestCase):
     """The point of the whole exercise. A bad waveform must be rejected, and
     the reason must be visible in the result rather than swallowed."""
@@ -258,6 +332,59 @@ class TestAntiRot(unittest.TestCase):
                 self.assertIn(fx.scenario, rt.SCENARIOS,
                               f"{fx.name} targets {fx.scenario}, which is not a "
                               f"runnable scenario in run_tests.SCENARIOS")
+
+    def test_every_wired_scenario_has_coverage(self):
+        """A scenario with no fixture is a scenario nothing has ever checked.
+
+        The rule-level guard above keys on the *evaluator function*, because
+        SR_02, SR_03, SR_04 and SR_06 all run `eval_step_count` and one bad
+        waveform demonstrates it for all of them. That is the right granularity
+        for proving a rule can fail, and the wrong one for proving a scenario
+        is tested: it happily allows a newly wired scenario to have no fixture
+        at all.
+
+        SR_03 is the case that motivated this. It had no fixture, and its
+        builder turned out to send the same ticks as SR_01, so the "speed floor"
+        test was not testing the floor.
+
+        Coverage counts either a committed fixture or one of the generated
+        long-run scenarios, so the scale tests above are honoured here.
+        """
+        generated = {"SR_07", "SR_08"}  # see TestLongRuns
+        for scenario in sorted(rt.EVALUATORS):
+            has = [fx.name for fx in vf.FIXTURES if fx.scenario == scenario]
+            with self.subTest(scenario=scenario):
+                self.assertTrue(
+                    has or scenario in generated,
+                    f"{scenario} is wired in run_tests.EVALUATORS but no fixture "
+                    f"and no generated test covers it")
+
+    def test_a_scenario_is_not_a_duplicate_of_another(self):
+        """Two scenarios sending identical segment lists test one thing.
+
+        Catches a scenario whose builder was copied and left pointing at the
+        wrong constant, which makes the suite look broader than it is: SR_03
+        and SR_01 both sent `(8, 640, True)`, so the pair bought one test, not
+        two.
+
+        Compared within a config only. SR_14 is `2ch` and legitimately sends
+        the same segment list as SR_07's `1ch` -- same steps, but a different
+        question (when the second stepper starts, not whether 2000 steps
+        arrive), reached through a different evaluator.
+        """
+        seen = {}
+        for scenario, (cfg, builder, _mask, _name) in rt.SCENARIOS.items():
+            segs = tuple(builder(vf.Dut().info()))
+            if not segs:
+                continue
+            for (other, other_segs) in seen.get(cfg, []):
+                with self.subTest(scenario=scenario, same_as=other, config=cfg):
+                    self.assertNotEqual(
+                        segs, other_segs,
+                        f"{scenario} and {other} are both {cfg} and send the "
+                        f"identical segment list {segs}, so they exercise the "
+                        f"same waveform")
+            seen.setdefault(cfg, []).append((scenario, segs))
 
     def test_fixtures_match_their_scenario(self):
         """A fixture must depict the segment list its scenario actually sends.

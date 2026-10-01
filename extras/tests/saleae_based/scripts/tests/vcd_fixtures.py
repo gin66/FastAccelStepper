@@ -214,6 +214,8 @@ SCENARIO_BUILDERS = {
     "SR_04": rt.sc_ticks_max,
     "SR_05": rt.sc_pulse_high_time,
     "SR_06": rt.sc_trailing_wait,
+    "SR_07": rt.sc_long_run,
+    "SR_08": rt.sc_queue_full,
     "SR_09": rt.sc_pause,
     "SR_10": rt.sc_dir_change,
     "SR_14": rt.sc_sync_start,
@@ -388,6 +390,20 @@ def _shorten_pause(step, _dirs=None):
            [(t - shift, v) for t, v in step if t >= r[5]]
 
 
+def _drop_step_in_second_command(step, _dirs=None):
+    """A step is swallowed in the *second* command of a two-command scenario.
+
+    Placed deliberately after the command boundary, because the trailing wait
+    makes that gap two periods wide and the per-period check now ignores it.
+    Without this fixture, dropping the boundary gap from the period check would
+    have quietly blinded it to a fault on the far side.
+    """
+    r = _rises(step)
+    victim = r[3]
+    ticks = _period(step)
+    return [ev for ev in step if not (victim <= ev[0] < victim + ticks)]
+
+
 def _short_reverse_phase(step, _dirs=None):
     """The reverse phase loses its last three steps."""
     r = _rises(step)
@@ -417,12 +433,25 @@ FIXTURES: List[Fixture] = [
           "8 steps, period exactly as commanded"),
     _good("SR_02", "good_steps_255",
           "255 steps in one command, the uint8_t maximum"),
+    # The speed floor, which is the *largest* legal ticks value. SR_01 already
+    # covers 640 ticks, so pinning the floor here is what makes the two ends of
+    # the range distinguishable -- and `sc_ticks_min` used to send 640 ticks,
+    # identical to SR_01, so the floor was never actually exercised.
+    _good("SR_03", "good_ticks_min",
+          "8 steps at min_cmd_ticks, the slowest legal speed (200 us)"),
     _good("SR_04", "good_ticks_max",
           "4 steps at ticks=65535, the 16-bit maximum"),
     _good("SR_05", "good_rate_adherence",
           "16 steps, achieved rate matches the commanded rate"),
     _good("SR_09", "good_pause",
           "5 steps, a pause, 5 steps"),
+    # SR_06 exists to pin the trailing wait, and it is the regression fixture
+    # for a real evaluator bug: the period check used to compare the gap
+    # *between* two commands against a single commanded period, so this
+    # scenario failed on its own correct waveform. The gap there is two periods
+    # wide by design.
+    _good("SR_06", "good_trailing_wait",
+          "two 2-step commands; the inter-command gap is the trailing wait"),
     _good("SR_27", "good_single_step",
           "one step, one command: no inter-step period to measure"),
     # The two ends of the per-platform range in white paper 1.3, each pinned to
@@ -468,6 +497,9 @@ FIXTURES: List[Fixture] = [
     _bad("SR_27", "bad_single_step",
          "the single commanded step never arrives",
          _no_steps, "swallowed single step", "missing_steps"),
+    _bad("SR_06", "bad_dropped_step_second_command",
+         "a step is swallowed in the second command, past the boundary",
+         _drop_step_in_second_command, "swallowed step", "missing_steps"),
     _bad("SR_10", "bad_dir_change",
          "the reverse phase loses three steps",
          _short_reverse_phase, "swallowed reverse steps", "missing_steps"),

@@ -194,7 +194,14 @@ def sc_single_step(info):
 
 
 def sc_ticks_min(info):
-    return seg_period(8, info["max_speed_ticks"])
+    """The speed floor: the *largest* ticks the firmware will accept.
+
+    min_cmd_ticks is the floor, not max_speed_ticks. max_speed_ticks is the
+    fastest legal speed (the smallest ticks), so a scenario that claims to test
+    the floor while using it tests the opposite end of the range -- and lands on
+    the same 640 ticks as SR_01, which is why the two were indistinguishable.
+    """
+    return seg_period(8, info["min_cmd_ticks"])
 
 
 def sc_ticks_max(info):
@@ -304,12 +311,42 @@ def evaluate(test_id, channels, rate, segments, info):
     return ok and inv["ok"], detail
 
 
+def intra_command_periods(inter_step_us, segments):
+    """The inter-step periods that fall *within* a command, dropping the gaps
+    between commands.
+
+    A command of n > 0 steps is followed by one more `ticks` of holding time --
+    the queue's trailing wait -- before the next command's first step
+    (avr_queue.cpp schedules the next entry one period after the last step).
+    So the gap spanning a command boundary is two periods wide by design, and a
+    pause between commands is wider still.
+
+    Those gaps are structural, not timing defects, so feeding them to
+    `period_defects` makes every multi-command scenario fail on a correct
+    waveform. They are the boundary between commands, not a period within one,
+    so the per-period check must not see them.
+
+    Returns the periods belonging to a single command, in order. A command
+    contributes (n - 1) periods for n steps.
+    """
+    boundaries = set()
+    seen = 0
+    for n, _ticks, _up in segments:
+        seen += n
+        # The gap after the last step of this command is a boundary, not an
+        # intra-command period.
+        if n > 0:
+            boundaries.add(seen - 1)
+    return [p for i, p in enumerate(inter_step_us) if i not in boundaries]
+
+
 def eval_period_exact(channels, rate, segments, info):
     """Inter-step period must equal the commanded ticks, in microseconds."""
     ticks = segments[0][1]
     expect_us = ticks * 1e6 / info["ticks_per_s"]
     m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
-    detail = sp.period_defects(m.inter_step_us, expect_us)
+    periods = intra_command_periods(m.inter_step_us, segments)
+    detail = sp.period_defects(periods, expect_us)
     counts = sp.step_count_defects(m.step_count, segments[0][0])
     # ISR-driven architectures set the step pin from inside a timer interrupt,
     # so the achieved rate is systematically below the commanded one. That is
@@ -331,7 +368,8 @@ def eval_step_count(channels, rate, segments, info):
     step = channels[STEP_CHANNELS["A"]]
     m = sp.channel_metrics(step, rate)
     counts = sp.step_count_defects(m.step_count, n)
-    detail = sp.period_defects(m.inter_step_us, expect_us)
+    detail = sp.period_defects(
+        intra_command_periods(m.inter_step_us, segments), expect_us)
     return counts["ok"] and detail["ok"], {
         "ticks": ticks,
         "steps": counts,
@@ -345,8 +383,9 @@ def eval_pulse_width(channels, rate, segments, info):
     expect_us = ticks * 1e6 / info["ticks_per_s"]
     m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
     counts = sp.step_count_defects(m.step_count, segments[0][0])
-    detail = sp.period_defects(m.inter_step_us, expect_us)
-    adherence = sp.rate_adherence(m.inter_step_us, expect_us)
+    periods = intra_command_periods(m.inter_step_us, segments)
+    detail = sp.period_defects(periods, expect_us)
+    adherence = sp.rate_adherence(periods, expect_us)
     return counts["ok"] and detail["ok"] and adherence["ok"], {
         "ticks": ticks,
         "ticks_per_s": info["ticks_per_s"],

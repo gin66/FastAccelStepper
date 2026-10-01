@@ -96,7 +96,7 @@ fail.
    - [x] AVR step pins via `stepPinStepperA/B`; `SALEAE_MAX_STEPPERS` from
          `MAX_STEPPER`
 4. **Golden VCD fixtures** — `scripts/tests/vcd_fixtures.py` +
-   `make_fixtures.py`. **11 fixtures committed.** **Done (initial set).**
+   `make_fixtures.py`. **22 fixtures committed.** **Done.**
 4b. **Global pin invariants** — `run_tests.check_pin_invariants()`, applied by
    `evaluate()` to every capture. **Done.**
    - [x] DIR must never change while STEP is high (a driver latches direction on
@@ -120,11 +120,29 @@ fail.
          suite red, one rule at a time
 6. **Scenario wiring** — `scripts/run_tests.py`: scenario table + evaluators.
    - [x] scenario table for SR_01–SR_14, `QINFO` plumbing
-   - [x] every implemented evaluator proven against fixtures (SR_01–SR_05,
-         SR_09, SR_10, SR_14)
+   - [x] every implemented evaluator proven against fixtures (SR_01–SR_10,
+         SR_14, SR_27)
+   - [x] every wired scenario covered, by a committed fixture or a generated
+         test — SR_03, SR_06, SR_07 and SR_08 were wired with no coverage at all
+   - [x] no two scenarios of the same config send an identical segment list;
+         this is what found SR_03 sending 640 ticks, the same as SR_01, so
+         "at the speed floor" never tested the floor (`sc_ticks_min` used
+         `max_speed_ticks`, the *fastest* legal speed, not `min_cmd_ticks`)
+   - [x] per-period checks apply only *within* a command. The gap between two
+         commands is the queue's trailing wait and is two periods wide by
+         design, so feeding it to `period_defects` made every multi-command
+         scenario fail on a correct waveform — SR_06 failed its own good
+         fixture until this was fixed (`intra_command_periods()`)
+   - [x] SR_07 (2000 steps) and SR_08 (4000 steps) generated at full size
+         rather than committed: a 4000-step VCD is ~300 KB for one assertion.
+         Covers step count, that every intra-command period is examined rather
+         than a bounded window, and a step dropped at the *end* of the run
    - [x] SR_27 `single_step` — `steps == 1` takes the other ISR branch and is
          the only command with no inter-step period to measure
-   - [ ] SR_01–SR_13 verified against the fixtures, then on hardware
+   - [ ] SR_01–SR_13 **on hardware** — every one now has fixture coverage; what
+         is left is a real capture, which nothing has ever had
+   - [ ] SR_11 / SR_12 / SR_13 have no scenario function yet (SR_13 is a
+         negative test on the firmware: a rejected command must emit no pulse)
    - [ ] SR_14 / SR_16 (synchronized start, multi-stepper timing impact)
    - [ ] SR_17 cross-driver (ESP32 only)
    - [ ] SR_18–SR_20 MCPWM/PCNT overrun
