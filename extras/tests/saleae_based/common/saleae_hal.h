@@ -20,6 +20,11 @@ void saleae_hal_write(int pin, int level);
 uint32_t saleae_hal_millis(void);
 void saleae_hal_delay_ms(uint32_t ms);
 
+// Serial console (host command channel)
+void saleae_hal_serial_begin(uint32_t baud);
+int saleae_hal_serial_read(void);  // returns a byte 0..255, or -1 if none
+void saleae_hal_serial_write(const char *text);
+
 #ifdef __cplusplus
 }
 #endif

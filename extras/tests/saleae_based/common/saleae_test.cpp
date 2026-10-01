@@ -39,6 +39,12 @@ void saleae_test_setup(void) {
   }
 }
 
+void saleae_test_stop(void) {
+  for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
+    saleae_hal_write(saleae_pins[i], 0);
+  }
+}
+
 void saleae_test_loop(void) {
   uint16_t phase = (uint16_t)(saleae_hal_millis() % 1000);
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {

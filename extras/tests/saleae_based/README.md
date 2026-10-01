@@ -89,11 +89,40 @@ python3 scripts/run_tests.py --tag-key esp32_idf5_conn_8ch_step_only
 python3 scripts/run_tests.py --tag-key esp32_idf5_conn_8ch_step_only --force
 ```
 
-It captures, evaluates, writes `results/<tag_key>_<test>.json` and updates
-`results/tag_index.json`. Tests already recorded `passed` for that tag key are
-**skipped** (unless `--force`), so a hardware matrix can be resumed without
-re-measuring. SR_00 gates the rest: if it fails, later tests are recorded
-`skipped`. Tests not yet implemented are recorded `skipped (not implemented)`.
+Each test does **one capture** (start capture → trigger the test over serial →
+wait for the capture to finish → analyze). It writes
+`results/<tag_key>_<test>.json` and updates `results/tag_index.json`. Tests
+already recorded `passed` for that tag key are **skipped** (unless `--force`),
+so a hardware matrix can be resumed without re-measuring.
+
+**SR_00 is the standard pre-check and always runs first** (even if you only ask
+for a later test); it verifies all 8 I/Os are alive and correctly wired. If it
+fails, the remaining tests are recorded `skipped`. Tests not yet implemented are
+recorded `skipped (not implemented)`.
+
+### Host control channel
+
+The firmware exposes a newline text protocol over the serial console
+(`common/saleae_app.cpp`); `scripts/control.py` sends commands:
+
+```bash
+python3 scripts/control.py --port /dev/cu.usbserial-0001 --send "STOP"
+python3 scripts/control.py --port /dev/cu.usbserial-0001 --send "SR01 400 400" --read 2
+```
+
+| Command | Effect |
+|---------|--------|
+| `SR00` | start the SR_00 self-test (also runs on boot) |
+| `SR01 <steps> <speed_us>` | constant-speed move; replies `DONE <pos>` |
+| `POS` | reply `POS <position>` |
+| `STOP` | stop move / self-test |
+
+`run_tests.py` drives this itself for SR_01 (serial + capture + analysis):
+
+```bash
+python3 scripts/run_tests.py --tag-key esp32_conn_8ch_step_only --tests SR_01 \
+    --steps 400 --speed-us 400 --seconds 2
+```
 
 ### Unit tests
 

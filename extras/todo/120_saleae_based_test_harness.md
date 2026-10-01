@@ -62,8 +62,13 @@ as needed.
    analyzer as oracle.
    - [x] SR_00 connection verification (8 pins, 1 Hz, distinct duty) on
      ESP32 Arduino and ESP32 ESP-IDF; proven on hardware.
-   - [ ] SR_01–SR_40 (needs a host→device control channel + FastAccelStepper
-     integration in the saleae pio dirs).
+   - [x] Host→device control channel: newline text protocol (`SR00`, `SR01
+     <steps> <speed_us>`, `POS`, `STOP`), FastAccelStepper integrated into both
+     saleae pio dirs, host client `scripts/control.py`.
+   - [x] SR_01 basic move forward: constant-speed move, step pulses counted on
+     the analyzer vs `steps` (passes on ESP32 Arduino). Orchestrated end-to-end
+     by `run_tests.py` (serial + capture + analysis).
+   - [ ] SR_02–SR_40.
 4. **Synchronized-start tests** — Multi-stepper `synchronizedStart()`: first
    step alignment, cross-channel skew, per-platform tolerance (feeds the
    050-series items). _Pending._
@@ -75,9 +80,12 @@ as needed.
 `scripts/run_tests.py` runs the implemented tests for a hardware tag key
 (`{arch}_{driver}_{channel_config}`, white paper §2.3.3). It captures,
 evaluates, writes `results/<tag_key>_<test>.json`, and maintains
-`results/tag_index.json`. Tests already recorded `passed` for a tag key are
-skipped unless `--force`; SR_00 gates the rest; unimplemented tests are recorded
-`skipped`. This makes a hardware matrix resumable. **Done (SR_00).**
+`results/tag_index.json`. Each test does **one capture** (start capture →
+trigger the test over serial → wait for the capture to finish → analyze). Tests
+already recorded `passed` for a tag key are skipped unless `--force`; **SR_00 is
+the standard pre-check and always runs first**, gating the rest; unimplemented
+tests are recorded `skipped`. This makes a hardware matrix resumable.
+**Done (SR_00, SR_01).**
 
 ## Status
 

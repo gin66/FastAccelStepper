@@ -17,3 +17,11 @@ extern "C" void saleae_hal_write(int pin, int level) {
 extern "C" uint32_t saleae_hal_millis(void) { return millis(); }
 
 extern "C" void saleae_hal_delay_ms(uint32_t ms) { delay(ms); }
+
+extern "C" void saleae_hal_serial_begin(uint32_t baud) { Serial.begin(baud); }
+
+extern "C" int saleae_hal_serial_read(void) {
+  return Serial.available() ? Serial.read() : -1;
+}
+
+extern "C" void saleae_hal_serial_write(const char *text) { Serial.print(text); }

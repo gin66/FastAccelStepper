@@ -14,6 +14,7 @@ extern "C" {
 #endif
 
 void saleae_test_setup(void);
+void saleae_test_stop(void);
 void saleae_test_loop(void);
 
 #ifdef __cplusplus
