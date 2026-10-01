@@ -90,5 +90,14 @@ ln -s ../../../extras/tests/pc_based/test_03.h .
 ln -s ../../../extras/tests/pc_based/LOG2_test.ino LOG2_test.ino
 cd ../../..
 
+# Saleae connection test: 8 pins, all 1 Hz, distinct duty cycles.
+# Pure GPIO, no library needed — used for channel/wiring identification.
+mkdir -p pio_dirs/saleae_simple/src
+cd pio_dirs/saleae_simple
+ln -s ../../extras/ci/platformio.ini .
+cd src
+ln -s ../../../extras/tests/saleae_based/firmware/src/simple_test.cpp .
+cd ../../..
+
 ls -al pio_*
 find pio_*

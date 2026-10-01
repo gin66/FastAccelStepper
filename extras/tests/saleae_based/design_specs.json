@@ -1,0 +1,75 @@
+{
+  "esp32_rmt_v2": {
+    "SR_06_direction_to_step_delay": {
+      "expected_us": 12.5,
+      "tolerance_us": 2.0,
+      "description": "Time from DIR edge to first step pulse at 400us speed"
+    },
+    "SR_07_step_pulse_width_at_400us_speed": {
+      "expected_us": 0.4,
+      "tolerance_us": 0.1,
+      "description": "Step pulse width at 400us inter-step period"
+    },
+    "SR_08_duty_cycle_deviation": {
+      "max_percent": 5.0,
+      "description": "Maximum duty cycle deviation from 50%"
+    },
+    "SR_13_sync_start_skew_us": {
+      "max_us": 0.0625,
+      "description": "Max cross-channel skew at synchronized start (1 tick at 16MHz)"
+    },
+    "SR_04_inter_step_period_range": {
+      "min_us": 40,
+      "max_us": 400,
+      "description": "Inter-step period range for acceleration ramp"
+    }
+  },
+  "esp32_mcpwm_pcnt": {
+    "SR_06_direction_to_step_delay": {
+      "expected_us": 15.0,
+      "tolerance_us": 3.0,
+      "description": "MCPWM has additional setup latency"
+    },
+    "SR_29_sync_skew_us": {
+      "max_us": 0.125,
+      "description": "MCPWM timer sync skew across units"
+    }
+  },
+  "esp32s3_rmt_v2": {
+    "SR_06_direction_to_step_delay": {
+      "expected_us": 12.5,
+      "tolerance_us": 2.0,
+      "description": "ESP32-S3 RMT V2 dir→step delay"
+    },
+    "SR_30_sync_manager_skew_us": {
+      "max_us": 0.0625,
+      "description": "RMT TX sync manager skew (ESP32-S3 supports sync)"
+    }
+  },
+  "esp32c3_rmt": {
+    "SR_06_direction_to_step_delay": {
+      "expected_us": 15.0,
+      "tolerance_us": 3.0,
+      "description": "ESP32-C3 RMT V1 dir→step delay"
+    }
+  },
+  "avr_328p": {
+    "SR_06_direction_to_step_delay": {
+      "expected_us": 25.0,
+      "tolerance_us": 5.0,
+      "description": "ATmega328P Timer 1 dir→step delay"
+    },
+    "SR_07_step_pulse_width_at_400us_speed": {
+      "expected_us": 0.5,
+      "tolerance_us": 0.2,
+      "description": "ATmega328P step pulse width at 400us speed"
+    }
+  },
+  "pico": {
+    "SR_06_direction_to_step_delay": {
+      "expected_us": 10.0,
+      "tolerance_us": 2.0,
+      "description": "RP2040 PIO dir→step delay"
+    }
+  }
+}
