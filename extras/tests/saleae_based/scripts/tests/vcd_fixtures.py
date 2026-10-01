@@ -101,10 +101,16 @@ def render(segments, high: int = PULSE_HIGH, lead: int = LEAD,
     """Render `segments` -- the exact tuples `sc_*()` builders return -- into
     step and dir events.
 
-    A segment of (n, ticks, count_up) with n > 0 emits n pulses `ticks` apart
-    and then holds the line for one more period, matching the queue's trailing
-    wait. n == 0 is a pause: the line simply stays low for `ticks`. A change of
+    A segment of (n, ticks, count_up) with n > 0 emits n pulses `ticks` apart.
+    n == 0 is a pause: the line simply stays low for `ticks`. A change of
     `count_up` costs a DIR drain.
+
+    There is no extra period after a command. Measured on ESP32/RMT at 24 MS/s
+    with two 2-step commands at ticks=3200, the gap from the last step of one
+    command to the first step of the next was 199.833 us -- identical to the
+    intra-command period, ratio 1.000. An earlier version of this function
+    appended one extra `ticks` after every command ("trailing wait"), which
+    described a 2x gap the hardware never produces.
     """
     step: List[Event] = []
     dirs: List[Event] = []
@@ -126,7 +132,6 @@ def render(segments, high: int = PULSE_HIGH, lead: int = LEAD,
                 step.append((t, 1))
                 step.append((t + high, 0))
                 t += ticks
-            t += ticks  # trailing wait
         else:
             t += ticks
     return step, dirs

@@ -57,3 +57,6 @@ extras/tests/saleae_based/results/
 extras/tests/saleae_based/apps/arduino/FastAccelStepper/
 extras/tests/saleae_based/apps/arduino/src/
 !extras/tests/saleae_based/apps/arduino/src/saleae_main.ino
+
+# PlatformIO build artifact
+extras/tests/saleae_based/apps/arduino/compile_commands.json

@@ -633,7 +633,14 @@ extern "C" void saleae_app_setup(void) {
   saleae_hal_serial_begin(SALEAE_SERIAL_BAUD);
   reply("READY\n");
   saleae_test_setup();
-  sr00_active = true;
+  // SR_00 is NOT started here. It toggles eight pins at 1 Hz, so leaving it
+  // running from boot fills every capture taken before the first CONFIG with
+  // 1 Hz square waves -- which buries the very pulses a scenario is trying to
+  // measure, and costs a second per cycle to sit through.
+  //
+  // The host starts it deliberately with the SR00 command when it wants the
+  // channel-identification pre-check, and any CONFIG stops it. Detection runs
+  // therefore see a quiet pin until the scenario under test begins.
 }
 
 extern "C" void saleae_app_loop(void) {

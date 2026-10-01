@@ -139,8 +139,26 @@ fail.
          than a bounded window, and a step dropped at the *end* of the run
    - [x] SR_27 `single_step` — `steps == 1` takes the other ISR branch and is
          the only command with no inter-step period to measure
-   - [ ] SR_01–SR_13 **on hardware** — every one now has fixture coverage; what
-         is left is a real capture, which nothing has ever had
+   - [x] **on hardware** — ESP32 + Saleae clone (fx2lafw) at 24 MS/s. SR_01,
+         SR_03, SR_06, SR_09 and SR_27 all accepted by their real evaluators.
+         SR_09's pause measures 839 us, matching (640 + 12800) ticks.
+   - [ ] remaining scenarios on hardware: SR_02, SR_04, SR_05, SR_07, SR_08,
+         SR_10, SR_14
+   - [x] **measured, not assumed: the inter-command gap is ONE period.** Two
+         2-step commands at ticks=1600 measured 99.917 us across the boundary
+         against 99.917 us within a command — ratio 1.000. There is no trailing
+         wait. `render()` used to append one extra `ticks` per command, which
+         described a 2x gap the hardware never produces; that wrong fixture is
+         what made SR_06 "fail", and the evaluator change made to accommodate
+         it (`intra_command_periods`) was also wrong and is reverted.
+   - [x] `MIN_CMD_TICKS` bounds the **whole command**, not the period:
+         `ticks * steps` for steps > 1, so 2 steps at 640 ticks is refused and
+         2 at 1600 accepted. `legal_ticks()` clamps every scenario builder, so
+         no fixture describes a command the firmware rejects.
+   - [x] SR_00 no longer auto-starts at boot. It toggles eight pins at 1 Hz, so
+         it filled every pre-CONFIG capture with square waves over the pulses
+         under test. The host starts it with `SR00` when it wants the
+         identification pre-check.
    - [ ] SR_11 / SR_12 / SR_13 have no scenario function yet (SR_13 is a
          negative test on the firmware: a rejected command must emit no pulse)
    - [ ] SR_14 / SR_16 (synchronized start, multi-stepper timing impact)
