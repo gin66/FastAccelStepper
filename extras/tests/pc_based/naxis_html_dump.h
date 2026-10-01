@@ -20,11 +20,11 @@
 #include <string.h>
 
 // Root of the checked-in viewer assets. The trace build passes an absolute
-// path (-DNAXIS_HTML_ROOT="$(PRJ_ROOT)/extras/n_axes") so the page resolves
-// regardless of the test's working directory; the default is the repo-relative
-// path for a manual run from the repo root.
+// path (-DNAXIS_HTML_ROOT="$(PRJ_ROOT)/extras/tests/pc_based") so the page
+// resolves regardless of the test's working directory; the default is the
+// repo-relative path for a manual run from the repo root.
 #ifndef NAXIS_HTML_ROOT
-#define NAXIS_HTML_ROOT "extras/n_axes"
+#define NAXIS_HTML_ROOT "extras/tests/pc_based"
 #endif
 
 class NaxisHtmlDump {
