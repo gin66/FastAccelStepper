@@ -225,6 +225,46 @@ def sc_ticks_max(info):
     return seg_period(4, 65535)
 
 
+def sc_mcpwm_overrun_after_255(info):
+    """255 pulses, a gap, then exactly one. The MCPWM/PCNT overrun case.
+
+    The PCNT high limit is re-armed from the live counter value on every
+    command, and a `steps == 1` command issued straight after a full 255-step
+    run is where a stale or mis-computed limit shows up: the expected result is
+    exactly one pulse, and a lost or duplicated pulse here is a real defect
+    rather than a timing tolerance.
+    """
+    t = legal_ticks(info, 255, info["max_speed_ticks"])
+    # The trailing single step cannot use the same period as the run. A
+    # steps == 1 command is bounded by ticks alone, so it needs at least
+    # MIN_CMD_TICKS -- the white paper's `QSEG 1 <max>` with max = 640 ticks is
+    # refused outright by addQueueEntry(). Hence legal_ticks() here.
+    t1 = legal_ticks(info, 1, info["max_speed_ticks"])
+    return [(255, t, True), (0, legal_ticks(info, 1, 6400), True), (1, t1, True)]
+
+
+def sc_mcpwm_overrun_boundary(info):
+    """The same shape at a smaller first command, for a one-off probe.
+
+    SR_18 pins the full 255 case; this runs the trailing single step on its own
+    so a failure can be attributed to the boundary rather than to the sweep.
+    """
+    t = legal_ticks(info, 200, info["max_speed_ticks"])
+    t1 = legal_ticks(info, 1, info["max_speed_ticks"])
+    return [(200, t, True), (1, t1, True)]
+
+
+def sc_pause_after_full_command(info):
+    """255 pulses, a pause, then another 255.
+
+    Complements SR_18 by making the *second* command the large one, so a limit
+    left over from the pause is exercised in the other direction.
+    """
+    t = legal_ticks(info, 255, info["max_speed_ticks"])
+    return [(255, t, True), (0, legal_ticks(info, 1, 6400), True),
+            (255, t, True)]
+
+
 def sc_pulse_high_time(info):
     # 16 steps is enough to measure a stable high time and still short.
     return seg_period(16, max(info["max_speed_ticks"], 160))
@@ -273,6 +313,13 @@ SCENARIOS = {
     "SR_10": ("1ch", sc_dir_change, 1, "dir change -> first step"),
     "SR_14": ("2ch", sc_sync_start, 3, "2 steppers, synchronized start"),
     "SR_27": ("1ch", sc_single_step, 1, "single step in one command"),
+    # ESP32 MCPWM/PCNT only; the overrun needs the PCNT high-limit re-arm.
+    "SR_18": ("mcpwm", sc_mcpwm_overrun_after_255, 1,
+              "255 steps, gap, exactly 1 (PCNT limit re-arm)"),
+    "SR_19": ("mcpwm", sc_mcpwm_overrun_boundary, 1,
+              "200 steps then a single step at the boundary"),
+    "SR_20": ("mcpwm", sc_pause_after_full_command, 1,
+              "255, pause, 255 (large command on both sides)"),
 }
 
 
@@ -360,6 +407,34 @@ def eval_step_count(channels, rate, segments, info):
         "ticks": ticks,
         "steps": counts,
         "period": detail,
+    }
+
+
+def eval_counts_and_gap(channels, rate, segments, info):
+    """Exact step count plus the presence of the commanded pause.
+
+    Used for the phase-shaped scenarios (255 / gap / 1). The count is the point:
+    these tests exist to catch a lost or duplicated pulse at a command
+    boundary, and a count that is off by one is a defect with no tolerance.
+    The inter-step period check is deliberately not applied across the pause,
+    which is a stretch of silence and not a period.
+    """
+    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    expected = sum(steps for steps, _, _ in segments)
+    counts = sp.step_count_defects(m.step_count, expected)
+    pause_us = None
+    gap_ok = True
+    for steps, ticks, _up in segments:
+        if steps == 0:
+            period = segments[0][1]
+            pause_us = (period + ticks) * 1e6 / info["ticks_per_s"]
+            gap_ok = any(abs(w - pause_us) <= pause_us * 0.05 + 1.0
+                         for w in m.inter_step_us)
+            break
+    return counts["ok"] and gap_ok, {
+        "steps": counts,
+        "pause_found": gap_ok,
+        "expected_gap_us": round(pause_us, 4) if pause_us else None,
     }
 
 
@@ -529,6 +604,9 @@ EVALUATORS = {
     "SR_10": eval_dir_change,
     "SR_14": eval_sync_start,
     "SR_27": eval_period_exact,
+    "SR_18": eval_counts_and_gap,
+    "SR_19": eval_counts_and_gap,
+    "SR_20": eval_counts_and_gap,
 }
 
 

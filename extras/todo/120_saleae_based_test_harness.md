@@ -178,7 +178,22 @@ fail.
          negative test on the firmware: a rejected command must emit no pulse)
    - [ ] SR_14 / SR_16 (synchronized start, multi-stepper timing impact)
    - [ ] SR_17 cross-driver (ESP32 only)
-   - [ ] SR_18–SR_20 MCPWM/PCNT overrun
+   - [x] **SR_18–SR_20 MCPWM/PCNT overrun — no defect found.** Wired the three
+         scenarios plus `eval_counts_and_gap`, and ran them on the ESP32 on the
+         MCPWM/PCNT driver. SR_18 measured 256/256 steps with the phase
+         structure the test asserts: 255 steps at 39.96 us, then one 439.67 us
+         gap (expected 440), then exactly one step. The PCNT high-limit re-arm
+         is correct at the full 255 boundary. The band SR_19 cares about was
+         then swept on hardware at n = 200, 240, 250, 251, 252, 253, 254, 255,
+         each followed by a single step: every one produced exactly n+1 steps,
+         no lost or duplicated pulse anywhere. SR_20 (255, pause, 255) measured
+         510/510.
+   - [x] a spec bug found while writing SR_18: the white paper specifies
+         `QSEG 1 <max> 1`, but a `steps == 1` command is bounded by its ticks
+         alone, so `<max>` = 640 is below `MIN_CMD_TICKS` = 3200 and the
+         firmware refuses it with ErrorTicksTooLow. The trailing single step has
+         to use at least 3200 ticks (200 us), so the scenario's last phase runs
+         at a different period from the run before it.
    - [ ] SR_21–SR_24 driver-specific; SR_25 / SR_26
 7. **Parameter sweeps** — SR_02 over `steps` = 1…255, SR_05 over the whole
    `ticks` range. `_Pending._`

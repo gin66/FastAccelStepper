@@ -223,6 +223,9 @@ SCENARIO_BUILDERS = {
     "SR_08": rt.sc_queue_full,
     "SR_09": rt.sc_pause,
     "SR_10": rt.sc_dir_change,
+    "SR_18": rt.sc_mcpwm_overrun_after_255,
+    "SR_19": rt.sc_mcpwm_overrun_boundary,
+    "SR_20": rt.sc_pause_after_full_command,
     "SR_14": rt.sc_sync_start,
     "SR_27": rt.sc_single_step,
 }
@@ -409,6 +412,24 @@ def _drop_step_in_second_command(step, _dirs=None):
     return [ev for ev in step if not (victim <= ev[0] < victim + ticks)]
 
 
+def _drop_trailing_step(step, _dirs=None):
+    """The last commanded step never arrives.
+
+    The PCNT high-limit case: after a full 255-step run, a single-step command
+    has to re-arm the limit from the live counter. If it does not, that step is
+    lost. This is the one fixture whose whole purpose is to prove the rule can
+    fail on its own target defect.
+    """
+    return list(step[:-2])
+
+
+def _duplicate_trailing_step(step, _dirs=None):
+    """One pulse too many after a pause, i.e. a limit left over from before."""
+    r = _rises(step)
+    extra = r[-1] + _period(step) // 2
+    return sorted(list(step) + [(extra, 1), (extra + 4, 0)])
+
+
 def _short_reverse_phase(step, _dirs=None):
     """The reverse phase loses its last three steps."""
     r = _rises(step)
@@ -508,7 +529,26 @@ FIXTURES: List[Fixture] = [
     _bad("SR_10", "bad_dir_change",
          "the reverse phase loses three steps",
          _short_reverse_phase, "swallowed reverse steps", "missing_steps"),
+    # The MCPWM/PCNT overrun cases. The good fixture is what the hardware
+    # produces (verified on the ESP32 at 24 MS/s: 255 steps at 40 us, one
+    # 439.67 us gap, then exactly one more step -- 256 total). The bad fixture
+    # drops that final single step, which is precisely the defect SR_18 exists
+    # to detect, so the rule is proven able to fail on its own target.
+    _good("SR_18", "good_overrun_after_255",
+          "255 steps, a 440 us gap, then exactly one more"),
+    _good("SR_19", "good_overrun_boundary",
+          "200 steps then a single step at the boundary"),
+    _good("SR_20", "good_pause_after_full_command",
+          "255, a pause, then 255 more"),
+
+    _bad("SR_18", "bad_lost_trailing_step",
+         "the single step after a 255-step run is swallowed",
+         _drop_trailing_step, "swallowed trailing step", "missing_steps"),
+    _bad("SR_20", "bad_extra_step_after_pause",
+         "a duplicate pulse follows the pause",
+         _duplicate_trailing_step, "duplicate step after pause", "extra_steps"),
 ]
+
 
 def _drop_from_second_stepper(step, _dirs=None):
     """Stepper B starts perfectly aligned but loses one step in the middle.
