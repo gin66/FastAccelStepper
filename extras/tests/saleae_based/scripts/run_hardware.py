@@ -53,24 +53,6 @@ DEFAULT_RATE = 24_000_000
 # buffer filled just as the final step landed.
 ARM_DELAY = {"SR_25": 1.0}
 
-# CONFIG takes a name from {1ch, 2ch, 4ch_rmt, 4ch_mcpwm, mixed <drivers>}. The
-# scenario table uses short names to say which driver a scenario *requires*, so
-# the two are mapped here rather than duplicating firmware vocabulary in the
-# scenario table.
-WIRE_CONFIG = {
-    "1ch": "1ch",
-    "2ch": "2ch",
-    "mcpwm": "mixed mcpwm",
-    "mixed_rmt_mcpwm": "mixed rmt,mcpwm",
-    "i2s": "mixed i2s",
-}
-
-# Configs that drive a second stepper on D2/D3, so those channels must be
-# captured. Sparse selections drop channels on this clone: -C D0,D2 yields
-# nothing on D2 while -C D0,D1,D2 works, so multi-stepper captures stay
-# contiguous.
-MULTI_STEPPER = ("2ch", "mixed_rmt_mcpwm")
-
 
 class BoardError(RuntimeError):
     """The board refused a command, or could not be reached."""
@@ -113,14 +95,21 @@ def program_seconds(segments, info):
     return ticks / info["ticks_per_s"]
 
 
-def wire_plan(scenario):
-    """(firmware CONFIG string, channels to capture, QRUN mask) for a scenario."""
+def wire_plan(scenario, dut_driver=rt.DEFAULT_NATIVE_DRIVER):
+    """(firmware CONFIG line, channels to capture, QRUN mask) for a scenario.
+
+    The channel run is contiguous and starts at D0: sparse selections drop
+    channels on this clone, where -C D0,D2 yields nothing on D2 while
+    -C D0,D1,D2 works. A two-stepper config therefore captures D0..D3 rather
+    than only the two step pins it uses.
+    """
     cfg = rt.SCENARIOS[scenario][0]
-    if cfg not in WIRE_CONFIG:
+    if cfg not in rt.CONFIGS:
         raise BoardError(f"no wiring known for config {cfg!r}")
-    two = cfg in MULTI_STEPPER
-    return WIRE_CONFIG[cfg], ("D0,D1,D2,D3" if two else "D0,D1"), \
-        ("3" if two else "1")
+    count = len(rt.config_drivers(cfg, dut_driver))
+    channels = ",".join(f"D{i}" for i in range(4 if count > 1 else 2))
+    return rt.config_wire(cfg, dut_driver), channels, \
+        ("3" if count > 1 else "1")
 
 
 def run_segments(segments, wire_cfg, channels, mask, name, info,
@@ -134,6 +123,11 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
     scenario, it is one parameter value of one. Returns (vcd_path, note), and
     raises BoardError if the board refuses the program -- a refusal is a wiring
     or firmware problem, not a timing result.
+
+    `wire_cfg` is the whole command line, CONFIG keyword included, as
+    `wire_plan()` builds it. It is sent verbatim: re-prefixing the keyword
+    produced `CONFIG CONFIG 1 rmt_v2 dir`, which the firmware correctly refused
+    and which read as a wiring fault on all 25 scenarios at once.
     """
     if serial is None:
         raise BoardError("pyserial is not installed")
@@ -142,7 +136,7 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
 
     ser = cold_boot(port)
     try:
-        reply = send(ser, f"CONFIG {wire_cfg}")
+        reply = send(ser, wire_cfg)
         if reply.startswith("ERR"):
             raise BoardError(f"CONFIG refused: {reply}")
 
@@ -197,11 +191,12 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
 
 def run_scenario(scenario, port=DEFAULT_PORT, driver=DEFAULT_DRIVER,
                  out_dir=DEFAULT_OUT, seconds=DEFAULT_SECONDS,
-                 rate=DEFAULT_RATE, capture_script=None):
+                 rate=DEFAULT_RATE, capture_script=None,
+                 dut_driver=rt.DEFAULT_NATIVE_DRIVER):
     """Run one named scenario on a cold board and capture it."""
     info = vf.Dut().info()
     segments = rt.SCENARIOS[scenario][1](info)
-    wire_cfg, channels, mask = wire_plan(scenario)
+    wire_cfg, channels, mask = wire_plan(scenario, dut_driver)
     vcd, note = run_segments(
         segments, wire_cfg, channels, mask, scenario, info,
         port=port, driver=driver, out_dir=out_dir, seconds=seconds, rate=rate,
@@ -235,19 +230,8 @@ def metrics_periods(channels, rate):
     return sp.channel_metrics(channels["D0"], rate).inter_step_us
 
 
-def driver_of(config):
-    """The driver a scenario's CONFIG actually selects.
-
-    Recorded rather than inferred at report time, because "2ch" and
-    "mixed rmt,mcpwm" both exercise two steppers and mean different things.
-    """
-    return {
-        "1ch": "auto", "2ch": "auto", "mcpwm": "mcpwm_pcnt",
-        "mixed_rmt_mcpwm": "rmt+mcpwm_pcnt", "i2s": "i2s",
-    }.get(config, config)
-
-
-def build_result(scenario, vcd, ok, detail, channels, rate, arch, out_dir):
+def build_result(scenario, vcd, ok, detail, channels, rate, arch, out_dir,
+                 dut_driver=rt.DEFAULT_NATIVE_DRIVER):
     """One scenario's measurements as a JSON record.
 
     Everything downstream reads this rather than re-parsing the capture: a 24
@@ -256,6 +240,7 @@ def build_result(scenario, vcd, ok, detail, channels, rate, arch, out_dir):
     """
     info = vf.Dut().info()
     cfg = rt.SCENARIOS[scenario][0]
+    driver = rt.driver_tag(cfg, dut_driver)
     per_stepper = {}
     for letter, ch_name in sorted(rt.STEP_CHANNELS.items()):
         if ch_name not in channels:
@@ -266,9 +251,9 @@ def build_result(scenario, vcd, ok, detail, channels, rate, arch, out_dir):
         "test_id": scenario,
         "goal": rt.SCENARIOS[scenario][3],
         "arch": arch,
-        "driver": driver_of(cfg),
+        "driver": driver,
         "channel_config": cfg,
-        "tag": f"{arch}_{driver_of(cfg).replace('+', '_')}_{cfg}",
+        "tag": f"{arch}_{driver.replace('+', '_')}_{cfg}",
         "dut": info,
         "segments": [list(seg) for seg in rt.SCENARIOS[scenario][1](info)],
         "per_stepper": ({str(k): [list(seg) for seg in v]
@@ -303,7 +288,11 @@ def main():
     ap.add_argument("--all", action="store_true", help="run every scenario")
     ap.add_argument("--list", action="store_true", help="list scenarios and exit")
     ap.add_argument("--port", default=DEFAULT_PORT)
-    ap.add_argument("--driver", default=DEFAULT_DRIVER)
+    ap.add_argument("--driver", default=DEFAULT_DRIVER,
+                    help="sigrok device of the logic analyzer")
+    ap.add_argument("--dut-driver", default=rt.DEFAULT_NATIVE_DRIVER,
+                    help="pulse driver for scenarios whose config does not "
+                         "name one (timer on AVR, pio on Pico)")
     ap.add_argument("--out", default=str(DEFAULT_OUT))
     ap.add_argument("--seconds", type=float, default=DEFAULT_SECONDS)
     ap.add_argument("--sample-rate", type=int, default=DEFAULT_RATE)
@@ -320,7 +309,8 @@ def main():
             cfg, _b, mask, desc = rt.SCENARIOS[sid]
             extra = (f" (host issues STOP at {rt.STOP_AFTER[sid]} s)"
                      if sid in rt.STOP_AFTER else "")
-            print(f"{sid}  {cfg:16} mask={mask}  {desc}{extra}")
+            print(f"{sid}  {cfg:16} mask={mask}  "
+                  f"{rt.driver_tag(cfg, args.dut_driver):22} {desc}{extra}")
         return 0
 
     todo = scenario_ids() if args.all else args.scenarios
@@ -335,7 +325,7 @@ def main():
             vcd, note = run_scenario(
                 scenario, port=args.port, driver=args.driver,
                 out_dir=args.out, seconds=args.seconds,
-                rate=args.sample_rate)
+                rate=args.sample_rate, dut_driver=args.dut_driver)
         except BoardError as exc:
             print(f"{scenario:9} {'ERROR':10} {exc}")
             failed.append(scenario)
@@ -343,7 +333,7 @@ def main():
         ok, detail, channels, rate = judge(scenario, vcd)
         if args.results:
             result = build_result(scenario, vcd, ok, detail, channels, rate,
-                                  args.arch, args.out)
+                                  args.arch, args.out, args.dut_driver)
             save_result(result, args.results)
         counts = detail.get("steps")
         if isinstance(counts, dict) and "steps_measured" in counts:

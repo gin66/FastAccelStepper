@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_15.vcd",
+  "capture": "/tmp/cap/r8/SR_15.vcd",
   "channel_config": "2ch",
-  "driver": "auto",
+  "driver": "rmt_v2+rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -11,7 +11,7 @@
   },
   "evaluator_detail": {
     "A": {
-      "mean_period_us": 39.9665,
+      "mean_period_us": 39.9661,
       "period": {
         "expected_period_us": 40.0,
         "long_periods_us": [],
@@ -32,7 +32,7 @@
       "ticks": 640
     },
     "B": {
-      "mean_period_us": 79.9322,
+      "mean_period_us": 79.9326,
       "period": {
         "expected_period_us": 80.0,
         "long_periods_us": [],
@@ -52,79 +52,80 @@
       },
       "ticks": 1280
     },
-    "first_step_skew_us": 27.1667,
+    "first_step_skew_us": 27.0417,
     "invariants": {
       "dir_while_step_high": {},
       "n_dir_while_step_high": 0,
       "ok": true
     },
+    "skew_periods": 0.676,
     "speed_ratio": 2
   },
   "goal": "aligned start, then each stepper at its own period",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 39.0599,
+      "duty_cycle_percent": 39.0627,
       "edge_count": 400,
       "inter_step_us": {
         "max": 40.0,
-        "mean": 39.9665,
+        "mean": 39.9661,
         "median": 39.9583,
         "min": 39.9167,
         "n": 199,
         "spread": 0.0833,
-        "stdev": 0.0194
+        "stdev": 0.0187
       },
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6108,
+        "mean": 15.6119,
         "median": 15.625,
-        "min": 15.5417,
+        "min": 15.5833,
         "n": 200,
-        "spread": 0.0833,
-        "stdev": 0.021
+        "spread": 0.0417,
+        "stdev": 0.0194
       },
       "pulse_low_us": {
         "max": 24.375,
-        "mean": 24.3555,
+        "mean": 24.3543,
         "median": 24.375,
-        "min": 24.3333,
+        "min": 24.2917,
         "n": 199,
-        "spread": 0.0417,
-        "stdev": 0.0208
+        "spread": 0.0833,
+        "stdev": 0.0212
       },
       "step_count": 200
     },
     "B": {
-      "duty_cycle_percent": 19.5309,
+      "duty_cycle_percent": 19.531,
       "edge_count": 400,
       "inter_step_us": {
         "max": 79.9583,
-        "mean": 79.9322,
+        "mean": 79.9326,
         "median": 79.9167,
         "min": 79.875,
         "n": 199,
         "spread": 0.0833,
-        "stdev": 0.0244
+        "stdev": 0.0238
       },
       "max_pulse_width_us": 64.3333,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6115,
+        "mean": 15.6117,
         "median": 15.625,
         "min": 15.5417,
         "n": 200,
         "spread": 0.0833,
-        "stdev": 0.0204
+        "stdev": 0.0203
       },
       "pulse_low_us": {
         "max": 64.3333,
-        "mean": 64.3208,
+        "mean": 64.321,
         "median": 64.3333,
         "min": 64.25,
         "n": 199,
         "spread": 0.0833,
-        "stdev": 0.0209
+        "stdev": 0.0208
       },
       "step_count": 200
     }
@@ -155,7 +156,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_2ch",
+  "tag": "esp32_rmt_v2_rmt_v2_2ch",
   "test_id": "SR_15",
-  "timestamp": "2026-10-02T10:01:27Z"
+  "timestamp": "2026-10-02T11:58:41Z"
 }

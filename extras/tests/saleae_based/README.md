@@ -235,8 +235,8 @@ which are plain MCU outputs, so the analyzer connects directly to them.
 | Logic Analyzer | 4 channels, 4 MS/s | 8+ channels, 24 MS/s |
 | USB cable | For the serial console | — |
 
-Two channels per stepper (step + dir), so `1ch` needs 2, `2ch` needs 4, and the
-4-stepper configs need 8. Wiring and the full rationale are in white paper §10.
+Two channels per stepper (step + dir), so one stepper needs 2, two need 4, and
+four need all 8. Wiring and the full rationale are in white paper §10.
 
 ## Where things are
 

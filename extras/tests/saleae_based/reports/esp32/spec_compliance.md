@@ -4,17 +4,17 @@ Measured against what the library promises: the commanded period and the step co
 
 | test | metric | expected | measured | verdict |
 |---|---|---|---|---|
-| SR_01 | A inter-step period | 40 us (640 ticks) | 39.96 us | ✓ |
+| SR_01 | A inter-step period | 40 us (640 ticks) | 39.97 us | ✓ |
 | SR_01 | A step count | 8 | 8 | ✓ |
 | SR_02 | A inter-step period | 40 us (640 ticks) | 39.97 us | ✓ |
 | SR_02 | A step count | 255 | 255 | ✓ |
 | SR_03 | A inter-step period | 200 us (3200 ticks) | 199.83 us | ✓ |
 | SR_03 | A step count | 8 | 8 | ✓ |
-| SR_04 | A inter-step period | 4095.94 us (65535 ticks) | 4092.47 us | ✓ |
+| SR_04 | A inter-step period | 4095.94 us (65535 ticks) | 4092.49 us | ✓ |
 | SR_04 | A step count | 4 | 4 | ✓ |
-| SR_05 | A inter-step period | 40 us (640 ticks) | 39.97 us | ✓ |
+| SR_05 | A inter-step period | 40 us (640 ticks) | 39.96 us | ✓ |
 | SR_05 | A step count | 16 | 16 | ✓ |
-| SR_06 | A inter-step period | 100 us (1600 ticks) | 99.9 us | ✓ |
+| SR_06 | A inter-step period | 100 us (1600 ticks) | 99.92 us | ✓ |
 | SR_06 | A step count | 4 | 4 | ✓ |
 | SR_07 | A inter-step period | 40 us (640 ticks) | 39.97 us | ✓ |
 | SR_07 | A step count | 2000 | 2000 | ✓ |

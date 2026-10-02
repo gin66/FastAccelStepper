@@ -4,8 +4,8 @@
 **Goal:** STOP mid-run: pulses cease
 **Program:** `QSEG 20000 640 1`
 **DUT:** 16000000 ticks/s, `MIN_CMD_TICKS` 3200, `QUEUE_LEN` 32, fastest legal 640 ticks
-**Configuration:** 1ch on auto (esp32)
-**Tag:** `esp32_auto_1ch`
+**Configuration:** 1ch on rmt_v2 (esp32)
+**Tag:** `esp32_rmt_v2_1ch`
 **Captured at:** 24000000 Hz
 **Result:** **PASS**
 
@@ -51,4 +51,4 @@
 
 ## Capture
 
-`/tmp/cap/rep/SR_25.vcd`
+`/tmp/cap/r8/SR_25.vcd`

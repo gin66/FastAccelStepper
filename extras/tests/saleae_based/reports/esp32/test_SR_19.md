@@ -13,7 +13,7 @@
 
 | stepper | steps | period us (min–max, spread) | pulse high us (min–max, spread) | duty % |
 |---|---|---|---|---|
-| A | 201 | 39.9167–40, 0.0833 | 15.5417–15.625, 0.0833 | 39.06 |
+| A | 201 | 39.9167–40, 0.0833 | 19.875–99.8333, 79.9583 | 50.34 |
 
 ## Detail
 
@@ -38,4 +38,4 @@
 
 ## Capture
 
-`/tmp/cap/rep/SR_19.vcd`
+`/tmp/cap/r8/SR_19.vcd`

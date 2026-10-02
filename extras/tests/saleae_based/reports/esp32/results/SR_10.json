@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_10.vcd",
+  "capture": "/tmp/cap/r8/SR_10.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -13,9 +13,9 @@
     "below_capture_resolution": false,
     "capture_rate_hz": 24000000,
     "dir_edges": 1,
-    "dir_to_first_step_min_us": 17.125,
+    "dir_to_first_step_min_us": 17.6667,
     "dir_to_first_step_us": [
-      17.125
+      17.6667
     ],
     "invariants": {
       "dir_while_step_high": {},
@@ -34,7 +34,7 @@
   "goal": "dir change -> first step",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 19.915,
+      "duty_cycle_percent": 19.9126,
       "edge_count": 80,
       "inter_step_us": {
         "max": 1538.6667,
@@ -45,29 +45,30 @@
         "spread": 1498.75,
         "stdev": 236.8871
       },
-      "max_pulse_width_us": 1523.0833,
+      "max_pulse_width_us": 1523.0417,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6125,
+        "mean": 15.6104,
         "median": 15.625,
-        "min": 15.5833,
+        "min": 15.5417,
         "n": 40,
-        "spread": 0.0417,
-        "stdev": 0.0191
+        "spread": 0.0833,
+        "stdev": 0.0219
       },
       "pulse_low_us": {
-        "max": 1523.0833,
-        "mean": 62.7831,
+        "max": 1523.0417,
+        "mean": 62.7842,
         "median": 24.375,
         "min": 24.2917,
         "n": 39,
-        "spread": 1498.7917,
-        "stdev": 236.892
+        "spread": 1498.75,
+        "stdev": 236.885
       },
       "step_count": 40
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -82,7 +83,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_10",
-  "timestamp": "2026-10-02T09:50:55Z"
+  "timestamp": "2026-10-02T11:55:30Z"
 }

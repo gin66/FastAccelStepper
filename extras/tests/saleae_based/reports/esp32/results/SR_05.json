@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_05.vcd",
+  "capture": "/tmp/cap/r8/SR_05.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -13,26 +13,26 @@
     "adherence": {
       "commanded_period_us": 40.0,
       "commanded_rate_hz": 25000.0,
-      "jitter_pct": 0.104,
+      "jitter_pct": 0.208,
       "max_period_us": 40.0,
-      "mean_period_us": 39.9694,
+      "mean_period_us": 39.9639,
       "measurable": true,
-      "min_period_us": 39.9583,
+      "min_period_us": 39.9167,
       "n_out_of_tolerance": 0,
       "ok": true,
       "periods_measured": 15,
-      "rate_max_hz": 25026.07,
-      "rate_mean_hz": 25019.11,
+      "rate_max_hz": 25052.19,
+      "rate_mean_hz": 25022.59,
       "rate_min_hz": 25000.0,
-      "sag_pct": -0.076,
+      "sag_pct": -0.09,
       "tolerance_us": 0.8,
-      "worst_deviation_us": 0.0417
+      "worst_deviation_us": 0.0833
     },
-    "avg_high_us": 15.612,
-    "avg_low_us": 24.3583,
-    "duty_percent": 39.06,
+    "avg_high_us": 15.6146,
+    "avg_low_us": 24.35,
+    "duty_percent": 39.07,
     "expected_period_us": 40.0,
-    "frequency_hz": 25019.11,
+    "frequency_hz": 25022.59,
     "invariants": {
       "dir_while_step_high": {},
       "n_dir_while_step_high": 0,
@@ -62,40 +62,41 @@
   "goal": "pulse high time",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 39.0589,
+      "duty_cycle_percent": 39.0711,
       "edge_count": 32,
       "inter_step_us": {
         "max": 40.0,
-        "mean": 39.9694,
+        "mean": 39.9639,
         "median": 39.9583,
-        "min": 39.9583,
+        "min": 39.9167,
         "n": 15,
-        "spread": 0.0417,
-        "stdev": 0.0184
+        "spread": 0.0833,
+        "stdev": 0.0208
       },
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.612,
+        "mean": 15.6146,
         "median": 15.625,
         "min": 15.5833,
         "n": 16,
         "spread": 0.0417,
-        "stdev": 0.0193
+        "stdev": 0.018
       },
       "pulse_low_us": {
         "max": 24.375,
-        "mean": 24.3583,
-        "median": 24.375,
-        "min": 24.3333,
+        "mean": 24.35,
+        "median": 24.3333,
+        "min": 24.2917,
         "n": 15,
-        "spread": 0.0417,
-        "stdev": 0.0204
+        "spread": 0.0833,
+        "stdev": 0.0255
       },
       "step_count": 16
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -105,7 +106,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_05",
-  "timestamp": "2026-10-02T09:48:16Z"
+  "timestamp": "2026-10-02T11:52:50Z"
 }

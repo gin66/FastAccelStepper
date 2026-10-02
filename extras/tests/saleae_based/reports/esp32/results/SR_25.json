@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_25.vcd",
+  "capture": "/tmp/cap/r8/SR_25.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -75,6 +75,7 @@
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -84,7 +85,7 @@
     ]
   ],
   "stop_after_s": 0.15,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_25",
-  "timestamp": "2026-10-02T09:58:56Z"
+  "timestamp": "2026-10-02T12:03:29Z"
 }

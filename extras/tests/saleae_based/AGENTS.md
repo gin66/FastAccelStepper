@@ -84,15 +84,19 @@ python3 -m unittest discover -s scripts/tests -v
 
 # high-level: pick target + test; --flash builds+flashes first
 python3 scripts/harness.py --arch esp32 --framework idf --version 5.3 \
-    --driver mcpwm_pcnt --channel-config 2ch --tests SR_01 --flash
-python3 scripts/harness.py --arch nanoatmega328 --channel-config 1ch --flash
-python3 scripts/harness.py --arch rpipico --driver pio --channel-config 2ch --flash
+    --driver mcpwm_pcnt --count 2 --tests SR_01 --flash
+python3 scripts/harness.py --arch nanoatmega328 --driver timer --count 1 --flash
+python3 scripts/harness.py --arch rpipico --driver pio --count 2 --flash
+
+# two steppers on two different drivers
+python3 scripts/harness.py --arch esp32 --drivers rmt,mcpwm_pcnt --count 2 \
+    --tests SR_17 --flash
 
 # low-level (firmware already flashed; you supply the tag key)
 python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch --tests SR_01
 
 # manual serial: read the limits, then run a program
-python3 scripts/control.py --send "CONFIG 1ch" --read 2
+python3 scripts/control.py --send "CONFIG 1 timer" --read 2
 python3 scripts/control.py --send "QINFO" --read 1
 python3 scripts/control.py --send "QCLR;QSEG 255 80 1;QSEG 0 1600 1;QSEG 1 80 1;QRUN 1" --read 6
 ```
@@ -123,13 +127,31 @@ recompile.
 
 ```
 SR00                        SR_00 pin self-test (8 pins, 1 Hz)
-CONFIG <name> [drv,drv,..]  1ch | 2ch | 4ch_rmt | 4ch_mcpwm | mixed <drv,..>
+CONFIG <n> <drv>[,<drv>..] [dir|nodir]
+                            connect <n> steppers, one driver NAMED per stepper.
+                            There is no `auto`: an unknown driver, an absent
+                            one, a list whose length is not <n>, a count this
+                            platform cannot provide and an unimplemented pin
+                            mode are all REFUSED, never substituted.
 QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, per-stepper floor
 QCLR                        drop the program and stop
 QSEG <steps> <ticks> <dir>  append a segment; steps=0 means "pause <ticks>"
+QSEG <idx> <steps> <ticks> <dir>
+                            the same, into stepper <idx>'s own program, for two
+                            steppers at different speeds (SR_15)
 QRUN <mask>                 run on the steppers in the bitmask, synced start
 POS | STOP
 ```
+
+Driver names: `rmt` | `rmt_v2` | `mcpwm` | `mcpwm_pcnt` | `i2s` | `i2s_direct` |
+`i2s_mux` on the ESP32 family, `timer` on AVR/SAM/SAMD, `pio` on Pico. A driver
+the running build has no queues for is refused — `CONFIG 2 rmt,rmt` on a 328P
+does not quietly give you two timer queues. The list is explicit on every
+architecture precisely because it costs nothing to name a single native driver
+and a result that does not record which driver produced it characterizes
+nothing. An earlier revision let `1ch`/`2ch` fall back to the library's automatic
+choice and tagged 17 of 25 results `auto`, which recorded whatever the firmware
+happened to pick.
 
 `ticks` is the **raw queue period in timer ticks, not microseconds**, so the
 host can address the 16-bit boundaries exactly (1 and 65535). Always read
@@ -161,13 +183,14 @@ Every scenario is a handful of `QSEG` lines. The ones that matter, by goal:
 | dir change → first step | `QSEG 10 <ticks> 1` then `QSEG 10 <ticks> 0` | dir edge settles before the first step of phase 2; measure the delay |
 | Pause command | `QSEG 5 <ticks> 1`, `QSEG 0 <p> 1`, `QSEG 5 <ticks> 1` | gap of exactly p ticks, dir must not flip on a pause |
 | MCPWM overrun | `QSEG 255 <max> 1`, `QSEG 0 <p> 1`, `QSEG 1 <max> 1` | 255 pulses, gap, then exactly 1 — no lost or extra step |
-| Multi-stepper max speed | `CONFIG 2ch`, `QSEG <n> <max> 1`, `QRUN 3` | does the second stepper perturb the first step's timing |
-| Sync start | `CONFIG 2ch`, `QSEG <n> <ticks> 1`, `QRUN 3` | time from kick-off to each stepper's first step; all within tolerance |
+| Multi-stepper max speed | `CONFIG 2 <d>,<d> dir`, `QSEG <n> <max> 1`, `QRUN 3` | does the second stepper perturb the first step's timing |
+| Sync start | `CONFIG 2 <d>,<d> dir`, `QSEG <n> <ticks> 1`, `QRUN 3` | time from kick-off to each stepper's first step; all within tolerance |
 
 The last two interact on AVR: `max_speed_in_ticks` is
 `TICKS_PER_S/50000` with one stepper but 426 with two
-(`adjustSpeedToStepperCount`, `src/pd_avr/avr_queue.cpp`), so `1ch` and `2ch`
-must both be characterized on the same board.
+(`adjustSpeedToStepperCount`, `src/pd_avr/avr_queue.cpp`), so one and two
+steppers (`--count 1` and `--count 2`) must both be characterized on the same
+board.
 
 ## Capabilities (today)
 

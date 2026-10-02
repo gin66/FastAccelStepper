@@ -112,6 +112,9 @@ def main():
                     help="print the sweep plan and any illegal points, run nothing")
     ap.add_argument("--port", default=hw.DEFAULT_PORT)
     ap.add_argument("--driver", default=hw.DEFAULT_DRIVER)
+    ap.add_argument("--dut-driver", default=rt.DEFAULT_NATIVE_DRIVER,
+                    help="pulse driver for scenarios whose config does not "
+                         "name one (timer on AVR, pio on Pico)")
     ap.add_argument("--sample-rate", type=int, default=hw.DEFAULT_RATE)
     ap.add_argument("--run", action="store_true",
                     help="drive the board once per point and capture each")
@@ -165,7 +168,8 @@ def run_sweep(args, info):
             continue
         name = f"{args.scenario}_{label.replace('=', '_')}"
         try:
-            wire_cfg, channels, mask = hw.wire_plan(args.scenario)
+            wire_cfg, channels, mask = hw.wire_plan(args.scenario,
+                                                    args.dut_driver)
             vcd, _note = hw.run_segments(
                 segments, wire_cfg, channels, mask, name, info,
                 port=args.port, driver=args.driver, out_dir=run_dir,

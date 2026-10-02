@@ -1,6 +1,6 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_17.vcd",
+  "capture": "/tmp/cap/r8/SR_17.vcd",
   "channel_config": "mixed_rmt_mcpwm",
   "driver": "rmt+mcpwm_pcnt",
   "dut": {
@@ -10,10 +10,10 @@
     "ticks_per_s": 16000000
   },
   "evaluator_detail": {
-    "first_step_skew_us": 29.5417,
+    "first_step_skew_us": 48.9167,
     "first_step_us": {
-      "A": 2211247.8333,
-      "B": 2211277.375
+      "A": 2200130.3333,
+      "B": 2200179.25
     },
     "invariants": {
       "dir_while_step_high": {},
@@ -21,7 +21,7 @@
       "ok": true
     },
     "period_us": 40.0,
-    "skew_periods": 0.7385,
+    "skew_periods": 1.2229,
     "steps_per_stepper": {
       "A": {
         "extra_steps": 0,
@@ -42,7 +42,7 @@
   "goal": "synchronized start across two different drivers",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 39.0627,
+      "duty_cycle_percent": 39.0643,
       "edge_count": 400,
       "inter_step_us": {
         "max": 40.0,
@@ -56,59 +56,60 @@
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6119,
+        "mean": 15.6125,
         "median": 15.625,
         "min": 15.5833,
         "n": 200,
         "spread": 0.0417,
-        "stdev": 0.0194
+        "stdev": 0.0191
       },
       "pulse_low_us": {
         "max": 24.375,
-        "mean": 24.3543,
+        "mean": 24.3536,
         "median": 24.375,
         "min": 24.2917,
         "n": 199,
         "spread": 0.0833,
-        "stdev": 0.0221
+        "stdev": 0.0224
       },
       "step_count": 200
     },
     "B": {
-      "duty_cycle_percent": 39.0607,
+      "duty_cycle_percent": 49.8436,
       "edge_count": 400,
       "inter_step_us": {
         "max": 40.0,
-        "mean": 39.9661,
+        "mean": 39.9663,
         "median": 39.9583,
         "min": 39.9167,
         "n": 199,
         "spread": 0.0833,
-        "stdev": 0.0196
+        "stdev": 0.0189
       },
-      "max_pulse_width_us": 24.375,
+      "max_pulse_width_us": 20.0833,
       "pulse_high_us": {
-        "max": 15.625,
-        "mean": 15.611,
-        "median": 15.625,
-        "min": 15.5417,
+        "max": 19.9583,
+        "mean": 19.9206,
+        "median": 19.9167,
+        "min": 19.875,
         "n": 200,
         "spread": 0.0833,
-        "stdev": 0.0205
+        "stdev": 0.0284
       },
       "pulse_low_us": {
-        "max": 24.375,
-        "mean": 24.3551,
-        "median": 24.375,
-        "min": 24.2917,
+        "max": 20.0833,
+        "mean": 20.0456,
+        "median": 20.0417,
+        "min": 20.0,
         "n": 199,
         "spread": 0.0833,
-        "stdev": 0.0212
+        "stdev": 0.0285
       },
       "step_count": 200
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -120,5 +121,5 @@
   "stop_after_s": null,
   "tag": "esp32_rmt_mcpwm_pcnt_mixed_rmt_mcpwm",
   "test_id": "SR_17",
-  "timestamp": "2026-10-02T09:55:42Z"
+  "timestamp": "2026-10-02T12:00:15Z"
 }

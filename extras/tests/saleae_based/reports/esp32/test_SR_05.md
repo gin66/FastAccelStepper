@@ -4,8 +4,8 @@
 **Goal:** pulse high time
 **Program:** `QSEG 16 640 1`
 **DUT:** 16000000 ticks/s, `MIN_CMD_TICKS` 3200, `QUEUE_LEN` 32, fastest legal 640 ticks
-**Configuration:** 1ch on auto (esp32)
-**Tag:** `esp32_auto_1ch`
+**Configuration:** 1ch on rmt_v2 (esp32)
+**Tag:** `esp32_rmt_v2_1ch`
 **Captured at:** 24000000 Hz
 **Result:** **PASS**
 
@@ -13,7 +13,7 @@
 
 | stepper | steps | period us (min–max, spread) | pulse high us (min–max, spread) | duty % |
 |---|---|---|---|---|
-| A | 16 | 39.9583–40, 0.0417 | 15.5833–15.625, 0.0417 | 39.06 |
+| A | 16 | 39.9167–40, 0.0833 | 15.5833–15.625, 0.0417 | 39.07 |
 
 ## Detail
 
@@ -22,26 +22,26 @@
   "adherence": {
     "commanded_period_us": 40.0,
     "commanded_rate_hz": 25000.0,
-    "jitter_pct": 0.104,
+    "jitter_pct": 0.208,
     "max_period_us": 40.0,
-    "mean_period_us": 39.9694,
+    "mean_period_us": 39.9639,
     "measurable": true,
-    "min_period_us": 39.9583,
+    "min_period_us": 39.9167,
     "n_out_of_tolerance": 0,
     "ok": true,
     "periods_measured": 15,
-    "rate_max_hz": 25026.07,
-    "rate_mean_hz": 25019.11,
+    "rate_max_hz": 25052.19,
+    "rate_mean_hz": 25022.59,
     "rate_min_hz": 25000.0,
-    "sag_pct": -0.076,
+    "sag_pct": -0.09,
     "tolerance_us": 0.8,
-    "worst_deviation_us": 0.0417
+    "worst_deviation_us": 0.0833
   },
-  "avg_high_us": 15.612,
-  "avg_low_us": 24.3583,
-  "duty_percent": 39.06,
+  "avg_high_us": 15.6146,
+  "avg_low_us": 24.35,
+  "duty_percent": 39.07,
   "expected_period_us": 40.0,
-  "frequency_hz": 25019.11,
+  "frequency_hz": 25022.59,
   "invariants": {
     "dir_while_step_high": {},
     "n_dir_while_step_high": 0,
@@ -72,4 +72,4 @@
 
 ## Capture
 
-`/tmp/cap/rep/SR_05.vcd`
+`/tmp/cap/r8/SR_05.vcd`

@@ -14,16 +14,18 @@
 | stepper | steps | period us (min–max, spread) | pulse high us (min–max, spread) | duty % |
 |---|---|---|---|---|
 | A | 200 | 39.9167–40, 0.0833 | 15.5833–15.625, 0.0417 | 39.06 |
-| B | 200 | 39.9167–40, 0.0833 | 15.5417–15.625, 0.0833 | 39.06 |
+| B | 200 | 39.9167–40, 0.0833 | 19.875–19.9583, 0.0833 | 49.84 |
+
+**First-step skew between steppers:** 48.9167 us (1.2229 step periods). Both steppers' steady-state periods matching above does *not* mean they started together -- this is the number that says when their first steps landed. Recorded, not asserted.
 
 ## Detail
 
 ```json
 {
-  "first_step_skew_us": 29.5417,
+  "first_step_skew_us": 48.9167,
   "first_step_us": {
-    "A": 2211247.8333,
-    "B": 2211277.375
+    "A": 2200130.3333,
+    "B": 2200179.25
   },
   "invariants": {
     "dir_while_step_high": {},
@@ -31,7 +33,7 @@
     "ok": true
   },
   "period_us": 40.0,
-  "skew_periods": 0.7385,
+  "skew_periods": 1.2229,
   "steps_per_stepper": {
     "A": {
       "extra_steps": 0,
@@ -53,4 +55,4 @@
 
 ## Capture
 
-`/tmp/cap/rep/SR_17.vcd`
+`/tmp/cap/r8/SR_17.vcd`

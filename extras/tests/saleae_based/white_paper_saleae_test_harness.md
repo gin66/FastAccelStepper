@@ -940,7 +940,7 @@ key and compared across runs instead of being reduced to a pass or fail.
 
 | **SR_15** | `sync_start_diff_speed` | `QSEG <n> <ticks_a> 1`, `QRUN 3` at a speed valid for both | Same first-step instant, then each stepper runs at its own period — proves the arm is aligned but the periods stay independent. |
 | **SR_16** | `multi_stepper_timing_impact` | `CONFIG 1 <drv>`, `QSEG 64 <ticks> 1`, `QRUN 1`; then `CONFIG 2 <drv>,<drv>`, same, `QRUN 3` | **Does the second stepper perturb the first?** Compare SR_01's period from the `1ch` run against the same channel's period in the `2ch` run. On AVR the answer is structural: the floor rises from `TICKS_PER_S/50000` to 426 ticks, so a sweep done only at `1ch` would report a speed the board cannot sustain with two steppers connected. |
-| **SR_17** | `sync_cross_driver` | `CONFIG 2 rmt,mcpwm`, `QSEG <n> <ticks> 1`, `QRUN 3` | Cross-driver start skew. **Measured: 29.5417 µs, identical to the same-driver case.** The premise that RMT and MCPWM+PCNT "arm through entirely different hardware and must therefore diverge" is not what the hardware does — see §5.5. |
+| **SR_17** | `sync_cross_driver` | `CONFIG 2 rmt,mcpwm_pcnt dir`, `QSEG <n> <ticks> 1`, `QRUN 3` | Cross-driver start skew. **Measured: 49.0 µs = 1.225 step periods, against 29.5 µs = 0.738 for two steppers on one RMT.** So the premise that RMT and MCPWM+PCNT "arm through entirely different hardware and must therefore diverge" holds after all — see §5.5, including how an earlier run of this very test appeared to refute it and did not. |
 
 ### 5.5 The `sync` mode, and what the permutations showed
 
@@ -954,20 +954,32 @@ question is whether skew tracks *driver heterogeneity* at all:
 
 | Driver list | First-step skew | In step periods |
 |-------------|-----------------|------------------|
-| `rmt+rmt` (same driver) | 29.5417 µs | 0.7385 |
-| `rmt+mcpwm` (cross-driver) | 29.5417 µs | 0.7385 |
-| `rmt+rmt` at 2:1 speeds (SR_15) | 27.1667 µs | 0.6792 |
+| `rmt+rmt` (same driver, SR_14) | 29.5417 µs | 0.7385 |
+| `rmt+mcpwm_pcnt` (cross-driver, SR_17) | **49.0 µs** | **1.2250** |
+| `rmt+rmt` at 2:1 speeds (SR_15) | 27.0417 µs | 0.6760 |
 
-**Cross-driver is not worse than same-driver.** Both land at ~0.74 of a step
-period, to four decimal places. So on this hardware the skew is dominated by
-something common to both paths rather than by which driver a stepper sits on.
-That is worth knowing before writing off multi-driver designs on start alignment,
-and it is exactly the kind of thing a single hand-picked pair would have missed:
-testing only `rmt+mcpwm` would have produced a number with nothing to compare it
-to, and reading it as "the two drivers diverge" would have been wrong.
+**Cross-driver skew is ~66 % worse than same-driver** — 1.22 step periods against
+0.74. The two drivers do arm through unrelated hardware and they do diverge; §5.2's
+original premise was right and the correction it used to be was wrong.
 
-A skew of 29.5 µs is meaningless alone — it is three quarters of a period at 640
-ticks and almost nothing at 65535. Hence the period column.
+> **This table was wrong once, and the reason is worth recording.** An earlier
+> revision of this section reported `rmt+mcpwm` at *exactly* the same 29.5417 µs
+> as `rmt+rmt`, four decimal places, and concluded from the identity that skew
+> tracks nothing but uC load. The identity was the tell: two independent
+> measurements do not agree to a sample at 24 MS/s. The firmware's `mixed`
+> channel config parsed its per-stepper driver list and then **overwrote it with
+> the automatic driver choice** before connecting, so the "cross-driver" run was
+> RMT+RMT — the same run twice. Removing the automatic driver (todo R1) is what
+> exposed it: with drivers named explicitly, the cross-driver row is a
+> genuinely different measurement and it is ~0.49 periods larger.
+>
+> The general lesson is the one this harness is built around: a result that
+> records what the firmware happened to do is not a measurement of what was
+> asked for. Fixing it required re-running SR_17 on hardware, not reasoning
+> about it.
+
+A skew of 29.5 µs — or of 49 µs — is meaningless alone: it is three quarters of
+a period at 640 ticks and almost nothing at 65535. Hence the period column.
 
 **Adherence is the asserted half.** Each stepper is given its own period and
 checked against *its own*, not a common one: a synchronized start that dragged

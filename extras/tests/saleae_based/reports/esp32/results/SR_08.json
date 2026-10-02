@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_08.vcd",
+  "capture": "/tmp/cap/r8/SR_08.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -37,7 +37,7 @@
   "goal": "4000 steps, QueueFull retry",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 39.0617,
+      "duty_cycle_percent": 39.0623,
       "edge_count": 8000,
       "inter_step_us": {
         "max": 40.0,
@@ -46,31 +46,32 @@
         "min": 39.9167,
         "n": 3999,
         "spread": 0.0833,
-        "stdev": 0.0196
+        "stdev": 0.0194
       },
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6115,
+        "mean": 15.6117,
         "median": 15.625,
         "min": 15.5417,
         "n": 4000,
         "spread": 0.0833,
-        "stdev": 0.0202
+        "stdev": 0.0199
       },
       "pulse_low_us": {
         "max": 24.375,
-        "mean": 24.3547,
+        "mean": 24.3545,
         "median": 24.375,
         "min": 24.2917,
         "n": 3999,
         "spread": 0.0833,
-        "stdev": 0.0216
+        "stdev": 0.0217
       },
       "step_count": 4000
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -80,7 +81,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_08",
-  "timestamp": "2026-10-02T09:49:47Z"
+  "timestamp": "2026-10-02T11:54:21Z"
 }

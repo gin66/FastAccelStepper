@@ -28,19 +28,33 @@
  * Protocol
  * --------
  *   SR00                       SR_00 connection self-test (8 pins, 1 Hz)
- *   CONFIG <name> [d0,d1,...]  apply channel config; mixed takes per-stepper
- *                              drivers (rmt/mcpwm/i2s/i2s_mux/auto). 1ch and
- * 2ch exist because on AVR the achievable speed depends on the number of
- * connected steppers. QINFO                      tick rate, MIN_CMD_TICKS,
- * QUEUE_LEN and the per-stepper speed floor QCLR                      drop the
- * program and stop QSEG <steps> <ticks> <dir> append a segment to the shared
- * program; steps=0 is a pause of <ticks> ticks, dir is 0 or 1.
- * QSEG <idx> <steps> <ticks> <dir> append to stepper <idx>'s own program
- * instead, for scenarios that need two steppers at different speeds (SR_15).
- * A stepper with its own program ignores the shared one.
- * QRUN <mask>                run the
- * program on the steppers selected by the bitmask, synchronized start POS reply
- * positions of all steppers STOP                       stop move / self-test
+ *   CONFIG <n> <drv>[,<drv>...] [dir|nodir]
+ *                              connect <n> steppers, one driver NAMED per
+ *                              stepper. There is no automatic choice: a result
+ *                              that does not record which driver produced it
+ *                              characterizes nothing. An unknown driver, an
+ *                              absent one, a list whose length is not <n>, a
+ *                              count this platform cannot provide and an
+ *                              unimplemented pin mode are all refused --
+ *                              nothing is ever silently substituted.
+ *                              rmt | rmt_v2 | mcpwm | mcpwm_pcnt | i2s |
+ *                              i2s_direct | i2s_mux on the ESP32 family, timer
+ *                              on AVR/SAM/SAMD, pio on Pico; a driver the
+ *                              running build has no queues for is refused.
+ *   QINFO                      tick rate, MIN_CMD_TICKS, QUEUE_LEN and the
+ *                              per-stepper speed floor
+ *   QCLR                       drop the program and stop
+ *   QSEG <steps> <ticks> <dir> append a segment to the shared program; steps=0
+ *                              is a pause of <ticks> ticks, dir is 0 or 1.
+ *   QSEG <idx> <steps> <ticks> <dir>
+ *                              append to stepper <idx>'s own program instead,
+ *                              for scenarios that need two steppers at
+ *                              different speeds (SR_15). A stepper with its
+ *                              own program ignores the shared one.
+ *   QRUN <mask>                run the program on the steppers selected by the
+ *                              bitmask, synchronized start
+ *   POS                        reply positions of all steppers
+ *   STOP                       stop move / self-test
  *
  * Characterization scenarios are assembled from segments, e.g.
  *   QCLR | QSEG 255 80 1 | QSEG 0 1600 1 | QSEG 1 80 1 | QRUN 1
@@ -108,7 +122,14 @@ static_assert(kStepPins[0] != kStepPins[1],
 
 // Portable driver selector (FasDriver only exists on platforms with driver
 // selection, so keep our own enum and map it at connect time).
-enum saleae_driver { SA_AUTO, SA_RMT, SA_MCPWM, SA_I2S, SA_I2S_MUX };
+//
+// There is deliberately no "automatic" member. The harness never sends an
+// unspecified driver and the firmware never substitutes one: a result that does
+// not record which driver produced it characterizes nothing. An earlier
+// revision resolved 1ch/2ch to the library's automatic choice and tagged
+// seventeen of twenty-five recorded results `auto`, which recorded whatever the
+// firmware happened to pick and said nothing about any driver.
+enum saleae_driver { SA_RMT, SA_MCPWM, SA_I2S, SA_I2S_MUX, SA_TIMER, SA_PIO };
 
 // One entry of the command program. steps == 0 means "pause for ticks ticks".
 struct segment {
@@ -123,10 +144,10 @@ struct segment {
 struct qe_cursor {
   uint32_t left;  // steps (or pause ticks) left in the current segment
   const struct segment* list;
-  uint8_t len;      // segments in `list`
-  uint8_t seg;      // index of the current segment
-  bool started;     // queue kicked off
-  bool active;      // selected by QRUN and not yet finished
+  uint8_t len;   // segments in `list`
+  uint8_t seg;   // index of the current segment
+  bool started;  // queue kicked off
+  bool active;   // selected by QRUN and not yet finished
 };
 
 struct stepper_slot {
@@ -183,12 +204,76 @@ static uint8_t linelen = 0;
 
 static void reply(const char* text) { saleae_hal_serial_write(text); }
 
-static enum saleae_driver parse_driver(const char* name) {
-  if (!strcmp(name, "rmt") || !strcmp(name, "rmt_v2")) return SA_RMT;
-  if (!strcmp(name, "mcpwm") || !strcmp(name, "mcpwm_pcnt")) return SA_MCPWM;
-  if (!strcmp(name, "i2s") || !strcmp(name, "i2s_direct")) return SA_I2S;
-  if (!strcmp(name, "i2s_mux")) return SA_I2S_MUX;
-  return SA_AUTO;
+// Resolve one driver name. Returns false for an unknown name *and* for a real
+// driver this build cannot provide, so `CONFIG 2 rmt,rmt` on an AVR board is
+// refused instead of quietly running two timer queues -- a capture that ran
+// something else is indistinguishable from a capture of what was asked for.
+//
+// On an architecture with a single native driver the list is still explicit, it
+// simply repeats that one (`timer` for AVR/SAM, `pio` for Pico). Naming it
+// costs nothing and keeps every result tagged with the driver that made it.
+static bool parse_driver(const char* name, enum saleae_driver* out) {
+  (void)out;
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  if (!strcmp(name, "rmt") || !strcmp(name, "rmt_v2")) {
+#if defined(SUPPORT_ESP32_RMT)
+    *out = SA_RMT;
+    return true;
+#endif
+  }
+  if (!strcmp(name, "mcpwm") || !strcmp(name, "mcpwm_pcnt")) {
+#if defined(SUPPORT_ESP32_MCPWM_PCNT)
+    *out = SA_MCPWM;
+    return true;
+#endif
+  }
+  if (!strcmp(name, "i2s") || !strcmp(name, "i2s_direct")) {
+#if defined(SUPPORT_ESP32_I2S)
+    *out = SA_I2S;
+    return true;
+#endif
+  }
+  if (!strcmp(name, "i2s_mux")) {
+#if defined(SUPPORT_ESP32_I2S)
+    *out = SA_I2S_MUX;
+    return true;
+#endif
+  }
+#else
+  if (!strcmp(name, "timer")) {
+    *out = SA_TIMER;
+    return true;
+  }
+#if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2040) || \
+    defined(PICO_SDK_RP2350)
+  if (!strcmp(name, "pio")) {
+    *out = SA_PIO;
+    return true;
+  }
+#endif
+#endif
+  return false;
+}
+
+// The name a connected stepper is reported under. `rmt` rather than `rmt_v2`:
+// the RMT generation is a property of the SDK, which is a tag on the run, not
+// of the driver the harness asked for.
+static const char* driver_name(enum saleae_driver d) {
+  switch (d) {
+    case SA_RMT:
+      return "rmt";
+    case SA_MCPWM:
+      return "mcpwm_pcnt";
+    case SA_I2S:
+      return "i2s_direct";
+    case SA_I2S_MUX:
+      return "i2s_mux";
+    case SA_TIMER:
+      return "timer";
+    case SA_PIO:
+      return "pio";
+  }
+  return "unknown";
 }
 
 static void stop_sr00(void) {
@@ -214,7 +299,9 @@ static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
                             enum saleae_driver driver) {
   FastAccelStepper* s;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  FasDriver fd = DRIVER_DONT_CARE;
+  // No DRIVER_DONT_CARE anywhere: the caller named the driver, and a name this
+  // build cannot honour must not reach the engine as a request for "any".
+  FasDriver fd;
   switch (driver) {
     case SA_RMT:
       fd = DRIVER_RMT;
@@ -222,7 +309,7 @@ static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
     case SA_MCPWM:
       fd = DRIVER_MCPWM_PCNT;
       break;
-#if defined(DRIVER_I2S_DIRECT)
+#if defined(SUPPORT_ESP32_I2S)
     case SA_I2S:
       fd = DRIVER_I2S_DIRECT;
       break;
@@ -231,7 +318,7 @@ static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
       break;
 #endif
     default:
-      break;
+      return false;
   }
   s = engine.stepperConnectToPin(step_pin, fd);
 #else
@@ -250,78 +337,92 @@ static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
   return true;
 }
 
-static void handle_config(char* name, char* driver_list) {
+// CONFIG <count> <driver>[,<driver>...] [dir|nodir]
+//
+// One generic grammar replaces the eight named presets (white paper §3.2): a
+// preset was only ever a count, a list of drivers and a pin mode, so naming the
+// combinations only means a new name for every one.
+//
+// It refuses rather than clamps, on all four counts, because a silently reduced
+// or differently-driven run makes the capture look like a driver problem:
+//   - a count the platform cannot provide,
+//   - a driver name this build has no driver for,
+//   - a driver list whose length is not the count,
+//   - a pin mode that is not the one this build implements.
+static void handle_config(char* count_text, char* driver_list,
+                          char* mode_text) {
   stop_sr00();
   if (!engine_ready) {
     engine.init();
     engine_ready = true;
   }
 
-  // Resolve the requested count *before* touching the array. On AVR
-  // SALEAE_MAX_STEPPERS is 2, so filling a 4-entry config into a 2-entry array
-  // would scribble past it -- and clamping afterwards is too late, the writes
-  // have already happened.
-  char line[64];
-  uint8_t n = 0;
+  // Resolve the count *before* touching the array. On AVR SALEAE_MAX_STEPPERS
+  // is 2, so filling a 4-entry driver list into a 2-entry array would scribble
+  // past it -- and clamping afterwards is too late, the writes have already
+  // happened.
+  const uint8_t cap = SALEAE_MAX_STEPPERS;
   enum saleae_driver drivers[SALEAE_MAX_STEPPERS];
-  enum saleae_driver fill = SA_AUTO;
-  uint8_t cap = SALEAE_MAX_STEPPERS;
+  uint8_t n;
 
-  if (!strcmp(name, "1ch")) {
-    n = 1;
-  } else if (!strcmp(name, "2ch")) {
-    n = 2;
-  } else if (!strcmp(name, "4ch_rmt")) {
-    n = 4;
-    fill = SA_RMT;
-  } else if (!strcmp(name, "4ch_mcpwm")) {
-    n = 4;
-    fill = SA_MCPWM;
-  } else if (!strcmp(name, "mixed")) {
-    if (!driver_list) {
-      reply("ERR mixed needs driver list\n");
-      return;
-    }
-    char* tok = strtok(driver_list, ",");
-    while (tok && n < cap) {
-      drivers[n++] = parse_driver(tok);
-      tok = strtok(NULL, ",");
-    }
-    if (n == 0) {
-      reply("ERR mixed needs driver list\n");
-      return;
-    }
-  } else {
-    reply("ERR unknown config\n");
+  if (!count_text) {
+    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
     return;
   }
 
-  // Refuse rather than silently truncate: the host asked for a configuration
-  // this platform cannot provide, and quietly running fewer steppers would make
-  // the capture look like a driver problem.
-  if (n > cap) {
-    snprintf(line, sizeof(line), "ERR %s needs %u steppers, max %u\n", name,
-             (unsigned)n, (unsigned)cap);
-    reply(line);
+  char* end = NULL;
+  long count = strtol(count_text, &end, 10);
+  // A trailing character means one of the superseded preset names ("1ch",
+  // "mixed") is still arriving. atol would read the leading digits and quietly
+  // configure one stepper, so reject the token instead.
+  if (end == count_text || *end != '\0' || count < 1) {
+    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+    return;
+  }
+  if (count > cap) {
+    reply("ERR CONFIG too many steppers\n");
+    return;
+  }
+  n = (uint8_t)count;
+
+  if (!driver_list) {
+    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
     return;
   }
 
-  if (fill == SA_AUTO && n > 1) {
-    // 1ch/2ch leave every stepper on the automatic driver choice.
-    for (uint8_t i = 0; i < n; i++) drivers[i] = SA_AUTO;
-  } else {
-    for (uint8_t i = 0; i < n; i++) drivers[i] = fill;
+  uint8_t got = 0;
+  for (char* tok = strtok(driver_list, ","); tok; tok = strtok(NULL, ",")) {
+    enum saleae_driver d;
+    if (!parse_driver(tok, &d)) {
+      reply("ERR CONFIG no such driver\n");
+      return;
+    }
+    if (got == n) {
+      reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+      return;
+    }
+    drivers[got++] = d;
   }
-  if (n == 1) {
-    drivers[0] = SA_AUTO;
+  if (got != n) {
+    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+    return;
+  }
+
+  // Pin mode. `nodir` arrives with the mode-agnostic stepper count: until then
+  // this build only implements the two-channels-per-stepper map, and running a
+  // step-only request on it would have the host measuring a pin layout it did
+  // not ask for.
+  if (mode_text && strcmp(mode_text, "dir")) {
+    reply("ERR CONFIG mode not 'dir'\n");
+    return;
   }
 
   // Each queue can only be allocated once, so a second CONFIG cannot move an
   // already-connected stepper. Report the existing setup instead of silently
   // running with a different pin map than the host thinks.
   if (slot_count > 0) {
-    char buf[56];
-    snprintf(buf, sizeof(buf), "OK CONFIG %s n=%u already\n", name, slot_count);
+    char buf[48];
+    snprintf(buf, sizeof(buf), "OK CONFIG n=%u mode=dir already\n", slot_count);
     reply(buf);
     return;
   }
@@ -337,10 +438,19 @@ static void handle_config(char* name, char* driver_list) {
     }
   }
 
-  char buf[72];
-  int len = snprintf(buf, sizeof(buf), "OK CONFIG %s n=%u", name, n);
+  char buf[128];
+  // Naming the drivers that were actually connected is what lets a run be
+  // checked against what the board really did -- the one thing an implicit
+  // driver choice used to make impossible. The host already knows what it asked
+  // for, so this is not how a result is tagged.
+  int len = snprintf(buf, sizeof(buf),
+                     "OK CONFIG n=%u mode=dir drivers=", (unsigned)n);
   for (uint8_t i = 0; i < n; i++) {
-    len += snprintf(buf + len, sizeof(buf) - len, " maxspeed%d=%u", i,
+    len += snprintf(buf + len, sizeof(buf) - len, "%s%s", i ? "," : "",
+                    driver_name(slots[i].driver));
+  }
+  for (uint8_t i = 0; i < n; i++) {
+    len += snprintf(buf + len, sizeof(buf) - len, " maxspeed%u=%u", i,
                     slots[i].stepper->getMaxSpeedInTicks());
   }
   snprintf(buf + len, sizeof(buf) - len, "\n");
@@ -369,8 +479,8 @@ static bool qe_next_segment(struct qe_cursor* c) {
   while (c->seg < c->len && c->left == 0) {
     c->seg++;
     if (c->seg < c->len) {
-      c->left = c->list[c->seg].steps ? c->list[c->seg].steps
-                                      : c->list[c->seg].ticks;
+      c->left =
+          c->list[c->seg].steps ? c->list[c->seg].steps : c->list[c->seg].ticks;
     }
   }
   return c->seg < c->len;
@@ -661,11 +771,14 @@ static void handle_qrun(char* mask_text) {
 static void handle_line(char* line) {
   char cmd[16] = {0};
   char arg1[32] = {0};
-  char arg2[32] = {0};
+  // arg2 is the CONFIG driver list, one name per stepper, so it is the only
+  // argument that grows with the stepper count: 4 x "i2s_direct" is 43
+  // characters and truncating it to 32 would refuse a legal request with a
+  // confusing "no such driver" on the last, half-cut name.
+  char arg2[48] = {0};
   char arg3[32] = {0};
   char arg4[32] = {0};
-  int n = sscanf(line, "%15s %31s %31s %31s %31s", cmd, arg1, arg2, arg3,
-                 arg4);
+  int n = sscanf(line, "%15s %31s %47s %31s %31s", cmd, arg1, arg2, arg3, arg4);
 
   if (n <= 0) {
     return;
@@ -677,10 +790,10 @@ static void handle_line(char* line) {
     reply("OK SR00\n");
   } else if (!strcmp(cmd, "CONFIG")) {
     if (n < 2) {
-      reply("ERR CONFIG needs <name>\n");
+      reply("ERR CONFIG needs <count> <driver>[,<driver>...]\n");
       return;
     }
-    handle_config(arg1, arg2);
+    handle_config(arg1, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL);
   } else if (!strcmp(cmd, "QINFO")) {
     handle_qinfo();
   } else if (!strcmp(cmd, "QCLR")) {

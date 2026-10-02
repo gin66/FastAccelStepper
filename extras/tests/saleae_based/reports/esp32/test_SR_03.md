@@ -4,8 +4,8 @@
 **Goal:** at the speed floor
 **Program:** `QSEG 8 3200 1`
 **DUT:** 16000000 ticks/s, `MIN_CMD_TICKS` 3200, `QUEUE_LEN` 32, fastest legal 640 ticks
-**Configuration:** 1ch on auto (esp32)
-**Tag:** `esp32_auto_1ch`
+**Configuration:** 1ch on rmt_v2 (esp32)
+**Tag:** `esp32_rmt_v2_1ch`
 **Captured at:** 24000000 Hz
 **Result:** **PASS**
 
@@ -13,7 +13,7 @@
 
 | stepper | steps | period us (min–max, spread) | pulse high us (min–max, spread) | duty % |
 |---|---|---|---|---|
-| A | 8 | 199.7917–199.875, 0.0833 | 15.5417–15.625, 0.0833 | 7.81 |
+| A | 8 | 199.7917–199.875, 0.0833 | 15.5833–15.625, 0.0417 | 7.81 |
 
 ## Detail
 
@@ -47,4 +47,4 @@
 
 ## Capture
 
-`/tmp/cap/rep/SR_03.vcd`
+`/tmp/cap/r8/SR_03.vcd`

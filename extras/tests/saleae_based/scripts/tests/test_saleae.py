@@ -7,18 +7,28 @@ Run from extras/tests/saleae_based:
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1]
+COMMON = SCRIPTS.parents[0] / "common"
 sys.path.insert(0, str(SCRIPTS))
 
 import analyze_csv  # noqa: E402
+import run_hardware  # noqa: E402
+import run_tests  # noqa: E402
 import signal_parser as sp  # noqa: E402
+import vcd_fixtures as vf  # noqa: E402
+
+# The QINFO values the scenarios are planned against. Nothing here measures
+# them; run_hardware only needs them to size the capture window.
+_FAKE_DUT = vf.Dut()
 
 
 def square(period_samples, high_samples, n_samples):
@@ -233,6 +243,162 @@ class TestSR00(unittest.TestCase):
         channels = self._channels(period_samples=500)
         passed, _ = analyze_csv.evaluate_sr00(channels, 1000)
         self.assertFalse(passed)
+
+
+# Every CONFIG the harness can emit, as (logical config, native driver) pairs.
+# The firmware's grammar is not exercised by any unit test -- it needs a board --
+# so what is pinned here is that the host never produces a line the firmware
+# would refuse, and never names no driver at all.
+CONFIG_CASES = [
+    (cfg, native)
+    for cfg in run_tests.CONFIGS
+    for native in ("rmt_v2", "timer", "pio", "mcpwm_pcnt")
+]
+
+# The names the firmware's parse_driver() knows about. A driver it does not know
+# is refused, so a typo here would surface as a refused CONFIG and an ERR that
+# reads like a hardware fault.
+FIRMWARE_DRIVERS = {
+    "rmt", "rmt_v2", "mcpwm", "mcpwm_pcnt", "i2s", "i2s_direct", "i2s_mux",
+    "timer", "pio",
+}
+
+
+class TestConfigGrammar(unittest.TestCase):
+    def test_wire_line_names_every_driver(self):
+        for cfg, native in CONFIG_CASES:
+            wire = run_tests.config_wire(cfg, native)
+            tokens = wire.split()
+            self.assertEqual(tokens[0], "CONFIG", wire)
+            # count, then one driver per stepper, then the pin mode.
+            self.assertTrue(tokens[1].isdigit(), wire)
+            drivers = tokens[2].split(",")
+            self.assertEqual(len(drivers), int(tokens[1]), wire)
+            self.assertIn(tokens[3], ("dir", "nodir"), wire)
+            self.assertTrue(all(drivers), f"empty driver name in {wire!r}")
+
+    def test_no_driver_is_ever_auto(self):
+        for cfg, native in CONFIG_CASES:
+            for driver in run_tests.config_drivers(cfg, native):
+                self.assertIn(driver, FIRMWARE_DRIVERS,
+                              f"{cfg} sends {driver!r}, which CONFIG refuses")
+
+    def test_driver_names_resolve_per_architecture(self):
+        # One driver per stepper is the invariant; the count comes from the
+        # config, not from the length of a driver list the caller padded.
+        self.assertEqual(run_tests.config_drivers("1ch", "timer"), ["timer"])
+        self.assertEqual(run_tests.config_drivers("2ch", "pio"), ["pio", "pio"])
+        self.assertEqual(run_tests.config_drivers("mixed_rmt_mcpwm", "rmt_v2"),
+                         ["rmt", "mcpwm_pcnt"])
+
+    def test_scenarios_only_use_known_configs(self):
+        for sid, (cfg, *_rest) in run_tests.SCENARIOS.items():
+            self.assertIn(cfg, run_tests.CONFIGS,
+                          f"{sid} names config {cfg!r}, which has no CONFIG")
+
+    def test_firmware_has_no_implicit_driver_choice(self):
+        # The firmware is not unit-tested, so this is the only place the rule
+        # can be checked without a board: SA_AUTO and DRIVER_DONT_CARE would
+        # both reintroduce a driver nobody named.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        code = "\n".join(
+            line for line in source.splitlines()
+            if not line.lstrip().startswith("//"))
+        self.assertNotIn("SA_AUTO", code)
+        self.assertNotIn("DRIVER_DONT_CARE", code)
+
+    def test_firmware_refuses_the_superseded_presets(self):
+        # `CONFIG 1ch` is the old vocabulary. It must not reach a connected
+        # stepper, and the count token is validated whole so atol cannot read
+        # the leading digit and quietly configure one stepper.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        self.assertIn('*end != \'\\0\'', source)
+        for name in ("1ch", "2ch", "4ch_rmt", "4ch_mcpwm"):
+            self.assertNotIn(f'strcmp(name, "{name}")', source)
+
+    def test_config_line_fits_the_firmware_line_buffer(self):
+        # The firmware reads a line into a fixed buffer and takes each argument
+        # with a bounded sscanf width. A CONFIG the host generates that does not
+        # fit is truncated on the way in and refused with a misleading "no such
+        # driver" on the half-cut last name -- so the budget is checked here,
+        # where it can be changed when the stepper count rises.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        line_max = int(re.search(r"#define SALEAE_LINE_MAX (\d+)",
+                                 source).group(1))
+        # Every buffer sscanf writes into, paired with the width the format
+        # claims for it. A buffer smaller than its own width is a buffer
+        # overflow, and a width smaller than the buffer is a silent truncation
+        # that reads as a refusal -- both have to be ruled out, and only
+        # checking one of them is what made an earlier version of this test
+        # pass while the bug it was written for was present.
+        buffers = {name: int(size) for name, size in re.findall(
+            r"char (arg\d)\[(\d+)\]", source)}
+        widths = [int(w) for w in re.findall(r"%(\d+)s", source)]
+        self.assertEqual(len(widths), len(buffers) + 1,
+                         "sscanf format and argument buffers disagree")
+        for (name, size), width in zip(buffers.items(), widths[1:]):
+            self.assertEqual(size - 1, width,
+                             f"{name}[{size}] but sscanf says %{width}s")
+        widest = max(buffers.values()) - 1
+
+        count = max(run_tests.CONFIGS[c][0] for c in run_tests.CONFIGS)
+        for driver in FIRMWARE_DRIVERS:
+            line = f"CONFIG {count} {','.join([driver] * count)} dir"
+            self.assertLessEqual(len(line), line_max - 1,
+                                 f"{line!r} does not fit SALEAE_LINE_MAX")
+            self.assertLessEqual(count * len(driver) + count - 1, widest,
+                                 f"a {count}x {driver!r} driver list is "
+                                 f"truncated by the argument width")
+
+
+class TestBoardCommands(unittest.TestCase):
+    """What the runner actually puts on the wire.
+
+    Nothing else here talks to a board, and the one thing that goes wrong
+    silently is a line that is *nearly* right: `CONFIG CONFIG 1 rmt_v2 dir` was
+    refused by the firmware on all 25 scenarios at once and read as a wiring
+    fault rather than as the doubled keyword it was. A fake board that records
+    what it was asked is the only place that shows up without one.
+    """
+
+    def _sent_to_board(self, scenario, dut_driver="rmt_v2"):
+        """Run one scenario's CONFIG against a fake board; return the lines."""
+        sent = []
+
+        class FakeCapture:
+            returncode = 0
+
+            def communicate(self, timeout=None):
+                return ("", "")
+
+        def fake_capture(*_args, **_kwargs):
+            return FakeCapture()
+
+        wire, channels, mask = run_hardware.wire_plan(scenario, dut_driver)
+        with mock.patch.object(run_hardware, "send",
+                               lambda ser, line, wait=1.0:
+                               sent.append(line) or "OK CONFIG"), \
+                mock.patch.object(run_hardware, "cold_boot",
+                                  lambda port: mock.Mock()), \
+                mock.patch.object(run_hardware.subprocess, "Popen",
+                                  fake_capture), \
+                mock.patch("time.sleep", lambda _s: None):
+            run_hardware.run_segments(
+                [(8, 640, True)], wire, channels, mask, "t",
+                _FAKE_DUT.info())
+        return sent
+
+    def test_config_is_sent_exactly_once(self):
+        for scenario in sorted(run_tests.SCENARIOS,
+                               key=lambda s: int(s.split("_")[1])):
+            sent = self._sent_to_board(scenario)
+            self.assertTrue(sent, scenario)
+            first = sent[0]
+            self.assertEqual(first, run_tests.config_wire(
+                run_tests.SCENARIOS[scenario][0], "rmt_v2"),
+                f"{scenario} sends {first!r}")
+            self.assertEqual(first.count("CONFIG"), 1, first)
+            self.assertEqual(first.split()[0], "CONFIG", first)
 
 
 if __name__ == "__main__":

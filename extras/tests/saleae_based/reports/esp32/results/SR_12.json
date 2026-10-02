@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_12.vcd",
+  "capture": "/tmp/cap/r8/SR_12.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -41,7 +41,7 @@
   "goal": "forward, reverse, forward: two direction changes",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 10.8938,
+      "duty_cycle_percent": 10.891,
       "edge_count": 60,
       "inter_step_us": {
         "max": 1538.7083,
@@ -55,26 +55,27 @@
       "max_pulse_width_us": 1523.0833,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6139,
+        "mean": 15.6097,
         "median": 15.625,
         "min": 15.5833,
         "n": 30,
         "spread": 0.0417,
-        "stdev": 0.0184
+        "stdev": 0.0201
       },
       "pulse_low_us": {
         "max": 1523.0833,
-        "mean": 127.7141,
+        "mean": 127.717,
         "median": 24.375,
         "min": 24.3333,
         "n": 29,
         "spread": 1498.75,
-        "stdev": 379.7657
+        "stdev": 379.7706
       },
       "step_count": 30
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -94,7 +95,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_12",
-  "timestamp": "2026-10-02T09:52:00Z"
+  "timestamp": "2026-10-02T11:56:33Z"
 }

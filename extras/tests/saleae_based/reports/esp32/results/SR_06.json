@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_06.vcd",
+  "capture": "/tmp/cap/r8/SR_06.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -37,16 +37,16 @@
   "goal": "trailing wait after last step",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 15.6402,
+      "duty_cycle_percent": 15.638,
       "edge_count": 8,
       "inter_step_us": {
         "max": 99.9167,
-        "mean": 99.9028,
+        "mean": 99.9167,
         "median": 99.9167,
-        "min": 99.875,
+        "min": 99.9167,
         "n": 3,
-        "spread": 0.0417,
-        "stdev": 0.0196
+        "spread": 0.0,
+        "stdev": 0.0
       },
       "max_pulse_width_us": 84.2917,
       "pulse_high_us": {
@@ -60,17 +60,18 @@
       },
       "pulse_low_us": {
         "max": 84.2917,
-        "mean": 84.2778,
+        "mean": 84.2917,
         "median": 84.2917,
-        "min": 84.25,
+        "min": 84.2917,
         "n": 3,
-        "spread": 0.0417,
-        "stdev": 0.0196
+        "spread": 0.0,
+        "stdev": 0.0
       },
       "step_count": 4
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -85,7 +86,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_06",
-  "timestamp": "2026-10-02T09:48:47Z"
+  "timestamp": "2026-10-02T11:53:21Z"
 }

@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_01.vcd",
+  "capture": "/tmp/cap/r8/SR_01.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -15,16 +15,16 @@
       "commanded_rate_hz": 25000.0,
       "jitter_pct": 0.104,
       "max_period_us": 40.0,
-      "mean_period_us": 39.9643,
+      "mean_period_us": 39.9702,
       "measurable": true,
       "min_period_us": 39.9583,
       "n_out_of_tolerance": 0,
       "ok": true,
       "periods_measured": 7,
       "rate_max_hz": 25026.07,
-      "rate_mean_hz": 25022.34,
+      "rate_mean_hz": 25018.62,
       "rate_min_hz": 25000.0,
-      "sag_pct": -0.089,
+      "sag_pct": -0.074,
       "tolerance_us": 0.8,
       "worst_deviation_us": 0.0417
     },
@@ -56,31 +56,31 @@
   "goal": "inter-step period equals ticks",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 39.0699,
+      "duty_cycle_percent": 39.0561,
       "edge_count": 16,
       "inter_step_us": {
         "max": 40.0,
-        "mean": 39.9643,
+        "mean": 39.9702,
         "median": 39.9583,
         "min": 39.9583,
         "n": 7,
         "spread": 0.0417,
-        "stdev": 0.0146
+        "stdev": 0.0188
       },
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6146,
+        "mean": 15.6094,
         "median": 15.625,
         "min": 15.5833,
         "n": 8,
         "spread": 0.0417,
-        "stdev": 0.018
+        "stdev": 0.0202
       },
       "pulse_low_us": {
         "max": 24.375,
-        "mean": 24.3512,
-        "median": 24.3333,
+        "mean": 24.3571,
+        "median": 24.375,
         "min": 24.3333,
         "n": 7,
         "spread": 0.0417,
@@ -90,6 +90,7 @@
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -99,7 +100,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_01",
-  "timestamp": "2026-10-02T09:46:15Z"
+  "timestamp": "2026-10-02T11:50:49Z"
 }

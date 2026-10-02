@@ -5,10 +5,14 @@ harness.py — high-level, target-agnostic front-end for the Saleae harness.
 Describe the target and the test; the harness derives the rest and drives the
 low-level orchestrator (run_tests.py).
 
-    # ESP32, Arduino framework, latest
+    # ESP32, Arduino framework, four steppers on RMT
     python3 scripts/harness.py --arch esp32 --framework arduino \
-        --driver rmt_v2 --channel-config 8ch_step_only --tests SR_01 \
+        --driver rmt_v2 --count 4 --pin-mode dir --tests SR_01 \
         --steps 4000 --speed-us 5 --flash
+
+    # Same board, one stepper on RMT and one on MCPWM/PCNT
+    python3 scripts/harness.py --arch esp32 --framework idf --version 5.3 \
+        --drivers rmt,mcpwm_pcnt --count 2 --tests SR_17 --flash
 
     # ESP32, ESP-IDF 5.3, MCPWM
     python3 scripts/harness.py --arch esp32 --framework idf --version 5.3 \
@@ -22,9 +26,14 @@ low-level orchestrator (run_tests.py).
     python3 scripts/harness.py --arch rpipico --driver pio \
         --tests SR_01 --steps 4000 --speed-us 5 --flash
 
-From --arch/--framework/--version/--driver/--channel-config it computes the tag
-key, the PlatformIO project dir + env, and (unless given) a capture sample rate
-that is >= 20 samples per step period. --dry-run prints the mapping only.
+From --arch/--framework/--version/--driver(s)/--count/--pin-mode it computes the
+tag key, the PlatformIO project dir + env, and (unless given) a capture sample
+rate that is >= 20 samples per step period. --dry-run prints the mapping only.
+
+There is no automatic driver selection anywhere. --driver names the pulse driver
+for every stepper, or --drivers gives one name per stepper; both land in the
+firmware's `CONFIG <count> <drv>[,<drv>...] [dir|nodir]`, which refuses anything
+it cannot provide rather than falling back.
 
 The capture sample rate is automatically snapped to a rate the analyzer
 supports (fx2lafw: 48 MHz / n). Use --sample-rate to override.
@@ -49,14 +58,23 @@ SAM_ARCHS = ["atmelsam", "samd51"]
 ARCHS = ESP_ARCHS + AVR_ARCHS + PICO_ARCHS + SAM_ARCHS
 
 DRIVERS = {
-    "esp": ["rmt_v2", "rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux", "mixed"],
+    "esp": ["rmt_v2", "rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"],
     "avr": ["timer"],
     "pico": ["pio"],
     "sam": ["timer"],
 }
 
-CHANNEL_CONFIGS = ["8ch_step_only", "7ch_shared_dir", "4ch_rmt", "4ch_mcpwm",
-                   "2rmt_2i2s", "4ch_i2s_extender", "6ch_i2s_mux", "mixed"]
+# The pin mode, the other half of the firmware's CONFIG grammar. `nodir` exists
+# in the grammar but the firmware does not implement it yet (see the todo's R2),
+# and it is not offered here rather than offered and refused.
+PIN_MODES = ["dir"]
+
+# One generic CONFIG covers every channel configuration there is: a count, a
+# driver list and a pin mode. The eight named presets the firmware used to take
+# (`8ch_step_only`, `4ch_rmt`, `mixed`, ...) are gone -- naming the combinations
+# only means a new name for every one (white paper §3.2). --count and --pin-mode
+# say the first and third terms; --driver says the second.
+DEFAULT_COUNT = 4
 
 # fx2lafw-supported samplerates (48 MHz / n).
 SUPPORTED_RATES = [20000, 25000, 50000, 100000, 200000, 250000, 500000,
@@ -112,7 +130,8 @@ def derive(args):
             env = args.arch  # avr / pico / sam envs are the plain names
         fw = "arduino" if vt is None else "arduino" + vt.replace("V", "").replace("_", ".")
 
-    raw = f"{args.arch}_{fw}_{args.driver}_{args.channel_config}"
+    raw = f"{args.arch}_{fw}_{driver_list(args).replace('+', '_')}" \
+          f"{args.count}{args.pin_mode}"
     tag_key = "".join(c if (c.isalnum() or c == "_") else "_" for c in raw)
 
     rate = args.sample_rate
@@ -123,6 +142,28 @@ def derive(args):
         step_freq = 1_000_000.0 / args.speed_us
         rate = snap_rate(max(4_000_000, int(20 * step_freq)))
     return tag_key, proj, env, rate
+
+
+def driver_list(args):
+    """One driver name per stepper, which is what CONFIG wants.
+
+    --drivers overrides --driver and is the way to say "stepper A on RMT,
+    stepper B on MCPWM": every run names its drivers, because a result that does
+    not record which driver produced it characterizes nothing.
+    """
+    if args.drivers:
+        names = [d.strip() for d in args.drivers.split(",") if d.strip()]
+    else:
+        names = [args.driver] * args.count
+    if len(names) != args.count:
+        raise SystemExit(f"--drivers lists {len(names)} names but --count is "
+                         f"{args.count}; CONFIG refuses a mismatched list")
+    unknown = [d for d in names if d not in DRIVERS[arch_family(args.arch)]]
+    if unknown:
+        raise SystemExit(f"unknown driver(s) for {args.arch}: "
+                         f"{', '.join(unknown)}; known: "
+                         f"{', '.join(DRIVERS[arch_family(args.arch)])}")
+    return "+".join(names)
 
 
 def build_and_flash(proj, env, port, do_build, do_flash):
@@ -146,10 +187,12 @@ def main():
                    help="driver family; defaults per arch "
                         "(esp: rmt_v2, avr: timer, pico: pio)")
     p.add_argument("--drivers", default=None,
-                   help="per-stepper drivers for --channel-config mixed, "
-                        "e.g. rmt,mcpwm (sent as 'CONFIG mixed <list>')")
-    p.add_argument("--channel-config", choices=CHANNEL_CONFIGS,
-                   default="4ch_rmt")
+                   help="per-stepper drivers, one per stepper, e.g. "
+                        "rmt,mcpwm; overrides --driver")
+    p.add_argument("--count", type=int, default=DEFAULT_COUNT,
+                   help="number of steppers to connect (1..4 with dir pins)")
+    p.add_argument("--pin-mode", choices=PIN_MODES, default="dir",
+                   help="two channels per stepper (dir) or one (nodir)")
     p.add_argument("--tests", help="comma list (default: all)")
     p.add_argument("--flash", action="store_true", help="build + flash first")
     p.add_argument("--build", action="store_true", help="build first (no flash)")
@@ -180,7 +223,8 @@ def main():
         return 0
 
     print(f"target : {args.arch} / {args.framework} / {args.version}")
-    print(f"driver : {args.driver}  config: {args.channel_config}")
+    print(f"driver : {driver_list(args)}  "
+          f"config: {args.count} steppers, {args.pin_mode}")
     print(f"tag key: {tag_key}")
     print(f"project: {proj}  env: {env}")
     print(f"rate   : {rate} Hz  ({rate / 1_000_000 * args.speed_us:.0f} "
@@ -191,6 +235,7 @@ def main():
 
     build_and_flash(proj, env, args.port, args.build, args.flash)
 
+    args.dut_driver = args.driver
     tests = run_tests.parse_tests(args.tests)
     run_tests.run(tag_key, tests, args)
     return 0

@@ -4,8 +4,8 @@
 **Goal:** long RMT run: no gap at a buffer split
 **Program:** `QSEG 200 640 1`
 **DUT:** 16000000 ticks/s, `MIN_CMD_TICKS` 3200, `QUEUE_LEN` 32, fastest legal 640 ticks
-**Configuration:** 1ch on auto (esp32)
-**Tag:** `esp32_auto_1ch`
+**Configuration:** 1ch on rmt_v2 (esp32)
+**Tag:** `esp32_rmt_v2_1ch`
 **Captured at:** 24000000 Hz
 **Result:** **PASS**
 
@@ -24,16 +24,16 @@
     "commanded_rate_hz": 25000.0,
     "jitter_pct": 0.208,
     "max_period_us": 40.0,
-    "mean_period_us": 39.9663,
+    "mean_period_us": 39.9661,
     "measurable": true,
     "min_period_us": 39.9167,
     "n_out_of_tolerance": 0,
     "ok": true,
     "periods_measured": 199,
     "rate_max_hz": 25052.19,
-    "rate_mean_hz": 25021.09,
+    "rate_mean_hz": 25021.22,
     "rate_min_hz": 25000.0,
-    "sag_pct": -0.084,
+    "sag_pct": -0.085,
     "tolerance_us": 0.8,
     "worst_deviation_us": 0.0833
   },
@@ -66,4 +66,4 @@
 
 ## Capture
 
-`/tmp/cap/rep/SR_21.vcd`
+`/tmp/cap/r8/SR_21.vcd`

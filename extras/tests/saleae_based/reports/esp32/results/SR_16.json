@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_16.vcd",
+  "capture": "/tmp/cap/r8/SR_16.vcd",
   "channel_config": "2ch",
-  "driver": "auto",
+  "driver": "rmt_v2+rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -66,7 +66,7 @@
   "goal": "does a second stepper perturb the first?",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 39.0617,
+      "duty_cycle_percent": 39.065,
       "edge_count": 128,
       "inter_step_us": {
         "max": 40.0,
@@ -80,26 +80,26 @@
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6113,
+        "mean": 15.6126,
         "median": 15.625,
         "min": 15.5833,
         "n": 64,
         "spread": 0.0417,
-        "stdev": 0.0196
+        "stdev": 0.019
       },
       "pulse_low_us": {
         "max": 24.375,
-        "mean": 24.3545,
-        "median": 24.375,
-        "min": 24.3333,
+        "mean": 24.3532,
+        "median": 24.3333,
+        "min": 24.2917,
         "n": 63,
-        "spread": 0.0417,
-        "stdev": 0.0208
+        "spread": 0.0833,
+        "stdev": 0.0221
       },
       "step_count": 64
     },
     "B": {
-      "duty_cycle_percent": 39.0601,
+      "duty_cycle_percent": 39.0633,
       "edge_count": 128,
       "inter_step_us": {
         "max": 40.0,
@@ -113,26 +113,27 @@
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6107,
+        "mean": 15.612,
         "median": 15.625,
-        "min": 15.5417,
+        "min": 15.5833,
         "n": 64,
-        "spread": 0.0833,
-        "stdev": 0.0211
+        "spread": 0.0417,
+        "stdev": 0.0193
       },
       "pulse_low_us": {
         "max": 24.375,
-        "mean": 24.3552,
+        "mean": 24.3538,
         "median": 24.375,
-        "min": 24.3333,
+        "min": 24.2917,
         "n": 63,
-        "spread": 0.0417,
-        "stdev": 0.0208
+        "spread": 0.0833,
+        "stdev": 0.0221
       },
       "step_count": 64
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -142,7 +143,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_2ch",
+  "tag": "esp32_rmt_v2_rmt_v2_2ch",
   "test_id": "SR_16",
-  "timestamp": "2026-10-02T09:54:57Z"
+  "timestamp": "2026-10-02T11:59:30Z"
 }

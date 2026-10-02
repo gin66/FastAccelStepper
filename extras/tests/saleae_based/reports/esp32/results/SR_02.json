@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_02.vcd",
+  "capture": "/tmp/cap/r8/SR_02.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -46,7 +46,7 @@
         "min": 39.9167,
         "n": 254,
         "spread": 0.0833,
-        "stdev": 0.0204
+        "stdev": 0.0194
       },
       "max_pulse_width_us": 24.375,
       "pulse_high_us": {
@@ -56,7 +56,7 @@
         "min": 15.5417,
         "n": 255,
         "spread": 0.0833,
-        "stdev": 0.0201
+        "stdev": 0.0198
       },
       "pulse_low_us": {
         "max": 24.375,
@@ -65,12 +65,13 @@
         "min": 24.2917,
         "n": 254,
         "spread": 0.0833,
-        "stdev": 0.0218
+        "stdev": 0.0215
       },
       "step_count": 255
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -80,7 +81,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_02",
-  "timestamp": "2026-10-02T09:46:45Z"
+  "timestamp": "2026-10-02T11:51:19Z"
 }

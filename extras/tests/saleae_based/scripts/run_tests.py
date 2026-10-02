@@ -452,6 +452,55 @@ def sc_sync_start(info):
     return seg_period(2000, t)
 
 
+# Scenario config -> stepper count and driver list.
+#
+# The driver list is explicit on every architecture, including the ones with a
+# single native driver, where it simply repeats that driver (`timer` for
+# AVR/SAM, `pio` for Pico). There is no "auto" entry and no shorthand, because
+# the firmware now refuses an unspecified driver instead of falling back to the
+# library's automatic choice -- a result that does not record which driver
+# produced it characterizes nothing. `native` stands for "whatever single driver
+# this architecture has", which the caller names.
+CONFIGS = {
+    "1ch": (1, "native"),
+    "2ch": (2, "native"),
+    "mcpwm": (1, ("mcpwm_pcnt",)),
+    "mixed_rmt_mcpwm": (2, ("rmt", "mcpwm_pcnt")),
+    "i2s": (1, ("i2s_direct",)),
+}
+
+# The pulse driver of an architecture that has only one, used to expand the
+# "native" spec above. ESP32 has several, so the default here is the one the
+# measured baseline was taken on and any other run passes its own.
+DEFAULT_NATIVE_DRIVER = "rmt_v2"
+
+
+def config_drivers(config, native_driver=DEFAULT_NATIVE_DRIVER):
+    """Resolve a scenario config to one driver name per stepper.
+
+    Always exactly as many drivers as steppers: the firmware refuses a list
+    whose length is not the count, because a silently reduced run makes the
+    capture look like a driver problem. Asserting it here catches the mistake at
+    the table instead of as an ERR on the board.
+    """
+    count, spec = CONFIGS[config]
+    drivers = [native_driver] * count if spec == "native" else list(spec)
+    assert len(drivers) == count, \
+        f"{config}: {count} steppers but {len(drivers)} drivers"
+    return drivers
+
+
+def config_wire(config, native_driver=DEFAULT_NATIVE_DRIVER):
+    """The CONFIG line this scenario sends, in the firmware's grammar."""
+    drivers = config_drivers(config, native_driver)
+    return f"CONFIG {len(drivers)} {','.join(drivers)} dir"
+
+
+def driver_tag(config, native_driver=DEFAULT_NATIVE_DRIVER):
+    """The driver(s) a scenario's CONFIG selects, as one tag component."""
+    return "+".join(config_drivers(config, native_driver))
+
+
 # test id -> (config, segment builder, mask, human name)
 SCENARIOS = {
     "SR_01": ("1ch", sc_period_exact, 1, "inter-step period equals ticks"),
@@ -1049,7 +1098,7 @@ def run_scenario(tag_key, test_id, args):
     config, builder, mask, _desc = SCENARIOS[test_id]
     ser = open_board(args.port, args.baud)
     try:
-        text = reply_of(ser, f"CONFIG {config}")
+        text = reply_of(ser, config_wire(config, args.dut_driver))
         if "OK CONFIG" not in text:
             return "failed", {"error": text.strip()}
         info = read_qinfo(ser)
@@ -1201,6 +1250,9 @@ def main():
     p.add_argument("--results-dir", default="results")
     p.add_argument("--port", default="/dev/cu.usbserial-0001")
     p.add_argument("--baud", type=int, default=115200)
+    p.add_argument("--dut-driver", default=DEFAULT_NATIVE_DRIVER,
+                   help="pulse driver for scenarios whose config does not "
+                        "name one (timer on AVR, pio on Pico)")
     p.add_argument("--force", action="store_true",
                    help="re-run even if a passed result exists")
     p.add_argument("--list", action="store_true",

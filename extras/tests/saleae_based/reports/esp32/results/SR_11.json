@@ -1,8 +1,8 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_11.vcd",
+  "capture": "/tmp/cap/r8/SR_11.vcd",
   "channel_config": "1ch",
-  "driver": "auto",
+  "driver": "rmt_v2",
   "dut": {
     "max_speed_ticks": 640,
     "min_cmd_ticks": 3200,
@@ -39,40 +39,41 @@
   "goal": "reverse then forward: the drain is symmetric",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 19.9123,
+      "duty_cycle_percent": 19.9137,
       "edge_count": 80,
       "inter_step_us": {
-        "max": 1538.6667,
+        "max": 1538.7083,
         "mean": 78.3953,
         "median": 39.9583,
         "min": 39.9167,
         "n": 39,
-        "spread": 1498.75,
-        "stdev": 236.8873
+        "spread": 1498.7917,
+        "stdev": 236.8941
       },
-      "max_pulse_width_us": 1523.0417,
+      "max_pulse_width_us": 1523.125,
       "pulse_high_us": {
         "max": 15.625,
-        "mean": 15.6104,
+        "mean": 15.6115,
         "median": 15.625,
         "min": 15.5833,
         "n": 40,
         "spread": 0.0417,
-        "stdev": 0.0199
+        "stdev": 0.0195
       },
       "pulse_low_us": {
-        "max": 1523.0417,
-        "mean": 62.7853,
+        "max": 1523.125,
+        "mean": 62.7842,
         "median": 24.375,
-        "min": 24.3333,
+        "min": 24.2917,
         "n": 39,
-        "spread": 1498.7083,
-        "stdev": 236.8849
+        "spread": 1498.8333,
+        "stdev": 236.8986
       },
       "step_count": 40
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -87,7 +88,7 @@
     ]
   ],
   "stop_after_s": null,
-  "tag": "esp32_auto_1ch",
+  "tag": "esp32_rmt_v2_1ch",
   "test_id": "SR_11",
-  "timestamp": "2026-10-02T09:51:28Z"
+  "timestamp": "2026-10-02T11:56:01Z"
 }

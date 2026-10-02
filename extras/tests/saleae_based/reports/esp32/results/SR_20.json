@@ -1,6 +1,6 @@
 {
   "arch": "esp32",
-  "capture": "/tmp/cap/rep/SR_20.vcd",
+  "capture": "/tmp/cap/r8/SR_20.vcd",
   "channel_config": "mcpwm",
   "driver": "mcpwm_pcnt",
   "dut": {
@@ -28,40 +28,41 @@
   "goal": "255, pause, 255 (large command on both sides)",
   "measurements": {
     "A": {
-      "duty_cycle_percent": 38.3089,
+      "duty_cycle_percent": 48.8827,
       "edge_count": 1020,
       "inter_step_us": {
-        "max": 439.6667,
-        "mean": 40.7515,
+        "max": 439.5833,
+        "mean": 40.7514,
         "median": 39.9583,
         "min": 39.9167,
         "n": 509,
-        "spread": 399.75,
-        "stdev": 17.699
+        "spread": 399.6667,
+        "stdev": 17.6953
       },
-      "max_pulse_width_us": 424.0417,
+      "max_pulse_width_us": 419.7083,
       "pulse_high_us": {
-        "max": 15.625,
-        "mean": 15.6114,
-        "median": 15.625,
-        "min": 15.5417,
+        "max": 19.9583,
+        "mean": 19.9204,
+        "median": 19.9167,
+        "min": 19.875,
         "n": 510,
         "spread": 0.0833,
-        "stdev": 0.02
+        "stdev": 0.029
       },
       "pulse_low_us": {
-        "max": 424.0417,
-        "mean": 25.14,
-        "median": 24.375,
-        "min": 24.2917,
+        "max": 419.7083,
+        "mean": 20.831,
+        "median": 20.0417,
+        "min": 20.0,
         "n": 509,
-        "spread": 399.75,
-        "stdev": 17.6984
+        "spread": 399.7083,
+        "stdev": 17.6973
       },
       "step_count": 510
     }
   },
   "pass": true,
+  "per_stepper": null,
   "sample_rate_hz": 24000000,
   "segments": [
     [
@@ -83,5 +84,5 @@
   "stop_after_s": null,
   "tag": "esp32_mcpwm_pcnt_mcpwm",
   "test_id": "SR_20",
-  "timestamp": "2026-10-02T09:57:22Z"
+  "timestamp": "2026-10-02T12:01:55Z"
 }

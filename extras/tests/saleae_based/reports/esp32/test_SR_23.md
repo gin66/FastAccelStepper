@@ -4,8 +4,8 @@
 **Goal:** I2S step output timing
 **Program:** `QSEG 64 640 1`
 **DUT:** 16000000 ticks/s, `MIN_CMD_TICKS` 3200, `QUEUE_LEN` 32, fastest legal 640 ticks
-**Configuration:** i2s on i2s (esp32)
-**Tag:** `esp32_i2s_i2s`
+**Configuration:** i2s on i2s_direct (esp32)
+**Tag:** `esp32_i2s_direct_i2s`
 **Captured at:** 24000000 Hz
 **Result:** **PASS**
 
@@ -13,7 +13,7 @@
 
 | stepper | steps | period us (min–max, spread) | pulse high us (min–max, spread) | duty % |
 |---|---|---|---|---|
-| A | 64 | 39.9167–40, 0.0833 | 15.5833–15.625, 0.0417 | 39.06 |
+| A | 64 | 39.9167–40, 0.0833 | 1.9583–2, 0.0417 | 5 |
 
 ## Detail
 
@@ -66,4 +66,4 @@
 
 ## Capture
 
-`/tmp/cap/rep/SR_23.vcd`
+`/tmp/cap/r8/SR_23.vcd`

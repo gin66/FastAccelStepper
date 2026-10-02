@@ -460,12 +460,16 @@ answer a different one.
 ## Status
 
 **25 of the white paper's 28 scenarios are implemented and verified on
-hardware (ESP32, 25/25 pass).** Three are documented as not applicable to this
-hardware: SR_22 needs RMT V2, SR_24 an AVR board, SR_00 is the opt-in pin
-self-test. Committed baseline: `reports/esp32/`.
+hardware (ESP32, 25/25 pass, every one naming its driver).** Three are
+documented as not applicable to this hardware: SR_22 needs RMT V2, SR_24 an AVR
+board, SR_00 is the opt-in pin self-test. Committed baseline: `reports/esp32/`,
+regenerated with explicit drivers (R8).
 
-Implementation plan items 1–8 are done. See *Decisions and findings* for what
-the hardware actually showed.
+Implementation plan items 1–8 are done, and the redesign's **R1** (firmware:
+`auto` removed) and **R8** (re-run and re-baseline) are done with hardware
+behind them. R2–R5 and R7 remain. See *Decisions and findings* for what the
+hardware actually showed — including the one recorded finding that R1's re-run
+invalidated.
 
 ### The redesign now in progress
 
@@ -479,12 +483,78 @@ report. **Every result must name the driver it ran on.**
 The redesign is tracked item by item below so it can be picked up by more than
 one agent. Each item is independently checkable and states how to verify it.
 
-- [ ] **R1 — firmware: `auto` removed.** `parse_driver()` must not return
-      `SA_AUTO`; an unknown or absent driver is an error, not a fallback.
-      `CONFIG` takes an explicit count plus a per-stepper driver list, and
-      refuses anything it cannot provide rather than clamping.
-      *Verify:* `CONFIG 2` / `CONFIG 2 auto` is refused; no `SA_AUTO` reaches
-      `connect_stepper()`; both builds clean.
+- [x] **R1 — firmware: `auto` removed. Done.** `parse_driver()` returns a
+      `bool` and never `SA_AUTO`; an unknown name *and* a real driver this build
+      has no queues for are both refused, so `CONFIG 2 rmt,rmt` on a 328P does
+      not quietly hand back two timer queues. `enum saleae_driver` has no
+      automatic member and `connect_stepper()` no longer has a `default: break`
+      that leaves `DRIVER_DONT_CARE` in `fd` — the only way out of the switch is
+      `return false`.
+      `CONFIG <count> <driver>[,<driver>...] [dir|nodir]` replaces the eight
+      named presets. It **refuses rather than clamps** on all four counts: a
+      count above `SALEAE_MAX_STEPPERS`, a driver the build cannot provide, a
+      list whose length is not the count, and a pin mode that is not `dir`
+      (which is the only one implemented; `nodir` arrives with R2). The count
+      token is validated *whole* (`*end != '\0'`), not with `atol`: `CONFIG 1ch`
+      would otherwise have `atol` read the leading `1` and quietly connect one
+      stepper on an unspecified driver — the exact failure mode being removed.
+      The eight preset names are gone from the firmware entirely; a grep for
+      `SA_AUTO`, `DRIVER_DONT_CARE` or `strcmp(name, "1ch")` finds nothing but
+      the comments that explain why they are gone.
+      Driver names stay explicit on every architecture, including the ones with
+      a single native driver, where the list simply repeats it: `timer` on
+      AVR/SAM/SAMD, `pio` on Pico (white paper §3.1). Naming one costs nothing
+      and keeps every result tagged with the driver that made it.
+      The `OK CONFIG` reply now names the drivers the board actually connected
+      (`OK CONFIG n=2 mode=dir drivers=rmt,mcpwm_pcnt maxspeed0=…`), so a run can
+      be checked against what the hardware did rather than what the host asked
+      for. `rmt` is reported, not `rmt_v2`: the RMT generation is a property of
+      the SDK, which is already a tag on the run.
+      *Host side, because the firmware no longer speaks the old vocabulary:*
+      `run_tests.CONFIGS` owns the logical-config → `(count, driver list)`
+      mapping, `config_wire()` renders the line and `driver_tag()` names the
+      drivers for the result record — so `driver_of()`'s hardcoded `"1ch": "auto"`
+      table is deleted rather than left lying. `harness.py` drops
+      `--channel-config` for `--count` / `--pin-mode` / `--drivers`, and
+      `run_hardware.py` / `sweep.py` gained `--dut-driver` (`--driver` was
+      already the sigrok device, and renaming it would have broken `sweep.py`).
+      Every scenario now sends a named driver: `SR_17` `CONFIG 2 rmt,mcpwm_pcnt
+      dir`, `SR_18` `CONFIG 1 mcpwm_pcnt dir`, and on AVR `SR_14` `CONFIG 2
+      timer,timer dir`.
+      *A cost worth recording.* String literals live in `.data` on AVR, and the
+      first draft of the messages cost **+212 bytes** of a 2048-byte budget
+      (1591 → 1803, i.e. 77.7% → 88.0%). Collapsing four near-duplicate error
+      strings into one and dropping the driver-name table from the AVR build
+      brought it to **+84 bytes (1591 → 1675, 81.8%)**, which is what the
+      uniform `drivers=` reply above costs. Worth remembering before adding a
+      sixth `ERR` variant.
+      *A second cost, found by the test that checks the first.* The generic
+      grammar makes argument 2 — the driver list — grow with the stepper count,
+      and it was still parsed with `%31s` into a `char[32]`. Four
+      `mcpwm_pcnt`/`i2s_direct` names is 43 characters, so `CONFIG 4
+      mcpwm_pcnt,mcpwm_pcnt,mcpwm_pcnt,mcpwm_pcnt dir` was truncated to
+      `mcpwm_pcnt,mcpwm_pcnt,mcpwm_pc` and refused with `ERR CONFIG no such
+      driver` — a **legal request refused with a misleading reason**, which is
+      the failure mode this whole item exists to remove. `arg2` is now `char[48]`
+      read with `%47s`. The old `mixed` form had the same 31-char cap, so the
+      bug predates R1; the grammar is only what made it reachable at 4 steppers.
+      `SALEAE_LINE_MAX` (64) still has room at 4 steppers — the longest legal
+      line is 57 characters — but **R2 will have to raise it**: 8 steppers is
+      `CONFIG 8 i2s_direct,… dir` at 100 characters.
+      *Verify:* `CONFIG 2` / `CONFIG 2 auto` / `CONFIG 1ch` / `CONFIG 2 rmt
+      timer` / `CONFIG 3 timer,timer dir` are all refused with an `ERR` and no
+      stepper connects; `CONFIG 2 rmt,mcpwm_pcnt dir` connects both; the `SA_AUTO`
+      and preset-name greps above are clean; `saleae_avr` **1675/2048**,
+      `saleae_esp32` and `esp32_idf_V5_3_0` all build with no new warning; 97
+      unit tests pass. Seven new hardware-free tests in
+      `scripts/tests/test_saleae.py::TestConfigGrammar`, each **mutation-checked**
+      — reintroducing `SA_AUTO`, dropping the whole-token count check, padding a
+      config to fewer drivers than its count, shrinking `arg2`, and narrowing
+      the `sscanf` format each turn the suite red. That last two exposed a
+      vacuous first version of the line-budget check, which read the width from
+      the format string and so could not see a buffer that disagreed with it.
+      **Not verified on hardware** — no board was connected, so R8 has to re-run
+      the set before any of these numbers mean anything.
 - [ ] **R2 — firmware: 1…8 steppers, both channel modes.** `SALEAE_MAX_STEPPERS`
       rises from 4 to 8, `CONFIG` accepts a `nodir` mode, and a new `MAP`
       command reports mode and stride so host and firmware cannot disagree on
@@ -561,11 +631,37 @@ one agent. Each item is independently checkable and states how to verify it.
       `--driver i2s_mux` run once it is available.
       *Verify:* a recorded result tagged `i2s_mux`; until then the todo must
       say *untested*, not *absent*.
-- [ ] **R8 — re-run and re-baseline.** The existing 25 results are tagged
-      `auto` for the most part and stop being meaningful the moment R1 lands.
-      Re-run the full set with explicit drivers and regenerate
-      `reports/esp32/`.
-      *Verify:* no result file contains the tag `auto`.
+- [x] **R8 — re-run and re-baseline. Done.** All 25 wired scenarios re-run on the
+      connected ESP32 with the R1 firmware, one cold boot each, Saleae clone at
+      24 MS/s: **25/25 accepted by their own evaluators**. `reports/esp32/`
+      regenerated from those result JSONs.
+      `--dut-driver rmt_v2` was chosen for the `1ch`/`2ch` scenarios
+      deliberately: under `SUPPORT_DYNAMIC_ALLOCATION` the old `auto` resolved to
+      RMT first, so this is a like-for-like comparison and any regression would
+      be attributable rather than confused with a driver change.
+      *The re-run is a clean like-for-like:* every one of the 25 step counts is
+      **identical** to the previous baseline (SR_02 255, SR_07 2000, SR_08 4000,
+      SR_25 stopping at 11475 of 20000, …), all verdicts unchanged, and every
+      period within one 24 MS/s sample of the old value. So R1 changed the
+      *labelling* of the runs, as intended, and nothing else.
+      **What naming the drivers bought, immediately:** the report's pulse-width
+      column now separates the three drivers instead of showing one number.
+      RMT emits a constant **15.54–15.625 µs** high time, MCPWM/PCNT
+      **19.875–99.83 µs**, I2S **1.958–2 µs**. Under `auto` all of the RMT and
+      MCPWM rows had been filed under one tag and could not be compared.
+      *And it exposed a wrong measurement that had been recorded as a finding* —
+      see *Cross-driver start skew* in *Decisions and findings*, which was
+      invalidated by this re-run and has been corrected in white paper §5.5.
+      *Verify:* no result file contains the tag `auto` — confirmed, 25/25 files
+      carry a named driver (`rmt_v2` ×20, `mcpwm_pcnt` ×3, `rmt+mcpwm_pcnt` ×1,
+      `i2s_direct` ×1). The three stale `tag_summary/esp32_auto_*.md` pages were
+      deleted, since `generate_report.py` writes but does not prune.
+
+      > **Known gap in the re-baseline, left for R5.** `regression.md` compares
+      > verdicts and periods only, so it reports "no changes" — while the one
+      > number that materially changed in this whole re-run (SR_17's skew,
+      > 29.54 → 48.92 µs) is invisible in it. The skew column R5 adds to the
+      > sync-permutation table would close this; it is not added here.
 
 ### Not started, and deliberately so
 
@@ -594,11 +690,36 @@ Recorded because they change what the tests mean.
       queue refilled. Verified on a waveform: truncated at 11475 of 20000, no
       partial pulse, pin still for the remaining 2.823 s. Worth knowing before
       relying on `stopMove()` as an emergency stop.
-- [x] **Cross-driver start skew is not worse than same-driver skew.**
-      29.5417 µs for RMT+PCNT and the same 29.5417 µs for two steppers on one
-      driver — about 0.74 of a step period. So the paper's premise that the two
-      drivers arm through unrelated hardware and must therefore diverge is not
-      what the hardware does. Reported, never gated.
+- [x] **Cross-driver start skew *is* worse than same-driver — and the earlier
+      finding that said otherwise was an artefact of the firmware's `mixed`
+      config, not a property of the hardware.** Two `rmt` steppers start
+      **29.5417 µs** apart (0.7385 step periods); one RMT and one MCPWM/PCNT
+      start **49.0 µs** apart (**1.2250** periods), i.e. ~66 % worse, and
+      reproducibly so (three consecutive runs each, to within one sample at
+      24 MS/s). The paper's §5.2 premise — two drivers arming through unrelated
+      hardware must diverge — is what the hardware does.
+      **How the wrong number was produced, because it is the most interesting
+      thing here.** The old firmware's `mixed` channel config parsed its
+      per-stepper driver list into `drivers[]` and then, three lines later,
+      overwrote every entry with the automatic driver choice:
+
+      ```c
+      if (fill == SA_AUTO && n > 1) {
+        for (uint8_t i = 0; i < n; i++) drivers[i] = SA_AUTO;   // <- discarded the list
+      }
+      ```
+
+      `fill` was only non-`SA_AUTO` for `4ch_rmt`/`4ch_mcpwm`, so `CONFIG mixed
+      rmt,mcpwm` was byte-for-byte equivalent to `CONFIG 2ch`: both steppers on
+      the automatic choice, which under `SUPPORT_DYNAMIC_ALLOCATION` is RMT.
+      **SR_17 never crossed drivers at all.** It reported 29.5417 µs — the
+      same-driver number, because it *was* the same-driver run, agreeing to a
+      sample at 24 MS/s. That absurd precision is what gave it away: two
+      independent hardware paths do not agree to four decimal places.
+      Verified by flashing the pre-R1 firmware and re-running: SR_17 came back
+      at 29.5417 µs again, and SR_14 at 29.5417 µs, on the old build.
+      **Consequence for the baseline:** the committed `reports/esp32/` SR_17
+      entry is labelled `rmt+mcpwm_pcnt` but measured RMT+RMT. R8 replaces it.
 - [x] **MCPWM/PCNT counter-limit overrun: no defect.** 256/256, 510/510, and a
       200…255 sweep where every count was exact.
 - [x] **The inter-command gap is one period**, not a trailing wait — the earlier
