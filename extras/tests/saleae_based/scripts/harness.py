@@ -499,6 +499,9 @@ def main():
     build_and_flash(proj, env, args.port, args.build, args.flash)
 
     args.dut_driver = args.driver
+    # run_tests.run_modes() records these into every mode result; the report
+    # groups its tables by them. harness owns them, so set them from here.
+    args.sdk_version = args.version
     if args.mode:
         plans = plan_scale(args) if args.mode == "scale" else plan_sync(args)
         print()

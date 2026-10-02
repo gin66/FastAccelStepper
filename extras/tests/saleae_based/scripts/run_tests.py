@@ -1866,6 +1866,16 @@ def run_modes(tag_key, plans, args, mode):
         detail["pin_mode"] = plan.pin_mode
         detail["stepper_count"] = plan.count
         detail["goal"] = plan.goal
+        # The report groups mode results by arch / sdk / driver list. Until this
+        # was recorded here the only place the arch existed was inside the tag
+        # key, and the report had to take it apart again -- which means a report
+        # table keyed by architecture was reading a *string convention* rather
+        # than a recorded fact, and `esp32_idf5_3_0_...` has two underscores
+        # where `esp32_arduino_...` has one. A tag key is an index; it is not a
+        # schema.
+        detail["arch"] = getattr(args, "arch", None)
+        detail["framework"] = getattr(args, "framework", None)
+        detail["sdk_version"] = getattr(args, "sdk_version", None)
 
         result_file = results_dir / f"{key}.json"
         with open(result_file, "w") as f:
@@ -2001,6 +2011,13 @@ def main():
     p = argparse.ArgumentParser(
         description="addQueueEntry() characterization orchestrator.")
     p.add_argument("--tag-key", help="tag key {arch}_{driver}_{channel_config}")
+    # Recorded into mode results so a report can group by them. The tag key
+    # already encodes them, but a key is for indexing, not for parsing back.
+    p.add_argument("--arch", default=None, help="recorded in mode results")
+    p.add_argument("--framework", default=None,
+                   choices=[None, "arduino", "idf"])
+    p.add_argument("--sdk-version", default=None,
+                   help="e.g. 5.3.0; recorded in mode results")
     p.add_argument("--tests", help="comma list (default: all)")
     p.add_argument("--sample-rate", type=int, default=DEFAULT_RATE,
                    help=f"capture rate in Hz (default: {DEFAULT_RATE})")

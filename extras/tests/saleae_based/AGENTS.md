@@ -37,6 +37,7 @@ scripts/
   run_tests.py             orchestrator: capture + serial + analyze + record/skip
   control.py               send serial commands and read replies
   capture.py               reliable sigrok-cli wrapper (.sr capture, --vcd, rate/time)
+  report.py                markdown + csv view of a run; mode tables
   analyze_csv.py           SR_00 evaluation
   signal_parser.py         edges/metrics core (shared)
   tests/                   hardware-free unit tests
@@ -101,6 +102,11 @@ python3 scripts/harness.py --mode sync --arch esp32 --speed-us 5 --flash
 
 # low-level (firmware already flashed; you supply the tag key)
 python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch --tests SR_01
+
+# report: catalogue rows from VCDs, mode tables from result JSON.
+# A mode run records a result and NO capture, so --results-dir is where the
+# parallel-count and sync tables come from.
+python3 scripts/report.py /tmp/cap/hw --results-dir /tmp/results
 
 # manual serial: read the limits, then run a program
 python3 scripts/control.py --send "CONFIG 1 timer" --read 2

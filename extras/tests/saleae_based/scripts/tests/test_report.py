@@ -12,6 +12,7 @@ this suite take minutes; the fixtures are the same shape in miniature.
 """
 import csv
 import io
+import json
 import shutil
 import subprocess
 import sys
@@ -183,6 +184,283 @@ class TestUsesTheEvaluators(unittest.TestCase):
         self.assertEqual(report.verdict_of(False, {"first_step_skew_us": 29.583}),
                          "FAIL")
         self.assertEqual(report.verdict_of(True, {}), "PASS")
+
+
+def mode_record(**over):
+    """A mode result as run_modes() writes one, minimal but shaped like real."""
+    record = {
+        "test_id": "MODE", "tag_key": "t", "mode": "sync", "result": "passed",
+        "arch": "esp32", "framework": "arduino", "sdk_version": "latest",
+        "drivers": ["rmt_v2", "rmt_v2"], "pin_mode": "dir",
+        "stepper_count": 2, "first_step_skew_us": 37.5, "skew_periods": 3.75,
+        "per_stepper": {
+            "A": {"channel": "D0", "ticks": 160, "mean_period_us": 10.0,
+                  "steps": {"steps_expected": 64, "steps_measured": 64,
+                            "missing_steps": 0, "extra_steps": 0, "ok": True},
+                  "period": {"expected_period_us": 10.0, "n_long": 0,
+                             "n_short": 0, "ok": True}},
+            "B": {"channel": "D2", "ticks": 320, "mean_period_us": 20.0,
+                  "steps": {"steps_expected": 64, "steps_measured": 64,
+                            "missing_steps": 0, "extra_steps": 0, "ok": True},
+                  "period": {"expected_period_us": 20.0, "n_long": 0,
+                             "n_short": 0, "ok": True}},
+        },
+    }
+    record.update(over)
+    return record
+
+
+class TestModeTables(unittest.TestCase):
+    """R5: the parallel-count and sync-permutation tables.
+
+    Both are read out of mode result JSON, because a mode run records a result
+    and no capture -- there is no VCD for the report to evaluate, which is
+    exactly why these tables exist rather than being another evaluator.
+    """
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+
+    def write(self, records):
+        for i, record in enumerate(records):
+            (self.tmp / f"run{i}.json").write_text(json.dumps(record))
+        return self.tmp
+
+    def test_both_tables_appear_for_a_run_that_has_both_modes(self):
+        scale = mode_record(mode="scale", drivers=["rmt_v2"],
+                            stepper_count=1, first_step_skew_us=None,
+                            skew_periods=None, period_spread_us=0.0,
+                            per_stepper={"A": {
+                                "mean_period_us": 10.0,
+                                "steps": {"steps_expected": 64,
+                                          "steps_measured": 64, "ok": True},
+                                "period": {"ok": True}}})
+        text = report.as_mode_tables(self.write([scale, mode_record()]))
+        self.assertIn("Parallel stepper count (`scale`)", text)
+        self.assertIn("Synced start (`sync`)", text)
+        self.assertIn("rmt_v2", text)
+        self.assertIn("37.5 us", text)
+
+    def test_a_driver_list_with_no_measured_skew_says_so(self):
+        """The todo's own requirement: no empty table, and no empty cell.
+
+        A blank skew column is indistinguishable from a report bug, so the row
+        states what happened instead. For a refused driver list the refusal *is*
+        the measurement.
+        """
+        refused = mode_record(result="refused", drivers=["i2s_mux", "i2s_mux"],
+                              per_stepper={}, first_step_skew_us=None,
+                              skew_periods=None,
+                              error="ERR connect step 0 n=0 drv=i2s_mux")
+        text = report.as_mode_tables(self.write([refused]))
+        row = [ln for ln in text.splitlines() if ln.startswith("| i2s_mux")][0]
+        self.assertIn("not measured", row)
+        self.assertIn("ERR connect step 0", row)
+        self.assertNotIn("|  |", row)
+        # The adherence column must stay silent rather than claim the steppers
+        # were fine. A cell reading "ok" beside a refused row is a report that
+        # reports a driver as healthy because it was never asked.
+        adherence = row.split("|")[-3]
+        self.assertEqual(adherence.strip(), "-", adherence)
+        self.assertNotIn("ok", adherence)
+
+    def test_a_passed_run_whose_record_lacks_skew_does_not_claim_zero(self):
+        silent = mode_record(first_step_skew_us=None, skew_periods=None,
+                             per_stepper={})
+        text = report.as_mode_tables(self.write([silent]))
+        row = [ln for ln in text.splitlines() if ln.startswith("| rmt_v2")][0]
+        self.assertIn("no first-step skew", row)
+        self.assertNotIn("None", row)
+
+    def test_the_skew_table_shows_step_periods_as_well_as_microseconds(self):
+        """Microseconds alone do not say whether a skew is small.
+
+        37.5 us is three quarters of one step period or three quarters of a
+        hundred, and only one of those is a defect a reader can act on.
+        """
+        text = report.as_mode_tables(self.write([mode_record()]))
+        self.assertIn("37.5 us", text)
+        self.assertIn("3.75", text)
+
+    def test_the_runaway_is_visible_even_though_its_skew_is_the_smallest(self):
+        """The measured case, and the reason adherence is its own column.
+
+        `mcpwm_pcnt+mcpwm_pcnt` posts the smallest first-step skew of any
+        combination in the sync run -- 6.25 us -- while being the driver that
+        never stops. Its *period* is flawless: 10 883 steps at exactly the
+        commanded 19.9991 us. Reported as a skew alone the defect would be the
+        best row in the table, so the count has to sit beside the period.
+        """
+        runaway = mode_record(
+            drivers=["mcpwm_pcnt", "mcpwm_pcnt"],
+            first_step_skew_us=6.25, skew_periods=0.625,
+            per_stepper={
+                "A": mode_record()["per_stepper"]["A"],
+                "B": {"channel": "D2", "ticks": 320,
+                      "mean_period_us": 19.9991,
+                      "steps": {"steps_expected": 64,
+                                "steps_measured": 10883, "missing_steps": 0,
+                                "extra_steps": 10819, "ok": False},
+                      "period": {"expected_period_us": 20.0, "n_long": 0,
+                                 "n_short": 0, "ok": True}},
+            })
+        text = report.as_mode_tables(self.write([runaway]))
+        row = [ln for ln in text.splitlines()
+               if ln.startswith("| mcpwm_pcnt+mcpwm_pcnt")][0]
+        self.assertIn("6.25 us", row)
+        self.assertIn("x10883/64", row)
+        self.assertIn("+10819", row)
+
+    def test_the_target_comes_from_the_record_not_the_tag_key(self):
+        """Grouping by architecture must not mean parsing one.
+
+        The key encodes the target, but as a convention: `esp32_arduino_...`
+        splits on two underscores and `esp32_idf5_3_0_...` on one. Two records
+        whose keys disagree with their own fields must group by the fields.
+        """
+        a = mode_record(tag_key="esp32_arduino_rmt_v2_syncdir_n2")
+        b = mode_record(tag_key="esp32_idf5_3_0_rmt_v2_syncdir_n2",
+                        framework="idf", sdk_version="5.3.0")
+        c = mode_record(tag_key="nanoatmega328_arduino_timer_syncdir_n2",
+                        arch="nanoatmega328", framework="arduino")
+        text = report.as_mode_tables(self.write([a, b, c]))
+        self.assertIn("esp32 / arduino", text)
+        self.assertIn("esp32 / idf / sdk 5.3.0", text)
+        self.assertIn("nanoatmega328 / arduino", text)
+        self.assertIn("Target: ", text)
+
+    def test_a_missing_target_is_shown_not_guessed(self):
+        old = mode_record()
+        for key in ("arch", "framework", "sdk_version"):
+            old.pop(key)
+        text = report.as_mode_tables(self.write([old]))
+        self.assertIn("Target: ? / ?", text)
+
+    def test_each_stepper_keeps_its_own_period_in_the_scale_table(self):
+        """Not just the count: a shared-program run must still show per-stepper."""
+        scale = mode_record(mode="scale", drivers=["rmt_v2"] * 2,
+                            stepper_count=2, first_step_skew_us=None,
+                            skew_periods=None, period_spread_us=0.004,
+                            per_stepper=mode_record()["per_stepper"])
+        text = report.as_mode_tables(self.write([scale]))
+        row = [ln for ln in text.splitlines()
+               if ln.startswith("| rmt_v2+rmt_v2 ")][0]
+        self.assertIn("A 10.0usx64/64", row)
+        self.assertIn("B 20.0usx64/64", row)
+
+    def test_a_scale_point_that_deviated_is_marked_in_the_table(self):
+        scale = mode_record(mode="scale", drivers=["rmt_v2"] * 3,
+                            stepper_count=3, first_step_skew_us=None,
+                            skew_periods=None,
+                            per_stepper={
+                                "A": mode_record()["per_stepper"]["A"],
+                                "B": mode_record()["per_stepper"]["B"],
+                                "C": {"mean_period_us": 10.0,
+                                      "steps": {"steps_expected": 64,
+                                                "steps_measured": 64,
+                                                "extra_steps": 12000,
+                                                "ok": False},
+                                      "period": {"ok": True}}})
+        text = report.as_mode_tables(self.write([scale]))
+        row = [ln for ln in text.splitlines()
+               if ln.startswith("| rmt_v2+rmt_v2+rmt_v2")][0]
+        self.assertIn("DEVIATED", row)
+        self.assertIn("+12000", row)
+
+    def test_two_records_sharing_a_tag_key_are_both_reported(self):
+        """A table that drops a row without saying so is worse than no table.
+
+        The filename is the tag key, so in practice they agree -- but keying the
+        dedup by the record's own field meant a collision silently reported one
+        run instead of two.
+        """
+        scale = mode_record(mode="scale", drivers=["rmt_v2"],
+                            stepper_count=1, first_step_skew_us=None,
+                            skew_periods=None)
+        text = report.as_mode_tables(self.write([scale, mode_record()]))
+        self.assertIn("Parallel stepper count (`scale`)", text)
+        self.assertIn("Synced start (`sync`)", text)
+
+    def test_a_lost_step_is_named_not_just_flagged(self):
+        """`DEVIATED` alone does not say which way it went.
+
+        A swallowed step and an extra one are opposite failures that look
+        identical in a flag, and they call for opposite responses -- a driver
+        that stops early and one that never stops are not the same bug.
+        """
+        short = mode_record(per_stepper={
+            "A": mode_record()["per_stepper"]["A"],
+            "B": {"channel": "D2", "ticks": 320, "mean_period_us": 20.0,
+                  "steps": {"steps_expected": 64, "steps_measured": 51,
+                            "missing_steps": 13, "extra_steps": 0, "ok": False},
+                  "period": {"expected_period_us": 20.0, "n_long": 0,
+                             "n_short": 0, "ok": True}}})
+        text = report.as_mode_tables(self.write([short]))
+        row = [ln for ln in text.splitlines() if ln.startswith("| rmt_v2+")][0]
+        self.assertIn("x51/64", row)
+        self.assertIn("-13 missing", row)
+        self.assertNotIn("+", row.split("|")[-3])
+
+    def test_a_wrong_period_is_named_not_just_flagged(self):
+        """A stepper that keeps its count but drifts is the subtler failure.
+
+        Nothing about the step count says the rate was wrong, so without the
+        period named in the same cell a table of counts would call this row
+        healthy.
+        """
+        drifted = mode_record(per_stepper={
+            "A": mode_record()["per_stepper"]["A"],
+            "B": {"channel": "D2", "ticks": 320, "mean_period_us": 21.4,
+                  "steps": {"steps_expected": 64, "steps_measured": 64,
+                            "missing_steps": 0, "extra_steps": 0, "ok": True},
+                  "period": {"expected_period_us": 20.0, "n_long": 7,
+                             "n_short": 2, "ok": False}}})
+        text = report.as_mode_tables(self.write([drifted]))
+        row = [ln for ln in text.splitlines() if ln.startswith("| rmt_v2+")][0]
+        self.assertIn("7 long/2 short periods", row)
+        self.assertIn("21.4us", row)
+        self.assertIn("x64/64", row)
+
+    def test_a_mode_record_with_an_unknown_mode_is_named_not_dropped(self):
+        """It went missing before.
+
+        A MODE record belongs to neither table once its `mode` key is gone or
+        misspelt, and filtering on that key alone dropped it from the report
+        with nothing said -- so the reader would conclude the run was never
+        made, which is a different claim from "made and unreported".
+        """
+        lost = mode_record(mode=None)
+        text = report.as_mode_tables(self.write([lost]))
+        self.assertIn("no recognised mode", text)
+        self.assertIn(lost["tag_key"], text)
+
+    def test_a_results_dir_with_no_mode_records_yields_no_section(self):
+        (self.tmp / "SR_01.json").write_text(json.dumps({"test_id": "SR_01"}))
+        self.assertIsNone(report.as_mode_tables(self.tmp))
+        self.assertIsNone(report.as_mode_tables(self.tmp / "nope"))
+
+    def test_catalogue_and_mode_results_combine_in_one_report(self):
+        """A person should not have to ask twice to see a whole session."""
+        run_dir = build_run_dir("SR_01")
+        self.addCleanup(shutil.rmtree, run_dir)
+        results = self.write([mode_record()])
+        text = report.as_markdown(report.collect(run_dir, vf.Dut().info()),
+                                  run_dir, results)
+        self.assertIn("SR_01", text)
+        self.assertIn("Synced start (`sync`)", text)
+
+    def test_a_run_with_only_mode_records_still_reports(self):
+        text = report.as_markdown([], self.tmp, self.write([mode_record()]))
+        self.assertIn("Synced start (`sync`)", text)
+        self.assertIn("No captures found.", text)
+
+    def test_the_tables_read_the_recorded_drivers(self):
+        """A driver-list column that said 'rmt_v2' for an rmt+mcpwm run would
+        make the table's whole reason for existing -- comparing combinations --
+        meaningless."""
+        text = report.as_mode_tables(self.write([mode_record()]))
+        self.assertIn("rmt_v2+rmt_v2", text)
 
 
 if __name__ == "__main__":

@@ -472,7 +472,7 @@ R3 (host: the two generic modes `scale` and `sync`) and R4 (the channel map
 becoming configuration rather than a global) are done too. R3's first hardware
 run found a live defect in the MCPWM/PCNT driver; R4's found that SR_15's
 ratio collapsed to 1:1 on the real chip, so it had been measuring nothing.
-R5 and R7 remain. See *Decisions and findings* for what the hardware actually showed — including the one recorded finding that R1's re-run
+R5 (the two mode report tables) is done as well. R7 remains. See *Decisions and findings* for what the hardware actually showed — including the one recorded finding that R1's re-run
 invalidated.
 
 ### The redesign now in progress
@@ -898,12 +898,72 @@ one agent. Each item is independently checkable and states how to verify it.
       comparing a pin to itself in `nodir`, a missing channel no longer noticed,
       the SR_15 ratio collapsing, SR_15 no longer flagged, the runner probing
       with `None` again, and the channel cap back to a fixed 4.
-- [ ] **R5 — report: two new tables, keyed by arch / sdk / driver list.**
+- [x] **R5 — report: the two mode tables, keyed by arch / sdk / driver list.**
       A parallel-count table (per driver: 1…max steppers, each stepper's period
       and count) and a sync-permutation table (per driver list: first-step skew
       in µs **and in step periods**, plus per-stepper adherence).
-      *Verify:* both tables appear for the ESP32 run; a driver-list with no
-      measured skew says so rather than printing an empty table.
+
+      Both ship in `report.py`. They exist because **a mode run produces a
+      result and no capture**: there is no VCD for the catalogue pipeline to
+      evaluate, so before these a `--mode scale` run had nothing to report at
+      all. `--results-dir` names where the mode JSON lives (defaulting to the
+      run directory), and the markdown gains both tables alongside whatever
+      catalogue rows there are.
+
+      #### Skew is not a score, and the table proved it
+
+      Writing the sync table immediately paid for itself. `mcpwm_pcnt+mcpwm_pcnt`
+      posts the **smallest first-step skew of any combination measured — 6.25 µs,
+      0.625 periods** — while being the driver that never stops. Ranked by skew,
+      the defect is the best row in the table. Its *period* is flawless:
+      **10 717 steps at exactly the commanded 19.9991 µs** where 64 were
+      commanded, so a step count is the only thing that shows it. This is the R3
+      runaway, and the reason adherence is a column rather than a footnote.
+
+      A deviation is therefore **named, not flagged**. `DEVIATED` cannot tell a
+      swallowed step from an extra one — a driver that stops early and one that
+      never stops are opposite bugs — so the cell reads
+      `B 19.9991us x10717/64 (+10653 extra steps)` and, where it applies,
+      `-13 missing` or `7 long/2 short periods`. A stepper that keeps its count
+      and drifts its rate has nothing wrong with its count, so the period is
+      named in the same cell.
+
+      The skew cell for a driver list that could not be measured states **why**,
+      including the refusal text. A blank is indistinguishable from a report
+      bug, and for a refused driver list the refusal *is* the measurement.
+
+      #### Reading the target out of the record, not the tag key
+
+      The tag key encodes arch and SDK, but as a naming convention: `esp32_arduino_…`
+      splits on two underscores and `esp32_idf5_3_0_…` on one. A table keyed by
+      architecture that recovers the target by string surgery is keyed by a
+      convention, so `arch`, `framework` and `sdk_version` are now recorded in
+      every mode result. Pre-existing records show `? / ?` rather than a guess —
+      which is the correct thing for them, and made the gap visible: every sync
+      result from R3 was in a directory that never recorded its own target.
+
+      *Verified on hardware.* A fresh ESP32 run of both modes:
+      `scale rmt_v2/nodir` **8/8 passed** (parallel-count table, 8 rows),
+      `sync` **10 combinations** (sync table, 6 measured / 4 refused), both
+      under `Target: esp32 / arduino / sdk latest`. The fresh run reproduced
+      R3's findings independently — MCPWM runaway again (10 717 steps, 6.25 µs
+      skew) and all four `i2s_mux` combinations refused.
+
+      Two smaller things the tests forced out: a MODE record whose `mode` key is
+      missing fits neither table, and filtering on that key alone dropped it
+      from the report with nothing said — so it is listed under *Mode records
+      with no recognised mode* rather than vanishing, because a run that
+      disappeared reads as a run that was never made. And the results
+      directory is now keyed by file name, not by the record's own `tag_key`;
+      keying on the field meant a collision silently reported one run of two.
+
+      *Tests: 178 pass, from 161.* New `TestModeTables` (14). *Mutation-checked,
+      all caught:* catalogue `SR_*` records swept into the mode tables, a refused
+      driver list claiming its steppers were fine, an unknown-mode record
+      dropped again, `collect_modes` returning nothing, a missing skew printing
+      `None`, the target read from a constant, the measured count replaced by
+      the expected count, the extra-step count unreported, a lost step
+      unreported, a wrong period unreported, and a refusal's reason dropped.
 - [x] **R6 — whitepaper: complete revision. Done, and done *first*.** Done
       before R1–R3 on purpose: the paper is the spec, so R1–R5 now implement a
       written design rather than the code inventing one the paper then
