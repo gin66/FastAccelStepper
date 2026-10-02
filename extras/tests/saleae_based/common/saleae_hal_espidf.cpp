@@ -64,4 +64,11 @@ extern "C" void saleae_hal_serial_write(const char* text) {
   uart_write_bytes(SALEAE_UART, text, strlen(text));
 }
 
+// See the note in saleae_hal_arduino.cpp: the flash/RAM distinction only exists
+// on AVR, and uart_write_bytes() takes a length, so it never has to read the
+// string as C would.
+extern "C" void saleae_hal_serial_write_p(const char* text) {
+  uart_write_bytes(SALEAE_UART, text, strlen(text));
+}
+
 #endif  // ESP_PLATFORM

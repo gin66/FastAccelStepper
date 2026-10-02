@@ -22,39 +22,50 @@
 #include <stdint.h>
 
 #include "saleae_hal.h"
+#include "saleae_str.h"
 
 #define SALEAE_PIN_COUNT 8
 
 // 8 identification pins. On ESP32 these match the white paper §3.3 channel
 // map. On other targets use a contiguous, always-valid range that avoids the
 // UART pins (0/1 on AVR) so the serial control channel keeps working.
+//
+// PROGMEM because `const` is not free on AVR: the linker script copies
+// `.rodata` into SRAM to initialise it at reset, so a 22-byte lookup table is
+// 22 bytes of SRAM on a 328P and nothing on an ESP32. See saleae_str.h.
 #if defined(ARDUINO_ARCH_ESP32)
-static const int saleae_pins[SALEAE_PIN_COUNT] = {2, 0, 4, 16, 17, 5, 18, 19};
+static const int saleae_pins[SALEAE_PIN_COUNT] SAL_PROGMEM = {2,  0, 4,  16,
+                                                              17, 5, 18, 19};
 #else
-static const int saleae_pins[SALEAE_PIN_COUNT] = {2, 3, 4, 5, 6, 7, 8, 9};
+static const int saleae_pins[SALEAE_PIN_COUNT] SAL_PROGMEM = {2, 3, 4, 5,
+                                                              6, 7, 8, 9};
 #endif
 
-// High time in milliseconds for a fixed 1000 ms (1 Hz) period.
-static const uint16_t saleae_high_ms[SALEAE_PIN_COUNT] = {50,  100, 150, 200,
-                                                          250, 300, 350, 400};
+// High time in milliseconds for a fixed 1000 ms (1 Hz) period. PROGMEM for the
+// same reason as the pin table above.
+static const uint16_t saleae_high_ms[SALEAE_PIN_COUNT] SAL_PROGMEM = {
+    50, 100, 150, 200, 250, 300, 350, 400};
+
+#define PIN_OF(i) ((int)sal_pgm_read_word(&saleae_pins[i]))
+#define HIGH_MS_OF(i) ((uint16_t)sal_pgm_read_word(&saleae_high_ms[i]))
 
 void saleae_test_setup(void) {
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
-    saleae_hal_pin_output(saleae_pins[i]);
-    saleae_hal_write(saleae_pins[i], 0);
+    saleae_hal_pin_output(PIN_OF(i));
+    saleae_hal_write(PIN_OF(i), 0);
   }
 }
 
 void saleae_test_stop(void) {
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
-    saleae_hal_write(saleae_pins[i], 0);
+    saleae_hal_write(PIN_OF(i), 0);
   }
 }
 
 void saleae_test_loop(void) {
   uint16_t phase = (uint16_t)(saleae_hal_millis() % 1000);
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
-    saleae_hal_write(saleae_pins[i], phase < saleae_high_ms[i] ? 1 : 0);
+    saleae_hal_write(PIN_OF(i), phase < HIGH_MS_OF(i) ? 1 : 0);
   }
   saleae_hal_delay_ms(1);
 }

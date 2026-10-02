@@ -95,6 +95,23 @@
  *   QCLR | QSEG 255 80 1 | QSEG 0 1600 1 | QSEG 1 80 1 | QRUN 1
  * is "255 steps at max speed, a pause, then a single step" — the case that
  * exposes MCPWM/PCNT counter-limit overrun handling.
+ *
+ * Strings: every literal here is in flash on AVR, not in SRAM
+ * -----------------------------------------------------------
+ * This file is mostly text, and on AVR a string literal is an SRAM allocation:
+ * the linker script copies .rodata into RAM to initialise it at reset. Before
+ * that was accounted for, .data was 1136 B — 96 B of variables and **1040 B of
+ * string pool**, 51 % of a 328P's 2048 B, with 80 B left. So every literal goes
+ * through SAL_PSTR() and every function that reads one uses the `_P` variant
+ * (common/saleae_str.h), and a literal reply goes out through reply_p() rather
+ * than reply(). The rule underneath it: a flash string is never handed to
+ * anything that reads RAM — which is why driver_name() and pin_mode_name() fill
+ * a caller's buffer instead of returning a pointer, since a `%s` argument has
+ * to be in RAM. The `const` pin table is SAL_PROGMEM for the same reason.
+ *
+ * TestAvrRamBudget in scripts/tests/test_saleae.py enforces all of it, because
+ * no host-side test can see this and a 328P build only fails once the part is
+ * full.
  */
 
 #include "saleae_app.h"
@@ -107,6 +124,7 @@
 #include "FastAccelStepper.h"
 #include "FastAccelStepperEngine.h"
 #include "saleae_hal.h"
+#include "saleae_str.h"
 #include "saleae_test.h"
 
 #define SALEAE_SERIAL_BAUD 115200
@@ -172,6 +190,13 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 // a 328P: a flat 256-byte CONFIG reply cost 112 bytes of RAM there and pushed
 // the build to 93 % of SRAM, for no benefit, since a 328P has two steppers.
 //
+// The numbers below were chosen when the AVR build had 80 bytes free; it now
+// has 1196 (the string pool moved to flash, see the header), so they are
+// conservative rather than tight. They are kept: a buffer sized for the stepper
+// count is right on every target, and the alternative -- a flat size that has
+// to be re-derived whenever a target gains steppers -- is how the 48-byte
+// CONFIG bug above happened.
+//
 // The CONFIG reply is the larger of the two -- "OK CONFIG n=8 mode=nodir
 // stride=1 drivers=" plus 8 driver names plus 8 "maxspeedN=<ticks>" fields
 // needs about 26 bytes per stepper on top of a fixed 48. The short replies
@@ -210,18 +235,30 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 // library's own macros there instead of literals. A 328P has MAX_STEPPER == 2,
 // so only the first two channels' step pins are ever reached; the rest are
 // filled with the dir pins, which is inert.
+//
+// One macro, not one table plus a copy: the runtime table below and the
+// static_asserts beside it are both built from this initializer, so they cannot
+// drift. The runtime table is PROGMEM because a `const` array is an SRAM
+// allocation on AVR (saleae_str.h); the constexpr mirror is only ever read by
+// the static_asserts, so the compiler emits nothing for it and it costs no
+// RAM at all.
 #if defined(ARDUINO_ARCH_ESP32)
-static constexpr uint8_t kChanPin[SALEAE_CHANNELS] = {2,  0, 4,  16,
-                                                      17, 5, 18, 19};
+#define SAL_CHAN_PINS {2, 0, 4, 16, 17, 5, 18, 19}
 #elif defined(ARDUINO_ARCH_AVR)
 // 8 and 12 are the dir pins: pin 9 and 10 are the Timer1 compare outputs
 // (OC1A/OC1B) and are already the step pins; 0 and 1 are the serial port; 13 is
 // the LED. Anything left that is not a compare pin is fine for a plain output.
-static constexpr uint8_t kChanPin[SALEAE_CHANNELS] = {
-    stepPinStepperA, 8, stepPinStepperB, 12, 0, 0, 0, 0};
+#define SAL_CHAN_PINS {stepPinStepperA, 8, stepPinStepperB, 12, 0, 0, 0, 0}
 #else
-static constexpr uint8_t kChanPin[SALEAE_CHANNELS] = {2, 3, 4, 5, 6, 7, 8, 9};
+#define SAL_CHAN_PINS {2, 3, 4, 5, 6, 7, 8, 9}
 #endif
+
+static const uint8_t kChanPin[SALEAE_CHANNELS] SAL_PROGMEM = SAL_CHAN_PINS;
+static constexpr uint8_t kChanPinConst[SALEAE_CHANNELS] = SAL_CHAN_PINS;
+
+// The runtime read. `static_assert` cannot use this (it is not a constant
+// expression), which is exactly why kChanPinConst exists.
+#define CHAN_PIN(i) (sal_pgm_read_byte(&kChanPin[i]))
 
 // A pin cannot be a step output and a direction output at once, and two
 // steppers cannot share a pin. On AVR the step pins are the timer compare pins,
@@ -237,16 +274,25 @@ static_assert(SALEAE_MAX_STEPPERS <= SALEAE_CHANNELS,
 
 #if defined(ARDUINO_ARCH_AVR)
 // Only channels 0..3 are reachable (MAX_STEPPER is 2); the rest are inert.
-static_assert(kChanPin[0] != kChanPin[1], "step A collides with dir A");
-static_assert(kChanPin[2] != kChanPin[3], "step B collides with dir B");
-static_assert(kChanPin[0] != kChanPin[2], "both steppers on one compare pin");
+static_assert(kChanPinConst[0] != kChanPinConst[1],
+              "step A collides with dir A");
+static_assert(kChanPinConst[2] != kChanPinConst[3],
+              "step B collides with dir B");
+static_assert(kChanPinConst[0] != kChanPinConst[2],
+              "both steppers on one compare pin");
 #else
-static_assert(kChanPin[0] != kChanPin[1], "step A collides with dir A");
-static_assert(kChanPin[2] != kChanPin[3], "step B collides with dir B");
-static_assert(kChanPin[0] != kChanPin[2], "step A collides with step B");
-static_assert(kChanPin[4] != kChanPin[6], "step C collides with step D");
-static_assert(kChanPin[1] != kChanPin[7], "dir A collides with dir D");
-static_assert(kChanPin[5] != kChanPin[7], "dir C collides with dir D");
+static_assert(kChanPinConst[0] != kChanPinConst[1],
+              "step A collides with dir A");
+static_assert(kChanPinConst[2] != kChanPinConst[3],
+              "step B collides with dir B");
+static_assert(kChanPinConst[0] != kChanPinConst[2],
+              "step A collides with step B");
+static_assert(kChanPinConst[4] != kChanPinConst[6],
+              "step C collides with step D");
+static_assert(kChanPinConst[1] != kChanPinConst[7],
+              "dir A collides with dir D");
+static_assert(kChanPinConst[5] != kChanPinConst[7],
+              "dir C collides with dir D");
 #endif
 
 // Portable driver selector (FasDriver only exists on platforms with driver
@@ -351,7 +397,23 @@ static bool done_announced = false;
 static char linebuf[SALEAE_LINE_MAX];
 static uint8_t linelen = 0;
 
+// Two ways out, and which one is correct depends on where the text lives.
+//
+//   reply()   `text` is a RAM buffer this file built with sal_snprintf().
+//   reply_p() `text` is a flash literal (SAL_PSTR on AVR).
+//
+// On AVR the distinction is not cosmetic: a flash string read through the RAM
+// path returns whatever SRAM happens to hold at that address, so a reply that
+// "works" on ESP32 prints garbage on a 328P. Every literal reply must go
+// through reply_p(). See saleae_str.h.
 static void reply(const char* text) { saleae_hal_serial_write(text); }
+
+static void reply_p(const char* text) { saleae_hal_serial_write_p(text); }
+
+// Longest driver name is "mcpwm_pcnt"/"i2s_direct" at 10, so 12 leaves a NUL
+// and a byte of slack. The names are copied out of flash rather than returned
+// as a pointer, because every use of one is a `%s` argument.
+#define SAL_DRV_NAME_MAX 12
 
 // Resolve one driver name. Returns false for an unknown name *and* for a real
 // driver this build cannot provide, so `CONFIG 2 rmt,rmt` on an AVR board is
@@ -364,38 +426,41 @@ static void reply(const char* text) { saleae_hal_serial_write(text); }
 static bool parse_driver(const char* name, enum saleae_driver* out) {
   (void)out;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  if (!strcmp(name, "rmt") || !strcmp(name, "rmt_v2")) {
+  if (!sal_strcmp(name, SAL_PSTR("rmt")) ||
+      !sal_strcmp(name, SAL_PSTR("rmt_v2"))) {
 #if defined(SUPPORT_ESP32_RMT)
     *out = SA_RMT;
     return true;
 #endif
   }
-  if (!strcmp(name, "mcpwm") || !strcmp(name, "mcpwm_pcnt")) {
+  if (!sal_strcmp(name, SAL_PSTR("mcpwm")) ||
+      !sal_strcmp(name, SAL_PSTR("mcpwm_pcnt"))) {
 #if defined(SUPPORT_ESP32_MCPWM_PCNT)
     *out = SA_MCPWM;
     return true;
 #endif
   }
-  if (!strcmp(name, "i2s") || !strcmp(name, "i2s_direct")) {
+  if (!sal_strcmp(name, SAL_PSTR("i2s")) ||
+      !sal_strcmp(name, SAL_PSTR("i2s_direct"))) {
 #if defined(SUPPORT_ESP32_I2S)
     *out = SA_I2S;
     return true;
 #endif
   }
-  if (!strcmp(name, "i2s_mux")) {
+  if (!sal_strcmp(name, SAL_PSTR("i2s_mux"))) {
 #if defined(SUPPORT_ESP32_I2S)
     *out = SA_I2S_MUX;
     return true;
 #endif
   }
 #else
-  if (!strcmp(name, "timer")) {
+  if (!sal_strcmp(name, SAL_PSTR("timer"))) {
     *out = SA_TIMER;
     return true;
   }
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2040) || \
     defined(PICO_SDK_RP2350)
-  if (!strcmp(name, "pio")) {
+  if (!sal_strcmp(name, SAL_PSTR("pio"))) {
     *out = SA_PIO;
     return true;
   }
@@ -407,22 +472,47 @@ static bool parse_driver(const char* name, enum saleae_driver* out) {
 // The name a connected stepper is reported under. `rmt` rather than `rmt_v2`:
 // the RMT generation is a property of the SDK, which is a tag on the run, not
 // of the driver the harness asked for.
-static const char* driver_name(enum saleae_driver d) {
+//
+// It writes into a caller-supplied buffer rather than returning a pointer,
+// because both callers feed the result to `%s` and a flash string must be
+// copied into RAM before snprintf can read it (saleae_str.h).
+static void driver_name(enum saleae_driver d, char* out) {
   switch (d) {
     case SA_RMT:
-      return "rmt";
+      sal_to_ram(out, SAL_PSTR("rmt"), SAL_DRV_NAME_MAX);
+      return;
     case SA_MCPWM:
-      return "mcpwm_pcnt";
+      sal_to_ram(out, SAL_PSTR("mcpwm_pcnt"), SAL_DRV_NAME_MAX);
+      return;
     case SA_I2S:
-      return "i2s_direct";
+      sal_to_ram(out, SAL_PSTR("i2s_direct"), SAL_DRV_NAME_MAX);
+      return;
     case SA_I2S_MUX:
-      return "i2s_mux";
+      sal_to_ram(out, SAL_PSTR("i2s_mux"), SAL_DRV_NAME_MAX);
+      return;
     case SA_TIMER:
-      return "timer";
+      sal_to_ram(out, SAL_PSTR("timer"), SAL_DRV_NAME_MAX);
+      return;
     case SA_PIO:
-      return "pio";
+      sal_to_ram(out, SAL_PSTR("pio"), SAL_DRV_NAME_MAX);
+      return;
   }
-  return "unknown";
+  sal_to_ram(out, SAL_PSTR("unknown"), SAL_DRV_NAME_MAX);
+}
+
+// Likewise the pin mode, which CONFIG and MAP both report as `mode=%s`. Two
+// names share a 7-byte buffer; there is nothing to be gained by returning a
+// pointer to a literal nobody may dereference.
+#define SAL_PIN_MODE_MAX 7
+
+static void pin_mode_name(bool nodir, char* out) {
+  // Two copies rather than SAL_PSTR(nodir ? "nodir" : "dir"): PSTR takes a
+  // literal, because it declares a `static const char[]` and has to size it.
+  if (nodir) {
+    sal_to_ram(out, SAL_PSTR("nodir"), SAL_PIN_MODE_MAX);
+  } else {
+    sal_to_ram(out, SAL_PSTR("dir"), SAL_PIN_MODE_MAX);
+  }
 }
 
 static void stop_sr00(void) {
@@ -507,12 +597,12 @@ static void stop_all(void) {
 
 static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
                             bool nodir) {
-  const uint8_t step_pin = kChanPin[idx * chan_stride];
+  const uint8_t step_pin = CHAN_PIN(idx * chan_stride);
   // A step-only stepper gets no dir pin at all rather than a repeated one, so
   // setDirectionPin() is not called and nothing on that pin can be mistaken for
   // a direction. The `nodir` consequence is that count_up is always driven true
   // (see qe_feed), because there is no pin to toggle for a false.
-  const uint8_t dir_pin = nodir ? 0 : kChanPin[idx * chan_stride + 1];
+  const uint8_t dir_pin = nodir ? 0 : CHAN_PIN(idx * chan_stride + 1);
 
   FastAccelStepper* s;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
@@ -569,12 +659,12 @@ static bool parse_pin_mode(char* mode_text, bool* nodir, uint8_t* stride) {
     *stride = SALEAE_STRIDE_DIR;
     return true;
   }
-  if (!strcmp(mode_text, "dir")) {
+  if (!sal_strcmp(mode_text, SAL_PSTR("dir"))) {
     *nodir = false;
     *stride = SALEAE_STRIDE_DIR;
     return true;
   }
-  if (!strcmp(mode_text, "nodir")) {
+  if (!sal_strcmp(mode_text, SAL_PSTR("nodir"))) {
     *nodir = true;
     *stride = SALEAE_STRIDE_NODIR;
     return true;
@@ -592,9 +682,9 @@ static bool parse_pin_mode(char* mode_text, bool* nodir, uint8_t* stride) {
 // recursed into, so the extra level costs nothing that matters.
 static void reply_too_many(long count, uint8_t cap, uint8_t stride) {
   char buf[48];
-  snprintf(buf, sizeof(buf), "ERR CONFIG n=%ld max=%u/%u/%u/%u\n", count,
-           (unsigned)cap, (unsigned)SALEAE_MAX_STEPPERS,
-           (unsigned)SALEAE_CHANNELS, (unsigned)stride);
+  sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR CONFIG n=%ld max=%u/%u/%u/%u\n"),
+               count, (unsigned)cap, (unsigned)SALEAE_MAX_STEPPERS,
+               (unsigned)SALEAE_CHANNELS, (unsigned)stride);
   reply(buf);
 }
 
@@ -676,31 +766,30 @@ static void mark_event(void) {
     return;
   }
   marker_level ^= 1;
-  saleae_hal_write(kChanPin[marker_channel], marker_level);
+  saleae_hal_write(CHAN_PIN(marker_channel), marker_level);
 }
 
 // MARK <ch> -- designate an analyzer channel as the event marker.
 //
-// Two literals, no formatting. Every distinct error string here costs ~100
-// bytes of a 328P's SRAM, because avr-gcc copies .rodata into RAM: the first
-// version of this function took the build from 1845 to 1992 of 2048, leaving 56
-// bytes, and 12 of those came from the extra text in MAP alone. So the reply
-// says only whether the marker was accepted, and MAP's `marker=` field says
-// what it ended up as -- which is the diagnosis anyway, since a refused MARK
-// leaves marker=255.
+// Two replies and nothing else. That was once forced on it -- the first version
+// formatted its own errors and took the AVR build from 1845 to 1992 of 2048
+// bytes, because a string literal is an SRAM allocation there. It is no longer
+// forced (the literals are in flash now), but the simplification is kept,
+// because MAP's `marker=` field is the diagnosis anyway: a refused MARK leaves
+// marker=255. More error text here would be text no one reads.
 static void handle_mark(const char* arg) {
   if (!arg) {
-    reply("ERR MARK\n");
+    reply_p(SAL_PSTR("ERR MARK\n"));
     return;
   }
   if (arg[0] == 'n') {
     marker_channel = SALEAE_NO_MARKER;
-    reply("OK MARK\n");
+    reply_p(SAL_PSTR("OK MARK\n"));
     return;
   }
   // Only 0..7, one digit. Not atoi: this needs a digit range, not a parser.
   if (arg[1] != '\0' || arg[0] < '0' || arg[0] > ('0' + SALEAE_CHANNELS - 1)) {
-    reply("ERR MARK\n");
+    reply_p(SAL_PSTR("ERR MARK\n"));
     return;
   }
   const int ch = arg[0] - '0';
@@ -708,11 +797,11 @@ static void handle_mark(const char* arg) {
   // against that stepper's own edges.
   const uint8_t used = slot_count ? slot_count * chan_stride : 0;
   if (ch < used) {
-    reply("ERR MARK\n");
+    reply_p(SAL_PSTR("ERR MARK\n"));
     return;
   }
   marker_channel = (uint8_t)ch;
-  reply("OK MARK\n");
+  reply_p(SAL_PSTR("OK MARK\n"));
 }
 
 // Set once IMUX has successfully brought the I2S multiplexer up. The engine's
@@ -745,27 +834,27 @@ static void handle_drivers(void) {
 #else
   char buf[48];
 #endif
-  int len = snprintf(buf, sizeof(buf), "OK DRIVERS mux=%u", mux_ready ? 1 : 0);
+  int len = sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK DRIVERS mux=%u"),
+                         mux_ready ? 1 : 0);
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  len += snprintf(buf + len, sizeof(buf) - len,
-                  " rmt=%u rmt_v2=%u mcpwm_pcnt=%u i2s_direct=%u i2s_mux=%u",
-                  driver_supported(SA_RMT) ? 1 : 0,
-                  driver_supported(SA_RMT) ? 1 : 0,
-                  driver_supported(SA_MCPWM) ? 1 : 0,
-                  driver_supported(SA_I2S) ? 1 : 0,
-                  driver_supported(SA_I2S_MUX) ? 1 : 0);
+  len += sal_snprintf(
+      buf + len, sizeof(buf) - len,
+      SAL_PSTR(" rmt=%u rmt_v2=%u mcpwm_pcnt=%u i2s_direct=%u i2s_mux=%u"),
+      driver_supported(SA_RMT) ? 1 : 0, driver_supported(SA_RMT) ? 1 : 0,
+      driver_supported(SA_MCPWM) ? 1 : 0, driver_supported(SA_I2S) ? 1 : 0,
+      driver_supported(SA_I2S_MUX) ? 1 : 0);
 #else
-  len += snprintf(buf + len, sizeof(buf) - len, " timer=1");
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" timer=1"));
 #if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2040) || \
     defined(PICO_SDK_RP2350)
-  len += snprintf(buf + len, sizeof(buf) - len, " pio=1");
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" pio=1"));
 #endif
 #endif
   // A mux that is compiled in but not initialised would otherwise report
   // i2s_mux=1 and then refuse every CONFIG naming it, which reads as a
   // contradiction. The two fields together say "present, not up yet".
-  len += snprintf(buf + len, sizeof(buf) - len, " mux_init=%u\n",
-                  mux_ready ? 1 : 0);
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" mux_init=%u\n"),
+                      mux_ready ? 1 : 0);
   reply(buf);
 }
 
@@ -779,50 +868,67 @@ static void handle_drivers(void) {
 static void handle_imux(const char* data, const char* bclk, const char* ws) {
 #if defined(SUPPORT_ESP32_I2S)
   if (!data || !bclk || !ws) {
-    reply("ERR IMUX needs <data> <bclk> <ws>\n");
+    reply_p(SAL_PSTR("ERR IMUX needs <data> <bclk> <ws>\n"));
     return;
   }
   if (mux_ready) {
-    reply("ERR IMUX already up (initI2sMux() cannot run twice)\n");
+    reply_p(SAL_PSTR("ERR IMUX already up (initI2sMux() cannot run twice)\n"));
     return;
   }
   const uint8_t d = (uint8_t)atoi(data);
   const uint8_t b = (uint8_t)atoi(bclk);
   const uint8_t w = (uint8_t)atoi(ws);
   if (!engine.initI2sMux(d, b, w)) {
-    reply("ERR IMUX initI2sMux failed (pins busy, or already initialised)\n");
+    reply_p(SAL_PSTR(
+        "ERR IMUX initI2sMux failed (pins busy, or already initialised)"
+        "\n"));
     return;
   }
   mux_ready = true;
   char buf[48];
-  snprintf(buf, sizeof(buf), "OK IMUX data=%u bclk=%u ws=%u\n", d, b, w);
+  sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK IMUX data=%u bclk=%u ws=%u\n"), d,
+               b, w);
   reply(buf);
 #else
   (void)data;
   (void)bclk;
   (void)ws;
-  reply("ERR IMUX needs an ESP32 I2S build\n");
+  reply_p(SAL_PSTR("ERR IMUX needs an ESP32 I2S build\n"));
 #endif
 }
 
 static void handle_map(void) {
   // "MAP count=8 mode=nodir stride=1 ch=" plus 8 two-digit pins. Sized from the
   // channel budget for the same RAM reason as SALEAE_CFG_REPLY_MAX.
+  //
+  // `mode` is the one field that cannot be a literal in the format string: it
+  // depends on chan_stride, and a `%s` argument has to be in RAM. Hence the
+  // pin_mode_name() copy.
   char buf[SALEAE_CHANNELS * 4 + 64];
-  int len = snprintf(buf, sizeof(buf),
-                     "MAP count=%u mode=%s stride=%u ch=", (unsigned)slot_count,
-                     chan_stride == SALEAE_STRIDE_NODIR ? "nodir" : "dir",
-                     (unsigned)chan_stride);
+  char mode[SAL_PIN_MODE_MAX];
+  pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
+  int len = sal_snprintf(buf, sizeof(buf),
+                         SAL_PSTR("MAP count=%u mode=%s stride=%u ch="),
+                         (unsigned)slot_count, mode, (unsigned)chan_stride);
   const uint8_t used = slot_count ? slot_count * chan_stride : 0;
   for (uint8_t c = 0; c < used && c < SALEAE_CHANNELS; c++) {
-    len += snprintf(buf + len, sizeof(buf) - len, "%s%u", c ? "," : "",
-                    (unsigned)kChanPin[c]);
+    // Two formats rather than a `"%s%u"` with `c ? "," : ""`: that would put
+    // the separator in RAM as well as flash, and the whole point of the two
+    // lines below is that no string literal ends up in SRAM. It is also the
+    // only way to keep the leading separator off channel 0 without a runtime
+    // string.
+    if (c) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(",%u"),
+                          (unsigned)CHAN_PIN(c));
+    } else {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u"),
+                          (unsigned)CHAN_PIN(c));
+    }
   }
-  len += snprintf(buf + len, sizeof(buf) - len, " marker=%u",
-                  marker_channel == SALEAE_NO_MARKER
-                      ? 0xFFu
-                      : (unsigned)marker_channel);
-  snprintf(buf + len, sizeof(buf) - len, "\n");
+  len += sal_snprintf(
+      buf + len, sizeof(buf) - len, SAL_PSTR(" marker=%u"),
+      marker_channel == SALEAE_NO_MARKER ? 0xFFu : (unsigned)marker_channel);
+  sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("\n"));
   reply(buf);
 }
 
@@ -852,7 +958,7 @@ static void handle_config(char* count_text, char* driver_list,
   bool nodir;
   uint8_t stride;
   if (!parse_pin_mode(mode_text, &nodir, &stride)) {
-    reply("ERR CONFIG mode dir|nodir\n");
+    reply_p(SAL_PSTR("ERR CONFIG mode dir|nodir\n"));
     return;
   }
   const uint8_t chan_cap = SALEAE_CHANNELS / stride;
@@ -867,7 +973,7 @@ static void handle_config(char* count_text, char* driver_list,
   uint8_t n;
 
   if (!count_text) {
-    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+    reply_p(SAL_PSTR("ERR CONFIG needs <n> <drv>[,<driver>]\n"));
     return;
   }
 
@@ -877,7 +983,7 @@ static void handle_config(char* count_text, char* driver_list,
   // "mixed") is still arriving. atol would read the leading digits and quietly
   // configure one stepper, so reject the token instead.
   if (end == count_text || *end != '\0' || count < 1) {
-    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+    reply_p(SAL_PSTR("ERR CONFIG needs <n> <drv>[,<driver>]\n"));
     return;
   }
   if (count > cap) {
@@ -887,25 +993,33 @@ static void handle_config(char* count_text, char* driver_list,
   n = (uint8_t)count;
 
   if (!driver_list) {
-    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+    reply_p(SAL_PSTR("ERR CONFIG needs <n> <drv>[,<driver>]\n"));
     return;
   }
 
+  // The delimiter is a two-byte array rather than the literal "," because on
+  // AVR a string literal is an SRAM allocation -- and one comma does not earn
+  // two bytes of a 328P's RAM. Char constants are immediates, so this costs
+  // nothing. strtok() is kept rather than hand-rolled: its treatment of a run
+  // of commas is exactly what makes "CONFIG 1 timer," and "CONFIG 1 timer" the
+  // same request, and reimplementing that is where a protocol would quietly
+  // change.
+  const char comma[2] = {',', '\0'};
   uint8_t got = 0;
-  for (char* tok = strtok(driver_list, ","); tok; tok = strtok(NULL, ",")) {
+  for (char* tok = strtok(driver_list, comma); tok; tok = strtok(NULL, comma)) {
     enum saleae_driver d;
     if (!parse_driver(tok, &d)) {
-      reply("ERR CONFIG no such driver\n");
+      reply_p(SAL_PSTR("ERR CONFIG no such driver\n"));
       return;
     }
     if (got == n) {
-      reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+      reply_p(SAL_PSTR("ERR CONFIG needs <n> <drv>[,<driver>]\n"));
       return;
     }
     drivers[got++] = d;
   }
   if (got != n) {
-    reply("ERR CONFIG needs <n> <drv>[,<drv>]\n");
+    reply_p(SAL_PSTR("ERR CONFIG needs <n> <drv>[,<driver>]\n"));
     return;
   }
 
@@ -918,9 +1032,10 @@ static void handle_config(char* count_text, char* driver_list,
     // drivers, since a second CONFIG naming a different mode is exactly the
     // case where "already" would otherwise hide a disagreement.
     char buf[SALEAE_SHORT_REPLY_MAX];
-    snprintf(buf, sizeof(buf), "OK CONFIG n=%u mode=%s already\n",
-             (unsigned)slot_count,
-             chan_stride == SALEAE_STRIDE_NODIR ? "nodir" : "dir");
+    char mode[SAL_PIN_MODE_MAX];
+    pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
+    sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK CONFIG n=%u mode=%s already\n"),
+                 (unsigned)slot_count, mode);
     reply(buf);
     return;
   }
@@ -931,8 +1046,11 @@ static void handle_config(char* count_text, char* driver_list,
     if (!connect_stepper(i, drivers[i], nodir)) {
       slot_count = i;
       char buf[SALEAE_SHORT_REPLY_MAX];
-      snprintf(buf, sizeof(buf), "ERR connect step %u n=%u drv=%s nodir=%u\n",
-               i, i, driver_name(drivers[i]), (unsigned)nodir);
+      char drv[SAL_DRV_NAME_MAX];
+      driver_name(drivers[i], drv);
+      sal_snprintf(buf, sizeof(buf),
+                   SAL_PSTR("ERR connect step %u n=%u drv=%s nodir=%u\n"), i, i,
+                   drv, (unsigned)nodir);
       reply(buf);
       return;
     }
@@ -941,22 +1059,34 @@ static void handle_config(char* count_text, char* driver_list,
   // One buffer rather than several, so the reply cannot be truncated halfway,
   // and sized by SALEAE_CFG_REPLY_MAX because on AVR it is stack.
   char buf[SALEAE_CFG_REPLY_MAX];
+  // `mode` and `drv` are RAM copies of flash literals, because both are `%s`
+  // arguments and snprintf reads its arguments out of RAM. See saleae_str.h.
+  char mode[SAL_PIN_MODE_MAX];
+  char drv[SAL_DRV_NAME_MAX];
+  pin_mode_name(nodir, mode);
   // Naming the drivers that were actually connected is what lets a run be
   // checked against what the board really did -- the one thing an implicit
   // driver choice used to make impossible. The host already knows what it asked
   // for, so this is not how a result is tagged.
-  int len = snprintf(buf, sizeof(buf),
-                     "OK CONFIG n=%u mode=%s stride=%u drivers=", (unsigned)n,
-                     nodir ? "nodir" : "dir", (unsigned)stride);
+  int len = sal_snprintf(buf, sizeof(buf),
+                         SAL_PSTR("OK CONFIG n=%u mode=%s stride=%u drivers="),
+                         (unsigned)n, mode, (unsigned)stride);
   for (uint8_t i = 0; i < n; i++) {
-    len += snprintf(buf + len, sizeof(buf) - len, "%s%s", i ? "," : "",
-                    driver_name(slots[i].driver));
+    driver_name(slots[i].driver, drv);
+    // Leading separator as its own format, so no separator literal is needed --
+    // see handle_map() for why. The reply is unchanged either way.
+    if (i) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(",%s"), drv);
+    } else {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%s"), drv);
+    }
   }
   for (uint8_t i = 0; i < n; i++) {
-    len += snprintf(buf + len, sizeof(buf) - len, " maxspeed%u=%u", i,
-                    slots[i].stepper->getMaxSpeedInTicks());
+    len +=
+        sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" maxspeed%u=%u"),
+                     i, slots[i].stepper->getMaxSpeedInTicks());
   }
-  snprintf(buf + len, sizeof(buf) - len, "\n");
+  sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("\n"));
   reply(buf);
 }
 
@@ -1096,7 +1226,8 @@ static void qe_pump(void) {
     if (err) {
       c->active = false;
       char buf[64];
-      snprintf(buf, sizeof(buf), "ERR QE step%u rc=%d\n", i, (int)last);
+      sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR QE step%u rc=%d\n"), i,
+                   (int)last);
       reply(buf);
       done_pending = true;
     }
@@ -1123,7 +1254,7 @@ static void qe_pump(void) {
     }
     if (rc != AqeResultCode::OK) {
       char buf[48];
-      snprintf(buf, sizeof(buf), "ERR QE start rc=%d\n", (int)rc);
+      sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR QE start rc=%d\n"), (int)rc);
       reply(buf);
       done_pending = true;
     }
@@ -1142,7 +1273,8 @@ static void qe_pump(void) {
     if (err) {
       c->active = false;
       char buf[64];
-      snprintf(buf, sizeof(buf), "ERR QE step%u rc=%d\n", i, (int)last);
+      sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR QE step%u rc=%d\n"), i,
+                   (int)last);
       reply(buf);
       done_pending = true;
     }
@@ -1165,10 +1297,9 @@ static void handle_qinfo(void) {
   // (48) which caps at 2 steppers, so a separate larger buffer is needed for
   // the many-stepper rungs; the two ladder rungs are otherwise identical.
   char buf[SALEAE_QINFO_REPLY_MAX];
-  int len = snprintf(
-      buf, sizeof(buf),
-      "QINFO tps=%lu mincmd=%u qlen=%u maxall=", (unsigned long)TICKS_PER_S,
-      (unsigned)MIN_CMD_TICKS, (unsigned)QUEUE_LEN);
+  int len = sal_snprintf(
+      buf, sizeof(buf), SAL_PSTR("QINFO tps=%lu mincmd=%u qlen=%u maxall="),
+      (unsigned long)TICKS_PER_S, (unsigned)MIN_CMD_TICKS, (unsigned)QUEUE_LEN);
   uint32_t floor = 0;
   for (uint8_t i = 0; i < slot_count; i++) {
     uint32_t t = slots[i].stepper ? slots[i].stepper->getMaxSpeedInTicks() : 0;
@@ -1176,17 +1307,19 @@ static void handle_qinfo(void) {
       floor = t;
     }
   }
-  len += snprintf(buf + len, sizeof(buf) - len, "%lu", (unsigned long)floor);
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%lu"),
+                      (unsigned long)floor);
   for (uint8_t i = 0; i < slot_count; i++) {
     uint32_t t = slots[i].stepper ? slots[i].stepper->getMaxSpeedInTicks() : 0;
-    int n = snprintf(buf + len, sizeof(buf) - len, " maxspeed%u=%lu",
+    int n =
+        sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" maxspeed%u=%lu"),
                      (unsigned)i, (unsigned long)t);
     if (n < 0 || len + n >= (int)sizeof(buf) - 1) {
       break;
     }
     len += n;
   }
-  snprintf(buf + len, sizeof(buf) - len, "\n");
+  sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("\n"));
   reply(buf);
 }
 
@@ -1206,7 +1339,7 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
   if (a4) {
     long idx = atol(a1);
     if (idx < 0 || idx >= slot_count) {
-      reply("ERR QSEG stepper out of range\n");
+      reply_p(SAL_PSTR("ERR QSEG stepper out of range\n"));
       return;
     }
     if (!own_used[idx]) {
@@ -1227,12 +1360,13 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
   }
 
   if (!steps_s || !ticks_s || !dir_s) {
-    reply("ERR QSEG needs <steps> <ticks> <dir>\n");
+    reply_p(SAL_PSTR("ERR QSEG needs <steps> <ticks> <dir>\n"));
     return;
   }
   if (*len >= QE_MAX_SEG) {
     char buf[48];
-    snprintf(buf, sizeof(buf), "ERR QSEG max %u\n", (unsigned)QE_MAX_SEG);
+    sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR QSEG max %u\n"),
+                 (unsigned)QE_MAX_SEG);
     reply(buf);
     return;
   }
@@ -1241,7 +1375,7 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
   long ticks = atol(ticks_s);
   long dir = atol(dir_s);
   if (steps < 0 || ticks < 1 || ticks > 65535 || (dir != 0 && dir != 1)) {
-    reply("ERR QSEG steps>=0 ticks=1..65535 dir=0|1\n");
+    reply_p(SAL_PSTR("ERR QSEG steps>=0 ticks=1..65535 dir=0|1\n"));
     return;
   }
   if (steps > 65535) {
@@ -1254,8 +1388,8 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
   seg->count_up = (dir == 1);
 
   char buf[48];
-  snprintf(buf, sizeof(buf), "OK QSEG %u/%u\n", (unsigned)*len,
-           (unsigned)QE_MAX_SEG);
+  sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK QSEG %u/%u\n"), (unsigned)*len,
+               (unsigned)QE_MAX_SEG);
   reply(buf);
 }
 
@@ -1322,21 +1456,27 @@ static uint8_t arm_cursors(long mask, bool fill_only) {
   return ARM_OK;
 }
 
+// `cmd` is a flash literal (SAL_PSTR at the call site), so it is copied into
+// `name` before snprintf sees it: the two errors that name the command are
+// formatted, and a `%s` cannot be handed a flash address.
 static void reply_arm_error(uint8_t code, const char* cmd) {
   char buf[40];
+  char name[8];
+  sal_to_ram(name, cmd, sizeof(name));
   switch (code) {
     case ARM_NO_CONFIG:
-      reply("ERR no config\n");
+      reply_p(SAL_PSTR("ERR no config\n"));
       break;
     case ARM_BAD_MASK:
-      snprintf(buf, sizeof(buf), "ERR %s mask=1..255\n", cmd);
+      sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR %s mask=1..255\n"), name);
       reply(buf);
       break;
     case ARM_NO_PROGRAM:
-      reply("ERR no program\n");
+      reply_p(SAL_PSTR("ERR no program\n"));
       break;
     default:
-      snprintf(buf, sizeof(buf), "ERR %s selects no stepper\n", cmd);
+      sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR %s selects no stepper\n"),
+                   name);
       reply(buf);
   }
 }
@@ -1346,14 +1486,14 @@ static void handle_qrun(char* mask_text) {
   long mask = mask_text ? atol(mask_text) : 1;
   uint8_t rc = arm_cursors(mask, false);
   if (rc != ARM_OK) {
-    reply_arm_error(rc, "QRUN");
+    reply_arm_error(rc, SAL_PSTR("QRUN"));
     return;
   }
 
   done_pending = false;
   done_announced = false;
   qe_pump();
-  reply("OK QRUN\n");
+  reply_p(SAL_PSTR("OK QRUN\n"));
 }
 
 // QFILL <mask> [entries] -- queue the program with start = false, as deep as
@@ -1378,12 +1518,12 @@ static void handle_qfill(char* mask_text, char* entries_text) {
   long mask = mask_text ? atol(mask_text) : 1;
   long want = entries_text ? atol(entries_text) : QUEUE_LEN;
   if (want < 1 || want > QUEUE_LEN) {
-    reply("ERR QFILL entries=1..\n");
+    reply_p(SAL_PSTR("ERR QFILL entries=1..\n"));
     return;
   }
   uint8_t rc = arm_cursors(mask, true);
   if (rc != ARM_OK) {
-    reply_arm_error(rc, "QFILL");
+    reply_arm_error(rc, SAL_PSTR("QFILL"));
     return;
   }
 
@@ -1412,14 +1552,14 @@ static void handle_qfill(char* mask_text, char* entries_text) {
   }
   if (err) {
     char buf[48];
-    snprintf(buf, sizeof(buf), "ERR QE step%u rc=%d\n", (unsigned)bad,
-             (int)last);
+    sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR QE step%u rc=%d\n"),
+                 (unsigned)bad, (int)last);
     reply(buf);
     return;
   }
 
   char buf[32];
-  snprintf(buf, sizeof(buf), "OK QFILL q=%u\n", (unsigned)depth);
+  sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK QFILL q=%u\n"), (unsigned)depth);
   reply(buf);
 }
 
@@ -1440,55 +1580,61 @@ static void handle_line(char* line) {
   // tracks the stepper count instead of drifting from it: a width shorter than
   // the buffer truncates the driver list and refuses a legal request, and one
   // longer than the buffer overflows it.
-  int n = sscanf(line, "%15s %31s %" SALEAE_STR(SALEAE_ARG2_MAX) "s %31s %31s",
-                 cmd, arg1, arg2, arg3, arg4);
+  //
+  // sscanf_P, not sscanf: the format is the one remaining literal in this
+  // function and on AVR a literal is an SRAM allocation (saleae_str.h). The
+  // destinations are RAM -- sscanf_P writes through RAM pointers -- so only the
+  // format has to move.
+  int n = sal_sscanf(
+      line, SAL_PSTR("%15s %31s %" SALEAE_STR(SALEAE_ARG2_MAX) "s %31s %31s"),
+      cmd, arg1, arg2, arg3, arg4);
 
   if (n <= 0) {
     return;
   }
 
-  if (!strcmp(cmd, "SR00")) {
+  if (!sal_strcmp(cmd, SAL_PSTR("SR00"))) {
     saleae_test_setup();
     sr00_active = true;
-    reply("OK SR00\n");
-  } else if (!strcmp(cmd, "CONFIG")) {
+    reply_p(SAL_PSTR("OK SR00\n"));
+  } else if (!sal_strcmp(cmd, SAL_PSTR("CONFIG"))) {
     if (n < 2) {
-      reply("ERR CONFIG needs <count> <driver>[,<driver>...]\n");
+      reply_p(SAL_PSTR("ERR CONFIG needs <count> <driver>[,<driver>...]\n"));
       return;
     }
     handle_config(arg1, arg2, n > 2 ? arg3 : NULL);
-  } else if (!strcmp(cmd, "MAP")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("MAP"))) {
     handle_map();
-  } else if (!strcmp(cmd, "MARK")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("MARK"))) {
     handle_mark(n > 1 ? arg1 : NULL);
-  } else if (!strcmp(cmd, "DRIVERS")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("DRIVERS"))) {
     handle_drivers();
-  } else if (!strcmp(cmd, "IMUX")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("IMUX"))) {
     handle_imux(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL);
-  } else if (!strcmp(cmd, "QINFO")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("QINFO"))) {
     handle_qinfo();
-  } else if (!strcmp(cmd, "QCLR")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("QCLR"))) {
     stop_all();
     stop_sr00();
-    reply("OK QCLR\n");
-  } else if (!strcmp(cmd, "QSEG")) {
+    reply_p(SAL_PSTR("OK QCLR\n"));
+  } else if (!sal_strcmp(cmd, SAL_PSTR("QSEG"))) {
     handle_qseg(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL,
                 n > 4 ? arg4 : NULL);
-  } else if (!strcmp(cmd, "QRUN")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("QRUN"))) {
     handle_qrun(n > 1 ? arg1 : NULL);
-  } else if (!strcmp(cmd, "QFILL")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("QFILL"))) {
     handle_qfill(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL);
-  } else if (!strcmp(cmd, "POS")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("POS"))) {
     char buf[80];
-    int len = snprintf(buf, sizeof(buf), "POS");
+    int len = sal_snprintf(buf, sizeof(buf), SAL_PSTR("POS"));
     for (uint8_t i = 0; i < slot_count; i++) {
-      len += snprintf(
-          buf + len, sizeof(buf) - len, " %ld",
+      len += sal_snprintf(
+          buf + len, sizeof(buf) - len, SAL_PSTR(" %ld"),
           slots[i].stepper ? (long)slots[i].stepper->getCurrentPosition() : 0L);
     }
-    snprintf(buf + len, sizeof(buf) - len, "\n");
+    sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("\n"));
     reply(buf);
-  } else if (!strcmp(cmd, "STOP")) {
+  } else if (!sal_strcmp(cmd, SAL_PSTR("STOP"))) {
     // stopMove() alone. The feeder is left alone on purpose: the contract is
     // that already-queued motion still runs, so a run that keeps stepping after
     // this is the documented behaviour and is what SR_25 asserts. Marked on the
@@ -1496,22 +1642,22 @@ static void handle_line(char* line) {
     stop_move_only();
     stop_sr00();
     mark_event();
-    reply("OK STOP stopmove\n");
-  } else if (!strcmp(cmd, "XSTOP")) {
+    reply_p(SAL_PSTR("OK STOP stopmove\n"));
+  } else if (!sal_strcmp(cmd, SAL_PSTR("XSTOP"))) {
     // forceStopAndNewPosition(): stop adding *and* empty the queue. The only one
     // of the three stops that the queued commands do not survive.
     abort_queue();
     stop_sr00();
     mark_event();
-    reply("OK XSTOP abortqueue\n");
+    reply_p(SAL_PSTR("OK XSTOP abortqueue\n"));
   } else {
-    reply("ERR unknown\n");
+    reply_p(SAL_PSTR("ERR unknown\n"));
   }
 }
 
 extern "C" void saleae_app_setup(void) {
   saleae_hal_serial_begin(SALEAE_SERIAL_BAUD);
-  reply("READY\n");
+  reply_p(SAL_PSTR("READY\n"));
   saleae_test_setup();
   // SR_00 is NOT started here. It toggles eight pins at 1 Hz, so leaving it
   // running from boot fills every capture taken before the first CONFIG with
@@ -1556,14 +1702,14 @@ extern "C" void saleae_app_loop(void) {
 
   if (done_pending && !any_running()) {
     char buf[96];
-    int len = snprintf(buf, sizeof(buf), "DONE");
+    int len = sal_snprintf(buf, sizeof(buf), SAL_PSTR("DONE"));
     uint8_t n = slot_count ? slot_count : 1;
     for (uint8_t i = 0; i < n; i++) {
-      len += snprintf(
-          buf + len, sizeof(buf) - len, " %ld",
+      len += sal_snprintf(
+          buf + len, sizeof(buf) - len, SAL_PSTR(" %ld"),
           slots[i].stepper ? (long)slots[i].stepper->getCurrentPosition() : 0L);
     }
-    snprintf(buf + len, sizeof(buf) - len, "\n");
+    sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("\n"));
     reply(buf);
     done_pending = false;
     done_announced = true;

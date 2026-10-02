@@ -265,6 +265,189 @@ FIRMWARE_DRIVERS = {
 }
 
 
+class TestAvrRamBudget(unittest.TestCase):
+    """No string literal may reach SRAM on AVR.
+
+    The AVR linker script copies `.rodata` into RAM so it can initialise it at
+    reset, so every `const` object and every string literal in the firmware is a
+    permanent SRAM allocation. Measured on the saleae_avr build before this was
+    fixed: .data 1136 B of which only 96 B were variables -- the remaining
+    1040 B, 51 % of a 328P's 2048 bytes, was the string pool, and the build had
+    80 bytes free.
+
+    The library is already PROGMEM-clean through `FAS_PSTR`
+    (src/fas_arch/result_codes.h). This harness is a serial protocol and used
+    not to be: two earlier revisions were pushed past 90 % of SRAM by adding a
+    few words to an error message. So the rule is checked here rather than
+    trusted -- a host-side test cannot see it, and a 328P build only fails once
+    the part is full.
+
+    Nothing here builds anything. It is a source-level check, because the thing
+    it guards is a source-level habit; the measurement it quotes comes from
+    `avr-size -A .pio/build/saleae_avr/firmware.elf`, where `.data` is the whole
+    story (a 328P's stack lives in `.data` too).
+    """
+
+    # Wrappers that put a literal in flash, and the compile-time-only contexts
+    # where a literal costs nothing because it is never emitted.
+    _FLASH_WRAPPERS = ("SAL_PSTR(",)
+    _COMPILE_TIME = ("static_assert(", "_Static_assert(", "assert(", "#error",
+                     "#pragma")
+
+    def _sources(self):
+        for path in sorted(COMMON.glob("*.[ch]")) + sorted(COMMON.glob("*.cpp")):
+            yield path, path.read_text()
+
+    def _bare_literals(self, path, text):
+        """(line_no, line_text) for every literal that would land in RAM.
+
+        A hand-rolled scan rather than a regex, because the cases that matter
+        are exactly the ones a regex gets wrong: a literal split across lines by
+        clang-format, parentheses inside the text, and two adjacent literals
+        concatenated as one argument.
+        """
+        # saleae_str.h defines SAL_PSTR in terms of PSTR, which declares
+        # `static const char[] PROGMEM = (s)`. Checking it would report the
+        # definition of the rule as a violation of it.
+        if path.name == "saleae_str.h":
+            return []
+
+        out = []            # scanned text, literals replaced by a space, so
+        #                     the "what precedes this" checks below see only
+        #                     real code
+        offenders = []
+        i, n = 0, len(text)
+        depth = 0           # parenthesis nesting of the scanned text
+        pstr_until = None   # depth at which the innermost SAL_PSTR( closes
+
+        def since(sym):
+            """`out` from just after its last `sym` -- a statement or a line."""
+            joined = "".join(out)
+            k = joined.rfind(sym)
+            return joined[k + 1:] if k >= 0 else joined
+
+        while i < n:
+            c = text[i]
+            if text.startswith("//", i):
+                j = text.find("\n", i)
+                i = n if j < 0 else j
+                out.append(" ")
+                continue
+            if text.startswith("/*", i):
+                j = text.find("*/", i)
+                i = n if j < 0 else j + 2
+                out.append(" ")
+                continue
+            if c != '"':
+                out.append(c)
+                i += 1
+                if c == "(":
+                    depth += 1
+                    # `SAL_PSTR(` opening: every literal until the matching
+                    # `)` belongs to it, which is what makes a format string
+                    # split across lines by clang-format -- and two adjacent
+                    # literals concatenated as one argument -- come out clean.
+                    if "".join(out[:-1]).rstrip().endswith("SAL_PSTR"):
+                        pstr_until = depth
+                elif c == ")":
+                    depth -= 1
+                    if pstr_until is not None and depth < pstr_until:
+                        pstr_until = None
+                continue
+
+            # A literal. Consume it whole, honouring backslash escapes.
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == "\\" else 1
+            j = min(j + 1, n)
+            line_ctx = since("\n")
+            stmt_ctx = since(";")
+            exempt = (
+                pstr_until is not None          # a SAL_PSTR(...) argument
+                or line_ctx.rstrip().endswith("extern")  # extern "C"
+                or re.search(r"#\s*include", line_ctx)
+                or any(t in stmt_ctx for t in self._COMPILE_TIME))
+            if exempt:
+                out.append(" ")
+            else:
+                line_no = text.count("\n", 0, i) + 1
+                line = text.splitlines()[line_no - 1].strip()
+                offenders.append(f"{path.name}:{line_no}: {line[:70]}")
+                out.append(" ")
+            i = j
+        return offenders
+
+    def test_no_bare_string_literal_reaches_ram(self):
+        offenders = []
+        for path, text in self._sources():
+            offenders += self._bare_literals(path, text)
+        self.assertEqual(
+            offenders, [],
+            "string literals outside SAL_PSTR() become SRAM on AVR -- wrap "
+            "them in SAL_PSTR() and use reply_p()/sal_snprintf()/sal_strcmp():\n"
+            "  " + "\n  ".join(offenders))
+
+    def test_flash_strings_are_never_printed_through_the_ram_path(self):
+        # `reply()` dereferences its argument as RAM. A flash literal reaching
+        # it returns whatever SRAM happens to hold at that address, which reads
+        # as correct on ESP32 and prints garbage on a 328P -- the worst kind of
+        # platform-dependent bug, because the host sees a plausible line.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        self.assertIn(
+            "static void reply(const char* text) "
+            "{ saleae_hal_serial_write(text); }", source,
+            "reply() must go through the RAM HAL -- it is what a formatted "
+            "buffer is sent with")
+        self.assertIn(
+            "static void reply_p(const char* text) "
+            "{ saleae_hal_serial_write_p(text); }", source,
+            "reply_p() must go through the flash HAL")
+        # Every literal reply goes through the flash path.
+        self.assertNotRegex(source, r'reply\(\s*"')
+        # ...and the HAL really can write a flash string on AVR. If the
+        # __FlashStringHelper cast were dropped, Print would pick the
+        # `const char*` overload and read flash as RAM.
+        hal = (COMMON / "saleae_hal_arduino.cpp").read_text()
+        self.assertIn("__FlashStringHelper", hal)
+
+    def test_const_tables_are_progmem(self):
+        # `const` is not free on AVR either: a lookup table is .rodata, and
+        # .rodata is copied into SRAM. kChanPin (8 B), saleae_pins (22 B) and
+        # saleae_high_ms (22 B) were 52 bytes of SRAM for data nothing writes.
+        for name in ("kChanPin", "saleae_pins", "saleae_high_ms"):
+            decls = [(p, line) for p, t in self._sources()
+                     for line in t.splitlines()
+                     if re.search(r"^static const .*\b%s\[" % name, line)]
+            self.assertTrue(decls, f"{name} not found -- did it move or rename?")
+            for path, line in decls:
+                self.assertIn(
+                    "SAL_PROGMEM", line,
+                    f"{name} is const, so it is .rodata, and .rodata is RAM on "
+                    f"AVR: {line.strip()}")
+
+    def test_saleae_str_wraps_the_libc_calls_that_read_ram(self):
+        # The header's value is the mapping: on AVR each of these reads its
+        # format/operand out of flash, off AVR each is the plain libc call. If a
+        # new call site appears that needs one of these and is not routed
+        # through saleae_str.h, this is where the omission is visible.
+        header = (COMMON / "saleae_str.h").read_text()
+        for call, avr_form in (("sal_strcmp", "strcmp_P"),
+                               ("sal_sscanf", "sscanf_P"),
+                               ("sal_snprintf", "snprintf_P")):
+            self.assertRegex(header, r"#define %s %s" % (call, avr_form),
+                             f"{call} has no AVR form in saleae_str.h")
+        for macro in ("SAL_PROGMEM", "SAL_PSTR", "sal_pgm_read_byte"):
+            self.assertIn("#define %s" % macro, header,
+                          f"saleae_str.h is missing {macro}")
+        # The one helper that is a function rather than a macro, because it has
+        # a loop in it: the flash -> RAM copy that every `%s` argument needs.
+        self.assertIn("sal_to_ram(char* dst, const char* src, size_t cap)",
+                      header)
+        self.assertRegex(header, r"sal_pgm_read_byte\(src \+ i\)",
+                         "sal_to_ram must read its source through "
+                         "pgm_read_byte, or it copies garbage on AVR")
+
+
 class TestConfigGrammar(unittest.TestCase):
     def test_wire_line_names_every_driver(self):
         for cfg, native in CONFIG_CASES:
@@ -344,7 +527,7 @@ class TestConfigGrammar(unittest.TestCase):
         # entries back, so a request for 16 cannot be met everywhere.
         self.assertIn('"OK QFILL q=%u\\n"', source)
         self.assertIn("slots[i].stepper->queueEntries()", source)
-        self.assertIn("!strcmp(cmd, \"QFILL\")", source)
+        self.assertIn('!sal_strcmp(cmd, SAL_PSTR("QFILL"))', source)
 
     @classmethod
     def _resolve_size(cls, expr):
@@ -512,9 +695,13 @@ class TestConfigGrammar(unittest.TestCase):
         # bounds have to be checked per field. snprintf's return value is how
         # much it *would* have written, which is the only way to notice.
         body = self._qinfo_body()
-        self.assertIn("int n = snprintf", body,
-                      "the QINFO append does not check what snprintf wanted "
-                      "to write, so it cannot detect an overrun")
+        # sal_snprintf, not snprintf: on AVR the format is a flash literal and
+        # only snprintf_P can read it (saleae_str.h). Its return value is the
+        # would-be length, exactly as snprintf's. Whitespace-tolerant, because
+        # clang-format reflows the call across lines as the line grows.
+        self.assertRegex(body, r"int n\s*=\s*sal_snprintf",
+                         "the QINFO append does not check what snprintf wanted "
+                         "to write, so it cannot detect an overrun")
         self.assertIn("sizeof(buf)", body)
 
     def test_host_reads_the_largest_floor_not_the_first(self):
@@ -650,7 +837,13 @@ class TestConfigGrammar(unittest.TestCase):
         # one is stringized from SALEAE_ARG2_MAX so it tracks the stepper count
         # instead of drifting from it, and has to be resolved the same way.
         widths = [int(w) for w in re.findall(r"%(\d+)s", source)]
-        stringized = re.findall(r'%" SALEAE_STR\((\w+)\) "s', source)
+        # Whitespace-tolerant: clang-format wraps the format literal, so the
+        # `%` of the stringized width, the `SALEAE_STR(...)` call and the `s` of
+        # its conversion can each end up on a different line. Matching the
+        # literal's spacing broke the moment the format moved into SAL_PSTR and
+        # got long enough to wrap.
+        stringized = re.findall(
+            r'%"?\s*SALEAE_STR\(\s*(\w+)\s*\)\s*"s', source)
         for name in stringized:
             widths.insert(-2, self._firmware_constant(name))
         self.assertEqual(len(widths), len(buffers) + 1,
@@ -782,7 +975,9 @@ class TestChannelMap(unittest.TestCase):
         # the library's dir state that the capture never drives, and any
         # direction-observing evaluator would then have a second pin to read.
         source = (COMMON / "saleae_app.cpp").read_text()
-        self.assertIn("nodir ? 0 : kChanPin[idx * chan_stride + 1]", source)
+        # CHAN_PIN() rather than kChanPin[] directly: the table is PROGMEM on
+        # AVR (saleae_str.h), so a plain subscript would read flash as RAM.
+        self.assertIn("nodir ? 0 : CHAN_PIN(idx * chan_stride + 1)", source)
         # ...and the call is guarded, not unconditional.
         self.assertRegex(source, r"if \(!nodir\) \{\s*\n\s*s->setDirectionPin")
 
@@ -792,12 +987,19 @@ class TestChannelMap(unittest.TestCase):
         # every host-side test still passed.
         source = (COMMON / "saleae_app.cpp").read_text()
         for mode in ("dir", "nodir"):
-            # Anchored to the `if`: `if (false && !strcmp(...))` still contains
-            # the strcmp, so a plain substring check passes on a build where the
-            # mode is unreachable -- which is exactly the mutation that has to
-            # be caught here.
-            self.assertRegex(source,
-                             r'if \(!strcmp\(mode_text, "%s"\)\) \{' % mode)
+            # Anchored to the `if`: `if (false && !sal_strcmp(...))` still
+            # contains the comparison, so a plain substring check passes on a
+            # build where the mode is unreachable -- which is exactly the
+            # mutation that has to be caught here.
+            #
+            # sal_strcmp/SAL_PSTR, not strcmp/"": on AVR the mode names are
+            # flash literals, because a string literal is an SRAM allocation
+            # there. A stray plain literal is the regression this whole
+            # conversion exists to prevent, so the test asserts the form.
+            self.assertRegex(
+                source,
+                r'if \(!sal_strcmp\(mode_text, SAL_PSTR\("%s"\)\)\) \{'
+                % mode)
         self.assertIn("*stride = SALEAE_STRIDE_DIR", source)
         self.assertIn("*stride = SALEAE_STRIDE_NODIR", source)
 

@@ -825,6 +825,61 @@ largest allocation in the firmware. `SALEAE_MAX_STEPPERS` is derived from
 `MAX_STEPPER` for the same reason (2 on a 328P), so `CONFIG 4ch_*` cannot
 work there, and mode `scale` covers both counts on that driver.
 
+**On AVR, `const` is not free either — see §4.3.2.** A table that is declared
+`const` for its own sake is still `.rodata`, and the AVR linker script copies
+`.rodata` into SRAM to initialise it at reset. "Harness program: 48 B" in the
+table above is a `.bss` figure; the same program's `const` neighbours are not
+free, and neither are its string literals.
+
+### 4.3.2 Strings and `const` tables on AVR
+
+The AVR linker script copies `.rodata` into SRAM. Every string literal and
+every `const` object therefore becomes a permanent SRAM allocation, which is
+counter-intuitive enough to cost this harness 51 % of a 328P twice over:
+
+```
+before   .data 1136 B =  96 B of variables + 1040 B of string pool
+        .bss   832 B
+        -> 1968 of 2048 B used, 80 B free
+
+after    .data   20 B =  the same 96 B of variables, now 20 after the tables
+        .bss   832 B                    moved out too
+        ->  852 of 2048 B used, 1196 B free
+```
+
+`.text` grew 22664 -> 24210 B: `snprintf_P`/`strcmp_P`/`sscanf_P`/`strlen_P`
+are larger than the plain libc calls. That is the right trade — flash on a
+328P is 30 KB with 6.5 KB to spare, and RAM was the scarce resource.
+
+The rules this produced, all enforced by `TestAvrRamBudget` in
+`scripts/tests/test_saleae.py` rather than by convention:
+
+- every literal goes through `SAL_PSTR()` (`common/saleae_str.h`), which is
+  `PSTR` on AVR and the identity everywhere else;
+- a flash string is never handed to anything that reads RAM. That is why
+  `driver_name()` and `pin_mode_name()` fill a caller-supplied buffer
+  (`sal_to_ram()`) instead of returning a pointer: both feed a `%s`, and
+  snprintf reads its arguments out of RAM;
+- literals are replied with `reply_p()` (`saleae_hal_serial_write_p`), never
+  `reply()`. Getting this wrong is silent on ESP32 and prints SRAM garbage on
+  a 328P, because a flash address dereferenced as RAM returns whatever is
+  there;
+- `const` lookup tables are `SAL_PROGMEM` and read with `sal_pgm_read_byte()`
+  / `sal_pgm_read_word()`. `kChanPin` needed a `static constexpr` mirror for
+  its `static_assert`s, because `static_assert` needs a constant expression and
+  `pgm_read_byte` is a function call;
+- even a *delimiter* is not free: `strtok(driver_list, ",")` cost 2 bytes of
+  SRAM, so the comma is a `char[2]` initialised from char constants.
+
+`%S` (snprintf's flash-string conversion) is deliberately unused: it would make
+the AVR reply path differ from every other target for no gain, since every `%s`
+here is a number's neighbour, a token already in the line buffer, or a name
+copied on purpose.
+
+The library itself was never affected — it routes every literal through
+`FAS_PSTR` (`src/fas_arch/result_codes.h`). The harness is a serial protocol,
+and a serial protocol is mostly text.
+
 ### 4.4 Firmware Structure
 
 The firmware is small on purpose. It holds a segment program, feeds it into

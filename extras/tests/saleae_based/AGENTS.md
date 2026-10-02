@@ -365,6 +365,50 @@ back, so a VCD may end before the last constant stretch of the capture.
 - Builds must keep working across the Arduino CI matrix and the ESP-IDF matrix
   (`pio_dirs/*`, `pio_espidf/*` are built for every env).
 
+## Strings and `const` tables: the AVR RAM rule
+
+**On AVR a string literal is an SRAM allocation, and so is a `const` object.**
+The linker script copies `.rodata` into RAM to initialise it at reset. This is
+counter-intuitive, it is invisible on every other target, and it cost this
+harness 51 % of a 328P:
+
+```
+before  .data 1136 B =  96 B variables + 1040 B string pool   ->  80 B free
+after   .data   20 B                                         -> 1196 B free
+```
+
+So, in `common/` and any app built for AVR:
+
+- **Every literal goes in `SAL_PSTR()`** (`common/saleae_str.h`; it is `PSTR`
+  on AVR, the identity elsewhere). `TestAvrRamBudget` in
+  `scripts/tests/test_saleae.py` fails the build on a bare one — that test is
+  the enforcement, this paragraph is the reason.
+- **A flash string is never handed to anything that reads RAM.** Reply with
+  `reply_p()` (→ `saleae_hal_serial_write_p`), never `reply()`. Getting that
+  backwards is silent on ESP32 and prints SRAM garbage on a 328P. A `%s`
+  argument must be in RAM, so copy it first with `sal_to_ram()` — which is why
+  `driver_name()` and `pin_mode_name()` fill a caller's buffer rather than
+  returning a pointer. `%S` is deliberately not used: it would fork the AVR
+  reply path from every other target for no gain.
+- **`const` tables are `SAL_PROGMEM`** and read with `sal_pgm_read_byte()` /
+  `sal_pgm_read_word()`. `static_assert` cannot read those, so a table the
+  build asserts on needs a `static constexpr` mirror — `kChanPin` has one,
+  generated from the same initializer macro so the two cannot drift.
+- Not even a delimiter is free: `strtok(d, ",")` cost 2 bytes, so it is a
+  `char[2]` built from char constants.
+
+The library was never affected — it routes everything through `FAS_PSTR`
+(`src/fas_arch/result_codes.h`). Measured on `saleae_avr`:
+
+```bash
+pio run -d extras/tests/saleae_based/apps/arduino -e saleae_avr
+~/.platformio/packages/toolchain-atmelavr/bin/avr-size -A \
+    extras/tests/saleae_based/apps/arduino/.pio/build/saleae_avr/firmware.elf
+```
+
+`.data` is the number to watch: it holds `.rodata` *and* the stack. PlatformIO's
+`RAM:` line only gives the sum. See white paper §4.3.2.
+
 ## Hardware pin map (ESP32-DevKitC)
 
 ```

@@ -1518,3 +1518,38 @@ Recorded because they change what the tests mean.
       SR_15 could give two steppers different periods. The 3-argument form still
       means the shared program, so nothing else changed meaning; all 25
       scenarios were re-run afterwards and passed.
+- [x] **AVR RAM was 51 % string literals — the whole `.rodata` pool.** Three
+      earlier entries in this file record the symptom rather than the cause:
+      `DRIVERS`/`IMUX` costing 90 bytes, `MARK` taking the build to 1992 of
+      2048, and the note that "the `.rodata` for the new strings is the larger
+      part and avr-gcc puts that in RAM". Each was paid for by making the reply
+      less informative. The actual measurement:
+
+      | | `.data` | `.bss` | used / 2048 | free |
+      |---|---|---|---|---|
+      | before | **1136 B** (96 B variables + **1040 B** string pool) | 832 B | 1968 B | **80 B** |
+      | after | **20 B** | 832 B | 852 B | **1196 B** |
+
+      Fixed properly, not by trimming text: `common/saleae_str.h` gives the
+      target-independent macros (`SAL_PSTR`, `sal_strcmp`, `sal_sscanf`,
+      `sal_snprintf`, `sal_to_ram`, `sal_pgm_read_*`), `saleae_hal_serial_write_p`
+      carries a flash string to the port, and `driver_name()`/`pin_mode_name()`
+      copy into a caller's buffer because a `%s` argument has to be in RAM.
+      `const` tables went too — `kChanPin`, `saleae_pins`, `saleae_high_ms` were
+      52 B of SRAM for data nothing writes. `.text` grew 22664 -> 24210 B for
+      the `_P` libc variants, which is the right trade (6.5 KB of flash spare).
+
+      Two things are worth remembering beyond the arithmetic. **`const` is not
+      free on AVR either**, so the fix was not only about strings. And **not
+      even a delimiter is**: `strtok(driver_list, ",")` was 2 bytes of SRAM, so
+      it is now a `char[2]` built from char constants. That one was found by the
+      new test rather than by reading the code.
+
+      `TestAvrRamBudget` (`scripts/tests/test_saleae.py`) now enforces it: no
+      bare literal in `common/` outside `SAL_PSTR`, no literal reply through
+      `reply()`, `SAL_PROGMEM` on the `const` tables. Each assertion was
+      checked against a planted regression rather than trusted. **This matters
+      because no host-side test can see it and a 328P build only fails once the
+      part is full** — with 1196 B free that failure is now a long way off, which
+      is exactly the argument for the check existing rather than the memory
+      being low.
