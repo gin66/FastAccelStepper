@@ -468,8 +468,9 @@ regenerated with explicit drivers (R8).
 Implementation plan items 1–8 are done, and the redesign's **R1** (firmware:
 `auto` removed) and **R8** (re-run and re-baseline) are done with hardware
 behind them. R2 (firmware: 1…8 steppers, both pin modes, `MAP`) is done too.
-R3–R5 and R7 remain. See *Decisions and findings* for what the hardware
-actually showed — including the one recorded finding that R1's re-run
+R3 (host: the two generic modes `scale` and `sync`) is done too, and its first
+hardware run found a live defect in the MCPWM/PCNT driver. R4, R5 and R7
+remain. See *Decisions and findings* for what the hardware actually showed — including the one recorded finding that R1's re-run
 invalidated.
 
 ### The redesign now in progress
@@ -640,17 +641,178 @@ one agent. Each item is independently checkable and states how to verify it.
       budget check. Two were missed on the first pass — an unreachable `nodir`
       (`if (false && …)` still contains the strcmp) and an unconditional
       `setDirectionPin` — so those assertions are now anchored to the `if`.
-- [ ] **R3 — host: one generic entry point, two modes.** One call covers both:
-      - **mode `scale`** — 1…driver-max steppers in parallel on a single named
-        driver. For AVR this is one run; for Pico, SAMD and the rest, the same.
-      - **mode `sync`** — for architectures with more than one driver: every
-        driver-list combination, measuring **sync start** (first-step skew) and
-        **adherence** (each stepper keeps the period it was given).
-      Neither mode names an architecture. `--arch` / `--sdk` are metadata tags,
-      not modes. A driver the board has not got connected — `i2s_mux` today —
-      is one flag away and needs no new code path.
-      *Verify:* `--mode scale` and `--mode sync` both run on the ESP32 and
-      produce the tables in R5.
+- [x] **R3 — host: one generic entry point, two modes. Done, and it found a
+      library defect on its first run.**
+      `harness.py --mode scale|sync`. Neither mode names an architecture, which
+      is the property worth testing: `scale` is the whole cross-architecture
+      matrix (one run on a 328P, eight on an ESP32 in `nodir`), and `sync`
+      applies to any board with more than one driver.
+
+      **The two modes are deliberately not the same measurement, and the
+      difference is the whole point.** `scale` gives every stepper **one shared
+      program**, so each run answers "does this driver still emit the commanded
+      period with N attached, and does every one get every step". `sync` gives
+      each stepper **its own period** (a 1:2:3 ratio ladder), because
+      adherence is only checkable if the steppers were given different
+      expectations — a synchronized start that dragged them all onto one speed
+      satisfies a first-step test *and* a shared-period test, and would be
+      reported as a perfect sync. Each stepper is then checked against **its
+      own** commanded period, so a collapse is *seen* rather than inferred from
+      its absence. Skew is still reported, never gated, in µs **and** in step
+      periods.
+
+      **`scale` stops at min(driver, channels) and says which bound it was.**
+      `DRIVER_MAXS` carries the library's own `QUEUES_*` counts and the test
+      cross-checks the ESP entries against `src/pd_esp32/pd_config_idf5.h`, so
+      the table cannot drift away from the build it plans for. A missing entry
+      is **refused**, not guessed: a guessed bound either stops the sweep early
+      (reporting a driver limit that is not one) or runs past what the board can
+      connect. A `0` entry means "this chip has no such driver" and is distinct
+      from an absent one. So "RMT reaches 8 steppers in `nodir`" and "RMT
+      reaches 4 in `dir`" are different findings, and only the second is about
+      the analyzer rather than RMT.
+
+      **`sync` enumerates over driver *identities*, not names.** `rmt` and
+      `rmt_v2` are one driver — the firmware maps both to `SA_RMT` and reports
+      both as `rmt` — so enumerating spellings would put `rmt_v2+rmt` in the
+      table as a *cross-driver* combination, under a name claiming they differ.
+      **That is precisely how R1's wrong finding was produced**: the old `mixed`
+      config discarded its driver list for the automatic choice, so the
+      "cross-driver" run *was* RMT+RMT — and the tell was that two supposedly
+      different configurations agreed to four decimal places. Identical numbers
+      across different configurations is the signature to look for, so the plan
+      has to contain both cases to make it meaningful.
+
+      **Measured on the connected ESP32** (RMT, 5 µs step, 4 MS/s, Saleae
+      clone). `--mode scale --driver rmt_v2 --pin-mode nodir`: **8/8 passed**,
+      every stepper 64/64 steps at 160 ticks, and the period spread across
+      steppers was **0.004 µs** at its widest (9.996 vs 10.000 µs, i.e. one
+      4 MS/s sample) — so RMT holds its period from 1 stepper to 8 with nothing
+      to report but "it scales".
+
+      `--mode sync --arch esp32` — all 10 combinations attempted:
+
+      | driver list | result | skew µs | in periods | adherence |
+      |---|---|---|---|---|
+      | `rmt+rmt` | passed | 37.5 | 3.75 | both kept 160 t / 320 t |
+      | `rmt+mcpwm_pcnt` | passed | 62.25 | 6.23 | both kept theirs |
+      | `mcpwm_pcnt+i2s_direct` | passed | 858.75 | 85.88 | both kept theirs |
+      | `rmt+i2s_direct` | passed | 990.0 | **99.0** | both kept theirs |
+      | `i2s_direct+i2s_direct` | passed | 52.25 | 5.23 | both kept theirs |
+      | `mcpwm_pcnt+mcpwm_pcnt` | **failed** | 6.5 | 0.65 | **B: 11053 steps, not 64** |
+      | `*+i2s_mux` (4) | refused | — | — | `ERR connect step 0/1 drv=i2s_mux` |
+      | `i2s_mux+i2s_mux` | refused | — | — | as above |
+
+      **A refused point is recorded, not skipped, and the plan continues** — for
+      `scale` the point where the board says no *is* the answer, and for `sync`
+      a driver this build cannot connect is a fact worth recording next to the
+      combinations that did measure. That is what makes `i2s_mux` (R7) one flag
+      away with no new code path: it is already in the ESP32 driver list, so the
+      run attempts it and records the refusal.
+
+      **The I2S skew is the interesting number, and it is 30× the
+      cross-driver figure R1 recorded.** `rmt+i2s_direct` comes in at ~990 µs
+      (99 step periods) against `rmt+mcpwm_pcnt`'s 62 µs, and it **reproduces to
+      a sample across three runs** (990.0 / 990.25 / 1068.25 µs; `rmt+rmt` was
+      37.5 / 37.5 / 37.75 over the same three). I2S is the one driver here that
+      emits from a DMA callback rather than from an armed timer, so "arm
+      together" cannot include it — a millisecond is the time for the DMA
+      pipeline to produce anything at all, not a scheduling jitter. R1's
+      cross-driver conclusion ("skew tracks driver heterogeneity, ~66 % worse
+      than same-driver") **holds and understates**: it was drawn from RMT and
+      MCPWM, which are both armed timers, and the I2S case is a different
+      mechanism entirely. Skew in *periods* is what makes that visible — 6.23
+      against 99.0, which one number in µs would not convey.
+
+      #### Two real bugs the first `--mode scale` run exposed
+
+      Both are in code R3 merely *reached*, not code R3 wrote, and both had been
+      invisible because **the path that uses them had never run.**
+
+      **1. `QINFO` concatenated its per-stepper floors, so it was silently wrong
+      for any run with more than one stepper.** `handle_qinfo` printed
+      `maxspeed=` followed by one value per stepper with **no separator**, so a
+      3-stepper board replied `maxspeed=808080` — which the host's regex read as
+      the single number 808080. Every `QSEG` built from that exceeded the 16-bit
+      ticks field, so the run failed with `ERR QSEG ticks=1..65535`: *accurate*,
+      and about a number nothing had asked for. The fix separates them
+      (`maxspeedN=<ticks>`) and adds `maxall=`, the **largest** floor, which is
+      what a shared program must be planned against — reading stepper A's own
+      floor would plan too fast whenever a later stepper is slower, which is
+      exactly the RMT+MCPWM case. `maxall` is printed **first** so a buffer
+      overrun cannot truncate the one field the host cannot reconstruct.
+      `SALEAE_QINFO_REPLY_MAX` is a separate per-rung buffer (QINFO grows ~13 B
+      per stepper and could not share `SALEAE_SHORT_REPLY_MAX`; an 8-stepper
+      reply truncated its own tail, after which the host reported "no QINFO
+      reply" with no hint that the firmware had run out of buffer). AVR cost
+      +14 B → **1755/2048**. `legal_ticks()` now also clamps to 65535, so that
+      class of mistake fails as a slow-but-legal run rather than as a confusing
+      refusal.
+
+      **2. `harness.py` could not run at all.** It never defined
+      `--capture-dir` or `--sr00-sample-rate`, both of which `run_tests.py` reads,
+      so *every* non-`--dry-run` invocation died with `AttributeError: 'Namespace'
+      object has no attribute 'capture_dir'` on the first capture — including
+      the documented `--flash` example in AGENTS.md. Verified pre-existing by
+      stashing. Also `build-pio-dirs.sh` still pointed at
+      `apps/arduino/saleae_main.ino`, which moved to `apps/arduino/src/` in
+      fa3e419a, so the `pio_dirs/saleae` project could not build either.
+
+      #### The library defect R3 exists to find, found on the first sweep
+
+      **`scale` on `mcpwm_pcnt` fails at 2 steppers and above: stepper B emits
+      continuously and never stops.** `POS` reads **non-monotonic** — `64 31`,
+      then `64 26`, then `64 32` — all below 64, which is the signature of a
+      position counter being re-read mid-run rather than of steps being lost.
+      The capture shows why: D2 carries **22 143 rising edges at exactly the
+      commanded 10 µs period** (5.0 µs high, 5.0 µs low, continuously, to the end
+      of the window) where 64 were asked for.
+
+      **Localized to two MCPWM/PCNT queues, not to MCPWM and not to the mode:**
+
+      | configuration | `POS` over 1.5 s |
+      |---|---|
+      | `rmt+rmt` | `64 64` every time — stable |
+      | `rmt+mcpwm_pcnt` | `64 64` every time — stable |
+      | `mcpwm_pcnt+rmt` (swapped) | `64 64` every time — stable |
+      | `mcpwm_pcnt+mcpwm_pcnt` | `64 31 / 64 26 / 64 32 / 64 50 / 64 34` |
+      | `mcpwm_pcnt+mcpwm_pcnt` at 3200 ticks (200 µs) | also fails — not a speed limit |
+
+      It reproduces on the **unmodified firmware** (stashed and re-flashed), so
+      it is a library defect, not an artefact of this mode. Most likely
+      `channel2mapping[]`/`pcnt_unit_to_queue[]` indexed by `channel_num` with
+      `pcnt_unit_id = timer_num`, while the ESP32 has **4 MCPWM timers**
+      (2 groups × 2) against **`QUEUES_MCPWM_PCNT` = 6** — the second queue's
+      timer/PCNT mapping is the thing to look at first. Left as a finding rather
+      than fixed here: the library is out of R3's scope, and R3's job was to
+      surface it. **`DRIVER_MAXS` says MCPWM/PCNT has 6 queues on IDF 5, and
+      that number is now known to be wrong** — the driver cannot run 2 queues
+      correctly on this chip.
+
+      *Tests: 144 pass, from 110.* New `TestModes` (23) plus 11 regression
+      tests covers both plan shapes,
+      the mask selecting every connected stepper, the wire matching the label,
+      `scale` using a shared program, `sync`'s periods being *distinct* and its
+      commands legal, identity folding, the bound arithmetic, and what each
+      evaluator actually catches — a collapsed rate, a lost step, a silent
+      stepper, an off-period stepper, and skew that is *reported but not gated*.
+      Eleven more cover the two bugs above and the `scale`/`sync` runners: the
+      QINFO reply is **rendered from the firmware's own format strings** and then
+      parsed, so a disagreement between the two sides fails rather than being
+      papered over by a hand-written example (a hand-written one agrees with
+      whichever side the author was looking at); the largest floor is read, not
+      the first; `QINFO` keeps its own buffer and checks what `snprintf` wanted to
+      write; and a **fully faked** catalogue run is driven end to end, so
+      `harness.py`'s missing `capture_dir` — which made *every* real invocation
+      die on its first capture — cannot come back. *Mutation-checked, all caught:* the
+      driver bound ignored, the channel budget off by one, an unknown driver
+      guessed, identity folding dropped, permutations instead of combinations,
+      a dropped combination, the sweep skipping n=1, a mask leaving steppers
+      idle, shared periods in `sync`, skew pinned to zero, and either adherence
+      check made vacuous. Two misses were equivalent mutants — `dmax <
+      chan_cap` → `dmax < chan_cap + 1` changes no output when `dmax ==
+      chan_cap` — and one "mutation" only edited a docstring; the behavioural
+      version of it was caught twice.
 - [ ] **R4 — host: channel map is configuration, not a constant.** Today
       `STEP_CHANNELS`/`DIR_CHANNELS` hardcode A=`D0`, B=`D2`… which is only
       right in `dir` mode with four steppers. Evaluators, fixtures and the
@@ -700,14 +862,26 @@ one agent. Each item is independently checkable and states how to verify it.
       *Verify:* all 15 internal `§` references resolve; the 28 scenario ids in
       the paper match the harness exactly (25 wired, 3 documented
       not-applicable); every file the paper names exists.
-- [ ] **R7 — `i2s_mux` measured.** Never run. The build supports it
-      (`SUPPORT_ESP32_I2S` is defined for IDF 5/6, `QUEUES_I2S_MUX` = 32 under
-      dynamic allocation) and the mux is internal to the library
-      (`i2s_manager` `_is_mux`/`_mux_state`), so no extender board is implied —
-      but it is untested, and the user has not connected it. It is a single
-      `--driver i2s_mux` run once it is available.
-      *Verify:* a recorded result tagged `i2s_mux`; until then the todo must
-      say *untested*, not *absent*.
+- [ ] **R7 — `i2s_mux` measured.** Still **untested**, but R3 has now made the
+      path mechanical rather than hypothetical, and the first attempt is recorded.
+      The build supports it (`SUPPORT_ESP32_I2S` is defined for IDF 5/6,
+      `QUEUES_I2S_MUX` = 32 under dynamic allocation) and the mux is internal to
+      the library (`i2s_manager` `_is_mux`/`_mux_state`), so no extender board is
+      implied.
+      **What `--mode sync` did on its first run:** all four `i2s_mux`
+      combinations were attempted and the board refused every one with
+      `ERR connect step 0/1 n=… drv=i2s_mux nodir=0` — recorded as `refused`
+      beside the combinations that measured, which is the mode working as
+      designed. So `i2s_mux` is **absent from the *running build***, not merely
+      untested: whatever the IDF/board configuration is, this build's
+      `SUPPORT_ESP32_I2S` did not yield a connectable mux. That is a more precise
+      statement than "untested" and it is what the run established.
+      *Remaining:* find out why the mux does not connect on this build (compare
+      against `i2s_direct`, which **does** connect on the same board in the same
+      run — so `SUPPORT_ESP32_I2S` is compiled in, and the failure is specific to
+      the mux path), then one `--driver i2s_mux` scale run.
+      *Verify:* a recorded result tagged `i2s_mux`; until then this must keep
+      saying *untested*, not *absent*.
 - [x] **R8 — re-run and re-baseline. Done.** All 25 wired scenarios re-run on the
       connected ESP32 with the R1 firmware, one cold boot each, Saleae clone at
       24 MS/s: **25/25 accepted by their own evaluators**. `reports/esp32/`
@@ -754,6 +928,48 @@ one agent. Each item is independently checkable and states how to verify it.
 
 Recorded because they change what the tests mean.
 
+- [x] **Two MCPWM/PCNT queues on one ESP32 do not work: the second stepper
+      emits continuously and never stops.** Found by `--mode scale` on its first
+      hardware run, which is the argument for having the mode at all — SR_16
+      asks whether a *second* stepper perturbs the first and would report
+      "perturbed", not "runaway".
+
+      `CONFIG 2 mcpwm_pcnt,mcpwm_pcnt dir`, `QSEG 64 160 1`, `QRUN 3`: stepper A
+      emits exactly 64 steps. Stepper B emits **22 143** rising edges at exactly
+      the commanded 10 µs period (5.0 µs high, 5.0 µs low) and never stops. The
+      board's own `POS` reads **non-monotonic** — `64 31`, `64 26`, `64 32`,
+      `64 50` — all below 64, which says the *position counter* is being re-read
+      while the pin runs on rather than that steps were lost. So the capture and
+      the firmware disagree about what happened, and the capture is right.
+
+      **It is two MCPWM/PCNT queues, not MCPWM, and not `nodir`:**
+
+      | configuration | `POS` sampled over 1.5 s |
+      |---|---|
+      | `rmt+rmt` | `64 64` every time |
+      | `rmt+mcpwm_pcnt` | `64 64` every time |
+      | `mcpwm_pcnt+rmt` (order swapped) | `64 64` every time |
+      | `mcpwm_pcnt+mcpwm_pcnt` | `64 31 / 64 26 / 64 32 / 64 50 / 64 34` |
+      | `mcpwm_pcnt+mcpwm_pcnt` at 3200 ticks (200 µs) | fails too — not a speed limit |
+
+      Reproduced on the **unmodified** firmware (stashed and re-flashed), so it
+      is a library defect and not an artefact of the mode or of the `nodir`
+      change. Also fails with only stepper B selected (`QRUN 2`), which rules
+      out the synchronized kick-off as the trigger — **configuring a second
+      MCPWM/PCNT queue is enough**, no `QRUN` needed.
+
+      *Where to look:* `StepperISR_idf5_esp32_mcpwm_pcnt.cpp` indexes
+      `channel2mapping[NUM_QUEUES]` and `pcnt_unit_to_queue[QUEUES_MCPWM_PCNT]`
+      by `channel_num` and sets `pcnt_unit_id = timer_num`, while the ESP32 has
+      **4 MCPWM timers** (2 groups × 2) and `QUEUES_MCPWM_PCNT` is **6**. The
+      second queue's timer/PCNT assignment is the first thing to check.
+
+      **Consequence for the harness's own tables:** `DRIVER_MAXS` records
+      MCPWM/PCNT as 6 queues on IDF 5, from `pd_config_idf5.h`, and **that
+      number is now known to be wrong** — not in the count but in what the
+      driver can actually do. Left unfixed here: the library is outside R3's
+      scope and R3's job was to surface it. Until it is fixed, any MCPWM/PCNT
+      row in the R5 tables is a measurement of a defect, not of the driver.
 - [x] **The driver never promises a pulse width.** Measured a constant
       **15.625 µs (250 ticks) at every period from 200 µs to 4096 µs**. So pulse
       width is *recorded*, never asserted: the driver sets it, its value is a

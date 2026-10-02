@@ -117,7 +117,7 @@ for f in saleae_app.cpp saleae_app.h saleae_test.cpp saleae_test.h saleae_hal.h 
 do
 	ln -s ../../../extras/tests/saleae_based/common/$f .
 done
-ln -s ../../../extras/tests/saleae_based/apps/arduino/saleae_main.ino .
+ln -s ../../../extras/tests/saleae_based/apps/arduino/src/saleae_main.ino .
 cd ../../..
 
 ls -al pio_*

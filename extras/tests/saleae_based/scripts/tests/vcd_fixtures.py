@@ -67,14 +67,23 @@ class Dut:
     queue_len: int = 32
     # 640 ticks = 40 us, comfortably above any realistic speed floor.
     max_speed_ticks: int = 640
+    # The fixture prints one floor per stepper, comma-separated, plus the max --
+    # the same reply shape the firmware sends and read_qinfo() parses. A fixture
+    # with a different shape would let a QINFO parsing bug pass every test here.
+    max_speed_per_stepper: Tuple[int, ...] = (max_speed_ticks,)
 
-    def info(self) -> Dict[str, int]:
+    def info(self, steppers: int = 1) -> Dict[str, int]:
         """The dict shape `read_qinfo()` returns, so evaluators run unchanged."""
+        floors = [self.max_speed_ticks] * steppers
         return {
             "ticks_per_s": self.ticks_per_s,
             "min_cmd_ticks": self.min_cmd_ticks,
             "queue_len": self.queue_len,
-            "max_speed_ticks": self.max_speed_ticks,
+            "max_speed_first_ticks": floors[0],
+            "max_speed_per_stepper": floors,
+            # The largest floor, which is what every builder means by "the
+            # fastest period this program may use".
+            "max_speed_ticks": max(floors),
         }
 
 

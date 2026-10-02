@@ -141,15 +141,24 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 // stride=1 drivers=" plus 8 driver names plus 8 "maxspeedN=<ticks>" fields
 // needs about 26 bytes per stepper on top of a fixed 48. The short replies
 // carry no driver names, so they get their own size.
+// QINFO is the one reply that grows per stepper: a fixed prefix for
+// tps/mincmd/qlen/maxall, then " maxspeedN=<ticks>" each. Sized per rung --
+// 48 + 16 * SALEAE_MAX_STEPPERS rounded up, which is what the worst case
+// (5-digit ticks on every stepper, one-character index) needs.
+#define QINFO_REPLY_FOR(n) (48 + 16 * (n) + 8)
+
 #if SALEAE_MAX_STEPPERS <= 2
 #define SALEAE_CFG_REPLY_MAX 96
 #define SALEAE_SHORT_REPLY_MAX 48
+#define SALEAE_QINFO_REPLY_MAX QINFO_REPLY_FOR(2)
 #elif SALEAE_MAX_STEPPERS <= 4
 #define SALEAE_CFG_REPLY_MAX 192
 #define SALEAE_SHORT_REPLY_MAX 64
+#define SALEAE_QINFO_REPLY_MAX QINFO_REPLY_FOR(4)
 #else
 #define SALEAE_CFG_REPLY_MAX 288
 #define SALEAE_SHORT_REPLY_MAX 80
+#define SALEAE_QINFO_REPLY_MAX QINFO_REPLY_FOR(8)
 #endif
 
 // GPIO per analyzer channel, in channel order.
@@ -823,18 +832,41 @@ static void qe_pump(void) {
 }
 
 static void handle_qinfo(void) {
-  char buf[128];
+  // One speed floor per stepper, comma-separated, then the largest of them as
+  // `maxall`. The commas are not cosmetic: without them a 3-stepper board
+  // replies `maxspeed=808080` and the host reads that as the single number
+  // 808080, so every QSEG built from it is refused for exceeding the 16-bit
+  // ticks field and the run fails with a message about the tick range rather
+  // than about what was wrong. `maxall` is what a shared program is planned
+  // against, and it leads the reply so it cannot be the field that gets
+  // truncated.
+  //
+  // Sizing: "QINFO tps=16000000 mincmd=65535 qlen=32 maxall=65535 " is 48
+  // characters before any per-stepper field, and 8 floors at 5 digits plus a
+  // comma each is 48 more. SALEAE_SHORT_REPLY_MAX is sized for the AVR rung
+  // (48) which caps at 2 steppers, so a separate larger buffer is needed for
+  // the many-stepper rungs; the two ladder rungs are otherwise identical.
+  char buf[SALEAE_QINFO_REPLY_MAX];
   int len = snprintf(
       buf, sizeof(buf),
-      "QINFO tps=%lu mincmd=%u qlen=%u maxspeed=", (unsigned long)TICKS_PER_S,
+      "QINFO tps=%lu mincmd=%u qlen=%u maxall=", (unsigned long)TICKS_PER_S,
       (unsigned)MIN_CMD_TICKS, (unsigned)QUEUE_LEN);
+  uint32_t floor = 0;
   for (uint8_t i = 0; i < slot_count; i++) {
-    len +=
-        snprintf(buf + len, sizeof(buf) - len, "%u",
-                 slots[i].stepper ? slots[i].stepper->getMaxSpeedInTicks() : 0);
-    if (len >= (int)sizeof(buf) - 8) {
+    uint32_t t = slots[i].stepper ? slots[i].stepper->getMaxSpeedInTicks() : 0;
+    if (t > floor) {
+      floor = t;
+    }
+  }
+  len += snprintf(buf + len, sizeof(buf) - len, "%lu", (unsigned long)floor);
+  for (uint8_t i = 0; i < slot_count; i++) {
+    uint32_t t = slots[i].stepper ? slots[i].stepper->getMaxSpeedInTicks() : 0;
+    int n = snprintf(buf + len, sizeof(buf) - len, " maxspeed%u=%lu",
+                     (unsigned)i, (unsigned long)t);
+    if (n < 0 || len + n >= (int)sizeof(buf) - 1) {
       break;
     }
+    len += n;
   }
   snprintf(buf + len, sizeof(buf) - len, "\n");
   reply(buf);

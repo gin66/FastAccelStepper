@@ -370,6 +370,235 @@ class TestConfigGrammar(unittest.TestCase):
             f"cannot resolve {name} in the firmware: no ladder, and not "
             f"'OTHER + n'")
 
+    def test_qinfo_reply_fits_its_buffer_with_every_stepper(self):
+        # QINFO grows by ~13 bytes per stepper (" maxspeedN=65535") on top of a
+        # fixed prefix. It was printed into SALEAE_SHORT_REPLY_MAX, which is
+        # sized for a reply with no per-stepper fields, so an 8-stepper board
+        # truncated its own reply mid-number -- and the host then reported "no
+        # QINFO reply" with no hint that the firmware had run out of buffer.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        m = re.search(r"#define QINFO_REPLY_FOR\(n\) \((\d+) \+ (\d+) \* \(n\)"
+                      r" \+ (\d+)\)", source)
+        self.assertIsNotNone(m, "QINFO_REPLY_FOR is not defined by term, so the "
+                               "buffer size cannot be checked against the "
+                               "stepper count it has to cover")
+        base, per, slack = (int(m.group(i)) for i in (1, 2, 3))
+        # Each rung must cover the stepper count that rung admits. A 328P has
+        # SALEAE_MAX_STEPPERS 2, so sizing its QINFO for 8 would cost RAM the
+        # tightest target does not have.
+        max_steppers = re.search(r"#define SALEAE_MAX_STEPPERS "
+                                 r"\(MAX_STEPPER < (\d+) \?", source)
+        platform_cap = int(max_steppers.group(1))
+        worst = len("QINFO tps=16000000 mincmd=65535 qlen=32 maxall=65535 ")
+        for count in (2, 4, 8):
+            worst_fields = base
+            for i in range(count):
+                worst_fields += len(f" maxspeed{i}=65535")
+            worst_fields += len("\n") + 1        # the trailing NUL
+            self.assertLessEqual(worst_fields, base + per * count + slack,
+                                 f"a {count}-stepper QINFO needs "
+                                 f"{worst_fields} bytes")
+
+    def test_qinfo_reply_leads_with_the_field_the_host_plans_against(self):
+        # maxall must come before the per-stepper fields, because a truncated
+        # reply loses its tail: a leading field survives, a trailing one does
+        # not, and the one that matters is the one the host cannot reconstruct.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        body = source.split("static void handle_qinfo")[1].split("\n}\n")[0]
+        self.assertLess(body.index("maxall="), body.index("maxspeed%u="),
+                        "maxall is printed after the per-stepper fields, so a "
+                        "buffer overrun truncates the value the host plans "
+                        "against while leaving the ones it does not need")
+
+    def _qinfo_body(self):
+        return (COMMON / "saleae_app.cpp").read_text().split(
+            "static void handle_qinfo")[1].split("\n}\n")[0]
+
+    def _render_qinfo(self, floors):
+        """Build the reply the firmware's own format strings produce.
+
+        Rendered from the *source's* format strings rather than from a
+        hand-written example, because the bug being guarded against was a
+        disagreement between the firmware's grammar and the host's regex -- and
+        a hand-written example would agree with whichever side the test author
+        was looking at.
+        """
+        body = self._qinfo_body()
+        head = re.search(r'"(QINFO tps=%\w+ mincmd=%\w+ qlen=%\w+ [^"]*)"',
+                         body)
+        self.assertIsNotNone(head, "handle_qinfo has no leading format string")
+        # The floor is appended by a *separate* snprintf, so the header carries
+        # only tps/mincmd/qlen and the name of the field that follows.
+        self.assertRegex(head.group(1), r"[a-z]+=$",
+                         "the QINFO header does not end in a field name, so "
+                         "the floor value that follows has no field to belong "
+                         "to and cannot be parsed")
+        per = re.search(r'"( maxspeed%u=%lu)"', body)
+        self.assertIsNotNone(per, "no per-stepper field in the QINFO reply")
+        text = head.group(1) % (16_000_000, 3200, 32)
+        m = re.search(r'"([^"]*%lu)"', body[body.index(head.group(1)) + 40:])
+        self.assertIsNotNone(m, "the floor value is never formatted")
+        text += m.group(1) % max(floors)
+        for i, f in enumerate(floors):
+            text += per.group(1) % (i, f)
+        return text + "\n"
+
+    def test_qinfo_names_every_stepper_separately(self):
+        # The bug: one unseparated number per stepper, so a 3-stepper board sent
+        # `maxspeed=808080` and the host read that as the single value 808080.
+        # Every QSEG built from it then exceeded the 16-bit ticks field and was
+        # refused, and the firmware's complaint was about the tick range rather
+        # than about what was wrong.
+        for floors in ([80], [80, 80], [80, 640, 320], [80] * 8):
+            text = self._render_qinfo(floors)
+            m = run_tests.QINFO_RE.search(text)
+            self.assertIsNotNone(m,
+                                 f"a {len(floors)}-stepper QINFO does not "
+                                 f"parse: {text!r}")
+            per = [int(v) for v in re.findall(r"maxspeed\d+=(\d+)",
+                                              m.group(0))]
+            self.assertEqual(per, floors,
+                             f"floors came back wrong for {text!r}")
+
+    def test_qinfo_reply_carries_the_floor_the_host_plans_against(self):
+        # maxall is the field a shared program depends on. If it is dropped from
+        # the reply the host cannot reconstruct it -- and the run then plans
+        # against whichever field happens to survive.
+        text = self._render_qinfo([80, 640])
+        m = run_tests.QINFO_RE.search(text)
+        self.assertIsNotNone(m, text)
+        self.assertIn("maxall=", m.group(0))
+        self.assertEqual(int(m.group(4)), 640,
+                         "maxall must be the largest floor, not the first")
+
+    def test_qinfo_uses_its_own_reply_buffer(self):
+        # QINFO grew by ~13 bytes per stepper, into a buffer sized for a reply
+        # with no per-stepper fields. An 8-stepper board truncated its own reply
+        # mid-number, and the host reported "no QINFO reply" with no hint that
+        # the firmware had run out of buffer.
+        self.assertIn("char buf[SALEAE_QINFO_REPLY_MAX]", self._qinfo_body())
+
+    def test_qinfo_stops_before_it_overruns_its_buffer(self):
+        # The per-stepper fields are appended into a bounded buffer, so the
+        # bounds have to be checked per field. snprintf's return value is how
+        # much it *would* have written, which is the only way to notice.
+        body = self._qinfo_body()
+        self.assertIn("int n = snprintf", body,
+                      "the QINFO append does not check what snprintf wanted "
+                      "to write, so it cannot detect an overrun")
+        self.assertIn("sizeof(buf)", body)
+
+    def test_host_reads_the_largest_floor_not_the_first(self):
+        # A shared program is walked by every stepper, so the fastest period
+        # legal for all of them is the largest floor -- not stepper A's own.
+        # Reading the first field would plan too fast whenever a later stepper
+        # is slower (MCPWM/PCNT next to RMT is exactly that case).
+        text = ("QINFO tps=16000000 mincmd=3200 qlen=32 maxall=640 "
+                "maxspeed0=80 maxspeed1=640")
+        m = run_tests.QINFO_RE.search(text)
+        self.assertIsNotNone(m, text)
+        per = [int(v) for v in re.findall(r"maxspeed\d+=(\d+)", m.group(0))]
+        self.assertEqual(per, [80, 640])
+        self.assertEqual(int(m.group(4)), 640)
+        self.assertEqual(max(per), 640)
+
+    def test_qinfo_with_one_stepper_still_parses(self):
+        # The single-stepper reply is the one the existing 25 scenarios ran on,
+        # so it must keep parsing. A grammar change that only works for N > 1
+        # would pass every plan test and break every recorded scenario.
+        for text in ("QINFO tps=16000000 mincmd=3200 qlen=32 maxall=640 "
+                     "maxspeed0=640",
+                     "QINFO tps=16000000 mincmd=3200 qlen=32 maxall=640"):
+            self.assertIsNotNone(run_tests.QINFO_RE.search(text), text)
+
+    def test_legal_ticks_never_exceeds_the_16_bit_field(self):
+        # Two floors concatenated by a sloppy QINFO parse once reached
+        # legal_ticks() as 808080. The firmware's refusal was then accurate --
+        # out of ticks range -- and about a number nothing had asked for. The
+        # clamp turns that class of mistake into a slow but legal run.
+        info = {"min_cmd_ticks": 3200, "max_speed_ticks": 808080}
+        self.assertLessEqual(run_tests.legal_ticks(info, 1, 65535), 65535)
+        self.assertLessEqual(run_tests.legal_ticks(info, 8, 808080), 65535)
+
+    def test_harness_supplies_everything_the_runner_reads(self):
+        # harness.py builds the args namespace run_tests.py then reads. Two were
+        # missing -- capture_dir and sr00_sample_rate -- so *every* non-dry-run
+        # invocation died on its first capture with an AttributeError,
+        # including the --flash example in AGENTS.md. Nothing exercised the
+        # path, because a test that only parses arguments never gets that far.
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt_v2",
+                                   "--tests", "SR_01"])
+        for name in ("capture_dir", "sr00_sample_rate", "results_dir",
+                     "sample_rate", "seconds", "port", "baud", "force",
+                     "capture"):
+            self.assertTrue(hasattr(args, name),
+                            f"harness args lack {name!r}, which run_tests "
+                            f"reads on every run")
+
+    def test_the_catalogue_path_reaches_the_runner(self):
+        # The end of the same regression: not just that the attributes exist,
+        # but that a plain catalogue run gets past the first capture. The board
+        # and the analyzer are faked, so this asserts only that the runner is
+        # handed everything it needs before any hardware is touched.
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt_v2",
+                                   "--tests", "SR_01", "--results-dir",
+                                   "/tmp/does-not-exist-yet",
+                                   "--capture-dir", "/tmp/r3-none"])
+        args.dut_driver = args.driver
+        # A temp results dir, so the assertion that run() creates it does not
+        # depend on -- and then leave behind -- a fixed path.
+        with tempfile.TemporaryDirectory() as tmp:
+            args.results_dir = str(Path(tmp) / "results")
+            args.capture_dir = str(Path(tmp) / "capture")
+            seen = {}
+
+            def fake_open(port, baud, timeout=6.0):
+                seen["opened"] = True
+                return mock.Mock()
+
+            # SR_00 is the gate, and it needs an analyzer too; this test is
+            # about reaching the board at all, so let SR_00 pass on the fixture
+            # and check SR_01 gets its turn.
+            def fake_sr00(tag_key, a):
+                seen["sr00"] = True
+                return "passed", {"channels": {}}
+
+            def fake_load(*a, **k):
+                return {"D0": [0] * 400}, 1_000_000
+
+            with mock.patch.object(run_tests, "open_board", fake_open), \
+                    mock.patch.object(run_tests, "run_sr00", fake_sr00), \
+                    mock.patch.object(run_tests, "load_capture_for_eval",
+                                      fake_load), \
+                    mock.patch.object(run_tests, "read_map",
+                                      lambda ser:
+                                          (run_tests.default_channel_map(),
+                                           {})), \
+                    mock.patch.object(run_tests, "read_qinfo",
+                                      lambda ser: dict(vf.Dut().info())), \
+                    mock.patch.object(run_tests, "program",
+                                      lambda *a: True), \
+                    mock.patch.object(run_tests, "start_capture",
+                                      lambda *a, **k: mock.Mock(
+                                          wait=lambda: None)), \
+                    mock.patch.object(run_tests, "send_line",
+                                      lambda *a, **k: ""), \
+                    mock.patch.object(run_tests, "reply_of",
+                                      lambda *a: "OK QCLR"), \
+                    mock.patch.object(run_tests, "drain",
+                                      lambda *a, **k: ""):
+                try:
+                    run_tests.run("r3_probe", ["SR_01"], args)
+                except Exception as exc:                  # noqa: BLE001
+                    self.fail(f"catalogue run raised before any hardware: "
+                              f"{exc!r}")
+            self.assertTrue(seen.get("opened"),
+                            "the runner never reached open_board")
+            self.assertTrue(seen.get("sr00"), "SR_00 never ran")
+            # run() creates the results directory; a caller naming one must not
+            # get a FileNotFoundError after a capture has already been spent.
+            self.assertTrue(Path(args.results_dir).is_dir(), args.results_dir)
+
     def test_config_line_fits_the_firmware_line_buffer(self):
         # The firmware reads a line into a fixed buffer and takes each argument
         # with a bounded sscanf width. A CONFIG the host generates that does not
@@ -592,6 +821,318 @@ class TestBoardCommands(unittest.TestCase):
                 f"{scenario} sends {first!r}")
             self.assertEqual(first.count("CONFIG"), 1, first)
             self.assertEqual(first.split()[0], "CONFIG", first)
+
+
+class TestModes(unittest.TestCase):
+    """The two generic modes (todo R3).
+
+    Neither mode names an architecture, so what is worth testing here is the
+    property that makes that true: a plan is a legal, fully-labelled set of
+    CONFIG lines and programs, built before anything runs. Every one of these
+    is a pure function of the plan arguments -- no board -- so a mode that
+    would waste a capture on a point the firmware refuses, or measure a
+    different configuration than it names, is caught here rather than by an
+    hour of hardware.
+    """
+
+    # QINFO values good enough to plan against. Nothing here measures them;
+    # these only have to make legal_ticks() produce distinct periods.
+    INFO = {"ticks_per_s": 16_000_000, "min_cmd_ticks": 6400,
+            "max_speed_ticks": 80, "queue_len": 32,
+            "per_stepper_floor": 80}
+
+    def dense(self, events, n):
+        """Expand (index, level) changes into the per-sample array evaluators read."""
+        s = [0] * n
+        for i, (t, v) in enumerate(events):
+            end = events[i + 1][0] if i + 1 < len(events) else n
+            for j in range(t, min(end, n)):
+                s[j] = v
+        return s
+
+    def square(self, period, n, offset=1000, high=8):
+        out = []
+        for i in range(n):
+            out.append((i * period + offset, 1))
+            out.append((i * period + offset + high, 0))
+        return out
+
+    # -- plan shape ------------------------------------------------------
+    def test_scale_plan_covers_every_count_from_one(self):
+        for pin_mode, cap in (("nodir", 8), ("dir", 4)):
+            plan = run_tests.scale_plan("rmt", pin_mode, cap)
+            self.assertEqual([p.count for p in plan], list(range(1, cap + 1)),
+                             pin_mode)
+            self.assertEqual(plan[0].count, 1, "the loop must start at one "
+                             "stepper; a sweep that skipped 1 could not show "
+                             "whether adding a stepper changed anything")
+
+    def test_scale_run_selects_every_connected_stepper(self):
+        # QRUN's mask is a bitmask over stepper slots. A mask that does not
+        # cover them all leaves steppers idle, and the run then reports a
+        # driver that emitted nothing for a stepper that was never asked to
+        # run -- the same silent-wrong-answer shape as a wrong channel map.
+        for plan in run_tests.scale_plan("rmt", "nodir", 8):
+            self.assertEqual(plan.mask, (1 << plan.count) - 1, plan.label)
+
+    def test_scale_names_the_configuration_it_actually_connects(self):
+        # The wire is what the firmware gets, and the label is what the result
+        # is filed under. If they disagree the table attributes a measurement
+        # to a run that never happened.
+        for plan in run_tests.scale_plan("mcpwm_pcnt", "dir", 4):
+            tokens = plan.wire.split()
+            self.assertEqual(tokens[0], "CONFIG", plan.wire)
+            self.assertEqual(int(tokens[1]), plan.count, plan.wire)
+            self.assertEqual(tokens[2].split(","), plan.drivers, plan.wire)
+            self.assertEqual(tokens[3], plan.pin_mode, plan.wire)
+            self.assertIn(f"n{plan.count}", plan.label)
+
+    def test_scale_uses_one_shared_program(self):
+        # A per-stepper program here would answer SR_15's question (does each
+        # stepper keep its own speed) instead of scale's (does the driver still
+        # emit this period with N attached), and the two would be conflated.
+        for plan in run_tests.scale_plan("rmt", "nodir", 8):
+            self.assertIsNone(plan.per_stepper_builder, plan.label)
+
+    def test_sync_enumerates_combinations_with_repetition(self):
+        drivers = ["rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"]
+        plan = run_tests.sync_plan(drivers, "dir", 2)
+        pairs = [tuple(p.drivers) for p in plan]
+        # n*(n+1)/2, and no reverse duplicates: rmt+mcpwm is one measurement.
+        self.assertEqual(len(pairs), len(drivers) * (len(drivers) + 1) // 2)
+        # No reverse duplicate: rmt+mcpwm_pcnt and mcpwm_pcnt+rmt are the same
+        # measurement and the same two channels, so running both would report
+        # one configuration twice.
+        self.assertEqual(len(set(pairs)), len(pairs), pairs)
+        for a, b in pairs:
+            self.assertNotIn((b, a), set(pairs) - {(a, b)}, (a, b))
+
+    def test_sync_includes_both_same_and_cross_driver_pairs(self):
+        # The same-driver pair is the baseline a cross-driver skew is only
+        # interpretable against, so a plan with only cross-driver pairs has no
+        # reference and the column means nothing. R1's wrong finding was
+        # exactly this shape: a "cross-driver" run that was really RMT+RMT.
+        plan = run_tests.sync_plan(["rmt", "mcpwm_pcnt"], "dir", 2)
+        pairs = {tuple(p.drivers) for p in plan}
+        self.assertEqual(pairs, {("rmt", "rmt"),
+                                 ("mcpwm_pcnt", "mcpwm_pcnt"),
+                                 ("rmt", "mcpwm_pcnt")})
+
+    def test_sync_gives_each_stepper_a_distinct_period(self):
+        # Adherence is only checkable if each stepper was given a *different*
+        # period. With one shared period a start that dragged every stepper
+        # onto one speed would satisfy every check here, which is the exact
+        # defect the mode exists to catch.
+        for plan in run_tests.sync_plan(["rmt", "mcpwm_pcnt", "i2s_direct"],
+                                       "dir", 3):
+            programs = plan.per_stepper_builder(self.INFO)
+            ticks = [programs[i][0][1] for i in sorted(programs)]
+            self.assertEqual(len(ticks), 3, plan.label)
+            self.assertEqual(len(set(ticks)), 3,
+                             f"{plan.label}: steppers share a period {ticks}, "
+                             f"so a rate collapse could not be detected")
+
+    def test_sync_periods_are_legal_commands(self):
+        # legal_ticks clamps to MIN_CMD_TICKS/steps; a plan that skipped it
+        # would have the firmware refuse the program and the evaluator would
+        # never see a waveform at all.
+        for plan in run_tests.sync_plan(["rmt", "i2s_direct"], "dir", 2):
+            for i, segs in plan.per_stepper_builder(self.INFO).items():
+                ticks, steps = segs[0][1], segs[0][0]
+                self.assertGreaterEqual(ticks * steps, self.INFO["min_cmd_ticks"],
+                                        f"{plan.label} step {i}")
+
+    def test_sync_needs_two_drivers_to_have_a_skew(self):
+        with self.assertRaises(ValueError):
+            run_tests.sync_plan(["timer"], "dir", 2)
+
+    # -- driver identities ----------------------------------------------
+    def test_rmt_and_rmt_v2_are_one_driver(self):
+        # The firmware maps both spellings to SA_RMT and reports both as `rmt`.
+        # Enumerating them as two would put rmt_v2+rmt in the table as a
+        # *cross-driver* combination, under a name claiming they differ, when
+        # the two are the same run -- the tell that gave away R1's wrong
+        # finding (two supposedly different configurations agreeing to four
+        # decimal places).
+        self.assertEqual(harness.driver_identities(
+            ["rmt_v2", "rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"]),
+            ["rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"])
+        self.assertEqual(harness.driver_identities(["timer", "pio"]),
+                         ["timer", "pio"])
+
+    def test_sync_plan_has_no_duplicate_run_after_identity_folding(self):
+        drivers = harness.driver_identities(
+            harness.DRIVERS[harness.arch_family("esp32")])
+        plan = run_tests.sync_plan(drivers, "dir", 2)
+        labels = [p.label for p in plan]
+        self.assertEqual(len(set(labels)), len(labels), labels)
+
+    def test_driver_identities_cover_every_known_driver(self):
+        # A driver missing from the map is compared to itself, so the typo
+        # would only surface as a combination that silently equals another.
+        for family, names in harness.DRIVERS.items():
+            for d in names:
+                self.assertIn(d, harness.DRIVER_IDENTITY,
+                              f"{d} (family {family}) has no identity")
+
+    # -- the bound a scale run stops at ----------------------------------
+    def test_scale_stops_at_the_smaller_of_driver_and_channels(self):
+        # RMT on the ESP32 has 8 queues and `dir` spends 2 channels per
+        # stepper, so the run stops at 4 and that is the *analyzer's* limit.
+        # Reporting 8 there would be a claim about RMT that the rig could not
+        # have measured.
+        self.assertEqual(harness.scale_bound("esp32", "rmt", "dir")[0], 4)
+        self.assertIn("channels", harness.scale_bound("esp32", "rmt", "dir")[1])
+        # MCPWM/PCNT has 6 queues on IDF 5, so there the driver is the bound
+        # and `nodir` can only reach 6 of the 8 channels.
+        self.assertEqual(harness.scale_bound("esp32", "mcpwm_pcnt", "nodir")[0],
+                         6)
+        self.assertIn("driver", harness.scale_bound("esp32", "mcpwm_pcnt",
+                                                    "nodir")[1])
+        # AVR: one timer driver, two queues, and two channels' worth of a 328P.
+        self.assertEqual(harness.scale_bound("nanoatmega328", "timer", "dir")[0],
+                         2)
+
+    def test_scale_bound_refuses_an_unknown_driver_rather_than_guessing(self):
+        # A guessed bound either stops the sweep early -- reporting a driver
+        # limit that is not one -- or runs past what the board can connect.
+        with self.assertRaises(SystemExit):
+            harness.scale_bound("esp32", "nonexistent", "dir")
+        with self.assertRaises(SystemExit):
+            harness.scale_bound("not_an_arch", "rmt", "dir")
+
+    def test_scale_bound_agrees_with_the_librarys_queue_counts(self):
+        # Cross-check the table against the library's own QUEUES_* values, so
+        # it cannot drift away from the build it plans for.
+        root = SCRIPTS.parents[3] / "src" / "pd_esp32"
+        idf5 = (root / "pd_config_idf5.h").read_text()
+
+        def queues(target, name):
+            block = idf5.split(f"CONFIG_IDF_TARGET_{target}")[1]
+            for line in block.splitlines():
+                if line.startswith(f"#define QUEUES_{name} "):
+                    return int(line.split()[2])
+            self.fail(f"no QUEUES_{name} for {target}")
+
+        self.assertEqual(harness.driver_max("esp32", "rmt"),
+                         queues("ESP32", "RMT"))
+        self.assertEqual(harness.driver_max("esp32", "mcpwm_pcnt"),
+                         queues("ESP32", "MCPWM_PCNT"))
+        self.assertEqual(harness.driver_max("esp32s2", "rmt"),
+                         queues("ESP32S2", "RMT"))
+        self.assertEqual(harness.driver_max("esp32c3", "rmt"),
+                         queues("ESP32C3", "RMT"))
+        # Under dynamic allocation I2S mux is 32 and I2S direct 3, so the
+        # channel budget is what caps a mux run at 8.
+        self.assertEqual(harness.driver_max("esp32", "i2s_mux"), 32)
+        self.assertEqual(harness.scale_bound("esp32", "i2s_mux", "nodir")[0], 8)
+
+    def test_driver_max_is_known_for_every_architecture_offered(self):
+        # `--arch` accepts these, so a scale run on any of them must be able
+        # to say how far it goes. An architecture whose limit is missing is a
+        # mode that cannot run at all.
+        for arch in harness.ARCHS:
+            for driver in harness.DRIVERS[harness.arch_family(arch)]:
+                self.assertIsNotNone(
+                    harness.driver_max(arch, driver),
+                    f"{arch}/{driver} has no DRIVER_MAXS entry")
+
+    # -- what the evaluators actually catch -----------------------------
+    # The evaluator tests synthesize waveforms at 1 sample == 1 us, so their
+    # DUT tick rate has to be 1 MHz for "160 ticks" to mean 160 samples. Using
+    # the ESP32's 16 MHz here would ask for a 10 us period from a waveform that
+    # measures 160 us, and every case would fail for the wrong reason.
+    EVAL_INFO = {"ticks_per_s": 1_000_000, "min_cmd_ticks": 100,
+                 "max_speed_ticks": 160, "queue_len": 32,
+                 "per_stepper_floor": 160}
+
+    def _eval_sync(self, a, b):
+        """eval_sync on two rendered stepper channels, 1 sample == 1 us."""
+        n = 20000
+        channels = {"D0": self.dense(a, n), "D1": [0] * n,
+                    "D2": self.dense(b, n), "D3": [0] * n}
+        old = run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS
+        chan_map = run_tests.default_channel_map(2, 2)
+        run_tests.STEP_CHANNELS = run_tests.step_channels(chan_map)
+        run_tests.DIR_CHANNELS = run_tests.dir_channels(chan_map)
+        try:
+            return run_tests.eval_sync(channels, 1_000_000,
+                                       [(40, 160, True)], self.EVAL_INFO,
+                                       {0: [(40, 160, True)],
+                                        1: [(40, 320, True)]})
+        finally:
+            run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS = old
+
+    def test_sync_accepts_each_stepper_at_its_own_period(self):
+        ok, detail = self._eval_sync(self.square(160, 40),
+                                     self.square(320, 40, offset=1100))
+        self.assertTrue(ok, detail)
+        self.assertAlmostEqual(
+            detail["per_stepper"]["A"]["mean_period_us"], 160.0, places=3)
+        self.assertAlmostEqual(
+            detail["per_stepper"]["B"]["mean_period_us"], 320.0, places=3)
+
+    def test_sync_catches_a_stepper_collapsed_onto_another_s_period(self):
+        # The defect the distinct periods exist to expose: both steppers
+        # stepped, the start was aligned, and one was running at the wrong
+        # speed. With a shared expected period this would pass.
+        ok, detail = self._eval_sync(self.square(160, 40),
+                                     self.square(160, 40, offset=1100))
+        self.assertFalse(ok, "a rate collapse passed a sync run")
+        self.assertFalse(detail["per_stepper"]["B"]["period"]["ok"])
+
+    def test_sync_catches_a_stepper_that_lost_steps(self):
+        ok, detail = self._eval_sync(self.square(160, 40),
+                                     self.square(320, 40, offset=1100)[:-400])
+        self.assertFalse(ok, "a lost step passed a sync run")
+        self.assertFalse(detail["per_stepper"]["B"]["steps"]["ok"])
+
+    def test_sync_reports_skew_but_does_not_gate_on_it(self):
+        # A stepper starting 40 us late has not malfunctioned; it is a
+        # platform characteristic. It is reported in us AND in step periods,
+        # because 40 us is nothing on one period and enormous on another.
+        ok, detail = self._eval_sync(self.square(160, 40),
+                                     self.square(320, 40, offset=1040))
+        self.assertTrue(ok, "skew was gated on: " + repr(detail))
+        self.assertAlmostEqual(detail["first_step_skew_us"], 40.0, places=3)
+        self.assertAlmostEqual(detail["skew_periods"], 0.25, places=3)
+
+    def _eval_scale(self, waveforms):
+        n = 20000
+        channels = {}
+        for i, w in enumerate(waveforms):
+            channels[f"D{i}"] = self.dense(w, n)
+        old = run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS
+        chan_map = run_tests.default_channel_map(len(waveforms), 1)
+        run_tests.STEP_CHANNELS = run_tests.step_channels(chan_map)
+        run_tests.DIR_CHANNELS = {}
+        try:
+            return run_tests.eval_scale(channels, 1_000_000,
+                                        [(40, 160, True)], self.EVAL_INFO)
+        finally:
+            run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS = old
+
+    def test_scale_accepts_every_stepper_at_the_shared_period(self):
+        ok, detail = self._eval_scale([self.square(160, 40)
+                                       for _ in range(4)])
+        self.assertTrue(ok, detail)
+        self.assertEqual(detail["stepper_count"], 4)
+        self.assertEqual(detail["period_spread_us"], 0.0)
+
+    def test_scale_catches_one_stepper_off_period(self):
+        # The point of scale: stepper D runs at another stepper's rate while
+        # the others are correct, so a check that only looked at the first
+        # stepper would pass.
+        ok, detail = self._eval_scale([self.square(160, 40), self.square(160, 40),
+                                       self.square(160, 40), self.square(320, 40)])
+        self.assertFalse(ok, "an off-period stepper passed a scale run")
+        self.assertFalse(detail["per_stepper"]["D"]["period"]["ok"])
+
+    def test_scale_catches_a_stepper_that_never_stepped(self):
+        ok, detail = self._eval_scale([self.square(160, 40), self.square(160, 40),
+                                       self.square(160, 40), []])
+        self.assertFalse(ok, "a silent stepper passed a scale run")
+        self.assertEqual(detail["per_stepper"]["D"]["steps"]["steps_measured"], 0)
 
 
 if __name__ == "__main__":

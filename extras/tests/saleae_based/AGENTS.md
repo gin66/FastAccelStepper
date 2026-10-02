@@ -92,6 +92,13 @@ python3 scripts/harness.py --arch rpipico --driver pio --count 2 --flash
 python3 scripts/harness.py --arch esp32 --drivers rmt,mcpwm_pcnt --count 2 \
     --tests SR_17 --flash
 
+# the two generic modes (todo R3). Neither names an architecture; --arch and
+# --driver are tags on the run. --dry-run prints the whole plan first.
+python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --dry-run
+python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --flash
+python3 scripts/harness.py --mode sync --arch esp32 --dry-run
+python3 scripts/harness.py --mode sync --arch esp32 --speed-us 5 --flash
+
 # low-level (firmware already flashed; you supply the tag key)
 python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch --tests SR_01
 
@@ -147,7 +154,15 @@ MAP                         count, mode, stride, and the GPIO behind each
                             than assume a channel map: in `dir` stepper B is D2,
                             in `nodir` it is D1, and a host that guesses reads a
                             quiet pin and reports a driver that emits nothing.
-QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, per-stepper floor
+QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, maxall (the
+                            LARGEST per-stepper speed floor -- the fastest
+                            period legal for every connected stepper, and what
+                            a shared program is planned against), then
+                            maxspeed0..N for each stepper's own. Printed with
+                            maxall FIRST so a buffer overrun cannot truncate
+                            the one field the host cannot reconstruct. Reading
+                            only the first stepper's floor plans too fast
+                            whenever a later stepper is slower.
 QCLR                        drop the program and stop
 QSEG <steps> <ticks> <dir>  append a segment; steps=0 means "pause <ticks>"
 QSEG <idx> <steps> <ticks> <dir>
@@ -214,9 +229,24 @@ board.
 - The `QSEG`/`QRUN` feeder itself: segment program, prefill, synchronized
   kick-off, DIR-pause retry, pause commands. Implemented in
   `common/saleae_app.cpp` (`qe_pump`/`qe_feed`).
-- Characterization scenarios above are runnable by hand with `control.py`; the
-  orchestrated SR ids that consume them are still being wired up in
-  `run_tests.py`.
+- **The two generic modes** (`--mode scale|sync`, todo R3). `scale` sweeps the
+  stepper count 1..`min(driver queues, channel budget)` on one named driver with
+  a **shared** program, asserting each stepper's own step count and period;
+  `sync` runs **every driver-list combination** with each stepper at **its own**
+  period, reporting first-step skew (µs *and* step periods) and asserting
+  adherence per stepper. A refused point is recorded and the plan continues.
+- Characterization scenarios above are runnable by hand with `control.py`.
+
+### Known defect found by `--mode scale`
+
+**Two MCPWM/PCNT queues on one ESP32 do not run**: the second stepper emits
+continuously and never stops (22 143 edges where 64 were commanded, at exactly
+the commanded period), and `POS` reads non-monotonic. Reproduces on unmodified
+firmware, in both `dir` and `nodir`, at any speed, with only stepper B selected.
+`rmt+mcpwm_pcnt` and `rmt+rmt` are both fine. Suspect the `channel_num` /
+`pcnt_unit_id` indexing in `src/pd_esp32/StepperISR_idf5_esp32_mcpwm_pcnt.cpp`
+against 4 MCPWM timers vs `QUEUES_MCPWM_PCNT` = 6. Until fixed, MCPWM/PCNT
+multi-stepper results characterize this bug, not the driver.
 
 ## Target/driver notes## Capture format
 

@@ -82,6 +82,40 @@ matrix, and what lets a driver nobody has connected yet be added by naming it.
 an architecture that grows a second driver needs no new code path, only a
 second name in its driver list.
 
+**The two modes are deliberately different measurements.** `scale` gives every
+stepper *one shared program*, so a run answers "does this driver still emit the
+commanded period with N attached, and does each stepper get every step".
+`sync` gives each stepper *its own period*, on a 1:2:3 ratio ladder, because
+adherence is only checkable when the steppers were given **different**
+expectations: a synchronized start that dragged them all onto one speed would
+satisfy a first-step test *and* a shared-period test, and be reported as a
+perfect sync. Each stepper is then judged against **its own** commanded period,
+so a collapse is observed rather than inferred from its absence.
+
+**`scale` stops at `min(driver-max, channel budget)` and says which bound it
+hit.** These are different findings — "RMT reaches 8 steppers step-only" and
+"RMT reaches 4 with direction pins" — and only the second is a fact about the
+analyzer rather than about RMT. The driver bound comes from the library's own
+`QUEUES_*` values, which the host cross-checks against
+`src/pd_esp32/pd_config_idf5.h`; an unknown entry is **refused**, never guessed,
+since a guessed bound either truncates the sweep or runs past what the board can
+connect.
+
+**`sync` enumerates over driver *identities*, not spellings.** `rmt` and
+`rmt_v2` are one driver — the firmware maps both to `SA_RMT` and reports both as
+`rmt` — so enumerating names would file `rmt_v2+rmt` as a *cross-driver*
+combination under a name claiming they differ. That is exactly the failure §5.5
+records having produced once already, and the reason the plan contains both
+same-driver and cross-driver pairs is that the same-driver row is the only
+baseline the cross-driver skew is interpretable against.
+
+A **refused** point is recorded and the plan continues: for `scale` the point
+where the board says no *is* the answer, and for `sync` a driver this build
+cannot connect is a fact worth recording beside the combinations that did
+measure. That is what makes `i2s_mux` — never run, see §5.8 — one flag away with
+no new code path: it is already in the driver list, so the run attempts it and
+records the refusal.
+
 **Driver maximum is a property of the driver, bounded by the analyzer.** The
 loop stops at `min(driver-max, channel budget)` and says which bound it hit:
 the `dir` mapping spends two channels per stepper and so caps at 4, while
@@ -843,7 +877,7 @@ The whole surface. Note how small it is: everything else is assembled from
 | `SR00` | `OK SR00` | SR_00 pin self-test (§5.0) |
 | `CONFIG <count> <drv>[,<drv>…] [dir\|nodir]` | `OK CONFIG n=<N> mode=<pinmode> maxspeed<i>=<ticks> …` | Connect `<count>` steppers, one driver named per stepper. Pin mode `dir` (default) or `nodir`. **There is no `auto`.** |
 | `MAP` | `MAP count=<n> mode=<pinmode> stride=<s> ch=<pin,…>` | Which analyzer channel carries which stepper, plus the GPIO behind each reachable channel, so host and firmware cannot disagree (§3.3). **The host must read this rather than assume a map**: in `dir` stepper B is `D2`, in `nodir` it is `D1`, and a host that guesses reads a quiet pin and reports a driver that emits nothing |
-| `QINFO` | `QINFO tps=… mincmd=… qlen=… maxspeed=…` | Platform limits the host must respect |
+| `QINFO` | `QINFO tps=… mincmd=… qlen=… maxall=… maxspeed0=… [maxspeed1=…]` | Platform limits the host must respect. **`maxall` is the largest per-stepper speed floor** — the fastest period legal for *every* connected stepper, and what a shared program is planned against. The indexed `maxspeedN` fields are each stepper's own, for a program that addresses one stepper specifically. `maxall` is printed **first** so a buffer overrun cannot truncate the field the host cannot reconstruct |
 | `QCLR` | `OK QCLR` | Drop the program, stop everything |
 | `QSEG <steps> <ticks> <dir>` | `OK QSEG <n>/8` | Append a segment to the **shared** program. `steps=0` means "pause for `<ticks>` ticks". `dir` is 0 or 1 |
 | `QSEG <idx> <steps> <ticks> <dir>` | `OK QSEG <n>/8` | Append a segment to **stepper `<idx>`'s own** program, ignoring the shared one. Needed for two steppers at *different* periods (SR_15, mode `sync`) |
@@ -991,6 +1025,39 @@ question is whether skew tracks *driver heterogeneity* at all:
 0.74. The two drivers do arm through unrelated hardware and they do diverge; §5.2's
 original premise was right and the correction it used to be was wrong.
 
+**Re-measured by `--mode sync`, which enumerates every combination rather than
+the three above** (ESP32, 5 µs step, 4 MS/s; each stepper given its own period,
+so adherence is checked per stepper):
+
+| Driver list | Skew µs | In step periods | Adherence |
+|-------------|---------|-----------------|-----------|
+| `rmt+rmt` | 37.5 | 3.75 | both kept 160 t / 320 t |
+| `rmt+mcpwm_pcnt` | 62.25 | 6.23 | both kept theirs |
+| `mcpwm_pcnt+i2s_direct` | 858.75 | 85.88 | both kept theirs |
+| `rmt+i2s_direct` | **990.0** | **99.0** | both kept theirs |
+| `i2s_direct+i2s_direct` | 52.25 | 5.23 | both kept theirs |
+| `mcpwm_pcnt+mcpwm_pcnt` | 6.5 | 0.65 | **B emitted 11053 steps, not 64** |
+
+**The I2S rows change the conclusion, and only the enumeration exposed them.**
+RMT and MCPWM are both *armed timers*, and comparing them says cross-driver skew
+is modestly worse than same-driver. I2S is a third thing: it emits from a DMA
+callback, so it cannot be armed alongside the others at all, and the gap is
+**99 step periods** rather than 6.2 — reproducible to a sample across three runs
+(990.0 / 990.25 / 1068.25 µs, with `rmt+rmt` at 37.5 / 37.5 / 37.75 over the same
+three). A millisecond there is the time for the DMA pipeline to produce anything
+at all, not scheduling jitter.
+
+So "skew tracks driver heterogeneity" is right but undersold: what it tracks is
+**how the driver is started**, and among armed timers the spread is tens of µs
+while a DMA-fed driver is three orders of magnitude away. The skew *column* is
+what makes that legible — 99.0 against 6.23 is a different kind of number from
+990 µs against 62 µs, and one figure in µs alone would hide it.
+
+> The `mcpwm_pcnt+mcpwm_pcnt` row is **a defect, not a measurement** — see
+> §5.8. Two MCPWM/PCNT queues on one ESP32 do not run: the second stepper emits
+> continuously and never stops, on the unmodified firmware too. Until that is
+> fixed this row characterizes the bug.
+
 > **This table was wrong once, and the reason is worth recording.** An earlier
 > revision of this section reported `rmt+mcpwm` at *exactly* the same 29.5417 µs
 > as `rmt+rmt`, four decimal places, and concluded from the identity that skew
@@ -1055,6 +1122,51 @@ expect, and the delay is whatever the queue happened to hold. SR_25 therefore
 uses a move far larger than the queue, which makes it a test of *stopping*
 rather than of queue drain. Anyone relying on `stopMove()` as an emergency stop
 should know this.
+
+### 5.8 What `--mode scale` found that no scenario was looking for
+
+**Two MCPWM/PCNT queues on one ESP32 do not run.** The second stepper emits
+continuously and never stops.
+
+`CONFIG 2 mcpwm_pcnt,mcpwm_pcnt dir`, `QSEG 64 160 1`, `QRUN 3`: stepper A emits
+exactly 64 steps; stepper B emits **22 143 rising edges at exactly the commanded
+10 µs period** (5.0 µs high, 5.0 µs low) straight through to the end of the
+capture window. The board's own `POS` reads **non-monotonic** — `64 31`, then
+`64 26`, then `64 32`, all below 64 — which says the position counter is being
+re-read while the pin runs on, not that steps were lost. The capture and the
+firmware disagree about what happened, and the capture is right.
+
+**It is two MCPWM/PCNT queues, not MCPWM, and not the pin mode:**
+
+| Configuration | `POS` sampled over 1.5 s |
+|---------------|--------------------------|
+| `rmt+rmt` | `64 64` every time |
+| `rmt+mcpwm_pcnt` | `64 64` every time |
+| `mcpwm_pcnt+rmt` (order swapped) | `64 64` every time |
+| `mcpwm_pcnt+mcpwm_pcnt` | `64 31 / 64 26 / 64 32 / 64 50 / 64 34` |
+| `mcpwm_pcnt+mcpwm_pcnt` at 3200 ticks (200 µs) | fails too — not a speed limit |
+
+It reproduces with only stepper B selected (`QRUN 2`), so the synchronized
+kick-off is not the trigger: **merely configuring a second MCPWM/PCNT queue is
+enough.** And it reproduces on the unmodified firmware, so it is a library
+defect rather than an artefact of the harness.
+
+*Where to look:* `StepperISR_idf5_esp32_mcpwm_pcnt.cpp` indexes
+`channel2mapping[NUM_QUEUES]` and `pcnt_unit_to_queue[QUEUES_MCPWM_PCNT]` by
+`channel_num` with `pcnt_unit_id = timer_num`, while the ESP32 has **4 MCPWM
+timers** (2 groups × 2) against `QUEUES_MCPWM_PCNT` = **6**. The second queue's
+timer/PCNT assignment is the first thing to check.
+
+**This is the argument for `scale` as a mode.** SR_16 asks whether a second
+stepper *perturbs* the first, and its answer to a runaway is "perturbed" — it
+compares periods on two channels and reports a difference. `scale` sweeps the
+count and asserts each stepper's step count, so a stepper that never stops is a
+failure rather than a larger number. Coverage that scales with the hardware
+finds things a hand-picked case cannot, because the hand-picked case was written
+by someone who did not know to look.
+
+Until it is fixed, **any MCPWM/PCNT row in the report tables characterizes this
+bug, not the driver.**
 
 The catalogue is intentionally small, and every entry is either a measured
 waveform property or a driver limit. Nothing in it re-verifies arithmetic, and

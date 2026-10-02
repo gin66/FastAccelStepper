@@ -16,11 +16,27 @@ A tag key ({arch}_{driver}_{channel_config}) indexes results so an already
 passed test is skipped on the next run, and so the same measurement on
 different silicon stays separate.
 
+Two *generic modes* generate runs from a rule rather than naming them, and both
+are here rather than in the front-end because a mode is a measurement, not a
+command line:
+
+  * `scale`  -- counts 1..channel-budget on one named driver, all steppers
+    running the same period in parallel.
+  * `sync`   -- every driver-list combination on a board with more than one
+    driver, each stepper given its *own* period so adherence is checkable.
+
+Neither names an architecture. `scale` is the single run an AVR board needs
+(one driver, two steppers); `sync` applies to the ESP32 family, and an
+architecture that grows a second driver needs no new code path here, only a
+second name in the driver list.
+
 Usage:
     python3 scripts/run_tests.py --list
     python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch
     python3 scripts/run_tests.py --tag-key ... --tests SR_01,SR_05
     python3 scripts/run_tests.py --tag-key ... --force
+    python3 scripts/run_tests.py --mode scale --driver rmt_v2 --pin-mode nodir
+    python3 scripts/run_tests.py --mode sync --arch esp32
 """
 
 import argparse
@@ -135,7 +151,19 @@ def reply_of(ser, line):
     return drain(ser, 0.2)
 
 
-QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxspeed=(\d+)")
+# maxall is the largest per-stepper floor, which is what a shared program has
+# to be planned against. maxspeed is the first stepper's own floor and is kept
+# for the grammar's sake. Both are read because the firmware prints one floor
+# per stepper comma-separated: parsing only the first field is right for one
+# stepper and silently wrong for more, because the run then either plans too
+# fast (the firmware refuses) or, worse, plans against a number that is really
+# several concatenated together.
+# `maxall` leads the reply so it cannot be the field a buffer overruns, and the
+# per-stepper floors are indexed after it. Parsing the *first* field alone would
+# have been wrong for any run with more than one stepper, which is exactly the
+# shape the two generic modes produce.
+QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxall=(\d+)"
+                      r"(?: maxspeed\d+=(\d+))*")
 MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)")
 
 
@@ -181,11 +209,21 @@ def read_qinfo(ser):
         text = reply_of(ser, "QINFO")
         m = QINFO_RE.search(text)
         if m:
+            per_stepper = [int(v) for v in
+                           re.findall(r"maxspeed\d+=(\d+)", m.group(0))]
             return {
                 "ticks_per_s": int(m.group(1)),
                 "min_cmd_ticks": int(m.group(2)),
                 "queue_len": int(m.group(3)),
-                "max_speed_ticks": int(m.group(4)),
+                # The fastest period legal for *every* connected stepper --
+                # the largest of the per-stepper floors. Every builder asks for
+                # "the fastest period this program may use", and for a program
+                # all steppers walk that is the max, not stepper A's own. The
+                # per-stepper values stay available for a builder that has to
+                # address one stepper specifically.
+                "max_speed_ticks": max(per_stepper, default=int(m.group(4))),
+                "max_speed_all_ticks": int(m.group(4)),
+                "max_speed_per_stepper": per_stepper,
             }
         time.sleep(0.1)
     raise RuntimeError(f"no QINFO reply, got: {text!r}")
@@ -201,6 +239,26 @@ def program(ser, segments):
         if "OK QSEG" not in text:
             print(f"    QSEG {steps} {ticks} rejected: {text.strip()}")
             return False
+    return True
+
+
+def program_per_stepper(ser, programs):
+    """QCLR, then the 4-argument QSEG for each stepper's own program.
+
+    The shared 3-argument form cannot express two different periods, so a
+    scenario that needs them (SR_15, and every `sync` run) has to send one
+    indexed list per stepper. Split out of run_hardware's inline version so both
+    runners send the same thing in the same order.
+    """
+    text = reply_of(ser, "QCLR")
+    if "OK QCLR" not in text:
+        return False
+    for idx in sorted(programs):
+        for steps, ticks, count_up in programs[idx]:
+            line = f"QSEG {idx} {steps} {ticks} {1 if count_up else 0}"
+            if "OK QSEG" not in reply_of(ser, line):
+                print(f"    {line} rejected")
+                return False
     return True
 
 
@@ -268,7 +326,13 @@ def legal_ticks(info, steps, wanted):
     """
     floor = info["min_cmd_ticks"]
     need = -(-floor // steps) if steps > 1 else floor
-    return max(wanted, need, 160)
+    # And under the 16-bit ticks field, which is a property of the command and
+    # not of the board. Two max_speed floors concatenated by a sloppy QINFO
+    # parse once produced 808080 here, and the firmware's rejection came back
+    # saying the ticks were out of range -- true, and about a number no scenario
+    # had asked for. Clamping makes that class of mistake fail as an
+    # implausibly slow run instead of as a confusing refusal.
+    return min(65535, max(wanted, need, 160))
 
 
 def sc_period_exact(info):
@@ -553,6 +617,41 @@ CONFIGS = {
 DEFAULT_NATIVE_DRIVER = "rmt_v2"
 
 
+def per_stepper_builder(scenario):
+    """(info) -> {stepper: segments} for a scenario, or None.
+
+    A thin adapter so the runner can ask "does this scenario need per-stepper
+    programs?" without knowing that per_stepper_programs() needs a QINFO dict
+    to compute them -- which it does not have until the board is wired.
+    """
+    if per_stepper_programs(scenario, None) is None:
+        return None
+    return lambda info: per_stepper_programs(scenario, info)
+
+
+def config_wire_drivers(drivers, pin_mode="dir"):
+    """The CONFIG line for an explicit driver list and pin mode.
+
+    The one place a CONFIG line is built from a driver list rather than a
+    CONFIGS key, because the two generic modes generate their own lists:
+    `scale` needs [d]*n and `sync` needs an arbitrary combination. Everything
+    else goes through config_wire() so there is one grammar, not two.
+    """
+    return f"CONFIG {len(drivers)} {','.join(drivers)} {pin_mode}"
+
+
+def config_wire_for(config, native_driver=DEFAULT_NATIVE_DRIVER,
+                    pin_mode="dir"):
+    """The CONFIG line for a CONFIGS key, in an explicit pin mode.
+
+    Kept beside config_wire rather than inside it so the existing three-argument
+    form -- used by run_hardware.py, sweep.py and the tests -- keeps working
+    unchanged, and so a mode can ask for the same named config in `nodir`
+    without either caller having to rebuild the line itself.
+    """
+    return config_wire_drivers(config_drivers(config, native_driver), pin_mode)
+
+
 def config_drivers(config, native_driver=DEFAULT_NATIVE_DRIVER):
     """Resolve a scenario config to one driver name per stepper.
 
@@ -577,6 +676,170 @@ def config_wire(config, native_driver=DEFAULT_NATIVE_DRIVER):
 def driver_tag(config, native_driver=DEFAULT_NATIVE_DRIVER):
     """The driver(s) a scenario's CONFIG selects, as one tag component."""
     return "+".join(config_drivers(config, native_driver))
+
+
+# ---------------------------------------------------------------------------
+# The two generic modes
+# ---------------------------------------------------------------------------
+#
+# The scenario table below is a *catalogue*: hand-picked cases, each with a name
+# worth keeping. The modes are the other half -- they generate runs from a rule,
+# so coverage scales with the hardware instead of with someone's patience.
+#
+# Neither mode names an architecture. That is the point: `scale` is the whole
+# cross-architecture matrix (one run on an AVR, four on an ESP32 in `dir`), and
+# `sync` applies to any board that has more than one driver to choose from. A
+# driver nobody has connected yet -- `i2s_mux` today -- is one flag away and
+# needs no new code path, because a driver is a *name* in a list and nothing
+# here switches on it.
+
+
+class ModeRun:
+    """One generated run: a wire, a program, an evaluator, and a label.
+
+    Deliberately not a scenario id. A scenario is a named case that appears in
+    the catalogue and in the report; a generated run is one point of a sweep,
+    and giving each one an id would put 4 or 10 rows of near-identical entries
+    into SCENARIOS, where `scale` at 3 steppers and `scale` at 7 steppers would
+    differ by a loop variable and nothing else.
+    """
+
+    def __init__(self, label, drivers, pin_mode, builder, evaluator, mask,
+                 goal, per_stepper_builder=None, steps=None, ticks=None):
+        self.label = label
+        self.drivers = list(drivers)
+        self.pin_mode = pin_mode
+        self.builder = builder
+        self.evaluator = evaluator
+        self.mask = mask
+        self.goal = goal
+        self.per_stepper_builder = per_stepper_builder
+        # Recorded when a builder ignores the QINFO limits and was told the
+        # period outright. None means "read it from the board", which is the
+        # normal case and the only trustworthy one.
+        self.steps = steps
+        self.ticks = ticks
+
+    @property
+    def count(self):
+        return len(self.drivers)
+
+    @property
+    def wire(self):
+        return config_wire_drivers(self.drivers, self.pin_mode)
+
+    @property
+    def tag(self):
+        """A filename- and tag-key-safe label. '+' and ',' would both leak."""
+        return "+".join(self.drivers) + self.pin_mode + f"n{self.count}"
+
+
+# How long a `scale` run's program is. Long enough for the period to be
+# measurable several times over -- one inter-step period is a single sample
+# interval at 4 MS/s and says nothing -- and short enough that 8 steppers
+# still fit the analyzer's 64 MSample buffer (see white paper 10).
+SCALE_STEPS = 64
+
+
+def scale_plan(driver, pin_mode, count_max, steps=SCALE_STEPS, ticks=None):
+    """Every count 1..count_max on one driver, all steppers in parallel.
+
+    One shared program, so the question each run answers is the one `scale` is
+    for: does this driver still emit the commanded period once N steppers are
+    attached, and does each one get every step it was promised? A per-stepper
+    program would answer a different question (SR_15's), and asking it here
+    would conflate "does adding steppers slow it down" with "does each stepper
+    keep its own speed".
+
+    The upper bound is `count_max`, which the caller has already bounded by
+    min(driver max, channel budget) -- so the plan is legal before anything is
+    run, and a sweep point that the firmware would refuse never gets measured.
+    """
+    plan = []
+    for count in range(1, count_max + 1):
+        def builder(info, count=count):
+            t = ticks if ticks else legal_ticks(info, steps,
+                                                info["max_speed_ticks"])
+            return seg_period(steps, t)
+
+        plan.append(ModeRun(
+            label=f"scale_{driver}_{pin_mode}_n{count}",
+            drivers=[driver] * count,
+            pin_mode=pin_mode,
+            builder=builder,
+            # Every stepper's own count and period, judged against the shared
+            # command: that is exactly what "N in parallel on one driver" has to
+            # mean, and it is the same check SR_16 makes for two steppers.
+            evaluator=eval_scale,
+            mask=(1 << count) - 1,
+            goal=f"{count} stepper(s) on {driver} in parallel",
+            steps=steps,
+            ticks=ticks,
+        ))
+    return plan
+
+
+# The per-stepper period ratios `sync` runs at, and why more than one.
+#
+# Adherence is only checkable if each stepper was given a *different* period:
+# a start that dragged every stepper onto one speed would satisfy a first-step
+# test and a shared-period test, and would be reported as a perfect sync. The
+# ratios are distinct per stepper so a collapse is visible in the measurement
+# rather than inferred from its absence.
+SYNC_RATIOS = (1, 2, 3)
+
+
+def sync_plan(drivers, pin_mode, count=2, steps=SCALE_STEPS):
+    """One run per driver-list combination, each stepper at its own period.
+
+    Every combination *with repetition* of `count` steppers drawn from
+    `drivers`, so the plan contains the same-driver pairs (rmt+rmt) as well as
+    the cross-driver ones (rmt+mcpwm_pcnt). That is deliberate and is the whole
+    reason to enumerate rather than hand-pick: the same-driver pair is the
+    baseline the cross-driver skew is only interpretable against, and R1
+    recorded a finding that had exactly this shape and was wrong -- an earlier
+    firmware overwrote the parsed driver list with its automatic choice, so the
+    "cross-driver" run was RMT+RMT and agreed with the same-driver number to
+    four decimal places. Identical numbers across supposedly different
+    configurations is the signature to look for, so the plan has to contain
+    both.
+
+    `count` defaults to 2 because skew needs two steppers to have a skew at
+    all. Three or more is allowed and adds combinations rather than changing
+    the question.
+    """
+    from itertools import combinations_with_replacement
+
+    if len(drivers) < count:
+        raise ValueError(f"sync needs {count} drivers, {drivers} has "
+                         f"{len(drivers)}")
+    plan = []
+    for combo in combinations_with_replacement(drivers, count):
+        ratios = SYNC_RATIOS[:count]
+
+        def per_stepper(info, ratios=ratios, steps=steps):
+            base = legal_ticks(info, steps, info["max_speed_ticks"])
+            return {i: seg_period(steps,
+                                  legal_ticks(info, steps, base * r), True)
+                    for i, r in enumerate(ratios)}
+
+        # segments is stepper A's program: it sets the capture window and the
+        # shared-program fields. Every stepper's real expectation goes to the
+        # evaluator through the very dict that was sent to the board, so the two
+        # cannot disagree about what was commanded.
+        plan.append(ModeRun(
+            label=f"sync_{'+'.join(combo)}_{pin_mode}_n{count}",
+            drivers=list(combo),
+            pin_mode=pin_mode,
+            builder=lambda info, ps=per_stepper: ps(info)[0],
+            evaluator=lambda ch, rt_, segs, inf, ps=per_stepper:
+                eval_sync(ch, rt_, segs, inf, ps(inf)),
+            mask=(1 << count) - 1,
+            goal=f"{'+'.join(combo)}: aligned start, each at its own period",
+            per_stepper_builder=per_stepper,
+            steps=steps,
+        ))
+    return plan
 
 
 # test id -> (config, segment builder, mask, human name)
@@ -662,8 +925,13 @@ def check_pin_invariants(channels, rate):
     }
 
 
-def evaluate(test_id, channels, rate, segments, info, chan_map=None):
-    """Run a scenario's evaluator, then the global invariants.
+def evaluate(evaluator, channels, rate, segments, info, chan_map=None):
+    """Run an evaluator, then the global invariants.
+
+    `evaluator` is an EVALUATORS key or a callable, so the two generic modes
+    can pass their own without registering a scenario id per generated run --
+    `scale` at 7 steppers is the same measurement as at 3, and giving it its own
+    id would be 8 rows in SCENARIOS that differ only in a loop variable.
 
     Every result carries the invariant block, and a violation fails the test
     regardless of what the scenario's own checks concluded.
@@ -676,7 +944,8 @@ def evaluate(test_id, channels, rate, segments, info, chan_map=None):
     if chan_map is not None:
         STEP_CHANNELS = step_channels(chan_map)
         DIR_CHANNELS = dir_channels(chan_map)
-    ok, detail = EVALUATORS[test_id](channels, rate, segments, info)
+    fn = evaluator if callable(evaluator) else EVALUATORS[evaluator]
+    ok, detail = fn(channels, rate, segments, info)
     inv = check_pin_invariants(channels, rate)
     detail = dict(detail)
     detail["invariants"] = inv
@@ -715,6 +984,140 @@ def eval_step_count(channels, rate, segments, info):
         "ticks": ticks,
         "steps": counts,
         "period": detail,
+    }
+
+
+def eval_scale(channels, rate, segments, info):
+    """`scale`: every stepper's own count and period, against the shared command.
+
+    The assertion each stepper must satisfy is its own: the exact number of
+    steps it was promised, and the exact period it was given. Judging all N
+    against one another instead would let a driver that emitted the right
+    number of steps on the wrong pin pass, which is the failure mode a
+    channel-map mix-up produces.
+
+    No threshold on how close together the steppers are. N steppers at one
+    period *should* agree -- that is the claim -- but the tolerance that would
+    make it an assertion has to come from the pulse timing the driver actually
+    emits (RMT holds 15.54 us, I2S 2 us, measured), which is not known before
+    the run. So each is asserted against its own command and the spread is
+    reported, and the report is where a change in it is noticed.
+    """
+    t = segments[0][1]
+    expect_us = t * 1e6 / info["ticks_per_s"]
+    expected = sum(n for n, _, _ in segments)
+    per_stepper = {}
+    means = []
+    ok = True
+    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+        if ch_name not in channels:
+            continue
+        m = sp.channel_metrics(channels[ch_name], rate)
+        counts = sp.step_count_defects(m.step_count, expected)
+        detail = sp.period_defects(m.inter_step_us, expect_us)
+        ok = ok and counts["ok"] and detail["ok"]
+        mean = (sum(m.inter_step_us) / len(m.inter_step_us)
+                if m.inter_step_us else None)
+        if mean is not None:
+            means.append(mean)
+        per_stepper[letter] = {
+            "channel": ch_name,
+            "steps": counts,
+            "period": detail,
+            "mean_period_us": round(mean, 4) if mean is not None else None,
+        }
+    return ok and bool(per_stepper), {
+        "ticks": t,
+        "expected_steps": expected,
+        "stepper_count": len(per_stepper),
+        "per_stepper": per_stepper,
+        # How far apart the steppers' mean periods are. Reported, not gated:
+        # see the docstring.
+        "period_spread_us": round(max(means) - min(means), 4)
+                            if len(means) > 1 else 0.0,
+    }
+
+
+def first_step_skew_us(channels, rate):
+    """(skew in us, first-step time per stepper) across every mapped stepper.
+
+    The skew is max(first) - min(first): it says how far apart the *extremes*
+    are, so one straggler is not hidden by the others being close together.
+    """
+    firsts = {}
+    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+        if ch_name not in channels:
+            continue
+        edges = sp.rising_edges(channels[ch_name])
+        if edges:
+            firsts[letter] = edges[0]
+    skew = ((max(firsts.values()) - min(firsts.values())) * 1e6 / rate
+            if len(firsts) > 1 else 0.0)
+    return skew, firsts
+
+
+def eval_sync(channels, rate, segments, info, programs):
+    """`sync`: first-step skew reported, per-stepper period adherence asserted.
+
+    Two questions, and they are deliberately not the same check.
+
+    **Skew is reported, never gated.** How closely several steppers actually
+    begin is a property of the pulse driver and of what the processor happens
+    to be doing at that instant, not a correctness property of the queue. RMT
+    and MCPWM arm unrelated hardware; PCNT and an ISR-based driver step from an
+    interrupt, so their offset grows with interrupt latency. A stepper that
+    starts a few microseconds late has not malfunctioned, and a pass/fail on it
+    would report a platform characteristic as a defect. The number is given in
+    microseconds *and* in step periods, because on its own it is meaningless: a
+    skew of 29 us is three quarters of a period at 640 ticks and three
+    thousandths of one at 65535.
+
+    **Adherence is asserted, per stepper, against its own commanded period.**
+    `programs` is the *same dict the plan sent to the board*, so the
+    expectation cannot drift from the command -- and because the plan gave each
+    stepper a distinct period, a synchronized start that dragged them all onto
+    one speed shows up as every stepper measuring at some *other* stepper's
+    period. That is the whole reason the periods differ; checking them against
+    a common expectation would pass exactly the case this exists to catch.
+
+    The step counts are asserted too, on the same reasoning as SR_14: a
+    swallowed or spurious step is a real defect on any platform.
+    """
+    skew_us, firsts = first_step_skew_us(channels, rate)
+    ok = True
+    per_stepper = {}
+    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+        idx = ord(letter) - ord("A")
+        if ch_name not in channels or idx not in programs:
+            continue
+        segs = programs[idx]
+        ticks = segs[0][1]
+        expected = sum(n for n, _, _ in segs)
+        expect_us = ticks * 1e6 / info["ticks_per_s"]
+        m = sp.channel_metrics(channels[ch_name], rate)
+        counts = sp.step_count_defects(m.step_count, expected)
+        period = sp.period_defects(m.inter_step_us, expect_us)
+        ok = ok and counts["ok"] and period["ok"]
+        per_stepper[letter] = {
+            "channel": ch_name,
+            "ticks": ticks,
+            "steps": counts,
+            "period": period,
+            "mean_period_us": round(sum(m.inter_step_us)
+                                    / len(m.inter_step_us), 4)
+                              if m.inter_step_us else None,
+        }
+    return ok and bool(per_stepper), {
+        "per_stepper": per_stepper,
+        "first_step_skew_us": round(skew_us, 4),
+        "first_step_us": {k: round(v * 1e6 / rate, 4) for k, v in
+                          firsts.items()},
+        # The ratio column is what makes the microseconds comparable. A skew is
+        # meaningless without the period it is measured against.
+        "skew_periods": round(
+            skew_us / (per_stepper["A"]["mean_period_us"] or 1), 4)
+            if "A" in per_stepper and per_stepper["A"]["mean_period_us"]
+            else None,
     }
 
 
@@ -1179,14 +1582,29 @@ def run_sr00(tag_key, args):
     }
 
 
-def run_scenario(tag_key, test_id, args):
-    """Program a scenario, capture it, and evaluate the waveform."""
-    config, builder, mask, _desc = SCENARIOS[test_id]
+def measure(tag_key, name, wire, mask, builder, evaluator, args,
+            per_stepper_for=None):
+    """Wire the board, capture one measurement, evaluate it. One code path.
+
+    Everything measured here goes through this function -- the named scenarios
+    in SCENARIOS and the runs the two generic modes generate alike. A mode with
+    its own capture path could disagree with the scenarios about when sigrok is
+    armed, how long the window has to be, or which channel map is correct, and
+    nothing would say which of the two was right.
+
+    `wire` is the whole CONFIG line. `evaluator` is (channels, rate, segments,
+    info) -> (passed, detail), passed straight to evaluate() so the global pin
+    invariants are checked for generated runs too.
+
+    Returns (status, detail). `status` is `refused` when the board would not
+    accept the configuration at all -- which is a *result* for `scale`, whose
+    question is where the limit is, and a wiring problem for a named scenario.
+    """
     ser = open_board(args.port, args.baud)
     try:
-        text = reply_of(ser, config_wire(config, args.dut_driver))
+        text = reply_of(ser, wire)
         if "OK CONFIG" not in text:
-            return "failed", {"error": text.strip()}
+            return "refused", {"error": text.strip(), "wire": wire}
         # The channel map comes from the board, not from the host's assumption:
         # `dir` and `nodir` put different channels on different steppers, so
         # evaluating a capture against the wrong map reads a quiet pin and calls
@@ -1195,12 +1613,17 @@ def run_scenario(tag_key, test_id, args):
         info = read_qinfo(ser)
 
         segments = builder(info)
-        if not program(ser, segments):
+        programs = per_stepper_for(info) if per_stepper_for else None
+        if programs:
+            if not program_per_stepper(ser, programs):
+                return "failed", {"error": "QSEG rejected",
+                                  "segments": segments}
+        elif not program(ser, segments):
             return "failed", {"error": "QSEG rejected", "segments": segments}
 
         seconds = scenario_seconds(segments, info["ticks_per_s"]) + 0.5
         rate = args.sample_rate
-        capture_file = Path(args.capture_dir) / f"{test_id.lower()}_{tag_key}.sr"
+        capture_file = Path(args.capture_dir) / f"{name}_{tag_key}.sr"
 
         proc = start_capture(capture_file, seconds, rate)
         time.sleep(0.3)  # let sigrok-cli start sampling
@@ -1214,7 +1637,7 @@ def run_scenario(tag_key, test_id, args):
         ser.close()
 
     channels, sample_rate = load_capture_for_eval(capture_file)
-    passed, detail = evaluate(test_id, channels, sample_rate, segments, info,
+    passed, detail = evaluate(evaluator, channels, sample_rate, segments, info,
                               chan_map)
     detail.update({
         "capture": str(capture_file),
@@ -1223,12 +1646,100 @@ def run_scenario(tag_key, test_id, args):
         "sample_rate_hz": sample_rate,
         "capture_seconds_requested": round(seconds, 3),
         "segments": segments,
+        "per_stepper_segments": programs,
         "reply": replies.strip(),
     })
     # The DUT's tick rate is what makes the ticks in `segments` interpretable,
     # so it travels with every result.
     detail["dut"] = info
     return ("passed" if passed else "failed"), detail
+
+
+def run_scenario(tag_key, test_id, args):
+    """Program a scenario, capture it, and evaluate the waveform."""
+    config, builder, mask, _desc = SCENARIOS[test_id]
+    status, detail = measure(tag_key, test_id.lower(),
+                             config_wire(config, args.dut_driver), mask,
+                             builder, test_id, args,
+                             per_stepper_builder(test_id))
+    # A named scenario that the board refuses is a wiring fault, not a finding,
+    # so it is reported as a failure even though the shared path calls it
+    # `refused` for the modes.
+    return ("failed" if status == "refused" else status), detail
+
+
+def run_modes(tag_key, plans, args, mode):
+    """Run every generated point, recording each one as a result.
+
+    A refused point is recorded as `refused` and the plan carries on. For
+    `scale` that is the *answer*: the point where the board says no is the
+    bound the mode exists to find, and stopping the run there would report one
+    fewer stepper than the board supports. For `sync` a refusal means a driver
+    this build cannot connect, which is a fact worth recording rather than a
+    reason to abandon the other 9 combinations.
+
+    Nothing is re-run that already passed, the same as a named scenario: a mode
+    is many runs and re-measuring all of them to look at one is expensive on
+    hardware that takes seconds per capture.
+    """
+    results_dir = Path(args.results_dir)
+    # Both directories: run() creates them for the catalogue path, and a mode
+    # run writing into a --results-dir the caller just named is the normal case,
+    # not a special one. A missing parent here is a FileNotFoundError after the
+    # capture has already been spent.
+    results_dir.mkdir(parents=True, exist_ok=True)
+    Path(args.capture_dir).mkdir(parents=True, exist_ok=True)
+    index_file = results_dir / "tag_index.json"
+    index = load_index(index_file)
+    summary = []
+
+    for plan in plans:
+        key = f"{tag_key}_{plan.tag}"
+        prev = index.get(key, {}).get("MODE")
+        if prev and prev.get("result") == "passed" and not args.force:
+            print(f"  {plan.label}: SKIP (already passed)")
+            continue
+
+        print(f"  {plan.label}: {plan.wire}")
+        status, detail = measure(key, plan.label, plan.wire, plan.mask,
+                                 plan.builder, plan.evaluator, args,
+                                 plan.per_stepper_builder)
+        detail["mode"] = mode
+        detail["drivers"] = plan.drivers
+        detail["pin_mode"] = plan.pin_mode
+        detail["stepper_count"] = plan.count
+        detail["goal"] = plan.goal
+
+        result_file = results_dir / f"{key}.json"
+        with open(result_file, "w") as f:
+            json.dump({"test_id": "MODE", "tag_key": key, "mode": mode,
+                       "timestamp": datetime.now().isoformat() + "Z",
+                       "result": status, **detail}, f, indent=2)
+        record(index, index_file, key, "MODE", status, result_file)
+        summary.append({"label": plan.label, "drivers": plan.drivers,
+                        "count": plan.count, "result": status,
+                        "wire": plan.wire})
+        print(f"  {plan.label}: {status.upper()}")
+
+    print(f"Index: {index_file}")
+    return summary
+
+
+def summarize(summary):
+    """The plan's outcome as a table: which bound stopped it, per driver.
+
+    The one thing a `scale` run has to say and a list of pass/fail does not is
+    *where it stopped*. Recording "8 steppers on RMT: passed" and "4 steppers
+    on RMT: refused" is the measurement; the bound that stopped the sweep is
+    the answer to the mode's question.
+    """
+    if not summary:
+        return "(nothing ran)"
+    out = ["| run | drivers | n | result |", "|---|---|---|---|"]
+    for row in summary:
+        out.append(f"| {row['label']} | {'+'.join(row['drivers'])} | "
+                   f"{row['count']} | {row['result']} |")
+    return "\n".join(out)
 
 
 def load_index(index_file):
@@ -1258,6 +1769,7 @@ def record(index, index_file, tag_key, test_id, result, result_file, extra=None)
 
 def run(tag_key, tests, args):
     results_dir = Path(args.results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
     Path(args.capture_dir).mkdir(parents=True, exist_ok=True)
     index_file = results_dir / "tag_index.json"
     index = load_index(index_file)

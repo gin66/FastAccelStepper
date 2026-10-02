@@ -100,6 +100,43 @@ for a later test); it verifies all 8 I/Os are alive and correctly wired. If it
 fails, the remaining tests are recorded `skipped`. Tests not yet implemented are
 recorded `skipped (not implemented)`.
 
+### The two generic modes
+
+`scripts/harness.py --mode scale|sync` generates runs from a rule instead of
+naming them. Neither mode mentions an architecture: `--arch`, `--framework` and
+`--driver` are *tags on a run*, which is what makes the same two commands the
+whole cross-architecture matrix. Use `--dry-run` to see the plan without
+touching hardware.
+
+```bash
+# scale: 1..min(driver queues, channel budget) steppers on ONE driver, all
+# running a shared program. Says which bound stopped it.
+python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --dry-run
+python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --flash
+
+# sync: every driver-list combination on this board, each stepper given its OWN
+# period, so adherence is checkable per stepper rather than against a common one.
+python3 scripts/harness.py --mode sync --arch esp32 --dry-run
+python3 scripts/harness.py --mode sync --arch esp32 --speed-us 5 --flash
+```
+
+| | what it varies | what it asserts |
+|---|---|---|
+| **`scale`** | driver × stepper count | each stepper's own step count and period, against the shared command |
+| **`sync`** | every driver-list combination | each stepper keeps **its own** period; first-step skew is *reported*, not gated |
+
+`scale` stops at the smaller of the driver limit (the library's `QUEUES_*`) and
+the channel budget (8 channels; 2 per stepper with a direction pin, 1 without)
+and prints which one bound it was — those are different findings, and only one
+is about the driver. `sync` enumerates over driver *identities* rather than
+spellings, so `rmt_v2` and `rmt` are one driver and do not appear as a
+cross-driver pair.
+
+A **refused** point is recorded and the plan continues: for `scale` the point
+where the board says no *is* the answer; for `sync` a driver this build cannot
+connect is recorded next to the combinations that did measure. That is how
+`i2s_mux` becomes runnable — no new code, just naming it.
+
 ### Host control channel
 
 The firmware exposes a newline text protocol over the serial console
