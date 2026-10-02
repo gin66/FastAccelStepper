@@ -50,8 +50,18 @@ def evaluate(fx: vf.Fixture):
     channels, rate = sp.load_vcd(fx.path)
     # `evaluate`, not the raw evaluator: that applies the global pin invariants
     # too, so a fixture that violates one of them fails here as well.
+    #
+    # A fixture carrying a marker channel passes it the way a hardware run
+    # does. Which channel that is has to be asked of the fixture rather than
+    # assumed, because the whole point is that the marker is data: a fixture
+    # whose marker sat on the wrong channel would otherwise be scored as a run
+    # with no marker at all, which reports "undecidable" and hides the fault.
+    marker = fx.scenario in rt.SCENARIO_MARKERS and bool(fx.extra)
+    channel = (rt.marker_channel_for(fx.steppers, fx.stride)
+               if marker and fx.extra else None)
     return rt.evaluate(fx.scenario, channels, rate, fx.segments, fx.info(),
-                      rt.Pins.for_scenario(fx.scenario).map)
+                       rt.Pins.for_scenario(fx.scenario).map,
+                       extra=channel)
 
 
 def flatten(detail) -> str:
@@ -372,6 +382,12 @@ class TestAntiRot(unittest.TestCase):
         the same segment list as SR_07's `1ch` -- same steps, but a different
         question (when the second stepper starts, not whether 2000 steps
         arrive), reached through a different evaluator.
+
+        The one exception *within* a config is a declared contrasting pair:
+        SR_25 and SR_27 send the same waveform and assert opposite outcomes,
+        because that is the property being pinned. `stopMove()` must not
+        truncate and `forceStop()` must, and a suite that showed only one of them
+        would be asserting half a contract and calling it the whole thing.
         """
         seen = {}
         for scenario, (cfg, builder, _mask, _name) in rt.SCENARIOS.items():
@@ -379,6 +395,8 @@ class TestAntiRot(unittest.TestCase):
             if not segs:
                 continue
             for (other, other_segs) in seen.get(cfg, []):
+                if frozenset((scenario, other)) in rt.CONTRASTING_PAIRS:
+                    continue
                 with self.subTest(scenario=scenario, same_as=other, config=cfg):
                     self.assertNotEqual(
                         segs, other_segs,

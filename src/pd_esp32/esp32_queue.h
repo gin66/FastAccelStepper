@@ -354,14 +354,14 @@ static inline uint8_t esp32_before_pause_count(const StepperQueue* q) {
 
 static inline bool esp32_i2s_dir_is_mux_slot(const StepperQueue* q) {
 #if defined(SUPPORT_ESP32_I2S)
-  if (!esp32_driver_is_i2s(q) || ((q->dirPin & PIN_I2S_FLAG) == 0)) {
-    return false;
-  }
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (q->_driver_type == FasDriver::I2S_DIRECT) {
     return false;
   }
 #endif
+  if (!esp32_driver_is_i2s(q) || ((q->dirPin & PIN_I2S_FLAG) == 0)) {
+    return false;
+  }
   return true;
 #else
   (void)q;
@@ -370,6 +370,7 @@ static inline bool esp32_i2s_dir_is_mux_slot(const StepperQueue* q) {
 }
 
 static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
+#if defined(SUPPORT_ESP32_RMT)
   if (esp32_driver_is_rmt(q)) {
 #if defined(SUPPORT_ESP32_RMT_V2)
     // F2: tick-based drain covering the full worst-case in-flight,
@@ -381,6 +382,7 @@ static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
     return MIN_CMD_TICKS;
 #endif
   }
+#endif
 #if defined(SUPPORT_ESP32_MCPWM_PCNT)
   if (esp32_driver_is_mcpwm(q)) {
     return MIN_CMD_TICKS;

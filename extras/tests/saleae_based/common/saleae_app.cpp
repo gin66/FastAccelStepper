@@ -398,6 +398,48 @@ static void stop_sr00(void) {
   }
 }
 
+// Three stops, and the difference between them is the whole point. The library
+// documents all three (FastAccelStepper.h):
+//
+//   stopMove()                    a flag for the ramp generator's *next*
+//                                 command. It must NOT truncate motion that is
+//                                 already queued -- that is its contract, and
+//                                 this harness is not the ramp's planner, so it
+//                                 has nothing to act on here.
+//   forceStop()                   ignore_commands = true, so nothing further is
+//                                 *added*; what is already queued still runs,
+//                                 within about 20 ms.
+//   forceStopAndNewPosition()     aborts everything queued: no further step.
+//
+// This harness's feeder IS the planner, so "nothing further is added" is the
+// harness's job, not the library's -- hence the cursor zeroing in emergency_stop.
+// The previous stop_all() conflated the first two: it called stopMove() *and*
+// zeroed the cursor, so it behaved like a partial forceStop while reporting
+// itself as a stop. Measured, that hybrid left 7655 of 20000 steps to run on
+// i2s_direct and 7608 on rmt_v2 -- just under the 8160 a 32-deep queue of
+// 255-step commands holds, which is to say it was the harness's own arithmetic
+// and not any documented guarantee. Nothing in the library promises that number.
+
+static void stop_move_only(void) {
+  for (uint8_t i = 0; i < slot_count; i++) {
+    if (slots[i].stepper) {
+      slots[i].stepper->stopMove();
+    }
+  }
+}
+
+static void emergency_stop(void) {
+  for (uint8_t i = 0; i < slot_count; i++) {
+    if (slots[i].stepper) {
+      slots[i].stepper->forceStop();
+      memset(&slots[i].cur, 0, sizeof(slots[i].cur));
+    }
+  }
+  clear_programs();
+  done_pending = false;
+  done_announced = false;
+}
+
 static void stop_all(void) {
   for (uint8_t i = 0; i < slot_count; i++) {
     if (slots[i].stepper) {
@@ -548,6 +590,78 @@ static bool driver_supported(enum saleae_driver driver) {
 #endif
 }
 
+// The event-marker channel: the analyzer channel index whose pin the firmware
+// pulses at the instant it processes STOP, or 0xFF for none.
+//
+// Without it the host knows only that it *sent* STOP at some wall-clock moment,
+// and has to infer the stop instant from pulses ceasing. That inference is what
+// made SR_25 unanswerable: on this rig the requested capture is not the
+// delivered capture, so "the pulses stopped" and "the capture ended" cannot be
+// told apart. Toggling a pin the stepper does not own puts the STOP instant on
+// the waveform, and the harness can then measure the only quantity that matters
+// for a machine that is actually moving: how many steps and how long *after* it
+// was told to stop.
+//
+// It has to be a channel no stepper is using, so a configuration that fills the
+// analyzer (8 steppers in `nodir`) has none and MARK is refused rather than
+// silently overwriting a step pin.
+#define SALEAE_NO_MARKER 0xFF
+static uint8_t marker_channel = SALEAE_NO_MARKER;
+
+// Alternates the marker level, so every marked event is exactly one edge and
+// the level then holds until the next one.
+//
+// A timed high pulse was the first idea and it needs a sub-millisecond delay the
+// HAL does not have (and an ESP-IDF busy-wait would block the very loop that
+// drains the queue, which is the thing being measured). Alternating needs no
+// timing primitive and no width to reason about: the level persists, so the
+// edge is unambiguous however long afterwards the host reads it.
+static uint8_t marker_level = 0;
+
+static void mark_event(void) {
+  if (marker_channel == SALEAE_NO_MARKER) {
+    return;
+  }
+  marker_level ^= 1;
+  saleae_hal_write(kChanPin[marker_channel], marker_level);
+}
+
+// MARK <ch> -- designate an analyzer channel as the event marker.
+//
+// Two literals, no formatting. Every distinct error string here costs ~100
+// bytes of a 328P's SRAM, because avr-gcc copies .rodata into RAM: the first
+// version of this function took the build from 1845 to 1992 of 2048, leaving 56
+// bytes, and 12 of those came from the extra text in MAP alone. So the reply
+// says only whether the marker was accepted, and MAP's `marker=` field says
+// what it ended up as -- which is the diagnosis anyway, since a refused MARK
+// leaves marker=255.
+static void handle_mark(const char* arg) {
+  if (!arg) {
+    reply("ERR MARK\n");
+    return;
+  }
+  if (arg[0] == 'n') {
+    marker_channel = SALEAE_NO_MARKER;
+    reply("OK MARK\n");
+    return;
+  }
+  // Only 0..7, one digit. Not atoi: this needs a digit range, not a parser.
+  if (arg[1] != '\0' || arg[0] < '0' || arg[0] > ('0' + SALEAE_CHANNELS - 1)) {
+    reply("ERR MARK\n");
+    return;
+  }
+  const int ch = arg[0] - '0';
+  // A channel a stepper owns cannot be the marker: it would be unreadable
+  // against that stepper's own edges.
+  const uint8_t used = slot_count ? slot_count * chan_stride : 0;
+  if (ch < used) {
+    reply("ERR MARK\n");
+    return;
+  }
+  marker_channel = (uint8_t)ch;
+  reply("OK MARK\n");
+}
+
 // Set once IMUX has successfully brought the I2S multiplexer up. The engine's
 // own _i2s_mux_initialized is private to StepperQueue, but this app is the one
 // that calls initI2sMux(), so this app is the one that knows.
@@ -651,6 +765,10 @@ static void handle_map(void) {
     len += snprintf(buf + len, sizeof(buf) - len, "%s%u", c ? "," : "",
                     (unsigned)kChanPin[c]);
   }
+  len += snprintf(buf + len, sizeof(buf) - len, " marker=%u",
+                  marker_channel == SALEAE_NO_MARKER
+                      ? 0xFFu
+                      : (unsigned)marker_channel);
   snprintf(buf + len, sizeof(buf) - len, "\n");
   reply(buf);
 }
@@ -1165,6 +1283,8 @@ static void handle_line(char* line) {
     handle_config(arg1, arg2, n > 2 ? arg3 : NULL);
   } else if (!strcmp(cmd, "MAP")) {
     handle_map();
+  } else if (!strcmp(cmd, "MARK")) {
+    handle_mark(n > 1 ? arg1 : NULL);
   } else if (!strcmp(cmd, "DRIVERS")) {
     handle_drivers();
   } else if (!strcmp(cmd, "IMUX")) {
@@ -1191,9 +1311,23 @@ static void handle_line(char* line) {
     snprintf(buf + len, sizeof(buf) - len, "\n");
     reply(buf);
   } else if (!strcmp(cmd, "STOP")) {
-    stop_all();
+    // stopMove() alone. The feeder is left alone on purpose: the contract is
+    // that already-queued motion still runs, so a run that keeps stepping after
+    // this is the documented behaviour and is what SR_25 asserts. Marked on the
+    // marker channel so that boundary is on the waveform rather than inferred.
+    stop_move_only();
     stop_sr00();
-    reply("OK STOP\n");
+    mark_event();
+    reply("OK STOP stopmove\n");
+  } else if (!strcmp(cmd, "ESTOP")) {
+    // forceStop(): stop adding, let the queue drain. The cursor goes too,
+    // because qe_feed() is this harness's planner and forceStop's own
+    // guarantee ("no further commands are added") would otherwise never be
+    // exercised.
+    emergency_stop();
+    stop_sr00();
+    mark_event();
+    reply("OK ESTOP forcestop\n");
   } else {
     reply("ERR unknown\n");
   }

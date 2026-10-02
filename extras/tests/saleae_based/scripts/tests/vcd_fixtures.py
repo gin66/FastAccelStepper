@@ -182,6 +182,11 @@ class Fixture:
     step: List[Event]
     expect_pass: bool
     dirs: Optional[List[Event]] = None
+    # How many steppers this fixture's configuration connects. Only needed to
+    # work out which channel a marker would occupy -- 1 for every scenario in
+    # the catalogue today, but the marker channel moves if that ever changes,
+    # and a test that hardcoded D7 would quietly score the wrong channel.
+    steppers: int = 1
     dut: Dut = field(default_factory=Dut)
     fault: Optional[str] = None  # for bad fixtures: what was injected
     expect_detail: Optional[str] = None  # key that must appear when rejected
@@ -209,6 +214,11 @@ class Fixture:
     @property
     def path(self) -> Path:
         return FIXTURE_DIR / f"{self.name}.vcd"
+
+    @property
+    def stride(self) -> int:
+        """2 when the scenario drives a dir pin alongside each step pin."""
+        return 2 if self.dirs is not None else 1
 
     def channels(self) -> Dict[str, List[Event]]:
         ev = {"D0": self.step}
@@ -247,6 +257,7 @@ SCENARIO_BUILDERS = {
     "SR_25": rt.sc_emergency_stop,
     "SR_26": rt.sc_pause_ticks_max,
     "SR_27": rt.sc_single_step,
+    "SR_29": rt.sc_emergency_stop,
 }
 
 
@@ -707,49 +718,75 @@ FIXTURES.append(Fixture(
     step=render(SCENARIO_BUILDERS["SR_26"](_DUT.info()))[0], dirs=[(0, 1)],
     expect_pass=True))
 
-# SR_25's fixtures are hand-built, because the analyser has to see a run that
-# stopped *short* of its program. Padding matters: eval_emergency_stop proves
-# the capture goes quiet after the stop, and on real hardware that was exactly
-# the trap -- at 24 MS/s the clone's 64 MSample buffer filled just as the last
-# step landed, so the quiet tail was zero-length and the check could not be
-# made at all. The pad reproduces a capture long enough to judge.
+# SR_25 and SR_27 send the *same* waveform and assert opposite outcomes, because
+# that is the property being pinned: `stopMove()` must not truncate queued
+# motion, `forceStop()` must. One scenario with a flag would assert half a
+# contract and call it the whole thing.
+#
+# Both carry a marker channel (D7) that steps high at the instant the stop was
+# processed, so the boundary is on the waveform. Without it the only available
+# inference was "the pulses stopped", and the capture this rig delivers is not the
+# capture it requests (24 MHz truncates), so that inference could not tell a stop
+# from the recording ending -- which is how SR_25 came to report a complete
+# 20000-step move as "STOP was never processed".
 _stop_ticks = rt.legal_ticks(_DUT.info(), 20000, _DUT.info()["max_speed_ticks"])
-_stop_ticks = rt.legal_ticks(_DUT.info(), 20000, _DUT.info()["max_speed_ticks"])
-_stopped = render([(2000, _stop_ticks, True)])[0]
-
-# The pad has to exceed 3x the step span, not merely exist. eval_emergency_stop
-# proves the capture goes quiet over its last quarter, so a capture whose last
-# quarter still holds steps cannot decide the question at all. On real hardware
-# that was the trap rather than a theoretical one: the clone's 64 MSample
-# buffer ran out at 2.66 s at 24 MS/s, just as the final step landed.
 _full = render([(20000, _stop_ticks, True)])[0]
-_span = _stopped[-1][0] - _stopped[0][0]
-_pad = 4 * _span
-_tail_at = _stopped[-1][0] + _pad
+_stopped = render([(2000, _stop_ticks, True)])[0]
+_early = _full[0][0] + 400 * _stop_ticks
 
+# SR_25, stopMove(): the marker fires early and all 20000 steps still arrive.
+# Passing here means the stop did *not* cut the run -- which is the contract.
 FIXTURES.append(Fixture(
-    name="good_emergency_stop_short", scenario="SR_25",
-    why="20000 requested, stopped after 2000, then a long quiet tail",
-    step=_stopped + [(_tail_at, 0)], dirs=[(0, 1)], expect_pass=True,
-    expect_flags={"truncated": True, "stopped_early": True}))
+    name="good_stop_move_does_not_truncate", scenario="SR_25",
+    why="stopMove() is a flag for the ramp's next command: all 20000 steps run",
+    step=_full, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
+    expect_pass=True,
+    # The count after the marker is deliberately not pinned: it depends on
+    # exactly where the marker edge falls relative to a pulse, which is a
+    # rendering detail. The contract is "nothing was truncated", and that is
+    # what is asserted.
+    expect_flags={"stop_measured": True, "not_truncated": True}))
 
+# The violation: a stopMove that did truncate would be the library breaking its
+# own contract, and this is what that looks like on the wire.
 FIXTURES.append(Fixture(
-    name="bad_emergency_stop_ignored", scenario="SR_25",
-    why="STOP ignored: the full 20000 steps were still emitted",
-    step=_full + [(_full[-1][0] + _pad, 0)],
-    dirs=[(0, 1)], expect_pass=False, expect_detail="truncated",
-    fault="stop ignored, run not truncated"))
+    name="bad_stop_move_truncated", scenario="SR_25",
+    why="the run was cut short, which stopMove() must never do",
+    step=_stopped, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
+    expect_pass=False, expect_detail="not_truncated",
+    fault="stopMove truncated a queued move, against its documented contract"))
 
-# Dropping the final falling edge leaves the step pin high. The tail carries no
-# rising edge, so `stopped_early` stays true and the unterminated pulse is the
-# only thing wrong -- one defect per fixture.
+# SR_27, forceStop(): the marker fires and the queue drains. The bound is
+# QUEUE_LEN * 255, so a drain inside it is the documented behaviour.
 FIXTURES.append(Fixture(
-    name="bad_emergency_stop_partial_pulse", scenario="SR_25",
+    name="good_force_stop_drains", scenario="SR_29",
+    why="forceStop() stops adding; the queued remainder still runs",
+    step=_stopped, dirs=[(0, 1)],
+    extra={"D7": [(_stopped[-1][0] + _stop_ticks, 1)]},
+    expect_pass=True,
+    expect_flags={"stop_measured": True, "drain_within_queue": True,
+                  "truncated_by_stop": True}))
+
+# forceStop() ignored: the whole program came out, which is what the harness
+# looked like before STOP and ESTOP were separated.
+FIXTURES.append(Fixture(
+    name="bad_force_stop_ignored", scenario="SR_29",
+    why="forceStop() issued but all 20000 steps still arrived",
+    step=_full, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
+    expect_pass=False, expect_detail="truncated_by_stop",
+    fault="emergency stop ignored, the full program ran"))
+
+# Dropping the final falling edge leaves the step pin high. The marker still
+# fires after it, so the stop is seen to have worked and the unterminated pulse
+# is the only thing wrong -- one defect per fixture, which matters because a
+# fixture with two faults only proves that one of them is detected.
+FIXTURES.append(Fixture(
+    name="bad_emergency_stop_partial_pulse", scenario="SR_29",
     why="the run was cut mid-pulse, leaving the step pin high",
-    step=_stopped[:-1] + [(_tail_at, 1)], dirs=[(0, 1)], expect_pass=False,
-    expect_detail="unterminated_pulses",
+    step=_stopped[:-1] + [(_stopped[-1][0] + _stop_ticks, 1)], dirs=[(0, 1)],
+    extra={"D7": [(_stopped[-1][0] + _stop_ticks, 1)]},
+    expect_pass=False, expect_detail="unterminated_pulses",
     fault="last pulse left high, no terminating falling edge"))
-
 # SR_13 is the inverse of every other fixture: the command is refused, so the
 # correct waveform is a pin that never moves. There is no `render()` output to
 # start from -- the whole point is that nothing is emitted.

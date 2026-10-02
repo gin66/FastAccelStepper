@@ -1756,9 +1756,20 @@ class TestPins(unittest.TestCase):
         import inspect
         for test_id, fn in run_tests.EVALUATORS.items():
             params = list(inspect.signature(fn).parameters)
-            self.assertEqual(params,
+            # The first five exactly; further keyword arguments are allowed,
+            # because two evaluators genuinely need one more -- eval_sync the
+            # per-stepper programs, eval_emergency_stop the marker channel. What
+            # must never happen is one that reads a *default* instead of the
+            # run's own data, which is what the first five guarantee.
+            self.assertEqual(params[:5],
                              ["channels", "rate", "segments", "info", "pins"],
                              f"{test_id} does not take the channel map")
+            extra = params[5:]
+            self.assertTrue(all(inspect.signature(fn).parameters[n].default
+                                is not inspect.Parameter.empty
+                                for n in extra),
+                            f"{test_id} has required extras {extra}; a run "
+                            f"would have to supply them unconditionally")
 
     def test_wire_plan_captures_every_channel_the_config_can_reach(self):
         # Sparse selections drop channels on this clone, so the capture must be

@@ -55,7 +55,7 @@ import analyze_csv  # noqa: E402
 import capture as cap  # noqa: E402
 import signal_parser as sp  # noqa: E402
 
-ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 27)]
+ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 30)]
 
 # Analyzer channel -> stepper, derived from what the DUT reports in MAP rather
 # than assumed here.
@@ -260,7 +260,8 @@ def reply_of(ser, line):
 # shape the two generic modes produce.
 QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxall=(\d+)"
                       r"(?: maxspeed\d+=(\d+))*")
-MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)")
+MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)"
+                      r"(?:\s+marker=(\d+))?")
 # "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1
 #  mux_init=0". The driver fields are read as a name=value scan rather than by
 # position, because the set of names is build-dependent: an AVR build emits only
@@ -338,7 +339,10 @@ def read_map(ser):
                 if entry["step"] not in STEP_CHANNEL_ORDER[:count * stride]:
                     raise RuntimeError(f"stepper {name} maps to a channel "
                                        f"outside the reported {count * stride}")
-            return chan_map, {"mode": mode, "stride": stride, "pins": pins}
+            # marker=-1 means no channel is designated as the event marker.
+            marker = int(m.group(5)) if m.group(5) else -1
+            return chan_map, {"mode": mode, "stride": stride, "pins": pins,
+                              "marker": marker}
         time.sleep(0.1)
     raise RuntimeError(f"no MAP reply, got: {text!r}")
 
@@ -372,6 +376,28 @@ def read_qinfo(ser):
             }
         time.sleep(0.1)
     raise RuntimeError(f"no QINFO reply, got: {text!r}")
+
+
+# Scenarios whose subject needs the STOP instant *on the waveform*. Sending STOP
+# and then inferring when it landed from "the pulses ceased" cannot work on this
+# rig: the capture the host requests is not the capture it gets (24 MHz
+# truncates 0.7 s to ~458 ms), so a quiet tail is not evidence of a stop.
+SCENARIO_MARKERS = {"SR_25", "SR_29"}
+
+
+def marker_channel_for(count, stride, channels=8):
+    """The highest analyzer channel no stepper owns, or None if there is none.
+
+    The marker has to be readable without ambiguity against a stepper's own
+    edges, so it cannot share a channel. At 8 steppers in `nodir` every channel
+    is taken and there is no marker to be had -- which is a real limit of this
+    approach, and the reason MARK is refused rather than quietly overwriting a
+    step pin.
+    """
+    used = count * stride
+    if used >= channels:
+        return None
+    return channels - 1
 
 
 def stop_after_for(scenario, segments, info):
@@ -1143,6 +1169,11 @@ SCENARIOS = {
     "SR_21": ("1ch", sc_rmt_buffer_split, 1,
               "long RMT run: no gap at a buffer split"),
     "SR_23": ("i2s", sc_i2s_timing, 1, "I2S step output timing"),
+    # SR_28 is the emergency stop, and it is a *different scenario* rather than a
+    # flag on SR_25 because the two have opposite expected outcomes: stopMove()
+    # must not truncate, forceStop() must.
+    "SR_29": ("1ch", sc_emergency_stop, 1,
+              "ESTOP mid-run: queue drains, nothing further is added"),
     "SR_26": ("1ch", sc_pause_ticks_max, 1,
               "pause of exactly 65535 ticks (16-bit pause field)"),
     "SR_25": ("1ch", sc_emergency_stop, 1, "STOP mid-run: pulses cease"),
@@ -1641,55 +1672,125 @@ def eval_independent_speeds(channels, rate, segments, info, pins):
     return ok and len(detail) >= 2, detail
 
 
-def eval_emergency_stop(channels, rate, segments, info, pins):
-    """SR_25: pulses must stop the instant STOP is issued.
+def eval_stop_move_contract(channels, rate, segments, info, pins,
+                           marker_channel=None):
+    """SR_25: `stopMove()` must NOT truncate already-queued motion.
 
-    Checks three things a naive step count cannot. That no pulse is left high
-    when the run is cut -- a partial pulse would leave the driver energised and
-    the rotor on a detent. That the tail of the capture is flat, so the stop was
-    immediate rather than trailing off over the remaining queue. And that the
-    step count is a whole number of steps, not a fraction, which is what "no
-    partial pulse" means on a waveform.
+    This is the opposite assertion to SR_28's, and it is the reason the two are
+    separate scenarios rather than one with a flag. `stopMove()` only sets a
+    flag for the ramp generator to consult when it asks for its *next* command;
+    motion already in the queue is meant to run to completion. A harness that
+    called it, then reported "the stop was ignored" when all 20000 steps came
+    out, would be calling the documented behaviour a defect.
 
-    `expected_steps` is deliberately absent: where the run lands when STOP
-    arrives depends on when the host's STOP reaches the queue relative to the
-    stepper, so the exact count is not predictable from the command program.
-    What must hold is that the count is stable and the capture goes quiet.
+    Earlier this scenario asserted the reverse -- that steps cease -- because the
+    harness's STOP was a conflation: `stopMove()` *plus* zeroing the feeder
+    cursor. That hybrid is a partial `forceStop()` wearing stopMove()'s name,
+    and the residue it left (7655 steps on i2s_direct, 7608 on rmt_v2, against a
+    queue holding 32 * 255 = 8160) was the harness's own arithmetic rather than
+    any guarantee the library makes.
+
+    So the measurement here is that *nothing* was cut, witnessed on the marker
+    channel rather than inferred from where the pulses ended.
     """
     ch = channels["D0"]
     m = sp.channel_metrics(ch, rate)
     t = segments[0][1]
-    expect_us = t * 1e6 / info["ticks_per_s"]
-
-    counts = sp.step_count_defects(m.step_count, m.step_count)
-    period = sp.period_defects(m.inter_step_us, expect_us)
-
-    # The run must be genuinely cut short, not merely complete.
+    period = sp.period_defects(m.inter_step_us, t * 1e6 / info["ticks_per_s"])
+    steps = sp.rising_edges(ch)
     requested = segments[0][0]
-    truncated = m.step_count < requested
 
-    # Every pulse after the first must be a whole low-to-high-to-low cycle.
+    base = {"requested_steps": requested, "steps_measured": len(steps),
+            "steps": sp.step_count_defects(m.step_count, requested),
+            "period": period}
+    marker_at = _marker_edge(channels, rate, marker_channel)
+    if marker_at is None:
+        base["stop_measured"] = False
+        base["reason"] = "no marker edge: the stop instant is not on the waveform"
+        return False, base
+    after = [i for i in steps if i > marker_at]
+    base.update({"stop_measured": True, "marker_channel": marker_channel,
+                 "steps_after_stop": len(after),
+                 "not_truncated": len(steps) >= requested})
+    ok = (base["steps"]["ok"] and period["ok"] and len(steps) >= requested)
+    return ok, base
+
+
+def eval_emergency_stop(channels, rate, segments, info, pins,
+                       marker_channel=None):
+    """SR_28: `forceStop()` stops *adding*, and the queue drains.
+
+    The counterpart to SR_25. `forceStop()` sets `ignore_commands`, so nothing
+    further is added to the queue; what is already queued still runs, and the
+    header puts that at about 20 ms. This harness is the planner that adds the
+    commands, so its feeder is stopped too -- otherwise forceStop()'s own
+    guarantee would never be exercised by anything.
+
+    The criterion is a *bound*, not zero: the queue holds QUEUE_LEN entries of at
+    most 255 steps, so at most `queue_len * 255` steps can follow the marker.
+    Demanding zero would be demanding a behaviour this library does not have --
+    that is `forceStopAndNewPosition()`, which aborts the queue outright and is a
+    third thing again.
+
+    What makes this measurable at all is the marker channel. Without it the only
+    available inference was "the pulses stopped", and the capture this rig
+    delivers is not the capture it requests (24 MHz truncates), so that
+    inference could not tell a stop from the recording ending.
+    """
+    ch = channels["D0"]
+    m = sp.channel_metrics(ch, rate)
+    t = segments[0][1]
+    period = sp.period_defects(m.inter_step_us, t * 1e6 / info["ticks_per_s"])
+    steps = sp.rising_edges(ch)
+    requested = segments[0][0]
+
     edges = sp.detect_edges(ch)
     starts = [i for i, level in edges if level == 1]
     ends = [i for i, level in edges if level == 0]
     unterminated = 1 if starts and (not ends or starts[-1] > ends[-1]) else 0
 
-    # The capture must go quiet: no step in the last 25% of the recording.
-    quiet_from = int(len(ch) * 0.75)
-    tail = sp.rising_edges(list(ch[quiet_from:]))
-    stopped_early = not tail
+    bound = info.get("queue_len", 32) * 255
+    marker_at = _marker_edge(channels, rate, marker_channel)
+    base = {"requested_steps": requested, "steps_measured": len(steps),
+            "unterminated_pulses": unterminated, "queue_bound_steps": bound,
+            "period": period,
+            "steps": sp.step_count_defects(m.step_count, len(steps))}
 
-    ok = counts["ok"] and period["ok"] and truncated and not unterminated \
-        and stopped_early
-    return ok, {
-        "requested_steps": requested,
-        "steps_before_stop": m.step_count,
-        "truncated": truncated,
-        "unterminated_pulses": unterminated,
-        "stopped_early": stopped_early,
-        "steps": counts,
-        "period": period,
-    }
+    if marker_at is None:
+        base.update({"stop_measured": False, "drain_within_queue": False,
+                     "reason": "no marker edge: the stop instant is not on the "
+                               "waveform, so a drain cannot be separated from "
+                               "the capture simply ending"})
+        return False, base
+
+    after = [i for i in steps if i > marker_at]
+    last = steps[-1] if steps else None
+    base.update({
+        "stop_measured": True,
+        "marker_channel": marker_channel,
+        "steps_after_stop": len(after),
+        "stop_to_last_step_us": round((last - marker_at) / rate * 1e6, 3)
+        if last is not None and last > marker_at else 0.0,
+        "drain_within_queue": len(after) <= bound,
+        # Truncated by the stop rather than by the recording running out: the
+        # whole program did not come out.
+        "truncated_by_stop": len(steps) < requested,
+    })
+    ok = (period["ok"] and not unterminated and len(after) <= bound
+          and len(steps) < requested)
+    return ok, base
+
+
+def _marker_edge(channels, rate, marker_channel):
+    """Sample index of the first edge on the marker channel, or None."""
+    if marker_channel is None or marker_channel < 0:
+        return None
+    mark = channels.get(STEP_CHANNEL_ORDER[marker_channel])
+    if not mark:
+        return None
+    edges = sp.detect_edges(mark)
+    return edges[0][0] if edges else None
+
 
 
 def eval_pause(channels, rate, segments, info, pins):
@@ -1828,7 +1929,11 @@ def eval_sync_start(channels, rate, segments, info, pins):
 # Scenario -> the longest the host will wait after QRUN before issuing STOP.
 # The actual wait is stop_after_for(): this is an upper bound, and the program's
 # own duration is what normally decides.
-STOP_AFTER = {"SR_25": 0.15}
+# Scenario -> the command issued after the run has started. STOP is the
+# library's `stopMove()`, whose contract is that it must NOT truncate queued
+# motion; ESTOP is `forceStop()`, whose contract is that nothing further is added.
+SCENARIO_STOP = {"SR_25": "STOP", "SR_29": "ESTOP"}
+STOP_AFTER = {"SR_25": 0.15, "SR_29": 0.15}
 # ...and never less than this, or the stop can precede the start.
 STOP_AFTER_MIN = 0.01
 
@@ -1854,7 +1959,8 @@ EVALUATORS = {
     "SR_21": eval_period_exact,
     "SR_23": eval_period_exact,
     "SR_26": eval_pause,
-    "SR_25": eval_emergency_stop,
+    "SR_29": eval_emergency_stop,
+    "SR_25": eval_stop_move_contract,
     "SR_18": eval_counts_and_gap,
     "SR_19": eval_counts_and_gap,
     "SR_20": eval_counts_and_gap,
@@ -1926,6 +2032,31 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         chan_map, pin_map = read_map(ser)
         info = read_qinfo(ser)
 
+        # Put the STOP instant on the waveform, for the scenarios that need it.
+        #
+        # Here, before QRUN, and that placement is load-bearing rather than
+        # tidy. Sent after QRUN it cost two serial round-trips (~0.25 s each)
+        # that sat between the start of the move and the STOP, so on a driver
+        # whose move was shorter than that -- i2s_direct and rmt_v2 at a floor of
+        # 80 ticks both run 20000 steps in 0.1 s -- STOP arrived after the move
+        # had finished and the marker edge fell past the end of the delivered
+        # capture. The run then reported a complete 20000-step move and "no
+        # marker edge", which reads as "STOP was never processed".
+        #
+        # MARK is configuration, like CONFIG, so it belongs in the setup phase.
+        marker = None
+        if scenario in SCENARIO_MARKERS:
+            want = marker_channel_for(len(chan_map), pin_map.get("stride", 2))
+            mark_reply = reply_of(ser, f"MARK {want if want is not None else 'none'}")
+            if "OK MARK" not in mark_reply:
+                print(f"    MARK refused: {mark_reply.strip()}")
+            pin_map = read_map(ser)[1]
+            marker = pin_map.get("marker", -1)
+            if marker < 0:
+                print(f"    no marker channel free for {scenario}: every "
+                      f"channel belongs to a stepper, so the stop instant "
+                      f"cannot be put on the waveform")
+
         segments = builder(info)
         programs = per_stepper_for(info) if per_stepper_for else None
         # The legality pre-check is skipped for the scenarios whose subject is a
@@ -1959,7 +2090,7 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         stop_after = stop_after_for(scenario, segments, info)
         if stop_after:
             time.sleep(stop_after)
-            send_line(ser, "STOP")
+            send_line(ser, SCENARIO_STOP.get(scenario, "STOP"))
         proc.wait()
         replies = drain(ser, 0.4)
         # SR_13 is excluded because the rejection is its *subject*: it exists to
@@ -1991,8 +2122,12 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         ser.close()
 
     channels, sample_rate = load_capture_for_eval(capture_file)
+    # The marker channel is an optional 6th argument, so it goes through `extra`
+    # rather than being appended for every evaluator. `extra` is the *value*,
+    # forwarded positionally: eval_sync's 6th parameter is the programs dict and
+    # gets it the same way.
     passed, detail = evaluate(evaluator, channels, sample_rate, segments, info,
-                              chan_map)
+                              chan_map, extra=marker)
     detail.update({
         "capture": str(capture_file),
         "channel_map": chan_map,
@@ -2006,6 +2141,9 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     # The DUT's tick rate is what makes the ticks in `segments` interpretable,
     # so it travels with every result.
     detail["dut"] = info
+    # Which channel, if any, carries the STOP marker. The evaluator needs it to
+    # measure the stop instant rather than infer it.
+    detail["marker_channel"] = marker
     # Queue entries shorter than MIN_CMD_TICKS, named as such.
     #
     # RMT emits them; `i2s_direct` silently discards them and produces nothing
@@ -2277,3 +2415,9 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
+# Scenarios that deliberately send the same waveform and assert opposite
+# outcomes. SR_25 sends `stopMove()` and SR_28 sends `forceStop()` over the same
+# program: the contract is that the first must NOT truncate queued motion and the
+# second must. Keeping them apart is what makes each assertion meaningful -- a
+# single scenario with a flag would be asserting half a contract.
+CONTRASTING_PAIRS = {frozenset(("SR_25", "SR_29"))}

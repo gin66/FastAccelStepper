@@ -1179,6 +1179,139 @@ Recorded because they change what the tests mean.
   harness's job was to find and record it.
 
 - **`i2s_direct` on the full catalogue: 23 passed, 2 skipped. Two of the three
+  original failures were harness bugs; the third was withdrawn.**
+  The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
+  first characterization of the I2S step/dir waveform. **Two** of the three
+  original failures were harness bugs (below); the two that remain are driver
+  behaviour no scenario on RMT could have surfaced.
+
+  **1. ~~The driver silently discards short entries.~~ Wrong: the harness did.**
+  This was first written up as a driver defect and that was incorrect. The
+  driver is right and the firmware is right:
+
+  - `addQueueEntry()` bounds the whole command -- `ticks * steps >= MIN_CMD_TICKS`
+    -- and returns `AQE_ERROR_TICKS_TOO_LOW` (`queue_add_entry.cpp:46`).
+  - The firmware surfaces it: `ERR QE step0 rc=-1`.
+
+  Three harness bugs, all real:
+
+  1. **`sc_pulse_high_time`, `sc_pause`, `sc_long_run` bypassed `legal_ticks()`**,
+     using `max(max_speed_ticks, 160)` instead. `addQueueEntry` bounds the
+     *command*, so 16 steps need `ticks*16 >= 3200`. `rmt_v2`'s floor is 640, so
+     the expression gave 10240 and the scenario passed; `i2s_direct`'s floor is
+     80, so it gave 2560 and the queue rejected it. **One expression, two
+     drivers, and the difference was invisible until a driver with a lower floor
+     was tried.** All three now use `legal_ticks(info, steps, ...)`.
+  2. **The rejection is asynchronous, so `program()`'s check could not see it.**
+     `QSEG` replies `OK QSEG` after *parsing* only; the real `addQueueEntry()`
+     runs in `qe_feed()` from `qe_pump()`, in the main loop, *after* `QRUN`. The
+     error therefore lands in the post-run drain, and the harness went on to
+     measure.
+  3. **The post-run `ERR QE` was read as a measurement.** So SR_05 was recorded
+     as "the pin emitted 0 of 16 steps" -- a statement about the hardware that
+     was simply false. The pin carries every legal move perfectly.
+
+  `measure()` now treats a post-run `ERR QE` as a **setup failure**, and
+  `program()` refuses an entry the queue must reject *before* a capture is
+  spent. SR_05 and SR_09 re-run: **both pass.** The general guard is a test that
+  every scenario is programmable against three QINFO shapes whose
+  `max_speed_ticks` differ by 8x, plus one that asserts the shape set has not
+  collapsed to a single floor.
+
+  `REJECTION_SCENARIOS` names the one scenario whose subject *is* a rejection
+  (SR_13), so exempting it from both checks is a recorded decision rather than a
+  carve-out that could quietly widen. It also broke twice on the way: the
+  exemption read `test_id`, which is not a parameter of `measure()`, and all 199
+  tests passed because they drove the helpers rather than `measure()` itself. It
+  is now exercised directly.
+
+  **2. A step appears on the wrong side of a direction change** (SR_12) --
+  **still open, and now itself suspect.**
+  30/30 steps, 2 dir edges and a correct final dir, but the steps land
+  **10 / 9 / 11** across the three phases instead of 10/10/10. One step of a
+  phase is attributed to its neighbour -- precisely the dir-to-step ordering
+  this harness exists to check. The total count and the per-phase count
+  disagree, and only the second one notices.
+
+  **3. ~~`STOP` does not stop an I2S queue.~~ Withdrawn, and the scenario behind
+  it was measuring a thing that does not exist.**
+
+  The harness's `STOP` was `stopMove()` **plus zeroing the feeder cursor** -- a
+  hybrid matching neither documented behaviour. The library has three, and the
+  harness was conflating the first two:
+
+  | API | contract |
+  |---|---|
+  | `stopMove()` | a flag for the ramp's **next** command. Must **not** truncate queued motion. |
+  | `forceStop()` | `ignore_commands = true`; nothing further *added*, queue drains (~20 ms). |
+  | `forceStopAndNewPosition()` | aborts everything queued -- no further step issued. |
+
+  So the number reported earlier -- 7655 steps left on `i2s_direct`, 7608 on
+  `rmt_v2`, both just under the 8160 a 32-deep queue of 255-step commands holds
+  -- was **the harness's own arithmetic, not a library guarantee.** Nothing in
+  the library promises it.
+
+  `STOP` is now `stopMove()` alone, and `ESTOP` is `forceStop()`. Because the
+  expected outcomes are *opposite*, they are two scenarios rather than one with a
+  flag; `CONTRASTING_PAIRS` declares them so the anti-duplication test accepts the
+  shared waveform. SR_25 asserts `stopMove()` did **not** truncate; SR_29
+  asserts `forceStop()` drained within the queue bound.
+
+  ### What made any of it measurable: a marker channel
+
+  None of the above could be established before, because the stop instant was
+  inferred from "the pulses ceased" and the capture this rig *delivers* is not the
+  capture it *requests* (24 MHz truncates). Measured: both drivers had their last
+  step landing exactly on the capture edge, 0.0 ms of quiet tail, so
+  `truncated = step_count < requested` was satisfied by the recording ending.
+
+  A new `MARK <ch>` command designates an analyzer channel **no stepper owns**,
+  and the firmware flips its level when it processes a stop, so the instant is on
+  the waveform. `MAP` reports `marker=`; it is refused rather than silently
+  overwriting a step pin, and at 8 steppers in `nodir` there is no free channel --
+  a real limit of the approach. The level alternates per event, so no
+  sub-millisecond delay primitive is needed (an ESP-IDF busy-wait would block the
+  very loop that drains the queue).
+
+  *Placement was load-bearing.* Sent after `QRUN` it cost two serial round-trips
+  (~0.25 s each) before the stop, so on any driver whose move was shorter than
+  that the stop arrived after the move had finished and the marker edge fell past
+  the end of the delivered capture -- reported as "STOP was never processed".
+  `MARK` is configuration and belongs in the setup phase.
+
+  *Verified on hardware*, rmt_v2, same program, opposite assertions:
+
+  | | steps emitted | after the stop marker | verdict |
+  |---|---|---|---|
+  | SR_25 `stopMove()` | **20000 / 20000** | 8099 | **passed** -- did not truncate, as required |
+  | SR_29 `forceStop()` | 18615 / 20000 | 7464 (bound 8160) | **passed** -- stopped adding |
+
+  *Cost:* AVR RAM 1845 -> **1912 of 2048** (93.4 %). Two literals in `MARK` rather
+  than formatted errors, because avr-gcc copies `.rodata` into RAM and the first
+  version of that function took the build to 1992 of 2048.
+
+- **`QUEUES_I2S_DIRECT` is 3; the ESP32 has 2 I2S channels.** Measured
+  `--mode scale --driver i2s_direct --pin-mode nodir` on the connected board:
+  **n=1 and n=2 pass, n=3..8 are refused**, and the refusal is the IDF's own --
+  `E (129) i2s_common: i2s_new_channel(902)`, i.e. `ESP_ERR_NO_MEM` from the
+  peripheral rather than a policy limit. `SOC_I2S_NUM` is 2 on the ESP32 and
+  `I2sManager::create()` allocates one TX channel per manager
+  (`i2s_new_channel(..., &chan, NULL)`, `i2s_manager.cpp:31`), so two is the
+  ceiling and the constant overstates it by one.
+
+  This is a *different kind* of wrong from the MCPWM defect below. There the
+  constant counted allocations correctly and only the health was bad. Here the
+  allocation figure itself is wrong, so anything sizing a queue array from
+  `NUM_QUEUES` over-allocates by one. It was found only because R7 stopped
+  trusting the constant: `DRIVER_MAXS` had carried `i2s_direct: 3` through every
+  previous run, unchanged and untested, because `i2s_direct` had only ever been
+  measured as a *partner* in a `sync` combination with a stepper on another
+  driver. The failure mode is graceful -- `I2sManager::create()` returns nullptr
+  and the harness reports `refused` with the peripheral's own error -- so this is
+  a capacity and documentation bug, not a crash. Left as a library change; the
+  harness's job was to find and record it.
+
+- **`i2s_direct` on the full catalogue: 23 passed, 2 skipped. Two of the three
   original failures were harness bugs; one further finding is withdrawn.**
   The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
   first characterization of the I2S step/dir waveform. **Two** of the three

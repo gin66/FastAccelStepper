@@ -169,6 +169,25 @@ MAP                         count, mode, stride, and the GPIO behind each
                             capture lacking a stepper the board connected is an
                             *incomplete capture* and fails the run -- it is not
                             reported as a quiet stepper, and not passed.
+MARK <ch> | none             designate an analyzer channel no stepper owns as
+                            the event marker: the firmware flips its level when
+                            it processes a stop, putting the stop instant on the
+                            waveform instead of leaving it to be inferred from
+                            "the pulses ceased". That inference cannot work
+                            here -- the capture delivered is not the capture
+                            requested (24 MHz truncates) -- so the two cannot be
+                            told apart. MAP reports marker=. At 8 steppers in
+                            `nodir` there is no free channel and MARK is refused.
+                            Send it in the setup phase, never after QRUN: its
+                            serial round-trips would otherwise land between the
+                            move starting and the stop.
+STOP | ESTOP                STOP is `stopMove()` and MUST NOT truncate already
+                            queued motion -- a run that keeps stepping after it
+                            is the contract holding, not a stop failing. ESTOP is
+                            `forceStop()`: nothing further is added, the queue
+                            drains. A third API, `forceStopAndNewPosition()`,
+                            aborts everything queued. SR_25 and SR_29 send the
+                            same program and assert opposite outcomes.
 QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, maxall (the
                             LARGEST per-stepper speed floor -- the fastest
                             period legal for every connected stepper, and what
