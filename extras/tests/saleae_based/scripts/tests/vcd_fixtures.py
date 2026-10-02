@@ -72,6 +72,14 @@ class Dut:
     # with a different shape would let a QINFO parsing bug pass every test here.
     max_speed_per_stepper: Tuple[int, ...] = (max_speed_ticks,)
 
+    # What QFILL reported reaching. Present because a hardware run's info dict
+    # carries it (measure() records it before the evaluator is called) and an
+    # evaluator that read the key unconditionally would then raise on every
+    # real capture. The queue here is 32 deep, so a 16-entry request is met in
+    # full; a board where it is not would report the smaller number, and the
+    # bound follows the report rather than the request.
+    queue_filled_entries: int = rt.QUEUE_FILL_ENTRIES
+
     def info(self, steppers: int = 1) -> Dict[str, int]:
         """The dict shape `read_qinfo()` returns, so evaluators run unchanged."""
         floors = [self.max_speed_ticks] * steppers
@@ -84,6 +92,7 @@ class Dut:
             # The largest floor, which is what every builder means by "the
             # fastest period this program may use".
             "max_speed_ticks": max(floors),
+            "queue_filled_entries": self.queue_filled_entries,
         }
 
 
@@ -257,7 +266,7 @@ SCENARIO_BUILDERS = {
     "SR_25": rt.sc_emergency_stop,
     "SR_26": rt.sc_pause_ticks_max,
     "SR_27": rt.sc_single_step,
-    "SR_29": rt.sc_emergency_stop,
+    "SR_30": rt.sc_emergency_stop,
 }
 
 
@@ -718,75 +727,118 @@ FIXTURES.append(Fixture(
     step=render(SCENARIO_BUILDERS["SR_26"](_DUT.info()))[0], dirs=[(0, 1)],
     expect_pass=True))
 
-# SR_25 and SR_27 send the *same* waveform and assert opposite outcomes, because
+# SR_25 and SR_30 send the *same* waveform and assert opposite outcomes, because
 # that is the property being pinned: `stopMove()` must not truncate queued
-# motion, `forceStop()` must. One scenario with a flag would assert half a
-# contract and call it the whole thing.
+# motion, `forceStopAndNewPosition()` must discard it. One scenario with a flag
+# would assert half a contract and call it the whole thing.
+#
+# There is no scenario for `forceStop()` and there will not be one. Its only
+# effect on a queue this harness fills itself is `ignore_commands = true`, which
+# refuses *later* addQueueEntry() calls -- and the feeder is stopped after the
+# start, so there are none and the call cannot fail. Measured: identical
+# waveforms, 4080 of 4080 steps, on rmt_v2, i2s_direct and mcpwm_pcnt alike.
+# `stopMove()` is weaker still, being a flag the ramp generator consults for its
+# next command while this harness drives addQueueEntry() directly and never runs
+# one, so SR_25 measures the drain rather than the API -- it is kept because it
+# is the baseline SR_30 is read against.
 #
 # Both carry a marker channel (D7) that steps high at the instant the stop was
 # processed, so the boundary is on the waveform. Without it the only available
 # inference was "the pulses stopped", and the capture this rig delivers is not the
 # capture it requests (24 MHz truncates), so that inference could not tell a stop
 # from the recording ending -- which is how SR_25 came to report a complete
-# 20000-step move as "STOP was never processed".
-_stop_ticks = rt.legal_ticks(_DUT.info(), 20000, _DUT.info()["max_speed_ticks"])
-_full = render([(20000, _stop_ticks, True)])[0]
-_stopped = render([(2000, _stop_ticks, True)])[0]
-_early = _full[0][0] + 400 * _stop_ticks
+# move as "STOP was never processed".
+_stop_ticks = rt.legal_ticks(_DUT.info(), rt.QUEUE_FILL_STEPS,
+                             _DUT.info()["max_speed_ticks"])
 
-# SR_25, stopMove(): the marker fires early and all 20000 steps still arrive.
-# Passing here means the stop did *not* cut the run -- which is the contract.
+
+def run_tests_stop_quarter_of_fill():
+    """The marker depth the real harness would use on this DUT.
+
+    Asked of `stop_after_for()` rather than written down, so a fixture cannot
+    depict a stop the runner would never issue -- the failure mode the SR_25/SR_30
+    pair had when the delay was a fixed 1 ms and i2s_direct's marker landed
+    before its first step.
+    """
+    info = _DUT.info()
+    segs = rt.sc_emergency_stop(info)
+    return int(round(rt.stop_after_for("SR_30", segs, info)
+                     * info["ticks_per_s"] / _stop_ticks))
+
+
+# The whole run. QRUN on a QFILLed queue adds nothing after the start, so the
+# waveform is the fill and only the fill, however long the program behind it is.
+_drained = render([(rt.QUEUE_FILL_STEPS, _stop_ticks, True)])[0]
+# Where the marker sits: a quarter into the fill, which is what stop_after_for()
+# issues on a DUT of this shape (640 ticks = 40 us, so a quarter of 40.8 ms).
+# Fractional rather than a round step count because the delay is now derived from
+# the DUT's tick rate and period -- 1020 steps here, and it has to track the
+# waveform or the fixture would depict a stop the harness never issues.
+_marker_in_steps = run_tests_stop_quarter_of_fill()
+_early = _drained[0][0] + _marker_in_steps * _stop_ticks
+
+# SR_25, stopMove(): the marker fires 1 ms in and the whole filled queue still
+# runs. Passing here means the stop did *not* cut anything queued.
 FIXTURES.append(Fixture(
     name="good_stop_move_does_not_truncate", scenario="SR_25",
-    why="stopMove() is a flag for the ramp's next command: all 20000 steps run",
-    step=_full, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
+    why="stopMove() is a flag for the ramp's next command: the fill drains",
+    step=_drained, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
     expect_pass=True,
-    # The count after the marker is deliberately not pinned: it depends on
-    # exactly where the marker edge falls relative to a pulse, which is a
-    # rendering detail. The contract is "nothing was truncated", and that is
-    # what is asserted.
     expect_flags={"stop_measured": True, "not_truncated": True}))
 
 # The violation: a stopMove that did truncate would be the library breaking its
-# own contract, and this is what that looks like on the wire.
+# own contract. With the feeder stopped after the start this is a *short* run --
+# the queue lost most of its contents -- rather than a run shorter than the
+# program, which the feeder could have produced by itself.
+_truncated = render([(255, _stop_ticks, True)])[0]
 FIXTURES.append(Fixture(
     name="bad_stop_move_truncated", scenario="SR_25",
-    why="the run was cut short, which stopMove() must never do",
-    step=_stopped, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
+    why="the filled queue was cut short, which stopMove() must never do",
+    step=_truncated, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
     expect_pass=False, expect_detail="not_truncated",
     fault="stopMove truncated a queued move, against its documented contract"))
 
-# SR_27, forceStop(): the marker fires and the queue drains. The bound is
-# QUEUE_LEN * 255, so a drain inside it is the documented behaviour.
+# SR_30, forceStopAndNewPosition(): the queue is emptied, so the filled queue
+# does not drain. This is what SR_25's good waveform looks like, which is the
+# point: the two APIs are told apart by exactly this.
+_aborted = render([(_marker_in_steps + 1, _stop_ticks, True)])[0]
+_aborted_marker = _aborted[0][0] + _marker_in_steps * _stop_ticks
 FIXTURES.append(Fixture(
-    name="good_force_stop_drains", scenario="SR_29",
-    why="forceStop() stops adding; the queued remainder still runs",
-    step=_stopped, dirs=[(0, 1)],
-    extra={"D7": [(_stopped[-1][0] + _stop_ticks, 1)]},
+    name="good_force_stop_and_new_pos_discards", scenario="SR_30",
+    why="the queue is emptied, so only the steps already out came out",
+    step=_aborted, dirs=[(0, 1)], extra={"D7": [(_aborted_marker, 1)]},
     expect_pass=True,
-    expect_flags={"stop_measured": True, "drain_within_queue": True,
-                  "truncated_by_stop": True}))
+    expect_flags={"stop_measured": True, "queue_discarded": True,
+                  "stop_interrupted_the_run": True}))
 
-# forceStop() ignored: the whole program came out, which is what the harness
-# looked like before STOP and ESTOP were separated.
+# The violation: the fill drained, so forceStopAndNewPosition() did not empty
+# anything. Sending the stop a driver ignores, or wiring it to the wrong API,
+# looks exactly like this -- and it is what forceStop() does, which is why that
+# one has no scenario.
 FIXTURES.append(Fixture(
-    name="bad_force_stop_ignored", scenario="SR_29",
-    why="forceStop() issued but all 20000 steps still arrived",
-    step=_full, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
-    expect_pass=False, expect_detail="truncated_by_stop",
-    fault="emergency stop ignored, the full program ran"))
+    name="bad_abort_queue_still_drained", scenario="SR_30",
+    why="the filled queue drained behind the abort, which empties nothing",
+    step=_drained, dirs=[(0, 1)], extra={"D7": [(_early, 1)]},
+    expect_pass=False, expect_detail="queue_discarded",
+    fault="the queue drained, so the stop was forceStop() rather than "
+          "forceStopAndNewPosition()"))
 
-# Dropping the final falling edge leaves the step pin high. The marker still
-# fires after it, so the stop is seen to have worked and the unterminated pulse
-# is the only thing wrong -- one defect per fixture, which matters because a
-# fixture with two faults only proves that one of them is detected.
+# A driver that keeps stepping commands it can no longer be told about: more
+# than two entries past the marker. The gate catches it, and the count is the
+# number a driver with a hardware transmit buffer would be characterised by.
 FIXTURES.append(Fixture(
-    name="bad_emergency_stop_partial_pulse", scenario="SR_29",
-    why="the run was cut mid-pulse, leaving the step pin high",
-    step=_stopped[:-1] + [(_stopped[-1][0] + _stop_ticks, 1)], dirs=[(0, 1)],
-    extra={"D7": [(_stopped[-1][0] + _stop_ticks, 1)]},
-    expect_pass=False, expect_detail="unterminated_pulses",
-    fault="last pulse left high, no terminating falling edge"))
+    name="bad_abort_queue_leaked_a_tail", scenario="SR_30",
+    why="three entries of steps came out after the queue was emptied",
+    # Marker plus the tail bound plus one more entry, so the leak is over the
+    # bound rather than at it -- the depth is measured from the marker, which
+    # moves with the harness's own delay. Two events per step, so the cut is in
+    # event indices and lands on a falling edge.
+    step=_drained[:2 * (_marker_in_steps + (rt.ABORT_TAIL_ENTRIES + 1) * 255)],
+    dirs=[(0, 1)],
+    extra={"D7": [(_early, 1)]},
+    expect_pass=False, expect_detail="steps_after_stop",
+    fault="the driver emitted queued commands after the queue was emptied"))
+
 # SR_13 is the inverse of every other fixture: the command is refused, so the
 # correct waveform is a pin that never moves. There is no `render()` output to
 # start from -- the whole point is that nothing is emitted.

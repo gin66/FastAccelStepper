@@ -317,6 +317,35 @@ class TestConfigGrammar(unittest.TestCase):
         for name in ("1ch", "2ch", "4ch_rmt", "4ch_mcpwm"):
             self.assertNotIn(f'strcmp(name, "{name}")', source)
 
+    def test_a_filled_queue_is_started_not_replayed(self):
+        """QFILL queues the program; QRUN must not queue it a second time.
+
+        Both commands arm the same cursors, so QRUN re-arming from scratch would
+        push the program into a queue that already holds it and every one of
+        those steps would come out twice -- a run with twice the steps asked
+        for, and no error anywhere to say so. The firmware is not unit-tested,
+        so this checks the source.
+
+        The other half is that a filled cursor must not be topped up before the
+        start: qe_pump() prefills and then feeds, and both loops have to skip a
+        cursor that is waiting for its QRUN, or the depth QFILL reported is
+        stale before the first step.
+        """
+        source = (COMMON / "saleae_app.cpp").read_text()
+        self.assertIn("!fill_only && c->fill_only", source,
+                      "QRUN re-arms a QFILLed cursor instead of starting it")
+        pump = source[source.index("static void qe_pump"):]
+        pump = pump[:pump.index("\nstatic ")]
+        self.assertEqual(pump.count("c->fill_only"), 2,
+                         "qe_pump must skip a fill_only cursor in both loops: "
+                         "the prefill and the top-up")
+        # QFILL reports the depth it reached, never the one it was asked for:
+        # QUEUE_LEN is 16 on AVR and 32 on ESP32, and QE_ROOM_RESERVE holds
+        # entries back, so a request for 16 cannot be met everywhere.
+        self.assertIn('"OK QFILL q=%u\\n"', source)
+        self.assertIn("slots[i].stepper->queueEntries()", source)
+        self.assertIn("!strcmp(cmd, \"QFILL\")", source)
+
     @classmethod
     def _resolve_size(cls, expr):
         """A buffer size from its declaration: a literal or CONSTANT + n."""
@@ -822,6 +851,85 @@ class TestBoardCommands(unittest.TestCase):
             self.assertEqual(first.count("CONFIG"), 1, first)
             self.assertEqual(first.split()[0], "CONFIG", first)
 
+    def _stop_scenario_lines(self, scenario):
+        """The lines run_hardware puts on the wire for a stop scenario."""
+        sent = []
+
+        class FakeCapture:
+            returncode = 0
+
+            def communicate(self, timeout=None):
+                return ("", "")
+
+            def kill(self):
+                pass
+
+        info = vf.Dut().info()
+        segments = run_tests.SCENARIOS[scenario][1](info)
+        wire, channels, mask = run_hardware.wire_plan(scenario, "rmt_v2")
+
+        def record(_ser, line, wait=1.0):
+            sent.append(line)
+            return "OK"
+
+        def qfill(ser, m, entries=run_tests.QUEUE_FILL_ENTRIES):
+            sent.append(f"QFILL {m} {entries}")
+            return 14
+
+        with mock.patch.object(run_hardware, "send", record), \
+                mock.patch.object(run_hardware, "cold_boot",
+                                  lambda port: mock.Mock()), \
+                mock.patch.object(run_hardware.subprocess, "Popen",
+                                  lambda *a, **k: FakeCapture()), \
+                mock.patch.object(run_tests, "read_map",
+                                  lambda ser: (
+                                      run_tests.default_channel_map(1, 2),
+                                      {"mode": "dir", "stride": 2,
+                                       "pins": [2, 0], "marker": 7})), \
+                mock.patch.object(run_tests, "fill_queue", qfill), \
+                mock.patch("time.sleep", lambda _s: None):
+            run_hardware.run_segments(
+                segments, wire, channels, mask, scenario, info,
+                stop_after=run_tests.STOP_AFTER.get(scenario),
+                scenario=scenario)
+        return sent
+
+    def test_both_runners_issue_the_same_stop(self):
+        """run_tests.py and run_hardware.py drive the same board.
+
+        Separate capture paths, nothing to force agreement: an earlier revision
+        of this harness gave the two runners different stops, and the one that
+        was not updated could not have judged its scenario -- the marker was
+        never designated either, so the evaluator found no marker edge and
+        declined to judge. A runner that cannot judge a scenario is worse than
+        one that fails it.
+
+        So both stop scenarios are driven through run_hardware's own path here
+        and the sequence is asserted: the fill and the marker are setup, both
+        before QRUN, and the stop is the one the scenario is about.
+        """
+        for scenario, stop in (("SR_25", "STOP"), ("SR_30", "XSTOP")):
+            with self.subTest(scenario=scenario):
+                sent = self._stop_scenario_lines(scenario)
+                self.assertEqual(sent[0].split()[0], "CONFIG")
+                self.assertEqual(sent[-1], "POS")
+                qrun = sent.index(f"QRUN 1")
+                self.assertLess(sent.index("MARK 7"), qrun,
+                                "MARK after QRUN puts a serial round-trip "
+                                "between the start of the move and the stop")
+                self.assertLess(sent.index(f"QFILL 1 "
+                                           f"{run_tests.QUEUE_FILL_ENTRIES}"),
+                                qrun, "QFILL must precede the run it fills for")
+                self.assertLess(qrun, sent.index(stop),
+                                f"{scenario} asserts a {stop} contract and must "
+                                f"issue {stop}")
+                # Only the one stop, and only after the run has started.
+                self.assertEqual(sent.count(stop), 1)
+                # Four segments of one queue-fill each, then the fill request.
+                self.assertEqual(
+                    [ln for ln in sent if ln.startswith("QSEG")],
+                    [f"QSEG {run_tests.QUEUE_FILL_STEPS} 640 1"] * 4)
+
 
 class TestModes(unittest.TestCase):
     """The two generic modes (todo R3).
@@ -1072,34 +1180,107 @@ class TestModes(unittest.TestCase):
                                              self.QINFOS["rmt_v2"]))
         self.assertEqual(sent, ["QCLR", "QSEG 16 640 1"])
 
-    def test_the_stop_time_is_derived_from_the_run_not_fixed(self):
-        """A fixed 0.15 s stops testing anything on a fast driver.
+    def test_the_stop_delay_scales_with_the_fill_not_with_the_program(self):
+        """A wall-clock constant is a different depth on every driver.
 
-        The feeder runs far ahead of the driver: STOP cancels queue *filling*
-        but commands already queued still emit, so the useful window is "after
-        some output, before the whole program is queued". A move shorter than the
-        fixed time, or a feeder quick enough to queue all 20000 steps before it,
-        both land outside that window -- and then SR_25 measures a move that was
-        never stopped rather than a driver that cannot be stopped.
+        The stop has exactly one requirement now that the feeder is stopped after
+        the start: land inside the run, which is the fill and nothing more. A
+        fixed 1 ms met that on rmt_v2 and mcpwm_pcnt and not on i2s_direct, whose
+        first step arrives later than 1 ms after QRUN because it streams from a
+        DMA buffer -- its marker edge came 16 us *before* the first pulse, so the
+        scenario measured a stop that interrupted nothing.
+
+        Scaled to the fill's own duration the same fraction is ~10 ms here, about
+        a thousand steps in, and comfortably outside any driver's start latency.
+        It also has to be a fraction of the *fill*, not of the program: the
+        program is four fills long, so a quarter of it would land past the end of
+        the run on any driver.
         """
         info = {"ticks_per_s": 16000000, "min_cmd_ticks": 3200,
                 "max_speed_all_ticks": 640}
+        for scenario in ("SR_25", "SR_30"):
+            for floor in (640, 160, 80):
+                dut = dict(info, max_speed_ticks=floor)
+                segs = run_tests.sc_emergency_stop(dut)
+                when = run_tests.stop_after_for(scenario, segs, dut)
+                fill_s = (run_tests.QUEUE_FILL_STEPS * segs[0][1]
+                          / info["ticks_per_s"])
+                self.assertAlmostEqual(when, fill_s * 0.25, places=6)
+                self.assertGreater(when, 0.001,
+                                   "must clear every driver's start latency")
+                # Inside the run, and not scaled to the program: four fills long,
+                # a quarter of *that* would be past the end.
+                self.assertLess(when, fill_s)
+                self.assertLess(when, run_tests.scenario_seconds(
+                    segs, info["ticks_per_s"]))
+        # Nothing to stop in an ordinary scenario.
+        self.assertIsNone(run_tests.stop_after_for(
+            "SR_01", [(8, 640, True)], info))
 
-        def segs(floor):
-            ticks = run_tests.legal_ticks(dict(info, max_speed_ticks=floor), 20000, floor)
-            return [(20000, ticks, True)]
+    def test_the_stop_program_is_four_queue_fills_of_255_step_commands(self):
+        """The program has to outlast the queue, or the stop proves nothing.
 
-        slow = run_tests.stop_after_for("SR_25", segs(640), info)
-        fast = run_tests.stop_after_for("SR_25", segs(80), info)
-        self.assertAlmostEqual(slow, 0.15, places=3)   # 0.25 * 0.8 = 0.2, capped
-        self.assertAlmostEqual(fast, 0.05, places=3)   # 0.25 * 0.2
-        for floor, when in ((640, slow), (80, fast)):
-            duration = run_tests.scenario_seconds(segs(floor), 16000000)
-            self.assertGreater(when, 0.0)
-            self.assertLess(when, duration,
-                            f"floor {floor}: STOP at {when} s is not inside the "
-                            f"{duration} s run")
-        self.assertIsNone(run_tests.stop_after_for("SR_01", segs(640), info))
+        QFILL puts 16 * 255 = 4080 steps in the queue before the run, and the
+        program is four times that. The program being longer than the fill is
+        what makes a run *longer* than the fill a detectable defect rather than
+        something the feeder is entitled to do, so two ways this could rot: the
+        segments dropping to one, and the command growing past 255 steps per
+        entry (which the firmware splits itself, so the fill would no longer be
+        16 entries of the size the scenario claims).
+        """
+        info = {"ticks_per_s": 16000000, "min_cmd_ticks": 3200,
+                "queue_len": 32, "max_speed_ticks": 640,
+                "max_speed_all_ticks": 640}
+        segs = run_tests.sc_emergency_stop(info)
+        self.assertEqual(len(segs), 4)
+        for steps, ticks, _ in segs:
+            self.assertEqual(steps, 16 * 255)
+            self.assertLessEqual(steps, 255 * 16)
+            self.assertIsNone(run_tests.unprogrammable([(steps, ticks, True)],
+                                                      info))
+        self.assertEqual(run_tests.requested_steps(segs), 4 * 16 * 255)
+        # Four segments is all QE_MAX_SEG takes; a fifth would be refused.
+        self.assertLessEqual(len(segs), 8)
+        # The fill is what makes the queue bound 4080, and it is a whole queue
+        # on AVR -- where QUEUE_LEN is 16 -- so the two boards differ.
+        self.assertEqual(run_tests.QUEUE_FILL_STEPS, 4080)
+
+    def test_the_queue_is_filled_before_the_run_and_the_depth_recorded(self):
+        """QFILL's reply, not the request, is what the evaluator bounds with.
+
+        QUEUE_LEN is 16 on AVR and 32 on ESP32, and the firmware keeps
+        QE_ROOM_RESERVE entries back for a DIR-drain pause, so a request for 16
+        entries cannot be met in full everywhere. The depth the board reports is
+        recorded in `info`, where the evaluator reads it -- bounding the drain
+        with the requested depth instead would assert against a queue state no
+        board was ever in.
+        """
+        sent = []
+        with mock.patch.object(
+                run_tests, "reply_of",
+                lambda ser, line: sent.append(line) or "OK QFILL q=14\n"):
+            self.assertEqual(run_tests.fill_queue(object(), 1), 14)
+        self.assertEqual(sent, ["QFILL 1 16"])
+        # No reply, no fill: 0 is what measure() refuses to capture against.
+        with mock.patch.object(run_tests, "reply_of", lambda ser, line: "ERR"):
+            self.assertEqual(run_tests.fill_queue(object(), 3), 0)
+        self.assertIn("SR_25", run_tests.SCENARIO_FILL)
+        self.assertIn("SR_30", run_tests.SCENARIO_FILL)
+
+    def test_the_requested_step_count_sums_every_segment(self):
+        """`segments[0][0]` is one segment, not the program.
+
+        The stop scenarios program four identical segments. Reading the first
+        would ask for 4080 of 16320 steps and call a complete run a fourfold
+        oversupply -- and would call SR_25's *contract* (nothing truncated)
+        impossible to satisfy.
+        """
+        segs = [(4080, 640, True)] * 4
+        self.assertEqual(run_tests.requested_steps(segs), 16320)
+        self.assertEqual(run_tests.requested_steps([(1, 8, True)]), 1)
+        # A pause contributes no steps, only ticks.
+        self.assertEqual(run_tests.requested_steps([(0, 1600, True),
+                                                    (255, 640, True)]), 255)
 
     def test_measure_reaches_the_capture_on_both_paths(self):
         """measure() itself, not just its helpers.
@@ -1758,7 +1939,7 @@ class TestPins(unittest.TestCase):
             params = list(inspect.signature(fn).parameters)
             # The first five exactly; further keyword arguments are allowed,
             # because two evaluators genuinely need one more -- eval_sync the
-            # per-stepper programs, eval_emergency_stop the marker channel. What
+            # per-stepper programs, eval_abort_queue the marker channel. What
             # must never happen is one that reads a *default* instead of the
             # run's own data, which is what the first five guarantee.
             self.assertEqual(params[:5],

@@ -181,13 +181,30 @@ MARK <ch> | none             designate an analyzer channel no stepper owns as
                             Send it in the setup phase, never after QRUN: its
                             serial round-trips would otherwise land between the
                             move starting and the stop.
-STOP | ESTOP                STOP is `stopMove()` and MUST NOT truncate already
+STOP | XSTOP                STOP is `stopMove()` and MUST NOT truncate already
                             queued motion -- a run that keeps stepping after it
-                            is the contract holding, not a stop failing. ESTOP is
-                            `forceStop()`: nothing further is added, the queue
-                            drains. A third API, `forceStopAndNewPosition()`,
-                            aborts everything queued. SR_25 and SR_29 send the
-                            same program and assert opposite outcomes.
+                            is the contract holding, not a stop failing. XSTOP is
+                            `forceStopAndNewPosition()`: the queue is emptied, so
+                            the queued commands never run. SR_25 and SR_30 send
+                            the same program and assert opposite outcomes.
+                            There is deliberately no `forceStop()`: it only sets
+                            `ignore_commands`, which refuses *later*
+                            addQueueEntry() calls, and this harness stops
+                            feeding after the start, so there are none and a
+                            scenario could not fail. `stopMove()` is weaker
+                            still -- a flag the ramp generator reads, and this
+                            harness drives addQueueEntry() directly.
+QFILL <mask> [entries]     queue the program with start = false, `entries`
+                            deep (default: the whole queue), and stop there;
+                            QRUN then starts exactly what was filled. The reply
+                            carries the depth REACHED, not the one asked for:
+                            QUEUE_LEN is 16 on AVR and 32 on ESP32, and the
+                            firmware holds QE_ROOM_RESERVE entries back for a
+                            driver's DIR-drain pause. This exists because QRUN
+                            alone prefills half a queue and tops it up from the
+                            main loop, which leaves the depth a moment into a
+                            run to a race between the loop and the drain -- so a
+                            stop scenario measured the feeder, not the stop.
 QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, maxall (the
                             LARGEST per-stepper speed floor -- the fastest
                             period legal for every connected stepper, and what
@@ -234,35 +251,66 @@ QSEG 1 80 1        # single step after the pause
 QRUN 1
 ```
 
-## Characterization scenarios
+Example — SR_25 / SR_30, the two stop scenarios. The program is four
+`QUEUE_FILL_STEPS` segments, the queue is filled to a fixed 16 entries before
+the start, and the stop lands a quarter of the way into the fill:
 
-Every scenario is a handful of `QSEG` lines. The ones that matter, by goal:
+```
+QCLR
+QSEG 4080 80 1     # 16 entries x 255 steps, at the speed floor from QINFO
+QSEG 4080 80 1
+QSEG 4080 80 1
+QSEG 4080 80 1     # 16320 steps = four queue-fills, of which one is run
+QFILL 1 16         # -> OK QFILL q=14 on AVR (QUEUE_LEN 16 - QE_ROOM_RESERVE)
+QRUN 1             # starts the fill and adds nothing afterwards
+... ~10 ms, a quarter of the 40.8 ms fill ...
+XSTOP              # SR_30; SR_25 sends STOP and expects all 4080 steps
+```
 
-| Goal | Program | What the capture must show |
-|------|---------|---------------------------|
-| Pulse high time / duty vs speed | `QSEG 1 <ticks> 1`, sweep `ticks` | high time shrinks as ticks drop; no pulse merges |
-| 1..255 steps per command | `QSEG <n> <ticks> 1`, n = 1..255 | exactly n pulses, inter-step period = ticks, no glitch at the last step |
-| `ticks` = 65535 | `QSEG 1 65535 1` | longest period the 16-bit field allows |
-| dir change → first step | `QSEG 10 <ticks> 1` then `QSEG 10 <ticks> 0` | dir edge settles before the first step of phase 2; measure the delay |
-| Pause command | `QSEG 5 <ticks> 1`, `QSEG 0 <p> 1`, `QSEG 5 <ticks> 1` | gap of exactly p ticks, dir must not flip on a pause |
-| MCPWM overrun | `QSEG 255 <max> 1`, `QSEG 0 <p> 1`, `QSEG 1 <max> 1` | 255 pulses, gap, then exactly 1 — no lost or extra step |
-| Multi-stepper max speed | `CONFIG 2 <d>,<d> dir`, `QSEG <n> <max> 1`, `QRUN 3` | does the second stepper perturb the first step's timing |
-| Sync start | `CONFIG 2 <d>,<d> dir`, `QSEG <n> <ticks> 1`, `QRUN 3` | time from kick-off to each stepper's first step; all within tolerance |
+The delay is a **fraction of the fill's duration**, computed from the DUT's own
+tick rate and period (`stop_after_for()`), not a wall-clock constant. It has to
+be a fraction of the *fill* rather than of the program — the program is four
+fills long, so a quarter of that would land past the end of the run — and it has
+to be scaled at all: a fixed 1 ms cleared the run on rmt_v2 and mcpwm_pcnt but
+not on i2s_direct, whose first step arrives later than that because it streams
+from a DMA buffer. Its marker edge then came 16 µs *before* the first pulse and
+the scenario measured a stop that interrupted nothing.
 
-The last two interact on AVR: `max_speed_in_ticks` is
-`TICKS_PER_S/50000` with one stepper but 426 with two
-(`adjustSpeedToStepperCount`, `src/pd_avr/avr_queue.cpp`), so one and two
-steppers (`--count 1` and `--count 2`) must both be characterized on the same
-board.
+Why the fill, and why a scaled delay: the stop has to land while the queue is
+still the one `QFILL` put there, or the number of steps after the marker is a
+measure of how far the feeder got in the meantime. The earlier form ran 20000
+steps and stopped a quarter of the way in, and reported 7464 steps after the
+marker against a bound of 8160 — a number that described the host's serial loop,
+not any stop.
 
-## Capabilities (today)
+The measurement both scenarios make is `steps_after_stop`: the pulses from the
+marker to the end of the capture. SR_30 requires it to be ~nothing — the queue
+was emptied, so only what a driver had already handed to its hardware can still
+step — and SR_25 requires it to be the whole remainder. Measured on ESP32 at
+160 ticks with a 16-entry fill:
 
-- **SR_00** connection self-test: 8 pins, 1 Hz, distinct asymmetric duty so an
-  inverted channel reads as the complement duty. Proven on ESP32 (Arduino and
-  IDF5.3). Runs first; if it fails the rest are skipped.
-- The `QSEG`/`QRUN` feeder itself: segment program, prefill, synchronized
-  kick-off, DIR-pause retry, pause commands. Implemented in
-  `common/saleae_app.cpp` (`qe_pump`/`qe_feed`).
+| driver | SR_25 after marker | SR_30 after marker |
+|---|---|---|
+| rmt_v2 | 3999 of 4080 | **0** |
+| mcpwm_pcnt | 3988 of 4080 | **0** |
+| i2s_direct | 4046 of 4080 | **67** |
+
+MCPWM/PCNT and RMT emit nothing after the abort: both take one queue entry at a
+time and have nothing in flight. I2S leaks 67 steps — 0.26 of an entry — because
+it streams from a DMA buffer, which is the only hardware buffer in the three.
+That difference is invisible to SR_25, where all three produce the full fill, and
+it is the reason SR_30 exists as its own scenario.
+
+The upper bound is the fill rather than the queue's capacity, and that is the
+other half of the fix: the feeder used to top the queue back up to capacity
+within one main-loop pass of the start, so the drain after a stop was always
+(QUEUE_LEN − QE_ROOM_RESERVE) × 255 — measured as 7650 steps on all three
+drivers, a number with nothing to do with any stop. `QRUN` on a filled queue now
+sets `no_topup` and the queue drains exactly what `QFILL` reported.
+
+- The `QSEG`/`QFILL`/`QRUN` feeder itself: segment program, prefill, fill-to-a-
+  depth with `start = false`, synchronized kick-off, DIR-pause retry, pause
+  commands. Implemented in `common/saleae_app.cpp` (`qe_pump`/`qe_feed`).
 - **The two generic modes** (`--mode scale|sync`, todo R3). `scale` sweeps the
   stepper count 1..`min(driver queues, channel budget)` on one named driver with
   a **shared** program, asserting each stepper's own step count and period;

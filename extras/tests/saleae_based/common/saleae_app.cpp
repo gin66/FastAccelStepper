@@ -68,8 +68,28 @@
  *                              own program ignores the shared one.
  *   QRUN <mask>                run the program on the steppers selected by the
  *                              bitmask, synchronized start
+ *   QFILL <mask> [entries]     queue the program with start = false, `entries`
+ *                              deep (default: the whole queue), and leave it
+ *                              there; QRUN then starts exactly what was filled
+ *                              and adds nothing afterwards, so the queue drains
+ *                              exactly what this command put in it.
+ *                              The reply carries the depth reached, not the one
+ *                              asked for.
  *   POS                        reply positions of all steppers
  *   STOP                       stop move / self-test
+ *
+ * Two stops, and they differ in what happens to what is already queued:
+ *   STOP                       stopMove(): queued motion still runs
+ *   XSTOP                      forceStopAndNewPosition(): queue emptied, so the
+ *                              queued commands never run
+ *
+ * There is deliberately no forceStop(). Its only effect on a queue this harness
+ * fills itself is `ignore_commands = true`, which refuses *later*
+ * addQueueEntry() calls -- and QRUN stops feeding once the fill is in, so there
+ * are none and the call could not fail. stopMove() is weaker still: a flag the
+ * ramp generator consults for its next command, while this harness drives
+ * addQueueEntry() directly and never runs one. Only forceStopAndNewPosition()
+ * reaches the queue, so only it has a waveform of its own to assert.
  *
  * Characterization scenarios are assembled from segments, e.g.
  *   QCLR | QSEG 255 80 1 | QSEG 0 1600 1 | QSEG 1 80 1 | QRUN 1
@@ -257,6 +277,20 @@ struct qe_cursor {
   uint8_t seg;   // index of the current segment
   bool started;  // queue kicked off
   bool active;   // selected by QRUN and not yet finished
+  // Armed by QFILL and waiting for QRUN: the queue is already full and nothing
+  // may be added to it in the meantime, which is the whole point of filling it
+  // before the start.
+  bool fill_only;
+  // Set when QRUN started a QFILLed queue. From then on the feeder adds
+  // nothing: the queue drains exactly what QFILL put in it and the run ends.
+  //
+  // This is what makes the stop scenarios measurable. With a top-up, the queue
+  // is back to capacity within one main-loop pass of the start -- qe_feed()
+  // loops until qe_has_room() is false -- so the steps that follow a stop are
+  // always QUEUE_LEN entries' worth and say nothing about the stop. Measured:
+  // 7650 steps after the stop on rmt_v2, i2s_direct and mcpwm_pcnt alike, which
+  // is (QUEUE_LEN - QE_ROOM_RESERVE) * 255 and nothing else.
+  bool no_topup;
 };
 
 struct stepper_slot {
@@ -398,8 +432,8 @@ static void stop_sr00(void) {
   }
 }
 
-// Three stops, and the difference between them is the whole point. The library
-// documents all three (FastAccelStepper.h):
+// The stops, and the difference between them. The library documents all three
+// (FastAccelStepper.h):
 //
 //   stopMove()                    a flag for the ramp generator's *next*
 //                                 command. It must NOT truncate motion that is
@@ -407,13 +441,18 @@ static void stop_sr00(void) {
 //                                 this harness is not the ramp's planner, so it
 //                                 has nothing to act on here.
 //   forceStop()                   ignore_commands = true, so nothing further is
-//                                 *added*; what is already queued still runs,
-//                                 within about 20 ms.
+//                                 *added*; what is already queued still runs.
 //   forceStopAndNewPosition()     aborts everything queued: no further step.
 //
-// This harness's feeder IS the planner, so "nothing further is added" is the
-// harness's job, not the library's -- hence the cursor zeroing in emergency_stop.
-// The previous stop_all() conflated the first two: it called stopMove() *and*
+// Of those, only the third reaches the queue from here. stopMove() sets a flag
+// nothing in this harness reads, and forceStop() refuses later addQueueEntry()
+// calls that are never made: QRUN stops feeding once the fill is in, so there is
+// nothing after the start for it to refuse. Both are no-ops against a
+// directly-fed queue, which is why there is no scenario for either and why the
+// harness's own no_topup cursor is what enforces "nothing further is added" --
+// the harness is the planner, so that guarantee is the harness's to keep.
+//
+// The earlier stop_all() conflated the first two: it called stopMove() *and*
 // zeroed the cursor, so it behaved like a partial forceStop while reporting
 // itself as a stop. Measured, that hybrid left 7655 of 20000 steps to run on
 // i2s_direct and 7608 on rmt_v2 -- just under the 8160 a 32-deep queue of
@@ -428,10 +467,24 @@ static void stop_move_only(void) {
   }
 }
 
-static void emergency_stop(void) {
+// forceStopAndNewPosition() at the current position: the third stop, and the
+// only one that touches the queue itself.
+//
+// forceStop() sets ignore_commands and leaves everything queued to run out --
+// measured: 4080 of 4080 steps after the marker with a filled queue, identical
+// on rmt_v2, i2s_direct and mcpwm_pcnt. forceStopAndNewPosition() goes on to
+// q->forceStop(), which per driver stops the timer/channel and does
+// read_idx = next_write_idx, so the ring is emptied and the queued commands
+// never run. It is also the only stop whose effect on the wire differs from the
+// other two, which is what makes it a scenario rather than an API detail.
+//
+// The position is passed through unchanged, so POS keeps reporting where the
+// stepper really is: the point of this stop is the queue, not the coordinate.
+static void abort_queue(void) {
   for (uint8_t i = 0; i < slot_count; i++) {
     if (slots[i].stepper) {
-      slots[i].stepper->forceStop();
+      slots[i].stepper->forceStopAndNewPosition(
+          slots[i].stepper->getCurrentPosition());
       memset(&slots[i].cur, 0, sizeof(slots[i].cur));
     }
   }
@@ -937,10 +990,15 @@ static bool qe_next_segment(struct qe_cursor* c) {
 }
 
 // Emit commands from the plan until the queue is full or a retryable code is
-// returned. Sets *err on a terminal addQueueEntry() code.
-static void qe_feed(struct qe_cursor* c, FastAccelStepper* s, bool* err,
-                    AqeResultCode* last) {
-  while (qe_has_room(s) && qe_next_segment(c)) {
+// returned. `cap` bounds how deep this call may fill the queue, in entries: 0
+// means "as deep as qe_has_room() allows", and a nonzero value stops at that
+// depth instead, which is how QFILL fills to a requested depth rather than to
+// whatever the queue happens to hold. Sets *err on a terminal addQueueEntry()
+// code.
+static void qe_feed(struct qe_cursor* c, FastAccelStepper* s, uint8_t cap,
+                    bool* err, AqeResultCode* last) {
+  while (qe_has_room(s) && (cap == 0 || s->queueEntries() < cap) &&
+         qe_next_segment(c)) {
     const struct segment* seg = &c->list[c->seg];
     struct stepper_command_s cmd;
     bool is_pause = (seg->steps == 0);
@@ -1021,13 +1079,13 @@ static void qe_pump(void) {
 
   for (uint8_t i = 0; i < slot_count; i++) {
     struct qe_cursor* c = &slots[i].cur;
-    if (!c->active || c->started) {
+    if (!c->active || c->started || c->fill_only) {
       continue;
     }
     bool err = false;
     AqeResultCode last = AqeResultCode::OK;
     while (slots[i].stepper->queueEntries() < QE_PREFILL) {
-      qe_feed(c, slots[i].stepper, &err, &last);
+      qe_feed(c, slots[i].stepper, 0, &err, &last);
       if (err) {
         break;
       }
@@ -1048,7 +1106,8 @@ static void qe_pump(void) {
   // them on one shared timer compare.
   uint8_t n = 0;
   for (uint8_t i = 0; i < slot_count; i++) {
-    if (slots[i].cur.active && !slots[i].cur.started) {
+    if (slots[i].cur.active && !slots[i].cur.started &&
+        !slots[i].cur.fill_only) {
       if (slots[i].stepper->queueEntries() >= QE_PREFILL ||
           !qe_next_segment(&slots[i].cur)) {
         participants[n++] = slots[i].stepper;
@@ -1070,15 +1129,16 @@ static void qe_pump(void) {
     }
   }
 
-  // Top up the running queues.
+  // Top up the running queues. A queue QFILL started is deliberately left alone:
+  // see `no_topup`.
   for (uint8_t i = 0; i < slot_count; i++) {
     struct qe_cursor* c = &slots[i].cur;
-    if (!c->active || !c->started) {
+    if (!c->active || !c->started || c->fill_only || c->no_topup) {
       continue;
     }
     bool err = false;
     AqeResultCode last = AqeResultCode::OK;
-    qe_feed(c, slots[i].stepper, &err, &last);
+    qe_feed(c, slots[i].stepper, 0, &err, &last);
     if (err) {
       c->active = false;
       char buf[64];
@@ -1199,16 +1259,20 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
   reply(buf);
 }
 
-static void handle_qrun(char* mask_text) {
-  stop_sr00();
+// Arm the cursors `mask` selects at the head of their programs. `fill_only`
+// arms them for QFILL (queued, not started) rather than for QRUN.
+#define ARM_OK 0
+#define ARM_NO_CONFIG 1
+#define ARM_BAD_MASK 2
+#define ARM_NONE_SELECTED 3
+#define ARM_NO_PROGRAM 4
+
+static uint8_t arm_cursors(long mask, bool fill_only) {
   if (slot_count == 0) {
-    reply("ERR no config\n");
-    return;
+    return ARM_NO_CONFIG;
   }
-  long mask = mask_text ? atol(mask_text) : 1;
   if (mask <= 0 || mask > 0xff) {
-    reply("ERR QRUN mask=1..255\n");
-    return;
+    return ARM_BAD_MASK;
   }
 
   // A selected stepper with no program of its own walks the shared one, so the
@@ -1218,6 +1282,22 @@ static void handle_qrun(char* mask_text) {
   uint8_t runnable = 0;
   for (uint8_t i = 0; i < slot_count; i++) {
     struct qe_cursor* c = &slots[i].cur;
+    if (!fill_only && c->fill_only) {
+      // QFILL already put this stepper's commands in the queue, so QRUN only
+      // has to start them. Re-arming here would replay the program from its
+      // first segment into a queue that already holds it, and every one of
+      // those steps would come out twice.
+      c->fill_only = false;
+      // And nothing is added from here on: the run drains what QFILL put in and
+      // stops, so the queue depth at any later instant -- including at a stop --
+      // is the depth the board reported, not a race with the feeder.
+      c->no_topup = true;
+      if (mask & (1 << i)) {
+        selected++;
+        runnable++;
+      }
+      continue;
+    }
     memset(c, 0, sizeof(*c));
     if (!(mask & (1 << i))) {
       continue;
@@ -1229,15 +1309,44 @@ static void handle_qrun(char* mask_text) {
     c->seg = 0;
     c->left = c->list[0].steps ? c->list[0].steps : c->list[0].ticks;
     c->active = true;
+    c->fill_only = fill_only;
     selected++;
     runnable++;
   }
   if (selected == 0) {
-    reply("ERR QRUN mask selects no stepper\n");
-    return;
+    return ARM_NONE_SELECTED;
   }
   if (runnable == 0) {
-    reply("ERR no program\n");
+    return ARM_NO_PROGRAM;
+  }
+  return ARM_OK;
+}
+
+static void reply_arm_error(uint8_t code, const char* cmd) {
+  char buf[40];
+  switch (code) {
+    case ARM_NO_CONFIG:
+      reply("ERR no config\n");
+      break;
+    case ARM_BAD_MASK:
+      snprintf(buf, sizeof(buf), "ERR %s mask=1..255\n", cmd);
+      reply(buf);
+      break;
+    case ARM_NO_PROGRAM:
+      reply("ERR no program\n");
+      break;
+    default:
+      snprintf(buf, sizeof(buf), "ERR %s selects no stepper\n", cmd);
+      reply(buf);
+  }
+}
+
+static void handle_qrun(char* mask_text) {
+  stop_sr00();
+  long mask = mask_text ? atol(mask_text) : 1;
+  uint8_t rc = arm_cursors(mask, false);
+  if (rc != ARM_OK) {
+    reply_arm_error(rc, "QRUN");
     return;
   }
 
@@ -1245,6 +1354,73 @@ static void handle_qrun(char* mask_text) {
   done_announced = false;
   qe_pump();
   reply("OK QRUN\n");
+}
+
+// QFILL <mask> [entries] -- queue the program with start = false, as deep as
+// `entries` (default: the whole queue) and stop there. QRUN then starts exactly
+// what was filled.
+//
+// The alternative is what QRUN alone does: prefill half the queue and top it up
+// from the main loop. That leaves the queue depth at any given instant to a
+// race between the loop and the drain, so a scenario that stops mid-run
+// measures whatever the feeder happened to be ahead by -- which is how SR_29
+// came to report a step count after the marker that was a third of the queue
+// bound and said nothing about forceStop(). Filling first makes the depth at
+// the stop a number the DUT reports rather than one the host infers.
+//
+// The reply carries the depth actually reached, not the one requested: the
+// queue may be shorter than asked for (QUEUE_LEN is 16 on AVR and 32 on ESP32),
+// and QE_ROOM_RESERVE keeps entries free for a driver's DIR-drain pause. The
+// host asserts against the achieved depth, so a board that cannot hold the
+// requested one is characterized rather than failed.
+static void handle_qfill(char* mask_text, char* entries_text) {
+  stop_sr00();
+  long mask = mask_text ? atol(mask_text) : 1;
+  long want = entries_text ? atol(entries_text) : QUEUE_LEN;
+  if (want < 1 || want > QUEUE_LEN) {
+    reply("ERR QFILL entries=1..\n");
+    return;
+  }
+  uint8_t rc = arm_cursors(mask, true);
+  if (rc != ARM_OK) {
+    reply_arm_error(rc, "QFILL");
+    return;
+  }
+
+  // Filled here rather than left to the main loop, because the reply has to
+  // report the depth and the queue can only have drained since.
+  uint8_t depth = (uint8_t)want;
+  bool err = false;
+  uint8_t bad = 0;
+  AqeResultCode last = AqeResultCode::OK;
+  for (uint8_t i = 0; i < slot_count; i++) {
+    struct qe_cursor* c = &slots[i].cur;
+    if (!c->active || !c->fill_only) {
+      continue;
+    }
+    qe_feed(c, slots[i].stepper, (uint8_t)want, &err, &last);
+    if (err) {
+      c->active = false;
+      c->fill_only = false;
+      bad = i;
+      break;
+    }
+    uint8_t n = slots[i].stepper->queueEntries();
+    if (n < depth) {
+      depth = n;
+    }
+  }
+  if (err) {
+    char buf[48];
+    snprintf(buf, sizeof(buf), "ERR QE step%u rc=%d\n", (unsigned)bad,
+             (int)last);
+    reply(buf);
+    return;
+  }
+
+  char buf[32];
+  snprintf(buf, sizeof(buf), "OK QFILL q=%u\n", (unsigned)depth);
+  reply(buf);
 }
 
 static void handle_line(char* line) {
@@ -1300,6 +1476,8 @@ static void handle_line(char* line) {
                 n > 4 ? arg4 : NULL);
   } else if (!strcmp(cmd, "QRUN")) {
     handle_qrun(n > 1 ? arg1 : NULL);
+  } else if (!strcmp(cmd, "QFILL")) {
+    handle_qfill(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL);
   } else if (!strcmp(cmd, "POS")) {
     char buf[80];
     int len = snprintf(buf, sizeof(buf), "POS");
@@ -1319,15 +1497,13 @@ static void handle_line(char* line) {
     stop_sr00();
     mark_event();
     reply("OK STOP stopmove\n");
-  } else if (!strcmp(cmd, "ESTOP")) {
-    // forceStop(): stop adding, let the queue drain. The cursor goes too,
-    // because qe_feed() is this harness's planner and forceStop's own
-    // guarantee ("no further commands are added") would otherwise never be
-    // exercised.
-    emergency_stop();
+  } else if (!strcmp(cmd, "XSTOP")) {
+    // forceStopAndNewPosition(): stop adding *and* empty the queue. The only one
+    // of the three stops that the queued commands do not survive.
+    abort_queue();
     stop_sr00();
     mark_event();
-    reply("OK ESTOP forcestop\n");
+    reply("OK XSTOP abortqueue\n");
   } else {
     reply("ERR unknown\n");
   }

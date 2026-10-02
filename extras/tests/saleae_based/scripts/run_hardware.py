@@ -165,6 +165,21 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
                 if r.startswith("ERR"):
                     raise BoardError(f"QSEG {steps} {ticks} refused: {r}")
 
+        # Setup, before the capture and before the run. Both of these are
+        # *configuration* for the stop scenarios, and sending either after QRUN
+        # would put a serial round-trip between the start of the move and the
+        # stop -- which is what made a stop arrive after the move had already
+        # finished, and read as "the stop was never processed".
+        marker = None
+        if scenario in rt.SCENARIO_MARKERS:
+            chan_map, pin_map = rt.read_map(ser)
+            want = rt.marker_channel_for(len(chan_map),
+                                         pin_map.get("stride", 2))
+            if want is None:
+                raise BoardError("no channel is free for the stop marker")
+            send(ser, f"MARK {want}")
+            marker = rt.read_map(ser)[1].get("marker", -1)
+
         # The capture has to outlast the program, or a long phase reads as
         # "nothing after it" when it was still running.
         window = max(seconds, round(program_seconds(segments, info) * 2.5 + 1.0,
@@ -178,18 +193,31 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
              "--output", str(out_dir / f"{name}.sr")],
             stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         time.sleep(arm_delay)
+        # QFILL after the capture is armed, so a refusal is visible rather than
+        # leaving a run whose queue was never filled. QRUN then starts exactly
+        # what was filled, which is what makes the stop 1 ms later land on a
+        # known queue depth instead of on whatever the feeder had got through.
+        filled = 0
+        if scenario in rt.SCENARIO_FILL:
+            filled = rt.fill_queue(ser, mask)
+            if filled <= 0:
+                cap.kill()
+                raise BoardError("QFILL did not reach the queue")
         run_reply = send(ser, f"QRUN {mask}",
                          wait=1.5 if stop_after is None else stop_after)
         if stop_after is not None:
-            # STOP mid-run: the reply is the point of the test, so wait for it
-            # and record the position the board froze at.
-            run_reply += " | STOP -> " + send(ser, "STOP", wait=0.6)
+            # STOP mid-run: XSTOP for SR_30, STOP for SR_25 -- they assert
+            # opposite outcomes and sending the wrong one would test neither.
+            # The reply is the point of the test, so wait for it and record the
+            # position the board froze at.
+            run_reply += f" | {rt.SCENARIO_STOP[scenario]} -> " + \
+                send(ser, rt.SCENARIO_STOP[scenario], wait=0.6)
         _, cap_err = cap.communicate(timeout=120)
         if cap.returncode:
             raise BoardError(f"capture failed: {cap_err.strip()[:200]}")
         pos = send(ser, "POS")
         return out_dir / f"{name}.vcd", \
-            (run_reply if "ERR" in run_reply else pos)
+            (run_reply if "ERR" in run_reply else pos), marker, filled
     finally:
         ser.close()
 
@@ -202,21 +230,31 @@ def run_scenario(scenario, port=DEFAULT_PORT, driver=DEFAULT_DRIVER,
     info = vf.Dut().info()
     segments = rt.SCENARIOS[scenario][1](info)
     wire_cfg, channels, mask = wire_plan(scenario, dut_driver)
-    vcd, note = run_segments(
+    vcd, note, marker, filled = run_segments(
         segments, wire_cfg, channels, mask, scenario, info,
         port=port, driver=driver, out_dir=out_dir, seconds=seconds, rate=rate,
         capture_script=capture_script,
         arm_delay=ARM_DELAY.get(scenario, 2.5),
-        stop_after=rt.STOP_AFTER.get(scenario), scenario=scenario)
-    return vcd, note
+        stop_after=rt.stop_after_for(scenario, segments, info),
+        scenario=scenario)
+    return vcd, note, marker, filled
 
 
-def judge(scenario, vcd):
-    """Evaluate a capture with the scenario's own evaluator."""
+def judge(scenario, vcd, marker=None, queue_filled=0):
+    """Evaluate a capture with the scenario's own evaluator.
+
+    `marker` and `queue_filled` are what the run asked the board for: which
+    channel carries the stop marker, and how deep QFILL reached. The evaluator
+    needs both -- without the marker it reports "no marker edge" and declines to
+    judge, and without the fill it has only the requested depth to reason from.
+    """
     info = vf.Dut().info()
+    if queue_filled:
+        info["queue_filled_entries"] = queue_filled
     segments = rt.SCENARIOS[scenario][1](info)
     channels, rate = sp.load_vcd(vcd)
-    ok, detail = rt.evaluate(scenario, channels, rate, segments, info)
+    ok, detail = rt.evaluate(scenario, channels, rate, segments, info,
+                             extra=marker)
     return ok, detail, channels, rate
 
 
@@ -270,7 +308,8 @@ def build_result(scenario, vcd, ok, detail, channels, rate, arch, out_dir,
         "pass": bool(ok),
         "evaluator_detail": detail,
         "measurements": per_stepper,
-        "stop_after_s": rt.STOP_AFTER.get(scenario),
+        "stop_after_s": rt.stop_after_for(
+            scenario, rt.SCENARIOS[scenario][1](info), info),
     }
 
 
@@ -312,7 +351,8 @@ def main():
     if args.list:
         for sid in scenario_ids():
             cfg, _b, mask, desc = rt.SCENARIOS[sid]
-            extra = (f" (host issues STOP at {rt.STOP_AFTER[sid]} s)"
+            extra = (f" (host issues {rt.SCENARIO_STOP[sid]} a quarter of "
+                     f"the way into the fill)"
                      if sid in rt.STOP_AFTER else "")
             print(f"{sid}  {cfg:16} mask={mask}  "
                   f"{rt.driver_tag(cfg, args.dut_driver):22} {desc}{extra}")
@@ -327,7 +367,7 @@ def main():
     failed = []
     for scenario in todo:
         try:
-            vcd, note = run_scenario(
+            vcd, note, marker, filled = run_scenario(
                 scenario, port=args.port, driver=args.driver,
                 out_dir=args.out, seconds=args.seconds,
                 rate=args.sample_rate, dut_driver=args.dut_driver)
@@ -335,7 +375,7 @@ def main():
             print(f"{scenario:9} {'ERROR':10} {exc}")
             failed.append(scenario)
             continue
-        ok, detail, channels, rate = judge(scenario, vcd)
+        ok, detail, channels, rate = judge(scenario, vcd, marker, filled)
         if args.results:
             result = build_result(scenario, vcd, ok, detail, channels, rate,
                                   args.arch, args.out, args.dut_driver)

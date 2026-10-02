@@ -522,7 +522,9 @@ def as_scenarios():
         cfg, builder, mask, desc = rt.SCENARIOS[scenario]
         extra = ""
         if scenario in rt.STOP_AFTER:
-            extra = f" (host issues STOP at {rt.STOP_AFTER[scenario]} s)"
+            extra = (" (host issues "
+                     f"{rt.SCENARIO_STOP.get(scenario, 'STOP')} a quarter of "
+                     "the way into the fill)")
         out.append(f"| {scenario} | {cfg} | {mask} | {desc}{extra} |")
     return "\n".join(out)
 

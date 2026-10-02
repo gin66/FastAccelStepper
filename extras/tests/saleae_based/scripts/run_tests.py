@@ -55,7 +55,10 @@ import analyze_csv  # noqa: E402
 import capture as cap  # noqa: E402
 import signal_parser as sp  # noqa: E402
 
-ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 30)]
+# SR_01..SR_29 are the implemented catalogue plus SR_00; the range is the
+# catalogue's numbering, and every id in it that SCENARIOS does not define is
+# reported "not implemented" rather than silently missing.
+ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 31)]
 
 # Analyzer channel -> stepper, derived from what the DUT reports in MAP rather
 # than assumed here.
@@ -205,6 +208,35 @@ MAX_STEPPERS_PER_MODE = {
 # few us wide at 16 MHz (see README).
 DEFAULT_RATE = 4_000_000
 
+# How deep QFILL is asked to fill the queue, in entries, and how many queue-fulls
+# of steps the stop scenarios run on top of that.
+#
+# 16 entries, fixed rather than taken from QINFO's QUEUE_LEN, so the waveform is
+# the same on every board: QUEUE_LEN is 16 on AVR and 32 on ESP32 and Pico, and
+# a scenario whose fill depth is a board constant characterizes the board as much
+# as the stop. 16 * 255 = 4080 steps, which is a whole queue on AVR and half of
+# one on ESP32 -- enough that a driver which emits a different number says so.
+QUEUE_FILL_ENTRIES = 16
+QUEUE_FILL_STEPS = QUEUE_FILL_ENTRIES * 255
+# Four times the fill, so a forceStop() that stopped nothing emits three quarters
+# of the program and truncation cannot be mistaken for a capture that ended.
+# Four segments is within QE_MAX_SEG (8) and comes to ~80 ms at the speed floor
+# of a 16 MHz tick, so the capture window stays close to the one SR_25 has used.
+QUEUE_FILL_ROUNDS = 4
+
+# What elapses between the capture being armed and QRUN being written: the arm
+# sleep, plus one serial round-trip per setup command after the capture starts
+# (QFILL, for the scenarios that fill). The capture has to cover that as well as
+# the program, or the program is cut off by the end of the recording and the
+# scenario measures the capture rather than the driver.
+#
+# It did. SR_25 measured 12007 of 16320 steps with the last pulse on the final
+# sample of the recording: the run started 0.54 s into a 0.66 s window because
+# the 0.3 s arm sleep and QFILL's round-trip are inside it, and only ~0.11 s was
+# left of a 0.163 s program. `truncated_by_stop` read true and the whole run
+# looked like a stop that had worked.
+SETUP_AFTER_CAPTURE_S = 0.3 + 0.25
+
 
 # ---------------------------------------------------------------------------
 # Serial
@@ -269,6 +301,10 @@ MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)"
 # different field as each driver on each target.
 DRIVERS_RE = re.compile(r"OK DRIVERS\s+mux=(\d)(.*?)(?:\s+mux_init=(\d))?\s*$",
                         re.M)
+# "OK QFILL q=14" -- the queue depth the board actually reached, which is not
+# necessarily the one asked for: QUEUE_LEN is 16 on AVR and 32 on ESP32, and the
+# firmware keeps QE_ROOM_RESERVE entries free for a driver's DIR-drain pause.
+QFILL_RE = re.compile(r"OK QFILL q=(\d+)")
 
 
 def read_drivers(ser):
@@ -382,7 +418,7 @@ def read_qinfo(ser):
 # and then inferring when it landed from "the pulses ceased" cannot work on this
 # rig: the capture the host requests is not the capture it gets (24 MHz
 # truncates 0.7 s to ~458 ms), so a quiet tail is not evidence of a stop.
-SCENARIO_MARKERS = {"SR_25", "SR_29"}
+SCENARIO_MARKERS = {"SR_25", "SR_30"}
 
 
 def marker_channel_for(count, stride, channels=8):
@@ -401,27 +437,31 @@ def marker_channel_for(count, stride, channels=8):
 
 
 def stop_after_for(scenario, segments, info):
-    """When to issue STOP, in seconds after QRUN, or None.
+    """When to issue the stop, in seconds after QRUN, or None.
 
-    Derived from the program's own duration rather than a fixed constant,
-    because a fixed one silently stops testing anything on a fast driver. The
-    feeder runs far ahead of the driver: `stop_all()` cancels queue *filling*
-    (it zeroes the stepper's cursor and calls clear_programs()) while commands
-    already in the queue still emit, since stopMove() only sets a flag the next
-    command consults. So the useful window is "after some output has appeared,
-    before the whole program is queued".
+    A fraction of the *fill's* duration, derived from the DUT's own tick rate and
+    period -- not a wall-clock constant. The queue is filled before the start and
+    nothing is added after it, so the run is exactly `QUEUE_FILL_STEPS` steps
+    long whatever the program behind it says, and the stop has one requirement:
+    land inside that. A fixed 1 ms met it on two of three drivers and not on the
+    third -- i2s_direct takes longer than that to produce its first step, being a
+    DMA stream rather than a per-entry compare, and its marker edge came 16 us
+    *before* the first pulse. The scenario then measured a stop that interrupted
+    nothing, which the `stop_interrupted_the_run` guard rejected.
 
-    A fixed 0.15 s sat outside that window on any driver whose move was shorter,
-    and equally on one fast enough for the feeder to have queued all 20000 steps
-    by then. A quarter of the run is inside it by construction.
+    Scaled, the same delay is ~10 ms on this DUT: 25% into a 40.8 ms fill, about
+    a thousand steps in, and far outside any driver's start latency. Scaling is
+    also what makes it portable -- 1 ms is 200 steps at 5 us and 25 at 40 us, so
+    a constant tuned on one driver is a different depth on the next.
 
     The floor exists because a stop issued in the same instant as QRUN can land
     before the move starts, which measures nothing at all.
     """
     if scenario not in STOP_AFTER:
         return None
-    duration = scenario_seconds(segments, info["ticks_per_s"])
-    return max(STOP_AFTER_MIN, min(STOP_AFTER[scenario], duration * 0.25))
+    fill_s = (QUEUE_FILL_STEPS * segments[0][1]
+              / float(info["ticks_per_s"]))
+    return max(STOP_AFTER_MIN, fill_s * STOP_AFTER[scenario])
 
 
 # The scenarios whose subject IS a queue rejection. SR_13 programs a command
@@ -500,6 +540,25 @@ def program_per_stepper(ser, programs, info=None):
                 print(f"    {line} rejected")
                 return False
     return True
+
+
+# Scenarios that must know what the queue holds when the stop lands, so the
+# board fills it deliberately (QFILL, start = false) before QRUN instead of
+# leaving the depth to the feeder.
+SCENARIO_FILL = {"SR_25", "SR_30"}
+
+
+def fill_queue(ser, mask, entries=QUEUE_FILL_ENTRIES):
+    """QFILL the queue and return the depth the board reached, or 0.
+
+    The depth reached is not the depth asked for: QUEUE_LEN is 16 on AVR and 32
+    on ESP32, and the firmware keeps two entries free for a driver's DIR-drain
+    pause, so a request for 16 can only be met in full on some boards. The
+    number is the board's, and the evaluator bounds the drain with it rather
+    than with a host-side assumption.
+    """
+    m = QFILL_RE.search(reply_of(ser, f"QFILL {mask} {entries}"))
+    return int(m.group(1)) if m else 0
 
 
 # ---------------------------------------------------------------------------
@@ -662,18 +721,26 @@ def sc_sync_independent_speeds(info):
 
 
 def sc_emergency_stop(info):
-    """SR_25: long enough that STOP lands mid-run with room to spare.
+    """SR_25/SR_30: a stop 1 ms into a run whose queue was filled before it.
 
-    The move has to outlast the pulse queue. Measured: stopMove() only sets a
-    flag that the ramp generator consults when asked for its *next* command, so
-    a move already sitting in the queue runs to completion regardless. A 2000
-    step move at 4000 ticks stopped at 510 and finished at 2000 -- no effect at
-    all. The same stop on a 20000 step move at 640 ticks left 14240 of 20000
-    done, i.e. it truncated only once the queue had to refill. So this scenario
-    uses a move far larger than the queue, and that overshoot is what makes it a
-    test of stopping rather than of queue drain.
+    Two things make the measurement well defined, and neither of them was true
+    of the 20000-step program this replaces.
+
+    The queue is filled to a *reported* depth by QFILL before QRUN, with
+    start = false, and the stop lands 1 ms later. So the steps that can follow
+    the marker are the ones the board said it was holding, rather than whatever
+    the feeder had got through in a quarter of a 20000-step program. Measured on
+    rmt_v2 before this change: 7464 steps after the marker against a bound of
+    8160, close enough to the queue's whole capacity that the number described
+    the feeder rather than forceStop().
+
+    The program is four segments of 4080 steps -- 16320 of them, four times the
+    fill. That is what leaves room for the two opposite outcomes to be opposite:
+    a forceStop() that stopped nothing emits nearly all of it, and one that
+    stopped adding cannot exceed the queue's capacity however long it is left.
     """
-    return [(20000, legal_ticks(info, 20000, info["max_speed_ticks"]), True)]
+    t = legal_ticks(info, QUEUE_FILL_STEPS, info["max_speed_ticks"])
+    return [(QUEUE_FILL_STEPS, t, True)] * QUEUE_FILL_ROUNDS
 
 
 def sc_rmt_buffer_split(info):
@@ -1169,14 +1236,16 @@ SCENARIOS = {
     "SR_21": ("1ch", sc_rmt_buffer_split, 1,
               "long RMT run: no gap at a buffer split"),
     "SR_23": ("i2s", sc_i2s_timing, 1, "I2S step output timing"),
-    # SR_28 is the emergency stop, and it is a *different scenario* rather than a
-    # flag on SR_25 because the two have opposite expected outcomes: stopMove()
-    # must not truncate, forceStop() must.
-    "SR_29": ("1ch", sc_emergency_stop, 1,
-              "ESTOP mid-run: queue drains, nothing further is added"),
     "SR_26": ("1ch", sc_pause_ticks_max, 1,
               "pause of exactly 65535 ticks (16-bit pause field)"),
-    "SR_25": ("1ch", sc_emergency_stop, 1, "STOP mid-run: pulses cease"),
+    "SR_25": ("1ch", sc_emergency_stop, 1,
+              "STOP a quarter into the fill: it still drains"),
+    # The only stop with an observable effect on this harness, and therefore the
+    # only stop scenario there is. `forceStopAndNewPosition()` empties the ring,
+    # so whatever a driver had already handed to its hardware keeps stepping and
+    # the rest never runs -- and that count is what tells the drivers apart.
+    "SR_30": ("1ch", sc_emergency_stop, 1,
+              "XSTOP a quarter into the fill: it is discarded"),
     # ESP32 MCPWM/PCNT only; the overrun needs the PCNT high-limit re-arm.
     "SR_18": ("mcpwm", sc_mcpwm_overrun_after_255, 1,
               "255 steps, gap, exactly 1 (PCNT limit re-arm)"),
@@ -1672,16 +1741,26 @@ def eval_independent_speeds(channels, rate, segments, info, pins):
     return ok and len(detail) >= 2, detail
 
 
+def requested_steps(segments):
+    """Steps the program asks for in total.
+
+    Not `segments[0][0]`: the stop scenarios program four identical segments, and
+    reading the first would compare 16320 emitted steps against 4080 requested
+    ones and call a complete run a four-fold oversupply.
+    """
+    return sum(steps for steps, _, _ in segments)
+
+
 def eval_stop_move_contract(channels, rate, segments, info, pins,
                            marker_channel=None):
     """SR_25: `stopMove()` must NOT truncate already-queued motion.
 
-    This is the opposite assertion to SR_28's, and it is the reason the two are
+    This is the opposite assertion to SR_30's, and it is the reason the two are
     separate scenarios rather than one with a flag. `stopMove()` only sets a
     flag for the ramp generator to consult when it asks for its *next* command;
     motion already in the queue is meant to run to completion. A harness that
-    called it, then reported "the stop was ignored" when all 20000 steps came
-    out, would be calling the documented behaviour a defect.
+    called it, then reported "the stop was ignored" when every step came out,
+    would be calling the documented behaviour a defect.
 
     Earlier this scenario asserted the reverse -- that steps cease -- because the
     harness's STOP was a conflation: `stopMove()` *plus* zeroing the feeder
@@ -1692,92 +1771,141 @@ def eval_stop_move_contract(channels, rate, segments, info, pins,
 
     So the measurement here is that *nothing* was cut, witnessed on the marker
     channel rather than inferred from where the pulses ended.
+
+    The expectation is the fill, not the program. QFILL queues `filled` entries
+    and QRUN adds nothing afterwards, so the run is exactly `filled * 255` steps
+    however long the program behind it is, and a stopMove() that truncated
+    anything would leave a shortfall of whole entries that nothing else
+    explains. Four queue-fills of program are still programmed: a run *longer*
+    than the fill is then the detectable defect -- something queued after the
+    start -- rather than something the harness has to be trusted not to have
+    done.
     """
     ch = channels["D0"]
     m = sp.channel_metrics(ch, rate)
     t = segments[0][1]
     period = sp.period_defects(m.inter_step_us, t * 1e6 / info["ticks_per_s"])
     steps = sp.rising_edges(ch)
-    requested = segments[0][0]
+    requested = requested_steps(segments)
+    filled = info.get("queue_filled_entries", 0)
 
     base = {"requested_steps": requested, "steps_measured": len(steps),
-            "steps": sp.step_count_defects(m.step_count, requested),
-            "period": period}
+            "steps": sp.step_count_defects(m.step_count, len(steps)),
+            "period": period,
+            # The depth QFILL reported, which is the whole run: QRUN on a filled
+            # queue adds nothing after the start.
+            "queue_filled_entries": filled}
     marker_at = _marker_edge(channels, rate, marker_channel)
     if marker_at is None:
         base["stop_measured"] = False
         base["reason"] = "no marker edge: the stop instant is not on the waveform"
         return False, base
     after = [i for i in steps if i > marker_at]
+    before = len(steps) - len(after)
+    # The whole run is the fill, and everything the marker interrupted came out
+    # of it. One entry of slack below, for a driver that drops the entry a stop
+    # landed inside.
+    fill = filled * 255
+    floor = max(0, fill - before - 255)
+    # Same guard as SR_30: a marker ahead of the first pulse did not interrupt
+    # anything, and a run that totals the fill without being interrupted is not
+    # a measurement of stopMove().
+    interrupted = 0 < before < fill and len(after) > 0
     base.update({"stop_measured": True, "marker_channel": marker_channel,
+                 "steps_before_stop": before,
                  "steps_after_stop": len(after),
-                 "not_truncated": len(steps) >= requested})
-    ok = (base["steps"]["ok"] and period["ok"] and len(steps) >= requested)
+                 "filled_steps": fill,
+                 # Nothing was cut: the queue drained, and the run is the fill.
+                 "not_truncated": len(steps) >= fill,
+                 # Reported: the marker interrupted the queue, and this is what
+                 # was still in it at that instant.
+                 "queued_at_stop_estimate": max(0, fill - before),
+                 # And nothing beyond it: anything more was queued after the
+                 # start, which stopMove() does not permit either.
+                 "nothing_added_after_start": len(steps) <= fill})
+    base["stop_interrupted_the_run"] = interrupted
+    ok = (period["ok"] and interrupted and len(steps) >= floor
+          and len(steps) <= fill
+          and len(after) >= max(0, fill - before - 255))
     return ok, base
 
 
-def eval_emergency_stop(channels, rate, segments, info, pins,
-                       marker_channel=None):
-    """SR_28: `forceStop()` stops *adding*, and the queue drains.
+# How many steps may follow the marker before the queue counts as discarded.
+# Two entries: the one the driver was executing when the stop landed, plus one it
+# may already have handed to its hardware. Anything beyond that is a driver
+# stepping commands nothing can reach any more, and it is the number that tells
+# the drivers apart -- mcpwm_pcnt programs the next compare per entry, so it has
+# nothing in flight, while a driver with its own transmit buffer can.
+ABORT_TAIL_ENTRIES = 2
 
-    The counterpart to SR_25. `forceStop()` sets `ignore_commands`, so nothing
-    further is added to the queue; what is already queued still runs, and the
-    header puts that at about 20 ms. This harness is the planner that adds the
-    commands, so its feeder is stopped too -- otherwise forceStop()'s own
-    guarantee would never be exercised by anything.
 
-    The criterion is a *bound*, not zero: the queue holds QUEUE_LEN entries of at
-    most 255 steps, so at most `queue_len * 255` steps can follow the marker.
-    Demanding zero would be demanding a behaviour this library does not have --
-    that is `forceStopAndNewPosition()`, which aborts the queue outright and is a
-    third thing again.
+def eval_abort_queue(channels, rate, segments, info, pins, marker_channel=None):
+    """SR_30: `forceStopAndNewPosition()` empties the queue.
 
-    What makes this measurable at all is the marker channel. Without it the only
-    available inference was "the pulses stopped", and the capture this rig
-    delivers is not the capture it requests (24 MHz truncates), so that
-    inference could not tell a stop from the recording ending.
+    The third stop, and the only one whose waveform differs from the other two.
+    `stopMove()` (SR_25) leaves the queue to drain, 4080 of 4080 steps. This one
+    calls `q->forceStop()`, which
+    per driver stops the timer or channel and does `read_idx = next_write_idx`,
+    so the queued commands never run at all.
+
+    That makes it the scenario that can rank drivers. What may still follow the
+    marker is whatever each driver had already taken out of the queue: for
+    mcpwm_pcnt, which re-arms the compare per entry, that is at most the entry in
+    progress. A driver with a hardware transmit buffer can be further ahead, and
+    the count is the measurement rather than a pass/fail about the stop.
+
+    The gate is deliberately the same shape as SR_25's, mirrored: the run started
+    (`0 < steps_before_stop`), it stopped short of the fill -- otherwise nothing
+    was discarded -- and the tail is within `ABORT_TAIL_ENTRIES`.
     """
     ch = channels["D0"]
     m = sp.channel_metrics(ch, rate)
     t = segments[0][1]
     period = sp.period_defects(m.inter_step_us, t * 1e6 / info["ticks_per_s"])
     steps = sp.rising_edges(ch)
-    requested = segments[0][0]
+    requested = requested_steps(segments)
+    filled = info.get("queue_filled_entries", 0)
+    fill = filled * 255
 
     edges = sp.detect_edges(ch)
     starts = [i for i, level in edges if level == 1]
     ends = [i for i, level in edges if level == 0]
     unterminated = 1 if starts and (not ends or starts[-1] > ends[-1]) else 0
 
-    bound = info.get("queue_len", 32) * 255
+    tail_bound = ABORT_TAIL_ENTRIES * 255
     marker_at = _marker_edge(channels, rate, marker_channel)
     base = {"requested_steps": requested, "steps_measured": len(steps),
-            "unterminated_pulses": unterminated, "queue_bound_steps": bound,
+            "unterminated_pulses": unterminated, "queue_filled_entries": filled,
+            "filled_steps": fill, "abort_tail_bound_steps": tail_bound,
             "period": period,
             "steps": sp.step_count_defects(m.step_count, len(steps))}
-
     if marker_at is None:
-        base.update({"stop_measured": False, "drain_within_queue": False,
+        base.update({"stop_measured": False, "queue_discarded": False,
                      "reason": "no marker edge: the stop instant is not on the "
-                               "waveform, so a drain cannot be separated from "
+                               "waveform, so an abort cannot be separated from "
                                "the capture simply ending"})
         return False, base
 
     after = [i for i in steps if i > marker_at]
+    before = len(steps) - len(after)
     last = steps[-1] if steps else None
+    interrupted = 0 < before < fill
     base.update({
         "stop_measured": True,
         "marker_channel": marker_channel,
+        "steps_before_stop": before,
+        # The measurement: what the driver still emitted after the queue was
+        # emptied. Small, and how small is the driver's own answer.
         "steps_after_stop": len(after),
+        "tail_entries": round(len(after) / 255, 2),
         "stop_to_last_step_us": round((last - marker_at) / rate * 1e6, 3)
         if last is not None and last > marker_at else 0.0,
-        "drain_within_queue": len(after) <= bound,
-        # Truncated by the stop rather than by the recording running out: the
-        # whole program did not come out.
-        "truncated_by_stop": len(steps) < requested,
+        "stop_interrupted_the_run": interrupted,
+        # The queue was discarded: the run stopped short of what was filled.
+        "queue_discarded": interrupted and len(steps) < fill,
     })
-    ok = (period["ok"] and not unterminated and len(after) <= bound
-          and len(steps) < requested)
+    ok = (period["ok"] and not unterminated and interrupted
+          and len(steps) < fill and len(after) <= tail_bound)
     return ok, base
 
 
@@ -1926,16 +2054,31 @@ def eval_sync_start(channels, rate, segments, info, pins):
 # to wait after QRUN before issuing STOP. Everything else runs untouched to
 # completion. Kept out of the SCENARIOS tuple so the four-field shape every
 # other scenario uses stays uniform.
-# Scenario -> the longest the host will wait after QRUN before issuing STOP.
-# The actual wait is stop_after_for(): this is an upper bound, and the program's
-# own duration is what normally decides.
 # Scenario -> the command issued after the run has started. STOP is the
 # library's `stopMove()`, whose contract is that it must NOT truncate queued
-# motion; ESTOP is `forceStop()`, whose contract is that nothing further is added.
-SCENARIO_STOP = {"SR_25": "STOP", "SR_29": "ESTOP"}
-STOP_AFTER = {"SR_25": 0.15, "SR_29": 0.15}
-# ...and never less than this, or the stop can precede the start.
-STOP_AFTER_MIN = 0.01
+# motion; XSTOP is `forceStopAndNewPosition()`, which empties the queue.
+#
+# `forceStop()` is deliberately absent: on a queue this harness fills itself and
+# then stops feeding, it is a no-op. Its only effect is `ignore_commands = true`,
+# which refuses *later* addQueueEntry() calls, and by construction there are none
+# -- so a scenario for it could not fail. `stopMove()` is weaker still: it sets
+# a flag the ramp generator consults for its *next* command, and this harness
+# drives addQueueEntry() directly and never runs one.
+SCENARIO_STOP = {"SR_25": "STOP", "SR_30": "XSTOP"}
+# Scenario -> how long after QRUN the stop is issued, in seconds.
+#
+# A stop a quarter of the way into the run -- the earlier rule -- measures the
+# queue only if the feeder is still filling at that point, and that is a race
+# between the host's serial loop and the driver's drain rather than a property
+# of the stop. Measured on rmt_v2: 7464 steps after the marker against a bound of
+# 8160, from a 20000-step program the feeder was still working through. The same
+# program with the stop 1 ms in leaves the queue as QFILL put it, so what the
+# marker bounds is a queue state the board itself reported.
+# Scenario -> where in the fill's duration the stop is issued, as a fraction.
+# See stop_after_for() for why this is scaled rather than a constant.
+STOP_AFTER = {"SR_25": 0.25, "SR_30": 0.25}
+# ...and never sooner than this, or the stop can precede the start.
+STOP_AFTER_MIN = 0.001
 
 EVALUATORS = {
     "SR_01": eval_period_exact,
@@ -1959,7 +2102,7 @@ EVALUATORS = {
     "SR_21": eval_period_exact,
     "SR_23": eval_period_exact,
     "SR_26": eval_pause,
-    "SR_29": eval_emergency_stop,
+    "SR_30": eval_abort_queue,
     "SR_25": eval_stop_move_contract,
     "SR_18": eval_counts_and_gap,
     "SR_19": eval_counts_and_gap,
@@ -2071,13 +2214,38 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         elif not program(ser, segments, check):
             return "failed", {"error": "QSEG rejected", "segments": segments}
 
-        seconds = scenario_seconds(segments, info["ticks_per_s"]) + 0.5
+        seconds = scenario_seconds(segments, info["ticks_per_s"]) \
+            + (SETUP_AFTER_CAPTURE_S if scenario in SCENARIO_FILL else 0.0) \
+            + 0.5
         rate = args.sample_rate
         capture_file = Path(args.capture_dir) / f"{name}_{tag_key}.sr"
 
         proc = start_capture(capture_file, seconds, rate)
         time.sleep(0.3)  # let sigrok-cli start sampling
-        send_line(ser, f"QRUN {mask}")
+        # Fill the queue before the run, for the scenarios that stop into it.
+        # QFILL goes here rather than with the rest of the setup because it is
+        # what makes the start deterministic: QRUN alone prefills half a queue
+        # and tops it up from the main loop, so the depth a millisecond later is
+        # a race between the loop and the drain. Sent after the capture is
+        # running, so a refusal is inside the capture rather than a silent gap.
+        if scenario in SCENARIO_FILL:
+            filled = fill_queue(ser, mask)
+            if filled <= 0:
+                proc.kill()
+                return "error", {"error": "QFILL did not reach the queue",
+                                 "requested_entries": QUEUE_FILL_ENTRIES,
+                                 "reply": drain(ser, 0.2).strip()}
+            info["queue_filled_entries"] = filled
+        # settle=0 on both lines below, and the reason is the whole point of the
+        # scenario. `send_line` sleeps 50 ms *after* writing, so with the default
+        # the stop was written 51 ms after QRUN and the marker landed on step
+        # 5610 of a 10 us program -- 56 ms in, not the 1 ms the scenario asks
+        # for, by which time the feeder had replaced most of the filled queue.
+        # Measured, not inferred: that run reported 5596 steps before the marker
+        # against a fill of 4080. run_hardware's `send()` waits *after* the write
+        # and so never had this problem; the two disagreed by 50x on when the
+        # stop landed.
+        send_line(ser, f"QRUN {mask}", settle=0.0)
         # STOP, for the scenarios whose subject is stopping.
         #
         # This was missing entirely from measure(): the only STOP in this file
@@ -2090,7 +2258,7 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         stop_after = stop_after_for(scenario, segments, info)
         if stop_after:
             time.sleep(stop_after)
-            send_line(ser, SCENARIO_STOP.get(scenario, "STOP"))
+            send_line(ser, SCENARIO_STOP.get(scenario, "STOP"), settle=0.0)
         proc.wait()
         replies = drain(ser, 0.4)
         # SR_13 is excluded because the rejection is its *subject*: it exists to
@@ -2415,9 +2583,9 @@ def main():
 
 if __name__ == "__main__":
     sys.exit(main())
-# Scenarios that deliberately send the same waveform and assert opposite
-# outcomes. SR_25 sends `stopMove()` and SR_28 sends `forceStop()` over the same
-# program: the contract is that the first must NOT truncate queued motion and the
-# second must. Keeping them apart is what makes each assertion meaningful -- a
-# single scenario with a flag would be asserting half a contract.
-CONTRASTING_PAIRS = {frozenset(("SR_25", "SR_29"))}
+# Scenarios that deliberately send the same waveform. SR_25 (`stopMove()`) and
+# SR_30 (`forceStopAndNewPosition()`) program the same fill and stop it at the
+# same instant; what separates them is the outcome, and it is a real one:
+# measured 4080 of 4080 steps after the marker for the first and 0 for the
+# second on rmt_v2 and mcpwm_pcnt, 67 for i2s_direct.
+CONTRASTING_PAIRS = {frozenset(("SR_25", "SR_30"))}
