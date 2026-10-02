@@ -192,8 +192,9 @@ fail.
    - [x] the white paper's SR_13 error text (`ERR QE ticks … < maxspeed …`)
          does not match the firmware, which emits `ERR QE step0 rc=-1`
          (ErrorTicksTooLow). Worth correcting in the paper.
-   - [ ] SR_14 / SR_16 (synchronized start, multi-stepper timing impact)
-   - [ ] SR_17 cross-driver (ESP32 only)
+   - [x] SR_14 / SR_16 / SR_17 all implemented and run on hardware; see the
+         entries further down. (These two boxes were stale: the work landed in
+         `d564b204` but the checklist was never ticked.)
    - [x] **SR_18–SR_20 MCPWM/PCNT overrun — no defect found.** Wired the three
          scenarios plus `eval_counts_and_gap`, and ran them on the ESP32 on the
          MCPWM/PCNT driver. SR_18 measured 256/256 steps with the phase
@@ -214,6 +215,24 @@ fail.
          irregular gap at a hardware buffer split): 200/200, zero gaps outside
          tolerance. SR_23 (I2S, whose timing comes from a DMA-fed sample stream
          rather than a compare register): 64/64 at 39.96–40.0 us.
+   - [x] **SR_15 implemented by extending the protocol, not by hardcoding it
+         into the firmware.** It needs two steppers at *different* periods, and
+         `QSEG <steps> <ticks> <dir>` appended to one shared `program[]` that
+         `qe_feed` walked for every slot -- so both steppers necessarily got
+         identical steps, ticks and direction. A firmware-resident test sequence
+         would have fixed SR_15's parameters in silicon and lost the ability to
+         sweep them, so the protocol grew instead:
+         `QSEG <idx> <steps> <ticks> <dir>` targets one stepper's own program.
+         The two forms differ in argument count, so no existing command can be
+         misread as the other, and a stepper with its own program ignores the
+         shared one. **Measured: A at 640 ticks = 39.9661 us, B at 1280 ticks =
+         79.9326 us, 200/200 each, first-step skew 27.0417 us** -- the arm
+         stayed aligned while each stepper kept its own speed, which is the
+         whole point. The skew is reported, not gated, as with SR_14 and SR_17.
+         **Cost: +110 bytes of RAM on AVR** (1481 -> 1591 of 2048, 77.7% used)
+         for the per-stepper segment matrix. The only cost that mattered, and it
+         fits. **All 25 scenarios re-run after the change: 25/25 pass**, so the
+         shared-program path is unregressed.
    - [x] **SR_22 not applicable here.** RMT V2 fill-encoder output needs a chip
          with RMT V2; this ESP32 has V1. Nothing to measure, so it is left
          unwired rather than wired to a config that cannot exist.

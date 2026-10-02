@@ -232,6 +232,7 @@ SCENARIO_BUILDERS = {
     "SR_14": rt.sc_sync_start,
     "SR_16": rt.sc_multi_stepper_timing,
     "SR_17": rt.sc_sync_cross_driver,
+    "SR_15": rt.sc_sync_independent_speeds,
     "SR_21": rt.sc_rmt_buffer_split,
     "SR_23": rt.sc_i2s_timing,
     "SR_25": rt.sc_emergency_stop,
@@ -643,6 +644,40 @@ FIXTURES.append(Fixture(
     fault="second stepper period wrong",
     expect_detail="per_stepper",
     extra={"D2": _s16_b, "D3": [(0, 1)]}))
+
+# SR_15: stepper A on D0/D1 at its own ticks, stepper B on D2/D3 at twice them.
+# The evaluator checks each against *its* expected period, so a capture where
+# both steppers ran at the same speed must fail -- that is the defect SR_15
+# exists to catch, and it cannot be expressed with the shared program.
+_per15 = rt.per_stepper_programs("SR_15", _DUT.info())
+_a15 = render(_per15[0])[0]
+_b15 = render(_per15[1])[0]
+# The same cross-driver offset SR_17 measured, in ticks: ticks, not samples.
+_s15_skew = round(29.583 * _DUT.info()["ticks_per_s"] / 1e6)
+FIXTURES.append(Fixture(
+    name="good_independent_speeds", scenario="SR_15",
+    why="both steppers start together, then each keeps its own period",
+    step=_a15, dirs=[(0, 1)], expect_pass=True,
+    expect_measurement=round(_s15_skew * 1e6 / _DUT.info()["ticks_per_s"], 4),
+    measurement_key="first_step_skew_us",
+    extra={"D2": [(t + _s15_skew, v) for t, v in _b15], "D3": [(0, 1)]}))
+
+# B collapsed onto A's period: the arm aligned and both steppers stepped, which
+# is exactly the wrong answer and the only way this scenario can fail.
+FIXTURES.append(Fixture(
+    name="bad_independent_speeds_collapsed", scenario="SR_15",
+    why="both steppers ran at A's period instead of their own",
+    step=_a15, dirs=[(0, 1)], expect_pass=False, expect_detail="B",
+    fault="stepper B's period is A's, not its own",
+    extra={"D2": _a15, "D3": [(0, 1)]}))
+
+# B missing half its steps: independent period, wrong count.
+FIXTURES.append(Fixture(
+    name="bad_independent_speeds_lost_steps", scenario="SR_15",
+    why="stepper B dropped steps while keeping its own period",
+    step=_a15, dirs=[(0, 1)], expect_pass=False, expect_detail="B",
+    fault="stepper B lost steps",
+    extra={"D2": _b15[:-2 * 40], "D3": [(0, 1)]}))
 
 # SR_21/23/26 need no bespoke construction: the renderer already produces a
 # correct waveform from the builder's own segments, which is the point -- these

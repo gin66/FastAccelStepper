@@ -126,7 +126,7 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
                  port=DEFAULT_PORT, driver=DEFAULT_DRIVER,
                  out_dir=DEFAULT_OUT, seconds=DEFAULT_SECONDS,
                  rate=DEFAULT_RATE, capture_script=None, arm_delay=2.5,
-                 stop_after=None):
+                 stop_after=None, scenario=None):
     """Send an arbitrary segment program to a cold board and capture it.
 
     The sweep uses this rather than run_scenario: a sweep point is not a named
@@ -144,10 +144,26 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
         reply = send(ser, f"CONFIG {wire_cfg}")
         if reply.startswith("ERR"):
             raise BoardError(f"CONFIG refused: {reply}")
-        for steps, ticks, up in segments:
-            r = send(ser, f"QSEG {steps} {ticks} {int(bool(up))}")
-            if r.startswith("ERR"):
-                raise BoardError(f"QSEG {steps} {ticks} refused: {r}")
+
+        # Most scenarios drive every stepper from one shared program, which is
+        # the 3-argument QSEG. A scenario that needs per-stepper speeds uses the
+        # 4-argument form with a stepper index instead, and sends one list per
+        # stepper -- which is the only way to ask for two different periods.
+        per_stepper = rt.per_stepper_programs(scenario, info) if scenario \
+            else None
+        if per_stepper:
+            for idx, prog in sorted(per_stepper.items()):
+                for steps, ticks, up in prog:
+                    r = send(ser, f"QSEG {idx} {steps} {ticks} "
+                                  f"{int(bool(up))}")
+                    if r.startswith("ERR"):
+                        raise BoardError(f"QSEG {idx} {steps} {ticks} "
+                                         f"refused: {r}")
+        else:
+            for steps, ticks, up in segments:
+                r = send(ser, f"QSEG {steps} {ticks} {int(bool(up))}")
+                if r.startswith("ERR"):
+                    raise BoardError(f"QSEG {steps} {ticks} refused: {r}")
 
         # The capture has to outlast the program, or a long phase reads as
         # "nothing after it" when it was still running.
@@ -190,7 +206,7 @@ def run_scenario(scenario, port=DEFAULT_PORT, driver=DEFAULT_DRIVER,
         port=port, driver=driver, out_dir=out_dir, seconds=seconds, rate=rate,
         capture_script=capture_script,
         arm_delay=ARM_DELAY.get(scenario, 2.5),
-        stop_after=rt.STOP_AFTER.get(scenario))
+        stop_after=rt.STOP_AFTER.get(scenario), scenario=scenario)
     return vcd, note
 
 

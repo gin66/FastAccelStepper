@@ -33,8 +33,12 @@
  * 2ch exist because on AVR the achievable speed depends on the number of
  * connected steppers. QINFO                      tick rate, MIN_CMD_TICKS,
  * QUEUE_LEN and the per-stepper speed floor QCLR                      drop the
- * program and stop QSEG <steps> <ticks> <dir> append a segment; steps=0 is a
- * pause of <ticks> ticks, dir is 0 or 1 QRUN <mask>                run the
+ * program and stop QSEG <steps> <ticks> <dir> append a segment to the shared
+ * program; steps=0 is a pause of <ticks> ticks, dir is 0 or 1.
+ * QSEG <idx> <steps> <ticks> <dir> append to stepper <idx>'s own program
+ * instead, for scenarios that need two steppers at different speeds (SR_15).
+ * A stepper with its own program ignores the shared one.
+ * QRUN <mask>                run the
  * program on the steppers selected by the bitmask, synchronized start POS reply
  * positions of all steppers STOP                       stop move / self-test
  *
@@ -113,13 +117,16 @@ struct segment {
   bool count_up;
 };
 
-// Per-stepper cursor into the shared program. This is the only per-stepper RAM
-// the harness adds: 8 bytes on AVR.
+// Per-stepper cursor. `list`/`len` resolve which program this stepper walks:
+// its own if it was given one, otherwise the shared one. A pointer rather than
+// an index so the shared and per-stepper cases cost the same.
 struct qe_cursor {
   uint32_t left;  // steps (or pause ticks) left in the current segment
-  uint8_t seg;    // index of the current segment
-  bool started;   // queue kicked off
-  bool active;    // selected by QRUN and not yet finished
+  const struct segment* list;
+  uint8_t len;      // segments in `list`
+  uint8_t seg;      // index of the current segment
+  bool started;     // queue kicked off
+  bool active;      // selected by QRUN and not yet finished
 };
 
 struct stepper_slot {
@@ -135,8 +142,36 @@ static bool engine_ready = false;
 static struct stepper_slot slots[SALEAE_MAX_STEPPERS];
 static uint8_t slot_count = 0;
 
-static struct segment program[QE_MAX_SEG];
-static uint8_t program_len = 0;
+// Two programs. `shared_program` is what a 3-argument QSEG appends to, and
+// every stepper walks it unless it was given a program of its own -- so all the
+// scenarios that drive several steppers from one command list keep working
+// unchanged. `own_program` is per stepper and exists for SR_15, which needs two
+// steppers at *different* periods; the shared program cannot express that.
+static struct segment shared_program[QE_MAX_SEG];
+static uint8_t shared_len = 0;
+static struct segment own_program[SALEAE_MAX_STEPPERS][QE_MAX_SEG];
+static uint8_t own_len[SALEAE_MAX_STEPPERS];
+static bool own_used[SALEAE_MAX_STEPPERS];
+
+// The program a stepper walks: its own if it has one, else the shared list.
+static void program_for(uint8_t idx, const struct segment** list,
+                        uint8_t* len) {
+  if (own_used[idx]) {
+    *list = own_program[idx];
+    *len = own_len[idx];
+  } else {
+    *list = shared_program;
+    *len = shared_len;
+  }
+}
+
+static void clear_programs(void) {
+  shared_len = 0;
+  for (uint8_t i = 0; i < SALEAE_MAX_STEPPERS; i++) {
+    own_len[i] = 0;
+    own_used[i] = false;
+  }
+}
 
 static bool sr00_active = false;
 static bool done_pending = false;
@@ -170,7 +205,7 @@ static void stop_all(void) {
     }
     memset(&slots[i].cur, 0, sizeof(slots[i].cur));
   }
-  program_len = 0;
+  clear_programs();
   done_pending = false;
   done_announced = false;
 }
@@ -331,14 +366,14 @@ static bool qe_has_room(FastAccelStepper* s) {
 // Advance to the next segment, skipping exhausted ones. Returns false when the
 // program is done.
 static bool qe_next_segment(struct qe_cursor* c) {
-  while (c->seg < program_len && c->left == 0) {
+  while (c->seg < c->len && c->left == 0) {
     c->seg++;
-    if (c->seg < program_len) {
-      c->left =
-          program[c->seg].steps ? program[c->seg].steps : program[c->seg].ticks;
+    if (c->seg < c->len) {
+      c->left = c->list[c->seg].steps ? c->list[c->seg].steps
+                                      : c->list[c->seg].ticks;
     }
   }
-  return c->seg < program_len;
+  return c->seg < c->len;
 }
 
 // Emit commands from the plan until the queue is full or a retryable code is
@@ -346,7 +381,7 @@ static bool qe_next_segment(struct qe_cursor* c) {
 static void qe_feed(struct qe_cursor* c, FastAccelStepper* s, bool* err,
                     AqeResultCode* last) {
   while (qe_has_room(s) && qe_next_segment(c)) {
-    const struct segment* seg = &program[c->seg];
+    const struct segment* seg = &c->list[c->seg];
     struct stepper_command_s cmd;
     bool is_pause = (seg->steps == 0);
 
@@ -506,21 +541,56 @@ static void handle_qinfo(void) {
   reply(buf);
 }
 
-static void handle_qseg(char* a_steps, char* a_ticks, char* a_dir) {
-  if (!a_steps || !a_ticks || !a_dir) {
+// QSEG <steps> <ticks> <dir>            append to the shared program
+// QSEG <idx> <steps> <ticks> <dir>      append to stepper idx's own program
+//
+// The two forms differ in argument count, so no existing command can be
+// misread as the other. The 3-argument form keeps its meaning exactly: the
+// shared program, walked by every stepper that has no program of its own.
+static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
+  struct segment* target;
+  uint8_t* len;
+  const char* steps_s;
+  const char* ticks_s;
+  const char* dir_s;
+
+  if (a4) {
+    long idx = atol(a1);
+    if (idx < 0 || idx >= slot_count) {
+      reply("ERR QSEG stepper out of range\n");
+      return;
+    }
+    if (!own_used[idx]) {
+      own_used[idx] = true;
+      own_len[idx] = 0;
+    }
+    target = own_program[idx];
+    len = &own_len[idx];
+    steps_s = a2;
+    ticks_s = a3;
+    dir_s = a4;
+  } else {
+    target = shared_program;
+    len = &shared_len;
+    steps_s = a1;
+    ticks_s = a2;
+    dir_s = a3;
+  }
+
+  if (!steps_s || !ticks_s || !dir_s) {
     reply("ERR QSEG needs <steps> <ticks> <dir>\n");
     return;
   }
-  if (program_len >= QE_MAX_SEG) {
+  if (*len >= QE_MAX_SEG) {
     char buf[48];
     snprintf(buf, sizeof(buf), "ERR QSEG max %u\n", (unsigned)QE_MAX_SEG);
     reply(buf);
     return;
   }
 
-  long steps = atol(a_steps);
-  long ticks = atol(a_ticks);
-  long dir = atol(a_dir);
+  long steps = atol(steps_s);
+  long ticks = atol(ticks_s);
+  long dir = atol(dir_s);
   if (steps < 0 || ticks < 1 || ticks > 65535 || (dir != 0 && dir != 1)) {
     reply("ERR QSEG steps>=0 ticks=1..65535 dir=0|1\n");
     return;
@@ -529,13 +599,13 @@ static void handle_qseg(char* a_steps, char* a_ticks, char* a_dir) {
     steps = 65535;  // pump splits this into <=255 step commands anyway
   }
 
-  struct segment* s = &program[program_len++];
-  s->steps = (uint16_t)steps;
-  s->ticks = (uint16_t)ticks;
-  s->count_up = (dir == 1);
+  struct segment* seg = &target[(*len)++];
+  seg->steps = (uint16_t)steps;
+  seg->ticks = (uint16_t)ticks;
+  seg->count_up = (dir == 1);
 
   char buf[48];
-  snprintf(buf, sizeof(buf), "OK QSEG %u/%u\n", (unsigned)program_len,
+  snprintf(buf, sizeof(buf), "OK QSEG %u/%u\n", (unsigned)*len,
            (unsigned)QE_MAX_SEG);
   reply(buf);
 }
@@ -546,30 +616,39 @@ static void handle_qrun(char* mask_text) {
     reply("ERR no config\n");
     return;
   }
-  if (program_len == 0) {
-    reply("ERR no program\n");
-    return;
-  }
-
   long mask = mask_text ? atol(mask_text) : 1;
   if (mask <= 0 || mask > 0xff) {
     reply("ERR QRUN mask=1..255\n");
     return;
   }
 
+  // A selected stepper with no program of its own walks the shared one, so the
+  // single-program scenarios are unaffected. "No program" therefore means no
+  // selected stepper has anything to run -- not that the shared list is empty.
   uint8_t selected = 0;
+  uint8_t runnable = 0;
   for (uint8_t i = 0; i < slot_count; i++) {
     struct qe_cursor* c = &slots[i].cur;
     memset(c, 0, sizeof(*c));
-    if (mask & (1 << i)) {
-      c->seg = 0;
-      c->left = program[0].steps ? program[0].steps : program[0].ticks;
-      c->active = true;
-      selected++;
+    if (!(mask & (1 << i))) {
+      continue;
     }
+    program_for(i, &c->list, &c->len);
+    if (c->len == 0) {
+      continue;
+    }
+    c->seg = 0;
+    c->left = c->list[0].steps ? c->list[0].steps : c->list[0].ticks;
+    c->active = true;
+    selected++;
+    runnable++;
   }
   if (selected == 0) {
     reply("ERR QRUN mask selects no stepper\n");
+    return;
+  }
+  if (runnable == 0) {
+    reply("ERR no program\n");
     return;
   }
 
@@ -584,7 +663,9 @@ static void handle_line(char* line) {
   char arg1[32] = {0};
   char arg2[32] = {0};
   char arg3[32] = {0};
-  int n = sscanf(line, "%15s %31s %31s %31s", cmd, arg1, arg2, arg3);
+  char arg4[32] = {0};
+  int n = sscanf(line, "%15s %31s %31s %31s %31s", cmd, arg1, arg2, arg3,
+                 arg4);
 
   if (n <= 0) {
     return;
@@ -607,7 +688,8 @@ static void handle_line(char* line) {
     stop_sr00();
     reply("OK QCLR\n");
   } else if (!strcmp(cmd, "QSEG")) {
-    handle_qseg(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL);
+    handle_qseg(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL,
+                n > 4 ? arg4 : NULL);
   } else if (!strcmp(cmd, "QRUN")) {
     handle_qrun(n > 1 ? arg1 : NULL);
   } else if (!strcmp(cmd, "POS")) {

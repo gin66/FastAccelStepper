@@ -202,6 +202,39 @@ def sc_steps_per_command(info):
     return seg_period(255, legal_ticks(info, 255, info["max_speed_ticks"]))
 
 
+# SR_15 is the one scenario the shared command program cannot express: it needs
+# two steppers at *different* periods. The firmware's 4-argument QSEG form takes
+# a stepper index for exactly this. Defined here, once, so the runner that sends
+# the commands and the evaluator that checks the result cannot disagree about
+# who runs at what speed.
+SR_15_RATIO = 2
+
+
+def per_stepper_programs(scenario, info):
+    """{stepper index: segments}, for scenarios needing per-stepper speeds.
+
+    None for every other scenario: they all share one program, and the
+    3-argument QSEG form is what they use.
+    """
+    if scenario != "SR_15":
+        return None
+    fast = legal_ticks(info, 200, info["max_speed_ticks"])
+    slow = legal_ticks(info, 200, info["max_speed_ticks"] * SR_15_RATIO)
+    return {0: [(200, fast, True)], 1: [(200, slow, True)]}
+
+
+def sc_sync_independent_speeds(info):
+    """SR_15: both steppers start together, then each runs at its own period.
+
+    Returns stepper A's program only, because that is the list shape every
+    scenario uses and the evaluator derives B's from SR_15_RATIO. What the test
+    actually asserts is that the arm stayed aligned *and* the periods stayed
+    independent -- a synchronized start that dragged both steppers onto one speed
+    would satisfy the first and fail the second.
+    """
+    return per_stepper_programs("SR_15", info)[0]
+
+
 def sc_emergency_stop(info):
     """SR_25: long enough that STOP lands mid-run with room to spare.
 
@@ -444,6 +477,8 @@ SCENARIOS = {
     # Cross-driver start alignment: one stepper on RMT, one on MCPWM+PCNT.
     "SR_17": ("mixed_rmt_mcpwm", sc_sync_cross_driver, 3,
               "synchronized start across two different drivers"),
+    "SR_15": ("2ch", sc_sync_independent_speeds, 3,
+              "aligned start, then each stepper at its own period"),
     "SR_27": ("1ch", sc_single_step, 1, "single step in one command"),
     "SR_21": ("1ch", sc_rmt_buffer_split, 1,
               "long RMT run: no gap at a buffer split"),
@@ -712,6 +747,52 @@ def eval_pulse_width(channels, rate, segments, info):
     }
 
 
+def eval_independent_speeds(channels, rate, segments, info):
+    """SR_15: aligned start, independent periods.
+
+    Checks each stepper against *its own* commanded period, not against a
+    common one. That distinction is the whole test: a start that pulled both
+    steppers onto a single speed would look fine if the expectation were shared,
+    and this is the scenario that would catch it.
+
+    The first-step skew is measured and reported, not gated on, for the same
+    reason as SR_14 and SR_17 -- how closely two drivers arm is a property of
+    the hardware, not a correctness property of the queue. What must hold is
+    that each stepper then keeps the speed it was given.
+    """
+    per = per_stepper_programs("SR_15", info)
+    ok = True
+    detail = {}
+    for letter, idx in (("A", 0), ("B", 1)):
+        ch_name = STEP_CHANNELS[letter]
+        if ch_name not in channels:
+            continue
+        ticks = per[idx][0][1]
+        expect_us = ticks * 1e6 / info["ticks_per_s"]
+        expected = sum(n for n, _, _ in per[idx])
+        m = sp.channel_metrics(channels[ch_name], rate)
+        counts = sp.step_count_defects(m.step_count, expected)
+        period = sp.period_defects(m.inter_step_us, expect_us)
+        ok = ok and counts["ok"] and period["ok"]
+        detail[letter] = {
+            "ticks": ticks,
+            "steps": counts,
+            "period": period,
+            "mean_period_us": round(sum(m.inter_step_us)
+                                    / len(m.inter_step_us), 4)
+                              if m.inter_step_us else None,
+        }
+
+    skew = None
+    a_rises = sp.rising_edges(channels[STEP_CHANNELS["A"]])
+    b_rises = sp.rising_edges(channels[STEP_CHANNELS["B"]])
+    if a_rises and b_rises:
+        skew = round(abs(a_rises[0] - b_rises[0]) * 1e6 / rate, 4)
+    detail["first_step_skew_us"] = skew
+    detail["speed_ratio"] = SR_15_RATIO
+    return ok and len(detail) >= 2, detail
+
+
 def eval_emergency_stop(channels, rate, segments, info):
     """SR_25: pulses must stop the instant STOP is issued.
 
@@ -915,6 +996,7 @@ EVALUATORS = {
     "SR_14": eval_sync_start,
     "SR_16": eval_multi_stepper_periods,
     "SR_17": eval_sync_start,
+    "SR_15": eval_independent_speeds,
     "SR_27": eval_period_exact,
     "SR_21": eval_period_exact,
     "SR_23": eval_period_exact,
