@@ -24,6 +24,7 @@ import json
 import subprocess
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -234,6 +235,64 @@ def metrics_periods(channels, rate):
     return sp.channel_metrics(channels["D0"], rate).inter_step_us
 
 
+def driver_of(config):
+    """The driver a scenario's CONFIG actually selects.
+
+    Recorded rather than inferred at report time, because "2ch" and
+    "mixed rmt,mcpwm" both exercise two steppers and mean different things.
+    """
+    return {
+        "1ch": "auto", "2ch": "auto", "mcpwm": "mcpwm_pcnt",
+        "mixed_rmt_mcpwm": "rmt+mcpwm_pcnt", "i2s": "i2s",
+    }.get(config, config)
+
+
+def build_result(scenario, vcd, ok, detail, channels, rate, arch, out_dir):
+    """One scenario's measurements as a JSON record.
+
+    Everything downstream reads this rather than re-parsing the capture: a 24
+    MS/s capture is ~96M samples of pure-Python waveform, and a report generator
+    that re-measured would be free to disagree with the run that produced it.
+    """
+    info = vf.Dut().info()
+    cfg = rt.SCENARIOS[scenario][0]
+    per_stepper = {}
+    for letter, ch_name in sorted(rt.STEP_CHANNELS.items()):
+        if ch_name not in channels:
+            continue
+        per_stepper[letter] = sp.stepper_metrics(channels[ch_name], rate)
+    return {
+        "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "test_id": scenario,
+        "goal": rt.SCENARIOS[scenario][3],
+        "arch": arch,
+        "driver": driver_of(cfg),
+        "channel_config": cfg,
+        "tag": f"{arch}_{driver_of(cfg).replace('+', '_')}_{cfg}",
+        "dut": info,
+        "segments": [list(seg) for seg in rt.SCENARIOS[scenario][1](info)],
+        "per_stepper": ({str(k): [list(seg) for seg in v]
+                         for k, v in programs.items()}
+                        if (programs := rt.per_stepper_programs(scenario, info))
+                        else None),
+        "sample_rate_hz": rate,
+        "capture": str(vcd),
+        "pass": bool(ok),
+        "evaluator_detail": detail,
+        "measurements": per_stepper,
+        "stop_after_s": rt.STOP_AFTER.get(scenario),
+    }
+
+
+def save_result(result, results_dir):
+    """Write one JSON record, newest run overwriting the last for that test."""
+    results_dir = Path(results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    path = results_dir / f"{result['test_id']}.json"
+    path.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n")
+    return path
+
+
 def scenario_ids():
     return sorted(rt.SCENARIOS, key=lambda sid: int(sid.split("_")[1]))
 
@@ -248,6 +307,10 @@ def main():
     ap.add_argument("--out", default=str(DEFAULT_OUT))
     ap.add_argument("--seconds", type=float, default=DEFAULT_SECONDS)
     ap.add_argument("--sample-rate", type=int, default=DEFAULT_RATE)
+    ap.add_argument("--results", default=None,
+                    help="directory to write one JSON result per scenario")
+    ap.add_argument("--arch", default="esp32",
+                    help="architecture tag for the results and reports")
     ap.add_argument("--quiet", action="store_true",
                     help="print only the summary line")
     args = ap.parse_args()
@@ -278,6 +341,10 @@ def main():
             failed.append(scenario)
             continue
         ok, detail, channels, rate = judge(scenario, vcd)
+        if args.results:
+            result = build_result(scenario, vcd, ok, detail, channels, rate,
+                                  args.arch, args.out)
+            save_result(result, args.results)
         counts = detail.get("steps")
         if isinstance(counts, dict) and "steps_measured" in counts:
             got, exp = counts["steps_measured"], counts["steps_expected"]

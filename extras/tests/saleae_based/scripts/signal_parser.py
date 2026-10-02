@@ -286,6 +286,62 @@ def read_capture_meta(vcd_path) -> Optional[Dict[str, int]]:
     return None
 
 
+def describe(values: Sequence[float], digits: int = 4) -> Dict[str, Optional[float]]:
+    """Summarise a distribution of timings.
+
+    A single average hides the thing a characterization run is looking for. If a
+    driver holds a fixed pulse width, min == max and that is the finding; if it
+    jitters, the spread is the finding; if one pulse in ten thousand is short,
+    only the minimum says so. Averaging first would report all three cases as
+    the same number, which is why the report carries min/max/spread rather than
+    a mean and a pass mark.
+
+    `median` is reported alongside the mean because a long tail pulls the mean
+    without moving the typical value, and for inter-step periods that difference
+    is usually the defect itself.
+    """
+    if not values:
+        return {"n": 0, "min": None, "max": None, "mean": None,
+                "median": None, "spread": None, "stdev": None}
+    ordered = sorted(values)
+    n = len(ordered)
+    mean = sum(ordered) / n
+    mid = n // 2
+    median = (ordered[mid] if n % 2
+              else (ordered[mid - 1] + ordered[mid]) / 2.0)
+    variance = sum((v - mean) ** 2 for v in ordered) / n
+    return {
+        "n": n,
+        "min": round(ordered[0], digits),
+        "max": round(ordered[-1], digits),
+        "mean": round(mean, digits),
+        "median": round(median, digits),
+        "spread": round(ordered[-1] - ordered[0], digits),
+        "stdev": round(variance ** 0.5, digits),
+    }
+
+
+def stepper_metrics(samples: Sequence[int], sample_rate_hz: int) -> Dict:
+    """Per-stepper measurements for one channel, in report-ready form.
+
+    Reports the *distribution* of each timing rather than one number: see
+    `describe` for why. No glitch count and no pass mark on pulse width -- the
+    driver sets the width, its value is a property of the silicon rather than
+    something the library promises, and a threshold invented here would be a
+    number with no source behind it.
+    """
+    m = channel_metrics(samples, sample_rate_hz)
+    return {
+        "edge_count": m.edge_count,
+        "step_count": m.step_count,
+        "pulse_high_us": describe(m.high_widths_us),
+        "pulse_low_us": describe(m.low_widths_us),
+        "inter_step_us": describe(m.inter_step_us),
+        "duty_cycle_percent": round(m.duty_cycle_percent, 4),
+        "max_pulse_width_us": round(m.max_pulse_width_us, 4),
+    }
+
+
 def load_capture(filepath: str) -> Tuple[Dict[str, List[int]], int]:
     """Load a capture by extension: .sr (srzip), .vcd or .csv."""
     ext = str(filepath).lower()

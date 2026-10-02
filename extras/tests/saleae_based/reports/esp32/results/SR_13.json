@@ -1,0 +1,73 @@
+{
+  "arch": "esp32",
+  "capture": "/tmp/cap/rep/SR_13.vcd",
+  "channel_config": "1ch",
+  "driver": "auto",
+  "dut": {
+    "max_speed_ticks": 640,
+    "min_cmd_ticks": 3200,
+    "queue_len": 32,
+    "ticks_per_s": 16000000
+  },
+  "evaluator_detail": {
+    "command_rate_ticks": 3192,
+    "invariants": {
+      "dir_while_step_high": {},
+      "n_dir_while_step_high": 0,
+      "ok": true
+    },
+    "min_cmd_ticks": 3200,
+    "rejected_ticks": 399,
+    "steps_measured": 0,
+    "steps_that_would_have_been": 8
+  },
+  "goal": "a command below MIN_CMD_TICKS must emit nothing",
+  "measurements": {
+    "A": {
+      "duty_cycle_percent": 0.0,
+      "edge_count": 0,
+      "inter_step_us": {
+        "max": null,
+        "mean": null,
+        "median": null,
+        "min": null,
+        "n": 0,
+        "spread": null,
+        "stdev": null
+      },
+      "max_pulse_width_us": 0.0,
+      "pulse_high_us": {
+        "max": null,
+        "mean": null,
+        "median": null,
+        "min": null,
+        "n": 0,
+        "spread": null,
+        "stdev": null
+      },
+      "pulse_low_us": {
+        "max": null,
+        "mean": null,
+        "median": null,
+        "min": null,
+        "n": 0,
+        "spread": null,
+        "stdev": null
+      },
+      "step_count": 0
+    }
+  },
+  "pass": true,
+  "sample_rate_hz": 24000000,
+  "segments": [
+    [
+      8,
+      399,
+      true
+    ]
+  ],
+  "stop_after_s": null,
+  "tag": "esp32_auto_1ch",
+  "test_id": "SR_13",
+  "timestamp": "2026-10-02T09:52:28Z"
+}

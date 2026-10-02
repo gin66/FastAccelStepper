@@ -1,0 +1,91 @@
+{
+  "arch": "esp32",
+  "capture": "/tmp/cap/rep/SR_06.vcd",
+  "channel_config": "1ch",
+  "driver": "auto",
+  "dut": {
+    "max_speed_ticks": 640,
+    "min_cmd_ticks": 3200,
+    "queue_len": 32,
+    "ticks_per_s": 16000000
+  },
+  "evaluator_detail": {
+    "invariants": {
+      "dir_while_step_high": {},
+      "n_dir_while_step_high": 0,
+      "ok": true
+    },
+    "period": {
+      "expected_period_us": 100.0,
+      "long_periods_us": [],
+      "n_long": 0,
+      "n_short": 0,
+      "ok": true,
+      "periods_measured": 3,
+      "short_periods_us": [],
+      "tolerance_us": 5.0
+    },
+    "steps": {
+      "extra_steps": 0,
+      "missing_steps": 0,
+      "ok": true,
+      "steps_expected": 4,
+      "steps_measured": 4
+    },
+    "ticks": 1600
+  },
+  "goal": "trailing wait after last step",
+  "measurements": {
+    "A": {
+      "duty_cycle_percent": 15.6402,
+      "edge_count": 8,
+      "inter_step_us": {
+        "max": 99.9167,
+        "mean": 99.9028,
+        "median": 99.9167,
+        "min": 99.875,
+        "n": 3,
+        "spread": 0.0417,
+        "stdev": 0.0196
+      },
+      "max_pulse_width_us": 84.2917,
+      "pulse_high_us": {
+        "max": 15.625,
+        "mean": 15.625,
+        "median": 15.625,
+        "min": 15.625,
+        "n": 4,
+        "spread": 0.0,
+        "stdev": 0.0
+      },
+      "pulse_low_us": {
+        "max": 84.2917,
+        "mean": 84.2778,
+        "median": 84.2917,
+        "min": 84.25,
+        "n": 3,
+        "spread": 0.0417,
+        "stdev": 0.0196
+      },
+      "step_count": 4
+    }
+  },
+  "pass": true,
+  "sample_rate_hz": 24000000,
+  "segments": [
+    [
+      2,
+      1600,
+      true
+    ],
+    [
+      2,
+      1600,
+      true
+    ]
+  ],
+  "stop_after_s": null,
+  "tag": "esp32_auto_1ch",
+  "test_id": "SR_06",
+  "timestamp": "2026-10-02T09:48:47Z"
+}

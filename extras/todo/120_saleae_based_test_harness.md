@@ -275,48 +275,38 @@ fail.
      shape, not a defect.)
    Every point is asserted legal before any hardware runs, so no run was spent
    measuring `ErrorTicksTooLow`.
-8. **Reporting** — done: `scripts/report.py` gives markdown, `--csv`, and
-   `--scenarios`. Every number comes from the evaluator in `run_tests.py`, never
-   recomputed here, so the report cannot disagree with the tests; a test asserts
-   that delegation. Measured-but-not-gated results print as `PASS(reported)`
-   rather than being flattened into a pass. Exit code is 1 on any failure.
-   11 tests cover it.
-
-### A VCD cannot show you a flat tail
-
-`sigrok-cli` wrote the full 96M samples (4 s at 24 MS/s) but the VCD held only
-36.5M, because **a VCD records value changes only** -- a line that stays flat
-after its last edge contributes nothing more, so the file's last timestamp is
-not the end of the capture.
-
-This made every SR_25 capture read as though the run stopped the instant its
-final pulse landed. `capture.py` now writes a `.meta` sidecar with the true
-sample count and `load_vcd` pads to it, which is what makes "the run stopped"
-distinguishable from "the recording ran out". Two things fell out of the fix:
-
-- Channels are expanded into a `bytearray` rather than a list. At 96M samples a
-  list of ints costs ~770 MB per channel against 96 MB.
-- `load_vcd`'s rate-inference fallback divided by zero on a capture whose
-  channels never change. It now answers one tick per sample instead.
-
-### The hardware runner is committed
-
-`scripts/run_hardware.py` was needed all along and lived only in /tmp, so the
-repo had no way to actually run on a board. It is committed now, with one cold
-boot per scenario, a scenario-aware arm delay and capture length, mid-run `STOP`
-threaded through as a parameter, and the same `rt.evaluate` the fixtures use --
-never a second implementation of what a correct waveform looks like.
-
-### Capture limits worth knowing
-
-The clone's hardware buffer holds **64 MSamples: 2.66 s at 24 MS/s**. A capture
-that hits the limit ends mid-run, which reads as "the run stopped there" when it
-merely ran out of room — SR_25 hit exactly this, and the evaluator correctly
-rejected the capture rather than reading the truncated end as a stop. Anything
-needing a longer window must drop the sample rate or shorten the program.
-
-Sparse channel selections also drop channels on this clone: `-C D0,D2` yields
-nothing on D2 while `-C D0,D1,D2` works. Contiguous selections only.
+8. **Reporting** — done, and now actually to the white paper's section 8. The
+   box was ticked earlier against a console table, which did not meet the spec;
+   that was premature.
+   - `scripts/generate_report.py` builds the artefacts §8.1 lists: `index.md`
+     (dashboard, pass rate per tag, full results table), one `test_SR_XX.md` per
+     test, `spec_compliance.md`, `regression.md` against a baseline,
+     `tag_summary/` per configuration, and `all_results.csv`. 28 tests.
+   - `run_hardware.py --results DIR` writes one JSON per scenario, and the
+     generator only formats: it never re-parses a capture, so it cannot disagree
+     with the run that measured it. A 24 MS/s capture is ~96M samples of
+     pure-Python waveform, and a report that re-measured would be free to
+     disagree.
+   - **A committed baseline exists**: `reports/esp32/` holds the result JSONs
+     and the generated report for the full 25/25 run, so `index.md` is
+     reviewable in the diff and `--baseline reports/esp32/results` is a
+     working regression comparison.
+   - **Timings are reported as distributions, not averages.** min/max/spread and
+     a median for every period and pulse width, because a mean hides the finding:
+     SR_05's constant 15.625 us pulse width shows as min == max, and one short
+     pulse in ten thousand moves only the minimum.
+   - **No glitch counter.** The paper's CSV names a `glitch_count` column and it
+     was tempting to fill the schema in, but a glitch count needs a threshold
+     invented for it and collapses a distribution into one number. The statistics
+     are worth more and have a source. Pulse width is recorded, not judged: the
+     driver sets it, so its value is a property of the silicon and becomes the
+   baseline a regression is measured against.
+   - *Not done, and not claimed:* `design_specs.json` (section 7) is not emitted;
+     `spec_compliance.md` derives its expectations from the QINFO values the DUT
+     reports instead. That covers the commanded period and the step count, which
+     is what the library promises, but the paper's per-driver spec table is not
+     reproduced. Cross-configuration comparison is implemented and exercised, but
+     with one architecture measured it has nothing to compare yet.
 
 ## Analyzer negative testing — why the fixtures exist
 

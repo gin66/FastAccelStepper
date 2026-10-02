@@ -1,0 +1,95 @@
+{
+  "arch": "esp32",
+  "capture": "/tmp/cap/rep/SR_27.vcd",
+  "channel_config": "1ch",
+  "driver": "auto",
+  "dut": {
+    "max_speed_ticks": 640,
+    "min_cmd_ticks": 3200,
+    "queue_len": 32,
+    "ticks_per_s": 16000000
+  },
+  "evaluator_detail": {
+    "adherence": {
+      "commanded_period_us": 200.0,
+      "commanded_rate_hz": 5000.0,
+      "measurable": false,
+      "ok": true,
+      "periods_measured": 0,
+      "reason": "fewer than 2 inter-step periods: rate adherence cannot be measured for a single-step command"
+    },
+    "invariants": {
+      "dir_while_step_high": {},
+      "n_dir_while_step_high": 0,
+      "ok": true
+    },
+    "period": {
+      "expected_period_us": 200.0,
+      "long_periods_us": [],
+      "n_long": 0,
+      "n_short": 0,
+      "ok": true,
+      "periods_measured": 0,
+      "short_periods_us": [],
+      "tolerance_us": 10.0
+    },
+    "steps": {
+      "extra_steps": 0,
+      "missing_steps": 0,
+      "ok": true,
+      "steps_expected": 1,
+      "steps_measured": 1
+    },
+    "ticks": 3200,
+    "ticks_per_s": 16000000
+  },
+  "goal": "single step in one command",
+  "measurements": {
+    "A": {
+      "duty_cycle_percent": 100.0,
+      "edge_count": 2,
+      "inter_step_us": {
+        "max": null,
+        "mean": null,
+        "median": null,
+        "min": null,
+        "n": 0,
+        "spread": null,
+        "stdev": null
+      },
+      "max_pulse_width_us": 15.625,
+      "pulse_high_us": {
+        "max": 15.625,
+        "mean": 15.625,
+        "median": 15.625,
+        "min": 15.625,
+        "n": 1,
+        "spread": 0.0,
+        "stdev": 0.0
+      },
+      "pulse_low_us": {
+        "max": null,
+        "mean": null,
+        "median": null,
+        "min": null,
+        "n": 0,
+        "spread": null,
+        "stdev": null
+      },
+      "step_count": 1
+    }
+  },
+  "pass": true,
+  "sample_rate_hz": 24000000,
+  "segments": [
+    [
+      1,
+      3200,
+      true
+    ]
+  ],
+  "stop_after_s": null,
+  "tag": "esp32_auto_1ch",
+  "test_id": "SR_27",
+  "timestamp": "2026-10-02T09:59:58Z"
+}
