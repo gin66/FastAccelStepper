@@ -122,8 +122,57 @@ class TestSignalParser(unittest.TestCase):
                 f.write("#5 1!\n")
             channels, rate = sp.load_vcd(path)
             self.assertEqual(rate, 1_000_000)
-            self.assertEqual(channels["D0"], [1, 1, 0, 0, 0, 1])
-            self.assertEqual(channels["D1"], [0, 0, 0, 0, 0, 0])
+            self.assertEqual(list(channels["D0"]), [1, 1, 0, 0, 0, 1])
+            self.assertEqual(list(channels["D1"]), [0, 0, 0, 0, 0, 0])
+
+    def test_vcd_is_padded_to_the_declared_capture_length(self):
+        """A flat tail must survive the trip through VCD.
+
+        A VCD records value changes only, so a channel that stops changing
+        early ends the file short of the real capture. Without the sidecar the
+        two cases -- a line that went quiet, and a recording that ran out --
+        are indistinguishable, which is what made every SR_25 capture look
+        like it stopped on its final pulse.
+        """
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            vcd = Path(tmp) / "c.vcd"
+            # Shaped like sigrok's own output, including the $comment that
+            # carries the acquisition rate, so the real parse path is exercised.
+            vcd.write_text(
+                "$comment\n  Acquisition with 2/8 channels at 1 MHz\n"
+                "$end\n"
+                "$timescale 1 ns $end\n"
+                "$scope logic $end\n"
+                "$var wire 1 ! D0 $end\n"
+                "$upscope $end\n"
+                "$enddefinitions $end\n"
+                "#0 1!\n")
+            bare, _ = sp.load_vcd(str(vcd))
+            self.assertEqual(len(bare["D0"]), 1, "no sidecar means no padding")
+
+            (Path(tmp) / "c.meta").write_text(json.dumps(
+                {"samples": 500, "sample_rate": 1_000_000}))
+            padded, rate = sp.load_vcd(str(vcd))
+            self.assertEqual(rate, 1_000_000)
+            self.assertEqual(len(padded["D0"]), 500)
+            self.assertEqual(set(padded["D0"]), {1}, "the flat level is kept")
+
+    def test_unreadable_sidecar_is_ignored(self):
+        """A corrupt sidecar must not make a capture unloadable."""
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            vcd = Path(tmp) / "c.vcd"
+            vcd.write_text("$timescale 1 ns $end\n"
+                          "$scope logic $end\n"
+                          "$var wire 1 ! D0 $end\n"
+                          "$upscope $end\n"
+                          "$enddefinitions $end\n"
+                          "#0 1!\n")
+            (Path(tmp) / "c.meta").write_text("{not json")
+            channels, _ = sp.load_vcd(str(vcd))
+            self.assertEqual(list(channels["D0"]), [1])
 
     def test_sr_to_vcd_matches_sr(self):
         """sigrok-cli .sr -> VCD must reproduce the samples exactly."""
@@ -144,7 +193,10 @@ class TestSignalParser(unittest.TestCase):
             # constant stretch of the capture.
             n = min(len(samples) for samples in vcd_channels.values())
             for name, samples in sr_channels.items():
-                self.assertEqual(samples[:n], vcd_channels[name], name)
+                # bytearray, not list: a 24 MS/s capture is 96M samples and a
+                # list of ints would cost ~770 MB per channel.
+                self.assertEqual(bytes(samples[:n]), bytes(vcd_channels[name]),
+                                 name)
 
 
 class TestSR00(unittest.TestCase):

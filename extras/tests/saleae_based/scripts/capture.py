@@ -38,6 +38,7 @@ Examples:
 """
 
 import argparse
+import json
 import os
 import subprocess
 import sys
@@ -342,10 +343,17 @@ def run_capture(args):
             return 1
 
     if args.vcd:
+        # A VCD stores value changes only, so a channel that stays flat after the
+        # last edge leaves the file's last timestamp short of the real end of the
+        # capture. Record the true length beside it, so an analyser can tell a
+        # line that went quiet from a recording that simply ran out.
         vcd = Path(str(args.output).rsplit(".", 1)[0] + ".vcd")
         if sr_to_vcd(args.output, vcd) is None:
             return 1
         vcd_kb = vcd.stat().st_size / 1024
+        Path(str(vcd).rsplit(".", 1)[0] + ".meta").write_text(
+            json.dumps({"samples": n, "sample_rate": args.sample_rate,
+                        "seconds": args.seconds}) + "\n")
         n_changes = sum(1 for line in vcd.open() if line.startswith("#"))
         print(f"VCD:         {vcd} (~{vcd_kb:.1f} KB, "
               f"{n_changes} value changes — open in GTKWave)")

@@ -226,7 +226,7 @@ fail.
          before and none after the gap is unobservable rather than wrong.
          **Corrected a units error of my own along the way** -- 65535 ticks at
          16 MHz is 4.0965 *ms*, not seconds.
-   - [ ] **SR_25 found a real library behaviour: `stopMove()` does not stop a
+   - [x] **SR_25 found a real library behaviour: `stopMove()` does not stop a
          move that is already queued.** `stopMove()` only sets a flag that the
          ramp generator reads when asked for its *next* command, so a move
          sitting in the pulse queue runs to completion. Measured:
@@ -234,15 +234,28 @@ fail.
            no effect at all.
          - 20000 steps @ 640 ticks, `STOP` at POS 5825 -> stopped at **14240**,
            truncating only once the queue had to refill.
-         The scenario now uses a move far larger than the queue, so it tests
-         stopping rather than queue drain. Waveform verification (no partial
-         pulse, capture goes quiet) is **incomplete**: see the blocker below.
-7. **Parameter sweeps** — tooling in place: `scripts/sweep.py`, which plans
-   19 points for SR_02 and 6 for SR_05 and **asserts every point is legal
-   before any hardware runs** (`--list` shows the plan). All 25 points are
-   legal; `legal_ticks` pulls the small-step points up to the floor, so
-   steps=1 runs at 3200 ticks and steps=2 at 1600. 14 tests cover it.
-   `_Pending._ the data: needs the Saleae._`
+         The scenario uses a move far larger than the queue, so it tests
+         stopping rather than queue drain. **Verified on a waveform:** stopped at
+         11475 of 20000, no partial pulse, and the pin held still for the
+         remaining **2.823 s** of the capture. The stop is clean once it lands;
+         the surprise is only how long it takes to land.
+7. **Parameter sweeps** — **done.** `scripts/sweep.py` plans and runs them:
+   - **SR_02 over `steps` = 1…255, 19 points, all pass.** Exact step counts
+     everywhere, and `legal_ticks` pulls the small-step points up to the floor
+     so each runs as fast as it legally can: steps=1 at 3200 ticks (200 us),
+     steps=2 at 1600 (100 us), steps=3 at 1067 (66.69 us), steps=4 at 800
+     (50 us), steps>=8 at 640 (40 us). **No lost or duplicated step anywhere in
+     the range, including at the 16-bit and uint8_t boundaries.**
+   - **SR_05 over `ticks` = 3200…65535, 6 points, all pass.** The useful result
+     is the one that does *not* vary: **pulse high time is a constant 15.625 us
+     (250 ticks) at every period from 200 us to 4096 us.** The driver emits a
+     fixed-width pulse and varies the gap, so high time is a property of the
+     driver alone and can be checked once instead of per speed.
+     (The duty column reads 100% at these points because each uses a single
+     step, so there is no low interval to divide by -- an artifact of the sweep
+     shape, not a defect.)
+   Every point is asserted legal before any hardware runs, so no run was spent
+   measuring `ErrorTicksTooLow`.
 8. **Reporting** — done: `scripts/report.py` gives markdown, `--csv`, and
    `--scenarios`. Every number comes from the evaluator in `run_tests.py`, never
    recomputed here, so the report cannot disagree with the tests; a test asserts
@@ -250,20 +263,30 @@ fail.
    rather than being flattened into a pass. Exit code is 1 on any failure.
    11 tests cover it.
 
-### Blocked: the Saleae clone dropped off USB
+### A VCD cannot show you a flat tail
 
-`SR_25`'s waveform verification is unfinished because the clone vanished from
-the USB bus mid-session (`sigrok-cli -l` lists no device; no FX2 vendor ID in
-ioreg, while the ESP32's own serial port is still present). It needs an unplug
-and replug, which cannot be done from here.
+`sigrok-cli` wrote the full 96M samples (4 s at 24 MS/s) but the VCD held only
+36.5M, because **a VCD records value changes only** -- a line that stays flat
+after its last edge contributes nothing more, so the file's last timestamp is
+not the end of the capture.
 
-Consequences, stated plainly:
+This made every SR_25 capture read as though the run stopped the instant its
+final pulse landed. `capture.py` now writes a `.meta` sidecar with the true
+sample count and `load_vcd` pads to it, which is what makes "the run stopped"
+distinguishable from "the recording ran out". Two things fell out of the fix:
 
-- **SR_25 is not verified on a waveform.** Its serial evidence stands (POS 510
-  -> 2000 and POS 5825 -> 14240 above), and its three fixtures pass, but the
-  two claims that need a capture — no partial pulse, and the capture going
-  quiet after the stop — are untested against hardware.
-- Every other scenario in this file has its hardware result recorded above.
+- Channels are expanded into a `bytearray` rather than a list. At 96M samples a
+  list of ints costs ~770 MB per channel against 96 MB.
+- `load_vcd`'s rate-inference fallback divided by zero on a capture whose
+  channels never change. It now answers one tick per sample instead.
+
+### The hardware runner is committed
+
+`scripts/run_hardware.py` was needed all along and lived only in /tmp, so the
+repo had no way to actually run on a board. It is committed now, with one cold
+boot per scenario, a scenario-aware arm delay and capture length, mid-run `STOP`
+threaded through as a parameter, and the same `rt.evaluate` the fixtures use --
+never a second implementation of what a correct waveform looks like.
 
 ### Capture limits worth knowing
 

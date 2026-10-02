@@ -23,9 +23,11 @@ build on this module.
 
 from __future__ import annotations
 
+import json
 import re
 import zipfile
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
 Edge = Tuple[int, int]  # (sample index, level after the edge)
@@ -226,25 +228,62 @@ def load_vcd(filepath: str,
             1, int(round(1e9 / (timescale_ns * sample_rate_hz))))
     else:
         # Last resort: infer the spacing from the changes. Approximate, since
-        # the capture may not contain the shortest interval.
-        sample_ns = min(ch[1][0] - ch[0][0]
-                        for ch in changes.values()
-                        if len(ch) > 1 and ch[1][0] > ch[0][0])
+        # the capture may not contain the shortest interval. A capture whose
+        # channels never change carries no interval at all, and the only honest
+        # answer there is one tick per sample rather than a division by zero.
+        gaps = [ch[1][0] - ch[0][0]
+                for ch in changes.values()
+                if len(ch) > 1 and ch[1][0] > ch[0][0]]
+        sample_ns = min(gaps) if gaps else timescale_ns
         ticks_per_sample = max(1, int(round(sample_ns / timescale_ns)))
         sample_rate_hz = int(round(1e9 / (timescale_ns * ticks_per_sample)))
 
-    channels: Dict[str, List[int]] = {}
+    # A VCD records value changes only, so a line that stays flat after the last
+    # edge contributes no further entries and the file's last timestamp is not
+    # the end of the capture. capture.py writes the true sample count to a .meta
+    # sidecar; honouring it is what lets a test distinguish "the run stopped"
+    # from "the recording ran out" -- the two look identical in a bare VCD.
+    # SR_25 hit exactly this: the clone's 64 MSample buffer ended 2.5 s after the
+    # last step, and without the extent every capture looked like it stopped the
+    # instant its final pulse landed.
+    declared = read_capture_meta(filepath)
+    if declared:
+        # The sidecar counts samples; n_samples is in VCD ticks. Converting here
+        # rather than later keeps the one place that knows about ticks_per_sample
+        # being the one that has to get it right.
+        n_samples = max(n_samples,
+                        (int(declared["samples"]) - 1) * ticks_per_sample)
+    total = n_samples // ticks_per_sample + 1
+
+    channels: Dict[str, Sequence[int]] = {}
     for name in names.values():
-        series: List[int] = []
+        # bytearray, not list: a full-length 24 MS/s capture is 96M samples, and
+        # a Python list of ints would cost ~770 MB per channel against 96 MB
+        # here. Indexing, slicing and len() all behave the same for the
+        # analysers, which only ever read.
+        series = bytearray()
         level = 0
         for time, value in changes.get(name, []):
-            series.extend([level] * (time // ticks_per_sample - len(series)))
+            series.extend(bytes([level]) * (time // ticks_per_sample
+                                            - len(series)))
             series.append(value)
             level = value
-        series.extend([level] * (n_samples // ticks_per_sample + 1 - len(series)))
+        series.extend(bytes([level]) * (total - len(series)))
         channels[name] = series
 
     return channels, sample_rate_hz
+
+
+def read_capture_meta(vcd_path) -> Optional[Dict[str, int]]:
+    """The true sample count capture.py recorded beside a VCD, if present."""
+    sidecar = Path(str(vcd_path).rsplit(".", 1)[0] + ".meta")
+    try:
+        data = json.loads(sidecar.read_text())
+    except (OSError, ValueError):
+        return None
+    if isinstance(data, dict) and "samples" in data:
+        return data
+    return None
 
 
 def load_capture(filepath: str) -> Tuple[Dict[str, List[int]], int]:

@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent / "tests"))
 
 import report                    # noqa: E402
+import run_hardware as hw        # noqa: E402
 import run_tests as rt           # noqa: E402
 import signal_parser as sp       # noqa: E402
 import vcd_fixtures as vf        # noqa: E402
@@ -109,6 +110,11 @@ def main():
     ap.add_argument("scenario", nargs="?", help="SR_02 or SR_05")
     ap.add_argument("--list", action="store_true",
                     help="print the sweep plan and any illegal points, run nothing")
+    ap.add_argument("--port", default=hw.DEFAULT_PORT)
+    ap.add_argument("--driver", default=hw.DEFAULT_DRIVER)
+    ap.add_argument("--sample-rate", type=int, default=hw.DEFAULT_RATE)
+    ap.add_argument("--run", action="store_true",
+                    help="drive the board once per point and capture each")
     ap.add_argument("--run-dir", default=None,
                     help="directory holding <scenario>_<label>.vcd captures")
     ap.add_argument("--csv", action="store_true")
@@ -122,8 +128,11 @@ def main():
         print(as_plan(args.scenario, info))
         return 0
 
+    if args.run:
+        return run_sweep(args, info)
+
     if not args.run_dir:
-        ap.error("give --run-dir with the captures to tabulate")
+        ap.error("give --run-dir with the captures to tabulate, or --run")
 
     rows = []
     for label, segs, problem in plan(args.scenario, info):
@@ -139,6 +148,35 @@ def main():
     print(as_csv(rows) if args.csv else as_markdown(args.scenario, rows))
     return 1 if any(r[1] in ("FAIL", "ERROR", "ILLEGAL", "MISSING")
                     for r in rows) else 0
+
+
+def run_sweep(args, info):
+    """Drive the board once per sweep point, then tabulate what came back.
+
+    Each point gets its own cold boot, for the same reason each scenario does:
+    the question is what the board does from a fresh start.
+    """
+    rows = []
+    run_dir = Path(args.run_dir or ("/tmp/cap/sweep"))
+    cfg = rt.SCENARIOS[args.scenario][0]
+    for label, segments, problem in plan(args.scenario, info):
+        if problem:
+            rows.append((label, "ILLEGAL", "", "", "", problem))
+            continue
+        name = f"{args.scenario}_{label.replace('=', '_')}"
+        try:
+            wire_cfg, channels, mask = hw.wire_plan(args.scenario)
+            vcd, _note = hw.run_segments(
+                segments, wire_cfg, channels, mask, name, info,
+                port=args.port, driver=args.driver, out_dir=run_dir,
+                rate=args.sample_rate)
+        except hw.BoardError as exc:
+            rows.append((label, "ERROR", "", "", "", str(exc)[:60]))
+            continue
+        print(f"  {label}: captured", file=sys.stderr)
+        rows.append(evaluate_point(args.scenario, label, segments, vcd, info))
+    print(as_csv(rows) if args.csv else as_markdown(args.scenario, rows))
+    return 1 if any(r[1] != "PASS" for r in rows) else 0
 
 
 def evaluate_point(scenario, label, segments, path, info):
