@@ -100,16 +100,21 @@ def wire_plan(scenario, dut_driver=rt.DEFAULT_NATIVE_DRIVER):
 
     The channel run is contiguous and starts at D0: sparse selections drop
     channels on this clone, where -C D0,D2 yields nothing on D2 while
-    -C D0,D1,D2 works. A two-stepper config therefore captures D0..D3 rather
-    than only the two step pins it uses.
+    -C D0,D1,D2 works. So the capture covers every channel the configuration can
+    reach -- `count * stride`, not a fixed pair -- which is also why the mask is
+    derived from the count. Capturing only D0..D3 would leave a four-stepper
+    scenario's C and D uncaptured, and `evaluate()` now fails that as an
+    incomplete capture instead of quietly scoring them as silent drivers.
     """
     cfg = rt.SCENARIOS[scenario][0]
     if cfg not in rt.CONFIGS:
         raise BoardError(f"no wiring known for config {cfg!r}")
-    count = len(rt.config_drivers(cfg, dut_driver))
-    channels = ",".join(f"D{i}" for i in range(4 if count > 1 else 2))
-    return rt.config_wire(cfg, dut_driver), channels, \
-        ("3" if count > 1 else "1")
+    drivers = rt.config_drivers(cfg, dut_driver)
+    count = len(drivers)
+    # Every catalogue scenario is a `dir` one, so two channels per stepper.
+    reach = min(rt.CHANNELS, count * 2)
+    channels = ",".join(f"D{i}" for i in range(reach))
+    return rt.config_wire(cfg, dut_driver), channels, str((1 << count) - 1)
 
 
 def run_segments(segments, wire_cfg, channels, mask, name, info,
@@ -242,7 +247,7 @@ def build_result(scenario, vcd, ok, detail, channels, rate, arch, out_dir,
     cfg = rt.SCENARIOS[scenario][0]
     driver = rt.driver_tag(cfg, dut_driver)
     per_stepper = {}
-    for letter, ch_name in sorted(rt.STEP_CHANNELS.items()):
+    for letter, ch_name in rt.Pins.default().items():
         if ch_name not in channels:
             continue
         per_stepper[letter] = sp.stepper_metrics(channels[ch_name], rate)

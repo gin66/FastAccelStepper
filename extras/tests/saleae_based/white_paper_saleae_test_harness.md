@@ -877,6 +877,7 @@ The whole surface. Note how small it is: everything else is assembled from
 | `SR00` | `OK SR00` | SR_00 pin self-test (§5.0) |
 | `CONFIG <count> <drv>[,<drv>…] [dir\|nodir]` | `OK CONFIG n=<N> mode=<pinmode> maxspeed<i>=<ticks> …` | Connect `<count>` steppers, one driver named per stepper. Pin mode `dir` (default) or `nodir`. **There is no `auto`.** |
 | `MAP` | `MAP count=<n> mode=<pinmode> stride=<s> ch=<pin,…>` | Which analyzer channel carries which stepper, plus the GPIO behind each reachable channel, so host and firmware cannot disagree (§3.3). **The host must read this rather than assume a map**: in `dir` stepper B is `D2`, in `nodir` it is `D1`, and a host that guesses reads a quiet pin and reports a driver that emits nothing |
+| | | The map the host evaluates with is carried **in the result record** (`channel_map`), and every evaluator receives it as an argument (`Pins`) rather than reading a module-level table. A capture missing a stepper the board connected is reported as an incomplete capture — *not* as a quiet stepper, and not as a pass |
 | `QINFO` | `QINFO tps=… mincmd=… qlen=… maxall=… maxspeed0=… [maxspeed1=…]` | Platform limits the host must respect. **`maxall` is the largest per-stepper speed floor** — the fastest period legal for *every* connected stepper, and what a shared program is planned against. The indexed `maxspeedN` fields are each stepper's own, for a program that addresses one stepper specifically. `maxall` is printed **first** so a buffer overrun cannot truncate the field the host cannot reconstruct |
 | `QCLR` | `OK QCLR` | Drop the program, stop everything |
 | `QSEG <steps> <ticks> <dir>` | `OK QSEG <n>/8` | Append a segment to the **shared** program. `steps=0` means "pause for `<ticks>` ticks". `dir` is 0 or 1 |
@@ -1080,6 +1081,23 @@ a period at 640 ticks and almost nothing at 65535. Hence the period column.
 **Adherence is the asserted half.** Each stepper is given its own period and
 checked against *its own*, not a common one: a synchronized start that dragged
 both onto one speed would satisfy a first-step test and fail this one.
+
+**This is only a test if the periods actually differ.** SR_15 derives its slow
+stepper from the *clamped* fast period, not from `max_speed_ticks × ratio`,
+because `legal_ticks()` has a 160-tick floor and the ESP32's real RMT floor is
+80: asking for 80 and for 160 returns 160 for both, the ratio collapses to 1.0,
+two identical periods reach the board, and the evaluator — checking each
+stepper against *its own* command — passes. Measured on the real chip after the
+fix: A commanded 160 t → **9.9987 µs**, B commanded 320 t → **19.9987 µs**,
+200/200 steps each, skew 37.5 µs (3.75 periods). Before it, the recorded
+"adherence" was the firmware obeying two identical commands.
+
+The fixture DUT's floor is 640, where the ratio survives by arithmetic accident.
+That is worth stating plainly: a fixture **10× more generous than the silicon**
+let a real defect pass, and its own discipline — the QINFO values are the only
+source of time constants, so no evaluator can hardcode 16 MHz — did not cover
+it. The lesson generalises: a fixture's job is to be *harder* than the hardware,
+and a generous constant is as dangerous as a hardcoded one.
 
 ### 5.3 Category: Driver Edge Behaviour
 

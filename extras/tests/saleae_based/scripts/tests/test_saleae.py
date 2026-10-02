@@ -6,6 +6,8 @@ Run from extras/tests/saleae_based:
     python3 -m unittest discover -s scripts/tests -v
 """
 
+import argparse
+import json
 import os
 import re
 import shutil
@@ -145,8 +147,6 @@ class TestSignalParser(unittest.TestCase):
         are indistinguishable, which is what made every SR_25 capture look
         like it stopped on its final pulse.
         """
-        import json
-        import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             vcd = Path(tmp) / "c.vcd"
             # Shaped like sigrok's own output, including the $comment that
@@ -1046,22 +1046,25 @@ class TestModes(unittest.TestCase):
                  "max_speed_ticks": 160, "queue_len": 32,
                  "per_stepper_floor": 160}
 
-    def _eval_sync(self, a, b):
-        """eval_sync on two rendered stepper channels, 1 sample == 1 us."""
+    def _eval_sync(self, a, b, chan_map=None, count=2):
+        """eval_sync on two rendered stepper channels, 1 sample == 1 us.
+
+        The map is passed in and nothing is set globally -- which is the point
+        of R4. These tests previously saved, overwrote and restored two module
+        globals, so they could only ever test one map at a time and would
+        silently judge a `nodir` capture with the `dir` table if two of them ran
+        together.
+        """
         n = 20000
-        channels = {"D0": self.dense(a, n), "D1": [0] * n,
-                    "D2": self.dense(b, n), "D3": [0] * n}
-        old = run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS
-        chan_map = run_tests.default_channel_map(2, 2)
-        run_tests.STEP_CHANNELS = run_tests.step_channels(chan_map)
-        run_tests.DIR_CHANNELS = run_tests.dir_channels(chan_map)
-        try:
-            return run_tests.eval_sync(channels, 1_000_000,
-                                       [(40, 160, True)], self.EVAL_INFO,
-                                       {0: [(40, 160, True)],
-                                        1: [(40, 320, True)]})
-        finally:
-            run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS = old
+        channels = {"D0": self.dense(a, n)}
+        for i in range(1, 4):
+            channels[f"D{i}"] = [0] * n
+        channels["D2"] = self.dense(b, n)
+        pins = run_tests.Pins(chan_map or run_tests.default_channel_map(2, 2))
+        return run_tests.eval_sync(channels, 1_000_000,
+                                   [(40, 160, True)], self.EVAL_INFO, pins,
+                                   {0: [(40, 160, True)],
+                                    1: [(40, 320, True)]})
 
     def test_sync_accepts_each_stepper_at_its_own_period(self):
         ok, detail = self._eval_sync(self.square(160, 40),
@@ -1102,15 +1105,9 @@ class TestModes(unittest.TestCase):
         channels = {}
         for i, w in enumerate(waveforms):
             channels[f"D{i}"] = self.dense(w, n)
-        old = run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS
-        chan_map = run_tests.default_channel_map(len(waveforms), 1)
-        run_tests.STEP_CHANNELS = run_tests.step_channels(chan_map)
-        run_tests.DIR_CHANNELS = {}
-        try:
-            return run_tests.eval_scale(channels, 1_000_000,
-                                        [(40, 160, True)], self.EVAL_INFO)
-        finally:
-            run_tests.STEP_CHANNELS, run_tests.DIR_CHANNELS = old
+        pins = run_tests.Pins(run_tests.default_channel_map(len(waveforms), 1))
+        return run_tests.eval_scale(channels, 1_000_000,
+                                   [(40, 160, True)], self.EVAL_INFO, pins)
 
     def test_scale_accepts_every_stepper_at_the_shared_period(self):
         ok, detail = self._eval_scale([self.square(160, 40)
@@ -1133,6 +1130,359 @@ class TestModes(unittest.TestCase):
                                        self.square(160, 40), []])
         self.assertFalse(ok, "a silent stepper passed a scale run")
         self.assertEqual(detail["per_stepper"]["D"]["steps"]["steps_measured"], 0)
+
+
+class TestPerStepperPrograms(unittest.TestCase):
+    """The scenarios that need one indexed QSEG program per stepper.
+
+    SR_15 is the only one, and it is the only one because it is the only one
+    that gives two steppers *different* periods. Both halves of that have been
+    wrong in ways no test caught, so they are pinned here:
+
+    * The runner used to answer "does this need per-stepper programs?" by
+      calling `per_stepper_programs(scenario, None)`, which dereferences the
+      QINFO dict and raised `TypeError`. SR_15 could therefore never run.
+    * SR_15 derives its slow stepper from `max_speed_ticks * ratio`, and
+      `legal_ticks()` has a 160-tick floor. The ESP32's real RMT floor is 80,
+      so 80 and 160 both clamp to 160 and the ratio collapses to **1.0** -- the
+      scenario would send two identical periods and report success. The fixture
+      DUT's floor is 640, where the ratio survives by accident, which is why the
+      recorded result was never a statement about the real chip.
+    """
+
+    REAL_ESP32 = {"min_cmd_ticks": 3200, "max_speed_ticks": 80,
+                  "ticks_per_s": 16_000_000, "queue_len": 32}
+    FIXTURE_DUT = {"min_cmd_ticks": 3200, "max_speed_ticks": 640,
+                  "ticks_per_s": 16_000_000, "queue_len": 32}
+
+    def test_sr15_is_the_only_scenario_needing_them(self):
+        self.assertEqual(run_tests.PER_STEPPER_SCENARIOS, {"SR_15"})
+        self.assertTrue(run_tests.needs_per_stepper("SR_15"))
+        self.assertIsNotNone(run_tests.per_stepper_builder("SR_15"))
+        for sid in run_tests.SCENARIOS:
+            if sid == "SR_15":
+                continue
+            self.assertFalse(run_tests.needs_per_stepper(sid), sid)
+            self.assertIsNone(run_tests.per_stepper_builder(sid), sid)
+
+    def test_asking_needs_no_qinfo(self):
+        # The runner asks before the board is wired, so this must not need an
+        # info dict. It used to, and every catalogue run that reached SR_15
+        # raised TypeError on the way.
+        for sid in run_tests.SCENARIOS:
+            run_tests.per_stepper_builder(sid)
+        self.assertIsNone(run_tests.per_stepper_programs("SR_01", None))
+
+    def test_sr15_ratio_survives_on_the_real_chip(self):
+        for label, info in (("real ESP32 RMT", self.REAL_ESP32),
+                            ("fixture DUT", self.FIXTURE_DUT)):
+            programs = run_tests.per_stepper_programs("SR_15", info)
+            a, b = programs[0][0][1], programs[1][0][1]
+            self.assertEqual(b / a, run_tests.SR_15_RATIO,
+                             f"{label}: A={a} B={b} -- the ratio collapsed to "
+                             f"{b / a}, so both steppers ran at one speed and "
+                             f"the scenario measured nothing")
+
+    def test_sr15_periods_are_legal_at_the_real_chip_floor(self):
+        programs = run_tests.per_stepper_programs("SR_15", self.REAL_ESP32)
+        for idx, segs in programs.items():
+            steps, ticks = segs[0][0], segs[0][1]
+            self.assertGreaterEqual(ticks * steps,
+                                    self.REAL_ESP32["min_cmd_ticks"],
+                                    f"stepper {idx} would be refused")
+            self.assertLessEqual(ticks, 65535, f"stepper {idx}")
+
+    def test_every_synced_plan_keeps_its_ratio_on_the_real_chip(self):
+        # sync_plan already derives its ladder from the clamped base; this pins
+        # that at the real floor, where the SR_15 bug lived.
+        for plan in run_tests.sync_plan(["rmt", "mcpwm_pcnt", "i2s_direct"],
+                                        "dir", 3):
+            programs = plan.per_stepper_builder(self.REAL_ESP32)
+            ticks = [programs[i][0][1] for i in sorted(programs)]
+            self.assertEqual(len(set(ticks)), 3,
+                             f"{plan.label}: {ticks} -- a rate collapse could "
+                             f"not be detected if two steppers share a period")
+
+
+class TestPins(unittest.TestCase):
+    """The channel map as a value passed to the evaluator, not a global.
+
+    This is todo R4. The map used to be two module-level dicts that `evaluate()`
+    overwrote per run, which meant a *wrong* map was not an error but a silent
+    substitution: with `nodir`, stepper B is on `D1`, so reading it on `D2`
+    measures a quiet pin and reports a driver that emits nothing.
+
+    The tests below are mostly about that substitution not being able to
+    happen any more, and the two that matter most are `test_a_nodir_map_cannot
+    _be_judged_as_a_dir_map` and its inverse -- they assert the *conclusion*
+    changes with the map, which is what makes the map load-bearing rather than
+    decorative.
+    """
+
+    # 1 sample == 1 us, and a tick is a sample, so 160 ticks is a 160 us period.
+    INFO = {"ticks_per_s": 1_000_000, "min_cmd_ticks": 100,
+            "max_speed_ticks": 160, "queue_len": 32, "per_stepper_floor": 160}
+
+    def dense(self, events, n):
+        s = [0] * n
+        for i, (t, v) in enumerate(events):
+            end = events[i + 1][0] if i + 1 < len(events) else n
+            for j in range(t, min(end, n)):
+                s[j] = v
+        return s
+
+    def square(self, period, n, offset=1000, high=8):
+        out = []
+        for i in range(n):
+            out.append((i * period + offset, 1))
+            out.append((i * period + offset + high, 0))
+        return out
+
+    def two_steppers(self, b_period=320, b_offset=1000):
+        """A and B both stepping, B at `b_period`, all eight channels present."""
+        n = 20000
+        ch = {f"D{i}": [0] * n for i in range(8)}
+        ch["D0"] = self.dense(self.square(160, 40), n)
+        ch["D2"] = self.dense(self.square(b_period, 40, offset=b_offset), n)
+        return ch
+
+    def test_pins_exposes_both_shapes(self):
+        d = run_tests.Pins(run_tests.default_channel_map(2, 2))
+        self.assertEqual(d.letters, ["A", "B"])
+        self.assertEqual(d.step_of("A"), "D0")
+        self.assertEqual(d.dir_of("A"), "D1")
+        self.assertEqual(d.step_of("B"), "D2")
+        self.assertEqual(d.count, 2)
+
+        n = run_tests.Pins(run_tests.default_channel_map(8, 1))
+        self.assertEqual(n.letters, list("ABCDEFGH"))
+        self.assertEqual(n.step_of("B"), "D1")
+        # nodir has no direction pin at all, and that has to be None rather than
+        # a repeat of the step pin: comparing a pin against itself would either
+        # find every dir change or none, both meaningless.
+        self.assertIsNone(n.dir_of("B"))
+        self.assertEqual(n.dir, {})
+
+    def test_nodir_8_stepper_map_is_d0_through_d7(self):
+        # The todo's verification case, stated directly: a nodir 8-stepper
+        # result maps A..H to D0..D7.
+        pins = run_tests.Pins(run_tests.default_channel_map(8, 1))
+        self.assertEqual([pins.step_of(c) for c in "ABCDEFGH"],
+                         [f"D{i}" for i in range(8)])
+
+    def test_a_nodir_map_cannot_be_judged_as_a_dir_map(self):
+        # A on D0, B on D1 -- the `nodir` shape. Judged with the `dir` map, B is
+        # read on D2, which is quiet, so a working pair of steppers is reported
+        # as one working stepper and one dead driver.
+        # Both steppers at the same period, and B present on D1 *only*: SR_16
+        # judges every stepper against the shared command, so a differing rate
+        # would fail for a second unrelated reason, and a waveform mirrored onto
+        # D2 as well would make the wrong map pass. D2 stays quiet, which is the
+        # whole situation being tested.
+        ch = self.two_steppers(b_period=160, b_offset=1100)
+        ch["D1"] = ch.pop("D2")
+        nodir = run_tests.default_channel_map(2, 1)
+        wrong = run_tests.default_channel_map(2, 2)
+
+        ok, right = run_tests.evaluate(
+            run_tests.EVALUATORS["SR_16"], ch, 1_000_000,
+            [(40, 160, True)], self.INFO, nodir)
+        ok_wrong, wrong_detail = run_tests.evaluate(
+            run_tests.EVALUATORS["SR_16"], ch, 1_000_000,
+            [(40, 160, True)], self.INFO, wrong)
+
+        self.assertTrue(ok, right)
+        self.assertEqual(right["per_stepper"]["B"]["steps"]["steps_measured"],
+                         40)
+        self.assertEqual(right["per_stepper"]["B"]["channel"], "D1")
+
+        # The wrong map does not merely report B as quiet -- it says the capture
+        # has no B at all, which is the true reason and cannot be mistaken for a
+        # driver finding.
+        self.assertFalse(ok_wrong,
+                         "the wrong map still passed -- the map is decorative")
+        self.assertIn("incomplete_capture", wrong_detail)
+        self.assertEqual(wrong_detail["incomplete_capture"]["missing_steppers"],
+                         ["B"])
+        self.assertEqual(wrong_detail["incomplete_capture"]["missing_channels"],
+                         ["D2"])
+
+    def test_two_maps_can_be_judged_in_one_process(self):
+        # The globals could not do this: whichever map was installed last won,
+        # so two results with different shapes could never be compared. This is
+        # the property the fixtures and the mode runs both need.
+        nodir_ch = self.two_steppers(b_period=160, b_offset=1100)
+        nodir_ch["D1"] = nodir_ch.pop("D2")
+        dir_ch = self.two_steppers(b_period=160, b_offset=1000)
+
+        nodir_ok, _ = run_tests.evaluate(
+            run_tests.EVALUATORS["SR_16"], nodir_ch, 1_000_000,
+            [(40, 160, True)], self.INFO,
+            run_tests.default_channel_map(2, 1))
+        dir_ok, dir_detail = run_tests.evaluate(
+            run_tests.EVALUATORS["SR_16"], dir_ch, 1_000_000,
+            [(40, 160, True)], self.INFO,
+            run_tests.default_channel_map(2, 2))
+        # And back again, to catch an evaluator that cached the first map.
+        nodir_again, _ = run_tests.evaluate(
+            run_tests.EVALUATORS["SR_16"], nodir_ch, 1_000_000,
+            [(40, 160, True)], self.INFO,
+            run_tests.default_channel_map(2, 1))
+
+        self.assertTrue(nodir_ok and dir_ok and nodir_again,
+                        "interleaved maps gave different answers")
+        self.assertEqual(dir_detail["per_stepper"]["B"]["channel"], "D2")
+
+    def test_no_evaluator_reads_a_module_level_channel_table(self):
+        # The structural half of R4. A grep-based test, deliberately: the
+        # failure mode was a table that exists and is correct for the shape in
+        # front of you, so the only way to keep it gone is to notice it coming
+        # back.
+        source = (SCRIPTS / "run_tests.py").read_text()
+        code = "\n".join(line for line in source.splitlines()
+                          if not line.lstrip().startswith("#"))
+        for name in ("STEP_CHANNELS", "DIR_CHANNELS"):
+            body = code.split('"""', 2)[-1] if '"""' in code else code
+            self.assertNotIn(f"{name} =", code,
+                             f"a module-level {name} is back; the map must be "
+                             f"passed to the evaluator, not installed globally")
+
+    def test_every_evaluator_takes_the_map(self):
+        # Every entry in EVALUATORS has the same signature, so a new one cannot
+        # be added that quietly reads a default instead of the run's own map.
+        import inspect
+        for test_id, fn in run_tests.EVALUATORS.items():
+            params = list(inspect.signature(fn).parameters)
+            self.assertEqual(params,
+                             ["channels", "rate", "segments", "info", "pins"],
+                             f"{test_id} does not take the channel map")
+
+    def test_wire_plan_captures_every_channel_the_config_can_reach(self):
+        # Sparse selections drop channels on this clone, so the capture must be
+        # contiguous -- and it must cover all of them. Capturing only D0..D3 left
+        # a four-stepper scenario's C and D uncaptured, which used to score them
+        # as silent drivers and now fails as an incomplete capture.
+        import run_hardware as hw
+        for scenario, want_channels, want_mask in (
+                ("SR_01", ["D0", "D1"], "1"),
+                ("SR_14", ["D0", "D1", "D2", "D3"], "3")):
+            _wire, channels, mask = hw.wire_plan(scenario, "rmt_v2")
+            self.assertEqual(channels.split(","), want_channels, scenario)
+            self.assertEqual(mask, want_mask, scenario)
+        # The mask has to select every stepper the config connected, or QRUN
+        # leaves one idle and the run reports a driver that was never asked.
+        cfg = run_tests.SCENARIOS["SR_14"][0]
+        count = len(run_tests.config_drivers(cfg, "rmt_v2"))
+        _w, _c, mask = hw.wire_plan("SR_14", "rmt_v2")
+        self.assertEqual(int(mask), (1 << count) - 1)
+
+        # No catalogue scenario reaches four steppers today, so the 4-channel
+        # cap is unreachable through SR ids -- which is exactly why a test that
+        # only walked the catalogue would not have caught it. Exercise the rule
+        # with the scenario table widened instead of pretending it is reachable.
+        with mock.patch.dict(run_tests.CONFIGS, {"4ch": (4, "native")}), \
+                mock.patch.dict(run_tests.SCENARIOS,
+                                {"SR_99": ("4ch", None, 0, "four steppers")}):
+            _w, channels, mask = hw.wire_plan("SR_99", "rmt_v2")
+        self.assertEqual(channels.split(","), [f"D{i}" for i in range(8)])
+        self.assertEqual(mask, "15",
+                         "a four-stepper run needs all 8 channels and mask 15")
+
+    def test_dir_change_still_maps_a_to_d0_and_b_to_d2(self):
+        # The todo's other verification case, and the guard against R4 breaking
+        # the one shape every recorded result uses.
+        pins = run_tests.Pins.default()
+        self.assertEqual(pins.step_of("A"), "D0")
+        self.assertEqual(pins.dir_of("A"), "D1")
+        self.assertEqual(pins.step_of("B"), "D2")
+        self.assertEqual(pins.dir_of("B"), "D3")
+
+    def test_pin_invariants_skip_nodir_rather_than_comparing_a_pin_to_itself(self):
+        # In nodir there is no dir pin. Passing the step pin as both arguments
+        # would make every step edge look like a dir edge during step-high, and
+        # the invariant would then fail every nodir run for no reason.
+        ch = {f"D{i}": [0] * 20000 for i in range(8)}
+        ch["D0"] = self.dense(self.square(160, 40), 20000)
+        pins = run_tests.Pins(run_tests.default_channel_map(2, 1))
+        inv = run_tests.check_pin_invariants(ch, 1_000_000, pins)
+        self.assertTrue(inv["ok"], inv)
+        self.assertEqual(inv["n_dir_while_step_high"], 0)
+
+    def test_pin_invariants_still_catch_a_dir_edge_inside_a_pulse(self):
+        # ...and the check is not vacuous for them: a dir change during step-high
+        # is a real defect, so it has to be found in `dir` mode.
+        n = 20000
+        ch = {f"D{i}": [0] * n for i in range(8)}
+        ch["D0"] = self.dense(self.square(160, 40), n)
+        ch["D1"] = self.dense([(1000 + 160 * 5, 1), (1000 + 160 * 5 + 4, 0)], n)
+        pins = run_tests.Pins(run_tests.default_channel_map(1, 2))
+        inv = run_tests.check_pin_invariants(ch, 1_000_000, pins)
+        self.assertFalse(inv["ok"], "a dir edge inside a pulse went unnoticed")
+        self.assertEqual(inv["n_dir_while_step_high"], 1)
+        self.assertIn("A", inv["dir_while_step_high"])
+
+    def test_a_missing_channel_is_not_a_quiet_one(self):
+        # A capture can legitimately omit a channel. `step_wave` returns None
+        # for that, so an evaluator skips the stepper rather than measuring an
+        # absent channel as a quiet one -- which would read as a driver that
+        # never fired.
+        pins = run_tests.Pins(run_tests.default_channel_map(2, 2))
+        self.assertIsNone(pins.step_wave({"D0": [1]}, "B"))
+        self.assertIsNotNone(pins.step_wave({"D0": [1]}, "A"))
+        self.assertIsNone(pins.dir_wave({"D0": [1]}, "A"))
+
+    def test_results_carry_the_map_they_were_judged_with(self):
+        # R4 is only half done if the map is used and then thrown away: the
+        # record has to say which map produced it, or a reader cannot tell a
+        # nodir result from a dir one.
+        import json
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "results"
+            args = argparse.Namespace(
+                port="/dev/null", baud=115200, sample_rate=1_000_000,
+                sr00_sample_rate=1_000_000, seconds=1.0,
+                capture_dir=str(Path(tmp) / "cap"),
+                results_dir=str(out), force=True)
+            seen = {}
+
+            def fake_measure(key, name, wire, mask, builder, ev, a,
+                             per_stepper_for=None):
+                chan_map = run_tests.default_channel_map(3, 1)
+                seen["pins"] = run_tests.Pins(chan_map)
+                return "passed", {"channel_map": chan_map, "pin_map": {}}
+
+            with mock.patch.object(run_tests, "measure", fake_measure), \
+                    mock.patch.object(run_tests, "load_index", lambda f: {}), \
+                    mock.patch.object(run_tests, "start_capture",
+                                      lambda *a, **k: mock.Mock()), \
+                    mock.patch.object(run_tests, "send_line",
+                                      lambda *a, **k: ""), \
+                    mock.patch.object(run_tests, "reply_of",
+                                      lambda *a: "OK CONFIG"), \
+                    mock.patch.object(run_tests, "read_map",
+                                      lambda ser: (seen["chan_map"], {})), \
+                    mock.patch.object(run_tests, "read_qinfo",
+                                      lambda ser: dict(vf.Dut().info())), \
+                    mock.patch.object(run_tests, "program",
+                                      lambda *a: True), \
+                    mock.patch.object(run_tests, "drain",
+                                      lambda *a, **k: ""), \
+                    mock.patch.object(run_tests, "open_board",
+                                      lambda *a: mock.Mock()), \
+                    mock.patch.object(run_tests, "load_capture_for_eval",
+                                      lambda *a: ({"D0": [0]}, 1000)):
+                seen["chan_map"] = run_tests.default_channel_map(3, 1)
+                plan = run_tests.scale_plan("rmt", "nodir", 3)
+                run_tests.run_modes("r4_probe", plan, args, "scale")
+            records = [json.loads(f.read_text())
+                       for f in sorted(out.glob("*.json"))
+                       if "tag_index" not in f.name]
+            self.assertEqual(len(records), 3)
+            for rec in records:
+                self.assertEqual(rec["channel_map"]["B"], {"step": "D1"},
+                                 rec["tag_key"])
+                self.assertEqual(rec["pin_mode"], "nodir")
 
 
 if __name__ == "__main__":

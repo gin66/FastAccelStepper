@@ -50,7 +50,8 @@ def evaluate(fx: vf.Fixture):
     channels, rate = sp.load_vcd(fx.path)
     # `evaluate`, not the raw evaluator: that applies the global pin invariants
     # too, so a fixture that violates one of them fails here as well.
-    return rt.evaluate(fx.scenario, channels, rate, fx.segments, fx.info())
+    return rt.evaluate(fx.scenario, channels, rate, fx.segments, fx.info(),
+                      rt.Pins.for_scenario(fx.scenario).map)
 
 
 def flatten(detail) -> str:

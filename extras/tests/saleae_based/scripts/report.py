@@ -31,21 +31,24 @@ import run_tests as rt          # noqa: E402
 import signal_parser as sp       # noqa: E402
 import vcd_fixtures as vf        # noqa: E402
 
-# Per-stepper channel letters, so a two-channel result reads as "A and B" rather
-# than as raw channel names the reader has to look up.
-STEP_CHANNELS = rt.STEP_CHANNELS
-
-
 def scenario_ids():
     """Every wired scenario id, in SR order."""
     return sorted(rt.SCENARIOS, key=lambda sid: int(sid.split("_")[1]))
 
 
-def evaluate_file(path, scenario, info):
-    """Evaluate one capture. Returns (ok, detail) or raises on unreadable input."""
+def evaluate_file(path, scenario, info, chan_map=None):
+    """Evaluate one capture. Returns (ok, detail) or raises on unreadable input.
+
+    `chan_map` is the run's own channel map. A capture recorded from a `nodir`
+    run has to be judged with the `nodir` map or stepper B is read on `D2`
+    instead of `D1` -- a quiet pin, reported as a driver that emits nothing.
+    Callers that have the result record pass the map it carries.
+    """
     channels, rate = load_once(path)
     segments = rt.SCENARIOS[scenario][1](info)
-    return rt.evaluate(scenario, channels, rate, segments, info)
+    pins = rt.Pins(chan_map) if chan_map is not None \
+        else rt.Pins.for_scenario(scenario)
+    return rt.evaluate(scenario, channels, rate, segments, info, pins.map)
 
 
 _CACHE = {}
@@ -110,9 +113,9 @@ def verdict_of(ok, detail):
     return "PASS"
 
 
-def row_for(scenario, path, info):
+def row_for(scenario, path, info, chan_map=None):
     try:
-        ok, detail = evaluate_file(path, scenario, info)
+        ok, detail = evaluate_file(path, scenario, info, chan_map)
     except Exception as exc:                      # noqa: BLE001
         return {"scenario": scenario, "verdict": "ERROR",
                 "steps_hw": "", "steps_exp": "", "note": str(exc)[:60],

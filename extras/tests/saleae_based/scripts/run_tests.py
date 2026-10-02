@@ -89,8 +89,104 @@ def dir_channels(chan_map):
             if "dir" in entry}
 
 
-STEP_CHANNELS = step_channels(default_channel_map())
-DIR_CHANNELS = dir_channels(default_channel_map())
+class Pins:
+    """Which analyzer channel is which stepper, and which has a direction pin.
+
+    The map is **configuration, not a constant**, and this class is what makes
+    that structural rather than a convention: an evaluator receives the `Pins`
+    for the run it is judging and reads channels through it, so there is no
+    module-level channel table for a stale one to be read through by accident.
+
+    It existed as two globals (`STEP_CHANNELS`, `DIR_CHANNELS`) that `evaluate()`
+    overwrote per run. That works one run at a time and quietly breaks the moment
+    anything holds two maps at once -- a fixture and a mode run, or two results
+    in the same process. It also meant the *wrong* map was not an error but a
+    silent substitution: with `nodir`, stepper B is `D1` and not `D2`, so an
+    evaluator reading the `dir` table measures a quiet pin and reports zero
+    steps, which reads as a dead driver rather than as a wrong map.
+
+    `letters()` is the stepper order, A..H, and `step_of`/`dir_of` look one up.
+    `dir_of` returns None in `nodir`, where no direction pin exists at all.
+    """
+
+    __slots__ = ("map", "step", "dir")
+
+    def __init__(self, chan_map):
+        self.map = dict(chan_map)
+        self.step = step_channels(self.map)
+        self.dir = dir_channels(self.map)
+
+    @classmethod
+    def default(cls):
+        """The 4-stepper `dir` map, for callers with nothing better to go on.
+
+        Every scenario in SCENARIOS that uses more than one stepper connects the
+        `dir` shape, and 1ch scenarios need only A, so this is correct for the
+        catalogue. It is a *fallback*, not the harness's idea of a channel map;
+        anything that knows what it connected should use `for_scenario()` or
+        the board's own map.
+        """
+        return cls(default_channel_map(4, 2))
+
+    @classmethod
+    def for_scenario(cls, scenario):
+        """The map for the configuration a named scenario connects.
+
+        Derived from the scenario's own CONFIGS entry rather than assumed, so a
+        1-stepper scenario is not handed a 4-stepper map and then reported as
+        having three silent steppers. The pin mode is still `dir`: every
+        multi-stepper scenario in SCENARIOS is a `dir` one.
+        """
+        config = SCENARIOS[scenario][0]
+        return cls(default_channel_map(CONFIGS[config][0], 2))
+
+    @property
+    def count(self):
+        return len(self.step)
+
+    @property
+    def letters(self):
+        """Stepper names, in order: A, B, C ..."""
+        return sorted(self.step)
+
+    def step_of(self, letter):
+        return self.step[letter]
+
+    def dir_of(self, letter):
+        """The direction channel for `letter`, or None in `nodir`."""
+        return self.dir.get(letter)
+
+    def step_wave(self, channels, letter):
+        """The step channel's samples, or None when it was not captured.
+
+        A capture can legitimately omit a channel -- a scenario that only needs
+        two of eight, or an analyzer that dropped one -- and that has to be
+        distinguishable from a channel that was captured and stayed quiet.
+        """
+        ch = self.step.get(letter)
+        return channels.get(ch) if ch is not None else None
+
+    def dir_wave(self, channels, letter):
+        ch = self.dir.get(letter)
+        return channels.get(ch) if ch is not None else None
+
+    def items(self):
+        """(letter, step channel) pairs, in stepper order."""
+        return [(letter, self.step[letter]) for letter in self.letters]
+
+    def missing(self, channels):
+        """Steppers the board connected whose channel the capture lacks.
+
+        This is an **incomplete capture**, not a quiet stepper, and the two have
+        to be distinguishable: the map says the board connected stepper B, so if
+        the capture has no `D2` then nothing was measured for B. Reporting that
+        as "B emitted 0 steps" invents a defect, and *passing* it invents a
+        result. Either way the measurement is not there, so a run that hits this
+        fails with the reason rather than answering a question nobody asked.
+        """
+        return [letter for letter in self.letters
+                if self.step[letter] not in channels]
+
 
 # Every analyzer channel, in order. A capture has to enable all of them or a
 # scenario's own channels come back missing.
@@ -352,16 +448,44 @@ def sc_steps_per_command(info):
 SR_15_RATIO = 2
 
 
+# The scenarios that cannot be expressed with the shared 3-argument QSEG and so
+# need one indexed program per stepper. SR_15 is the only one, and it is the
+# only one because it is the only one that gives two steppers *different*
+# periods.
+#
+# This is a set rather than a probe because the runner has to answer "does this
+# scenario need per-stepper programs?" *before* it has a QINFO dict, and
+# per_stepper_programs() needs one. Asking it with a None info and comparing the
+# answer crashed on SR_15 -- a scenario the catalogue has carried since R1 and
+# which nothing had actually run, because the harness path that reaches it had
+# never worked.
+PER_STEPPER_SCENARIOS = {"SR_15"}
+
+
+def needs_per_stepper(scenario):
+    return scenario in PER_STEPPER_SCENARIOS
+
+
 def per_stepper_programs(scenario, info):
     """{stepper index: segments}, for scenarios needing per-stepper speeds.
 
     None for every other scenario: they all share one program, and the
     3-argument QSEG form is what they use.
     """
-    if scenario != "SR_15":
+    if not needs_per_stepper(scenario):
         return None
+    # Derive the slow stepper from the *clamped* fast period, not from
+    # max_speed_ticks * ratio. legal_ticks() has a 160-tick floor, and the
+    # ESP32's real RMT floor is 80 -- so asking for 80 and for 160 both return
+    # 160, and the ratio collapses to 1.0. This scenario's entire subject is
+    # that each stepper keeps *its own* period, so a builder that hands the
+    # firmware two identical periods measures nothing and reports success.
+    #
+    # It went unnoticed because the fixture DUT's floor is 640, where the ratio
+    # survives by arithmetic accident -- 640 and 1280 clear the floor. The
+    # recorded result was therefore never a statement about the real chip.
     fast = legal_ticks(info, 200, info["max_speed_ticks"])
-    slow = legal_ticks(info, 200, info["max_speed_ticks"] * SR_15_RATIO)
+    slow = legal_ticks(info, 200, fast * SR_15_RATIO)
     return {0: [(200, fast, True)], 1: [(200, slow, True)]}
 
 
@@ -621,10 +745,10 @@ def per_stepper_builder(scenario):
     """(info) -> {stepper: segments} for a scenario, or None.
 
     A thin adapter so the runner can ask "does this scenario need per-stepper
-    programs?" without knowing that per_stepper_programs() needs a QINFO dict
-    to compute them -- which it does not have until the board is wired.
+    programs?" without knowing that per_stepper_programs() needs a QINFO dict to
+    compute them -- which it does not have until the board is wired.
     """
-    if per_stepper_programs(scenario, None) is None:
+    if not needs_per_stepper(scenario):
         return None
     return lambda info: per_stepper_programs(scenario, info)
 
@@ -832,8 +956,8 @@ def sync_plan(drivers, pin_mode, count=2, steps=SCALE_STEPS):
             drivers=list(combo),
             pin_mode=pin_mode,
             builder=lambda info, ps=per_stepper: ps(info)[0],
-            evaluator=lambda ch, rt_, segs, inf, ps=per_stepper:
-                eval_sync(ch, rt_, segs, inf, ps(inf)),
+            evaluator=lambda ch, rt_, segs, inf, pins, ps=per_stepper:
+                eval_sync(ch, rt_, segs, inf, pins, ps(inf)),
             mask=(1 << count) - 1,
             goal=f"{'+'.join(combo)}: aligned start, each at its own period",
             per_stepper_builder=per_stepper,
@@ -891,7 +1015,7 @@ SCENARIOS = {
 # ---------------------------------------------------------------------------
 
 
-def check_pin_invariants(channels, rate):
+def check_pin_invariants(channels, rate, pins):
     """Rules that must hold for *every* capture, whatever the scenario.
 
     Currently one: the direction pin must never change while the step pin is
@@ -904,17 +1028,20 @@ def check_pin_invariants(channels, rate):
 
     This is checked across all steppers, on every test, rather than only in the
     direction-change scenario: a DIR edge during a high STEP would be a bug
-    anywhere in the program, and a per-scenario check would only catch it in the
-    one scenario that happens to change direction.
+    anywhere in the program, and a per-scenario check would only catch it in
+    the one scenario that happens to change direction.
+
+    `nodir` has no direction pin, so there is nothing to check -- `dir_of` is
+    None and the stepper is skipped rather than compared against itself.
     """
     per_stepper = {}
     total = 0
-    for name, step_ch in STEP_CHANNELS.items():
-        dir_ch = DIR_CHANNELS.get(name)
-        if step_ch not in channels or dir_ch not in channels:
+    for name, step_ch in pins.items():
+        dir_wave = pins.dir_wave(channels, name)
+        step_wave = pins.step_wave(channels, name)
+        if step_wave is None or dir_wave is None:
             continue
-        conflicts = sp.dir_changes_during_step_high(
-            channels[dir_ch], channels[step_ch], rate)
+        conflicts = sp.dir_changes_during_step_high(dir_wave, step_wave, rate)
         if conflicts:
             per_stepper[name] = conflicts
         total += len(conflicts)
@@ -925,7 +1052,8 @@ def check_pin_invariants(channels, rate):
     }
 
 
-def evaluate(evaluator, channels, rate, segments, info, chan_map=None):
+def evaluate(evaluator, channels, rate, segments, info, chan_map=None,
+             extra=None):
     """Run an evaluator, then the global invariants.
 
     `evaluator` is an EVALUATORS key or a callable, so the two generic modes
@@ -936,27 +1064,52 @@ def evaluate(evaluator, channels, rate, segments, info, chan_map=None):
     Every result carries the invariant block, and a violation fails the test
     regardless of what the scenario's own checks concluded.
 
-    `chan_map` is the board's own channel map (todo R4 threads it through the
-    evaluators); until then it defaults to the 4-stepper `dir` map, which is
-    what every current scenario connects.
+    `chan_map` is the board's own channel map, and the evaluator is given a
+    `Pins` built from it rather than reading a module-level table. Omitting it
+    falls back to the 4-stepper `dir` map, which is what every named catalogue
+    scenario connects -- the fallback exists for those, not as the harness's
+    idea of a channel map.
+
+    `extra` is forwarded to an evaluator that needs more than the four
+    standard arguments -- `eval_sync` needs the per-stepper programs it was
+    sent, so its expectations cannot drift from what went on the wire.
     """
-    global STEP_CHANNELS, DIR_CHANNELS
-    if chan_map is not None:
-        STEP_CHANNELS = step_channels(chan_map)
-        DIR_CHANNELS = dir_channels(chan_map)
+    pins = Pins(chan_map) if chan_map is not None else Pins.default()
+
+    # A capture that does not carry every stepper the board connected cannot
+    # answer the question. Checked here rather than in each evaluator because
+    # every one of them would have to get it right, and one that skipped the
+    # missing stepper would *pass* -- reporting a result for a stepper nothing
+    # was measured about.
+    missing = pins.missing(channels)
+    if missing:
+        wanted = [pins.step_of(letter) for letter in missing]
+        return False, {
+            "incomplete_capture": {
+                "missing_steppers": missing,
+                "missing_channels": wanted,
+                "channel_map": pins.map,
+                "captured": sorted(channels),
+            },
+            "invariants": {"ok": False, "n_dir_while_step_high": 0,
+                           "dir_while_step_high": {},
+                           "skipped": "capture lacks a connected stepper"},
+        }
+
     fn = evaluator if callable(evaluator) else EVALUATORS[evaluator]
-    ok, detail = fn(channels, rate, segments, info)
-    inv = check_pin_invariants(channels, rate)
+    args = (channels, rate, segments, info, pins)
+    ok, detail = fn(*args, extra) if extra is not None else fn(*args)
+    inv = check_pin_invariants(channels, rate, pins)
     detail = dict(detail)
     detail["invariants"] = inv
     return ok and inv["ok"], detail
 
 
-def eval_period_exact(channels, rate, segments, info):
+def eval_period_exact(channels, rate, segments, info, pins):
     """Inter-step period must equal the commanded ticks, in microseconds."""
     ticks = segments[0][1]
     expect_us = ticks * 1e6 / info["ticks_per_s"]
-    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
     detail = sp.period_defects(m.inter_step_us, expect_us)
     counts = sp.step_count_defects(m.step_count, segments[0][0])
     # ISR-driven architectures set the step pin from inside a timer interrupt,
@@ -972,11 +1125,11 @@ def eval_period_exact(channels, rate, segments, info):
     }
 
 
-def eval_step_count(channels, rate, segments, info):
+def eval_step_count(channels, rate, segments, info, pins):
     ticks = segments[0][1]
     expect_us = ticks * 1e6 / info["ticks_per_s"]
     n = sum(steps for steps, _, _ in segments)
-    step = channels[STEP_CHANNELS["A"]]
+    step = pins.step_wave(channels, "A")
     m = sp.channel_metrics(step, rate)
     counts = sp.step_count_defects(m.step_count, n)
     detail = sp.period_defects(m.inter_step_us, expect_us)
@@ -987,7 +1140,7 @@ def eval_step_count(channels, rate, segments, info):
     }
 
 
-def eval_scale(channels, rate, segments, info):
+def eval_scale(channels, rate, segments, info, pins):
     """`scale`: every stepper's own count and period, against the shared command.
 
     The assertion each stepper must satisfy is its own: the exact number of
@@ -1009,7 +1162,7 @@ def eval_scale(channels, rate, segments, info):
     per_stepper = {}
     means = []
     ok = True
-    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+    for letter, ch_name in pins.items():
         if ch_name not in channels:
             continue
         m = sp.channel_metrics(channels[ch_name], rate)
@@ -1038,14 +1191,14 @@ def eval_scale(channels, rate, segments, info):
     }
 
 
-def first_step_skew_us(channels, rate):
+def first_step_skew_us(channels, rate, pins):
     """(skew in us, first-step time per stepper) across every mapped stepper.
 
     The skew is max(first) - min(first): it says how far apart the *extremes*
     are, so one straggler is not hidden by the others being close together.
     """
     firsts = {}
-    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+    for letter, ch_name in pins.items():
         if ch_name not in channels:
             continue
         edges = sp.rising_edges(channels[ch_name])
@@ -1056,7 +1209,7 @@ def first_step_skew_us(channels, rate):
     return skew, firsts
 
 
-def eval_sync(channels, rate, segments, info, programs):
+def eval_sync(channels, rate, segments, info, pins, programs):
     """`sync`: first-step skew reported, per-stepper period adherence asserted.
 
     Two questions, and they are deliberately not the same check.
@@ -1083,18 +1236,19 @@ def eval_sync(channels, rate, segments, info, programs):
     The step counts are asserted too, on the same reasoning as SR_14: a
     swallowed or spurious step is a real defect on any platform.
     """
-    skew_us, firsts = first_step_skew_us(channels, rate)
+    skew_us, firsts = first_step_skew_us(channels, rate, pins)
     ok = True
     per_stepper = {}
-    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+    for letter, ch_name in pins.items():
         idx = ord(letter) - ord("A")
-        if ch_name not in channels or idx not in programs:
+        wave = pins.step_wave(channels, letter)
+        if wave is None or idx not in programs:
             continue
         segs = programs[idx]
         ticks = segs[0][1]
         expected = sum(n for n, _, _ in segs)
         expect_us = ticks * 1e6 / info["ticks_per_s"]
-        m = sp.channel_metrics(channels[ch_name], rate)
+        m = sp.channel_metrics(wave, rate)
         counts = sp.step_count_defects(m.step_count, expected)
         period = sp.period_defects(m.inter_step_us, expect_us)
         ok = ok and counts["ok"] and period["ok"]
@@ -1121,7 +1275,7 @@ def eval_sync(channels, rate, segments, info, programs):
     }
 
 
-def eval_multi_stepper_periods(channels, rate, segments, info):
+def eval_multi_stepper_periods(channels, rate, segments, info, pins):
     """Every stepper's own step count and period, for the SR_16 comparison.
 
     Asserts each stepper independently against the commanded period, and
@@ -1137,7 +1291,7 @@ def eval_multi_stepper_periods(channels, rate, segments, info):
     expected = sum(n for n, _, _ in segments)
     per_stepper = {}
     ok = True
-    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+    for letter, ch_name in pins.items():
         if ch_name not in channels:
             continue
         m = sp.channel_metrics(channels[ch_name], rate)
@@ -1145,6 +1299,9 @@ def eval_multi_stepper_periods(channels, rate, segments, info):
         detail = sp.period_defects(m.inter_step_us, expect_us)
         ok = ok and counts["ok"] and detail["ok"]
         per_stepper[letter] = {
+            # Which channel this stepper was read on, so the record says the map
+            # it used instead of leaving the reader to assume one.
+            "channel": ch_name,
             "steps": counts,
             "period": detail,
             "mean_period_us": round(sum(m.inter_step_us) / len(m.inter_step_us), 4)
@@ -1155,7 +1312,7 @@ def eval_multi_stepper_periods(channels, rate, segments, info):
     return ok and bool(per_stepper), {"ticks": t, "per_stepper": per_stepper}
 
 
-def eval_direction_phases(channels, rate, segments, info):
+def eval_direction_phases(channels, rate, segments, info, pins):
     """Step count per phase, and the dir pin's level for each.
 
     For SR_11 and SR_12 the claim is not about timing but about the dir pin
@@ -1164,8 +1321,8 @@ def eval_direction_phases(channels, rate, segments, info):
     tolerance: a phase that steps the wrong number of times, or a dir pin that
     does not reach its commanded level, is a defect rather than a statistic.
     """
-    step = channels[STEP_CHANNELS["A"]]
-    dir_ch = channels[DIR_CHANNELS["A"]]
+    step = pins.step_wave(channels, "A")
+    dir_ch = pins.dir_wave(channels, "A")
     rises = sp.rising_edges(step)
     expected_steps = sum(steps for steps, _, _ in segments)
     counts = sp.step_count_defects(len(rises), expected_steps)
@@ -1212,7 +1369,7 @@ def eval_direction_phases(channels, rate, segments, info):
     }
 
 
-def eval_nothing_emitted(channels, rate, segments, info):
+def eval_nothing_emitted(channels, rate, segments, info, pins):
     """SR_13: a rejected command must produce no pulse at all.
 
     The inverse of every other test in the suite. Here a non-empty capture is
@@ -1221,7 +1378,7 @@ def eval_nothing_emitted(channels, rate, segments, info):
     performs, and a rejection that still stepped would move the motor by steps
     the caller never asked for.
     """
-    step = channels[STEP_CHANNELS["A"]]
+    step = pins.step_wave(channels, "A")
     rises = sp.rising_edges(step)
     expected_steps = sum(steps for steps, _, _ in segments)
     return len(rises) == 0, {
@@ -1233,7 +1390,7 @@ def eval_nothing_emitted(channels, rate, segments, info):
     }
 
 
-def eval_counts_and_gap(channels, rate, segments, info):
+def eval_counts_and_gap(channels, rate, segments, info, pins):
     """Exact step count plus the presence of the commanded pause.
 
     Used for the phase-shaped scenarios (255 / gap / 1). The count is the point:
@@ -1242,7 +1399,7 @@ def eval_counts_and_gap(channels, rate, segments, info):
     The inter-step period check is deliberately not applied across the pause,
     which is a stretch of silence and not a period.
     """
-    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
     expected = sum(steps for steps, _, _ in segments)
     counts = sp.step_count_defects(m.step_count, expected)
     pause_us = None
@@ -1261,11 +1418,11 @@ def eval_counts_and_gap(channels, rate, segments, info):
     }
 
 
-def eval_pulse_width(channels, rate, segments, info):
+def eval_pulse_width(channels, rate, segments, info, pins):
     """The primary characterization output: high time and duty at one speed."""
     ticks = segments[0][1]
     expect_us = ticks * 1e6 / info["ticks_per_s"]
-    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
     counts = sp.step_count_defects(m.step_count, segments[0][0])
     detail = sp.period_defects(m.inter_step_us, expect_us)
     adherence = sp.rate_adherence(m.inter_step_us, expect_us)
@@ -1285,7 +1442,7 @@ def eval_pulse_width(channels, rate, segments, info):
     }
 
 
-def eval_independent_speeds(channels, rate, segments, info):
+def eval_independent_speeds(channels, rate, segments, info, pins):
     """SR_15: aligned start, independent periods.
 
     Checks each stepper against *its own* commanded period, not against a
@@ -1302,7 +1459,7 @@ def eval_independent_speeds(channels, rate, segments, info):
     ok = True
     detail = {}
     for letter, idx in (("A", 0), ("B", 1)):
-        ch_name = STEP_CHANNELS[letter]
+        ch_name = pins.step_of(letter)
         if ch_name not in channels:
             continue
         ticks = per[idx][0][1]
@@ -1322,8 +1479,8 @@ def eval_independent_speeds(channels, rate, segments, info):
         }
 
     skew = None
-    a_rises = sp.rising_edges(channels[STEP_CHANNELS["A"]])
-    b_rises = sp.rising_edges(channels[STEP_CHANNELS["B"]])
+    a_rises = sp.rising_edges(pins.step_wave(channels, "A"))
+    b_rises = sp.rising_edges(pins.step_wave(channels, "B"))
     if a_rises and b_rises:
         skew = round(abs(a_rises[0] - b_rises[0]) * 1e6 / rate, 4)
     detail["first_step_skew_us"] = skew
@@ -1338,7 +1495,7 @@ def eval_independent_speeds(channels, rate, segments, info):
     return ok and len(detail) >= 2, detail
 
 
-def eval_emergency_stop(channels, rate, segments, info):
+def eval_emergency_stop(channels, rate, segments, info, pins):
     """SR_25: pulses must stop the instant STOP is issued.
 
     Checks three things a naive step count cannot. That no pulse is left high
@@ -1389,7 +1546,7 @@ def eval_emergency_stop(channels, rate, segments, info):
     }
 
 
-def eval_pause(channels, rate, segments, info):
+def eval_pause(channels, rate, segments, info, pins):
     """A pause (steps=0) must produce exactly its tick count of silence.
 
     A pause far shorter than commanded means pulses arrived during it, which is
@@ -1398,7 +1555,7 @@ def eval_pause(channels, rate, segments, info):
     ticks = segments[0][1]
     pause_ticks = segments[1][1]
     pause_us = pause_ticks * 1e6 / info["ticks_per_s"]
-    m = sp.channel_metrics(channels[STEP_CHANNELS["A"]], rate)
+    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
     # A pause shows up as one long inter-step period, not as a wide pulse: it
     # is a stretch of silence, so searching the high widths would be looking in
     # the wrong place entirely.
@@ -1424,7 +1581,7 @@ def eval_pause(channels, rate, segments, info):
     }
 
 
-def eval_dir_change(channels, rate, segments, info):
+def eval_dir_change(channels, rate, segments, info, pins):
     """Measure the delay from the dir edge to the first step of phase 2.
 
     The value is **reported, not gated on** (white paper 1.3): it is set by how
@@ -1441,8 +1598,8 @@ def eval_dir_change(channels, rate, segments, info):
     "zero".
     """
     expected_steps = sum(steps for steps, _, _ in segments)
-    step = channels[STEP_CHANNELS["A"]]
-    dir_ch = channels[DIR_CHANNELS["A"]]
+    step = pins.step_wave(channels, "A")
+    dir_ch = pins.dir_wave(channels, "A")
     delays = sp.dir_to_first_step_us(dir_ch, step, rate)
     counts = sp.step_count_defects(len(sp.rising_edges(step)), expected_steps)
     sample_us = 1e6 / rate
@@ -1467,7 +1624,7 @@ def eval_dir_change(channels, rate, segments, info):
     }
 
 
-def eval_sync_start(channels, rate, segments, info):
+def eval_sync_start(channels, rate, segments, info, pins):
     """Measure how well the steppers start together, and check the step counts.
 
     The skew is **measured and reported, not gated on**. `synchronizedStart()`
@@ -1493,7 +1650,7 @@ def eval_sync_start(channels, rate, segments, info):
     """
     counts = {}
     firsts = {}
-    for name, ch in STEP_CHANNELS.items():
+    for name, ch in pins.items():
         if ch not in channels:
             continue
         edges = sp.rising_edges(channels[ch])

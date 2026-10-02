@@ -154,6 +154,11 @@ MAP                         count, mode, stride, and the GPIO behind each
                             than assume a channel map: in `dir` stepper B is D2,
                             in `nodir` it is D1, and a host that guesses reads a
                             quiet pin and reports a driver that emits nothing.
+                            The map is passed to each evaluator as a `Pins`
+                            object; there is no module-level channel table. A
+                            capture lacking a stepper the board connected is an
+                            *incomplete capture* and fails the run -- it is not
+                            reported as a quiet stepper, and not passed.
 QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, maxall (the
                             LARGEST per-stepper speed floor -- the fastest
                             period legal for every connected stepper, and what

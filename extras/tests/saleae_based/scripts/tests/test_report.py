@@ -146,9 +146,11 @@ class TestUsesTheEvaluators(unittest.TestCase):
         seen = []
         real = rt.evaluate
 
-        def spy(scenario, channels, rate, segments, info):
+        def spy(scenario, channels, rate, segments, info, chan_map=None,
+                extra=None):
             seen.append(scenario)
-            return real(scenario, channels, rate, segments, info)
+            return real(scenario, channels, rate, segments, info, chan_map,
+                        extra)
 
         rt.evaluate = spy
         report.rt.evaluate = spy
@@ -166,7 +168,8 @@ class TestUsesTheEvaluators(unittest.TestCase):
         channels, rate = report.load_once(self.tmp / "SR_01.vcd")
         info = vf.Dut().info()
         ok, detail = rt.evaluate(
-            "SR_01", channels, rate, rt.SCENARIOS["SR_01"][1](info), info)
+            "SR_01", channels, rate, rt.SCENARIOS["SR_01"][1](info), info,
+            rt.Pins.for_scenario("SR_01").map)
         # Reading the evaluator's own count back out is the point: if the report
         # invented a number instead, this would not match it.
         self.assertTrue(ok)

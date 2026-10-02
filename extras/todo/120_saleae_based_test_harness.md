@@ -468,9 +468,11 @@ regenerated with explicit drivers (R8).
 Implementation plan items 1–8 are done, and the redesign's **R1** (firmware:
 `auto` removed) and **R8** (re-run and re-baseline) are done with hardware
 behind them. R2 (firmware: 1…8 steppers, both pin modes, `MAP`) is done too.
-R3 (host: the two generic modes `scale` and `sync`) is done too, and its first
-hardware run found a live defect in the MCPWM/PCNT driver. R4, R5 and R7
-remain. See *Decisions and findings* for what the hardware actually showed — including the one recorded finding that R1's re-run
+R3 (host: the two generic modes `scale` and `sync`) and R4 (the channel map
+becoming configuration rather than a global) are done too. R3's first hardware
+run found a live defect in the MCPWM/PCNT driver; R4's found that SR_15's
+ratio collapsed to 1:1 on the real chip, so it had been measuring nothing.
+R5 and R7 remain. See *Decisions and findings* for what the hardware actually showed — including the one recorded finding that R1's re-run
 invalidated.
 
 ### The redesign now in progress
@@ -813,12 +815,89 @@ one agent. Each item is independently checkable and states how to verify it.
       chan_cap` → `dmax < chan_cap + 1` changes no output when `dmax ==
       chan_cap` — and one "mutation" only edited a docstring; the behavioural
       version of it was caught twice.
-- [ ] **R4 — host: channel map is configuration, not a constant.** Today
-      `STEP_CHANNELS`/`DIR_CHANNELS` hardcode A=`D0`, B=`D2`… which is only
-      right in `dir` mode with four steppers. Evaluators, fixtures and the
-      report must take the map from the result record.
-      *Verify:* an `nodir` 8-stepper result maps A…H to `D0`…`D7` and an SR_15
-      result still maps A=`D0`, B=`D2`.
+- [x] **R4 — host: the channel map is configuration, not a constant. Done, and
+      it exposed three defects on the way.**
+      `STEP_CHANNELS`/`DIR_CHANNELS` were two module-level dicts that
+      `evaluate()` overwrote per run, hardcoding A=`D0`, B=`D2`… — right only in
+      `dir` mode with four steppers. They are gone, replaced by a **`Pins`
+      object passed to every evaluator**. There is no channel table at module
+      scope any more, so a stale one cannot be read by accident; a test greps
+      for its return.
+
+      **Why the global was worse than a wrong default.** It made a wrong map a
+      *silent substitution* rather than an error: in `nodir`, stepper B is on
+      `D1`, so reading it on `D2` measures a quiet pin and reports a driver that
+      emits nothing. And it could only ever hold one map at a time, so two
+      results with different shapes could not be compared in one process —
+      which is what a fixture and a mode run need. `test_two_maps_can_be_judged
+      _in_one_process` pins that property; the globals could not satisfy it.
+
+      **The load-bearing assertion is that the verdict *changes* with the map.**
+      `test_a_nodir_map_cannot_be_judged_as_a_dir_map` puts a working pair of
+      steppers on `D0`/`D1` and evaluates them twice: with the `nodir` map it
+      passes and reports B at 40/40 on `D1`; with the `dir` map it fails. A test
+      that only checked the right map passed would pass just as well against a
+      decorative one.
+
+      #### Three defects found while doing it
+
+      **1. A stepper the board connected but the capture lacked was silently
+      skipped — and the run *passed*.** `step_wave()` returns `None` for a
+      channel that is not in the capture, and the evaluators skipped it. With a
+      map naming three steppers and a capture carrying two, SR_16 reported only
+      A, found nothing wrong, and returned **passed**: a result for a stepper
+      nothing was measured about. Reading an absent channel as a quiet one
+      invents a defect; *passing* it invents a result. `Pins.missing()` now
+      detects it and `evaluate()` fails the run with the missing steppers and
+      channels named, before any evaluator runs — centrally, because every one
+      of the thirteen would otherwise have to get it right.
+
+      **2. SR_15 could never have run.** The runner asked "does this scenario
+      need per-stepper programs?" by calling `per_stepper_programs(scenario,
+      None)`, which dereferences the QINFO dict: `TypeError`. The question is
+      now answered from an explicit `PER_STEPPER_SCENARIOS` set, because the
+      answer is needed *before* the board is wired and the old way of asking
+      needed a value that does not exist yet.
+
+      **3. SR_15's 2:1 ratio collapsed to 1.0 on the real chip — so the scenario
+      measured nothing and reported success.** `legal_ticks()` has a 160-tick
+      floor, and the ESP32's real RMT floor is **80**. SR_15 derived its slow
+      stepper from `max_speed_ticks * 2`, so it asked for 80 and for 160 — which
+      both clamp to **160**. Two identical periods went to the board, and the
+      evaluator, checking each stepper against *its own* command, passed.
+
+      **It went unnoticed because the fixture DUT's floor is 640**, where the
+      ratio survives by arithmetic accident (640 and 1280 both clear 160). The
+      fixture docstring brags that it is the only source of time constants so an
+      evaluator cannot hardcode 16 MHz — and that discipline missed the one
+      number that mattered, because the fixture was **10× more generous than the
+      silicon**. The slow stepper is now derived from the *clamped* fast period,
+      so the ratio is a ratio: 160/320 on the real RMT floor, 640/1280 on the
+      fixture, 426/852 on an AVR timer.
+
+      *Verified on hardware.* `--mode scale --driver rmt_v2 --pin-mode nodir`:
+      **8/8 passed, 64/64 steps each**, and the recorded map at every count
+      matches the capture — 1→`A=D0` … 8→`A=D0…H=D7`. Catalogue `dir` scenarios
+      re-run: SR_01, SR_14, SR_15, SR_16, SR_17 all pass with the map **A=`D0`,
+      B=`D2`** preserved. SR_15 now measures something it never measured before:
+      A commanded 160 t → **9.9987 µs**, B commanded 320 t → **19.9987 µs**,
+      200/200 steps each, skew 37.5 µs = 3.75 periods.
+
+      Also: `run_hardware.wire_plan()` captured a fixed `D0..D3` regardless of
+      stepper count and a fixed `QRUN 3` mask, so a four-stepper scenario would
+      have scored C and D as silent drivers. Both are derived from the config
+      now. The test that covers it widens the scenario table to four steppers
+      deliberately, because no SR id reaches four and a test that only walked
+      the catalogue would not have caught the cap.
+
+      *Tests: 161 pass, from 144.* New `TestPins` (12) and
+      `TestPerStepperPrograms` (5). *Mutation-checked, all caught:* the map
+      ignored by `evaluate()`, a module-level table returning, `report.py`
+      ignoring the recorded map, `for_scenario` always claiming four steppers,
+      `Pins.items()` truncated, `dir_of` returning the step pin, the invariant
+      comparing a pin to itself in `nodir`, a missing channel no longer noticed,
+      the SR_15 ratio collapsing, SR_15 no longer flagged, the runner probing
+      with `None` again, and the channel cap back to a fixed 4.
 - [ ] **R5 — report: two new tables, keyed by arch / sdk / driver list.**
       A parallel-count table (per driver: 1…max steppers, each stepper's period
       and count) and a sync-permutation table (per driver list: first-step skew
