@@ -223,6 +223,9 @@ SCENARIO_BUILDERS = {
     "SR_08": rt.sc_queue_full,
     "SR_09": rt.sc_pause,
     "SR_10": rt.sc_dir_change,
+    "SR_11": rt.sc_dir_change_both_ways,
+    "SR_12": rt.sc_multi_step_direction,
+    "SR_13": rt.sc_ticks_error_rejected,
     "SR_18": rt.sc_mcpwm_overrun_after_255,
     "SR_19": rt.sc_mcpwm_overrun_boundary,
     "SR_20": rt.sc_pause_after_full_command,
@@ -412,6 +415,34 @@ def _drop_step_in_second_command(step, _dirs=None):
     return [ev for ev in step if not (victim <= ev[0] < victim + ticks)]
 
 
+def _drop_steps_from_reverse_phase(step, _dirs=None):
+    """A phase loses steps, so the per-phase counts no longer match.
+
+    SR_12's real claim is that each phase contributes its own step count, not
+    merely that the total is right. Dropping three from the middle phase keeps
+    the total correct for a naive counter while breaking the per-phase rule.
+    """
+    r = _rises(step)
+    mid = len(r) // 2
+    ticks = _period(step)
+    victim = r[mid]
+    return [ev for ev in step
+            if not (victim <= ev[0] < victim + 3 * ticks)]
+
+
+def _render_rejected_steps():
+    """The 8 steps a refused SR_13 command must not emit.
+
+    The fixture for "the rejection is reported but the steps happen anyway",
+    which is the defect SR_13 targets.
+    """
+    steps = [(i * 640, 1) for i in range(8)]
+    out = []
+    for t, _ in steps:
+        out += [(t, 1), (t + 16, 0)]
+    return out
+
+
 def _drop_trailing_step(step, _dirs=None):
     """The last commanded step never arrives.
 
@@ -547,7 +578,48 @@ FIXTURES: List[Fixture] = [
     _bad("SR_20", "bad_extra_step_after_pause",
          "a duplicate pulse follows the pause",
          _duplicate_trailing_step, "duplicate step after pause", "extra_steps"),
+
+    _good("SR_11", "good_dir_change_both_ways",
+          "20 reverse then 20 forward; the drain is symmetric"),
+    _good("SR_12", "good_multi_step_direction",
+          "forward, reverse, forward: two direction changes"),
+
+    _bad("SR_12", "bad_phase_step_count",
+         "a phase loses three steps; the per-phase counts stop matching",
+         _drop_steps_from_reverse_phase, "swallowed phase steps",
+         "steps_per_phase"),
 ]
+
+# The dir pin pinned to the wrong level: every commanded step still arrives, so
+# a step-count-only check passes, and what fails is the dir tracking the phases.
+# Built directly rather than through _bad() because the mutation needs to know
+# the scenario's final direction to pick a level that is actually wrong --
+# SR_11 and SR_12 both finish forward, so "stuck at the starting level" would
+# be correct half the time.
+_dir_steps, _ = render(SCENARIO_BUILDERS["SR_11"](_DUT.info()))
+FIXTURES.append(Fixture(
+    name="bad_dir_never_follows", scenario="SR_11",
+    why="the dir pin never follows either commanded direction",
+    step=_dir_steps, dirs=[(0, 0)], expect_pass=False,
+    fault="dir pin never followed the command",
+    expect_detail="expected_final_dir"))
+
+# SR_13 is the inverse of every other fixture: the command is refused, so the
+# correct waveform is a pin that never moves. There is no `render()` output to
+# start from -- the whole point is that nothing is emitted.
+FIXTURES.append(Fixture(
+    name="good_rejected_emits_nothing", scenario="SR_13",
+    why="a command below MIN_CMD_TICKS is refused and emits no pulse",
+    step=[], dirs=[(0, 1)], expect_pass=True))
+
+# The matching bad fixture is the bug SR_13 exists to catch: the rejection is
+# reported but the steps still happen.
+FIXTURES.append(Fixture(
+    name="bad_rejected_still_steps", scenario="SR_13",
+    why="a refused command still emits its 8 steps",
+    step=_render_rejected_steps(), dirs=[(0, 1)], expect_pass=False,
+    fault="rejected command still stepped",
+    expect_detail="steps_measured"))
 
 
 def _drop_from_second_stepper(step, _dirs=None):

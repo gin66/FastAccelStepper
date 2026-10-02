@@ -174,8 +174,24 @@ fail.
          it filled every pre-CONFIG capture with square waves over the pulses
          under test. The host starts it with `SR00` when it wants the
          identification pre-check.
-   - [ ] SR_11 / SR_12 / SR_13 have no scenario function yet (SR_13 is a
-         negative test on the firmware: a rejected command must emit no pulse)
+   - [x] **SR_11 / SR_12 / SR_13 implemented and run on hardware.** SR_11
+         (reverse then forward) measured 40/40 steps with per-phase counts
+         [20, 20]; SR_12 (forward, reverse, forward) 30/30 with [10, 10, 10].
+         SR_13 is the suite's only negative test on the firmware: 8 steps at
+         399 ticks is 3192 ticks of motion against a floor of 3200, so
+         addQueueEntry() refuses it, and the measurement confirms
+         **zero pulses emitted and POS 0**. A rejection that still stepped
+         would be a real defect; it does not happen.
+   - [x] `eval_direction_phases` asserts each phase contributes its own step
+         count and that the dir pin ends at the commanded level. Two things had
+         to be got right, both found by the fixtures: split at *every* dir
+         change, not just a rise (reverse-then-forward has one rise and two
+         phases), and drop regions containing no steps -- on hardware the dir
+         pin settles to its starting level before the first step, which adds a
+         leading empty region that is not a defect.
+   - [x] the white paper's SR_13 error text (`ERR QE ticks … < maxspeed …`)
+         does not match the firmware, which emits `ERR QE step0 rc=-1`
+         (ErrorTicksTooLow). Worth correcting in the paper.
    - [ ] SR_14 / SR_16 (synchronized start, multi-stepper timing impact)
    - [ ] SR_17 cross-driver (ESP32 only)
    - [x] **SR_18–SR_20 MCPWM/PCNT overrun — no defect found.** Wired the three

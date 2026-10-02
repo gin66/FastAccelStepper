@@ -225,6 +225,39 @@ def sc_ticks_max(info):
     return seg_period(4, 65535)
 
 
+def sc_dir_change_both_ways(info):
+    """Reverse phase then forward phase: the same change, both directions.
+
+    A direction change costs a DIR drain before the next step. Doing it in both
+    directions shows the drain is symmetric rather than an artefact of one
+    transition, and that the dir pin returns to where it started.
+    """
+    t = legal_ticks(info, 20, info["max_speed_ticks"])
+    return [(20, t, False), (20, t, True)]
+
+
+def sc_multi_step_direction(info):
+    """Three phases: forward, reverse, forward. Two direction changes."""
+    t = legal_ticks(info, 10, info["max_speed_ticks"])
+    return [(10, t, True), (10, t, False), (10, t, True)]
+
+
+def sc_ticks_error_rejected(info):
+    """A command the firmware must refuse, and emit nothing for.
+
+    8 steps at (max_speed - 1) ticks: period * steps lands below MIN_CMD_TICKS,
+    so addQueueEntry() returns ErrorTicksTooLow. The point of the test is the
+    second half -- a rejected command must produce no pulse at all. A rejection
+    that still stepped would move the motor by 8 steps the caller never asked
+    for.
+    """
+    fast = max(info["max_speed_ticks"] - 1, 1)
+    # Keep it below MIN_CMD_TICKS/steps, which is the actual rejection rule.
+    while 8 * fast >= info["min_cmd_ticks"] and fast > 1:
+        fast -= 1
+    return [(8, fast, True)]
+
+
 def sc_mcpwm_overrun_after_255(info):
     """255 pulses, a gap, then exactly one. The MCPWM/PCNT overrun case.
 
@@ -311,6 +344,13 @@ SCENARIOS = {
     "SR_08": ("1ch", sc_queue_full, 1, "4000 steps, QueueFull retry"),
     "SR_09": ("1ch", sc_pause, 1, "pause command"),
     "SR_10": ("1ch", sc_dir_change, 1, "dir change -> first step"),
+    "SR_11": ("1ch", sc_dir_change_both_ways, 1,
+              "reverse then forward: the drain is symmetric"),
+    "SR_12": ("1ch", sc_multi_step_direction, 1,
+              "forward, reverse, forward: two direction changes"),
+    # SR_13 is a negative test: the command is refused and nothing is emitted.
+    "SR_13": ("1ch", sc_ticks_error_rejected, 1,
+              "a command below MIN_CMD_TICKS must emit nothing"),
     "SR_14": ("2ch", sc_sync_start, 3, "2 steppers, synchronized start"),
     "SR_27": ("1ch", sc_single_step, 1, "single step in one command"),
     # ESP32 MCPWM/PCNT only; the overrun needs the PCNT high-limit re-arm.
@@ -407,6 +447,84 @@ def eval_step_count(channels, rate, segments, info):
         "ticks": ticks,
         "steps": counts,
         "period": detail,
+    }
+
+
+def eval_direction_phases(channels, rate, segments, info):
+    """Step count per phase, and the dir pin's level for each.
+
+    For SR_11 and SR_12 the claim is not about timing but about the dir pin
+    tracking the commanded direction through every phase, and about the step
+    count being exactly what was asked for. Both are asserted with no
+    tolerance: a phase that steps the wrong number of times, or a dir pin that
+    does not reach its commanded level, is a defect rather than a statistic.
+    """
+    step = channels[STEP_CHANNELS["A"]]
+    dir_ch = channels[DIR_CHANNELS["A"]]
+    rises = sp.rising_edges(step)
+    expected_steps = sum(steps for steps, _, _ in segments)
+    counts = sp.step_count_defects(len(rises), expected_steps)
+
+    # One phase per commanded segment, split at *every* dir change rather than
+    # only at a rise: reverse-then-forward has a single rising edge but two
+    # phases, and the first phase starts at the beginning of the capture.
+    # Boundaries are the dir edges; a step on the same sample as an edge belongs
+    # to the new phase, because the direction is set before the step is emitted.
+    edges = sp.detect_edges(dir_ch)
+    bounds = [e for e, _lvl in edges]
+    phases = []
+    # len(bounds) edges cut the capture into len(bounds) + 1 regions: the run
+    # before the first edge, each run between edges, and the run after the last.
+    for i in range(len(bounds) + 1):
+        start = 0 if i == 0 else bounds[i - 1]
+        end = bounds[i] if i < len(bounds) else len(step)
+        phases.append(sum(1 for r in rises if start <= r < end))
+
+    want_phases = sum(1 for n, _, _ in segments if n > 0)
+
+    # The dir level at the end has to match the last commanded direction.
+    final_dir = dir_ch[-1]
+    want_final = 1 if segments[-1][2] else 0
+    dir_ok = (final_dir == want_final)
+
+    # Regions with no steps are not phases of the motion. On hardware the dir
+    # pin can settle to its starting level before the first step, which adds a
+    # leading empty region; dropping empty regions keeps that from reading as a
+    # defect while still requiring one non-empty region per commanded segment.
+    phases = [p for p in phases if p > 0]
+    want_counts = [n for n, _, _ in segments if n > 0]
+    per_phase_ok = bool(phases) and phases == want_counts
+
+    return counts["ok"] and per_phase_ok and dir_ok, {
+        "steps": counts,
+        "phases": len(phases),
+        "phases_expected": want_phases,
+        "steps_per_phase": phases,
+        "expected_steps": [n for n, _, _ in segments],
+        "dir_edges": len(edges),
+        "final_dir": int(final_dir),
+        "expected_final_dir": want_final,
+    }
+
+
+def eval_nothing_emitted(channels, rate, segments, info):
+    """SR_13: a rejected command must produce no pulse at all.
+
+    The inverse of every other test in the suite. Here a non-empty capture is
+    the failure, so this asserts the absence of steps rather than their count.
+    It is the only test that checks the firmware refuses rather than that it
+    performs, and a rejection that still stepped would move the motor by steps
+    the caller never asked for.
+    """
+    step = channels[STEP_CHANNELS["A"]]
+    rises = sp.rising_edges(step)
+    expected_steps = sum(steps for steps, _, _ in segments)
+    return len(rises) == 0, {
+        "steps_measured": len(rises),
+        "steps_that_would_have_been": expected_steps,
+        "rejected_ticks": segments[0][1],
+        "min_cmd_ticks": info["min_cmd_ticks"],
+        "command_rate_ticks": segments[0][1] * max(expected_steps, 1),
     }
 
 
@@ -602,6 +720,9 @@ EVALUATORS = {
     "SR_08": eval_step_count,
     "SR_09": eval_pause,
     "SR_10": eval_dir_change,
+    "SR_11": eval_direction_phases,
+    "SR_12": eval_direction_phases,
+    "SR_13": eval_nothing_emitted,
     "SR_14": eval_sync_start,
     "SR_27": eval_period_exact,
     "SR_18": eval_counts_and_gap,
