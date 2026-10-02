@@ -529,7 +529,27 @@ CONFIG <count> <driver>[,<driver>…] [dir|nodir]
 - `<driver>` — one name per stepper, comma separated, **no shorthand, no
   default**. A count that does not match the list length is refused.
 - `dir` (default) — two channels per stepper, direction pin present, max 4.
-- `nodir` — one channel per stepper, step-only, max 8.
+- `nodir` — one channel per stepper, step-only, max 8. **No direction pin is
+  connected at all**, so `setDirectionPin()` is not called. The `QSEG` direction
+  argument still parses — a scenario's program is therefore identical in both
+  modes — but is forced true, because there is no pin to toggle for a false and
+  the queue would refuse the command with `ErrorNoDirPinToToggle`. That is the
+  only semantic difference between the modes, and it is why the
+  direction-observing scenarios are `dir`-mode by construction.
+
+The count cap is `min(platform stepper queues, channels / stride)` and a
+refusal reports **both** bounds — `ERR CONFIG n=5 max=4/8/8/2` for
+`n / cap / stepper queues / channels / stride` — because "too many steppers"
+cannot say which one bit: the channel budget running out at 4 and a driver
+running out of queues (MCPWM/PCNT has 6 on IDF 5) are different facts.
+
+**One pin table serves both modes; the stride is what selects between them.**
+`kChanPin[8]` maps analyzer channel to GPIO, and in `dir` stepper *j* owns
+channels 2*j* (step) and 2*j*+1 (dir) while in `nodir` it owns channel *j*. So
+the mode cannot drift from the map — there is nothing to keep in step but the
+stride, and the table does not even have to know the count. It is also the same
+pins in the same order as SR_00's eight (§5.0), so a channel the self-test
+proved is a channel a scenario measures.
 
 Every preset in the old list is expressible:
 
@@ -617,12 +637,21 @@ to: **all eight are spoken for by four steppers' step and dir pins.** A marker
 channel is therefore not available on a 4-stepper `dir` run at all, and on a
 step-only run every channel is a step pin. See §3.4.
 
-**Step-only mapping** (8 steppers, no direction pin):
+**Step-only mapping** (8 steppers, no direction pin). Same GPIO per channel as
+the `dir` table above — the pins do not move, only which of them a stepper owns:
 
 ```
 CH 0: Step A   CH 1: Step B   CH 2: Step C   CH 3: Step D
 CH 4: Step E   CH 5: Step F   CH 6: Step G   CH 7: Step H
 ```
+
+**Verified on hardware**, not just derived: `CONFIG 8 rmt×8 nodir` gives 8 steps
+on every one of `D0`…`D7` at 40.00 µs with a 15.50 µs high time, and
+`CONFIG 4 rmt×4 dir` gives steps on `D0`, `D2`, `D4`, `D6` with `D1`, `D3`,
+`D5`, `D7` quiet. A host that assumed the `dir` map while running the 8-stepper
+case would find `E`–`H` unreadable and report working drivers as dead; one that
+assumed it for a 2-stepper `nodir` run reads `B` as 0 steps when it is on `D1`.
+That is why `MAP` is in the protocol and the host parses it.
 
 **Hardware notes:**
 - **GPIO0**: Must be **HIGH** at boot (otherwise ESP32 enters download mode).
@@ -813,7 +842,7 @@ The whole surface. Note how small it is: everything else is assembled from
 |---------|----------|-------------|
 | `SR00` | `OK SR00` | SR_00 pin self-test (§5.0) |
 | `CONFIG <count> <drv>[,<drv>…] [dir\|nodir]` | `OK CONFIG n=<N> mode=<pinmode> maxspeed<i>=<ticks> …` | Connect `<count>` steppers, one driver named per stepper. Pin mode `dir` (default) or `nodir`. **There is no `auto`.** |
-| `MAP` | `MAP <count> <pinmode> <stride>` | Which analyzer channel carries which stepper, so host and firmware cannot disagree (§3.3) |
+| `MAP` | `MAP count=<n> mode=<pinmode> stride=<s> ch=<pin,…>` | Which analyzer channel carries which stepper, plus the GPIO behind each reachable channel, so host and firmware cannot disagree (§3.3). **The host must read this rather than assume a map**: in `dir` stepper B is `D2`, in `nodir` it is `D1`, and a host that guesses reads a quiet pin and reports a driver that emits nothing |
 | `QINFO` | `QINFO tps=… mincmd=… qlen=… maxspeed=…` | Platform limits the host must respect |
 | `QCLR` | `OK QCLR` | Drop the program, stop everything |
 | `QSEG <steps> <ticks> <dir>` | `OK QSEG <n>/8` | Append a segment to the **shared** program. `steps=0` means "pause for `<ticks>` ticks". `dir` is 0 or 1 |

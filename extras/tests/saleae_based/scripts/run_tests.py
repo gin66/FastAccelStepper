@@ -41,9 +41,53 @@ import signal_parser as sp  # noqa: E402
 
 ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 27)]
 
-# Step channels for steppers A..D (white paper §3.3).
-STEP_CHANNELS = {"A": "D0", "B": "D2", "C": "D4", "D": "D6"}
-DIR_CHANNELS = {"A": "D1", "B": "D3", "C": "D5", "D": "D7"}
+# Analyzer channel -> stepper, derived from what the DUT reports in MAP rather
+# than assumed here.
+#
+# The old hardcoded A=D0, B=D2, C=D4, D=D6 is only right in `dir` mode with four
+# steppers, and it silently measured the wrong channel in every other case: in
+# `nodir` mode stepper B is D1, not D2. So the map is built from the count and
+# stride the firmware reports, and carried in the result record (todo R4).
+#
+# The default is the 4-stepper `dir` map, which is what every scenario in
+# SCENARIOS below uses until a `nodir` one exists; a run that actually connected
+# a different shape replaces it from MAP before evaluating.
+def default_channel_map(count=4, stride=2):
+    """{'A': {'step': 'D0', 'dir': 'D1'}, ...} for a count/stride pair."""
+    letters = "ABCDEFGH"
+    out = {}
+    for i in range(count):
+        entry = {"step": f"D{i * stride}"}
+        if stride > 1:
+            entry["dir"] = f"D{i * stride + 1}"
+        out[letters[i]] = entry
+    return out
+
+
+def step_channels(chan_map):
+    return {name: entry["step"] for name, entry in chan_map.items()}
+
+
+def dir_channels(chan_map):
+    return {name: entry["dir"] for name, entry in chan_map.items()
+            if "dir" in entry}
+
+
+STEP_CHANNELS = step_channels(default_channel_map())
+DIR_CHANNELS = dir_channels(default_channel_map())
+
+# Every analyzer channel, in order. A capture has to enable all of them or a
+# scenario's own channels come back missing.
+STEP_CHANNEL_ORDER = [f"D{i}" for i in range(8)]
+
+# How many steppers each pin mode can carry: 8 channels, 2 per stepper with a
+# direction pin and 1 without (white paper 3.3/10.1). The firmware caps the
+# count at the smaller of this and the platform's own stepper limit.
+CHANNELS = len(STEP_CHANNEL_ORDER)
+CHANNELS_PER_STEPPER = {"dir": 2, "nodir": 1}
+MAX_STEPPERS_PER_MODE = {
+    mode: CHANNELS // per for mode, per in CHANNELS_PER_STEPPER.items()
+}
 
 # Default capture rate. 4 MS/s is the practical minimum to resolve a pulse a
 # few us wide at 16 MHz (see README).
@@ -92,6 +136,38 @@ def reply_of(ser, line):
 
 
 QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxspeed=(\d+)")
+MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)")
+
+
+def read_map(ser):
+    """Read the DUT's channel map: which analyzer channel is which stepper.
+
+    The host must not assume it. `dir` spends two channels per stepper (step,
+    dir) and `nodir` one, so 4 steppers is D0,D2,D4,D6 in the first case and
+    D0,D1,D2,D3 in the second -- and a host that guessed wrong measures a quiet
+    pin and reports zero steps, which reads as a driver that emits nothing.
+
+    Returns (channel_map, pins) where channel_map is the letter -> {step, dir}
+    dict the evaluators index and pins is the GPIO behind each channel, for the
+    record.
+    """
+    for _ in range(5):
+        text = reply_of(ser, "MAP")
+        m = MAP_RE.search(text)
+        if m:
+            count, mode, stride = int(m.group(1)), m.group(2), int(m.group(3))
+            pins = [int(p) for p in m.group(4).split(",") if p]
+            chan_map = default_channel_map(count, stride)
+            # Cross-check the GPIO list against the capture's wiring: the pin
+            # map is the firmware's, but if a channel is not driven at all there
+            # is no measurement to make of it.
+            for name, entry in chan_map.items():
+                if entry["step"] not in STEP_CHANNEL_ORDER[:count * stride]:
+                    raise RuntimeError(f"stepper {name} maps to a channel "
+                                       f"outside the reported {count * stride}")
+            return chan_map, {"mode": mode, "stride": stride, "pins": pins}
+        time.sleep(0.1)
+    raise RuntimeError(f"no MAP reply, got: {text!r}")
 
 
 def read_qinfo(ser):
@@ -135,8 +211,10 @@ def program(ser, segments):
 
 def start_capture(output, seconds, rate):
     devices, driver = cap.detect_analyzer("auto")
-    channels = ",".join(sorted(set(list(STEP_CHANNELS.values()) +
-                                   list(DIR_CHANNELS.values()))))
+    # All eight, not just the ones this scenario reads: SR_00 needs every channel
+    # and a nodir 8-stepper run needs all of them too, so a narrowed list would
+    # have to be correct per scenario rather than always.
+    channels = ",".join(STEP_CHANNEL_ORDER)
     cmd = cap.build_command(driver, rate, channels,
                             int(seconds * 1000), output, None, "srzip")
     return subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
@@ -584,12 +662,20 @@ def check_pin_invariants(channels, rate):
     }
 
 
-def evaluate(test_id, channels, rate, segments, info):
+def evaluate(test_id, channels, rate, segments, info, chan_map=None):
     """Run a scenario's evaluator, then the global invariants.
 
     Every result carries the invariant block, and a violation fails the test
     regardless of what the scenario's own checks concluded.
+
+    `chan_map` is the board's own channel map (todo R4 threads it through the
+    evaluators); until then it defaults to the 4-stepper `dir` map, which is
+    what every current scenario connects.
     """
+    global STEP_CHANNELS, DIR_CHANNELS
+    if chan_map is not None:
+        STEP_CHANNELS = step_channels(chan_map)
+        DIR_CHANNELS = dir_channels(chan_map)
     ok, detail = EVALUATORS[test_id](channels, rate, segments, info)
     inv = check_pin_invariants(channels, rate)
     detail = dict(detail)
@@ -1101,6 +1187,11 @@ def run_scenario(tag_key, test_id, args):
         text = reply_of(ser, config_wire(config, args.dut_driver))
         if "OK CONFIG" not in text:
             return "failed", {"error": text.strip()}
+        # The channel map comes from the board, not from the host's assumption:
+        # `dir` and `nodir` put different channels on different steppers, so
+        # evaluating a capture against the wrong map reads a quiet pin and calls
+        # it zero steps.
+        chan_map, pin_map = read_map(ser)
         info = read_qinfo(ser)
 
         segments = builder(info)
@@ -1123,9 +1214,12 @@ def run_scenario(tag_key, test_id, args):
         ser.close()
 
     channels, sample_rate = load_capture_for_eval(capture_file)
-    passed, detail = evaluate(test_id, channels, sample_rate, segments, info)
+    passed, detail = evaluate(test_id, channels, sample_rate, segments, info,
+                              chan_map)
     detail.update({
         "capture": str(capture_file),
+        "channel_map": chan_map,
+        "pin_map": pin_map,
         "sample_rate_hz": sample_rate,
         "capture_seconds_requested": round(seconds, 3),
         "segments": segments,

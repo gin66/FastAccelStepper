@@ -133,6 +133,20 @@ CONFIG <n> <drv>[,<drv>..] [dir|nodir]
                             one, a list whose length is not <n>, a count this
                             platform cannot provide and an unimplemented pin
                             mode are all REFUSED, never substituted.
+                            The mode is not cosmetic. The analyzer has 8
+                            channels; `dir` spends 2 per stepper (step, dir) and
+                            `nodir` 1, so `dir` reaches 4 steppers and `nodir`
+                            reaches 8. The cap is min(platform stepper queues,
+                            channels/stride) and a refusal names both bounds.
+                            In `nodir` no direction pin is connected at all, so
+                            the QSEG direction argument still parses but is
+                            forced true -- there is no pin to toggle for a
+                            false, and the queue would refuse it.
+MAP                         count, mode, stride, and the GPIO behind each
+                            reachable channel. The host MUST read this rather
+                            than assume a channel map: in `dir` stepper B is D2,
+                            in `nodir` it is D1, and a host that guesses reads a
+                            quiet pin and reports a driver that emits nothing.
 QINFO                       tps, MIN_CMD_TICKS, QUEUE_LEN, per-stepper floor
 QCLR                        drop the program and stop
 QSEG <steps> <ticks> <dir>  append a segment; steps=0 means "pause <ticks>"

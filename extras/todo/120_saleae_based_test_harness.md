@@ -467,8 +467,9 @@ regenerated with explicit drivers (R8).
 
 Implementation plan items 1–8 are done, and the redesign's **R1** (firmware:
 `auto` removed) and **R8** (re-run and re-baseline) are done with hardware
-behind them. R2–R5 and R7 remain. See *Decisions and findings* for what the
-hardware actually showed — including the one recorded finding that R1's re-run
+behind them. R2 (firmware: 1…8 steppers, both pin modes, `MAP`) is done too.
+R3–R5 and R7 remain. See *Decisions and findings* for what the hardware
+actually showed — including the one recorded finding that R1's re-run
 invalidated.
 
 ### The redesign now in progress
@@ -555,14 +556,90 @@ one agent. Each item is independently checkable and states how to verify it.
       the format string and so could not see a buffer that disagreed with it.
       **Not verified on hardware** — no board was connected, so R8 has to re-run
       the set before any of these numbers mean anything.
-- [ ] **R2 — firmware: 1…8 steppers, both channel modes.** `SALEAE_MAX_STEPPERS`
-      rises from 4 to 8, `CONFIG` accepts a `nodir` mode, and a new `MAP`
-      command reports mode and stride so host and firmware cannot disagree on
-      which channel is which stepper.
-      *Verify:* `MAP` matches the capture's channel use; 8 steppers in `nodir`
-      and 4 in `dir`; AVR RAM still fits (it is at 1591/2048 with the
-      per-stepper matrix — re-measure, and keep the matrix at a small
-      segment count since only SR_15 needs it).
+- [x] **R2 — firmware: 1…8 steppers, both channel modes. Done and measured on
+      hardware.** `SALEAE_MAX_STEPPERS` rises 4 → 8, `CONFIG` takes a `nodir`
+      mode, and `MAP` reports count + mode + stride + the GPIO behind each
+      reachable channel.
+
+      *One pin table serves both modes, and the stride is what selects between
+      them.* `kChanPin[8]` maps analyzer channel to GPIO; in `dir` stepper *j*
+      owns channels 2*j* (step) and 2*j*+1 (dir), in `nodir` it owns channel *j*.
+      So the mode cannot drift from the map — there is nothing to keep in step
+      but the stride. It is also the same pins in the same order as SR_00's
+      eight (`common/saleae_test.cpp`), so a channel the self-test proved is a
+      channel a scenario measures. The two old tables (`kStepPins[4]`,
+      `kDirPins[4]`) could only ever express the `dir` shape; eight entries
+      that a stride indexes express both.
+
+      *The count cap is `min(stepper queues, channels/stride)`,* and a refusal
+      names **both** bounds — `ERR CONFIG n=5 max=4/8/8/2` — because "too many
+      steppers" cannot say which one bit, and they are different facts (MCPWM/PCNT
+      has 6 queues on IDF 5; the channel budget runs out at 4 with `dir`).
+
+      *`nodir` is a real pin configuration, not a shorthand.* No dir pin is
+      connected at all, so `setDirectionPin()` is not called; the QSEG direction
+      argument still **parses** (a scenario's program is unchanged between modes)
+      but is **forced true**, because there is no pin to toggle for a false and
+      the queue would otherwise refuse with `ErrorNoDirPinToToggle`. That is the
+      one semantic difference, and it is why the direction-observing scenarios
+      are `dir`-mode by construction rather than by convention.
+
+      *Verified on the connected ESP32* (RMT, 4 MS/s, Saleae clone):
+
+      | CONFIG | MAP | capture |
+      |--------|-----|---------|
+      | `4 rmt,rmt,rmt,rmt dir` | `count=4 mode=dir stride=2` | steps on **D0,D2,D4,D6**; D1,D3,D5,D7 quiet (dir) |
+      | `8 rmt×8 nodir` | `count=8 mode=nodir stride=1` | **8 steps on every one of D0…D7**, all 40.00 µs, all 15.50 µs high |
+      | `3 rmt×3 nodir`, program `dir=0` | `count=3 mode=nodir stride=1` | 12 steps each — the forced-true path runs |
+
+      `POS` agrees in every case (8×8, 8×4, 12×3), so the counts are the board's
+      and not a capture artifact. **And `MAP` matches the capture's channel use
+      in both modes**, which is the check that matters: it is the firmware's
+      claim about itself, corroborated by the wires.
+
+      *AVR RAM: 1741 / 2048 (was 1675), so it fits with 307 bytes spare.* The
+      +66 was not free, and finding out where it went was most of the work:
+
+      - **`SALEAE_ARG2_MAX` is a `#if` ladder, not `12 * SALEAE_MAX_STEPPERS`,**
+        because it doubles as an `sscanf` field width and a format string cannot
+        hold an expression. AVR gets 24 bytes where ESP32 gets 96. The
+        `static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS)` is what
+        makes the ladder safe for a platform that outgrows its top rung.
+      - **avr-gcc puts the stack in `.data`, so every reply buffer is RAM.** A
+        flat 256-byte CONFIG reply cost **112 bytes** and took the build to
+        87 %; a single shared `reply_scratch` took it to 93 % — worse, because
+        the static buffer is *added* to what the frame already held. The buffers
+        are sized per platform (`SALEAE_CFG_REPLY_MAX`, `SALEAE_SHORT_REPLY_MAX`).
+      - **The `ERR CONFIG` reply is 46 characters, not 88.** Prose on a 2 KB part
+        is 64 bytes of stack; `n=5 max=4/8/8/2` carries the same information and
+        cost 58 bytes back on its own.
+
+      *Host side.* `run_tests.py` derives the channel map from `MAP` instead of
+      the hardcoded A=D0/B=D2 table, and `channel_map` + `pin_map` travel in every
+      result record. This was **not cosmetic** — measured on the 2-stepper `nodir`
+      run, the old map reads stepper B as **0 steps** because B is on D1, not
+      D2, i.e. it reports a working driver as dead. On the 8-stepper `nodir` run
+      it cannot even name E–H. `harness.py` refuses a count the channels cannot
+      carry before opening a capture. *Full threading of the map through the
+      evaluators is still R4 — `evaluate()` takes `chan_map` and installs it, and
+      every current scenario connects the 4-stepper `dir` shape, which is
+      unchanged.*
+
+      *Tests: 110 pass, up from 98.* New `TestChannelMap` (9) covers both
+      shapes, the specific case the hardcoded map got wrong, the channel budget,
+      the `MAP` reply parse, and the firmware's `nodir` semantics. The
+      line-buffer test now resolves the `#if` ladder the way the preprocessor
+      would — **including the trailing `#else`**, which is easy to miss: it
+      answered with the last `#elif`'s value (72 where 96 was meant) and the
+      8-stepper driver list then failed a check it should have passed.
+      *Mutation-checked, all caught:* ladder rung too small, `arg2` losing its
+      `+1` terminator, `sscanf` width off by one, `LINE_MAX` slack too small,
+      the `#else` rung deleted, firmware dropping `count_up` forcing,
+      `setDirectionPin` called unconditionally, `nodir` made unreachable,
+      host stride/cap/map ignoring the stride, and `harness` dropping the
+      budget check. Two were missed on the first pass — an unreachable `nodir`
+      (`if (false && …)` still contains the strcmp) and an unconditional
+      `setDirectionPin` — so those assertions are now anchored to the `if`.
 - [ ] **R3 — host: one generic entry point, two modes.** One call covers both:
       - **mode `scale`** — 1…driver-max steppers in parallel on a single named
         driver. For AVR this is one run; for Pico, SAMD and the rest, the same.

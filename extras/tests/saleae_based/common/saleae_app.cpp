@@ -75,7 +75,14 @@
 #include "saleae_test.h"
 
 #define SALEAE_SERIAL_BAUD 115200
-#define SALEAE_LINE_MAX 64
+
+// Analyzer channels and the pin stride, which together decide how many steppers
+// fit. A stepper with a direction pin costs two channels (step + dir), a
+// step-only one costs a single channel, so `dir` reaches 4 and `nodir` reaches
+// 8 on the same eight channels (white paper 3.3/10.1).
+#define SALEAE_CHANNELS 8
+#define SALEAE_STRIDE_DIR 2
+#define SALEAE_STRIDE_NODIR 1
 
 // Bounded program: 8 segments is 8 * 6 bytes = 48 bytes of RAM, shared by all
 // steppers. Every characterization scenario needs fewer.
@@ -84,40 +91,118 @@
 // The library cannot hand out more steppers than MAX_STEPPER, and each costs
 // RAM, so never ask for more. AVR is the tight case (2 on a 328P).
 #if defined(MAX_STEPPER)
-#define SALEAE_MAX_STEPPERS (MAX_STEPPER < 4 ? MAX_STEPPER : 4)
+#define SALEAE_MAX_STEPPERS (MAX_STEPPER < 8 ? MAX_STEPPER : 8)
 #else
-#define SALEAE_MAX_STEPPERS 4
+#define SALEAE_MAX_STEPPERS 8
 #endif
 
-// Stepper step/dir pins. On AVR the step pin MUST be the one the library maps
-// to the timer compare output (stepPinStepperA/B), which depends on
-// FAS_TIMER_MODULE, so use the library's own macros there instead of literals.
+// The longest argument is the CONFIG driver list: one driver name per stepper,
+// at 12 bytes each (10 for the longest name, "mcpwm_pcnt" or "i2s_direct", plus
+// the separating comma).
+//
+// An earlier revision used a flat 48 bytes, which truncated a legal
+// `CONFIG 4 mcpwm_pcnt,...` at 31 characters and refused it with a misleading
+// "no such driver" on the last, half-cut name. A flat 96 would fix that too and
+// cost AVR 72 bytes of RAM it cannot spare, so the width steps with the stepper
+// count.
+//
+// It has to be a *literal* rather than `12 * SALEAE_MAX_STEPPERS`, because it
+// is also an sscanf field width and a format string cannot hold an expression.
+// The static_assert below is what keeps the ladder honest: a platform that
+// gains steppers and outgrows the top rung fails the build instead of silently
+// truncating a driver list.
+#if SALEAE_MAX_STEPPERS <= 2
+#define SALEAE_ARG2_MAX 24
+#elif SALEAE_MAX_STEPPERS <= 4
+#define SALEAE_ARG2_MAX 48
+#elif SALEAE_MAX_STEPPERS <= 6
+#define SALEAE_ARG2_MAX 72
+#else
+#define SALEAE_ARG2_MAX 96
+#endif
+
+static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
+              "SALEAE_ARG2_MAX too small for the driver list");
+
+// Stringize SALEAE_ARG2_MAX so it can be used as an sscanf field width, which
+// must be a literal in the format string.
+#define SALEAE_STR_(x) #x
+#define SALEAE_STR(x) SALEAE_STR_(x)
+
+// Enough for "CONFIG " + count + the driver list + " nodir" + slack.
+#define SALEAE_LINE_MAX (SALEAE_ARG2_MAX + 32)
+
+// Reply buffers are sized from the stepper count too, for the same RAM reason.
+// avr-gcc puts the stack in .data, so an oversized local buffer is not free on
+// a 328P: a flat 256-byte CONFIG reply cost 112 bytes of RAM there and pushed
+// the build to 93 % of SRAM, for no benefit, since a 328P has two steppers.
+//
+// The CONFIG reply is the larger of the two -- "OK CONFIG n=8 mode=nodir
+// stride=1 drivers=" plus 8 driver names plus 8 "maxspeedN=<ticks>" fields
+// needs about 26 bytes per stepper on top of a fixed 48. The short replies
+// carry no driver names, so they get their own size.
+#if SALEAE_MAX_STEPPERS <= 2
+#define SALEAE_CFG_REPLY_MAX 96
+#define SALEAE_SHORT_REPLY_MAX 48
+#elif SALEAE_MAX_STEPPERS <= 4
+#define SALEAE_CFG_REPLY_MAX 192
+#define SALEAE_SHORT_REPLY_MAX 64
+#else
+#define SALEAE_CFG_REPLY_MAX 288
+#define SALEAE_SHORT_REPLY_MAX 80
+#endif
+
+// GPIO per analyzer channel, in channel order.
+//
+// This one table serves both pin modes, and the stride is what selects between
+// them: in `dir` stepper j owns channels 2j (step) and 2j+1 (dir); in `nodir`
+// it owns channel j alone. So the mode cannot disagree with the map -- there is
+// nothing to keep in step but the stride. It is also the same order and the
+// same pins as SR_00's eight (common/saleae_test.cpp), so a channel the
+// self-test proved is the channel a scenario measures.
+//
+// On AVR the step pin MUST be the one the library maps to the timer compare
+// output (stepPinStepperA/B), which depends on FAS_TIMER_MODULE, so use the
+// library's own macros there instead of literals. A 328P has MAX_STEPPER == 2,
+// so only the first two channels' step pins are ever reached; the rest are
+// filled with the dir pins, which is inert.
 #if defined(ARDUINO_ARCH_ESP32)
-static constexpr uint8_t kStepPins[4] = {2, 4, 17, 18};
-static constexpr uint8_t kDirPins[4] = {0, 16, 5, 19};
+static constexpr uint8_t kChanPin[SALEAE_CHANNELS] = {2,  0, 4,  16,
+                                                      17, 5, 18, 19};
 #elif defined(ARDUINO_ARCH_AVR)
-static constexpr uint8_t kStepPins[4] = {stepPinStepperA, stepPinStepperB, 0,
-                                         0};
-// 8 and 12. Pin 9 and 10 are the Timer1 compare outputs (OC1A/OC1B) and are
-// already the step pins; 0 and 1 are the serial port; 13 is the LED. Anything
-// left that is not a compare pin is fine for a plain output.
-static constexpr uint8_t kDirPins[4] = {8, 12, 0, 0};
+// 8 and 12 are the dir pins: pin 9 and 10 are the Timer1 compare outputs
+// (OC1A/OC1B) and are already the step pins; 0 and 1 are the serial port; 13 is
+// the LED. Anything left that is not a compare pin is fine for a plain output.
+static constexpr uint8_t kChanPin[SALEAE_CHANNELS] = {
+    stepPinStepperA, 8, stepPinStepperB, 12, 0, 0, 0, 0};
 #else
-static constexpr uint8_t kStepPins[4] = {2, 4, 6, 8};
-static constexpr uint8_t kDirPins[4] = {3, 5, 7, 9};
+static constexpr uint8_t kChanPin[SALEAE_CHANNELS] = {2, 3, 4, 5, 6, 7, 8, 9};
 #endif
 
-// A pin cannot be a step output and a direction output at once. On AVR the step
-// pins are the timer compare pins, which move with FAS_TIMER_MODULE, so this is
-// checked rather than assumed -- a collision here compiles cleanly and then has
-// two peripherals driving one pin.
-static_assert(kDirPins[0] != kStepPins[0], "dir A collides with step A");
-static_assert(kDirPins[1] != kStepPins[1], "dir B collides with step B");
-static_assert(kDirPins[1] != kStepPins[0], "dir B collides with step A");
-static_assert(kDirPins[0] != kStepPins[1], "dir A collides with step B");
+// A pin cannot be a step output and a direction output at once, and two
+// steppers cannot share a pin. On AVR the step pins are the timer compare pins,
+// which move with FAS_TIMER_MODULE, so this is checked rather than assumed -- a
+// collision here compiles cleanly and then has two peripherals driving one pin.
+//
+// `nodir` needs one channel per stepper, so SALEAE_MAX_STEPPERS must fit in the
+// channel budget: that is the binding limit for the 8-stepper case, ahead of
+// any driver queue count. (A driver may bind first -- MCPWM/PCNT has 6 queues
+// on IDF 5 -- and CONFIG reports the refusal per stepper rather than guessing.)
+static_assert(SALEAE_MAX_STEPPERS <= SALEAE_CHANNELS,
+              "SALEAE_MAX_STEPPERS does not fit one channel per stepper");
+
 #if defined(ARDUINO_ARCH_AVR)
-static_assert(kStepPins[0] != kStepPins[1],
-              "both steppers on the same timer compare pin");
+// Only channels 0..3 are reachable (MAX_STEPPER is 2); the rest are inert.
+static_assert(kChanPin[0] != kChanPin[1], "step A collides with dir A");
+static_assert(kChanPin[2] != kChanPin[3], "step B collides with dir B");
+static_assert(kChanPin[0] != kChanPin[2], "both steppers on one compare pin");
+#else
+static_assert(kChanPin[0] != kChanPin[1], "step A collides with dir A");
+static_assert(kChanPin[2] != kChanPin[3], "step B collides with dir B");
+static_assert(kChanPin[0] != kChanPin[2], "step A collides with step B");
+static_assert(kChanPin[4] != kChanPin[6], "step C collides with step D");
+static_assert(kChanPin[1] != kChanPin[7], "dir A collides with dir D");
+static_assert(kChanPin[5] != kChanPin[7], "dir C collides with dir D");
 #endif
 
 // Portable driver selector (FasDriver only exists on platforms with driver
@@ -157,6 +242,12 @@ struct stepper_slot {
   uint8_t dir_pin;
   enum saleae_driver driver;
 };
+
+// Which pin mode the current CONFIG connected, and the channel stride that goes
+// with it. The stride is not derivable from the count alone -- 4 steppers is
+// 8 channels with `dir` and 4 with `nodir` -- so `MAP` reports it and the host
+// derives the channel map from it rather than assuming a mode.
+static uint8_t chan_stride = SALEAE_STRIDE_DIR;
 
 static FastAccelStepperEngine engine;
 static bool engine_ready = false;
@@ -295,8 +386,15 @@ static void stop_all(void) {
   done_announced = false;
 }
 
-static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
-                            enum saleae_driver driver) {
+static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
+                            bool nodir) {
+  const uint8_t step_pin = kChanPin[idx * chan_stride];
+  // A step-only stepper gets no dir pin at all rather than a repeated one, so
+  // setDirectionPin() is not called and nothing on that pin can be mistaken for
+  // a direction. The `nodir` consequence is that count_up is always driven true
+  // (see qe_feed), because there is no pin to toggle for a false.
+  const uint8_t dir_pin = nodir ? 0 : kChanPin[idx * chan_stride + 1];
+
   FastAccelStepper* s;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   // No DRIVER_DONT_CARE anywhere: the caller named the driver, and a name this
@@ -328,7 +426,9 @@ static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
   if (!s) {
     return false;
   }
-  s->setDirectionPin(dir_pin);
+  if (!nodir) {
+    s->setDirectionPin(dir_pin);
+  }
   memset(&slots[idx].cur, 0, sizeof(slots[idx].cur));
   slots[idx].stepper = s;
   slots[idx].step_pin = step_pin;
@@ -337,18 +437,88 @@ static bool connect_stepper(uint8_t idx, uint8_t step_pin, uint8_t dir_pin,
   return true;
 }
 
+// Pin mode. `dir` costs two channels per stepper, `nodir` one, so the mode sets
+// the channel stride and with it how many steppers the eight channels reach.
+//
+// `nodir` is a real pin configuration, not a shorthand: step-only steppers get
+// no dir pin, the QSEG direction argument is accepted and forced true (there is
+// no pin to toggle for a false), and the host learns it from MAP rather than
+// assuming. It is how 8 parallel steppers fit on 8 channels.
+static bool parse_pin_mode(char* mode_text, bool* nodir, uint8_t* stride) {
+  if (!mode_text) {
+    *nodir = false;
+    *stride = SALEAE_STRIDE_DIR;
+    return true;
+  }
+  if (!strcmp(mode_text, "dir")) {
+    *nodir = false;
+    *stride = SALEAE_STRIDE_DIR;
+    return true;
+  }
+  if (!strcmp(mode_text, "nodir")) {
+    *nodir = true;
+    *stride = SALEAE_STRIDE_NODIR;
+    return true;
+  }
+  return false;
+}
+
+// Both bounds, in the refusal, because "too many steppers" cannot say which one
+// bit: a driver that binds first (MCPWM/PCNT has 6 queues on IDF 5) is a
+// different fact from a channel budget that runs out at 4 with `dir`.
+//
+// Its own function rather than a buffer in handle_config, because on AVR that
+// function's frame is on top of the reply buffer and a second one there cost 58
+// bytes of SRAM -- measured, not estimated. The frame is transient and never
+// recursed into, so the extra level costs nothing that matters.
+static void reply_too_many(long count, uint8_t cap, uint8_t stride) {
+  char buf[48];
+  snprintf(buf, sizeof(buf), "ERR CONFIG n=%ld max=%u/%u/%u/%u\n", count,
+           (unsigned)cap, (unsigned)SALEAE_MAX_STEPPERS,
+           (unsigned)SALEAE_CHANNELS, (unsigned)stride);
+  reply(buf);
+}
+
+// MAP
+//
+// Which analyzer channel carries which stepper. The host needs this to read the
+// capture: with `dir` the channels are step0,dir0,step1,dir1,... and with
+// `nodir` they are step0,step1,step2,..., so the same count is a different
+// channel map. Reporting count + mode + stride makes the map derivable from one
+// reply instead of from a constant the host and firmware each keep.
+//
+// It also reports the GPIO behind each reachable channel, which is what makes
+// the map checkable against the wiring rather than merely self-consistent.
+static void handle_map(void) {
+  // "MAP count=8 mode=nodir stride=1 ch=" plus 8 two-digit pins. Sized from the
+  // channel budget for the same RAM reason as SALEAE_CFG_REPLY_MAX.
+  char buf[SALEAE_CHANNELS * 4 + 64];
+  int len = snprintf(buf, sizeof(buf),
+                     "MAP count=%u mode=%s stride=%u ch=", (unsigned)slot_count,
+                     chan_stride == SALEAE_STRIDE_NODIR ? "nodir" : "dir",
+                     (unsigned)chan_stride);
+  const uint8_t used = slot_count ? slot_count * chan_stride : 0;
+  for (uint8_t c = 0; c < used && c < SALEAE_CHANNELS; c++) {
+    len += snprintf(buf + len, sizeof(buf) - len, "%s%u", c ? "," : "",
+                    (unsigned)kChanPin[c]);
+  }
+  snprintf(buf + len, sizeof(buf) - len, "\n");
+  reply(buf);
+}
+
 // CONFIG <count> <driver>[,<driver>...] [dir|nodir]
 //
 // One generic grammar replaces the eight named presets (white paper §3.2): a
 // preset was only ever a count, a list of drivers and a pin mode, so naming the
 // combinations only means a new name for every one.
 //
-// It refuses rather than clamps, on all four counts, because a silently reduced
+// It refuses rather than clamps, on all five counts, because a silently reduced
 // or differently-driven run makes the capture look like a driver problem:
 //   - a count the platform cannot provide,
+//   - a count the channel budget cannot carry in the requested pin mode,
 //   - a driver name this build has no driver for,
 //   - a driver list whose length is not the count,
-//   - a pin mode that is not the one this build implements.
+//   - a pin mode this build does not implement.
 static void handle_config(char* count_text, char* driver_list,
                           char* mode_text) {
   stop_sr00();
@@ -357,11 +527,22 @@ static void handle_config(char* count_text, char* driver_list,
     engine_ready = true;
   }
 
+  // Pin mode first: the stride it selects decides how many steppers the eight
+  // channels can carry, and so the count cap below depends on it.
+  bool nodir;
+  uint8_t stride;
+  if (!parse_pin_mode(mode_text, &nodir, &stride)) {
+    reply("ERR CONFIG mode dir|nodir\n");
+    return;
+  }
+  const uint8_t chan_cap = SALEAE_CHANNELS / stride;
+
   // Resolve the count *before* touching the array. On AVR SALEAE_MAX_STEPPERS
   // is 2, so filling a 4-entry driver list into a 2-entry array would scribble
   // past it -- and clamping afterwards is too late, the writes have already
   // happened.
-  const uint8_t cap = SALEAE_MAX_STEPPERS;
+  const uint8_t cap =
+      SALEAE_MAX_STEPPERS < chan_cap ? SALEAE_MAX_STEPPERS : chan_cap;
   enum saleae_driver drivers[SALEAE_MAX_STEPPERS];
   uint8_t n;
 
@@ -380,7 +561,7 @@ static void handle_config(char* count_text, char* driver_list,
     return;
   }
   if (count > cap) {
-    reply("ERR CONFIG too many steppers\n");
+    reply_too_many(count, cap, stride);
     return;
   }
   n = (uint8_t)count;
@@ -408,43 +589,45 @@ static void handle_config(char* count_text, char* driver_list,
     return;
   }
 
-  // Pin mode. `nodir` arrives with the mode-agnostic stepper count: until then
-  // this build only implements the two-channels-per-stepper map, and running a
-  // step-only request on it would have the host measuring a pin layout it did
-  // not ask for.
-  if (mode_text && strcmp(mode_text, "dir")) {
-    reply("ERR CONFIG mode not 'dir'\n");
-    return;
-  }
-
   // Each queue can only be allocated once, so a second CONFIG cannot move an
   // already-connected stepper. Report the existing setup instead of silently
   // running with a different pin map than the host thinks.
   if (slot_count > 0) {
-    char buf[48];
-    snprintf(buf, sizeof(buf), "OK CONFIG n=%u mode=dir already\n", slot_count);
+    // Report the existing setup rather than silently running with a different
+    // pin map than the host believes. It has to include the mode and the
+    // drivers, since a second CONFIG naming a different mode is exactly the
+    // case where "already" would otherwise hide a disagreement.
+    char buf[SALEAE_SHORT_REPLY_MAX];
+    snprintf(buf, sizeof(buf), "OK CONFIG n=%u mode=%s already\n",
+             (unsigned)slot_count,
+             chan_stride == SALEAE_STRIDE_NODIR ? "nodir" : "dir");
     reply(buf);
     return;
   }
 
+  chan_stride = stride;
   slot_count = n;
   for (uint8_t i = 0; i < n; i++) {
-    if (!connect_stepper(i, kStepPins[i], kDirPins[i], drivers[i])) {
+    if (!connect_stepper(i, drivers[i], nodir)) {
       slot_count = i;
-      char buf[48];
-      snprintf(buf, sizeof(buf), "ERR connect step %u n=%u\n", i, i);
+      char buf[SALEAE_SHORT_REPLY_MAX];
+      snprintf(buf, sizeof(buf), "ERR connect step %u n=%u drv=%s nodir=%u\n",
+               i, i, driver_name(drivers[i]), (unsigned)nodir);
       reply(buf);
       return;
     }
   }
 
-  char buf[128];
+  // One buffer rather than several, so the reply cannot be truncated halfway,
+  // and sized by SALEAE_CFG_REPLY_MAX because on AVR it is stack.
+  char buf[SALEAE_CFG_REPLY_MAX];
   // Naming the drivers that were actually connected is what lets a run be
   // checked against what the board really did -- the one thing an implicit
   // driver choice used to make impossible. The host already knows what it asked
   // for, so this is not how a result is tagged.
   int len = snprintf(buf, sizeof(buf),
-                     "OK CONFIG n=%u mode=dir drivers=", (unsigned)n);
+                     "OK CONFIG n=%u mode=%s stride=%u drivers=", (unsigned)n,
+                     nodir ? "nodir" : "dir", (unsigned)stride);
   for (uint8_t i = 0; i < n; i++) {
     len += snprintf(buf + len, sizeof(buf) - len, "%s%s", i ? "," : "",
                     driver_name(slots[i].driver));
@@ -502,7 +685,13 @@ static void qe_feed(struct qe_cursor* c, FastAccelStepper* s, bool* err,
       cmd.ticks = seg->ticks;
       cmd.steps = (c->left > 255u) ? 255u : (uint8_t)c->left;
     }
-    cmd.count_up = seg->count_up;
+    // In `nodir` there is no direction pin, so a false has nothing to toggle
+    // and the queue would refuse the command with ErrorNoDirPinToToggle.
+    // Driving it true unconditionally is the only coherent reading: the
+    // direction argument still has to parse (so a scenario's program is
+    // unchanged between modes), it simply cannot mean anything without the pin.
+    // The direction-observing scenarios are `dir`-mode by construction.
+    cmd.count_up = (chan_stride == SALEAE_STRIDE_NODIR) ? true : seg->count_up;
 
     AqeResultCode rc;
     do {
@@ -775,10 +964,18 @@ static void handle_line(char* line) {
   // argument that grows with the stepper count: 4 x "i2s_direct" is 43
   // characters and truncating it to 32 would refuse a legal request with a
   // confusing "no such driver" on the last, half-cut name.
-  char arg2[48] = {0};
+  // One byte larger than the sscanf width above: sscanf writes at most
+  // `width` characters and then a NUL, so a buffer of exactly `width` overflows
+  // by that terminator.
+  char arg2[SALEAE_ARG2_MAX + 1] = {0};
   char arg3[32] = {0};
   char arg4[32] = {0};
-  int n = sscanf(line, "%15s %31s %47s %31s %31s", cmd, arg1, arg2, arg3, arg4);
+  // arg2's field width comes from SALEAE_ARG2_MAX rather than a literal, so it
+  // tracks the stepper count instead of drifting from it: a width shorter than
+  // the buffer truncates the driver list and refuses a legal request, and one
+  // longer than the buffer overflows it.
+  int n = sscanf(line, "%15s %31s %" SALEAE_STR(SALEAE_ARG2_MAX) "s %31s %31s",
+                 cmd, arg1, arg2, arg3, arg4);
 
   if (n <= 0) {
     return;
@@ -793,7 +990,9 @@ static void handle_line(char* line) {
       reply("ERR CONFIG needs <count> <driver>[,<driver>...]\n");
       return;
     }
-    handle_config(arg1, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL);
+    handle_config(arg1, arg2, n > 2 ? arg3 : NULL);
+  } else if (!strcmp(cmd, "MAP")) {
+    handle_map();
   } else if (!strcmp(cmd, "QINFO")) {
     handle_qinfo();
   } else if (!strcmp(cmd, "QCLR")) {

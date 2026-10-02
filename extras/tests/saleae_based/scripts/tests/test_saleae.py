@@ -21,6 +21,7 @@ COMMON = SCRIPTS.parents[0] / "common"
 sys.path.insert(0, str(SCRIPTS))
 
 import analyze_csv  # noqa: E402
+import harness  # noqa: E402
 import run_hardware  # noqa: E402
 import run_tests  # noqa: E402
 import signal_parser as sp  # noqa: E402
@@ -316,6 +317,59 @@ class TestConfigGrammar(unittest.TestCase):
         for name in ("1ch", "2ch", "4ch_rmt", "4ch_mcpwm"):
             self.assertNotIn(f'strcmp(name, "{name}")', source)
 
+    @classmethod
+    def _resolve_size(cls, expr):
+        """A buffer size from its declaration: a literal or CONSTANT + n."""
+        expr = expr.strip()
+        if expr.isdigit():
+            return int(expr)
+        m = re.fullmatch(r"(\w+)\s*\+\s*(\d+)", expr)
+        if m:
+            return cls._firmware_constant(m.group(1)) + int(m.group(2))
+        raise AssertionError(f"cannot resolve buffer size {expr!r}")
+
+    @classmethod
+    def _firmware_constant(cls, name, max_steppers=8):
+        """Resolve a #define from saleae_app.cpp for a given stepper count.
+
+        The buffer sizes are a #if ladder on SALEAE_MAX_STEPPERS rather than one
+        expression, because the value is also an sscanf field width and a format
+        string cannot hold `12 * SALEAE_MAX_STEPPERS`. So it is resolved here the
+        same way the preprocessor would, for the worst case (8 steppers), which
+        is the one that has to fit.
+        """
+        source = (COMMON / "saleae_app.cpp").read_text()
+        # Rungs of a #if ladder on SALEAE_MAX_STEPPERS, including the trailing
+        # `#else`. The `#else` rung is the unconditional top of the ladder and
+        # has no condition of its own -- leaving it out made this resolver answer
+        # with the last #elif's value (72 where 96 was meant), which is exactly
+        # the sort of off-by-one-rung slip the test this feeds exists to catch.
+        conditional = re.compile(
+            r"#(?:if|elif) SALEAE_MAX_STEPPERS <= (\d+)\n"
+            r"#define %s (\d+)\n" % name)
+        unconditional = re.compile(
+            r"#else\n#define %s (\d+)\n" % name)
+        rungs = conditional.findall(source)
+        if rungs:
+            for cap, value in rungs:
+                if max_steppers <= int(cap):
+                    return int(value)
+            top = unconditional.search(source)
+            if not top:
+                raise AssertionError(f"the {name} ladder has no #else rung")
+            return int(top.group(1))
+
+        # Not a ladder: a plain expression, which can still name another
+        # constant. SALEAE_LINE_MAX is SALEAE_ARG2_MAX + slack, and ARG2_MAX is
+        # the ladder -- so resolve the name it references and add.
+        expr = re.search(r"#define %s \((\w+) \+ (\d+)\)" % name, source)
+        if expr:
+            return (cls._firmware_constant(expr.group(1), max_steppers)
+                    + int(expr.group(2)))
+        raise AssertionError(
+            f"cannot resolve {name} in the firmware: no ladder, and not "
+            f"'OTHER + n'")
+
     def test_config_line_fits_the_firmware_line_buffer(self):
         # The firmware reads a line into a fixed buffer and takes each argument
         # with a bounded sscanf width. A CONFIG the host generates that does not
@@ -323,25 +377,38 @@ class TestConfigGrammar(unittest.TestCase):
         # driver" on the half-cut last name -- so the budget is checked here,
         # where it can be changed when the stepper count rises.
         source = (COMMON / "saleae_app.cpp").read_text()
-        line_max = int(re.search(r"#define SALEAE_LINE_MAX (\d+)",
-                                 source).group(1))
+        line_max = self._firmware_constant("SALEAE_LINE_MAX")
         # Every buffer sscanf writes into, paired with the width the format
         # claims for it. A buffer smaller than its own width is a buffer
         # overflow, and a width smaller than the buffer is a silent truncation
         # that reads as a refusal -- both have to be ruled out, and only
         # checking one of them is what made an earlier version of this test
         # pass while the bug it was written for was present.
-        buffers = {name: int(size) for name, size in re.findall(
-            r"char (arg\d)\[(\d+)\]", source)}
+        buffers = {name: self._resolve_size(size) for name, size in
+                   re.findall(r"char (arg\d)\[([^\]]+)\]", source)}
+        self.assertEqual(len(buffers), 4,
+                         f"expected arg1..arg4, found {sorted(buffers)}")
+        # The sscanf field widths, in order. Four are literals; the driver-list
+        # one is stringized from SALEAE_ARG2_MAX so it tracks the stepper count
+        # instead of drifting from it, and has to be resolved the same way.
         widths = [int(w) for w in re.findall(r"%(\d+)s", source)]
+        stringized = re.findall(r'%" SALEAE_STR\((\w+)\) "s', source)
+        for name in stringized:
+            widths.insert(-2, self._firmware_constant(name))
         self.assertEqual(len(widths), len(buffers) + 1,
-                         "sscanf format and argument buffers disagree")
+                         f"found {len(widths)} widths for {len(buffers)} "
+                         f"buffers: {widths}")
         for (name, size), width in zip(buffers.items(), widths[1:]):
             self.assertEqual(size - 1, width,
                              f"{name}[{size}] but sscanf says %{width}s")
         widest = max(buffers.values()) - 1
 
-        count = max(run_tests.CONFIGS[c][0] for c in run_tests.CONFIGS)
+        # The count that has to fit is the widest one the protocol allows, not
+        # the widest any scenario happens to use: `nodir` reaches 8 steppers
+        # (one channel each) even though no scenario is written for it yet, and
+        # a buffer sized for today's 4 would truncate the moment one is.
+        count = max(max(run_tests.CONFIGS[c][0] for c in run_tests.CONFIGS),
+                    max(run_tests.MAX_STEPPERS_PER_MODE.values()))
         for driver in FIRMWARE_DRIVERS:
             line = f"CONFIG {count} {','.join([driver] * count)} dir"
             self.assertLessEqual(len(line), line_max - 1,
@@ -349,6 +416,132 @@ class TestConfigGrammar(unittest.TestCase):
             self.assertLessEqual(count * len(driver) + count - 1, widest,
                                  f"a {count}x {driver!r} driver list is "
                                  f"truncated by the argument width")
+
+
+class TestChannelMap(unittest.TestCase):
+    """Which analyzer channel carries which stepper.
+
+    This is the thing a hardcoded map gets wrong, and it gets it wrong
+    *quietly*: with the map A=D0, B=D2, C=D4, D=D6, a `nodir` run's stepper B is
+    really on D1, so the evaluator reads a quiet pin, counts 0 steps, and calls
+    it a driver that emits nothing. So the map is derived from the count and
+    stride the firmware reports, and that derivation is checked here against both
+    shapes -- including the one the old constant was wrong about.
+    """
+
+    def test_dir_mode_interleaves_step_and_dir(self):
+        m = run_tests.default_channel_map(4, 2)
+        self.assertEqual(m, {
+            "A": {"step": "D0", "dir": "D1"},
+            "B": {"step": "D2", "dir": "D3"},
+            "C": {"step": "D4", "dir": "D5"},
+            "D": {"step": "D6", "dir": "D7"},
+        })
+        # The old hardcoded map, which must survive this shape unchanged so no
+        # recorded result is re-interpreted.
+        self.assertEqual(run_tests.step_channels(m), {
+            "A": "D0", "B": "D2", "C": "D4", "D": "D6"})
+
+    def test_nodir_mode_is_one_channel_per_stepper(self):
+        m = run_tests.default_channel_map(8, 1)
+        self.assertEqual(sorted(m), list("ABCDEFGH"))
+        self.assertEqual([e["step"] for e in m.values()],
+                         [f"D{i}" for i in range(8)])
+        # No dir channel to confuse a step channel with.
+        self.assertEqual(run_tests.dir_channels(m), {})
+
+    def test_nodir_puts_stepper_b_on_d1_not_d2(self):
+        # The exact case the hardcoded map got wrong.
+        self.assertEqual(run_tests.default_channel_map(2, 1)["B"]["step"], "D1")
+        self.assertNotEqual(run_tests.default_channel_map(2, 1)["B"]["step"],
+                            run_tests.default_channel_map(2, 2)["B"]["step"])
+
+    def test_channel_budget_bounds_each_mode(self):
+        self.assertEqual(run_tests.MAX_STEPPERS_PER_MODE,
+                         {"dir": 4, "nodir": 8})
+        self.assertEqual(len(run_tests.STEP_CHANNEL_ORDER), 8)
+        for mode, cap in run_tests.MAX_STEPPERS_PER_MODE.items():
+            stride = run_tests.CHANNELS_PER_STEPPER[mode]
+            m = run_tests.default_channel_map(cap, stride)
+            self.assertEqual(cap * stride, run_tests.CHANNELS, mode)
+            self.assertEqual(len(m), cap, mode)
+
+    def test_firmware_stride_matches_the_host_budget(self):
+        # The host's stride table and the firmware's must agree, or a MAP reply
+        # produces a map the host cannot build.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        self.assertIn("#define SALEAE_STRIDE_DIR 2", source)
+        self.assertIn("#define SALEAE_STRIDE_NODIR 1", source)
+        self.assertIn("#define SALEAE_CHANNELS 8", source)
+        self.assertEqual(
+            run_tests.CHANNELS,
+            int(re.search(r"#define SALEAE_CHANNELS (\d+)", source).group(1)))
+
+    def test_map_reply_is_parsed_into_the_right_shape(self):
+        """MAP count=8 mode=nodir stride=1 ch=... -> A..H on D0..D7."""
+        line = "MAP count=8 mode=nodir stride=1 ch=2,0,4,16,17,5,18,19"
+        m = run_tests.MAP_RE.search(line)
+        self.assertIsNotNone(m, line)
+        self.assertEqual(int(m.group(1)), 8)
+        self.assertEqual(m.group(2), "nodir")
+        self.assertEqual(int(m.group(3)), 1)
+        self.assertEqual([int(p) for p in m.group(4).split(",")],
+                         [2, 0, 4, 16, 17, 5, 18, 19])
+
+    def test_harness_refuses_a_count_the_channels_cannot_carry(self):
+        args = harness.parse_args(["--arch", "esp32", "--count", "5",
+                                   "--pin-mode", "dir"])
+        with self.assertRaises(SystemExit) as cm:
+            harness.derive(args)
+        self.assertIn("4", str(cm.exception))
+
+    def test_harness_accepts_eight_steppers_in_nodir(self):
+        args = harness.parse_args(["--arch", "esp32", "--count", "8",
+                                   "--pin-mode", "nodir",
+                                   "--drivers", ",".join(["rmt_v2"] * 8)])
+        tag, _proj, _env, _rate = harness.derive(args)
+        self.assertIn("nodir", tag)
+
+    def test_firmware_refuses_nodir_counts_over_eight(self):
+        source = (COMMON / "saleae_app.cpp").read_text()
+        # The cap is min(stepper queues, channels/stride), and it is reported
+        # with both bounds so "too many" says which one bit.
+        self.assertIn("SALEAE_CHANNELS / stride", source)
+        self.assertIn("SALEAE_MAX_STEPPERS < chan_cap", source)
+        self.assertIn("ERR CONFIG n=%ld max=%u/%u/%u/%u", source)
+
+    def test_nodir_forces_count_up_because_there_is_no_dir_pin(self):
+        # count_up=false with no dir pin set is refused by the queue with
+        # ErrorNoDirPinToToggle, so a nodir run has to drive it true. If that
+        # line goes, a `nodir` scenario with dir=0 emits nothing at all.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        self.assertIn("chan_stride == SALEAE_STRIDE_NODIR) ? true : seg->count_up",
+                      source)
+
+    def test_nodir_connects_no_direction_pin(self):
+        # A step-only stepper gets no dir pin at all, not a repeated one, so
+        # setDirectionPin() is not called. Calling it anyway would put a pin into
+        # the library's dir state that the capture never drives, and any
+        # direction-observing evaluator would then have a second pin to read.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        self.assertIn("nodir ? 0 : kChanPin[idx * chan_stride + 1]", source)
+        # ...and the call is guarded, not unconditional.
+        self.assertRegex(source, r"if \(!nodir\) \{\s*\n\s*s->setDirectionPin")
+
+    def test_firmware_accepts_both_pin_modes(self):
+        # parse_pin_mode has to recognise both names; a build where `nodir` is
+        # unreachable would refuse the 8-stepper case with "mode dir|nodir" while
+        # every host-side test still passed.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        for mode in ("dir", "nodir"):
+            # Anchored to the `if`: `if (false && !strcmp(...))` still contains
+            # the strcmp, so a plain substring check passes on a build where the
+            # mode is unreachable -- which is exactly the mutation that has to
+            # be caught here.
+            self.assertRegex(source,
+                             r'if \(!strcmp\(mode_text, "%s"\)\) \{' % mode)
+        self.assertIn("*stride = SALEAE_STRIDE_DIR", source)
+        self.assertIn("*stride = SALEAE_STRIDE_NODIR", source)
 
 
 class TestBoardCommands(unittest.TestCase):

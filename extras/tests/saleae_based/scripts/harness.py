@@ -64,10 +64,19 @@ DRIVERS = {
     "sam": ["timer"],
 }
 
-# The pin mode, the other half of the firmware's CONFIG grammar. `nodir` exists
-# in the grammar but the firmware does not implement it yet (see the todo's R2),
-# and it is not offered here rather than offered and refused.
-PIN_MODES = ["dir"]
+# The pin mode, the other half of the firmware's CONFIG grammar. It is not
+# cosmetic: the analyzer has 8 channels and `dir` spends two per stepper, so
+# `dir` reaches 4 steppers and `nodir` reaches 8 (white paper 3.3/10.1).
+PIN_MODES = ["dir", "nodir"]
+
+# Analyzer channels, and the stepper count each pin mode can therefore carry.
+CHANNELS = 8
+CHANNELS_PER_STEPPER = {"dir": 2, "nodir": 1}
+
+
+def max_steppers(pin_mode):
+    """How many steppers this pin mode can put on CHANNELS channels."""
+    return CHANNELS // CHANNELS_PER_STEPPER[pin_mode]
 
 # One generic CONFIG covers every channel configuration there is: a count, a
 # driver list and a pin mode. The eight named presets the firmware used to take
@@ -114,6 +123,16 @@ def derive(args):
     """Return (tag_key, project_dir, env, sample_rate)."""
     family = arch_family(args.arch)
     vt = version_tag(args.version)
+
+    # Checked here rather than left to the firmware, because the firmware's
+    # refusal names the bounds but by then the host has already picked a sample
+    # rate and opened a capture.
+    cap = max_steppers(args.pin_mode)
+    if args.count < 1 or args.count > cap:
+        raise SystemExit(
+            f"--count {args.count} does not fit {args.pin_mode}: "
+            f"{CHANNELS} channels / {CHANNELS_PER_STEPPER[args.pin_mode]} per "
+            f"stepper = {cap}")
 
     if args.framework == "idf":
         if family != "esp":
@@ -177,7 +196,12 @@ def build_and_flash(proj, env, port, do_build, do_flash):
     subprocess.run(cmd, cwd=ROOT, check=True)
 
 
-def main():
+def build_parser():
+    """The argument parser, split out so the tests can call it.
+
+    The channel-budget refusal in derive() is only reachable through the CLI,
+    and a rule nothing can reach is a rule that silently stops being true.
+    """
     p = argparse.ArgumentParser(description="Target-agnostic Saleae harness.")
     p.add_argument("--arch", choices=ARCHS, default="esp32")
     p.add_argument("--framework", choices=["arduino", "idf"], default="arduino")
@@ -190,7 +214,8 @@ def main():
                    help="per-stepper drivers, one per stepper, e.g. "
                         "rmt,mcpwm; overrides --driver")
     p.add_argument("--count", type=int, default=DEFAULT_COUNT,
-                   help="number of steppers to connect (1..4 with dir pins)")
+                   help="number of steppers to connect (1..4 with dir, "
+                        "1..8 with nodir: 8 channels, 2 or 1 per stepper)")
     p.add_argument("--pin-mode", choices=PIN_MODES, default="dir",
                    help="two channels per stepper (dir) or one (nodir)")
     p.add_argument("--tests", help="comma list (default: all)")
@@ -210,10 +235,18 @@ def main():
     p.add_argument("--speed-us", type=int, default=400,
                    help="us per step; 25 = 40 kHz, 5 = 200 kHz")
     p.add_argument("--force", action="store_true")
-    args = p.parse_args()
+    return p
 
+
+def parse_args(argv=None):
+    args = build_parser().parse_args(argv)
     if args.driver is None:
         args.driver = DRIVERS[arch_family(args.arch)][0]
+    return args
+
+
+def main():
+    args = parse_args()
 
     tag_key, proj, env, rate = derive(args)
     args.sample_rate = rate
