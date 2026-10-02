@@ -210,11 +210,71 @@ fail.
          firmware refuses it with ErrorTicksTooLow. The trailing single step has
          to use at least 3200 ticks (200 us), so the scenario's last phase runs
          at a different period from the run before it.
-   - [ ] SR_21–SR_24 driver-specific; SR_25 / SR_26
-7. **Parameter sweeps** — SR_02 over `steps` = 1…255, SR_05 over the whole
-   `ticks` range. `_Pending._`
-8. **Reporting** — markdown/CSV summaries, cross-architecture comparison.
-   `_Pending._`
+   - [x] **SR_21 / SR_23 pass on hardware.** SR_21 (200 RMT steps, hunting an
+         irregular gap at a hardware buffer split): 200/200, zero gaps outside
+         tolerance. SR_23 (I2S, whose timing comes from a DMA-fed sample stream
+         rather than a compare register): 64/64 at 39.96–40.0 us.
+   - [x] **SR_22 not applicable here.** RMT V2 fill-encoder output needs a chip
+         with RMT V2; this ESP32 has V1. Nothing to measure, so it is left
+         unwired rather than wired to a config that cannot exist.
+   - [x] **SR_24 not applicable here.** AVR timer OC pins, and no AVR board is
+         connected. Not inferable from ESP32 results.
+   - [x] **SR_26 passes: the 16-bit pause field works.** 65535 ticks of silence
+         between two single steps, measured gap 8185 us against 8191.875 us
+         expected. Deviates from the white paper by adding a step *after* the
+         pause: silence can only be measured between two pulses, so with one step
+         before and none after the gap is unobservable rather than wrong.
+         **Corrected a units error of my own along the way** -- 65535 ticks at
+         16 MHz is 4.0965 *ms*, not seconds.
+   - [ ] **SR_25 found a real library behaviour: `stopMove()` does not stop a
+         move that is already queued.** `stopMove()` only sets a flag that the
+         ramp generator reads when asked for its *next* command, so a move
+         sitting in the pulse queue runs to completion. Measured:
+         - 2000 steps @ 4000 ticks, `STOP` at POS 510 -> finished at **2000**,
+           no effect at all.
+         - 20000 steps @ 640 ticks, `STOP` at POS 5825 -> stopped at **14240**,
+           truncating only once the queue had to refill.
+         The scenario now uses a move far larger than the queue, so it tests
+         stopping rather than queue drain. Waveform verification (no partial
+         pulse, capture goes quiet) is **incomplete**: see the blocker below.
+7. **Parameter sweeps** — tooling in place: `scripts/sweep.py`, which plans
+   19 points for SR_02 and 6 for SR_05 and **asserts every point is legal
+   before any hardware runs** (`--list` shows the plan). All 25 points are
+   legal; `legal_ticks` pulls the small-step points up to the floor, so
+   steps=1 runs at 3200 ticks and steps=2 at 1600. 14 tests cover it.
+   `_Pending._ the data: needs the Saleae._`
+8. **Reporting** — done: `scripts/report.py` gives markdown, `--csv`, and
+   `--scenarios`. Every number comes from the evaluator in `run_tests.py`, never
+   recomputed here, so the report cannot disagree with the tests; a test asserts
+   that delegation. Measured-but-not-gated results print as `PASS(reported)`
+   rather than being flattened into a pass. Exit code is 1 on any failure.
+   11 tests cover it.
+
+### Blocked: the Saleae clone dropped off USB
+
+`SR_25`'s waveform verification is unfinished because the clone vanished from
+the USB bus mid-session (`sigrok-cli -l` lists no device; no FX2 vendor ID in
+ioreg, while the ESP32's own serial port is still present). It needs an unplug
+and replug, which cannot be done from here.
+
+Consequences, stated plainly:
+
+- **SR_25 is not verified on a waveform.** Its serial evidence stands (POS 510
+  -> 2000 and POS 5825 -> 14240 above), and its three fixtures pass, but the
+  two claims that need a capture — no partial pulse, and the capture going
+  quiet after the stop — are untested against hardware.
+- Every other scenario in this file has its hardware result recorded above.
+
+### Capture limits worth knowing
+
+The clone's hardware buffer holds **64 MSamples: 2.66 s at 24 MS/s**. A capture
+that hits the limit ends mid-run, which reads as "the run stopped there" when it
+merely ran out of room — SR_25 hit exactly this, and the evaluator correctly
+rejected the capture rather than reading the truncated end as a stop. Anything
+needing a longer window must drop the sample rate or shorten the program.
+
+Sparse channel selections also drop channels on this clone: `-C D0,D2` yields
+nothing on D2 while `-C D0,D1,D2` works. Contiguous selections only.
 
 ## Analyzer negative testing — why the fixtures exist
 

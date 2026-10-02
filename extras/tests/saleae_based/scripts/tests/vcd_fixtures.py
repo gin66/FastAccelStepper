@@ -232,6 +232,10 @@ SCENARIO_BUILDERS = {
     "SR_14": rt.sc_sync_start,
     "SR_16": rt.sc_multi_stepper_timing,
     "SR_17": rt.sc_sync_cross_driver,
+    "SR_21": rt.sc_rmt_buffer_split,
+    "SR_23": rt.sc_i2s_timing,
+    "SR_25": rt.sc_emergency_stop,
+    "SR_26": rt.sc_pause_ticks_max,
     "SR_27": rt.sc_single_step,
 }
 
@@ -639,6 +643,68 @@ FIXTURES.append(Fixture(
     fault="second stepper period wrong",
     expect_detail="per_stepper",
     extra={"D2": _s16_b, "D3": [(0, 1)]}))
+
+# SR_21/23/26 need no bespoke construction: the renderer already produces a
+# correct waveform from the builder's own segments, which is the point -- these
+# three assert nothing the renderer cannot express.
+FIXTURES.append(Fixture(
+    name="good_rmt_no_split_gap", scenario="SR_21",
+    why="200 RMT steps with no inter-step gap at a buffer split",
+    step=render(SCENARIO_BUILDERS["SR_21"](_DUT.info()))[0], dirs=[(0, 1)],
+    expect_pass=True))
+FIXTURES.append(Fixture(
+    name="good_i2s_period", scenario="SR_23",
+    why="I2S step output at the commanded period",
+    step=render(SCENARIO_BUILDERS["SR_23"](_DUT.info()))[0], dirs=[(0, 1)],
+    expect_pass=True))
+FIXTURES.append(Fixture(
+    name="good_pause_16bit", scenario="SR_26",
+    why="a pause of exactly 65535 ticks between two steps",
+    step=render(SCENARIO_BUILDERS["SR_26"](_DUT.info()))[0], dirs=[(0, 1)],
+    expect_pass=True))
+
+# SR_25's fixtures are hand-built, because the analyser has to see a run that
+# stopped *short* of its program. Padding matters: eval_emergency_stop proves
+# the capture goes quiet after the stop, and on real hardware that was exactly
+# the trap -- at 24 MS/s the clone's 64 MSample buffer filled just as the last
+# step landed, so the quiet tail was zero-length and the check could not be
+# made at all. The pad reproduces a capture long enough to judge.
+_stop_ticks = rt.legal_ticks(_DUT.info(), 20000, _DUT.info()["max_speed_ticks"])
+_stop_ticks = rt.legal_ticks(_DUT.info(), 20000, _DUT.info()["max_speed_ticks"])
+_stopped = render([(2000, _stop_ticks, True)])[0]
+
+# The pad has to exceed 3x the step span, not merely exist. eval_emergency_stop
+# proves the capture goes quiet over its last quarter, so a capture whose last
+# quarter still holds steps cannot decide the question at all. On real hardware
+# that was the trap rather than a theoretical one: the clone's 64 MSample
+# buffer ran out at 2.66 s at 24 MS/s, just as the final step landed.
+_full = render([(20000, _stop_ticks, True)])[0]
+_span = _stopped[-1][0] - _stopped[0][0]
+_pad = 4 * _span
+_tail_at = _stopped[-1][0] + _pad
+
+FIXTURES.append(Fixture(
+    name="good_emergency_stop_short", scenario="SR_25",
+    why="20000 requested, stopped after 2000, then a long quiet tail",
+    step=_stopped + [(_tail_at, 0)], dirs=[(0, 1)], expect_pass=True,
+    expect_flags={"truncated": True, "stopped_early": True}))
+
+FIXTURES.append(Fixture(
+    name="bad_emergency_stop_ignored", scenario="SR_25",
+    why="STOP ignored: the full 20000 steps were still emitted",
+    step=_full + [(_full[-1][0] + _pad, 0)],
+    dirs=[(0, 1)], expect_pass=False, expect_detail="truncated",
+    fault="stop ignored, run not truncated"))
+
+# Dropping the final falling edge leaves the step pin high. The tail carries no
+# rising edge, so `stopped_early` stays true and the unterminated pulse is the
+# only thing wrong -- one defect per fixture.
+FIXTURES.append(Fixture(
+    name="bad_emergency_stop_partial_pulse", scenario="SR_25",
+    why="the run was cut mid-pulse, leaving the step pin high",
+    step=_stopped[:-1] + [(_tail_at, 1)], dirs=[(0, 1)], expect_pass=False,
+    expect_detail="unterminated_pulses",
+    fault="last pulse left high, no terminating falling edge"))
 
 # SR_13 is the inverse of every other fixture: the command is refused, so the
 # correct waveform is a pin that never moves. There is no `render()` output to

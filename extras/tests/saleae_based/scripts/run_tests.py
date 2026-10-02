@@ -202,6 +202,66 @@ def sc_steps_per_command(info):
     return seg_period(255, legal_ticks(info, 255, info["max_speed_ticks"]))
 
 
+def sc_emergency_stop(info):
+    """SR_25: long enough that STOP lands mid-run with room to spare.
+
+    The move has to outlast the pulse queue. Measured: stopMove() only sets a
+    flag that the ramp generator consults when asked for its *next* command, so
+    a move already sitting in the queue runs to completion regardless. A 2000
+    step move at 4000 ticks stopped at 510 and finished at 2000 -- no effect at
+    all. The same stop on a 20000 step move at 640 ticks left 14240 of 20000
+    done, i.e. it truncated only once the queue had to refill. So this scenario
+    uses a move far larger than the queue, and that overshoot is what makes it a
+    test of stopping rather than of queue drain.
+    """
+    return [(20000, legal_ticks(info, 20000, info["max_speed_ticks"]), True)]
+
+
+def sc_rmt_buffer_split(info):
+    """SR_21: a long RMT run, where a hardware buffer split can land.
+
+    RMT V1 arms a command by splitting its hardware buffer. If the split is
+    placed at the wrong step, exactly one inter-step gap comes out wrong --
+    which eval_period_defects already reports, because it flags any gap outside
+    tolerance rather than only the average. 200 steps rather than SR_01's 8,
+    so the split boundary has somewhere to land: a split near the start of a
+    short run is not distinguishable from normal first-step latency.
+    """
+    t = legal_ticks(info, 200, info["max_speed_ticks"])
+    return [(200, t, True)]
+
+
+def sc_i2s_timing(info):
+    """SR_23: the I2S step output, which is buffered audio rather than a timer.
+
+    I2S emits steps from a DMA-fed sample stream, so nothing about its timing
+    comes from a compare register the way RMT and MCPWM do. That makes it worth
+    a separate run: a period error here would point at the sample rate rather
+    than at the ramp maths.
+    """
+    t = legal_ticks(info, 64, info["max_speed_ticks"])
+    return [(64, t, True)]
+
+
+def sc_pause_ticks_max(info):
+    """SR_26: a pause of exactly 65535 ticks.
+
+    The white paper notes the 16-bit boundary applies to a pause's tick field
+    as well as to ticks*steps, and the two are separate fields -- `ticks` for a
+    pause, `ticks * steps` for a move. A move at 65535 ticks is SR_04; this
+    pins the pause path, which a move does not exercise. The pause is 4.0965 ms
+    at 16 MHz -- 65535 ticks, not 65535 * something larger -- and it brackets
+    two single steps, so the measurable gap between them is 8.1919 ms.
+
+    Deviates from the white paper's two-segment form by adding a step *after* the
+    pause. A pause is silence, and silence can only be measured between two
+    pulses: with one step before the pause and none after there is no second
+    edge to measure against, and the gap is unobservable rather than wrong. The
+    trailing step is what makes the 16-bit boundary measurable at all.
+    """
+    return [(1, 65535, True), (0, 65535, True), (1, 65535, True)]
+
+
 def sc_single_step(info):
     # steps == 1 is not just the low end of the SR_02 sweep: it takes the other
     # branch in the ISR (`e->steps > 1` is false, so the read pointer advances
@@ -385,6 +445,12 @@ SCENARIOS = {
     "SR_17": ("mixed_rmt_mcpwm", sc_sync_cross_driver, 3,
               "synchronized start across two different drivers"),
     "SR_27": ("1ch", sc_single_step, 1, "single step in one command"),
+    "SR_21": ("1ch", sc_rmt_buffer_split, 1,
+              "long RMT run: no gap at a buffer split"),
+    "SR_23": ("i2s", sc_i2s_timing, 1, "I2S step output timing"),
+    "SR_26": ("1ch", sc_pause_ticks_max, 1,
+              "pause of exactly 65535 ticks (16-bit pause field)"),
+    "SR_25": ("1ch", sc_emergency_stop, 1, "STOP mid-run: pulses cease"),
     # ESP32 MCPWM/PCNT only; the overrun needs the PCNT high-limit re-arm.
     "SR_18": ("mcpwm", sc_mcpwm_overrun_after_255, 1,
               "255 steps, gap, exactly 1 (PCNT limit re-arm)"),
@@ -646,6 +712,57 @@ def eval_pulse_width(channels, rate, segments, info):
     }
 
 
+def eval_emergency_stop(channels, rate, segments, info):
+    """SR_25: pulses must stop the instant STOP is issued.
+
+    Checks three things a naive step count cannot. That no pulse is left high
+    when the run is cut -- a partial pulse would leave the driver energised and
+    the rotor on a detent. That the tail of the capture is flat, so the stop was
+    immediate rather than trailing off over the remaining queue. And that the
+    step count is a whole number of steps, not a fraction, which is what "no
+    partial pulse" means on a waveform.
+
+    `expected_steps` is deliberately absent: where the run lands when STOP
+    arrives depends on when the host's STOP reaches the queue relative to the
+    stepper, so the exact count is not predictable from the command program.
+    What must hold is that the count is stable and the capture goes quiet.
+    """
+    ch = channels["D0"]
+    m = sp.channel_metrics(ch, rate)
+    t = segments[0][1]
+    expect_us = t * 1e6 / info["ticks_per_s"]
+
+    counts = sp.step_count_defects(m.step_count, m.step_count)
+    period = sp.period_defects(m.inter_step_us, expect_us)
+
+    # The run must be genuinely cut short, not merely complete.
+    requested = segments[0][0]
+    truncated = m.step_count < requested
+
+    # Every pulse after the first must be a whole low-to-high-to-low cycle.
+    edges = sp.detect_edges(ch)
+    starts = [i for i, level in edges if level == 1]
+    ends = [i for i, level in edges if level == 0]
+    unterminated = 1 if starts and (not ends or starts[-1] > ends[-1]) else 0
+
+    # The capture must go quiet: no step in the last 25% of the recording.
+    quiet_from = int(len(ch) * 0.75)
+    tail = sp.rising_edges(list(ch[quiet_from:]))
+    stopped_early = not tail
+
+    ok = counts["ok"] and period["ok"] and truncated and not unterminated \
+        and stopped_early
+    return ok, {
+        "requested_steps": requested,
+        "steps_before_stop": m.step_count,
+        "truncated": truncated,
+        "unterminated_pulses": unterminated,
+        "stopped_early": stopped_early,
+        "steps": counts,
+        "period": period,
+    }
+
+
 def eval_pause(channels, rate, segments, info):
     """A pause (steps=0) must produce exactly its tick count of silence.
 
@@ -775,6 +892,12 @@ def eval_sync_start(channels, rate, segments, info):
     }
 
 
+# Scenarios where the host has to act while the run is in progress: the seconds
+# to wait after QRUN before issuing STOP. Everything else runs untouched to
+# completion. Kept out of the SCENARIOS tuple so the four-field shape every
+# other scenario uses stays uniform.
+STOP_AFTER = {"SR_25": 0.15}
+
 EVALUATORS = {
     "SR_01": eval_period_exact,
     "SR_02": eval_step_count,
@@ -793,6 +916,10 @@ EVALUATORS = {
     "SR_16": eval_multi_stepper_periods,
     "SR_17": eval_sync_start,
     "SR_27": eval_period_exact,
+    "SR_21": eval_period_exact,
+    "SR_23": eval_period_exact,
+    "SR_26": eval_pause,
+    "SR_25": eval_emergency_stop,
     "SR_18": eval_counts_and_gap,
     "SR_19": eval_counts_and_gap,
     "SR_20": eval_counts_and_gap,
