@@ -230,6 +230,8 @@ SCENARIO_BUILDERS = {
     "SR_19": rt.sc_mcpwm_overrun_boundary,
     "SR_20": rt.sc_pause_after_full_command,
     "SR_14": rt.sc_sync_start,
+    "SR_16": rt.sc_multi_stepper_timing,
+    "SR_17": rt.sc_sync_cross_driver,
     "SR_27": rt.sc_single_step,
 }
 
@@ -603,6 +605,40 @@ FIXTURES.append(Fixture(
     step=_dir_steps, dirs=[(0, 0)], expect_pass=False,
     fault="dir pin never followed the command",
     expect_detail="expected_final_dir"))
+
+# SR_16/17 are two-channel: stepper A on D0/D1, stepper B on D2/D3.
+_s16_a, _ = render(SCENARIO_BUILDERS["SR_16"](_DUT.info()))
+FIXTURES.append(Fixture(
+    name="good_two_steppers_even", scenario="SR_16",
+    why="two steppers, both at the commanded period",
+    step=_s16_a, dirs=[(0, 1)], expect_pass=True,
+    extra={"D2": list(_s16_a), "D3": [(0, 1)]}))
+
+_s17_a, _ = render(SCENARIO_BUILDERS["SR_17"](_DUT.info()))
+# The measured cross-driver offset on the ESP32: RMT arms first, MCPWM+PCNT
+# follows 29.583 us later at ticks=640 (40 us), i.e. about three quarters of a
+# period. Reported, not gated on -- white paper 1.3 -- but pinned here so the
+# number cannot silently decay to zero, which is what would hide the fact that
+# these two drivers are not aligned at all.
+FIXTURES.append(Fixture(
+    name="cross_driver_skew_30us", scenario="SR_17",
+    why="RMT and MCPWM+PCNT start ~30 us apart; reported, not failed",
+    step=_s17_a, dirs=[(0, 1)], expect_pass=True,
+    expect_measurement=29.583,
+    measurement_key="first_step_skew_us",
+    extra={"D2": [(t + 473, v) for t, v in _s17_a], "D3": [(0, 1)]}))
+
+# The negative fixture for eval_multi_stepper_periods: stepper B's period is
+# stretched, which a check on stepper A alone would miss. That is the whole
+# point of SR_16 -- the second stepper is the subject.
+_s16_b = _s16_a[:20] + [(t + 160, v) for t, v in _s16_a[20:]]
+FIXTURES.append(Fixture(
+    name="bad_second_stepper_slow", scenario="SR_16",
+    why="stepper B runs at a longer period than commanded",
+    step=_s16_a, dirs=[(0, 1)], expect_pass=False,
+    fault="second stepper period wrong",
+    expect_detail="per_stepper",
+    extra={"D2": _s16_b, "D3": [(0, 1)]}))
 
 # SR_13 is the inverse of every other fixture: the command is refused, so the
 # correct waveform is a pin that never moves. There is no `render()` output to

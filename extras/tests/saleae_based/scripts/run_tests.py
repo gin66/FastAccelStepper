@@ -225,6 +225,33 @@ def sc_ticks_max(info):
     return seg_period(4, 65535)
 
 
+def sc_multi_stepper_timing(info):
+    """Both steppers stepping the same period, for the SR_16 comparison.
+
+    The question SR_16 asks is not "does B step" but "does B perturb A": the
+    same channel is compared between a 1ch run and this 2ch run. On AVR the
+    answer is structural -- the speed floor rises once a second stepper is
+    attached -- so a sweep done only at 1ch would report a speed the board
+    cannot sustain with two steppers connected. The measurement that settles it
+    is the period of channel A here versus channel A alone.
+    """
+    t = legal_ticks(info, 64, info["max_speed_ticks"])
+    return [(64, t, True)]
+
+
+def sc_sync_cross_driver(info):
+    """Two steppers on different drivers, started together.
+
+    RMT and MCPWM+PCNT arm through entirely different hardware, so this is the
+    hardest start-alignment case: one channel is driven by a buffered
+    peripheral filling symbols ahead of time, the other by a timer compare with
+    a hardware counter watching the pin. The offset is reported rather than
+    gated on -- see eval_sync_start and white paper 1.3.
+    """
+    t = legal_ticks(info, 200, info["max_speed_ticks"])
+    return [(200, t, True)]
+
+
 def sc_dir_change_both_ways(info):
     """Reverse phase then forward phase: the same change, both directions.
 
@@ -352,6 +379,11 @@ SCENARIOS = {
     "SR_13": ("1ch", sc_ticks_error_rejected, 1,
               "a command below MIN_CMD_TICKS must emit nothing"),
     "SR_14": ("2ch", sc_sync_start, 3, "2 steppers, synchronized start"),
+    "SR_16": ("2ch", sc_multi_stepper_timing, 3,
+              "does a second stepper perturb the first?"),
+    # Cross-driver start alignment: one stepper on RMT, one on MCPWM+PCNT.
+    "SR_17": ("mixed_rmt_mcpwm", sc_sync_cross_driver, 3,
+              "synchronized start across two different drivers"),
     "SR_27": ("1ch", sc_single_step, 1, "single step in one command"),
     # ESP32 MCPWM/PCNT only; the overrun needs the PCNT high-limit re-arm.
     "SR_18": ("mcpwm", sc_mcpwm_overrun_after_255, 1,
@@ -448,6 +480,40 @@ def eval_step_count(channels, rate, segments, info):
         "steps": counts,
         "period": detail,
     }
+
+
+def eval_multi_stepper_periods(channels, rate, segments, info):
+    """Every stepper's own step count and period, for the SR_16 comparison.
+
+    Asserts each stepper independently against the commanded period, and
+    reports each one's mean and worst period so the two runs SR_16 compares --
+    one stepper alone, then two -- can be set side by side. Whether attaching a
+    second stepper perturbs the first is answered by comparing those two
+    reports, not by a threshold here: the second stepper has to be present for
+    the question to mean anything, so a within-tolerance check on both is the
+    only thing that can be asserted in a single capture.
+    """
+    t = segments[0][1]
+    expect_us = t * 1e6 / info["ticks_per_s"]
+    expected = sum(n for n, _, _ in segments)
+    per_stepper = {}
+    ok = True
+    for letter, ch_name in sorted(STEP_CHANNELS.items()):
+        if ch_name not in channels:
+            continue
+        m = sp.channel_metrics(channels[ch_name], rate)
+        counts = sp.step_count_defects(m.step_count, expected)
+        detail = sp.period_defects(m.inter_step_us, expect_us)
+        ok = ok and counts["ok"] and detail["ok"]
+        per_stepper[letter] = {
+            "steps": counts,
+            "period": detail,
+            "mean_period_us": round(sum(m.inter_step_us) / len(m.inter_step_us), 4)
+                              if m.inter_step_us else None,
+            "min_period_us": round(min(m.inter_step_us), 4) if m.inter_step_us else None,
+            "max_period_us": round(max(m.inter_step_us), 4) if m.inter_step_us else None,
+        }
+    return ok and bool(per_stepper), {"ticks": t, "per_stepper": per_stepper}
 
 
 def eval_direction_phases(channels, rate, segments, info):
@@ -724,6 +790,8 @@ EVALUATORS = {
     "SR_12": eval_direction_phases,
     "SR_13": eval_nothing_emitted,
     "SR_14": eval_sync_start,
+    "SR_16": eval_multi_stepper_periods,
+    "SR_17": eval_sync_start,
     "SR_27": eval_period_exact,
     "SR_18": eval_counts_and_gap,
     "SR_19": eval_counts_and_gap,
