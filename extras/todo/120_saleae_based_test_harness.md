@@ -1145,6 +1145,11 @@ one agent. Each item is independently checkable and states how to verify it.
 
 ### Not started, and deliberately so
 
+- **`i2s_direct` across the catalogue.** Its reach is now measured (2 steppers,
+  see the finding above) but the 25 wired scenarios have only ever been run on
+  `rmt_v2`, so the I2S step/dir waveform has not been characterized the way RMT's
+  has. One command closes it. Note only 2 steppers connect, so scenarios needing
+  more will refuse -- which is itself the finding.
 - **Cross-architecture runs.** Only the ESP32 has been measured. AVR, Pico,
   SAMD and the other ESP32 variants are unmeasured, so the paper's central
   comparison does not exist yet. This needs boards, not code — but it is the
