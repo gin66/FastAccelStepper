@@ -975,6 +975,46 @@ class TestModes(unittest.TestCase):
                 self.assertIn(d, harness.DRIVER_IDENTITY,
                               f"{d} (family {family}) has no identity")
 
+    # -- queue entries the board may silently discard --------------------
+    def test_an_entry_shorter_than_min_cmd_ticks_is_named_in_the_result(self):
+        """A scenario measuring zero steps has to say why.
+
+        Measured on the ESP32 with i2s_direct: a 195 us entry produces zero
+        pulses, a 200 us entry produces every one, and 200 us is exactly
+        MIN_CMD_TICKS (3200 ticks at 16 MHz). Three 40 us entries totalling
+        240 us also produce nothing, so the limit is per entry and not on the
+        program as a whole.
+
+        Without the note a zero-step result reads as a dead pin or a driver
+        that emits nothing -- and neither is true: the same pin carries every
+        longer move perfectly.
+        """
+        self.assertEqual(run_tests.sub_min_entries(
+            [(16, 160, True)], {"ticks_per_s": 16_000_000,
+                                "min_cmd_ticks": 3200}),
+            [{"steps": 16, "ticks": 160, "us": 160.0}])
+        # Exactly at the threshold is not below it.
+        self.assertEqual(run_tests.sub_min_entries(
+            [(20, 160, True)], {"ticks_per_s": 16_000_000,
+                                "min_cmd_ticks": 3200}), [])
+        # A pause counts one period, and the threshold applies to it too.
+        self.assertEqual(run_tests.sub_min_entries(
+            [(0, 1600, True)], {"ticks_per_s": 16_000_000,
+                                "min_cmd_ticks": 3200}),
+            [{"steps": 0, "ticks": 1600, "us": 100.0}])
+
+    def test_per_stepper_programs_are_checked_for_short_entries_too(self):
+        # SR_15 is the one scenario with per-stepper programs, and its steppers
+        # are short by design. Checking only the shared program would let the
+        # same silent drop through on the other half of the run.
+        # One short entry and one long one, so the filter is exercised per entry
+        # rather than per program -- checking only the shared program would let
+        # the same silent drop through on the other half of the run.
+        entries = run_tests.sub_min_entries(
+            None, {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200},
+            programs={0: [(4, 160, True)], 1: [(4, 1600, True)]})
+        self.assertEqual(entries, [{"steps": 4, "ticks": 160, "us": 40.0}])
+
     # -- DRIVERS: asking the board what it has ----------------------------
     def test_drivers_is_read_as_name_value_pairs_not_by_position(self):
         # The set of names is build-dependent -- an AVR build emits only

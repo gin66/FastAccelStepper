@@ -433,6 +433,22 @@ def load_capture_for_eval(capture_file):
     return sp.load_capture(str(capture_file))
 
 
+def sub_min_entries(segments, info, programs=None):
+    """Queue entries shorter than the DUT's MIN_CMD_TICKS, in microseconds.
+
+    Some drivers emit them and some silently discard them, and the difference
+    is invisible from the outside: the pin is simply quiet afterwards. Naming
+    them in the result turns "measured zero steps" into "measured zero steps,
+    and here is a command this driver does not honour".
+    """
+    entries = segments if segments is not None else [
+        seg for segs in programs.values() for seg in segs]
+    return [{"steps": st, "ticks": tk,
+             "us": round(tk * (st if st else 1) / info["ticks_per_s"] * 1e6, 1)}
+            for st, tk, _ in entries
+            if tk * (st if st else 1) < info["min_cmd_ticks"]]
+
+
 def scenario_seconds(segments, ticks_per_s):
     """Exact duration of a program: sum of ticks*steps (or ticks for a pause).
 
@@ -1858,6 +1874,20 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     # The DUT's tick rate is what makes the ticks in `segments` interpretable,
     # so it travels with every result.
     detail["dut"] = info
+    # Queue entries shorter than MIN_CMD_TICKS, named as such.
+    #
+    # RMT emits them; `i2s_direct` silently discards them and produces nothing
+    # at all -- measured, not guessed: a 195 us entry yields zero pulses and a
+    # 200 us entry yields all of them, and 200 us is exactly MIN_CMD_TICKS
+    # (3200 ticks at 16 MHz). Three 40 us entries totalling 240 us also yield
+    # nothing, so the limit is per entry rather than on the program.
+    #
+    # Recorded because a scenario measuring *zero* steps otherwise reads as a
+    # dead pin or a driver that emits nothing, and neither is true: the pin
+    # carries every longer move perfectly. Without this note the finding had to
+    # be rediscovered from a capture by hand.
+    detail["entries_below_min_cmd_ticks"] = sub_min_entries(
+        segments if not programs else None, info, programs)
     return ("passed" if passed else "failed"), detail
 
 
