@@ -975,31 +975,175 @@ class TestModes(unittest.TestCase):
                 self.assertIn(d, harness.DRIVER_IDENTITY,
                               f"{d} (family {family}) has no identity")
 
-    # -- the bound a scale run stops at ----------------------------------
-    def test_scale_stops_at_the_smaller_of_driver_and_channels(self):
-        # RMT on the ESP32 has 8 queues and `dir` spends 2 channels per
-        # stepper, so the run stops at 4 and that is the *analyzer's* limit.
-        # Reporting 8 there would be a claim about RMT that the rig could not
-        # have measured.
-        self.assertEqual(harness.scale_bound("esp32", "rmt", "dir")[0], 4)
-        self.assertIn("channels", harness.scale_bound("esp32", "rmt", "dir")[1])
-        # MCPWM/PCNT has 6 queues on IDF 5, so there the driver is the bound
-        # and `nodir` can only reach 6 of the 8 channels.
-        self.assertEqual(harness.scale_bound("esp32", "mcpwm_pcnt", "nodir")[0],
-                         6)
-        self.assertIn("driver", harness.scale_bound("esp32", "mcpwm_pcnt",
-                                                    "nodir")[1])
-        # AVR: one timer driver, two queues, and two channels' worth of a 328P.
-        self.assertEqual(harness.scale_bound("nanoatmega328", "timer", "dir")[0],
-                         2)
+    # -- DRIVERS: asking the board what it has ----------------------------
+    def test_drivers_is_read_as_name_value_pairs_not_by_position(self):
+        # The set of names is build-dependent -- an AVR build emits only
+        # `timer`, a Pico `timer` and `pio` -- so a positional parse reads a
+        # different field as each driver on each target.
+        esp = "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 " \
+              "i2s_mux=1 mux_init=0"
+        avr = "OK DRIVERS mux=0 timer=1 mux_init=0"
+        pico = "OK DRIVERS mux=0 timer=1 pio=1 mux_init=0"
+        for text, expected in ((esp, {"rmt", "rmt_v2", "mcpwm_pcnt",
+                                      "i2s_direct", "i2s_mux"}),
+                               (avr, {"timer"}),
+                               (pico, {"timer", "pio"})):
+            m = run_tests.DRIVERS_RE.search(text)
+            self.assertIsNotNone(m, text)
+            present = {k for k, v in re.findall(r"(\w+)=(\d)", m.group(2))
+                       if v == "1"}
+            self.assertEqual(present, expected, text)
 
-    def test_scale_bound_refuses_an_unknown_driver_rather_than_guessing(self):
-        # A guessed bound either stops the sweep early -- reporting a driver
-        # limit that is not one -- or runs past what the board can connect.
-        with self.assertRaises(SystemExit):
-            harness.scale_bound("esp32", "nonexistent", "dir")
-        with self.assertRaises(SystemExit):
-            harness.scale_bound("not_an_arch", "rmt", "dir")
+    def test_a_mux_compiled_in_but_not_brought_up_is_distinguishable(self):
+        """"Present" and "up" are different, and only one is enough to connect.
+
+        Without the distinction a planner reads i2s_mux=1, builds a run, and
+        every CONFIG naming it is refused -- which looks like a contradiction
+        between two firmware replies rather than a pin assignment not made yet.
+        """
+        up = run_tests.DRIVERS_RE.search(
+            "OK DRIVERS mux=1 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+            "i2s_mux=1 mux_init=1")
+        down = run_tests.DRIVERS_RE.search(
+            "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+            "i2s_mux=1 mux_init=0")
+        self.assertEqual(up.group(3), "1")
+        self.assertEqual(down.group(3), "0")
+
+    def test_read_drivers_parses_every_driver_not_just_the_first(self):
+        """The function's own parsing, not just the regex the tests read.
+
+        The regex tests above assert on DRIVERS_RE directly, which left
+        read_drivers()'s parse of it untested -- so truncating the field list to
+        the first two drivers broke nothing. Every driver this build reports has
+        to reach the host, or a planner will read "i2s_mux absent" from a board
+        that has it.
+        """
+        reply = ("OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+                 "i2s_mux=1 mux_init=0")
+        with mock.patch.object(run_tests, "reply_of", lambda *a: reply):
+            present, mux_init = run_tests.read_drivers(object())
+        self.assertEqual(present, {"rmt": True, "rmt_v2": True,
+                                   "mcpwm_pcnt": True, "i2s_direct": True,
+                                   "i2s_mux": True})
+        self.assertFalse(mux_init)
+
+    def test_read_drivers_reports_a_mux_that_is_up_as_up(self):
+        # Reported-always-up would tell the planner the mux needs no pin
+        # assignment, and every CONFIG naming it would then be refused.
+        reply = ("OK DRIVERS mux=1 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+                 "i2s_mux=1 mux_init=1")
+        with mock.patch.object(run_tests, "reply_of", lambda *a: reply):
+            _present, mux_init = run_tests.read_drivers(object())
+        self.assertTrue(mux_init)
+
+    def test_read_drivers_survives_the_boot_log_in_front_of_the_reply(self):
+        """Not hypothetical: the first DRIVERS after a reset arrives behind the
+        ESP32's own boot banner, which is several hundred bytes of unrelated
+        text. A parser that did not retry would read the wrong thing here."""
+        boot = ("v:0x00\r\nmode:div:2\r\nload:0x3fff0030,len:4688\r\n"
+                "READY\r\nDONE 0\r\nOK DRIVERS mux=0 rmt=1 rmt_v2=1 "
+                "mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1 mux_init=0\r\n")
+        replies = iter([boot, boot])
+        with mock.patch.object(run_tests, "reply_of",
+                               lambda *a: next(replies)), \
+                mock.patch("scripts.tests.test_saleae.run_tests.time.sleep",
+                           lambda *a: None):
+            present, mux_init = run_tests.read_drivers(object())
+        self.assertTrue(present["i2s_mux"])
+        self.assertFalse(mux_init)
+
+    def test_read_drivers_raises_rather_than_guessing_when_nobody_answers(self):
+        # The failure mode this whole item removes. If the board cannot be asked,
+        # the old answer was the table -- and a silent fallback to the table is
+        # how the wrong 6 got believed in the first place.
+        with mock.patch.object(run_tests, "reply_of",
+                               lambda *a: "OK QCLR"), \
+                mock.patch("scripts.tests.test_saleae.run_tests.time.sleep",
+                           lambda *a: None):
+            with self.assertRaises(RuntimeError):
+                run_tests.read_drivers(object())
+
+    def test_imux_is_sent_once_and_its_failure_is_not_retried(self):
+        # initI2sMux() cannot run twice, so a retry loop would turn a first
+        # success into a later failure.
+        sent = []
+
+        def reply(ser, line):
+            sent.append(line)
+            return "OK IMUX data=25 bclk=26 ws=27\n" \
+                if len(sent) == 1 else "ERR IMUX already up\n"
+
+        with mock.patch.object(run_tests, "reply_of", reply):
+            self.assertTrue(run_tests.send_imux(object(), 25, 26, 27))
+            self.assertFalse(run_tests.send_imux(object(), 25, 26, 27))
+        self.assertEqual(sent, ["IMUX 25 26 27", "IMUX 25 26 27"])
+
+    # -- the bound a scale run stops at ----------------------------------
+    def test_the_sweep_limit_is_the_channel_budget_not_a_predicted_count(self):
+        # The limit is the analyzer's budget and nothing else. It used to be
+        # min(that, a DRIVER_MAXS entry) -- a copy of the library's declared
+        # QUEUES_* constant. That constant is accurate about allocations (this
+        # board really does allocate six MCPWM queues, refusing the seventh at
+        # CONFIG) and silent about health: one of the six runs. A sweep bounded
+        # by it reported "MCPWM reaches 6" directly above five runaways.
+        for arch, driver, pin_mode, expected in (
+                ("esp32", "rmt", "dir", 4),
+                ("esp32", "rmt_v2", "nodir", 8),
+                ("esp32", "mcpwm_pcnt", "nodir", 8),   # not 6: measured
+                ("esp32", "i2s_direct", "dir", 4),
+                # The 328P is the clearest case: the analyzer affords 4 in
+                # `dir`, and the board connects 2. The sweep now runs to 4 and
+                # the firmware refuses 3 and 4 -- which is a better result than
+                # the table's answer of 2, because it is the board's answer.
+                ("nanoatmega328", "timer", "dir", 4),
+                ("rpipico", "pio", "nodir", 8)):
+            self.assertEqual(harness.scale_bound(arch, driver, pin_mode)[0],
+                             expected, f"{arch}/{driver}/{pin_mode}")
+            self.assertIn("channels",
+                          harness.scale_bound(arch, driver, pin_mode)[1])
+
+    def test_the_budget_may_exceed_what_the_board_connects(self):
+        """The sweep limit and the driver's real reach are different numbers.
+
+        Pinned because the temptation to restore the smaller of the two is
+        exactly the bug: a sweep that stops where the driver stops reports
+        "the driver reached N", when all it established is that it stopped
+        looking.
+        """
+        for arch, driver, pin_mode, board_reaches in (
+                ("esp32", "mcpwm_pcnt", "nodir", 1),
+                ("nanoatmega328", "timer", "dir", 2)):
+            budget = harness.scale_bound(arch, driver, pin_mode)[0]
+            self.assertGreater(budget, board_reaches,
+                               f"{arch}/{driver}: budget {budget} does not "
+                               f"exceed the measured {board_reaches}, so this "
+                               f"test would not notice the limit creeping back")
+
+    def test_a_host_table_entry_cannot_change_the_sweep_limit(self):
+        # Even an absurd entry is only reported, never obeyed. If a claim could
+        # set the limit, the claim would again be the answer to the mode's
+        # question, which is the whole thing being removed.
+        with mock.patch.dict(harness.DRIVER_MAXS,
+                             {"esp32": {"rmt_v2": 1, "brand_new": 64}}):
+            self.assertEqual(harness.scale_bound("esp32", "rmt_v2", "nodir")[0],
+                             8)
+            self.assertEqual(harness.scale_bound("esp32", "brand_new",
+                                                 "nodir")[0], 8)
+            bound = harness.scale_bound("esp32", "rmt_v2", "nodir")[1]
+        self.assertIn("host table believed 1", bound)
+
+    def test_an_unknown_driver_no_longer_stops_the_sweep(self):
+        # It used to raise, on the grounds that a guessed bound is worse than
+        # none. But the loop limit is the rig's channel budget, which is a fact
+        # and not a guess, and where the driver stops is the board's to say.
+        # Refusing to plan for a driver with no table entry would mean the table
+        # still governs which runs are possible -- exactly the coupling being
+        # removed.
+        self.assertEqual(harness.scale_bound("esp32", "nonexistent", "dir")[0],
+                         4)
+        self.assertEqual(harness.scale_bound("not_an_arch", "rmt", "dir")[0], 4)
+        self.assertIsNone(harness.driver_max("esp32", "nonexistent"))
 
     def test_scale_bound_agrees_with_the_librarys_queue_counts(self):
         # Cross-check the table against the library's own QUEUES_* values, so

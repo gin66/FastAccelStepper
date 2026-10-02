@@ -261,6 +261,55 @@ def reply_of(ser, line):
 QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxall=(\d+)"
                       r"(?: maxspeed\d+=(\d+))*")
 MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)")
+# "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1
+#  mux_init=0". The driver fields are read as a name=value scan rather than by
+# position, because the set of names is build-dependent: an AVR build emits only
+# `timer`, a Pico only `timer` and `pio`. A positional parse would read a
+# different field as each driver on each target.
+DRIVERS_RE = re.compile(r"OK DRIVERS\s+mux=(\d)(.*?)(?:\s+mux_init=(\d))?\s*$",
+                        re.M)
+
+
+def read_drivers(ser):
+    """What this build accepts: ({driver: bool}, mux_init) or raises.
+
+    The board is asked rather than consulted from a table. The host used to keep
+    DRIVER_MAXS, a hand-maintained copy of the library's declared QUEUES_*
+    constants. It was not wrong about what it counted -- this board really does
+    allocate six MCPWM queues, and refuses the seventh at CONFIG -- but a queue
+    count is not a health check: only one of those six runs, and no constant can
+    express the difference. A host cannot detect that class of error, because
+    only the hardware knows the answer, so the copy has to go rather than be
+    corrected.
+
+    Queue *counts* are not reported by the firmware and are not asked for here.
+    They live in pd_config.h behind headers the public API does not expose, and
+    a library accessor added for a test harness would be test scaffolding in the
+    product. They are also not needed: `scale` sweeps to the analyzer's channel
+    budget and the point the board refuses *is* the measured bound.
+    """
+    text = ""
+    for _ in range(5):
+        text = reply_of(ser, "DRIVERS")
+        m = DRIVERS_RE.search(text.strip())
+        if m:
+            present = {k: v == "1" for k, v in re.findall(r"(\w+)=(\d)", m.group(2))}
+            return present, m.group(3) == "1"
+        time.sleep(0.1)
+    raise RuntimeError(f"no DRIVERS reply, got: {text!r}")
+
+
+def send_imux(ser, data, bclk, ws):
+    """Bring the I2S multiplexer up. Returns True on success.
+
+    `initI2sMux()` has to precede any mux stepper and cannot run twice, so it is
+    issued once here rather than retried per scenario. On a board where no
+    multiplexer is wired this is simply never called, and `DRIVERS` reports
+    i2s_mux present but not up -- which is the distinction that stops a planner
+    from offering a driver every CONFIG will refuse.
+    """
+    text = reply_of(ser, f"IMUX {data} {bclk} {ws}")
+    return text.lstrip().startswith("OK IMUX")
 
 
 def read_map(ser):
@@ -1876,6 +1925,12 @@ def run_modes(tag_key, plans, args, mode):
         detail["arch"] = getattr(args, "arch", None)
         detail["framework"] = getattr(args, "framework", None)
         detail["sdk_version"] = getattr(args, "sdk_version", None)
+        # What the board said it accepts, recorded with the result. Without it a
+        # reader has to attach the hardware to learn that i2s_mux was compiled in
+        # but never brought up -- which is the difference between "this driver
+        # is broken" and "these three pins are not wired yet".
+        detail["board_drivers"] = getattr(args, "board_drivers", None)
+        detail["mux_init"] = getattr(args, "mux_init", None)
 
         result_file = results_dir / f"{key}.json"
         with open(result_file, "w") as f:

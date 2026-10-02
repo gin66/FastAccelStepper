@@ -435,6 +435,48 @@ class TestModeTables(unittest.TestCase):
         self.assertIn("no recognised mode", text)
         self.assertIn(lost["tag_key"], text)
 
+    def test_the_capability_table_comes_from_the_board_not_a_host_table(self):
+        old = mode_record(board_drivers={"rmt_v2": True, "rmt": True,
+                                         "mcpwm_pcnt": True,
+                                         "i2s_direct": True,
+                                         "i2s_mux": True}, mux_init=False)
+        text = report.as_mode_tables(self.write([old]))
+        self.assertIn("Driver capability", text)
+        for name in ("rmt_v2", "mcpwm_pcnt", "i2s_direct", "i2s_mux"):
+            self.assertIn(name, text)
+
+    def test_a_mux_compiled_in_but_not_up_is_distinguishable_from_a_broken_one(self):
+        # "i2s_mux=1 mux_init=0" is three unassigned pins. "i2s_mux absent" is a
+        # build that never had it. A reader shown only a refusal cannot tell
+        # them apart, and would call a wiring gap a driver defect.
+        not_up = mode_record(board_drivers={"rmt_v2": True, "i2s_mux": True},
+                             mux_init=False)
+        up = mode_record(board_drivers={"rmt_v2": True, "i2s_mux": True},
+                         mux_init=True)
+        absent = mode_record(board_drivers={"rmt_v2": True,
+                                            "i2s_mux": False}, mux_init=False)
+        unreported = mode_record(board_drivers={"timer": True}, mux_init=False)
+        for record, expected in ((not_up, "compiled in, not brought up"),
+                                 (up, "| up |"),
+                                 (absent, "compiled out by this build"),
+                                 (unreported, "not reported")):
+            text = report.as_mode_tables(self.write([record]))
+            row = [ln for ln in text.splitlines()
+                   if ln.startswith("| esp32 / arduino")][0]
+            self.assertIn(expected, row, record["mux_init"])
+        # The three must read as three different situations.
+        cells = set()
+        for record in (not_up, up, absent, unreported):
+            cells.add([ln for ln in report.as_mode_tables(self.write([record]))
+                       .splitlines() if ln.startswith("| esp32 / arduino")][0])
+        self.assertEqual(len(cells), 4, cells)
+
+    def test_no_capability_section_when_the_board_was_never_asked(self):
+        old = mode_record()
+        old.pop("board_drivers", None)
+        text = report.as_mode_tables(self.write([old]))
+        self.assertNotIn("Driver capability", text)
+
     def test_a_results_dir_with_no_mode_records_yields_no_section(self):
         (self.tmp / "SR_01.json").write_text(json.dumps({"test_id": "SR_01"}))
         self.assertIsNone(report.as_mode_tables(self.tmp))

@@ -472,7 +472,9 @@ R3 (host: the two generic modes `scale` and `sync`) and R4 (the channel map
 becoming configuration rather than a global) are done too. R3's first hardware
 run found a live defect in the MCPWM/PCNT driver; R4's found that SR_15's
 ratio collapsed to 1:1 on the real chip, so it had been measuring nothing.
-R5 (the two mode report tables) is done as well. R7 remains. See *Decisions and findings* for what the hardware actually showed — including the one recorded finding that R1's re-run
+R5 (the two mode report tables) is done as well. R7 is rewritten rather than
+done: `i2s_mux` turned out not to be measurable by this rig at all, and chasing
+it found that the host had been guessing what each chip can do. See *Decisions and findings* for what the hardware actually showed — including the one recorded finding that R1's re-run
 invalidated.
 
 ### The redesign now in progress
@@ -1001,26 +1003,114 @@ one agent. Each item is independently checkable and states how to verify it.
       *Verify:* all 15 internal `§` references resolve; the 28 scenario ids in
       the paper match the harness exactly (25 wired, 3 documented
       not-applicable); every file the paper names exists.
-- [ ] **R7 — `i2s_mux` measured.** Still **untested**, but R3 has now made the
-      path mechanical rather than hypothetical, and the first attempt is recorded.
-      The build supports it (`SUPPORT_ESP32_I2S` is defined for IDF 5/6,
-      `QUEUES_I2S_MUX` = 32 under dynamic allocation) and the mux is internal to
-      the library (`i2s_manager` `_is_mux`/`_mux_state`), so no extender board is
-      implied.
-      **What `--mode sync` did on its first run:** all four `i2s_mux`
-      combinations were attempted and the board refused every one with
-      `ERR connect step 0/1 n=… drv=i2s_mux nodir=0` — recorded as `refused`
-      beside the combinations that measured, which is the mode working as
-      designed. So `i2s_mux` is **absent from the *running build***, not merely
-      untested: whatever the IDF/board configuration is, this build's
-      `SUPPORT_ESP32_I2S` did not yield a connectable mux. That is a more precise
-      statement than "untested" and it is what the run established.
-      *Remaining:* find out why the mux does not connect on this build (compare
-      against `i2s_direct`, which **does** connect on the same board in the same
-      run — so `SUPPORT_ESP32_I2S` is compiled in, and the failure is specific to
-      the mux path), then one `--driver i2s_mux` scale run.
-      *Verify:* a recorded result tagged `i2s_mux`; until then this must keep
-      saying *untested*, not *absent*.
+- [ ] **R7 — `i2s_mux`: not connected yet, and the harness was the problem.**
+      *Remaining:* wire the multiplexer and give it a pin assignment, then run
+      `--driver i2s_mux`. The harness is ready: `--imux data,bclk,ws` brings it
+      up over serial. Until a pin assignment exists this must keep saying
+      *not connected*, not *absent* and not *broken*.
+
+      **What it actually is, from the library.** `i2s_mux` is not a driver this
+      rig can probe, and the reason is structural rather than electrical. In mux
+      mode a "step pin" is **not a pin**: it is a *slot index* on one shared I2S
+      data line — `esp32_set_enable_pin_state()` masks `PIN_I2S_FLAG` and uses
+      `pin & 0x1F` as the slot (`src/pd_esp32/esp32_queue.h:186`). Up to 32
+      steppers share that one line. The harness model — one analyzer channel per
+      step pin, `MAP count/mode/stride`, `Pins` — assumes distinct pins, so a
+      32-slot mux cannot be measured with an 8-channel probe. Characterizing it
+      means probing `data/bclk/ws` and selecting one slot at a time, which is a
+      different measurement and a different tool.
+
+      **The refusal was correct, and the harness caused it.** `initI2sMux()` must
+      be called before any `stepperConnectToPin(DRIVER_I2S_MUX)` and cannot run
+      twice (`FastAccelStepperEngine.h:92`). The harness never called it, so
+      `stepperConnectToPin` returned NULL and CONFIG reported
+      `ERR connect step 0 … drv=i2s_mux` — a *correct* refusal for a pin
+      assignment nobody had made. R3 recorded that as `refused` and moved on,
+      which was the right behaviour, but left the reason as an open question.
+
+#### The real finding: the host had no business guessing
+
+      R7 was framed as "measure `i2s_mux`". Asking why it would not connect led
+      somewhere better: **`harness.py` carried a hand-maintained table of what
+      every chip has, and used it to decide how far to sweep.** `DRIVER_MAXS` said
+      `mcpwm_pcnt: 6` and `i2s_mux: 32`.
+
+      **The 6 was accurate, and that is exactly the problem.** The board really
+      does allocate six MCPWM/PCNT queues — CONFIG accepts six and refuses the
+      seventh with `ERR connect step 6`. What the constant cannot say is how
+      many of those six *run*, and on this board **one does**: steppers 2–6 all
+      connect and then emit ~21 000 steps where 64 were commanded. A queue count
+      is an allocation figure, not a health check, and no host table can hold
+      the second number because only the hardware knows it.
+
+      So the sweep ran to `min(channels, DRIVER_MAXS)` = 6 and its summary read
+      **"MCPWM reaches 6"** — printed directly above five runaway steppers. Not
+      a wrong number in the table; **the wrong question**, bounded by a constant
+      that cannot answer it.
+
+      #### What changed
+
+      - **`scale` no longer predicts.** The loop limit is the analyzer's channel
+        budget and nothing else; the board decides where it stops, and a CONFIG
+        refusal *is* the measured bound. `DRIVER_MAXS` survives only as a
+        cross-check that is printed, never obeyed.
+      - **A new `DRIVERS` firmware command** reports what the build accepts,
+        derived from the *same* conditions `parse_driver()` uses, so a capability
+        report cannot disagree with what CONFIG will do. A second copy of those
+        `#if`s would be a second thing to keep in sync.
+      - **A new `IMUX data,bclk,ws` command** brings the multiplexer up at
+        runtime. `initI2sMux()` is once-only, so making it a serial command
+        means wiring a mux up is three pins on *existing* firmware rather than a
+        recompile — which is what makes the pending measurement a matter of
+        naming three pins.
+      - **`present` and `up` are reported separately.** `i2s_mux=1 mux_init=0` is
+        a wiring gap; `i2s_mux` compiled out is a different build; a driver that
+        refuses at connect is a third thing. A reader shown only "i2s_mux
+        refused" cannot tell them apart, and would file a wiring gap as a driver
+        defect.
+      - **The report gained a capability table**, so "what else can this target
+        do" is an answer attached to the run rather than something to rediscover
+        with the hardware attached.
+      - **A board that cannot be asked is an error, never a fallback to the
+        table.** Silently reverting to the old belief is how the wrong number
+        got believed in the first place.
+
+      *Verified on hardware.* `DRIVERS` on the connected ESP32:
+      `rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1 mux_init=0` — five
+      drivers compiled in, multiplexer not brought up, exactly the distinction
+      that was missing. `mcpwm_pcnt`/`nodir` swept 1..8 and now reports three
+      separate facts where it previously reported one:
+
+      | n | outcome |
+      |---|---|
+      | 1 | **passed** |
+      | 2–6 | **failed** — connect, then ~21 000 steps where 64 were commanded |
+      | 7–8 | **refused** at CONFIG (`ERR connect step 6`) |
+
+      `rmt_v2`/`nodir` re-measured 1..8: **8/8 passed**, no regression.
+
+      *Tests: 190 pass, from 178.* New coverage for the bound, the `DRIVERS`
+      parse and the capability table. *Mutation-checked, all caught:* the host
+      table bounding the sweep again, the bound reported as the driver rather
+      than the channels, only the first two drivers parsed, `mux_init` always
+      reported up, an unanswerable board falling back to an empty set, an `IMUX`
+      failure reported as success, a compiled-in-but-down mux not
+      distinguished, and a fabricated accepted-driver list.
+
+      Two of those were missed the first time round and both were real: the
+      `DRIVERS` tests had been asserting on the **regex** rather than on
+      `read_drivers()`, so its own parse of the fields was never exercised. The
+      boot-log test is not hypothetical either — the first `DRIVERS` after a
+      reset really does arrive behind the ESP32's banner, several hundred bytes
+      of unrelated text.
+
+      *Cost:* AVR RAM 1755 → **1845 of 2048** (90.1 %, 203 B free) for `DRIVERS`
+      and `IMUX`. The reply buffer is sized from each build's own reply rather
+      than borrowed from the CONFIG constant, but the `.rodata` for the new
+      strings is the larger part and avr-gcc puts that in RAM. `saleae_avr` is
+      the tightest target in the matrix and still fits; noted rather than papered
+      over, because the alternative is a driver no AVR build can report on.
+
 - [x] **R8 — re-run and re-baseline. Done.** All 25 wired scenarios re-run on the
       connected ESP32 with the R1 firmware, one cold boot each, Saleae clone at
       24 MS/s: **25/25 accepted by their own evaluators**. `reports/esp32/`

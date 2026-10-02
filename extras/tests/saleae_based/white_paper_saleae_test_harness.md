@@ -1489,6 +1489,40 @@ extra one, and those are opposite bugs.
 is indistinguishable from a report bug. For a refused driver list the refusal
 *is* the measurement, so the reason is printed.
 
+**Capability comes from the board, and the sweep measures rather than predicts.**
+Every mode result carries a `board_drivers` map and `mux_init`, read from the
+firmware's `DRIVERS` command, and the report prints it as a capability table. The
+host used to keep `DRIVER_MAXS` — what it believed each chip had — and used it to
+bound the `scale` sweep.
+
+The interesting part is that the old bound was *accurate*. `QUEUES_MCPWM_PCNT` is
+6, the board really does allocate six MCPWM/PCNT queues, and `CONFIG` refuses the
+seventh with `ERR connect step 6`. But a queue count is an **allocation** figure,
+not a health check: only **one** of those six runs, with steppers 2–6 emitting
+~21 000 steps where 64 were commanded. No host table can hold that second number,
+because only the hardware knows it.
+
+So the sweep ran to `min(channels, DRIVER_MAXS)` = 6 and printed **"MCPWM reaches
+6"** directly above five runaway steppers. The number was right and the question
+was wrong. Bounding by the channel budget instead, and letting refusals land as
+refusals, makes one run say three separate things:
+
+| n | outcome |
+|---|---|
+| 1 | **passed** |
+| 2–6 | **failed** — connects, then runs away |
+| 7–8 | **refused** at `CONFIG` |
+
+A host table also cannot know what a build *contains*, only what someone
+believed it contained. `DRIVERS` reports it from the same conditions
+`parse_driver()` uses, so a capability report cannot contradict what `CONFIG`
+will do — and `present` and `up` are separate fields, because `i2s_mux=1
+mux_init=0` is three unassigned pins, not a driver that is broken.
+
+Finally: **a board that cannot be asked is an error, never a fallback to the
+table.** Quietly reverting to the old belief is the mechanism by which the wrong
+number was believed in the first place.
+
 **The target is read from the record, not recovered from the tag key.** The key
 encodes arch and SDK, but as a naming convention: `esp32_arduino_…` splits on
 two underscores and `esp32_idf5_3_0_…` on one. Grouping architecture results by

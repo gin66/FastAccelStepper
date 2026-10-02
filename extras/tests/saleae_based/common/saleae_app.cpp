@@ -41,6 +41,21 @@
  *                              i2s_direct | i2s_mux on the ESP32 family, timer
  *                              on AVR/SAM/SAMD, pio on Pico; a driver the
  *                              running build has no queues for is refused.
+ *   DRIVERS                    which drivers this build accepts, and whether
+ *                              the I2S multiplexer is up. Read from the same
+ *                              conditions CONFIG parses names with, so a
+ *                              capability report cannot disagree with what
+ *                              CONFIG will actually do. The host keeps no
+ *                              table of its own: a host-side table was wrong
+ *                              about this board (6 MCPWM queues where there is
+ *                              one, 32 mux queues where there are none) and a
+ *                              host cannot tell that it is wrong.
+ *   IMUX <data> <bclk> <ws>    bring the I2S multiplexer up, at runtime.
+ *                              initI2sMux() must precede any mux stepper and
+ *                              cannot run twice, so it is a serial command
+ *                              rather than a build flag: wiring a multiplexer
+ *                              up is three pins on existing firmware instead
+ *                              of a recompile. Refused on a non-I2S build.
  *   QINFO                      tick rate, MIN_CMD_TICKS, QUEUE_LEN and the
  *                              per-stepper speed floor
  *   QCLR                       drop the program and stop
@@ -498,6 +513,131 @@ static void reply_too_many(long count, uint8_t cap, uint8_t stride) {
 //
 // It also reports the GPIO behind each reachable channel, which is what makes
 // the map checkable against the wiring rather than merely self-consistent.
+// Whether this build can connect `driver` at all. Mirrors parse_driver()'s
+// conditions deliberately and exactly: a capability report built from a second
+// copy of these #ifs is a second thing to keep in sync, and when it drifts the
+// host plans runs against a driver this build will refuse.
+static bool driver_supported(enum saleae_driver driver) {
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  switch (driver) {
+    case SA_RMT:
+#if defined(SUPPORT_ESP32_RMT)
+      return true;
+#else
+      return false;
+#endif
+    case SA_MCPWM:
+#if defined(SUPPORT_ESP32_MCPWM_PCNT)
+      return true;
+#else
+      return false;
+#endif
+    case SA_I2S:
+    case SA_I2S_MUX:
+#if defined(SUPPORT_ESP32_I2S)
+      return true;
+#else
+      return false;
+#endif
+    default:
+      return false;
+  }
+#else
+  (void)driver;
+  return true;  // timer, and pio where compiled, are the only drivers here
+#endif
+}
+
+// Set once IMUX has successfully brought the I2S multiplexer up. The engine's
+// own _i2s_mux_initialized is private to StepperQueue, but this app is the one
+// that calls initI2sMux(), so this app is the one that knows.
+static bool mux_ready = false;
+
+static void handle_drivers(void) {
+  // Which drivers this build accepts, and whether the multiplexer is up.
+  //
+  // The host used to keep its own table of what each chip has -- and it was
+  // wrong in both directions: `mcpwm_pcnt` claimed 6 queues where the board
+  // connects one, `i2s_mux` claimed 32 where the board connects none. A host
+  // cannot detect that, because only the firmware has the answer. Presence is
+  // therefore reported here, from the same conditions parse_driver() uses.
+  //
+  // Queue *counts* are deliberately absent. They are in pd_config.h, which the
+  // public headers do not pull in, and adding a library accessor for a test
+  // harness would put test scaffolding into the product. They do not need to be
+  // predicted either: `scale` sweeps to the analyzer's channel budget and the
+  // board's refusal *is* the measured bound. See harness.py scale_bound().
+  // Sized from this build's own reply, not from the CONFIG buffer it shares a
+  // constant with. The ESP32 form is "OK DRIVERS mux=0 rmt=1 rmt_v2=1
+  // mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1 mux_init=0" -- 80 bytes -- while a
+  // timer build emits "OK DRIVERS mux=0 timer=1 mux_init=0", 40. avr-gcc puts
+  // the stack in .data, so borrowing the CONFIG size would spend 56 bytes of a
+  // 328P's 203 remaining on a reply that is half that long.
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  char buf[88];
+#else
+  char buf[48];
+#endif
+  int len = snprintf(buf, sizeof(buf), "OK DRIVERS mux=%u", mux_ready ? 1 : 0);
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
+  len += snprintf(buf + len, sizeof(buf) - len,
+                  " rmt=%u rmt_v2=%u mcpwm_pcnt=%u i2s_direct=%u i2s_mux=%u",
+                  driver_supported(SA_RMT) ? 1 : 0,
+                  driver_supported(SA_RMT) ? 1 : 0,
+                  driver_supported(SA_MCPWM) ? 1 : 0,
+                  driver_supported(SA_I2S) ? 1 : 0,
+                  driver_supported(SA_I2S_MUX) ? 1 : 0);
+#else
+  len += snprintf(buf + len, sizeof(buf) - len, " timer=1");
+#if defined(ARDUINO_ARCH_RP2040) || defined(PICO_RP2040) || \
+    defined(PICO_SDK_RP2350)
+  len += snprintf(buf + len, sizeof(buf) - len, " pio=1");
+#endif
+#endif
+  // A mux that is compiled in but not initialised would otherwise report
+  // i2s_mux=1 and then refuse every CONFIG naming it, which reads as a
+  // contradiction. The two fields together say "present, not up yet".
+  len += snprintf(buf + len, sizeof(buf) - len, " mux_init=%u\n",
+                  mux_ready ? 1 : 0);
+  reply(buf);
+}
+
+// IMUX <data> <bclk> <ws> -- bring up the I2S multiplexer at runtime.
+//
+// initI2sMux() must be called before any stepperConnectToPin(DRIVER_I2S_MUX), and
+// it cannot be called twice. Making it a serial command rather than a build-time
+// constant means wiring a multiplexer up is three pins on an existing firmware,
+// not a recompile -- which is what makes the mux testable at all on a rig whose
+// stepper pins are the analyzer's channels.
+static void handle_imux(const char* data, const char* bclk, const char* ws) {
+#if defined(SUPPORT_ESP32_I2S)
+  if (!data || !bclk || !ws) {
+    reply("ERR IMUX needs <data> <bclk> <ws>\n");
+    return;
+  }
+  if (mux_ready) {
+    reply("ERR IMUX already up (initI2sMux() cannot run twice)\n");
+    return;
+  }
+  const uint8_t d = (uint8_t)atoi(data);
+  const uint8_t b = (uint8_t)atoi(bclk);
+  const uint8_t w = (uint8_t)atoi(ws);
+  if (!engine.initI2sMux(d, b, w)) {
+    reply("ERR IMUX initI2sMux failed (pins busy, or already initialised)\n");
+    return;
+  }
+  mux_ready = true;
+  char buf[48];
+  snprintf(buf, sizeof(buf), "OK IMUX data=%u bclk=%u ws=%u\n", d, b, w);
+  reply(buf);
+#else
+  (void)data;
+  (void)bclk;
+  (void)ws;
+  reply("ERR IMUX needs an ESP32 I2S build\n");
+#endif
+}
+
 static void handle_map(void) {
   // "MAP count=8 mode=nodir stride=1 ch=" plus 8 two-digit pins. Sized from the
   // channel budget for the same RAM reason as SALEAE_CFG_REPLY_MAX.
@@ -1025,6 +1165,10 @@ static void handle_line(char* line) {
     handle_config(arg1, arg2, n > 2 ? arg3 : NULL);
   } else if (!strcmp(cmd, "MAP")) {
     handle_map();
+  } else if (!strcmp(cmd, "DRIVERS")) {
+    handle_drivers();
+  } else if (!strcmp(cmd, "IMUX")) {
+    handle_imux(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL);
   } else if (!strcmp(cmd, "QINFO")) {
     handle_qinfo();
   } else if (!strcmp(cmd, "QCLR")) {

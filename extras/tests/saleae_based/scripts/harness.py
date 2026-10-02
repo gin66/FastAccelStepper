@@ -191,35 +191,47 @@ DRIVER_MAXS = {
 # away. It is named here, in a list, and nothing in the mode logic switches on
 # it, so a plan that includes it either connects or records the refusal.
 def driver_max(arch, driver):
-    """The most steppers `driver` can connect, or None if unknown for `arch`."""
+    """A *claimed* queue count for `driver` on `arch`, or None. Cross-check only.
+
+    Kept so a run can be compared against what the host believed, and so a
+    disagreement is visible. It is no longer consulted to decide the sweep:
+    see scale_bound().
+    """
     return DRIVER_MAXS.get(arch, {}).get(driver)
 
 
 def scale_bound(arch, driver, pin_mode):
     """(count_max, bound) for a `scale` run: the loop limit, and what set it.
 
-    Reporting the bound is not decoration. "RMT reaches 8 steppers" and "RMT
-    reaches 4 steppers" are different findings, and only one of them is about
-    RMT -- the other is the analyzer running out of channels. The mode stops at
-    the smaller of the two because that is the largest number of steppers that
-    can actually be measured, and reports which limit was hit so the number is
-    not read as a property of the driver when it is a property of the rig.
+    The limit is the analyzer's channel budget and nothing else. It used to be
+    min(that, a DRIVER_MAXS entry), and the entry -- `QUEUES_MCPWM_PCNT` = 6 --
+    is not wrong about what it counts. The board really does allocate six MCPWM
+    queues; CONFIG accepts six and refuses the seventh with
+    `ERR connect step 6`. What the constant cannot say is how many of those six
+    *run*, and on this board exactly one does: two through six connect and then
+    emit ~21 000 steps where 64 were commanded.
+
+    So the old bound was not a wrong number, it was the wrong question. A sweep
+    that stopped at the queue count reported "MCPWM reaches 6" over a column of
+    five runaway steppers. Sweeping past it lets the refusals land as refusals
+    instead, and the run then says three separate things: one stepper passes,
+    five connect and misbehave, and a seventh will not connect at all.
+
+    So the loop now runs to the channel budget and the board decides where it
+    stops: run_modes() records a refusal and carries on, which for `scale` is
+    exactly the measurement. The bound in the summary is then measured rather
+    than predicted, and it is right about drivers no table has ever heard of.
     """
     chan_cap = max_steppers(pin_mode)
-    dmax = driver_max(arch, driver)
-    if dmax is None:
-        raise SystemExit(
-            f"no stepper limit known for driver {driver!r} on {arch}; add it "
-            f"to DRIVER_MAXS rather than guessing one -- a guessed bound stops "
-            f"the sweep early or runs it past what the board can connect")
-    if dmax == 0:
-        raise SystemExit(
-            f"{driver!r} has no queues on {arch} (DRIVER_MAXS says 0, and the "
-            f"library defines no QUEUES_ for it on this chip), so a scale run "
-            f"on it has nothing to measure")
-    if dmax < chan_cap:
-        return dmax, f"driver ({dmax} queues)"
-    return chan_cap, f"channels ({CHANNELS} / {CHANNELS_PER_STEPPER[pin_mode]} per stepper)"
+    claimed = driver_max(arch, driver)
+    note = ""
+    if claimed is not None and claimed != chan_cap:
+        # Said once, and only when it would have mattered -- a host belief that
+        # differs from the rig's own budget is not by itself an error.
+        note = f" [host table believed {claimed} queues for {driver} on " \
+               f"{arch}; the sweep measures it]"
+    return chan_cap, f"channels ({CHANNELS} / {CHANNELS_PER_STEPPER[pin_mode]}" \
+                     f" per stepper){note}"
 
 
 def arch_family(arch):
@@ -324,6 +336,44 @@ def driver_list(args):
     return "+".join(names)
 
 
+def preflight(args, port, baud=115200):
+    """Ask the board which drivers it accepts, and bring the mux up if asked.
+
+    The host keeps no authority on what the target has. It used to: a per-arch
+    name table and DRIVER_MAXS, both maintained by hand, and the queue counts
+    in DRIVER_MAXS were a faithful copy of the library's declared constants --
+    which is exactly the problem, because on this board QUEUES_MCPWM_PCNT is 6
+    and the hardware connects one. A copy of a claim is not evidence.
+
+    So the question goes to the only party that knows. And a board that cannot
+    be asked is an error, never a fallback to the table: silently reverting to
+    the belief is how the wrong number got believed in the first place.
+    """
+    import serial
+    ser = serial.Serial(port, baud, timeout=1)
+    try:
+        present, mux_init = run_tests.read_drivers(ser)
+        absent = sorted(d for d, ok in present.items() if not ok)
+        if absent:
+            print(f"drivers: this build does not accept {', '.join(absent)}")
+        if args.imux:
+            if "i2s_mux" not in present:
+                raise SystemExit(f"--imux needs an ESP32 I2S build; this one "
+                                 f"does not accept i2s_mux")
+            if mux_init:
+                print("mux     : already up (nothing sent)")
+            else:
+                data, bclk, ws = (int(x) for x in args.imux.split(","))
+                if not run_tests.send_imux(ser, data, bclk, ws):
+                    raise SystemExit(
+                        f"--imux {args.imux} was refused; the three pins must "
+                        f"be free, and initI2sMux() cannot run twice")
+                print(f"mux     : up, data={data} bclk={bclk} ws={ws}")
+        return present, mux_init
+    finally:
+        ser.close()
+
+
 def build_and_flash(proj, env, port, do_build, do_flash):
     if do_build or do_flash:
         subprocess.run(["bash", "extras/scripts/build-pio-dirs.sh"],
@@ -344,6 +394,13 @@ def build_parser():
     p = argparse.ArgumentParser(description="Target-agnostic Saleae harness.")
     p.add_argument("--arch", choices=ARCHS, default="esp32")
     p.add_argument("--framework", choices=["arduino", "idf"], default="arduino")
+    p.add_argument("--imux", default=None,
+                   help="comma list data,bclk,ws: bring the ESP32 I2S "
+                        "multiplexer up over serial before the run. Wired at "
+                        "runtime rather than compiled in, because "
+                        "initI2sMux() must precede any mux stepper and cannot "
+                        "run twice -- so this is three pins on existing "
+                        "firmware, not a rebuild")
     p.add_argument("--version", default="latest",
                    help="build version, e.g. 5.3 / V6_13_0 / latest (ESP only)")
     p.add_argument("--driver", default=None,
@@ -421,8 +478,9 @@ def plan_scale(args):
     count_max, bound = scale_bound(args.arch, args.driver, args.pin_mode)
     plans = run_tests.scale_plan(args.driver, args.pin_mode, count_max)
     print(f"scale  : {args.driver}, {args.pin_mode}, counts 1..{count_max}")
-    print(f"         stopping at min(driver, channels) = {count_max}, "
-          f"bound: {bound}")
+    print(f"         sweeping 1..{count_max}, bound: {bound}")
+    print(f"         the board decides where it stops: a CONFIG refusal is the "
+          f"measured bound")
     return plans
 
 
@@ -502,6 +560,10 @@ def main():
     # run_tests.run_modes() records these into every mode result; the report
     # groups its tables by them. harness owns them, so set them from here.
     args.sdk_version = args.version
+    # The board is asked what it accepts, after the flash, so the answer is
+    # about the firmware that is actually running. The answer is recorded in
+    # every mode result, so a table can be read without the hardware attached.
+    args.board_drivers, args.mux_init = preflight(args, args.port, args.baud)
     if args.mode:
         plans = plan_scale(args) if args.mode == "scale" else plan_sync(args)
         print()

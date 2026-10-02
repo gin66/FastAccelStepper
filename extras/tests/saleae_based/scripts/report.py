@@ -419,6 +419,52 @@ def as_sync_table(rows):
     return "\n".join(out)
 
 
+def as_capability_table(records):
+    """What each measured target's board said it accepts.
+
+    A run's capability answer is a fact about the *build*, and it is the answer
+    to "what else can this target do" -- so it belongs next to the results
+    rather than in a log. It also settles an ambiguity the results alone cannot:
+    `i2s_mux=1 mux_init=0` means the driver is compiled in but its three pins
+    were never assigned, which is a different thing from a driver that is
+    broken, and a reader shown only "i2s_mux refused" cannot tell them apart.
+    """
+    seen = {}
+    for record in records:
+        board = record.get("board_drivers")
+        if not board:
+            continue
+        seen[target_of(record)] = (board, record.get("mux_init"))
+    if not seen:
+        return None
+    out = ["### Driver capability", "",
+           "Read from the board by the `DRIVERS` command, not from a host "
+           "table. A host table could only be a copy of the library's declared "
+           "`QUEUES_*` constants, and those count allocations rather than "
+           "working steppers: `QUEUES_MCPWM_PCNT` is 6, the board does allocate "
+           "six, and only one of them runs.",
+           "",
+           "| target | drivers this build accepts | i2s multiplexer |",
+           "|---|---|---|"]
+    for target, (board, mux_init) in sorted(seen.items()):
+        accepts = ", ".join(sorted(d for d, ok in board.items() if ok)) or "-"
+        rejects = ", ".join(sorted(d for d, ok in board.items() if not ok))
+        if mux_init:
+            mux = "up"
+        elif board.get("i2s_mux"):
+            # Present in the build, so a CONFIG naming it is accepted and then
+            # fails to connect. That reads as a contradiction unless the
+            # missing step is named: three pins have not been assigned.
+            mux = "compiled in, not brought up (no pins assigned)"
+        elif "i2s_mux" in board:
+            mux = "compiled out by this build"
+        else:
+            # Not reported at all, which on a timer or pio build is the answer.
+            mux = "not reported (no I2S on this target)"
+        out.append(f"| {target} | {accepts} | {mux} |")
+    return "\n".join(out)
+
+
 def as_mode_tables(results_dir):
     """Both tables, grouped by target. Sections with nothing are left out."""
     records = collect_modes(results_dir)
@@ -446,6 +492,9 @@ def as_mode_tables(results_dir):
             out += [sync, ""]
         if unclassified:
             out += [as_unclassified_table(unclassified), ""]
+        capability = as_capability_table(group)
+        if capability:
+            out += [capability, ""]
         any_table = True
     return "\n".join(out).rstrip() if any_table else None
 

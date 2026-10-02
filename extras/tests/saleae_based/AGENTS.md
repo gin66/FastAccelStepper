@@ -100,6 +100,10 @@ python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --flash
 python3 scripts/harness.py --mode sync --arch esp32 --dry-run
 python3 scripts/harness.py --mode sync --arch esp32 --speed-us 5 --flash
 
+# the mux, once it is wired: three pins on existing firmware, no rebuild
+python3 scripts/harness.py --mode scale --arch esp32 --driver i2s_mux \
+    --imux 12,13,14 --pin-mode dir --flash
+
 # low-level (firmware already flashed; you supply the tag key)
 python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch --tests SR_01
 
