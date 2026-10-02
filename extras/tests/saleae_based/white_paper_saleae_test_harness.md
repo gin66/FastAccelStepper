@@ -1523,6 +1523,25 @@ Finally: **a board that cannot be asked is an error, never a fallback to the
 table.** Quietly reverting to the old belief is the mechanism by which the wrong
 number was believed in the first place.
 
+**Per-driver characterization is not the same as measuring a driver as a
+partner.** Running all 25 scenarios on `i2s_direct` -- for the first time, they
+had only ever run on `rmt_v2` -- produced three defects that no RMT scenario
+could have surfaced. The sharpest is that **any queue entry shorter than
+`MIN_CMD_TICKS` is silently discarded**: at the speed floor a 195 µs entry
+produces zero pulses and a 200 µs entry produces all of them, and 200 µs is
+exactly `MIN_CMD_TICKS` (3200 ticks at 16 MHz). The limit is *per entry*, not per
+program -- three 40 µs entries totalling 240 µs also produce nothing. RMT emits
+short entries and does not care, so the scenarios that use them all passed there.
+
+Every result therefore records `entries_below_min_cmd_ticks`. Without it a
+zero-step result reads as a dead pin or a driver that emits nothing, and neither
+is true: the same pin carries every longer move perfectly.
+
+The other two are `STOP` not stopping an I2S queue at all (all 20 000 steps come
+out where `rmt_v2` stops at 11 475), and one step of a phase being emitted on
+the wrong side of a direction change — visible only in the *per-phase* count
+(`10 / 9 / 11`), since the total is a correct 30/30.
+
 **The target is read from the record, not recovered from the tag key.** The key
 encodes arch and SDK, but as a naming convention: `esp32_arduino_…` splits on
 two underscores and `esp32_idf5_3_0_…` on one. Grouping architecture results by

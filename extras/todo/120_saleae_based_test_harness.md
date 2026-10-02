@@ -1145,16 +1145,6 @@ one agent. Each item is independently checkable and states how to verify it.
 
 ### Not started, and deliberately so
 
-- **`i2s_direct` across the catalogue.** Its reach is now measured (2 steppers,
-  see the finding above) but the 25 wired scenarios have only ever been run on
-  `rmt_v2`, so the I2S step/dir waveform has not been characterized the way RMT's
-  has. One command closes it. Note only 2 steppers connect, so scenarios needing
-  more will refuse -- which is itself the finding.
-- **`i2s_direct` across the catalogue.** Its reach is now measured (2 steppers,
-  see the finding above), but the 25 wired scenarios have only ever been run on
-  `rmt_v2`, so the I2S step/dir waveform is not characterized the way RMT's is.
-  One command closes it. Only 2 steppers connect, so scenarios needing more will
-  refuse -- which is itself part of the finding.
 - **Cross-architecture runs.** Only the ESP32 has been measured. AVR, Pico,
   SAMD and the other ESP32 variants are unmeasured, so the paper's central
   comparison does not exist yet. This needs boards, not code — but it is the
@@ -1166,6 +1156,61 @@ one agent. Each item is independently checkable and states how to verify it.
 ## Decisions and findings
 
 Recorded because they change what the tests mean.
+
+- **`QUEUES_I2S_DIRECT` is 3; the ESP32 has 2 I2S channels.** Measured
+  `--mode scale --driver i2s_direct --pin-mode nodir` on the connected board:
+  **n=1 and n=2 pass, n=3..8 are refused**, and the refusal is the IDF's own --
+  `E (129) i2s_common: i2s_new_channel(902)`, i.e. `ESP_ERR_NO_MEM` from the
+  peripheral rather than a policy limit. `SOC_I2S_NUM` is 2 on the ESP32 and
+  `I2sManager::create()` allocates one TX channel per manager
+  (`i2s_new_channel(..., &chan, NULL)`, `i2s_manager.cpp:31`), so two is the
+  ceiling and the constant overstates it by one.
+
+  This is a *different kind* of wrong from the MCPWM defect below. There the
+  constant counted allocations correctly and only the health was bad. Here the
+  allocation figure itself is wrong, so anything sizing a queue array from
+  `NUM_QUEUES` over-allocates by one. It was found only because R7 stopped
+  trusting the constant: `DRIVER_MAXS` had carried `i2s_direct: 3` through every
+  previous run, unchanged and untested, because `i2s_direct` had only ever been
+  measured as a *partner* in a `sync` combination with a stepper on another
+  driver. The failure mode is graceful -- `I2sManager::create()` returns nullptr
+  and the harness reports `refused` with the peripheral's own error -- so this is
+  a capacity and documentation bug, not a crash. Left as a library change; the
+  harness's job was to find and record it.
+
+- **`i2s_direct` on the full catalogue: 21 passed, 2 skipped, 3 real defects.**
+  The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
+  first characterization of the I2S step/dir waveform. Two of the three are
+  behaviour no scenario on RMT could have surfaced.
+
+  **1. Any queue entry shorter than `MIN_CMD_TICKS` is silently discarded.**
+  Measured, not inferred: at the speed floor (80 ticks = 5 us) a **195 us entry
+  produces zero pulses** and a **200 us entry produces all 40** of them. 200 us
+  is exactly `MIN_CMD_TICKS` -- 3200 ticks at 16 MHz -- so the threshold is the
+  library's own minimum command duration, and it is **per entry, not per
+  program**: three 40 us entries totalling 240 us also produce nothing. Above the
+  threshold the driver is exact (64/64, 128/128, 255/255, 510/510). RMT emits
+  short entries and does not care, which is why no scenario ever surfaced it.
+  This is what failed SR_05 (16 x 160 ticks = 160 us) and SR_09 (three 50 us
+  entries).
+
+  **Every result now records `entries_below_min_cmd_ticks`.** Without it a
+  zero-step result reads as a dead pin or a driver that emits nothing -- and
+  neither is true, since the same pin carries every longer move perfectly. The
+  finding had to be recovered from a raw capture by hand before it could be
+  stated.
+
+  **2. A step is emitted on the wrong side of a direction change** (SR_12).
+  30/30 steps, 2 dir edges and a correct final dir, but the steps land
+  **10 / 9 / 11** across the three phases instead of 10/10/10. One step of a
+  phase is attributed to its neighbour -- precisely the dir-to-step ordering
+  this harness exists to check. The total count and the per-phase count
+  disagree, and only the second one notices.
+
+  **3. `STOP` does not stop an I2S queue** (SR_25). `STOP` at 0.15 s into a
+  20 000-step move stops it at 11 475 on `rmt_v2` and lets **all 20 000** out on
+  `i2s_direct`. The most consequential of the three for a real machine, even
+  though this rig only ever drives probe pins.
 
 - [x] **Two MCPWM/PCNT queues on one ESP32 do not work: the second stepper
       emits continuously and never stops.** Found by `--mode scale` on its first
