@@ -516,15 +516,43 @@ one agent. Each item is independently checkable and states how to verify it.
       in µs **and in step periods**, plus per-stepper adherence).
       *Verify:* both tables appear for the ESP32 run; a driver-list with no
       measured skew says so rather than printing an empty table.
-- [ ] **R6 — whitepaper: complete revision.** It predates all of this and is
-      wrong in several places that matter: it describes an automatic driver
-      choice, the old console-only reporting, and channel configs the harness
-      never implemented. Rewrite the driver model, the channel-config table
-      (including `8ch_step_only`), the two test modes, and §8 to match what
-      shipped. Do this **after** R1–R3 so it documents the code rather than
-      anticipating it.
-      *Verify:* every claim in the paper maps to a test that exists, or is
-      marked as not applicable with a reason.
+- [x] **R6 — whitepaper: complete revision. Done, and done *first*.** Done
+      before R1–R3 on purpose: the paper is the spec, so R1–R5 now implement a
+      written design rather than the code inventing one the paper then
+      documents. What changed:
+      - **§1.2 two generic modes** (`scale`, `sync`), neither naming an
+        architecture; architecture/sdk/driver are tags on a run.
+      - **§1.4 the pulse-width measurement**, which moved that row of the
+        measured/asserted table from *asserted* to *measured* — the hardware
+        disagreed with the original reasoning, so the reasoning changed.
+      - **§3.1–3.2 the driver model**: no automatic selection anywhere, and the
+        eight named channel presets replaced by the single generic
+        `CONFIG <count> <driver>[,…] [dir|nodir]`, with the old table kept in a
+        collapsed `<details>` for the record.
+      - **§3.3–3.4 the channel budget and why there is no start marker.** All
+        eight channels carry step/dir pins, so no marker channel exists on a
+        4-stepper run; the library's own probes cannot substitute because they
+        exist only in the RMT drivers and only on two chips. Also removed the
+        fictitious "CH 8"/"CH 9" the draft reserved — the clone has 8 channels.
+      - **§4.5 the protocol**: `CONFIG` grammar, `MAP`, and both `QSEG` forms
+        with the +110-byte AVR cost stated.
+      - **§5.5 the sync permutations**, including the result that
+        cross-driver skew is *identical* to same-driver skew (29.5417 µs,
+        0.7385 periods), which contradicts what §5.2 previously asserted.
+      - **§5.6 `stopMove()` and the pulse queue**, with the two measured cases.
+      - **§8 what actually ships**: no `tag_index.json`, no `design_specs.json`,
+        and why; no `glitch_count` column and no single `period_us`; real sample
+        output; LF-only CSV.
+      - **§9 the real directory listing**, and the instrument/harness split.
+      - **§10 the 4-vs-8 channel budget** and the 64 MSample buffer limit.
+      - **Two catalogue entries corrected against the firmware**: SR_13's error
+        text is `ERR QE step0 rc=-1` (`ErrorTicksTooLow`), not the predicted
+        `ERR QE ticks … < maxspeed …`; and SR_18's trailing single step cannot
+        use `<max>` ticks because a `steps=1` command is bounded by its ticks
+        alone and `<max>` = 640 is under `MIN_CMD_TICKS`.
+      *Verify:* all 15 internal `§` references resolve; the 28 scenario ids in
+      the paper match the harness exactly (25 wired, 3 documented
+      not-applicable); every file the paper names exists.
 - [ ] **R7 — `i2s_mux` measured.** Never run. The build supports it
       (`SUPPORT_ESP32_I2S` is defined for IDF 5/6, `QUEUES_I2S_MUX` = 32 under
       dynamic allocation) and the mux is internal to the library

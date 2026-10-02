@@ -208,6 +208,50 @@ def csv_export(results):
     return buf.getvalue().rstrip()
 
 
+def sync_start_table(results):
+    """Every synchronized-start result, skew tabulated.
+
+    Without this the skew appears only as a note in the results table, and the
+    per-test "Measured" table shows both steppers at the same period -- which
+    reads as a perfect simultaneous start and is exactly the wrong conclusion.
+    The two steppers' *steady-state* periods matching says nothing about when
+    their *first* steps land.
+
+    Skew is given in microseconds and in step periods because the ratio is what
+    carries the meaning: 29.5 us is three quarters of a period at 640 ticks and
+    almost nothing at 65535.
+    """
+    rows = [r for r in results
+            if r.get("evaluator_detail", {}).get("first_step_skew_us") is not None]
+    if not rows:
+        return ("_No synchronized-start scenario was run in this results "
+                "set._")
+    out = ["| test | drivers | stepper periods us | first-step skew us | "
+           "in step periods |", "|---|---|---|---|---|"]
+    for r in rows:
+        detail = r["evaluator_detail"]
+        m = r.get("measurements", {})
+        periods = []
+        for letter in sorted(m):
+            p = m[letter].get("inter_step_us", {})
+            if p.get("mean") is not None:
+                periods.append(f"{letter} {fmt(p['mean'], 2)}")
+        out.append(
+            f"| {r['test_id']} | {r.get('driver', '—')} | "
+            f"{', '.join(periods) or '—'} | "
+            f"{fmt(detail['first_step_skew_us'])} | "
+            f"{fmt(detail.get('skew_periods'))} |")
+    out.append("")
+    out.append(
+        "Recorded, not asserted: how closely two pulse drivers arm is a "
+        "property of the hardware, not a correctness property of the queue. "
+        "Note that a cross-driver pair (RMT against MCPWM/PCNT) is **not** "
+        "measurably worse than two steppers on the same driver here, which is "
+        "worth knowing before assuming the two arm through unrelated paths must "
+        "therefore diverge.")
+    return "\n".join(out)
+
+
 def index_report(results, baseline):
     """The dashboard: counts, pass rate per tag, then the full results table."""
     total = len(results)
@@ -248,6 +292,10 @@ def index_report(results, baseline):
         lines.append(cross_tag_table(results))
         lines.append("")
 
+    lines.append("## Synchronized start")
+    lines.append("")
+    lines.append(sync_start_table(results))
+    lines.append("")
     lines.append("## Reading the numbers")
     lines.append("")
     lines.append(
@@ -325,6 +373,16 @@ def test_report(result):
     lines.append("")
     lines.append(stepper_table(result))
     lines.append("")
+    skew = result.get("evaluator_detail", {}).get("first_step_skew_us")
+    if skew is not None:
+        lines.append("**First-step skew between steppers:** "
+                     f"{fmt(skew)} us "
+                     f"({fmt(result['evaluator_detail'].get('skew_periods'))} "
+                     "step periods). Both steppers' steady-state periods "
+                     "matching above does *not* mean they started together -- "
+                     "this is the number that says when their first steps "
+                     "landed. Recorded, not asserted.")
+        lines.append("")
     lines.append("## Detail")
     lines.append("")
     detail = result.get("evaluator_detail", {})

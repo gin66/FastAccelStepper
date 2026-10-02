@@ -64,7 +64,32 @@ driver's overrun/limit handling is correct. None of that is observable from
 
 ### 1.2 Characterization goals
 
-The outcome of the whole suite is a characterization of the queue layer:
+The outcome of the whole suite is a characterization of the queue layer.
+
+It is organized as **two generic test modes**. Neither mode names an
+architecture: the architecture, SDK version and driver are *tags on a run*, not
+modes. That is what makes the same two commands the whole cross-architecture
+matrix, and what lets a driver nobody has connected yet be added by naming it.
+
+| Mode | Question | Varies over | Applies to |
+|------|----------|--------------|-----------|
+| **`scale`** | How does a single driver behave from 1 up to its maximum steppers in parallel? | driver × stepper count `1…driver-max` | every architecture |
+| **`sync`** | On an architecture with more than one driver: do they start together, and does each stepper keep the speed it was given? | every driver-list combination | every architecture with >1 driver |
+
+`scale` is the single run an AVR board needs: one driver, two steppers.
+`sync` applies today to the ESP32 family, because
+`SUPPORT_SELECT_DRIVER_TYPE` exists only there — but the *mode* is generic, and
+an architecture that grows a second driver needs no new code path, only a
+second name in its driver list.
+
+**Driver maximum is a property of the driver, bounded by the analyzer.** The
+loop stops at `min(driver-max, channel budget)` and says which bound it hit:
+the `dir` mapping spends two channels per stepper and so caps at 4, while
+step-only spends one and caps at 8. Reporting "8 steppers" on a configuration
+where the analyzer ran out of channels would be the same category of error as
+letting the firmware choose the driver.
+
+Underneath the two modes sit the original targets:
 
 1. **Step pulse high time / duty cycle vs speed.** How wide is the pulse the
    driver emits, and how does it scale with the commanded `ticks`?
@@ -103,7 +128,7 @@ asking whether a wrong value could mean the queue misbehaved:
 | Step count per command | **asserted** | A swallowed or spurious step is a defect on any platform. |
 | Inter-step period | **asserted** | Deviates only if the timer or the ISR is wrong. |
 | Step rate adherence | **asserted** (2 %) | ISR cost and uC load shift it, but not by much, and a large sag is a real problem. |
-| Pulse high time | **asserted** | Set by the driver logic, not by load. |
+| Pulse high time | **measured** | Set by the driver logic, not by load — so it is *recorded* and becomes the baseline a regression is judged against, but no threshold is asserted on it. See §1.4. |
 | Pause duration | **asserted** | The queue owns the timing. |
 | Dir edge → first step | **measured** | The driver sets the minimum and the value depends on the driver, so the number is recorded; only the *existence* of a delay and the step counts are asserted. |
 | **Synchronized start skew** | **measured** | Driver capability and uC load, not correctness. |
@@ -128,6 +153,27 @@ and on what the processor is doing at that instant.
 A stepper that begins a few microseconds late has not malfunctioned. The
 harness therefore records the skew, each stepper's first-step timestamp, and
 the skew expressed in step periods, and leaves the verdict to the step counts.
+
+#### 1.4 Pulse width is measured, not asserted — with the measurement
+
+This table row was originally "asserted" and the hardware disagreed with the
+reasoning, so the reasoning changed.
+
+Measured on ESP32, sweeping the commanded period over 200 µs, 500 µs, 1 ms, 2 ms,
+2.048 ms and 4.096 ms, the **pulse high time is a constant 15.625 µs (250
+ticks) in every one of them**. The driver emits a fixed-width pulse and varies
+the silence between pulses; high time does not scale with `ticks` at all.
+
+So the pulse width is a property of the silicon, not a promise the queue makes,
+and asserting it would mean asserting a number with no source behind it. It is
+recorded — as a *distribution*, min/max/median/spread, because a driver holding
+a fixed width shows `min == max` and that is itself the result — and it becomes
+the baseline a future regression is measured against.
+
+This is also why there is no glitch counter. The CSV schema originally carried a
+`glitch_count` column and filling it in was the only reason to want one; a glitch
+count needs a threshold invented for it, and it collapses a distribution into a
+single number. The statistics have a source and the counter does not.
 
 #### Global pin invariants
 
@@ -235,13 +281,17 @@ sigrok-cli \
   --output capture_$(date +%Y%m%d_%H%M%S).sr
 ```
 
-- **Channels**: 8–10 persistent channels (Step/Dir per stepper), plus optional
-  trigger channels (e.g. `startQueue`, `queueEmpty`, `testMarker`).
+- **Channels**: exactly **8**. Four steppers with step+dir, or eight step-only.
+  There is no spare channel for a trigger marker — see §3.4 for why that is a
+  design outcome rather than an omission.
 - **Sample rate**: ≥ 1 MS/s (10× the highest step frequency; 16 MHz clock
   → max ~400 kHz step frequency → 4 MHz sample rate is the practical minimum).
-- **Trigger**: Saleae CH 8 connected to a GPIO that the firmware toggles at
-  `startQueue` — this ensures the capture window starts exactly when the test
-  begins, avoiding long pre-trigger recordings.
+- **Trigger**: **unused**, and not optional. All eight channels carry step and/or
+  dir pins, so there is nothing left to trigger on. Captures are started, armed
+  for a fixed interval, and only then is `QRUN` issued. `capture.py` still
+  supports `--wait-trigger` for setups with a spare channel, but the committed
+  suite never uses it, because triggering on the first STEP edge makes that edge
+  sample 0 and undercounts by one — see §3.4.
 - **Output format**: `.sr` (sigrok srzip) — lossless and, unlike CSV, compact:
   one packed byte per sample, so a 2 Msample 8-channel capture is 26 KB as
   `.sr` against 80 MB as CSV. High-rate captures are not truncated by the
@@ -280,7 +330,7 @@ Key metrics per channel:
 | **dir_to_first_step_us** | Time from direction-change edge to first step pulse |
 | **duty_cycle** | High time / total period |
 | **step_count** | Total step pulses counted from edges |
-| **glitch_count** | Spurious edges (width < 1/2 MIN_CMD_TICKS) |
+| ~~**glitch_count**~~ | *Removed* — needs an invented threshold and collapses a distribution; see §1.4 and §8.4 |
 | **cross_channel_skew_us** | Max time difference between any two channels'
   first step pulse (for synchronized-start tests) |
 
@@ -331,7 +381,7 @@ configurations.
         "dir_to_first_step_us": 12.5,
         "avg_inter_step_us": 0.8,
         "max_pulse_width_us": 0.4,
-        "glitch_count": 0
+        "pulse_high_us": {"min": 15.5417, "max": 15.625, "mean": 15.6116}
       }
     },
     "errors": []
@@ -366,12 +416,19 @@ Tags are stored in a JSON index file (`tag_index.json`) for fast lookup:
 | **arch** | `esp32`, `esp32s2`, `esp32s3`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `avr`, `pico`, `sam`, `samd51`, `teensy` |
 | **driver** | `mcpwm_pcnt`, `rmt`, `rmt_v2`, `i2s_direct`, `i2s_mux` |
 | **idf_version** | `idf4`, `idf5`, `idf6` |
-| **channel_config** | `8ch_step_only`, `7ch_shared_dir`, `4ch_rmt`, `4ch_mcpwm`, `2rmt_2i2s`, `4ch_i2s_extender`, `6ch_i2s_mux`, `mixed` |
+| **channel_config** | derived, not chosen: `<count>` steppers, `dir` or `nodir`, plus the driver list — e.g. `4/dir`, `8/nodir` |
 | **test_type** | `ramp`, `sync_start`, `dir_change`, `abrupt_speed`, `queue_full`, `move_timed`, `pause`, `overflow`, `speed_limit`, `queue_fill_latency` |
 | **result** | `passed`, `failed`, `skipped`, `error` |
 
-Composite tag key format: `{arch}_{driver}_{channel_config}` — used as the
-primary index key.
+Composite tag key format: `{arch}_{sdk}_{driver_list}_{count}_{pin_mode}` —
+used as the primary index key. `driver_list` is the per-stepper list joined with
+`+` (`rmt`, `rmt+rmt`, `rmt+mcpwm`, `i2s_mux+i2s_mux+i2s_mux`). A key that
+cannot name its driver is not a valid key.
+
+Note there is no `tag_index.json` in the shipped design: results are one JSON
+file per test under `results/`, and the index is derived from them by
+`generate_report.py`. An index file kept in step with the results is a second
+thing that can disagree with them.
 
 ---
 
@@ -393,9 +450,25 @@ rather than assumed.
 | SAMD51 (`pd_samd`) | TC timer compare | `timer` | `TCC_INST_NUM` (chip dependent) |
 | Teensy 4.x (`pd_teensy`) | interval timer + FlexPWM | `flexpwm`, `interval` | 16 |
 
-`SUPPORT_SELECT_DRIVER_TYPE` only exists on the ESP32 family, so `CONFIG mixed
-<drivers>` is an ESP32-only concept; elsewhere the single native driver is used
-and `1ch` / `2ch` are the meaningful configuration axes.
+`SUPPORT_SELECT_DRIVER_TYPE` only exists on the ESP32 family, so only there can
+one run mix drivers. Everywhere else there is a single native driver, and the
+driver list simply repeats it — `timer` for AVR, `pio` for Pico. The list is
+**always explicit**, on every architecture, for one reason: a result that does
+not record which driver produced it characterizes nothing.
+
+> **There is no automatic driver selection.** Not as a convenience and not as a
+> default. The harness never sends an unspecified driver, and the firmware
+> refuses one rather than falling back. An earlier version of this harness drove
+> most scenarios with `CONFIG 1ch`/`2ch`, which resolved to the library's
+> automatic choice; seventeen of twenty-five recorded results were tagged
+> `auto`, which meant they recorded whatever the firmware happened to pick and
+> could say nothing about any driver. See the todo for the correction work.
+
+**The analyzer bounds the stepper count, and the driver bounds it too.** The
+queue totals above (49 on ESP32) are the library's capacity; the harness is
+limited by 8 analyzer channels, which is 4 steppers with a direction pin and 8
+without. The `scale` mode therefore stops at the smaller of the two bounds and
+reports which bound it hit.
 
 #### ESP32 sub-types, in detail
 
@@ -433,14 +506,45 @@ Two architecture facts shape the test plan itself:
 - **AVR speed floor depends on the stepper count.**
   `StepperQueue::adjustSpeedToStepperCount()` (`src/pd_avr/avr_queue.cpp`) sets
   `max_speed_in_ticks` to `TICKS_PER_S/50000` with one stepper but **426** with
-  two, because the ISR needs ~14 us. So `1ch` and `2ch` must both be
-  characterized on the same board.
+  two, because the ISR needs ~14 us. So one and two steppers must both be
+  characterized on the same board — which is mode `scale` at count 1 and 2.
 - **AVR step pin is not a free choice.** It must be the pin the library maps to
   the timer compare output (`stepPinStepperA`/`stepPinStepperB` in
   `src/AVRStepperPins.h`), and *which* physical pin that is depends on
   `FAS_TIMER_MODULE`. Never hardcode it.
 
 ### 3.2 Channel Configuration Modes
+
+Originally this section listed eight named presets (`8ch_step_only`,
+`7ch_shared_dir`, `4ch_rmt`, `2rmt_2i2s`, …). That was the wrong shape: every
+preset is just *(a count, a list of drivers, a pin mode)*, and enumerating named
+combinations means a new name for every one. The harness now expresses all of
+them with one generic command:
+
+```
+CONFIG <count> <driver>[,<driver>…] [dir|nodir]
+```
+
+- `<count>` — number of steppers to connect, 1…8.
+- `<driver>` — one name per stepper, comma separated, **no shorthand, no
+  default**. A count that does not match the list length is refused.
+- `dir` (default) — two channels per stepper, direction pin present, max 4.
+- `nodir` — one channel per stepper, step-only, max 8.
+
+Every preset in the old list is expressible:
+
+| Old preset | Now |
+|------------|-----|
+| `8ch_step_only` | `CONFIG 8 rmt,rmt,rmt,rmt,rmt,rmt,rmt,rmt nodir` |
+| `4ch_rmt` | `CONFIG 4 rmt,rmt,rmt,rmt` |
+| `4ch_mcpwm` | `CONFIG 4 mcpwm,mcpwm,mcpwm,mcpwm` |
+| `6ch_i2s_mux` | `CONFIG 6 i2s_mux,i2s_mux,… nodir` |
+| `2rmt_2i2s` | `CONFIG 4 rmt,rmt,i2s_direct,i2s_direct` |
+| `mixed` | `CONFIG <n> <any list> [dir|nodir]` |
+
+The superseded preset table, kept only for the record:
+
+<details><summary>Superseded preset list</summary>
 
 The test app shall support the following **channel configuration presets**,
 selectable at build time or via runtime command:
@@ -455,6 +559,10 @@ selectable at build time or via runtime command:
 | **`4ch_i2s_extender`** | 4–8 steppers on I2S Extender (GPIO matrix mux). | 4–8 | I2S Mux |
 | **`6ch_i2s_mux`** | 6 steppers on I2S Mux (maximizing mux channels). | 6 | I2S Mux |
 | **`mixed`** | Arbitrary mix of RMT + MCPWM + I2S. Configurable per-stepper. | 1–8 | Per-stepper driver selection |
+
+</details>
+
+All of the above are superseded by the single generic `CONFIG` grammar.
 
 #### Runtime Configuration Interface
 
@@ -500,8 +608,20 @@ Saleae CH 4: Step C  (GPIO17)
 Saleae CH 5: Dir C   (GPIO5)
 Saleae CH 6: Step D  (GPIO18)
 Saleae CH 7: Dir D   (GPIO19)
-Saleae CH 8: Test marker (GPIO25 — toggled at startQueue)
-Saleae CH 9: Queue empty (GPIO26 — toggled when queue empties)
+```
+
+**The analyzer has 8 channels, so there are no CH 8 / CH 9.** An earlier draft
+of this section reserved a 9th channel for a start marker and a 10th for
+queue-empty; both do not exist. Worse, there is no spare channel to move them
+to: **all eight are spoken for by four steppers' step and dir pins.** A marker
+channel is therefore not available on a 4-stepper `dir` run at all, and on a
+step-only run every channel is a step pin. See §3.4.
+
+**Step-only mapping** (8 steppers, no direction pin):
+
+```
+CH 0: Step A   CH 1: Step B   CH 2: Step C   CH 3: Step D
+CH 4: Step E   CH 5: Step F   CH 6: Step G   CH 7: Step H
 ```
 
 **Hardware notes:**
@@ -514,6 +634,27 @@ Saleae CH 9: Queue empty (GPIO26 — toggled when queue empties)
   ESP32. No input-only pins are used, and no GPIO is assigned to two roles.
 - The trigger/marker pins (25, 26) must be **distinct** from every Step/Dir
   pin. Do not reuse a stepper GPIO as a trigger.
+
+#### 3.4 There is no universally safe start marker
+
+A trigger marker is attractive: it makes the start instant exact instead of
+inferred from when the host sent `QRUN`. It was implemented, measured, and
+removed. The reasons are worth recording, because they will recur.
+
+- **No channel is free.** Four steppers need all eight channels. A marker would
+  have to displace a step or dir pin, which changes the thing being measured.
+- **The library's own probes cannot cover the suite.** `PROBE_1` and friends are
+  disabled by default (`ESP32_TEST_PROBE` / `ESP32C3_TEST_PROBE`), are defined
+  only for ESP32 and ESP32-C3 — not S3/C6/H2/P4 — and exist **only in the RMT
+  drivers**, not MCPWM/PCNT or I2S. A suite whose whole point is comparing
+  drivers cannot have its start instant defined by one of them.
+- **Triggering costs a step.** Capturing triggered on the first STEP edge makes
+  that edge sample 0 and undercounts the run by exactly one. Every scenario that
+  asserts a step count therefore captures *untriggered*.
+
+The arming is instead done by starting the capture, sleeping a fixed interval,
+then issuing `QRUN` — and the capture length is chosen so the whole program and
+a quiet tail both fit inside it. The `scale` and `sync` modes inherit this.
 
 **Reuse the built-in test probes:** the library already ships probe macros in
 `src/pd_esp32/test_probe.h` that toggle a GPIO directly from the RMT ISR —
@@ -619,7 +760,7 @@ on a 328P, of which the engine and two stepper objects already claim a large
 part, a download buffer of even a few hundred bytes would have been the single
 largest allocation in the firmware. `SALEAE_MAX_STEPPERS` is derived from
 `MAX_STEPPER` for the same reason (2 on a 328P), so `CONFIG 4ch_*` cannot
-work there and `1ch`/`2ch` exist to characterize both cases.
+work there, and mode `scale` covers both counts on that driver.
 
 ### 4.4 Firmware Structure
 
@@ -671,10 +812,12 @@ The whole surface. Note how small it is: everything else is assembled from
 | Command | Response | Description |
 |---------|----------|-------------|
 | `SR00` | `OK SR00` | SR_00 pin self-test (§5.0) |
-| `CONFIG <name> [d0,d1,…]` | `OK CONFIG <name> n=<N> maxspeed<i>=<ticks> …` | Connect N steppers. `1ch`, `2ch`, `4ch_rmt`, `4ch_mcpwm`, `mixed <drv,drv,…>` (drivers `rmt`, `mcpwm`, `i2s`, `i2s_mux`, `auto`) |
+| `CONFIG <count> <drv>[,<drv>…] [dir\|nodir]` | `OK CONFIG n=<N> mode=<pinmode> maxspeed<i>=<ticks> …` | Connect `<count>` steppers, one driver named per stepper. Pin mode `dir` (default) or `nodir`. **There is no `auto`.** |
+| `MAP` | `MAP <count> <pinmode> <stride>` | Which analyzer channel carries which stepper, so host and firmware cannot disagree (§3.3) |
 | `QINFO` | `QINFO tps=… mincmd=… qlen=… maxspeed=…` | Platform limits the host must respect |
 | `QCLR` | `OK QCLR` | Drop the program, stop everything |
-| `QSEG <steps> <ticks> <dir>` | `OK QSEG <n>/8` | Append a segment. `steps=0` means "pause for `<ticks>` ticks". `dir` is 0 or 1 |
+| `QSEG <steps> <ticks> <dir>` | `OK QSEG <n>/8` | Append a segment to the **shared** program. `steps=0` means "pause for `<ticks>` ticks". `dir` is 0 or 1 |
+| `QSEG <idx> <steps> <ticks> <dir>` | `OK QSEG <n>/8` | Append a segment to **stepper `<idx>`'s own** program, ignoring the shared one. Needed for two steppers at *different* periods (SR_15, mode `sync`) |
 | `QRUN <mask>` | `OK QRUN` … later `DONE <pos…>` | Run the program on the steppers in the bitmask, synchronized start |
 | `POS` | `POS <pos…>` | Current position of every connected stepper |
 | `STOP` | `OK STOP` | Stop, clear the program and the self-test |
@@ -694,6 +837,20 @@ AVR speed-floor comparison works: `adjustSpeedToStepperCount()`
 (`src/pd_avr/avr_queue.cpp`) sets `max_speed_in_ticks` to `TICKS_PER_S/50000`
 with one stepper but **426** with two, so the same board has to be measured
 under both configurations.
+
+**Why two `QSEG` forms.** The forms differ in argument count, so no command can
+be misread as the other. The three-argument form means the shared program,
+which every stepper walks unless it has one of its own — that keeps every
+single-program scenario unchanged. The four-argument form exists because a
+shared program cannot express two steppers at different periods, which is
+exactly what mode `sync` has to measure. The cost is a per-stepper segment
+matrix in RAM: **+110 bytes on AVR** (1481 → 1591 of 2048). That is the price of
+the capability and it fits.
+
+**`CONFIG` refuses rather than clamps.** If the count exceeds what the platform
+or the channel budget allows, or the driver list length does not match the
+count, it returns `ERR` rather than quietly connecting fewer steppers — a
+silently reduced count makes the capture look like a driver problem.
 
 **`CONFIG` cannot be re-applied.** Each queue can only be allocated once per
 boot (`stepper_allocated_mask` on AVR), so a second `CONFIG` reports the
@@ -761,7 +918,7 @@ across the full range the 16-bit `ticks` and 8-bit `steps` fields allow.
 | **SR_10** | `dir_change_first_step` | `QSEG 20 <ticks> 1`, `QSEG 20 <ticks> 0` | **Primary characterization output**: time from the dir edge to the first step of the reversed phase. Must be ≥ the driver's DIR drain pause (`MIN_DIR_DELAY_US`), and steps must not be emitted while dir is still settling. Position after: 0. |
 | **SR_11** | `dir_change_both_ways` | `QSEG 20 <ticks> 0`, `QSEG 20 <ticks> 1` | Same in the other direction; confirms the pause is symmetric and not dependent on which way the pin goes. |
 | **SR_12** | `multi_step_direction` | `QSEG 10 <ticks> 1`, `QSEG 10 <ticks> 0`, `QSEG 10 <ticks> 1` | Three direction changes in one program; cumulative position returns to +10 and the dir pin tracks every phase. |
-| **SR_13** | `ticks_error_rejected` | `QSEG 8 <max_speed - 1> 1` | The firmware refuses it up front (`ERR QE ticks … < maxspeed …`) and **no pulse is emitted**. A rejection that still steps would be a serious bug. |
+| **SR_13** | `ticks_error_rejected` | `QSEG 8 399 1` | The firmware refuses it and **no pulse is emitted**. A rejection that still steps would move the motor by steps nobody asked for. 8 steps at 399 ticks is 3192 ticks of motion against a floor of 3200, so it is refused with **`ERR QE step0 rc=-1`** (`ErrorTicksTooLow`) — *not* the `ERR QE ticks … < maxspeed …` this table used to predict. Measured: zero pulses, position 0. |
 
 ### 5.2 Category: Multi-Stepper — timing and synchronization
 
@@ -782,8 +939,39 @@ key and compared across runs instead of being reduced to a pass or fail.
 | **SR_14** | `sync_start_skew` | `QRUN 0b11`, then 2000 steps at `<ticks>` | **Measures** the offset between the first step of each stepper. Not gated on: see §5.2. Step counts are still checked. |
 
 | **SR_15** | `sync_start_diff_speed` | `QSEG <n> <ticks_a> 1`, `QRUN 3` at a speed valid for both | Same first-step instant, then each stepper runs at its own period — proves the arm is aligned but the periods stay independent. |
-| **SR_16** | `multi_stepper_timing_impact` | `CONFIG 1ch`, `QSEG 64 <ticks> 1`, `QRUN 1`; then `CONFIG 2ch`, same, `QRUN 3` | **Does the second stepper perturb the first?** Compare SR_01's period from the `1ch` run against the same channel's period in the `2ch` run. On AVR the answer is structural: the floor rises from `TICKS_PER_S/50000` to 426 ticks, so a sweep done only at `1ch` would report a speed the board cannot sustain with two steppers connected. |
-| **SR_17** | `sync_cross_driver` | `CONFIG mixed rmt,mcpwm`, `QSEG <n> <ticks> 1`, `QRUN 3` | Cross-driver start skew — the hardest case, since RMT and MCPWM+PCNT arm through entirely different hardware. ESP32 only. |
+| **SR_16** | `multi_stepper_timing_impact` | `CONFIG 1 <drv>`, `QSEG 64 <ticks> 1`, `QRUN 1`; then `CONFIG 2 <drv>,<drv>`, same, `QRUN 3` | **Does the second stepper perturb the first?** Compare SR_01's period from the `1ch` run against the same channel's period in the `2ch` run. On AVR the answer is structural: the floor rises from `TICKS_PER_S/50000` to 426 ticks, so a sweep done only at `1ch` would report a speed the board cannot sustain with two steppers connected. |
+| **SR_17** | `sync_cross_driver` | `CONFIG 2 rmt,mcpwm`, `QSEG <n> <ticks> 1`, `QRUN 3` | Cross-driver start skew. **Measured: 29.5417 µs, identical to the same-driver case.** The premise that RMT and MCPWM+PCNT "arm through entirely different hardware and must therefore diverge" is not what the hardware does — see §5.5. |
+
+### 5.5 The `sync` mode, and what the permutations showed
+
+`sync` runs every driver-list combination on an architecture with more than one
+driver, and records two things per combination: **sync start** (first-step skew,
+in µs *and* in step periods) and **adherence** (whether each stepper kept the
+period it was individually given — SR_15). Skew is reported, never gated.
+
+The permutations matter more than any single pair, because the interesting
+question is whether skew tracks *driver heterogeneity* at all:
+
+| Driver list | First-step skew | In step periods |
+|-------------|-----------------|------------------|
+| `rmt+rmt` (same driver) | 29.5417 µs | 0.7385 |
+| `rmt+mcpwm` (cross-driver) | 29.5417 µs | 0.7385 |
+| `rmt+rmt` at 2:1 speeds (SR_15) | 27.1667 µs | 0.6792 |
+
+**Cross-driver is not worse than same-driver.** Both land at ~0.74 of a step
+period, to four decimal places. So on this hardware the skew is dominated by
+something common to both paths rather than by which driver a stepper sits on.
+That is worth knowing before writing off multi-driver designs on start alignment,
+and it is exactly the kind of thing a single hand-picked pair would have missed:
+testing only `rmt+mcpwm` would have produced a number with nothing to compare it
+to, and reading it as "the two drivers diverge" would have been wrong.
+
+A skew of 29.5 µs is meaningless alone — it is three quarters of a period at 640
+ticks and almost nothing at 65535. Hence the period column.
+
+**Adherence is the asserted half.** Each stepper is given its own period and
+checked against *its own*, not a common one: a synchronized start that dragged
+both onto one speed would satisfy a first-step test and fail this one.
 
 ### 5.3 Category: Driver Edge Behaviour
 
@@ -793,7 +981,7 @@ step count still looks plausible.
 
 | Test ID | Name | Program | Saleae Check |
 |---------|------|---------|--------------|
-| **SR_18** | `mcpwm_overrun_after_255` | `QSEG 255 <max> 1`, `QSEG 0 <p> 1`, `QSEG 1 <max> 1` | Exactly 255 pulses, then a gap of `p`, then **exactly 1**. The PCNT high limit is re-armed from the live counter value on every command (`StepperISR_idf5_esp32_mcpwm_pcnt.cpp`); a `steps=1` command straight after a 255-step run is precisely where a stale or mis-computed limit produces a lost or extra pulse. |
+| **SR_18** | `mcpwm_overrun_after_255` | `QSEG 255 <max> 1`, `QSEG 0 <p> 1`, `QSEG 1 <max> 1` | Exactly 255 pulses, then a gap of `p`, then **exactly 1**. The PCNT high limit is re-armed from the live counter value on every command; a `steps=1` command straight after a 255-step run is precisely where a stale or mis-computed limit produces a lost or extra pulse. **The trailing single step must use at least 3200 ticks**, not `<max>`: a `steps=1` command is bounded by its ticks alone, so `<max>` = 640 is under `MIN_CMD_TICKS` and the firmware refuses it with `ErrorTicksTooLow`. The last phase therefore runs at a different period from the one before it — the corrected program uses 3200 ticks (200 µs) for the single step. Measured 256/256 with the expected 439.67 µs boundary gap. |
 | **SR_19** | `mcpwm_overrun_boundary` | `QSEG <n> <max> 1` for `n` = 200…255, each followed by `QSEG 1 <max> 1` | Sweeps the suspicious band. The 8-bit counter and the MCPWM timer period interact differently at each `n`; one `n` is enough to lose the trailing step. |
 | **SR_20** | `pause_after_full_command` | `QSEG 255 <ticks> 1`, `QSEG 0 <p> 1`, `QSEG 255 <ticks> 1` | A full 255-step run, a pause, then another full run: 255 / gap / 255. Complements SR_18 by making the *second* command the large one. |
 | **SR_21** | `rmt_buffer_split` | `QSEG 200 <ticks> 1` | RMT V1 splits its hardware buffer at a command boundary. A split at the wrong step shows up as one irregular inter-step gap. |
@@ -805,13 +993,38 @@ step count still looks plausible.
 
 | Test ID | Name | Program | Saleae Check |
 |---------|------|---------|--------------|
-| **SR_25** | `emergency_stop` | long `QSEG 2000 …`, then `STOP` mid-run | Pulses cease immediately; position frozen at whatever was completed; no partial pulse. |
-| **SR_26** | `pause_ticks_max` | `QSEG 1 65535 1`, `QSEG 0 65535 1` | A pause of exactly 65535 ticks — the 16-bit boundary on the pause path too, which is a separate field from `ticks*steps`. |
+| **SR_25** | `emergency_stop` | `QSEG 20000 <ticks> 1`, then `STOP` at 0.15 s | No partial pulse and the capture goes quiet after the stop. **Measured: truncated at 11475 of 20000, pin still for the remaining 2.823 s.** The move must exceed the pulse queue — see §5.6. |
+| **SR_26** | `pause_ticks_max` | `QSEG 1 65535 1`, `QSEG 0 65535 1`, `QSEG 1 65535 1` | A pause of exactly 65535 ticks on the pause path, which is a separate field from `ticks*steps`. **Measured gap 8185 µs against 8191.875 expected.** The trailing step is not in the original two-segment form: silence can only be measured between two pulses, so without a step after the pause the gap is unobservable rather than wrong. |
 
-The catalogue is intentionally small — 26 ids of which 11 are automated today
-(§14) — and every one is either a measured waveform property or a driver limit.
-Nothing in it re-verifies arithmetic, and nothing in it needs more than a
-handful of `QSEG` lines.
+### 5.6 `stopMove()` does not stop a move that is already queued
+
+Found by SR_25, and the reason the scenario's program is larger than it looks.
+
+`stopMove()` sets a flag that the ramp generator consults when it is asked for
+its *next* command. A move already sitting in the pulse queue never asks again,
+so it runs to completion:
+
+| Move | `STOP` issued at | Result |
+|------|------------------|--------|
+| 2000 steps @ 4000 ticks | position 510 | finished at **2000** — no effect at all |
+| 20000 steps @ 640 ticks | position 5825 | stopped at **14240**, truncating only once the queue refilled |
+
+So the stop is honoured, but later than anyone issuing an emergency stop would
+expect, and the delay is whatever the queue happened to hold. SR_25 therefore
+uses a move far larger than the queue, which makes it a test of *stopping*
+rather than of queue drain. Anyone relying on `stopMove()` as an emergency stop
+should know this.
+
+The catalogue is intentionally small, and every entry is either a measured
+waveform property or a driver limit. Nothing in it re-verifies arithmetic, and
+nothing needs more than a handful of `QSEG` lines.
+
+**Status: 25 of 28 ids are implemented, fixtured, and verified on hardware
+(ESP32 — 25/25 pass).** Three are documented as not applicable to that board:
+**SR_22** needs RMT V2 (this ESP32 has V1), **SR_24** needs an AVR board, and
+**SR_00** is the opt-in pin self-test. A committed baseline lives in
+`reports/esp32/`. Modes `scale` and `sync` generate their runs from this
+catalogue rather than duplicating it.
 
 ---
 
@@ -945,7 +1158,7 @@ Note the `dut` block: **`ticks_per_s` is read back from the firmware with
 so the same segment list is evaluated correctly on a 16 MHz target, a prescaled
 Teensy, or an AVR whose `F_CPU` differs from the default. The same applies to
 `max_speed_ticks`, which on AVR is a function of the connected stepper count and
-therefore differs between the `1ch` and `2ch` runs of the same test.
+therefore differs between the 1-stepper and 2-stepper runs of the same test.
 
 ### 7.3 Design Spec File
 
@@ -989,34 +1202,46 @@ Result: FAIL (stepper D exceeds spec tolerance)
 ### 8.1 Report Pipeline
 
 ```
-Python analyzer
+run_hardware.py --results DIR          sweep.py --run
     │
-    ├──► JSON result files (one per test run)
-    │
-    ├──► tag_index.json (index by composite key)
-    │
-    ├──► design_specs.json (design spec values)
+    ├──► JSON result files (one per test)
     │
     └──► generate_report.py
             │
             ├──► results/
-            │       └── 2026-10-01_test_01_esp32_rmt_v2_8ch_step_only.json
+            │       └── SR_01.json
             │
             ├──► capture/
-            │       └── 2026-10-01_test_01_esp32_rmt_v2_8ch_step_only.sr
+            │       └── SR_01.vcd  (+ .meta sidecar)
             │
             └──► reports/
-                    ├── index.md                ← main report
+                    ├── index.md                ← dashboard + results table
                     ├── test_SR_01.md           ← per-test detail
-                    ├── test_SR_04.md
                     ├── spec_compliance.md      ← all spec comparisons
-                    ├── regression.md           ← regression tracking
-                    ├── comparison_esp32_vs_esp32s3.md
+                    ├── regression.md           ← vs a baseline run
                     ├── all_results.csv         ← spreadsheet export
                     └── tag_summary/            ← per-tag summaries
-                        ├── esp32_rmt_v2.md
-                        └── esp32s3_mcpwm_pcnt.md
+                        ├── esp32_rmt_4_dir.md
+                        └── esp32_rmt_mcpwm_2_dir.md
 ```
+
+Two things this pipeline deliberately does **not** have:
+
+- **No `tag_index.json`.** Results are one JSON file per test and the index is
+  derived from them. An index file kept in step with the results is a second
+  thing that can disagree with them.
+- **No `design_specs.json`.** `spec_compliance.md` derives its expectations from
+  the `QINFO` limits the DUT reports (`ticks_per_s`, `min_cmd_ticks`,
+  `queue_len`, fastest legal ticks) plus the commanded program. That covers what
+  the library promises — the commanded period and the step count — and avoids a
+  hand-maintained spec file that can drift from the firmware. What it does not
+  do is reproduce a per-driver spec table for quantities the library does not
+  promise (§1.4).
+
+The generator **formats only**. It never re-parses a capture, so it cannot
+disagree with the run that measured it — which matters because a 24 MS/s capture
+is ~96M samples of pure-Python waveform, and re-measuring would be free to reach
+different numbers than the test just passed on.
 
 ### 8.2 Report Format
 
@@ -1052,53 +1277,79 @@ generated by `generate_report.py`. They include:
 
 ### 8.3 Sample Markdown Report
 
-```
-# SR_05 — Pulse High Time
+Real output from `generate_report.py`, for the run in `reports/esp32/`. This is
+the per-test detail page shape; `index.md` adds the dashboard and the full
+results table on top.
 
-**Test ID:** SR_05
-**Goal:** step pulse high time / duty vs commanded period
-**Program:** `QSEG 16 1600 1`  (16 steps, 1600 ticks apart, dir high)
+```
+# SR_15 — aligned start, then each stepper at its own period
+
+**Test ID:** SR_15
+**Goal:** aligned start, then each stepper at its own period
+**Program:** `stepper 0: QSEG 0 200 640 1 ; stepper 1: QSEG 1 200 1280 1`
 **DUT:** 16000000 ticks/s, `MIN_CMD_TICKS` 3200, `QUEUE_LEN` 32,
-       `max_speed_in_ticks` 80
-**Date:** 2026-10-01
-**Tag:** esp32_idf5_3_0_mcpwm_pcnt_1ch
+       fastest legal 640 ticks
+**Configuration:** 2ch on rmt+mcpwm (esp32)
+**Tag:** `esp32_rmt_mcpwm_2_dir`
+**Captured at:** 24000000 Hz
+**Result:** **PASS**
 
 ## Measured
 
-| Metric | Expected | Measured | Verdict |
-|--------|----------|----------|---------|
-| Commanded period | 100.00 us (1600 ticks) | 100.02 us | ✓ |
-| Step count | 16 | 16 | ✓ |
-| Pulse high time | — | 0.44 us | recorded |
-| Pulse low time | — | 99.58 us | recorded |
-| Duty cycle | — | 0.44 % | recorded |
-| Glitches | 0 | 0 | ✓ |
+| stepper | steps | period us (min–max, spread) | pulse high us (min–max, spread) | duty % |
+|---|---|---|---|---|
+| A | 200 | 39.9167–40, 0.0833 | 15.5417–15.625, 0.0833 | 39.06 |
+| B | 200 | 79.875–79.9583, 0.0833 | 15.5417–15.625, 0.0833 | 19.53 |
 
-## Notes
+**First-step skew between steppers:** 27.1667 us (0.6792 step periods). Both
+steppers' steady-state periods matching above does *not* mean they started
+together -- this is the number that says when their first steps landed.
+Recorded, not asserted.
 
-High/low time and duty are **recorded, not asserted**: the driver sets the pulse
-width, and its value is a property of the silicon rather than something the
-library promises. They become the baseline that a regression is judged against
-(§7.1.1). The assertions in this test are the things the queue layer *does*
-promise: the period is exactly what was commanded, the step count is exact, and
-no pulse is narrower than the glitch filter.
+## Detail
+
+(evaluator JSON: per-stepper expected vs measured period, step-count defects,
+first-step skew, skew in periods, speed ratio)
+
+## Capture
+
+`/tmp/.../SR_15.vcd`
 ```
+
+Three details of that page are load-bearing:
+
+- **`Program` shows one QSEG per stepper**, because SR_15 genuinely sends one
+  list per stepper. Printing only the first would misrepresent what the board
+  was told to do.
+- **The skew sits inside `## Measured`, not only in the JSON blob.** An earlier
+  version of this table showed both steppers at the same period and never
+  mentioned the skew — which reads as a perfect simultaneous start and is
+  exactly the wrong conclusion.
+- **Durations are ranges.** B's 79.875–79.9583 µs against its commanded 80 µs is
+  the assertion; the 0.0833 µs spread is what makes it meaningful.
 
 ### 8.4 CSV Export
 
-A `all_results.csv` is generated for spreadsheet analysis:
+A single `all_results.csv` is generated for spreadsheet analysis, one row per
+**test and stepper**:
 
-```csv
-timestamp,test_id,arch,driver,channel_config,stepper,ticks,ticks_per_s,
-step_count,expected_count,period_us,avg_high_us,avg_low_us,duty_percent,
-glitch_count,pass
-2026-10-01T12:00:00Z,SR_05,esp32,rmt_v2,1ch,A,1600,16000000,16,16,100.02,0.44,99.58,0.44,0,true
-2026-10-01T12:00:01Z,SR_05,esp32,rmt_v2,1ch,B,1600,16000000,16,16,100.03,0.45,99.58,0.45,0,true
-2026-10-01T12:01:00Z,SR_03,esp32s3,mcpwm_pcnt,1ch,A,80,16000000,8,8,5.00,0.21,4.79,4.20,0,true
-2026-10-01T12:02:00Z,SR_16,avr328,timer,2ch,A,426,16000000,64,64,26.63,0.48,26.15,1.80,0,true
-```
+**There is no `glitch_count` column, and `period_us` is not a single number.**
+Both were in the original schema and both were wrong.
 
----
+A glitch count needs a threshold invented for it, and it collapses a
+distribution into one number: it would have reported "0" for all six of the
+pulse-width sweep points that established a constant 15.625 µs width, and
+communicated nothing. The width columns are `min`/`max` instead, so a driver
+holding a fixed width shows as `min == max` and one short pulse in ten thousand
+moves only the minimum (§1.4).
+
+`period_us` is split into mean/min/max/spread for the same reason, and because
+the single mean is what hid the cross-driver result: 29.5417 µs against 40 µs
+nominal looks like a rounding detail until you see it is 0.74 of a step period
+and *identical* to the same-driver case (§5.5).
+
+The CSV is LF-only. CRLF would make every regenerated export show as a
+whole-file diff, which defeats the point of a git-committed baseline.
 
 ## 9. Directory Structure
 
@@ -1107,19 +1358,29 @@ extras/tests/saleae_based/
 ├── white_paper_saleae_test_harness.md   # This white paper
 ├── README.md                            # Quick start guide
 ├── AGENTS.md                            # Agent guide
-├── capture/                             # Generated .sr / .vcd captures
-├── scripts/
-│   ├── harness.py                       # arch/framework/driver -> env + tag
-│   ├── run_tests.py                     # program, capture, evaluate, record
-│   ├── control.py                       # manual serial
-│   ├── capture.py                       # sigrok-cli capture (.sr, --vcd)
-│   ├── analyze_csv.py                   # SR_00 evaluation
-│   ├── signal_parser.py                 # edges/metrics core
-│   └── tests/                           # hardware-free unit tests
-├── common/                              # shared firmware (see §4.4)
-├── apps/                                # thin entry points
-└── capture/                             # generated captures (git-ignored)
+├── common/                              # Shared firmware, all targets (§4.4)
+├── apps/                                # Thin entry points (arduino/, esp-idf/)
+├── reports/                             # Committed baseline: reports/esp32/
+└── scripts/
+    ├── capture.py                       # sigrok-cli capture (.sr, --vcd, .meta)
+    ├── signal_parser.py                 # edges, metrics, distributions
+    ├── run_tests.py                     # scenario table + evaluators
+    ├── run_hardware.py                  # run scenarios on a real board
+    ├── sweep.py                         # parameter sweeps, --list / --run
+    ├── generate_report.py               # the §8 artefacts from JSON results
+    ├── report.py                        # quick console view of a run
+    ├── control.py                       # manual serial
+    ├── analyze_csv.py                   # SR_00 evaluation
+    └── tests/                           # hardware-free tests + golden fixtures
+        ├── fixtures/                    # generated .vcd, committed
+        └── make_fixtures.py             # regenerate them; drift-checked
 ```
+
+`scripts/` is the split that matters: **`capture.py` and `signal_parser.py` are
+the instruments** (they know about volts and sample clocks), and
+`run_tests.py`/`run_hardware.py`/`generate_report.py` are the harness (they know
+about queues and scenarios). Keeping measurement and judgement apart is what
+lets the fixtures test the judgement without hardware.
 
 **Note:** there is no separate `build-saleae.sh`. The firmware is assembled by
 `extras/scripts/build-pio-dirs.sh` into `pio_dirs/saleae` (Arduino) and
@@ -1155,19 +1416,31 @@ driver while producing nothing the analyzer would use.
 
 ### 10.1 Channel count and sample rate
 
-Two channels per stepper, one for step and one for direction:
+Channels per stepper depends on the pin mode: two with a direction pin, one
+without.
 
-| Config | Steppers | Channels needed |
-|--------|----------|-----------------|
-| `1ch` | 1 | 2 |
-| `2ch` | 2 | 4 |
-| `4ch_mcpwm`, `4ch_rmt`, `mixed` | up to 4 | 8 |
+| Pin mode | Channels per stepper | Max steppers on 8 channels |
+|----------|----------------------|------------------------------|
+| `dir` | 2 (step + dir) | **4** |
+| `nodir` | 1 (step only) | **8** |
+
+Step-only is what makes 8 parallel steppers reachable. The driver queue limits
+on this ESP32 are RMT 8, MCPWM/PCNT 6, I2S mux 32, I2S direct 3, so `dir` is the
+binding constraint for every driver at 4 and `nodir` only becomes the binding one
+for RMT (and I2S mux, if connected). The `scale` mode reports which bound it hit.
 
 The sample rate has to resolve the pulse high time, which is a few
 microseconds. At 16 MHz one tick is 62.5 ns, so a 16-tick pulse is 1 us wide and
 4 MS/s gives four samples across it. That is the floor; 24 MS/s is enough
 headroom for the narrowest pulse worth resolving without needing the analyzer's
 full bandwidth.
+
+**Buffer limit.** The Saleae clone used for the committed results holds **64
+MSamples**, which is **2.66 s at 24 MS/s**. A capture that hits that limit ends
+mid-run, and an ended capture looks identical to a run that stopped on its own —
+which is why `capture.py` writes the true sample count to a `.meta` sidecar and
+the VCD loader pads to it (§2.1). Anything needing a longer window must lower
+the sample rate or shorten the program.
 
 ### 10.2 Wiring
 

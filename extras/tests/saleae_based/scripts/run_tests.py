@@ -789,6 +789,13 @@ def eval_independent_speeds(channels, rate, segments, info):
     if a_rises and b_rises:
         skew = round(abs(a_rises[0] - b_rises[0]) * 1e6 / rate, 4)
     detail["first_step_skew_us"] = skew
+    # Also in step periods. A skew of 29 us means nothing on its own -- it is
+    # three quarters of a period at 640 ticks and three thousandths of one at
+    # 65535, and only the ratio says whether the drivers actually started
+    # together.
+    period_us = per[0][0][1] * 1e6 / info["ticks_per_s"]
+    detail["skew_periods"] = round(skew / period_us, 4) if skew and period_us \
+        else None
     detail["speed_ratio"] = SR_15_RATIO
     return ok and len(detail) >= 2, detail
 
