@@ -374,6 +374,30 @@ def read_qinfo(ser):
     raise RuntimeError(f"no QINFO reply, got: {text!r}")
 
 
+def stop_after_for(scenario, segments, info):
+    """When to issue STOP, in seconds after QRUN, or None.
+
+    Derived from the program's own duration rather than a fixed constant,
+    because a fixed one silently stops testing anything on a fast driver. The
+    feeder runs far ahead of the driver: `stop_all()` cancels queue *filling*
+    (it zeroes the stepper's cursor and calls clear_programs()) while commands
+    already in the queue still emit, since stopMove() only sets a flag the next
+    command consults. So the useful window is "after some output has appeared,
+    before the whole program is queued".
+
+    A fixed 0.15 s sat outside that window on any driver whose move was shorter,
+    and equally on one fast enough for the feeder to have queued all 20000 steps
+    by then. A quarter of the run is inside it by construction.
+
+    The floor exists because a stop issued in the same instant as QRUN can land
+    before the move starts, which measures nothing at all.
+    """
+    if scenario not in STOP_AFTER:
+        return None
+    duration = scenario_seconds(segments, info["ticks_per_s"])
+    return max(STOP_AFTER_MIN, min(STOP_AFTER[scenario], duration * 0.25))
+
+
 # The scenarios whose subject IS a queue rejection. SR_13 programs a command
 # below MIN_CMD_TICKS on purpose, to pin that nothing is emitted; everywhere else
 # such a rejection is a setup failure.
@@ -1801,7 +1825,12 @@ def eval_sync_start(channels, rate, segments, info, pins):
 # to wait after QRUN before issuing STOP. Everything else runs untouched to
 # completion. Kept out of the SCENARIOS tuple so the four-field shape every
 # other scenario uses stays uniform.
+# Scenario -> the longest the host will wait after QRUN before issuing STOP.
+# The actual wait is stop_after_for(): this is an upper bound, and the program's
+# own duration is what normally decides.
 STOP_AFTER = {"SR_25": 0.15}
+# ...and never less than this, or the stop can precede the start.
+STOP_AFTER_MIN = 0.01
 
 EVALUATORS = {
     "SR_01": eval_period_exact,
@@ -1918,6 +1947,19 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         proc = start_capture(capture_file, seconds, rate)
         time.sleep(0.3)  # let sigrok-cli start sampling
         send_line(ser, f"QRUN {mask}")
+        # STOP, for the scenarios whose subject is stopping.
+        #
+        # This was missing entirely from measure(): the only STOP in this file
+        # was SR_00's cleanup, and STOP_AFTER was honoured only by
+        # run_hardware.py. So a catalogue run through this orchestrator never
+        # issued one, on any driver -- SR_25 asserts "pulses cease when STOP is
+        # issued" while no STOP was issued, and the 20000-step move simply ran
+        # to completion. That reads as "STOP does not work on this driver",
+        # which is not what was being measured.
+        stop_after = stop_after_for(scenario, segments, info)
+        if stop_after:
+            time.sleep(stop_after)
+            send_line(ser, "STOP")
         proc.wait()
         replies = drain(ser, 0.4)
         # SR_13 is excluded because the rejection is its *subject*: it exists to

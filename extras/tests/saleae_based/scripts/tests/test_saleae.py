@@ -1072,6 +1072,35 @@ class TestModes(unittest.TestCase):
                                              self.QINFOS["rmt_v2"]))
         self.assertEqual(sent, ["QCLR", "QSEG 16 640 1"])
 
+    def test_the_stop_time_is_derived_from_the_run_not_fixed(self):
+        """A fixed 0.15 s stops testing anything on a fast driver.
+
+        The feeder runs far ahead of the driver: STOP cancels queue *filling*
+        but commands already queued still emit, so the useful window is "after
+        some output, before the whole program is queued". A move shorter than the
+        fixed time, or a feeder quick enough to queue all 20000 steps before it,
+        both land outside that window -- and then SR_25 measures a move that was
+        never stopped rather than a driver that cannot be stopped.
+        """
+        info = {"ticks_per_s": 16000000, "min_cmd_ticks": 3200,
+                "max_speed_all_ticks": 640}
+
+        def segs(floor):
+            ticks = run_tests.legal_ticks(dict(info, max_speed_ticks=floor), 20000, floor)
+            return [(20000, ticks, True)]
+
+        slow = run_tests.stop_after_for("SR_25", segs(640), info)
+        fast = run_tests.stop_after_for("SR_25", segs(80), info)
+        self.assertAlmostEqual(slow, 0.15, places=3)   # 0.25 * 0.8 = 0.2, capped
+        self.assertAlmostEqual(fast, 0.05, places=3)   # 0.25 * 0.2
+        for floor, when in ((640, slow), (80, fast)):
+            duration = run_tests.scenario_seconds(segs(floor), 16000000)
+            self.assertGreater(when, 0.0)
+            self.assertLess(when, duration,
+                            f"floor {floor}: STOP at {when} s is not inside the "
+                            f"{duration} s run")
+        self.assertIsNone(run_tests.stop_after_for("SR_01", segs(640), info))
+
     def test_measure_reaches_the_capture_on_both_paths(self):
         """measure() itself, not just its helpers.
 

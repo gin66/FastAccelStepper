@@ -1178,7 +1178,8 @@ Recorded because they change what the tests mean.
   a capacity and documentation bug, not a crash. Left as a library change; the
   harness's job was to find and record it.
 
-- **`i2s_direct` on the full catalogue: 23 passed, 2 skipped, 2 real defects.**
+- **`i2s_direct` on the full catalogue: 23 passed, 2 skipped. Two of the three
+  original failures were harness bugs; one further finding is withdrawn.**
   The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
   first characterization of the I2S step/dir waveform. **Two** of the three
   original failures were harness bugs (below); the two that remain are driver
@@ -1224,17 +1225,63 @@ Recorded because they change what the tests mean.
   tests passed because they drove the helpers rather than `measure()` itself. It
   is now exercised directly.
 
-  **2. A step is emitted on the wrong side of a direction change** (SR_12).
+  **2. A step appears on the wrong side of a direction change** (SR_12) --
+  **still open, and now itself suspect.**
   30/30 steps, 2 dir edges and a correct final dir, but the steps land
   **10 / 9 / 11** across the three phases instead of 10/10/10. One step of a
   phase is attributed to its neighbour -- precisely the dir-to-step ordering
   this harness exists to check. The total count and the per-phase count
   disagree, and only the second one notices.
 
-  **3. `STOP` does not stop an I2S queue** (SR_25). `STOP` at 0.15 s into a
-  20 000-step move stops it at 11 475 on `rmt_v2` and lets **all 20 000** out on
-  `i2s_direct`. The most consequential of the three for a real machine, even
-  though this rig only ever drives probe pins.
+  **3. ~~`STOP` does not stop an I2S queue.~~ Withdrawn: never established.**
+  Written up from a `run_tests.py` catalogue run in which all 20 000 steps came
+  out. Three separate harness problems stacked up, and the conclusion was not
+  available from that run:
+
+  - **`measure()` never issued STOP at all.** The only `STOP` in `run_tests.py`
+    was SR_00's cleanup; `STOP_AFTER` was honoured solely by `run_hardware.py`.
+    So a catalogue run through the main orchestrator never sent one, on any
+    driver — SR_25 asserts "pulses cease when STOP is issued" while no STOP was
+    issued. Now fixed: `measure()` issues it.
+  - **The stop time was a fixed 0.15 s, not derived from the program.** Replaced
+    with `stop_after_for()`: a quarter of the run, capped by `STOP_AFTER` and
+    floored so a stop cannot precede the start.
+  - **Even with STOP issued, the test cannot tell a stopped move from a capture
+    that ended first.** Measured on *both* drivers, identically:
+
+    | driver | capture | first pulse | last pulse | quiet tail |
+    |---|---|---|---|---|
+    | `i2s_direct` | 458.9 ms | 280.6 ms | 458.9 ms | **0.0 ms** |
+    | `rmt_v2` | 458.2 ms | 282.4 ms | 458.2 ms | **0.0 ms** |
+
+    The pulses run to the capture edge on both, because 24 MHz truncates the
+    requested 0.7 s to ~458 ms while the move needs ~281 ms of startup plus its
+    own duration. So `truncated = step_count < requested` was satisfied by the
+    capture ending, not by anything stopping. It was evidence of nothing.
+
+  **On the mechanism, which is answerable from the code rather than a run:**
+  `stop_all()` calls `stepper->stopMove()` and then `memset(&slots[i].cur, 0)`
+  and `clear_programs()`. So queue *filling* is cancelled immediately — the
+  feeder cursor is zeroed and the segment program dropped, so `qe_feed()` stops
+  calling `addQueueEntry()`. What is **not** cancelled is what is already queued:
+  the library's `stopMove()` only sets a flag consulted when the queue asks for
+  its *next* command, so queued commands still emit. The truncation point is
+  therefore however much was prefilled, not when STOP arrived.
+
+  And the feeder runs *far* ahead of the driver — it is pumped from the main
+  loop — so on a driver that takes ~281 ms to start emitting, the whole program
+  can be queued before the first pulse. Then STOP has nothing left to cancel and
+  the full program runs, which is the documented library behaviour and not a
+  defect.
+
+  **What SR_25 needs before it can answer the question:** a capture that is
+  *measured* to outlast the move rather than requested to (`capture.py` already
+  warns that 24 MHz truncates, and `--strict` fails on it); a STOP issued after
+  the driver's startup latency rather than at a fixed offset from QRUN; and a
+  `stopped_early` test in absolute time rather than as a fraction of a capture
+  whose length is not under the harness's control. Until then it reports a
+  number and calls it truncation.
+
 
 - [x] **Two MCPWM/PCNT queues on one ESP32 do not work: the second stepper
       emits continuously and never stops.** Found by `--mode scale` on its first
