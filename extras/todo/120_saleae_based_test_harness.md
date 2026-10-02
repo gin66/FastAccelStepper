@@ -1178,27 +1178,51 @@ Recorded because they change what the tests mean.
   a capacity and documentation bug, not a crash. Left as a library change; the
   harness's job was to find and record it.
 
-- **`i2s_direct` on the full catalogue: 21 passed, 2 skipped, 3 real defects.**
+- **`i2s_direct` on the full catalogue: 23 passed, 2 skipped, 2 real defects.**
   The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
-  first characterization of the I2S step/dir waveform. Two of the three are
+  first characterization of the I2S step/dir waveform. **Two** of the three
+  original failures were harness bugs (below); the two that remain are driver
   behaviour no scenario on RMT could have surfaced.
 
-  **1. Any queue entry shorter than `MIN_CMD_TICKS` is silently discarded.**
-  Measured, not inferred: at the speed floor (80 ticks = 5 us) a **195 us entry
-  produces zero pulses** and a **200 us entry produces all 40** of them. 200 us
-  is exactly `MIN_CMD_TICKS` -- 3200 ticks at 16 MHz -- so the threshold is the
-  library's own minimum command duration, and it is **per entry, not per
-  program**: three 40 us entries totalling 240 us also produce nothing. Above the
-  threshold the driver is exact (64/64, 128/128, 255/255, 510/510). RMT emits
-  short entries and does not care, which is why no scenario ever surfaced it.
-  This is what failed SR_05 (16 x 160 ticks = 160 us) and SR_09 (three 50 us
-  entries).
+  **1. ~~The driver silently discards short entries.~~ Wrong: the harness did.**
+  This was first written up as a driver defect and that was incorrect. The
+  driver is right and the firmware is right:
 
-  **Every result now records `entries_below_min_cmd_ticks`.** Without it a
-  zero-step result reads as a dead pin or a driver that emits nothing -- and
-  neither is true, since the same pin carries every longer move perfectly. The
-  finding had to be recovered from a raw capture by hand before it could be
-  stated.
+  - `addQueueEntry()` bounds the whole command -- `ticks * steps >= MIN_CMD_TICKS`
+    -- and returns `AQE_ERROR_TICKS_TOO_LOW` (`queue_add_entry.cpp:46`).
+  - The firmware surfaces it: `ERR QE step0 rc=-1`.
+
+  Three harness bugs, all real:
+
+  1. **`sc_pulse_high_time`, `sc_pause`, `sc_long_run` bypassed `legal_ticks()`**,
+     using `max(max_speed_ticks, 160)` instead. `addQueueEntry` bounds the
+     *command*, so 16 steps need `ticks*16 >= 3200`. `rmt_v2`'s floor is 640, so
+     the expression gave 10240 and the scenario passed; `i2s_direct`'s floor is
+     80, so it gave 2560 and the queue rejected it. **One expression, two
+     drivers, and the difference was invisible until a driver with a lower floor
+     was tried.** All three now use `legal_ticks(info, steps, ...)`.
+  2. **The rejection is asynchronous, so `program()`'s check could not see it.**
+     `QSEG` replies `OK QSEG` after *parsing* only; the real `addQueueEntry()`
+     runs in `qe_feed()` from `qe_pump()`, in the main loop, *after* `QRUN`. The
+     error therefore lands in the post-run drain, and the harness went on to
+     measure.
+  3. **The post-run `ERR QE` was read as a measurement.** So SR_05 was recorded
+     as "the pin emitted 0 of 16 steps" -- a statement about the hardware that
+     was simply false. The pin carries every legal move perfectly.
+
+  `measure()` now treats a post-run `ERR QE` as a **setup failure**, and
+  `program()` refuses an entry the queue must reject *before* a capture is
+  spent. SR_05 and SR_09 re-run: **both pass.** The general guard is a test that
+  every scenario is programmable against three QINFO shapes whose
+  `max_speed_ticks` differ by 8x, plus one that asserts the shape set has not
+  collapsed to a single floor.
+
+  `REJECTION_SCENARIOS` names the one scenario whose subject *is* a rejection
+  (SR_13), so exempting it from both checks is a recorded decision rather than a
+  carve-out that could quietly widen. It also broke twice on the way: the
+  exemption read `test_id`, which is not a parameter of `measure()`, and all 199
+  tests passed because they drove the helpers rather than `measure()` itself. It
+  is now exercised directly.
 
   **2. A step is emitted on the wrong side of a direction change** (SR_12).
   30/30 steps, 2 dir edges and a correct final dir, but the steps land

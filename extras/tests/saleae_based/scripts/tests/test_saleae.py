@@ -975,6 +975,196 @@ class TestModes(unittest.TestCase):
                 self.assertIn(d, harness.DRIVER_IDENTITY,
                               f"{d} (family {family}) has no identity")
 
+    # -- every scenario must be programmable on every driver --------------
+    #
+    # The QINFO shapes below are the ones this harness has actually met. They
+    # differ in `max_speed_ticks` by a factor of eight, which is the whole point:
+    # a builder that assumes a fast driver has a fast floor is legal on one and
+    # not on the other.
+    QINFOS = {
+        "rmt_v2": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+                   "max_speed_ticks": 640, "max_speed_all_ticks": 640},
+        "i2s_direct": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+                       "max_speed_ticks": 80, "max_speed_all_ticks": 80},
+        "avr_timer": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+                      "max_speed_ticks": 426, "max_speed_all_ticks": 426},
+    }
+
+    def _programs(self, scenario, info):
+        """Every program a scenario would send, as {stepper: segments}."""
+        cfg, builder, _mask, _desc = run_tests.SCENARIOS[scenario]
+        segments = builder(info)
+        per_stepper = run_tests.per_stepper_builder(scenario)
+        return per_stepper(info) if per_stepper else {0: segments}
+
+    def test_every_scenario_is_programmable_on_every_driver_seen(self):
+        """The bug this pins, exactly as it happened.
+
+        SR_05 built `max(max_speed_ticks, 160)` instead of legal_ticks(). On
+        rmt_v2 (floor 640) that gave 16 * 640 = 10240 and passed; on i2s_direct
+        (floor 80) it gave 16 * 160 = 2560 against a MIN_CMD_TICKS of 3200, so
+        the queue rejected the command and the run was reported as "the pin
+        emitted 0 of 16 steps". One expression, two drivers, and the difference
+        was invisible until a driver with a lower floor was tried.
+        """
+        offenders = []
+        for scenario in run_tests.SCENARIOS:
+            if scenario in run_tests.REJECTION_SCENARIOS:
+                continue
+            for name, info in self.QINFOS.items():
+                for idx, segs in self._programs(scenario, info).items():
+                    bad = run_tests.unprogrammable(segs, info)
+                    if bad:
+                        offenders.append(f"{scenario} on {name} "
+                                         f"(stepper {idx}): {bad}")
+        self.assertEqual(offenders, [], "unprogrammable scenarios:\n  "
+                                        + "\n  ".join(offenders))
+
+    def test_the_only_intentionally_illegal_scenario_is_the_rejection_test(self):
+        """The exclusion list is a decision, so it is pinned.
+
+        SR_13 exists to assert that a sub-MIN_CMD_TICKS command emits nothing, so
+        it is illegal on purpose. Every other scenario has to be programmable --
+        which is the assertion the previous test makes, and this one keeps the
+        carve-out from quietly widening.
+        """
+        for name, info in self.QINFOS.items():
+            for scenario in run_tests.REJECTION_SCENARIOS:
+                self.assertIn(scenario, run_tests.SCENARIOS)
+                bad = [run_tests.unprogrammable(segs, info)
+                       for segs in self._programs(scenario, info).values()]
+                self.assertTrue(any(b is not None for b in bad),
+                                f"{scenario} on {name} is now programmable, so "
+                                f"it no longer tests the rejection and should "
+                                f"leave REJECTION_SCENARIOS")
+        # And every remaining scenario is illegal on at least one driver, or it
+        # is not testing what its name claims.
+        self.assertEqual(run_tests.REJECTION_SCENARIOS, {"SR_13"})
+
+    def test_the_sweep_covers_a_driver_floor_eight_times_lower(self):
+        # Guards the guard: if QINFOS above ever collapsed to one shape, the
+        # test above would pass for the wrong reason and quietly stop covering
+        # the low-floor driver that broke SR_05.
+        floors = {name: info["max_speed_ticks"] for name, info
+                  in self.QINFOS.items()}
+        self.assertEqual(max(floors.values()) / min(floors.values()), 8.0,
+                         floors)
+
+    def test_a_short_entry_is_refused_before_a_capture_is_spent(self):
+        # Refusing after the capture costs seconds of analyzer time and leaves
+        # only "the pin emitted nothing" to say -- which is what made this look
+        # like a hardware fault for so long.
+        sent = []
+        with mock.patch.object(run_tests, "reply_of",
+                               lambda ser, line: sent.append(line) or "OK QCLR"):
+            self.assertFalse(run_tests.program(object(),
+                                               [(16, 160, True)],
+                                               self.QINFOS["i2s_direct"]))
+        self.assertEqual(sent, [], "nothing should reach the board")
+
+    def test_a_legal_entry_is_still_sent(self):
+        sent = []
+        replies = {"QCLR": "OK QCLR", "QSEG 16 640 1": "OK QSEG 1/1"}
+        with mock.patch.object(run_tests, "reply_of",
+                               lambda ser, line: sent.append(line)
+                               or replies[line]):
+            self.assertTrue(run_tests.program(object(), [(16, 640, True)],
+                                             self.QINFOS["rmt_v2"]))
+        self.assertEqual(sent, ["QCLR", "QSEG 16 640 1"])
+
+    def test_measure_reaches_the_capture_on_both_paths(self):
+        """measure() itself, not just its helpers.
+
+        The SR_13 exemption introduced a NameError in this function -- it read
+        `test_id`, which is not a parameter here -- and every unit test passed
+        because they all drove the helpers directly. Only a hardware run found
+        it. So measure() is exercised with serial and capture mocked, on the
+        ordinary path and on the rejection scenario: the two branches that can
+        disagree about whether a command is legal.
+        """
+        info = {"ticks_per_s": 16000000, "min_cmd_ticks": 3200,
+                "queue_len": 32, "max_speed_ticks": 640,
+                "max_speed_all_ticks": 640, "max_speed_per_stepper": [640]}
+        replies = {
+            "CONFIG 1 rmt_v2 dir": "OK CONFIG n=1 mode=dir stride=2 "
+                                    "drivers=rmt_v2\n",
+            "QCLR": "OK QCLR\n",
+            "MAP": "OK MAP count=1 mode=dir stride=2 ch=2\n",
+            "QINFO": "OK QINFO tps=16000000 mincmd=3200 qlen=32 maxall=640"
+                     " maxspeed0=640\n",
+            "QSEG 8 640 1": "OK QSEG 1/1\n",
+            "QSEG 1 8 1": "OK QSEG 1/1\n",
+            "QRUN 1": "OK QRUN\n",
+            "POS": "POS 8\n",
+            "STOP": "OK STOP\n",
+        }
+        args = argparse.Namespace(
+            capture_dir="/tmp/none", results_dir="/tmp/none",
+            sample_rate=4000000, port="/dev/null", baud=115200,
+            dut_driver="rmt_v2", seconds=1.0, sr00_sample_rate=1000000,
+            force=True)
+        outcomes = {}
+        sent_lines = []
+
+        fixture = next(fx for fx in vf.FIXTURES if fx.scenario == "SR_01")
+
+        def drive(scenario, builder, post_qrun="OK QRUN\nPOS 8\n",
+                  capture=None):
+            # SR_13 asserts the *absence* of pulses, so it needs a capture with
+            # no edges at all -- the SR_01 fixture has eight and would fail it.
+            capture = capture if capture is not None else sp.load_vcd(
+                str(vf.FIXTURE_DIR / f"{fixture.name}.vcd"))
+            with mock.patch.object(run_tests, "reply_of",
+                                   lambda ser, line: (
+                                       sent_lines.append(line),
+                                       replies.get(line, "OK"))[1]), \
+                    mock.patch.object(run_tests, "drain",
+                                      lambda *a, **k: post_qrun), \
+                    mock.patch.object(run_tests, "read_qinfo",
+                                      lambda ser: dict(info)), \
+                    mock.patch.object(run_tests, "read_map",
+                                      lambda ser: (
+                                          run_tests.default_channel_map(1, 2),
+                                          {"mode": "dir", "stride": 2,
+                                           "pins": [2, 0]})), \
+                    mock.patch.object(run_tests, "start_capture",
+                                      lambda *a, **k: mock.Mock(
+                                          wait=lambda: None,
+                                          returncode=0)), \
+                    mock.patch.object(run_tests.time, "sleep",
+                                      lambda *a: None), \
+                    mock.patch.object(run_tests, "open_board",
+                                      lambda *a, **k: mock.Mock()), \
+                    mock.patch.object(
+                        run_tests, "load_capture_for_eval",
+                        lambda f: capture):
+                outcomes[scenario] = run_tests.measure(
+                    "t", scenario.lower(), "CONFIG 1 rmt_v2 dir", 1, builder,
+                    scenario, args, None, scenario=scenario)
+
+        drive("SR_01", lambda i: [(8, i["max_speed_ticks"], True)])
+        # The rejection scenario must still reach the board: exempting it from
+        # the legality pre-check is the point, and a mistake here would make it
+        # "pass" by never programming anything at all.
+        # The rejection arrives in the post-QRUN drain, from qe_pump in the main
+        # loop -- which is exactly why program()'s "OK QSEG" check cannot see it.
+        drive("SR_13", lambda i: [(1, 8, True)],
+              post_qrun="ERR QE step0 rc=-1\nOK QRUN\nDONE 0\nPOS 0\n",
+              capture=({"D0": [0, 0, 0, 0], "D1": [0, 0, 0, 0]}, 4000000))
+        self.assertEqual(outcomes["SR_01"][0], "passed")
+        self.assertEqual(outcomes["SR_13"][0], "passed")
+        self.assertIn("POS 0", outcomes["SR_13"][1].get("reply", ""))
+        # And the ordinary path must still *program*: a run that refuses to send
+        # anything would report zero steps and look like a dead pin.
+        self.assertIn("QSEG 8 640 1", sent_lines)
+
+    def test_a_pause_counts_one_period_against_the_minimum(self):
+        # A pause's tick field is its own bound, not ticks*steps, so it is a
+        # separate case with the same threshold.
+        info = self.QINFOS["i2s_direct"]
+        self.assertIsNotNone(run_tests.unprogrammable([(0, 1600, True)], info))
+        self.assertIsNone(run_tests.unprogrammable([(0, 3200, True)], info))
+
     # -- queue entries the board may silently discard --------------------
     def test_an_entry_shorter_than_min_cmd_ticks_is_named_in_the_result(self):
         """A scenario measuring zero steps has to say why.

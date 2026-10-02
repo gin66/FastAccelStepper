@@ -374,8 +374,45 @@ def read_qinfo(ser):
     raise RuntimeError(f"no QINFO reply, got: {text!r}")
 
 
-def program(ser, segments):
+# The scenarios whose subject IS a queue rejection. SR_13 programs a command
+# below MIN_CMD_TICKS on purpose, to pin that nothing is emitted; everywhere else
+# such a rejection is a setup failure.
+REJECTION_SCENARIOS = {"SR_13"}
+
+
+def unprogrammable(segments, info):
+    """The first entry the queue must reject, or None.
+
+    addQueueEntry() bounds the whole command: `ticks * steps` (or `ticks` for a
+    pause) must reach MIN_CMD_TICKS, and QINFO told us that number before the
+    run. Checking here means an illegal scenario is refused *before* a capture
+    is started, instead of after -- when all that is left to say is that the pin
+    emitted nothing, which reads as a dead driver and is not the case.
+
+    This is not hypothetical bookkeeping. SR_05 asked for 16 steps at a period
+    floor of 160 ticks because its builder used `max(max_speed_ticks, 160)`
+    rather than legal_ticks(): 2560 ticks against a MIN_CMD_TICKS of 3200. RMT's
+    floor of 640 made the same expression give 10240, so the scenario passed for
+    years and broke the moment it was run on a driver whose floor is lower.
+    """
+    for steps, ticks, _ in segments:
+        if ticks * (steps if steps else 1) < info["min_cmd_ticks"]:
+            return {"steps": steps, "ticks": ticks,
+                    "us": round(ticks * (steps if steps else 1)
+                                / info["ticks_per_s"] * 1e6, 1),
+                    "min_cmd_ticks": info["min_cmd_ticks"]}
+    return None
+
+
+def program(ser, segments, info=None):
     """Send QCLR followed by one QSEG per segment. Returns False on error."""
+    if info is not None:
+        bad = unprogrammable(segments, info)
+        if bad is not None:
+            print(f"    not programmable: {bad['steps']} x {bad['ticks']} ticks "
+                  f"= {bad['us']} us < MIN_CMD_TICKS ({bad['min_cmd_ticks']} "
+                  f"ticks). The queue would reject it; not capturing.")
+            return False
     text = reply_of(ser, "QCLR")
     if "OK QCLR" not in text:
         return False
@@ -387,7 +424,7 @@ def program(ser, segments):
     return True
 
 
-def program_per_stepper(ser, programs):
+def program_per_stepper(ser, programs, info=None):
     """QCLR, then the 4-argument QSEG for each stepper's own program.
 
     The shared 3-argument form cannot express two different periods, so a
@@ -395,6 +432,14 @@ def program_per_stepper(ser, programs):
     indexed list per stepper. Split out of run_hardware's inline version so both
     runners send the same thing in the same order.
     """
+    if info is not None:
+        for idx in sorted(programs):
+            bad = unprogrammable(programs[idx], info)
+            if bad is not None:
+                print(f"    stepper {idx} not programmable: {bad['steps']} x "
+                      f"{bad['ticks']} ticks = {bad['us']} us < "
+                      f"MIN_CMD_TICKS ({bad['min_cmd_ticks']} ticks)")
+                return False
     text = reply_of(ser, "QCLR")
     if "OK QCLR" not in text:
         return False
@@ -751,7 +796,16 @@ def sc_pause_after_full_command(info):
 
 def sc_pulse_high_time(info):
     # 16 steps is enough to measure a stable high time and still short.
-    return seg_period(16, max(info["max_speed_ticks"], 160))
+    #
+    # legal_ticks, not max(max_speed, 160): addQueueEntry bounds the *whole*
+    # command, so 16 steps need ticks*16 >= MIN_CMD_TICKS. On rmt_v2 the floor
+    # is 640 and the old `max(..., 160)` gave 16*640 = 10240 by accident; on
+    # i2s_direct the floor is 80, so it gave 16*160 = 2560, below MIN_CMD_TICKS,
+    # and the queue rejected the command. The scenario measured a rejected
+    # command as "hardware emitted 0 of 16 steps" -- a statement about the pin
+    # that was simply false. See legal_ticks().
+    return seg_period(16, legal_ticks(info, 16, max(info["max_speed_ticks"],
+                                                     160)))
 
 
 def sc_trailing_wait(info):
@@ -760,7 +814,8 @@ def sc_trailing_wait(info):
 
 
 def sc_long_run(info):
-    return seg_period(2000, max(info["max_speed_ticks"], 160))
+    return seg_period(2000, legal_ticks(info, 2000,
+                                         max(info["max_speed_ticks"], 160)))
 
 
 def sc_queue_full(info):
@@ -768,7 +823,9 @@ def sc_queue_full(info):
 
 
 def sc_pause(info):
-    t = max(info["max_speed_ticks"], 160)
+    # Legal for the 5-step legs: 5*t must clear MIN_CMD_TICKS, which on a driver
+    # with a low speed floor the bare max_speed_ticks does not.
+    t = legal_ticks(info, 5, max(info["max_speed_ticks"], 160))
     pause = min(65535, t * 20)
     return [(5, t, True), (0, pause, True), (5, t, True)]
 
@@ -1805,8 +1862,14 @@ def run_sr00(tag_key, args):
 
 
 def measure(tag_key, name, wire, mask, builder, evaluator, args,
-            per_stepper_for=None):
+            per_stepper_for=None, scenario=None):
     """Wire the board, capture one measurement, evaluate it. One code path.
+
+    `scenario` is the SR id when there is one, and None for a mode run. It is
+    separate from `evaluator` because a mode run's evaluator is a closure, and
+    SR_13's exemption below needs the *id* to be knowable, not the callable.
+
+    Wire the board, capture one measurement, evaluate it. One code path.
 
     Everything measured here goes through this function -- the named scenarios
     in SCENARIOS and the runs the two generic modes generate alike. A mode with
@@ -1836,11 +1899,16 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
 
         segments = builder(info)
         programs = per_stepper_for(info) if per_stepper_for else None
+        # The legality pre-check is skipped for the scenarios whose subject is a
+        # rejection: SR_13 programs a command below MIN_CMD_TICKS on purpose, so
+        # refusing it here would rob the scenario of the thing it exists to see,
+        # and it would "pass" by never reaching the queue.
+        check = None if scenario in REJECTION_SCENARIOS else info
         if programs:
-            if not program_per_stepper(ser, programs):
+            if not program_per_stepper(ser, programs, check):
                 return "failed", {"error": "QSEG rejected",
                                   "segments": segments}
-        elif not program(ser, segments):
+        elif not program(ser, segments, check):
             return "failed", {"error": "QSEG rejected", "segments": segments}
 
         seconds = scenario_seconds(segments, info["ticks_per_s"]) + 0.5
@@ -1852,6 +1920,28 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         send_line(ser, f"QRUN {mask}")
         proc.wait()
         replies = drain(ser, 0.4)
+        # SR_13 is excluded because the rejection is its *subject*: it exists to
+        # assert that a command below MIN_CMD_TICKS emits nothing, and the queue
+        # saying `ERR QE step0 rc=-1` is that scenario passing, not failing. The
+        # set is asserted against the catalogue in the tests, so a second
+        # rejection scenario cannot be added without deciding the same question.
+        #
+        # `ERR QE ... rc=-1` arriving *now* is the queue rejecting a command --
+        # almost always ticks*steps below MIN_CMD_TICKS. It is a setup failure,
+        # not a measurement, and reporting it as one produces a falsehood: the
+        # evaluator then counts zero pulses on a pin that carries every legal
+        # move perfectly. Caught here because QSEG only acknowledges the parse;
+        # the real addQueueEntry() call happens in qe_pump() from the main loop,
+        # after QRUN, so the syntax check in program() cannot see it.
+        if "ERR QE" in replies and scenario not in REJECTION_SCENARIOS:
+            detail = {"error": "queue rejected the command",
+                      "firmware_reply": replies.strip(),
+                      "segments": segments,
+                      "entries_below_min_cmd_ticks": sub_min_entries(
+                          segments if not programs else None, info, programs)}
+            print(f"    {replies.strip().splitlines()[0]} -- a setup failure, "
+                  f"not a measurement")
+            return "error", detail
         send_line(ser, "POS")
         replies += drain(ser, 0.2)
     finally:
@@ -1897,7 +1987,8 @@ def run_scenario(tag_key, test_id, args):
     status, detail = measure(tag_key, test_id.lower(),
                              config_wire(config, args.dut_driver), mask,
                              builder, test_id, args,
-                             per_stepper_builder(test_id))
+                             per_stepper_builder(test_id),
+                             scenario=test_id)
     # A named scenario that the board refuses is a wiring fault, not a finding,
     # so it is reported as a failure even though the shared path calls it
     # `refused` for the modes.
