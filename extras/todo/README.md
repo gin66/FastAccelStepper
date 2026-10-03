@@ -1,13 +1,13 @@
 # Open items (TODO)
 
 Library-wide open items, one file per item. The list is not
-FasNAxis-specific: the ramp-generator arrival (080) is single-axis,
+FasNAxis-specific: the ramp-generator arrival (110) is single-axis,
 and the rest is n-axis work.
 
 The filename prefix is the priority, three digits wide
-(`050_name.md`). Numbers step by 10, so a new item takes a free
-number between two existing ones (`055_` sits between `050_` and
-`060_`). Items that share a priority share the prefix.
+(`010_name.md`). Numbers step by 10, so a new item takes a free
+number between two existing ones (`015_` sits between `010_` and
+`020_`). Items that share a priority share the prefix.
 
 Source of truth for the n-axis items: `extras/doc/n_axes_whitepaper.md`.
 Their test-driven implementation plan (Steps 0–14) is complete; its
@@ -24,25 +24,32 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **050** | [ESP32 synchronized start](050_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
-| **050** | [Pico synchronized start](050_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
-| **050** | [AVR synchronized start](050_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
-| **050** | [SAM synchronized start](050_sam_synchronized_start.md) | ~20 k | 1–2 d | PWM/TC common release point to be identified. |
-| **050** | [SAMD51 synchronized start](050_samd51_synchronized_start.md) | ~20 k | 1–2 d | TCC cross-instance release to be identified. |
-| **050** | [Teensy synchronized start](050_teensy_synchronized_start.md) | ~20 k | 1–2 d | TMR within/cross-module release to be decided. |
-| **060** | [Cubic start (`s_h`) overlay](060_cubic_start.md) | ~200 k | 1–2 w | Later feature, not v1. |
-| **070** | [Common head speed](070_common_head_speed.md) | ~300 k | 1–2 w | Later planner. One acceleration and one max path speed for an x/y/z/… head. Waypoints are `dx, dy, dz, …, v`. |
-| **080** | [Delta steps](080_delta_steps.md) | ~400 k | 1–2 w | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
-| **080** | [Ramp time and moveTo eta](080_move_to_eta.md) | ~400 k | 1–2 w | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
-| **090** | [Smooth stop at end of path](090_end_path_decel.md) | ~200 k | 1 w | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
-| **100** | [Pipeline position estimate](100_position_pipeline_estimate.md) | ~100 k | 2–3 d | Low priority. Estimate how far a pipelined driver has played out, so `getCurrentPosition()` can lead the pin by less. A pulse counter remains the real position. |
-| **110** | [RMT V1/V2 file split](110_rmt_v1_v2_split.md) | ~100 k | 0.5 d | Low hanging fruit. `SUPPORT_RMT_V1` / `SUPPORT_RMT_V2` instead of one flag for both and `V2` only for IDF5/6. |
-| **120** | [Saleae-based test harness](120_saleae_based_test_harness.md) | ~1 M | 2–3 w | Hardware + software: Saleae bridge, signal parser, multi-platform synchronized-start verification. |
-| **130** | [Interrupt slow steps](130_interrupt_slow_steps.md) | ~500 k | 1–2 w | Periodic interrupt check in timer ISR, safe abort point, per-platform driver updates. |
+| **010** | [MCPWM/PCNT defect — two queues on ESP32](010_mcpwm_pcnt_defect.md) | ~100 k | 1–2 d | **Critical.** Configuring two MCPWM/PCNT queues causes the second stepper to emit continuously and never stop. Runaway motion. |
+| **020** | [stopMove() does not stop a queued move](020_stopMove_behavior.md) | ~100 k | 1–2 d | **Critical.** `stopMove()` only sets a flag; queued commands run to completion. Unexpected motion. |
+| **030** | [Interrupt slow steps](030_interrupt_slow_steps.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
+| **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
+| **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
+| **040** | [AVR synchronized start](040_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
+| **040** | [SAM synchronized start](040_sam_synchronized_start.md) | ~20 k | 1–2 d | PWM/TC common release point to be identified. |
+| **040** | [SAMD51 synchronized start](040_samd51_synchronized_start.md) | ~20 k | 1–2 d | TCC cross-instance release to be identified. |
+| **040** | [Teensy synchronized start](040_teensy_synchronized_start.md) | ~20 k | 1–2 d | TMR within/cross-module release to be decided. |
+| **050** | [Cross-driver start skew ~66% worse than same-driver](050_cross_driver_skew.md) | ~100 k | 0.5 d | Medium: critical characterization result previously hidden by a firmware bug. |
+| **060** | [AVR RAM was 51% string literals](060_avr_ram_strings.md) | ~100 k | 0.5 d | Medium: resource constraint (1040 B of 2048 B `.rodata` in SRAM). Fixed, documented. |
+| **070** | [i2s_direct has 2 channels on ESP32, not 3](070_i2s_direct_channels.md) | ~100 k | 0.5 d | Medium: constant overstates channel count by one. Graceful failure. |
+| **080** | [Cubic start (`s_h`) overlay](080_cubic_start.md) | ~200 k | 1–2 w | Later feature, not v1. |
+| **090** | [Common head speed](090_common_head_speed.md) | ~300 k | 1–2 w | Later planner. One acceleration and one max path speed for an x/y/z/… head. Waypoints are `dx, dy, dz, …, v`. |
+| **100** | [Delta steps](100_delta_steps.md) | ~400 k | 1–2 w | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
+| **110** | [Ramp time and moveTo eta](110_move_to_eta.md) | ~400 k | 1–2 w | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
+| **120** | [Smooth stop at end of path](120_end_path_decel.md) | ~200 k | 1 w | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
+| **130** | [Pipeline position estimate](130_position_pipeline_estimate.md) | ~100 k | 2–3 d | Low priority. Estimate how far a pipelined driver has played out, so `getCurrentPosition()` can lead the pin by less. A pulse counter remains the real position. |
+| **140** | [RMT V1/V2 file split](140_rmt_v1_v2_split.md) | ~100 k | 0.5 d | Low hanging fruit. `SUPPORT_RMT_V1` / `SUPPORT_RMT_V2` instead of one flag for both and `V2` only for IDF5/6. |
 | **140** | [Modular ramp generator](140_modular_ramp_generator.md) | ~2 M | 3–4 w | Major refactor: extract 4 modules, write PC tests, documentation, regression suite. |
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
-| **total** | 20 items (13 existing + 7 new) | ~7 M | 18–25 w | All priorities 050–160. |
+| **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
+| **175** | [stopMove() / forceStop() / forceStopAndNewPosition() — three APIs, one harness conflated two](175_stop_api_conflation.md) | ~100 k | 0.5 d | Low: harness bug that was found, fixed, and documented. |
+| **180** | [R7 — Flexible channel count for the test harness](180_r7_virtual_i2s_mux.md) | ~1 M | 2–3 w | Low: test harness must handle arbitrary channel counts (8 + 32 virtual I2S mux). |
+| **total** | 24 items (17 existing + 7 new) | ~7.5 M | 20–28 w | All priorities 010–180. |
 
 ## Done
 
@@ -143,4 +150,4 @@ non-goals in the whitepaper §3.2 and are not tracked separately.
   fewer steps than the current ramp, and the last steps then go out
   at speed. The coordinated fix is a decel tail after the last
   waypoint; handing each axis to the ramp generator leaves the chord.
-  See [090_end_path_decel.md](090_end_path_decel.md).
+  See [120_end_path_decel.md](120_end_path_decel.md).
