@@ -85,10 +85,7 @@ mkdir FastAccelStepper
 ln -s $ROOT/src FastAccelStepper
 ln -s $ROOT/CMakeLists.txt FastAccelStepper
 cd src
-for f in saleae_app.cpp saleae_app.h saleae_test.cpp saleae_test.h saleae_hal.h saleae_hal_espidf.cpp
-do
-	ln -s ../../../extras/tests/saleae_based/common/$f .
-done
+ln -s ../../../extras/tests/saleae_based/common/* .
 ln -s ../../../extras/tests/saleae_based/apps/espidf/saleae_main.cpp .
 ln -s ../../../extras/tests/saleae_based/apps/espidf/CMakeLists.txt CMakeLists.txt
 cd ../../..
@@ -113,10 +110,7 @@ ln -s ../../extras/ci/platformio.ini .
 mkdir FastAccelStepper
 ln -s $ROOT/src FastAccelStepper
 cd src
-for f in saleae_app.cpp saleae_app.h saleae_test.cpp saleae_test.h saleae_hal.h saleae_hal_arduino.cpp
-do
-	ln -s ../../../extras/tests/saleae_based/common/$f .
-done
+ln -s ../../../extras/tests/saleae_based/common/* .
 ln -s ../../../extras/tests/saleae_based/apps/arduino/src/saleae_main.ino .
 cd ../../..
 

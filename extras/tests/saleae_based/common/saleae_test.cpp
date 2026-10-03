@@ -25,6 +25,7 @@
 #include "saleae_str.h"
 
 #define SALEAE_PIN_COUNT 8
+#define PERIOD_MS 1000
 
 // 8 identification pins. On ESP32 these match the white paper §3.3 channel
 // map. On other targets use a contiguous, always-valid range that avoids the
@@ -33,7 +34,11 @@
 // PROGMEM because `const` is not free on AVR: the linker script copies
 // `.rodata` into SRAM to initialise it at reset, so a 22-byte lookup table is
 // 22 bytes of SRAM on a 328P and nothing on an ESP32. See saleae_str.h.
-#if defined(ARDUINO_ARCH_ESP32)
+//
+// Same order and same pins as SAL_CHAN_PINS in saleae_app.cpp, off the same
+// SALEAE_TARGET_ESP32 test, so a channel the self-test proves is the channel a
+// scenario measures.
+#if defined(SALEAE_TARGET_ESP32)
 static const int saleae_pins[SALEAE_PIN_COUNT] SAL_PROGMEM = {2,  0, 4,  16,
                                                               17, 5, 18, 19};
 #else
@@ -49,7 +54,18 @@ static const uint16_t saleae_high_ms[SALEAE_PIN_COUNT] SAL_PROGMEM = {
 #define PIN_OF(i) ((int)sal_pgm_read_word(&saleae_pins[i]))
 #define HIGH_MS_OF(i) ((uint16_t)sal_pgm_read_word(&saleae_high_ms[i]))
 
+// Phase anchor. `millis() % 1000` starts the pattern at whatever point of the
+// millisecond clock the SR00 command happened to land on, so the FIRST cycle is
+// a fragment -- a short high, then a long low -- and the evaluator, which
+// requires every width to be exactly the commanded one, reads the fragment as a
+// spurious edge. Measured on the ESP-IDF build: one ~9 ms width and one ~400 ms
+// width per channel where 50..400/600..950 ms were commanded. Anchoring the
+// phase to the start of the self-test makes every cycle whole, which is also
+// what makes the measured duty unbiased.
+static uint32_t phase0_ms = 0;
+
 void saleae_test_setup(void) {
+  phase0_ms = saleae_hal_millis();
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
     saleae_hal_pin_output(PIN_OF(i));
     saleae_hal_write(PIN_OF(i), 0);
@@ -63,7 +79,8 @@ void saleae_test_stop(void) {
 }
 
 void saleae_test_loop(void) {
-  uint16_t phase = (uint16_t)(saleae_hal_millis() % 1000);
+  uint16_t phase =
+      (uint16_t)((saleae_hal_millis() - phase0_ms) % PERIOD_MS);
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
     saleae_hal_write(PIN_OF(i), phase < HIGH_MS_OF(i) ? 1 : 0);
   }

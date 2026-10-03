@@ -22,8 +22,15 @@
 
 #define SALEAE_UART UART_NUM_0
 
+// No gpio_reset_pin(). The IDF driver logs every pin reset at INFO, and the
+// harness reconfigures all eight pins on every SR00 and every CONFIG. That log
+// traffic is not information and it is not free: the UART is installed with
+// tx_buffer_size 0, so uart_write_bytes() blocks its caller until a 115200-baud
+// line has drained, and the stall lands in the very loop that generates the
+// SR_00 pattern -- measured as a 25 ms stretch on one channel, which SR_00
+// reads as a spurious edge. Direction plus level is all these pins need;
+// nothing else drives them.
 extern "C" void saleae_hal_pin_output(int pin) {
-  gpio_reset_pin((gpio_num_t)pin);
   gpio_set_direction((gpio_num_t)pin, GPIO_MODE_OUTPUT);
 }
 
@@ -35,7 +42,22 @@ extern "C" uint32_t saleae_hal_millis(void) {
   return (uint32_t)(esp_timer_get_time() / 1000);
 }
 
+// pdMS_TO_TICKS(1) is 0 at FreeRTOS's 100 Hz, which is the IDF default on
+// ESP32, and vTaskDelay(0) only yields. The "1 ms" idle delay was therefore a
+// 100 %-CPU spin: harmless-looking, but SR_00's 1 Hz pattern then lands
+// wherever the scheduler happens to switch (measured 428 us / 455.9 ms widths
+// against a commanded 50/950 ms), and SR_00 is the wiring pre-check every other
+// test is gated on. Spin on esp_timer below one tick; sleep above it. The spin
+// only ever runs when the harness is idle or in SR_00 -- a scenario in flight
+// goes through qe_pump() instead -- so it does not perturb a measurement.
 extern "C" void saleae_hal_delay_ms(uint32_t ms) {
+  const uint32_t tick_ms = 1000U / configTICK_RATE_HZ;
+  if ((ms == 0) || ((tick_ms > 1) && (ms < tick_ms))) {
+    const int64_t until = esp_timer_get_time() + (int64_t)ms * 1000;
+    while (esp_timer_get_time() < until) {
+    }
+    return;
+  }
   vTaskDelay(pdMS_TO_TICKS(ms));
 }
 

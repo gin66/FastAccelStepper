@@ -349,8 +349,7 @@ def preflight(args, port, baud=115200):
     be asked is an error, never a fallback to the table: silently reverting to
     the belief is how the wrong number got believed in the first place.
     """
-    import serial
-    ser = serial.Serial(port, baud, timeout=1)
+    ser = run_tests.open_board(port, baud)
     try:
         present, mux_init = run_tests.read_drivers(ser)
         absent = sorted(d for d, ok in present.items() if not ok)

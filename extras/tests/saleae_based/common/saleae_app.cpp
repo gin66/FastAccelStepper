@@ -242,7 +242,7 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 // allocation on AVR (saleae_str.h); the constexpr mirror is only ever read by
 // the static_asserts, so the compiler emits nothing for it and it costs no
 // RAM at all.
-#if defined(ARDUINO_ARCH_ESP32)
+#if defined(SALEAE_TARGET_ESP32)
 #define SAL_CHAN_PINS {2, 0, 4, 16, 17, 5, 18, 19}
 #elif defined(ARDUINO_ARCH_AVR)
 // 8 and 12 are the dir pins: pin 9 and 10 are the Timer1 compare outputs
@@ -250,6 +250,11 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 // the LED. Anything left that is not a compare pin is fine for a plain output.
 #define SAL_CHAN_PINS {stepPinStepperA, 8, stepPinStepperB, 12, 0, 0, 0, 0}
 #else
+// Neither an ESP32 nor an AVR: a plain contiguous range that avoids the UART
+// pins. The ESP32 map above is chosen by SALEAE_TARGET_ESP32 rather than
+// ARDUINO_ARCH_ESP32 because it describes the wiring, which is the same for
+// every SDK variant -- and GPIO3 in this fallback is UART0's RX, which is what
+// a plain ESP-IDF build used to land on here (see saleae_hal.h).
 #define SAL_CHAN_PINS {2, 3, 4, 5, 6, 7, 8, 9}
 #endif
 

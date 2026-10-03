@@ -237,6 +237,12 @@ QUEUE_FILL_ROUNDS = 4
 # looked like a stop that had worked.
 SETUP_AFTER_CAPTURE_S = 0.3 + 0.25
 
+# How long the SR_00 1 Hz pattern runs before its capture starts, so the window
+# holds whole cycles only. One period plus a margin for the loop's granularity;
+# the pattern keeps running during the capture, so nothing is lost by starting
+# it early.
+SR00_SETTLE_S = 1.5
+
 
 # ---------------------------------------------------------------------------
 # Serial
@@ -2121,9 +2127,16 @@ def run_sr00(tag_key, args):
     rate = args.sr00_sample_rate
     ser = open_board(args.port, args.baud)
     try:
-        proc = start_capture(capture_file, args.seconds, rate)
-        time.sleep(0.3)
+        # Start the pattern BEFORE the capture, not during it. The evaluator
+        # requires every width to be exactly the commanded high or low time,
+        # and an interval that straddles the start of the capture window is a
+        # fragment of one: measured 402 us / 998.8 ms where 50 / 950 ms were
+        # commanded, reported as a spurious edge on a correctly wired channel.
+        # Letting the pattern reach steady state first keeps the check strict
+        # instead of teaching the evaluator to forgive the boundary.
         send_line(ser, "SR00")
+        time.sleep(SR00_SETTLE_S)
+        proc = start_capture(capture_file, args.seconds, rate)
         proc.wait()
         replies = drain(ser, 0.3)
     finally:

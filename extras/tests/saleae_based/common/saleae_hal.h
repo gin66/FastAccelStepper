@@ -11,6 +11,19 @@
 
 #include <stdint.h>
 
+// Is this an ESP32, whatever the SDK? The pin map is a property of the board and
+// the wiring, not of the framework, and the two files that carry it
+// (saleae_test.cpp's SR_00 pins, saleae_app.cpp's SAL_CHAN_PINS) must agree --
+// one is the identification pattern, the other is what the scenarios measure.
+// Testing for Arduino instead put the plain ESP-IDF builds on the generic table
+// {2, 3, 4, 5, ...}, whose GPIO3 is UART0's RX: the harness reconfigured its own
+// console pin as a stepper direction output (half a console, since TX is GPIO1),
+// and the analyzer, watching GPIO0, never saw the direction at all.
+#if defined(ARDUINO_ARCH_ESP32) || defined(ESP_PLATFORM) || \
+    defined(CONFIG_IDF_TARGET_ESP32)
+#define SALEAE_TARGET_ESP32 1
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
