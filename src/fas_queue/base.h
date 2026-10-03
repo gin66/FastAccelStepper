@@ -52,6 +52,14 @@ class StepperQueueBase {
     _last_pause_ticks = 0;
     _nr_of_pauses = 0;
   }
+  // Nothing is in flight, so every amount of pause time is already behind the
+  // next command. Without this a standstill reads as "no drain yet": the first
+  // command whose direction differs from the power-on queue_end got a full
+  // driver drain pause in front of it, and -- because that pause makes the
+  // queue non-empty -- lost the empty-queue path in addQueueEntry() that sets
+  // the dir pin directly, so the driver had to *toggle* it at encode time
+  // instead. _nr_of_pauses is left alone: only the ESP32 drain reads it.
+  inline void markPipelineDrained() { _last_pause_ticks = 65535; }
 #endif
 
   // ticks of the pause(s) injected for the current moveTimed() call
@@ -65,7 +73,7 @@ class StepperQueueBase {
     // intentionally slow speed to make missing initialization detectable
     max_speed_in_ticks = TICKS_PER_S / 1000;
 #if defined(SUPPORT_PAUSE_CMD_COUNTING)
-    clear_pause_stats();
+    markPipelineDrained();
 #endif
     _injected_pause_ticks = 0;
   }

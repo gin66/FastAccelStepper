@@ -20,9 +20,16 @@ struct rmt_fill_state {
 // RMT V2 fill encoder (F2 - read-ahead bound)
 //
 // Walks the queue and emits the low phase in pieces. Every RMT sub-entry
-// (including the step high) is capped at RMT_MAX_SYMBOL_TICKS, so any
-// PART_SIZE-symbol window spans at most 2*PART_SIZE*RMT_MAX_SYMBOL_TICKS =
-// RMT_MAX_INFLIGHT_TICKS (1 ms).
+// (including the step high) is capped at RMT_MAX_SYMBOL_TICKS and a symbol
+// holds two sub-entries, so one RMT half (PART_SIZE symbols) spans at most
+// RMT_BLOCK_TICKS and the whole buffer at most RMT_BUFFER_TICKS.
+//
+// A pause entry is consumed when it is *scheduled*: remaining_low_ticks is set
+// and read_idx advances in the same iteration, before a single one of its
+// symbols has been played. LL_TOGGLE_PIN therefore runs at encode time and a
+// pause only delays it by the share of the buffer the pause occupies. A pause
+// that fits in the buffer does not delay it at all, which is why the DIR drain
+// has to exceed RMT_BUFFER_TICKS.
 //
 // Only the low phase is carried in state; the capped high is emitted with the
 // step-start symbol and needs no state. Every sub-entry is >= 2 ticks
@@ -42,7 +49,8 @@ static void IRAM_ATTR emit_pair(uint32_t* out, bool first_high, uint16_t a,
 // Each symbol holds two low sub-entries in [2, RMT_MAX_SYMBOL_TICKS]. The
 // split is chosen so the remaining ticks are never 1..3, so every sub-entry
 // stays legal across calls.
-static uint32_t IRAM_ATTR emit_low_only(uint32_t* symbols, uint32_t symbols_free,
+static uint32_t IRAM_ATTR emit_low_only(uint32_t* symbols,
+                                        uint32_t symbols_free,
                                         uint16_t* remaining_inout) {
   const uint16_t cap = (uint16_t)RMT_MAX_SYMBOL_TICKS;
   uint32_t written = 0;
@@ -81,8 +89,8 @@ uint32_t IRAM_ATTR rmt_encode_fill(StepperQueue* q,
   while (free_sym > 0) {
     // 1) Drain low left over from the previous entry (or call).
     if (state->remaining_low_ticks > 0) {
-      uint32_t n =
-          emit_low_only(symbols + written, free_sym, &state->remaining_low_ticks);
+      uint32_t n = emit_low_only(symbols + written, free_sym,
+                                 &state->remaining_low_ticks);
       written += n;
       free_sym -= n;
       if (state->remaining_low_ticks > 0) {

@@ -18,9 +18,10 @@
 #endif
 
 // RMT V2 fill model constants (test fallback).
-// Cap every RMT sub-entry (including the step high) at
-// RMT_BLOCK_TICKS/PART_SIZE, so any PART_SIZE-symbol window spans at most
-// RMT_MAX_INFLIGHT_TICKS = 1 ms, well below the 20 ms planning window.
+// A symbol holds TWO sub-entries, so one RMT half (PART_SIZE symbols) spans at
+// most 2*PART_SIZE*RMT_MAX_SYMBOL_TICKS. The divisor is 2*PART_SIZE: with
+// PART_SIZE the half covered 2*RMT_BLOCK_TICKS, doubling the buffer and
+// shortening the direction-change drain below the buffer's playback content.
 #ifndef RMT_BLOCK_COUNT
 #define RMT_BLOCK_COUNT 2
 #endif
@@ -31,7 +32,14 @@
 #define RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT * RMT_BLOCK_TICKS)
 #endif
 #ifndef RMT_MAX_SYMBOL_TICKS
-#define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / PART_SIZE)
+#define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / (2 * PART_SIZE))
+#endif
+#ifndef RMT_BUFFER_TICKS
+#define RMT_BUFFER_TICKS (2 * PART_SIZE * 2 * RMT_MAX_SYMBOL_TICKS)
+// Pause the driver injects before a direction change. It must EXCEED
+// RMT_BUFFER_TICKS: the toggle runs at encode time, so a pause that fits
+// in the buffer delays it not at all. One RMT_BLOCK_TICKS of margin.
+#define RMT_DIR_DRAIN_TICKS (RMT_BUFFER_TICKS + RMT_BLOCK_TICKS)
 #endif
 
 #define TICKS_PER_S 16000000L

@@ -141,6 +141,16 @@ def row_for(scenario, path, info, chan_map=None):
 
 def note_of(detail):
     """The one line a reader needs, per scenario."""
+    if "dir_per_phase" in detail:
+        # SR_11/SR_12: say which way each phase actually went, not just how many
+        # steps it took. A count that adds up while the direction is wrong is the
+        # failure POS cannot see, and "FAIL" alone does not name it.
+        got = detail.get("dir_per_phase") or []
+        want = detail.get("expected_dir_per_phase") or []
+        per = detail.get("steps_per_phase") or []
+        return "dir " + "".join(str(d) for d in got) + \
+            " vs " + "".join(str(d) for d in want) + \
+            (f", steps {per}" if per else "")
     if "first_step_skew_us" in detail:
         return f"skew {detail['first_step_skew_us']} us (reported)"
     if "pause_us" in detail:

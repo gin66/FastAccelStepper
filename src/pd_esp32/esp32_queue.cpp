@@ -129,6 +129,12 @@ void StepperQueue::startQueue() {
 }
 
 void StepperQueue::forceStop() {
+#if defined(SUPPORT_PAUSE_CMD_COUNTING)
+  // every branch below leaves the queue empty with the driver's pipeline
+  // dropped (rmt_disable / i2s channel disabled / timer off), so the next
+  // direction change needs no drain
+  markPipelineDrained();
+#endif
 #if defined(SUPPORT_SELECT_DRIVER_TYPE) && defined(SUPPORT_ESP32_I2S)
   if (_driver_type == FasDriver::I2S_DIRECT ||
       _driver_type == FasDriver::I2S_MUX) {

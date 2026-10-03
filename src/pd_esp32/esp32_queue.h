@@ -248,9 +248,10 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //   RMT (idf4)    MIN_CMD_TICKS                       user dir_change_delay
 //                 (a pause fills one whole half,
 //                 so this is the drain half)
-//   RMT (idf5/6)  3*RMT_BLOCK_TICKS                   user dir_change_delay
-//                 (covers 2*PART_SIZE + min_chunk
-//                 symbols at RMT_MAX_SYMBOL_TICKS)
+//   RMT (idf5/6)  RMT_BUFFER_TICKS + RMT_BLOCK_TICKS  user dir_change_delay
+//                 must exceed the buffer's playback
+//                 content, because the toggle happens
+//                 at encode time
 //   I2S GPIO DIR  2*I2S_BLOCK_TICKS (old dir)         user dir_change_delay
 //                 both DMA blocks must be pause:
 //                 GPIO DIR is async at fill time
@@ -281,9 +282,9 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //   last step part -> pause part -> fill that toggles DIR.
 //
 //   IDF5/6 (F2) no longer fills fixed halves: rmt_encode_fill() emits
-//   variable-length symbols and the queue can be several commands deep, so
-//   the drain is sized in ticks (3*RMT_BLOCK_TICKS), covering the
-//   worst-case in-flight including the overflow buffer.
+//   variable-length symbols and the queue can be several commands deep. The
+//   toggle still happens at encode time, so the drain has to cover the buffer
+//   content rather than one command; see esp32_before_pause_ticks().
 //
 // The fill path must not insert pauses of its own: extra ticks would be
 // invisible to addQueueEntry()/moveTimed().
@@ -363,11 +364,17 @@ static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
 #if defined(SUPPORT_ESP32_RMT)
   if (esp32_driver_is_rmt(q)) {
 #if defined(SUPPORT_ESP32_RMT_V2)
-    // F2: tick-based drain covering the full worst-case in-flight,
-    // including the overflow buffer (min_chunk_size = PART_SIZE).
-    // Bound = (2*PART_SIZE + PART_SIZE) * RMT_MAX_SYMBOL_TICKS
-    //       = 3 * RMT_BLOCK_TICKS = 24000 ticks (1.5 ms).
-    return (uint16_t)(3 * RMT_BLOCK_TICKS);
+    // F2: the drain must exceed the RMT buffer's playback content, and that is
+    // the whole requirement. rmt_encode_fill() consumes a pause entry when it
+    // *schedules* it (remaining_low_ticks is set and read_idx advances at
+    // once), and LL_TOGGLE_PIN runs when the encoder reaches the next entry --
+    // both at encode time, while the buffer still holds earlier symbols. A
+    // pause therefore delays the toggle only by the share of the buffer it
+    // occupies; one that fits in the buffer delays it by nothing at all, and
+    // the toggle lands while the previous segment's steps are still stepping.
+    // RMT_DIR_DRAIN_TICKS is RMT_BUFFER_TICKS plus one block of margin;
+    // extras/tests/pc_based/test_30.cpp asserts that ordering.
+    return RMT_DIR_DRAIN_TICKS;
 #else
     return MIN_CMD_TICKS;
 #endif

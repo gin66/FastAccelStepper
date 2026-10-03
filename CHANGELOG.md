@@ -1,5 +1,6 @@
 pre-1.5.0:
 - getDirChangeBeforePauseCount() removed from API
+- esp32: Fix the RMT direction change on ESP-IDF 5/6 landing before the previous segment finished stepping: trailing steps of the old segment went out in the new direction, or the first segment of a move went out backwards
 
 1.4.0:
 - naxes: experimental timed trajectory (EXPERIMENTAL): header-only FasTimed, separate from FasNAxis. A waypoint is per-axis delta steps in [-128, 128] and one shared duration in [MIN_CMD_TICKS, 65535] ticks. One call is one rate; a rate the motors cannot reach is TimingNotAchievable

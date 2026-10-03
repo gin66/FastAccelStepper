@@ -1572,6 +1572,12 @@ def eval_direction_phases(channels, rate, segments, info, pins):
     count being exactly what was asked for. Both are asserted with no
     tolerance: a phase that steps the wrong number of times, or a dir pin that
     does not reach its commanded level, is a defect rather than a statistic.
+
+    The direction is checked per phase and not only at the end of the capture.
+    A final level plus a phase split constrains the counts but not the
+    directions: a toggle that lands inside a phase leaves every count correct
+    while the steps of that phase went out backwards, which is the failure a
+    DIR drain that is shorter than the driver's read-ahead produces.
     """
     step = pins.step_wave(channels, "A")
     dir_ch = pins.dir_wave(channels, "A")
@@ -1596,6 +1602,28 @@ def eval_direction_phases(channels, rate, segments, info, pins):
 
     want_phases = sum(1 for n, _, _ in segments if n > 0)
 
+    # Which direction each phase actually ran at. The phase split above already
+    # forces the step *counts* to line up, but a phase can have the right count
+    # and the wrong direction -- and POS cannot see that at all, because the
+    # queue counts what it was told to do, not what the pin emitted. A driver
+    # that toggles DIR while encoding rather than while playing lands here: the
+    # edge moves into the middle of a phase, the counts still add up, and the
+    # steps went out backwards.
+    want_dirs = [1 if d else 0 for n, _, d in segments if n > 0]
+    got_dirs = []
+    dir_stable = True
+    for i in range(len(bounds) + 1):
+        start = 0 if i == 0 else bounds[i - 1]
+        end = bounds[i] if i < len(bounds) else len(step)
+        rs = [r for r in rises if start <= r < end]
+        if not rs:
+            continue
+        levels = sorted({int(dir_ch[r]) for r in rs})
+        if len(levels) != 1:
+            dir_stable = False
+        got_dirs.append(levels[0])
+    dir_per_phase_ok = dir_stable and got_dirs == want_dirs
+
     # The dir level at the end has to match the last commanded direction.
     final_dir = dir_ch[-1]
     want_final = 1 if segments[-1][2] else 0
@@ -1609,13 +1637,16 @@ def eval_direction_phases(channels, rate, segments, info, pins):
     want_counts = [n for n, _, _ in segments if n > 0]
     per_phase_ok = bool(phases) and phases == want_counts
 
-    return counts["ok"] and per_phase_ok and dir_ok, {
+    return (counts["ok"] and per_phase_ok and dir_ok and dir_per_phase_ok), {
         "steps": counts,
         "phases": len(phases),
         "phases_expected": want_phases,
         "steps_per_phase": phases,
         "expected_steps": [n for n, _, _ in segments],
         "dir_edges": len(edges),
+        "dir_per_phase": got_dirs,
+        "expected_dir_per_phase": want_dirs,
+        "dir_stable_within_phase": dir_stable,
         "final_dir": int(final_dir),
         "expected_final_dir": want_final,
     }

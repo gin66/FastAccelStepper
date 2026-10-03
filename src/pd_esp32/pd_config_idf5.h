@@ -170,13 +170,24 @@
 #define PART_SIZE (RMT_SIZE >> 1)
 
 // RMT V2 fill model: cap every RMT sub-entry (including the step high) at
-// RMT_MAX_SYMBOL_TICKS. Then any symbol is at most 2*RMT_MAX_SYMBOL_TICKS and
-// any PART_SIZE-symbol window is at most RMT_MAX_INFLIGHT_TICKS (= 2 *
-// RMT_BLOCK_TICKS = 1 ms), well below the 20 ms forward planning window.
+// RMT_MAX_SYMBOL_TICKS. A symbol holds TWO sub-entries, so one symbol spans at
+// most 2*RMT_MAX_SYMBOL_TICKS and one RMT half (PART_SIZE symbols) at most
+// 2*PART_SIZE*RMT_MAX_SYMBOL_TICKS. The divisor is 2*PART_SIZE, not PART_SIZE:
+// with PART_SIZE the half covered 2*RMT_BLOCK_TICKS instead of one, which
+// doubled the whole buffer and left the direction-change drain (sized from the
+// buffer) too short to do its job.
 #define RMT_BLOCK_COUNT 2
 #define RMT_BLOCK_TICKS 8000
 #define RMT_MAX_INFLIGHT_TICKS (RMT_BLOCK_COUNT * RMT_BLOCK_TICKS)
-#define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / PART_SIZE)
+// One RMT half holds at most RMT_BLOCK_TICKS, so the buffer's playback content
+// is RMT_BUFFER_TICKS. This is what a pause must exceed to keep a direction
+// change behind the pipeline: see esp32_before_pause_ticks().
+#define RMT_MAX_SYMBOL_TICKS (RMT_BLOCK_TICKS / (2 * PART_SIZE))
+#define RMT_BUFFER_TICKS (2 * PART_SIZE * 2 * RMT_MAX_SYMBOL_TICKS)
+// Pause the driver injects before a direction change. It must EXCEED
+// RMT_BUFFER_TICKS: the toggle runs at encode time, so a pause that fits
+// in the buffer delays it not at all. One RMT_BLOCK_TICKS of margin.
+#define RMT_DIR_DRAIN_TICKS (RMT_BUFFER_TICKS + RMT_BLOCK_TICKS)
 #endif
 
 #if (ESP_IDF_VERSION_MINOR >= 5) && defined(SUPPORT_ESP32_PULSE_COUNTER)

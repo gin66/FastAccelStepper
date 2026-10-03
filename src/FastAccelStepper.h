@@ -498,14 +498,14 @@ class FastAccelStepper {
   //     periods, which the fill routine limits).
   //   - ESP32 RMT (IDF5/6): rmt_encode_fill() caps every RMT sub-entry (the
   //     step high and every low chunk) at RMT_MAX_SYMBOL_TICKS
-  //     (= RMT_BLOCK_TICKS/PART_SIZE). A symbol is therefore at most
-  //     2*RMT_MAX_SYMBOL_TICKS and one RMT half (PART_SIZE symbols) spans at
-  //     most 2*PART_SIZE*RMT_MAX_SYMBOL_TICKS = 2*RMT_BLOCK_TICKS =
-  //     16000 ticks = 1 ms. Including the driver's overflow buffer
-  //     (min_chunk_size = PART_SIZE) the worst-case in-flight is
-  //     (2*PART_SIZE + min_chunk_size)*RMT_MAX_SYMBOL_TICKS =
-  //     3*RMT_BLOCK_TICKS = 24000 ticks = 1.5 ms. The direction-change drain
-  //     uses the same 3*RMT_BLOCK_TICKS. See
+  //     (= RMT_BLOCK_TICKS/(2*PART_SIZE)). A symbol holds TWO sub-entries, so a
+  //     symbol is at most 2*RMT_MAX_SYMBOL_TICKS and one RMT half
+  //     (PART_SIZE symbols) spans at most RMT_BLOCK_TICKS = 8000 ticks =
+  //     0.5 ms. The channel's mem_block_symbols = 2*PART_SIZE buffer therefore
+  //     holds at most RMT_BUFFER_TICKS = 16000 ticks = 1 ms, and that is the
+  //     driver's in-flight. The direction-change drain must exceed it, because
+  //     the DIR toggle is executed while encoding, not while playing: see
+  //     esp32_before_pause_ticks(). See
   //     extras/doc/implemented/040_idf6_rmt_slow.md.
   //
   // Attention:
