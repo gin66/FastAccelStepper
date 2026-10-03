@@ -238,17 +238,25 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 // AQE_DIR_CHANGE_PAUSE_INJECTED; the caller retries until the recorded pause
 // state (SUPPORT_PAUSE_CMD_COUNTING) satisfies the driver's requirement.
 //
-//   driver        drain pauses before dir change     dir change/delay pause
-//   RMT (idf4)    1 x MIN_CMD_TICKS                  user dir_change_delay
-//   RMT (idf5/6)  1 x 3*RMT_BLOCK_TICKS (ticks,       user dir_change_delay
-//                 covers 2*PART_SIZE + min_chunk
+// The drain is expressed in ticks only. Every driver needs one pause of at
+// least the listed length, so a count carries no information the ticks do not:
+// `_last_pause_ticks` is cleared by every command with steps or a DIR change
+// and can only reach the requirement through an injected pause, whose length is
+// the requirement itself.
+//
+//   driver        drain pause before dir change      dir change/delay pause
+//   RMT (idf4)    MIN_CMD_TICKS                       user dir_change_delay
+//                 (a pause fills one whole half,
+//                 so this is the drain half)
+//   RMT (idf5/6)  3*RMT_BLOCK_TICKS                   user dir_change_delay
+//                 (covers 2*PART_SIZE + min_chunk
 //                 symbols at RMT_MAX_SYMBOL_TICKS)
-//   I2S GPIO DIR  1 x 2*I2S_BLOCK_TICKS (old dir)    user dir_change_delay
+//   I2S GPIO DIR  2*I2S_BLOCK_TICKS (old dir)         user dir_change_delay
 //                 both DMA blocks must be pause:
 //                 GPIO DIR is async at fill time
-//   I2S mux DIR   none                               max(I2S_BLOCK_TICKS,
-//                 (mask applies to the next block)   user dir_change_delay)
-//   MCPWM/PCNT    1 x MIN_CMD_TICKS                  user dir_change_delay
+//   I2S mux DIR   none                                max(I2S_BLOCK_TICKS,
+//                 (mask applies to the next block)    user dir_change_delay)
+//   MCPWM/PCNT    MIN_CMD_TICKS                       user dir_change_delay
 //                 apply_command() (and DIR toggle)
 //                 runs at TEA of the previous command,
 //                 when STEP has just gone high and
@@ -263,22 +271,19 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 //                 would otherwise emit a step at the
 //                 first TEA of a leading pause.
 //
-// IDF4 RMT pause count is not a guess: it is the number of PART_SIZE
-// halves the hardware fills ahead of the wire. Each queue pause occupies
-// exactly one half, so N pauses put a pause in the other half when the
-// toggle command is filled — the same slot the 1.2.7 fill-time inject used.
+// IDF4 RMT needs no tick arithmetic: a queue pause occupies exactly one half,
+// so the drain half is what puts a pause in the half the DIR toggle is filled
+// into — the same slot the 1.2.7 fill-time inject used.
 //
 //   IDF4 ping-pongs one half per interrupt (and startQueue's double-fill
 //   puts the drain in part 2, so the first ISR fill is the toggle while
 //   that drain plays). One pause is therefore the same as one inject:
 //   last step part -> pause part -> fill that toggles DIR.
-//   A second pause shifts the toggle one half later, so DIR no longer
-//   sits on the pause that immediately follows the last steps.
 //
 //   IDF5/6 (F2) no longer fills fixed halves: rmt_encode_fill() emits
 //   variable-length symbols and the queue can be several commands deep, so
-//   the drain is expressed in ticks (3*RMT_BLOCK_TICKS), covering the
-//   worst-case in-flight including the overflow buffer, not in pause count.
+//   the drain is sized in ticks (3*RMT_BLOCK_TICKS), covering the
+//   worst-case in-flight including the overflow buffer.
 //
 // The fill path must not insert pauses of its own: extra ticks would be
 // invisible to addQueueEntry()/moveTimed().
@@ -288,14 +293,12 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 // processing that entry and then idles, so the user requested
 // dir_change_delay_ticks is honored as part of the direction change.
 //
-// needed_pauses is RMT-only (each pause occupies one RMT half). I2S uses
-// needed_pause_ticks: GPIO DIR needs 2*I2S_BLOCK_TICKS before the change
-// (in-flight block and the block being filled must contain no steps). Mux-slot
-// DIR (PIN_I2S_FLAG) updates _mux_state for the next block, so the after-pause
-// is I2S_BLOCK_TICKS and there is no extra before-pause. MCPWM uses
-// needed_pause_ticks = MIN_CMD_TICKS: pause TEA at compare=1 applies the
-// following command (DIR) at the start of that pause, after STEP has gone
-// low at TEP of the last step.
+// I2S GPIO DIR needs 2*I2S_BLOCK_TICKS before the change (in-flight block and
+// the block being filled must contain no steps). Mux-slot DIR (PIN_I2S_FLAG)
+// updates _mux_state for the next block, so the after-pause is I2S_BLOCK_TICKS
+// and there is no extra before-pause. MCPWM uses MIN_CMD_TICKS: pause TEA at
+// compare=1 applies the following command (DIR) at the start of that pause,
+// after STEP has gone low at TEP of the last step.
 static inline bool esp32_driver_is_rmt(const StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
 #if defined(SUPPORT_ESP32_RMT)
@@ -337,19 +340,6 @@ static inline bool esp32_driver_is_i2s(const StepperQueue* q) {
 #else
   return false;
 #endif
-}
-
-static inline uint8_t esp32_before_pause_count(const StepperQueue* q) {
-  if (esp32_driver_is_rmt(q)) {
-#if defined(SUPPORT_ESP32_RMT_V2)
-    // F2: tick-based drain (count 0).  The tick value below covers the
-    // full worst-case in-flight, including the overflow buffer.
-    return 0;
-#else
-    return 1;
-#endif
-  }
-  return 0;
 }
 
 static inline bool esp32_i2s_dir_is_mux_slot(const StepperQueue* q) {
@@ -422,10 +412,8 @@ static inline AqeResultCode esp32_enqueue_pause(StepperQueue* q,
 inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
     const struct stepper_command_s* cmd, bool start,
     uint16_t dir_change_delay_ticks) {
-  uint8_t needed_pauses = esp32_before_pause_count(this);
   uint16_t needed_pause_ticks = esp32_before_pause_ticks(this);
-  if ((_nr_of_pauses < needed_pauses) ||
-      (_last_pause_ticks < needed_pause_ticks)) {
+  if (_last_pause_ticks < needed_pause_ticks) {
     AqeResultCode res = esp32_enqueue_pause(this, needed_pause_ticks, start,
                                             queue_end.count_up);
     if (res != AQE_OK) {

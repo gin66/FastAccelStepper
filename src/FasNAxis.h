@@ -83,9 +83,8 @@ struct AxisLimits {
   uint32_t P_stop = 0;
   uint32_t accel = 0;  // steps/s^2, read from the stepper at addAxis
   // DIR pause budget (whitepaper section 4.4), read from the stepper:
-  // n_before entries of dir_before ticks (old DIR), then dir_after (new DIR).
+  // one dir_before pause (old DIR), then dir_after (new DIR).
   uint16_t dir_before = 0;
-  uint8_t dir_n_before = 0;
   uint16_t dir_after = 0;
 };
 
@@ -110,7 +109,6 @@ class FasNAxis {
       _lim[i].P_stop = 0;
       _lim[i].accel = 0;
       _lim[i].dir_before = 0;
-      _lim[i].dir_n_before = 0;
       _lim[i].dir_after = 0;
       _tick_cfg[i] = 0;
       _p[i] = 0;
@@ -123,7 +121,6 @@ class FasNAxis {
       _carve_axis[i].active = false;
       _carve_axis[i].phase = 0;
       _carve_axis[i].step_left = 0;
-      _carve_axis[i].n_before = 0;
       _carve_axis[i].before = 0;
       _carve_axis[i].after = 0;
       _carve_axis[i].old_up = true;
@@ -522,32 +519,23 @@ class FasNAxis {
   // config override is applied at use time in reverse_budget(), not here.
   void read_dir_budget(uint8_t i) {
     _lim[i].dir_before = _s[i]->getDirChangeBeforeTicks();
-    _lim[i].dir_n_before = _s[i]->getDirChangeBeforePauseCount();
     _lim[i].dir_after = _s[i]->getDirChangeAfterTicks();
   }
 
   // Resolve the reverse budget for axis i: config override when non-zero, else
-  // the stepper getter. n_before defaults to 1 when the config supplies a
-  // before period but the getter count is 0.
-  void reverse_budget(uint8_t i, uint16_t* before, uint8_t* n_before,
-                      uint16_t* after) const {
-    if (_cfg.dir_before_ticks != 0) {
-      *before = _cfg.dir_before_ticks;
-      *n_before = _lim[i].dir_n_before != 0 ? _lim[i].dir_n_before : 1;
-    } else {
-      *before = _lim[i].dir_before;
-      *n_before = _lim[i].dir_n_before;
-    }
+  // the stepper getter.
+  void reverse_budget(uint8_t i, uint16_t* before, uint16_t* after) const {
+    *before =
+        _cfg.dir_before_ticks != 0 ? _cfg.dir_before_ticks : _lim[i].dir_before;
     *after =
         _cfg.dir_after_ticks != 0 ? _cfg.dir_after_ticks : _lim[i].dir_after;
   }
 
   uint32_t reverse_tau(uint8_t i) const {
     uint16_t before = 0;
-    uint8_t n = 0;
     uint16_t after = 0;
-    reverse_budget(i, &before, &n, &after);
-    return (uint32_t)n * before + (uint32_t)after;
+    reverse_budget(i, &before, &after);
+    return (uint32_t)before + (uint32_t)after;
   }
 
   // Axis i reverses between block b and the next buffered block.
@@ -563,13 +551,12 @@ class FasNAxis {
     return (cur > 0) != (nxt > 0);
   }
 
-  // One axis's pending DIR carve: a shortened last step (old DIR) plus n_before
-  // before-pauses (old DIR) plus one after-pause (new DIR), tick sum unchanged.
+  // One axis's pending DIR carve: a shortened last step (old DIR) plus the
+  // before-pause (old DIR) plus one after-pause (new DIR), tick sum unchanged.
   struct Carve {
     bool active;
-    uint8_t phase;       // 0 shortened step, 1 before-pauses, 2 after-pause
+    uint8_t phase;       // 0 shortened step, 1 before-pause, 2 after-pause
     uint32_t step_left;  // remaining wait of the shortened step
-    uint8_t n_before;    // remaining before-pauses
     uint16_t before;
     uint16_t after;
     bool old_up;
@@ -592,10 +579,9 @@ class FasNAxis {
   // shortening a step). Section 4.4.2.
   void start_carve(uint8_t i, uint32_t T, bool new_up) {
     uint16_t before = 0;
-    uint8_t n_before = 0;
     uint16_t after = 0;
-    reverse_budget(i, &before, &n_before, &after);
-    uint32_t tau = (uint32_t)n_before * before + (uint32_t)after;
+    reverse_budget(i, &before, &after);
+    uint32_t tau = (uint32_t)before + (uint32_t)after;
     if (tau == 0) {
       return;
     }
@@ -603,7 +589,6 @@ class FasNAxis {
     c.active = true;
     c.phase = 0;
     c.step_left = T;
-    c.n_before = n_before;
     c.before = before;
     c.after = after;
     c.old_up = _dir[i];
@@ -644,9 +629,9 @@ class FasNAxis {
       return;
     }
     if (c.phase == 1) {
-      if (c.n_before > 0) {
+      if (c.before > 0) {
         hold(i, c.before, 0, c.old_up);
-        c.n_before--;
+        c.before = 0;
         *held = true;
         return;
       }

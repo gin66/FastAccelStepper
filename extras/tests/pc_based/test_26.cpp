@@ -3413,13 +3413,12 @@ struct RevTrace {
 
 // Run a Linear out-and-back on X with the given DIR budget; record the raw
 // command streams and the per-iteration XY/clock samples.
-static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
-                         uint32_t accel, int32_t move, uint32_t qlen,
-                         RevTrace* tr) {
+static void run_reversal(uint32_t before, uint32_t after, uint32_t accel,
+                         int32_t move, uint32_t qlen, RevTrace* tr) {
   SimPort px(4000, qlen), py(4000, qlen);
   px.setAcceleration(accel);
   py.setAcceleration(accel);
-  px.setDirChangeBudget((uint16_t)before, n_before, (uint16_t)after);
+  px.setDirChangeBudget((uint16_t)before, (uint16_t)after);
   FasNAxisConfig cfg;
   FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
   path.addAxis(0, &px);
@@ -3478,12 +3477,12 @@ static void run_reversal(uint32_t before, uint8_t n_before, uint32_t after,
 // DIR budget on the reversing X. X is the binder and carves its own last step;
 // the continuing Y keeps the steps already planned across those ticks (it is
 // not given a pauses=0 command by the budget).
-static void run_overshoot_rev(uint32_t before, uint8_t n_before, uint32_t after,
-                              uint32_t accel, int32_t leg, RevTrace* tr) {
+static void run_overshoot_rev(uint32_t before, uint32_t after, uint32_t accel,
+                              int32_t leg, RevTrace* tr) {
   SimPort px(4000, 64), py(4000, 64);
   px.setAcceleration(accel);
   py.setAcceleration(accel);
-  px.setDirChangeBudget((uint16_t)before, n_before, (uint16_t)after);
+  px.setDirChangeBudget((uint16_t)before, (uint16_t)after);
   FasNAxisConfig cfg;
   cfg.mode = FasNAxisConfig::Overshoot;
   cfg.overshoot_max = 8;
@@ -3569,12 +3568,12 @@ void f9_dir_pauses() {
   const uint16_t after = 3200;
   RampMap map(ticks_cfg, accel);
   const uint32_t T_min = map.calculate_ticks(1);
-  const uint32_t tau = (uint32_t)before + after;  // n_before = 1
+  const uint32_t tau = (uint32_t)before + after;
 
   // --- F12: the carve, Y gains no pause, clock equals the zero-budget run ---
   {
     static RevTrace tr;
-    run_reversal(before, 1, after, accel, move, 64, &tr);
+    run_reversal(before, after, accel, move, 64, &tr);
     test(!tr.error, "F12 run does not error");
     test(tr.pxe == 0 && tr.pye == 0, "F12 F12 both axes end on target");
 
@@ -3604,7 +3603,7 @@ void f9_dir_pauses() {
 
     // Y gains no DIR pause: its trace is identical to a zero-budget run.
     static RevTrace tr0;
-    run_reversal(0, 0, 0, accel, move, 64, &tr0);
+    run_reversal(0, 0, accel, move, 64, &tr0);
     bool y_same = (tr.ny == tr0.ny);
     if (y_same) {
       for (int j = 0; j < tr.ny; j++) {
@@ -3721,9 +3720,9 @@ void f9_dir_pauses() {
     const int32_t leg = 400;
     const uint32_t tau = (uint32_t)before + (uint32_t)after;
     static RevTrace tr0;
-    run_overshoot_rev(0, 0, 0, accel, leg, &tr0);
+    run_overshoot_rev(0, 0, accel, leg, &tr0);
     static RevTrace tr;
-    run_overshoot_rev(before, 1, after, accel, leg, &tr);
+    run_overshoot_rev(before, after, accel, leg, &tr);
     test(!tr.error, "F12b overshoot dog-leg does not error");
     test(tr.pxe == 0 && tr.pye == 2 * leg, "F12b both axes end on target");
     int k = last_old_step(&tr);
@@ -3765,7 +3764,7 @@ void f9_dir_pauses() {
     const uint16_t big_before = 50000;
     const uint16_t big_after = 0;
     static RevTrace tr;
-    run_reversal(big_before, 1, big_after, accel, move, 64, &tr);
+    run_reversal(big_before, big_after, accel, move, 64, &tr);
     test(!tr.error, "F12 long pause run does not error");
     test(tr.pxe == 0 && tr.pye == 0, "F12 long pause both axes end on target");
     int k = last_old_step(&tr);

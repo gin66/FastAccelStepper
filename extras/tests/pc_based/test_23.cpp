@@ -232,25 +232,22 @@ static void test_dir_change_before_after_getters() {
   engine.init();
   FastAccelStepper* s = engine.stepperConnectToPin(0);
   assert(s != NULL);
-  test_result("before/after 0 without dir pin",
-              s->getDirChangeBeforeTicks() == 0 &&
-                  s->getDirChangeBeforePauseCount() == 0 &&
-                  s->getDirChangeAfterTicks() == 0);
+  test_result(
+      "before/after 0 without dir pin",
+      s->getDirChangeBeforeTicks() == 0 && s->getDirChangeAfterTicks() == 0);
 
   s->setDirectionPin(5, true, 0);
   fas_queue[0]._before_dir_change_delay_ticks = 0;
   fas_queue[0]._after_dir_change_delay_ticks = 0;
-  test_result("before/after 0 with dir pin delay 0",
-              s->getDirChangeBeforeTicks() == 0 &&
-                  s->getDirChangeBeforePauseCount() == 0 &&
-                  s->getDirChangeAfterTicks() == 0);
+  test_result(
+      "before/after 0 with dir pin delay 0",
+      s->getDirChangeBeforeTicks() == 0 && s->getDirChangeAfterTicks() == 0);
 
   uint16_t before = US_TO_TICKS(500);
   fas_queue[0]._before_dir_change_delay_ticks = before;
-  test_result("before ticks from driver",
-              s->getDirChangeBeforeTicks() ==
-                      fas_max(before, (uint16_t)MIN_CMD_TICKS) &&
-                  s->getDirChangeBeforePauseCount() == 1);
+  test_result(
+      "before ticks from driver",
+      s->getDirChangeBeforeTicks() == fas_max(before, (uint16_t)MIN_CMD_TICKS));
 
   s->setDirectionPin(5, true, 1000);
   uint16_t user_after = US_TO_TICKS(1000);

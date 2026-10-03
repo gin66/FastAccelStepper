@@ -287,17 +287,12 @@ so leftover utea=2 cannot pulse during a leading pause.
   uint8_t getDirectionPin() const { return _dirPin; }
   bool directionPinHighCountsUp() const { return _dirHighCountsUp; }
 ```
-Ticks of each pause to issue *before* a direction change (old DIR),
-for pipeline drain (RMT/I2S/MCPWM). 0 means none. Issue
-`getDirChangeBeforePauseCount()` such pauses. Coordinated n-axis
-planners should emit these on every axis, not wait for inject.
+Ticks of the pause to issue *before* a direction change (old DIR),
+for pipeline drain (RMT/I2S/MCPWM). 0 means none, so it is also the
+pause count: one pause of this length, or none. Coordinated n-axis
+planners should emit it on every axis, not wait for inject.
 ```cpp
   uint16_t getDirChangeBeforeTicks() const;
-```
-How many before-pauses the driver needs (ESP32 RMT idf5/6: 2;
-otherwise 0 or 1). 0 if `getDirChangeBeforeTicks()` is 0.
-```cpp
-  uint8_t getDirChangeBeforePauseCount() const;
 ```
 Ticks of the pause that carries the new DIR: max of the user
 `dir_change_delay_us` from `setDirectionPin()` and the driver's

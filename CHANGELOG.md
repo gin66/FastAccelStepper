@@ -1,3 +1,6 @@
+pre-1.5.0:
+- getDirChangeBeforePauseCount() removed from API
+
 1.4.0:
 - naxes: experimental timed trajectory (EXPERIMENTAL): header-only FasTimed, separate from FasNAxis. A waypoint is per-axis delta steps in [-128, 128] and one shared duration in [MIN_CMD_TICKS, 65535] ticks. One call is one rate; a rate the motors cannot reach is TimingNotAchievable
 - naxes: experimental multi-axis planner (EXPERIMENTAL): header-only FasNAxis driving N time-synchronized FastAccelStepper queues from one polyline, Linear/Overshoot lookahead with no float/int division in the hot path, dwells, and external stop-cause hook with planner abort

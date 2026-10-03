@@ -264,19 +264,6 @@ uint16_t FastAccelStepper::getDirChangeBeforeTicks() const {
   return fas_max(t, (uint16_t)MIN_CMD_TICKS);
 }
 
-uint8_t FastAccelStepper::getDirChangeBeforePauseCount() const {
-  if (getDirChangeBeforeTicks() == 0) {
-    return 0;
-  }
-#if defined(SUPPORT_ESP32)
-  uint8_t n = esp32_before_pause_count(_queue());
-  if (n != 0) {
-    return n;
-  }
-#endif
-  return 1;
-}
-
 uint16_t FastAccelStepper::getDirChangeAfterTicks() const {
   if (_dirPin == PIN_UNDEFINED) {
     return 0;

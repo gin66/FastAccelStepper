@@ -49,7 +49,6 @@ class SimPort {
         inject_ticks_(8000),
         ramp_generator_active_(false),
         dir_before_ticks_(0),
-        dir_before_count_(0),
         dir_after_ticks_(0),
         force_extra_before_(0),
         stop_cause_(StepperStopCause::None) {
@@ -88,13 +87,11 @@ class SimPort {
   // the before/after pauses. FasNAxis reads these through the same names the
   // real FastAccelStepper exposes, so the planner carves the carved shape on
   // the reversing axis only. Default 0 = no pause (the current behaviour).
-  void setDirChangeBudget(uint16_t before, uint8_t n_before, uint16_t after) {
+  void setDirChangeBudget(uint16_t before, uint16_t after) {
     dir_before_ticks_ = before;
-    dir_before_count_ = n_before;
     dir_after_ticks_ = after;
   }
   uint16_t getDirChangeBeforeTicks() const { return dir_before_ticks_; }
-  uint8_t getDirChangeBeforePauseCount() const { return dir_before_count_; }
   uint16_t getDirChangeAfterTicks() const { return dir_after_ticks_; }
 
   // One-shot "the driver injects one more before-pause the plan did not
@@ -359,7 +356,6 @@ class SimPort {
   bool after_done_;
   AqeResultCode fail_rc_;
   uint16_t dir_before_ticks_;
-  uint8_t dir_before_count_;
   uint16_t dir_after_ticks_;
   uint16_t force_extra_before_;
   StepperStopCause stop_cause_;

@@ -487,10 +487,9 @@ The gap is the driver’s pause budget, read at `addAxis` /
 `setLimitsFromSteppers()`:
 
 ```
-τ_before = s->getDirChangeBeforeTicks()       // 0 = none
-n_before = s->getDirChangeBeforePauseCount()  // RMT idf5/6: 2
-τ_after  = s->getDirChangeAfterTicks()        // user delay + driver after
-τ        = n_before * τ_before + τ_after
+τ_before = s->getDirChangeBeforeTicks()  // 0 = none; one pause of this length
+τ_after  = s->getDirChangeAfterTicks()   // user delay + driver after
+τ        = τ_before + τ_after
 ```
 
 `FasNAxisConfig::dir_before_ticks` / `dir_after_ticks` override
@@ -499,7 +498,7 @@ is a plain `count_up` flip.
 
 | Pause | `count_up` | Role |
 |-------|------------|------|
-| **Before** | old DIR | `n_before` entries of `τ_before`. Drain the output pipeline so no old-DIR step is still in flight (RMT/I2S/MCPWM). |
+| **Before** | old DIR | One `τ_before` pause. Drain the output pipeline so no old-DIR step is still in flight (RMT/I2S/MCPWM). |
 | **After** | new DIR | The command that toggles the pin, plus the user `dir_change_delay`. |
 
 Typical drivers (from `pd_esp32/esp32_queue.h`):
@@ -507,9 +506,9 @@ Typical drivers (from `pd_esp32/esp32_queue.h`):
 | Driver | before | after (plus user delay) |
 |--------|--------|-------------------------|
 | AVR / Pico / SAM, delay 0 | 0 | 0 (toggle on the next step command) |
-| RMT idf4 / MCPWM | 1 × `MIN_CMD_TICKS` | user delay |
-| RMT idf5/6 | 2 × `MIN_CMD_TICKS` | user delay |
-| I2S GPIO DIR | 2 × `I2S_BLOCK_TICKS` | user delay |
+| RMT idf4 / MCPWM | `MIN_CMD_TICKS` | user delay |
+| RMT idf5/6 | `3 × RMT_BLOCK_TICKS` | user delay |
+| I2S GPIO DIR | `2 × I2S_BLOCK_TICKS` | user delay |
 | I2S mux DIR | 0 | `max(I2S_BLOCK_TICKS, user delay)` |
 | External DIR pin | drain until no steps | 2 ms (`US_TO_TICKS(2000)`) |
 
@@ -1587,7 +1586,7 @@ Rules:
 - No virtual `AxisPort`. The stepper type is a template parameter
   with duck typing (`addQueueEntry`, `isQueueEmpty`, `queueEntries`,
   `getSpeedInTicks` / `getAcceleration` / `getMaxSpeedInTicks` /
-  `getDirChangeBeforeTicks` / `getDirChangeBeforePauseCount` /
+  `getDirChangeBeforeTicks` /
   `getDirChangeAfterTicks` / `isRampGeneratorActive` / `isRunning`).
   Production default is `FastAccelStepper`.
 - No `new` / `malloc`. Lookahead and slice state are member arrays
@@ -2219,8 +2218,8 @@ paper refuses to paper over.
    interrupt-off section. FasNAxis documents the inherited skew
    (one `addQueueEntry(NULL, true)` call per axis).
 3. **Buffered ESP32 drivers inject a drain pause** when the
-   queued shape does not cover `getDirChangeBeforePauseCount()`
-   / `getDirChangeBeforeTicks()` / `getDirChangeAfterTicks()`.
+   queued shape does not cover `getDirChangeBeforeTicks()`
+   / `getDirChangeAfterTicks()`.
    FasNAxis pre-carves that shape from the last step (§4.4).
    An inject that still happens is `PumpStatus::Error`. The PC
    sim exposes the budget and a one-shot extra inject; it does
