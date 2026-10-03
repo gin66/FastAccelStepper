@@ -1,4 +1,4 @@
-# 180 R7 — Virtual I2S Mux: 40-Channel Test Harness Extension
+# 180 R7 — Virtual I2S Mux: 37-Channel Test Harness Extension
 
 > This document is the design reference: what is built, how it works, and why.
 > It deliberately carries no task list and no status. Progress and the
@@ -10,10 +10,10 @@
 > The commands this harness generates are **not intended to drive a motor**.
 > They are synthetic probe patterns chosen to make the waveform measurable.
 > The fast scenarios command **25–40 kHz step rates reached instantly from
-> standstill**, with a pulse high time of about **1 µs**. At 1.8° full step
-> that is roughly **7,500–9,400 rpm**, which no stepper can follow from rest
-> without acceleration. A real motor would stall, lose steps, and sit drawing
-> near-standstill current through the driver while the harness ran.
+> standstill**, with a mux pulse high time of **4 µs** (one I2S frame). At
+> 1.8° full step that is **7,500–12,000 rpm**, which no stepper can follow
+> from rest without acceleration. A real motor would stall, lose steps, and
+> sit drawing near-standstill current through the driver while the harness ran.
 >
 > Nothing is gained by attaching one: the measurement is the pin signal,
 > taken before any driver chip.
@@ -145,8 +145,17 @@ For each I2S frame:
 | `I2S_DIRECT_MIN_SPEED_TICKS` | 80 | Direct mode minimum |
 | `I2S_MUX_MIN_SPEED_TICKS` | 400 | Mux mode minimum (5× slower) |
 
-The mux mode minimum is 5× slower because the mux must switch between 32
-slots, and each slot only gets 1/32 of the frame time.
+400 ticks is 5× `I2S_DIRECT_MIN_SPEED_TICKS` (80). The ratio is not
+time-sharing among the 32 slots. Every frame holds the whole 32-bit
+`_mux_state`, so each slot is updated every frame (4 µs), not once per 32
+frames. The limit is the frame grid. A step pulse is one frame high (64
+ticks). Rates are whole frames apart (2 frames = 125 kHz, 6 frames ≈ 42 kHz),
+and 40 kHz is the practical maximum. A 400-tick command is not one steady
+25 µs period on the wire. The 64-tick high is one frame, and the 336 low
+ticks are 5 frames plus 16 ticks. `off_ticks` carries that remainder, so the
+step period repeats as 6, 6, 6, then 7 frames (24, 24, 24, 28 µs) and the
+low time is 5, 5, 5, then 6 frames. The average period is 25 µs (40 kHz).
+The average duty is 4 µs / 25 µs = 16%; a single pulse is 4/24 or 4/28.
 
 ---
 
@@ -420,8 +429,9 @@ The configuration specifies:
 3. **`mux_slot_map`** — maps each stepper to its mux slot (0–31) and
    specifies which mux-slot channel carries its step signal.
 4. **`stepper_count`** — number of steppers on the I2S mux (1–32).
-5. **`pin_mode`** — `nodir` (step only, 1 channel per stepper) or `dir`
-   (step + dir, 2 channels per stepper).
+5. **`pin_mode`** — `nodir` (step only, one mux slot) or `dir`. Direction
+   is a second slot in the same 32-bit word (another of S0–S31), or a GPIO
+   on a passthrough channel. There is no slot S+32.
 
 ### 6.2 VCD-Embedded Metadata (Alternative)
 
@@ -481,7 +491,7 @@ evaluators read it from there.
 
 ---
 
-## 7. Generalized VCD Analysis for 40 Channels
+## 7. Generalized VCD Analysis for 37 Channels
 
 ### 7.1 Current Limitations
 
@@ -639,14 +649,14 @@ QRUN 0xFFFFFFFF    # run all 32 steppers simultaneously
 | Metric | Expected | Why |
 |--------|----------|-----|
 | Step count per stepper | 255 × N segments | Verifies no steps are lost or duplicated |
-| Inter-step period | 400 ticks = 25 µs | Verifies the mux timing is correct |
+| Inter-step period | 400 ticks average (25 µs). Wire gaps repeat 6, 6, 6, 7 frames (24 µs, then 28 µs) | Frame grid in `i2s_fill_buffer_mux()` |
 | Cross-stepper skew | < 100 µs | Verifies synchronized start across 32 steppers |
-| Duty cycle | ~12.5% (4 µs high / 32 µs period) | Verifies pulse width is consistent |
+| Duty cycle | 16% average (4 µs high / 25 µs). A single pulse is 4/24 or 4/28 | One-frame high pulse |
 | Mux frame rate | 250 kHz | Verifies the I2S bus is running at the correct rate |
 
 ### 9.2 Sample Rate Requirement
 
-At 400 ticks (25 µs inter-step period), the step frequency is 40 kHz.
+At 400 ticks (25 µs average inter-step period), the step frequency is 40 kHz.
 The I2S bus runs at 250 kHz sample rate with 8 MHz BCLK. To resolve both
 the stepper signals and the I2S bus, the sample rate must be **≥ 8 MS/s**.
 
@@ -664,12 +674,15 @@ comfortable headroom for both the I2S bus and the stepper signals.
 
 On an ESP32 with the I2S mux driver, 32 steppers at 400 ticks:
 
-- Each stepper emits 255 steps at 25 µs intervals (40 kHz).
-- The I2S bus runs at 250 kHz, with 32 frames per mux cycle.
-- Each mux frame carries 1 bit per stepper (32 bits = 1 word).
-- The mux slot S's bit is 1 when the stepper is emitting a step pulse
-  (4 µs high), and 0 otherwise (28 µs low).
-- The duty cycle per stepper is 4 µs / 32 µs = 12.5%.
+- Each stepper emits 255 steps. The commanded period is 400 ticks
+  (25 µs average, 40 kHz).
+- The I2S bus runs at 250 kHz. Every frame is one 32-bit sample of all
+  slots. There is no 32-frame mux cycle.
+- Each frame carries 1 bit per stepper (32 bits = one `_mux_state` word).
+- Slot S is high for one frame (4 µs) per step. Because 400 is not a
+  multiple of 64, the step period repeats as 6, 6, 6, then 7 frames
+  (24 µs and 28 µs). The low time is the rest: 5, 5, 5, then 6 frames.
+- Average duty cycle is 4 µs / 25 µs = 16%.
 
 ---
 
@@ -740,9 +753,11 @@ should complete in under 120 seconds on a modern laptop.
 | `nodir` (I2S mux) | 1 (S0, S1, …) | 32 steppers (32 mux slots) |
 | `dir` (I2S mux) | 2 (step + dir) | 16 steppers (32 mux slots / 2) |
 
-The I2S mux driver supports up to 32 steppers in nodir mode (one mux
-slot per stepper) or 16 steppers in dir mode (two mux slots per stepper:
-one for step, one for dir).
+The I2S mux word is 32 bits (`_mux_state`). Nodir uses one slot per
+stepper (32 steppers). Dir-on-mux uses two of those same slots per
+stepper, one for step and one for direction (16 steppers). A GPIO
+direction pin does not consume a slot; capturing it takes one of the five
+passthrough channels. The decoded VCD still has S0–S31 only.
 
 ---
 
@@ -798,12 +813,14 @@ up to 32 steppers. This was not available in the original harness.
 The ESP32 I2S mux driver has the following limitations:
 
 1. **Maximum 32 steppers** — limited by the 32-bit mux state word.
-2. **Minimum speed of 400 ticks** — 5× slower than direct mode, because
-   each slot only gets 1/32 of the frame time.
-3. **Direction handling** — in mux mode, direction is handled by setting
-   a separate bit in the mux state word (slot S + 32). This means the
-   decoder must handle 64 slots (32 step + 32 direction) if dir mode is
-   used.
+2. **Minimum speed of 400 ticks** — 5× the direct-mode minimum (80 ticks).
+   The cause is the 64-tick frame grid (§3.4), which caps the practical
+   rate at 40 kHz. Slots are not time-shared inside the frame.
+3. **Direction** — a mux direction pin (`pin | PIN_I2S_FLAG`) is another
+   slot 0–31 in the same `_mux_state`. `i2sMuxSetBit()` ignores a slot
+   ≥ 32, and the allocation mask rejects a slot already used for step.
+   Dir-on-mux therefore fits 16 steppers, not 32, and the decoder does
+   not grow to 64 channels. A GPIO direction pin is outside the mux word.
 
 ### 14.2 Analyzer Limitations
 
@@ -865,5 +882,5 @@ using an 8-channel logic analyzer.
 
 **Maximum-speed test:**
 
-- 32 steppers at 400 ticks (minimum mux speed = 25 µs inter-step period,
-  40 kHz step frequency) at 16 MS/s sample rate.
+- 32 steppers at 400 ticks (minimum mux speed = 25 µs average inter-step
+  period, 40 kHz step frequency) at 16 MS/s sample rate.
