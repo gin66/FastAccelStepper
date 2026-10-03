@@ -2,6 +2,8 @@
 #define PD_ESP32_I2S_CONSTANTS_H
 #if defined(SUPPORT_ESP32_I2S)
 
+#include "fas_ramp/RampCalculator.h"  // US_TO_TICKS
+
 // I2S timing: 16-bit stereo mode
 // Sample rate: 250kHz
 // Bits per frame: 16-bit L + 16-bit R = 32 bits
@@ -35,6 +37,13 @@
 
 #define I2S_DIRECT_MIN_SPEED_TICKS 80
 #define I2S_MUX_MIN_SPEED_TICKS 400
+
+// Drain pause before an I2S_DIRECT direction change. 2 * I2S_BLOCK_TICKS
+// (1000 us) assumed the fill lead is two DMA blocks; measured 677..1096 us,
+// since the TX FIFO still holds part of a descriptor at DMA EOF. 1200 us
+// covers that plus one block of margin.
+#define I2S_DIR_DRAIN_US 1200
+#define I2S_DIR_DRAIN_TICKS ((uint16_t)US_TO_TICKS(I2S_DIR_DRAIN_US))
 
 // 100kHz step frequency corresponds to 10µs period, so 2µs pulse width is 20%
 #define I2S_DEFAULT_PULSE_WIDTH_TICKS 32

@@ -390,7 +390,7 @@ static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
 #endif
 #if defined(SUPPORT_ESP32_I2S)
   if (esp32_driver_is_i2s(q) && !esp32_i2s_dir_is_mux_slot(q)) {
-    return (uint16_t)(2 * I2S_BLOCK_TICKS);
+    return I2S_DIR_DRAIN_TICKS;
   }
 #endif
   return 0;
