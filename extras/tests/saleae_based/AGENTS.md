@@ -424,3 +424,5 @@ GPIO0 is a boot-strapping pin (must be HIGH at boot).
 - User-facing overview: `README.md`
 - Repo-wide rules: `AGENTS.md` at the repository root
 - sigrok-cli: <https://sigrok.org/wiki/Sigrok-cli>
+
+- PlatformIO ESP32 platform version mapping: \`extras/doc/platformio-espressif-versions.md\`
