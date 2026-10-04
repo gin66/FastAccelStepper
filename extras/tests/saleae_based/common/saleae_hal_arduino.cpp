@@ -36,9 +36,9 @@ extern "C" void saleae_hal_delay_ms(uint32_t ms) { delay(ms); }
 // as "ERR unknown" -- a mangled request, not a refused one, which is the one
 // failure mode this protocol cannot have: the host cannot tell a dropped
 // character from a typo, and "unknown" says the *command* was unrecognisable
-// when it was the *argument* that was lost. 1024 matches the plain ESP-IDF HAL's
-// uart_driver_install() and clears the longest line the protocol can produce
-// (384 + 32) with room to spare.
+// when it was the *argument* that was lost. 1024 matches the plain ESP-IDF
+// HAL's uart_driver_install() and clears the longest line the protocol can
+// produce (384 + 32) with room to spare.
 extern "C" void saleae_hal_serial_begin(uint32_t baud) {
 #if defined(ESP_PLATFORM)
   Serial.setRxBufferSize(1024);

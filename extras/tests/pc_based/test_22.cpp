@@ -654,6 +654,324 @@ static void test_mux_partial_steps() {
 }
 
 // ============================================================================
+// Part 6: Position-exact, many queues, one shared buffer
+// ============================================================================
+//
+// Everything above asserts pulse COUNTS, which cannot see a pulse landing one
+// frame early or late: the count still matches and only the timing is wrong.
+// They also memset(0) the buffer, while the driver seeds every frame from
+// _mux_state before any queue touches it (init_mux_buffer), and at most two
+// queues ever share a buffer. So the three things the failing sweep actually
+// exercised -- the seed, the OR of many slots, and the frame each pulse lands
+// in -- were untested.
+//
+// This drives N queues into one shared buffer the way handleTxDone() does and
+// compares every byte of every frame against a model built from the tick
+// arithmetic alone, so a fill that is off by a frame fails here rather than on
+// a logic analyzer 300 ms later.
+
+#define MUX_POS_MAX_SLOTS 32
+// Sized for the slowest case below: 64 steps at 1600 ticks is 1600 frames.
+#define MUX_POS_MAX_FRAMES (I2S_FRAMES_PER_BLOCK * 16)
+
+// init_mux_buffer() from i2s_manager.cpp, which test_22 does not link.
+static void seed_mux_buffer(uint8_t* buf, uint32_t mux_state) {
+  uint32_t* b = reinterpret_cast<uint32_t*>(buf);
+  uint8_t i = I2S_BYTES_PER_BLOCK / 4;
+  do {
+    b[--i] = mux_state;
+  } while (i);
+}
+
+// A step's pulse sits in the frame containing its start tick, and start tick of
+// step k is k * ticks. 400 ticks is 6.25 frames, so the frame sequence is
+// 6, 6, 6, 7, ... -- the frame-quantised period the harness has to allow for.
+static uint16_t ref_frame(uint16_t k, uint16_t ticks) {
+  return (uint16_t)((uint32_t)k * ticks / I2S_TICKS_PER_FRAME);
+}
+
+static uint8_t seed_byte(uint32_t seed, uint8_t byte_index) {
+  return (uint8_t)((seed >> (8 * byte_index)) & 0xFF);
+}
+
+static bool check_mux_positions(uint8_t nslots, uint16_t ticks, uint16_t steps,
+                                uint32_t seed, bool verbose) {
+  static StepperQueue q[MUX_POS_MAX_SLOTS];
+  static struct i2s_fill_state st[MUX_POS_MAX_SLOTS];
+  static uint8_t bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
+  static uint8_t want[MUX_POS_MAX_SLOTS][MUX_POS_MAX_FRAMES];
+  bool ok = true;
+
+  for (uint8_t s = 0; s < nslots; s++) {
+    setupMuxQueue(&q[s], s);
+    st[s].remaining_low_ticks = 0;
+    st[s].remaining_high_ticks = 0;
+    st[s].off_ticks = 0;
+    add_command(&q[s], steps, ticks);
+    memset(want[s], 0, MUX_POS_MAX_FRAMES);
+    for (uint16_t k = 0; k < steps; k++) {
+      uint16_t f = ref_frame(k, ticks);
+      if (f < MUX_POS_MAX_FRAMES) {
+        want[s][f] = 1;
+      }
+    }
+  }
+  memset(bufs, 0, sizeof(bufs));
+
+  uint32_t total_frames = (uint32_t)steps * ticks / I2S_TICKS_PER_FRAME;
+  uint16_t blocks = (uint16_t)(total_frames / I2S_FRAMES_PER_BLOCK) + 2;
+
+  uint16_t seen_total = 0;
+  for (uint16_t blk = 0; blk < blocks; blk++) {
+    uint8_t* buf = bufs[blk % I2S_BLOCK_COUNT];
+    seed_mux_buffer(buf, seed);
+    for (uint8_t s = 0; s < nslots; s++) {
+      i2s_fill_buffer_mux(&q[s], buf, &st[s], getByteOffset(s), getBitMask(s));
+    }
+
+    uint16_t f0 = (uint16_t)(blk * I2S_FRAMES_PER_BLOCK);
+    for (uint16_t s = 0; s < nslots; s++) {
+      uint16_t seen = 0;
+      for (uint16_t f = 0; f < I2S_FRAMES_PER_BLOCK; f++) {
+        uint16_t abs = f0 + f;
+        uint8_t got =
+            (buf[f * I2S_BYTES_PER_FRAME + getByteOffset(s)] & getBitMask(s))
+                ? 1
+                : 0;
+        uint8_t exp = (abs < MUX_POS_MAX_FRAMES) ? want[s][abs] : 0;
+        seen += got;
+        if (got != exp) {
+          if (ok && verbose) {
+            printf("  slot %2u: frame %u (abs %u) is %u, expected %u\n", s, f,
+                   abs, got, exp);
+          }
+          ok = false;
+        }
+      }
+      seen_total += seen;
+    }
+
+    // Bytes the steppers do not own must come through the fill untouched, i.e.
+    // still be exactly what init_mux_buffer seeded.
+    for (uint16_t f = 0; f < I2S_FRAMES_PER_BLOCK; f++) {
+      for (uint8_t b = 0; b < I2S_BYTES_PER_FRAME; b++) {
+        uint8_t exp = seed_byte(seed, b);
+        for (uint8_t s = 0; s < nslots; s++) {
+          if (getByteOffset(s) == b) {
+            uint16_t abs = (uint16_t)(f0 + f);
+            if (abs < MUX_POS_MAX_FRAMES && want[s][abs]) {
+              exp |= getBitMask(s);
+            }
+          }
+        }
+        uint8_t got = buf[f * I2S_BYTES_PER_FRAME + b];
+        if (got != exp) {
+          if (ok && verbose) {
+            printf("  block %u frame %u byte %u is 0x%02x, expected 0x%02x\n",
+                   blk, f, b, got, exp);
+          }
+          ok = false;
+        }
+      }
+    }
+  }
+
+  uint16_t exp_per_slot = steps;
+  if (verbose) {
+    printf("  slots %u, %u steps @ %u ticks = %u frames over %u blocks\n",
+           nslots, steps, ticks, total_frames, blocks);
+    printf("  pulses seen in slot 0: %u (expected %u)\n", seen_total / nslots,
+           exp_per_slot);
+    printf("  seed word 0x%08lx preserved outside step slots: %s\n",
+           (unsigned long)seed, ok ? "yes" : "NO");
+  }
+
+  for (uint8_t s = 0; s < nslots; s++) {
+    if (q[s].read_idx != q[s].next_write_idx) {
+      if (verbose) {
+        printf("  slot %u: queue not fully consumed\n", s);
+      }
+      ok = false;
+    }
+  }
+  return ok;
+}
+
+static void test_mux_positions_20_slots() {
+  printf("Running: MUX positions, 20 slots @ 400 ticks, 64 steps\n");
+  // Slots 20..31 are unused at n=20 and stand in for the dir bits a `dir` mode
+  // run would hold there, so the seed is not trivially zero.
+  test_result(
+      "MUX positions 20 slots",
+      check_mux_positions(20, I2S_MUX_MIN_SPEED_TICKS, 64, 0xFFF00000u, true));
+}
+
+static void test_mux_positions_26_slots() {
+  printf("Running: MUX positions, 26 slots @ 400 ticks, 64 steps\n");
+  // n=26 is the sweep point that lost slot 16 alone.
+  test_result(
+      "MUX positions 26 slots",
+      check_mux_positions(26, I2S_MUX_MIN_SPEED_TICKS, 64, 0xFC000000u, true));
+}
+
+static void test_mux_positions_all_slots() {
+  printf("Running: MUX positions, all 32 slots @ 400 ticks, 64 steps\n");
+  test_result("MUX positions 32 slots",
+              check_mux_positions(32, I2S_MUX_MIN_SPEED_TICKS, 64, 0u, true));
+}
+
+static void test_mux_positions_slow_and_fast() {
+  printf("Running: MUX positions at other periods\n");
+  bool a = check_mux_positions(20, 401, 64, 0xFFF00000u, false);
+  bool b = check_mux_positions(20, 640, 64, 0xFFF00000u, false);
+  bool c = check_mux_positions(20, 1000, 64, 0xFFF00000u, false);
+  bool d = check_mux_positions(8, 1600, 64, 0u, false);
+  test_result("MUX positions 401/640/1000/1600 ticks", a && b && c && d);
+}
+
+static void test_mux_positions_queue_drains_midrun() {
+  printf("Running: MUX positions with the queue draining mid-block\n");
+  // The path test_22 never takes: the fill returns false part way through a
+  // block (queue empty), _isRunning goes false, and a later addQueueEntry has
+  // to resume from the saved tick state rather than from the start of a block.
+  StepperQueue q;
+  setupMuxQueue(&q, 0);
+  uint8_t buf[I2S_BYTES_PER_BLOCK];
+  struct i2s_fill_state st = {0, 0, 0};
+  bool ok = true;
+
+  // 2 steps at 400 ticks: the block is 125 frames = 8000 ticks, so this fits
+  // and the block ends with the queue already empty.
+  add_command(&q, 2, 400);
+  seed_mux_buffer(buf, 0);
+  bool full =
+      i2s_fill_buffer_mux(&q, buf, &st, getByteOffset(0), getBitMask(0));
+  uint32_t first = countPulsesInSlot(buf, getByteOffset(0), getBitMask(0));
+  // false means "queue drained", which is what happened: 2 steps at 400 ticks
+  // is 800 ticks and the block is 8000. The unfilled rest of the block stays at
+  // the seed, which is correct.
+  if (first != 2 || full) {
+    printf("  block 1: %u pulses, full=%d (expected 2, false)\n", first, full);
+    ok = false;
+  }
+
+  // Now a pause long enough to span a block boundary, then a step. The step
+  // must land on the frame its tick arithmetic names, not on the first frame.
+  add_command(&q, 0, 9000);  // 9000 ticks = 140 frames > one block
+  add_command(&q, 1, 400);
+  memset(buf, 0, sizeof(buf));
+  seed_mux_buffer(buf, 0);
+  i2s_fill_buffer_mux(&q, buf, &st, getByteOffset(0), getBitMask(0));
+  memset(buf, 0, sizeof(buf));
+  seed_mux_buffer(buf, 0);
+  i2s_fill_buffer_mux(&q, buf, &st, getByteOffset(0), getBitMask(0));
+  uint32_t second = countPulsesInSlot(buf, getByteOffset(0), getBitMask(0));
+  if (second != 1) {
+    printf("  after the pause: %u pulses in the next block (expected 1)\n",
+           second);
+    ok = false;
+  }
+  if (q.read_idx != q.next_write_idx) {
+    printf("  queue not consumed\n");
+    ok = false;
+  }
+  test_result("MUX positions across a drained queue", ok);
+}
+
+// Do independently-filled queues stay in phase?
+//
+// Measured on hardware at 20 slots: the bus carried two distinct words per
+// period instead of one -- 0x0000FFFF (slots 0-15) and 0x000F0000 (slots 16-19)
+// -- each internally perfect at 6,6,6,7 frames, but offset from each other by
+// about one step. That offset is what makes a dropped frame hit "16 of 20" and
+// then "1 of 26, slot 16": the victims are a phase group, not a slot range.
+//
+// Nothing in i2s_fill_buffer_mux() can create that -- it is called per queue
+// with its own state and touches only its own byte_offset/bit_mask. So either
+// the fill introduces skew, or the queues were started at different times. This
+// starts 20 queues from the same instant with the same command and asserts
+// every one of them puts its pulses in the same frames. If this passes, the
+// skew is not in the fill and the queues did not start together.
+static void test_mux_queues_start_in_phase() {
+  printf("Running: MUX 20 queues started together stay in phase\n");
+
+  enum { N = 20 };
+  StepperQueue q[N];
+  struct i2s_fill_state st[N];
+  uint8_t bufs[I2S_BLOCK_COUNT][I2S_BYTES_PER_BLOCK];
+
+  for (uint8_t s = 0; s < N; s++) {
+    setupMuxQueue(&q[s], s);
+    st[s].remaining_low_ticks = 0;
+    st[s].remaining_high_ticks = 0;
+    st[s].off_ticks = 0;
+    add_command(&q[s], 255, I2S_MUX_MIN_SPEED_TICKS);
+  }
+  memset(bufs, 0, sizeof(bufs));
+
+  // One shared tick timeline: every queue runs the same 255 steps at the same
+  // period, so a bit is set in frame f exactly when some step starts in f.
+  static uint8_t common[MUX_POS_MAX_FRAMES];
+  memset(common, 0, sizeof(common));
+  for (uint16_t k = 0; k < 255; k++) {
+    uint16_t f = ref_frame(k, I2S_MUX_MIN_SPEED_TICKS);
+    if (f < MUX_POS_MAX_FRAMES) {
+      common[f] = 1;
+    }
+  }
+
+  bool ok = true;
+  uint16_t blk = 0;
+  uint16_t pulses_per_block = 0;
+  while (blk < 6) {
+    uint8_t* buf = bufs[blk % I2S_BLOCK_COUNT];
+    seed_mux_buffer(buf, 0);
+    for (uint8_t s = 0; s < N; s++) {
+      i2s_fill_buffer_mux(&q[s], buf, &st[s], getByteOffset(s), getBitMask(s));
+    }
+
+    for (uint16_t f = 0; f < I2S_FRAMES_PER_BLOCK; f++) {
+      uint16_t abs = (uint16_t)(blk * I2S_FRAMES_PER_BLOCK + f);
+      if (abs < MUX_POS_MAX_FRAMES && common[abs]) {
+        pulses_per_block++;
+      }
+      // All 20 slots must agree: byte b is 0xFF/0x0F/... in a pulse frame and
+      // exactly the seed everywhere else. Any disagreement between slots is a
+      // phase split, which is the hardware symptom this test exists to catch.
+      for (uint8_t b = 0; b < I2S_BYTES_PER_FRAME; b++) {
+        uint8_t expect = 0;
+        if (abs < MUX_POS_MAX_FRAMES && common[abs]) {
+          for (uint8_t s = 0; s < N; s++) {
+            if (getByteOffset(s) == b) {
+              expect |= getBitMask(s);
+            }
+          }
+        }
+        uint8_t got = buf[f * I2S_BYTES_PER_FRAME + b];
+        if (got != expect) {
+          if (ok) {
+            printf(
+                "  block %u frame %u (abs %u) byte %u is 0x%02x, "
+                "expected 0x%02x\n",
+                blk, f, abs, b, got, expect);
+          }
+          ok = false;
+        }
+      }
+    }
+    blk++;
+  }
+
+  if (ok) {
+    printf(
+        "  all %u slots agree on every frame of %u blocks "
+        "(%u pulse frames per block, 6.25-frame period)\n",
+        N, blk, pulses_per_block / blk);
+  }
+  test_result("MUX 20 queues start in phase", ok);
+}
+
+// ============================================================================
 // Main
 // ============================================================================
 
@@ -692,6 +1010,14 @@ void basic_test() {
   test_mux_long_pause();
   test_mux_min_speed();
   test_mux_partial_steps();
+
+  puts("\n=== Part 6: Position-exact, Many Queues, One Buffer ===");
+  test_mux_positions_20_slots();
+  test_mux_positions_26_slots();
+  test_mux_positions_all_slots();
+  test_mux_positions_slow_and_fast();
+  test_mux_positions_queue_drains_midrun();
+  test_mux_queues_start_in_phase();
 
   printf("\n=== Test Summary ===\n");
   printf("Total: %d  Passed: %d  Failed: %d\n", test_passed + test_failed,

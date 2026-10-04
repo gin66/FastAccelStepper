@@ -334,8 +334,8 @@ static constexpr uint8_t kChanPinConst[SALEAE_CHANNELS] = SAL_CHAN_PINS;
 // The bound is deliberately absent for the I2S mux, which is the one case that
 // does not fit: a mux stepper costs a slot of the 32-bit word rather than a
 // channel, so 32 of them are addressable on five remaining channels. What
-// replaces it is the word width itself, asserted below, and the physical half of
-// the budget in handle_config().
+// replaces it is the word width itself, asserted below, and the physical half
+// of the budget in handle_config().
 #if !defined(SUPPORT_ESP32_I2S)
 static_assert(SALEAE_MAX_STEPPERS <= SALEAE_CHANNELS,
               "SALEAE_MAX_STEPPERS does not fit one channel per stepper");
@@ -467,8 +467,9 @@ static bool mux_ready = false;
 // top of the range, so bringing it up costs three channels and nothing else
 // moves -- see SALEAE_BUS_BASE.
 static uint8_t channels_free(void) {
-  const uint8_t total =
-      mux_ready ? (uint8_t)(SALEAE_CHANNELS - SALEAE_BUS_COUNT) : SALEAE_CHANNELS;
+  const uint8_t total = mux_ready
+                            ? (uint8_t)(SALEAE_CHANNELS - SALEAE_BUS_COUNT)
+                            : SALEAE_CHANNELS;
   return (uint8_t)(total - chan_used);
 }
 
@@ -663,8 +664,8 @@ static void stop_sr00(void) {
 //
 // Of those, only the third reaches the queue from here. stopMove() sets a flag
 // nothing in this harness reads, and forceStop() refuses later addQueueEntry()
-// calls that are never made: QRUN stops feeding once the fill is in, so there is
-// nothing after the start for it to refuse. Both are no-ops against a
+// calls that are never made: QRUN stops feeding once the fill is in, so there
+// is nothing after the start for it to refuse. Both are no-ops against a
 // directly-fed queue, which is why there is no scenario for either and why the
 // harness's own no_topup cursor is what enforces "nothing further is added" --
 // the harness is the planner, so that guarantee is the harness's to keep.
@@ -674,7 +675,8 @@ static void stop_sr00(void) {
 // itself as a stop. Measured, that hybrid left 7655 of 20000 steps to run on
 // i2s_direct and 7608 on rmt_v2 -- just under the 8160 a 32-deep queue of
 // 255-step commands holds, which is to say it was the harness's own arithmetic
-// and not any documented guarantee. Nothing in the library promises that number.
+// and not any documented guarantee. Nothing in the library promises that
+// number.
 
 static void stop_move_only(void) {
   for (uint8_t i = 0; i < slot_count; i++) {
@@ -725,8 +727,8 @@ static void stop_all(void) {
 #if defined(SUPPORT_ESP32_I2S)
 // Lowest bit of the 32-bit _mux_state word not yet claimed. A step signal and a
 // direction signal compete for the same 32 bits (they are both one bit in the
-// same word), so the cursor is shared and a run in `dir` spends two per stepper --
-// which is why mux `dir` tops out at 16 steppers and not 32.
+// same word), so the cursor is shared and a run in `dir` spends two per stepper
+// -- which is why mux `dir` tops out at 16 steppers and not 32.
 static bool mux_next_slot(uint8_t* slot_out) {
   for (uint8_t s = 0; s < 32; s++) {
     if (!(mux_slots_used & (1UL << s))) {
@@ -769,8 +771,8 @@ static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
     step_pin = CHAN_PIN(chan_used);
     // A step-only stepper gets no dir pin at all rather than a repeated one, so
     // setDirectionPin() is not called and nothing on that pin can be mistaken
-    // for a direction. The `nodir` consequence is that count_up is always driven
-    // true (see qe_feed), because there is no pin to toggle for a false.
+    // for a direction. The `nodir` consequence is that count_up is always
+    // driven true (see qe_feed), because there is no pin to toggle for a false.
     dir_pin = nodir ? 0 : CHAN_PIN(chan_used + 1);
   }
 
@@ -867,9 +869,8 @@ static void reply_too_many(long count, uint8_t stride) {
   char buf[64];
   sal_snprintf(buf, sizeof(buf),
                SAL_PSTR("ERR CONFIG n=%ld max=%u slots=%u chans=%u/%u\n"),
-               count, (unsigned)SALEAE_MAX_STEPPERS,
-               (unsigned)channels_free(), (unsigned)SALEAE_CHANNELS,
-               (unsigned)stride);
+               count, (unsigned)SALEAE_MAX_STEPPERS, (unsigned)channels_free(),
+               (unsigned)SALEAE_CHANNELS, (unsigned)stride);
   reply(buf);
 }
 
@@ -939,10 +940,10 @@ static uint8_t marker_channel = SALEAE_NO_MARKER;
 // Alternates the marker level, so every marked event is exactly one edge and
 // the level then holds until the next one.
 //
-// A timed high pulse was the first idea and it needs a sub-millisecond delay the
-// HAL does not have (and an ESP-IDF busy-wait would block the very loop that
-// drains the queue, which is the thing being measured). Alternating needs no
-// timing primitive and no width to reason about: the level persists, so the
+// A timed high pulse was the first idea and it needs a sub-millisecond delay
+// the HAL does not have (and an ESP-IDF busy-wait would block the very loop
+// that drains the queue, which is the thing being measured). Alternating needs
+// no timing primitive and no width to reason about: the level persists, so the
 // edge is unambiguous however long afterwards the host reads it.
 static uint8_t marker_level = 0;
 
@@ -1045,20 +1046,20 @@ static void handle_drivers(void) {
 
 // IMUX -- bring up the I2S multiplexer at runtime.
 //
-// initI2sMux() must be called before any stepperConnectToPin(DRIVER_I2S_MUX), and
-// it cannot be called twice. Making it a serial command rather than a build-time
-// constant means wiring a multiplexer up is one word on an existing firmware, not
-// a recompile -- which is what makes the mux testable at all on a rig whose
-// stepper pins are the analyzer's channels.
+// initI2sMux() must be called before any stepperConnectToPin(DRIVER_I2S_MUX),
+// and it cannot be called twice. Making it a serial command rather than a
+// build-time constant means wiring a multiplexer up is one word on an existing
+// firmware, not a recompile -- which is what makes the mux testable at all on a
+// rig whose stepper pins are the analyzer's channels.
 //
 // It takes no arguments, which is the point. The bus is the last three analyzer
-// CHANNELS and the GPIOs behind them come out of CHAN_PIN(), so there is exactly
-// one place that knows the bus wiring and the host cannot ask for a bus the
-// channel map does not describe. The GPIO-to-channel table is per board and per
-// cable -- the ESP32-DevKitC map is not the ESP32-S3 one -- so naming the pins
-// over serial would have meant naming *this* rig's pins from a host that has no
-// way to know them, and the failure would be a capture that decodes into the
-// wrong 32 slots.
+// CHANNELS and the GPIOs behind them come out of CHAN_PIN(), so there is
+// exactly one place that knows the bus wiring and the host cannot ask for a bus
+// the channel map does not describe. The GPIO-to-channel table is per board and
+// per cable -- the ESP32-DevKitC map is not the ESP32-S3 one -- so naming the
+// pins over serial would have meant naming *this* rig's pins from a host that
+// has no way to know them, and the failure would be a capture that decodes into
+// the wrong 32 slots.
 static void handle_imux(void) {
 #if defined(SUPPORT_ESP32_I2S)
   if (mux_ready) {
@@ -1136,10 +1137,10 @@ static void handle_map(void) {
 #if defined(SUPPORT_ESP32_I2S)
   len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" bus="));
   if (mux_ready) {
-    len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u,%u,%u"),
-                        (unsigned)SALEAE_BUS_BASE,
-                        (unsigned)(SALEAE_BUS_BASE + 1),
-                        (unsigned)(SALEAE_BUS_BASE + 2));
+    len +=
+        sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u,%u,%u"),
+                     (unsigned)SALEAE_BUS_BASE, (unsigned)(SALEAE_BUS_BASE + 1),
+                     (unsigned)(SALEAE_BUS_BASE + 2));
   } else {
     len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("-"));
   }
@@ -1277,9 +1278,9 @@ static void handle_config(char* count_text, char* driver_list,
 #endif
     want_phy = (uint8_t)(want_phy + stride);
   }
-  const uint8_t chan_cap = mux_ready ? (uint8_t)(SALEAE_CHANNELS -
-                                                  SALEAE_BUS_COUNT)
-                                     : (uint8_t)SALEAE_CHANNELS;
+  const uint8_t chan_cap = mux_ready
+                               ? (uint8_t)(SALEAE_CHANNELS - SALEAE_BUS_COUNT)
+                               : (uint8_t)SALEAE_CHANNELS;
   if (want_phy > chan_cap) {
     char buf[64];
     sal_snprintf(buf, sizeof(buf),
@@ -1543,8 +1544,8 @@ static void qe_pump(void) {
     }
   }
 
-  // Top up the running queues. A queue QFILL started is deliberately left alone:
-  // see `no_topup`.
+  // Top up the running queues. A queue QFILL started is deliberately left
+  // alone: see `no_topup`.
   for (uint8_t i = 0; i < slot_count; i++) {
     struct qe_cursor* c = &slots[i].cur;
     if (!c->active || !c->started || c->fill_only || c->no_topup) {
@@ -1677,10 +1678,10 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
 }
 
 // The QRUN/QFILL stepper selector. Decimal as before, and hexadecimal as well
-// because the all-32-steppers mask has no useful decimal form: `QRUN 0xFFFFFFFF`
-// says "every slot" and `QRUN 4294967295` says nothing a reader can check by
-// eye. A leading 0x is the whole signal, so no flag argument is needed and the
-// existing decimal calls are untouched.
+// because the all-32-steppers mask has no useful decimal form: `QRUN
+// 0xFFFFFFFF` says "every slot" and `QRUN 4294967295` says nothing a reader can
+// check by eye. A leading 0x is the whole signal, so no flag argument is needed
+// and the existing decimal calls are untouched.
 //
 // strtoul, not atol: `atol` returns `long`, which on AVR is 16 bits, so a mask
 // of more than 32767 would silently wrap into a *valid-looking* different mask
@@ -1689,8 +1690,8 @@ static uint32_t parse_mask(const char* text) {
   if (!text) {
     return 1;
   }
-  const int base = (text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) ? 16
-                                                                       : 10;
+  const int base =
+      (text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) ? 16 : 10;
   return (uint32_t)strtoul(text, NULL, base);
 }
 
@@ -1728,8 +1729,8 @@ static uint8_t arm_cursors(uint32_t mask, bool fill_only) {
       // those steps would come out twice.
       c->fill_only = false;
       // And nothing is added from here on: the run drains what QFILL put in and
-      // stops, so the queue depth at any later instant -- including at a stop --
-      // is the depth the board reported, not a race with the feeder.
+      // stops, so the queue depth at any later instant -- including at a stop
+      // -- is the depth the board reported, not a race with the feeder.
       c->no_topup = true;
       if (mask & (1UL << i)) {
         selected++;
@@ -1953,8 +1954,8 @@ static void handle_line(char* line) {
     mark_event();
     reply_p(SAL_PSTR("OK STOP stopmove\n"));
   } else if (!sal_strcmp(cmd, SAL_PSTR("XSTOP"))) {
-    // forceStopAndNewPosition(): stop adding *and* empty the queue. The only one
-    // of the three stops that the queued commands do not survive.
+    // forceStopAndNewPosition(): stop adding *and* empty the queue. The only
+    // one of the three stops that the queued commands do not survive.
     abort_queue();
     stop_sr00();
     mark_event();

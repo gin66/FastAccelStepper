@@ -80,25 +80,35 @@ eight-channel 48 MS/s capture to 0.18 ms, and a scenario lasts milliseconds, so
 the capture covers a run that has not started. The floor is two-sided in
 `harness.py` and both sides are tested.
 
-### 3.3 The word goes out MSB first — confirmed, and worth having measured
+### 3.3 The word order — corrected: two halves, low first
 
-`probe_mux_bits.py` puts four steppers on slots 0, 7, 16 and 31 at four
-different periods and reads which bclk bit of each frame carries which slot:
+`probe_mux_bits.py` puts four steppers on slots 0..3 at four different
+periods and reads which bclk bit of each frame carries which slot.
 
-| wire bit (0 = first bclk of the frame) | measured period | stepper | slot |
+**Correction (2026-10-04):** the earlier table in this section claimed whole-
+word MSB-first order with slot 0 at wire bit 31. That was a misread of the
+probe capture, and it silently broke every decode: the decoder anchored the
+word at the ws *rising* edge and read MSB-first, so each real word was
+recovered half-swapped and a single step decoded as two adjacent words
+(`0x000F0000` then `0x0000FFFF`) that looked like two phase groups. The
+measured truth, re-derived from the same probe capture:
+
+| wire bit (0 = first bclk after the ws fall) | measured period | stepper | slot |
 |---|---|---|---|
-| 31 | 6.4 frames = 25.6 µs | 0 | 0 |
-| 30 | 12.5 frames = 50 µs | 1 | 1 |
-| 29 | 19 frames = 76 µs | 2 | 2 |
-| 28 | 25 frames = 100 µs | 3 | 3 |
+| 15 | 6/7 frames = 25 µs | 0 | 0 |
+| 14 | 12.5 frames = 50 µs | 1 | 1 |
+| 13 | 18.75 frames = 75 µs | 2 | 2 |
+| 12 | 25 frames = 100 µs | 3 | 3 |
 
-**MSB first, slot S = bit S of the word**, matching
-`i2s_mux_slot_to_bit_pos()`. One bit of information, and a wrong guess would have
-silently put every stepper's steps on another stepper's channel.
-
-Distinct periods per stepper are what make this answerable: at one shared period
-the pulses land on top of each other and a word with several bits set does not
-say which bit belongs to which stepper.
+The 32-bit word is two 16-bit halves, the **low half (slots 0-15) first**,
+each half MSB-first: wire bit k < 16 carries slot 15-k, k >= 16 carries slot
+47-k. ws is LOW for the first half and HIGH for the second, so a word starts
+at a ws *falling* edge and a ws rising edge is its middle. Slot S is bit S of
+the word, matching `i2s_mux_slot_to_bit_pos()`. The decoder
+(`i2s_mux_decoder.extract_frames()`) is a bclk-edge shift register anchored at
+the first ws fall and swaps the halves back. One bit of information, and a
+wrong guess would have silently put every stepper's steps on another
+stepper's channel — which is exactly what the old reading did.
 
 ## 4. The one non-obvious thing in the decoder
 
@@ -149,13 +159,20 @@ a *shared* event rather than 16 independent ones; slots 16–31 are complete.
 **Not reproducible on demand**: n=20 was re-measured three times consecutively
 after the sweep and passed all three. So it is intermittent, not a bound.
 
+**Correction (2026-10-04):** the decoder that produced this table read every
+word half-swapped (§3.3 correction), so the "16 of 20 slots 0-15" and the
+"low half bias" are that misread, not a driver finding. Re-swept with the
+corrected decoder, the 32-point scale sweep failed exactly once: **n=28,
+slot 16, 63 of 64 steps with the same 47.96 µs gap**. The single-step,
+single-slot drop is real and intermittent; everything about the failing *half
+word* was not.
+
 Suspected mechanism, offered as a lead rather than a conclusion: the buffer is
 DMA'd, and `i2s_fill_buffer_mux()` writes each slot with
 `buf[frame_pos * 4 + byte_offset] |= bit_mask` — a read-modify-write on memory
-the DMA is reading. Whether that loses bits on the low or the high half of the
-word would depend on ordering, which is what the "low half" bias is consistent
-with. I2S is the only driver of the three that streams from a DMA buffer, and
-`AGENTS.md` already records its post-abort leak for that reason.
+the DMA is reading. I2S is the only driver of the three that streams from a
+DMA buffer, and `AGENTS.md` already records its post-abort leak for that
+reason.
 
 This is recorded, not worked around: the evaluator still fails the run, because a
 step that went missing is a step that went missing.

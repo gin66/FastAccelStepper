@@ -3,7 +3,7 @@
 > This document is the **design reference**: what was specified, and why.
 > It carries no task list and no status. Both the implementation record and the
 > remaining work live in exactly one place:
-> [`extras/doc/implemented/180_r7_virtual_i2s_mux.md`](../doc/implemented/180_r7_virtual_i2s_mux.md).
+> [`extras/doc/implemented/r7_virtual_i2s_mux.md`](../doc/implemented/r7_virtual_i2s_mux.md).
 >
 > **Three assumptions below were measured to be wrong** and the implementation
 > does not follow them. Each is corrected, with the measurement, in the

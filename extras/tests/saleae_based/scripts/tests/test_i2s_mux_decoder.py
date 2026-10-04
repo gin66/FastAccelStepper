@@ -129,8 +129,10 @@ class Bus:
         bclk_half = self.bit_samples // 2
         for fi, word in enumerate(self.frames()):
             base = 1 + fi * self.frame_samples
-            # ws is high for the left (first) half of the frame.
-            ws_start = base
+            # ws is low for the first (low) half of the frame and high for the
+            # second: a word starts at a ws FALLING edge, the rising edge is its
+            # middle. That is the measured polarity of the ESP32's I2S output.
+            ws_start = base + self.frame_samples // 2
             ws_half = self.frame_samples // 2
             for i in range(ws_start, min(ws_start + ws_half, n)):
                 ws[i] = 1
@@ -146,9 +148,10 @@ class Bus:
                 # and a real capture cannot.
                 for i in range(b0, min(b0 + bclk_half, n)):
                     bclk[i] = 1
-                # MSB first: wire bit k carries slot 31 - k. Valid for the whole
-                # cell, from the rising edge to the next.
-                slot = FRAME_BITS - 1 - k
+                # Two 16-bit halves, low first, each MSB-first: wire bit k < 16
+                # carries slot 15 - k, k >= 16 carries slot 47 - k. Valid for
+                # the whole cell, from the rising edge to the next.
+                slot = 15 - k if k < FRAME_BITS // 2 else 47 - k
                 if (word >> slot) & 1:
                     for i in range(b0, min(b0 + self.bit_samples, n)):
                         data[i] = 1
@@ -426,15 +429,20 @@ class TestFrameExtraction(BusFixture):
         self.assertEqual(len(frames), 3 + 1 + 3)
         self.assertEqual([w for _, w in frames], [0, 0, 0, 1, 0, 0, 0])
 
-    def test_a_frame_with_the_wrong_bit_count_is_reported(self):
-        # A frame whose bclk is short or long is a protocol violation, and
-        # guessing which bits it meant would put steps on the wrong channels.
+    def test_a_frame_with_the_wrong_bit_count_is_reported_not_skipped(self):
+        # A frame whose bclk is short or long is a protocol violation. It used
+        # to be *skipped*, on the reasoning that guessing which bits it meant
+        # would put steps on the wrong channels -- but skipping deletes data on
+        # exactly the glitches worth seeing, and a caller counting steps cannot
+        # tell a dropped frame from one that never existed. The decoder is a
+        # shift register: 32 bclk edges make a word whatever ws thinks, and a
+        # disagreement is reported.
         words = [0x00000001]
         bus = Bus(words)
         channels, _ = self.roundtrip(bus)
         # Knock the last bit clock out of the third frame -- the one carrying
-        # the word, so "the word was skipped" and "the word decoded as 0" are
-        # distinguishable.
+        # the word, so "the word was skipped" and "the word decoded as
+        # something else" are distinguishable.
         bad = dict(channels)
         bclk = bytearray(bad["D6"])
         start = bus.frame_samples * 2
@@ -443,9 +451,30 @@ class TestFrameExtraction(BusFixture):
             bclk[i] = 0
         bad["D6"] = bclk
         frames, faults = dec.extract_frames(bad, MSPS, report_faults=True)
-        self.assertTrue(any("bit clock" in f for f in faults))
-        # Four lead/tail frames survive; the damaged one is skipped, not guessed.
-        self.assertEqual([w for _, w in frames], [0, 0, 0, 0])
+        # Reported...
+        self.assertTrue(faults, "a short frame must be reported")
+        # ...and not silently dropped: the word is still decoded, from 32 bclk
+        # edges, and the missing edge shows up as a shifted bit -- which is why
+        # the misalignment fault exists at all.
+        self.assertGreaterEqual(len(frames), 4)
+        self.assertNotEqual([w for _, w in frames], [0, 0, 0],
+                            "the damaged frame must not vanish")
+
+    def test_a_short_frame_reports_a_misalignment(self):
+        # The check that replaced the skip: with a bit clock missing, ws rises
+        # land off the frame grid, and that is reported rather than acted on.
+        bus = Bus([0x00000001, 0x00000002])
+        channels, _ = self.roundtrip(bus)
+        bad = dict(channels)
+        bclk = bytearray(bad["D6"])
+        start = bus.frame_samples
+        for i in range(start + bus.frame_samples - bus.bit_samples,
+                       start + bus.frame_samples):
+            bclk[i] = 0
+        bad["D6"] = bclk
+        _, faults = dec.extract_frames(bad, MSPS, report_faults=True)
+        self.assertTrue(any("misaligned" in f or "into a frame" in f
+                            for f in faults), faults)
 
     def test_no_bus_channels_is_an_error(self):
         # Naming the bus explicitly is what makes the message name the missing

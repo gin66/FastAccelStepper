@@ -483,9 +483,19 @@ implementation depends on:
   period; 8 MS/s is one sample per period and recovers nothing. **48 MS/s is
   worse** -- this analyzer truncates an eight-channel 48 MS/s capture to 0.18 ms
   and a scenario lasts milliseconds. See the table in
-  `extras/doc/implemented/180_r7_virtual_i2s_mux.md`.
-- The word goes out **MSB first**: wire bit k (0 = the frame's first bclk) is
-  slot 31-k, so slot S is bit S. Measured by `scripts/probe_mux_bits.py`.
+  `extras/doc/implemented/r7_virtual_i2s_mux.md`.
+- The 32-bit word goes out as **two 16-bit halves, the low half (slots 0-15)
+  first**, each half MSB-first. ws is LOW for the first half and HIGH for the
+  second, so a word starts at a ws **falling** edge and a ws rising edge is its
+  middle: wire bit k < 16 carries slot 15-k, k >= 16 carries slot 47-k. The
+  decoder is a bclk-edge shift register anchored at the first ws fall and swaps
+  the two halves back, so slot S is bit S, matching
+  `i2s_mux_slot_to_bit_pos()`. An earlier version anchored at the ws *rise*
+  with whole-word MSB-first order and read every word half-swapped: a 64-step
+  run decoded as two phase groups (`0x0000FFFF` / `0x000F0000`) that are really
+  the two halves of one word, and the intermittent "16 of 20 slots" sweep
+  failure was that misread. The fixture in `test_i2s_mux_decoder.py::Bus`
+  renders the measured wire order, so a decoder regression fails there.
 
 **Sample the data on the bclk rising edge.** The two plausible alternatives are
 both wrong *silently*: the middle of the clock's high time needs a 50 % clock and
@@ -501,12 +511,15 @@ A multiplexed step can only start on a frame boundary, so its period is a **set*
 ordinary +-5 % band (twelve call sites). A period on any other frame count still
 fails.
 
-**Known finding:** an intermittent dropped step at 20+ slots -- 16 of 20 (and 16
-of 25) lose exactly one of 64 steps at the same instant, the low half of the
-word, while 16..31 are complete; 3 of 32 sweep points. Not reproducible on demand
-(n=20 passed three consecutive re-measurements). Suspected: `i2s_fill_buffer_mux()`
-does `buf[...] |= bit_mask` on memory the DMA is reading. Recorded, not worked
-around. Details in `extras/doc/implemented/180_r7_virtual_i2s_mux.md`.
+**Known finding:** an intermittent dropped step. With the corrected decoder
+(the old sweep numbers were the half-swap misread above), a forced 32-point
+`--mode scale` sweep failed exactly once: n=28, slot **16**, 63 of 64 steps,
+one 47.96 us inter-step period (two frame periods = one missing pulse mid-run).
+Three follow-up n=28 runs were clean, so it stays intermittent. The earlier
+"16 of 20 slots" reading does not survive the decoder fix and should not be
+chased. Suspected: `i2s_fill_buffer_mux()` does `buf[...] |= bit_mask` on
+memory the DMA is reading. Recorded, not worked around. Details in
+`extras/doc/implemented/r7_virtual_i2s_mux.md` §5.
 
 ## Hardware pin map (ESP32-DevKitC)
 

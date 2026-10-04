@@ -22,9 +22,12 @@ The protocol, as measured rather than assumed
 docstring records how. The parts that matter here:
 
 * bclk 8 MHz, ws 250 kHz, 32 bclk per frame, so one frame every 4 us.
-* The word goes out **MSB first**, so wire bit k (k = 0 at the frame's first
-  bclk) is slot 31 - k. Slot S is therefore bit S of the word, matching
-  `i2s_mux_slot_to_bit_pos()` in src/pd_esp32/i2s_constants.h.
+* The word goes out as two 16-bit halves, the **low half (slots 0-15) first**,
+  each half MSB-first; ws is LOW for the first half and HIGH for the second, so
+  a word starts at a ws *falling* edge. Wire bit k < 16 therefore carries slot
+  15 - k and wire bit k >= 16 carries slot 47 - k, which makes slot S bit S of
+  the word, matching `i2s_mux_slot_to_bit_pos()` in
+  src/pd_esp32/i2s_constants.h.
 * A set bit is high for **one bclk period** (125 ns) -- not for the frame.
   White paper §3.3 says the bit is high for the whole frame and that is wrong;
   `i2s_fill_buffer_mux()` sets one bit of one 32-bit word, and the word is the
@@ -354,20 +357,59 @@ def extract_frames(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
                    report_faults: bool = False):
     """The 32-bit mux word of every I2S frame on the bus.
 
-    Frame boundaries are the ws edges and the bits are the bclk rising edges
-    inside one, MSB first. Both come from the *edges* rather than from a sample
-    grid: a grid has to be phase-aligned to the bit clock, and nothing in the
-    capture says where the bit clock starts. The grid version read a different
-    bit out of every frame.
+    This is a shift register, which is what the receiving hardware is: a
+    74HC595 shifts one bit in per **bclk rising edge** and after 32 of them the
+    word is complete. So the decode is driven by bclk edges and a bit counter,
+    and by nothing else.
 
-    Returns [(frame_start_sample, word), ...]. A frame whose bclk count is not
-    32 is *skipped and reported*, never padded or truncated: the alternative is
-    guessing which bits it meant and putting steps on the wrong channels.
+    Framing and bit order are what the hardware does, measured on the wire:
 
-    The first and last frames of a capture are usually partial -- the
-    acquisition started and stopped mid-stream -- and are dropped for that
-    reason. That costs at most one step at each end, which is the same size as
-    a lost step; `report_faults` is what tells the two apart.
+    * The 32-bit word goes out as two 16-bit halves, each MSB-first, the **low
+      half (slots 0-15) first**. The word-select line marks the halves: ws is
+      LOW for the first half and HIGH for the second, so a word starts at a ws
+      *falling* edge and a ws rising edge sits at its middle, 16 bits in.
+    * Consequently the 32 collected bits are the word with its halves swapped:
+      `word = (ser >> 16) | ((ser & 0xffff) << 16)`, which makes bit S of the
+      finished word slot S -- matching `i2s_mux_slot_to_bit_pos()`.
+
+    What that rules out, deliberately:
+
+    * **No sample rate, no grid, no period.** `sample_rate_hz` is accepted and
+      unused. Nothing here knows how long a bit is meant to be, so a capture at
+      any rate decodes identically. A frame is 32 bclk edges because the shift
+      register says so, not because anything was measured.
+    * **ws is a check, not a frame delimiter.** The previous version sliced the
+      bclk edges between consecutive ws edges and *discarded* any frame whose
+      count was not 32. That silently deletes data on exactly the glitches worth
+      seeing, and a caller counting steps cannot tell a dropped frame from one
+      that never existed. Here ws edges are checked against the counter and a
+      mismatch is *reported*; the word is emitted either way.
+    * **No frame is ever dropped.** Every group of 32 bclk edges yields a word.
+
+    The one thing edges cannot decide is where the first group starts: a capture
+    that opens mid-word would decode every later word offset by a constant
+    number of bits. So the first ws *fall* anchors the phase -- the partial
+    group containing it is the only thing discarded. After the anchor the
+    counter alone decides.
+
+    The sample point is the bclk rising edge itself, i.e. the level present at
+    the edge. Two plausible alternatives were tried and both are wrong on this
+    hardware, for measurable reasons:
+
+      - "sample the middle of the high time, so the value has settled". The
+        ESP32 does not run bclk at 50 %, and not at the same duty at every rate:
+        measured 4 samples high in 6 at 48 MS/s, 1 in 3 at 24 MS/s. At 24 MS/s
+        the middle of the high time is the one sample in three next to the launch
+        edge, and reading it there turned a clean 64-step run into 37 steps.
+      - "sample the last sample of the cell". At 24 MS/s that is the next cell's
+        first sample: the same run decoded to slot 1 instead of slot 0.
+
+    The edge is right because of what the edges *mean*: data is launched half a
+    cell before the observed rising edge (on a 48 MS/s capture the data cell runs
+    208..213 with bclk rises at 211 and 217), so the bit a rising edge names is
+    already stable for a full half cell.
+
+    Returns [(first_bclk_sample, word), ...].
     """
     data_name, bclk_name, ws_name = _bus_names(channels, i2s)
     for role, name in ((DATA, data_name), (BCLK, bclk_name), (WS, ws_name)):
@@ -377,77 +419,88 @@ def extract_frames(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
                 f"(channels: {', '.join(sorted(channels))})"
             )
     data = channels[data_name]
-    bclk = channels[bclk_name]
-    ws = channels[ws_name]
-    n = len(ws)
+    bclk_rises = sp.rising_edges(channels[bclk_name])
+    ws_rises = sp.rising_edges(channels[ws_name])
+    ws_falls = sp.falling_edges(channels[ws_name])
 
-    # The sample point is the bclk RISING edge itself.
-    #
-    # Two plausible alternatives were tried and both are wrong, on this hardware
-    # and for measurable reasons. Recorded because the reasoning sounds right and
-    # the measurements say otherwise:
-    #
-    #   - "sample the middle of the high time, so the value has settled". The
-    #     ESP32 does not run bclk at 50 %, and it is not the same duty at every
-    #     rate: measured off the captures, the high time is 4 samples in 6 at
-    #     48 MS/s and 1 sample in 3 at 24 MS/s. At 24 MS/s the "middle of the high
-    #     time" is the one sample in three that sits next to the launch edge, and
-    #     reading it there turned a clean 64-step run into 37 steps and two slots
-    #     carrying data.
-    #   - "sample the last sample of the cell". At 24 MS/s that lands on the next
-    #     cell's first sample: the same 64-step run decoded to slot 1 instead of
-    #     slot 0.
-    #
-    # The edge is right because of what the edges *mean* here. Data is launched
-    # half a cell before the observed bclk rising edge -- the analyzer sees the
-    # data cell running 208..213 with bclk rises at 211 and 217 -- so the
-    # peripheral's data for a bit is already stable a full half cell before the
-    # edge that names it. Whatever the polarity, the observed rising edge is the
-    # point at which every bit it names is settled.
-    bclk_rises = sp.rising_edges(bclk)
-    ws_rises = sp.rising_edges(ws)
-    if ws and ws[0]:
-        # A capture that starts *high* is ambiguous: either it began on a frame
-        # boundary, or it began partway through one -- and detect_edges() cannot
-        # report an edge that happened before sample 0. Treating sample 0 as a
-        # boundary unconditionally would decode the tail of the previous frame
-        # as a whole frame, which is a wrong word rather than a missing one.
-        #
-        # So claim it only where the data agrees: if exactly 32 bit clocks lie
-        # between sample 0 and the first ws edge, then a boundary really is at
-        # sample 0 (or within one bit period of it). Otherwise there is no
-        # boundary to claim and the first complete frame is the next one.
-        if ws_rises:
-            head = _lower_bound(bclk_rises, ws_rises[0])
-            if head == FRAME_BITS:
-                ws_rises = [0] + ws_rises
-    if not ws_rises:
-        raise DecodeError(f"the word-select channel {ws_name!r} never rises; "
+    if not ws_falls:
+        raise DecodeError(f"the word-select channel {ws_name!r} never falls; "
                           f"there is no I2S bus in this capture")
+    if not bclk_rises:
+        return ([], ["no bclk rising edges: the bus is not clocking"]) \
+            if report_faults else []
 
+    # Index of the first bclk edge at or after each ws edge.
+    fall_at = [_lower_bound(bclk_rises, f) for f in ws_falls]
+    rise_at = [_lower_bound(bclk_rises, r) for r in ws_rises]
+
+    # A word starts at a ws FALL (low half first), and the capture opens
+    # mid-word almost by definition. Which word is the first COMPLETE one
+    # depends on where it opened:
+    #
+    # - during the HIGH half: the first ws edge is a fall and the word
+    #   containing it is partial; the first complete word starts at that fall.
+    # - during the LOW half: the first ws edge is a rise. If the whole low
+    #   half is present (16 bclk edges before the rise), the capture opened
+    #   exactly on a word boundary and the word starting at the first bclk
+    #   edge is complete. Otherwise that word is partial too, and the first
+    #   complete one again starts at the first fall.
+    #
+    # The partial group is the only thing ever dropped, and only because its
+    # boundary is invisible: an edge that happened before sample 0 cannot be
+    # reported. After the anchor the counter alone decides.
+    if ws_falls[0] < ws_rises[0] or rise_at[0] != FRAME_BITS // 2:
+        anchor = fall_at[0]
+    else:
+        anchor = 0
     frames: List[Tuple[int, int]] = []
     faults: List[str] = []
-    bounds = ws_rises[1:] + [n]
-    for start, end in zip(ws_rises, bounds):
-        if end <= start:
+    word = 0
+    nbits = 0
+    group_start = anchor
+
+    for i, edge in enumerate(bclk_rises):
+        if i < anchor:
             continue
-        lo = _lower_bound(bclk_rises, start)
-        hi = _lower_bound(bclk_rises, end)
-        cells = bclk_rises[lo:hi]
-        if len(cells) != FRAME_BITS:
+        word = (word << 1) | (1 if data[edge] else 0)
+        nbits += 1
+        if nbits == FRAME_BITS:
+            # The two halves arrive low-first, each MSB-first, so the collected
+            # word is the true one with its halves swapped. Swapping back makes
+            # bit S of the word slot S.
+            frames.append(
+                (bclk_rises[group_start], (word >> 16) | ((word & 0xFFFF) << 16)))
+            word = 0
+            nbits = 0
+            group_start = i + 1
+
+    if nbits:
+        faults.append(f"{nbits} trailing bit(s) with no frame boundary")
+    if bclk_rises[-1] < ws_falls[-1]:
+        faults.append("capture ended before the last ws fall; the trailing "
+                      "frame is incomplete")
+
+    # ws as a check only: falls on a word boundary (offset 0), rises at the
+    # middle (offset 16). A mismatch is reported, never acted on -- the words
+    # above were emitted regardless.
+    for fall, at in zip(ws_falls, fall_at):
+        if at < anchor or at >= len(bclk_rises):
+            continue
+        off = (at - anchor) % FRAME_BITS
+        if off:
             faults.append(
-                f"frame at sample {start}: {len(cells)} bit clocks, expected "
-                f"{FRAME_BITS}"
-            )
+                f"ws fall at sample {fall}: bclk edge {at} is {off} bit(s) into "
+                f"a frame, not on a boundary; words from here on may be "
+                f"misaligned")
+    for rise, at in zip(ws_rises, rise_at):
+        if at < anchor or at >= len(bclk_rises):
             continue
-        word = 0
-        for cell in cells:
-            at = cell
-            # MSB first, so wire bit k (k = 0 at the frame's first bclk) is slot
-            # 31 - k and the last bit read is slot 0 -- which makes the assembled
-            # word exactly bit S = slot S.
-            word = (word << 1) | (1 if data[at] else 0)
-        frames.append((start, word))
+        off = (at - anchor) % FRAME_BITS
+        if off != FRAME_BITS // 2:
+            faults.append(
+                f"ws rise at sample {rise}: bclk edge {at} is {off} bit(s) into "
+                f"a frame, not at the half (16); words from here on may be "
+                f"misaligned")
 
     if report_faults:
         return frames, faults

@@ -52,6 +52,22 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 ## Done
 
+- **180 — i2s_mux short move "no output" — resolved, decoder fixed.**
+  The "64-step move puts nothing on the wire" reading was a decoder bug plus a
+  capture/QRUN sync misread: the decoder framed the word at the ws *rising*
+  edge and read it whole-word MSB-first, while the hardware sends two 16-bit
+  halves, low half (slots 0-15) first, each half MSB-first, starting at the ws
+  *fall* — so every word decoded half-swapped and one step looked like two
+  phase groups. `extract_frames()` is now a bclk-edge shift register anchored
+  at the first ws fall with the halves swapped back, and the test fixture
+  renders the measured wire order. The short move decodes 64 x `0x000FFFFF`
+  and the long control 327 675 words; the descriptor-seeding hypothesis was
+  refuted by measurement. The remaining real defect — an intermittent
+  single-step drop, reproduced once at n=28, slot 16, with the corrected
+  decoder — is recorded in the saleae `AGENTS.md` known finding and in
+  [r7_virtual_i2s_mux.md](../doc/implemented/r7_virtual_i2s_mux.md)
+  §5.
+
 - **R7 — Virtual I2S mux: 37-channel test harness — implemented.**
   `scripts/i2s_mux_decoder.py` turns an 8-channel capture into a 37-channel one
   (5 passthrough + 32 mux slots, the 3 bus wires consumed) and the existing
@@ -59,15 +75,16 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   `i2s_mux` steppers (`PIN_I2S_FLAG` slots) and the bus is the last three
   analyzer channels, so D0..D4 keep their names on both sides of a decode.
   `--mode scale --driver i2s_mux --pin-mode nodir` sweeps 1…32 multiplexed
-  steppers; **29 of 32 pass**. Three design assumptions were wrong and are
-  corrected with measurements: a slot is high for one bclk period (125 ns), not
-  for the frame; the bus needs ≥ 3 samples per bit period so 24 MS/s and not
-  8 — while 48 MS/s truncates the capture below a scenario's duration; and the
-  word goes out MSB first. Also found and fixed: an intermittent dropped step at
-  20+ slots (the remaining 3), a `uint8_t` serial line length that corrupted any
-  command over 255 characters, and a `sorted()` channel map that handed stepper
-  27 another stepper's channel. See
-  [180_r7_virtual_i2s_mux.md](../doc/implemented/180_r7_virtual_i2s_mux.md).
+  steppers; with the corrected decoder **31 of 32 pass**, the one failure an
+  intermittent dropped step (see the 180 entry above). Three design assumptions
+  were wrong and are corrected with measurements: a slot is high for one bclk
+  period (125 ns), not for the frame; the bus needs ≥ 3 samples per bit period
+  so 24 MS/s and not 8 — while 48 MS/s truncates the capture below a scenario's
+  duration; and the word goes out as two 16-bit halves, low half first, not
+  MSB-first. Also found and fixed: a `uint8_t` serial line length that
+  corrupted any command over 255 characters, and a `sorted()` channel map that
+  handed stepper 27 another stepper's channel. See
+  [r7_virtual_i2s_mux.md](../doc/implemented/r7_virtual_i2s_mux.md).
 
 - **IDF 6 RMT sequence 02 slow — implemented.** F2 caps every RMT sub-entry
   (`rmt_encode_fill()`), so the RMT buffer spans less time than the ramp

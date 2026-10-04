@@ -160,13 +160,14 @@ python3 scripts/harness.py --mode scale --arch esp32 --driver i2s_mux \
     --pin-mode nodir --imux --flash
 ```
 
-Measured on an ESP32-DevKitC with a Saleae Logic at 24 MS/s: **29 of 32 stepper
+Measured on an ESP32-DevKitC with a Saleae Logic at 24 MS/s: **31 of 32 stepper
 counts pass** — every stepper's own step count and its own period, through the
 decoded channel. Three design assumptions in
-`extras/doc/implemented/180_r7_virtual_i2s_mux.md` turned out to be wrong and
+`extras/doc/implemented/r7_virtual_i2s_mux.md` turned out to be wrong and
 were corrected by measurement (a slot is high for one bit-clock period, not for
-the frame; the bus needs 24 MS/s and *not* 48; the word is MSB first), and there
-is one open finding: an intermittent dropped step at 20+ slots.
+the frame; the bus needs 24 MS/s and *not* 48; the word is two 16-bit halves,
+low half first, not one MSB-first word), and there is one open finding: an
+intermittent dropped step (one failure in a 32-point sweep, n=28 slot 16).
 
 Sample rate matters more here than anywhere else in the harness. The bus runs at
 8 MHz, so what has to resolve is the **bit clock** — 24 MS/s is three samples per
