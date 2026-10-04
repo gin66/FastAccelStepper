@@ -843,42 +843,29 @@ class TestConfigGrammar(unittest.TestCase):
             self.assertTrue(Path(args.results_dir).is_dir(), args.results_dir)
 
     def test_config_line_fits_the_firmware_line_buffer(self):
-        # The firmware reads a line into a fixed buffer and takes each argument
-        # with a bounded sscanf width. A CONFIG the host generates that does not
-        # fit is truncated on the way in and refused with a misleading "no such
-        # driver" on the half-cut last name -- so the budget is checked here,
-        # where it can be changed when the stepper count rises.
+        # The firmware reads a line into a fixed buffer and copies each argument
+        # into a fixed buffer. A CONFIG the host generates that does not fit is
+        # truncated on the way in and refused with a misleading "no such driver"
+        # on the half-cut last name -- so the budget is checked here, where it
+        # can be changed when the stepper count rises.
         source = (COMMON / "saleae_app.cpp").read_text()
         line_max = self._firmware_constant("SALEAE_LINE_MAX")
-        # Every buffer sscanf writes into, paired with the width the format
-        # claims for it. A buffer smaller than its own width is a buffer
-        # overflow, and a width smaller than the buffer is a silent truncation
-        # that reads as a refusal -- both have to be ruled out, and only
-        # checking one of them is what made an earlier version of this test
-        # pass while the bug it was written for was present.
+        # Every buffer a command-line argument is copied into, with its size.
         buffers = {name: self._resolve_size(size) for name, size in
-                   re.findall(r"char (arg\d)\[([^\]]+)\]", source)}
-        self.assertEqual(len(buffers), 4,
-                         f"expected arg1..arg4, found {sorted(buffers)}")
-        # The sscanf field widths, in order. Four are literals; the driver-list
-        # one is stringized from SALEAE_ARG2_MAX so it tracks the stepper count
-        # instead of drifting from it, and has to be resolved the same way.
-        widths = [int(w) for w in re.findall(r"%(\d+)s", source)]
-        # Whitespace-tolerant: clang-format wraps the format literal, so the
-        # `%` of the stringized width, the `SALEAE_STR(...)` call and the `s` of
-        # its conversion can each end up on a different line. Matching the
-        # literal's spacing broke the moment the format moved into SAL_PSTR and
-        # got long enough to wrap.
-        stringized = re.findall(
-            r'%"?\s*SALEAE_STR\(\s*(\w+)\s*\)\s*"s', source)
-        for name in stringized:
-            widths.insert(-2, self._firmware_constant(name))
-        self.assertEqual(len(widths), len(buffers) + 1,
-                         f"found {len(widths)} widths for {len(buffers)} "
-                         f"buffers: {widths}")
-        for (name, size), width in zip(buffers.items(), widths[1:]):
-            self.assertEqual(size - 1, width,
-                             f"{name}[{size}] but sscanf says %{width}s")
+                   re.findall(r"SAL_REPLY_BUF char (arg\d|cmd)\[([^\]]+)\]", source)}
+        self.assertEqual(sorted(buffers), ["arg1", "arg2", "arg3", "arg4",
+                                           "cmd"],
+                         f"expected cmd and arg1..arg4, found {sorted(buffers)}")
+        # Each field's width is `sizeof(its own buffer) - 1`, so a width and its
+        # buffer cannot drift apart. That is stronger than the check this test
+        # used to make, which compared each buffer against a literal width
+        # spelled out in an sscanf format string -- two things to keep in sync,
+        # with a silent truncation (or an overflow) as the failure mode of
+        # getting it wrong.
+        fields = re.findall(r"\{(cmd|arg\d), sizeof\(\1\) - 1\}", source)
+        self.assertEqual(sorted(fields), sorted(buffers),
+                         "every argument buffer needs a sal_field entry of the "
+                         f"form {{name, sizeof(name) - 1}}; found {fields}")
         widest = max(buffers.values()) - 1
 
         # The count that has to fit is the widest one the protocol allows, not
@@ -894,6 +881,124 @@ class TestConfigGrammar(unittest.TestCase):
             self.assertLessEqual(count * len(driver) + count - 1, widest,
                                  f"a {count}x {driver!r} driver list is "
                                  f"truncated by the argument width")
+
+
+class TestStackBudget(unittest.TestCase):
+    """No reply or argument buffer may go back on the stack.
+
+    This is the guard for extras/todo/015_rmt_panics_on_esp_idf_5_5.md. Every
+    CONFIG constructs its drivers from the FreeRTOS `main` task, whose stack is
+    `CONFIG_ESP_MAIN_TASK_STACK_SIZE` -- 3584 B on ESP32. A local array reserves
+    its slot for the whole function, so `handle_config`'s reply buffer was held
+    while it called `rmt_new_tx_channel`, and on ESP-IDF 5.5.3 the overflow ran
+    off the top of the stack into the DRAM tlsf pool and surfaced much later as a
+    corrupted free list inside `tlsf_malloc`.
+
+    Measured peak stack for `CONFIG 1 rmt dir` on IDF 5.5.3, before and after:
+
+        before   4272 B of 3584 B   -- over budget, panics
+        after    2336 B of 3584 B   -- 1248 B spare
+
+    The two changes were moving these buffers to `static` and dropping libc
+    `sscanf`/`snprintf` (1496 B and 384 B per call) for the small formatter in
+    saleae_str.h. The buffer change is the larger half: `handle_config` alone
+    reserved SALEAE_CFG_REPLY_MAX = 1152 B on a 32-stepper ESP32 build.
+
+    Source-level, like TestAvrRamBudget, because that is the habit being guarded
+    and a host test cannot see it. `static` is not a pessimisation on AVR either:
+    a 328P's stack lives in `.data` too, so the bytes are the same bytes.
+    """
+
+    # Anything at or above this is a buffer whose size is a tuning decision
+    # rather than a token. The largest legitimate stack buffer left in the
+    # firmware is far below it.
+    LIMIT = 64
+
+    def test_no_large_buffer_is_a_stack_local(self):
+        offenders = []
+        for path in sorted(COMMON.glob("*.[ch]")) + sorted(COMMON.glob("*.cpp")):
+            for line_no, line in enumerate(path.read_text().splitlines(), 1):
+                stripped = line.strip()
+                # SAL_REPLY_BUF expands to `static` off AVR and to nothing on
+                # AVR, and the AVR choice is deliberate -- see its definition in
+                # saleae_app.cpp. Neither form is a bare stack local off AVR.
+                if stripped.startswith("static ") or stripped.startswith(
+                        "SAL_REPLY_BUF "):
+                    continue
+                m = re.match(r"(?:const\s+)?char\s+(\w+)\[([^\]]*)\]", stripped)
+                if not m:
+                    continue
+                name, size = m.group(1), m.group(2)
+                if not size.strip().isdigit():
+                    continue  # sized from a constant; checked by its own test
+                if int(size) >= self.LIMIT:
+                    offenders.append(f"{path.name}:{line_no} char {name}[{size}]")
+        self.assertEqual(offenders, [],
+                         "these buffers are stack locals; move them to static "
+                         "or the main task overflows into the heap:\n  "
+                         + "\n  ".join(offenders))
+
+    def test_reply_buffer_placement_is_explicit_and_platform_aware(self):
+        # The rule has two halves that look contradictory -- `static` off AVR,
+        # automatic on it -- so assert both are still spelled out. If the macro
+        # is collapsed to one form, the stack budget regresses on one platform
+        # or the other.
+        source = (COMMON / "saleae_app.cpp").read_text()
+        avr = re.search(r"#if defined\(__AVR__\)\n#define SAL_REPLY_BUF\n"
+                        r"#else\n#define SAL_REPLY_BUF static\n#endif", source)
+        self.assertIsNotNone(
+            avr, "SAL_REPLY_BUF must be empty on AVR and static elsewhere")
+
+    def test_the_measured_budget_is_recorded_next_to_the_fix(self):
+        # The number above is a measurement, not a derivation, so it belongs in
+        # the repository or it rots silently. Both documents carry it.
+        for doc in ("015_rmt_panics_on_esp_idf_5_5.md",):
+            text = (SCRIPTS.parents[2] / "todo" / doc).read_text()
+            self.assertIn("2336", text,
+                          f"{doc} no longer records the post-fix peak stack "
+                          "usage, so the budget claim cannot be checked")
+
+
+class TestSaleaeFmt(unittest.TestCase):
+    """The tiny formatter must cover every format string, and only those.
+
+    `sal_snprintf` is this harness's own implementation of five conversions
+    (saleae_str.h), not libc: libc cost 384 B of stack per call against a
+    3584 B task that also has to reach the driver constructors. It returns -1
+    for anything else rather than printing something plausible, which is safe
+    but silent -- so the set of conversions actually used is checked here.
+    """
+
+    SUPPORTED = {"s", "u", "d", "lu", "ld"}
+
+    def test_no_format_string_uses_an_unsupported_conversion(self):
+        seen = set()
+        for path in sorted(COMMON.glob("*.cpp")):
+            for fmt in re.findall(r'SAL_PSTR\("([^"]*)"\)', path.read_text()):
+                for m in re.finditer(r"%(-?\d*)(l?)([a-zA-Z%])", fmt):
+                    width, length, conv = m.groups()
+                    if conv == "%":
+                        continue
+                    spec = length + conv
+                    seen.add(spec)
+                    self.assertIn(spec, self.SUPPORTED,
+                                  f"{path.name}: %{'%'}{spec} in {fmt!r} is "
+                                  f"not implemented by sal_snprintf, which "
+                                  f"returns -1 and prints nothing")
+        # Not vacuous: if the scan ever stops finding conversions this test
+        # would pass for the wrong reason.
+        self.assertTrue(seen, "no format strings were scanned at all")
+
+    def test_widths_and_zero_padding_are_absent(self):
+        # `len += sal_snprintf(buf + len, sizeof(buf) - len, ...)` accumulates,
+        # so a width or a zero pad would silently misalign every multi-part
+        # reply. Neither is implemented; make sure nobody starts using one.
+        for path in sorted(COMMON.glob("*.cpp")):
+            for fmt in re.findall(r'SAL_PSTR\("([^"]*)"\)', path.read_text()):
+                for m in re.finditer(r"%(.)", fmt):
+                    self.assertNotIn(m.group(1), "0123456789.-+ #",
+                                     f"{path.name}: flags/width in {fmt!r} are "
+                                     "not implemented by sal_snprintf")
 
 
 class TestChannelMap(unittest.TestCase):

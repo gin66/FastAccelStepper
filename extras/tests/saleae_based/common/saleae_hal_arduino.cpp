@@ -28,6 +28,11 @@ extern "C" uint32_t saleae_hal_millis(void) { return millis(); }
 
 extern "C" void saleae_hal_delay_ms(uint32_t ms) { delay(ms); }
 
+// See saleae_hal.h: the idle path must block, not spin. Arduino's delay() is
+// already a yield/sleep on every target this harness builds, so it is correct
+// here as it stands.
+extern "C" void saleae_hal_idle(void) { delay(1); }
+
 // The RX ring buffer has to be enlarged before Serial.begin() and only on
 // ESP32, where the core sizes it at 256 bytes by default.
 //

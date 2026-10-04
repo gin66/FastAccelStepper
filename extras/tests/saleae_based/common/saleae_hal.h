@@ -33,6 +33,18 @@ void saleae_hal_write(int pin, int level);
 uint32_t saleae_hal_millis(void);
 void saleae_hal_delay_ms(uint32_t ms);
 
+// One idle pass's worth of wait, as a *blocking* delay on an RTOS.
+//
+// Deliberately not `saleae_hal_delay_ms(1)`: that resolves to a busy spin below
+// one tick, which is right where an edge has to land (SR_00) and wrong where it
+// merely means "nothing to do". Spinning in the idle path starves IDLE, and the
+// task watchdog then resets a board that is doing nothing at all -- measured on
+// ESP-IDF 4.4.3, ten seconds after boot, with no command outstanding. Blocking
+// for one tick is what the project's own ESP-IDF entry point does:
+// `DELAY_MS(10)` in examples/StepperDemo/StepperDemo.ino, which is
+// `vTaskDelay(pdMS_TO_TICKS(10))`.
+void saleae_hal_idle(void);
+
 // Serial console (host command channel)
 void saleae_hal_serial_begin(uint32_t baud);
 int saleae_hal_serial_read(void);  // returns a byte 0..255, or -1 if none

@@ -37,7 +37,17 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
       .clk_cfg = {.sample_rate_hz = I2S_SAMPLE_RATE_HZ,
                   .clk_src = I2S_CLK_SRC_DEFAULT,
                   .mclk_multiple = I2S_MCLK_MULTIPLE_128,
-#if ESP_IDF_VERSION_MAJOR >= 6
+                  // Plain uint32_t wherever it exists, and only takes
+                  // effect in slave role, so 0 is the right master-mode value.
+                  // Named explicitly so it is never left to implicit
+                  // zero-fill, which is the warning this file used to emit on
+                  // IDF 5.x. The field was added in ESP-IDF 5.5 -- the
+                  // Arduino-as-ESP-IDF builds ship a 5.3 SDK, where naming it
+                  // does not compile. Compared by MAJOR/MINOR because
+                  // ESP_IDF_VERSION is not visible in every build this library
+                  // compiles in; pd_config_idf5.h uses the same pair.
+#if (ESP_IDF_VERSION_MAJOR > 5) ||                                    \
+    (ESP_IDF_VERSION_MAJOR == 5 && ESP_IDF_VERSION_MINOR >= 5)
                   .bclk_div = 0
 #endif
       },

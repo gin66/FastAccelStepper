@@ -82,6 +82,15 @@ extern "C" int saleae_hal_serial_read(void) {
   return uart_read_bytes(SALEAE_UART, &c, 1, 0) == 1 ? c : -1;
 }
 
+extern "C" void saleae_hal_idle(void) {
+  // One tick, blocked. See saleae_hal.h for why this is not delay_ms(1): a
+  // sub-tick delay spins, and a spinning idle loop keeps IDLE from ever running,
+  // so the task watchdog fires on a board that is only waiting for a command.
+  // Note the watchdog subscription that fires is IDLE's, so resetting the WDT
+  // from this task would not help -- only blocking lets IDLE reset its own.
+  vTaskDelay(1);
+}
+
 extern "C" void saleae_hal_serial_write(const char* text) {
   uart_write_bytes(SALEAE_UART, text, strlen(text));
 }

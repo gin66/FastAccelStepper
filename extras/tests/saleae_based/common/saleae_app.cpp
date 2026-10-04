@@ -219,11 +219,6 @@
 static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
               "SALEAE_ARG2_MAX too small for the driver list");
 
-// Stringize SALEAE_ARG2_MAX so it can be used as an sscanf field width, which
-// must be a literal in the format string.
-#define SALEAE_STR_(x) #x
-#define SALEAE_STR(x) SALEAE_STR_(x)
-
 // Enough for "CONFIG " + count + the driver list + " nodir" + slack.
 #define SALEAE_LINE_MAX (SALEAE_ARG2_MAX + 32)
 
@@ -510,6 +505,31 @@ static bool done_pending = false;
 // does not restart the completion path. Cleared when a new program is armed.
 static bool done_announced = false;
 static char linebuf[SALEAE_LINE_MAX];
+// Where a reply buffer lives. The two platforms want opposite answers, for the
+// same underlying reason: on both, a buffer costs RAM either way, but what is
+// scarce is different.
+//
+// Off AVR the command loop runs on an RTOS task with a fixed stack -- 3584 B for
+// app_main by default -- and a local array holds its stack slot for the WHOLE
+// function, not just where it is written. `handle_config` therefore still had its
+// 1152-byte SALEAE_CFG_REPLY_MAX resident while it called rmt_new_tx_channel(),
+// and the overflow ran off the top of the stack into the DRAM tlsf pool, where
+// it surfaced much later as a corrupted free list inside tlsf_malloc. Measured
+// peak for `CONFIG 1 rmt dir` on ESP-IDF 5.5.3: 4272 B of 3584 B before, 2336 B
+// after. See extras/todo/015_rmt_panics_on_esp_idf_5_5.md.
+//
+// On AVR it is the other way round: the stack is ordinary SRAM above .bss, so a
+// stack local and a static cost the same *peak*. But a static is committed for
+// the whole life of the program while stack space is reused by every other call
+// path, and these buffers total ~640 B on a part with 2048 to begin with.
+// Committing them would spend headroom this target does not have, so AVR keeps
+// them automatic. `.data` stays at 40 B.
+#if defined(__AVR__)
+#define SAL_REPLY_BUF
+#else
+#define SAL_REPLY_BUF static
+#endif
+
 // uint16_t, not uint8_t.
 //
 // A uint8_t length wraps at 256, and the wrap does not drop the tail of a long
@@ -870,7 +890,7 @@ static bool parse_pin_mode(char* mode_text, bool* nodir, uint8_t* stride) {
 // bytes of SRAM -- measured, not estimated. The frame is transient and never
 // recursed into, so the extra level costs nothing that matters.
 static void reply_too_many(long count, uint8_t stride) {
-  char buf[64];
+  SAL_REPLY_BUF char buf[64];
   sal_snprintf(buf, sizeof(buf),
                SAL_PSTR("ERR CONFIG n=%ld max=%u slots=%u chans=%u/%u\n"),
                count, (unsigned)SALEAE_MAX_STEPPERS, (unsigned)channels_free(),
@@ -892,6 +912,12 @@ static void reply_too_many(long count, uint8_t stride) {
 // conditions deliberately and exactly: a capability report built from a second
 // copy of these #ifs is a second thing to keep in sync, and when it drifts the
 // host plans runs against a driver this build will refuse.
+//
+// Only the `SUPPORT_SELECT_DRIVER_TYPE` reply names drivers, so on a build
+// without driver selection (AVR, and the RP2040 timer build) this is unused --
+// and an unused static function is a warning, which is not allowed. The guard
+// matches the sole call site in handle_drivers().
+#if defined(SUPPORT_SELECT_DRIVER_TYPE)
 static bool driver_supported(enum saleae_driver driver) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   switch (driver) {
@@ -922,6 +948,7 @@ static bool driver_supported(enum saleae_driver driver) {
   return true;  // timer, and pio where compiled, are the only drivers here
 #endif
 }
+#endif  // SUPPORT_SELECT_DRIVER_TYPE
 
 // The event-marker channel: the analyzer channel index whose pin the firmware
 // pulses at the instant it processes STOP, or 0xFF for none.
@@ -1020,9 +1047,9 @@ static void handle_drivers(void) {
   // the stack in .data, so borrowing the CONFIG size would spend 56 bytes of a
   // 328P's 203 remaining on a reply that is half that long.
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  char buf[76];
+  SAL_REPLY_BUF char buf[76];
 #else
-  char buf[48];
+  SAL_REPLY_BUF char buf[48];
 #endif
   int len = sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK DRIVERS mux=%u"),
                          mux_ready ? 1 : 0);
@@ -1083,7 +1110,7 @@ static void handle_imux(void) {
   // Channels before pins, and both by name: `data=5` on its own is ambiguous on
   // this board, where GPIO 5 is also channel 5. The host needs the channels to
   // build a decoder config and the pins to check it against the wiring.
-  char buf[80];
+  SAL_REPLY_BUF char buf[80];
   sal_snprintf(buf, sizeof(buf),
                SAL_PSTR("OK IMUX ch=%u,%u,%u pin=%u,%u,%u D%d=D%d D%d=D%d "
                         "D%d=D%d\n"),
@@ -1098,6 +1125,24 @@ static void handle_imux(void) {
 #endif
 }
 
+// Without configurable driver type there is no mux, so `bus` and `slots` do not
+// exist and `ch` is the only variable part -- at most two channels on a 328P.
+// The full form's buffer (SALEAE_CHANNELS*4 + SALEAE_MAX_STEPPERS*4 + 96) is
+// 136 bytes there for a reply of at most 66, so this rung keeps only the three
+// scalars the host needs to build a channel map and spends 32 instead. The pin
+// list is what it gives up: the host keeps deriving the map from count/mode/
+// stride, and only records `pins` for the report.
+#if !defined(SUPPORT_SELECT_DRIVER_TYPE)
+static void handle_map(void) {
+  SAL_REPLY_BUF char buf[32];
+  SAL_REPLY_BUF char mode[SAL_PIN_MODE_MAX];
+  pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
+  sal_snprintf(buf, sizeof(buf),
+               SAL_PSTR("MAP count=%u mode=%s stride=%u ch=-\n"),
+               (unsigned)slot_count, mode, (unsigned)chan_stride);
+  reply(buf);
+}
+#else
 static void handle_map(void) {
   // "MAP count=8 mode=nodir stride=1 ch=" plus 8 two-digit pins. Sized from the
   // channel budget for the same RAM reason as SALEAE_CFG_REPLY_MAX.
@@ -1118,8 +1163,8 @@ static void handle_map(void) {
   // edge on a pin that carries somebody else's, find nothing, and report a
   // driver that emits nothing. `slots` uses `-` for a GPIO stepper so the field
   // lines up with the stepper letters one to one.
-  char buf[SALEAE_CHANNELS * 4 + SALEAE_MAX_STEPPERS * 4 + 96];
-  char mode[SAL_PIN_MODE_MAX];
+  SAL_REPLY_BUF char buf[SALEAE_CHANNELS * 4 + SALEAE_MAX_STEPPERS * 4 + 96];
+  SAL_REPLY_BUF char mode[SAL_PIN_MODE_MAX];
   pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
   int len = sal_snprintf(buf, sizeof(buf),
                          SAL_PSTR("MAP count=%u mode=%s stride=%u ch="),
@@ -1167,6 +1212,7 @@ static void handle_map(void) {
   sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("\n"));
   reply(buf);
 }
+#endif  // SUPPORT_SELECT_DRIVER_TYPE
 
 // CONFIG <count> <driver>[,<driver>...] [dir|nodir]
 //
@@ -1286,7 +1332,7 @@ static void handle_config(char* count_text, char* driver_list,
                                ? (uint8_t)(SALEAE_CHANNELS - SALEAE_BUS_COUNT)
                                : (uint8_t)SALEAE_CHANNELS;
   if (want_phy > chan_cap) {
-    char buf[64];
+    SAL_REPLY_BUF char buf[64];
     sal_snprintf(buf, sizeof(buf),
                  SAL_PSTR("ERR CONFIG n=%u needs %u channels, max=%u\n"),
                  (unsigned)n, (unsigned)want_phy, (unsigned)chan_cap);
@@ -1300,7 +1346,7 @@ static void handle_config(char* count_text, char* driver_list,
   // tryAllocateQueue()'s bitmask -- a refusal there names no bound.
   const uint8_t slots_wanted = (uint8_t)(want_mux * (nodir ? 1 : 2));
   if (slots_wanted > 32) {
-    char buf[64];
+    SAL_REPLY_BUF char buf[64];
     sal_snprintf(buf, sizeof(buf),
                  SAL_PSTR("ERR CONFIG mux n=%u needs %u slots, max=32\n"),
                  (unsigned)n, (unsigned)slots_wanted);
@@ -1346,11 +1392,11 @@ static void handle_config(char* count_text, char* driver_list,
 
   // One buffer rather than several, so the reply cannot be truncated halfway,
   // and sized by SALEAE_CFG_REPLY_MAX because on AVR it is stack.
-  char buf[SALEAE_CFG_REPLY_MAX];
+  SAL_REPLY_BUF char buf[SALEAE_CFG_REPLY_MAX];
   // `mode` and `drv` are RAM copies of flash literals, because both are `%s`
   // arguments and snprintf reads its arguments out of RAM. See saleae_str.h.
-  char mode[SAL_PIN_MODE_MAX];
-  char drv[SAL_DRV_NAME_MAX];
+  SAL_REPLY_BUF char mode[SAL_PIN_MODE_MAX];
+  SAL_REPLY_BUF char drv[SAL_DRV_NAME_MAX];
   pin_mode_name(nodir, mode);
   // Naming the drivers that were actually connected is what lets a run be
   // checked against what the board really did -- the one thing an implicit
@@ -1513,7 +1559,7 @@ static void qe_pump(void) {
     }
     if (err) {
       c->active = false;
-      char buf[64];
+      SAL_REPLY_BUF char buf[64];
       sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR QE step%u rc=%d\n"), i,
                    (int)last);
       reply(buf);
@@ -1560,7 +1606,7 @@ static void qe_pump(void) {
     qe_feed(c, slots[i].stepper, 0, &err, &last);
     if (err) {
       c->active = false;
-      char buf[64];
+      SAL_REPLY_BUF char buf[64];
       sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR QE step%u rc=%d\n"), i,
                    (int)last);
       reply(buf);
@@ -1584,7 +1630,7 @@ static void handle_qinfo(void) {
   // comma each is 48 more. SALEAE_SHORT_REPLY_MAX is sized for the AVR rung
   // (48) which caps at 2 steppers, so a separate larger buffer is needed for
   // the many-stepper rungs; the two ladder rungs are otherwise identical.
-  char buf[SALEAE_QINFO_REPLY_MAX];
+  SAL_REPLY_BUF char buf[SALEAE_QINFO_REPLY_MAX];
   int len = sal_snprintf(
       buf, sizeof(buf), SAL_PSTR("QINFO tps=%lu mincmd=%u qlen=%u maxall="),
       (unsigned long)TICKS_PER_S, (unsigned)MIN_CMD_TICKS, (unsigned)QUEUE_LEN);
@@ -1875,30 +1921,35 @@ static void handle_qfill(char* mask_text, char* entries_text) {
 }
 
 static void handle_line(char* line) {
-  char cmd[16] = {0};
-  char arg1[32] = {0};
+  SAL_REPLY_BUF char cmd[16];
+  SAL_REPLY_BUF char arg1[32];
   // arg2 is the CONFIG driver list, one name per stepper, so it is the only
   // argument that grows with the stepper count: 4 x "i2s_direct" is 43
   // characters and truncating it to 32 would refuse a legal request with a
   // confusing "no such driver" on the last, half-cut name.
-  // One byte larger than the sscanf width above: sscanf writes at most
-  // `width` characters and then a NUL, so a buffer of exactly `width` overflows
-  // by that terminator.
-  char arg2[SALEAE_ARG2_MAX + 1] = {0};
-  char arg3[32] = {0};
-  char arg4[32] = {0};
-  // arg2's field width comes from SALEAE_ARG2_MAX rather than a literal, so it
-  // tracks the stepper count instead of drifting from it: a width shorter than
-  // the buffer truncates the driver list and refuses a legal request, and one
-  // longer than the buffer overflows it.
+  // One byte larger than the width below, because a field stores at most
+  // `width` characters and then a NUL.
+  SAL_REPLY_BUF char arg2[SALEAE_ARG2_MAX + 1];
+  SAL_REPLY_BUF char arg3[32];
+  SAL_REPLY_BUF char arg4[32];
+  // The widths come from the buffer sizes rather than from literals in a format
+  // string, so they cannot drift apart: a width shorter than the buffer
+  // truncates the driver list and refuses a legal request, and one longer than
+  // the buffer overflows it.
   //
-  // sscanf_P, not sscanf: the format is the one remaining literal in this
-  // function and on AVR a literal is an SRAM allocation (saleae_str.h). The
-  // destinations are RAM -- sscanf_P writes through RAM pointers -- so only the
-  // format has to move.
-  int n = sal_sscanf(
-      line, SAL_PSTR("%15s %31s %" SALEAE_STR(SALEAE_ARG2_MAX) "s %31s %31s"),
-      cmd, arg1, arg2, arg3, arg4);
+  // sal_tokenize, not sscanf: libc `sscanf` costs 1496 bytes of stack per call
+  // and `snprintf` 384, against a 3584-byte main task that also has to reach
+  // the driver constructors -- the overflow runs off the top of the stack into
+  // the DRAM heap and surfaces much later as a corrupted free list. See
+  // saleae_str.h and extras/todo/015_rmt_panics_on_esp_idf_5_5.md.
+  const struct sal_field fields[] = {
+      {cmd, sizeof(cmd) - 1},
+      {arg1, sizeof(arg1) - 1},
+      {arg2, sizeof(arg2) - 1},
+      {arg3, sizeof(arg3) - 1},
+      {arg4, sizeof(arg4) - 1},
+  };
+  const int n = sal_tokenize(line, fields, sizeof(fields) / sizeof(fields[0]));
 
   if (n <= 0) {
     return;
@@ -1939,7 +1990,7 @@ static void handle_line(char* line) {
     // One slot per stepper, and " %ld" is up to 13 bytes with a leading space
     // and a sign -- so 32 of them do not fit the 80 bytes an eight-stepper run
     // needs. Sized from the same stepper count as the other replies.
-    char buf[8 * SALEAE_MAX_STEPPERS + 16];
+    SAL_REPLY_BUF char buf[8 * SALEAE_MAX_STEPPERS + 16];
     int len = sal_snprintf(buf, sizeof(buf), SAL_PSTR("POS"));
     for (uint8_t i = 0; i < slot_count; i++) {
       len += sal_snprintf(
@@ -2010,7 +2061,7 @@ extern "C" void saleae_app_loop(void) {
   } else if (any_active()) {
     qe_pump();
   } else {
-    saleae_hal_delay_ms(1);
+    saleae_hal_idle();
   }
 
   // `done_announced` latches completion. Without it `qe_finish()` re-arms
@@ -2023,7 +2074,7 @@ extern "C" void saleae_app_loop(void) {
   }
 
   if (done_pending && !any_running()) {
-    char buf[96];
+    SAL_REPLY_BUF char buf[96];
     int len = sal_snprintf(buf, sizeof(buf), SAL_PSTR("DONE"));
     uint8_t n = slot_count ? slot_count : 1;
     for (uint8_t i = 0; i < n; i++) {

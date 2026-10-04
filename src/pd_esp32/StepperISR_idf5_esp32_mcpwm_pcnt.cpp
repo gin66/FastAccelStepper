@@ -275,7 +275,13 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
       .count_mode = MCPWM_TIMER_COUNT_MODE_UP_DOWN,
       .period_ticks = 400,
       .intr_priority = 1,
-      .flags = {.update_period_on_empty = 0, .update_period_on_sync = 0}};
+      .flags = {.update_period_on_empty = 0,
+                .update_period_on_sync = 0,
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 4, 0)
+                // added in IDF 5.4; absent from 5.3's mcpwm_timer_config_t
+                .allow_pd = 0
+#endif
+      }};
   ESP_ERROR_CHECK_WITHOUT_ABORT(mcpwm_new_timer(&timer_cfg, &mapping->timer));
 
   mcpwm_operator_config_t oper_cfg = {.group_id = group_id,

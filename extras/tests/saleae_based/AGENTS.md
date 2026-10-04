@@ -274,19 +274,61 @@ happened to pick.
 host can address the 16-bit boundaries exactly (1 and 65535). Always read
 `QINFO` first and use its values; never hardcode a tick rate.
 
-`QRUN <mask>` is the multi-stepper selector: `QRUN 1` is one stepper, `QRUN 3`
-is steppers A and B together (synchronized start).
+### The tick floor is on the command's DURATION, not on `ticks`
 
-Example — 255 steps at max speed, a pause, then a single step, which is the
-case that exposes MCPWM/PCNT counter-limit overrun handling:
+`addQueueEntry()` refuses when `ticks × steps < MIN_CMD_TICKS`
+(`src/fas_queue/queue_add_entry.cpp`):
+
+```c
+uint32_t command_rate_ticks = period;
+if (steps > 1) { command_rate_ticks *= steps; }
+if (command_rate_ticks < MIN_CMD_TICKS) { return AQE_ERROR_TICKS_TOO_LOW; }
+```
+
+`MIN_CMD_TICKS` is `TICKS_PER_S / 5000`, so on ESP32 (16 MHz) it is **3200**
+ticks — a command has to occupy 200 µs of the queue's timeline whatever it
+contains. Measured on the board:
+
+| `QSEG` | ticks × steps | result |
+|---|---|---|
+| `40 80 1` | 3200 | accepted |
+| `39 80 1` | 3120 | `ERR QE step0 rc=-1` |
+| `255 80 1` | 20400 | accepted |
+| `1 80 1` | 80 | **refused** |
+| `0 1600 1` (pause) | 1600 | **refused** |
+| `0 3200 1` (pause) | 3200 | accepted |
+
+Two consequences that cost real time to rediscover:
+
+- **A single step cannot run faster than `MIN_CMD_TICKS`.** One step at 80 ticks
+  is 80, well under 3200. To use the advertised `maxspeed0=80` period you must
+  put *at least 40 steps* in the command (`40 × 80 = 3200`).
+- **`QSEG` does not check this; `QRUN` does.** Appending a too-fast segment
+  answers `OK QSEG n/8`, and the refusal arrives as `ERR QE step<u> rc=-1` from
+  the feeder — named by *stepper*, not by segment, so it reads like a queue
+  problem rather than a tick-range one.
+
+`maxspeed*` in `QINFO` is therefore **not** "the fastest period you may write":
+it is the fastest *period*, usable only on a command long enough to clear the
+duration floor. Plan shared programs from `mincmd` and treat `maxspeed*` as the
+per-stepper period to divide into, not as a `QSEG ticks` value.
+
+Example — 255 steps, a pause, then a single step, which is the case that exposes
+MCPWM/PCNT counter-limit overrun handling. Note the pause and the trailing step
+both have to clear the duration floor, so the single step runs at `mincmd` and
+the example no longer demonstrates "a single step at maximum speed" (nothing can,
+on this SDK):
 
 ```
 QCLR
-QSEG 255 80 1      # ticks = the max-speed floor from QINFO
-QSEG 0 1600 1      # pause
-QSEG 1 80 1        # single step after the pause
+QSEG 255 80 1      # ticks = the period from QINFO's maxspeed0
+QSEG 0 3200 1      # pause: steps==0, so ticks alone must clear mincmd
+QSEG 1 3200 1      # single step: ticks alone must clear mincmd
 QRUN 1
 ```
+
+`QRUN <mask>` is the multi-stepper selector: `QRUN 1` is one stepper, `QRUN 3`
+is steppers A and B together (synchronized start).
 
 Example — SR_25 / SR_30, the two stop scenarios. The program is four
 `QUEUE_FILL_STEPS` segments, the queue is filled to a fixed 16 entries before
@@ -411,18 +453,54 @@ records **failed** with `ERR CONFIG no such driver` on every row without I2S.
 That is the firmware answering a capability question, not a measurement going
 wrong, and it is why the report says so in its legend rather than suppressing it.
 
-### ESP-IDF 5.5.3 has two open library defects — do not read that row as green
+### ESP-IDF 5.5.3 broke RMT and `i2s_direct` — one cause, in this harness (fixed)
 
-- **Every RMT `CONFIG` panics the firmware** (`LoadProhibited` inside the
+Both symptoms on that row were **the same defect**, and it is not in the library
+or in either driver: **the main task overflowed its stack.**
+`CONFIG_ESP_MAIN_TASK_STACK_SIZE` is 3584 B, and every `CONFIG` constructs its
+drivers from that task, so `stepperConnectToPin()` ran on a stack that was out
+of budget before it started.
+
+- **Every RMT `CONFIG` panicked the firmware** (`LoadProhibited` inside the
   allocator, reached from `rmt_new_tx_channel`): 34 measurements, `connect_rmt()`
-  never returns. → [`extras/todo/015_rmt_panics_on_esp_idf_5_5.md`](../../todo/015_rmt_panics_on_esp_idf_5_5.md)
-- **`i2s_direct` is unstable**: the `scale` sweep answers refused / failed /
-  stack-overflow for the same point across runs. →
-  [`016_i2s_direct_stack_overflow_idf55.md`](../../todo/016_i2s_direct_stack_overflow_idf55.md)
+  never returned. The overflow ran off the *top* of the stack into the DRAM tlsf
+  pool, so it presented as a corrupted free list rather than a stack fault.
+  → [`extras/todo/015_rmt_panics_on_esp_idf_5_5.md`](../../todo/015_rmt_panics_on_esp_idf_5_5.md)
+- **`i2s_direct` was unstable**: the `scale` sweep answered refused / failed /
+  stack-overflow for the same point across runs. Here FreeRTOS *did* report it
+  (`CHECK_STACKOVERFLOW_CANARY` catches downward writes; the RMT row's
+  upward-into-heap write is invisible to it).
+  → [`016_i2s_direct_stack_overflow_idf55.md`](../../todo/016_i2s_direct_stack_overflow_idf55.md)
 
-Everything else on that row passes, so "IDF 5.5 is broken" is too strong a
-summary — it is RMT and `i2s_direct` on that SDK. IDF 4.4, IDF 6.1 and all
-three Arduino rows are clean apart from the mux `dir` slot loss below.
+**What the stack was spent on** (measured with
+`uxTaskGetStackHighWaterMark()`, ESP-IDF 5.5.3, peak for `CONFIG 1 rmt dir`):
+
+| | stack |
+|---|---|
+| reply buffers held as **stack locals** — `handle_config`'s `SALEAE_CFG_REPLY_MAX` alone is 1152 B, and a local array holds its slot for the whole function | **~1900 B** |
+| libc `sscanf` (one call) + libc `snprintf` (384 B each) — the protocol only ever formats `%s`/`%u`/`%d` | ~1900 B |
+| `StepperTask` (6000 B, 8 % used) — not involved | 508 B |
+
+Peak went **4272 B → 2336 B** of the 3584 B default, so the cliff is gone rather
+than moved and no Kconfig change was needed. `CONFIG 1 rmt dir` and
+`CONFIG 2 i2s_direct,i2s_direct nodir` both answer `OK` on 5.5.3 now.
+
+The rules that keep it that way are enforced by `TestStackBudget` and
+`TestSaleaeFmt` in `scripts/tests/test_saleae.py`: no `char[]` of 64 bytes or
+more may be a stack local off AVR, and no format string may use a conversion the
+small formatter does not implement. `SAL_REPLY_BUF` in `saleae_app.cpp` is the
+one place that says which side of the line a buffer is on, and the reason is
+platform-specific — off AVR the task stack is scarce, on AVR the 2 KB part is.
+
+Two things this harness still gets wrong, both unrelated to the stack and both
+reproduced on a pristine checkout:
+
+- **`i2s_mux` mangles any command from n ≥ 16** (`CONFIG 16 i2s_mux,…` answers
+  `ERR unknown '2s_mux,i2s_mux'`). Not the `uint8_t linelen` wrap documented in
+  `saleae_app.cpp` — `linelen` is `uint16_t` and an n=16 line is 144 characters.
+- `ticks` must be ≥ `MIN_CMD_TICKS` from `QINFO` (3200 on ESP32), so the
+  documented `QSEG … 80` example answers `ERR QE step0 rc=-1`
+  (`ErrorTicksTooLow`) on a current build.
 
 ### The mux in `dir` mode loses its second slot
 
