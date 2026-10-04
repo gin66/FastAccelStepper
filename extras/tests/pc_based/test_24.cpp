@@ -41,11 +41,17 @@ static int log_idx;
 // Phase 2: feed the captured command stream through the real ESP32 RMT fill
 // buffer translation (the code that produces the RMT symbols on hardware).
 uint16_t debug_part_size = 24;
-#define SUPPORT_ESP32_RMT
+#define SUPPORT_ESP32_RMT_V1
 #define IRAM_ATTR
 #define RMT_CHANNEL_T int
 #define LL_TOGGLE_PIN(dirPin)
-#include "pd_esp32/StepperISR_esp32xx_rmt.cpp"
+#include "pd_esp32/StepperISR_rmt_v1.cpp"
+
+// The V1 fill path stops the channel when the queue runs dry mid-part.
+// The real definition is per chip in StepperISR_rmt_v1_esp32*.cpp; these
+// tests compile the fill path only, so they bring their own.
+void StepperQueue::stop_rmt(bool both) { (void)both; }
+
 
 #include "FastAccelStepper.h"
 

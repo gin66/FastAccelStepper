@@ -11,7 +11,7 @@
 #include "pd_esp32/i2s_manager.h"
 #endif
 
-#if defined(SUPPORT_ESP32_RMT) && defined(SUPPORT_ESP32_RMT_V2)
+#if defined(SUPPORT_ESP32_RMT_V2)
 // The high pulse of a step is min(ticks >> 1, RMT_MAX_SYMBOL_TICKS), i.e. it is
 // just another sub-entry and needs no carried state. Only the low phase can
 // span more than one symbol and is split, tracked by remaining_low_ticks.
@@ -28,7 +28,7 @@ class StepperQueue : public StepperQueueBase {
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
   static uint8_t queues_allocated;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   static uint8_t _rmt_allocated;
 #endif
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
@@ -66,7 +66,7 @@ class StepperQueue : public StepperQueueBase {
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
     const void* driver_data;
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
     struct {
       RMT_CHANNEL_T channel;
       bool _rmtStopped;
@@ -102,7 +102,7 @@ class StepperQueue : public StepperQueueBase {
   void disconnect_mcpwm_pcnt();
   void syncStart_arm_mcpwm_pcnt();
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   bool isReadyForCommands_rmt() const;
   void init_rmt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_rmt();
@@ -165,7 +165,7 @@ class StepperQueue : public StepperQueueBase {
   static bool isValidStepPin(uint8_t step_pin);
 };
 
-#if defined(SUPPORT_ESP32_RMT) && !defined(SUPPORT_ESP32_RMT_V2)
+#if defined(SUPPORT_ESP32_RMT_V1)
 void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
 void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
 #endif
@@ -302,12 +302,12 @@ static inline void esp32_set_direction_pin_state(StepperQueue* q, bool high) {
 // after STEP has gone low at TEP of the last step.
 static inline bool esp32_driver_is_rmt(const StepperQueue* q) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-#if defined(SUPPORT_ESP32_RMT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   return q->_driver_type == FasDriver::RMT;
 #else
   return false;
 #endif
-#elif defined(SUPPORT_ESP32_RMT)
+#elif (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   return true;
 #else
   return false;
@@ -361,7 +361,7 @@ static inline bool esp32_i2s_dir_is_mux_slot(const StepperQueue* q) {
 }
 
 static inline uint16_t esp32_before_pause_ticks(const StepperQueue* q) {
-#if defined(SUPPORT_ESP32_RMT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   if (esp32_driver_is_rmt(q)) {
 #if defined(SUPPORT_ESP32_RMT_V2)
     // F2: the drain must exceed the RMT buffer's playback content, and that is
@@ -462,7 +462,7 @@ inline AqeResultCode StepperQueue::addDirChangePauseToQueue(
 // driver macros below, q is deliberately unused.
 // cppcheck-suppress constParameterPointer
 static inline void esp32_syncStart_arm(StepperQueue* q) {
-#if defined(SUPPORT_ESP32_RMT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   if (esp32_driver_is_rmt(q)) {
 #if defined(SUPPORT_ESP32_RMT_SYNC)
     q->syncStart_prepare_rmt();

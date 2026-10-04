@@ -134,7 +134,7 @@ existing `startQueue()` dispatch in `esp32_queue.cpp` / `esp32_queue.h`.
 ## Implementation plan
 
 1. **RMT IDF5/6 (the real win).**
-   - Split `startQueue_rmt()` (`StepperISR_idf5_esp32_rmt.cpp:128-203`) into an
+   - Split `startQueue_rmt()` (`StepperISR_rmt_v2.cpp:128-203`) into an
      arm part (dir toggle, encoder reset, channel enable; collect the channel)
      and a trigger part (create a sync manager over the armed channels, call
      `rmt_transmit()` on each, delete the manager).
@@ -146,7 +146,7 @@ existing `startQueue()` dispatch in `esp32_queue.cpp` / `esp32_queue.h`.
      the channels armed in one `synchronizedStart()` call and deleted right
      after the group has started. Channels must use the same clock
      source/resolution (they do: `RMT_CLK_SRC_DEFAULT`,
-     `resolution_hz = TICKS_PER_S`, `StepperISR_idf5_esp32_rmt.cpp:102-103`).
+     `resolution_hz = TICKS_PER_S`, `StepperISR_rmt_v2.cpp:102-103`).
    - `SOC_RMT_SUPPORT_TX_SYNCHRO` gates the native path; targets without it
      (ESP32 classic) keep the arm==trigger fallback via `syncStart_arm_rmt()`.
 2. **Dispatch layer.** Add `syncStart_arm()` and (for RMT) the group trigger in
@@ -193,12 +193,12 @@ existing `startQueue()` dispatch in `esp32_queue.cpp` / `esp32_queue.h`.
   `on_sent` → `handleTxDone()` per-stepper fill loop (`i2s_manager.cpp:127-148`).
 - `src/pd_esp32/StepperISR_esp32_i2s.cpp` — `startQueue_i2s()` (`_isRunning`
   gate; `fill_i2s_buffer()` returns early when not running).
-- `src/pd_esp32/StepperISR_idf5_esp32_rmt.cpp` — IDF5/6 RMT arm/trigger split
+- `src/pd_esp32/StepperISR_rmt_v2.cpp` — IDF5/6 RMT arm/trigger split
   point (`startQueue_rmt()`).
-- `src/pd_esp32/StepperISR_idf4_esp32_rmt.cpp`,
-  `StepperISR_idf4_esp32c3_rmt.cpp`,
-  `StepperISR_idf4_esp32s3_rmt.cpp` — IDF4 per-chip RMT `startQueue`.
-- `src/pd_esp32/StepperISR_esp32xx_rmt.cpp` — shared IDF4 `rmt_fill_buffer()` /
+- `src/pd_esp32/StepperISR_rmt_v1_esp32.cpp`,
+  `StepperISR_rmt_v1_esp32c3.cpp`,
+  `StepperISR_rmt_v1_esp32s3.cpp` — IDF4 per-chip RMT `startQueue`.
+- `src/pd_esp32/StepperISR_rmt_v1.cpp` — shared IDF4 `rmt_fill_buffer()` /
   `rmt_apply_command()` helper (not a startQueue).
 - `src/pd_esp32/StepperISR_idf4_esp32_mcpwm_pcnt.cpp`,
   `StepperISR_idf5_esp32_mcpwm_pcnt.cpp`,

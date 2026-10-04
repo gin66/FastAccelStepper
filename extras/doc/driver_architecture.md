@@ -129,14 +129,14 @@ src/
     i2s_fill.cpp/h      ← I2S buffer fill helpers
     i2s_manager.cpp/h   ← I2S multiplex manager
     StepperISR_idf4_esp32_mcpwm_pcnt.cpp  ← IDF4 MCPWM/PCNT
-    StepperISR_idf4_esp32_rmt.cpp         ← IDF4 RMT (legacy fill)
-    StepperISR_idf4_esp32c3_rmt.cpp       ← IDF4 ESP32-C3
-    StepperISR_idf4_esp32s3_rmt.cpp       ← IDF4 ESP32-S3
+    StepperISR_rmt_v1_esp32.cpp         ← IDF4 RMT (legacy fill)
+    StepperISR_rmt_v1_esp32c3.cpp       ← IDF4 ESP32-C3
+    StepperISR_rmt_v1_esp32s3.cpp       ← IDF4 ESP32-S3
     StepperISR_idf5_esp32_mcpwm_pcnt.cpp  ← IDF5 MCPWM/PCNT (ESP32, S3, C6, H2)
-    StepperISR_idf5_esp32_rmt.cpp         ← IDF5/6 RMT V2 encoder (only path, no legacy)
-    StepperISR_idf5_esp32_rmt_encode.cpp  ← IDF5/6 RMT V2 fill encoder helper
+    StepperISR_rmt_v2.cpp         ← IDF5/6 RMT V2 encoder (only path, no legacy)
+    StepperISR_rmt_v2_encode.cpp  ← IDF5/6 RMT V2 fill encoder helper
     StepperISR_idf6_esp32_mcpwm_pcnt.cpp  ← IDF6 MCPWM/PCNT
-    StepperISR_esp32xx_rmt.cpp            ← Shared RMT code
+    StepperISR_rmt_v1.cpp            ← Shared RMT code
     StepperISR_esp32xx_rmt_encode.cpp     ← Shared RMT V2 code
   pd_sam/
     sam_queue.h/cpp     ← SAM Due implementation
@@ -444,7 +444,7 @@ Chip and framework detection stays in `fas_arch/` and `pd_*/pd_config.h`.
 Those headers are the only place that tests `ARDUINO_ARCH_*`,
 `ESP_IDF_VERSION`, `__AVR__`, and the other toolchain macros. From that
 they define one `SUPPORT_...` macro per capability the build actually
-has, such as `SUPPORT_ESP32_RMT` or `SUPPORT_QUEUE_ENTRY_END_POS_U16`.
+has, such as `SUPPORT_ESP32_RMT_V1` or `SUPPORT_QUEUE_ENTRY_END_POS_U16`.
 
 The rest of `src/` — the ramp, the queue, `FastAccelStepper` — tests
 those `SUPPORT_` macros and does not test the architecture again. A
@@ -464,7 +464,8 @@ the same way for every target that offers the capability.
 | `SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING` | User can override max speed ceiling | AVR, ESP32, SAMD51, Teensy |
 | `SUPPORT_CPU_AFFINITY` | Engine can be pinned to a specific CPU core | ESP32 |
 | `SUPPORT_TASK_RATE_CHANGE` | Task rate can be changed at runtime | ESP32, Pico |
-| `SUPPORT_ESP32_RMT_V2` | RMT V2 encoder API available (no legacy fill) | All IDF5/6 chips |
+| `SUPPORT_ESP32_RMT_V1` | RMT driver present, half-filler path | All IDF4 chips with RMT |
+| `SUPPORT_ESP32_RMT_V2` | RMT driver present, encoder-API translator | All IDF5/6 chips with RMT |
 | `SUPPORT_ESP32_RMT_SYNC` | RMT TX synchronisation (ESP32 classic, not S3/C3) | ESP32 (IDF5/6) |
 | `SUPPORT_ESP32_PULSE_COUNTER` | PCNT unit count (0 = not available) | Varies by chip |
 | `NEED_FIXED_QUEUE_TO_PIN_MAPPING` | Stepper count limited by hardware pin mapping | AVR |
@@ -477,7 +478,8 @@ the same way for every target that offers the capability.
 | `SUPPORT_AVR` | ✓ | | | | | | | |
 | `SUPPORT_ESP32` | | ✓ | ✓ | ✓ | | | | |
 | `SUPPORT_ESP32_MCPWM_PCNT` | | ✓ | | | | | | |
-| `SUPPORT_ESP32_RMT` | | | ✓ | | | | | |
+| `SUPPORT_ESP32_RMT_V1` | | | ✓ | | | | | | |
+| `SUPPORT_ESP32_RMT_V2` | | | ✓ | | | | | | |
 | `SUPPORT_ESP32_I2S` | | | | ✓ | | | | |
 | `SUPPORT_SAM` | | | | | ✓ | | | |
 | `SUPPORT_SAMD51` | | | | | | ✓ | | |

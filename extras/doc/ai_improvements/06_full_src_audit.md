@@ -18,8 +18,8 @@ leftover code, code smells, inconsistencies, and technical debt.
 | 4 | `FastAccelStepper_idf5_esp32_pcnt.cpp` | 81-100 | 5 error paths leak `punit`/`pcnt_chan` before returning `false` | open |
 | ~~5~~ | ~~`FastAccelStepperEngine.cpp`~~ | ~~17, 150~~ | ~~File-scope `fas_stepper[]` shadowed by local `static`~~ | **fixed** |
 | 6 | `FastAccelStepperEngine.cpp` | 123-124 | No bounds check on `_stepper_cnt` increment -- buffer overflow | open |
-| 7 | `StepperISR_idf4_esp32c3_rmt.cpp:61`, `StepperISR_idf4_esp32s3_rmt.cpp:62` | -- | Hardcoded `61/62` in `stop_rmt()` is wrong for C3/S3 where `PART_SIZE=22` (should be `43/44`) | open |
-| ~~8~~ | ~~`StepperISR_esp32xx_rmt.cpp`~~ | ~~116-118~~ | ~~Dead redundant condition: inner `if (steps > PART_SIZE)` always true~~ | **fixed** (changed to `steps < 2*PART_SIZE`) |
+| 7 | `StepperISR_rmt_v1_esp32c3.cpp:61`, `StepperISR_rmt_v1_esp32s3.cpp:62` | -- | Hardcoded `61/62` in `stop_rmt()` is wrong for C3/S3 where `PART_SIZE=22` (should be `43/44`) | open |
+| ~~8~~ | ~~`StepperISR_rmt_v1.cpp`~~ | ~~116-118~~ | ~~Dead redundant condition: inner `if (steps > PART_SIZE)` always true~~ | **fixed** (changed to `steps < 2*PART_SIZE`) |
 | ~~9~~ | ~~`sam_queue.cpp`~~ | ~~64-65~~ | ~~`timeElapsed = micros() - ...` uses a second `micros()` call instead of saved `t`~~ | **fixed** |
 | 10 | `sam_queue.cpp` | 140-145 | `static` locals in ISR initialized once from mutable pointer -- stale data on remap | open |
 | 11 | `pico_queue.cpp` | 192-196 | Inverted break condition: breaks when FIFO has data, should break when empty | open |
@@ -44,7 +44,7 @@ leftover code, code smells, inconsistencies, and technical debt.
 | 24 | `RampCalculator.cpp` | 31-180 | `calculate_ticks_v1`..`v8` behind `#ifdef TEST_TIMING` -- dead benchmark functions |
 | 25 | `pd_config_idf5.h` / `pd_config_idf6.h` | ~20 lines | Commented-out `SUPPORT_ESP32_MCPWM_PCNT`, `NEED_MCPWM_HEADERS`, etc. |
 | 26 | `pd_config_idf5.h` / `pd_config_idf6.h` | 139-154 | `NEED_MCPWM_HEADERS` / `NEED_PCNT_HEADERS` include blocks -- dead (never compiled) |
-| 27 | `StepperISR_esp32xx_rmt.cpp` | 117 | `steps_to_do = PART_SIZE` -- dead assignment, always overwritten by line 119 |
+| 27 | `StepperISR_rmt_v1.cpp` | 117 | `steps_to_do = PART_SIZE` -- dead assignment, always overwritten by line 119 |
 
 Note: item #13 (accidental LLM prompt in `pd_pico/pico_pio.cpp:1-10`) was present at audit
 time but may have been removed separately.
@@ -82,7 +82,7 @@ time but may have been removed separately.
 | # | File | Details |
 |---|------|---------|
 | 40 | `pd_config_idf4.h` vs `idf5/6.h` | `PART_SIZE` formula: IDF4 uses `((RMT_SIZE-1)/4)<<1`=30; IDF5/6 use `RMT_SIZE>>1`=32 |
-| 41 | `StepperISR_idf5_esp32_rmt.cpp:182` vs all IDF4 | `lastChunkContainsSteps` init: IDF5=`false`; all IDF4=`true` |
+| 41 | `StepperISR_rmt_v2.cpp:182` vs all IDF4 | `lastChunkContainsSteps` init: IDF5=`false`; all IDF4=`true` |
 | 42 | `pd_avr/pd_config.h:15` vs all others | `MIN_CMD_TICKS` divisor: AVR `/25000` (5x shorter); all others `/5000` |
 | 43 | IDF4 RMT files vs C3/S3 vs IDF5 | TRACE debug output: ESP32=`Serial`; C3/S3=`USBSerial`; IDF5=`printf` |
 
@@ -99,8 +99,8 @@ time but may have been removed separately.
 | # | File | Details |
 |---|------|---------|
 | 47 | `FastAccelStepper.cpp:554, 562` | Bitwise `&` used instead of logical `&&` for `bool` return values |
-| 48 | `StepperISR_idf4_esp32_rmt.cpp:160` vs C3/S3/IDF5 | `connect()` vs `connect_rmt()` called in `init_rmt()` |
-| 49 | `StepperISR_idf4_esp32_rmt.cpp:131-132` vs `idf5:85-86` | Pin setup order: `digitalWrite` then `pinMode` vs `pinMode` then `digitalWrite` |
+| 48 | `StepperISR_rmt_v1_esp32.cpp:160` vs C3/S3/IDF5 | `connect()` vs `connect_rmt()` called in `init_rmt()` |
+| 49 | `StepperISR_rmt_v1_esp32.cpp:131-132` vs `idf5:85-86` | Pin setup order: `digitalWrite` then `pinMode` vs `pinMode` then `digitalWrite` |
 | 50 | `pd_config.h:19-21` | `SUPPORT_DYNAMIC_ALLOCATION` missing for IDF6 |
 | 51 | `esp32_queue.h:217-233` | `AFTER_DIR_CHANGE_DELAY_TICKS` missing in non-I2S path |
 
@@ -137,12 +137,12 @@ All fixed.
 
 Approximately **80+ lines** of commented-out code across the codebase:
 
-- `StepperISR_idf4_esp32_rmt.cpp:27-28, 148-149, 211-212, 226, 234, 254-255, 257, 271, 273`
-- `StepperISR_idf4_esp32c3_rmt.cpp:47-48, 180-181, 210-212, 288, 336-338`
-- `StepperISR_idf4_esp32s3_rmt.cpp:48-49, 181-182, 211-213, 289, 337-339`
-- `StepperISR_idf5_esp32_rmt.cpp:109-110, 129, 149, 177-180`
+- `StepperISR_rmt_v1_esp32.cpp:27-28, 148-149, 211-212, 226, 234, 254-255, 257, 271, 273`
+- `StepperISR_rmt_v1_esp32c3.cpp:47-48, 180-181, 210-212, 288, 336-338`
+- `StepperISR_rmt_v1_esp32s3.cpp:48-49, 181-182, 211-213, 289, 337-339`
+- `StepperISR_rmt_v2.cpp:109-110, 129, 149, 177-180`
 - `StepperISR_idf4_esp32_mcpwm_pcnt.cpp:259, 473-474, 548-553`
-- `StepperISR_esp32xx_rmt.cpp:68-69`
+- `StepperISR_rmt_v1.cpp:68-69`
 - `FastAccelStepper.cpp:309-310, 321-322, 335-336, 880-882`
 - `FastAccelStepper_idf4_esp32_pcnt.cpp:65-66`
 - `pico_pio.cpp:75, 79-83, 196-199`

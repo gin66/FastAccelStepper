@@ -556,7 +556,7 @@ static bool parse_driver(const char* name, enum saleae_driver* out) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (!sal_strcmp(name, SAL_PSTR("rmt")) ||
       !sal_strcmp(name, SAL_PSTR("rmt_v2"))) {
-#if defined(SUPPORT_ESP32_RMT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
     *out = SA_RMT;
     return true;
 #endif
@@ -892,7 +892,7 @@ static bool driver_supported(enum saleae_driver driver) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   switch (driver) {
     case SA_RMT:
-#if defined(SUPPORT_ESP32_RMT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
       return true;
 #else
       return false;

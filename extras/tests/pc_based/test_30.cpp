@@ -31,12 +31,13 @@ static uint32_t cur_rises;
 static uint32_t toggle_after_rise[8];
 #define SUPPORT_ESP32_RMT_V2
 #define IRAM_ATTR
+#define RMT_CHANNEL_T int
 #define LL_TOGGLE_PIN(dirPin)                                        \
   do {                                                               \
     if (dir_toggles < 8) toggle_after_rise[dir_toggles] = cur_rises; \
     dir_toggles++;                                                   \
   } while (0)
-#include "pd_esp32/StepperISR_idf5_esp32_rmt_encode.cpp"
+#include "pd_esp32/StepperISR_rmt_v2_encode.cpp"
 
 static int failures = 0;
 

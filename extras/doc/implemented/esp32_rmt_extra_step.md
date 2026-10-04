@@ -3,10 +3,10 @@
 Status: **closed, implemented**.
 
 IDF5/6 no longer fills fixed RMT halves. `encode_commands()` calls
-`rmt_encode_queue()` in `StepperISR_idf5_esp32_rmt_encode.cpp`. A pause
+`rmt_encode_queue()` in `StepperISR_rmt_v2_encode.cpp`. A pause
 is `PART_SIZE` symbols. A step is one symbol, or two when `ticks` is
 65535, and the unfinished `steps` count is written back. The IDF4 half
-filler in `StepperISR_esp32xx_rmt.cpp` is not compiled when
+filler in `StepperISR_rmt_v1.cpp` is not compiled when
 `SUPPORT_ESP32_RMT_V2` is set. PC coverage is `test_30`.
 
 On IDF5 RMT hardware, after that translator: **20× `seq_02` passed** and
@@ -18,7 +18,7 @@ the pulses already emitted is `readPulseCounter()` after
 `attachToPulseCounter()`. Two follow-ups are open, not part of this
 fix: a time-based estimate of the played-out position
 (`100_position_pipeline_estimate.md`), and RMT file names plus
-`SUPPORT_RMT_V1` / `SUPPORT_RMT_V2`
+`SUPPORT_ESP32_RMT_V1` / `SUPPORT_ESP32_RMT_V2`
 (`110_rmt_v1_v2_split.md`).
 
 ## What the counters showed
@@ -45,7 +45,7 @@ rise-to-rise interval from a bad capture reproduces the good capture to
 is introduced downstream, on the way from that stream to the pin.
 
 IDF4 writes `rmt_fill_buffer()` straight into `RMTMEM` from the threshold
-ISR (`StepperISR_idf4_esp32_rmt.cpp`, `rmt_apply_command` then `tx_start`).
+ISR (`StepperISR_rmt_v1_esp32.cpp`, `rmt_apply_command` then `tx_start`).
 IDF5 feeds the same filler through Espressif's simple encoder and ping-pong
 driver (IDF 5.3.1 `rmt_encoder.c` / `rmt_tx.c`, callback
 `encode_commands()`). Working assumption: IDF4 does not have this bug, and
@@ -546,7 +546,7 @@ IDF4 does not use the simple encoder. `startQueue_rmt()` writes both
 halves through `rmt_apply_command()` into `RMTMEM` and starts the
 transmitter itself. `esp32_before_pause_count()` is 1 on IDF4 and 2 on
 IDF5/6, because the IDF5 encoder is invoked two `PART_SIZE` chunks ahead.
-A clean IDF4 points at that driver (`StepperISR_idf5_esp32_rmt.cpp` plus
+A clean IDF4 points at that driver (`StepperISR_rmt_v2.cpp` plus
 IDF `rmt_encoder.c` / `rmt_tx.c`), not at the shared queue. The assumption
 is that longer IDF4 time stays clean. IDF5 with M1=RMT is the config that
 fails.
@@ -568,7 +568,7 @@ Guard with one macro, for example `FAS_RMT_DEBUG_COUNT`, compiled only
 on the IDF5 RMT path (`SUPPORT_ESP32_RMT_V2`). IDF4 does not get the
 counters.
 
-In `rmt_fill_buffer()` (`StepperISR_esp32xx_rmt.cpp`), count step
+In `rmt_fill_buffer()` (`StepperISR_rmt_v1.cpp`), count step
 symbols actually stored, not queue entries. A pause entry stores no
 step symbol and must not count. Two totals, chosen from the entry's
 `count_up` at the store:
@@ -580,7 +580,7 @@ step symbol and must not count. Two totals, chosen from the entry's
 A double walk of one entry increments the total twice. A hardware
 replay of a half that the filler already wrote does not increment it.
 
-In `encode_commands()` (`StepperISR_idf5_esp32_rmt.cpp`), before the
+In `encode_commands()` (`StepperISR_rmt_v2.cpp`), before the
 `symbols_free < PART_SIZE` return:
 
 - if `symbols_free` is neither 32 nor 64, increment a short-free
@@ -703,7 +703,7 @@ the count. `done` is set only when the queue is finished. IDF 5.3.1
 uses the return value 0 for one thing: "this call cannot make
 progress; try again with `min_chunk_size`."
 
-`rmt_fill_buffer()` in `StepperISR_esp32xx_rmt.cpp` is the IDF4
+`rmt_fill_buffer()` in `StepperISR_rmt_v1.cpp` is the IDF4
 contract. A threshold interrupt frees one fixed half, and the filler
 always writes exactly `PART_SIZE` symbols for one queue entry (or for
 `PART_SIZE/2` steps of a fast entry). `encode_commands()` keeps that
@@ -715,7 +715,7 @@ it IDF4 halves means a queue entry, a half, and a step pulse are the
 same object, which is what a repeated half turns into a repeated
 pulse.
 
-Remedy idea, IDF5/6 only. Leave `StepperISR_esp32xx_rmt.cpp` to IDF4.
+Remedy idea, IDF5/6 only. Leave `StepperISR_rmt_v1.cpp` to IDF4.
 A new filler, called only from `encode_commands()`, translates the
 queue into the buffer it was given. Two entry shapes:
 
@@ -766,9 +766,9 @@ return that H9 leaves unstopped.
 - Core pin, spinlock, and `volatile` on `_rmtStopped`: **dropped**. The
   counter split ruled out H1/H3 for this symptom.
 - IDF4 remains the control (direct register writes, same filler).
-- Translator is in `StepperISR_idf5_esp32_rmt_encode.cpp` and
+- Translator is in `StepperISR_rmt_v2_encode.cpp` and
   `encode_commands()` calls it. PC coverage is `test_30` (PART_SIZE 24
-  and 32). The half filler in `StepperISR_esp32xx_rmt.cpp` stays the
+  and 32). The half filler in `StepperISR_rmt_v1.cpp` stays the
   IDF4 path. A fix still has to be checked on hardware with
   `FAS_RMT_DEBUG_COUNT` off.
 - Optional confirmation inside IDF 5.3.1: the per-callback RAM ring
@@ -786,7 +786,7 @@ return that H9 leaves unstopped.
 - IDF 5.3.1 `components/esp_driver_rmt/src/rmt_encoder.c` — `rmt_encode_simple`, overflow buffer.
 - IDF 5.3.1 `components/esp_driver_rmt/src/rmt_tx.c` — ping-pong prefill, threshold ISR, `rmt_tx_mark_eof`.
 - `examples/StepperDemo/test_seq_15.cpp` — reproduction sequence.
-- `src/pd_esp32/StepperISR_idf5_esp32_rmt.cpp` — `encode_commands()`.
-- `src/pd_esp32/StepperISR_esp32xx_rmt.cpp` — `rmt_fill_buffer()`.
+- `src/pd_esp32/StepperISR_rmt_v2.cpp` — `encode_commands()`.
+- `src/pd_esp32/StepperISR_rmt_v1.cpp` — `rmt_fill_buffer()`.
 - `src/pd_esp32/rmt_debug.h` — `FAS_RMT_DEBUG_COUNT` counters.
 - `extras/tests/esp32_hw_based/serial_session.py` — `check_pcnt_sync()`.

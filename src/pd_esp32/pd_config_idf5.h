@@ -9,7 +9,6 @@
 
 #if CONFIG_IDF_TARGET_ESP32
 #define SUPPORT_ESP32_MCPWM_PCNT
-#define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 8
 #define HAVE_ESP32_RMT
@@ -28,7 +27,6 @@
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S2
-#define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 4
 #define HAVE_ESP32S3_PULSE_COUNTER
@@ -46,7 +44,6 @@
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32S3
 #define SUPPORT_ESP32_MCPWM_PCNT
-#define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 8
 #define HAVE_ESP32S3_PULSE_COUNTER
@@ -65,7 +62,6 @@
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C3
-#define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
@@ -80,7 +76,6 @@
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32C6
 #define SUPPORT_ESP32_MCPWM_PCNT
-#define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 4
 #define HAVE_ESP32_RMT
@@ -98,7 +93,6 @@
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32H2
 #define SUPPORT_ESP32_MCPWM_PCNT
-#define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER 4
 #define HAVE_ESP32_RMT
@@ -115,7 +109,6 @@
 //
 //==========================================================================
 #elif CONFIG_IDF_TARGET_ESP32P4
-#define SUPPORT_ESP32_RMT
 #define SUPPORT_ESP32_RMT_V2
 #define SUPPORT_ESP32_PULSE_COUNTER CONFIG_SOC_PCNT_UNITS_PER_GROUP
 #define HAVE_ESP32_RMT

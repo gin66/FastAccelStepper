@@ -205,7 +205,7 @@ over all symbols, not concentrated in single low phases).
 
 There is **no separate IDF 6 RMT code**. For the RMT V2 driver both IDF 5
 and IDF 6 use the same two library files,
-`StepperISR_idf5_esp32_rmt.cpp` and `StepperISR_idf5_esp32_rmt_encode.cpp`
+`StepperISR_rmt_v2.cpp` and `StepperISR_rmt_v2_encode.cpp`
 (both guarded by `SUPPORT_ESP32_RMT_V2`). Only MCPWM/PCNT, PCNT and the
 I2S manager have per-IDF-version files. So "the idf6 encoder" is a
 misnomer; the version difference in the 92 s vs 121 s split lives in
@@ -214,13 +214,13 @@ ESP-IDF's `esp_driver_rmt`, not in this library (see H4).
 The idf4 files document the hardware floor and the shared encoder does
 not check it:
 
-- `StepperISR_esp32xx_rmt.cpp:26-38` (also idf4 s3/c3): relation 1
+- `StepperISR_rmt_v1.cpp:26-38` (also idf4 s3/c3): relation 1
   `3*T_APB + 5*T_RMT_CLK < period*T_CLK_DIV` => `period > 1.6`, i.e. a
   symbol half of **1 tick is illegal**, 0 is the **stop pattern**;
   relation 2 before the end marker wants **period >= 4**.
 - `extras/tests/pc_based/AGENTS.md`: "Minimum RMT symbol period is 2
   ticks (hardware limit)".
-- `StepperISR_idf5_esp32_rmt_encode.cpp` has no such guard.
+- `StepperISR_rmt_v2_encode.cpp` has no such guard.
   `emit_step_symbols` splits a step into `floor(ticks/2)` and
   `ceil(ticks/2)`; `ticks < 4` yields a half < 2, `ticks == 1` yields a
   0-duration half (stop pattern). `emit_pause_symbols` is not a concern:
@@ -559,7 +559,7 @@ transaction (`trans_queue_depth > 1`) instead of waiting for the task.
 
 **F5 — Bypass the IDF simple encoder; use the idf4-style synchronous ISR
 refill for IDF 5/6 RMT.** Drive RMT registers directly and refill from the
-threshold/end ISR (`StepperISR_idf4_esp32_rmt.cpp` pattern).
+threshold/end ISR (`StepperISR_rmt_v1_esp32.cpp` pattern).
 - Pro: proven fast (idf4 is at 94 s); no async task restart; unifies the fill
   strategy.
 - Con: large rewrite; loses the IDF driver abstraction that idf5/6 adopted for
@@ -740,12 +740,12 @@ Constraints / follow-ups:
 - `pd_esp32/esp32_queue.h`: add `struct rmt_fill_state` (just
   `remaining_low_ticks`; in the RMT union with `_tx_encoder`/`channel`),
   analogous to `i2s_fill_state` but without high/off state.
-- `pd_esp32/StepperISR_idf5_esp32_rmt_encode.cpp`: replace
+- `pd_esp32/StepperISR_rmt_v2_encode.cpp`: replace
   `emit_step_symbols()`/`emit_pause_symbols()`/`rmt_encode_queue()` with the
   I2S-style fill (`rmt_encode_fill(q, state, symbols, symbols_free)`; distinct
   name from the IDF4 `rmt_fill_buffer`), keeping the dir toggle and
   `read_idx`/`steps` bookkeeping like `i2s_fill.cpp`.
-- `pd_esp32/StepperISR_idf5_esp32_rmt.cpp` `encode_commands()`: call the fill
+- `pd_esp32/StepperISR_rmt_v2.cpp` `encode_commands()`: call the fill
   with the persistent `rmt_fill_state`; drop the `symbols_free < PART_SIZE`
   whole-command gate; treat the queue as empty only when the fill state is also
   drained (see the open-questions note); resolve `min_chunk_size` per
@@ -755,7 +755,7 @@ Constraints / follow-ups:
   IDF5/6 path go tick-based (value = ovf-inclusive in-flight bound; count 0),
   matching I2S, and this branch must be `#if defined(SUPPORT_ESP32_RMT_V2)` guarded so the IDF4
   RMT path keeps its count-based drain (`count 1`, `MIN_CMD_TICKS`).
-- `pd_esp32/StepperISR_idf5_esp32_rmt.cpp` `startQueue_rmt()`/`forceStop_rmt()`:
+- `pd_esp32/StepperISR_rmt_v2.cpp` `startQueue_rmt()`/`forceStop_rmt()`:
   reset `rmt_fill_state` at every transaction boundary (mirror the
   `i2s_fill_state` lifecycle).
 - `pd_config_idf5.h`/`pd_config_idf6.h`: define `RMT_BLOCK_TICKS`,
@@ -902,7 +902,7 @@ re-expose H8 and it invalidates the existing hardware validation.
 Constraints F2 must obey:
 
 1. **Keep the translator contract.** No return to the fixed-half
-   `rmt_fill_buffer()` path (`StepperISR_esp32xx_rmt.cpp`) for IDF 5/6; fill
+   `rmt_fill_buffer()` path (`StepperISR_rmt_v1.cpp`) for IDF 5/6; fill
    exactly the bytes the callback was given. A command is consumed
    whole-command, never a fraction of `steps`: `read_idx` advances only after
    all the entry's steps have been loaded into the fill state. This is weaker
@@ -1085,7 +1085,7 @@ at H3/H4.
 ### HW event counters (implemented; the cheapest form of P1)
 
 `FAS_RMT_DEBUG_SLOW` in `pd_esp32/pd_config.h` is on. It counts, inside
-`encode_commands()` (`StepperISR_idf5_esp32_rmt.cpp`):
+`encode_commands()` (`StepperISR_rmt_v2.cpp`):
 
 - `empty=`: callbacks that found `read_idx == next_write_idx` (queue empty);
 - `stopped=`: callbacks that set `_rmtStopped` (the eager stop).

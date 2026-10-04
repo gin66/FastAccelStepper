@@ -19,7 +19,7 @@ class StepperQueue : public StepperQueueBase {
     max_speed_in_ticks = 80;
     _before_dir_change_delay_ticks = 0;
     _after_dir_change_delay_ticks = 0;
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
     channel = RMT_CHANNEL_T();
     _rmtStopped = true;
 #endif
@@ -27,9 +27,13 @@ class StepperQueue : public StepperQueueBase {
 
   inline bool isReadyForCommands() const { return true; }
   inline bool isRunning() const { return _isRunning; }
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   RMT_CHANNEL_T channel;
   bool _rmtStopped;
+  // Mirrors the real class (esp32_queue.h), where this is defined per chip in
+  // StepperISR_rmt_v1_esp32*.cpp. A test that compiles the V1 fill path supplies
+  // the definition itself, the way it already supplies inject_fill_interrupt.
+  void stop_rmt(bool both);
 #endif
 
   void setDirPin(uint8_t dir_pin, bool _dirHighCountsUp) {

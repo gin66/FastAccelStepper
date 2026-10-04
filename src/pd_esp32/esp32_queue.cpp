@@ -19,7 +19,7 @@ I2sManager* StepperQueue::_i2s_mux_manager = nullptr;
 #ifdef SUPPORT_ESP32_MCPWM_PCNT
 uint8_t StepperQueue::_mcpwm_pcnt_allocated = 0;
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
 uint8_t StepperQueue::_rmt_allocated = 0;
 #endif
 #else
@@ -39,7 +39,7 @@ void StepperQueue::connect() {
     return;
   }
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (_driver_type == FasDriver::RMT) {
     connect_rmt();
@@ -62,7 +62,7 @@ void StepperQueue::disconnect() {
     return;
   }
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (_driver_type == FasDriver::RMT) {
     disconnect_rmt();
@@ -88,7 +88,7 @@ bool StepperQueue::isReadyForCommands() const {
     return isReadyForCommands_i2s();
   }
 #endif
-#if defined(SUPPORT_ESP32_RMT) && defined(SUPPORT_ESP32_MCPWM_PCNT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2)) && defined(SUPPORT_ESP32_MCPWM_PCNT)
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (_driver_type == FasDriver::RMT) {
     return isReadyForCommands_rmt();
@@ -99,7 +99,7 @@ bool StepperQueue::isReadyForCommands() const {
 #endif
 #elif defined(SUPPORT_ESP32_MCPWM_PCNT)
   return isReadyForCommands_mcpwm_pcnt();
-#elif defined(SUPPORT_ESP32_RMT)
+#elif (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   return isReadyForCommands_rmt();
 #else
 #error "Nothing defined here"
@@ -114,7 +114,7 @@ void StepperQueue::startQueue() {
     return;
   }
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (_driver_type == FasDriver::RMT)
 #endif
@@ -142,7 +142,7 @@ void StepperQueue::forceStop() {
     return;
   }
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (_driver_type == FasDriver::RMT)
 #endif
@@ -166,7 +166,7 @@ uint16_t StepperQueue::_getPerformedPulses() const {
     return _getPerformedPulses_i2s();
   }
 #endif
-#ifdef SUPPORT_ESP32_RMT
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   if (_driver_type == FasDriver::RMT)
 #endif
@@ -243,7 +243,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   }
 #endif
 
-#if defined(SUPPORT_ESP32_RMT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   if (driver == DRIVER_RMT) {
     if (StepperQueue::_rmt_allocated >= QUEUES_RMT) {
       return nullptr;
@@ -305,7 +305,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
 
   StepperQueue* q = new StepperQueue();
   q->_initVars();
-#if defined(SUPPORT_ESP32_RMT)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
   q->init_rmt(0, step_pin);
 #endif
   StepperQueue::queues_allocated++;
@@ -364,7 +364,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
 #if defined(SUPPORT_ESP32_MCPWM_PCNT) && (QUEUES_MCPWM_PCNT > 0)
 static uint8_t mcpwm_pcnt_allocated = 0;
 #endif
-#if defined(SUPPORT_ESP32_RMT) && (QUEUES_RMT > 0)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2)) && (QUEUES_RMT > 0)
 static uint8_t rmt_allocated = 0;
 #endif
 #if defined(SUPPORT_ESP32_I2S) && (QUEUES_I2S > 0)
@@ -403,7 +403,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
   }
 #endif
 
-#if defined(SUPPORT_ESP32_RMT) && (QUEUES_RMT > 0)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2)) && (QUEUES_RMT > 0)
   if (driver == FasDriver::RMT) {
     if (rmt_allocated >= QUEUES_RMT) {
       return nullptr;
@@ -440,7 +440,7 @@ StepperQueue* StepperQueue::tryAllocateQueue(FastAccelStepperEngine* engine,
     q = tryAllocateQueue(engine, FasDriver::MCPWM_PCNT, step_pin);
     if (q != nullptr) return q;
 #endif
-#if defined(SUPPORT_ESP32_RMT) && (QUEUES_RMT > 0)
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2)) && (QUEUES_RMT > 0)
     q = tryAllocateQueue(engine, FasDriver::RMT, step_pin);
     if (q != nullptr) return q;
 #endif
@@ -587,8 +587,8 @@ void StepperQueue::syncStart_arm_mcpwm_pcnt() {
 }
 #endif
 
-#ifdef SUPPORT_ESP32_RMT
-#if ESP_IDF_VERSION_MAJOR == 4
+#if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
+#if defined(SUPPORT_ESP32_RMT_V1)
 // IDF4 RMT: trigger = arm (startQueue starts the hardware directly).
 // The syncStart_arm just calls the existing startQueue.
 // esp32_sync_trigger_rmt is a no-op (declared in header).

@@ -165,12 +165,12 @@ Queue structure migrated:
 - `pd_esp32/esp32_queue.h` + `pd_esp32/esp32_queue.cpp`
 
 Driver files NOT unified (7 files remain in `pd_esp32/`):
-- `StepperISR_esp32xx_rmt.cpp` — Common RMT buffer fill
+- `StepperISR_rmt_v1.cpp` — Common RMT buffer fill
 - `StepperISR_idf4_esp32_mcpwm_pcnt.cpp` — IDF4 MCPWM/PCNT
-- `StepperISR_idf4_esp32_rmt.cpp` — IDF4 ESP32 RMT
-- `StepperISR_idf4_esp32c3_rmt.cpp` — IDF4 ESP32-C3 RMT
-- `StepperISR_idf4_esp32s3_rmt.cpp` — IDF4 ESP32-S3 RMT
-- `StepperISR_idf5_esp32_rmt.cpp` — IDF5 RMT
+- `StepperISR_rmt_v1_esp32.cpp` — IDF4 ESP32 RMT
+- `StepperISR_rmt_v1_esp32c3.cpp` — IDF4 ESP32-C3 RMT
+- `StepperISR_rmt_v1_esp32s3.cpp` — IDF4 ESP32-S3 RMT
+- `StepperISR_rmt_v2.cpp` — IDF5 RMT
 
 **Rationale for not unifying:** Each driver file handles specific IDF version and chip variant combinations. Template-based unification was deemed too complex for the marginal benefit. The current structure works and is tested.
 

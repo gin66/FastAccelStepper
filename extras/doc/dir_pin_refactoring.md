@@ -114,7 +114,7 @@ For I2S multiplexed mode, both step and direction pins are controlled via the I2
 The RMT driver fills memory in chunks. When `toggle_dir` is processed:
 
 ```cpp
-// In StepperISR_idf4_esp32_rmt.cpp
+// In StepperISR_rmt_v1_esp32.cpp
 if (entry[rp & QUEUE_LEN_MASK].toggle_dir) {
     LL_TOGGLE_PIN(dirPin);
     entry[rp & QUEUE_LEN_MASK].toggle_dir = false;

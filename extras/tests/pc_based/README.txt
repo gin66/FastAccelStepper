@@ -227,7 +227,7 @@ Tests;
   neutral.
 
   Phase 2 feeds the SAME captured command stream through the real ESP32 RMT
-  fill buffer translation (pd_esp32/StepperISR_esp32xx_rmt.cpp, the same
+  fill buffer translation (pd_esp32/StepperISR_rmt_v1.cpp, the same
   code compiled on the ESP32). The commands are placed into a real
   StepperQueue via the same enqueue() (toggle_dir set on direction changes)
   and drained via rmt_fill_buffer(). The resulting RMT symbols are analyzed
@@ -379,7 +379,7 @@ Tests;
   motor left, second motor right).
 
 - test_30
-  IDF5/6 RMT translator (StepperISR_idf5_esp32_rmt_encode.cpp).
+  IDF5/6 RMT translator (StepperISR_rmt_v2_encode.cpp).
   A pause is exactly PART_SIZE symbols. A step is one symbol, or two
   when ticks is 65535, and is started only when two symbols are free.
   A partial entry writes the remaining steps back. A direction toggle

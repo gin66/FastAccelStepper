@@ -1,5 +1,5 @@
 #include "fas_queue/stepper_queue.h"
-#if defined(SUPPORT_ESP32_RMT) && !defined(SUPPORT_ESP32_RMT_V2)
+#if defined(SUPPORT_ESP32_RMT_V1)
 
 #if (PART_SIZE & 1) != 0
 #error "PART_SIZE must be even"
@@ -213,7 +213,6 @@ void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
   }
   return;
 }
-#if (ESP_IDF_VERSION_MAJOR == 4)
 void IRAM_ATTR rmt_apply_command(StepperQueue* q, bool fill_part_one,
                                  uint32_t* data) {
   if (!fill_part_one) {
@@ -236,6 +235,5 @@ void IRAM_ATTR rmt_apply_command(StepperQueue* q, bool fill_part_one,
   }
   rmt_fill_buffer(q, fill_part_one, data);
 }
-#endif
 
 #endif

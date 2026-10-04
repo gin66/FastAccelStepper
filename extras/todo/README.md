@@ -41,7 +41,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **110** | [Ramp time and moveTo eta](110_move_to_eta.md) | ~400 k | 1–2 w | Record ramp time next to performed ramp steps; `moveTo(position, eta_ticks)` caps speed so the move finishes by that tick. |
 | **120** | [Smooth stop at end of path](120_end_path_decel.md) | ~200 k | 1 w | Open: append a decel tail on `endPath()`, or hand the stop to the ramp generator. |
 | **130** | [Pipeline position estimate](130_position_pipeline_estimate.md) | ~100 k | 2–3 d | Low priority. Estimate how far a pipelined driver has played out, so `getCurrentPosition()` can lead the pin by less. A pulse counter remains the real position. |
-| **140** | [RMT V1/V2 file split](140_rmt_v1_v2_split.md) | ~100 k | 0.5 d | Low hanging fruit. `SUPPORT_RMT_V1` / `SUPPORT_RMT_V2` instead of one flag for both and `V2` only for IDF5/6. |
 | **140** | [Modular ramp generator](140_modular_ramp_generator.md) | ~2 M | 3–4 w | Major refactor: extract 4 modules, write PC tests, documentation, regression suite. |
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
@@ -51,6 +50,14 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 ## Done
 
+- **140 — RMT V1/V2 split — resolved, the two RMT paths had one flag and
+  the umbrella was doing the work the version test should do.**
+  `SUPPORT_ESP32_RMT` is replaced by `SUPPORT_ESP32_RMT_V1` (IDF4 half
+  filler) and `SUPPORT_ESP32_RMT_V2` (IDF5/6 encoder translator), the six
+  sources are renamed to say which path they are, and no RMT source or RMT
+  branch tests `ESP_IDF_VERSION` any more. Verified by compiling the AVR,
+  Arduino (IDF 4.4.7), IDF 4.4.3 and IDF 5.5.3 builds and by the four
+  PC tests that include those sources directly.
 - **010 — MCPWM/PCNT emitted continuously on every queue after the first —
   resolved, `pcnt_new_unit()` was clearing the interrupt-enable bit.**
   Measured `PCNT.int_ena == 0x39` with three queues connected (bits 1 and 2
@@ -101,7 +108,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   `seq_03_02` dropped 123 s -> 94 s. See
   [idf6_rmt_slow.md](../doc/implemented/idf6_rmt_slow.md).
 - **ESP32 RMT extra step — implemented.** IDF5/6 translates queue
-  commands in `StepperISR_idf5_esp32_rmt_encode.cpp` instead of filling
+  commands in `StepperISR_rmt_v2_encode.cpp` instead of filling
   fixed RMT halves. 20× `seq_02` and 20× `seq_03` passed on IDF5 RMT.
   See [esp32_rmt_extra_step.md](../doc/implemented/esp32_rmt_extra_step.md).
 - **Faithful timed trajectory — implemented.** Separate from

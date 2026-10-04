@@ -1,5 +1,7 @@
 #include "fas_queue/stepper_queue.h"
-#if defined(HAVE_ESP32_RMT) && (ESP_IDF_VERSION_MAJOR == 4)
+// The chip condition stays: SUPPORT_ESP32_RMT_V1 is defined for every
+// chip that has RMT at all, and this file is one chip's queue methods.
+#if defined(HAVE_ESP32_RMT) && defined(SUPPORT_ESP32_RMT_V1)
 
 // #define TEST_MODE
 
