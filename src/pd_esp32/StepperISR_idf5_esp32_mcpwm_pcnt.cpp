@@ -246,6 +246,14 @@ void StepperQueue::init_mcpwm_pcnt(uint8_t channel_num, uint8_t step_pin) {
   PCNT.conf_unit[pcnt_unit_id].conf0.FAS_THR_L_LIM_EN = 0;
 
   pcnt_unit_to_queue[pcnt_unit_id] = this;
+  // pcnt_new_unit() enables the unit's interrupt only when it installs its own
+  // ISR, i.e. only for accum_count; this driver counts by itself and asks for
+  // accum_count = 0, so the call above CLEARED this unit's int_ena bit.
+  // Re-assert it on every init, not once inside the pcnt_isr_installed guard:
+  // otherwise every queue after the first drains on hardware alone and
+  // free-runs forever.
+  PCNT.int_clr.val = (1 << pcnt_unit_id);
+  PCNT.int_ena.val |= (1 << pcnt_unit_id);
   if (!pcnt_isr_installed) {
     PCNT.int_clr.val = PCNT.int_st.val;
     PCNT.int_ena.val |= ((1 << QUEUES_MCPWM_PCNT) - 1);

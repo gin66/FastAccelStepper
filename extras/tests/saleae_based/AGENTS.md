@@ -340,16 +340,31 @@ sets `no_topup` and the queue drains exactly what `QFILL` reported.
   adherence per stepper. A refused point is recorded and the plan continues.
 - Characterization scenarios above are runnable by hand with `control.py`.
 
-### Known defect found by `--mode scale`
+### MCPWM/PCNT: all six queues measured working
 
-**Two MCPWM/PCNT queues on one ESP32 do not run**: the second stepper emits
-continuously and never stops (22 143 edges where 64 were commanded, at exactly
-the commanded period), and `POS` reads non-monotonic. Reproduces on unmodified
-firmware, in both `dir` and `nodir`, at any speed, with only stepper B selected.
-`rmt+mcpwm_pcnt` and `rmt+rmt` are both fine. Suspect the `channel_num` /
-`pcnt_unit_id` indexing in `src/pd_esp32/StepperISR_idf5_esp32_mcpwm_pcnt.cpp`
-against 4 MCPWM timers vs `QUEUES_MCPWM_PCNT` = 6. Until fixed, MCPWM/PCNT
-multi-stepper results characterize this bug, not the driver.
+`--mode scale --driver mcpwm_pcnt` sweeps n = 1…6 in `nodir` (n = 1…4 in `dir`,
+2 channels per stepper) and every point passes: each stepper emits exactly the
+commanded step count at the commanded period. n = 7 and 8 are **refused** — the
+bound is `QUEUES_MCPWM_PCNT` = 6, which is the ESP32's real hardware
+(`SOC_MCPWM_GROUPS=2` × `SOC_MCPWM_TIMERS_PER_GROUP=3`), so the board refusing
+the seventh queue is the measurement that the constant is right.
+
+This was not true until the `pcnt_new_unit()` interrupt-enable defect was
+fixed; `--mode scale` is what found it, and it is the regression test for it.
+The symptom to watch for is one stepper emitting exactly its share while every
+later stepper free-runs at exactly the commanded period and never stops (22 143
+edges where 64 were commanded), with `POS` reading non-monotonic and *below* the
+commanded count. Two invariants in the driver keep that from coming back, both
+non-obvious and both load-bearing — see the MCPWM/PCNT section of
+`extras/doc/platforms/esp32.md`:
+
+- the driver re-asserts its own PCNT unit's `int_ena` bit on **every** init,
+  because `pcnt_new_unit()` clears it;
+- MCPWM timer index and PCNT unit index are equal only because the library is
+  the first PCNT user, so the driver may not share the chip with an application
+  that also allocates PCNT units.
+
+`rmt+mcpwm_pcnt` and `rmt+rmt` are unaffected either way.
 
 ## Target/driver notes## Capture format
 

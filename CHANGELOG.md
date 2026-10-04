@@ -1,4 +1,5 @@
 pre-1.5.0:
+- esp32: Fix the MCPWM/PCNT driver on ESP-IDF 5/6 running away with more than one stepper: every stepper after the first emitted continuously and never stopped, so a second stepper produced unbounded motion. All six queues now work
 - getDirChangeBeforePauseCount() removed from API
 - esp32: Fix the RMT direction change on ESP-IDF 5/6 landing before the previous segment finished stepping: trailing steps of the old segment went out in the new direction, or the first segment of a move went out backwards
 

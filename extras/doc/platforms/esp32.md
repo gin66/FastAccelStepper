@@ -165,6 +165,87 @@ a dedicated ISR (`StepperISR_idf6_esp32_mcpwm_pcnt.cpp`) and the split
 three driver families (MCPWM/PCNT, RMT and I2S) are available and tested on
 ESP32/ESP32-S3 with ESP-IDF 6.1.
 
+#### Two MCPWM/PCNT invariants
+
+Both are non-obvious, both have caused runaway motion when violated, and both
+were established by measuring the step pin rather than by reading the code.
+
+**1. Re-assert your own unit's `int_ena` bit on every init.**
+`pcnt_new_unit()` enables the interrupt for the unit it creates *only* when it
+installs its own ISR, i.e. only for `accum_count`:
+
+```c
+// esp-idf, components/esp_driver_pcnt/src/pulse_cnt.c
+bool to_install_isr = (config->flags.accum_count == 1);
+...
+pcnt_ll_enable_intr(group->hal.dev, PCNT_LL_UNIT_WATCH_EVENT(unit_id),
+                    to_install_isr);   // false => int_ena.val &= ~unit_mask
+```
+
+This driver does its own counting and asks for `accum_count = 0`, so **every**
+`pcnt_new_unit()` call *clears* that unit's interrupt-enable bit, and
+`pcnt_unit_enable()` does not put it back (with `accum_count == 0`,
+`unit->intr` is NULL). The bit must therefore be written per queue, after the
+`pcnt_new_unit()` call. Setting it once, on the first queue only, leaves every
+later queue with `int_ena == 0`: the counter still reaches `cnt_h_lim` and sets
+`int_raw`, but nothing enters the ISR, so `what_is_next()` never runs for that
+queue — the MCPWM generator free-runs at the commanded period forever,
+`read_idx` never advances, `_isRunning` stays true and the ramp generator
+re-issues the same command. Measured with three queues:
+`PCNT.int_ena == 0x39` (bits 1 and 2 cleared by their own `pcnt_new_unit()`)
+instead of `0x3F`.
+
+The related `pcnt_ll_disable_all_events()` in the same call clears `conf0`
+bits 11..15 (`thr_zero_en`, `thr_h_lim_en`, `thr_l_lim_en`,
+`thr_thres0_en`, `thr_thres1_en`), so the high-limit **event** enable has to be
+re-asserted after the call too. It already is; keep the two together, since a
+unit with the event enabled and the interrupt disabled is exactly the runaway
+above, and one with the reverse is a silent stall.
+
+**2. MCPWM timer index == PCNT unit index only by allocation order.**
+The two are different peripherals with different counts on the ESP32: 6 MCPWM
+timers (2 groups × 3) but **8 PCNT units** in that single PCNT group. The
+driver equates them — `timer_num = channel_num` for the MCPWM side,
+`unit->unit_id` for the PCNT side — and they agree *only while the library is
+the first PCNT user*. They are also used inconsistently inside one init: the
+`conf_unit[]` and `pcnt_unit_to_queue[]` writes use the local `pcnt_unit_id`,
+while `isr_pcnt_counter_clear()` and every runtime access go through
+`mapping->pcnt_unit_id`.
+
+One application `pcnt_new_unit()` before connecting steppers shifts every
+stepper by one, and then: the driver writes `cnt_h_lim`/`thr_h_lim_en` into a
+PCNT unit it does not own; the ISR dispatch table points unit *N* at the queue
+registered for unit *N-1*, so the *first* stepper is the one that hangs; and
+`connect_mcpwm_pcnt()` derives the pin's `func_out_sel` from the PCNT unit id as
+if it were a timer index, routing the pin to the wrong generator. So MCPWM/PCNT
+and any application use of PCNT on the same ESP32 must not be mixed — and the
+missing `mapping->pcnt_unit_id == channel_num` check is what lets that
+combination fail silently instead of refusing it.
+
+#### Not done, known
+
+Found while verifying the above; none of these is a live defect today.
+
+- **No queue-progress watchdog.** A lost drain interrupt is *runaway motion*,
+  not "no motion", and nothing notices: the broken steppers sat at
+  `QueueEnd=38` indefinitely with motion as the only symptom. A bounded "no
+  queue progress for N periods → stop and report" would turn this into a
+  visible error. Worth doing on its own — a driver whose failure mode is
+  unbounded motion should not rest on one register bit being right.
+- **The PCNT ISR is allocated unmasked.** `esp_intr_alloc()` with no status
+  mask, so the handler also runs for units the library does not own. Guarded by
+  `if (q)`, hence harmless, but
+  `esp_intr_alloc_intrstatus(… PCNT_LL_UNIT_WATCH_EVENT(unit))` is the
+  idiomatic form and keeps an unrelated unit from waking the stepper ISR
+  thousands of times a second.
+- **Pause length on more than one queue is unmeasured.** `TIMER_BIT(timer) =
+  1 << (timer + 15)` is `op0/1/2_tea_int_ena` with `timer == timer_in_group`,
+  i.e. the operator-A timer-event-A interrupt of the right operator in the
+  right group — correct on both groups, and misnamed rather than wrong. What is
+  unverified is whether a `steps == 0` pause lasts the commanded ticks per
+  stepper; run `--mode scale` on a program containing `QSEG 0 <ticks> 1`, now
+  that more than one queue runs at all.
+
 ### I2S Mux driver implementation
 
 The I2S Mux driver uses the ESP32's I2S transmitter in 16-bit stereo mode at

@@ -6,8 +6,8 @@ and the rest is n-axis work.
 
 The filename prefix is the priority, three digits wide
 (`010_name.md`). Numbers step by 10, so a new item takes a free
-number between two existing ones (`015_` sits between `010_` and
-`020_`). Items that share a priority share the prefix.
+number between two existing ones (`025_` sits between `020_` and
+`030_`). Items that share a priority share the prefix.
 
 Source of truth for the n-axis items: `extras/doc/n_axes_whitepaper.md`.
 Their test-driven implementation plan (Steps 0–14) is complete; its
@@ -24,7 +24,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **010** | [MCPWM/PCNT defect — two queues on ESP32](010_mcpwm_pcnt_defect.md) | ~100 k | 1–2 d | **Critical.** Configuring two MCPWM/PCNT queues causes the second stepper to emit continuously and never stop. Runaway motion. |
 | **020** | [stopMove() does not stop a queued move](020_stopMove_behavior.md) | ~100 k | 1–2 d | **Critical.** `stopMove()` only sets a flag; queued commands run to completion. Unexpected motion. |
 | **030** | [Interrupt slow steps](030_interrupt_slow_steps.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
@@ -48,9 +47,19 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
 | **175** | [stopMove() / forceStop() / forceStopAndNewPosition() — three APIs, one harness conflated two](175_stop_api_conflation.md) | ~100 k | 0.5 d | Low: harness bug that was found, fixed, and documented. |
-| **total** | 23 items (16 existing + 7 new) | ~6.5 M | 18–26 w | All priorities 010–175. |
+| **total** | 22 items (15 existing + 7 new) | ~6.4 M | 18–26 w | All priorities 020–175. |
 
 ## Done
+
+- **010 — MCPWM/PCNT emitted continuously on every queue after the first —
+  resolved, `pcnt_new_unit()` was clearing the interrupt-enable bit.**
+  Measured `PCNT.int_ena == 0x39` with three queues connected (bits 1 and 2
+  cleared) and `0x3F` after the fix; `--mode scale --driver mcpwm_pcnt` now
+  passes n = 1…6 in `nodir` and n = 1…4 in `dir`, with n = 7/8 correctly
+  refused. The original lead — the `channel_num` / `pcnt_unit_id` indexing —
+  was *not* the cause but is a real latent defect of its own, so both
+  invariants are now written up in
+  [`extras/doc/platforms/esp32.md`](../doc/platforms/esp32.md).
 
 - **180 — i2s_mux short move "no output" — resolved, decoder fixed.**
   The "64-step move puts nothing on the wire" reading was a decoder bug plus a
