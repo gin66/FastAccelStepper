@@ -97,8 +97,8 @@ python3 scripts/harness.py --arch esp32 --drivers rmt,mcpwm_pcnt --count 2 \
 
 # the two generic modes (todo R3). Neither names an architecture; --arch and
 # --driver are tags on the run. --dry-run prints the whole plan first.
-python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --dry-run
-python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --flash
+python3 scripts/harness.py --mode scale --driver rmt --pin-mode nodir --dry-run
+python3 scripts/harness.py --mode scale --driver rmt --pin-mode nodir --flash
 python3 scripts/harness.py --mode sync --arch esp32 --dry-run
 python3 scripts/harness.py --mode sync --arch esp32 --speed-us 5 --flash
 
@@ -244,7 +244,7 @@ IMUX                          bring the ESP32 I2S multiplexer up, at runtime.
                               so a mux brought up in an earlier session is gone
                               by the next and the CONFIG is refused with
                               `ERR connect step 0`, which names no cause.
-Driver names: `rmt` | `rmt_v2` | `mcpwm` | `mcpwm_pcnt` | `i2s` | `i2s_direct` |
+Driver names: `rmt` | `rmt` | `mcpwm` | `mcpwm_pcnt` | `i2s` | `i2s_direct` |
 `i2s_mux` on the ESP32 family, `timer` on AVR/SAM/SAMD, `pio` on Pico. A driver
 the running build has no queues for is refused — `CONFIG 2 rmt,rmt` on a 328P
 does not quietly give you two timer queues. The list is explicit on every
@@ -292,7 +292,7 @@ The delay is a **fraction of the fill's duration**, computed from the DUT's own
 tick rate and period (`stop_after_for()`), not a wall-clock constant. It has to
 be a fraction of the *fill* rather than of the program — the program is four
 fills long, so a quarter of that would land past the end of the run — and it has
-to be scaled at all: a fixed 1 ms cleared the run on rmt_v2 and mcpwm_pcnt but
+to be scaled at all: a fixed 1 ms cleared the run on rmt and mcpwm_pcnt but
 not on i2s_direct, whose first step arrives later than that because it streams
 from a DMA buffer. Its marker edge then came 16 µs *before* the first pulse and
 the scenario measured a stop that interrupted nothing.
@@ -312,7 +312,7 @@ step — and SR_25 requires it to be the whole remainder. Measured on ESP32 at
 
 | driver | SR_25 after marker | SR_30 after marker |
 |---|---|---|
-| rmt_v2 | 3999 of 4080 | **0** |
+| rmt | 3999 of 4080 | **0** |
 | mcpwm_pcnt | 3988 of 4080 | **0** |
 | i2s_direct | 4046 of 4080 | **67** |
 

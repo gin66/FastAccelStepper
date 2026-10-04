@@ -131,7 +131,7 @@ def run_segments(segments, wire_cfg, channels, mask, name, info,
 
     `wire_cfg` is the whole command line, CONFIG keyword included, as
     `wire_plan()` builds it. It is sent verbatim: re-prefixing the keyword
-    produced `CONFIG CONFIG 1 rmt_v2 dir`, which the firmware correctly refused
+    produced `CONFIG CONFIG 1 rmt dir`, which the firmware correctly refused
     and which read as a wiring fault on all 25 scenarios at once.
     """
     if serial is None:

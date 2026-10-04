@@ -111,8 +111,8 @@ touching hardware.
 ```bash
 # scale: 1..min(driver queues, channel budget) steppers on ONE driver, all
 # running a shared program. Says which bound stopped it.
-python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --dry-run
-python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --flash
+python3 scripts/harness.py --mode scale --driver rmt --pin-mode nodir --dry-run
+python3 scripts/harness.py --mode scale --driver rmt --pin-mode nodir --flash
 
 # sync: every driver-list combination on this board, each stepper given its OWN
 # period, so adherence is checkable per stepper rather than against a common one.
@@ -129,7 +129,7 @@ python3 scripts/harness.py --mode sync --arch esp32 --speed-us 5 --flash
 the channel budget (8 channels; 2 per stepper with a direction pin, 1 without)
 and prints which one bound it was — those are different findings, and only one
 is about the driver. `sync` enumerates over driver *identities* rather than
-spellings, so `rmt_v2` and `rmt` are one driver and do not appear as a
+spellings, so `rmt` and `rmt` are one driver and do not appear as a
 cross-driver pair.
 
 A **refused** point is recorded and the plan continues: for `scale` the point

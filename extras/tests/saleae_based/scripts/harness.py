@@ -7,7 +7,7 @@ low-level orchestrator (run_tests.py).
 
     # ESP32, Arduino framework, four steppers on RMT
     python3 scripts/harness.py --arch esp32 --framework arduino \
-        --driver rmt_v2 --count 4 --pin-mode dir --tests SR_01 \
+        --driver rmt --count 4 --pin-mode dir --tests SR_01 \
         --steps 4000 --speed-us 5 --flash
 
     # Same board, one stepper on RMT and one on MCPWM/PCNT
@@ -57,53 +57,25 @@ PICO_ARCHS = ["rpipico", "rpipico2"]
 SAM_ARCHS = ["atmelsam", "samd51"]
 ARCHS = ESP_ARCHS + AVR_ARCHS + PICO_ARCHS + SAM_ARCHS
 
+# One name per driver, and it is the name the firmware's parse_driver() accepts
+# and driver_name() reports. There used to be a second RMT spelling here
+# (`rmt`) and aliases for MCPWM and I2S; they were removed together with the
+# firmware's tolerance for them.
+#
+# They were not harmless. `rmt` and `rmt` are the same queue, and which RMT
+# implementation is behind it -- V1 on IDF4, V2 on IDF5/6 -- is a property of the
+# SDK the firmware was built with, which is a tag on the run, not a choice this
+# protocol can make: no build has both. A second name for it invited the one
+# mistake R1 recorded, where "cross-driver" was measured as RMT+RMT and the tell
+# was that two supposedly different configurations agreed to four decimal
+# places. One name per driver is what makes a combination table mean what it
+# says.
 DRIVERS = {
-    "esp": ["rmt_v2", "rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"],
+    "esp": ["rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"],
     "avr": ["timer"],
     "pico": ["pio"],
     "sam": ["timer"],
 }
-
-# Driver *name* -> driver *identity*. `rmt` and `rmt_v2` are two spellings of
-# one driver: the firmware's parse_driver() maps both to SA_RMT and reports both
-# as `rmt`, because the RMT generation is a property of the SDK, which is a tag
-# on the run, not of the driver. They must be collapsed before a sync plan is
-# enumerated.
-#
-# This is not tidiness. R1 recorded a finding that was wrong for exactly this
-# reason: the pre-R1 firmware's `mixed` config parsed a driver list and then
-# overwrote it with its automatic choice, so "cross-driver" was measured as
-# RMT+RMT -- and the tell was that two supposedly different configurations
-# agreed to four decimal places. Enumerating `rmt_v2+rmt` as a *combination*
-# would put that same identical pair in the table under a name claiming they are
-# different drivers, and reading it as a cross-driver measurement is the mistake
-# the table exists to prevent.
-DRIVER_IDENTITY = {
-    "rmt_v2": "rmt",
-    "rmt": "rmt",
-    "mcpwm": "mcpwm_pcnt",
-    "mcpwm_pcnt": "mcpwm_pcnt",
-    "i2s": "i2s_direct",
-    "i2s_direct": "i2s_direct",
-    "i2s_mux": "i2s_mux",
-    "timer": "timer",
-    "pio": "pio",
-}
-
-
-def driver_identities(drivers):
-    """The distinct driver identities in `drivers`, first-seen order.
-
-    `sync` enumerates over identities, because a combination of two spellings of
-    one driver is not a combination -- it is the same-driver case, which is
-    already in the plan under the canonical name.
-    """
-    seen = []
-    for d in drivers:
-        ident = DRIVER_IDENTITY.get(d, d)
-        if ident not in seen:
-            seen.append(ident)
-    return seen
 
 # The pin mode, the other half of the firmware's CONFIG grammar. It is not
 # cosmetic: the analyzer has 8 channels and `dir` spends two per stepper, so
@@ -214,19 +186,19 @@ SUPPORTED_RATES = [20000, 25000, 50000, 100000, 200000, 250000, 500000,
 # applicable here" and "nobody filled this in", and the second is the one that
 # silently guesses a bound.
 DRIVER_MAXS = {
-    "esp32": {"rmt": 8, "rmt_v2": 8, "mcpwm_pcnt": 6,
+    "esp32": {"rmt": 8, "mcpwm_pcnt": 6,
               "i2s_direct": 3, "i2s_mux": 32},
-    "esp32s2": {"rmt": 4, "rmt_v2": 4, "mcpwm_pcnt": 0,
+    "esp32s2": {"rmt": 4, "mcpwm_pcnt": 0,
                 "i2s_direct": 0, "i2s_mux": 0},
-    "esp32s3": {"rmt": 4, "rmt_v2": 4, "mcpwm_pcnt": 4,
+    "esp32s3": {"rmt": 4, "mcpwm_pcnt": 4,
                 "i2s_direct": 0, "i2s_mux": 0},
-    "esp32c3": {"rmt": 2, "rmt_v2": 2, "mcpwm_pcnt": 0,
+    "esp32c3": {"rmt": 2, "mcpwm_pcnt": 0,
                 "i2s_direct": 0, "i2s_mux": 0},
-    "esp32c6": {"rmt": 2, "rmt_v2": 2, "mcpwm_pcnt": 2,
+    "esp32c6": {"rmt": 2, "mcpwm_pcnt": 2,
                 "i2s_direct": 0, "i2s_mux": 0},
-    "esp32h2": {"rmt": 2, "rmt_v2": 2, "mcpwm_pcnt": 2,
+    "esp32h2": {"rmt": 2, "mcpwm_pcnt": 2,
                 "i2s_direct": 0, "i2s_mux": 0},
-    "esp32p4": {"rmt": 8, "rmt_v2": 8, "mcpwm_pcnt": 0,
+    "esp32p4": {"rmt": 8, "mcpwm_pcnt": 0,
                 "i2s_direct": 0, "i2s_mux": 0},
     "nanoatmega328": {"timer": 2},
     "nanoatmega168": {"timer": 2},
@@ -336,7 +308,7 @@ def derive(args):
     # The budget is per-driver, not per-pin-mode: a multiplexed stepper spends a
     # bit of the 32-bit mux word and no analyzer channel at all, so `--driver
     # i2s_mux --count 32` is legal on an eight-channel analyzer and
-    # `--driver rmt_v2 --count 32` is not. What still bounds a mux run is the
+    # `--driver rmt --count 32` is not. What still bounds a mux run is the
     # 32-bit word itself.
     mux = is_mux_driver(args.driver)
     cap = mux_slot_bound(args.pin_mode) if mux \
@@ -376,7 +348,7 @@ def derive(args):
         # The channel-config suffix records that a run's step signals were
         # decoded out of the I2S bus rather than read off a channel. It is part
         # of the tag because the two produce the same channel names and very
-        # different waveforms: a physical `rmt_v2` 4-stepper `nodir` run and a
+        # different waveforms: a physical `rmt` 4-stepper `nodir` run and a
         # 4-slot mux run both read D0..D3 after decoding, and a result recorded
         # without the distinction says nothing about which produced it.
         #
@@ -507,7 +479,13 @@ def _unused_imux(port, baud):
                      "and initI2sMux() cannot run twice")
 
 
-def build_and_flash(proj, env, port, do_build, do_flash):
+def build_and_flash(proj, env, port, do_build, do_flash, do_skip=False):
+    if do_skip:
+        # A matrix flashes once per firmware and then runs dozens of
+        # configurations against it. The build was a no-op in that case, but not
+        # a free one: for framework=espidf `pio run` re-enters CMake and costs
+        # seconds per invocation, which over a matrix is more than the captures.
+        return
     if do_build or do_flash:
         subprocess.run(["bash", "extras/scripts/build-pio-dirs.sh"],
                        cwd=ROOT, check=True)
@@ -541,7 +519,7 @@ def build_parser():
                    help="build version, e.g. 5.3 / V6_13_0 / latest (ESP only)")
     p.add_argument("--driver", default=None,
                    help="driver family; defaults per arch "
-                        "(esp: rmt_v2, avr: timer, pico: pio)")
+                        "(esp: rmt, avr: timer, pico: pio)")
     p.add_argument("--drivers", default=None,
                    help="per-stepper drivers, one per stepper, e.g. "
                         "rmt,mcpwm; overrides --driver")
@@ -561,9 +539,20 @@ def build_parser():
     p.add_argument("--sync-count", type=int, default=2,
                    help="steppers per sync combination (default: 2; skew "
                         "needs two to exist)")
+    p.add_argument("--scale-max", type=int, default=0,
+                   help="cap the `scale` sweep at this many steppers (0 = the "
+                        "channel budget, the default). A matrix wants every "
+                        "driver swept the same distance: the budget is 8 in "
+                        "nodir but 32 for the I2S mux, so the uncapped sweep "
+                        "measures one driver four times as hard as another")
     p.add_argument("--tests", help="comma list (default: all)")
     p.add_argument("--flash", action="store_true", help="build + flash first")
     p.add_argument("--build", action="store_true", help="build first (no flash)")
+    p.add_argument("--no-build", action="store_true",
+                   help="do not even build: the firmware is already on the "
+                        "board. A matrix flashes once per target and then runs "
+                        "every driver against it, and the repeated no-op build "
+                        "is what makes that slow")
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--list", action="store_true", help="list recorded results")
     # pass-through to run_tests
@@ -600,6 +589,176 @@ def parse_args(argv=None):
     return args
 
 
+class ReleaseTarget:
+    """One firmware in RELEASE_MATRIX: a framework and an explicit version.
+
+    `esp_idf` is the ESP-IDF that firmware actually runs on, and it is data
+    rather than something derived, because it cannot be derived from the env
+    name -- see RELEASE_MATRIX.
+    """
+
+    def __init__(self, framework, version, esp_idf, note=""):
+        self.framework = framework
+        self.version = version
+        self.esp_idf = esp_idf
+        self.note = note
+
+    @property
+    def id(self):
+        """Short, filename- and tag-safe name: `arduino-6.13.0`."""
+        return f"{self.framework}-{self.version}"
+
+    def base_argv(self):
+        """The argument tail every run against this firmware starts from."""
+        return ["--arch", "esp32", "--framework", self.framework,
+                "--version", self.version]
+
+    def derive(self, argv_tail=()):
+        """(tag_key, project_dir, env, sample_rate) for one of its runs.
+
+        Routed through derive() rather than recomputed here, so the env name and
+        the tag key of a matrix row are the ones the harness itself would use.
+        A second implementation of the version -> env mapping is a second thing
+        to keep in step with the first, and it is the mapping that decides which
+        firmware is on the board.
+        """
+        return derive(parse_args(self.base_argv() + list(argv_tail)))
+
+    @property
+    def env(self):
+        """The PlatformIO environment this target flashes."""
+        return self.derive(["--driver", "rmt", "--count", "1"])[2]
+
+    def __repr__(self):
+        return f"<ReleaseTarget {self.id} (ESP-IDF {self.esp_idf})>"
+
+
+# The platform-release matrix: what gets flashed, and what is measured on it.
+#
+# One explicit version per ESP-IDF major, built and flashed ONCE, then every
+# driver the board admits and every driver combination measured against that one
+# flash. Flashing per configuration costs a minute of board time to learn
+# nothing -- the firmware is a runtime CONFIG, not a compile-time choice -- so
+# the matrix is (firmware x driver), never (firmware x driver x scenario).
+#
+# The IDF column is the part that is easy to get wrong, so it is written down
+# instead of computed. A PlatformIO environment name carries the *platform*
+# version, not the ESP-IDF version: `esp32_idf_V5_3_0` is espressif32 5.3.0,
+# which is ESP-IDF **4.4.3**, and `esp32_idf_V6_13_0` is ESP-IDF **5.5.3**. A
+# matrix written as "IDF 4.4 / 5.5 / 6.1" and turned into env names by
+# substituting the version would flash IDF 4.4.3 three times over IDF 5.5.3 and
+# IDF 6.1.0 and label all three correctly, which is exactly what
+# extras/doc/platformio-espressif-versions.md exists to prevent. Transcribed
+# from that table.
+#
+# 'latest' is not accepted here, deliberately. It is not a version: it means
+# whichever espressif32 PlatformIO has installed, so a `latest` row cannot be
+# reproduced and two `latest` rows are not comparable. Every row names the
+# platform it was built from.
+#
+# The Arduino rows all report ESP-IDF 4.4.7, and that is not a copy-paste
+# error: `framework = arduino` is Arduino-core-on-IDF-4.4.7 on every
+# espressif32 release, so the axis an Arduino row varies is the PlatformIO
+# platform (toolchain and Arduino core), not the IDF under it.
+RELEASE_MATRIX = (
+    ReleaseTarget("arduino", "4.4.0", "4.4.7", "oldest Arduino matrix env"),
+    ReleaseTarget("arduino", "5.3.0", "4.4.7", "-Werror Arduino env"),
+    ReleaseTarget("arduino", "6.13.0", "4.4.7", "Arduino core 2.0.17"),
+    ReleaseTarget("idf", "5.3.0", "4.4.3", "native ESP-IDF 4.4"),
+    ReleaseTarget("idf", "6.13.0", "5.5.3", "native ESP-IDF 5.5"),
+    ReleaseTarget("idf", "7.1.2", "6.1.0", "native ESP-IDF 6.1"),
+)
+
+# How far each driver's `scale` sweep goes, and in which pin mode. `nodir`,
+# because it is the sweep that reaches the driver's own queue count: `dir`
+# spends two of the eight channels per stepper and stops at 4, which is below
+# QUEUES_MCPWM_PCNT = 6, so a `dir` sweep cannot tell "MCPWM reaches 6" from
+# "the analyzer ran out of channels". The cap makes the sweep the same distance
+# for every driver -- the mux budget is 32 and the rest is 8, and an uncapped
+# sweep measures one driver four times as hard as the others.
+RELEASE_SCALE_PIN_MODE = "nodir"
+RELEASE_SCALE_MAX = 8
+
+# `sync` in `dir`, two steppers per combination: it is the mode that needs a
+# direction pin to have anything to compare (SR_15/SR_17), and 2 is the
+# smallest count at which a skew exists.
+RELEASE_SYNC_PIN_MODE = "dir"
+RELEASE_SYNC_COUNT = 2
+
+
+class ReleaseRun:
+    """One harness invocation against an already-flashed firmware."""
+
+    def __init__(self, label, argv, driver=None, needs_mux=False):
+        self.label = label
+        self.argv = argv
+        self.driver = driver
+        self.needs_mux = needs_mux
+
+    def __repr__(self):
+        return f"<ReleaseRun {self.label}>"
+
+
+def release_runs(target, drivers):
+    """Every run to make against ONE flash of `target`.
+
+    `drivers` is what the board itself reported it accepts (harness.preflight
+    asks; see the comment there). It is the whole of "where supported": a driver
+    this SDK has no queues for is never swept, and the report says it was absent
+    rather than leaving an empty column that reads like "not applicable here"
+    and "nobody filled this in" at the same time.
+
+    The catalogue runs first and is NOT parameterized: no --tests, no --steps,
+    no --speed-us. Each SR scenario has a fixed program and a fixed expectation
+    baked into its evaluator, and overriding them would make the matrix measure
+    the override instead of the scenario -- two firmwares measured with different
+    step counts are not comparable, which is the only reason a matrix exists.
+    """
+    mux = "i2s_mux" in drivers
+    native = next((d for d in DRIVERS["esp"] if d in drivers), "rmt")
+
+    runs = [ReleaseRun("catalogue",
+                       target.base_argv() + ["--driver", native,
+                                             "--count", "1",
+                                             "--pin-mode", "dir"])]
+
+    for d in drivers:
+        # One sweep per accepted driver, so "RMT reaches 8 in nodir" is a
+        # statement about RMT and the column can be read on its own.
+        argv = target.base_argv() + [
+            "--mode", "scale", "--driver", d,
+            "--pin-mode", RELEASE_SCALE_PIN_MODE,
+            "--scale-max", str(RELEASE_SCALE_MAX)]
+        if d == "i2s_mux":
+            argv.append("--imux")
+        runs.append(ReleaseRun(f"scale:{d}", argv, driver=d,
+                               needs_mux=(d == "i2s_mux")))
+
+    argv = target.base_argv() + ["--mode", "sync",
+                                 "--pin-mode", RELEASE_SYNC_PIN_MODE,
+                                 "--sync-count", str(RELEASE_SYNC_COUNT)]
+    if mux:
+        # Brought up for the whole run: `sync` connects at most two physical
+        # steppers, which in `dir` is four channels, and the bus is the LAST
+        # three -- so the mux and the steppers never want the same wire.
+        argv.append("--imux")
+    runs.append(ReleaseRun("sync", argv, needs_mux=mux))
+    return runs
+
+
+def release_targets(ids=None):
+    """RELEASE_MATRIX, optionally narrowed to the given target ids."""
+    if not ids:
+        return list(RELEASE_MATRIX)
+    wanted = set(ids)
+    unknown = wanted - {t.id for t in RELEASE_MATRIX}
+    if unknown:
+        raise SystemExit(f"unknown release target(s): "
+                         f"{', '.join(sorted(unknown))}; known: "
+                         f"{', '.join(t.id for t in RELEASE_MATRIX)}")
+    return [t for t in RELEASE_MATRIX if t.id in wanted]
+
+
 def plan_scale(args):
     """The `scale` plan: 1..bound on one driver, plus which bound stopped it.
 
@@ -612,6 +771,8 @@ def plan_scale(args):
     honouring it would silently start the loop somewhere other than 1.
     """
     count_max, bound = scale_bound(args.arch, args.driver, args.pin_mode)
+    if args.scale_max:
+        count_max = min(count_max, args.scale_max)
     plans = run_tests.scale_plan(args.driver, args.pin_mode, count_max)
     print(f"scale  : {args.driver}, {args.pin_mode}, counts 1..{count_max}")
     print(f"         sweeping 1..{count_max}, bound: {bound}")
@@ -635,13 +796,8 @@ def plan_sync(args):
     is the mode that applies there, and the sync table would otherwise show a
     same-driver row indistinguishable from a real cross-driver measurement.
     """
-    named = DRIVERS[arch_family(args.arch)]
-    # Over identities, not spellings: `rmt` and `rmt_v2` are one driver, so
-    # enumerating both would put rmt_v2+rmt in the table as if it were a
-    # cross-driver combination. See DRIVER_IDENTITY.
-    drivers = driver_identities(named)
-    print(f"sync   : {args.arch} drivers {drivers} "
-          f"(from {', '.join(named)}), "
+    drivers = DRIVERS[arch_family(args.arch)]
+    print(f"sync   : {args.arch} drivers {drivers}, "
           f"{args.sync_count} steppers per combination")
     if len(drivers) < args.sync_count:
         raise SystemExit(
@@ -690,7 +846,10 @@ def main():
                                         "result": p.wire} for p in plans]))
         return 0
 
-    build_and_flash(proj, env, args.port, args.build, args.flash)
+    build_and_flash(proj, env, args.port, args.build, args.flash, args.no_build)
+
+    args.capture_dir = str(run_tests.anchor_path(args.capture_dir))
+    args.results_dir = str(run_tests.anchor_path(args.results_dir))
 
     args.dut_driver = args.driver
     # run_tests.run_modes() records these into every mode result; the report

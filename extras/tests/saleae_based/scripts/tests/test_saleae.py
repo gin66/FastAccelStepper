@@ -272,14 +272,14 @@ class TestSR00(unittest.TestCase):
 CONFIG_CASES = [
     (cfg, native)
     for cfg in run_tests.CONFIGS
-    for native in ("rmt_v2", "timer", "pio", "mcpwm_pcnt")
+    for native in ("rmt", "timer", "pio", "mcpwm_pcnt")
 ]
 
 # The names the firmware's parse_driver() knows about. A driver it does not know
 # is refused, so a typo here would surface as a refused CONFIG and an ERR that
 # reads like a hardware fault.
 FIRMWARE_DRIVERS = {
-    "rmt", "rmt_v2", "mcpwm", "mcpwm_pcnt", "i2s", "i2s_direct", "i2s_mux",
+    "rmt", "rmt", "mcpwm", "mcpwm_pcnt", "i2s", "i2s_direct", "i2s_mux",
     "timer", "pio",
 }
 
@@ -491,7 +491,7 @@ class TestConfigGrammar(unittest.TestCase):
         # config, not from the length of a driver list the caller padded.
         self.assertEqual(run_tests.config_drivers("1ch", "timer"), ["timer"])
         self.assertEqual(run_tests.config_drivers("2ch", "pio"), ["pio", "pio"])
-        self.assertEqual(run_tests.config_drivers("mixed_rmt_mcpwm", "rmt_v2"),
+        self.assertEqual(run_tests.config_drivers("mixed_rmt_mcpwm", "rmt"),
                          ["rmt", "mcpwm_pcnt"])
 
     def test_scenarios_only_use_known_configs(self):
@@ -767,7 +767,7 @@ class TestConfigGrammar(unittest.TestCase):
         # invocation died on its first capture with an AttributeError,
         # including the --flash example in AGENTS.md. Nothing exercised the
         # path, because a test that only parses arguments never gets that far.
-        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt_v2",
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt",
                                    "--tests", "SR_01"])
         for name in ("capture_dir", "sr00_sample_rate", "results_dir",
                      "sample_rate", "seconds", "port", "baud", "force",
@@ -781,7 +781,7 @@ class TestConfigGrammar(unittest.TestCase):
         # but that a plain catalogue run gets past the first capture. The board
         # and the analyzer are faked, so this asserts only that the runner is
         # handed everything it needs before any hardware is touched.
-        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt_v2",
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt",
                                    "--tests", "SR_01", "--results-dir",
                                    "/tmp/does-not-exist-yet",
                                    "--capture-dir", "/tmp/r3-none"])
@@ -976,7 +976,7 @@ class TestChannelMap(unittest.TestCase):
     def test_harness_accepts_eight_steppers_in_nodir(self):
         args = harness.parse_args(["--arch", "esp32", "--count", "8",
                                    "--pin-mode", "nodir",
-                                   "--drivers", ",".join(["rmt_v2"] * 8)])
+                                   "--drivers", ",".join(["rmt"] * 8)])
         tag, _proj, _env, _rate = harness.derive(args)
         self.assertIn("nodir", tag)
 
@@ -1046,13 +1046,13 @@ class TestBoardCommands(unittest.TestCase):
     """What the runner actually puts on the wire.
 
     Nothing else here talks to a board, and the one thing that goes wrong
-    silently is a line that is *nearly* right: `CONFIG CONFIG 1 rmt_v2 dir` was
+    silently is a line that is *nearly* right: `CONFIG CONFIG 1 rmt dir` was
     refused by the firmware on all 25 scenarios at once and read as a wiring
     fault rather than as the doubled keyword it was. A fake board that records
     what it was asked is the only place that shows up without one.
     """
 
-    def _sent_to_board(self, scenario, dut_driver="rmt_v2"):
+    def _sent_to_board(self, scenario, dut_driver="rmt"):
         """Run one scenario's CONFIG against a fake board; return the lines."""
         sent = []
 
@@ -1086,7 +1086,7 @@ class TestBoardCommands(unittest.TestCase):
             self.assertTrue(sent, scenario)
             first = sent[0]
             self.assertEqual(first, run_tests.config_wire(
-                run_tests.SCENARIOS[scenario][0], "rmt_v2"),
+                run_tests.SCENARIOS[scenario][0], "rmt"),
                 f"{scenario} sends {first!r}")
             self.assertEqual(first.count("CONFIG"), 1, first)
             self.assertEqual(first.split()[0], "CONFIG", first)
@@ -1106,7 +1106,7 @@ class TestBoardCommands(unittest.TestCase):
 
         info = vf.Dut().info()
         segments = run_tests.SCENARIOS[scenario][1](info)
-        wire, channels, mask = run_hardware.wire_plan(scenario, "rmt_v2")
+        wire, channels, mask = run_hardware.wire_plan(scenario, "rmt")
 
         def record(_ser, line, wait=1.0):
             sent.append(line)
@@ -1294,34 +1294,28 @@ class TestModes(unittest.TestCase):
         with self.assertRaises(ValueError):
             run_tests.sync_plan(["timer"], "dir", 2)
 
-    # -- driver identities ----------------------------------------------
-    def test_rmt_and_rmt_v2_are_one_driver(self):
-        # The firmware maps both spellings to SA_RMT and reports both as `rmt`.
-        # Enumerating them as two would put rmt_v2+rmt in the table as a
-        # *cross-driver* combination, under a name claiming they differ, when
-        # the two are the same run -- the tell that gave away R1's wrong
-        # finding (two supposedly different configurations agreeing to four
-        # decimal places).
-        self.assertEqual(harness.driver_identities(
-            ["rmt_v2", "rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"]),
-            ["rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"])
-        self.assertEqual(harness.driver_identities(["timer", "pio"]),
-                         ["timer", "pio"])
+    # -- one name per driver --------------------------------------------
+    def test_one_name_per_driver(self):
+        # `rmt_v2` used to be a second name for the RMT queue, and `mcpwm` and
+        # `i2s` for the other two. No build has both RMT implementations, so
+        # the second name could only ever be a spelling; enumerating spellings
+        # as drivers would put rmt+rmt in the sync table as a *cross-driver*
+        # combination, under a name claiming they differ, when the two are the
+        # same run -- the tell that gave away R1's wrong finding (two supposedly
+        # different configurations agreeing to four decimal places).
+        for family, names in harness.DRIVERS.items():
+            self.assertEqual(len(names), len(set(names)),
+                             f"{family}: {names}")
+        for gone in ("rmt_v2", "mcpwm", "i2s"):
+            for family, names in harness.DRIVERS.items():
+                self.assertNotIn(gone, names,
+                                 f"{gone} is a second name, not a driver")
 
-    def test_sync_plan_has_no_duplicate_run_after_identity_folding(self):
-        drivers = harness.driver_identities(
-            harness.DRIVERS[harness.arch_family("esp32")])
+    def test_sync_plan_has_no_duplicate_run(self):
+        drivers = harness.DRIVERS[harness.arch_family("esp32")]
         plan = run_tests.sync_plan(drivers, "dir", 2)
         labels = [p.label for p in plan]
         self.assertEqual(len(set(labels)), len(labels), labels)
-
-    def test_driver_identities_cover_every_known_driver(self):
-        # A driver missing from the map is compared to itself, so the typo
-        # would only surface as a combination that silently equals another.
-        for family, names in harness.DRIVERS.items():
-            for d in names:
-                self.assertIn(d, harness.DRIVER_IDENTITY,
-                              f"{d} (family {family}) has no identity")
 
     # -- every scenario must be programmable on every driver --------------
     #
@@ -1330,7 +1324,7 @@ class TestModes(unittest.TestCase):
     # a builder that assumes a fast driver has a fast floor is legal on one and
     # not on the other.
     QINFOS = {
-        "rmt_v2": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+        "rmt": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
                    "max_speed_ticks": 640, "max_speed_all_ticks": 640},
         "i2s_direct": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
                        "max_speed_ticks": 80, "max_speed_all_ticks": 80},
@@ -1349,7 +1343,7 @@ class TestModes(unittest.TestCase):
         """The bug this pins, exactly as it happened.
 
         SR_05 built `max(max_speed_ticks, 160)` instead of legal_ticks(). On
-        rmt_v2 (floor 640) that gave 16 * 640 = 10240 and passed; on i2s_direct
+        rmt (floor 640) that gave 16 * 640 = 10240 and passed; on i2s_direct
         (floor 80) it gave 16 * 160 = 2560 against a MIN_CMD_TICKS of 3200, so
         the queue rejected the command and the run was reported as "the pin
         emitted 0 of 16 steps". One expression, two drivers, and the difference
@@ -1417,7 +1411,7 @@ class TestModes(unittest.TestCase):
                                lambda ser, line: sent.append(line)
                                or replies[line]):
             self.assertTrue(run_tests.program(object(), [(16, 640, True)],
-                                             self.QINFOS["rmt_v2"]))
+                                             self.QINFOS["rmt"]))
         self.assertEqual(sent, ["QCLR", "QSEG 16 640 1"])
 
     def test_the_stop_delay_scales_with_the_fill_not_with_the_program(self):
@@ -1425,7 +1419,7 @@ class TestModes(unittest.TestCase):
 
         The stop has exactly one requirement now that the feeder is stopped after
         the start: land inside the run, which is the fill and nothing more. A
-        fixed 1 ms met that on rmt_v2 and mcpwm_pcnt and not on i2s_direct, whose
+        fixed 1 ms met that on rmt and mcpwm_pcnt and not on i2s_direct, whose
         first step arrives later than 1 ms after QRUN because it streams from a
         DMA buffer -- its marker edge came 16 us *before* the first pulse, so the
         scenario measured a stop that interrupted nothing.
@@ -1536,8 +1530,8 @@ class TestModes(unittest.TestCase):
                 "queue_len": 32, "max_speed_ticks": 640,
                 "max_speed_all_ticks": 640, "max_speed_per_stepper": [640]}
         replies = {
-            "CONFIG 1 rmt_v2 dir": "OK CONFIG n=1 mode=dir stride=2 "
-                                    "drivers=rmt_v2\n",
+            "CONFIG 1 rmt dir": "OK CONFIG n=1 mode=dir stride=2 "
+                                    "drivers=rmt\n",
             "QCLR": "OK QCLR\n",
             "MAP": "OK MAP count=1 mode=dir stride=2 ch=2\n",
             "QINFO": "OK QINFO tps=16000000 mincmd=3200 qlen=32 maxall=640"
@@ -1551,7 +1545,7 @@ class TestModes(unittest.TestCase):
         args = argparse.Namespace(
             capture_dir="/tmp/none", results_dir="/tmp/none",
             sample_rate=4000000, port="/dev/null", baud=115200,
-            dut_driver="rmt_v2", seconds=1.0, sr00_sample_rate=1000000,
+            dut_driver="rmt", seconds=1.0, sr00_sample_rate=1000000,
             force=True)
         outcomes = {}
         sent_lines = []
@@ -1589,7 +1583,7 @@ class TestModes(unittest.TestCase):
                         run_tests, "load_capture_for_eval",
                         _two_or_three(capture)):
                 outcomes[scenario] = run_tests.measure(
-                    "t", scenario.lower(), "CONFIG 1 rmt_v2 dir", 1, builder,
+                    "t", scenario.lower(), "CONFIG 1 rmt dir", 1, builder,
                     scenario, args, None, scenario=scenario)
 
         drive("SR_01", lambda i: [(8, i["max_speed_ticks"], True)])
@@ -1660,11 +1654,11 @@ class TestModes(unittest.TestCase):
         # The set of names is build-dependent -- an AVR build emits only
         # `timer`, a Pico `timer` and `pio` -- so a positional parse reads a
         # different field as each driver on each target.
-        esp = "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 " \
+        esp = "OK DRIVERS mux=0 rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 " \
               "i2s_mux=1 mux_init=0"
         avr = "OK DRIVERS mux=0 timer=1 mux_init=0"
         pico = "OK DRIVERS mux=0 timer=1 pio=1 mux_init=0"
-        for text, expected in ((esp, {"rmt", "rmt_v2", "mcpwm_pcnt",
+        for text, expected in ((esp, {"rmt", "rmt", "mcpwm_pcnt",
                                       "i2s_direct", "i2s_mux"}),
                                (avr, {"timer"}),
                                (pico, {"timer", "pio"})):
@@ -1682,10 +1676,10 @@ class TestModes(unittest.TestCase):
         between two firmware replies rather than a pin assignment not made yet.
         """
         up = run_tests.DRIVERS_RE.search(
-            "OK DRIVERS mux=1 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+            "OK DRIVERS mux=1 rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 "
             "i2s_mux=1 mux_init=1")
         down = run_tests.DRIVERS_RE.search(
-            "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+            "OK DRIVERS mux=0 rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 "
             "i2s_mux=1 mux_init=0")
         self.assertEqual(up.group(3), "1")
         self.assertEqual(down.group(3), "0")
@@ -1699,11 +1693,11 @@ class TestModes(unittest.TestCase):
         to reach the host, or a planner will read "i2s_mux absent" from a board
         that has it.
         """
-        reply = ("OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+        reply = ("OK DRIVERS mux=0 rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 "
                  "i2s_mux=1 mux_init=0")
         with mock.patch.object(run_tests, "reply_of", lambda *a: reply):
             present, mux_init = run_tests.read_drivers(object())
-        self.assertEqual(present, {"rmt": True, "rmt_v2": True,
+        self.assertEqual(present, {"rmt": True, "rmt": True,
                                    "mcpwm_pcnt": True, "i2s_direct": True,
                                    "i2s_mux": True})
         self.assertFalse(mux_init)
@@ -1711,7 +1705,7 @@ class TestModes(unittest.TestCase):
     def test_read_drivers_reports_a_mux_that_is_up_as_up(self):
         # Reported-always-up would tell the planner the mux needs no pin
         # assignment, and every CONFIG naming it would then be refused.
-        reply = ("OK DRIVERS mux=1 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 "
+        reply = ("OK DRIVERS mux=1 rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 "
                  "i2s_mux=1 mux_init=1")
         with mock.patch.object(run_tests, "reply_of", lambda *a: reply):
             _present, mux_init = run_tests.read_drivers(object())
@@ -1722,7 +1716,7 @@ class TestModes(unittest.TestCase):
         ESP32's own boot banner, which is several hundred bytes of unrelated
         text. A parser that did not retry would read the wrong thing here."""
         boot = ("v:0x00\r\nmode:div:2\r\nload:0x3fff0030,len:4688\r\n"
-                "READY\r\nDONE 0\r\nOK DRIVERS mux=0 rmt=1 rmt_v2=1 "
+                "READY\r\nDONE 0\r\nOK DRIVERS mux=0 rmt=1 rmt=1 "
                 "mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1 mux_init=0\r\n")
         replies = iter([boot, boot])
         with mock.patch.object(run_tests, "reply_of",
@@ -1766,7 +1760,7 @@ class TestModes(unittest.TestCase):
     @staticmethod
     def _plan_args(**over):
         base = dict(arch="esp32", framework="arduino", version="latest",
-                    driver="rmt_v2", pin_mode="nodir", count=4, speed_us=40,
+                    driver="rmt", pin_mode="nodir", count=4, speed_us=40,
                     sample_rate=0, mode=None, tests=None, drivers=None,
                     capture_seconds=None, tag_key=None)
         base.update(over)
@@ -1784,7 +1778,7 @@ class TestModes(unittest.TestCase):
                                 harness.MUX_MIN_SAMPLES_PER_BIT)
 
         # The same run without the mux keeps the rate the step period needs.
-        _, _, _, plain = harness.derive(self._plan_args(driver="rmt_v2"))
+        _, _, _, plain = harness.derive(self._plan_args(driver="rmt"))
         self.assertLess(plain, harness.MUX_MIN_SAMPLE_RATE)
 
         # And a run that asks for too little is raised, not refused: the mux has
@@ -1810,7 +1804,7 @@ class TestModes(unittest.TestCase):
         # hardware. Without `/mux` in the tag, half the mux results read as
         # physical ones.
         mux_tag = harness.derive(self._plan_args(driver="i2s_mux"))[0]
-        phy_tag = harness.derive(self._plan_args(driver="rmt_v2"))[0]
+        phy_tag = harness.derive(self._plan_args(driver="rmt"))[0]
         self.assertNotEqual(mux_tag, phy_tag)
         self.assertTrue(mux_tag.endswith("4_mux"), mux_tag)
         self.assertTrue(phy_tag.endswith("4_nodir"), phy_tag)
@@ -1821,7 +1815,7 @@ class TestModes(unittest.TestCase):
         args = self._plan_args
         self.assertTrue(harness.derive(args(driver="i2s_mux", count=32))[0])
         with self.assertRaises(SystemExit):
-            harness.derive(args(driver="rmt_v2", count=32))
+            harness.derive(args(driver="rmt", count=32))
         # And the word still bounds it: 32 is all there is.
         with self.assertRaises(SystemExit):
             harness.derive(args(driver="i2s_mux", count=33))
@@ -1843,7 +1837,7 @@ class TestModes(unittest.TestCase):
         # then simply not written, with the failure surfacing as an unrelated
         # "sr -> vcd conversion failed".
         for driver, mode, bound in (("i2s_mux", "nodir", 32),
-                                    ("rmt_v2", "dir", 4)):
+                                    ("rmt", "dir", 4)):
             for plan in run_tests.scale_plan(driver, mode, bound):
                 name = f"esp32_arduino_{driver}_scale{mode}_{plan.tag}"
                 self.assertLessEqual(len(name) + len("_37ch.vcd"), 255,
@@ -1851,13 +1845,13 @@ class TestModes(unittest.TestCase):
 
     def test_a_mode_tag_names_each_driver_once(self):
         # ...and it still says which drivers, because a tag that cannot tell
-        # rmt_v2 from rmt_v2+rmt_v2 characterizes nothing.
+        # one driver from two of the same characterizes nothing.
         self.assertEqual(
-            run_tests.scale_plan("rmt_v2", "dir", 4)[1].tag, "rmt_v2dirn2")
-        tags = {p.tag for p in run_tests.sync_plan(["rmt_v2", "mcpwm_pcnt"],
+            run_tests.scale_plan("rmt", "dir", 4)[1].tag, "rmtdirn2")
+        tags = {p.tag for p in run_tests.sync_plan(["rmt", "mcpwm_pcnt"],
                                                    "dir", 2)}
-        self.assertEqual(tags, {"rmt_v2dirn2", "mcpwm_pcntdirn2",
-                                "rmt_v2+mcpwm_pcntdirn2"})
+        self.assertEqual(tags, {"rmtdirn2", "mcpwm_pcntdirn2",
+                                "rmt+mcpwm_pcntdirn2"})
 
     # -- the bound a scale run stops at ----------------------------------
     def test_the_sweep_limit_is_the_channel_budget_not_a_predicted_count(self):
@@ -1869,7 +1863,7 @@ class TestModes(unittest.TestCase):
         # by it reported "MCPWM reaches 6" directly above five runaways.
         for arch, driver, pin_mode, expected in (
                 ("esp32", "rmt", "dir", 4),
-                ("esp32", "rmt_v2", "nodir", 8),
+                ("esp32", "rmt", "nodir", 8),
                 ("esp32", "mcpwm_pcnt", "nodir", 8),   # not 6: measured
                 ("esp32", "i2s_direct", "dir", 4),
                 # The 328P is the clearest case: the analyzer affords 4 in
@@ -1905,12 +1899,12 @@ class TestModes(unittest.TestCase):
         # set the limit, the claim would again be the answer to the mode's
         # question, which is the whole thing being removed.
         with mock.patch.dict(harness.DRIVER_MAXS,
-                             {"esp32": {"rmt_v2": 1, "brand_new": 64}}):
-            self.assertEqual(harness.scale_bound("esp32", "rmt_v2", "nodir")[0],
+                             {"esp32": {"rmt": 1, "brand_new": 64}}):
+            self.assertEqual(harness.scale_bound("esp32", "rmt", "nodir")[0],
                              8)
             self.assertEqual(harness.scale_bound("esp32", "brand_new",
                                                  "nodir")[0], 8)
-            bound = harness.scale_bound("esp32", "rmt_v2", "nodir")[1]
+            bound = harness.scale_bound("esp32", "rmt", "nodir")[1]
         self.assertIn("host table believed 1", bound)
 
     def test_an_unknown_driver_no_longer_stops_the_sweep(self):
@@ -2581,14 +2575,14 @@ class TestPins(unittest.TestCase):
         for scenario, want_channels, want_mask in (
                 ("SR_01", ["D0", "D1"], "1"),
                 ("SR_14", ["D0", "D1", "D2", "D3"], "3")):
-            _wire, channels, mask = hw.wire_plan(scenario, "rmt_v2")
+            _wire, channels, mask = hw.wire_plan(scenario, "rmt")
             self.assertEqual(channels.split(","), want_channels, scenario)
             self.assertEqual(mask, want_mask, scenario)
         # The mask has to select every stepper the config connected, or QRUN
         # leaves one idle and the run reports a driver that was never asked.
         cfg = run_tests.SCENARIOS["SR_14"][0]
-        count = len(run_tests.config_drivers(cfg, "rmt_v2"))
-        _w, _c, mask = hw.wire_plan("SR_14", "rmt_v2")
+        count = len(run_tests.config_drivers(cfg, "rmt"))
+        _w, _c, mask = hw.wire_plan("SR_14", "rmt")
         self.assertEqual(int(mask), (1 << count) - 1)
 
         # No catalogue scenario reaches four steppers today, so the 4-channel
@@ -2598,7 +2592,7 @@ class TestPins(unittest.TestCase):
         with mock.patch.dict(run_tests.CONFIGS, {"4ch": (4, "native")}), \
                 mock.patch.dict(run_tests.SCENARIOS,
                                 {"SR_99": ("4ch", None, 0, "four steppers")}):
-            _w, channels, mask = hw.wire_plan("SR_99", "rmt_v2")
+            _w, channels, mask = hw.wire_plan("SR_99", "rmt")
         self.assertEqual(channels.split(","), [f"D{i}" for i in range(8)])
         self.assertEqual(mask, "15",
                          "a four-stepper run needs all 8 channels and mask 15")

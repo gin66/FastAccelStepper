@@ -191,7 +191,7 @@ def mode_record(**over):
     record = {
         "test_id": "MODE", "tag_key": "t", "mode": "sync", "result": "passed",
         "arch": "esp32", "framework": "arduino", "sdk_version": "latest",
-        "drivers": ["rmt_v2", "rmt_v2"], "pin_mode": "dir",
+        "drivers": ["rmt", "rmt"], "pin_mode": "dir",
         "stepper_count": 2, "first_step_skew_us": 37.5, "skew_periods": 3.75,
         "per_stepper": {
             "A": {"channel": "D0", "ticks": 160, "mean_period_us": 10.0,
@@ -228,7 +228,7 @@ class TestModeTables(unittest.TestCase):
         return self.tmp
 
     def test_both_tables_appear_for_a_run_that_has_both_modes(self):
-        scale = mode_record(mode="scale", drivers=["rmt_v2"],
+        scale = mode_record(mode="scale", drivers=["rmt"],
                             stepper_count=1, first_step_skew_us=None,
                             skew_periods=None, period_spread_us=0.0,
                             per_stepper={"A": {
@@ -239,7 +239,7 @@ class TestModeTables(unittest.TestCase):
         text = report.as_mode_tables(self.write([scale, mode_record()]))
         self.assertIn("Parallel stepper count (`scale`)", text)
         self.assertIn("Synced start (`sync`)", text)
-        self.assertIn("rmt_v2", text)
+        self.assertIn("rmt", text)
         self.assertIn("37.5 us", text)
 
     def test_a_driver_list_with_no_measured_skew_says_so(self):
@@ -269,7 +269,7 @@ class TestModeTables(unittest.TestCase):
         silent = mode_record(first_step_skew_us=None, skew_periods=None,
                              per_stepper={})
         text = report.as_mode_tables(self.write([silent]))
-        row = [ln for ln in text.splitlines() if ln.startswith("| rmt_v2")][0]
+        row = [ln for ln in text.splitlines() if ln.startswith("| rmt")][0]
         self.assertIn("no first-step skew", row)
         self.assertNotIn("None", row)
 
@@ -319,8 +319,8 @@ class TestModeTables(unittest.TestCase):
         splits on two underscores and `esp32_idf5_3_0_...` on one. Two records
         whose keys disagree with their own fields must group by the fields.
         """
-        a = mode_record(tag_key="esp32_arduino_rmt_v2_syncdir_n2")
-        b = mode_record(tag_key="esp32_idf5_3_0_rmt_v2_syncdir_n2",
+        a = mode_record(tag_key="esp32_arduino_rmt_syncdir_n2")
+        b = mode_record(tag_key="esp32_idf5_3_0_rmt_syncdir_n2",
                         framework="idf", sdk_version="5.3.0")
         c = mode_record(tag_key="nanoatmega328_arduino_timer_syncdir_n2",
                         arch="nanoatmega328", framework="arduino")
@@ -339,18 +339,18 @@ class TestModeTables(unittest.TestCase):
 
     def test_each_stepper_keeps_its_own_period_in_the_scale_table(self):
         """Not just the count: a shared-program run must still show per-stepper."""
-        scale = mode_record(mode="scale", drivers=["rmt_v2"] * 2,
+        scale = mode_record(mode="scale", drivers=["rmt"] * 2,
                             stepper_count=2, first_step_skew_us=None,
                             skew_periods=None, period_spread_us=0.004,
                             per_stepper=mode_record()["per_stepper"])
         text = report.as_mode_tables(self.write([scale]))
         row = [ln for ln in text.splitlines()
-               if ln.startswith("| rmt_v2+rmt_v2 ")][0]
+               if ln.startswith("| rmt+rmt ")][0]
         self.assertIn("A 10.0usx64/64", row)
         self.assertIn("B 20.0usx64/64", row)
 
     def test_a_scale_point_that_deviated_is_marked_in_the_table(self):
-        scale = mode_record(mode="scale", drivers=["rmt_v2"] * 3,
+        scale = mode_record(mode="scale", drivers=["rmt"] * 3,
                             stepper_count=3, first_step_skew_us=None,
                             skew_periods=None,
                             per_stepper={
@@ -364,7 +364,7 @@ class TestModeTables(unittest.TestCase):
                                       "period": {"ok": True}}})
         text = report.as_mode_tables(self.write([scale]))
         row = [ln for ln in text.splitlines()
-               if ln.startswith("| rmt_v2+rmt_v2+rmt_v2")][0]
+               if ln.startswith("| rmt+rmt+rmt")][0]
         self.assertIn("DEVIATED", row)
         self.assertIn("+12000", row)
 
@@ -375,7 +375,7 @@ class TestModeTables(unittest.TestCase):
         dedup by the record's own field meant a collision silently reported one
         run instead of two.
         """
-        scale = mode_record(mode="scale", drivers=["rmt_v2"],
+        scale = mode_record(mode="scale", drivers=["rmt"],
                             stepper_count=1, first_step_skew_us=None,
                             skew_periods=None)
         text = report.as_mode_tables(self.write([scale, mode_record()]))
@@ -397,7 +397,7 @@ class TestModeTables(unittest.TestCase):
                   "period": {"expected_period_us": 20.0, "n_long": 0,
                              "n_short": 0, "ok": True}}})
         text = report.as_mode_tables(self.write([short]))
-        row = [ln for ln in text.splitlines() if ln.startswith("| rmt_v2+")][0]
+        row = [ln for ln in text.splitlines() if ln.startswith("| rmt+")][0]
         self.assertIn("x51/64", row)
         self.assertIn("-13 missing", row)
         self.assertNotIn("+", row.split("|")[-3])
@@ -417,7 +417,7 @@ class TestModeTables(unittest.TestCase):
                   "period": {"expected_period_us": 20.0, "n_long": 7,
                              "n_short": 2, "ok": False}}})
         text = report.as_mode_tables(self.write([drifted]))
-        row = [ln for ln in text.splitlines() if ln.startswith("| rmt_v2+")][0]
+        row = [ln for ln in text.splitlines() if ln.startswith("| rmt+")][0]
         self.assertIn("7 long/2 short periods", row)
         self.assertIn("21.4us", row)
         self.assertIn("x64/64", row)
@@ -436,24 +436,24 @@ class TestModeTables(unittest.TestCase):
         self.assertIn(lost["tag_key"], text)
 
     def test_the_capability_table_comes_from_the_board_not_a_host_table(self):
-        old = mode_record(board_drivers={"rmt_v2": True, "rmt": True,
+        old = mode_record(board_drivers={"rmt": True, "rmt": True,
                                          "mcpwm_pcnt": True,
                                          "i2s_direct": True,
                                          "i2s_mux": True}, mux_init=False)
         text = report.as_mode_tables(self.write([old]))
         self.assertIn("Driver capability", text)
-        for name in ("rmt_v2", "mcpwm_pcnt", "i2s_direct", "i2s_mux"):
+        for name in ("rmt", "mcpwm_pcnt", "i2s_direct", "i2s_mux"):
             self.assertIn(name, text)
 
     def test_a_mux_compiled_in_but_not_up_is_distinguishable_from_a_broken_one(self):
         # "i2s_mux=1 mux_init=0" is three unassigned pins. "i2s_mux absent" is a
         # build that never had it. A reader shown only a refusal cannot tell
         # them apart, and would call a wiring gap a driver defect.
-        not_up = mode_record(board_drivers={"rmt_v2": True, "i2s_mux": True},
+        not_up = mode_record(board_drivers={"rmt": True, "i2s_mux": True},
                              mux_init=False)
-        up = mode_record(board_drivers={"rmt_v2": True, "i2s_mux": True},
+        up = mode_record(board_drivers={"rmt": True, "i2s_mux": True},
                          mux_init=True)
-        absent = mode_record(board_drivers={"rmt_v2": True,
+        absent = mode_record(board_drivers={"rmt": True,
                                             "i2s_mux": False}, mux_init=False)
         unreported = mode_record(board_drivers={"timer": True}, mux_init=False)
         for record, expected in ((not_up, "compiled in, not brought up"),
@@ -498,11 +498,11 @@ class TestModeTables(unittest.TestCase):
         self.assertIn("No captures found.", text)
 
     def test_the_tables_read_the_recorded_drivers(self):
-        """A driver-list column that said 'rmt_v2' for an rmt+mcpwm run would
+        """A driver-list column that said 'rmt' for an rmt+mcpwm run would
         make the table's whole reason for existing -- comparing combinations --
         meaningless."""
         text = report.as_mode_tables(self.write([mode_record()]))
-        self.assertIn("rmt_v2+rmt_v2", text)
+        self.assertIn("rmt+rmt", text)
 
 
 if __name__ == "__main__":

@@ -736,7 +736,7 @@ FIXTURES.append(Fixture(
 # effect on a queue this harness fills itself is `ignore_commands = true`, which
 # refuses *later* addQueueEntry() calls -- and the feeder is stopped after the
 # start, so there are none and the call cannot fail. Measured: identical
-# waveforms, 4080 of 4080 steps, on rmt_v2, i2s_direct and mcpwm_pcnt alike.
+# waveforms, 4080 of 4080 steps, on rmt, i2s_direct and mcpwm_pcnt alike.
 # `stopMove()` is weaker still, being a flag the ramp generator consults for its
 # next command while this harness drives addQueueEntry() directly and never runs
 # one, so SR_25 measures the drain rather than the API -- it is kept because it

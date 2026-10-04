@@ -514,7 +514,7 @@ one agent. Each item is independently checkable and states how to verify it.
       The `OK CONFIG` reply now names the drivers the board actually connected
       (`OK CONFIG n=2 mode=dir drivers=rmt,mcpwm_pcnt maxspeed0=…`), so a run can
       be checked against what the hardware did rather than what the host asked
-      for. `rmt` is reported, not `rmt_v2`: the RMT generation is a property of
+      for. `rmt` is reported, not `rmt`: the RMT generation is a property of
       the SDK, which is already a tag on the run.
       *Host side, because the firmware no longer speaks the old vocabulary:*
       `run_tests.CONFIGS` owns the logical-config → `(count, driver list)`
@@ -677,8 +677,8 @@ one agent. Each item is independently checkable and states how to verify it.
       the analyzer rather than RMT.
 
       **`sync` enumerates over driver *identities*, not names.** `rmt` and
-      `rmt_v2` are one driver — the firmware maps both to `SA_RMT` and reports
-      both as `rmt` — so enumerating spellings would put `rmt_v2+rmt` in the
+      `rmt` are one driver — the firmware maps both to `SA_RMT` and reports
+      both as `rmt` — so enumerating spellings would put `rmt+rmt` in the
       table as a *cross-driver* combination, under a name claiming they differ.
       **That is precisely how R1's wrong finding was produced**: the old `mixed`
       config discarded its driver list for the automatic choice, so the
@@ -688,7 +688,7 @@ one agent. Each item is independently checkable and states how to verify it.
       has to contain both cases to make it meaningful.
 
       **Measured on the connected ESP32** (RMT, 5 µs step, 4 MS/s, Saleae
-      clone). `--mode scale --driver rmt_v2 --pin-mode nodir`: **8/8 passed**,
+      clone). `--mode scale --driver rmt --pin-mode nodir`: **8/8 passed**,
       every stepper 64/64 steps at 160 ticks, and the period spread across
       steppers was **0.004 µs** at its widest (9.996 vs 10.000 µs, i.e. one
       4 MS/s sample) — so RMT holds its period from 1 stepper to 8 with nothing
@@ -877,7 +877,7 @@ one agent. Each item is independently checkable and states how to verify it.
       so the ratio is a ratio: 160/320 on the real RMT floor, 640/1280 on the
       fixture, 426/852 on an AVR timer.
 
-      *Verified on hardware.* `--mode scale --driver rmt_v2 --pin-mode nodir`:
+      *Verified on hardware.* `--mode scale --driver rmt --pin-mode nodir`:
       **8/8 passed, 64/64 steps each**, and the recorded map at every count
       matches the capture — 1→`A=D0` … 8→`A=D0…H=D7`. Catalogue `dir` scenarios
       re-run: SR_01, SR_14, SR_15, SR_16, SR_17 all pass with the map **A=`D0`,
@@ -945,7 +945,7 @@ one agent. Each item is independently checkable and states how to verify it.
       result from R3 was in a directory that never recorded its own target.
 
       *Verified on hardware.* A fresh ESP32 run of both modes:
-      `scale rmt_v2/nodir` **8/8 passed** (parallel-count table, 8 rows),
+      `scale rmt/nodir` **8/8 passed** (parallel-count table, 8 rows),
       `sync` **10 combinations** (sync table, 6 measured / 4 refused), both
       under `Target: esp32 / arduino / sdk latest`. The fresh run reproduced
       R3's findings independently — MCPWM runaway again (10 717 steps, 6.25 µs
@@ -1076,7 +1076,7 @@ one agent. Each item is independently checkable and states how to verify it.
         got believed in the first place.
 
       *Verified on hardware.* `DRIVERS` on the connected ESP32:
-      `rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1 mux_init=0` — five
+      `rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1 mux_init=0` — five
       drivers compiled in, multiplexer not brought up, exactly the distinction
       that was missing. `mcpwm_pcnt`/`nodir` swept 1..8 and now reports three
       separate facts where it previously reported one:
@@ -1087,7 +1087,7 @@ one agent. Each item is independently checkable and states how to verify it.
       | 2–6 | **failed** — connect, then ~21 000 steps where 64 were commanded |
       | 7–8 | **refused** at CONFIG (`ERR connect step 6`) |
 
-      `rmt_v2`/`nodir` re-measured 1..8: **8/8 passed**, no regression.
+      `rmt`/`nodir` re-measured 1..8: **8/8 passed**, no regression.
 
       *Tests: 190 pass, from 178.* New coverage for the bound, the `DRIVERS`
       parse and the capability table. *Mutation-checked, all caught:* the host
@@ -1115,7 +1115,7 @@ one agent. Each item is independently checkable and states how to verify it.
       connected ESP32 with the R1 firmware, one cold boot each, Saleae clone at
       24 MS/s: **25/25 accepted by their own evaluators**. `reports/esp32/`
       regenerated from those result JSONs.
-      `--dut-driver rmt_v2` was chosen for the `1ch`/`2ch` scenarios
+      `--dut-driver rmt` was chosen for the `1ch`/`2ch` scenarios
       deliberately: under `SUPPORT_DYNAMIC_ALLOCATION` the old `auto` resolved to
       RMT first, so this is a like-for-like comparison and any regression would
       be attributable rather than confused with a driver change.
@@ -1133,7 +1133,7 @@ one agent. Each item is independently checkable and states how to verify it.
       see *Cross-driver start skew* in *Decisions and findings*, which was
       invalidated by this re-run and has been corrected in white paper §5.5.
       *Verify:* no result file contains the tag `auto` — confirmed, 25/25 files
-      carry a named driver (`rmt_v2` ×20, `mcpwm_pcnt` ×3, `rmt+mcpwm_pcnt` ×1,
+      carry a named driver (`rmt` ×20, `mcpwm_pcnt` ×3, `rmt+mcpwm_pcnt` ×1,
       `i2s_direct` ×1). The three stale `tag_summary/esp32_auto_*.md` pages were
       deleted, since `generate_report.py` writes but does not prune.
 
@@ -1180,7 +1180,7 @@ Recorded because they change what the tests mean.
 
 - **`i2s_direct` on the full catalogue: 23 passed, 2 skipped. Two of the three
   original failures were harness bugs; the third was withdrawn.**
-  The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
+  The 25 wired scenarios had only ever been run on `rmt`, so this is the
   first characterization of the I2S step/dir waveform. **Two** of the three
   original failures were harness bugs (below); the two that remain are driver
   behaviour no scenario on RMT could have surfaced.
@@ -1197,7 +1197,7 @@ Recorded because they change what the tests mean.
 
   1. **`sc_pulse_high_time`, `sc_pause`, `sc_long_run` bypassed `legal_ticks()`**,
      using `max(max_speed_ticks, 160)` instead. `addQueueEntry` bounds the
-     *command*, so 16 steps need `ticks*16 >= 3200`. `rmt_v2`'s floor is 640, so
+     *command*, so 16 steps need `ticks*16 >= 3200`. `rmt`'s floor is 640, so
      the expression gave 10240 and the scenario passed; `i2s_direct`'s floor is
      80, so it gave 2560 and the queue rejected it. **One expression, two
      drivers, and the difference was invisible until a driver with a lower floor
@@ -1247,7 +1247,7 @@ Recorded because they change what the tests mean.
   | `forceStopAndNewPosition()` | aborts everything queued -- no further step issued. |
 
   So the number reported earlier -- 7655 steps left on `i2s_direct`, 7608 on
-  `rmt_v2`, both just under the 8160 a 32-deep queue of 255-step commands holds
+  `rmt`, both just under the 8160 a 32-deep queue of 255-step commands holds
   -- was **the harness's own arithmetic, not a library guarantee.** Nothing in
   the library promises it.
 
@@ -1279,7 +1279,7 @@ Recorded because they change what the tests mean.
   the end of the delivered capture -- reported as "STOP was never processed".
   `MARK` is configuration and belongs in the setup phase.
 
-  *Verified on hardware*, rmt_v2, same program, opposite assertions:
+  *Verified on hardware*, rmt, same program, opposite assertions:
 
   | | steps emitted | after the stop marker | verdict |
   |---|---|---|---|
@@ -1313,7 +1313,7 @@ Recorded because they change what the tests mean.
 
 - **`i2s_direct` on the full catalogue: 23 passed, 2 skipped. Two of the three
   original failures were harness bugs; one further finding is withdrawn.**
-  The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
+  The 25 wired scenarios had only ever been run on `rmt`, so this is the
   first characterization of the I2S step/dir waveform. **Two** of the three
   original failures were harness bugs (below); the two that remain are driver
   behaviour no scenario on RMT could have surfaced.
@@ -1330,7 +1330,7 @@ Recorded because they change what the tests mean.
 
   1. **`sc_pulse_high_time`, `sc_pause`, `sc_long_run` bypassed `legal_ticks()`**,
      using `max(max_speed_ticks, 160)` instead. `addQueueEntry` bounds the
-     *command*, so 16 steps need `ticks*16 >= 3200`. `rmt_v2`'s floor is 640, so
+     *command*, so 16 steps need `ticks*16 >= 3200`. `rmt`'s floor is 640, so
      the expression gave 10240 and the scenario passed; `i2s_direct`'s floor is
      80, so it gave 2560 and the queue rejected it. **One expression, two
      drivers, and the difference was invisible until a driver with a lower floor
@@ -1385,7 +1385,7 @@ Recorded because they change what the tests mean.
     | driver | capture | first pulse | last pulse | quiet tail |
     |---|---|---|---|---|
     | `i2s_direct` | 458.9 ms | 280.6 ms | 458.9 ms | **0.0 ms** |
-    | `rmt_v2` | 458.2 ms | 282.4 ms | 458.2 ms | **0.0 ms** |
+    | `rmt` | 458.2 ms | 282.4 ms | 458.2 ms | **0.0 ms** |
 
     The pulses run to the capture edge on both, because 24 MHz truncates the
     requested 0.7 s to ~458 ms while the move needs ~281 ms of startup plus its

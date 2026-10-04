@@ -35,7 +35,7 @@ Usage:
     python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch
     python3 scripts/run_tests.py --tag-key ... --tests SR_01,SR_05
     python3 scripts/run_tests.py --tag-key ... --force
-    python3 scripts/run_tests.py --mode scale --driver rmt_v2 --pin-mode nodir
+    python3 scripts/run_tests.py --mode scale --driver rmt --pin-mode nodir
     python3 scripts/run_tests.py --mode sync --arch esp32
 """
 
@@ -50,6 +50,24 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
+
+HARNESS = SCRIPTS.parent  # extras/tests/saleae_based
+
+
+def anchor_path(value):
+    """A relative --capture-dir/--results-dir resolves against the harness.
+
+    The defaults are the bare names `capture` and `results`, which the shell
+    then resolves against the working directory. So the same command typed in
+    the harness root and in scripts/ produced two capture directories, two
+    result directories and two tag_index.json files that know nothing about each
+    other -- and a report built from one of them was silently missing every
+    result recorded in the other. One home per artifact, chosen here rather
+    than per invocation: an absolute path still wins, so a caller that wants a
+    scratch directory can still ask for one.
+    """
+    p = Path(value)
+    return p if p.is_absolute() else HARNESS / p
 
 import analyze_csv  # noqa: E402
 import capture as cap  # noqa: E402
@@ -362,7 +380,7 @@ MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)"
                       r"(?:\s+bus=([\d,-]+))?"
                       r"(?:\s+slots=([\d,-]*))?"
                       r"(?:\s+marker=(\d+))?")
-# "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1
+# "OK DRIVERS mux=0 rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1
 #  mux_init=0". The driver fields are read as a name=value scan rather than by
 # position, because the set of names is build-dependent: an AVR build emits only
 # `timer`, a Pico only `timer` and `pio`. A positional parse would read a
@@ -466,7 +484,7 @@ def read_map(ser):
             letters = list(chan_map)
             # Physical channels are handed out in order to the steppers that
             # own a wire, and a multiplexed stepper does not take one -- so this
-            # cursor is NOT the stepper index. `CONFIG 3 i2s_mux,i2s_mux,rmt_v2
+            # cursor is NOT the stepper index. `CONFIG 3 i2s_mux,i2s_mux,rmt
             # nodir` puts the physical stepper on channel 0, not channel 2, and a
             # map built from the index would read D2: a channel the bus uses.
             chan_used = 0
@@ -954,7 +972,7 @@ def sc_emergency_stop(info):
     start = false, and the stop lands 1 ms later. So the steps that can follow
     the marker are the ones the board said it was holding, rather than whatever
     the feeder had got through in a quarter of a 20000-step program. Measured on
-    rmt_v2 before this change: 7464 steps after the marker against a bound of
+    rmt before this change: 7464 steps after the marker against a bound of
     8160, close enough to the queue's whole capacity that the number described
     the feeder rather than forceStop().
 
@@ -1139,7 +1157,7 @@ def sc_pulse_high_time(info):
     # 16 steps is enough to measure a stable high time and still short.
     #
     # legal_ticks, not max(max_speed, 160): addQueueEntry bounds the *whole*
-    # command, so 16 steps need ticks*16 >= MIN_CMD_TICKS. On rmt_v2 the floor
+    # command, so 16 steps need ticks*16 >= MIN_CMD_TICKS. On rmt the floor
     # is 640 and the old `max(..., 160)` gave 16*640 = 10240 by accident; on
     # i2s_direct the floor is 80, so it gave 16*160 = 2560, below MIN_CMD_TICKS,
     # and the queue rejected the command. The scenario measured a rejected
@@ -1201,7 +1219,7 @@ CONFIGS = {
 # The pulse driver of an architecture that has only one, used to expand the
 # "native" spec above. ESP32 has several, so the default here is the one the
 # measured baseline was taken on and any other run passes its own.
-DEFAULT_NATIVE_DRIVER = "rmt_v2"
+DEFAULT_NATIVE_DRIVER = "rmt"
 
 
 def per_stepper_builder(scenario):
@@ -2072,7 +2090,7 @@ def eval_stop_move_contract(channels, rate, segments, info, pins,
     Earlier this scenario asserted the reverse -- that steps cease -- because the
     harness's STOP was a conflation: `stopMove()` *plus* zeroing the feeder
     cursor. That hybrid is a partial `forceStop()` wearing stopMove()'s name,
-    and the residue it left (7655 steps on i2s_direct, 7608 on rmt_v2, against a
+    and the residue it left (7655 steps on i2s_direct, 7608 on rmt, against a
     queue holding 32 * 255 = 8160) was the harness's own arithmetic rather than
     any guarantee the library makes.
 
@@ -2383,7 +2401,7 @@ SCENARIO_STOP = {"SR_25": "STOP", "SR_30": "XSTOP"}
 # A stop a quarter of the way into the run -- the earlier rule -- measures the
 # queue only if the feeder is still filling at that point, and that is a race
 # between the host's serial loop and the driver's drain rather than a property
-# of the stop. Measured on rmt_v2: 7464 steps after the marker against a bound of
+# of the stop. Measured on rmt: 7464 steps after the marker against a bound of
 # 8160, from a 20000-step program the feeder was still working through. The same
 # program with the stop 1 ms in leaves the queue as QFILL put it, so what the
 # marker bounds is a queue state the board itself reported.
@@ -2510,7 +2528,7 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         # Here, before QRUN, and that placement is load-bearing rather than
         # tidy. Sent after QRUN it cost two serial round-trips (~0.25 s each)
         # that sat between the start of the move and the STOP, so on a driver
-        # whose move was shorter than that -- i2s_direct and rmt_v2 at a floor of
+        # whose move was shorter than that -- i2s_direct and rmt at a floor of
         # 80 ticks both run 20000 steps in 0.1 s -- STOP arrived after the move
         # had finished and the marker edge fell past the end of the delivered
         # capture. The run then reported a complete 20000-step move and "no
@@ -2942,6 +2960,9 @@ def main():
                    help="list recorded results and exit")
     args = p.parse_args()
 
+    args.capture_dir = str(anchor_path(args.capture_dir))
+    args.results_dir = str(anchor_path(args.results_dir))
+
     if args.list:
         show_list(args)
         return 0
@@ -2966,5 +2987,5 @@ if __name__ == "__main__":
 # SR_30 (`forceStopAndNewPosition()`) program the same fill and stop it at the
 # same instant; what separates them is the outcome, and it is a real one:
 # measured 4080 of 4080 steps after the marker for the first and 0 for the
-# second on rmt_v2 and mcpwm_pcnt, 67 for i2s_direct.
+# second on rmt and mcpwm_pcnt, 67 for i2s_direct.
 CONTRASTING_PAIRS = {frozenset(("SR_25", "SR_30"))}

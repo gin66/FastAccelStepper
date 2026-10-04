@@ -102,8 +102,8 @@ since a guessed bound either truncates the sweep or runs past what the board can
 connect.
 
 **`sync` enumerates over driver *identities*, not spellings.** `rmt` and
-`rmt_v2` are one driver — the firmware maps both to `SA_RMT` and reports both as
-`rmt` — so enumerating names would file `rmt_v2+rmt` as a *cross-driver*
+`rmt` are one driver — the firmware maps both to `SA_RMT` and reports both as
+`rmt` — so enumerating names would file `rmt+rmt` as a *cross-driver*
 combination under a name claiming they differ. That is exactly the failure §5.5
 records having produced once already, and the reason the plan contains both
 same-driver and cross-driver pairs is that the same-driver row is the only
@@ -387,17 +387,17 @@ configurations.
     "arch": "esp32"
   },
   "driver": {
-    "type": "rmt_v2",
+    "type": "rmt",
     "channel": 0,
     "channel_group": 0
   },
   "channel_config": {
     "mode": "8ch_step_only",
     "stepper_count": 4,
-    "stepper_A": { "step_pin": 2,  "dir_pin": 0,   "driver": "rmt_v2" },
-    "stepper_B": { "step_pin": 4,  "dir_pin": 16,  "driver": "rmt_v2" },
-    "stepper_C": { "step_pin": 17, "dir_pin": 5,   "driver": "rmt_v2" },
-    "stepper_D": { "step_pin": 18, "dir_pin": 19,  "driver": "rmt_v2" }
+    "stepper_A": { "step_pin": 2,  "dir_pin": 0,   "driver": "rmt" },
+    "stepper_B": { "step_pin": 4,  "dir_pin": 16,  "driver": "rmt" },
+    "stepper_C": { "step_pin": 17, "dir_pin": 5,   "driver": "rmt" },
+    "stepper_D": { "step_pin": 18, "dir_pin": 19,  "driver": "rmt" }
   },
   "test_case": {
     "name": "basic_move_forward",
@@ -420,7 +420,7 @@ configurations.
     },
     "errors": []
   },
-  "tags": ["esp32", "rmt_v2", "8ch_step_only", "idf5", "ramp", "passed"]
+  "tags": ["esp32", "rmt", "8ch_step_only", "idf5", "ramp", "passed"]
 }
 ```
 
@@ -430,15 +430,15 @@ Tags are stored in a JSON index file (`tag_index.json`) for fast lookup:
 
 ```json
 {
-  "esp32_rmt_v2_8ch_step_only": [
-    "2026-10-01_test_01_esp32_rmt_v2_8ch_step_only.json",
-    "2026-10-02_test_05_esp32_rmt_v2_8ch_step_only.json"
+  "esp32_rmt_8ch_step_only": [
+    "2026-10-01_test_01_esp32_rmt_8ch_step_only.json",
+    "2026-10-02_test_05_esp32_rmt_8ch_step_only.json"
   ],
   "esp32_mcpwm_pcnt_4ch_rmt": [
     "2026-10-01_test_01_esp32_mcpwm_pcnt_4ch_rmt.json"
   ],
-  "esp32c3_rmt_v2_2rmt_2i2s": [
-    "2026-10-03_test_09_esp32c3_rmt_v2_2rmt_2i2s.json"
+  "esp32c3_rmt_2rmt_2i2s": [
+    "2026-10-03_test_09_esp32c3_rmt_2rmt_2i2s.json"
   ]
 }
 ```
@@ -448,7 +448,7 @@ Tags are stored in a JSON index file (`tag_index.json`) for fast lookup:
 | Category | Values |
 |----------|--------|
 | **arch** | `esp32`, `esp32s2`, `esp32s3`, `esp32c3`, `esp32c6`, `esp32h2`, `esp32p4`, `avr`, `pico`, `sam`, `samd51`, `teensy` |
-| **driver** | `mcpwm_pcnt`, `rmt`, `rmt_v2`, `i2s_direct`, `i2s_mux` |
+| **driver** | `mcpwm_pcnt`, `rmt`, `rmt`, `i2s_direct`, `i2s_mux` |
 | **idf_version** | `idf4`, `idf5`, `idf6` |
 | **channel_config** | derived, not chosen: `<count>` steppers, `dir` or `nodir`, plus the driver list — e.g. `4/dir`, `8/nodir` |
 | **test_type** | `ramp`, `sync_start`, `dir_change`, `abrupt_speed`, `queue_full`, `move_timed`, `pause`, `overflow`, `speed_limit`, `queue_fill_latency` |
@@ -478,7 +478,7 @@ rather than assumed.
 | Architecture | Pulse driver | Driver families | Max steppers |
 |---|---|---|---|
 | AVR (`pd_avr`) | hardware timer compare (OC1A/OC1B, …) | `timer` only | 2 (328P) / 3 (2560, 32U4) |
-| ESP32 family (`pd_esp32`) | RMT / MCPWM+PCNT / I2S | `mcpwm_pcnt`, `rmt` (V1), `rmt_v2`, `i2s_direct`, `i2s_mux` | up to 49 (see below) |
+| ESP32 family (`pd_esp32`) | RMT / MCPWM+PCNT / I2S | `mcpwm_pcnt`, `rmt` (V1), `rmt`, `i2s_direct`, `i2s_mux` | up to 49 (see below) |
 | Pico / RP2040 (`pd_pico`) | PIO state machine | `pio` | `4 × NUM_PIOS` |
 | SAM (`pd_sam`) | TC timer compare | `timer` | `NUM_QUEUES` (6 on the tested parts) |
 | SAMD51 (`pd_samd`) | TC timer compare | `timer` | `TCC_INST_NUM` (chip dependent) |
@@ -510,7 +510,7 @@ reports which bound it hit.
 |--------|----------|---------------|------------------|-------------|
 | **MCPWM/PCNT** | `mcpwm_pcnt` | IDF4, IDF5, IDF6 | 2–8 | Uses MCPWM timer for step pulses + PCNT for direction counting. Classic ESP32/ESP32-S3 approach. |
 | **RMT** (V1) | `rmt` | IDF4 | 2–8 | Raw RMT memory buffer, two-part split. Older driver. |
-| **RMT** (V2) | `rmt_v2` | IDF5.3+, IDF6 | 2–8 | New RMT TX driver API with fill encoder. Supports sync manager on targets with `SOC_RMT_SUPPORT_TX_SYNCHRO`. |
+| **RMT** (V2) | `rmt` | IDF5.3+, IDF6 | 2–8 | New RMT TX driver API with fill encoder. Supports sync manager on targets with `SOC_RMT_SUPPORT_TX_SYNCHRO`. |
 | **I2S Direct** | `i2s_direct` | IDF5+, IDF6 | 0–3 | I2S bus used as a parallel step output (16-bit per sample). Direct GPIO mapping. |
 | **I2S Mux** | `i2s_mux` | IDF5+, IDF6 | 0–32 | I2S bus with GPIO matrix mux for more channels (up to 32). |
 
@@ -1166,7 +1166,7 @@ step count still looks plausible.
 | **SR_19** | `mcpwm_overrun_boundary` | `QSEG <n> <max> 1` for `n` = 200…255, each followed by `QSEG 1 <max> 1` | Sweeps the suspicious band. The 8-bit counter and the MCPWM timer period interact differently at each `n`; one `n` is enough to lose the trailing step. |
 | **SR_20** | `pause_after_full_command` | `QSEG 255 <ticks> 1`, `QSEG 0 <p> 1`, `QSEG 255 <ticks> 1` | A full 255-step run, a pause, then another full run: 255 / gap / 255. Complements SR_18 by making the *second* command the large one. |
 | **SR_21** | `rmt_buffer_split` | `QSEG 200 <ticks> 1` | RMT V1 splits its hardware buffer at a command boundary. A split at the wrong step shows up as one irregular inter-step gap. |
-| **SR_22** | `rmt_v2_encoder` | `QSEG 200 <ticks> 1` | RMT V2 fill-encoder output has no irregular gap. |
+| **SR_22** | `rmt_encoder` | `QSEG 200 <ticks> 1` | RMT V2 fill-encoder output has no irregular gap. |
 | **SR_23** | `i2s_timing` | `QSEG 64 <ticks> 1` | I2S direct/mux step output at the correct intervals. ESP32 only. |
 | **SR_24** | `avr_timer_timings` | `QSEG 64 <ticks> 1` on each of Timer1/3/4/5 | Each AVR timer channel produces the commanded period on its OC pin. |
 
@@ -1288,7 +1288,7 @@ per platform/driver combination. The design specs are stored in
 
 ```json
 {
-  "esp32_rmt_v2": {
+  "esp32_rmt": {
     "SR_06_direction_to_step_delay": {
       "expected_us": 12.5,
       "tolerance_us": 2.0,
@@ -1328,7 +1328,7 @@ inter-step period) is the canonical case:
 
 ```json
 {
-  "esp32_rmt_v2": {
+  "esp32_rmt": {
     "SR_11_max_speed": {
       "baseline_min_inter_step_us": 0.4,
       "baseline_max_frequency_khz": 2500,
@@ -1394,14 +1394,14 @@ The `design_specs.json` file is organized by platform/driver:
 extras/tests/saleae_based/
 ├── design_specs.json          ← all design specs per platform/driver
 ├── design_specs/              ← per-platform spec files (for review)
-│   ├── esp32_rmt_v2.json
+│   ├── esp32_rmt.json
 │   ├── esp32_mcpwm_pcnt.json
-│   ├── esp32s3_rmt_v2.json
+│   ├── esp32s3_rmt.json
 │   ├── esp32c3_rmt.json
 │   ├── avr_328p.json
 │   └── pico.json
 └── spec_baseline/             ← measured baselines from golden hardware
-    └── 2026-10-01_esp32_rmt_v2_baseline.json
+    └── 2026-10-01_esp32_rmt_baseline.json
 ```
 
 ### 7.4 Spec Comparison in Reports
@@ -1515,8 +1515,8 @@ every stepper's own period and step count rather than the run's verdict:
 
 | driver list | n | pins | steppers: period × steps | spread µs | result |
 |---|---|---|---|---|---|
-| rmt_v2 | 1 | nodir | A 10.0 µs × 64/64 | 0.0 | passed |
-| rmt_v2+rmt_v2 | 2 | nodir | A 10.0 µs × 64/64 B 10.0 µs × 64/64 | 0.0 | passed |
+| rmt | 1 | nodir | A 10.0 µs × 64/64 | 0.0 | passed |
+| rmt+rmt | 2 | nodir | A 10.0 µs × 64/64 B 10.0 µs × 64/64 | 0.0 | passed |
 | … up to `min(driver queues, channels / stride)` | 8 | nodir | A…H 10.0 µs × 64/64 | 0.004 | passed |
 
 **Synced start** — one row per driver list, skew in microseconds *and* in step
@@ -1524,7 +1524,7 @@ periods, plus per-stepper adherence:
 
 | driver list | n | pins | first-step skew | in step periods | per-stepper adherence | result |
 |---|---|---|---|---|---|---|
-| rmt_v2+rmt_v2 | 2 | dir | 37.5 µs | 3.75 | A 10.0 µs × 64/64, B 20.0 µs × 64/64 | passed |
+| rmt+rmt | 2 | dir | 37.5 µs | 3.75 | A 10.0 µs × 64/64, B 20.0 µs × 64/64 | passed |
 | mcpwm_pcnt+mcpwm_pcnt | 2 | dir | 6.25 µs | 0.625 | A 10.0 µs × 64/64, B 19.9991 µs × 10717/64 (+10653 extra steps) | failed |
 | i2s_mux+i2s_mux | 2 | dir | not measured: refused (`ERR connect step 0 … drv=i2s_mux`) | – | – | refused |
 
@@ -1580,7 +1580,7 @@ number was believed in the first place.
 
 **Per-driver characterization is not the same as measuring a driver as a
 partner.** Running all 25 scenarios on `i2s_direct` -- for the first time, they
-had only ever run on `rmt_v2` -- produced three defects that no RMT scenario
+had only ever run on `rmt` -- produced three defects that no RMT scenario
 could have surfaced. The sharpest is that **any queue entry shorter than
 `MIN_CMD_TICKS` is silently discarded**: at the speed floor a 195 µs entry
 produces zero pulses and a 200 µs entry produces all of them, and 200 µs is
@@ -1593,7 +1593,7 @@ zero-step result reads as a dead pin or a driver that emits nothing, and neither
 is true: the same pin carries every longer move perfectly.
 
 The other two are `STOP` not stopping an I2S queue at all (all 20 000 steps come
-out where `rmt_v2` stops at 11 475), and one step of a phase being emitted on
+out where `rmt` stops at 11 475), and one step of a phase being emitted on
 the wrong side of a direction change — visible only in the *per-phase* count
 (`10 / 9 / 11`), since the total is a correct 30/30.
 

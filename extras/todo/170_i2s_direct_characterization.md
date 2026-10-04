@@ -7,7 +7,7 @@ for comparing drivers.
 
 ## Finding
 
-The 25 wired scenarios had only ever been run on `rmt_v2`, so this is the
+The 25 wired scenarios had only ever been run on `rmt`, so this is the
 first characterization of the I2S step/dir waveform.  **Two** of the three
 original failures were harness bugs (below); the two that remain are driver
 behaviour no scenario on RMT could have surfaced.
@@ -16,7 +16,7 @@ behaviour no scenario on RMT could have surfaced.
 
 1. **`sc_pulse_high_time`, `sc_pause`, `sc_long_run` bypassed `legal_ticks()`**,
    using `max(max_speed_ticks, 160)` instead.  `addQueueEntry` bounds the
-   *command*, so 16 steps need `ticks*16 >= 3200`.  `rmt_v2`'s floor is 640,
+   *command*, so 16 steps need `ticks*16 >= 3200`.  `rmt`'s floor is 640,
    so the expression gave 10240 and the scenario passed; `i2s_direct`'s floor
    is 80, so it gave 2560 and the queue rejected it.  **One expression, two
    drivers, and the difference was invisible until a driver with a lower floor

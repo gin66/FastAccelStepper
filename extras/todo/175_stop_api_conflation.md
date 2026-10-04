@@ -17,7 +17,7 @@ hybrid matching neither documented behaviour.  The library has three:
 | `forceStopAndNewPosition()` | aborts everything queued — no further step issued. |
 
 So the number reported earlier — 7655 steps left on `i2s_direct`, 7608 on
-`rmt_v2`, both just under the 8160 a 32-deep queue of 255-step commands
+`rmt`, both just under the 8160 a 32-deep queue of 255-step commands
 holds — was **the harness's own arithmetic, not a library guarantee.**
 
 ## Fix
@@ -36,7 +36,7 @@ on the waveform.  Placement is load-bearing: sent after `QRUN` it costs two
 serial round-trips (~0.25 s each) before the stop, so on any driver whose move
 was shorter than that the stop arrived after the move had finished.
 
-Verified on hardware, rmt_v2, same program, opposite assertions:
+Verified on hardware, rmt, same program, opposite assertions:
 
 | | steps emitted | after the stop marker | verdict |
 |---|---|---|---|

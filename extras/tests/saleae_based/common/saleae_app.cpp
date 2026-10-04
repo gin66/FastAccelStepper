@@ -37,10 +37,10 @@
  *                              count this platform cannot provide and an
  *                              unimplemented pin mode are all refused --
  *                              nothing is ever silently substituted.
- *                              rmt | rmt_v2 | mcpwm | mcpwm_pcnt | i2s |
- *                              i2s_direct | i2s_mux on the ESP32 family, timer
- *                              on AVR/SAM/SAMD, pio on Pico; a driver the
- *                              running build has no queues for is refused.
+ *                              rmt | mcpwm_pcnt | i2s_direct | i2s_mux on
+ *                              the ESP32 family, timer on AVR/SAM/SAMD, pio
+ *                              on Pico; a driver the running build has no
+ *                              queues for is refused.
  *   DRIVERS                    which drivers this build accepts, and whether
  *                              the I2S multiplexer is up. Read from the same
  *                              conditions CONFIG parses names with, so a
@@ -415,7 +415,7 @@ struct qe_cursor {
   // is back to capacity within one main-loop pass of the start -- qe_feed()
   // loops until qe_has_room() is false -- so the steps that follow a stop are
   // always QUEUE_LEN entries' worth and say nothing about the stop. Measured:
-  // 7650 steps after the stop on rmt_v2, i2s_direct and mcpwm_pcnt alike, which
+  // 7650 steps after the stop on rmt, i2s_direct and mcpwm_pcnt alike, which
   // is (QUEUE_LEN - QE_ROOM_RESERVE) * 255 and nothing else.
   bool no_topup;
 };
@@ -551,25 +551,29 @@ static void reply_p(const char* text) { saleae_hal_serial_write_p(text); }
 // On an architecture with a single native driver the list is still explicit, it
 // simply repeats that one (`timer` for AVR/SAM, `pio` for Pico). Naming it
 // costs nothing and keeps every result tagged with the driver that made it.
+//
+// One accepted name per driver, and no aliases. An earlier revision also took
+// `rmt_v2`, `mcpwm` and `i2s`, which read as three more drivers and were not:
+// `rmt_v2` and `rmt` are the same queue, and which RMT implementation is behind
+// it (V1 on IDF4, V2 on IDF5/6) is a property of the SDK the firmware was built
+// with, not a choice this protocol can make. A second spelling is one more way
+// for a result to be tagged with a driver name that does not exist.
 static bool parse_driver(const char* name, enum saleae_driver* out) {
   (void)out;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  if (!sal_strcmp(name, SAL_PSTR("rmt")) ||
-      !sal_strcmp(name, SAL_PSTR("rmt_v2"))) {
+  if (!sal_strcmp(name, SAL_PSTR("rmt"))) {
 #if (defined(SUPPORT_ESP32_RMT_V1) || defined(SUPPORT_ESP32_RMT_V2))
     *out = SA_RMT;
     return true;
 #endif
   }
-  if (!sal_strcmp(name, SAL_PSTR("mcpwm")) ||
-      !sal_strcmp(name, SAL_PSTR("mcpwm_pcnt"))) {
+  if (!sal_strcmp(name, SAL_PSTR("mcpwm_pcnt"))) {
 #if defined(SUPPORT_ESP32_MCPWM_PCNT)
     *out = SA_MCPWM;
     return true;
 #endif
   }
-  if (!sal_strcmp(name, SAL_PSTR("i2s")) ||
-      !sal_strcmp(name, SAL_PSTR("i2s_direct"))) {
+  if (!sal_strcmp(name, SAL_PSTR("i2s_direct"))) {
 #if defined(SUPPORT_ESP32_I2S)
     *out = SA_I2S;
     return true;
@@ -597,9 +601,9 @@ static bool parse_driver(const char* name, enum saleae_driver* out) {
   return false;
 }
 
-// The name a connected stepper is reported under. `rmt` rather than `rmt_v2`:
-// the RMT generation is a property of the SDK, which is a tag on the run, not
-// of the driver the harness asked for.
+// The name a connected stepper is reported under: the same single name CONFIG
+// accepts. Which RMT generation is behind it (V1 on IDF4, V2 on IDF5/6) is a
+// property of the SDK, which is a tag on the run, not part of the driver's name.
 //
 // It writes into a caller-supplied buffer rather than returning a pointer,
 // because both callers feed the result to `%s` and a flash string must be
@@ -673,7 +677,7 @@ static void stop_sr00(void) {
 // The earlier stop_all() conflated the first two: it called stopMove() *and*
 // zeroed the cursor, so it behaved like a partial forceStop while reporting
 // itself as a stop. Measured, that hybrid left 7655 of 20000 steps to run on
-// i2s_direct and 7608 on rmt_v2 -- just under the 8160 a 32-deep queue of
+// i2s_direct and 7608 on rmt -- just under the 8160 a 32-deep queue of
 // 255-step commands holds, which is to say it was the harness's own arithmetic
 // and not any documented guarantee. Nothing in the library promises that
 // number.
@@ -691,7 +695,7 @@ static void stop_move_only(void) {
 //
 // forceStop() sets ignore_commands and leaves everything queued to run out --
 // measured: 4080 of 4080 steps after the marker with a filled queue, identical
-// on rmt_v2, i2s_direct and mcpwm_pcnt. forceStopAndNewPosition() goes on to
+// on rmt, i2s_direct and mcpwm_pcnt. forceStopAndNewPosition() goes on to
 // q->forceStop(), which per driver stops the timer/channel and does
 // read_idx = next_write_idx, so the ring is emptied and the queued commands
 // never run. It is also the only stop whose effect on the wire differs from the
@@ -1010,13 +1014,13 @@ static void handle_drivers(void) {
   // predicted either: `scale` sweeps to the analyzer's channel budget and the
   // board's refusal *is* the measured bound. See harness.py scale_bound().
   // Sized from this build's own reply, not from the CONFIG buffer it shares a
-  // constant with. The ESP32 form is "OK DRIVERS mux=0 rmt=1 rmt_v2=1
-  // mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1 mux_init=0" -- 80 bytes -- while a
+  // constant with. The ESP32 form is "OK DRIVERS mux=0 rmt=1 mcpwm_pcnt=1
+  // i2s_direct=1 i2s_mux=1 mux_init=0" -- 68 bytes -- while a
   // timer build emits "OK DRIVERS mux=0 timer=1 mux_init=0", 40. avr-gcc puts
   // the stack in .data, so borrowing the CONFIG size would spend 56 bytes of a
   // 328P's 203 remaining on a reply that is half that long.
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
-  char buf[88];
+  char buf[76];
 #else
   char buf[48];
 #endif
@@ -1025,8 +1029,8 @@ static void handle_drivers(void) {
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
   len += sal_snprintf(
       buf + len, sizeof(buf) - len,
-      SAL_PSTR(" rmt=%u rmt_v2=%u mcpwm_pcnt=%u i2s_direct=%u i2s_mux=%u"),
-      driver_supported(SA_RMT) ? 1 : 0, driver_supported(SA_RMT) ? 1 : 0,
+      SAL_PSTR(" rmt=%u mcpwm_pcnt=%u i2s_direct=%u i2s_mux=%u"),
+      driver_supported(SA_RMT) ? 1 : 0,
       driver_supported(SA_MCPWM) ? 1 : 0, driver_supported(SA_I2S) ? 1 : 0,
       driver_supported(SA_I2S_MUX) ? 1 : 0);
 #else
