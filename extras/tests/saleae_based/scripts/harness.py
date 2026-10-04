@@ -311,6 +311,22 @@ def derive(args):
     # `--driver rmt --count 32` is not. What still bounds a mux run is the
     # 32-bit word itself.
     mux = is_mux_driver(args.driver)
+    # Whether the CAPTURE carries the I2S bus, which is a different question from
+    # whether a stepper in the plan is a mux stepper, and the sample rate below
+    # turns on this one.
+    #
+    # `sync --imux` is the case that separates them: its steppers are drawn from
+    # every driver, so some of them are mux and some are GPIO, and there is no
+    # single `--driver` to read a mux out of. It brought the bus up and captured
+    # all three wires -- and then sampled them at 4 MS/s, half a sample per
+    # 8 MHz bit-clock period, so the four i2s_mux combinations decoded to 0 or 1
+    # of 64 steps and were recorded as a driver that emits nothing. Under the
+    # mux floor the decode is not a wrong answer, it is not an answer.
+    #
+    # Deliberately not folded into `mux` itself: that one decides the channel
+    # budget and the tag key, where a bus that merely happens to be up is not
+    # what either of them means.
+    bus = mux or bool(getattr(args, "imux", False))
     cap = mux_slot_bound(args.pin_mode) if mux \
         else max_steppers(args.pin_mode)
     if args.count < 1 or args.count > cap:
@@ -368,7 +384,7 @@ def derive(args):
         # at least 20 samples per step period.
         step_freq = 1_000_000.0 / args.speed_us
         rate = snap_rate(max(4_000_000, int(20 * step_freq)))
-    if mux and rate != MUX_MIN_SAMPLE_RATE:
+    if bus and rate != MUX_MIN_SAMPLE_RATE:
         # Two-sided: `rate <` would leave the 48 MS/s case alone, and 48 MS/s is
         # the one that truncates.
         # The mux's own floor, and it is a decoding one rather than a signal one:
@@ -382,15 +398,23 @@ def derive(args):
         # 0.18 ms, so it measures a scenario that has not started yet.
         # Snap DOWN as well as up: the rates this analyzer offers are a
         # ladder, and 48 MS/s is on it.
+        # The rate the sentence talks about is the one the flag RESOLVED to, not
+        # the flag. `--sample-rate` defaults to 0 meaning "choose for me", so
+        # quoting it printed "0 MS/s would have read 0.5" -- the 0.5 is computed
+        # from the 4 MS/s the step period actually selected, so the line mixed
+        # one number from the resolved rate with another from an argument that
+        # was never used. It read as though nothing had been decided yet, which
+        # is the opposite of what the line is for.
         have = rate / float(MUX_BIT_CLOCK_HZ)
+        chosen = rate
         rate = (MUX_MIN_SAMPLE_RATE if rate > MUX_MIN_SAMPLE_RATE
                 else snap_rate(max(rate, MUX_MIN_SAMPLE_RATE)))
         verb = "lowered" if have > MUX_MIN_SAMPLES_PER_BIT else "raised"
         print(f"sample rate: {verb} to {rate // 1000000} MS/s for the I2S mux "
               f"(8 MHz bclk needs {MUX_MIN_SAMPLES_PER_BIT} samples/bit; "
-              f"{args.sample_rate // 1000000} MS/s would have read "
-              f"{have:.1f}, and 48 MS/s truncates an eight-channel capture to "
-              f"0.18 ms -- long enough to miss the run entirely)")
+              f"{chosen // 1000000} MS/s would have read {have:.1f}, and 48 MS/s "
+              f"truncates an eight-channel capture to 0.18 ms -- long enough to "
+              f"miss the run entirely)")
     return tag_key, proj, env, rate
 
 

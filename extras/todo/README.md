@@ -25,6 +25,8 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
 | **020** | [stopMove() does not stop a queued move](020_stopMove_behavior.md) | ~100 k | 1–2 d | **Critical.** `stopMove()` only sets a flag; queued commands run to completion. Unexpected motion. |
+| **015** | [RMT panics the firmware on ESP-IDF 5.5](015_rmt_panics_on_esp_idf_5_5.md) | ~300 k | 2–3 d | **Critical.** 34 measurements on one SDK die in `connect_rmt()`; `LoadProhibited` inside the allocator, i.e. heap metadata already corrupt. |
+| **016** | [i2s_direct is unstable on ESP-IDF 5.5](016_i2s_direct_stack_overflow_idf55.md) | ~200 k | 1–2 d | **High.** The scale sweep answers refused / failed / stack-overflow for the same point across runs; n=2 fails where IDF 6.1 passes it. |
 | **030** | [Interrupt slow steps](030_interrupt_slow_steps.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
@@ -35,6 +37,8 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **050** | [Cross-driver start skew ~66% worse than same-driver](050_cross_driver_skew.md) | ~100 k | 0.5 d | Medium: critical characterization result previously hidden by a firmware bug. |
 | **060** | [AVR RAM was 51% string literals](060_avr_ram_strings.md) | ~100 k | 0.5 d | Medium: resource constraint (1040 B of 2048 B `.rodata` in SRAM). Fixed, documented. |
 | **070** | [i2s_direct has 2 channels on ESP32, not 3](070_i2s_direct_channels.md) | ~100 k | 0.5 d | Medium: constant overstates channel count by one. Graceful failure. |
+| **072** | [MAP does not report a multiplexed stepper's direction slot](072_map_does_not_report_mux_direction_slot.md) | ~150 k | 1 d | Medium: the host derives a mux stepper's dir slot as `step_slot + 1`; correct only while allocation stays gapless. |
+| **076** | [i2s_mux in `dir`: the second stepper's slot is intermittently not decoded](076_i2s_mux_dir_second_slot_not_decoded.md) | ~200 k | 1–2 d | Medium: `CONFIG 2 i2s_mux,i2s_mux dir` loses S2 on both I2S SDKs; `nodir` is unaffected and green. |
 | **080** | [Cubic start (`s_h`) overlay](080_cubic_start.md) | ~200 k | 1–2 w | Later feature, not v1. |
 | **090** | [Common head speed](090_common_head_speed.md) | ~300 k | 1–2 w | Later planner. One acceleration and one max path speed for an x/y/z/… head. Waypoints are `dx, dy, dz, …, v`. |
 | **100** | [Delta steps](100_delta_steps.md) | ~400 k | 1–2 w | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
@@ -46,9 +50,49 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
 | **175** | [stopMove() / forceStop() / forceStopAndNewPosition() — three APIs, one harness conflated two](175_stop_api_conflation.md) | ~100 k | 0.5 d | Low: harness bug that was found, fixed, and documented. |
-| **total** | 22 items (15 existing + 7 new) | ~6.4 M | 18–26 w | All priorities 020–175. |
+| **total** | 26 items (22 existing + 4 new) | ~7.2 M | 18–26 w | All priorities 015–175. |
 
 ## Done
+
+- **Platform-release matrix, first hardware run — 6 firmwares, 350
+  measurements, and six harness bugs that had been hiding results.**
+  `extras/tests/saleae_based/scripts/run_matrix.py` flashes each
+  `RELEASE_MATRIX` row once (arduino 4.4.0/5.3.0/6.13.0, idf
+  5.3.0/6.13.0/7.1.2) and measures the SR catalogue, one `scale` sweep per
+  driver the board admits, and all ten `sync` combinations against that one
+  flash. First execution found the two open library items above, plus:
+
+  - **`read_map()` read `slots=` as one entry per channel; the firmware sends
+    one per stepper.** Agrees with itself in `nodir`, runs off the end of the
+    list in `dir`, and handed every multiplexed stepper past the first a GPIO
+    channel — so `sync --imux` reported 0 of 64 steps for a stepper the
+    capture shows stepping 64 times. Verified against the board
+    (`CONFIG 2 i2s_mux,i2s_mux dir` → `slots=0,2`); the two unit tests that
+    encoded the wrong rule were corrected to the measured reply.
+    Tracked as [072](072_map_does_not_report_mux_direction_slot.md) for the
+    direction-slot half of the same gap.
+  - **The I2S mux's 24 MS/s floor keyed off `--driver`, and `sync` has none** —
+    so `--imux` sampled the 8 MHz bus at 4 MS/s (0.5 samples/bit) and the
+    decode was not a wrong answer but not an answer. The floor now keys off
+    `--imux`, i.e. off whether the capture carries the bus.
+  - **The sample-rate log line mixed two numbers**: the ratio came from the
+    resolved rate, the printed rate from `args.sample_rate`, which is `0` for
+    "auto". It always read "0 MS/s would have read 0.5" when the truth was
+    4 MS/s.
+  - **A refused `IMUX` was fatal**, but the USB reset does not always fire; when
+    it does not, the mux from the previous point is still up and
+    `initI2sMux()` is correctly refused. Now resolved by asking the firmware
+    (`mux_init=` in `DRIVERS`).
+  - **One point's exception aborted the rest of a sweep**, so a transient at
+    n=3 cost n=4…8.
+  - **A narrowed `--targets` discarded the other rows**, so recovering one row
+    whose upload hit "wrong boot mode" meant re-flashing all six. Rows now
+    merge, and a report built across invocations carries a per-row timestamp.
+
+  And in the report generator: the scale and sync tables printed **empty**
+  (mode points key as `{run_tag}_{point}`; the report compared for equality),
+  and no capture link ever rendered (`capture_link` appended `.vcd` to a `.sr`
+  path, so it looked for `foo.sr.vcd`).
 
 - **140 — RMT V1/V2 split — resolved, the two RMT paths had one flag and
   the umbrella was doing the work the version test should do.**

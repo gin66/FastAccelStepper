@@ -273,6 +273,11 @@ class Pins:
 # scenario's own channels come back missing.
 STEP_CHANNEL_ORDER = [f"D{i}" for i in range(8)]
 
+# Width of the I2S multiplexer's word: 32 slots, and a step bit and a direction
+# bit are the same kind of thing -- one bit of it each. Used to bound a
+# multiplexed stepper's direction slot, which MAP does not report.
+MUX_SLOT_COUNT = 32
+
 # How many steppers each pin mode can carry: 8 channels, 2 per stepper with a
 # direction pin and 1 without (white paper 3.3/10.1). The firmware caps the
 # count at the smaller of this and the platform's own stepper limit.
@@ -489,7 +494,20 @@ def read_map(ser):
             # map built from the index would read D2: a channel the bus uses.
             chan_used = 0
             for j, name in enumerate(letters):
-                step_slot = slots[j * stride] if j * stride < len(slots) else None
+                # One entry per STEPPER, not per channel: the firmware reports
+                # `slots[i].mux_slot`, which is the step bit stepper i claimed,
+                # and `-` for a stepper that is on a GPIO. Its own comment says
+                # the field "lines up with the stepper letters one to one", and
+                # `nodir` is the only mode where one-per-stepper and
+                # one-per-channel coincide -- which is exactly why every mux
+                # measurement made so far was `nodir` and looked right.
+                #
+                # Reading it as one-per-channel (this indexed `slots[j*stride]`)
+                # ran off the end for every stepper past the first in `dir`, so
+                # a mux stepper was given a GPIO channel and measured on a pin
+                # that carries somebody else's steps: `sync --imux` reported 0 of
+                # 64 for a stepper the capture shows stepping 64 times on S0.
+                step_slot = slots[j] if j < len(slots) else None
                 if step_slot is None:
                     if chan_used + stride > count * stride:
                         raise RuntimeError(
@@ -502,17 +520,22 @@ def read_map(ser):
                     continue
                 chan_map[name] = {"step": f"S{step_slot}"}
                 if stride > 1:
-                    # Direction on the mux is a second bit of the same word, and
-                    # the firmware allocates it right after the step bit, so
-                    # stepper j owns slots[2j] and slots[2j+1]. MAP reports one
-                    # slot per *channel* for that reason, not one per stepper.
-                    dir_idx = j * stride + 1
-                    dir_slot = (slots[dir_idx]
-                                if dir_idx < len(slots) else None)
-                    if dir_slot is None:
+                    # Direction on the mux is a second bit of the same word,
+                    # and MAP does not report it. It is `step_slot + 1` here
+                    # because CONFIG resets the slot cursor and connects the
+                    # steppers in order, so the pairs are allocated gaplessly:
+                    # 0/1, 2/3, ... in stepper order. That is an assumption
+                    # about this firmware's allocation, not a fact from the
+                    # reply, and it stops being true if the cursor is ever
+                    # resumed rather than reset -- which is why this is checked
+                    # against the word width below instead of trusted.
+                    dir_slot = step_slot + 1
+                    if dir_slot >= MUX_SLOT_COUNT:
                         raise RuntimeError(
-                            f"stepper {name} has a direction pin in "
-                            f"{mode} mode but MAP reports no dir slot")
+                            f"stepper {name} has a direction pin in {mode} mode "
+                            f"and step slot {step_slot}, whose direction bit "
+                            f"would be {dir_slot} -- outside the "
+                            f"{MUX_SLOT_COUNT}-bit word MAP reports on")
                     chan_map[name]["dir"] = f"S{dir_slot}"
             # marker=-1 means no channel is designated as the event marker.
             marker = int(m.group(7)) if m.group(7) else -1
@@ -2705,15 +2728,26 @@ def ensure_mux(ser, wire, args):
     """Bring the multiplexer up, in THIS session, if this CONFIG needs it.
 
     It has to be in the same session as the CONFIG, and that is not tidiness:
-    opening the serial port resets the ESP32, so every command batch in this
-    harness starts from a fresh board. `initI2sMux()` cannot run twice and does
-    not survive a reset, so a mux brought up in one session is gone by the next
-    -- and the CONFIG that follows is refused with `ERR connect step 0`, which
-    names no cause and looks exactly like a broken driver.
+    the intent is that opening the serial port resets the ESP32, so every command
+    batch in this harness starts from a fresh board. `initI2sMux()` cannot run
+    twice and does not survive a reset, so a mux brought up in one session is
+    gone by the next -- and the CONFIG that follows is refused with `ERR connect
+    step 0`, which names no cause and looks exactly like a broken driver.
 
     Decided from the CONFIG line rather than from a flag, so the two cannot
     disagree: a run that names i2s_mux has the mux, and a run that does not is
     left alone.
+
+    **A refused IMUX is not by itself an error; a mux that is not up is.**
+    Opening the port is *meant* to reset the board, and the DTR/RTS toggle does
+    not always fire -- which is the same reason a flash occasionally comes up in
+    the wrong boot mode. When it does not, the mux from the previous point is
+    still running, the second `initI2sMux()` is correctly refused, and the run
+    aborted on a board whose multiplexer was working the whole time: a
+    three-point sweep died at n=3 with "IMUX was refused" and the first two
+    points had passed. So a refusal is resolved by asking the firmware, which
+    reports `mux_init=` in its DRIVERS reply: 1 means the multiplexer is up and
+    the run carries on, 0 means it is not and the refusal was real.
     """
     if "i2s_mux" not in (wire or ""):
         return False
@@ -2721,9 +2755,16 @@ def ensure_mux(ser, wire, args):
         return False
     if send_imux(ser):
         return True
+    _present, mux_init = read_drivers(ser)
+    if mux_init:
+        # initI2sMux() cannot run twice and did not need to: it is already up.
+        print("    IMUX refused but the mux is already up (mux_init=1): the "
+              "port open did not reset the board; continuing")
+        return True
     raise RuntimeError(
-        "IMUX was refused for a CONFIG that names i2s_mux: the three bus "
-        "channels must be free, and initI2sMux() cannot run twice")
+        "IMUX was refused for a CONFIG that names i2s_mux, and the firmware "
+        "reports mux_init=0: the three bus channels must be free, and "
+        "initI2sMux() has to succeed before any mux stepper connects")
 
 
 def run_scenario(tag_key, test_id, args):
@@ -2773,9 +2814,20 @@ def run_modes(tag_key, plans, args, mode):
             continue
 
         print(f"  {plan.label}: {plan.wire}")
-        status, detail = measure(key, plan.label, plan.wire, plan.mask,
-                                 plan.builder, plan.evaluator, args,
-                                 plan.per_stepper_builder)
+        # One point must not take the rest of the sweep with it. A `scale` sweep
+        # is the measurement of a *range*, so an exception at n=3 leaves n=4..8
+        # unmeasured and the report shows one error where it should show a
+        # bound; that is how a transient board hiccup here cost a whole sweep
+        # (and, through the row's exit code, flagged the row as failed). The
+        # point is recorded as `error` with the reason, and the plan continues.
+        try:
+            status, detail = measure(key, plan.label, plan.wire, plan.mask,
+                                     plan.builder, plan.evaluator, args,
+                                     plan.per_stepper_builder)
+        except Exception as exc:
+            status = "error"
+            detail = {"error": f"{type(exc).__name__}: {exc}",
+                      "wire": plan.wire}
         detail["mode"] = mode
         detail["drivers"] = plan.drivers
         detail["pin_mode"] = plan.pin_mode

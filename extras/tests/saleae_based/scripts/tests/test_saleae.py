@@ -2170,13 +2170,38 @@ class TestMuxChannelMap(unittest.TestCase):
         # Direction on the mux is a second bit of the SAME word, so it is a
         # second slot rather than a second channel. That is what caps mux `dir`
         # at 16 steppers and not 32.
+        #
+        # `slots=0,2` is what the board actually sends for `CONFIG 2 i2s_mux,
+        # i2s_mux dir` -- two entries, one per STEPPER, being the step bits. It
+        # used to be read here as one entry per CHANNEL (four of them), which
+        # agrees with itself in `nodir` and runs off the end in `dir`: every
+        # stepper past the first was handed a GPIO channel and reported as
+        # emitting nothing.
         chan_map, pins = self._read(
             f"MAP count=2 mode=dir stride=2 ch= bus=5,6,7 "
-            f"slots=0,1,2,3 marker=255\n")
+            f"slots=0,2 marker=255\n")
         self.assertEqual(chan_map, {
             "A": {"step": "S0", "dir": "S1"},
             "B": {"step": "S2", "dir": "S3"},
         })
+
+    def test_a_mux_dir_stepper_beside_a_gpio_one(self):
+        # The case `sync --imux` runs, and the one that was measured wrong: a
+        # multiplexed stepper and a GPIO stepper in one CONFIG. The GPIO one
+        # takes a physical channel, the mux one takes none, and the mux one is
+        # still reported by slot.
+        #
+        # Read as one-per-channel this gave stepper B the channel D2 -- a pin
+        # nothing was connected to -- and the run reported 0 of 64 steps for a
+        # stepper the capture shows stepping 64 times.
+        chan_map, pins = self._read(
+            "MAP count=2 mode=dir stride=2 ch=2,0 bus=5,6,7 "
+            "slots=-,0 marker=255\n")
+        self.assertEqual(chan_map, {
+            "A": {"step": "D0", "dir": "D1"},
+            "B": {"step": "S0", "dir": "S1"},
+        })
+        self.assertEqual(pins["physical_channels"], 2)
 
     def test_mux_and_physical_steppers_share_one_map(self):
         # The mixed case the harness exists for: a mux run and a physical run in
@@ -2203,14 +2228,17 @@ class TestMuxChannelMap(unittest.TestCase):
         self.assertEqual(pins["bus"], [])
         self.assertFalse(pins["slots"])
 
-    def test_a_mux_dir_stepper_with_no_dir_slot_is_refused(self):
-        # `dir` mode with a step slot and no dir slot is a board that connected
-        # a direction pin it never allocated. Reading it as "no dir" would make
-        # the direction scenarios silently measure nothing.
+    def test_a_mux_dir_stepper_whose_dir_bit_leaves_the_word_is_refused(self):
+        # MAP reports the step bit and not the direction bit, so the direction
+        # slot is derived as step_slot + 1. That is only inside the 32-bit word
+        # while the allocation is gapless -- and a board that reported the last
+        # bit as a step bit would put the direction bit outside the word, where
+        # the decoder has no channel for it. Reading it anyway would have the
+        # direction scenarios measure a channel that does not exist.
         with self.assertRaises(RuntimeError) as cm:
             self._read("MAP count=1 mode=dir stride=2 ch= bus=5,6,7 "
-                       "slots=4 marker=255\n")
-        self.assertIn("dir slot", str(cm.exception))
+                       f"slots={run_tests.MUX_SLOT_COUNT - 1} marker=255\n")
+        self.assertIn("outside the", str(cm.exception))
 
     def test_the_bus_costs_three_channels_of_the_marker_budget(self):
         # MARK cannot sit on a bus channel: its edges are the bus protocol, not

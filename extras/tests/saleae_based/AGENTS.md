@@ -110,6 +110,13 @@ python3 scripts/harness.py --mode scale --arch esp32 --driver i2s_mux \
 # low-level (firmware already flashed; you supply the tag key)
 python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch --tests SR_01
 
+# the whole platform-release matrix: 6 firmwares, one flash each, then the
+# catalogue + one scale sweep per accepted driver + all 10 sync combinations
+# against that flash. Writes reports/esp32_platform_matrix.md.
+python3 scripts/run_matrix.py --plan          # the plan, no build/flash/capture
+python3 scripts/run_matrix.py                 # all of RELEASE_MATRIX
+python3 scripts/run_matrix.py --targets idf-6.13.0   # one row; others are carried
+
 # report: catalogue rows from VCDs, mode tables from result JSON.
 # A mode run records a result and NO capture, so --results-dir is where the
 # parallel-count and sync tables come from.
@@ -164,9 +171,18 @@ CONFIG <n> <drv>[,<drv>..] [dir|nodir]
                             false, and the queue would refuse it.
 MAP                         count, mode, stride, the GPIO behind each reachable
                             channel, plus `bus=` (the three I2S channels, or
-                            `-`) and `slots=` (one per channel: the bit of the
-                            32-bit word that channel's stepper is, or `-` for a
-                            GPIO). The host MUST read this rather than assume a
+                            `-`) and `slots=` (one entry per **stepper**: the bit
+                            of the 32-bit word that stepper's STEP signal is, or
+                            `-` for a GPIO stepper -- verified on hardware, not
+                            inferred; `CONFIG 2 i2s_mux,i2s_mux dir` answers
+                            `slots=0,2`). Read it as one per channel and every
+                            stepper past the first in `dir` is handed a GPIO
+                            channel it does not own, which measures 0 steps on a
+                            quiet pin. A mux stepper's DIRECTION bit is not
+                            reported at all: it is `step_slot + 1`, which holds
+                            because CONFIG resets the slot cursor and connects
+                            in order, so the pairs are gapless (0/1, 2/3, ...).
+                            The host MUST read the map rather than assume a
                             channel map: in `dir` stepper B is D2, in `nodir` it
                             is D1, and a host that guesses reads a quiet pin and
                             reports a driver that emits nothing. A multiplexed
@@ -366,7 +382,57 @@ non-obvious and both load-bearing — see the MCPWM/PCNT section of
 
 `rmt+mcpwm_pcnt` and `rmt+rmt` are unaffected either way.
 
-## Target/driver notes## Capture format
+## Target/driver notes
+
+### Which drivers a build has, measured per SDK
+
+`DRIVERS` is the host's list of names; what a build actually accepts is
+**asked of the board** (`DRIVERS` command, `read_drivers()`), because only the
+firmware knows. Measured over the release matrix, ESP32 classic, 350 runs:
+
+| PlatformIO env | ESP-IDF | drivers the board reports |
+|---|---|---|
+| `esp32_V4_4_0`, `esp32_V5_3_0`, `esp32_V6_13_0` (arduino) | 4.4.7 | `rmt`, `mcpwm_pcnt` |
+| `esp32_idf_V5_3_0` | 4.4.3 | `rmt`, `mcpwm_pcnt` |
+| `esp32_idf_V6_13_0` | 5.5.3 | `rmt`, `mcpwm_pcnt`, `i2s_direct`, `i2s_mux` |
+| `esp32_idf_V7_1_2` | 6.1.0 | `rmt`, `mcpwm_pcnt`, `i2s_direct`, `i2s_mux` |
+
+**There are no I2S queues below ESP-IDF 5**, and that includes every Arduino
+build: `SUPPORT_ESP32_I2S` is defined only in `pd_config_idf5.h` and
+`pd_config_idf6.h`, never in `pd_config_idf4.h`, so `QUEUES_I2S_MUX` and
+`QUEUES_I2S_DIRECT` are 0 and the library has no i2s driver to name. Do not
+read the missing `i2s_*` fields on an Arduino or IDF4 row as a broken build or
+a missing build flag — it is the library's own version split, and the env name
+carries the *platform* version, not the IDF version (see
+`extras/doc/platformio-espressif-versions.md`).
+
+Consequence for reading a matrix report: `SR_23` (the `i2s_direct` scenario)
+records **failed** with `ERR CONFIG no such driver` on every row without I2S.
+That is the firmware answering a capability question, not a measurement going
+wrong, and it is why the report says so in its legend rather than suppressing it.
+
+### ESP-IDF 5.5.3 has two open library defects — do not read that row as green
+
+- **Every RMT `CONFIG` panics the firmware** (`LoadProhibited` inside the
+  allocator, reached from `rmt_new_tx_channel`): 34 measurements, `connect_rmt()`
+  never returns. → [`extras/todo/015_rmt_panics_on_esp_idf_5_5.md`](../../todo/015_rmt_panics_on_esp_idf_5_5.md)
+- **`i2s_direct` is unstable**: the `scale` sweep answers refused / failed /
+  stack-overflow for the same point across runs. →
+  [`016_i2s_direct_stack_overflow_idf55.md`](../../todo/016_i2s_direct_stack_overflow_idf55.md)
+
+Everything else on that row passes, so "IDF 5.5 is broken" is too strong a
+summary — it is RMT and `i2s_direct` on that SDK. IDF 4.4, IDF 6.1 and all
+three Arduino rows are clean apart from the mux `dir` slot loss below.
+
+### The mux in `dir` mode loses its second slot
+
+`CONFIG 2 i2s_mux,i2s_mux dir` decodes S0 and S1 but not S2, on both I2S SDKs,
+so the run is recorded as an **incomplete capture** rather than a quiet stepper.
+`--mode scale --driver i2s_mux --pin-mode nodir` is unaffected and green
+(n=1…8, 64/64). →
+[`076_i2s_mux_dir_second_slot_not_decoded.md`](../../todo/076_i2s_mux_dir_second_slot_not_decoded.md)
+
+## Capture format
 
 Record `.sr` (sigrok srzip, one packed byte per sample), never CSV: a 2 Msample
 8-channel capture is 26 KB as `.sr` and 80 MB as CSV. `capture.py --vcd` derives

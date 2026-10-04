@@ -25,6 +25,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import report                     # noqa: E402
+import run_matrix                 # noqa: E402
 import run_tests as rt            # noqa: E402
 import vcd_fixtures as vf         # noqa: E402
 
@@ -503,6 +504,89 @@ class TestModeTables(unittest.TestCase):
         meaningless."""
         text = report.as_mode_tables(self.write([mode_record()]))
         self.assertIn("rmt+rmt", text)
+
+
+
+class TestMatrixFindingClassification(unittest.TestCase):
+    """A refusal is not a defect, and a capability answer is not a failure.
+
+    This is the distinction the platform-matrix report is built on, and it is
+    the difference between a report of defects and a log of the harness talking
+    to the board: the first release-matrix run produced a 26-row "everything
+    that did not pass" table in which two rows were real library bugs and the
+    rest were `scale` doing its job and a firmware correctly saying it has no
+    I2S queues.
+
+    Nothing else in the suite touches run_matrix.py, which is how the same run
+    also shipped two *empty* tables (mode points key as `{run_tag}_{point}`, and
+    the report compared for equality) without a single test noticing.
+    """
+
+    def test_a_connect_refusal_is_the_measured_bound(self):
+        # `scale` finding where MCPWM/PCNT stops. This is the answer the mode
+        # exists to give, not something that went wrong.
+        self.assertEqual(run_matrix.classify({
+            "test_id": "MODE", "mode": "scale", "result": "refused",
+            "error": "ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1",
+        }), run_matrix.BOUND)
+
+    def test_any_refusal_is_a_bound_not_a_defect(self):
+        # Whatever the wording, the board declined. `scale` and `sync` record
+        # refusals on purpose, so a refusal never reaches the findings table.
+        self.assertEqual(run_matrix.classify({
+            "test_id": "MODE", "mode": "sync", "result": "refused",
+            "error": "ERR CONFIG mode dir|nodir",
+        }), run_matrix.BOUND)
+
+    def test_a_missing_driver_is_a_capability_answer(self):
+        # ESP-IDF 4 and every Arduino build define no I2S queues, so SR_23 gets
+        # here. It is recorded `failed` -- the scenario did not run -- and it is
+        # not a defect of anything.
+        self.assertEqual(run_matrix.classify({
+            "test_id": "SR_23", "result": "failed",
+            "error": "ERR CONFIG no such driver",
+        }), run_matrix.CAPABILITY)
+
+    def test_a_capability_answer_renders_as_not_applicable(self):
+        # Not a bold FAIL in a matrix column: four of six rows looked like a
+        # broken library when the only thing wrong was the IDF version.
+        self.assertEqual(run_matrix.cell({
+            "test_id": "SR_23", "result": "failed",
+            "error": "ERR CONFIG no such driver",
+        }), "n/a (no such driver)")
+
+    def test_a_panic_is_a_defect(self):
+        self.assertEqual(run_matrix.classify({
+            "test_id": "SR_01", "result": "failed",
+            "error": "Guru Meditation Error: Core  0 panic'ed (LoadProhibited)",
+        }), run_matrix.DEFECT)
+
+    def test_a_wrong_step_count_is_a_defect(self):
+        # No error text at all -- the waveform disagreed with the command, which
+        # is the defect this harness exists to find.
+        self.assertEqual(run_matrix.classify({
+            "test_id": "SR_02", "result": "failed",
+            "steps": {"steps_measured": 254, "steps_expected": 255},
+        }), run_matrix.DEFECT)
+
+    def test_a_missing_channel_is_an_incomplete_measurement(self):
+        # Not a wrong step count either: there was nothing to count.
+        self.assertEqual(run_matrix.classify({
+            "test_id": "MODE", "mode": "sync", "result": "failed",
+            "incomplete_capture": {"missing_channels": ["S2"],
+                                   "missing_steppers": ["B"]},
+        }), run_matrix.INCOMPLETE)
+
+    def test_a_note_is_not_taken_from_a_reply_the_board_confirmed(self):
+        # An incomplete capture also carries `reply: "OK QRUN / POS 64 64"` --
+        # the board confirming the move it did make. Reading `reply` first gave
+        # a failed run the note "OK QRUN".
+        rec = {"test_id": "MODE", "result": "failed",
+               "reply": "OK QRUN\nPOS 64 64",
+               "incomplete_capture": {"missing_channels": ["S2"],
+                                      "missing_steppers": ["B"]}}
+        self.assertIn("S2", run_matrix.note_of(rec))
+        self.assertNotIn("OK QRUN", run_matrix.note_of(rec))
 
 
 if __name__ == "__main__":

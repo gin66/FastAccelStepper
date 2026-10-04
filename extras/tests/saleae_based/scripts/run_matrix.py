@@ -31,6 +31,7 @@ is; the report lands in extras/tests/saleae_based/reports/.
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import time
@@ -57,12 +58,20 @@ def log_path(target_id, label):
     return LOG_DIR / target_id / f"{safe}.log"
 
 
-def run_logged(argv, log, cwd=None, check=False):
-    """Run a command, teeing its output to `log`. Returns (rc, seconds)."""
+def run_logged(argv, log, cwd=None, check=False, append=False):
+    """Run a command, teeing its output to `log`. Returns (rc, seconds).
+
+    `append` adds to an existing log instead of replacing it, so a flash that
+    is retried leaves both attempts in one file -- a retried upload's log is
+    only readable if the failure that caused the retry is in it.
+    """
     log.parent.mkdir(parents=True, exist_ok=True)
     started = time.monotonic()
-    with open(log, "w") as fh:
-        fh.write(f"$ {' '.join(argv)}\n\n")
+    with open(log, "a" if append else "w") as fh:
+        if append:
+            fh.write(f"\n$ {' '.join(argv)}   (retry)\n\n")
+        else:
+            fh.write(f"$ {' '.join(argv)}\n\n")
         fh.flush()
         # Not captured: a build that prints a page of warnings is a build whose
         # log has to be readable, and the matrix runs unattended.
@@ -71,17 +80,37 @@ def run_logged(argv, log, cwd=None, check=False):
     return rc, time.monotonic() - started
 
 
-def flash(target, port):
-    """Build and flash one matrix row. Once. Returns (ok, seconds, log)."""
+def flash(target, port, attempts=2):
+    """Build and flash one matrix row. Returns (ok, seconds, log).
+
+    Retried once, because an upload that reaches esptool and then fails with
+    "Wrong boot mode detected" is the board, not the build: the image is already
+    compiled and linked at that point, and the DevKitC's DTR/RTS auto-reset
+    occasionally does not fire, so the chip is handed to esptool running rather
+    than in download mode. It took the arduino-4.4.0 row out of a full matrix
+    here, and a matrix row that is lost to a reset costs a whole row of
+    measurements -- so it is worth the retry. The retry is bounded and reported:
+    a row that fails twice is recorded as a failed flash, not retried forever.
+    """
     _tag, proj, env, _rate = target.derive(["--driver", "rmt", "--count", "1"])
     log = log_path(target.id, "flash")
     argv = ["pio", "run", "-d", proj, "-e", env, "-t", "upload",
             "--upload-port", port]
     print(f"  flash {env} ({target.framework} {target.version}, "
           f"ESP-IDF {target.esp_idf}) ... ", end="", flush=True)
-    rc, secs = run_logged(argv, log)
-    print("ok" if rc == 0 else f"FAILED (rc={rc}, see {log})")
-    return rc == 0, secs, str(log)
+    total = 0.0
+    for attempt in range(1, attempts + 1):
+        rc, secs = run_logged(argv, log, append=attempt > 1)
+        total += secs
+        if rc == 0:
+            print("ok" if attempt == 1 else f"ok (on attempt {attempt})")
+            return True, total, str(log)
+        # The build is already done, so the second attempt only re-links if it
+        # must; give the board a moment to settle rather than re-entering
+        # esptool into the same state that just failed.
+        time.sleep(5)
+    print(f"FAILED (rc={rc} after {attempts} attempts, see {log})")
+    return False, total, str(log)
 
 
 def board_drivers(port, baud):
@@ -106,7 +135,11 @@ def run_target(target, port, baud, force, capture_dir, results_dir):
     row = {"id": target.id, "framework": target.framework,
            "version": target.version, "esp_idf": target.esp_idf,
            "note": target.note, "env": target.env, "flash_ok": False,
-           "drivers": [], "runs": []}
+           "drivers": [], "runs": [],
+           # Seconds, and a space rather than a T: the backfill below writes a
+           # space, and one column is not worth a second date format.
+           "measured_at": datetime.now().isoformat(timespec="seconds")
+           .replace("T", " ")}
 
     ok, secs, log = flash(target, port)
     row["flash_seconds"] = round(secs, 1)
@@ -155,6 +188,23 @@ def load_results(results_dir):
     return out
 
 
+def mode_tag(base_tag, result):
+    """True when `result` is one of the points of the mode run `base_tag`.
+
+    A mode run writes ONE RECORD PER POINT, and each point's tag is the run's
+    tag with the point's own suffix on it -- `{tag_key}_{plan.tag}` in
+    run_tests.run_modes(). So the scale and sync tables cannot look the records
+    up by equality with the tag the runner recorded for the run: a tag is the
+    run's, and every point under it is a different key. Matching the prefix is
+    what joins the two. (The first version compared them for equality, which
+    found nothing, and printed two empty tables under headings promising the
+    per-n results -- a report that silently drops the measurements it was
+    written to show is worse than no report.)
+    """
+    tag = result.get("tag_key") or ""
+    return bool(base_tag) and tag.startswith(base_tag + "_")
+
+
 def statuses(results, tag_keys):
     """{test_id: result} for the tags of one matrix row."""
     wanted = set(tag_keys)
@@ -165,29 +215,202 @@ def statuses(results, tag_keys):
     return got
 
 
+# ESP-IDF boot and log noise that precedes a panic in a captured serial reply.
+# A firmware that crashes answers CONFIG with a hundred lines of bootloader
+# traceback, and a report that quotes its first line ("D (420) rmt: new simple
+# encoder @0x3ffb8a7c") describes the debug print before the crash rather than
+# the crash.
+ESP_LOG_NOISE = re.compile(
+    r"^(?:[IWED]\s*\(\d+\)|ets |rst:|configsip:|clk_drv:|mode:|load:|entry |"
+    r"ELF file SHA256|Rebooting|Warning:|abort\(\)|assert failed|"
+    r"Project version|Compile time|boot:|Partition Table|esp_image:|"
+    r"\*\*\* |[A-Za-z ]+: 0x[0-9a-f]+$)")
+
+
+def one_line(text, limit=110):
+    """The most informative single line of a serial reply, log noise removed.
+
+    A crash is searched for FIRST, wherever it sits in the reply. A firmware
+    that panics mid-CONFIG leaves the host holding a fragment of the half-sent
+    line, then the ESP-IDF log lines, then the panic — and the panic is the only
+    part that says anything. Taking the first surviving line instead reported
+    the fragment ("0", "DONE 0", a replacement character) as the note for four
+    measurements whose real content was the `Guru Meditation` two lines down,
+    which split one 24-measurement finding into four groups of 19, 4 and 1.
+    """
+    lines = [ln.strip() for ln in str(text).strip().splitlines()]
+    for line in lines:
+        if any(marker in line for marker in FIRMWARE_CRASH):
+            return line[:limit]
+    for line in lines:
+        if not line or ESP_LOG_NOISE.match(line) or junk_line(line):
+            continue
+        return line[:limit]
+    return lines[0][:limit] if lines else ""
+
+
+def junk_line(line):
+    """A line that is a fragment of a half-sent reply rather than an answer.
+
+    Short, or carrying a byte the serial read cut in half. Never rendered as a
+    note on its own -- see garbled().
+    """
+    return len(line) < 5 or "�" in line
+
+
+# What a non-pass *is*. Four kinds, and the distinction is the difference
+# between a report of defects and a log of the harness talking to the board.
+#
+# It matters because "everything that did not pass" was one table holding all
+# four, and two of them are not failures of anything:
+#
+#   BOUND      the board declined a CONFIG at a limit. `scale` exists to find
+#              it, so it is the answer, and it belongs in the sweep table where
+#              it reads "MCPWM/PCNT reaches 6" rather than in a defect list.
+#   CAPABILITY this build has no queues for the named driver. The firmware is
+#              answering a question correctly and the scenario was never
+#              applicable -- SR_23 on every row without I2S.
+#   INCOMPLETE the measurement could not be made: a channel the stepper needs
+#              was not captured. A hole in the harness, not a wrong step.
+#   DEFECT     anything else. A panic, a stack overflow, a step count or a
+#              period that is wrong. This is the only class that is a finding.
+BOUND = "bound"
+CAPABILITY = "capability"
+INCOMPLETE = "incomplete"
+DEFECT = "defect"
+
+# The firmware's own words for the two non-defect refusals. Matched on the raw
+# reply, not on the note, so classification does not depend on the note
+# rendering.
+NO_SUCH_DRIVER = re.compile(r"no such driver")
+CONNECT_REFUSED = re.compile(r"ERR connect step \d+")
+
+
+def classify(res):
+    """Which of the four kinds of non-pass this result is.
+
+    Deliberately not derived from the verdict alone. `failed` and `refused` are
+    both "not passed", and they say opposite things: a `failed` step count is a
+    defect, while a `failed` scenario that only ever got as far as
+    `ERR CONFIG no such driver` is a build without that driver.
+    """
+    if res.get("incomplete_capture"):
+        return INCOMPLETE
+    text = " ".join(str(res.get(k) or "") for k in
+                    ("error", "firmware_reply", "reply"))
+    if NO_SUCH_DRIVER.search(text):
+        return CAPABILITY
+    if CONNECT_REFUSED.search(text):
+        return BOUND
+    if res.get("result") == "refused":
+        # A refusal is the board declining, whatever its wording. Not a defect.
+        return BOUND
+    return DEFECT
+
+
+def what_of(r):
+    """What this result is *about*, for a table that lists non-passes.
+
+    A catalogue result is its scenario id. A mode result is one point of a sweep
+    or one driver combination, and `MODE` names neither: eight identical rows
+    saying `MODE` is the difference between a report that says "this driver is
+    refused past 6 steppers" and one that says something happened eight times.
+    """
+    test = r.get("test_id", "?")
+    if test != "MODE":
+        return test
+    mode = r.get("mode", "")
+    drivers = "+".join(r.get("drivers") or []) or "?"
+    if mode == "sync":
+        return f"sync {drivers}"
+    if mode == "scale":
+        return f"scale {drivers} n={r.get('stepper_count')}"
+    return f"{mode} {drivers}".strip()
+
+
+# The reply tokens the firmware actually emits (saleae_app.cpp: OK <CMD>, ERR
+# <what>, POS <n>, DONE <n>). A captured reply that starts with none of these,
+# and names no crash, is a fragment of something else.
+FIRMWARE_REPLY = re.compile(r"^(?:OK|ERR|POS|DONE|MAP)\b")
+FIRMWARE_CRASH = ("Guru Meditation", "stack overflow", "panic'ed",
+                  "assert failed", "abort()")
+
+
+def garbled(text):
+    """True when a captured serial reply is not usable as a note.
+
+    A firmware that panics mid-CONFIG leaves the host holding whatever bytes had
+    already arrived -- "E 0", "0", a replacement character where a byte was cut
+    in half. Those are real, and hiding them would be dishonest, but quoting a
+    fragment as though it were the board's answer is worse than saying the
+    answer was cut off, so they are named as what they are.
+
+    Asked as "is this the firmware's answer at all", not as "does it look odd":
+    the earlier version tried to spot the odd shapes and swallowed every
+    `ERR connect step 6 n=6 drv=...` in the report, which are the refusals that
+    are the whole measurement.
+    """
+    t = text.strip()
+    if not t:
+        return True
+    if FIRMWARE_REPLY.match(t):
+        return False
+    if any(marker in t for marker in FIRMWARE_CRASH):
+        return False
+    return junk_line(t)
+
+
 def note_of(r):
-    """One line explaining a non-pass, from whatever the record carries."""
+    """One line explaining a non-pass, from whatever the record carries.
+
+    A `refused` gets a line too, not only a `failed`: the refusal text is the
+    most informative thing a refused sweep point has ("ERR connect step 6
+    n=6" names the bound the whole mode exists to find), and leaving the cell
+    blank in the table of everything that did not pass is what made that table
+    useless.
+    """
     if r is None:
         return ""
-    if r.get("result") != "failed":
+    verdict = r.get("result")
+    if verdict in ("passed", "skipped"):
         return ""
-    for key in ("error", "firmware_reply", "reply"):
+    for key in ("incomplete_capture", "error", "firmware_reply", "reply"):
         if r.get(key):
-            return str(r[key]).strip().splitlines()[0][:110]
+            # An incomplete capture is its own verdict, and it is checked before
+            # the generic scan below: the record also carries a `reply` that
+            # says "OK QRUN / POS 64 64", which is the board confirming a move
+            # it did make -- so the note read "OK QRUN" for a run that could not
+            # be judged because a channel the stepper needs was never captured.
+            if key == "incomplete_capture":
+                inc = r[key]
+                missing = inc.get("missing_channels") or []
+                steppers = inc.get("missing_steppers") or []
+                return ("incomplete capture: " +
+                        (", ".join(str(m) for m in missing) or "channels") +
+                        (f" missing (stepper "
+                         f"{', '.join(str(s) for s in steppers)})"
+                         if steppers else ""))
+            return one_line(r[key]) if not garbled(one_line(r[key])) \
+                else "(serial output cut off mid-reply -- the board stopped " \
+                     "answering)"
     for key in ("period", "steps", "adherence", "invariants", "per_stepper"):
         v = r.get(key)
         if isinstance(v, dict):
             bad = [k for k, x in v.items() if x is False]
             if bad:
                 return "failed: " + ", ".join(bad)
-    return "failed"
+    return verdict or "?"
 
 
 def capture_link(r):
     p = r.get("capture")
     if not p:
         return ""
-    vcd = Path(str(p) + ".vcd")
+    # capture.py derives the VCD beside the .sr with the extension REPLACED, not
+    # appended: foo.sr -> foo.vcd. Appending gave "foo.sr.vcd", which never
+    # exists, so every cell in the report rendered without its capture link
+    # while the legend promised one.
+    vcd = Path(str(p)).with_suffix(".vcd")
     if vcd.exists():
         try:
             return f"[vcd]({vcd.relative_to(HARNESS)})"
@@ -197,12 +420,27 @@ def capture_link(r):
 
 
 def cell(r):
-    """One matrix cell: the verdict, and a capture link when there is one."""
+    """One matrix cell: the verdict, and a capture link when there is one.
+
+    The mark follows the *class*, not just the verdict word. A scenario whose
+    CONFIG names a driver this build has no queues for is recorded `failed` --
+    correctly, because the scenario did not run -- but printing that as a bold
+    **FAIL** in a matrix column made four of six rows look like a broken
+    library when the only thing wrong is that ESP-IDF 4 defines no I2S queues.
+    It is `n/a` here, and it is in the findings table's own legend.
+    """
     if r is None:
         return "–"
-    res = r.get("result", "?")
-    mark = {"passed": "pass", "failed": "**FAIL**", "refused": "refused",
-            "error": "**error**", "skipped": "skip"}.get(res, res)
+    kind = classify(r)
+    if kind == CAPABILITY:
+        return "n/a (no such driver)"
+    if kind == INCOMPLETE:
+        mark = "**incomplete**"
+    else:
+        res = r.get("result", "?")
+        mark = {"passed": "pass", "failed": "**FAIL**",
+                "refused": "refused (bound)", "error": "**error**",
+                "skipped": "skip"}.get(res, res)
     link = capture_link(r)
     return f"{mark} {link}".strip()
 
@@ -210,11 +448,32 @@ def cell(r):
 def report(rows, results, args):
     """The matrix report: what was run, what passed, and what did not."""
     by_row = {r["id"]: r for r in rows}
-    results_by_tag = {}
-    for res in results:
-        results_by_tag.setdefault(res.get("tag_key"), []).append(res)
+
+    # RELEASE_MATRIX order, not the order the rows happened to be measured in.
+    # A resumed matrix runs its re-flashed row last and carries the rest, so
+    # without this a report puts the row just re-measured at the bottom and the
+    # matrix stops reading as an ordered comparison of SDKs.
+    order = [t.id for t in harness.release_targets()]
+    rows = sorted(rows, key=lambda r: order.index(r["id"]) if r.get("id") in order
+                  else len(order))
 
     ids = [r["id"] for r in rows]
+
+    # When was this row measured? A row recorded by a run that stamped it says
+    # so; one carried from an older index does not, and its result records do --
+    # each measurement carries its own timestamp. Backfilled from those rather
+    # than left blank, because a blank in this column reads as "not measured"
+    # next to a full table of results for exactly that row.
+    for row in rows:
+        if row.get("measured_at"):
+            continue
+        tags = [run["tag_key"] for run in row["runs"] if run.get("tag_key")]
+        stamps = [res.get("timestamp") for res in results
+                  if res.get("timestamp")
+                  and (res.get("tag_key") in tags
+                       or any(mode_tag(t, res) for t in tags))]
+        if stamps:
+            row["measured_at"] = max(stamps).replace("T", " ")[:19]
     tests = sorted({res["test_id"] for res in results
                     if res.get("test_id", "").startswith("SR_")})
 
@@ -225,6 +484,22 @@ def report(rows, results, args):
         for run in row["runs"]:
             if run.get("tag_key"):
                 tags_of[run["tag_key"]] = (row["id"], run["label"])
+
+    def row_of(res):
+        """(row id, run label) for one result, or None.
+
+        A mode point's tag is not the run's tag, so the lookup has to try the
+        prefix as well as the exact key -- otherwise every sweep point and every
+        driver combination in this report is attributed to a bare tag string,
+        which is an index and not a name.
+        """
+        tag = res.get("tag_key")
+        if tag in tags_of:
+            return tags_of[tag]
+        for base, where in tags_of.items():
+            if mode_tag(base, res):
+                return where
+        return None
 
     L = []
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
@@ -249,8 +524,8 @@ def report(rows, results, args):
     L.append("## Firmware matrix")
     L.append("")
     L.append("| framework | version | ESP-IDF | PlatformIO env | drivers the "
-             "board accepts | catalogue | scale sweeps | sync |")
-    L.append("|---|---|---|---|---|---|---|---|")
+             "board accepts | catalogue | scale sweeps | sync | measured |")
+    L.append("|---|---|---|---|---|---|---|---|---|")
     for row in rows:
         cat = [run["label"] for run in row["runs"] if run["label"] == "catalogue"]
         scales = [run["label"] for run in row["runs"]
@@ -260,8 +535,16 @@ def report(rows, results, args):
             f"| {row['framework']} | {row['version']} | {row['esp_idf']} | "
             f"`{row['env']}` | {', '.join(row['drivers']) or '–'} | "
             f"{cat[0] if cat else '–'} | {len(scales)} | "
-            f"{sync[0] if sync else '–'} |")
+            f"{sync[0] if sync else '–'} | "
+            f"{row.get('measured_at', '–')} |")
     L.append("")
+    stamps = {r.get("measured_at") for r in rows if r.get("measured_at")}
+    if len(stamps) > 1:
+        L.append("> The rows were not measured in one sitting: a row whose "
+                 "upload failed is re-run on its own, and the *measured* column "
+                 "is when each row's flash happened. Rows that share a timestamp "
+                 "were measured against the board back to back.")
+        L.append("")
     for row in rows:
         if not row["flash_ok"]:
             L.append(f"> **{row['id']}**: build or flash failed "
@@ -290,31 +573,85 @@ def report(rows, results, args):
             row_cells.append(cell(got.get(test)))
         L.append(f"| {test} | " + " | ".join(row_cells) + " |")
     L.append("")
-    L.append("`pass` / `FAIL` / `refused` / `error` / `skip` are the recorded "
-             "verdicts; a capture link opens the VCD the verdict came from. "
-             "`skip` is either *not implemented* (SR_22, SR_24, SR_28, SR_29) or "
-             "*SR_00 failed*, which is the harness refusing to measure on dead "
-             "channels.")
+    L.append("`pass` / `FAIL` / `incomplete` / `refused (bound)` / `n/a` / `skip` "
+             "are the recorded verdicts; a capture link opens the VCD the "
+             "verdict came from. `skip` is either *not implemented* (SR_22, "
+             "SR_24, SR_28, SR_29) or *SR_00 failed*, which is the harness "
+             "refusing to measure on dead channels. **`FAIL` and `incomplete` "
+             "are the only cells here that are findings** — see Findings.")
+    L.append("")
+    L.append("`n/a` means this build has no queues for the driver the scenario "
+             "CONFIGS (`ERR CONFIG no such driver`), so the scenario was never "
+             "applicable to this row and its `failed` verdict is not a defect. "
+             "`refused (bound)` is the board declining a CONFIG at a limit, "
+             "which is what `scale` and `sync` exist to find.")
     L.append("")
 
     # --- non-passes --------------------------------------------------------
-    L.append("## Everything that did not pass")
+    L.append("## Findings")
+    L.append("")
+    L.append("Defects only: a panic, a crash, a step count or a period that is "
+             "wrong, and measurements that could not be made at all. Refusals "
+             "are **not** listed here — a `scale` sweep is *asked* where a "
+             "driver's limit is and a refusal is its answer, so those live in "
+             "the sweep tables below where they read as a bound. The one "
+             "exception is a scenario that names a driver the build does not "
+             "have; that is a capability answer, not a failure, and it is "
+             "counted at the bottom of this section rather than tabulated.")
     L.append("")
     bad = []
+    counts = {BOUND: 0, CAPABILITY: 0, INCOMPLETE: 0, DEFECT: 0}
     for res in results:
         if res.get("result") in ("passed", "skipped"):
             continue
-        where = tags_of.get(res.get("tag_key"))
+        kind = classify(res)
+        counts[kind] += 1
+        if kind == BOUND or kind == CAPABILITY:
+            continue
+        where = row_of(res)
         bad.append((where[0] if where else res.get("tag_key", "?"),
-                    res.get("test_id", "?"), res.get("result", "?"),
-                    note_of(res)))
-    if bad:
-        L.append("| matrix row | test | verdict | note |")
+                    what_of(res), kind, note_of(res)))
+
+    # Grouped before listed, because a driver that fails on *every* scenario of
+    # one firmware is one finding and twenty-six table rows, and a reader should
+    # not have to spot the pattern by counting.
+    groups = {}
+    for rid, what, kind, note in bad:
+        groups.setdefault((rid, kind, note), []).append(what)
+    loud = sorted(((len(v), k, v) for k, v in groups.items()),
+                  key=lambda t: (-t[0], t[1][0]))
+    if loud:
+        L.append("| matrix row | what | measurements | note |")
         L.append("|---|---|---|---|")
-        for rid, test, res, note in bad:
-            L.append(f"| {rid} | {test} | {res} | {note} |")
+        for count, (rid, kind, note), whats in loud:
+            L.append(f"| {rid} | {kind} | {count} | {note} |")
+        L.append("")
+        L.append("Expanded below, one line per measurement.")
+        L.append("")
     else:
-        L.append("_Nothing: every measurement that ran passed._")
+        L.append("_Nothing: every measurement that ran, passed._")
+        L.append("")
+
+    L.append("## Every finding, one line each")
+    L.append("")
+    if bad:
+        L.append("| matrix row | test | class | note |")
+        L.append("|---|---|---|---|")
+        for rid, test, kind, note in bad:
+            L.append(f"| {rid} | {test} | {kind} | {note} |")
+    else:
+        L.append("_Nothing._")
+    L.append("")
+
+    # The two classes that are not findings are counted, not tabulated, so the
+    # report cannot be read as having hidden them and cannot be read as having
+    # 60 defects either.
+    L.append(f"Not findings, and not listed above: "
+             f"**{counts[BOUND]}** refusal(s), which are the measured limits "
+             f"in the sweep tables below, and **{counts[CAPABILITY]}** "
+             f"`no such driver` answer(s), which are scenarios this build has "
+             f"no queues for. A full accounting of every result is in "
+             f"`results/` and in `results/tag_index.json`.")
     L.append("")
 
     # --- scale sweeps ------------------------------------------------------
@@ -331,9 +668,13 @@ def report(rows, results, args):
         for run in row["runs"]:
             if not run["label"].startswith("scale"):
                 continue
-            recs = sorted(results_by_tag.get(run.get("tag_key"), []),
+            recs = sorted((r for r in results
+                           if mode_tag(run.get("tag_key"), r)),
                           key=lambda r: r.get("stepper_count", 0))
             if not recs:
+                L.append(f"**{rid} / {run['label']}** — no results recorded "
+                         f"under this run's tag; nothing was measured.")
+                L.append("")
                 continue
             L.append(f"**{rid} / {run['label']}**")
             L.append("")
@@ -345,7 +686,10 @@ def report(rows, results, args):
                 steps = (first.get("steps") or {}).get("steps_measured")
                 exp = (first.get("steps") or {}).get("steps_expected")
                 adh = rec.get("adherence") or first.get("adherence") or {}
-                mean = adh.get("mean_period_us")
+                # A scale point records its mean period per stepper, not an
+                # `adherence` block, so the column read as "–" for every n --
+                # which is the period the whole sweep asserts on.
+                mean = adh.get("mean_period_us", first.get("mean_period_us"))
                 L.append(
                     f"| {rec.get('stepper_count')} | "
                     f"{cell(rec)} | "
@@ -359,7 +703,13 @@ def report(rows, results, args):
     L.append("## Driver combinations (synchronized start)")
     L.append("")
     L.append("Every driver-list combination this board could connect, two "
-             "steppers each, each at its own period.")
+             "steppers each, each at its own period. First-step skew is "
+             "**reported, not gated** (eval_sync): how closely two steppers "
+             "begin is a property of the pulse driver and of the interrupt "
+             "latency at that instant, not a correctness property of the queue — "
+             "so read the ratio in step periods, which is the only comparable "
+             "form of it. What *is* asserted per stepper is its own commanded "
+             "step count and period.")
     L.append("")
     for rid in ids:
         row = by_row.get(rid)
@@ -368,25 +718,40 @@ def report(rows, results, args):
         for run in row["runs"]:
             if run["label"] != "sync":
                 continue
-            recs = sorted(results_by_tag.get(run.get("tag_key"), []),
+            recs = sorted((r for r in results
+                           if mode_tag(run.get("tag_key"), r)),
                           key=lambda r: "+".join(r.get("drivers") or []))
             if not recs:
+                L.append(f"**{rid} / sync** — no results recorded under this "
+                         f"run's tag; nothing was measured.")
+                L.append("")
                 continue
             L.append(f"**{rid} / sync**")
             L.append("")
-            L.append("| drivers | verdict | first-step skew us | note |")
-            L.append("|---|---|---|---|")
+            L.append("| drivers | verdict | first-step skew us | in step periods "
+                     "| note |")
+            L.append("|---|---|---|---|---|")
             for rec in recs:
-                per = rec.get("per_stepper") or {}
                 skew = rec.get("first_step_skew_us")
                 if skew is None:
-                    skews = [v.get("first_step_us") for v in per.values()
+                    # Fall back to the per-stepper first-step instants. The
+                    # evaluator normally records the skew itself; this is for a
+                    # record that has the instants but not their difference.
+                    # (The first version computed the list and then dropped it,
+                    # which printed the same column as before either way.)
+                    times = [v.get("first_step_us") for v in
+                             (rec.get("per_stepper") or {}).values()
                              if isinstance(v, dict)]
-                    skews = [s for s in skews if s is not None]
+                    times = [t for t in times if t is not None]
+                    if times:
+                        skew = round(max(times) - min(times), 2)
                 drivers = "+".join(rec.get("drivers") or [])
+                periods = rec.get("skew_periods")
+                periods_txt = (f"{periods:.2f}"
+                               if isinstance(periods, (int, float)) else "–")
                 L.append(f"| {drivers} | {cell(rec)} | "
                          f"{skew if skew is not None else '–'} | "
-                         f"{note_of(rec)} |")
+                         f"{periods_txt} | {note_of(rec)} |")
             L.append("")
 
     L.append("## Reading this")
@@ -402,6 +767,12 @@ def report(rows, results, args):
              "ESP-IDF column is what runs underneath. Every Arduino row is "
              "IDF 4.4.7 because Arduino core is built on IDF 4.4.7 on every "
              "espressif32 release (see `extras/doc/platformio-espressif-versions.md`).")
+    L.append("- A named scenario that CONFIGS a driver the build has no queues "
+             "for is recorded **failed** with `ERR CONFIG no such driver`. That "
+             "is the firmware reporting a capability, not a measurement going "
+             "wrong, and the *drivers the board accepts* column of the firmware "
+             "matrix is where it is read as the capability it is. It is not "
+             "suppressed here because the scenario did not run.")
     L.append("")
     return "\n".join(L)
 
@@ -448,7 +819,34 @@ def main():
     print("\nlinking the PlatformIO projects ...")
     run_logged(["bash", "extras/scripts/build-pio-dirs.sh"], LOG_DIR / "pio_dirs.log")
 
-    rows = []
+    # Rows measured by an EARLIER invocation, kept so a resumed matrix is still
+    # a matrix.
+    #
+    # A row is not retried for free: one row's upload failing (an ESP32 that
+    # comes up in the wrong boot mode is a routine outcome, and it took the
+    # arduino-4.4.0 row out of the first full run here) used to mean the only
+    # way to get that row was to re-run every target, because the row table was
+    # built from scratch and written over. Re-running all six re-flashes all six
+    # to measure nothing -- the runs themselves skip, but a minute of board time
+    # per row buys no measurement. So a narrowed `--targets` merges into the
+    # recorded rows instead of replacing them, and each row carries the time it
+    # was measured, because a merged report otherwise presents rows measured
+    # hours apart as one sitting.
+    index_file = Path(args.results_dir) / INDEX
+    earlier = []
+    if args.targets and index_file.exists():
+        try:
+            earlier = json.loads(index_file.read_text()).get("rows", [])
+        except ValueError:
+            print(f"warning: {index_file} is unreadable; writing a fresh index",
+                  file=sys.stderr)
+    doing = {t.id for t in targets}
+    carried = [r for r in earlier if r.get("id") not in doing]
+    if carried:
+        print(f"carrying {len(carried)} row(s) from an earlier run: "
+              f"{', '.join(r['id'] for r in carried)}")
+
+    rows = list(carried)
     for t in targets:
         try:
             rows.append(run_target(t, args.port, args.baud, args.force,
@@ -467,9 +865,13 @@ def main():
             # After every row, so an interrupted matrix can be resumed from the
             # result index rather than from nothing.
             Path(args.results_dir).mkdir(parents=True, exist_ok=True)
-            (Path(args.results_dir) / INDEX).write_text(
+            index_file.write_text(
                 json.dumps({"generated": datetime.now().isoformat(),
                             "port": args.port, "rows": rows}, indent=2))
+
+    # Matrix order is applied in report(), so a row resumed into this list out
+    # of order still lands where RELEASE_MATRIX puts it.
+    index_file = Path(args.results_dir) / INDEX
 
     results = load_results(args.results_dir)
     reports = Path(args.reports_dir)
