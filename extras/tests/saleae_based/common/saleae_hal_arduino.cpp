@@ -28,7 +28,23 @@ extern "C" uint32_t saleae_hal_millis(void) { return millis(); }
 
 extern "C" void saleae_hal_delay_ms(uint32_t ms) { delay(ms); }
 
-extern "C" void saleae_hal_serial_begin(uint32_t baud) { Serial.begin(baud); }
+// The RX ring buffer has to be enlarged before Serial.begin() and only on
+// ESP32, where the core sizes it at 256 bytes by default.
+//
+// A 32-stepper CONFIG is one line of ~271 characters, and 256 is *below* that,
+// so the tail of the driver list was silently dropped and the command came back
+// as "ERR unknown" -- a mangled request, not a refused one, which is the one
+// failure mode this protocol cannot have: the host cannot tell a dropped
+// character from a typo, and "unknown" says the *command* was unrecognisable
+// when it was the *argument* that was lost. 1024 matches the plain ESP-IDF HAL's
+// uart_driver_install() and clears the longest line the protocol can produce
+// (384 + 32) with room to spare.
+extern "C" void saleae_hal_serial_begin(uint32_t baud) {
+#if defined(ESP_PLATFORM)
+  Serial.setRxBufferSize(1024);
+#endif
+  Serial.begin(baud);
+}
 
 extern "C" int saleae_hal_serial_read(void) {
   return Serial.available() ? Serial.read() : -1;

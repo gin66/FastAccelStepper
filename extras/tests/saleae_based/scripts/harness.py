@@ -119,10 +119,64 @@ MODES = ["scale", "sync"]
 CHANNELS = 8
 CHANNELS_PER_STEPPER = {"dir": 2, "nodir": 1}
 
+# What the I2S multiplexer costs: three analyzer channels, carrying data, bit
+# clock and word select. They are the LAST three (SALEAE_BUS_BASE in
+# common/saleae_app.cpp), so the stepper channels ahead of them keep their names
+# and a mux capture is a superset of a physical one.
+BUS_CHANNELS = 3
 
-def max_steppers(pin_mode):
-    """How many steppers this pin mode can put on CHANNELS channels."""
-    return CHANNELS // CHANNELS_PER_STEPPER[pin_mode]
+# The I2S bus runs at 8 MHz bclk and the 32-bit word is read out of it, so a mux
+# run is sampled for the BIT CLOCK and not for the step period. Measured on this
+# analyzer, one multiplexed stepper at 64 steps / 400 ticks, decoding the whole
+# run and comparing the recovered step periods against the frame grid:
+#
+#   rate     samples/bclk   window     steps recovered   frames skipped
+#   16 MS/s      2          2.0 s          64 / 64          3543 (0.7 %)
+#   24 MS/s      3          2.0 s          64 / 64           393 (0.08 %)
+#   48 MS/s      6          0.18 ms         0 / 64             -- (missed the run)
+#
+# So 24 MS/s, and not for the reason the arithmetic suggests. Three samples per
+# bit period is below the four Nyquist wants, and it is right anyway: nothing
+# here reconstructs the bit clock, it reads a value that is stable for the whole
+# period, so the margin that matters is settling time, not aliasing. 16 MS/s
+# loses a frame in 140, which is tolerable; 48 MS/s is nominally the best
+# resolution available and is useless, because this analyzer truncates an
+# eight-channel 48 MS/s capture to 0.18 ms and a scenario lasts milliseconds.
+#
+# White paper §4.2 calls 8 MS/s "adequate" -- one sample per bit period -- and
+# recommends 24 MS/s on a table that claims 16 samples per bit period there.
+MUX_MIN_SAMPLE_RATE = 24_000_000
+MUX_BIT_CLOCK_HZ = 8_000_000
+MUX_MIN_SAMPLES_PER_BIT = 3
+
+
+def max_steppers(pin_mode, bus=False):
+    """How many steppers this pin mode can put on CHANNELS channels.
+
+    `bus` is the I2S multiplexer, which takes three of the eight channels. It is
+    a parameter rather than a constant because the answer differs by *which*
+    driver: a physical stepper spends a channel and reaches 5 in `nodir` beside
+    the bus, while a multiplexed one spends a bit of the 32-bit word and reaches
+    all 32 -- see scale_bound().
+    """
+    budget = CHANNELS - BUS_CHANNELS if bus else CHANNELS
+    return budget // CHANNELS_PER_STEPPER[pin_mode]
+
+
+def is_mux_driver(driver):
+    return driver == "i2s_mux" or driver.startswith("i2s_mux+")
+
+
+def mux_slot_bound(pin_mode):
+    """How many mux steppers the 32-bit word carries in this pin mode.
+
+    A direction signal on the mux is a *second bit of the same word*, not a
+    second wire, so `dir` spends two of the 32 per stepper and reaches 16 where
+    `nodir` reaches 32. A GPIO direction pin would not -- it costs an analyzer
+    channel instead -- which is the one place the mux is cheaper than it looks.
+    """
+    return 32 // CHANNELS_PER_STEPPER[pin_mode]
+
 
 # One generic CONFIG covers every channel configuration there is: a count, a
 # driver list and a pin mode. The eight named presets the firmware used to take
@@ -149,11 +203,11 @@ SUPPORTED_RATES = [20000, 25000, 50000, 100000, 200000, 250000, 500000,
 # `scale` needs to know about them -- that is why `scale` is the single command
 # the cross-architecture matrix is made of.
 #
-# i2s_mux is 32 under dynamic allocation but the channel budget caps the run at
-# 8 first, so its row is the analyzer's bound, not the driver's. i2s_direct is 3
-# *channels that are not one pin each* -- it is an internal demux, not a
-# separate GPIO -- so it gets one channel per stepper like any other driver and
-# is limited by its own 3.
+# i2s_mux is 32, and 32 is now the whole of it: a multiplexed stepper spends a
+# slot of the 32-bit word and NOT one of the analyzer's channels, so the channel
+# budget does not cap it -- see scale_bound(). i2s_direct is 3 *channels that are
+# not one pin each* -- it is an internal demux, not a separate GPIO -- so it gets
+# one channel per stepper like any other driver and is limited by its own 3.
 # A 0 is not a missing entry: it is a driver this chip has no queues for
 # (`QUEUES_MCPWM_PCNT 0` on the S2, C3 and P4, which have no MCPWM/PCNT at
 # all). Omitting those would make the table's absence ambiguous between "not
@@ -187,9 +241,9 @@ DRIVER_MAXS = {
     "samd51": {"timer": 3},
 }
 
-# A driver the board has not got connected -- `i2s_mux` today -- is one flag
-# away. It is named here, in a list, and nothing in the mode logic switches on
-# it, so a plan that includes it either connects or records the refusal.
+# A driver this board cannot connect is one flag away. It is named here, in a
+# list, and nothing in the mode logic switches on it, so a plan that includes it
+# either connects or records the refusal.
 def driver_max(arch, driver):
     """A *claimed* queue count for `driver` on `arch`, or None. Cross-check only.
 
@@ -222,7 +276,8 @@ def scale_bound(arch, driver, pin_mode):
     exactly the measurement. The bound in the summary is then measured rather
     than predicted, and it is right about drivers no table has ever heard of.
     """
-    chan_cap = max_steppers(pin_mode)
+    mux = is_mux_driver(driver)
+    chan_cap = mux_slot_bound(pin_mode) if mux else max_steppers(pin_mode)
     claimed = driver_max(arch, driver)
     note = ""
     if claimed is not None and claimed != chan_cap:
@@ -230,8 +285,15 @@ def scale_bound(arch, driver, pin_mode):
         # differs from the rig's own budget is not by itself an error.
         note = f" [host table believed {claimed} queues for {driver} on " \
                f"{arch}; the sweep measures it]"
-    return chan_cap, f"channels ({CHANNELS} / {CHANNELS_PER_STEPPER[pin_mode]}" \
-                     f" per stepper){note}"
+    if mux:
+        budget = (f"the 32-bit I2S mux word ({CHANNELS_PER_STEPPER[pin_mode]} "
+                  f"slot(s) per stepper); a multiplexed stepper costs a slot "
+                  f"and not one of the {CHANNELS} analyzer channels, of which "
+                  f"{BUS_CHANNELS} carry the bus")
+    else:
+        budget = (f"channels ({CHANNELS} / {CHANNELS_PER_STEPPER[pin_mode]} "
+                  f"per stepper)")
+    return chan_cap, f"{budget}{note}"
 
 
 def arch_family(arch):
@@ -270,12 +332,23 @@ def derive(args):
     # Checked here rather than left to the firmware, because the firmware's
     # refusal names the bounds but by then the host has already picked a sample
     # rate and opened a capture.
-    cap = max_steppers(args.pin_mode)
+    #
+    # The budget is per-driver, not per-pin-mode: a multiplexed stepper spends a
+    # bit of the 32-bit mux word and no analyzer channel at all, so `--driver
+    # i2s_mux --count 32` is legal on an eight-channel analyzer and
+    # `--driver rmt_v2 --count 32` is not. What still bounds a mux run is the
+    # 32-bit word itself.
+    mux = is_mux_driver(args.driver)
+    cap = mux_slot_bound(args.pin_mode) if mux \
+        else max_steppers(args.pin_mode)
     if args.count < 1 or args.count > cap:
+        bound = (f"the 32-bit I2S mux word, {CHANNELS_PER_STEPPER[args.pin_mode]} "
+                 f"slot(s) per stepper" if mux else
+                 f"{CHANNELS} channels / "
+                 f"{CHANNELS_PER_STEPPER[args.pin_mode]} per stepper")
         raise SystemExit(
-            f"--count {args.count} does not fit {args.pin_mode}: "
-            f"{CHANNELS} channels / {CHANNELS_PER_STEPPER[args.pin_mode]} per "
-            f"stepper = {cap}")
+            f"--count {args.count} does not fit {args.driver} in "
+            f"{args.pin_mode}: {bound} = {cap}")
 
     if args.framework == "idf":
         if family != "esp":
@@ -300,8 +373,20 @@ def derive(args):
         # (ModeRun.tag) that does say which count it was.
         raw = f"{args.arch}_{fw}_{args.driver}_{args.mode}{args.pin_mode}"
     else:
+        # The channel-config suffix records that a run's step signals were
+        # decoded out of the I2S bus rather than read off a channel. It is part
+        # of the tag because the two produce the same channel names and very
+        # different waveforms: a physical `rmt_v2` 4-stepper `nodir` run and a
+        # 4-slot mux run both read D0..D3 after decoding, and a result recorded
+        # without the distinction says nothing about which produced it.
+        #
+        # `_mux`, not `/mux`: the sanitiser below rewrites anything that is not
+        # alphanumeric to an underscore, so the white paper's spelling would
+        # arrive as `4_mux` anyway -- and the pin modes are `dir`/`nodir`, so
+        # there is no collision to worry about.
+        config = "mux" if mux else args.pin_mode
         raw = f"{args.arch}_{fw}_{driver_list(args).replace('+', '_')}" \
-              f"{args.count}{args.pin_mode}"
+              f"{args.count}_{config}"
     tag_key = "".join(c if (c.isalnum() or c == "_") else "_" for c in raw)
 
     rate = args.sample_rate
@@ -311,6 +396,29 @@ def derive(args):
         # at least 20 samples per step period.
         step_freq = 1_000_000.0 / args.speed_us
         rate = snap_rate(max(4_000_000, int(20 * step_freq)))
+    if mux and rate != MUX_MIN_SAMPLE_RATE:
+        # Two-sided: `rate <` would leave the 48 MS/s case alone, and 48 MS/s is
+        # the one that truncates.
+        # The mux's own floor, and it is a decoding one rather than a signal one:
+        # the run's step signals are already covered by the rate above, but the
+        # three bus wires carry an 8 MHz bit clock and the 32-bit word is read
+        # out of it. Under the floor the decode is not a wrong answer -- it is
+        # not an answer.
+        #
+        # And not above it either, which is the half that is easy to get wrong:
+        # 48 MS/s resolves the bit clock better and truncates the capture to
+        # 0.18 ms, so it measures a scenario that has not started yet.
+        # Snap DOWN as well as up: the rates this analyzer offers are a
+        # ladder, and 48 MS/s is on it.
+        have = rate / float(MUX_BIT_CLOCK_HZ)
+        rate = (MUX_MIN_SAMPLE_RATE if rate > MUX_MIN_SAMPLE_RATE
+                else snap_rate(max(rate, MUX_MIN_SAMPLE_RATE)))
+        verb = "lowered" if have > MUX_MIN_SAMPLES_PER_BIT else "raised"
+        print(f"sample rate: {verb} to {rate // 1000000} MS/s for the I2S mux "
+              f"(8 MHz bclk needs {MUX_MIN_SAMPLES_PER_BIT} samples/bit; "
+              f"{args.sample_rate // 1000000} MS/s would have read "
+              f"{have:.1f}, and 48 MS/s truncates an eight-channel capture to "
+              f"0.18 ms -- long enough to miss the run entirely)")
     return tag_key, proj, env, rate
 
 
@@ -359,18 +467,44 @@ def preflight(args, port, baud=115200):
             if "i2s_mux" not in present:
                 raise SystemExit(f"--imux needs an ESP32 I2S build; this one "
                                  f"does not accept i2s_mux")
-            if mux_init:
-                print("mux     : already up (nothing sent)")
-            else:
-                data, bclk, ws = (int(x) for x in args.imux.split(","))
-                if not run_tests.send_imux(ser, data, bclk, ws):
-                    raise SystemExit(
-                        f"--imux {args.imux} was refused; the three pins must "
-                        f"be free, and initI2sMux() cannot run twice")
-                print(f"mux     : up, data={data} bclk={bclk} ws={ws}")
+            # Not brought up here. run_tests.measure() does it inside the same
+            # serial session as the CONFIG that needs it, because opening the
+            # port resets the board and initI2sMux() cannot run twice or survive
+            # a reset. This call only checks the build can accept it.
+            args.mux_init = mux_init
         return present, mux_init
     finally:
         ser.close()
+
+
+def _unused_imux(port, baud):
+    """Brought up by run_tests.measure() in-session; see preflight().
+
+    No pins, and that is the point. The bus is the last three analyzer CHANNELS
+    and the GPIOs behind them come out of the firmware's channel table, so there
+    is nothing for the host to name -- and naming them would mean naming *this*
+    rig's cable from a host that cannot see it. A wrong bus decodes into 32
+    quiet channels, which reads as a driver that emits nothing rather than as a
+    wrong map.
+
+    Called after SR_00, not before: SR_00 proves all eight channels toggle, and
+    three of them belong to the peripheral from here on. Ordering is the fix; a
+    relaxed SR_00 would stop proving anything about the five channels that still
+    can be proved.
+    """
+    # Its own connection: preflight() has already closed its own, and SR_00 in
+    # between opens and closes another. The board is opened once per command
+    # batch throughout the harness, and a held-open port across a 1 Hz capture
+    # is a port that has to survive the whole run.
+    ser = run_tests.open_board(port, baud)
+    try:
+        if run_tests.send_imux(ser):
+            print("mux     : up, on the last three analyzer channels")
+            return True
+    finally:
+        ser.close()
+    raise SystemExit("--imux was refused; the three bus channels must be free, "
+                     "and initI2sMux() cannot run twice")
 
 
 def build_and_flash(proj, env, port, do_build, do_flash):
@@ -393,13 +527,16 @@ def build_parser():
     p = argparse.ArgumentParser(description="Target-agnostic Saleae harness.")
     p.add_argument("--arch", choices=ARCHS, default="esp32")
     p.add_argument("--framework", choices=["arduino", "idf"], default="arduino")
-    p.add_argument("--imux", default=None,
-                   help="comma list data,bclk,ws: bring the ESP32 I2S "
-                        "multiplexer up over serial before the run. Wired at "
-                        "runtime rather than compiled in, because "
-                        "initI2sMux() must precede any mux stepper and cannot "
-                        "run twice -- so this is three pins on existing "
-                        "firmware, not a rebuild")
+    p.add_argument("--imux", action="store_true",
+                   help="bring the ESP32 I2S multiplexer up over serial before "
+                        "the run. Wired at runtime rather than compiled in, "
+                        "because initI2sMux() must precede any mux stepper and "
+                        "cannot run twice -- so this is one word on existing "
+                        "firmware, not a rebuild. Takes no pins: the bus is the "
+                        "last three analyzer channels (D5/D6/D7) and the GPIOs "
+                        "behind them come from the firmware's own channel "
+                        "table, so there is nothing for the host to name and "
+                        "nothing for it to get wrong")
     p.add_argument("--version", default="latest",
                    help="build version, e.g. 5.3 / V6_13_0 / latest (ESP only)")
     p.add_argument("--driver", default=None,

@@ -29,9 +29,28 @@ import run_tests  # noqa: E402
 import signal_parser as sp  # noqa: E402
 import vcd_fixtures as vf  # noqa: E402
 
+# The synthetic I2S mux bus, shared with the decoder's own tests rather than
+# written out twice: a bus renderer that disagrees with itself between two test
+# modules is a bus renderer that can be wrong.
+from test_i2s_mux_decoder import Bus as MuxBus  # noqa: E402
+from test_i2s_mux_decoder import write_bus_vcd as write_mux_bus_vcd  # noqa: E402
+
 # The QINFO values the scenarios are planned against. Nothing here measures
 # them; run_hardware only needs them to size the capture window.
 _FAKE_DUT = vf.Dut()
+
+
+def _two_or_three(capture):
+    """load_capture_for_eval's two return shapes, from one (channels, rate).
+
+    With `with_vcd` it also hands back the VCD path, which is what the mux decoder
+    reads. None is the honest value here: a fixture has no .sr behind it, and
+    handing the decoder a path that is not there would fail in the decoder rather
+    than in the test that forgot to mock it.
+    """
+    def load(_file, with_vcd=False):
+        return (capture[0], capture[1], None) if with_vcd else capture
+    return load
 
 
 def square(period_samples, high_samples, n_samples):
@@ -590,19 +609,25 @@ class TestConfigGrammar(unittest.TestCase):
         # QINFO reply" with no hint that the firmware had run out of buffer.
         source = (COMMON / "saleae_app.cpp").read_text()
         m = re.search(r"#define QINFO_REPLY_FOR\(n\) \((\d+) \+ (\d+) \* \(n\)"
-                      r" \+ (\d+)\)", source)
+                      r"(?: \+ (\d+))?\)", source)
         self.assertIsNotNone(m, "QINFO_REPLY_FOR is not defined by term, so the "
                                "buffer size cannot be checked against the "
                                "stepper count it has to cover")
-        base, per, slack = (int(m.group(i)) for i in (1, 2, 3))
+        base, per = int(m.group(1)), int(m.group(2))
+        slack = int(m.group(3) or 0)
         # Each rung must cover the stepper count that rung admits. A 328P has
-        # SALEAE_MAX_STEPPERS 2, so sizing its QINFO for 8 would cost RAM the
+        # SALEAE_MAX_STEPPERS 2, so sizing its QINFO for 32 would cost RAM the
         # tightest target does not have.
-        max_steppers = re.search(r"#define SALEAE_MAX_STEPPERS "
-                                 r"\(MAX_STEPPER < (\d+) \?", source)
+        #
+        # Two bounds now: SALEAE_STEPPER_BOUND is what the ladder is written
+        # against (8 without I2S, 32 with it), and the mux 32 is the case that
+        # actually broke a reply -- QINFO on a 32-stepper i2s_mux board is 32
+        # " maxspeedN=65535" fields, which is 500-odd bytes into a buffer sized
+        # for eight.
+        max_steppers = re.search(r"#define SALEAE_STEPPER_BOUND (\d+)", source)
         platform_cap = int(max_steppers.group(1))
         worst = len("QINFO tps=16000000 mincmd=65535 qlen=32 maxall=65535 ")
-        for count in (2, 4, 8):
+        for count in (2, 4, 8, platform_cap):
             worst_fields = base
             for i in range(count):
                 worst_fields += len(f" maxspeed{i}=65535")
@@ -780,7 +805,9 @@ class TestConfigGrammar(unittest.TestCase):
                 return "passed", {"channels": {}}
 
             def fake_load(*a, **k):
-                return {"D0": [0] * 400}, 1_000_000
+                return (({"D0": [0] * 400}, 1_000_000, None)
+                        if k.get("with_vcd") else
+                        ({"D0": [0] * 400}, 1_000_000))
 
             with mock.patch.object(run_tests, "open_board", fake_open), \
                     mock.patch.object(run_tests, "run_sr00", fake_sr00), \
@@ -953,13 +980,19 @@ class TestChannelMap(unittest.TestCase):
         tag, _proj, _env, _rate = harness.derive(args)
         self.assertIn("nodir", tag)
 
-    def test_firmware_refuses_nodir_counts_over_eight(self):
+    def test_firmware_refuses_counts_the_channels_cannot_carry(self):
         source = (COMMON / "saleae_app.cpp").read_text()
-        # The cap is min(stepper queues, channels/stride), and it is reported
-        # with both bounds so "too many" says which one bit.
-        self.assertIn("SALEAE_CHANNELS / stride", source)
-        self.assertIn("SALEAE_MAX_STEPPERS < chan_cap", source)
-        self.assertIn("ERR CONFIG n=%ld max=%u/%u/%u/%u", source)
+        # Two budgets, and the refusal names both because "too many steppers"
+        # cannot say which one bit: the slot array (SALEAE_MAX_STEPPERS) is a
+        # different fact from the analyzer's channel budget, and a driver that
+        # binds first (MCPWM/PCNT has 6 queues on IDF 5) is a third.
+        self.assertIn("SALEAE_MAX_STEPPERS", source)
+        self.assertIn("want_phy > chan_cap", source)
+        self.assertIn("ERR CONFIG n=%ld max=%u slots=%u chans=%u/%u", source)
+        # The channel budget is the count the mux does NOT spend: a
+        # multiplexed stepper is a bit of the 32-bit word, not a wire.
+        self.assertIn("SALEAE_CHANNELS - SALEAE_BUS_COUNT", source)
+        self.assertIn("want_mux", source)
 
     def test_nodir_forces_count_up_because_there_is_no_dir_pin(self):
         # count_up=false with no dir pin set is refused by the queue with
@@ -977,7 +1010,12 @@ class TestChannelMap(unittest.TestCase):
         source = (COMMON / "saleae_app.cpp").read_text()
         # CHAN_PIN() rather than kChanPin[] directly: the table is PROGMEM on
         # AVR (saleae_str.h), so a plain subscript would read flash as RAM.
-        self.assertIn("nodir ? 0 : CHAN_PIN(idx * chan_stride + 1)", source)
+        #
+        # chan_used, not idx * stride: a multiplexed stepper spends no channel
+        # at all, so the physical channel cursor only moves for the steppers
+        # that own a wire. Indexing by the stepper number is what made every
+        # i2s_mux CONFIG claim a channel it does not have.
+        self.assertIn("nodir ? 0 : CHAN_PIN(chan_used + 1)", source)
         # ...and the call is guarded, not unconditional.
         self.assertRegex(source, r"if \(!nodir\) \{\s*\n\s*s->setDirectionPin")
 
@@ -1549,7 +1587,7 @@ class TestModes(unittest.TestCase):
                                       lambda *a, **k: mock.Mock()), \
                     mock.patch.object(
                         run_tests, "load_capture_for_eval",
-                        lambda f: capture):
+                        _two_or_three(capture)):
                 outcomes[scenario] = run_tests.measure(
                     "t", scenario.lower(), "CONFIG 1 rmt_v2 dir", 1, builder,
                     scenario, args, None, scenario=scenario)
@@ -1689,8 +1727,8 @@ class TestModes(unittest.TestCase):
         replies = iter([boot, boot])
         with mock.patch.object(run_tests, "reply_of",
                                lambda *a: next(replies)), \
-                mock.patch("scripts.tests.test_saleae.run_tests.time.sleep",
-                           lambda *a: None):
+                mock.patch.object(run_tests.time, "sleep",
+                                  lambda *a: None):
             present, mux_init = run_tests.read_drivers(object())
         self.assertTrue(present["i2s_mux"])
         self.assertFalse(mux_init)
@@ -1701,8 +1739,8 @@ class TestModes(unittest.TestCase):
         # how the wrong 6 got believed in the first place.
         with mock.patch.object(run_tests, "reply_of",
                                lambda *a: "OK QCLR"), \
-                mock.patch("scripts.tests.test_saleae.run_tests.time.sleep",
-                           lambda *a: None):
+                mock.patch.object(run_tests.time, "sleep",
+                                  lambda *a: None):
             with self.assertRaises(RuntimeError):
                 run_tests.read_drivers(object())
 
@@ -1713,13 +1751,113 @@ class TestModes(unittest.TestCase):
 
         def reply(ser, line):
             sent.append(line)
-            return "OK IMUX data=25 bclk=26 ws=27\n" \
+            return "OK IMUX ch=5,6,7 pin=5,18,19\n" \
                 if len(sent) == 1 else "ERR IMUX already up\n"
 
         with mock.patch.object(run_tests, "reply_of", reply):
-            self.assertTrue(run_tests.send_imux(object(), 25, 26, 27))
-            self.assertFalse(run_tests.send_imux(object(), 25, 26, 27))
-        self.assertEqual(sent, ["IMUX 25 26 27", "IMUX 25 26 27"])
+            self.assertTrue(run_tests.send_imux(object()))
+            self.assertFalse(run_tests.send_imux(object()))
+        # No pins in the command, and no retry: the bus is the last three
+        # analyzer channels and their GPIOs come from the firmware's own channel
+        # table, so there is nothing for the host to name -- and a host that
+        # named them would be naming this rig's cable.
+        self.assertEqual(sent, ["IMUX", "IMUX"])
+
+    @staticmethod
+    def _plan_args(**over):
+        base = dict(arch="esp32", framework="arduino", version="latest",
+                    driver="rmt_v2", pin_mode="nodir", count=4, speed_us=40,
+                    sample_rate=0, mode=None, tests=None, drivers=None,
+                    capture_seconds=None, tag_key=None)
+        base.update(over)
+        return argparse.Namespace(**base)
+
+    def test_a_mux_run_is_sampled_fast_enough_to_read_the_bit_clock(self):
+        # The I2S bus runs at 8 MHz and the 32-bit word is read out of it, so a
+        # mux run is sampled for the bit clock and not for the step period.
+        # Nothing else about it needs a fast rate -- the step signals are
+        # ordinary -- so this floor is specific to it and would otherwise never
+        # be applied. 40 us steps ask for 500 kHz on their own.
+        _, _, _, rate = harness.derive(self._plan_args(driver="i2s_mux"))
+        self.assertGreaterEqual(rate, harness.MUX_MIN_SAMPLE_RATE)
+        self.assertGreaterEqual(rate / harness.MUX_BIT_CLOCK_HZ,
+                                harness.MUX_MIN_SAMPLES_PER_BIT)
+
+        # The same run without the mux keeps the rate the step period needs.
+        _, _, _, plain = harness.derive(self._plan_args(driver="rmt_v2"))
+        self.assertLess(plain, harness.MUX_MIN_SAMPLE_RATE)
+
+        # And a run that asks for too little is raised, not refused: the mux has
+        # its own floor and nothing else in the plan would notice.
+        _, _, _, low = harness.derive(
+            self._plan_args(driver="i2s_mux", sample_rate=1_000_000))
+        self.assertEqual(low, harness.MUX_MIN_SAMPLE_RATE)
+
+    def test_the_mux_rate_is_capped_below_the_analyzers_best_resolution(self):
+        # 48 MS/s resolves the bit clock better and is worse: this analyzer
+        # truncates an eight-channel 48 MS/s capture to 0.18 ms, and a scenario
+        # lasts milliseconds, so the capture covers a run that has not started.
+        # A floor without a ceiling is how that gets chosen.
+        self.assertLess(harness.MUX_MIN_SAMPLE_RATE, 48_000_000)
+        # ...and the ceiling is the analyzer's truncation, not a preference.
+        _, _, _, rate = harness.derive(
+            self._plan_args(driver="i2s_mux", sample_rate=48_000_000))
+        self.assertEqual(rate, harness.MUX_MIN_SAMPLE_RATE)
+
+    def test_a_mux_tag_records_that_the_channels_were_decoded(self):
+        # A physical 4-stepper nodir run and a 4-slot mux run both read D0..D3
+        # after decoding, and their waveforms come from completely different
+        # hardware. Without `/mux` in the tag, half the mux results read as
+        # physical ones.
+        mux_tag = harness.derive(self._plan_args(driver="i2s_mux"))[0]
+        phy_tag = harness.derive(self._plan_args(driver="rmt_v2"))[0]
+        self.assertNotEqual(mux_tag, phy_tag)
+        self.assertTrue(mux_tag.endswith("4_mux"), mux_tag)
+        self.assertTrue(phy_tag.endswith("4_nodir"), phy_tag)
+
+    def test_a_mux_run_may_ask_for_more_steppers_than_channels(self):
+        # The point of the decoder: 32 steppers, three wires. The refusal for
+        # the other direction has to stay a refusal.
+        args = self._plan_args
+        self.assertTrue(harness.derive(args(driver="i2s_mux", count=32))[0])
+        with self.assertRaises(SystemExit):
+            harness.derive(args(driver="rmt_v2", count=32))
+        # And the word still bounds it: 32 is all there is.
+        with self.assertRaises(SystemExit):
+            harness.derive(args(driver="i2s_mux", count=33))
+
+    def test_a_mux_dir_run_is_bounded_by_the_word_not_the_channels(self):
+        # 16, because a direction signal is a second bit of the same 32 -- even
+        # though the analyzer could afford far more physical pairs.
+        args = lambda **kw: self._plan_args(pin_mode="dir", driver="i2s_mux",
+                                            **kw)
+        self.assertTrue(harness.derive(args(count=16))[0])
+        with self.assertRaises(SystemExit):
+            harness.derive(args(count=17))
+
+    def test_a_mode_tag_is_still_a_filename_at_32_steppers(self):
+        # The tag lands in the capture's filename, the result's filename and the
+        # decoded capture's filename. Spelling the driver out once per stepper
+        # made that 32 x 8 characters for a mux run, which with the prefix and the
+        # `_37ch` suffix the decoder appends passes 255 -- and the capture is
+        # then simply not written, with the failure surfacing as an unrelated
+        # "sr -> vcd conversion failed".
+        for driver, mode, bound in (("i2s_mux", "nodir", 32),
+                                    ("rmt_v2", "dir", 4)):
+            for plan in run_tests.scale_plan(driver, mode, bound):
+                name = f"esp32_arduino_{driver}_scale{mode}_{plan.tag}"
+                self.assertLessEqual(len(name) + len("_37ch.vcd"), 255,
+                                     name)
+
+    def test_a_mode_tag_names_each_driver_once(self):
+        # ...and it still says which drivers, because a tag that cannot tell
+        # rmt_v2 from rmt_v2+rmt_v2 characterizes nothing.
+        self.assertEqual(
+            run_tests.scale_plan("rmt_v2", "dir", 4)[1].tag, "rmt_v2dirn2")
+        tags = {p.tag for p in run_tests.sync_plan(["rmt_v2", "mcpwm_pcnt"],
+                                                   "dir", 2)}
+        self.assertEqual(tags, {"rmt_v2dirn2", "mcpwm_pcntdirn2",
+                                "rmt_v2+mcpwm_pcntdirn2"})
 
     # -- the bound a scale run stops at ----------------------------------
     def test_the_sweep_limit_is_the_channel_budget_not_a_predicted_count(self):
@@ -1808,10 +1946,24 @@ class TestModes(unittest.TestCase):
                          queues("ESP32S2", "RMT"))
         self.assertEqual(harness.driver_max("esp32c3", "rmt"),
                          queues("ESP32C3", "RMT"))
-        # Under dynamic allocation I2S mux is 32 and I2S direct 3, so the
-        # channel budget is what caps a mux run at 8.
+        # Under dynamic allocation I2S mux is 32 and I2S direct 3. A multiplexed
+        # stepper spends a slot of the 32-bit word and no analyzer channel, so
+        # the channel budget no longer caps it -- the word does. That is the
+        # whole reason the decoder exists: 32 steppers on a rig whose steppers
+        # are the analyzer's channels, with three of the eight carrying the bus.
         self.assertEqual(harness.driver_max("esp32", "i2s_mux"), 32)
-        self.assertEqual(harness.scale_bound("esp32", "i2s_mux", "nodir")[0], 8)
+        self.assertEqual(harness.scale_bound("esp32", "i2s_mux", "nodir")[0], 32)
+        self.assertEqual(harness.scale_bound("esp32", "i2s_mux", "dir")[0], 16)
+        # A PHYSICAL stepper beside the same bus is still capped by the five
+        # channels left over: 5 in nodir, 2 in dir.
+        self.assertEqual(harness.max_steppers("nodir", bus=True), 5)
+        self.assertEqual(harness.max_steppers("dir", bus=True), 2)
+        self.assertEqual(harness.max_steppers("nodir"), 8)
+        # And the word bounds mux `dir` at 16, not 32: a direction signal is a
+        # second bit of the same word.
+        self.assertEqual(
+            harness.mux_slot_bound("dir"), 16)
+        self.assertEqual(harness.mux_slot_bound("nodir"), 32)
 
     def test_driver_max_is_known_for_every_architecture_offered(self):
         # `--arch` accepts these, so a scale run on any of them must be able
@@ -1988,6 +2140,272 @@ class TestPerStepperPrograms(unittest.TestCase):
             self.assertEqual(len(set(ticks)), 3,
                              f"{plan.label}: {ticks} -- a rate collapse could "
                              f"not be detected if two steppers share a period")
+
+
+class TestMuxChannelMap(unittest.TestCase):
+    """A multiplexed stepper is not on a channel at all.
+
+    Its step signal is one bit of the 32-bit word the I2S bus carries, so it has
+    no wire and no GPIO. The map has to name the *decoded* channel it becomes --
+    S<slot> -- or the evaluators are handed a D channel, read whichever physical
+    pin happens to own it, find nothing, and report a driver that emits nothing.
+    That is the same silent wrong map the physical cases below guard against,
+    one level of indirection further out.
+    """
+
+    BUS = " bus=5,6,7"
+
+    def _read(self, reply):
+        with mock.patch.object(run_tests, "reply_of", lambda ser, line: reply):
+            return run_tests.read_map(object())
+
+    def test_a_mux_stepper_maps_to_its_decoded_slot(self):
+        chan_map, pins = self._read(
+            f"MAP count=4 mode=nodir stride=1 ch= bus=5,6,7 "
+            f"slots=0,1,2,3 marker=255\n")
+        self.assertEqual(chan_map, {
+            "A": {"step": "S0"}, "B": {"step": "S1"},
+            "C": {"step": "S2"}, "D": {"step": "S3"},
+        })
+        self.assertEqual(pins["bus"], [5, 6, 7])
+        # No analyzer channel was spent on them, which is the whole point.
+        self.assertEqual(pins["pins"], [])
+        self.assertEqual(pins["physical_channels"], 0)
+
+    def test_a_mux_dir_stepper_maps_to_two_slots(self):
+        # Direction on the mux is a second bit of the SAME word, so it is a
+        # second slot rather than a second channel. That is what caps mux `dir`
+        # at 16 steppers and not 32.
+        chan_map, pins = self._read(
+            f"MAP count=2 mode=dir stride=2 ch= bus=5,6,7 "
+            f"slots=0,1,2,3 marker=255\n")
+        self.assertEqual(chan_map, {
+            "A": {"step": "S0", "dir": "S1"},
+            "B": {"step": "S2", "dir": "S3"},
+        })
+
+    def test_mux_and_physical_steppers_share_one_map(self):
+        # The mixed case the harness exists for: a mux run and a physical run in
+        # the same capture, evaluated from one map.
+        chan_map, pins = self._read(
+            f"MAP count=3 mode=nodir stride=1 ch=2 bus=5,6,7 "
+            f"slots=0,1,- marker=255\n")
+        self.assertEqual(chan_map, {
+            "A": {"step": "S0"}, "B": {"step": "S1"}, "C": {"step": "D0"},
+        })
+        self.assertEqual(pins["physical_channels"], 1)
+        self.assertEqual(pins["pins"], [2])
+
+    def test_a_non_mux_board_still_reports_no_bus(self):
+        # `bus=-` and `slots=-` are what every non-ESP32 build reports. The
+        # fields exist in the regex but must not turn a physical run into a mux
+        # one.
+        chan_map, pins = self._read(
+            "MAP count=2 mode=dir stride=2 ch=2,0,4,16 marker=255\n")
+        self.assertEqual(chan_map, {
+            "A": {"step": "D0", "dir": "D1"},
+            "B": {"step": "D2", "dir": "D3"},
+        })
+        self.assertEqual(pins["bus"], [])
+        self.assertFalse(pins["slots"])
+
+    def test_a_mux_dir_stepper_with_no_dir_slot_is_refused(self):
+        # `dir` mode with a step slot and no dir slot is a board that connected
+        # a direction pin it never allocated. Reading it as "no dir" would make
+        # the direction scenarios silently measure nothing.
+        with self.assertRaises(RuntimeError) as cm:
+            self._read("MAP count=1 mode=dir stride=2 ch= bus=5,6,7 "
+                       "slots=4 marker=255\n")
+        self.assertIn("dir slot", str(cm.exception))
+
+    def test_the_bus_costs_three_channels_of_the_marker_budget(self):
+        # MARK cannot sit on a bus channel: its edges are the bus protocol, not
+        # an event. And three channels of the eight are the bus, so a 5-stepper
+        # `nodir` mux run has no marker left where a 5-stepper physical run does.
+        self.assertEqual(run_tests.marker_channel_for(5, 1), 7)
+        self.assertIsNone(run_tests.marker_channel_for(5, 1, bus_channels=3))
+        self.assertEqual(run_tests.marker_channel_for(2, 2, bus_channels=3), 7)
+        self.assertIsNone(run_tests.marker_channel_for(5, 2, bus_channels=3))
+
+
+class TestMuxDecode(unittest.TestCase):
+    """The 8 -> 37 decode the evaluators actually run on."""
+
+    def setUp(self):
+        self._tmp = tempfile.TemporaryDirectory()
+        self.tmp = Path(self._tmp.name)
+        self.addCleanup(self._tmp.cleanup)
+
+    def _capture(self, words, passthrough_n=0):
+        """A synthetic 8-channel capture of a mux bus, as run_tests sees it."""
+        bus = MuxBus(words)
+        path = self.tmp / "cap.vcd"
+        passthrough = [f"D{i}" for i in range(passthrough_n)]
+        write_mux_bus_vcd(path, bus, passthrough=passthrough)
+        return path, sp.load_vcd(str(path)), passthrough
+
+    def test_decode_turns_three_bus_wires_into_slot_channels(self):
+        path, (channels, rate), _ = self._capture([0x00000005, 0, 0x80000004])
+        pin_map = {"bus": [5, 6, 7], "slots": [0, 1, 2, None],
+                   "mode": "nodir", "stride": 1}
+        decoded, decoded_rate, record = run_tests.decode_mux_capture(
+            path, channels, rate, pin_map)
+        self.assertEqual(decoded_rate, rate)
+        # 0x00000005 sets slots 0 and 2; 0x80000004 sets slots 31 and 2. So S0
+        # pulses once, S2 twice, and S1 never -- which is also the only reason to
+        # trust a word-level decode over "the data line moved".
+        fs = MuxBus([1]).frame_samples
+        self.assertEqual(sum(decoded["S0"]), fs)
+        self.assertEqual(sum(decoded["S2"]), 2 * fs)
+        self.assertEqual(sum(decoded["S1"]), 0)
+        self.assertEqual(record["bus_channels"], [5, 6, 7])
+        self.assertTrue(Path(record["vcd"]).exists())
+
+    def test_decode_passes_physical_channels_through_untouched(self):
+        # A mux run and a physical run in one capture: the physical steppers'
+        # channels have to come out the other side unchanged, or the mux work
+        # silently damages the measurements next to it.
+        path, (channels, rate), passthrough = self._capture(
+            [0x1, 0, 0x0], passthrough_n=2)
+        before = {n: bytes(channels[n]) for n in passthrough}
+        pin_map = {"bus": [5, 6, 7], "slots": [0, None], "mode": "nodir",
+                   "stride": 1}
+        chan_map = {"A": {"step": "S0"}, "B": {"step": "D0"},
+                    "C": {"step": "D1"}}
+        decoded, _, _ = run_tests.decode_mux_capture(path, channels, rate,
+                                                     pin_map, chan_map)
+        for n in passthrough:
+            self.assertEqual(bytes(decoded[n]), before[n])
+
+    def test_the_decoded_capture_evaluates_through_the_ordinary_path(self):
+        # The end the whole design rests on: a mux run goes through `evaluate()`
+        # with no special case anywhere, because a decoded slot channel is an
+        # ordinary step channel. If this needs a mux-aware evaluator, the
+        # channel-agnostic claim in white paper 7.4 is false.
+        # 640 ticks at 16 MHz is 40 us and a frame is 4 us, so a step lands on
+        # every tenth frame: nine idle frames then one with slot 0 set. The
+        # decoded channel is a GPIO step channel, so SR_01's own expectations
+        # have to hold against it untouched.
+        path, (channels, rate), _ = self._capture(([0] * 9 + [1]) * 4)
+        pin_map = {"bus": [5, 6, 7], "slots": [0], "mode": "nodir",
+                   "stride": 1}
+        decoded, decoded_rate, _ = run_tests.decode_mux_capture(
+            path, channels, rate, pin_map)
+        chan_map = {"A": {"step": "S0"}}
+        info = dict(vf.Dut().info())
+        segments = [(4, 640, True)]
+        passed, detail = run_tests.evaluate(
+            "SR_01", decoded, decoded_rate, segments, info, chan_map)
+        self.assertTrue(passed, detail)
+        self.assertEqual(detail["steps"]["steps_measured"], 4)
+        self.assertEqual(detail["adherence"]["mean_period_us"], 40.0)
+
+
+class TestMuxFrameGrid(unittest.TestCase):
+    """A multiplexed step cannot start between frames, so its period is a set.
+
+    The I2S mux sets a step bit for whole frames: the pulse is 4 us and it goes
+    out in the frame that contains its instant. A 400-tick command is therefore
+    not a steady 25 us period -- it is 6, 6, 6, then 7 frames, i.e. 24, 24, 24,
+    28 us, averaging exactly 25. Judged against the harness's ordinary +-5% band
+    around 25 us, one period in four reads 12 % long and the run fails while
+    measuring the behaviour it exists to describe.
+    """
+
+    RATE = 1_000_000
+    GRID = dict(frame_grid_ticks=run_tests.I2S_TICKS_PER_FRAME)
+    INFO = dict(vf.Dut().info(), **GRID)
+
+    def _channels(self, periods_us, high_us=1.0):
+        """A step channel with the given inter-step periods in microseconds.
+
+        Each period is placed on the sample grid, so the measured periods are the
+        commanded ones to within a sample -- which at 1 MS/s is 1 us against a
+        4 us frame, so the grid check is not being asked to resolve finer than it
+        can.
+        """
+        high = max(1, int(round(high_us * self.RATE / 1e6)))
+        wave = bytearray(int(sum(periods_us) * self.RATE / 1e6) + 8)
+        at = 0.0
+        for p in periods_us:
+            lo = int(round(at * self.RATE / 1e6))
+            wave[lo:lo + high] = b"\x01" * high
+            at += p
+        # One leading low sample. detect_edges() never counts the first sample as
+        # an edge, so a waveform that starts high reports one step fewer than it
+        # has -- which is a real property of the parser, not a fixture quirk, and
+        # the tests below count steps.
+        return {"S0": bytes(1) + bytes(wave)}, self.RATE
+
+    def test_the_library_frame_is_the_const_the_harness_asserts_against(self):
+        # Read from the source, not from the copy in run_tests.py: if the driver
+        # changes its frame length, the harness must find out here rather than by
+        # judging every mux run against a stale grid.
+        root = SCRIPTS.parents[3] / "src" / "pd_esp32" / "i2s_constants.h"
+        m = re.search(r"#define I2S_TICKS_PER_FRAME (\d+)",
+                      root.read_text())
+        self.assertIsNotNone(m, "I2S_TICKS_PER_FRAME moved or was renamed")
+        self.assertEqual(run_tests.I2S_TICKS_PER_FRAME, int(m.group(1)))
+
+    def test_the_frame_quantised_period_is_legal_and_the_mean_is_exact(self):
+        channels, rate = self._channels([24.0, 24.0, 24.0, 28.0] * 4)
+        m = sp.channel_metrics(channels["S0"], rate)
+        d = sp.grid_period_defects(m.inter_step_us, 400, 16_000_000,
+                                   run_tests.I2S_TICKS_PER_FRAME)
+        self.assertTrue(d["ok"], d)
+        self.assertEqual(d["legal_periods_us"], [24.0, 28.0])
+
+    def test_a_period_on_the_wrong_frame_count_still_fails(self):
+        # The grid is not a free pass. 6 and 7 frames are the legal pair for a
+        # 400-tick command; 5 frames is 20 us and is not one of them.
+        channels, rate = self._channels([20.0] * 8)
+        m = sp.channel_metrics(channels["S0"], rate)
+        d = sp.grid_period_defects(m.inter_step_us, 400, 16_000_000,
+                                   run_tests.I2S_TICKS_PER_FRAME)
+        self.assertFalse(d["ok"])
+        self.assertTrue(d["n_off_grid"])
+
+    def test_a_mean_that_has_drifted_fails_even_on_the_grid(self):
+        # Every period legal but the average wrong is a driver losing time, and
+        # the grid does not excuse it: the extra frame is paid every fourth step,
+        # not on every step.
+        channels, rate = self._channels([24.0, 24.0, 24.0, 32.0] * 4)
+        m = sp.channel_metrics(channels["S0"], rate)
+        d = sp.grid_period_defects(m.inter_step_us, 400, 16_000_000,
+                                   run_tests.I2S_TICKS_PER_FRAME)
+        self.assertFalse(d["ok"])
+        self.assertLess(d["mean_period_us"], 26.0)
+        self.assertFalse(d["ok"])
+
+    def test_scale_uses_the_grid_only_when_the_run_has_one(self):
+        # The same evaluator, both ways. A non-mux run must keep its +-5% band --
+        # widening it for every driver to accommodate the mux would let a real
+        # rate error through everywhere else.
+        segments = [(8, 400, True)]
+        chan_map = {"A": {"step": "S0"}}
+        # The frame-quantised pattern the mux really emits at 400 ticks, which a
+        # +-5% band around 25 us rejects...
+        wave, rate = self._channels([24.0, 24.0, 24.0, 28.0] * 2)
+        on_grid, detail = run_tests.evaluate(
+            "SR_01", wave, rate, segments,
+            dict(vf.Dut().info(), **self.GRID), chan_map)
+        self.assertTrue(on_grid, detail)
+        self.assertEqual(detail["period"]["legal_periods_us"], [24.0, 28.0])
+        # ...and the same evaluator WITHOUT the grid still catches a real rate
+        # error, which is what keeping the ordinary band everywhere else is for.
+        ok, detail2 = run_tests.evaluate(
+            "SR_01", wave, rate, segments, dict(vf.Dut().info()), chan_map)
+        self.assertFalse(ok)
+        self.assertTrue(detail2["period"]["long_periods_us"], detail2)
+
+    def test_the_grid_reaches_the_evaluator_through_info(self):
+        # Not a module-level flag and not a sixth evaluator argument threaded
+        # through all of them: `measure()` puts it in `info`, and `eval_scale`
+        # reads it there. Both halves named, because either alone leaves the
+        # other able to disappear unnoticed.
+        src = (SCRIPTS / "run_tests.py").read_text()
+        self.assertIn('info.get("frame_grid_ticks")', src)
+        self.assertIn("info = dict(info, frame_grid_ticks=", src)
 
 
 class TestPins(unittest.TestCase):

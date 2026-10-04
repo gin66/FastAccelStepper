@@ -1,9 +1,20 @@
 # 180 R7 — Virtual I2S Mux: 37-Channel Test Harness Extension
 
-> This document is the design reference: what is built, how it works, and why.
-> It deliberately carries no task list and no status. Progress and the
+> This document is the **design reference**: what was specified, and why.
+> It carries no task list and no status. Both the implementation record and the
 > remaining work live in exactly one place:
-> [`extras/todo/180_r7_virtual_i2s_mux.md`](../../../todo/180_r7_virtual_i2s_mux.md).
+> [`extras/doc/implemented/180_r7_virtual_i2s_mux.md`](../doc/implemented/180_r7_virtual_i2s_mux.md).
+>
+> **Three assumptions below were measured to be wrong** and the implementation
+> does not follow them. Each is corrected, with the measurement, in the
+> implementation record — and they are worth knowing before reading further,
+> because the reasoning here is plausible:
+>
+> | §  | Says | Measured |
+> |---|---|---|
+> | §3.3, §9.1 | a slot is high for the whole frame (4 µs) | one bclk period, **125 ns**; the frame is the unit of *time*, a slot one of 32 bits inside it |
+> | §4.2, §9.2 | ≥ 8 MS/s resolves the bus; "24 MS/s = 16 samples per bclk period" | the arithmetic is 5× out. 24/8 = **3** samples per 8 MHz bclk period. The floor is 24 MS/s; **48 MS/s is unusable** — this analyzer truncates an 8-channel capture there to 0.18 ms |
+> | §3.2, §5.3 | the sample point is not specified; §5.3 reads bits on bclk rising edges | correct, and *only* correct — and both plausible alternatives are silently wrong on this hardware |
 
 > **⚠ WARNING — do not connect a stepper, motor, or stepper driver.**
 >
@@ -762,6 +773,12 @@ passthrough channels. The decoded VCD still has S0–S31 only.
 ---
 
 ## 12. Directory Structure
+
+> As built, this is `extras/tests/saleae_based/`, and the decoder named below as
+> `i2s_mux_decoder.py` lives in `scripts/` next to `signal_parser.py`. The bus is
+> on the **last three** analyzer channels (D5/D6/D7) rather than the first, so
+> D0..D4 keep their names across a decode; the argument is in the implementation
+> record, §2.
 
 ```
 extras/tests/saleae_based/

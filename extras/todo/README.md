@@ -48,10 +48,26 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
 | **175** | [stopMove() / forceStop() / forceStopAndNewPosition() — three APIs, one harness conflated two](175_stop_api_conflation.md) | ~100 k | 0.5 d | Low: harness bug that was found, fixed, and documented. |
-| **180** | [R7 — Flexible channel count for the test harness](180_r7_virtual_i2s_mux.md) | ~1 M | 2–3 w | Low: test harness must handle arbitrary channel counts (8 + 32 virtual I2S mux). |
-| **total** | 24 items (17 existing + 7 new) | ~7.5 M | 20–28 w | All priorities 010–180. |
+| **total** | 23 items (16 existing + 7 new) | ~6.5 M | 18–26 w | All priorities 010–175. |
 
 ## Done
+
+- **R7 — Virtual I2S mux: 37-channel test harness — implemented.**
+  `scripts/i2s_mux_decoder.py` turns an 8-channel capture into a 37-channel one
+  (5 passthrough + 32 mux slots, the 3 bus wires consumed) and the existing
+  evaluators read it with no mux-specific code. The firmware can now connect
+  `i2s_mux` steppers (`PIN_I2S_FLAG` slots) and the bus is the last three
+  analyzer channels, so D0..D4 keep their names on both sides of a decode.
+  `--mode scale --driver i2s_mux --pin-mode nodir` sweeps 1…32 multiplexed
+  steppers; **29 of 32 pass**. Three design assumptions were wrong and are
+  corrected with measurements: a slot is high for one bclk period (125 ns), not
+  for the frame; the bus needs ≥ 3 samples per bit period so 24 MS/s and not
+  8 — while 48 MS/s truncates the capture below a scenario's duration; and the
+  word goes out MSB first. Also found and fixed: an intermittent dropped step at
+  20+ slots (the remaining 3), a `uint8_t` serial line length that corrupted any
+  command over 255 characters, and a `sorted()` channel map that handed stepper
+  27 another stepper's channel. See
+  [180_r7_virtual_i2s_mux.md](../doc/implemented/180_r7_virtual_i2s_mux.md).
 
 - **IDF 6 RMT sequence 02 slow — implemented.** F2 caps every RMT sub-entry
   (`rmt_encode_fill()`), so the RMT buffer spans less time than the ramp

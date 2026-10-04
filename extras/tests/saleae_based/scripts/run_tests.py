@@ -53,6 +53,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import analyze_csv  # noqa: E402
 import capture as cap  # noqa: E402
+import i2s_mux_decoder as muxdec  # noqa: E402
 import signal_parser as sp  # noqa: E402
 
 # SR_01..SR_29 are the implemented catalogue plus SR_00; the range is the
@@ -71,15 +72,53 @@ ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 31)]
 # The default is the 4-stepper `dir` map, which is what every scenario in
 # SCENARIOS below uses until a `nodir` one exists; a run that actually connected
 # a different shape replaces it from MAP before evaluating.
+# Stepper labels. A..Z then A1..F1, which is 32 and is as far as the I2S mux
+# word goes. Not a plain alphabet: `eval_sync` used to derive a stepper's index
+# as `ord(letter) - ord("A")`, which stops meaning anything at Z and raises
+# above it -- and a 32-stepper mux run is exactly the case that reaches it. The
+# index now comes from the map's own order.
+MUX_SLOT_WIDTH = 32
+
+# One I2S frame, in stepper ticks: src/pd_esp32/i2s_constants.h
+# I2S_TICKS_PER_FRAME. A multiplexed step pulse is exactly one frame high and can
+# only start on a frame boundary, which is what makes its period a set rather
+# than a value. Kept here as a named constant with its source rather than read
+# from the firmware, because QINFO does not report it and a second copy in a
+# header the harness cannot include is the cheaper of the two.
+I2S_TICKS_PER_FRAME = 64
+
+
+def stepper_letter(index):
+    """The label for stepper `index`: A..Z, then AA, AB, ...
+
+    Excel-column order, matching stepper order. The labels are read back out of
+    the channel map by `Pins.letters`, which uses the map's own order rather than
+    sorting -- see there -- so this only has to be distinct and stable.
+    """
+    if index >= MUX_SLOT_WIDTH:
+        raise RuntimeError(
+            f"{index + 1} steppers: the harness labels at most "
+            f"{MUX_SLOT_WIDTH}, which is the width of the I2S mux word")
+    out = ""
+    index += 1
+    while index:
+        index, rem = divmod(index - 1, 26)
+        out = chr(ord("A") + rem) + out
+    return out
+
+
 def default_channel_map(count=4, stride=2):
-    """{'A': {'step': 'D0', 'dir': 'D1'}, ...} for a count/stride pair."""
-    letters = "ABCDEFGH"
+    """{'A': {'step': 'D0', 'dir': 'D1'}, ...} for a count/stride pair.
+
+    Sorted by label, and `Pins.index_of()` is the label -> position map that
+    depends on it, so the two must agree on what "in order" means.
+    """
     out = {}
     for i in range(count):
         entry = {"step": f"D{i * stride}"}
         if stride > 1:
             entry["dir"] = f"D{i * stride + 1}"
-        out[letters[i]] = entry
+        out[stepper_letter(i)] = entry
     return out
 
 
@@ -149,8 +188,20 @@ class Pins:
 
     @property
     def letters(self):
-        """Stepper names, in order: A, B, C ..."""
-        return sorted(self.step)
+        """Stepper names, in stepper order.
+
+        The map's own order, NOT `sorted()`. The map is built in stepper order --
+        by `default_channel_map()`, and by `read_map()` when it substitutes the
+        mux slots -- and dicts keep insertion order, so that order is stepper
+        order exactly.
+
+        Sorting cannot express it past Z. The I2S mux reaches 32 steppers, so the
+        labels run A..Z and then need a second block; there is no labelling of 32
+        names whose *lexicographic* order is the stepper order ("AA" sorts between
+        "A" and "B"), and this is why the second block exists at all -- before it,
+        stepper 27 was 'Z' and stepper 28 did not exist.
+        """
+        return list(self.step)
 
     def step_of(self, letter):
         return self.step[letter]
@@ -176,6 +227,15 @@ class Pins:
     def items(self):
         """(letter, step channel) pairs, in stepper order."""
         return [(letter, self.step[letter]) for letter in self.letters]
+
+    def index_of(self, letter):
+        """`letter`'s position in stepper order.
+
+        Not `ord(letter) - ord("A")`: that is an alphabet assumption, and it is
+        wrong twice over past Z -- it is meaningless there and raises beyond it.
+        The I2S mux reaches 32 steppers, which is past both.
+        """
+        return self.letters.index(letter)
 
     def missing(self, channels):
         """Steppers the board connected whose channel the capture lacks.
@@ -299,6 +359,8 @@ def reply_of(ser, line):
 QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxall=(\d+)"
                       r"(?: maxspeed\d+=(\d+))*")
 MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)"
+                      r"(?:\s+bus=([\d,-]+))?"
+                      r"(?:\s+slots=([\d,-]*))?"
                       r"(?:\s+marker=(\d+))?")
 # "OK DRIVERS mux=0 rmt=1 rmt_v2=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1
 #  mux_init=0". The driver fields are read as a name=value scan rather than by
@@ -342,7 +404,7 @@ def read_drivers(ser):
     raise RuntimeError(f"no DRIVERS reply, got: {text!r}")
 
 
-def send_imux(ser, data, bclk, ws):
+def send_imux(ser):
     """Bring the I2S multiplexer up. Returns True on success.
 
     `initI2sMux()` has to precede any mux stepper and cannot run twice, so it is
@@ -350,8 +412,14 @@ def send_imux(ser, data, bclk, ws):
     multiplexer is wired this is simply never called, and `DRIVERS` reports
     i2s_mux present but not up -- which is the distinction that stops a planner
     from offering a driver every CONFIG will refuse.
+
+    No arguments. The bus is the last three analyzer CHANNELS and their GPIOs
+    come out of the firmware's own channel table, so naming the pins from here
+    would mean naming *this* rig's wiring from a host that has no way to know it
+    -- and the failure would be a capture that decodes into the wrong 32 slots.
+    See SALEAE_BUS_BASE in common/saleae_app.cpp.
     """
-    text = reply_of(ser, f"IMUX {data} {bclk} {ws}")
+    text = reply_of(ser, "IMUX")
     return text.lstrip().startswith("OK IMUX")
 
 
@@ -363,6 +431,12 @@ def read_map(ser):
     D0,D1,D2,D3 in the second -- and a host that guessed wrong measures a quiet
     pin and reports zero steps, which reads as a driver that emits nothing.
 
+    A multiplexed stepper is not on a channel at all: its step signal is one bit
+    of the 32-bit word the I2S bus carries, so MAP reports the slot and the
+    channel it becomes is `S<slot>` in the DECODED capture. Handing the
+    evaluators `D0` for such a stepper would measure the pin of whichever
+    physical stepper happens to own it.
+
     Returns (channel_map, pins) where channel_map is the letter -> {step, dir}
     dict the evaluators index and pins is the GPIO behind each channel, for the
     record.
@@ -373,18 +447,61 @@ def read_map(ser):
         if m:
             count, mode, stride = int(m.group(1)), m.group(2), int(m.group(3))
             pins = [int(p) for p in m.group(4).split(",") if p]
+            # bus= is "-" when the multiplexer is not up; the fields are only
+            # present on an ESP32 build, hence the None guards.
+            bus_field = m.group(5)
+            bus = [int(b) for b in bus_field.split(",")] if bus_field and bus_field != "-" else []
+            slot_field = m.group(6)
+            slots = ([int(s) if s != "-" else None
+                      for s in slot_field.split(",")]
+                     if slot_field else [])
+
             chan_map = default_channel_map(count, stride)
-            # Cross-check the GPIO list against the capture's wiring: the pin
-            # map is the firmware's, but if a channel is not driven at all there
-            # is no measurement to make of it.
-            for name, entry in chan_map.items():
-                if entry["step"] not in STEP_CHANNEL_ORDER[:count * stride]:
-                    raise RuntimeError(f"stepper {name} maps to a channel "
-                                       f"outside the reported {count * stride}")
+            # Insertion order, not sorted(). Past 26 steppers the two differ --
+            # sorted() puts "A1" right after "A", the build order puts it after
+            # "Z" -- and the mismatch hands slot 11 to the letter that owns slot
+            # 16. Every stepper then gets another stepper's channel and the
+            # result says so, which is the one thing a channel map exists to
+            # prevent. See Pins.letters.
+            letters = list(chan_map)
+            # Physical channels are handed out in order to the steppers that
+            # own a wire, and a multiplexed stepper does not take one -- so this
+            # cursor is NOT the stepper index. `CONFIG 3 i2s_mux,i2s_mux,rmt_v2
+            # nodir` puts the physical stepper on channel 0, not channel 2, and a
+            # map built from the index would read D2: a channel the bus uses.
+            chan_used = 0
+            for j, name in enumerate(letters):
+                step_slot = slots[j * stride] if j * stride < len(slots) else None
+                if step_slot is None:
+                    if chan_used + stride > count * stride:
+                        raise RuntimeError(
+                            f"stepper {name} maps to a channel outside the "
+                            f"reported {count * stride}")
+                    chan_map[name] = {"step": STEP_CHANNEL_ORDER[chan_used]}
+                    if stride > 1:
+                        chan_map[name]["dir"] = STEP_CHANNEL_ORDER[chan_used + 1]
+                    chan_used += stride
+                    continue
+                chan_map[name] = {"step": f"S{step_slot}"}
+                if stride > 1:
+                    # Direction on the mux is a second bit of the same word, and
+                    # the firmware allocates it right after the step bit, so
+                    # stepper j owns slots[2j] and slots[2j+1]. MAP reports one
+                    # slot per *channel* for that reason, not one per stepper.
+                    dir_idx = j * stride + 1
+                    dir_slot = (slots[dir_idx]
+                                if dir_idx < len(slots) else None)
+                    if dir_slot is None:
+                        raise RuntimeError(
+                            f"stepper {name} has a direction pin in "
+                            f"{mode} mode but MAP reports no dir slot")
+                    chan_map[name]["dir"] = f"S{dir_slot}"
             # marker=-1 means no channel is designated as the event marker.
-            marker = int(m.group(5)) if m.group(5) else -1
+            marker = int(m.group(7)) if m.group(7) else -1
+            physical = chan_used
             return chan_map, {"mode": mode, "stride": stride, "pins": pins,
-                              "marker": marker}
+                              "marker": marker, "bus": bus, "slots": slots,
+                              "physical_channels": physical}
         time.sleep(0.1)
     raise RuntimeError(f"no MAP reply, got: {text!r}")
 
@@ -420,6 +537,11 @@ def read_qinfo(ser):
     raise RuntimeError(f"no QINFO reply, got: {text!r}")
 
 
+# SR_00's own capture window, in seconds. Two full cycles of a 1 Hz pattern with
+# every channel at a different duty, so each one shows a complete high and a
+# complete low and the width check has something to measure.
+SR00_SECONDS = 2.5
+
 # Scenarios whose subject needs the STOP instant *on the waveform*. Sending STOP
 # and then inferring when it landed from "the pulses ceased" cannot work on this
 # rig: the capture the host requests is not the capture it gets (24 MHz
@@ -427,7 +549,7 @@ def read_qinfo(ser):
 SCENARIO_MARKERS = {"SR_25", "SR_30"}
 
 
-def marker_channel_for(count, stride, channels=8):
+def marker_channel_for(count, stride, channels=8, bus_channels=0):
     """The highest analyzer channel no stepper owns, or None if there is none.
 
     The marker has to be readable without ambiguity against a stepper's own
@@ -435,8 +557,14 @@ def marker_channel_for(count, stride, channels=8):
     is taken and there is no marker to be had -- which is a real limit of this
     approach, and the reason MARK is refused rather than quietly overwriting a
     step pin.
+
+    `bus_channels` is what the I2S multiplexer costs: three analyzer channels
+    that carry the bus and belong to no stepper, but whose edges are the bus
+    protocol rather than an event, so a marker there is unreadable. It counts
+    against the budget for MARK even though it counts for nothing else -- which
+    is exactly why it is a parameter and not a constant here.
     """
-    used = count * stride
+    used = count * stride + bus_channels
     if used >= channels:
         return None
     return channels - 1
@@ -572,6 +700,87 @@ def fill_queue(ser, mask, entries=QUEUE_FILL_ENTRIES):
 # ---------------------------------------------------------------------------
 
 
+def decode_mux_capture(capture_file, channels, sample_rate, pin_map,
+                       chan_map=None):
+    """Turn a mux run's 8 channels into its 37, and say what it was decoded from.
+
+    The three bus channels are consumed and 32 slot channels appear in their
+    place, so the evaluators and every metric in signal_parser.py work unchanged
+    on the result -- which is the whole point: the alternative is teaching eight
+    channel-specific metrics about a multiplexed driver.
+
+    `source_vcd` is the change-only VCD of the capture, not the .sr: a .sr is a
+    zip archive and `signal_parser.load_vcd` does not read one.
+
+    `pin_map["bus"]` is the board's own answer to which channels carry the bus
+    and which bit of the word each stepper owns, read from MAP. Nothing here is
+    guessed: a bus channel named wrongly decodes into 32 quiet channels, which
+    reads as a driver that emits nothing rather than as a bad map.
+
+    The decoded VCD is written next to the capture so a run can be re-evaluated
+    without the hardware, and it is returned in the result as `decoded_from` --
+    without it, "which waveform did you measure" has no answer for a mux run,
+    because the waveform in the capture is three wires and the one the evaluators
+    read was computed from them.
+    """
+    bus = pin_map["bus"]
+    # The physical steppers ride along. They are named by the same map the
+    # evaluators get, so this cannot disagree with what they will read: take
+    # the entries that are NOT slot channels.
+    passthrough = []
+    for entry in (chan_map or {}).values():
+        for role in ("step", "dir"):
+            name = entry.get(role)
+            if name and not name.startswith("S") and name not in passthrough:
+                passthrough.append(name)
+    cfg = muxdec.DecoderConfig(
+        source_vcd=str(capture_file),
+        output_vcd=str(Path(str(capture_file).rsplit(".", 1)[0] + "_37ch.vcd")),
+        i2s_channels={"data": f"D{bus[0]}", "bclk": f"D{bus[1]}",
+                      "ws": f"D{bus[2]}"},
+        passthrough_channels=sorted(passthrough),
+        mux_slot_map={
+            letter: {"slot": entry["slot"],
+                     "step_channel": entry["step"],
+                     "dir_channel": entry.get("dir")}
+            for letter, entry in _mux_map_with_slots(pin_map).items()},
+        stepper_count=len(pin_map.get("slots") or []),
+        pin_mode=pin_map.get("mode"),
+        out_comment=[f"  captured_from: {Path(capture_file).name}"],
+    )
+    out = muxdec.decode(cfg, sample_rate)
+    decoded, rate = sp.load_vcd(str(out))
+    # Only the slots this run used, so the decoded file is 5 + n channels rather
+    # than 37. The count is recorded in the result either way; what a reader wants
+    # is the waveform of the steppers that were actually connected.
+    return decoded, rate, {"vcd": str(out), "source": str(capture_file),
+                           "bus_channels": bus,
+                           "channels": len(decoded)}
+
+
+def _mux_map_with_slots(pin_map):
+    """letter -> {slot, step, dir} for the multiplexed steppers only.
+
+    `slots` is one entry per *channel*, not per stepper: in `dir` mode a
+    multiplexed stepper owns two of them (its step bit and its direction bit),
+    which is why mux `dir` reaches 16 steppers and not 32.
+    """
+    stride = pin_map.get("stride", 2)
+    slots = pin_map.get("slots") or []
+    letters = "ABCDEFGH"
+    out = {}
+    for j in range(len(slots) // stride):
+        slot = slots[j * stride]
+        if slot is None:
+            continue
+        letter = letters[j] if j < len(letters) else f"S{j}"
+        entry = {"slot": slot, "step": f"S{slot}"}
+        if stride > 1:
+            entry["dir"] = f"S{slots[j * stride + 1]}"
+        out[letter] = entry
+    return out
+
+
 def start_capture(output, seconds, rate):
     devices, driver = cap.detect_analyzer("auto")
     # All eight, not just the ones this scenario reads: SR_00 needs every channel
@@ -584,13 +793,22 @@ def start_capture(output, seconds, rate):
                             stderr=subprocess.DEVNULL)
 
 
-def load_capture_for_eval(capture_file):
-    """Load a recorded .sr as channels + rate, via its change-only VCD."""
+def load_capture_for_eval(capture_file, with_vcd=False):
+    """Load a recorded .sr as channels + rate, via its change-only VCD.
+
+    `with_vcd` adds the VCD path, which the mux decoder needs: it reads a VCD, and
+    handing it the .sr makes it decode a zip archive. The VCD is the change-only
+    form of the same capture, so deriving it here is what keeps the decoder on
+    the same artifact the evaluators are reading rather than on a second
+    conversion of the same bytes.
+    """
     vcd_file = cap.sr_to_vcd(capture_file,
                              Path(str(capture_file).rsplit(".", 1)[0] + ".vcd"))
     if vcd_file is not None:
-        return sp.load_vcd(str(vcd_file))
-    return sp.load_capture(str(capture_file))
+        channels, rate = sp.load_vcd(str(vcd_file))
+        return (channels, rate, str(vcd_file)) if with_vcd else (channels, rate)
+    channels, rate = sp.load_capture(str(capture_file))
+    return (channels, rate, None) if with_vcd else (channels, rate)
 
 
 def sub_min_entries(segments, info, programs=None):
@@ -1099,8 +1317,20 @@ class ModeRun:
 
     @property
     def tag(self):
-        """A filename- and tag-key-safe label. '+' and ',' would both leak."""
-        return "+".join(self.drivers) + self.pin_mode + f"n{self.count}"
+        """A filename- and tag-key-safe label. '+' and ',' would both leak.
+
+        One name per *distinct* driver, not one per stepper. Spelling the driver
+        out N times says nothing -- a `scale` run connects N of the same driver
+        by construction, and `sync` connects two -- and it stops being a filename
+        at all: 32 mux steppers is 32 x 8 characters, which with the tag prefix
+        and the `_37ch` suffix the decoder appends overruns the 255-byte limit,
+        and the capture is then silently not written.
+        """
+        distinct = []
+        for d in self.drivers:
+            if d not in distinct:
+                distinct.append(d)
+        return "+".join(distinct) + self.pin_mode + f"n{self.count}"
 
 
 # How long a `scale` run's program is. Long enough for the period to be
@@ -1304,8 +1534,36 @@ def check_pin_invariants(channels, rate, pins):
     }
 
 
+def check_periods(periods_us, ticks, info, with_adherence=False):
+    """(period detail, adherence) for one stepper's inter-step periods.
+
+    One place decides whether a period is judged against a band or against the
+    driver's frame grid, because the choice has to be right at every call site and
+    there are a dozen of them. Getting it wrong at one is not cosmetic:
+    `period_defects` at 400 ticks reports the mux's legal 28 us step as 12 % long,
+    and `rate_adherence` reports the legal 6/6/6/7 frame pattern as 16 % jitter.
+    Both would fail a run that is exactly right.
+
+    On the grid the adherence tolerance is one frame rather than 2 %, because a
+    single 7-frame step is 3 us off the commanded period by construction, and no
+    percentage of 25 us covers that without also covering a real rate error.
+
+    Called once per measurement where both are needed, and twice where a site only
+    needs one -- the work is a few arithmetic operations over the period list, and
+    a cache would be a second thing that can disagree with the decision above.
+    """
+    tps = info["ticks_per_s"]
+    expect_us = ticks * 1e6 / tps
+    grid = info.get("frame_grid_ticks")
+    if grid:
+        return (sp.grid_period_defects(periods_us, ticks, tps, grid),
+                sp.rate_adherence(periods_us, expect_us, tol_frac=0.0,
+                                  tol_abs=grid * 1e6 / tps))
+    return (sp.period_defects(periods_us, expect_us),
+            sp.rate_adherence(periods_us, expect_us) if with_adherence else None)
+
 def evaluate(evaluator, channels, rate, segments, info, chan_map=None,
-             extra=None):
+             extra=None, frame_grid_ticks=None):
     """Run an evaluator, then the global invariants.
 
     `evaluator` is an EVALUATORS key or a callable, so the two generic modes
@@ -1325,7 +1583,16 @@ def evaluate(evaluator, channels, rate, segments, info, chan_map=None,
     `extra` is forwarded to an evaluator that needs more than the four
     standard arguments -- `eval_sync` needs the per-stepper programs it was
     sent, so its expectations cannot drift from what went on the wire.
+
+    `frame_grid_ticks` says the run's step instants are quantised to a frame of
+    that many ticks -- the I2S multiplexer, whose pulse is one frame high and
+    can only start on a frame boundary. It is also placed in `info`, which is
+    where an evaluator that wants it will look: threading a sixth argument through
+    every evaluator to reach one of them is the kind of plumbing that makes the
+    next evaluator forget it exists.
     """
+    if frame_grid_ticks is not None:
+        info = dict(info, frame_grid_ticks=frame_grid_ticks)
     pins = Pins(chan_map) if chan_map is not None else Pins.default()
 
     # A capture that does not carry every stepper the board connected cannot
@@ -1362,12 +1629,12 @@ def eval_period_exact(channels, rate, segments, info, pins):
     ticks = segments[0][1]
     expect_us = ticks * 1e6 / info["ticks_per_s"]
     m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
-    detail = sp.period_defects(m.inter_step_us, expect_us)
     counts = sp.step_count_defects(m.step_count, segments[0][0])
     # ISR-driven architectures set the step pin from inside a timer interrupt,
     # so the achieved rate is systematically below the commanded one. That is
     # invisible to a step count and to a gross-period check.
-    adherence = sp.rate_adherence(m.inter_step_us, expect_us)
+    detail, adherence = check_periods(m.inter_step_us, ticks, info,
+                                      with_adherence=True)
     return detail["ok"] and counts["ok"] and adherence["ok"], {
         "ticks": ticks,
         "ticks_per_s": info["ticks_per_s"],
@@ -1384,7 +1651,7 @@ def eval_step_count(channels, rate, segments, info, pins):
     step = pins.step_wave(channels, "A")
     m = sp.channel_metrics(step, rate)
     counts = sp.step_count_defects(m.step_count, n)
-    detail = sp.period_defects(m.inter_step_us, expect_us)
+    detail, _ = check_periods(m.inter_step_us, ticks, info)
     return counts["ok"] and detail["ok"], {
         "ticks": ticks,
         "steps": counts,
@@ -1419,7 +1686,10 @@ def eval_scale(channels, rate, segments, info, pins):
             continue
         m = sp.channel_metrics(channels[ch_name], rate)
         counts = sp.step_count_defects(m.step_count, expected)
-        detail = sp.period_defects(m.inter_step_us, expect_us)
+        # A multiplexed stepper can only be stepped on a frame boundary, so its
+        # period is one of two values rather than one; check_periods() reads the
+        # grid out of `info` and judges it accordingly.
+        detail, _ = check_periods(m.inter_step_us, t, info)
         ok = ok and counts["ok"] and detail["ok"]
         mean = (sum(m.inter_step_us) / len(m.inter_step_us)
                 if m.inter_step_us else None)
@@ -1492,7 +1762,7 @@ def eval_sync(channels, rate, segments, info, pins, programs):
     ok = True
     per_stepper = {}
     for letter, ch_name in pins.items():
-        idx = ord(letter) - ord("A")
+        idx = pins.index_of(letter)
         wave = pins.step_wave(channels, letter)
         if wave is None or idx not in programs:
             continue
@@ -1502,7 +1772,7 @@ def eval_sync(channels, rate, segments, info, pins, programs):
         expect_us = ticks * 1e6 / info["ticks_per_s"]
         m = sp.channel_metrics(wave, rate)
         counts = sp.step_count_defects(m.step_count, expected)
-        period = sp.period_defects(m.inter_step_us, expect_us)
+        period, _ = check_periods(m.inter_step_us, ticks, info)
         ok = ok and counts["ok"] and period["ok"]
         per_stepper[letter] = {
             "channel": ch_name,
@@ -1548,7 +1818,7 @@ def eval_multi_stepper_periods(channels, rate, segments, info, pins):
             continue
         m = sp.channel_metrics(channels[ch_name], rate)
         counts = sp.step_count_defects(m.step_count, expected)
-        detail = sp.period_defects(m.inter_step_us, expect_us)
+        detail, _ = check_periods(m.inter_step_us, t, info)
         ok = ok and counts["ok"] and detail["ok"]
         per_stepper[letter] = {
             # Which channel this stepper was read on, so the record says the map
@@ -1707,8 +1977,8 @@ def eval_pulse_width(channels, rate, segments, info, pins):
     expect_us = ticks * 1e6 / info["ticks_per_s"]
     m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
     counts = sp.step_count_defects(m.step_count, segments[0][0])
-    detail = sp.period_defects(m.inter_step_us, expect_us)
-    adherence = sp.rate_adherence(m.inter_step_us, expect_us)
+    detail, adherence = check_periods(m.inter_step_us, ticks, info,
+                                      with_adherence=True)
     return counts["ok"] and detail["ok"] and adherence["ok"], {
         "ticks": ticks,
         "ticks_per_s": info["ticks_per_s"],
@@ -1750,7 +2020,7 @@ def eval_independent_speeds(channels, rate, segments, info, pins):
         expected = sum(n for n, _, _ in per[idx])
         m = sp.channel_metrics(channels[ch_name], rate)
         counts = sp.step_count_defects(m.step_count, expected)
-        period = sp.period_defects(m.inter_step_us, expect_us)
+        period, _ = check_periods(m.inter_step_us, ticks, info)
         ok = ok and counts["ok"] and period["ok"]
         detail[letter] = {
             "ticks": ticks,
@@ -1818,10 +2088,13 @@ def eval_stop_move_contract(channels, rate, segments, info, pins,
     start -- rather than something the harness has to be trusted not to have
     done.
     """
-    ch = channels["D0"]
+    # Through Pins, not `channels["D0"]`. A multiplexed stepper's step signal is
+    # on no channel at all -- it is a bit of the I2S word, decoded to S<slot> --
+    # so a hardcoded D0 raises KeyError on every mux run instead of measuring it.
+    ch = pins.step_wave(channels, "A")
     m = sp.channel_metrics(ch, rate)
     t = segments[0][1]
-    period = sp.period_defects(m.inter_step_us, t * 1e6 / info["ticks_per_s"])
+    period, _ = check_periods(m.inter_step_us, t, info)
     steps = sp.rising_edges(ch)
     requested = requested_steps(segments)
     filled = info.get("queue_filled_entries", 0)
@@ -1895,10 +2168,13 @@ def eval_abort_queue(channels, rate, segments, info, pins, marker_channel=None):
     (`0 < steps_before_stop`), it stopped short of the fill -- otherwise nothing
     was discarded -- and the tail is within `ABORT_TAIL_ENTRIES`.
     """
-    ch = channels["D0"]
+    # Through Pins, not `channels["D0"]`. A multiplexed stepper's step signal is
+    # on no channel at all -- it is a bit of the I2S word, decoded to S<slot> --
+    # so a hardcoded D0 raises KeyError on every mux run instead of measuring it.
+    ch = pins.step_wave(channels, "A")
     m = sp.channel_metrics(ch, rate)
     t = segments[0][1]
-    period = sp.period_defects(m.inter_step_us, t * 1e6 / info["ticks_per_s"])
+    period, _ = check_periods(m.inter_step_us, t, info)
     steps = sp.rising_edges(ch)
     requested = requested_steps(segments)
     filled = info.get("queue_filled_entries", 0)
@@ -2156,6 +2432,15 @@ def run_sr00(tag_key, args):
     """Capture the SR_00 pin pattern. Not a queue test; it gates the rest."""
     capture_file = Path(args.capture_dir) / f"sr00_{tag_key}.sr"
     rate = args.sr00_sample_rate
+    # SR_00's pattern is 1 Hz, so its window is set by the PATTERN and not by
+    # `--seconds`: that flag sizes a queue scenario, which is tens of
+    # milliseconds, and a 1 Hz pattern needs a couple of cycles to show one full
+    # high and one full low on every channel. It ran on whatever the scenario
+    # asked for, and at the short window a mux run legitimately wants it saw two
+    # edges per channel and reported all eight as dead pins -- which is what a
+    # dead cable looks like, so the pre-check was indistinguishable from the
+    # fault it exists to catch.
+    seconds = max(args.seconds, SR00_SECONDS)
     ser = open_board(args.port, args.baud)
     try:
         # Start the pattern BEFORE the capture, not during it. The evaluator
@@ -2167,7 +2452,7 @@ def run_sr00(tag_key, args):
         # instead of teaching the evaluator to forgive the boundary.
         send_line(ser, "SR00")
         time.sleep(SR00_SETTLE_S)
-        proc = start_capture(capture_file, args.seconds, rate)
+        proc = start_capture(capture_file, seconds, rate)
         proc.wait()
         replies = drain(ser, 0.3)
     finally:
@@ -2209,6 +2494,7 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     """
     ser = open_board(args.port, args.baud)
     try:
+        ensure_mux(ser, wire, args)
         text = reply_of(ser, wire)
         if "OK CONFIG" not in text:
             return "refused", {"error": text.strip(), "wire": wire}
@@ -2233,7 +2519,8 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         # MARK is configuration, like CONFIG, so it belongs in the setup phase.
         marker = None
         if scenario in SCENARIO_MARKERS:
-            want = marker_channel_for(len(chan_map), pin_map.get("stride", 2))
+            want = marker_channel_for(len(chan_map), pin_map.get("stride", 2),
+                                      bus_channels=len(pin_map.get("bus") or ()))
             mark_reply = reply_of(ser, f"MARK {want if want is not None else 'none'}")
             if "OK MARK" not in mark_reply:
                 print(f"    MARK refused: {mark_reply.strip()}")
@@ -2333,17 +2620,40 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         send_line(ser, "QCLR")
         ser.close()
 
-    channels, sample_rate = load_capture_for_eval(capture_file)
+    channels, sample_rate, source_vcd = load_capture_for_eval(capture_file,
+                                                              with_vcd=True)
+    # A multiplexed run has to be decoded before anything can read it: stepper
+    # A's step signal is one bit of a 32-bit word on three shared wires, and it
+    # is on no channel at all. The 8-channel capture becomes a 37-channel one
+    # (8 - 3 + 32) and the evaluators see ordinary step channels from there on.
+    decoded_from = None
+    if pin_map.get("bus"):
+        if source_vcd is None:
+            return "failed", {"error": "mux run needs a VCD to decode; the "
+                                       "capture has none",
+                               "capture": str(capture_file)}
+        decoded = decode_mux_capture(source_vcd, channels, sample_rate,
+                                     pin_map, chan_map)
+        channels, sample_rate, decoded_from = decoded
     # The marker channel is an optional 6th argument, so it goes through `extra`
     # rather than being appended for every evaluator. `extra` is the *value*,
     # forwarded positionally: eval_sync's 6th parameter is the programs dict and
     # gets it the same way.
+    # A multiplexed run is judged on the frame grid it is emitted on. The grid is
+    # a library constant (I2S_TICKS_PER_FRAME), it is a property of the driver
+    # rather than of the board, and it travels in `info` so that every evaluator
+    # sees it -- a scenario-specific special case would be one more thing to keep
+    # in step with the two above it.
+    if pin_map.get("bus"):
+        info = dict(info, frame_grid_ticks=I2S_TICKS_PER_FRAME)
     passed, detail = evaluate(evaluator, channels, sample_rate, segments, info,
-                              chan_map, extra=marker)
+                              chan_map, extra=marker,
+                              frame_grid_ticks=info.get("frame_grid_ticks"))
     detail.update({
         "capture": str(capture_file),
         "channel_map": chan_map,
         "pin_map": pin_map,
+        "decoded_from": decoded_from,
         "sample_rate_hz": sample_rate,
         "capture_seconds_requested": round(seconds, 3),
         "segments": segments,
@@ -2371,6 +2681,31 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     detail["entries_below_min_cmd_ticks"] = sub_min_entries(
         segments if not programs else None, info, programs)
     return ("passed" if passed else "failed"), detail
+
+
+def ensure_mux(ser, wire, args):
+    """Bring the multiplexer up, in THIS session, if this CONFIG needs it.
+
+    It has to be in the same session as the CONFIG, and that is not tidiness:
+    opening the serial port resets the ESP32, so every command batch in this
+    harness starts from a fresh board. `initI2sMux()` cannot run twice and does
+    not survive a reset, so a mux brought up in one session is gone by the next
+    -- and the CONFIG that follows is refused with `ERR connect step 0`, which
+    names no cause and looks exactly like a broken driver.
+
+    Decided from the CONFIG line rather than from a flag, so the two cannot
+    disagree: a run that names i2s_mux has the mux, and a run that does not is
+    left alone.
+    """
+    if "i2s_mux" not in (wire or ""):
+        return False
+    if not getattr(args, "imux", False):
+        return False
+    if send_imux(ser):
+        return True
+    raise RuntimeError(
+        "IMUX was refused for a CONFIG that names i2s_mux: the three bus "
+        "channels must be free, and initI2sMux() cannot run twice")
 
 
 def run_scenario(tag_key, test_id, args):

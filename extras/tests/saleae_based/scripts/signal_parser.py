@@ -429,6 +429,63 @@ def channel_metrics(samples: Sequence[int], sample_rate_hz: int) -> ChannelMetri
     return m
 
 
+def grid_period_defects(periods_us, expect_ticks, ticks_per_s, grid_ticks):
+    """Periods against a command whose step instants are quantised to a frame.
+
+    A driver that can only emit a step on a frame boundary does not emit one
+    period, it emits a *set* of them. The ESP32 I2S multiplexer is the case: a
+    step pulse is one frame (64 ticks = 4 us) high and the pulse is placed in the
+    frame containing its instant, so a 400-tick command is not a steady 25 us --
+    it is 6, 6, 6, then 7 frames, i.e. 24, 24, 24, 28 us, averaging 25 exactly.
+    Judged against a +-5% band around 25 us, one period in four reads as "long"
+    and the run fails while measuring precisely what it exists to describe.
+
+    The legal set is derived from the grid and the command rather than
+    hand-written: the frame holding a step is `floor(t / grid)`, so consecutive
+    steps are `floor((t + ticks) / grid) - floor(t / grid)` frames apart, which
+    can only be `q` or `q + 1` frames for `q = ticks // grid`, and only those two
+    when `ticks` is not a whole number of frames. That is a check, not a
+    rationalisation: a period on any other frame count fails, and so does one
+    that is not on a frame boundary at all.
+
+    The mean is still held to the commanded period, to a tolerance of one frame
+    divided by the number of periods measured plus the sample quantisation. The
+    grid does not move the mean -- the extra frame is paid every fourth step, not
+    on every step -- so any drift is the driver losing or adding time, and it
+    accumulates: over 63 periods a single steady extra frame is already 1.6 %.
+    """
+    frame_us = grid_ticks * 1e6 / ticks_per_s
+    expect_us = expect_ticks * 1e6 / ticks_per_s
+    q = expect_ticks // grid_ticks
+    legal_frames = [q] if expect_ticks % grid_ticks == 0 else [q, q + 1]
+    # A quarter frame: enough for the capture's own sample quantisation, far too
+    # little to admit a neighbouring frame count (which is 4 us away).
+    slack = frame_us * 0.25
+
+    off_grid = [p for p in periods_us
+                if min(abs(p - f * frame_us) for f in legal_frames) > slack]
+    mean = sum(periods_us) / len(periods_us) if periods_us else None
+    # How far the mean may sit from the commanded period, and why that is not a
+    # flat tolerance: the grid pays its extra frame every so often, so over N
+    # periods the accumulated difference is at most one frame divided by N. A
+    # driver running steadily fast accumulates instead, and by 63 periods one
+    # extra frame is already 1.6 % -- visible where a fixed band is not. The
+    # quarter-frame term is the capture's own sample quantisation.
+    mean_slack = frame_us / max(1, len(periods_us)) + slack
+    mean_off = (mean is not None and abs(mean - expect_us) > mean_slack)
+    return {
+        "expected_period_us": expect_us,
+        "grid_us": frame_us,
+        "legal_periods_us": [f * frame_us for f in legal_frames],
+        "periods_measured": len(periods_us),
+        "off_grid_periods_us": off_grid[:16],
+        "n_off_grid": len(off_grid),
+        "mean_period_us": mean,
+        "mean_tolerance_us": mean_slack,
+        "ok": not off_grid and not mean_off,
+    }
+
+
 def period_defects(periods_us, expected_us, tol_frac=0.05, tol_abs=0.5):
     """Compare measured inter-step periods against the commanded one.
 

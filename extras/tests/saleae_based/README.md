@@ -134,8 +134,44 @@ cross-driver pair.
 
 A **refused** point is recorded and the plan continues: for `scale` the point
 where the board says no *is* the answer; for `sync` a driver this build cannot
-connect is recorded next to the combinations that did measure. That is how
-`i2s_mux` becomes runnable — no new code, just naming it.
+connect is recorded next to the combinations that did measure.
+
+### 32 steppers on an 8-channel analyzer
+
+`i2s_mux` is the one driver that is **not** bounded by the channel budget. The
+ESP32 multiplexer carries up to 32 stepper signals as one 32-bit word on three
+wires, so the harness captures those three and *decodes* them into 32 step
+channels:
+
+```
+D0..D4   five stepper channels (step / dir of a physical driver)
+D5,D6,D7 I2S data, bclk, ws
+```
+
+`scripts/i2s_mux_decoder.py` turns that 8-channel capture into a 37-channel one
+(5 passthrough + 32 slots, the bus consumed) and the existing evaluators read the
+result with no mux-specific code. Bring the bus up with `--imux` — a flag, not a
+pin list; the bus *is* the last three channels, and the GPIOs behind them come
+from the firmware's own table so there is nothing for the host to name wrongly:
+
+```bash
+# sweep 1..32 multiplexed steppers at the mux speed floor
+python3 scripts/harness.py --mode scale --arch esp32 --driver i2s_mux \
+    --pin-mode nodir --imux --flash
+```
+
+Measured on an ESP32-DevKitC with a Saleae Logic at 24 MS/s: **29 of 32 stepper
+counts pass** — every stepper's own step count and its own period, through the
+decoded channel. Three design assumptions in
+`extras/doc/implemented/180_r7_virtual_i2s_mux.md` turned out to be wrong and
+were corrected by measurement (a slot is high for one bit-clock period, not for
+the frame; the bus needs 24 MS/s and *not* 48; the word is MSB first), and there
+is one open finding: an intermittent dropped step at 20+ slots.
+
+Sample rate matters more here than anywhere else in the harness. The bus runs at
+8 MHz, so what has to resolve is the **bit clock** — 24 MS/s is three samples per
+bit period and is the floor, while 48 MS/s resolves it better and is unusable
+because this analyzer truncates an eight-channel capture there to 0.18 ms.
 
 ### Host control channel
 
@@ -153,6 +189,8 @@ python3 scripts/control.py --port /dev/cu.usbserial-0001 --send "SR01 400 400" -
 | `SR01 <steps> <speed_us>` | constant-speed move; replies `DONE <pos>` |
 | `POS` | reply `POS <position>` |
 | `STOP` | stop move / self-test |
+| `IMUX` | bring the ESP32 I2S multiplexer up; no arguments (see above) |
+| `MAP` | the board's own channel map — count, mode, stride, the GPIO behind each channel, and `bus=`/`slots=` for the mux. The host reads this rather than assuming a map. |
 
 `run_tests.py` drives this itself for SR_01 (serial + capture + analysis):
 

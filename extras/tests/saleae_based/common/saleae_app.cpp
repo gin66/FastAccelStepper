@@ -50,12 +50,16 @@
  *                              about this board (6 MCPWM queues where there is
  *                              one, 32 mux queues where there are none) and a
  *                              host cannot tell that it is wrong.
- *   IMUX <data> <bclk> <ws>    bring the I2S multiplexer up, at runtime.
+ *   IMUX                      bring the I2S multiplexer up, at runtime.
  *                              initI2sMux() must precede any mux stepper and
  *                              cannot run twice, so it is a serial command
  *                              rather than a build flag: wiring a multiplexer
- *                              up is three pins on existing firmware instead
- *                              of a recompile. Refused on a non-I2S build.
+ *                              up is one word on existing firmware instead of
+ *                              a recompile. It takes no arguments -- the bus is
+ *                              the last three analyzer CHANNELS and their GPIOs
+ *                              come from the channel table, so the bus wiring
+ *                              has exactly one home. Refused on a non-I2S
+ *                              build.
  *   QINFO                      tick rate, MIN_CMD_TICKS, QUEUE_LEN and the
  *                              per-stepper speed floor
  *   QCLR                       drop the program and stop
@@ -137,16 +141,49 @@
 #define SALEAE_STRIDE_DIR 2
 #define SALEAE_STRIDE_NODIR 1
 
+// The I2S multiplexer takes the LAST three analyzer channels: data=D5,
+// bclk=D6, ws=D7.
+//
+// The tail, not the head, is the load-bearing part of the choice. The
+// stepper channel map is `stride * i` from channel 0 and it has to stay that
+// way: `CHAN_PIN(idx * stride)` is the whole of it, and SR_00's eight pins are
+// the same table in the same order. Reserving the head instead would put an
+// offset in front of every index and with it a second way for the firmware and
+// the host to disagree about which pin a channel is.
+//
+// It also keeps the surviving channels their names. With the bus on D5..D7 the
+// five stepper channels are still D0..D4, so a mux capture is a superset of the
+// non-mux one: a capture of an `i2s_mux` run drops the last three channels and
+// gains S0..S31, and D0..D4 need no renaming on either side of that.
+#define SALEAE_BUS_BASE (SALEAE_CHANNELS - 3)
+#define SALEAE_BUS_COUNT 3
+
 // Bounded program: 8 segments is 8 * 6 bytes = 48 bytes of RAM, shared by all
 // steppers. Every characterization scenario needs fewer.
 #define QE_MAX_SEG 8
 
+// The I2S mux word is 32 bits wide and every frame carries all of it, so a
+// multiplexed stepper costs a *slot*, not an analyzer channel: the three bus
+// wires are the only ones it occupies. That is the reason a build with I2S
+// addresses all 32 slots -- with the mux up, thirty-two of them are measurable
+// on a rig whose steppers are the analyzer's channels, and the analyzer's own
+// budget stops applying to them. The physical cap is still enforced, per pin
+// mode, in handle_config().
+//
 // The library cannot hand out more steppers than MAX_STEPPER, and each costs
-// RAM, so never ask for more. AVR is the tight case (2 on a 328P).
-#if defined(MAX_STEPPER)
-#define SALEAE_MAX_STEPPERS (MAX_STEPPER < 8 ? MAX_STEPPER : 8)
+// RAM, so never ask for more. AVR is the tight case (2 on a 328P) and is
+// untouched by any of this: it has no I2S.
+#if defined(SUPPORT_ESP32_I2S)
+#define SALEAE_STEPPER_BOUND 32
+#elif defined(MAX_STEPPER)
+#define SALEAE_STEPPER_BOUND (MAX_STEPPER < 8 ? MAX_STEPPER : 8)
 #else
-#define SALEAE_MAX_STEPPERS 8
+#define SALEAE_STEPPER_BOUND 8
+#endif
+#if defined(MAX_STEPPER) && (MAX_STEPPER < SALEAE_STEPPER_BOUND)
+#define SALEAE_MAX_STEPPERS MAX_STEPPER
+#else
+#define SALEAE_MAX_STEPPERS SALEAE_STEPPER_BOUND
 #endif
 
 // The longest argument is the CONFIG driver list: one driver name per stepper,
@@ -170,8 +207,13 @@
 #define SALEAE_ARG2_MAX 48
 #elif SALEAE_MAX_STEPPERS <= 6
 #define SALEAE_ARG2_MAX 72
-#else
+#elif SALEAE_MAX_STEPPERS <= 8
 #define SALEAE_ARG2_MAX 96
+#else
+// Thirty-two steppers of the longest driver name: 32 * 11 - 1 == 351, rounded
+// up. The one rung above the ladder, reached only by a build with the I2S mux,
+// where the RAM for a 384-byte line buffer is not the constraint.
+#define SALEAE_ARG2_MAX 384
 #endif
 
 static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
@@ -203,9 +245,15 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 // carry no driver names, so they get their own size.
 // QINFO is the one reply that grows per stepper: a fixed prefix for
 // tps/mincmd/qlen/maxall, then " maxspeedN=<ticks>" each. Sized per rung --
-// 48 + 16 * SALEAE_MAX_STEPPERS rounded up, which is what the worst case
-// (5-digit ticks on every stepper, one-character index) needs.
-#define QINFO_REPLY_FOR(n) (48 + 16 * (n) + 8)
+// 48 + 18 * SALEAE_MAX_STEPPERS, which is what the worst case needs.
+//
+// 18, not 16, and the difference is the stepper index: " maxspeed0=65535" is 17
+// characters and " maxspeed31=65535" is 18. A per-stepper budget sized for a
+// one-digit index is exact for eight steppers and short by four bytes per field
+// past ten -- which a 32-stepper i2s_mux board reaches, and the reply then
+// truncates mid-number and the host reports "no QINFO reply" with no hint that
+// the firmware ran out of buffer.
+#define QINFO_REPLY_FOR(n) (48 + 18 * (n))
 
 #if SALEAE_MAX_STEPPERS <= 2
 #define SALEAE_CFG_REPLY_MAX 96
@@ -215,10 +263,17 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 #define SALEAE_CFG_REPLY_MAX 192
 #define SALEAE_SHORT_REPLY_MAX 64
 #define SALEAE_QINFO_REPLY_MAX QINFO_REPLY_FOR(4)
-#else
+#elif SALEAE_MAX_STEPPERS <= 8
 #define SALEAE_CFG_REPLY_MAX 288
 #define SALEAE_SHORT_REPLY_MAX 80
 #define SALEAE_QINFO_REPLY_MAX QINFO_REPLY_FOR(8)
+#else
+// Thirty-two steppers: the driver-name list is 32 * 12 == 384 and the
+// maxspeed fields 32 * 19 == 608, so ~1 kB of reply. Only a build with the I2S
+// mux reaches this and only on ESP32, where that is stack and not SRAM.
+#define SALEAE_CFG_REPLY_MAX 1152
+#define SALEAE_SHORT_REPLY_MAX 80
+#define SALEAE_QINFO_REPLY_MAX QINFO_REPLY_FOR(32)
 #endif
 
 // GPIO per analyzer channel, in channel order.
@@ -270,12 +325,33 @@ static constexpr uint8_t kChanPinConst[SALEAE_CHANNELS] = SAL_CHAN_PINS;
 // which move with FAS_TIMER_MODULE, so this is checked rather than assumed -- a
 // collision here compiles cleanly and then has two peripherals driving one pin.
 //
-// `nodir` needs one channel per stepper, so SALEAE_MAX_STEPPERS must fit in the
-// channel budget: that is the binding limit for the 8-stepper case, ahead of
-// any driver queue count. (A driver may bind first -- MCPWM/PCNT has 6 queues
-// on IDF 5 -- and CONFIG reports the refusal per stepper rather than guessing.)
+// `nodir` needs one channel per PHYSICAL stepper, so SALEAE_MAX_STEPPERS must
+// fit in the channel budget on a build without the mux: that is the binding
+// limit for the 8-stepper case, ahead of any driver queue count. (A driver may
+// bind first -- MCPWM/PCNT has 6 queues on IDF 5 -- and CONFIG reports the
+// refusal per stepper rather than guessing.)
+//
+// The bound is deliberately absent for the I2S mux, which is the one case that
+// does not fit: a mux stepper costs a slot of the 32-bit word rather than a
+// channel, so 32 of them are addressable on five remaining channels. What
+// replaces it is the word width itself, asserted below, and the physical half of
+// the budget in handle_config().
+#if !defined(SUPPORT_ESP32_I2S)
 static_assert(SALEAE_MAX_STEPPERS <= SALEAE_CHANNELS,
               "SALEAE_MAX_STEPPERS does not fit one channel per stepper");
+static_assert(SALEAE_MAX_STEPPERS <= 32,
+              "the QRUN/QFILL bitmask is 32 bits wide");
+#else
+// One slot per stepper, so no run can ask for more slots than the word carries.
+static_assert(SALEAE_STEPPER_BOUND <= 32,
+              "a mux stepper needs one bit of the 32-bit _mux_state word");
+#endif
+
+// The bus occupies the top three channels, so the physical budget is the rest.
+// Asserted rather than assumed because SALEAE_MAX_STEPPERS no longer implies
+// it: the channel cap is a separate fact now.
+static_assert(SALEAE_BUS_BASE + SALEAE_BUS_COUNT == SALEAE_CHANNELS,
+              "the I2S bus must be the LAST three analyzer channels");
 
 #if defined(ARDUINO_ARCH_AVR)
 // Only channels 0..3 are reachable (MAX_STEPPER is 2); the rest are inert.
@@ -349,6 +425,11 @@ struct stepper_slot {
   struct qe_cursor cur;
   uint8_t step_pin;
   uint8_t dir_pin;
+  // The bit of the 32-bit _mux_state word this stepper's step signal is, or
+  // SAL_NO_MUX_SLOT when the stepper owns a GPIO instead. Not derivable from
+  // `step_pin` on the host side -- it lives inside PIN_I2S_FLAG, which the
+  // channel map has no idea about -- so MAP reports it.
+  uint8_t mux_slot;
   enum saleae_driver driver;
 };
 
@@ -362,6 +443,34 @@ static FastAccelStepperEngine engine;
 static bool engine_ready = false;
 static struct stepper_slot slots[SALEAE_MAX_STEPPERS];
 static uint8_t slot_count = 0;
+
+// How many analyzer channels the steppers have actually claimed, and which bits
+// of the mux word they have claimed.
+//
+// These are separate cursors because a multiplexed stepper costs a slot and no
+// channel at all, so `slot_count * chan_stride` -- which was the whole of the
+// channel accounting -- stops being either number. Both are reported by MAP, so
+// the host reads the map rather than deriving one from the count.
+static uint8_t chan_used = 0;
+static uint32_t mux_slots_used = 0;
+
+#define SAL_NO_MUX_SLOT 0xFF
+
+// Set once IMUX has successfully brought the I2S multiplexer up. The engine's
+// own _i2s_mux_initialized is private to StepperQueue, but this app is the one
+// that calls initI2sMux(), so this app is the one that knows. Declared up here
+// because the channel budget depends on it, and a "budget" that does not know
+// whether the bus is on the wires is a guess.
+static bool mux_ready = false;
+
+// Analyzer channels a *physical* stepper may still claim. The bus is off the
+// top of the range, so bringing it up costs three channels and nothing else
+// moves -- see SALEAE_BUS_BASE.
+static uint8_t channels_free(void) {
+  const uint8_t total =
+      mux_ready ? (uint8_t)(SALEAE_CHANNELS - SALEAE_BUS_COUNT) : SALEAE_CHANNELS;
+  return (uint8_t)(total - chan_used);
+}
 
 // Two programs. `shared_program` is what a 3-argument QSEG appends to, and
 // every stepper walks it unless it was given a program of its own -- so all the
@@ -400,7 +509,20 @@ static bool done_pending = false;
 // does not restart the completion path. Cleared when a new program is armed.
 static bool done_announced = false;
 static char linebuf[SALEAE_LINE_MAX];
-static uint8_t linelen = 0;
+// uint16_t, not uint8_t.
+//
+// A uint8_t length wraps at 256, and the wrap does not drop the tail of a long
+// line -- it restarts writing at linebuf[0] and overwrites the *head*. A
+// 32-stepper CONFIG is 271 characters, so the driver list overwrote the
+// "CONFIG 32 " that introduced it and the command came back as unrecognisable:
+// the firmware reported the wrong half of the damage, because sscanf then read
+// a token out of the middle of the argument. It went unnoticed for as long as
+// no legal line reached 256 characters, which the ARG2_MAX ladder (96, i.e. 128
+// with the count) guaranteed.
+//
+// Two bytes on a 328P buys a line buffer that can hold the longest line the
+// protocol can produce, which is the whole contract.
+static uint16_t linelen = 0;
 
 // Two ways out, and which one is correct depends on where the text lives.
 //
@@ -600,14 +722,57 @@ static void stop_all(void) {
   done_announced = false;
 }
 
+#if defined(SUPPORT_ESP32_I2S)
+// Lowest bit of the 32-bit _mux_state word not yet claimed. A step signal and a
+// direction signal compete for the same 32 bits (they are both one bit in the
+// same word), so the cursor is shared and a run in `dir` spends two per stepper --
+// which is why mux `dir` tops out at 16 steppers and not 32.
+static bool mux_next_slot(uint8_t* slot_out) {
+  for (uint8_t s = 0; s < 32; s++) {
+    if (!(mux_slots_used & (1UL << s))) {
+      mux_slots_used |= (1UL << s);
+      *slot_out = s;
+      return true;
+    }
+  }
+  return false;
+}
+#endif  // SUPPORT_ESP32_I2S
+
 static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
                             bool nodir) {
-  const uint8_t step_pin = CHAN_PIN(idx * chan_stride);
-  // A step-only stepper gets no dir pin at all rather than a repeated one, so
-  // setDirectionPin() is not called and nothing on that pin can be mistaken for
-  // a direction. The `nodir` consequence is that count_up is always driven true
-  // (see qe_feed), because there is no pin to toggle for a false.
-  const uint8_t dir_pin = nodir ? 0 : CHAN_PIN(idx * chan_stride + 1);
+  // A multiplexed stepper spends a bit of the mux word and no analyzer channel;
+  // every other driver spends `stride` channels. So the two are claimed from
+  // separate budgets and the channel cursor only moves for the second kind.
+  uint8_t step_slot = SAL_NO_MUX_SLOT;
+  uint8_t dir_slot = SAL_NO_MUX_SLOT;
+  uint8_t step_pin;
+  uint8_t dir_pin = 0;
+#if defined(SUPPORT_ESP32_I2S)
+  if (driver == SA_I2S_MUX) {
+    // PIN_I2S_FLAG is what tells the library's tryAllocateQueue() this is a mux
+    // slot and not a GPIO, and the low five bits are the slot. Without it the
+    // request falls through to isValidStepPin() as the plain GPIO this channel
+    // happens to map to, which is how every i2s_mux CONFIG was refused with
+    // "connect step 0" until the flag was set here.
+    if (!mux_next_slot(&step_slot)) {
+      return false;
+    }
+    if (!nodir && !mux_next_slot(&dir_slot)) {
+      return false;
+    }
+    step_pin = (uint8_t)(PIN_I2S_FLAG | step_slot);
+    dir_pin = nodir ? 0 : (uint8_t)(PIN_I2S_FLAG | dir_slot);
+  } else
+#endif
+  {
+    step_pin = CHAN_PIN(chan_used);
+    // A step-only stepper gets no dir pin at all rather than a repeated one, so
+    // setDirectionPin() is not called and nothing on that pin can be mistaken
+    // for a direction. The `nodir` consequence is that count_up is always driven
+    // true (see qe_feed), because there is no pin to toggle for a false.
+    dir_pin = nodir ? 0 : CHAN_PIN(chan_used + 1);
+  }
 
   FastAccelStepper* s;
 #if defined(SUPPORT_SELECT_DRIVER_TYPE)
@@ -638,6 +803,14 @@ static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
   s = engine.stepperConnectToPin(step_pin);
 #endif
   if (!s) {
+    // Give the claims back, so a refused stepper does not leave a hole that the
+    // next one skips past and MAP then reports as a gap.
+    if (step_slot != SAL_NO_MUX_SLOT) {
+      mux_slots_used &= ~(1UL << step_slot);
+    }
+    if (dir_slot != SAL_NO_MUX_SLOT) {
+      mux_slots_used &= ~(1UL << dir_slot);
+    }
     return false;
   }
   if (!nodir) {
@@ -647,7 +820,11 @@ static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
   slots[idx].stepper = s;
   slots[idx].step_pin = step_pin;
   slots[idx].dir_pin = dir_pin;
+  slots[idx].mux_slot = step_slot;
   slots[idx].driver = driver;
+  if (step_slot == SAL_NO_MUX_SLOT) {
+    chan_used = (uint8_t)(chan_used + (nodir ? 1 : 2));
+  }
   return true;
 }
 
@@ -678,18 +855,21 @@ static bool parse_pin_mode(char* mode_text, bool* nodir, uint8_t* stride) {
 }
 
 // Both bounds, in the refusal, because "too many steppers" cannot say which one
-// bit: a driver that binds first (MCPWM/PCNT has 6 queues on IDF 5) is a
-// different fact from a channel budget that runs out at 4 with `dir`.
+// bit: the slot array (SALEAE_MAX_STEPPERS) is a different fact from the
+// analyzer's channel budget, and a driver that binds first (MCPWM/PCNT has 6
+// queues on IDF 5) is a third.
 //
 // Its own function rather than a buffer in handle_config, because on AVR that
 // function's frame is on top of the reply buffer and a second one there cost 58
 // bytes of SRAM -- measured, not estimated. The frame is transient and never
 // recursed into, so the extra level costs nothing that matters.
-static void reply_too_many(long count, uint8_t cap, uint8_t stride) {
-  char buf[48];
-  sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR CONFIG n=%ld max=%u/%u/%u/%u\n"),
-               count, (unsigned)cap, (unsigned)SALEAE_MAX_STEPPERS,
-               (unsigned)SALEAE_CHANNELS, (unsigned)stride);
+static void reply_too_many(long count, uint8_t stride) {
+  char buf[64];
+  sal_snprintf(buf, sizeof(buf),
+               SAL_PSTR("ERR CONFIG n=%ld max=%u slots=%u chans=%u/%u\n"),
+               count, (unsigned)SALEAE_MAX_STEPPERS,
+               (unsigned)channels_free(), (unsigned)SALEAE_CHANNELS,
+               (unsigned)stride);
   reply(buf);
 }
 
@@ -799,9 +979,11 @@ static void handle_mark(const char* arg) {
   }
   const int ch = arg[0] - '0';
   // A channel a stepper owns cannot be the marker: it would be unreadable
-  // against that stepper's own edges.
-  const uint8_t used = slot_count ? slot_count * chan_stride : 0;
-  if (ch < used) {
+  // against that stepper's own edges. Neither can a bus channel -- the I2S bus
+  // is running its own protocol on it and a marker edge there is not an edge at
+  // all. That is why the bound is channels_free() rather than `used`: with the
+  // mux up, three channels are claimed by nothing this stepper owns.
+  if (ch < channels_free()) {
     reply_p(SAL_PSTR("ERR MARK\n"));
     return;
   }
@@ -809,10 +991,8 @@ static void handle_mark(const char* arg) {
   reply_p(SAL_PSTR("OK MARK\n"));
 }
 
-// Set once IMUX has successfully brought the I2S multiplexer up. The engine's
-// own _i2s_mux_initialized is private to StepperQueue, but this app is the one
-// that calls initI2sMux(), so this app is the one that knows.
-static bool mux_ready = false;
+// Set once IMUX has successfully brought the I2S multiplexer up: see the
+// declaration beside the channel budget, which is what reads it.
 
 static void handle_drivers(void) {
   // Which drivers this build accepts, and whether the multiplexer is up.
@@ -863,26 +1043,31 @@ static void handle_drivers(void) {
   reply(buf);
 }
 
-// IMUX <data> <bclk> <ws> -- bring up the I2S multiplexer at runtime.
+// IMUX -- bring up the I2S multiplexer at runtime.
 //
 // initI2sMux() must be called before any stepperConnectToPin(DRIVER_I2S_MUX), and
 // it cannot be called twice. Making it a serial command rather than a build-time
-// constant means wiring a multiplexer up is three pins on an existing firmware,
-// not a recompile -- which is what makes the mux testable at all on a rig whose
+// constant means wiring a multiplexer up is one word on an existing firmware, not
+// a recompile -- which is what makes the mux testable at all on a rig whose
 // stepper pins are the analyzer's channels.
-static void handle_imux(const char* data, const char* bclk, const char* ws) {
+//
+// It takes no arguments, which is the point. The bus is the last three analyzer
+// CHANNELS and the GPIOs behind them come out of CHAN_PIN(), so there is exactly
+// one place that knows the bus wiring and the host cannot ask for a bus the
+// channel map does not describe. The GPIO-to-channel table is per board and per
+// cable -- the ESP32-DevKitC map is not the ESP32-S3 one -- so naming the pins
+// over serial would have meant naming *this* rig's pins from a host that has no
+// way to know them, and the failure would be a capture that decodes into the
+// wrong 32 slots.
+static void handle_imux(void) {
 #if defined(SUPPORT_ESP32_I2S)
-  if (!data || !bclk || !ws) {
-    reply_p(SAL_PSTR("ERR IMUX needs <data> <bclk> <ws>\n"));
-    return;
-  }
   if (mux_ready) {
     reply_p(SAL_PSTR("ERR IMUX already up (initI2sMux() cannot run twice)\n"));
     return;
   }
-  const uint8_t d = (uint8_t)atoi(data);
-  const uint8_t b = (uint8_t)atoi(bclk);
-  const uint8_t w = (uint8_t)atoi(ws);
+  const uint8_t d = CHAN_PIN(SALEAE_BUS_BASE);
+  const uint8_t b = CHAN_PIN(SALEAE_BUS_BASE + 1);
+  const uint8_t w = CHAN_PIN(SALEAE_BUS_BASE + 2);
   if (!engine.initI2sMux(d, b, w)) {
     reply_p(SAL_PSTR(
         "ERR IMUX initI2sMux failed (pins busy, or already initialised)"
@@ -890,14 +1075,20 @@ static void handle_imux(const char* data, const char* bclk, const char* ws) {
     return;
   }
   mux_ready = true;
-  char buf[48];
-  sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK IMUX data=%u bclk=%u ws=%u\n"), d,
-               b, w);
+  // Channels before pins, and both by name: `data=5` on its own is ambiguous on
+  // this board, where GPIO 5 is also channel 5. The host needs the channels to
+  // build a decoder config and the pins to check it against the wiring.
+  char buf[80];
+  sal_snprintf(buf, sizeof(buf),
+               SAL_PSTR("OK IMUX ch=%u,%u,%u pin=%u,%u,%u D%d=D%d D%d=D%d "
+                        "D%d=D%d\n"),
+               (unsigned)SALEAE_BUS_BASE, (unsigned)(SALEAE_BUS_BASE + 1),
+               (unsigned)(SALEAE_BUS_BASE + 2), (unsigned)d, (unsigned)b,
+               (unsigned)w, (unsigned)SALEAE_BUS_BASE, (unsigned)d,
+               (unsigned)(SALEAE_BUS_BASE + 1), (unsigned)b,
+               (unsigned)(SALEAE_BUS_BASE + 2), (unsigned)w);
   reply(buf);
 #else
-  (void)data;
-  (void)bclk;
-  (void)ws;
   reply_p(SAL_PSTR("ERR IMUX needs an ESP32 I2S build\n"));
 #endif
 }
@@ -909,14 +1100,26 @@ static void handle_map(void) {
   // `mode` is the one field that cannot be a literal in the format string: it
   // depends on chan_stride, and a `%s` argument has to be in RAM. Hence the
   // pin_mode_name() copy.
-  char buf[SALEAE_CHANNELS * 4 + 64];
+  //
+  // `ch` lists the GPIO behind each channel the steppers claimed, and only
+  // those: `chan_used`, not slot_count * stride. The two differ as soon as a
+  // multiplexed stepper is in the list, and a host that read eight entries for
+  // two mux steppers would be reading bus pins as step pins.
+  //
+  // `bus` and `slots` are the mux half of the map, and they are what a decoder
+  // config is built from: which three channels carry the bus, and which bit of
+  // the 32-bit word each stepper is. A mux stepper's step signal is not on a
+  // channel at all, so without `slots` the host would look for stepper A's step
+  // edge on a pin that carries somebody else's, find nothing, and report a
+  // driver that emits nothing. `slots` uses `-` for a GPIO stepper so the field
+  // lines up with the stepper letters one to one.
+  char buf[SALEAE_CHANNELS * 4 + SALEAE_MAX_STEPPERS * 4 + 96];
   char mode[SAL_PIN_MODE_MAX];
   pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
   int len = sal_snprintf(buf, sizeof(buf),
                          SAL_PSTR("MAP count=%u mode=%s stride=%u ch="),
                          (unsigned)slot_count, mode, (unsigned)chan_stride);
-  const uint8_t used = slot_count ? slot_count * chan_stride : 0;
-  for (uint8_t c = 0; c < used && c < SALEAE_CHANNELS; c++) {
+  for (uint8_t c = 0; c < chan_used && c < SALEAE_CHANNELS; c++) {
     // Two formats rather than a `"%s%u"` with `c ? "," : ""`: that would put
     // the separator in RAM as well as flash, and the whole point of the two
     // lines below is that no string literal ends up in SRAM. It is also the
@@ -930,6 +1133,29 @@ static void handle_map(void) {
                           (unsigned)CHAN_PIN(c));
     }
   }
+#if defined(SUPPORT_ESP32_I2S)
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" bus="));
+  if (mux_ready) {
+    len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u,%u,%u"),
+                        (unsigned)SALEAE_BUS_BASE,
+                        (unsigned)(SALEAE_BUS_BASE + 1),
+                        (unsigned)(SALEAE_BUS_BASE + 2));
+  } else {
+    len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("-"));
+  }
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" slots="));
+  for (uint8_t i = 0; i < slot_count; i++) {
+    if (i) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(","));
+    }
+    if (slots[i].mux_slot == SAL_NO_MUX_SLOT) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("-"));
+    } else {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u"),
+                          (unsigned)slots[i].mux_slot);
+    }
+  }
+#endif
   len += sal_snprintf(
       buf + len, sizeof(buf) - len, SAL_PSTR(" marker=%u"),
       marker_channel == SALEAE_NO_MARKER ? 0xFFu : (unsigned)marker_channel);
@@ -958,22 +1184,19 @@ static void handle_config(char* count_text, char* driver_list,
     engine_ready = true;
   }
 
-  // Pin mode first: the stride it selects decides how many steppers the eight
-  // channels can carry, and so the count cap below depends on it.
+  // Pin mode first: the stride it selects decides how many channels each
+  // physical stepper costs, and so the channel cap below depends on it.
   bool nodir;
   uint8_t stride;
   if (!parse_pin_mode(mode_text, &nodir, &stride)) {
     reply_p(SAL_PSTR("ERR CONFIG mode dir|nodir\n"));
     return;
   }
-  const uint8_t chan_cap = SALEAE_CHANNELS / stride;
 
   // Resolve the count *before* touching the array. On AVR SALEAE_MAX_STEPPERS
   // is 2, so filling a 4-entry driver list into a 2-entry array would scribble
   // past it -- and clamping afterwards is too late, the writes have already
   // happened.
-  const uint8_t cap =
-      SALEAE_MAX_STEPPERS < chan_cap ? SALEAE_MAX_STEPPERS : chan_cap;
   enum saleae_driver drivers[SALEAE_MAX_STEPPERS];
   uint8_t n;
 
@@ -991,8 +1214,10 @@ static void handle_config(char* count_text, char* driver_list,
     reply_p(SAL_PSTR("ERR CONFIG needs <n> <drv>[,<driver>]\n"));
     return;
   }
-  if (count > cap) {
-    reply_too_many(count, cap, stride);
+  if (count > SALEAE_MAX_STEPPERS) {
+    // The array bound, which is the only one a driver list cannot dodge: a
+    // 4-entry list filled into a 2-entry array scribbles past it.
+    reply_too_many(count, stride);
     return;
   }
   n = (uint8_t)count;
@@ -1028,6 +1253,57 @@ static void handle_config(char* count_text, char* driver_list,
     return;
   }
 
+  // The channel budget is checked here, against the drivers actually named,
+  // because a multiplexed stepper spends no channel and every other one spends
+  // `stride`. Checking it before the list is parsed -- as the count-vs-cap test
+  // used to -- could only ask whether `count` channels fit, which is the wrong
+  // question the moment one entry is `i2s_mux`, and which would refuse
+  // `CONFIG 32 i2s_mux,...` on a rig that has thirty-two free slots.
+  //
+  // Two budgets, and the refusal names both because "too many steppers" cannot
+  // say which one bit: a driver that binds first (MCPWM/PCNT has 6 queues on
+  // IDF 5) is a different fact from a channel budget that runs out at 4 with
+  // `dir`.
+  uint8_t want_phy = 0;
+#if defined(SUPPORT_ESP32_I2S)
+  uint8_t want_mux = 0;
+#endif
+  for (uint8_t i = 0; i < n; i++) {
+#if defined(SUPPORT_ESP32_I2S)
+    if (drivers[i] == SA_I2S_MUX) {
+      want_mux++;
+      continue;
+    }
+#endif
+    want_phy = (uint8_t)(want_phy + stride);
+  }
+  const uint8_t chan_cap = mux_ready ? (uint8_t)(SALEAE_CHANNELS -
+                                                  SALEAE_BUS_COUNT)
+                                     : (uint8_t)SALEAE_CHANNELS;
+  if (want_phy > chan_cap) {
+    char buf[64];
+    sal_snprintf(buf, sizeof(buf),
+                 SAL_PSTR("ERR CONFIG n=%u needs %u channels, max=%u\n"),
+                 (unsigned)n, (unsigned)want_phy, (unsigned)chan_cap);
+    reply(buf);
+    return;
+  }
+#if defined(SUPPORT_ESP32_I2S)
+  // One slot per step, plus one more for a mux direction pin, all out of the
+  // same 32 bits. This is the bound that makes mux `dir` reach 16 rather than
+  // 32, and it is checked here rather than left to a silent refusal from
+  // tryAllocateQueue()'s bitmask -- a refusal there names no bound.
+  const uint8_t slots_wanted = (uint8_t)(want_mux * (nodir ? 1 : 2));
+  if (slots_wanted > 32) {
+    char buf[64];
+    sal_snprintf(buf, sizeof(buf),
+                 SAL_PSTR("ERR CONFIG mux n=%u needs %u slots, max=32\n"),
+                 (unsigned)n, (unsigned)slots_wanted);
+    reply(buf);
+    return;
+  }
+#endif
+
   // Each queue can only be allocated once, so a second CONFIG cannot move an
   // already-connected stepper. Report the existing setup instead of silently
   // running with a different pin map than the host thinks.
@@ -1047,6 +1323,8 @@ static void handle_config(char* count_text, char* driver_list,
 
   chan_stride = stride;
   slot_count = n;
+  chan_used = 0;
+  mux_slots_used = 0;
   for (uint8_t i = 0; i < n; i++) {
     if (!connect_stepper(i, drivers[i], nodir)) {
       slot_count = i;
@@ -1398,6 +1676,24 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
   reply(buf);
 }
 
+// The QRUN/QFILL stepper selector. Decimal as before, and hexadecimal as well
+// because the all-32-steppers mask has no useful decimal form: `QRUN 0xFFFFFFFF`
+// says "every slot" and `QRUN 4294967295` says nothing a reader can check by
+// eye. A leading 0x is the whole signal, so no flag argument is needed and the
+// existing decimal calls are untouched.
+//
+// strtoul, not atol: `atol` returns `long`, which on AVR is 16 bits, so a mask
+// of more than 32767 would silently wrap into a *valid-looking* different mask
+// -- QRUN 0x10001 selecting stepper B on a board that meant B and the 17th.
+static uint32_t parse_mask(const char* text) {
+  if (!text) {
+    return 1;
+  }
+  const int base = (text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) ? 16
+                                                                       : 10;
+  return (uint32_t)strtoul(text, NULL, base);
+}
+
 // Arm the cursors `mask` selects at the head of their programs. `fill_only`
 // arms them for QFILL (queued, not started) rather than for QRUN.
 #define ARM_OK 0
@@ -1406,11 +1702,15 @@ static void handle_qseg(char* a1, char* a2, char* a3, char* a4) {
 #define ARM_NONE_SELECTED 3
 #define ARM_NO_PROGRAM 4
 
-static uint8_t arm_cursors(long mask, bool fill_only) {
+static uint8_t arm_cursors(uint32_t mask, bool fill_only) {
   if (slot_count == 0) {
     return ARM_NO_CONFIG;
   }
-  if (mask <= 0 || mask > 0xff) {
+  // 32 bits wide, because the I2S mux word is: `QRUN 0xFFFFFFFF` is the whole
+  // point of the maximum-speed scenario. A build without the mux still refuses
+  // anything above its own stepper count below, so widening the mask cannot
+  // silently widen a run.
+  if (mask == 0) {
     return ARM_BAD_MASK;
   }
 
@@ -1431,14 +1731,14 @@ static uint8_t arm_cursors(long mask, bool fill_only) {
       // stops, so the queue depth at any later instant -- including at a stop --
       // is the depth the board reported, not a race with the feeder.
       c->no_topup = true;
-      if (mask & (1 << i)) {
+      if (mask & (1UL << i)) {
         selected++;
         runnable++;
       }
       continue;
     }
     memset(c, 0, sizeof(*c));
-    if (!(mask & (1 << i))) {
+    if (!(mask & (1UL << i))) {
       continue;
     }
     program_for(i, &c->list, &c->len);
@@ -1473,7 +1773,8 @@ static void reply_arm_error(uint8_t code, const char* cmd) {
       reply_p(SAL_PSTR("ERR no config\n"));
       break;
     case ARM_BAD_MASK:
-      sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR %s mask=1..255\n"), name);
+      sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR %s mask=1..0xFFFFFFFF\n"),
+                   name);
       reply(buf);
       break;
     case ARM_NO_PROGRAM:
@@ -1488,7 +1789,7 @@ static void reply_arm_error(uint8_t code, const char* cmd) {
 
 static void handle_qrun(char* mask_text) {
   stop_sr00();
-  long mask = mask_text ? atol(mask_text) : 1;
+  uint32_t mask = parse_mask(mask_text);
   uint8_t rc = arm_cursors(mask, false);
   if (rc != ARM_OK) {
     reply_arm_error(rc, SAL_PSTR("QRUN"));
@@ -1520,7 +1821,7 @@ static void handle_qrun(char* mask_text) {
 // requested one is characterized rather than failed.
 static void handle_qfill(char* mask_text, char* entries_text) {
   stop_sr00();
-  long mask = mask_text ? atol(mask_text) : 1;
+  uint32_t mask = parse_mask(mask_text);
   long want = entries_text ? atol(entries_text) : QUEUE_LEN;
   if (want < 1 || want > QUEUE_LEN) {
     reply_p(SAL_PSTR("ERR QFILL entries=1..\n"));
@@ -1615,7 +1916,7 @@ static void handle_line(char* line) {
   } else if (!sal_strcmp(cmd, SAL_PSTR("DRIVERS"))) {
     handle_drivers();
   } else if (!sal_strcmp(cmd, SAL_PSTR("IMUX"))) {
-    handle_imux(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL, n > 3 ? arg3 : NULL);
+    handle_imux();
   } else if (!sal_strcmp(cmd, SAL_PSTR("QINFO"))) {
     handle_qinfo();
   } else if (!sal_strcmp(cmd, SAL_PSTR("QCLR"))) {
@@ -1630,7 +1931,10 @@ static void handle_line(char* line) {
   } else if (!sal_strcmp(cmd, SAL_PSTR("QFILL"))) {
     handle_qfill(n > 1 ? arg1 : NULL, n > 2 ? arg2 : NULL);
   } else if (!sal_strcmp(cmd, SAL_PSTR("POS"))) {
-    char buf[80];
+    // One slot per stepper, and " %ld" is up to 13 bytes with a leading space
+    // and a sign -- so 32 of them do not fit the 80 bytes an eight-stepper run
+    // needs. Sized from the same stepper count as the other replies.
+    char buf[8 * SALEAE_MAX_STEPPERS + 16];
     int len = sal_snprintf(buf, sizeof(buf), SAL_PSTR("POS"));
     for (uint8_t i = 0; i < slot_count; i++) {
       len += sal_snprintf(
@@ -1656,7 +1960,15 @@ static void handle_line(char* line) {
     mark_event();
     reply_p(SAL_PSTR("OK XSTOP abortqueue\n"));
   } else {
-    reply_p(SAL_PSTR("ERR unknown\n"));
+    // Echo the token back. "ERR unknown" on its own cannot tell a typo from a
+    // line that arrived damaged -- a serial protocol that drops bytes reports
+    // the *command* as unrecognisable when it was the argument that was lost,
+    // and that was exactly the 32-stepper CONFIG driver list, arriving one
+    // buffer too long. `cmd` is a RAM copy of the first token, so it costs
+    // nothing to print.
+    char buf[40];
+    sal_snprintf(buf, sizeof(buf), SAL_PSTR("ERR unknown '%s'\n"), cmd);
+    reply(buf);
   }
 }
 

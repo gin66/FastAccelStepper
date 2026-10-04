@@ -40,6 +40,8 @@ scripts/
   report.py                markdown + csv view of a run; mode tables
   analyze_csv.py           SR_00 evaluation
   signal_parser.py         edges/metrics core (shared)
+  i2s_mux_decoder.py       8-channel VCD -> 37-channel VCD (ESP32 I2S mux)
+  probe_mux_bits.py        one-off: measures the I2S wire protocol on hardware
   tests/                   hardware-free unit tests
 results/                   generated JSON results + tag_index.json (git-ignored)
 capture.sr, capture.vcd     generated captures (git-ignored)
@@ -100,9 +102,10 @@ python3 scripts/harness.py --mode scale --driver rmt_v2 --pin-mode nodir --flash
 python3 scripts/harness.py --mode sync --arch esp32 --dry-run
 python3 scripts/harness.py --mode sync --arch esp32 --speed-us 5 --flash
 
-# the mux, once it is wired: three pins on existing firmware, no rebuild
+# the mux: 32 multiplexed steppers on 3 wires, 8-channel analyzer. --imux is a
+# flag, not a pin list -- the bus IS channels D5/D6/D7 (see "The I2S mux" below).
 python3 scripts/harness.py --mode scale --arch esp32 --driver i2s_mux \
-    --imux 12,13,14 --pin-mode dir --flash
+    --pin-mode nodir --imux --flash
 
 # low-level (firmware already flashed; you supply the tag key)
 python3 scripts/run_tests.py --tag-key esp32_idf5_3_0_mcpwm_pcnt_2ch --tests SR_01
@@ -159,24 +162,30 @@ CONFIG <n> <drv>[,<drv>..] [dir|nodir]
                             the QSEG direction argument still parses but is
                             forced true -- there is no pin to toggle for a
                             false, and the queue would refuse it.
-MAP                         count, mode, stride, and the GPIO behind each
-                            reachable channel. The host MUST read this rather
-                            than assume a channel map: in `dir` stepper B is D2,
-                            in `nodir` it is D1, and a host that guesses reads a
-                            quiet pin and reports a driver that emits nothing.
-                            The map is passed to each evaluator as a `Pins`
-                            object; there is no module-level channel table. A
-                            capture lacking a stepper the board connected is an
-                            *incomplete capture* and fails the run -- it is not
-                            reported as a quiet stepper, and not passed.
+MAP                         count, mode, stride, the GPIO behind each reachable
+                            channel, plus `bus=` (the three I2S channels, or
+                            `-`) and `slots=` (one per channel: the bit of the
+                            32-bit word that channel's stepper is, or `-` for a
+                            GPIO). The host MUST read this rather than assume a
+                            channel map: in `dir` stepper B is D2, in `nodir` it
+                            is D1, and a host that guesses reads a quiet pin and
+                            reports a driver that emits nothing. A multiplexed
+                            stepper is on NO channel at all, so its entry is
+                            `S<slot>` -- a name that exists only in the decoded
+                            capture. The map is passed to each evaluator as a
+                            `Pins` object; there is no module-level channel
+                            table. A capture lacking a stepper the board
+                            connected is an *incomplete capture* and fails the
+                            run -- it is not reported as a quiet stepper, and
+                            not passed.
 MARK <ch> | none             designate an analyzer channel no stepper owns as
                             the event marker: the firmware flips its level when
                             it processes a stop, putting the stop instant on the
                             waveform instead of leaving it to be inferred from
                             "the pulses ceased". That inference cannot work
-                            here -- the capture delivered is not the capture
-                            requested (24 MHz truncates) -- so the two cannot be
-                            told apart. MAP reports marker=. At 8 steppers in
+                            here -- at 48 MS/s the capture delivered is 0.18 ms of
+                            the capture requested -- so the two cannot be told
+                            apart. MAP reports marker=. At 8 steppers in
                             `nodir` there is no free channel and MARK is refused.
                             Send it in the setup phase, never after QRUN: its
                             serial round-trips would otherwise land between the
@@ -223,6 +232,18 @@ QRUN <mask>                 run on the steppers in the bitmask, synced start
 POS | STOP
 ```
 
+IMUX                          bring the ESP32 I2S multiplexer up, at runtime.
+                              Takes NO arguments. The bus is the last three
+                              analyzer CHANNELS and the GPIOs behind them come
+                              out of this firmware's own CHAN_PIN table, so the
+                              bus wiring has exactly one home and the host has
+                              nothing it could name wrongly. Sent inside the same
+                              serial session as the CONFIG that needs it --
+                              opening the port resets the ESP32 and
+                              initI2sMux() cannot run twice or survive a reset,
+                              so a mux brought up in an earlier session is gone
+                              by the next and the CONFIG is refused with
+                              `ERR connect step 0`, which names no cause.
 Driver names: `rmt` | `rmt_v2` | `mcpwm` | `mcpwm_pcnt` | `i2s` | `i2s_direct` |
 `i2s_mux` on the ESP32 family, `timer` on AVR/SAM/SAMD, `pio` on Pico. A driver
 the running build has no queues for is refused — `CONFIG 2 rmt,rmt` on a 328P
@@ -342,10 +363,27 @@ back, so a VCD may end before the last constant stretch of the capture.
 
 ## Sample-rate / capture gotchas
 
-- Supported rates are `48 MHz / n` (`sigrok-cli -d fx2lafw --show`). Low rates
-  (≤2 MHz) stream for the full `--time`; higher rates are **truncated** — e.g.
-  4 MHz is capped at ~2.22 Msamples regardless of `--time`, so a 1 s request
-  yields ~0.56 s. `capture.py` warns on this (`--strict` fails).
+- Supported rates are `48 MHz / n` (`sigrok-cli -d fx2lafw --show`). **Measured
+  delivered length for a 2 s request**, 8 channels:
+
+  | rate | 4 | 8 | 16 | 24 | 48 MHz |
+  |---|---|---|---|---|---|
+  | samples | 40 448 | 80 384 | 160 256 | 240 128 | **8 704** |
+  | window | 10 ms | 10 ms | 10 ms | 10 ms | **0.18 ms** |
+
+  (Those are *first-member* byte counts; the `.sr` is chunked into 200 members
+  and totals 2 s at 4–24 MHz. **48 MHz is the outlier — it truncates hard**, to
+  less than a scenario's duration, so a capture there covers a run that has not
+  started. Do not pick 48 MHz because it is the highest rate on the list.)
+
+  The 24 MHz VCD writes `$timescale 100 ps`, and `load_vcd()` recovers the sample
+  period from `$timescale × $comment rate` — so the two have to agree or every
+  timestamp lands on the wrong sample. `i2s_mux_decoder.timescale_for()` emits
+  exactly `1e9/rate` ns for this reason.
+- The **analyzer channel budget** is `CHANNELS - 3` while the mux bus is up (the
+  bus is the last three channels), so 5 physical steppers in `nodir`, 2 in `dir`.
+  A *multiplexed* stepper is not bounded by that at all — it costs a bit of the
+  32-bit word. See "The I2S mux" above.
 - For edge/step counting ~20 samples per step period is enough. For pulse-width
   / duty tests (SR_07/SR_08) the rate must resolve the **pulse width** (a few
   µs or less), i.e. MHz–tens of MHz — not just the period.
@@ -409,13 +447,79 @@ pio run -d extras/tests/saleae_based/apps/arduino -e saleae_avr
 `.data` is the number to watch: it holds `.rodata` *and* the stack. PlatformIO's
 `RAM:` line only gives the sum. See white paper §4.3.2.
 
+## The I2S mux: 32 steppers on 3 wires
+
+The ESP32 I2S multiplexer carries up to **32 stepper signals as one 32-bit word**,
+repeated every I2S frame. That is what lets an eight-channel analyzer measure 32
+steppers: the three bus wires are captured and *decoded*, and the other five
+channels carry whatever physical steppers are also attached.
+
+```
+D0..D4   five stepper channels (step / dir of a physical driver)
+D5,D6,D7 I2S data, bclk, ws
+```
+
+The bus is the **tail**, deliberately. The stepper channel map stays `stride * i`
+from channel 0 with no offset in front of it, and a mux capture is a superset of a
+physical one: decode it and D0..D4 keep their names. A mux stepper costs a bit of
+the word and **no analyzer channel**, which removes the channel budget as its
+limit -- `nodir` reaches 32, `dir` reaches 16 (a mux direction is a second bit of
+the *same* word).
+
+`scripts/i2s_mux_decoder.py` is the 8 -> 37 leg: 3 bus channels consumed, 5
+passthrough + 32 slots (`S0`..`S31`) written. The result is an ordinary VCD, so
+`signal_parser` and every evaluator read it with **no mux-specific code** --
+which is the property the whole design rests on, and it is tested
+(`TestMuxDecode.test_the_decoded_capture_evaluates_through_the_ordinary_path`).
+
+Three measured facts that the design reference got wrong, and that the
+implementation depends on:
+
+- A slot is high for **one bclk period (125 ns)**, not for the frame. The frame
+  is the unit of *time*; a slot is one of 32 bits inside it. The decoder widens
+  the one-bit pulse back to a frame, because that is the unit the receiving shift
+  register latches and the unit a step occupies.
+- The sample rate floor is **24 MS/s**, not 8. 24/8 = 3 samples per 8 MHz bclk
+  period; 8 MS/s is one sample per period and recovers nothing. **48 MS/s is
+  worse** -- this analyzer truncates an eight-channel 48 MS/s capture to 0.18 ms
+  and a scenario lasts milliseconds. See the table in
+  `extras/doc/implemented/180_r7_virtual_i2s_mux.md`.
+- The word goes out **MSB first**: wire bit k (0 = the frame's first bclk) is
+  slot 31-k, so slot S is bit S. Measured by `scripts/probe_mux_bits.py`.
+
+**Sample the data on the bclk rising edge.** The two plausible alternatives are
+both wrong *silently*: the middle of the clock's high time needs a 50 % clock and
+the ESP32 is not one (measured 4-in-6 high at 48 MS/s, 1-in-3 at 24 MS/s), and
+it turned a clean 64-step run into 37 steps across two slots; the cell's last
+sample lands on the *next* cell at three samples per cell and decoded slot 0 to
+slot 1. The tests in `test_i2s_mux_decoder.py::TestSamplingPoint` pin all three.
+
+A multiplexed step can only start on a frame boundary, so its period is a **set**:
+400 ticks is 6, 6, 6 then 7 frames -- 24, 24, 24, 28 us, averaging exactly 25.
+`signal_parser.grid_period_defects()` derives the legal set from the grid, and
+`run_tests.check_periods()` is the single place choosing between the grid and the
+ordinary +-5 % band (twelve call sites). A period on any other frame count still
+fails.
+
+**Known finding:** an intermittent dropped step at 20+ slots -- 16 of 20 (and 16
+of 25) lose exactly one of 64 steps at the same instant, the low half of the
+word, while 16..31 are complete; 3 of 32 sweep points. Not reproducible on demand
+(n=20 passed three consecutive re-measurements). Suspected: `i2s_fill_buffer_mux()`
+does `buf[...] |= bit_mask` on memory the DMA is reading. Recorded, not worked
+around. Details in `extras/doc/implemented/180_r7_virtual_i2s_mux.md`.
+
 ## Hardware pin map (ESP32-DevKitC)
 
 ```
 Saleae D0..D7 -> GPIO 2, 0, 4, 16, 17, 5, 18, 19
 4ch steppers : A step/dir 2/0, B 4/16, C 17/5, D 18/19
+I2S mux bus  : D5=D5/GPIO5 data, D6=D18 bclk, D7=D19 ws
 GPIO0 is a boot-strapping pin (must be HIGH at boot).
 ```
+
+The GPIO-to-channel table is **per board and per cable** -- the ESP32-S3 map is not
+the ESP32-DevKitC one. That is why `IMUX` names no pins and why the mux's channel
+allocation is a constant here rather than a host argument.
 
 ## References
 
