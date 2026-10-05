@@ -1,6 +1,6 @@
 # Saleae harness — ESP32 platform-release matrix
 
-- **Generated:** 2026-10-05 01:07
+- **Generated:** 2026-10-05 12:57
 - **Board:** ESP32-DevKitC, Saleae Logic 8ch (`fx2lafw:conn=8.88`), serial `/dev/cu.usbserial-0001`
 - **Firmware rows:** 6 — one build+flash each
 - **Matrix definition:** `scripts/harness.py` (`RELEASE_MATRIX`, `release_runs()`)
@@ -12,12 +12,12 @@ Every row is a firmware flashed **once**; all driver and combination runs below 
 
 | framework | version | ESP-IDF | PlatformIO env | drivers the board accepts | catalogue | scale sweeps | sync | measured |
 |---|---|---|---|---|---|---|---|---|
-| arduino | 4.4.0 | 4.4.7 | `esp32_V4_4_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-04T20:28:15 |
-| arduino | 5.3.0 | 4.4.7 | `esp32_V5_3_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-04 20:10:10 |
-| arduino | 6.13.0 | 4.4.7 | `esp32_V6_13_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-04 20:10:52 |
-| idf | 5.3.0 | 4.4.3 | `esp32_idf_V5_3_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-04 20:15:03 |
-| idf | 6.13.0 | 5.5.3 | `esp32_idf_V6_13_0` | rmt, mcpwm_pcnt, i2s_direct, i2s_mux | catalogue | 4 | sync | 2026-10-05 00:57:18 |
-| idf | 7.1.2 | 6.1.0 | `esp32_idf_V7_1_2` | rmt, mcpwm_pcnt, i2s_direct, i2s_mux | catalogue | 4 | sync | 2026-10-04 20:55:59 |
+| arduino | 4.4.0 | 4.4.7 | `esp32_V4_4_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-05 12:22:54 |
+| arduino | 5.3.0 | 4.4.7 | `esp32_V5_3_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-05 12:26:39 |
+| arduino | 6.13.0 | 4.4.7 | `esp32_V6_13_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-05 12:30:12 |
+| idf | 5.3.0 | 4.4.3 | `esp32_idf_V5_3_0` | rmt, mcpwm_pcnt | catalogue | 2 | sync | 2026-10-05 12:33:47 |
+| idf | 6.13.0 | 5.5.3 | `esp32_idf_V6_13_0` | rmt, mcpwm_pcnt, i2s_direct, i2s_mux | catalogue | 4 | sync | 2026-10-05 12:37:50 |
+| idf | 7.1.2 | 6.1.0 | `esp32_idf_V7_1_2` | rmt, mcpwm_pcnt, i2s_direct, i2s_mux | catalogue | 4 | sync | 2026-10-05 12:47:36 |
 
 > The rows were not measured in one sitting: a row whose upload failed is re-run on its own, and the *measured* column is when each row's flash happened. Rows that share a timestamp were measured against the board back to back.
 
@@ -66,7 +66,6 @@ Defects only: a panic, a crash, a step count or a period that is wrong, and meas
 | matrix row | what | measurements | note |
 |---|---|---|---|
 | idf-6.13.0 | incomplete | 1 | incomplete capture: S2 missing (stepper B) |
-| idf-6.13.0 | defect | 1 | OK QRUN |
 | idf-7.1.2 | incomplete | 1 | incomplete capture: S2 missing (stepper B) |
 
 Expanded below, one line per measurement.
@@ -76,7 +75,6 @@ Expanded below, one line per measurement.
 | matrix row | test | class | note |
 |---|---|---|---|
 | idf-6.13.0 | sync i2s_mux+i2s_mux | incomplete | incomplete capture: S2 missing (stepper B) |
-| idf-6.13.0 | sync rmt+i2s_mux | defect | OK QRUN |
 | idf-7.1.2 | sync i2s_mux+i2s_mux | incomplete | incomplete capture: S2 missing (stepper B) |
 
 Not findings, and not listed above: **24** refusal(s), which are the measured limits in the sweep tables below, and **32** `no such driver` answer(s), which are scenarios this build has no queues for. A full accounting of every result is in `results/` and in `results/tag_index.json`.
@@ -303,14 +301,14 @@ Every driver-list combination this board could connect, two steppers each, each 
 |---|---|---|---|---|
 | i2s_direct+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | i2s_direct+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| i2s_mux+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
+| i2s_mux+i2s_mux | n/a (no such driver) | – | – | DONE 0 |
 | mcpwm_pcnt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 7.25 | 0.72 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 3.0 | 0.30 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 31.0 | 3.10 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_rmtdirn2.vcd) | 21.0 | 2.10 |  |
+| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 15.5 | 1.55 |  |
+| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_rmtdirn2.vcd) | 21.25 | 2.12 |  |
 
 **arduino-5.3.0 / sync**
 
@@ -321,11 +319,11 @@ Every driver-list combination this board could connect, two steppers each, each 
 | i2s_mux+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 7.0 | 0.70 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 3.25 | 0.33 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 25.75 | 2.58 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_rmtdirn2.vcd) | 29.0 | 2.90 |  |
+| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 31.25 | 3.12 |  |
+| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_rmtdirn2.vcd) | 36.75 | 3.67 |  |
 
 **arduino-6.13.0 / sync**
 
@@ -336,11 +334,11 @@ Every driver-list combination this board could connect, two steppers each, each 
 | i2s_mux+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 7.25 | 0.72 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 3.25 | 0.33 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 43.0 | 4.30 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_rmtdirn2.vcd) | 21.25 | 2.12 |  |
+| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 19.25 | 1.93 |  |
+| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_rmtdirn2.vcd) | 17.25 | 1.73 |  |
 
 **idf-5.3.0 / sync**
 
@@ -354,38 +352,38 @@ Every driver-list combination this board could connect, two steppers each, each 
 | mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_idf5_3_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 4.5 | 0.45 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf5_3_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 52.5 | 5.25 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf5_3_0_rmt_syncdir_rmtdirn2.vcd) | 27.25 | 2.73 |  |
+| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf5_3_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 44.5 | 4.45 |  |
+| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf5_3_0_rmt_syncdir_rmtdirn2.vcd) | 27.5 | 2.75 |  |
 
 **idf-6.13.0 / sync**
 
 | drivers | verdict | first-step skew us | in step periods | note |
 |---|---|---|---|---|
-| i2s_direct+i2s_direct | pass [vcd](capture/sync_i2s_direct+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_directdirn2.vcd) | 40.7083 | 4.07 |  |
-| i2s_direct+i2s_mux | pass [vcd](capture/sync_i2s_direct+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_direct+i2s_muxdirn2.vcd) | 208.125 | 8.33 |  |
+| i2s_direct+i2s_direct | pass [vcd](capture/sync_i2s_direct+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_directdirn2.vcd) | 38.8333 | 3.89 |  |
+| i2s_direct+i2s_mux | pass [vcd](capture/sync_i2s_direct+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_direct+i2s_muxdirn2.vcd) | 232.5 | 9.31 |  |
 | i2s_mux+i2s_mux | **incomplete** [vcd](capture/sync_i2s_mux+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_muxdirn2.vcd) | – | – | incomplete capture: S2 missing (stepper B) |
-| mcpwm_pcnt+i2s_direct | pass [vcd](capture/sync_mcpwm_pcnt+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcnt+i2s_directdirn2.vcd) | 1149.1667 | 115.02 |  |
-| mcpwm_pcnt+i2s_mux | pass [vcd](capture/sync_mcpwm_pcnt+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcnt+i2s_muxdirn2.vcd) | 763.625 | 30.57 |  |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 13.2917 | 1.33 |  |
-| rmt+i2s_direct | pass [vcd](capture/sync_rmt+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+i2s_directdirn2.vcd) | 758.7083 | 75.94 |  |
-| rmt+i2s_mux | **FAIL** [vcd](capture/sync_rmt+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+i2s_muxdirn2.vcd) | 744.7083 | 29.81 | OK QRUN |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 73.2083 | 7.33 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmtdirn2.vcd) | 66.0 | 6.61 |  |
+| mcpwm_pcnt+i2s_direct | pass [vcd](capture/sync_mcpwm_pcnt+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcnt+i2s_directdirn2.vcd) | 683.1667 | 68.37 |  |
+| mcpwm_pcnt+i2s_mux | pass [vcd](capture/sync_mcpwm_pcnt+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcnt+i2s_muxdirn2.vcd) | 781.4167 | 31.28 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 13.3333 | 1.33 |  |
+| rmt+i2s_direct | pass [vcd](capture/sync_rmt+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+i2s_directdirn2.vcd) | 697.0417 | 69.76 |  |
+| rmt+i2s_mux | pass [vcd](capture/sync_rmt+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+i2s_muxdirn2.vcd) | 1051.1667 | 42.08 |  |
+| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 73.2917 | 7.33 |  |
+| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmtdirn2.vcd) | 67.625 | 6.77 |  |
 
 **idf-7.1.2 / sync**
 
 | drivers | verdict | first-step skew us | in step periods | note |
 |---|---|---|---|---|
-| i2s_direct+i2s_direct | pass [vcd](capture/sync_i2s_direct+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_directdirn2.vcd) | 335.2083 | 33.55 |  |
-| i2s_direct+i2s_mux | pass [vcd](capture/sync_i2s_direct+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_direct+i2s_muxdirn2.vcd) | 76.2917 | 3.05 |  |
+| i2s_direct+i2s_direct | pass [vcd](capture/sync_i2s_direct+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_directdirn2.vcd) | 412.5 | 41.28 |  |
+| i2s_direct+i2s_mux | pass [vcd](capture/sync_i2s_direct+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_direct+i2s_muxdirn2.vcd) | 227.8333 | 9.12 |  |
 | i2s_mux+i2s_mux | **incomplete** [vcd](capture/sync_i2s_mux+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_muxdirn2.vcd) | – | – | incomplete capture: S2 missing (stepper B) |
-| mcpwm_pcnt+i2s_direct | pass [vcd](capture/sync_mcpwm_pcnt+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcnt+i2s_directdirn2.vcd) | 1133.875 | 113.49 |  |
-| mcpwm_pcnt+i2s_mux | pass [vcd](capture/sync_mcpwm_pcnt+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcnt+i2s_muxdirn2.vcd) | 1056.0 | 42.28 |  |
+| mcpwm_pcnt+i2s_direct | pass [vcd](capture/sync_mcpwm_pcnt+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcnt+i2s_directdirn2.vcd) | 846.0833 | 84.68 |  |
+| mcpwm_pcnt+i2s_mux | pass [vcd](capture/sync_mcpwm_pcnt+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcnt+i2s_muxdirn2.vcd) | 1051.8333 | 42.11 |  |
 | mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 13.3333 | 1.33 |  |
-| rmt+i2s_direct | pass [vcd](capture/sync_rmt+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+i2s_directdirn2.vcd) | 913.5833 | 91.44 |  |
-| rmt+i2s_mux | pass [vcd](capture/sync_rmt+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+i2s_muxdirn2.vcd) | 895.7917 | 35.86 |  |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 84.4583 | 8.45 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmtdirn2.vcd) | 66.125 | 6.62 |  |
+| rmt+i2s_direct | pass [vcd](capture/sync_rmt+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+i2s_directdirn2.vcd) | 1093.4583 | 109.43 |  |
+| rmt+i2s_mux | pass [vcd](capture/sync_rmt+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+i2s_muxdirn2.vcd) | 948.375 | 37.97 |  |
+| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 80.5 | 8.06 |  |
+| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmtdirn2.vcd) | 66.0833 | 6.61 |  |
 
 ## Reading this
 
