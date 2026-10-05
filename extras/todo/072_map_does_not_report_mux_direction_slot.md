@@ -71,3 +71,21 @@ resumed rather than reset — which no code path does today.
 `slots=-` for a GPIO stepper is correct and the parse handles it; the mixed
 case (`CONFIG 2 i2s_direct,i2s_mux dir` → `slots=-,0`) is now covered by a
 unit test. Only the direction bit is missing.
+## 2026-10-05 — still open; workaround re-validated on both SDKs
+
+The gap is unchanged: `MAP` reports one slot per stepper (the **step** bit) and
+never the direction bit, which in `dir` mode is the next bit of the same word.
+
+Re-checked on both I2S rows of the full matrix. `CONFIG 2 i2s_mux,i2s_mux dir`
+still answers `slots=0,2` — the direction slots are still inferred from
+`step_slot + 1`, and they are still not reported.
+
+The `nodir` workaround this item's gap forces on the host is now validated on
+both SDKs in a single run: `--mode scale --driver i2s_mux --pin-mode nodir` is
+green for `n = 1…8` on IDF 5.5.3 and 6.1.0.
+
+Note the compounding with [076](076_i2s_mux_dir_second_slot_not_decoded.md): the
+only mux configuration that fails is `dir`, and `dir` is precisely the mode that
+needs the direction slot this item does not report. `nodir` works and does not
+exercise the gap; `dir` exercises the gap and does not work. Neither item can be
+settled from the other's evidence, and both are open.

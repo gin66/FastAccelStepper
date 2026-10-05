@@ -32,8 +32,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **040** | [SAM synchronized start](040_sam_synchronized_start.md) | ~20 k | 1–2 d | PWM/TC common release point to be identified. |
 | **040** | [SAMD51 synchronized start](040_samd51_synchronized_start.md) | ~20 k | 1–2 d | TCC cross-instance release to be identified. |
 | **040** | [Teensy synchronized start](040_teensy_synchronized_start.md) | ~20 k | 1–2 d | TMR within/cross-module release to be decided. |
-| **050** | [Cross-driver start skew ~66% worse than same-driver](050_cross_driver_skew.md) | ~100 k | 0.5 d | Medium: critical characterization result previously hidden by a firmware bug. |
-| **060** | [AVR RAM was 51% string literals](060_avr_ram_strings.md) | ~100 k | 0.5 d | Medium: resource constraint (1040 B of 2048 B `.rodata` in SRAM). Fixed, documented. |
+| **050** | [Cross-driver start skew — I2S dominates](050_cross_driver_skew.md) | ~100 k | 0.5 d | Medium: characterization. Up to **109 step periods** with an I2S driver; the old "cross-driver is 66% worse" ratio is withdrawn — the same-driver and cross-driver ranges overlap. |
 | **070** | [i2s_direct has 2 channels on ESP32, not 3](070_i2s_direct_channels.md) | ~100 k | 0.5 d | Medium: constant overstates channel count by one. Graceful failure. |
 | **072** | [MAP does not report a multiplexed stepper's direction slot](072_map_does_not_report_mux_direction_slot.md) | ~150 k | 1 d | Medium: the host derives a mux stepper's dir slot as `step_slot + 1`; correct only while allocation stays gapless. |
 | **076** | [i2s_mux in `dir`: the second stepper's slot is intermittently not decoded](076_i2s_mux_dir_second_slot_not_decoded.md) | ~200 k | 1–2 d | Medium: `CONFIG 2 i2s_mux,i2s_mux dir` loses S2 on both I2S SDKs; `nodir` is unaffected and green. |
@@ -47,10 +46,9 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
-| **175** | [stopMove() / forceStop() / forceStopAndNewPosition() — three APIs, one harness conflated two](175_stop_api_conflation.md) | ~100 k | 0.5 d | Low: harness bug that was found, fixed, and documented. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
 | **182** | [`i2s_mux` mangles any command from n ≥ 16](182_i2s_mux_command_mangled_from_16_steppers.md) | ~150 k | 1–2 d | High: the mux's 32-stepper claim cannot be tested — the host's own parser refuses `CONFIG 16 …`. Pre-existing. |
-| **total** | 26 items | ~6.5 M | 18–26 w | Priorities 020–182. |
+| **total** | 24 items | ~6.4 M | 18–26 w | Priorities 020–182. | ~6.5 M | 18–26 w | Priorities 020–182. |
 
 ## Done
 

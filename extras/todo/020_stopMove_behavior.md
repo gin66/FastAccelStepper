@@ -39,3 +39,24 @@ defect.
 Use `forceStop()` (cancels nothing already queued, queue drains ~20 ms) or
 `forceStopAndNewPosition()` (aborts everything queued, no further step issued)
 instead of `stopMove()` for emergency stops.
+
+## 2026-10-05 — unchanged, and now asserted on six rows
+
+The full release matrix runs `SR_25` (`STOP` = `stopMove()`) and `SR_30`
+(`XSTOP` = `forceStopAndNewPosition()`) on all six rows. Both pass everywhere,
+which does **not** mean this is fixed and is the point of recording it:
+
+- `SR_25` passing means the queued move ran to completion — the behaviour
+  described above, now asserted rather than discovered. `stopMove()` still sets
+  a flag and still does not truncate already-queued motion.
+- `SR_30` passing means `forceStopAndNewPosition()` did empty the queue.
+
+The distinction matters for anyone reading the matrix as a health report: the
+contract these two scenarios verify is that `STOP` *does not* stop. A user who
+wants an emergency stop wants `XSTOP`, and the library gives them no third
+option that is both immediate and documented in one place. That conflation was
+a harness bug, found and fixed while closing this item; the API naming it
+exposed is what is still open here.
+
+Behaviour here is by design in the library and the defect is documentation and
+API naming, not the queue.

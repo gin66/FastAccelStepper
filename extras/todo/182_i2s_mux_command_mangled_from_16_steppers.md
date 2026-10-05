@@ -63,3 +63,29 @@ count: `CONFIG 16 …` is ~144 characters.
 Found while closing [015/016](../doc/implemented/idf55_main_task_stack_overflow.md),
 which is where it was first written down. It belongs to the mux backlog, not to
 that item, and the stack overflow neither caused nor fixed it.
+## 2026-10-05 — confirmed still unmeasured; the matrix cannot reach it
+
+Worth recording explicitly, because the full six-row release matrix ran after
+this item was filed and did **not** close it: the matrix sweeps the mux only to
+`n = 8`. Every mux point it takes is `n = 1…8` in `nodir` plus the single
+`n = 2` `dir` combination, so nothing above 8 is exercised anywhere.
+
+That is the whole reason this item exists. The mux's design claim is that `nodir`
+reaches **32** multiplexed steppers and `dir` reaches **16**, measured on an
+8-channel analyzer because a multiplexed stepper costs a bit of the word and no
+analyzer channel. The claim is currently supported by *zero* measurements above
+n = 8, on a firmware whose host-side command parser drops the first character of
+each driver token from n ≥ 16.
+
+The cheapest thing that would confirm or kill the claim is one serial exchange,
+no analyzer required:
+
+```
+QCLR
+IMUX
+CONFIG 16 i2s_mux x16      -> expect OK CONFIG n=16
+```
+
+The failure is already at the parser, before any hardware is armed, so it needs
+no capture and no stepper — only the board. Until that one line answers `OK`,
+"32 steppers on 3 wires" is a design intent and not a measurement.

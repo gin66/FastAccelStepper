@@ -84,3 +84,21 @@ and 016. The stack overflow that was the subject of those items was real, in
 the harness, and fixed; this is a separate defect that the same acceptance run
 walked past, and it is recorded here rather than left in a paragraph of a
 resolved item where it would have looked settled.
+## 2026-10-05 — did not reproduce in the full matrix
+
+One clean run of every combination across all six rows
+(`reports/esp32_platform_matrix.md`), including `mcpwm_pcnt+i2s_direct` on both
+I2S SDKs: **16 measurements, all exact.** No extra steps, no missing steps,
+every stepper's period on grid.
+
+So the rate is somewhere below 1-in-16, against roughly 1-in-3 measured during
+the acceptance work that found it. That is a real reduction in weight but not a
+fix, and it is worth being precise about why: nothing was changed in the driver
+between those measurements, so the difference is more likely the sample than the
+code. A defect that appears in a third of runs and in none of sixteen is the
+same defect as before, described with a worse denominator.
+
+The useful new datum is that the *good* case is exactly right — 64/64 on both
+SDKs, periods on grid, no drift — so this is not a boundary condition that
+sometimes resolves. Something occasionally emits three extra pulses at precisely
+the commanded spacing, and otherwise the driver is exact.

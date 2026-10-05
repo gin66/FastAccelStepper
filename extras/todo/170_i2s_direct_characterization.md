@@ -49,3 +49,29 @@ spent.  SR_05 and SR_09 re-run: **both pass.**
 
 **23 passed, 2 skipped** (one harness bug fixed, one harness bug fixed, one
 withdrawn, one still open — SR_12 direction-change ordering).
+
+## 2026-10-05 — the open scenario is still uncovered, and that is the finding
+
+The full release matrix does **not** close this item, and the reason is
+structural rather than accidental: the catalogue runs `SR_00…SR_30` on **one**
+tag per row, `CONFIG 1 rmt dir`. Every scenario in it is therefore an RMT
+measurement, on all six rows.
+
+So `SR_12` — the direction-change ordering that is this item's last open
+scenario — passes on all six rows, but six rows of RMT is not the measurement
+that was missing. The open case is `SR_12` **on `i2s_direct`**, and
+`i2s_direct` has no wired scenario in the release matrix at all: of the 28 test
+ids recorded across the run, the only `i2s_direct` entries are `--mode scale`
+points (`n=1…8`) and `--mode sync` combinations, both of which command a single
+direction.
+
+That is worth stating plainly because it is the same trap this item was written
+to catch. An earlier version of this file reported "23 passed, 2 skipped" for
+`i2s_direct`, and a green matrix that never runs a wired scenario on
+`i2s_direct` reads the same way. The characterization gap is one level up from
+the scenario list: it is a **driver coverage** gap in the matrix definition, not
+a scenario gap.
+
+Closing this needs the release matrix to run the catalogue per driver, not only
+per row — a change to `release_runs()` in `scripts/harness.py`, not a new
+scenario.

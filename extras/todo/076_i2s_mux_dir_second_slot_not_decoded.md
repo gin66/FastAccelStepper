@@ -64,3 +64,33 @@ measurement and it is green: n = 1…8, 64/64 steps, 24.93 µs mean period on bo
 IDF 5.5.3 and 6.1.0. `nodir` is one slot per stepper, so no second slot is
 involved. Use `dir` on the mux only for the direction-bit behaviour, which is
 what 072 is about.
+## 2026-10-05 — full release matrix: same failure, both SDKs, one measurement each
+
+Re-measured from an empty build directory across all six matrix rows
+(`reports/esp32_platform_matrix.md`). The finding is unchanged and now has a
+stronger claim behind it, because it is no longer one SDK:
+
+| row | ESP-IDF | result | missing |
+|---|---|---|---|
+| `idf-6.13.0` | 5.5.3 | `failed` | S2 (stepper B) |
+| `idf-7.1.2` | 6.1.0 | `failed` | S2 (stepper B) |
+
+The other four rows refuse the configuration outright (`ERR CONFIG no such
+driver`), so this is the only failing sync combination in the matrix.
+
+`missing_channels: ["S2"]`, `captured: ["S0"]`, and the direction bit S1 *is*
+present — so slot 0 and its paired direction decode, slot 1 decodes, and slot 2
+never appears at all. Both `i2s_mux` steppers emit `POS 64 64`, so the firmware
+is commanding both; the loss is between the wire and the decoder, or in the
+firmware's slot assignment for stepper B.
+
+Two independent SDKs failing identically is the useful part: it argues against
+an SDK-specific I2S or DMA behaviour and for something in the library's slot
+allocation or in the decoder, which is shared by both. It remains **one**
+measurement per SDK, so "intermittent" in the original heading is still not
+excluded — the title says intermittently and the evidence cannot yet distinguish
+always from usually.
+
+Still cheap to settle, as above: read the raw 3-channel bus capture without the
+decoder and look for S2 in the 32-bit word. That distinguishes firmware from
+decoder in one capture.
