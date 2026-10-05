@@ -44,11 +44,28 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
-| **184** | [The mux decoder swaps the halves but not the bits inside them](184_mux_decoder_swaps_halves_but_not_bits.md) | ~40 k | 1 d | High: `extract_frames()` half-swaps the 16-bit halves and never reverses the bit order within either, so every slot mirrors inside its half — slot 0 decodes as slot 15. 11 unit-test failures are this. The only thing between the harness and a measured 32-stepper mux row. Found while closing 183. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 21 items | ~6.3 M | 18–26 w | Priorities 023–184, plus 500. |
+| **total** | 20 items | ~6.3 M | 18–26 w | Priorities 023–181, plus 500. |
 
 ## Done
+
+- **184 — the mux decoder's fixture launched its data at the wrong instant.**
+  11 unit-test failures, all correct to fail. `Bus._render()` drew each bit's
+  data cell starting *at* its bclk rising edge; real hardware launches it half a
+  cell *before* the edge that latches it, and the decoder samples at `edge - 1`.
+  So it read the previous cell and every bit landed one position out — slot 0
+  decoded as slot 31, uniformly, which is why every test in the file still
+  passed except the ones that happened to be sensitive to it.
+  Invisible because every existing test drove all 32 slots or a symmetric set: a
+  uniform shift is a consistent relabelling and those assertions are invariant
+  under it. Fixed in the fixture, one line. `i2s_mux_decoder.py` needed no
+  change and was right throughout — confirmed end-to-end on the real 24 MS/s
+  captures at 64/64 on the correct slots, mean period 24.931 us, identical to the
+  recorded results. Worth keeping: the first diagnosis blamed the decoder and was
+  built on a word read with bclk and data swapped, then "verified" with arithmetic
+  derived from it. The item records that, because the three confirmations were all
+  the same circular step. 023 (the 24 MS/s race in `dir`) is separate and open;
+  `i2s_mux` at n = 32 is still unmeasured, but the decoder is no longer why.
 
 - **183 — the catalogue now asks how many steppers a driver drives (SR_31).**
   The gap was real and it had a mechanism: the catalogue's largest case was three

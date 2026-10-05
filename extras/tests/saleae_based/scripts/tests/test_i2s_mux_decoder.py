@@ -16,9 +16,18 @@ peripheral uses -- and those rules were measured, not assumed (see
 scripts/probe_mux_bits.py and its docstring):
 
   - bclk 8 MHz, ws 250 kHz, 32 bclk per frame, one frame every 4 us;
-  - the word goes out MSB first, so wire bit k (k = 0 at the first bclk of the
-    frame) is slot 31 - k, i.e. slot S is bit S of the word;
-  - slot S's signal is high for ONE bclk period (125 ns), not for the frame.
+  - the word goes out as two 16-bit halves, the LOW half (slots 0-15) first,
+    each half MSB-first, so wire bit k < 16 carries slot 15 - k and k >= 16
+    carries slot 47 - k -- slot S is bit S of the word;
+  - slot S's signal is high for ONE bclk period (125 ns), not for the frame, and
+    it is launched half a cell BEFORE the bclk rising edge that latches it.
+
+The last two points are the ones a synthetic fixture gets wrong by accident,
+because a waveform with the right periods and the wrong phase still looks like
+a square wave on a scope. The phase is not cosmetic: the decoder samples at
+`edge - 1`, so a cell launched *at* its edge is read one cell late and every bit
+lands one position from where it belonged. See
+extras/todo/184_mux_decoder_swaps_halves_but_not_bits.md.
 
 The last point is the one the white paper gets wrong (§3.3 says the bit is high
 for the whole frame) and it is why `synthesize` has to widen a one-bit pulse
@@ -52,6 +61,8 @@ import signal_parser as sp  # noqa: E402
 # multiple of 8 MS/s. 12 MS/s would give 1.5 samples per bit period, which is
 # not a waveform at all.
 MSPS = 48_000_000
+# The rate harness.py actually captures a mux run at. See TestGeometry.
+MSPS_24 = 24_000_000
 BCLK_HZ = 8_000_000
 FRAME_US = 4
 FRAME_BITS = 32
@@ -148,12 +159,27 @@ class Bus:
                 # and a real capture cannot.
                 for i in range(b0, min(b0 + bclk_half, n)):
                     bclk[i] = 1
-                # Two 16-bit halves, low first, each MSB-first: wire bit k < 16
-                # carries slot 15 - k, k >= 16 carries slot 47 - k. Valid for
-                # the whole cell, from the rising edge to the next.
+# Two 16-bit halves, low first, each MSB-first: wire bit k < 16
+                # carries slot 15 - k, k >= 16 carries slot 47 - k.
                 slot = 15 - k if k < FRAME_BITS // 2 else 47 - k
                 if (word >> slot) & 1:
-                    for i in range(b0, min(b0 + self.bit_samples, n)):
+                    # Launched HALF A CELL BEFORE the rising edge that latches
+                    # it, which is the measured geometry and the reason the
+                    # decoder samples at `edge - 1`. On the 48 MS/s capture the
+                    # data cell runs 208..213 with bclk rises at 211 and 217:
+                    # the edge sits at the cell's midpoint, so the bit has been
+                    # stable for half a cell by the time the edge names it.
+                    #
+                    # Launching it AT the edge instead -- as this fixture
+                    # originally did -- is a different waveform that happens to
+                    # have the right frequencies, and it decodes every word one
+                    # cell late: 11 tests in this file failed that way, with
+                    # every bit landing one position from where it belonged. A
+                    # synthetic fixture is only a stand-in for hardware if its
+                    # *phase* is too, not just its periods; see
+                    # extras/todo/184_mux_decoder_swaps_halves_but_not_bits.md.
+                    d0 = b0 - bclk_half
+                    for i in range(max(0, d0), min(d0 + self.bit_samples, n)):
                         data[i] = 1
         return {"data": data, "bclk": bclk, "ws": ws}
 
@@ -621,6 +647,74 @@ class TestSlotSynthesis(BusFixture):
             lo = Bus.PAD + (bus.lead_frames + s) * fs
             self.assertEqual(out[f"S{s}"][lo:lo + fs], b"\x01" * fs, f"slot {s}")
 
+    def test_one_slot_lights_up_and_no_other_does(self):
+        # The asymmetric check. Every other test in this file either drives all
+        # 32 slots or a symmetric set, and a decoder that reads the word one
+        # cell late satisfies those perfectly -- it was 11 green-adjacent tests
+        # failing together that this exists to pre-empt.
+        #
+        # Slot 3 deliberately: not 0 (the bit order's usual first assertion),
+        # not 15 or 16 (the half boundary the swap is about), and not 28 (its
+        # mirror inside the low half). Any of the four plausible misreads --
+        # shifted by a cell, mirrored within the half, halves swapped, whole word
+        # reversed -- lands on a different slot from this one.
+        slot = 3
+        bus = Bus([0, 1 << slot, 0])
+        channels, _ = self.roundtrip(bus)
+        out = dec.decode_channels(channels, MSPS, [], slots=range(SLOTS))
+        fs = bus.frame_samples
+        lo = Bus.PAD + (bus.lead_frames + 1) * fs
+        lit = [s for s in range(SLOTS) if any(out[f"S{s}"][lo:lo + fs])]
+        self.assertEqual(lit, [slot],
+                         f"only S{slot} may be high in that frame, got {lit}")
+        # And the frame either side must be empty, so nothing is bleeding in.
+        for delta in (-1, 1):
+            other = lo + delta * fs
+            stray = [s for s in range(SLOTS) if any(out[f"S{s}"][other:other + fs])]
+            self.assertEqual(stray, [], f"frame at {delta:+d} should be empty")
+
+    def test_every_slot_in_isolation_decodes_to_itself(self):
+        # The same assertion for all 32, one at a time. Cheap (32 short buses),
+        # and it is the only form that covers the mirror of every slot: a shift
+        # by a cell maps 3 to 2 or 4, a half swap maps 3 to 19, a mirror within
+        # the low half maps 3 to 12, and each of those is caught somewhere in
+        # this loop rather than by one hand-picked slot.
+        for slot in range(SLOTS):
+            with self.subTest(slot=slot):
+                bus = Bus([1 << slot])
+                channels, _ = self.roundtrip(bus)
+                out = dec.decode_channels(channels, MSPS, [], slots=range(SLOTS))
+                lit = sorted(s for s in range(SLOTS) if any(out[f"S{s}"]))
+                self.assertEqual(lit, [slot])
+
+    def test_data_is_stable_one_sample_before_the_latching_edge(self):
+        # The phase invariant the decoder's `edge - 1` sample point depends on,
+        # asserted on the fixture so it cannot be quietly "simplified" away.
+        # Measured on hardware at 48 MS/s: the data cell runs 208..213 with bclk
+        # rises at 211 and 217, so the bit is already stable for half a cell by
+        # the time the edge names it. A fixture that launches data AT its edge
+        # still has the right periods and still looks like a square wave, and
+        # decodes every bit one cell late.
+        bus = Bus([0xFFFFFFFF])
+        waves = bus.render()
+        bclk, data = waves["bclk"], waves["data"]
+        rises = sp.rising_edges(bclk)
+        self.assertGreater(len(rises), 40)
+        # Only the middle frame carries the word; the lead and tail frames are
+        # idle words, where the data line is legitimately low everywhere.
+        lo = 1 + bus.lead_frames * bus.frame_samples
+        hi = lo + bus.frame_samples
+        checked = 0
+        for edge in rises:
+            if not (lo <= edge < hi):
+                continue
+            checked += 1
+            self.assertEqual(data[edge - 1], 1,
+                             f"data not established at sample {edge - 1} "
+                             f"(edge {edge}); the decoder reads this sample")
+        self.assertEqual(checked, FRAME_BITS,
+                         "the word-carrying frame must hold 32 bit cells")
+
     def test_passthrough_channels_pass_through_unchanged(self):
         # They are the same wires they were; only the three bus channels are
         # consumed. A passthrough channel that came back altered would make the
@@ -739,6 +833,62 @@ class TestCommandLine(BusFixture):
         )
         self.assertNotEqual(r.returncode, 0)
         self.assertIn("nope.vcd", r.stderr)
+
+
+class TestGeometry(BusFixture):
+    """The phase relationship, at the rate the harness actually uses.
+
+    Everything above runs at 48 MS/s, which is where the sampling-point
+    decision in `extract_frames` was originally made. The harness never captures
+    a mux run there: `48 MS/s` truncates an eight-channel capture to 0.18 ms
+    (see AGENTS.md), so `harness.py` raises the rate to 24 MS/s for the mux.
+    At 24 MS/s a bclk cell is 3 samples rather than 6, and the phase tolerance
+    is correspondingly tighter -- `bclk_half` is 1 sample, so the bit has been
+    established for exactly one sample by the time the edge names it.
+
+    That is a different regime, not the same one at lower resolution, so it is
+    covered on its own rather than assumed. Measured on the 24 MS/s hardware
+    capture: the data cell of the first step ran samples 6625361..6625363 with
+    bclk rises at 6625360 and 6625363, i.e. the cell contains the edge that
+    latches it rather than preceding it, and `edge - 1` still lands inside.
+    """
+
+    def bus_at_24(self, words, **kw):
+        """Render and load a bus at 24 MS/s.
+
+        `MSPS` is module-level because every test above is written against one
+        rate, so changing it is a save/restore rather than a parameter.
+        """
+        global MSPS
+        saved = MSPS
+        MSPS = MSPS_24
+        try:
+            bus = Bus(words, **kw)
+            waves = bus.render()
+            channels = {"D5": waves["data"], "D6": waves["bclk"], "D7": waves["ws"]}
+            path = write_bus_vcd(self.tmp / "b24.vcd", waves=channels,
+                                 sample_rate=MSPS_24)
+            # bit_samples is a property that reads the module rate, which the
+            # finally below has already put back, so it is captured here.
+            return bus, bus.bit_samples, sp.load_vcd(str(path))
+        finally:
+            MSPS = saved
+
+    def test_words_decode_at_three_samples_per_bit(self):
+        words = [0x00000001, 0x80000000, 0xFFFFFFFF, 0x00000000]
+        bus, bit_samples, (channels, rate) = self.bus_at_24(words)
+        self.assertEqual(rate, MSPS_24)
+        self.assertEqual(bit_samples, 3, "3 samples per bclk cell at 24 MS/s")
+        self.assertEqual([w for _, w in dec.extract_frames(channels, rate)],
+                         bus.frames())
+
+    def test_slot_identity_survives_the_tighter_phase(self):
+        for slot in (0, 1, 3, 15, 16, 17, 30, 31):
+            with self.subTest(slot=slot):
+                _, _, (channels, rate) = self.bus_at_24([1 << slot])
+                out = dec.decode_channels(channels, rate, [], slots=range(SLOTS))
+                lit = sorted(s for s in range(SLOTS) if any(out[f"S{s}"]))
+                self.assertEqual(lit, [slot])
 
 
 class TestAgainstRealCapture(unittest.TestCase):

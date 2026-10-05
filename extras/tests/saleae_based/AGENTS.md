@@ -873,16 +873,38 @@ implementation depends on:
   middle: wire bit k < 16 carries slot 15-k, k >= 16 carries slot 47-k. The
   decoder is a bclk-edge shift register anchored at the first ws fall and swaps
   the two halves back, so slot S is bit S, matching
-  `i2s_mux_slot_to_bit_pos()`. An earlier version anchored at the ws *rise*
-  with whole-word MSB-first order and read every word half-swapped: a 64-step
-  run decoded as two phase groups (`0x0000FFFF` / `0x000F0000`) that are really
-  the two halves of one word, and the intermittent "16 of 20 slots" sweep
-  failure was that misread. The fixture in `test_i2s_mux_decoder.py::Bus`
-  renders the measured wire order, so a decoder regression fails there.
+`i2s_mux_slot_to_bit_pos()`. An earlier version anchored at the ws *rise*
+   with whole-word MSB-first order and read every word half-swapped: a 64-step
+   run decoded as two phase groups (`0x0000FFFF` / `0x000F0000`) that are really
+   the two halves of one word, and the intermittent "16 of 20 slots" sweep
+   failure was that misread.
 
-**Sample the data on the bclk rising edge.** The two plausible alternatives are
-both wrong *silently*: the middle of the clock's high time needs a 50 % clock and
-the ESP32 is not one (measured 4-in-6 high at 48 MS/s, 1-in-3 at 24 MS/s), and
+**The wire order is right; the fixture's _phase_ was not.** A separate defect,
+[184](../../../todo/184_mux_decoder_fixture_launch_phase.md), had 11 tests in
+`test_i2s_mux_decoder.py` failing, and they were correct to:
+`Bus._render()` drew each
+bit's data cell starting **at** its bclk rising edge, while the peripheral
+launches it **half a cell before** the edge that latches it (at 48 MS/s the cell
+is 208..213 with rises at 211 and 217 — the edge is at the cell's midpoint). The
+decoder samples `edge - 1`, so the fixture was read one cell early and **every
+bit landed one position out**: slot 0 decoded as slot 31, uniformly.
+
+It stayed invisible because every test in the file drove all 32 slots or a
+symmetric set, and a uniform shift is a consistent relabelling that those
+assertions are invariant under. The fixture is now checked asymmetrically — one
+slot at a time, asserting that exactly that slot lights up — which is the only
+form that catches it. `TestGeometry` covers 24 MS/s separately, because that is
+the rate `harness.py` actually selects (3 samples per cell, `bclk_half == 1`) and
+it is a different regime rather than the same one at lower resolution.
+
+`i2s_mux_decoder.py` needed no change. Re-verified end-to-end on the real 24 MS/s
+captures: `S0 = 64` steps on the n=1 run, `S0 = 64` and `S1 = 64` on n=2, mean
+period 24.931 us — the slots and the number the results recorded.
+
+**Sample the data one sample before the bclk rising edge** (`edge - 1`), because
+the bit has been stable for half a cell by then. The two plausible alternatives
+are both wrong *silently*: the middle of the clock's high time needs a 50 % clock
+and the ESP32 is not one (measured 4-in-6 high at 48 MS/s, 1-in-3 at 24 MS/s), and
 it turned a clean 64-step run into 37 steps across two slots; the cell's last
 sample lands on the *next* cell at three samples per cell and decoded slot 0 to
 slot 1. The tests in `test_i2s_mux_decoder.py::TestSamplingPoint` pin all three.
