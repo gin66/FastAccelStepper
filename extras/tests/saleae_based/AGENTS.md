@@ -420,6 +420,157 @@ sets `no_topup` and the queue drains exactly what `QFILL` reported.
   adherence per stepper. A refused point is recorded and the plan continues.
 - Characterization scenarios above are runnable by hand with `control.py`.
 
+### SR_31: the maximum stepper count
+
+`SCENARIOS["SR_31"]` is the one entry whose stepper count is **not a literal**.
+"How many steppers does this driver drive?" is the one question a driver answers
+by refusing, and the answer is a hardware fact rather than a constant in a
+header — so the host asks the board rather than believing a table.
+
+`MaxCountProbe` (`scripts/run_tests.py`) sends `CONFIG` **descending** from
+`max_stepper_count_bound()` and takes the first count the firmware accepts:
+
+```
+CONFIG 8 rmt,... nodir    -> ERR CONFIG n=8 needs 8 channels, max=8   (analyzer)
+CONFIG 6 mcpwm_pcnt,...   -> ERR connect step 6 n=7                  (queues)
+CONFIG 6 mcpwm_pcnt,...   -> OK CONFIG 6                     <- the maximum
+```
+
+Three properties are load-bearing and each has a test:
+
+- **The refusals are the measurement as much as the count.** "stops at 6" and
+  "stops at 6 because the analyzer has no channel 7" are different answers, so
+  `refused_above` (every count tried, with the board's own words) travels in the
+  result record next to `max_stepper_count`.
+- **One `CONFIG` per attempt, and the accepted one *is* the run's.** `find()`
+  hands back the reply it already has so `measure()` does not send the line
+  again; a second `CONFIG` re-arms the drivers through `_initVars()` and would
+  discard the very allocation the probe proved.
+- **The search starts from the channel budget, not from `QUEUES_*`.** 8 in
+  `nodir` (the analyzer), 32 for `i2s_mux` (the 32-bit word, which is what bounds
+  a multiplexed stepper since it costs a slot and not a channel). The bound only
+  has to be an upper bound — it is the top of a descending search — but never a
+  *lower* one, or the probe cannot reach the maximum.
+
+**Why `nodir`:** `dir` spends two channels per stepper and stops at 4, below
+`QUEUES_MCPWM_PCNT` = 6, so a `dir` max-count run would report the analyzer's
+channel count as the driver's queue count. That is why `SCENARIO_PIN_MODE`
+exists and why `scenario_wire()` replaced the hardcoded `dir` in `config_wire()`
+— every scenario but this one is `dir`, and a fifth caller of `config_wire()`
+would otherwise have handed SR_31 a `dir` CONFIG the firmware happily accepts and
+then scored stepper B against D2 instead of D1.
+
+Judged by `eval_scale`, unchanged: **each** stepper's own step count and its own
+period, from the capture. Not the board's `POS` tally — that is the queue's
+bookkeeping and would pass on a driver emitting complete garbage. The mask is
+`(1 << count) - 1` from the probe, so `QRUN` starts every stepper; in the table
+the mask column reads `probed` rather than the literal `0`, which would read as a
+scenario that starts nothing.
+
+`Pins.for_scenario("SR_31")` builds the **widest** map the pin mode allows (8
+steppers, D0…D7) — the fixture and report path only; a hardware run uses the
+board's own `MAP`. A 2-stepper map here would score A and B and report the run
+done with six channels unread.
+
+**Two known reasons a mux row may record red,** both pre-existing and both
+recorded rather than worked around:
+
+- [023](../../todo/023_i2s_mux_dir_phantom_steps_at_24ms.md) — the 24 MS/s
+  sampling race makes the mux decode unreliable at high n. `nodir` is the clean
+  case (the data line is idle-low and has no transitions to race with), which is
+  one more reason this scenario does not use `dir`.
+- the intermittent dropped pulse (`r7_virtual_i2s_mux.md` §5). Observed while
+  measuring this item's premise: a forced 32-point `--mode scale --driver i2s_mux
+  --pin-mode nodir` sweep passed 31 of 32, with n = 3 reporting **63 of 64 steps**
+  and one off-grid period; an immediate re-run of n = 1…4 passed all four. A
+  max-count scenario inherits it — at n = 32 the expected cost is one flake per
+  few runs, which is a different trade from a scenario that is red every time.
+
+**Measured on hardware** (ESP32-DevKitC, ESP-IDF 5.5.3, `--pin-mode dir`, the
+catalogue re-run in full after the watchdog fix below). Each stepper's own step
+count and period, all within tolerance:
+
+| driver | max steppers | probe | notes |
+|---|---|---|---|
+| `rmt` | **8** | `CONFIG 8 rmt,… nodir` accepted first try | 8 queues, 8 channels — the analyzer is the binding constraint and the driver happens to match it |
+| `mcpwm_pcnt` | **6** | 8 and 7 refused `ERR connect step 6`, 6 accepted | `QUEUES_MCPWM_PCNT` = 6 confirmed by the board |
+| `i2s_direct` | **2** | 8 down to 3 refused, 2 accepted | `SOC_I2S_NUM` = 2; the refusals name `i2s_new_channel(): no available channel found` |
+
+Period spread across the steppers of a run: 0.000–0.004 µs.
+
+**Two defects the first run found**, both of which had to be fixed before the
+numbers above mean anything:
+
+- **The probe read acceptance off the reply, and the reply lies.** A `CONFIG`
+  refused partway through `connect_stepper()` leaves the steppers it did connect
+  in place and `slot_count` at that partial count, so the *next* `CONFIG`
+  short-circuits to `OK CONFIG n=6 mode=nodir already` — success, for a
+  configuration that was never established. Measured, by hand on `control.py`:
+
+  ```
+  CONFIG 8 mcpwm_pcnt,… nodir -> ERR connect step 6 n=6
+  CONFIG 7 mcpwm_pcnt,… nodir -> OK CONFIG n=6 mode=nodir already
+  ```
+
+  The probe recorded **7** for a board running six, and the run *passed*, because
+  `eval_scale` judges the six that are really there — so nothing downstream would
+  have noticed. Acceptance is now MAP (`read_map`), which is the board's own
+  count and cannot be stale, and a CONFIG that answers OK while connecting fewer
+  than it was asked for is recorded in `ok_but_short` rather than believed. This
+  is a firmware defect as well as a host one, and it is still there: the
+  `already` short-circuit reports success for a request it did not honour.
+- **The board's own task watchdog reset it mid-capture, and SR_00 called that
+  eight dead pins.** See below.
+
+**Not yet measured on hardware:** `i2s_mux` (32). The 32-stepper decode is
+024-untested and the intermittent dropped pulse is expected to show at that
+count.
+
+### The ESP-IDF task watchdog, and why SR_00 failed
+
+Measured on ESP-IDF 5.5.3: **a board doing nothing trips its own watchdog.**
+`open_board()`, no command, no capture, and six `task_wdt` lines arrive within
+~5.3 s with an IDLE0 backtrace naming `main` as the running task. It is the
+harness, not the library: IDLE0 is subscribed to the task WDT by default,
+`saleae_hal_serial_read()` is a zero-timeout `uart_read_bytes()`, and at
+FreeRTOS's 100 Hz `pdMS_TO_TICKS(1)` is 0, so a pass through the main loop ends
+in a sub-tick spin and IDLE0 never gets to run.
+
+Why it reached the report as a *wiring* fault: a panic inside a capture window
+truncates the run, and the truncated 1 Hz pattern reads as every channel's first
+high time being a fragment of the commanded one — measured D0 19.3 ms against
+50 ms, the pairs summing to exactly one 1000 ms period. **SR_00, the check whose
+job is to catch a dead cable, reported a firmware panic as eight dead pins.**
+
+Two loops were at fault and **both** had to change — neither alone fixed it:
+
+- `saleae_hal_idle()` was `saleae_hal_delay_ms(1)`, which *is* the sub-tick spin,
+  contradicting its own header ("Deliberately not `saleae_hal_delay_ms(1)` …
+  Spinning in the idle path starves IDLE, and the task watchdog then resets a
+  board that is doing nothing at all"). It now blocks a tick.
+- `saleae_test_loop()` spins 1 ms at a time for a whole second-long period, so
+  SR_00 starves IDLE0 *even with the idle path fixed* — which is what the second
+  attempt showed. The spin cannot simply go: an edge has to land within SR_00's
+  2 ms width tolerance. It now sleeps between edges and keeps the spin only for
+  the 12 ms before one (`SPIN_WINDOW_MS`, wider than the tolerance and narrower
+  than the 50 ms `EDGE_GRID_MS`), which is the only arrangement in which both
+  the timing and the watchdog are satisfied.
+
+And the watchdog is fed, in the right order: `esp_task_wdt_add(NULL)` once in
+`saleae_app_setup()` **before** `READY`, then `esp_task_wdt_reset()` on every
+main-loop pass. Both halves are needed. Feeding without subscribing is worse
+than nothing — `esp_task_wdt_reset()` on an unsubscribed task logs
+`task not found` *every call*, once per pass, on the UART the host protocol runs
+on; that attempt produced a console full of errors and still panicked.
+
+`TestNoRunawaySpin` pins all of it as source checks, since the defect is a timing
+property of firmware that no host-side unit test can execute.
+
+Independently, `open_board()` now **raises** if the board does not report
+`READY`: opening the port does not guarantee a reset (the DTR/RTS toggle does not
+always fire), and the old loop fell through after its timeout and measured
+whatever the previous test left behind.
+
 ### MCPWM/PCNT: all six queues measured working
 
 `--mode scale --driver mcpwm_pcnt` sweeps n = 1…6 in `nodir` (n = 1…4 in `dir`,
@@ -519,11 +670,10 @@ Two things this harness still gets wrong, both unrelated to the stack:
 - **`ticks` must be ≥ `MIN_CMD_TICKS` from `QINFO` (3200 on ESP32), so the
   documented `QSEG … 80` example answers `ERR QE step0 rc=-1`
   (`ErrorTicksTooLow`) on a current build.**
-- **The catalogue's largest case is 3 steppers.** `--mode scale` sweeps
-  n = 1…32 and is the only thing that reaches a high count, but it is outside
-  `ALL_TESTS` and has no SR number, so nothing in the characterization set asks
-  how many steppers a driver actually drives. Tracked as
-  `extras/todo/183_no_catalogue_test_for_the_maximum_stepper_count.md`.
+- **The catalogue now asks how many steppers a driver drives: SR_31.** See
+  "SR_31: the maximum stepper count" below. The other catalogue scenarios are
+  still 1–3 steppers, because a *named* case wants a shape to reason about; SR_31
+  is the one whose count is the question.
 
 A third claim is **withdrawn**: `i2s_mux` mangling commands from n ≥ 16 does not
 reproduce. `CONFIG 16…` and `CONFIG 32…` both parse (768-byte reply, 32 driver

@@ -44,11 +44,86 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
-| **183** | [No catalogue test steps the maximum number of steppers](183_no_catalogue_test_for_the_maximum_stepper_count.md) | ~40 k | 0.5 d | High: the catalogue's largest case is 3 steppers, and `--mode scale` (the only thing that reaches n=32) has no SR number. How many steppers a driver drives is a hardware fact it answers by refusing. Blocked on 023 for the mux row. |
+| **184** | [The mux decoder swaps the halves but not the bits inside them](184_mux_decoder_swaps_halves_but_not_bits.md) | ~40 k | 1 d | High: `extract_frames()` half-swaps the 16-bit halves and never reverses the bit order within either, so every slot mirrors inside its half — slot 0 decodes as slot 15. 11 unit-test failures are this. The only thing between the harness and a measured 32-stepper mux row. Found while closing 183. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 25 items | ~6.4 M | 18–26 w | Priorities 025–183. |
+| **total** | 21 items | ~6.3 M | 18–26 w | Priorities 023–184, plus 500. |
 
 ## Done
+
+- **183 — the catalogue now asks how many steppers a driver drives (SR_31).**
+  The gap was real and it had a mechanism: the catalogue's largest case was three
+  steppers, so a defect that only appears past n = 8 could not be caught by it,
+  and `--mode scale` — the only thing that reached n = 32 — sat outside
+  `ALL_TESTS` with no SR number, no per-test tag and no row of its own in a
+  matrix.
+
+  `SR_31` is wired in `run_tests.SCENARIOS`, and it is the one entry whose
+  stepper count is **not a literal**. How many steppers a driver drives is a
+  hardware fact that a driver answers by refusing, so `MaxCountProbe` asks:
+  `CONFIG` descending from the channel budget (8 in `nodir`, 32 for `i2s_mux`,
+  whose bound is the 32-bit word rather than the analyzer), and the first count
+  the firmware accepts is the maximum. `mcpwm_pcnt` yields
+  `ERR connect step 6` at n = 7 and `OK CONFIG 6` at n = 6 — the refusal names
+  the sixth queue, which is `QUEUES_MCPWM_PCNT` being right for a reason.
+
+  Three things are load-bearing and each is tested:
+
+  - **The refusals travel with the result.** `refused_above` records every count
+    tried and the board's own words for each, because "stops at 6" and "stops at
+    6 because the analyzer has no channel 7" are different answers.
+  - **One `CONFIG` per attempt, and the accepted one *is* the run's.** A second
+    `CONFIG` re-arms the drivers through `_initVars()` and would throw away the
+    very allocation the probe proved.
+  - **`nodir`, not `dir`.** `dir` spends two channels per stepper and stops at 4,
+    below MCPWM/PCNT's 6 — so it would report the analyzer as the driver. This is
+    why `SCENARIO_PIN_MODE` and `scenario_wire()` exist: `config_wire()`'s
+    hardcoded `dir` would otherwise have handed SR_31 a CONFIG the firmware
+    accepts and then scored stepper B against D2 instead of D1.
+
+  Judged by `eval_scale`, unchanged — each stepper's own count and its own
+  period from the capture, never `POS`, which would pass on a driver emitting
+  complete garbage. One shared program, so a driver that kept its own pace and
+  dragged the others off it cannot pass.
+
+  **Measured on hardware** (ESP32-DevKitC, ESP-IDF 5.5.3): `rmt` **8**,
+  `mcpwm_pcnt` **6**, `i2s_direct` **2** — each stepper's own step count and
+  period, period spread 0.000–0.004 µs, and the full 28-scenario catalogue green
+  on all three after the watchdog fix below. `i2s_mux` (32) is not yet measured;
+  023's 24 MS/s sampling race and the intermittent dropped pulse are why that row
+  is not simply assumed green.
+
+  **The first hardware run found two defects, and the second is the more
+  interesting one.**
+
+  - *The probe read acceptance off the reply, and the reply lies.* A `CONFIG`
+    refused partway through `connect_stepper()` leaves the steppers it did
+    connect in place, so the **next** `CONFIG` short-circuits to
+    `OK CONFIG n=6 mode=nodir already` — success, for a configuration never
+    established. Reproduced by hand: `CONFIG 8` → `ERR connect step 6 n=6`, then
+    `CONFIG 7` → `OK CONFIG n=6 already`. The probe recorded **7** for a board
+    running six, and the run **passed**, because `eval_scale` judges the six that
+    are really there — so nothing downstream would have noticed. Acceptance is
+    now MAP, which cannot be stale.
+  - *The board's own task watchdog reset it mid-capture, and SR_00 reported that
+    as eight dead pins.* Measured on 5.5.3: `open_board()`, nothing at all, six
+    `task_wdt` lines in ~5.3 s. A panic inside a capture window truncates the
+    run, and a truncated 1 Hz pattern reads as every channel's first high time
+    being a fragment (D0 19.3 ms against 50 ms, the pairs summing to exactly one
+    1000 ms period) — **the check whose job is to catch a dead cable, reporting a
+    firmware panic as a dead cable.** Two loops were at fault and both had to
+    change: the idle path was the sub-tick spin its own header forbids, and
+    SR_00's pattern spins 1 ms at a time for a whole second so it starves IDLE0
+    even with the idle path fixed — and its spin cannot simply go, because an
+    edge has to land within a 2 ms tolerance. It now sleeps between edges and
+    spins only for the 12 ms before one. The watchdog is subscribed before
+    `READY` and fed each pass; feeding without subscribing is worse than
+    nothing, since `esp_task_wdt_reset()` on an unsubscribed task logs an error
+    every call on the UART the protocol uses. `open_board()` also now raises if
+    the board never reports `READY`, instead of measuring a stale board.
+
+  Full account, with the measured numbers:
+  `extras/tests/saleae_based/AGENTS.md` → "SR_31" and "The ESP-IDF task
+  watchdog".
 
 - **`i2s_mux` "mangles any command from n ≥ 16" — closed as not reproducible;
   the reported symptom does not exist on current HEAD.** Filed HIGH against
@@ -76,12 +151,11 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   measurements above n = 8. Also hammered eight 271-character CONFIG lines in
   one 2176-byte write, 2.1× the RX buffer: 8 OK, 0 mangled.
 
-  The item's *goal* — make the 32-stepper claim testable — is real and is now
-  [183](183_no_catalogue_test_for_the_maximum_stepper_count.md), because it
-  turned out the blocker was never the parser: **no catalogue scenario steps
-  more than three steppers**, and `--mode scale` is outside `ALL_TESTS`. What
-  remains genuinely unmeasured is the direction slots on the wire, which 023's
-  24 MS/s sampling race blocks.
+  The item's *goal* — make the 32-stepper claim testable — was real and became
+  **183**, now **SR_31** (see Done), because the blocker was never the parser:
+  **no catalogue scenario stepped more than three steppers**, and `--mode scale`
+  was outside `ALL_TESTS`. What remains genuinely unmeasured is the direction
+  slots on the wire, which 023's 24 MS/s sampling race blocks.
 
 - **`i2s_mux` in `dir` "loses the second stepper's slot" — closed, and it was
   our own decoder config.** Filed HIGH as a functional defect in the shipped
@@ -254,8 +328,8 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   [idf55_main_task_stack_overflow.md](../doc/implemented/idf55_main_task_stack_overflow.md).
   Two new items came out of the acceptance run and are **not** covered by it:
   [181](181_mcpwm_pcnt_sync_extra_steps.md) and **182** (since closed as not
-  reproducible — see Done — which in turn produced
-  [183](183_no_catalogue_test_for_the_maximum_stepper_count.md)).
+  reproducible — see Done — which in turn produced **183**, now **SR_31**; see
+  Done).
 
 - **010 — MCPWM/PCNT emitted continuously on every queue after the first —
   resolved, `pcnt_new_unit()` was clearing the interrupt-enable bit.**

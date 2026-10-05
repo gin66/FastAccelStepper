@@ -33,6 +33,13 @@ extern "C" void saleae_hal_delay_ms(uint32_t ms) { delay(ms); }
 // here as it stands.
 extern "C" void saleae_hal_idle(void) { delay(1); }
 
+// No RTOS and no task watchdog on AVR: these compile to nothing. They exist
+// because both HALs are linked into every build and saleae_app calls both
+// unconditionally. See saleae_hal.h.
+extern "C" void saleae_hal_wdt_subscribe(void) {}
+extern "C" void saleae_hal_wdt_reset(void) {}
+
+
 // The RX ring buffer has to be enlarged before Serial.begin() and only on
 // ESP32, where the core sizes it at 256 bytes by default.
 //

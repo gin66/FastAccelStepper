@@ -552,7 +552,11 @@ def report(rows, results, args):
             L.append("")
 
     # --- catalogue ---------------------------------------------------------
-    L.append("## Scenario catalogue (SR_00 … SR_30)")
+    # From ALL_TESTS rather than from `tests`, which is what this run happened to
+    # measure: the heading states the catalogue's numbering, and a run that
+    # recorded nothing must still produce a report.
+    L.append(f"## Scenario catalogue ({run_tests.ALL_TESTS[0]} … "
+             f"{run_tests.ALL_TESTS[-1]})")
     L.append("")
     L.append("Unparameterized: every scenario runs its own fixed program and is "
              "judged by its own evaluator.")

@@ -16,11 +16,18 @@
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "esp_idf_version.h"
+#include "esp_task_wdt.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
 #define SALEAE_UART UART_NUM_0
+
+// Whether app_main is subscribed to the task watchdog. See
+// saleae_hal_wdt_subscribe() below: `esp_task_wdt_reset()` on a task that is
+// not subscribed logs an error every call, and that is once per main-loop
+// pass on the UART the host protocol runs on.
+static bool wdt_subscribed = false;
 
 // No gpio_reset_pin(). The IDF driver logs every pin reset at INFO, and the
 // harness reconfigures all eight pins on every SR00 and every CONFIG. That log
@@ -82,24 +89,87 @@ extern "C" int saleae_hal_serial_read(void) {
   return uart_read_bytes(SALEAE_UART, &c, 1, 0) == 1 ? c : -1;
 }
 
-// Deliberately a sub-tick spin, NOT vTaskDelay(1), even though StepperDemo
-// blocks and never trips the task watchdog. Measured, on ESP-IDF 5.5.3:
+// Subscribe app_main to the task watchdog, and keep it fed.
 //
-// - Blocking for one whole tick does not fix the IDF 4.4.3 idle watchdog. That
-//   reset fires with no command outstanding at all -- `QINFO` alone reproduces
-//   it, 43 WDT lines -- so it is not this loop, and 5.5.3/6.1 never show it
-//   with identical firmware. Nothing here was fixing it.
-// - It is not free either. The feeder is this same loop, so a one-tick block
-//   changes how promptly a queue is topped up, and `sync` on mcpwm_pcnt grew
-//   trailing pulses (67 where 64 were commanded, period still exactly 10.0 us).
-//   That turned out to be intermittent either way -- 1 failure in 3 runs with
-//   the spin, 2 in 2 with the block -- so the block is not the cause, but it is
-//   not free of suspicion on a path this timing-sensitive.
+// Measured on this harness, ESP-IDF 5.5.3: the board trips its own task
+// watchdog while doing nothing at all -- `open_board()`, no command, no
+// capture, six `task_wdt` lines within ~5.3 s and an IDLE0 backtrace naming
+// `main` as the running task. IDLE0 is subscribed to the WDT by default, and
+// it starves because app_main never blocks: `saleae_hal_serial_read()` is a
+// zero-timeout `uart_read_bytes()`, and the sub-tick spin in
+// `saleae_hal_delay_ms(1)` means a pass through the loop ends in a busy wait.
 //
-// So the spin stays: it is the long-standing behaviour, it is what every
-// measurement in the matrix was taken with, and the watchdog it was proposed
-// to fix is someone else's. See extras/doc/implemented/idf55_main_task_stack_overflow.md.
-extern "C" void saleae_hal_idle(void) { saleae_hal_delay_ms(1); }
+// Why this matters more than a crashed idle board: a panic inside a capture
+// window truncates the run, and SR_00 then reports the truncated 1 Hz pattern
+// as eight dead pins -- the one fault the wiring pre-check exists to catch. It
+// did exactly that, and the result was recorded as `SR_00: failed`.
+//
+// Subscribing rather than removing the spin. The spin has to stay in
+// `saleae_test_loop()`, where an edge has to land on time and where
+// `saleae_hal_delay_ms(1)` is deliberate (see the note above); the feeder uses
+// it too, and blocking there grew trailing pulses on mcpwm_pcnt. So the spin is
+// fixed and the watchdog is fed, which is the arrangement in which the timing
+// the matrix was measured with survives.
+//
+// `esp_task_wdt_add(NULL)` subscribes the *calling* task and is what the IDF
+// docs prescribe for exactly this. It is called once, from setup, because
+// adding the same task twice returns ESP_ERR_INVALID_STATE and logs an error.
+extern "C" void saleae_hal_wdt_subscribe(void) {
+  if (esp_task_wdt_add(NULL) == ESP_OK) {
+    wdt_subscribed = true;
+  }
+}
+
+extern "C" void saleae_hal_wdt_reset(void) {
+  // Only once subscribed: `esp_task_wdt_reset()` on an unsubscribed task logs
+  // `E task_wdt: esp_task_wdt_reset(707): task not found`, and this runs once
+  // per main-loop pass, on the UART the host protocol uses. Measured: that call
+  // alone flooded the console and the capture window with it.
+  if (wdt_subscribed) {
+    esp_task_wdt_reset();
+  }
+}
+
+// One whole tick, blocked -- which is what saleae_hal.h asks for and what this
+// function was not doing.
+//
+// `saleae_hal_idle()` was `saleae_hal_delay_ms(1)`, and that resolves to the
+// sub-tick *spin* branch above: at FreeRTOS's 100 Hz `pdMS_TO_TICKS(1)` is 0,
+// so app_main spun at 100 % CPU instead of ever blocking. The header says
+// "deliberately not saleae_hal_delay_ms(1) ... Spinning in the idle path
+// starves IDLE, and the task watchdog then resets a board that is doing nothing
+// at all -- measured on ESP-IDF 4.4.3, ten seconds after boot, with no command
+// outstanding."
+//
+// That reproduction came back on 5.5.3 while closing this item, and it is worse
+// than a crashed idle board: a panic inside a capture window truncates the run,
+// and SR_00 then reports the truncated 1 Hz pattern as eight dead pins -- the
+// one fault the wiring pre-check exists to catch. Measured here: `open_board()`,
+// no command, no capture, six `task_wdt` lines within ~5.3 s with an IDLE0
+// backtrace naming `main`. And the spin was *also* what the note below called
+// out as deliberate, so the fix has to reconcile two measurements rather than
+// pick one.
+//
+// The reconciliation: the spin that had to stay is in `saleae_test_loop()`, the
+// SR_00 pattern, where an edge has to land on time and where this function is
+// never called. This one is the idle path, which the header already required to
+// block. So the pattern keeps its sub-tick spin and the idle path stops
+// spinning, which is the only arrangement in which both statements hold.
+//
+// One tick and not `DELAY_MS(10)`: 10 ms would put a 10 ms floor on how
+// promptly a command is picked up, and the feeder is this same loop. Measured
+// after this change: the watchdog stays quiet, and SR_00's widths are unchanged
+// (the pattern path uses `saleae_hal_delay_ms(1)`, which is still the spin, and
+// has to be -- that is where an edge has to land).
+//
+// Neither change alone is enough, and both were needed -- measured, in this
+// order. Blocking the idle path alone left the watchdog firing during SR_00,
+// whose pattern loop is the spin this comment is about. Feeding the watchdog
+// alone was worse than useless until the subscription existed: every
+// `esp_task_wdt_reset()` logged `task not found` and flooded the console.
+extern "C" void saleae_hal_idle(void) {
+  vTaskDelay(pdMS_TO_TICKS(1) ? pdMS_TO_TICKS(1) : 1);
+}
 
 extern "C" void saleae_hal_serial_write(const char* text) {
   uart_write_bytes(SALEAE_UART, text, strlen(text));

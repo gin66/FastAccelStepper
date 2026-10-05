@@ -7,6 +7,7 @@ Run from extras/tests/saleae_based:
 """
 
 import argparse
+import itertools
 import json
 import os
 import re
@@ -1255,9 +1256,11 @@ class TestBoardCommands(unittest.TestCase):
             sent = self._sent_to_board(scenario)
             self.assertTrue(sent, scenario)
             first = sent[0]
-            self.assertEqual(first, run_tests.config_wire(
-                run_tests.SCENARIOS[scenario][0], "rmt"),
-                f"{scenario} sends {first!r}")
+            # `scenario_wire`, not `config_wire`: the pin mode is `dir` for all
+            # but one scenario, and building the line from a hardcoded `dir`
+            # would score SR_31 against a CONFIG it never sends.
+            self.assertEqual(first, run_tests.scenario_wire(scenario, "rmt"),
+                             f"{scenario} sends {first!r}")
             self.assertEqual(first.count("CONFIG"), 1, first)
             self.assertEqual(first.split()[0], "CONFIG", first)
 
@@ -1339,6 +1342,892 @@ class TestBoardCommands(unittest.TestCase):
                 self.assertEqual(
                     [ln for ln in sent if ln.startswith("QSEG")],
                     [f"QSEG {run_tests.QUEUE_FILL_STEPS} 640 1"] * 4)
+
+
+# The QINFO shapes this harness has actually met, one per driver family. They
+# differ in `max_speed_ticks` by a factor of eight, which is the whole point of
+# checking every builder against all of them: a builder that assumes a fast
+# driver has a fast floor is legal on one and not on the other.
+QINFO_SHAPES = {
+    "rmt": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+            "max_speed_ticks": 640, "max_speed_all_ticks": 640},
+    "i2s_direct": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+                   "max_speed_ticks": 80, "max_speed_all_ticks": 80},
+    "avr_timer": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+                  "max_speed_ticks": 426, "max_speed_all_ticks": 426},
+}
+
+
+class TestAlreadyIsNotAlwaysYes(unittest.TestCase):
+    """A CONFIG that cannot be honoured must say so.
+
+    `handle_config()` cannot move an already-connected stepper: a queue is
+    allocated once and the engine has no release, so a reset is the only way
+    back to an empty board. That is the reason for the `already` branch -- and
+    it is not a reason to answer `OK`.
+
+    Measured on ESP-IDF 5.5.3, before this was fixed:
+
+    ```
+    CONFIG 8 mcpwm_pcnt,... nodir -> ERR connect step 6 n=6
+    CONFIG 7 mcpwm_pcnt,... nodir -> OK CONFIG n=6 mode=nodir already
+    ```
+
+    The first connects six and then fails, leaving `slot_count = 6`, so the
+    second reported success for a configuration that was never established. The
+    max-count probe believed it and recorded seven steppers on a board running
+    six -- and the run *passed*, because `eval_scale` judges the six that are
+    really there.
+
+    Source checks, because the replies are firmware's. What the host does with
+    them is checked in `TestMaxStepperCount`.
+    """
+
+    def _already_branch(self):
+        src = (COMMON / "saleae_app.cpp").read_text()
+        start = src.index("if (slot_count > 0) {")
+        return src[start:src.index("\n  }", start)]
+
+    def test_the_already_branch_compares_the_request_before_answering_ok(self):
+        body = self._already_branch()
+        # Every field a second CONFIG can disagree about: the count, the pin
+        # mode (which is what sets the stride), and each stepper's driver. A
+        # check that misses one of them reopens a way to be told OK falsely.
+        self.assertIn("n == slot_count", body, "the count is compared")
+        self.assertIn("stride == chan_stride", body,
+                      "the pin mode is compared; it is what sets the stride")
+        self.assertIn("slots[i].driver == drivers[i]", body,
+                      "every stepper's driver is compared")
+        # And OK is reachable only from inside that comparison.
+        ok = body.index("OK CONFIG n=%u mode=%s already")
+        self.assertGreater(ok, body.index("if (i == n)"),
+                           "OK must be behind the full-match test, not before it")
+
+    def test_a_mismatch_is_refused_and_names_what_is_connected(self):
+        body = self._already_branch()
+        self.assertIn("ERR CONFIG already n=%u stride=%u mode=%s", body)
+        # The driver-mismatch refusal names the *index*, so a reader can see
+        # which stepper disagrees rather than only that they all do.
+        self.assertIn("ERR CONFIG already n=%u driver %u is %s", body)
+
+    def test_the_branch_is_not_reachable_before_the_request_is_parsed(self):
+        # Order matters as a property of the function, not just of the text: the
+        # count, the mode and the driver list all have to be resolved first, or
+        # the comparison is against whatever was left in them. `slot_count` is
+        # zero until a CONFIG has connected something, so a fresh board never
+        # reaches this branch at all.
+        src = (COMMON / "saleae_app.cpp").read_text()
+        setup = src[src.index("static void handle_config("):
+                    src.index("if (slot_count > 0) {")]
+        for needed in ("parse_pin_mode(mode_text", "strtol(count_text",
+                       "parse_driver(tok"):
+            self.assertIn(needed, setup,
+                          f"the request is not fully parsed before the already "
+                          f"check: {needed}")
+
+    def test_the_probe_no_longer_depends_on_the_lie_being_absent(self):
+        # The host fix is the load-bearing half: even with the firmware honest,
+        # acceptance is MAP, because a CONFIG that says OK has still to be
+        # cross-checked against what the board reports it connected. This is
+        # what makes the probe right on a firmware that has not been reflashed.
+        src = (SCRIPTS / "run_tests.py").read_text()
+        probe = src[src.index("class MaxCountProbe:"):
+                    src.index("def probe_for(")]
+        self.assertIn("connected = len(read_map(ser)[0])", probe)
+        self.assertIn("if connected == count:", probe,
+                      "acceptance must be the board's own count")
+        self.assertNotIn('if "OK CONFIG" in reply:',
+                         probe.split("if connected == count:")[0],
+                         "the reply must not be the acceptance test")
+
+
+class TestNoRunawaySpin(unittest.TestCase):
+    """No firmware loop may busy-wait long enough to starve IDLE into a WDT.
+
+    Measured on this harness, ESP-IDF 5.5.3: a board sitting idle produced six
+    `task_wdt` lines within ~5.3 s, with an IDLE0 backtrace naming `main` as the
+    running task. A panic inside a capture window truncates the run, and SR_00
+    then reported the truncated 1 Hz pattern as eight dead pins -- the one fault
+    the wiring pre-check exists to catch.
+
+    Two loops were at fault and both had to change, because neither alone fixed
+    it:
+
+    - `saleae_hal_idle()` was `saleae_hal_delay_ms(1)`, and that resolves to the
+      *sub-tick spin* branch at FreeRTOS's 100 Hz, contradicting its own header,
+      which says the idle path must block;
+    - `saleae_test_loop()` spins once per millisecond for the whole second-long
+      period, so SR_00 starves IDLE0 even with the idle path fixed.
+
+    The second cannot simply stop spinning -- an edge has to land within SR_00's
+    2 ms width tolerance -- so it sleeps between edges and keeps the spin only
+    where the edge is. These are source checks because the defect is a *timing*
+    property of firmware, which no unit test here can execute.
+    """
+
+    def _body(self, text, signature):
+        """The body of `signature`'s definition, comments stripped."""
+        start = text.index(signature)
+        body = text[start:text.index("\n}", start)]
+        return "\n".join(line for line in body.splitlines()
+                         if not line.lstrip().startswith("//"))
+
+    def test_the_idle_path_blocks_and_does_not_reuse_the_spin_delay(self):
+        # The header names the required behaviour and the spin as the thing to
+        # avoid; this is the check that the two agree. saleae_hal_delay_ms(1) is
+        # the spin on ESP-IDF, so it appearing here is the bug.
+        header = (COMMON / "saleae_hal.h").read_text()
+        espidf = (COMMON / "saleae_hal_espidf.cpp").read_text()
+        self.assertIn("Deliberately not `saleae_hal_delay_ms(1)`", header,
+                      "the header must keep naming the trap, or the next "
+                      "reader has no way to know what is being avoided")
+        body = self._body(espidf, "void saleae_hal_idle(void)")
+        self.assertNotIn("saleae_hal_delay_ms", body,
+                         "the idle path is the sub-tick spin; it must block so "
+                         "IDLE0 gets to run")
+        self.assertIn("vTaskDelay", body)
+
+    def test_the_sr00_pattern_sleeps_between_edges_and_spins_only_near_one(self):
+        # The pattern is 1 Hz with edges every 50 ms, so there is nothing to do
+        # between them. Spinning through all of it starves IDLE0, which is what
+        # produced the watchdog panic.
+        src = (COMMON / "saleae_test.cpp").read_text()
+        body = self._body(src, "void saleae_test_loop(void)")
+        self.assertIn("SPIN_WINDOW_MS", body,
+                      "the spin has to be bounded to the window before an edge")
+        self.assertIn("saleae_hal_delay_ms(ms_to_edge", body,
+                      "the quiet time between edges must block, not spin")
+        # And the spin itself must remain: it is where the edge lands, and
+        # removing it is how SR_00's widths went to 428 us / 455.9 ms once
+        # already (see the note in saleae_hal_espidf.cpp).
+        self.assertIn("saleae_hal_delay_ms(1)", body)
+
+    def test_the_spin_window_is_wider_than_the_tolerance_and_narrower_than_the_grid(self):
+        # Both bounds are load-bearing. Narrower than the grid, or an edge is
+        # reached by a timer wake-up instead of by spinning. Wider than SR_00's
+        # tolerance, or the same. Measured tolerances, not preferences.
+        src = (COMMON / "saleae_test.cpp").read_text()
+        window = int(re.search(r"#define SPIN_WINDOW_MS (\d+)",
+                               src).group(1))
+        grid = int(re.search(r"#define EDGE_GRID_MS (\d+)", src).group(1))
+        self.assertGreater(window, analyze_csv.EXPECTED_WIDTH_TOL_US / 1000.0)
+        self.assertLess(window, grid)
+
+    def test_the_edge_grid_matches_the_high_times_the_pattern_generates(self):
+        # `saleae_test_loop()` computes the next edge as the next EDGE_GRID_MS
+        # boundary. That is only right because every high time is a multiple of
+        # the grid -- if one were not, the loop would sleep through its own edge.
+        src = (COMMON / "saleae_test.cpp").read_text()
+        grid = int(re.search(r"#define EDGE_GRID_MS (\d+)", src).group(1))
+        table = re.search(r"saleae_high_ms\[SALEAE_PIN_COUNT\] SAL_PROGMEM = \{"
+                          r"([^}]*)\}", src)
+        self.assertIsNotNone(table, "the high-time table moved or changed shape")
+        highs = [int(v) for v in re.findall(r"\d+", table.group(1))]
+        self.assertTrue(highs)
+        for high in highs:
+            self.assertEqual(high % grid, 0,
+                             f"high time {high} ms is not on the {grid} ms "
+                             f"edge grid, so the sleep would cross its edge")
+
+    def test_the_watchdog_is_subscribed_before_it_is_reset(self):
+        # `esp_task_wdt_reset()` on a task that is not subscribed logs an error
+        # on every call -- once per main-loop pass, on the UART the host
+        # protocol uses. Measured: it flooded the console and the capture window.
+        for name in ("saleae_hal_espidf.cpp", "saleae_hal_arduino.cpp"):
+            hal = (COMMON / name).read_text()
+            self.assertIn("saleae_hal_wdt_subscribe", hal, name)
+            self.assertIn("saleae_hal_wdt_reset", hal, name)
+        espidf = (COMMON / "saleae_hal_espidf.cpp").read_text()
+        self.assertIn("wdt_subscribed", espidf,
+                      "the reset must be guarded by the subscription")
+        # Subscribe once, in setup, and before READY -- the host opens the port
+        # and waits for READY, so anything before it is unobserved.
+        app = (COMMON / "saleae_app.cpp").read_text()
+        setup = self._body(app, "void saleae_app_setup(void)")
+        self.assertIn("saleae_hal_wdt_subscribe()", setup)
+        self.assertLess(setup.index("saleae_hal_wdt_subscribe()"),
+                        setup.index("READY"),
+                        "the watchdog must be live before the host is told the "
+                        "board is ready")
+        loop = self._body(app, "void saleae_app_loop(void)")
+        self.assertIn("saleae_hal_wdt_reset()", loop)
+        # Every pass, not inside one of the three branches: the pattern loop and
+        # the feeder both end in a spin, so idle is not the only hungry path.
+        reset = loop.index("saleae_hal_wdt_reset()")
+        for branch in ("saleae_test_loop()", "qe_pump()", "saleae_hal_idle()"):
+            self.assertLess(loop.index(branch), reset,
+                            f"{branch} must come before the watchdog reset")
+
+    def test_both_watchdog_calls_exist_on_every_hal(self):
+        # Both HALs are linked into every build (link_app.sh) and app calls both
+        # unconditionally, so a missing one is a link error on the other
+        # platform -- found by building the wrong one first.
+        for name in ("saleae_hal_espidf.cpp", "saleae_hal_arduino.cpp"):
+            hal = (COMMON / name).read_text()
+            for fn in ("saleae_hal_wdt_subscribe(void)",
+                       "saleae_hal_wdt_reset(void)"):
+                self.assertIn(f"void {fn}", hal, f"{name} lacks {fn}")
+        header = (COMMON / "saleae_hal.h").read_text()
+        for fn in ("saleae_hal_wdt_subscribe(void);", "saleae_hal_wdt_reset(void);"):
+            self.assertIn(fn, header)
+
+
+class TestResetBeforeEachTest(unittest.TestCase):
+    """Every run starts on a board that has just rebooted.
+
+    Measured on an ESP32-DevKitC with ESP-IDF 5.5.3: the firmware trips its own
+    task watchdog while completely idle -- `open_board()`, then nothing at all,
+    and six `task_wdt` lines arrive within ~5.3 s with an IDLE0 backtrace. No
+    CONFIG, no program, no capture involved.
+
+    That is a firmware property, and it is why this is load-bearing rather than
+    hygiene. A panic inside a capture window truncates the run, and the pin
+    self-test then reports the truncated pattern as eight dead cables -- which
+    is the fault it exists to catch, so the pre-check becomes indistinguishable
+    from the thing it is for.
+    """
+
+    def test_open_board_raises_when_the_board_did_not_reset(self):
+        # Opening the port does not *guarantee* a reset: the DTR/RTS toggle does
+        # not always fire, which is the same reason a flash occasionally comes
+        # up in the wrong boot mode. The old loop fell through after its timeout
+        # and handed back a stale board that answered commands from the previous
+        # test, so a run measured that board's leftovers.
+        class FakeSerial:
+            def __init__(self, *a, **k):
+                pass
+
+            def read(self, _n):
+                return b""
+
+            def reset_input_buffer(self):
+                pass
+
+            def close(self):
+                pass
+
+        # A clock that advances: open_board() loops on `time.time() < deadline`,
+        # so a frozen one would spin forever rather than time out.
+        clock = itertools.count(0, 0.5)
+
+        def now():
+            return next(clock)
+
+        with mock.patch("serial.Serial", FakeSerial), \
+                mock.patch.object(run_tests.time, "time", now):
+            with self.assertRaises(run_tests.BoardError) as ctx:
+                run_tests.open_board("/dev/null", 115200, timeout=1.0)
+        # The message has to name the cause, because "it did not reset" is the
+        # one thing the reader can act on and "timed out" is not.
+        self.assertIn("READY", str(ctx.exception))
+        self.assertIn("not reset", str(ctx.exception))
+
+    def test_open_board_returns_when_ready_is_seen(self):
+        class FakeSerial:
+            def __init__(self, *a, **k):
+                self.written = []
+
+            def read(self, _n):
+                return b"I (290) main_task: Start\n... READY\n"
+
+            def reset_input_buffer(self):
+                pass
+
+            def close(self):
+                pass
+
+        with mock.patch("serial.Serial", FakeSerial):
+            ser = run_tests.open_board("/dev/null", 115200, timeout=1.0)
+        self.assertIsInstance(ser, FakeSerial)
+
+    def test_every_path_that_talks_to_a_board_goes_through_open_board(self):
+        # One reset point, or the guarantee is only as good as the call site
+        # somebody remembered. `measure()` and `run_sr00()` are the two, and
+        # both are what every scenario and every mode point runs through.
+        source = (SCRIPTS / "run_tests.py").read_text()
+        code = "\n".join(line for line in source.splitlines()
+                         if not line.lstrip().startswith("#"))
+        for fn in ("def run_sr00(", "def measure("):
+            start = code.index(fn)
+            body = code[start:code.index("\ndef ", start + 10)]
+            self.assertIn("open_board(", body,
+                          f"{fn} does not open (and so reset) the board")
+
+    def test_a_firmware_fault_is_not_reported_as_a_wiring_failure(self):
+        # The two must be distinguishable, and it is the *verdict* that carries
+        # it: `failed` on SR_00 is a statement about the cable, so it must not
+        # be reachable from a firmware panic.
+        self.assertEqual(
+            run_tests.firmware_fault("OK SR00\nE (5300) task_wdt: ...\n"),
+            ["task_wdt"])
+        self.assertEqual(
+            run_tests.firmware_fault(
+                "Backtrace: 0x400DEDEE:0x3FFB1150 0x400DF1B0\n"),
+            ["Backtrace:"])
+        self.assertIsNone(run_tests.firmware_fault(
+            "OK SR00\nOK CONFIG n=1 mode=dir\nPOS 0\n"))
+        # A refused command is not a fault: the firmware is answering.
+        self.assertIsNone(run_tests.firmware_fault(
+            "ERR connect step 6 n=7 drv=mcpwm_pcnt nodir=1\n"))
+
+    def test_sr00_records_a_fault_as_an_error_and_names_the_marker(self):
+        # The path that was misreading one. A truncated capture makes every
+        # channel's first high time a fragment of the commanded one -- measured
+        # D0 19.3 ms against 50 ms, the pairs summing to exactly one 1000 ms
+        # period -- which is indistinguishable from eight dead pins. So the
+        # verdict is `error`, the marker is named, and the waveform is not
+        # consulted for a wiring claim at all.
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt",
+                                   "--tests", "SR_00", "--results-dir",
+                                   "/tmp/sr00err", "--capture-dir",
+                                   "/tmp/sr00err"])
+        fault = "E (5300) task_wdt: Task watchdog got triggered.\n" \
+                "Backtrace: 0x400DEDEE:0x3FFB1150\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            args.capture_dir = str(Path(tmp) / "cap")
+            with mock.patch.object(run_tests, "open_board",
+                                   lambda *a, **k: mock.Mock()), \
+                    mock.patch.object(run_tests, "send_line",
+                                      lambda *a, **k: ""), \
+                    mock.patch.object(run_tests, "start_capture",
+                                      lambda *a, **k: mock.Mock(
+                                          wait=lambda: None)), \
+                    mock.patch.object(run_tests, "drain",
+                                      lambda *a, **k: fault), \
+                    mock.patch.object(run_tests.time, "sleep",
+                                      lambda *a: None), \
+                    mock.patch.object(
+                        run_tests, "load_capture_for_eval",
+                        lambda *a, **k: ({f"D{i}": [0] * 100 for i in range(8)},
+                                         1_000_000)):
+                status, detail = run_tests.run_sr00("t", args)
+        self.assertEqual(status, "error")
+        self.assertEqual(detail["firmware_fault"], ["task_wdt", "Backtrace:"])
+        self.assertIn("truncated", detail["error"])
+        self.assertIn("nothing about the wiring", detail["error"])
+
+    def test_a_clean_sr00_is_still_passed_and_a_wiring_fault_still_failed(self):
+        # The other direction, which matters more: the check must not turn a
+        # real dead cable into an error, or the pre-check stops catching the one
+        # thing it exists for.
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt",
+                                   "--tests", "SR_00", "--results-dir",
+                                   "/tmp/sr00ok", "--capture-dir",
+                                   "/tmp/sr00ok"])
+        quiet = {"D0": [0] * 100}
+        with tempfile.TemporaryDirectory() as tmp:
+            args.capture_dir = str(Path(tmp) / "cap")
+            with mock.patch.object(run_tests, "open_board",
+                                   lambda *a, **k: mock.Mock()), \
+                    mock.patch.object(run_tests, "send_line",
+                                      lambda *a, **k: ""), \
+                    mock.patch.object(run_tests, "start_capture",
+                                      lambda *a, **k: mock.Mock(
+                                          wait=lambda: None)), \
+                    mock.patch.object(run_tests, "drain",
+                                      lambda *a, **k: "OK SR00\n"), \
+                    mock.patch.object(run_tests.time, "sleep",
+                                      lambda _s: None), \
+                    mock.patch.object(run_tests,
+                                      "load_capture_for_eval",
+                                      lambda *a, **k: (quiet, 1_000_000)):
+                status, _detail = run_tests.run_sr00("t", args)
+        # A single quiet channel cannot pass the 8-channel pre-check, and it is
+        # a wiring verdict, not a firmware one.
+        self.assertEqual(status, "failed")
+
+    def test_a_fault_during_a_scenario_capture_is_an_error_not_a_failure(self):
+        # Same reasoning for a queue scenario: a panic truncates the run, and
+        # the evaluator would otherwise report the short count as a driver that
+        # drops steps. That is a defect claim, and it would be false.
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt",
+                                   "--tests", "SR_01", "--results-dir",
+                                   "/tmp/faultsr", "--capture-dir",
+                                   "/tmp/faultsr"])
+        info = {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
+                "max_speed_ticks": 640, "queue_len": 32}
+        fault = "OK QRUN\nE (5300) task_wdt: Task watchdog got triggered.\n"
+
+        def _ok_config(_ser, line, **_kw):
+            # CONFIG has to be accepted or the run is refused before it ever
+            # reaches a capture, and this test is about what happens after.
+            return ("OK CONFIG n=1 mode=dir" if line.startswith("CONFIG")
+                    else "OK QCLR")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            args.capture_dir = str(Path(tmp) / "cap")
+            with mock.patch.object(run_tests, "open_board",
+                                   lambda *a, **k: mock.Mock()), \
+                    mock.patch.object(run_tests, "reply_of", _ok_config), \
+                    mock.patch.object(run_tests, "send_line",
+                                      lambda *a, **k: ""), \
+                    mock.patch.object(run_tests, "drain",
+                                      lambda *a, **k: fault), \
+                    mock.patch.object(run_tests, "read_map",
+                                      lambda ser: (run_tests
+                                                   .default_channel_map(1, 2),
+                                                   {"stride": 2})), \
+                    mock.patch.object(run_tests, "read_qinfo",
+                                      lambda ser: dict(info)), \
+                    mock.patch.object(run_tests, "program",
+                                      lambda *a: True), \
+                    mock.patch.object(run_tests, "start_capture",
+                                      lambda *a, **k: mock.Mock(
+                                          wait=lambda: None)), \
+                    mock.patch.object(run_tests.time, "sleep",
+                                      lambda _s: None):
+                status, detail = run_tests.measure(
+                    "t", "sr01", "CONFIG 1 rmt dir", 1,
+                    run_tests.sc_period_exact, "SR_01", args,
+                    scenario="SR_01")
+        self.assertEqual(status, "error")
+        self.assertEqual(detail["firmware_fault"], ["task_wdt"])
+        self.assertNotIn("per_stepper", detail)
+
+
+class TestMaxStepperCount(unittest.TestCase):
+    """SR_31: the catalogue's only test whose stepper count it does not know.
+
+    Everything here is a pure function of the driver name and the board's
+    replies, so the properties that matter -- the count comes from the board and
+    not from a table, the wire is legal, the mask covers every stepper -- are
+    checkable without hardware. What still needs a board is the *answer*, which
+    is the measurement the scenario exists to record.
+    """
+
+    class FakeBoard:
+        """A board that connects `n` steppers up to `limit` and refuses above.
+
+        Refuses for the reason each real limit has: a driver with no queue left
+        says `ERR connect step`, and the analyzer running out of channels says
+        the count needs more channels than it has.
+
+        Models the *partial* connect too, because it is the whole reason
+        acceptance cannot be read off the reply: a refused CONFIG leaves the
+        steppers it did connect in place, and the next CONFIG answers
+        `OK CONFIG n=<connected> ... already`. `lying_again` turns that second
+        half on and off, because a fake board that only ever refuses perfectly
+        would pass a probe that trusted the reply.
+        """
+
+        def __init__(self, limit, channel_cap=run_tests.CHANNELS,
+                     mux_word=run_tests.MUX_SLOT_COUNT, stride=1,
+                     lying_again=True):
+            self.limit = limit
+            self.channel_cap = channel_cap
+            self.mux_word = mux_word
+            self.stride = stride
+            self.lying_again = lying_again
+            self.lines = []
+            self.connected = 0
+
+        def __call__(self, _ser, line, **_kw):
+            self.lines.append(line)
+            tokens = line.split()
+            if tokens[0] != "CONFIG":
+                return "OK"
+            count = int(tokens[1])
+            mux = all(d.startswith("i2s_mux") for d in tokens[2].split(","))
+            if self.connected and self.lying_again:
+                # The half-configured trap: whatever is asked for, the board
+                # reports success for what a *previous* attempt left connected.
+                return f"OK CONFIG n={self.connected} mode=nodir already"
+            if mux and count * self.stride > self.mux_word:
+                return (f"ERR CONFIG mux n={count} needs "
+                        f"{count * self.stride} slots, max={self.mux_word}")
+            if not mux and count * self.stride > self.channel_cap:
+                return (f"ERR CONFIG n={count} needs "
+                        f"{count * self.stride} channels, "
+                        f"max={self.channel_cap}")
+            if count > self.limit:
+                # Partial connect: the prefix that fitted stays connected.
+                self.connected = self.limit
+                return f"ERR connect step {self.limit} n={self.limit}"
+            self.connected = count
+            return "OK CONFIG"
+
+        def map(self, _ser):
+            """read_map(), as the probe sees it: one entry per connected stepper."""
+            return (run_tests.default_channel_map(self.connected, self.stride),
+                    {"stride": self.stride})
+
+    def _probe(self, driver, limit, reopen=True, reset=True, **kw):
+        """Run the probe against a FakeBoard. Returns what find() returns.
+
+        `reopen` models the caller reopening the port between attempts.
+        `reset` is what that reopen *does* -- clearing the half-connected state
+        an ESP32 reset clears. Both are switchable because they are two
+        different mistakes: `reopen=False` means the probe never asked for a
+        fresh session, and `reset=False` means it asked for one that did not
+        reset, which is the silent half (the DTR/RTS toggle not firing, which
+        AGENTS.md already records for the bootloader).
+        """
+        board = self.FakeBoard(limit, **kw)
+        probe = run_tests.MaxCountProbe(driver)
+        opens = []
+
+        def do_reopen():
+            opens.append(1)
+            if reset:
+                board.connected = 0
+            return mock.Mock()
+
+        with mock.patch.object(run_tests, "reply_of", board), \
+                mock.patch.object(run_tests, "read_map", board.map):
+            wire, mask, detail, reply, ser = probe.find(
+                mock.Mock(), do_reopen if reopen else None)
+        return wire, mask, detail, reply, board, opens
+
+    def test_an_ok_reply_for_a_count_the_board_did_not_connect_is_not_believed(self):
+        # The defect the first `--tests SR_31` run walked into, measured on the
+        # board and reproduced by the fake's `lying_again` mode:
+        #
+        #   CONFIG 8 mcpwm_pcnt,... nodir -> ERR connect step 6 n=6
+        #   CONFIG 7 mcpwm_pcnt,... nodir -> OK CONFIG n=6 mode=nodir already
+        #
+        # The second line is success for a configuration that was never
+        # established: the first attempt left six steppers connected, and
+        # handle_config() short-circuits any later CONFIG to "already". A host
+        # that reads acceptance off the reply records 7 here -- and the run
+        # *passes*, because eval_scale judges the six steppers that are really
+        # there. Nothing downstream would have noticed.
+        #
+        # So acceptance is MAP, and the disagreement is recorded rather than
+        # absorbed: `ok_but_short` is a different entry from `refused_above`
+        # because "the board refuses 7" and "the board said yes and did not" are
+        # different findings.
+        _w, _m, detail, _r, _b, _o = self._probe("mcpwm_pcnt", 6, reset=False)
+        self.assertEqual(detail["max_stepper_count"], 6,
+                         "the board connected six; six is the answer")
+        self.assertEqual([r["n"] for r in detail["refused_above"]], [8])
+        self.assertEqual(detail["ok_but_short"],
+                         [{"n": 7,
+                           "reply": "OK CONFIG n=6 mode=nodir already",
+                           "connected": 6}])
+        # And the mask is the connected count's, not the one that said yes.
+        _w, mask, _d, _r, _b, _o = self._probe("mcpwm_pcnt", 6, reset=False)
+        self.assertEqual(mask, (1 << 6) - 1)
+
+    def test_the_count_survives_a_reopen_that_does_not_reset_because_map_decides(self):
+        # Worth stating because the first design assumed the opposite. Reading
+        # acceptance off MAP rather than off the reply is what makes the probe
+        # robust to the half-configured board, so the reset between attempts is
+        # about *provenance*, not about reaching the number:
+        #
+        #   with a reset: 8 refused, 7 refused, 6 CONFIGured and connected
+        #   without one: 8 refused, 7 answered "already" for the six that
+        #                 attempt left, and 6 is accepted because MAP says six
+        #
+        # Both reach 6. What differs is that without the reset the accepted
+        # state is a *leftover* from a refused attempt, which is only the right
+        # answer because every attempt uses the same driver and the same pin
+        # mode -- asserted below. A probe whose attempts could differ would need
+        # the reset to mean anything.
+        _w, _m, clean, _r, _b, opens = self._probe("mcpwm_pcnt", 6)
+        self.assertEqual(len(opens), 2, "two resets between three attempts")
+        self.assertEqual(clean["probe_attempts"], 3)
+        self.assertEqual(clean["max_stepper_count"], 6)
+        self.assertEqual([r["n"] for r in clean["refused_above"]], [8, 7])
+        self.assertEqual(clean["ok_but_short"], [])
+        _w, _m, dirty, _r, _b, opens = self._probe("mcpwm_pcnt", 6, reset=False)
+        self.assertEqual(dirty["max_stepper_count"], 6)
+        self.assertEqual(len(opens), 2)
+        self.assertEqual([r["n"] for r in dirty["refused_above"]], [8])
+        self.assertEqual(dirty["ok_but_short"],
+                         [{"n": 7,
+                           "reply": "OK CONFIG n=6 mode=nodir already",
+                           "connected": 6}])
+
+    def test_every_probe_attempt_uses_one_driver_and_one_pin_mode(self):
+        # The invariant the previous test leans on: a leftover state from a
+        # refused attempt is the right answer only because it was the same
+        # request. If two attempts could differ, MAP matching by count would be
+        # a coincidence, and the reset would be load-bearing again.
+        probe = run_tests.MaxCountProbe("mcpwm_pcnt")
+        wires = [probe.wire_for(n) for n in range(1, probe.bound + 1)]
+        for wire in wires:
+            tokens = wire.split()
+            self.assertEqual(tokens[0], "CONFIG")
+            self.assertEqual(tokens[3], run_tests.MAX_COUNT_PIN_MODE)
+            self.assertEqual(set(tokens[2].split(",")), {"mcpwm_pcnt"})
+            self.assertEqual(int(tokens[1]),
+                             len(tokens[2].split(",")))
+
+    def test_a_driver_that_takes_the_bound_outright_is_never_reset(self):
+        # The common case must cost one CONFIG and no reset: `rmt` has eight
+        # queues and eight channels, so the first attempt is the answer.
+        _w, mask, detail, _r, _b, opens = self._probe("rmt", 8)
+        self.assertEqual(opens, [])
+        self.assertEqual(detail["probe_attempts"], 1)
+        self.assertEqual(mask, 255)
+
+    def test_the_count_is_the_board_s_answer_not_a_host_table_s(self):
+        # The whole premise of the scenario, and the thing a host table would
+        # quietly replace: three boards, three different answers, one probe.
+        for limit, want in ((8, 8), (6, 6), (2, 2)):
+            with self.subTest(limit=limit):
+                _w, _m, detail, reply, _b, _o = self._probe("mcpwm_pcnt", limit)
+                self.assertIn("OK CONFIG", reply)
+                self.assertEqual(detail["max_stepper_count"], want)
+
+    def test_the_probe_walks_down_and_stops_at_the_first_acceptance(self):
+        wire, mask, detail, reply, board, opens = self._probe("mcpwm_pcnt", 6)
+        self.assertIn("OK CONFIG", reply)
+        self.assertEqual(mask, (1 << 6) - 1, "the mask must select every stepper")
+        self.assertEqual(detail["search_bound"], 8)
+        self.assertEqual(detail["probe_attempts"], 3, "8 refused, 7 refused, 6 ok")
+        # Descending, one CONFIG per attempt, and the accepted one is last: the
+        # run must not connect the same steppers a second time.
+        counts = [int(ln.split()[1]) for ln in board.lines]
+        self.assertEqual(counts, [8, 7, 6])
+        self.assertEqual(wire, f"CONFIG 6 {','.join(['mcpwm_pcnt'] * 6)} nodir")
+
+    def test_every_refusal_above_the_count_is_recorded_with_its_reason(self):
+        # The refusal names *which* limit stopped it, and "stops at 6" and
+        # "stops at 6 because the analyzer has no channel 7" are different
+        # answers. So the transcript travels with the result.
+        _w, _m, detail, _r, _b, _o = self._probe("mcpwm_pcnt", 6)
+        self.assertEqual([r["n"] for r in detail["refused_above"]], [8, 7])
+        for refused in detail["refused_above"]:
+            self.assertTrue(refused["reply"].startswith("ERR"), refused)
+            self.assertTrue(refused["reply"] != "", refused)
+        # And the channel-budget reason is distinguishable from the queue one.
+        _w, _m, channels_detail, _r, _b, _o = self._probe("rmt", 99)
+        self.assertEqual(channels_detail["max_stepper_count"], 8)
+        self.assertEqual(channels_detail["refused_above"], [])
+
+    def test_the_search_starts_from_the_channel_budget_not_a_queue_table(self):
+        self.assertEqual(run_tests.max_stepper_count_bound("rmt")[0], 8)
+        self.assertEqual(run_tests.max_stepper_count_bound("timer")[0], 8)
+        # A multiplexed stepper is a bit of the word, so the eight channels stop
+        # being its limit and the 32-bit word takes over.
+        count, why = run_tests.max_stepper_count_bound("i2s_mux")
+        self.assertEqual(count, 32)
+        self.assertIn("32-bit", why)
+        # `dir` halves it either way.
+        self.assertEqual(
+            run_tests.max_stepper_count_bound("rmt", "dir")[0], 4)
+        self.assertEqual(
+            run_tests.max_stepper_count_bound("i2s_mux", "dir")[0], 16)
+
+    def test_the_bound_is_a_bound_and_not_a_prediction(self):
+        # It is the top of a descending search, so it may be above the answer --
+        # but never below it, or the probe cannot reach the maximum. The
+        # channel budget is the tightest cap the host knows of, and the mux word
+        # is the tightest for a multiplexed stepper, because both are enforced
+        # by the firmware itself.
+        self.assertEqual(run_tests.max_stepper_count_bound("mcpwm_pcnt")[0], 8)
+        self.assertGreaterEqual(
+            run_tests.max_stepper_count_bound("mcpwm_pcnt")[0],
+            harness.driver_max("esp32", "mcpwm_pcnt"))
+
+    def test_measure_connects_once_and_qruns_every_stepper_it_found(self):
+        # The end-to-end shape, with the board and the analyzer faked: one
+        # CONFIG for the accepted count (the probe's reply is reused rather than
+        # a second CONFIG sent), QRUN carrying a mask that selects all of them,
+        # and the count in the result record.
+        #
+        # The double-CONFIG matters and is not cosmetic: CONFIG re-arms the
+        # drivers through _initVars(), so a second one for the count the probe
+        # just proved allocatable would discard the very measurement.
+        sent = []
+
+        class FakeCapture:
+            returncode = 0
+
+            def wait(self):
+                return 0
+
+            def kill(self):
+                pass
+
+        board = self.FakeBoard(6)
+
+        def fake_reply(_ser, line, **_kw):
+            return board(None, line)
+
+        def fake_send(_ser, line, **_kw):
+            sent.append(line)
+            return ""
+
+        info = dict(vf.Dut().info(), ticks_per_s=16_000_000,
+                    min_cmd_ticks=3200, max_speed_ticks=640)
+        with tempfile.TemporaryDirectory() as tmp:
+            args = harness.parse_args(["--arch", "esp32", "--driver",
+                                       "mcpwm_pcnt", "--tests", "SR_31",
+                                       "--results-dir", tmp,
+                                       "--capture-dir", tmp])
+            args.dut_driver = args.driver
+            probe = run_tests.MaxCountProbe("mcpwm_pcnt")
+
+            def fake_open(*a, **k):
+                # An ESP32 reset is what clears the half-connected state a
+                # refused CONFIG leaves, so opening the port clears it here.
+                board.connected = 0
+                return mock.Mock()
+
+            with mock.patch.object(run_tests, "open_board", fake_open), \
+                    mock.patch.object(run_tests, "reply_of", fake_reply), \
+                    mock.patch.object(run_tests, "send_line", fake_send), \
+                    mock.patch.object(run_tests, "drain",
+                                      lambda *a, **k: ""), \
+                    mock.patch.object(run_tests, "read_map", board.map), \
+                    mock.patch.object(run_tests, "read_qinfo",
+                                      lambda ser: dict(info)), \
+                    mock.patch.object(run_tests, "program",
+                                      lambda *a: True), \
+                    mock.patch.object(run_tests, "start_capture",
+                                      lambda *a, **k: FakeCapture()), \
+                    mock.patch.object(run_tests, "load_capture_for_eval",
+                                      lambda *a, **k: ({"D0": [0] * 400},
+                                                       4_000_000, None)), \
+                    mock.patch("time.sleep", lambda _s: None):
+                status, detail = run_tests.measure(
+                    "t", "sr31", None, 0,
+                    run_tests.sc_max_stepper_count, "SR_31", args,
+                    scenario="SR_31", probe=probe)
+        configs = [ln for ln in sent if ln.startswith("CONFIG")]
+        self.assertEqual(status, "failed", "a quiet fake capture fails, which "
+                                          "is not what this test is about")
+        self.assertEqual(configs, [], "the CONFIGs go through reply_of")
+        # Three CONFIG attempts: 8 refused, 7 refused, 6 connected. Each on a
+        # reset board, so the third is a real attempt and not an "already".
+        self.assertEqual([int(l.split()[1]) for l in board.lines], [8, 7, 6])
+        self.assertIn("QRUN 63", sent,
+                      "the mask must select every stepper the probe accepted")
+        self.assertEqual(detail["max_stepper_count"], 6)
+        self.assertEqual(detail["search_bound"], 8)
+        self.assertEqual([r["n"] for r in detail["refused_above"]], [8, 7])
+        self.assertEqual(detail["ok_but_short"], [])
+
+    def test_a_refused_probe_is_a_refused_run_naming_the_board_s_own_words(self):
+        # Not a crash and not a run against steppers that were never connected.
+        board = self.FakeBoard(0)
+        args = harness.parse_args(["--arch", "esp32", "--driver", "rmt",
+                                   "--tests", "SR_31",
+                                   "--results-dir", "/tmp/r31",
+                                   "--capture-dir", "/tmp/r31"])
+        args.dut_driver = args.driver
+        probe = run_tests.MaxCountProbe("rmt")
+        with mock.patch.object(run_tests, "open_board",
+                               lambda *a, **k: mock.Mock()), \
+                mock.patch.object(run_tests, "reply_of",
+                                  lambda _s, l, **k: board(None, l)), \
+                mock.patch.object(run_tests, "read_map", board.map), \
+                mock.patch.object(run_tests, "send_line",
+                                  lambda *a, **k: ""), \
+                mock.patch.object(run_tests, "drain", lambda *a, **k: ""):
+            status, detail = run_tests.measure(
+                "t", "sr31", None, 0, run_tests.sc_max_stepper_count,
+                "SR_31", args, scenario="SR_31", probe=probe)
+        self.assertEqual(status, "refused")
+        self.assertIn("ERR", detail["error"])
+        self.assertEqual(detail["max_stepper_count"], 0)
+        self.assertEqual(detail["wire"], f"CONFIG 1 rmt nodir")
+
+    def test_the_mux_search_is_refused_by_the_word_and_not_by_the_channels(self):
+        _w, _m, detail, reply, _b, _o = self._probe("i2s_mux", 99, channel_cap=5)
+        self.assertIn("OK CONFIG", reply)
+        self.assertEqual(detail["max_stepper_count"], 32)
+        self.assertEqual(detail["refused_above"], [])
+
+    def test_a_board_that_accepts_nothing_is_a_refusal_with_the_smallest_try(self):
+        # Not a crash and not a zero mask: the caller's job is to report the
+        # board's own words, and the smallest attempt's refusal is the one that
+        # says why even one stepper would not connect.
+        wire, mask, detail, reply, _b, _o = self._probe("rmt", 0)
+        self.assertNotIn("OK CONFIG", reply)
+        self.assertEqual(mask, 0)
+        self.assertEqual(detail["max_stepper_count"], 0)
+        self.assertEqual(detail["probe_attempts"], 8)
+        # Every count down to one, and n=1's refusal is the one that names why.
+        self.assertEqual([r["n"] for r in detail["refused_above"]],
+                         list(range(8, 0, -1)))
+        self.assertEqual(detail["refused_above"][-1]["reply"], reply.strip())
+        self.assertEqual(int(wire.split()[1]), 1)
+
+    def test_the_probe_never_sends_a_second_config_for_the_count_it_found(self):
+        # One CONFIG per attempt, and the accepted attempt is the run's own.
+        # measure() takes the reply `find()` hands back precisely so it does not
+        # re-send it; re-CONFIG would reset the drivers the probe just proved
+        # can be allocated, which is the measurement.
+        _w, mask, _detail, _r, board, _o = self._probe("rmt", 8)
+        self.assertEqual(len(board.lines), 1)
+        self.assertEqual(mask, 255)
+
+    def test_the_scenario_sends_nodir_not_dir(self):
+        # `dir` spends two channels per stepper and stops at 4, which is below
+        # MCPWM/PCNT's 6 queues -- so a `dir` max-count run would report the
+        # analyzer's channel count as the driver's queue count.
+        self.assertEqual(run_tests.scenario_pin_mode("SR_31"), "nodir")
+        wire = run_tests.scenario_wire("SR_31", "rmt")
+        self.assertTrue(wire.endswith(" nodir"), wire)
+        # And it is the only scenario that is not `dir`, which is what makes
+        # this a table rather than a constant.
+        others = [s for s in run_tests.SCENARIOS
+                  if run_tests.scenario_pin_mode(s) != "dir"]
+        self.assertEqual(others, ["SR_31"])
+
+    def test_the_mask_in_the_scenario_table_is_not_a_stepper_count(self):
+        # 0 means "not known yet", and the probe overwrites it. A literal here
+        # would be the catalogue asserting a count it exists to measure.
+        _cfg, _builder, mask, _desc = run_tests.SCENARIOS["SR_31"]
+        self.assertEqual(mask, 0)
+        self.assertEqual(run_tests.PROBE_SCENARIOS, {"SR_31"})
+
+    def test_only_the_max_count_scenario_is_probed(self):
+        for scenario in run_tests.SCENARIOS:
+            if scenario == "SR_31":
+                self.assertIsNotNone(run_tests.probe_for(scenario, "rmt"))
+            else:
+                self.assertIsNone(
+                    run_tests.probe_for(scenario, "rmt"), scenario)
+
+    def test_the_channel_map_covers_every_channel_the_pin_mode_allows(self):
+        # The fixture and report path judges the capture through this map, so a
+        # map of 2 steppers would score steppers A and B and report the run
+        # done while six channels went unread.
+        pins = run_tests.Pins.for_scenario("SR_31")
+        self.assertEqual(len(pins.map),
+                         run_tests.MAX_STEPPERS_PER_MODE["nodir"])
+        self.assertEqual([pins.step_of(c) for c in pins.letters],
+                         [f"D{i}" for i in range(8)])
+        self.assertEqual(pins.dir_of("A"), None, "nodir has no direction pin")
+        self.assertEqual(pins.missing({f"D{i}": [] for i in range(8)}), [])
+        self.assertEqual(pins.missing({f"D{i}": [] for i in range(7)}), ["H"])
+
+    def test_the_program_is_the_shared_one_a_scale_point_sends(self):
+        # One program, one period, every stepper. A per-stepper program would
+        # let a driver that matched its own command and dragged the others off
+        # pace look correct.
+        info = {"min_cmd_ticks": 3200, "max_speed_ticks": 640,
+                "ticks_per_s": 16_000_000}
+        segs = run_tests.sc_max_stepper_count(info)
+        self.assertEqual(len(segs), 1)
+        self.assertEqual(segs[0][0], run_tests.SCALE_STEPS)
+        self.assertFalse(run_tests.needs_per_stepper("SR_31"),
+                         "a per-stepper program would let a driver that "
+                         "matched its own command and dragged the others off "
+                         "pace look correct")
+        # And it is legal on every QINFO shape the harness has met -- the same
+        # property the catalogue-wide test asserts, checked here because the
+        # step count is this scenario's own.
+        for name, qinfo in QINFO_SHAPES.items():
+            with self.subTest(driver=name):
+                self.assertIsNone(
+                    run_tests.unprogrammable(
+                        run_tests.sc_max_stepper_count(qinfo), qinfo),
+                    name)
+
+    def test_every_scenario_config_resolves_to_a_pin_mode(self):
+        # The pin mode is read from a table now, so a scenario added without an
+        # entry silently gets `dir` -- which is right for all of them today and
+        # wrong for a future `nodir` one. This is the guard that says so.
+        self.assertEqual(set(run_tests.SCENARIO_PIN_MODE), {"SR_31"})
+        for scenario in run_tests.SCENARIOS:
+            mode = run_tests.scenario_pin_mode(scenario)
+            self.assertIn(mode, run_tests.CHANNELS_PER_STEPPER, scenario)
+            self.assertIn(mode, run_tests.MAX_STEPPERS_PER_MODE, scenario)
 
 
 class TestModes(unittest.TestCase):
@@ -1493,14 +2382,7 @@ class TestModes(unittest.TestCase):
     # differ in `max_speed_ticks` by a factor of eight, which is the whole point:
     # a builder that assumes a fast driver has a fast floor is legal on one and
     # not on the other.
-    QINFOS = {
-        "rmt": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
-                   "max_speed_ticks": 640, "max_speed_all_ticks": 640},
-        "i2s_direct": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
-                       "max_speed_ticks": 80, "max_speed_all_ticks": 80},
-        "avr_timer": {"ticks_per_s": 16_000_000, "min_cmd_ticks": 3200,
-                      "max_speed_ticks": 426, "max_speed_all_ticks": 426},
-    }
+    QINFOS = QINFO_SHAPES
 
     def _programs(self, scenario, info):
         """Every program a scenario would send, as {stepper: segments}."""

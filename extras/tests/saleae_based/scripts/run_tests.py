@@ -74,10 +74,10 @@ import capture as cap  # noqa: E402
 import i2s_mux_decoder as muxdec  # noqa: E402
 import signal_parser as sp  # noqa: E402
 
-# SR_01..SR_29 are the implemented catalogue plus SR_00; the range is the
+# SR_01..SR_30 are the implemented catalogue plus SR_00; the range is the
 # catalogue's numbering, and every id in it that SCENARIOS does not define is
 # reported "not implemented" rather than silently missing.
-ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 31)]
+ALL_TESTS = ["SR_00"] + [f"SR_{i:02d}" for i in range(1, 32)]
 
 # Analyzer channel -> stepper, derived from what the DUT reports in MAP rather
 # than assumed here.
@@ -194,11 +194,23 @@ class Pins:
 
         Derived from the scenario's own CONFIGS entry rather than assumed, so a
         1-stepper scenario is not handed a 4-stepper map and then reported as
-        having three silent steppers. The pin mode is still `dir`: every
-        multi-stepper scenario in SCENARIOS is a `dir` one.
+        having three silent steppers. The pin mode comes from
+        `scenario_pin_mode()`, which is `dir` for every scenario but the
+        max-count one.
+
+        For a probe scenario the CONFIGS count is only the *widest* the pin mode
+        allows, not the count the board agreed to connect, so the map is built at
+        that width. A hardware run does not use this map at all -- `measure()`
+        reads the one the board prints -- so this is the fixture and report path,
+        and its job there is to be wide enough that a fixture which puts every
+        stepper on its own channel is read at all.
         """
         config = SCENARIOS[scenario][0]
-        return cls(default_channel_map(CONFIGS[config][0], 2))
+        mode = scenario_pin_mode(scenario)
+        count = CONFIGS[config][0]
+        if scenario in PROBE_SCENARIOS:
+            count = MAX_STEPPERS_PER_MODE[mode]
+        return cls(default_channel_map(count, CHANNELS_PER_STEPPER[mode]))
 
     @property
     def count(self):
@@ -278,6 +290,20 @@ STEP_CHANNEL_ORDER = [f"D{i}" for i in range(8)]
 # multiplexed stepper's direction slot, which MAP does not report.
 MUX_SLOT_COUNT = 32
 
+
+def is_mux_driver(driver):
+    """A driver whose steppers are bits of the 32-bit I2S word, not pins.
+
+    Two things follow from it and both are used below: a multiplexed stepper
+    costs a *slot* and not one of the eight analyzer channels, so its count is
+    bounded by the word and not by `CHANNELS`; and the three bus channels are
+    spoken for, so the analyzer has five left for anything physical.
+
+    `startswith` rather than equality because a run may name several drivers at
+    once and the harness joins them with `+` (`rmt+i2s_mux`).
+    """
+    return (driver or "").startswith("i2s_mux")
+
 # How many steppers each pin mode can carry: 8 channels, 2 per stepper with a
 # direction pin and 1 without (white paper 3.3/10.1). The firmware caps the
 # count at the smaller of this and the platform's own stepper limit.
@@ -286,6 +312,19 @@ CHANNELS_PER_STEPPER = {"dir": 2, "nodir": 1}
 MAX_STEPPERS_PER_MODE = {
     mode: CHANNELS // per for mode, per in CHANNELS_PER_STEPPER.items()
 }
+
+# The I2S bus takes the *last* three channels, deliberately, so the stepper map
+# stays `stride * i` from channel 0 with no offset in front of it and a mux
+# capture is a superset of a physical one. It is the same constant as
+# SALEAE_BUS_COUNT in the firmware, and the only reason the host knows it is
+# that the mux bus is this harness's own wiring rather than an argument.
+BUS_CHANNELS = 3
+
+# The pin mode a *max-count* run connects in. `nodir`, because `dir` spends two
+# channels per stepper and stops at 4 -- below the 6 queues MCPWM/PCNT has on
+# ESP32 -- so a `dir` max-count run would report the analyzer's channel count as
+# the driver's queue count. See `scenario_pin_mode()`.
+MAX_COUNT_PIN_MODE = "nodir"
 
 # Default capture rate. 4 MS/s is the practical minimum to resolve a pulse a
 # few us wide at 16 MHz (see README).
@@ -332,8 +371,30 @@ SR00_SETTLE_S = 1.5
 # ---------------------------------------------------------------------------
 
 
-def open_board(port, baud, timeout=6.0):
-    """Open the serial port (which resets the board) and wait for READY."""
+def open_board(port, baud, timeout=6.0, require_ready=True):
+    """Open the serial port (which resets the board) and wait for READY.
+
+    **Every run starts here, and the reset is not optional.** The board's
+    firmware trips its own task watchdog while completely idle -- measured on
+    ESP-IDF 5.5.3: `open_board()`, then nothing at all, produces six
+    `task_wdt` lines within ~5.3 s and an IDLE0 backtrace, with no CONFIG, no
+    program and no capture involved. `saleae_hal_serial_read()` is a
+    zero-timeout `uart_read_bytes()`, so `app_main` spins and IDLE0 starves.
+
+    That is a firmware property, and it is the reason a reset precedes each
+    test rather than once per invocation: a watchdog panic *inside* a capture
+    window ends the run early, and SR_00 then reports a truncated first pulse
+    (measured: D0's first high 19.3 ms where 50 ms was commanded, with the
+    pairs summing to exactly one 1000 ms period) as eight dead pins. The
+    pre-check that exists to catch a bad cable was reporting a firmware panic.
+
+    `require_ready` makes that failure loud. Opening the port does not
+    *guarantee* a reset -- the DTR/RTS toggle does not always fire, which is
+    the same reason a flash occasionally comes up in the wrong boot mode -- so
+    the old loop simply fell through after `timeout` and handed back a stale
+    board that answered commands from the previous test. It now raises, because
+    a run against an unreset board measures that board's leftovers.
+    """
     import serial
     ser = serial.Serial(port, baud, timeout=0.1)
     deadline = time.time() + timeout
@@ -344,8 +405,45 @@ def open_board(port, baud, timeout=6.0):
             buf += data
             if b"READY" in buf:
                 break
+    if require_ready and b"READY" not in buf:
+        ser.close()
+        raise BoardError(
+            f"{port} did not report READY within {timeout:.0f}s, so the board "
+            f"was not reset (the DTR/RTS toggle does not always fire). "
+            f"Measuring a stale board would report the previous run's state "
+            f"as this one's. Saw {len(buf)} byte(s) of boot output; unplug and "
+            f"replug the board, or pass a longer --baud-timeout.")
     ser.reset_input_buffer()
     return ser
+
+
+# Markers the firmware prints that mean "something went wrong in the firmware",
+# as opposed to a line the host sent being refused. A test that measures a pin
+# must not read one of these as a dead wire, and the way to guarantee that is to
+# fail the run on the spot rather than leave it to the waveform to explain.
+FIRMWARE_FAULT_MARKERS = (
+    "task_wdt",
+    "Guru Meditation",
+    "assert failed",
+    "Backtrace:",
+    "abort() was called",
+    "Panic",
+)
+
+
+def firmware_fault(reply):
+    """The firmware-fault markers in `reply`, or None. See FIRMWARE_FAULT_MARKERS."""
+    hits = [m for m in FIRMWARE_FAULT_MARKERS if m in reply]
+    return hits or None
+
+
+class BoardError(RuntimeError):
+    """The board is not in a state this measurement can be taken in.
+
+    Distinct from a scenario `failed` on the record: this one means *no*
+    measurement was made, so it must not be recorded as a verdict about the
+    driver. A reset that did not happen is the case that motivated it.
+    """
 
 
 def send_line(ser, line, settle=0.05):
@@ -976,6 +1074,24 @@ def needs_per_stepper(scenario):
     return scenario in PER_STEPPER_SCENARIOS
 
 
+# The scenarios whose stepper *count* is not known before the board is asked, and
+# whose pin mode is therefore not `dir`. SR_31 is the only one.
+#
+# A set for the same reason PER_STEPPER_SCENARIOS is one: `measure()` has to
+# answer "does this scenario need a probe?" before it has a serial port, and the
+# probe needs the driver name, which only the caller has.
+PROBE_SCENARIOS = {"SR_31"}
+
+# Scenario -> pin mode. Everything absent is `dir`; see `scenario_pin_mode()`.
+#
+# SR_31's mode is `nodir` and the entry says so in one place, so that a fifth
+# caller of `config_wire()` cannot reintroduce a `dir` CONFIG for it. Its
+# direction-pin coverage is SR_10..SR_12's job anyway -- the subject here is how
+# many steppers connect, and a direction pin per stepper would halve that count
+# for the analyzer rather than for the driver.
+SCENARIO_PIN_MODE = {"SR_31": MAX_COUNT_PIN_MODE}
+
+
 def per_stepper_programs(scenario, info):
     """{stepper index: segments}, for scenarios needing per-stepper speeds.
 
@@ -1248,6 +1364,23 @@ def sc_sync_start(info):
     return seg_period(2000, t)
 
 
+def sc_max_stepper_count(info):
+    """SR_31: one shared program, every stepper at the same period.
+
+    Deliberately the same program a `scale` point sends, and deliberately *one*
+    program: the question is whether each of the board's maximum steppers gets
+    every step it was promised, and a per-stepper program would let a driver
+    that matched its own command while dragging the others off pace look
+    correct. `eval_scale` judges each stepper against this one command.
+
+    The step count is `SCALE_STEPS` rather than something of its own, so the
+    max-count run and a `scale` sweep at the same count measure the same
+    waveform and a difference between them is a difference in the count.
+    """
+    return seg_period(SCALE_STEPS,
+                      legal_ticks(info, SCALE_STEPS, info["max_speed_ticks"]))
+
+
 # Scenario config -> stepper count and driver list.
 #
 # The driver list is explicit on every architecture, including the ones with a
@@ -1263,6 +1396,12 @@ CONFIGS = {
     "mcpwm": (1, ("mcpwm_pcnt",)),
     "mixed_rmt_mcpwm": (2, ("rmt", "mcpwm_pcnt")),
     "i2s": (1, ("i2s_direct",)),
+    # SR_31's. The count here is the widest `nodir` allows, which is the *top of
+    # the probe's search* and not what the run connects: the board picks a count
+    # at or below it (`MaxCountProbe`). It has to be a CONFIGS entry anyway so
+    # that the scenario table, `driver_tag()` and `Pins.for_scenario()` all keep
+    # resolving a config key rather than learning about a second kind.
+    "nodir_max": (MAX_STEPPERS_PER_MODE[MAX_COUNT_PIN_MODE], "native"),
 }
 
 # The pulse driver of an architecture that has only one, used to expand the
@@ -1330,6 +1469,230 @@ def config_wire(config, native_driver=DEFAULT_NATIVE_DRIVER):
 def driver_tag(config, native_driver=DEFAULT_NATIVE_DRIVER):
     """The driver(s) a scenario's CONFIG selects, as one tag component."""
     return "+".join(config_drivers(config, native_driver))
+
+
+def scenario_pin_mode(scenario, default="dir"):
+    """The pin mode a named scenario connects in.
+
+    `dir` for everything but SR_31, and that is a decision rather than an
+    oversight: `dir` spends two of the eight analyzer channels per stepper and
+    so stops at 4, which is *below* the queue count of the driver with the most
+    queues this harness drives (MCPWM/PCNT's 6 on ESP32). A `dir` max-count run
+    would therefore measure the analyzer and call it the driver -- the same
+    confusion `RELEASE_SCALE_PIN_MODE = "nodir"` exists to avoid, and it is why
+    this is a table rather than a constant.
+    """
+    return SCENARIO_PIN_MODE.get(scenario, default)
+
+
+def scenario_wire(scenario, native_driver=DEFAULT_NATIVE_DRIVER):
+    """The CONFIG line a named scenario sends, in that scenario's own pin mode.
+
+    The single place a scenario's wiring is spelled out, because the pin mode
+    stopped being the same for all of them. A caller that builds the line itself
+    from `config_wire()` gets a `dir` CONFIG for a `nodir` scenario, which the
+    firmware accepts -- and which then scores stepper B against D2 instead of D1.
+    """
+    return config_wire_for(SCENARIOS[scenario][0], native_driver,
+                           scenario_pin_mode(scenario))
+
+
+def max_stepper_count_bound(driver, pin_mode=MAX_COUNT_PIN_MODE):
+    """(count_max, why) for a max-count run: the top of the probe's search.
+
+    The search starts here and walks *down*, so this only has to be an upper
+    bound; the board picks the answer. It is derived from the two budgets that
+    are the host's to know and from nothing else:
+
+    - a multiplexed stepper is one bit of the 32-bit word, so it costs a slot
+      and not a channel -- 32 in `nodir`, 16 in `dir`;
+    - a physical stepper is on the wire, so it costs `stride` channels of the
+      eight -- 8 in `nodir`, 4 in `dir`.
+
+    What the driver can actually *allocate* is deliberately not consulted. It is
+    a header constant (`QUEUES_MCPWM_PCNT` and friends), and a host table of
+    them is a belief about an SDK rather than a fact about the board in front of
+    it -- which is why the catalogue asks the board instead (see
+    `MaxCountProbe`) and `harness.DRIVER_MAXS` only ever cross-checks a sweep.
+    """
+    per = CHANNELS_PER_STEPPER[pin_mode]
+    if is_mux_driver(driver):
+        why = (f"the 32-bit I2S mux word ({per} slot(s) per stepper); a "
+               f"multiplexed stepper costs a slot and not one of the "
+               f"{CHANNELS} analyzer channels, {BUS_CHANNELS} of which carry "
+               f"the bus")
+        return MUX_SLOT_COUNT // per, why
+    why = (f"the analyzer channel budget ({CHANNELS} channels, {per} per "
+           f"stepper in {pin_mode})")
+    return MAX_STEPPERS_PER_MODE[pin_mode], why
+
+
+class MaxCountProbe:
+    """The CONFIG line and QRUN mask at the largest count the board accepts.
+
+    How many steppers a driver drives is the one quantity in this harness that
+    the host cannot know: it is a hardware fact, not a constant in a header, and
+    the constants disagree in both directions. `QUEUES_MCPWM_PCNT` is 6 and the
+    board really allocates six, so a host table is right -- and `harness`'s own
+    `scale_bound()` says of the same constant that the number of queues which
+    *run* is a different question the table cannot answer. Meanwhile the
+    analyzer's channel budget can be the smaller of the two and neither one is
+    the answer.
+
+    So the count is asked for, by asking the board: descending from
+    `max_stepper_count_bound()`, one CONFIG per count, and the first one that
+    *actually connects that many steppers* is the maximum. Descending rather
+    than ascending because the refusals are the interesting half of the answer
+    -- `ERR connect step 6` at n=7 names MCPWM/PCNT's sixth queue,
+    `ERR CONFIG n=9 needs 9 channels` names the analyzer -- and because it needs
+    no assumption about where the limit is.
+
+    **Acceptance is MAP, never the reply.** Measured, not hypothesized: a CONFIG
+    refused partway through `connect_stepper()` leaves the steppers it did
+    connect in place and `slot_count` at that partial count, so the *next* CONFIG
+    short-circuits to `OK CONFIG n=6 mode=nodir already` -- success, for a
+    configuration that was never established. A host that trusts the reply reads
+    that as "7 is fine" and records 7 for a board running six steppers. That is
+    exactly what the first `--tests SR_31` run did, and the run passed, so
+    nothing downstream would have noticed. `read_map()` is the board's own count
+    and the only one that cannot be stale.
+
+    **Every attempt is preceded by a board reset**, because of the same trap: a
+    failed CONFIG leaves the half-connected state that makes the next reply
+    meaningless. Re-opening the serial port resets the ESP32, which is the
+    mechanism `ensure_mux()` already depends on, so it is not a new assumption
+    about this board. What it buys is *provenance*, not reachability -- and that
+    is worth being precise about, because the obvious reading is the opposite.
+    Measured on the board, with MAP-based acceptance, all three of these reach
+    the same count:
+
+    - reset between attempts: 8 refused, 7 refused, 6 CONFIGured and connected;
+    - no reset: 8 refused, 7 answers `OK ... already` for the six the first
+      attempt left behind, and 6 is accepted because MAP says six;
+    - no reopen at all: the same, since the accepted state is a leftover.
+
+    The difference is that without the reset the accepted state comes from a
+    *refused* attempt. That is still the right answer, and only because every
+    attempt is the same request -- one driver, one pin mode. Both halves of that
+    are asserted. Were two attempts allowed to differ, MAP matching on count
+    would be a coincidence and the reset would be load-bearing again.
+
+    It is one CONFIG *per attempt and no more*: the accepted attempt is the run's
+    own CONFIG, and `find()` hands back the reply it already has so the caller
+    does not connect the same steppers twice.
+
+    Why `nodir` and not `dir`: see `scenario_pin_mode()`.
+
+    One consequence worth naming: a run's tag key records the `--pin-mode` and
+    `--count` the *invocation* asked for, which is what every scenario in one
+    run shares -- so an SR_31 result inside a `--pin-mode dir` run is tagged
+    `dir` while having connected `nodir` steppers. That is the tag scheme's
+    existing shape (SR_14 is tagged `1` and connects two), and the record
+    itself is unambiguous: `pin_mode` and `channel_map` above come from the
+    board's own MAP.
+    """
+
+    def __init__(self, driver, pin_mode=MAX_COUNT_PIN_MODE):
+        self.driver = driver
+        self.pin_mode = pin_mode
+        self.bound, self.bound_reason = max_stepper_count_bound(driver,
+                                                                 pin_mode)
+
+    def driver_wire(self):
+        """The CONFIG line to hand `ensure_mux()` before the probe runs.
+
+        Only the driver name matters to that decision -- whether the run needs
+        the multiplexer -- so the count in it is the search bound and nothing
+        more. It is never sent.
+        """
+        return config_wire_drivers([self.driver] * self.bound, self.pin_mode)
+
+    def wire_for(self, count):
+        """The CONFIG line for `count` steppers on this driver."""
+        return config_wire_drivers([self.driver] * count, self.pin_mode)
+
+    def find(self, ser, reopen=None):
+        """Search downward for the largest count the board really connects.
+
+        `reopen()` returns a fresh serial port for the next attempt and is
+        called between attempts, not before the first -- the caller has already
+        opened one, and for a driver that accepts the bound outright it is never
+        called at all.
+
+        Returns `(wire, mask, detail, reply, ser)`. `ser` is the live port,
+        because `reopen()` may have replaced it and the caller goes on to use it
+        for the whole run. `reply` is the accepted CONFIG's own reply -- which is
+        what `measure()` needs, so it does not send the line again -- or the last
+        refusal, so the caller reports a `refused` with the board's own words.
+        """
+        detail = {
+            "probed_driver": self.driver,
+            "pin_mode": self.pin_mode,
+            "search_bound": self.bound,
+            "bound_reason": self.bound_reason,
+            # Every count tried above the one accepted, with the board's reason
+            # for each. This is the measurement as much as the count below it:
+            # "mcpwm_pcnt stops at 6" and "rmt stops at 8 because the analyzer
+            # ran out of channels" are different answers with the same number.
+            "refused_above": [],
+            # Set only if a CONFIG ever answered OK while connecting fewer
+            # steppers than it was asked for. A firmware lie, and it belongs in
+            # the record rather than in a comment: a reader seeing
+            # `max_stepper_count: 6` next to `ok_but_short` can tell the
+            # difference between "the board refuses 7" and "the board said yes
+            # and did not".
+            "ok_but_short": [],
+        }
+        last = None
+        for count in range(self.bound, 0, -1):
+            wire = self.wire_for(count)
+            reply = reply_of(ser, wire)
+            connected = len(read_map(ser)[0])
+            last = (wire, reply)
+            if connected == count:
+                detail["max_stepper_count"] = count
+                detail["probe_attempts"] = self.bound - count + 1
+                return wire, (1 << count) - 1, detail, reply, ser
+            if "OK CONFIG" in reply and connected != count:
+                # Named, not folded into refused_above: the board answered yes.
+                detail["ok_but_short"].append(
+                    {"n": count, "reply": reply.strip(), "connected": connected})
+            else:
+                detail["refused_above"].append({"n": count,
+                                                "reply": reply.strip()})
+            if reopen is not None:
+                ser.close()
+                ser = reopen()
+        # Nothing from the bound down to one. Report the smallest attempt rather
+        # than the largest: its refusal is the one that names why even a single
+        # stepper could not connect.
+        #
+        # `probe_attempts` and `max_stepper_count` are set on both paths, not
+        # just the accepting one, because the caller reads them to *print* the
+        # probe before it decides whether the run continues. A key present only
+        # on success is a KeyError on exactly the run whose transcript matters
+        # most.
+        wire, reply = last
+        detail["max_stepper_count"] = 0
+        detail["probe_attempts"] = self.bound
+        # `refused_above` already ends with n=1, which is the smallest attempt
+        # and the refusal that names why even one stepper could not connect. No
+        # extra entry for it: an n=0 line would read as a CONFIG for zero
+        # steppers, which is not a thing this harness sends.
+        return wire, 0, detail, reply, ser
+
+
+def probe_for(scenario, driver):
+    """The `MaxCountProbe` a scenario needs, or None.
+
+    None for every scenario but the max-count one, which is the only one whose
+    stepper count is not known before the board is asked. Kept beside
+    `PER_STEPPER_SCENARIOS` for the same reason that table is beside SCENARIOS:
+    a property of a scenario that is not one of its four table fields.
+    """
+    if scenario not in PROBE_SCENARIOS:
+        return None
+    return MaxCountProbe(driver, scenario_pin_mode(scenario))
 
 
 # ---------------------------------------------------------------------------
@@ -1556,6 +1919,17 @@ SCENARIOS = {
               "200 steps then a single step at the boundary"),
     "SR_20": ("mcpwm", sc_pause_after_full_command, 1,
               "255, pause, 255 (large command on both sides)"),
+    # The only scenario that asks how *many* steppers a driver drives, and the
+    # mask of 0 says why: the count is not known when this table is written, so
+    # `MaxCountProbe` finds it by descending CONFIG and sets the mask. Every
+    # other entry has a literal here, which is the point -- a count that could be
+    # wrong is the thing this scenario exists to measure, so it must not be a
+    # literal anywhere, including here. `--mode scale` reaches the same numbers
+    # but is not part of the characterisation set, is not tagged per test and
+    # does not appear in a matrix row as its own result, which is why this
+    # scenario exists (extras/todo/README.md → Done, item 183).
+    "SR_31": ("nodir_max", sc_max_stepper_count, 0,
+              "the driver's own maximum stepper count, each stepper measured"),
 }
 
 
@@ -2487,6 +2861,12 @@ EVALUATORS = {
     "SR_18": eval_counts_and_gap,
     "SR_19": eval_counts_and_gap,
     "SR_20": eval_counts_and_gap,
+    # The max-count scenario, judged by the evaluator `scale` already uses: each
+    # stepper's own step count and its own period, measured from the capture.
+    # `eval_scale` is count-agnostic -- it walks the channel map it is handed --
+    # so 2 steppers and 32 come through the same code, which is what lets the
+    # catalogue have a max-count test without a second evaluator to keep in step.
+    "SR_31": eval_scale,
 }
 
 
@@ -2526,8 +2906,32 @@ def run_sr00(tag_key, args):
         send_line(ser, "STOP")
         ser.close()
 
+    # A firmware fault is reported as one, before the waveform is interpreted.
+    #
+    # This check is the reason a task watchdog no longer reads as eight dead
+    # pins. Measured: a watchdog panic inside this capture window truncates the
+    # pattern mid-cycle, and the evaluator -- correctly, on the waveform it was
+    # given -- reports every channel's first high time as a fragment of the
+    # commanded one (D0 19.3 ms against 50 ms, the pairs summing to exactly one
+    # 1000 ms period). "All eight channels are dead" is what that looks like,
+    # and it is not what happened: the harness was measuring a panic.
+    #
+    # So the verdict is `error`, not `failed`, and it names the marker. `failed`
+    # on SR_00 is a wiring statement, and it must not be reachable from a
+    # firmware fault.
+    fault = firmware_fault(replies)
     channels, sample_rate = load_capture_for_eval(capture_file)
     passed, channel_results = analyze_csv.evaluate_sr00(channels, sample_rate)
+    if fault:
+        return "error", {
+            "sample_rate_hz": sample_rate,
+            "channels": channel_results,
+            "reply": replies.strip(),
+            "firmware_fault": fault,
+            "error": "the firmware faulted during the SR_00 capture window, so "
+                     "the pin pattern was truncated and the waveform says "
+                     "nothing about the wiring: " + ", ".join(fault),
+        }
     return ("passed" if passed else "failed"), {
         "sample_rate_hz": sample_rate,
         "channels": channel_results,
@@ -2536,7 +2940,7 @@ def run_sr00(tag_key, args):
 
 
 def measure(tag_key, name, wire, mask, builder, evaluator, args,
-            per_stepper_for=None, scenario=None):
+            per_stepper_for=None, scenario=None, probe=None):
     """Wire the board, capture one measurement, evaluate it. One code path.
 
     `scenario` is the SR id when there is one, and None for a mode run. It is
@@ -2551,9 +2955,18 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     armed, how long the window has to be, or which channel map is correct, and
     nothing would say which of the two was right.
 
-    `wire` is the whole CONFIG line. `evaluator` is (channels, rate, segments,
-    info) -> (passed, detail), passed straight to evaluate() so the global pin
-    invariants are checked for generated runs too.
+    `wire` is the whole CONFIG line, or None when a `probe` decides it.
+    `evaluator` is (channels, rate, segments, info) -> (passed, detail), passed
+    straight to evaluate() so the global pin invariants are checked for generated
+    runs too.
+
+    `probe` is a `MaxCountProbe` for the scenarios whose stepper count is not
+    known until the board is asked. It runs *after* `ensure_mux()` and *before*
+    the CONFIG that counts on it, because the multiplexer has to be up for a
+    `CONFIG` naming `i2s_mux` to connect at all and the probe's first attempt is
+    such a CONFIG. It replaces `wire` and `mask` and contributes its transcript
+    to `detail`, so the result record says *why* the count is what it is and not
+    only how many steppers stepped.
 
     Returns (status, detail). `status` is `refused` when the board would not
     accept the configuration at all -- which is a *result* for `scale`, whose
@@ -2561,10 +2974,62 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     """
     ser = open_board(args.port, args.baud)
     try:
-        ensure_mux(ser, wire, args)
-        text = reply_of(ser, wire)
-        if "OK CONFIG" not in text:
-            return "refused", {"error": text.strip(), "wire": wire}
+        # ensure_mux() only reads the driver names off the wire, so a probed
+        # run can hand it the probe's top-of-search line: the name is already
+        # known even though the count is not.
+        ensure_mux(ser, wire or probe.driver_wire(), args)
+        probe_detail = None
+        if probe is None:
+            text = reply_of(ser, wire)
+        else:
+            # `ser` is rebound: a probe that had to try more than one count
+            # reopened the port between attempts, because a CONFIG refused
+            # partway leaves the board half-configured and the next reply then
+            # describes the *previous* attempt. Closing and reopening resets the
+            # ESP32, which is the same mechanism `ensure_mux()` already relies on
+            # to bring the multiplexer up at all.
+            def reopen():
+                nonlocal ser
+                ser.close()
+                ser = open_board(args.port, args.baud)
+                return ser
+
+            wire, mask, probe_detail, text, ser = probe.find(ser, reopen)
+            print(f"    probe: {probe_detail['max_stepper_count']} stepper(s) is "
+                  f"the most {probe_detail['probed_driver']} connects in "
+                  f"{probe_detail['pin_mode']} (searched down from "
+                  f"{probe_detail['search_bound']} in "
+                  f"{probe_detail['probe_attempts']} attempt(s))")
+            for refused in probe_detail["refused_above"]:
+                print(f"      n={refused['n']}: {refused['reply']}")
+            for short in probe_detail["ok_but_short"]:
+                # The board said yes and connected fewer than it was asked for.
+                # That is a firmware defect, so it is named as one here rather
+                # than being quietly counted as a refusal -- and it is a count
+                # the probe did NOT believe, which is the whole reason it is
+                # reported at all.
+                print(f"      n={short['n']}: {short['reply']}")
+                print(f"      ^ answered OK but connected {short['connected']}"
+                      f" stepper(s); not believed")
+
+        def with_probe(failure):
+            """A failure record carrying what the probe found, when it ran.
+
+            A setup failure *after* a successful probe would otherwise be the one
+            record with no count in it -- and for SR_31 the count is the
+            measurement, so it belongs in every record the run produces.
+            """
+            return dict(failure, **(probe_detail or {}))
+
+        # Whether the board took the configuration at all. For a probed run the
+        # probe has already decided -- by MAP, not by the reply -- so the reply
+        # is not consulted again: a board that answered `OK ... already` for a
+        # count it never connected has to read as refused here, or the run would
+        # proceed against steppers nobody asked for.
+        accepted = (probe_detail["max_stepper_count"] > 0
+                    if probe_detail is not None else "OK CONFIG" in text)
+        if not accepted:
+            return "refused", with_probe({"error": text.strip(), "wire": wire})
         # The channel map comes from the board, not from the host's assumption:
         # `dir` and `nodir` put different channels on different steppers, so
         # evaluating a capture against the wrong map reads a quiet pin and calls
@@ -2607,10 +3072,11 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         check = None if scenario in REJECTION_SCENARIOS else info
         if programs:
             if not program_per_stepper(ser, programs, check):
-                return "failed", {"error": "QSEG rejected",
-                                  "segments": segments}
+                return "failed", with_probe({"error": "QSEG rejected",
+                                             "segments": segments})
         elif not program(ser, segments, check):
-            return "failed", {"error": "QSEG rejected", "segments": segments}
+            return "failed", with_probe({"error": "QSEG rejected",
+                                         "segments": segments})
 
         seconds = scenario_seconds(segments, info["ticks_per_s"]) \
             + (SETUP_AFTER_CAPTURE_S if scenario in SCENARIO_FILL else 0.0) \
@@ -2630,9 +3096,10 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
             filled = fill_queue(ser, mask)
             if filled <= 0:
                 proc.kill()
-                return "error", {"error": "QFILL did not reach the queue",
-                                 "requested_entries": QUEUE_FILL_ENTRIES,
-                                 "reply": drain(ser, 0.2).strip()}
+                return "error", with_probe(
+                    {"error": "QFILL did not reach the queue",
+                     "requested_entries": QUEUE_FILL_ENTRIES,
+                     "reply": drain(ser, 0.2).strip()})
             info["queue_filled_entries"] = filled
         # settle=0 on both lines below, and the reason is the whole point of the
         # scenario. `send_line` sleeps 50 ms *after* writing, so with the default
@@ -2659,6 +3126,13 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
             send_line(ser, SCENARIO_STOP.get(scenario, "STOP"), settle=0.0)
         proc.wait()
         replies = drain(ser, 0.4)
+        # A firmware fault inside a capture window truncates the run, and the
+        # waveform then reports a step count or a period that is short for a
+        # reason that has nothing to do with the driver. Same reasoning as
+        # SR_00's, and the same verdict: `error`, naming the marker, never
+        # `failed`. Measured -- a task watchdog fires on this board while idle,
+        # so this is reachable without anything being wrong with the driver.
+        fault = firmware_fault(replies)
         # SR_13 is excluded because the rejection is its *subject*: it exists to
         # assert that a command below MIN_CMD_TICKS emits nothing, and the queue
         # saying `ERR QE step0 rc=-1` is that scenario passing, not failing. The
@@ -2672,12 +3146,22 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         # move perfectly. Caught here because QSEG only acknowledges the parse;
         # the real addQueueEntry() call happens in qe_pump() from the main loop,
         # after QRUN, so the syntax check in program() cannot see it.
+        if fault and scenario not in REJECTION_SCENARIOS:
+            print(f"    firmware fault: {', '.join(fault)} -- a setup failure, "
+                  f"not a measurement")
+            return "error", with_probe(
+                {"error": "the firmware faulted during the capture window",
+                 "firmware_fault": fault,
+                 "firmware_reply": replies.strip(),
+                 "segments": segments,
+                 "capture": str(capture_file)})
         if "ERR QE" in replies and scenario not in REJECTION_SCENARIOS:
-            detail = {"error": "queue rejected the command",
-                      "firmware_reply": replies.strip(),
-                      "segments": segments,
-                      "entries_below_min_cmd_ticks": sub_min_entries(
-                          segments if not programs else None, info, programs)}
+            detail = with_probe(
+                {"error": "queue rejected the command",
+                 "firmware_reply": replies.strip(),
+                 "segments": segments,
+                 "entries_below_min_cmd_ticks": sub_min_entries(
+                     segments if not programs else None, info, programs)})
             print(f"    {replies.strip().splitlines()[0]} -- a setup failure, "
                   f"not a measurement")
             return "error", detail
@@ -2696,9 +3180,9 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     decoded_from = None
     if pin_map.get("bus"):
         if source_vcd is None:
-            return "failed", {"error": "mux run needs a VCD to decode; the "
-                                       "capture has none",
-                               "capture": str(capture_file)}
+            return "failed", with_probe(
+                {"error": "mux run needs a VCD to decode; the capture has none",
+                 "capture": str(capture_file)})
         decoded = decode_mux_capture(source_vcd, channels, sample_rate,
                                      pin_map, chan_map)
         channels, sample_rate, decoded_from = decoded
@@ -2727,6 +3211,12 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
         "per_stepper_segments": programs,
         "reply": replies.strip(),
     })
+    # How the stepper count was arrived at, for the scenarios that had to ask.
+    # `max_stepper_count` is the measurement this scenario exists for, and
+    # `refused_above` is what makes it checkable afterwards: a reader who cannot
+    # reproduce the count can see which CONFIG was refused and why.
+    if probe_detail is not None:
+        detail.update(probe_detail)
     # The DUT's tick rate is what makes the ticks in `segments` interpretable,
     # so it travels with every result.
     detail["dut"] = info
@@ -2795,12 +3285,18 @@ def ensure_mux(ser, wire, args):
 
 def run_scenario(tag_key, test_id, args):
     """Program a scenario, capture it, and evaluate the waveform."""
-    config, builder, mask, _desc = SCENARIOS[test_id]
+    _config, builder, mask, _desc = SCENARIOS[test_id]
+    # A probed scenario's CONFIG is the probe's to send -- it is what finds the
+    # count -- so it is handed no wire at all. Every other scenario's is built
+    # from its own pin mode, which is `dir` for all of them but one.
+    probe = probe_for(test_id, args.dut_driver)
     status, detail = measure(tag_key, test_id.lower(),
-                             config_wire(config, args.dut_driver), mask,
+                             None if probe else scenario_wire(test_id,
+                                                             args.dut_driver),
+                             mask,
                              builder, test_id, args,
                              per_stepper_builder(test_id),
-                             scenario=test_id)
+                             scenario=test_id, probe=probe)
     # A named scenario that the board refuses is a wiring fault, not a finding,
     # so it is reported as a failure even though the shared path calls it
     # `refused` for the modes.
@@ -2954,6 +3450,7 @@ def run(tag_key, tests, args):
         tests = ["SR_00"] + tests
 
     sr00_failed = False
+    sr00_reason = "SR_00 failed"
     for test_id in tests:
         prev = index.get(tag_key, {}).get(test_id)
         if prev and prev.get("result") == "passed" and not args.force:
@@ -2967,12 +3464,23 @@ def run(tag_key, tests, args):
             continue
 
         if sr00_failed:
-            print(f"{test_id}: SKIP (SR_00 failed)")
+            # The reason carries *which* verdict SR_00 recorded, because the two
+            # mean different things and the reader needs to tell them apart: a
+            # `failed` is a statement about the wiring, an `error` is a
+            # statement about the firmware. Collapsing them into "SR_00 failed"
+            # is what let a watchdog panic be reported as a dead cable.
+            print(f"{test_id}: SKIP ({sr00_reason})")
             record(index, index_file, tag_key, test_id, "skipped", None,
-                   {"reason": "SR_00 failed"})
+                   {"reason": sr00_reason})
             continue
 
         print(f"{test_id}: running ...")
+        # A BoardError means no measurement was made -- the board did not reset,
+        # or the port is gone. It is raised, not recorded: a verdict on the
+        # record says something about the driver, and there is nothing here to
+        # say. The modes already treat an exception this way (as `error`), and a
+        # catalogue run that skipped it would report a scenario that was never
+        # attempted as one that was attempted and did not pass.
         if test_id == "SR_00":
             result, extra = run_sr00(tag_key, args)
         else:
@@ -2992,6 +3500,8 @@ def run(tag_key, tests, args):
 
         if test_id == "SR_00" and result != "passed":
             sr00_failed = True
+            sr00_reason = ("SR_00 errored (firmware fault)"
+                           if result == "error" else "SR_00 failed")
 
     print(f"Index: {index_file}")
 

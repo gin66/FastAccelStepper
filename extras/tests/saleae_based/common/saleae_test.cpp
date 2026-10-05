@@ -27,6 +27,11 @@
 #define SALEAE_PIN_COUNT 8
 #define PERIOD_MS 1000
 
+// The pattern's edges are all on a 50 ms grid: the high times are 50, 100 ...
+// 400 ms, so every 50 ms boundary is an edge on exactly one channel. See
+// saleae_test_loop(), which uses it to sleep instead of spinning between them.
+#define EDGE_GRID_MS 50
+
 // 8 identification pins. On ESP32 these match the white paper §3.3 channel
 // map. On other targets use a contiguous, always-valid range that avoids the
 // UART pins (0/1 on AVR) so the serial control channel keeps working.
@@ -78,11 +83,46 @@ void saleae_test_stop(void) {
   }
 }
 
+// Sleep until just before the next edge, then spin the last moment.
+//
+// The edges are at phase 0, 50, 100 ... 400 ms -- one every 50 ms -- so between
+// them this loop has nothing to do. Spinning through all of it is what used to
+// be here, and it starved IDLE0 into a task-watchdog panic: on ESP-IDF 5.5.3
+// `main` runs `saleae_test_loop()` in a `saleae_hal_delay_ms(1)` spin, IDLE0 is
+// subscribed to the WDT by default, and it never gets to run. The panic landed
+// inside SR_00's capture window and truncated the pattern, which SR_00 then
+// reported as eight dead pins.
+//
+// So the spin is kept for the window where it is load-bearing -- the edge has to
+// land within the evaluator's 2 ms tolerance -- and the quiet time between edges
+// blocks instead. `SPIN_WINDOW_MS` is comfortably wider than that tolerance and
+// narrower than the 50 ms between edges, so an edge is always approached by
+// spinning and never by a timer wake-up.
+//
+// The spin itself is unchanged (`saleae_hal_delay_ms(1)`, the sub-tick branch),
+// because this is where an edge has to land; see saleae_hal_espidf.cpp.
+#define SPIN_WINDOW_MS 12
+
 void saleae_test_loop(void) {
-  uint16_t phase =
-      (uint16_t)((saleae_hal_millis() - phase0_ms) % PERIOD_MS);
+  uint32_t now = saleae_hal_millis();
+  uint16_t phase = (uint16_t)((now - phase0_ms) % PERIOD_MS);
   for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
     saleae_hal_write(PIN_OF(i), phase < HIGH_MS_OF(i) ? 1 : 0);
+  }
+
+  // The next edge is the next 50 ms boundary: the high times are 50..400 in
+  // steps of 50, so every boundary is an edge on exactly one channel.
+  const uint32_t ms_to_edge = EDGE_GRID_MS - (phase % EDGE_GRID_MS);
+  if (ms_to_edge > SPIN_WINDOW_MS) {
+    saleae_hal_delay_ms(ms_to_edge - SPIN_WINDOW_MS);
+    now = saleae_hal_millis();
+    phase = (uint16_t)((now - phase0_ms) % PERIOD_MS);
+    // Re-drive the pins: the block may have overshot the phase by up to a
+    // tick, and a pin left at the previous phase would report a width that is
+    // short by that much.
+    for (int i = 0; i < SALEAE_PIN_COUNT; i++) {
+      saleae_hal_write(PIN_OF(i), phase < HIGH_MS_OF(i) ? 1 : 0);
+    }
   }
   saleae_hal_delay_ms(1);
 }

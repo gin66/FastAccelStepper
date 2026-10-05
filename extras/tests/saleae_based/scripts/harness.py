@@ -136,7 +136,10 @@ def max_steppers(pin_mode, bus=False):
 
 
 def is_mux_driver(driver):
-    return driver == "i2s_mux" or driver.startswith("i2s_mux+")
+    # run_tests owns the predicate, because run_tests needs it too (to bound a
+    # multiplexed stepper by the 32-bit word rather than by the analyzer's
+    # channels) and two copies of it would be free to disagree.
+    return run_tests.is_mux_driver(driver)
 
 
 def mux_slot_bound(pin_mode):
@@ -737,6 +740,12 @@ def release_runs(target, drivers):
     baked into its evaluator, and overriding them would make the matrix measure
     the override instead of the scenario -- two firmwares measured with different
     step counts are not comparable, which is the only reason a matrix exists.
+
+    `--count 1 --pin-mode dir` on that line therefore describe *the catalogue's*
+    wiring, not every scenario's: SR_31 derives both itself (it probes the
+    board for the count and connects `nodir`), which is why it can run in a
+    `--count 1` invocation. It reads `native` as its driver, so the row's SR_31
+    cell is "this firmware's maximum stepper count for <native>".
     """
     mux = "i2s_mux" in drivers
     native = next((d for d in DRIVERS["esp"] if d in drivers), "rmt")

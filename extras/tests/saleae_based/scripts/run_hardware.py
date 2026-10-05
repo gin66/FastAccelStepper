@@ -105,16 +105,24 @@ def wire_plan(scenario, dut_driver=rt.DEFAULT_NATIVE_DRIVER):
     derived from the count. Capturing only D0..D3 would leave a four-stepper
     scenario's C and D uncaptured, and `evaluate()` now fails that as an
     incomplete capture instead of quietly scoring them as silent drivers.
+
+    The stride comes from the scenario's own pin mode, not from a literal 2: one
+    scenario is a `nodir` one, and at eight steppers the two differ by every
+    channel. Its count is the widest its pin mode allows rather than a literal
+    either -- this runner has no probe, so it wires the top of the search and
+    the firmware is what refuses the run if the board cannot take it. That is
+    the honest answer from a runner that cannot ask: this file is the
+    pre-`measure()` path and `run_tests.measure()` is the one that probes.
     """
     cfg = rt.SCENARIOS[scenario][0]
     if cfg not in rt.CONFIGS:
         raise BoardError(f"no wiring known for config {cfg!r}")
     drivers = rt.config_drivers(cfg, dut_driver)
     count = len(drivers)
-    # Every catalogue scenario is a `dir` one, so two channels per stepper.
-    reach = min(rt.CHANNELS, count * 2)
+    stride = rt.CHANNELS_PER_STEPPER[rt.scenario_pin_mode(scenario)]
+    reach = min(rt.CHANNELS, count * stride)
     channels = ",".join(f"D{i}" for i in range(reach))
-    return rt.config_wire(cfg, dut_driver), channels, str((1 << count) - 1)
+    return rt.scenario_wire(scenario, dut_driver), channels, str((1 << count) - 1)
 
 
 def run_segments(segments, wire_cfg, channels, mask, name, info,

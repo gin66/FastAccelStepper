@@ -267,6 +267,7 @@ SCENARIO_BUILDERS = {
     "SR_26": rt.sc_pause_ticks_max,
     "SR_27": rt.sc_single_step,
     "SR_30": rt.sc_emergency_stop,
+    "SR_31": rt.sc_max_stepper_count,
 }
 
 
@@ -855,6 +856,49 @@ FIXTURES.append(Fixture(
     step=_render_rejected_steps(), dirs=[(0, 1)], expect_pass=False,
     fault="rejected command still stepped",
     expect_detail="steps_measured"))
+
+
+# SR_31: the maximum stepper count, `nodir`, eight channels and eight steppers.
+#
+# The widest map the pin mode allows, which is what `Pins.for_scenario("SR_31")`
+# builds, so every analyzer channel carries a stepper here. That is the whole
+# point of the fixture: a max-count test evaluated against a 2-stepper map would
+# report on steppers A and B and call the run done, and the six channels it never
+# looked at are the six that would have shown the defect.
+_s31, _ = render(SCENARIO_BUILDERS["SR_31"](_DUT.info()))
+FIXTURES.append(Fixture(
+    name="good_max_count_all_steppers", scenario="SR_31",
+    why="every one of the eight steppers gets all 64 steps at the period",
+    step=_s31, expect_pass=True, steppers=8,
+    extra={f"D{i}": list(_s31) for i in range(1, 8)}))
+
+# The defect AGENTS.md records for MCPWM/PCNT above n=2, which is exactly the
+# shape this scenario exists to reach: stepper H emits its own share correctly
+# *and then keeps going*, so a check that only asks "did the first steps arrive"
+# passes. eval_scale counts every stepper's total, so the free-run is the defect
+# -- 22 143 edges where 64 were commanded is the measured signature.
+_s31_ticks = _period(_s31)
+_h_free_run = list(_s31) + [(t + rt.SCALE_STEPS * _s31_ticks, v)
+                            for t, v in _s31]
+FIXTURES.append(Fixture(
+    name="bad_max_count_free_running_stepper", scenario="SR_31",
+    why="the last stepper never stops; its share is right and its total is not",
+    step=_s31, expect_pass=False, steppers=8,
+    fault="stepper H free-runs past the end of the program",
+    expect_detail="per_stepper",
+    extra={**{f"D{i}": list(_s31) for i in range(1, 7)},
+           "D7": _h_free_run}))
+
+# And the other half: one stepper silently short. A count check that summed the
+# channels instead of judging each would see 8 x 64 - 2 and pass it.
+FIXTURES.append(Fixture(
+    name="bad_max_count_one_stepper_short", scenario="SR_31",
+    why="stepper E swallows two steps while every other stepper is exact",
+    step=_s31, expect_pass=False, steppers=8,
+    fault="stepper E swallowed two steps",
+    expect_detail="per_stepper",
+    extra={**{f"D{i}": list(_s31) for i in (1, 2, 3, 5, 6, 7)},
+           "D4": list(_s31[:20]) + list(_s31[24:])}))
 
 
 def _drop_from_second_stepper(step, _dirs=None):

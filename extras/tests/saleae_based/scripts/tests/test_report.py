@@ -75,8 +75,21 @@ class TestCatalogue(unittest.TestCase):
             row = [ln for ln in out.splitlines() if ln.startswith(f"| {scenario} ")]
             self.assertEqual(len(row), 1, f"{scenario} missing from catalogue")
             self.assertIn(cfg, row[0])
-            self.assertIn(str(mask), row[0])
+            # A probed scenario's mask is 0 in the table because the count is
+            # not known until the board is asked, and the row has to say *that*
+            # rather than print the 0 -- which reads as a scenario that starts
+            # no stepper at all.
+            shown = "probed" if scenario in rt.PROBE_SCENARIOS else str(mask)
+            self.assertIn(shown, row[0])
             self.assertIn(desc, row[0])
+
+    def test_a_probed_scenario_is_not_printed_as_a_zero_mask(self):
+        # The exact misreading: `| SR_31 | nodir_max | 0 | ... |` says nothing
+        # runs. It does run; the count is what the scenario measures.
+        out = run_report("--scenarios").stdout
+        row = [ln for ln in out.splitlines() if ln.startswith("| SR_31 ")]
+        self.assertEqual(len(row), 1)
+        self.assertIn("| probed |", row[0])
 
     def test_stop_scenarios_are_marked_as_needing_the_host(self):
         out = run_report("--scenarios").stdout

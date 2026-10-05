@@ -45,6 +45,20 @@ void saleae_hal_delay_ms(uint32_t ms);
 // `vTaskDelay(pdMS_TO_TICKS(10))`.
 void saleae_hal_idle(void);
 
+// Task watchdog: subscribe the calling task, then keep it fed.
+//
+// Two calls, not one, and the order matters. `esp_task_wdt_reset()` on a task
+// that is not subscribed logs an error on *every* call -- once per main-loop
+// pass, on the UART the host protocol runs on -- so resetting before
+// subscribing turns a quiet board into a chatty one.
+//
+// Both are no-ops on platforms with no task watchdog, and both are needed only
+// where app_main can starve IDLE0: a zero-timeout serial read plus a sub-tick
+// delay means the main loop never blocks. On Arduino there is no RTOS and no
+// WDT, so both compile to nothing.
+void saleae_hal_wdt_subscribe(void);
+void saleae_hal_wdt_reset(void);
+
 // Serial console (host command channel)
 void saleae_hal_serial_begin(uint32_t baud);
 int saleae_hal_serial_read(void);  // returns a byte 0..255, or -1 if none

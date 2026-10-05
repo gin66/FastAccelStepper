@@ -141,6 +141,15 @@ def row_for(scenario, path, info, chan_map=None):
 
 def note_of(detail):
     """The one line a reader needs, per scenario."""
+    if "max_stepper_count" in detail:
+        # SR_31: the count is the measurement, so it leads -- and the reasons the
+        # counts above it were refused follow, because "stops at 6" and "stops
+        # at 6 because the analyzer has no channel 7" are different answers.
+        reached = detail["max_stepper_count"]
+        above = detail.get("refused_above") or []
+        bound = f" (searched down from {detail.get('search_bound')})"
+        return f"{reached} stepper(s) on {detail.get('probed_driver')}{bound}; " \
+               f"{len(above)} count(s) above it refused"
     if "dir_per_phase" in detail:
         # SR_11/SR_12: say which way each phase actually went, not just how many
         # steps it took. A count that adds up while the direction is wrong is the
@@ -535,7 +544,11 @@ def as_scenarios():
             extra = (" (host issues "
                      f"{rt.SCENARIO_STOP.get(scenario, 'STOP')} a quarter of "
                      "the way into the fill)")
-        out.append(f"| {scenario} | {cfg} | {mask} | {desc}{extra} |")
+        # A mask of 0 does not mean "no stepper runs" -- it means the count is
+        # not known until the board is asked, which is SR_31's whole subject.
+        # Printed as `0` it would read as a scenario that starts nothing.
+        shown = "probed" if scenario in rt.PROBE_SCENARIOS else mask
+        out.append(f"| {scenario} | {cfg} | {shown} | {desc}{extra} |")
     return "\n".join(out)
 
 

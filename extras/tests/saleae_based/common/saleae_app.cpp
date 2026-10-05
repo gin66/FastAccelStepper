@@ -1407,19 +1407,54 @@ static void handle_config(char* count_text, char* driver_list,
   }
 #endif
 
-  // Each queue can only be allocated once, so a second CONFIG cannot move an
-  // already-connected stepper. Report the existing setup instead of silently
-  // running with a different pin map than the host thinks.
+  // A CONFIG that finds steppers already connected cannot move them -- a queue
+  // is allocated once and there is no way to free it (no release in the engine),
+  // so a reset is the only way back to an empty board. That is the reason for
+  // the branch, and not a reason to say OK.
+  //
+  // It used to answer `OK CONFIG n=<connected> ... already` whatever was
+  // asked for, which is a false success. Measured, on ESP-IDF 5.5.3:
+  //
+  //   CONFIG 8 mcpwm_pcnt,... nodir -> ERR connect step 6 n=6
+  //   CONFIG 7 mcpwm_pcnt,... nodir -> OK CONFIG n=6 mode=nodir already
+  //
+  // The first line connects six and then fails, leaving `slot_count = 6`, so
+  // the second reports success for a configuration that was never established.
+  // A host that trusts it records seven steppers on a board running six -- which
+  // is exactly what the max-count probe did before it learned to read MAP.
+  //
+  // So the answer is now whatever the request actually is: `OK ... already` when
+  // it matches what is connected (which is a genuine no-op, and worth answering
+  // so a reconnecting host is not refused), and a refusal naming the mismatch
+  // otherwise. No release is needed to tell the truth about what is connected.
   if (slot_count > 0) {
-    // Report the existing setup rather than silently running with a different
-    // pin map than the host believes. It has to include the mode and the
-    // drivers, since a second CONFIG naming a different mode is exactly the
-    // case where "already" would otherwise hide a disagreement.
     char buf[SALEAE_SHORT_REPLY_MAX];
     char mode[SAL_PIN_MODE_MAX];
     pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
-    sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK CONFIG n=%u mode=%s already\n"),
-                 (unsigned)slot_count, mode);
+    const uint8_t want_stride = nodir ? SALEAE_STRIDE_NODIR : SALEAE_STRIDE_DIR;
+    if (n == slot_count && stride == chan_stride) {
+      uint8_t i = 0;
+      while (i < n && slots[i].driver == drivers[i]) i++;
+      if (i == n) {
+        // Identical to what is connected, so this is the no-op it claims.
+        sal_snprintf(buf, sizeof(buf), SAL_PSTR("OK CONFIG n=%u mode=%s already\n"),
+                     (unsigned)slot_count, mode);
+        reply(buf);
+        return;
+      }
+      char drv[SAL_DRV_NAME_MAX];
+      driver_name(drivers[i], drv);
+      sal_snprintf(buf, sizeof(buf),
+                   SAL_PSTR("ERR CONFIG already n=%u driver %u is %s\n"),
+                   (unsigned)slot_count, (unsigned)i, drv);
+      reply(buf);
+      return;
+    }
+    sal_snprintf(buf, sizeof(buf),
+                 SAL_PSTR("ERR CONFIG already n=%u stride=%u mode=%s, asked "
+                          "n=%u stride=%u\n"),
+                 (unsigned)slot_count, (unsigned)chan_stride, mode,
+                 (unsigned)n, (unsigned)want_stride);
     reply(buf);
     return;
   }
@@ -2081,6 +2116,12 @@ static void handle_line(char* line) {
 }
 
 extern "C" void saleae_app_setup(void) {
+  // Before READY: the watchdog has to be live for the whole life of the board,
+  // and the host opens the port and waits for READY, so anything before it is
+  // unobserved. See saleae_hal_wdt_subscribe() -- app_main starves IDLE0 on a
+  // zero-timeout serial read, and the resulting panic inside a capture window
+  // was what made SR_00 report eight dead pins.
+  saleae_hal_wdt_subscribe();
   saleae_hal_serial_begin(SALEAE_SERIAL_BAUD);
   reply_p(SAL_PSTR("READY\n"));
   saleae_test_setup();
@@ -2115,6 +2156,14 @@ extern "C" void saleae_app_loop(void) {
   } else {
     saleae_hal_idle();
   }
+
+  // Every pass, and it has to be here rather than in the three branches: the
+  // SR_00 pattern and the feeder both end in a sub-tick spin by design, so
+  // "when there is nothing to do" is not the only time the watchdog can expire.
+  // No-op unless setup() subscribed this task.
+  saleae_hal_wdt_reset();
+
+  
 
   // `done_announced` latches completion. Without it `qe_finish()` re-arms
   // done_pending on every idle pass through the loop, so DONE is reprinted
