@@ -1246,6 +1246,24 @@ Recorded because they change what the tests mean.
   | `forceStop()` | `ignore_commands = true`; nothing further *added*, queue drains (~20 ms). |
   | `forceStopAndNewPosition()` | aborts everything queued -- no further step issued. |
 
+  They are not three flavours of one thing: they differ in **which subsystem
+  they touch** (`src/FastAccelStepper.cpp`).
+
+  | | ramp output | queue **admission** | queue **mutation** |
+  |---|---|---|---|
+  | `stopMove()` :401 | `initiateStop()` | -- | -- |
+  | `forceStop()` :431 | `immediateStop()` | `ignore_commands = true` | -- |
+  | `forceStopAndNewPosition()` :442 | `stopRamp()` | `ignore_commands = true` | `q->forceStop()` |
+
+  `forceStop()` does **not** truncate either -- it gates admission, and the gate
+  refuses only *later* `addQueueEntry()` calls, which a caller that has already
+  stopped feeding never makes. That is why this harness has no scenario for it.
+
+  The admission latch itself is a separate, open defect: it has four writers in
+  two layers, no reader, no public way to clear it, and its refusal returns
+  `AQE_OK`. Tracked as `extras/todo/020_queue_admission_latch.md`, which is also
+  why a scenario cannot currently abort and rearm on one connection.
+
   So the number reported earlier -- 7655 steps left on `i2s_direct`, 7608 on
   `rmt`, both just under the 8160 a 32-deep queue of 255-step commands holds
   -- was **the harness's own arithmetic, not a library guarantee.** Nothing in
@@ -1404,8 +1422,19 @@ Recorded because they change what the tests mean.
   And the feeder runs *far* ahead of the driver — it is pumped from the main
   loop — so on a driver that takes ~281 ms to start emitting, the whole program
   can be queued before the first pulse. Then STOP has nothing left to cancel and
-  the full program runs, which is the documented library behaviour and not a
-  defect.
+  the full program runs, which is the library's behaviour and not a defect.
+
+  The truncation point is the **prefill depth, not the instant STOP arrived**, and
+  the prefill depth is not stable across runs. The three measurements above imply
+  three different depths (>=2000, 14240, 11475) from what reads as one setup. The
+  variance is the more useful fact: a reader who took "runs to completion" from
+  this would not expect a nondeterministic cut.
+
+  Note the behaviour is **not** documented in the library's public API docs.
+  `FastAccelStepper.h:401-404` says only "This only sets a flag", and
+  `README.md:74` mentions `stopMove()` once, silent on queued commands. An earlier
+  revision of this document called it "the documented library behaviour"; that
+  wording was wrong and is withdrawn.
 
   **What SR_25 needs before it can answer the question:** a capture that is
   *measured* to outlast the move rather than requested to (`capture.py` already
@@ -1471,6 +1500,21 @@ Recorded because they change what the tests mean.
       queue refilled. Verified on a waveform: truncated at 11475 of 20000, no
       partial pulse, pin still for the remaining 2.823 s. Worth knowing before
       relying on `stopMove()` as an emergency stop.
+
+      By design, and now asserted rather than discovered: `SR_25` and `SR_30`
+      send an **identical** program and assert opposite outcomes, as a
+      `CONTRASTING_PAIRS` entry. Both pass on all six release-matrix rows.
+      Two limits, so it is not read as stronger than it is —
+      `eval_stop_move_contract` allows 255 steps of slack below the fill
+      (`floor = fill - before - 255`), and it requires the marker to land
+      *inside* the run, so it asserts a conditional drain of a QFILL-ed queue
+      rather than non-truncation in general.
+
+      Three claims once made about this were wrong and are withdrawn:
+      `forceStop()` does **not** substitute for it (it gates admission and
+      truncates nothing); the behaviour is not "documented" anywhere in the
+      library's public API; and the emergency stop a caller actually wants is
+      `forceStopAndNewPosition()`, which works.
 - [x] **Cross-driver start skew *is* worse than same-driver — and the earlier
       finding that said otherwise was an artefact of the firmware's `mixed`
       config, not a property of the hardware.** Two `rmt` steppers start

@@ -6,7 +6,7 @@ and the rest is n-axis work.
 
 The filename prefix is the priority, three digits wide
 (`010_name.md`). Numbers step by 10, so a new item takes a free
-number between two existing ones (`025_` sits between `020_` and
+number between two existing ones (`025_` would sit between `020_` and
 `030_`). Items that share a priority share the prefix.
 
 Source of truth for the n-axis items: `extras/doc/n_axes_whitepaper.md`.
@@ -24,7 +24,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **020** | [stopMove() does not stop a queued move](020_stopMove_behavior.md) | ~100 k | 1–2 d | **Critical.** `stopMove()` only sets a flag; queued commands run to completion. Unexpected motion. |
+| **020** | [The queue admission latch has no lifecycle](020_queue_admission_latch.md) | ~80 k | 1–2 d | **Critical.** `ignore_commands`: 4 writers in 2 layers, no reader, no public clear, refusal returns `AQE_OK`. Low-level callers cannot queue again after a stop. |
 | **030** | [Interrupt slow steps](030_interrupt_slow_steps.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
@@ -48,9 +48,24 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
 | **182** | [`i2s_mux` mangles any command from n ≥ 16](182_i2s_mux_command_mangled_from_16_steppers.md) | ~150 k | 1–2 d | High: the mux's 32-stepper claim cannot be tested — the host's own parser refuses `CONFIG 16 …`. Pre-existing. |
-| **total** | 24 items | ~6.4 M | 18–26 w | Priorities 020–182. | ~6.5 M | 18–26 w | Priorities 020–182. |
+| **total** | 24 items | ~6.4 M | 18–26 w | Priorities 020–182. |
 
 ## Done
+
+- **`stopMove()` does not stop a queued move — closed as a defect, by
+  design.** It sets a flag the ramp generator reads for its *next*
+  command; nothing already queued is touched, so the truncation point is
+  the prefill depth and is *not stable across runs*. Now asserted rather
+  than discovered: `SR_25` and `SR_30` send an identical program and
+  assert opposite outcomes, both passing on all six matrix rows. Three
+  claims this item once made were withdrawn — `forceStop()` does not
+  substitute for it, the behaviour is not documented in the library's
+  public API, and the emergency stop a caller wants is
+  `forceStopAndNewPosition()`, which works. Re-evaluating it is what
+  surfaced [020](020_queue_admission_latch.md), the real defect behind
+  it. Record:
+  `extras/doc/implemented/saleae_based_test_harness.md` (§ *stopMove
+  does not truncate queued motion*).
 
 - **Platform-release matrix, first hardware run — 6 firmwares, 350
   measurements, and six harness bugs that had been hiding results.**
