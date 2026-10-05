@@ -44,11 +44,44 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
-| **182** | [`i2s_mux` mangles any command from n ≥ 16](182_i2s_mux_command_mangled_from_16_steppers.md) | ~150 k | 1–2 d | High: the mux's 32-stepper claim cannot be tested — the host's own parser refuses `CONFIG 16 …`. Pre-existing. |
+| **183** | [No catalogue test steps the maximum number of steppers](183_no_catalogue_test_for_the_maximum_stepper_count.md) | ~40 k | 0.5 d | High: the catalogue's largest case is 3 steppers, and `--mode scale` (the only thing that reaches n=32) has no SR number. How many steppers a driver drives is a hardware fact it answers by refusing. Blocked on 023 for the mux row. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 24 items | ~6.4 M | 18–26 w | Priorities 025–182. |
+| **total** | 25 items | ~6.4 M | 18–26 w | Priorities 025–183. |
 
 ## Done
+
+- **`i2s_mux` "mangles any command from n ≥ 16" — closed as not reproducible;
+  the reported symptom does not exist on current HEAD.** Filed HIGH against
+  `CONFIG 16 i2s_mux,…` answering `ERR unknown '2s_mux,i2s_mux'`. It does not
+  reproduce, and two of the item's own conclusions were wrong:
+
+  - **The mechanism was head-loss, not tail-truncation.** `ERR unknown` prints
+    the `cmd` field (`common/saleae_app.cpp:2078`), which is 15 characters wide,
+    and `'2s_mux,i2s_mux'` is exactly 15. So the line arrived with `CONFIG 16 i`
+    gone — a *truncated driver list* would have answered `ERR CONFIG no such
+    driver` (`:1345`), which is not what was reported. The item read a tail
+    symptom as a receive-buffer overflow.
+  - **The receive buffer had already been fixed.** `setRxBufferSize(1024)`
+    landed in 961c75f8 (2026-10-04), a day *before* the item was filed
+    (87d1fbed), and the plain ESP-IDF HAL installs 1024 regardless
+    (`saleae_hal_espidf.cpp:74`). The item's `uint8_t linelen` theory was stale
+    in a different way too — it is `uint16_t`, as the item itself noted.
+
+  Measured on an ESP32-DevKitC, ESP-IDF 6.13, current HEAD: `nodir` accepts
+  n = 1…32 with 32 driver names and 32 `maxspeedN` fields in one 768-byte
+  reply, `MAP` reports `slots=0…31`, and n = 33 is refused
+  (`ERR CONFIG n=33 max=32`). `dir` accepts n = 16 and refuses 17
+  (`needs 34 slots, max=32`) — so **both** of the mux's documented claims
+  (32 in `nodir`, 16 in `dir`) now hold, where the item recorded zero
+  measurements above n = 8. Also hammered eight 271-character CONFIG lines in
+  one 2176-byte write, 2.1× the RX buffer: 8 OK, 0 mangled.
+
+  The item's *goal* — make the 32-stepper claim testable — is real and is now
+  [183](183_no_catalogue_test_for_the_maximum_stepper_count.md), because it
+  turned out the blocker was never the parser: **no catalogue scenario steps
+  more than three steppers**, and `--mode scale` is outside `ALL_TESTS`. What
+  remains genuinely unmeasured is the direction slots on the wire, which 023's
+  24 MS/s sampling race blocks.
 
 - **`i2s_mux` in `dir` "loses the second stepper's slot" — closed, and it was
   our own decoder config.** Filed HIGH as a functional defect in the shipped
@@ -220,8 +253,9 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   Full analysis, measurements and guards:
   [idf55_main_task_stack_overflow.md](../doc/implemented/idf55_main_task_stack_overflow.md).
   Two new items came out of the acceptance run and are **not** covered by it:
-  [181](181_mcpwm_pcnt_sync_extra_steps.md) and
-  [182](182_i2s_mux_command_mangled_from_16_steppers.md).
+  [181](181_mcpwm_pcnt_sync_extra_steps.md) and **182** (since closed as not
+  reproducible — see Done — which in turn produced
+  [183](183_no_catalogue_test_for_the_maximum_stepper_count.md)).
 
 - **010 — MCPWM/PCNT emitted continuously on every queue after the first —
   resolved, `pcnt_new_unit()` was clearing the interrupt-enable bit.**

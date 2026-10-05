@@ -112,6 +112,14 @@ stepper->setDirectionPin(dir_slot | PIN_I2S_FLAG, dirHighCountsUp);
 stepper->setEnablePin(enable_slot | PIN_I2S_FLAG, activeLow);
 ```
 
+A mux slot is **not a GPIO**. `PIN_I2S_FLAG` is `0x40`, so a flagged pin number
+is 64 or above, which is not a pin on any ESP32 — the flag has to survive into
+the queue, which uses it to find the bit in the frame. `setDirectionPin()` and
+`setEnablePin()` therefore ask `isI2sMuxPin()` before touching the GPIO driver,
+and apply the initial level through the queue instead. Passing a raw slot
+number without the flag is the error this prevents, and it fails as
+`ERR CONFIG no such driver` rather than as a GPIO fault.
+
 **Pin Allocation:**
 The I2S mux uses slot numbers 0-31, which are output on the I2S data line. These
 can be used in two ways:

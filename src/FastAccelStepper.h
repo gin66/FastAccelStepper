@@ -82,6 +82,25 @@ class FastAccelStepper;
 #define PIN_UNDEFINED 255
 #define PIN_EXTERNAL_FLAG 128
 
+// Is this pin number an I2S mux slot rather than a GPIO?
+//
+// The low five bits are the slot and PIN_I2S_FLAG marks it, so a mux slot is
+// `0x40 | slot` -- 64 and up, which is not a pin on any ESP32. Callers that
+// would otherwise hand such a value to the GPIO driver have to ask this first:
+// the flag is *kept* on a mux direction/enable pin (the queue needs it to find
+// the bit in the frame), so stripping it on the way in would lose the slot.
+// Every platform without I2S answers false, so the call sites need no #if.
+//
+// Off ESP32 there is no PIN_I2S_FLAG at all, so nothing can be a mux slot.
+static inline bool isI2sMuxPin(uint8_t pin) {
+#if defined(PIN_I2S_FLAG)
+  return (pin & PIN_I2S_FLAG) != 0;
+#else
+  (void)pin;
+  return false;
+#endif
+}
+
 class FastAccelStepper {
 #ifdef TEST
  public:

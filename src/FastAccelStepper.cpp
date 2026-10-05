@@ -299,7 +299,19 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
       if (_engine->_externalCallForPin) {
         _engine->_externalCallForPin(_dirPin, dirHighCountsUp ? HIGH : LOW);
       }
-    } else {
+    } else if (!isI2sMuxPin(_dirPin)) {
+      // An I2S mux direction slot is not a GPIO. PIN_OUTPUT() on
+      // `PIN_I2S_FLAG | slot` addresses pin 0x40+slot, which does not exist --
+      // measured on an ESP32-DevKitC, one
+      // "gpio_set_direction: GPIO number error" and one
+      // "gpio_set_level: GPIO output gpio_num error" per stepper, from a
+      // CONFIG the host had every right to send. The flag is kept in `_dirPin`
+      // (the queue needs it to find the bit, and I2S_DIRECT is masked above),
+      // so the test has to be here rather than on the argument: nothing else
+      // distinguishes a mux slot from an external pin.
+      //
+      // Skipping the write is not a loss of the initial level: setDirPin()
+      // below applies it through i2sMuxSetBit() for exactly this case.
       PIN_OUTPUT(dirPin, dirHighCountsUp ? HIGH : LOW);
     }
   }
@@ -318,6 +330,12 @@ void FastAccelStepper::setDirectionPin(uint8_t dirPin, bool dirHighCountsUp,
 }
 void FastAccelStepper::setEnablePin(uint8_t enablePin,
                                     bool low_active_enables_stepper) {
+  // An I2S mux enable slot is not a GPIO either, so PIN_OUTPUT() on
+  // `PIN_I2S_FLAG | slot` would address pin 0x40+slot. The level is applied
+  // through the mux by esp32_set_enable_pin_state() instead -- see the same
+  // guard in setDirectionPin(). A mux enable slot is documented as legal in
+  // extras/doc/platforms/esp32.md, so this path is reachable, not theoretical.
+  const bool mux_pin = isI2sMuxPin(enablePin);
   if (low_active_enables_stepper) {
     _enablePinLowActive = enablePin;
     if (enablePin != PIN_UNDEFINED) {
@@ -325,7 +343,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
         if (_engine->_externalCallForPin) {
           _engine->_externalCallForPin(enablePin, HIGH);
         }
-      } else {
+      } else if (!mux_pin) {
         PIN_OUTPUT(enablePin, HIGH);
         if (_enablePinHighActive == enablePin) {
           _enablePinHighActive = PIN_UNDEFINED;
@@ -339,7 +357,7 @@ void FastAccelStepper::setEnablePin(uint8_t enablePin,
         if (_engine->_externalCallForPin) {
           _engine->_externalCallForPin(enablePin, LOW);
         }
-      } else {
+      } else if (!mux_pin) {
         PIN_OUTPUT(enablePin, LOW);
         if (_enablePinLowActive == enablePin) {
           _enablePinLowActive = PIN_UNDEFINED;

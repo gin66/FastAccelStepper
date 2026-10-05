@@ -514,15 +514,25 @@ small formatter does not implement. `SAL_REPLY_BUF` in `saleae_app.cpp` is the
 one place that says which side of the line a buffer is on, and the reason is
 platform-specific — off AVR the task stack is scarce, on AVR the 2 KB part is.
 
-Two things this harness still gets wrong, both unrelated to the stack and both
-reproduced on a pristine checkout:
+Two things this harness still gets wrong, both unrelated to the stack:
 
-- **`i2s_mux` mangles any command from n ≥ 16** (`CONFIG 16 i2s_mux,…` answers
-  `ERR unknown '2s_mux,i2s_mux'`). Not the `uint8_t linelen` wrap documented in
-  `saleae_app.cpp` — `linelen` is `uint16_t` and an n=16 line is 144 characters.
-- `ticks` must be ≥ `MIN_CMD_TICKS` from `QINFO` (3200 on ESP32), so the
+- **`ticks` must be ≥ `MIN_CMD_TICKS` from `QINFO` (3200 on ESP32), so the
   documented `QSEG … 80` example answers `ERR QE step0 rc=-1`
-  (`ErrorTicksTooLow`) on a current build.
+  (`ErrorTicksTooLow`) on a current build.**
+- **The catalogue's largest case is 3 steppers.** `--mode scale` sweeps
+  n = 1…32 and is the only thing that reaches a high count, but it is outside
+  `ALL_TESTS` and has no SR number, so nothing in the characterization set asks
+  how many steppers a driver actually drives. Tracked as
+  `extras/todo/183_no_catalogue_test_for_the_maximum_stepper_count.md`.
+
+A third claim is **withdrawn**: `i2s_mux` mangling commands from n ≥ 16 does not
+reproduce. `CONFIG 16…` and `CONFIG 32…` both parse (768-byte reply, 32 driver
+names, 32 `maxspeedN` fields), `MAP` reports `slots=0…31`, n=33 is refused, and
+`dir` reaches 16 and refuses 17. Both of the mux's documented claims now hold.
+The reported `ERR unknown '2s_mux,i2s_mux'` was head-loss (the `cmd` field is 15
+characters wide and that token is exactly 15), and the suspected 256-byte RX
+ring was already 1024 before the report was filed. What is actually unmeasured is
+the direction slots on the wire, which 023's sampling race blocks.
 
 ### The mux in `dir` mode: a host bug, and 51 phantom steps left
 

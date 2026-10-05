@@ -20,6 +20,10 @@ from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1]
 COMMON = SCRIPTS.parents[0] / "common"
+# The library, for the checks that are about src/ rather than about this harness
+# -- the mux direction/enable pin write is library code, and a defect there is
+# found from here but fixed and guarded there.
+LIB = SCRIPTS.parents[3] / "src"
 sys.path.insert(0, str(SCRIPTS))
 
 import analyze_csv  # noqa: E402
@@ -549,14 +553,31 @@ class TestConfigGrammar(unittest.TestCase):
         self.assertIn('!sal_strcmp(cmd, SAL_PSTR("QFILL"))', source)
 
     @classmethod
-    def _resolve_size(cls, expr):
+    def _firmware_stepper_bound(cls):
+        """SALEAE_STEPPER_BOUND: the widest stepper count this ladder is written
+        against (8 without I2S, 32 with it).
+
+        Read from the firmware rather than restated here, because the buffer
+        ladder is keyed on it: a check that assumed 8 while the firmware builds
+        32 would resolve the wrong rung and pass on a buffer that truncates a
+        32-stepper CONFIG.
+        """
+        source = (COMMON / "saleae_app.cpp").read_text()
+        m = re.search(r"#define SALEAE_STEPPER_BOUND (\d+)", source)
+        if not m:
+            raise AssertionError("SALEAE_STEPPER_BOUND is not defined")
+        return int(m.group(1))
+
+    @classmethod
+    def _resolve_size(cls, expr, max_steppers=8):
         """A buffer size from its declaration: a literal or CONSTANT + n."""
         expr = expr.strip()
         if expr.isdigit():
             return int(expr)
         m = re.fullmatch(r"(\w+)\s*\+\s*(\d+)", expr)
         if m:
-            return cls._firmware_constant(m.group(1)) + int(m.group(2))
+            return (cls._firmware_constant(m.group(1), max_steppers)
+                    + int(m.group(2)))
         raise AssertionError(f"cannot resolve buffer size {expr!r}")
 
     @classmethod
@@ -578,8 +599,14 @@ class TestConfigGrammar(unittest.TestCase):
         conditional = re.compile(
             r"#(?:if|elif) SALEAE_MAX_STEPPERS <= (\d+)\n"
             r"#define %s (\d+)\n" % name)
+        # `#else` is allowed a comment block before its #define, because the top
+        # rung of a ladder is exactly where the reasoning for it lives -- and the
+        # ARG2_MAX one documents the 32-stepper case this test now resolves. A
+        # regex that demanded the #define on the next line raised "no #else rung"
+        # for the one rung that carries the number under test, which read as a
+        # missing rung rather than a regex that cannot see past a comment.
         unconditional = re.compile(
-            r"#else\n#define %s (\d+)\n" % name)
+            r"#else\n(?://[^\n]*\n)*#define %s (\d+)\n" % name)
         rungs = conditional.findall(source)
         if rungs:
             for cap, value in rungs:
@@ -848,8 +875,21 @@ class TestConfigGrammar(unittest.TestCase):
         # truncated on the way in and refused with a misleading "no such driver"
         # on the half-cut last name -- so the budget is checked here, where it
         # can be changed when the stepper count rises.
+        #
+        # The count is the widest the protocol can produce, NOT the widest the
+        # analyzer channels allow. Those differ by 4x for the mux: a multiplexed
+        # stepper spends a bit of the 32-bit word and no channel, so `nodir`
+        # reaches 32 and `dir` 16 (run_tests.MUX_SLOT_COUNT) against the 8 and 4
+        # that CHANNELS bounds. Deriving the count from MAX_STEPPERS_PER_MODE --
+        # which is what this test used to do -- checked an 8-stepper line against
+        # the 8-stepper rung of the buffer ladder and could not see the 32-stepper
+        # rung at all, so a buffer that only truncated at 32 passed. The parser
+        # refusal this item tracks (extras/todo/182) lived in exactly that gap.
         source = (COMMON / "saleae_app.cpp").read_text()
-        line_max = self._firmware_constant("SALEAE_LINE_MAX")
+        # The ladder rung that has to hold the widest legal line, resolved the
+        # way the preprocessor resolves it for that stepper count.
+        cap = self._firmware_stepper_bound()
+        line_max = self._firmware_constant("SALEAE_LINE_MAX", max_steppers=cap)
         # Every buffer a command-line argument is copied into, with its size.
         buffers = {name: self._resolve_size(size) for name, size in
                    re.findall(r"SAL_REPLY_BUF char (arg\d|cmd)\[([^\]]+)\]", source)}
@@ -866,21 +906,39 @@ class TestConfigGrammar(unittest.TestCase):
         self.assertEqual(sorted(fields), sorted(buffers),
                          "every argument buffer needs a sal_field entry of the "
                          f"form {{name, sizeof(name) - 1}}; found {fields}")
+        # Every buffer, resolved at the widest stepper count rather than the
+        # default: the argument widths come from the same ladder as the line
+        # buffer, so a rung that fits the line can still be too narrow for the
+        # driver list, and only the top rung is exercised by a 32-stepper CONFIG.
+        buffers = {name: self._resolve_size(size, max_steppers=cap)
+                   for name, size in
+                   re.findall(r"SAL_REPLY_BUF char (arg\d|cmd)\[([^\]]+)\]",
+                              source)}
         widest = max(buffers.values()) - 1
 
-        # The count that has to fit is the widest one the protocol allows, not
-        # the widest any scenario happens to use: `nodir` reaches 8 steppers
-        # (one channel each) even though no scenario is written for it yet, and
-        # a buffer sized for today's 4 would truncate the moment one is.
-        count = max(max(run_tests.CONFIGS[c][0] for c in run_tests.CONFIGS),
-                    max(run_tests.MAX_STEPPERS_PER_MODE.values()))
-        for driver in FIRMWARE_DRIVERS:
-            line = f"CONFIG {count} {','.join([driver] * count)} dir"
-            self.assertLessEqual(len(line), line_max - 1,
-                                 f"{line!r} does not fit SALEAE_LINE_MAX")
-            self.assertLessEqual(count * len(driver) + count - 1, widest,
-                                 f"a {count}x {driver!r} driver list is "
-                                 f"truncated by the argument width")
+        # `dir` is the longer line at a given count (six more characters), and
+        # the mux doubles the count again. Both bounds are checked, so a fix
+        # that sizes for `nodir` alone still fails here.
+        counts = {
+            "channel-bound": max(max(run_tests.CONFIGS[c][0]
+                                     for c in run_tests.CONFIGS),
+                                 max(run_tests.MAX_STEPPERS_PER_MODE.values())),
+            "mux-nodir": run_tests.MUX_SLOT_COUNT,
+            "mux-dir": run_tests.MUX_SLOT_COUNT // 2,
+        }
+        for label, count in counts.items():
+            for mode in ("dir", "nodir"):
+                for driver in FIRMWARE_DRIVERS:
+                    line = (f"CONFIG {count} "
+                            f"{','.join([driver] * count)} {mode}")
+                    self.assertLessEqual(
+                        len(line), line_max - 1,
+                        f"{label} {mode}: {line!r} ({len(line)} chars) does not "
+                        f"fit SALEAE_LINE_MAX ({line_max})")
+                    self.assertLessEqual(
+                        count * len(driver) + count - 1, widest,
+                        f"{label} {mode}: a {count}x {driver!r} driver list is "
+                        f"truncated by the argument width ({widest})")
 
 
 class TestStackBudget(unittest.TestCase):
@@ -2398,6 +2456,88 @@ class TestMuxChannelMap(unittest.TestCase):
         self.assertIsNone(run_tests.marker_channel_for(5, 1, bus_channels=3))
         self.assertEqual(run_tests.marker_channel_for(2, 2, bus_channels=3), 7)
         self.assertIsNone(run_tests.marker_channel_for(5, 2, bus_channels=3))
+
+
+class TestMuxPinWriteGuard(unittest.TestCase):
+    """A mux direction or enable slot must never reach the GPIO driver.
+
+    `PIN_I2S_FLAG` is 0x40, so a mux slot is a pin number of 64 or above -- not a
+    pin on any ESP32. `FastAccelStepper::setDirectionPin()` masks the flag off for
+    I2S_DIRECT (where a slot is meaningless) but must KEEP it for I2S_MUX, since
+    the queue needs it to find the bit in the frame. Keeping it meant the initial
+    level went through `PIN_OUTPUT(PIN_I2S_FLAG | slot, ...)`, and the board said
+    so once per stepper:
+
+        CONFIG 2 i2s_mux,i2s_mux dir
+        E (916) gpio: gpio_set_direction(321): GPIO number error
+        E (916) gpio: gpio_set_level(251): GPIO output gpio_num error
+        OK CONFIG n=2 mode=dir stride=2 drivers=i2s_mux,i2s_mux
+
+    Measured on an ESP32-DevKitC, ESP-IDF 6.13: 2 errors per stepper, at every n
+    from 1 to 16, and 0 after the guard. Spurious rather than corrupting -- the
+    queue's own setDirPin() applies the level through i2sMuxSetBit() either way --
+    which is why `dir` still stepped correctly and only the log was wrong. A
+    capture-based test cannot see it (the wrong write changes no wire) and neither
+    can pc_based (it stubs digitalWrite/pinMode to empty blocks), so this is a
+    source-level guard.
+
+    The harness is what finds a library defect like this, and the guard belongs
+    with the mux tests rather than in pc_based; the fix is in
+    src/FastAccelStepper.cpp.
+    """
+
+    def _body(self, func):
+        src = (LIB / "FastAccelStepper.cpp").read_text()
+        start = src.index(func)
+        # Up to the next top-level function definition.
+        rest = src[start + len(func):]
+        end = rest.index("\nvoid FastAccelStepper::")
+        return src[start:start + len(func) + end]
+
+    def test_direction_pin_never_drives_a_mux_slot_as_a_gpio(self):
+        body = self._body("void FastAccelStepper::setDirectionPin(")
+        self.assertIn("PIN_OUTPUT", body)
+        # The comment block between the guard and the write is part of why the
+        # guard is load-bearing, so the match allows for it rather than pinning
+        # the two lines together.
+        self.assertRegex(
+            body,
+            r"else if \(!isI2sMuxPin\(_dirPin\)\) \{[^{}]*?PIN_OUTPUT",
+            "setDirectionPin() reaches PIN_OUTPUT without asking "
+            "isI2sMuxPin() first, so a mux direction slot is written as GPIO "
+            "0x40|slot. The flag has to be KEPT here (the queue needs it), so "
+            "the test cannot live on the argument -- see the class docstring.")
+
+    def test_enable_pin_never_drives_a_mux_slot_as_a_gpio(self):
+        body = self._body("void FastAccelStepper::setEnablePin(")
+        self.assertIn("PIN_OUTPUT", body)
+        # Both polarities, or the guard covers only one of them.
+        guards = len(re.findall(r"else if \(!mux_pin\) \{\s*\n\s*PIN_OUTPUT",
+                                body))
+        self.assertEqual(guards, 2,
+                         "setEnablePin() has two PIN_OUTPUT sites (one per "
+                         "polarity) and both must be guarded; found "
+                         f"{guards}")
+
+    def test_the_mux_initial_level_still_goes_somewhere(self):
+        # The guard must not silence the level along with the bad write: the
+        # queue applies it for a mux slot, so setDirPin() still has to be called
+        # with the FLAGGED pin (stripping it there would lose the slot).
+        body = self._body("void FastAccelStepper::setDirectionPin(")
+        self.assertRegex(
+            body, r"_queue\(\)->setDirPin\(dirPin, dirHighCountsUp\)",
+            "setDirectionPin() no longer hands the flagged pin to the queue, so "
+            "the initial direction level is never applied to the mux word")
+
+    def test_the_helper_is_defined_once_and_degrades_off_esp32(self):
+        hdr = (LIB / "FastAccelStepper.h").read_text()
+        self.assertEqual(hdr.count("isI2sMuxPin"), 1,
+                         "isI2sMuxPin() must be defined exactly once")
+        self.assertRegex(hdr, r"#if defined\(PIN_I2S_FLAG\)")
+        self.assertRegex(hdr, r"#else\s*\n\s*\(void\)pin;\s*\n\s*return false;",
+                         "off ESP32 there is no PIN_I2S_FLAG, so the helper has "
+                         "to compile to a constant false rather than fail to "
+                         "build -- AVR has no mux and must still build")
 
 
 class TestMuxDecode(unittest.TestCase):
