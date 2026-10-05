@@ -74,7 +74,8 @@ and clears it, so a planner detects a per-axis stop from existing state.
 Rearming the latch is `resumeCommands()`; `fill_queue()` does it
 implicitly per active ramp pass, which is why a ramp user never observes
 it and why the low-level `addQueueEntry()` user used to be stuck
-permanently after a stop (see `extras/todo/020_queue_admission_latch.md`).
+permanently after a stop — a refusal that also returned `AQE_OK`, so the
+caller advanced its own position model by steps that were never queued.
 
 Design:
 

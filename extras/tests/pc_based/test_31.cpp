@@ -1,4 +1,4 @@
-// test_31: the queue admission latch (extras/todo/020_queue_admission_latch.md)
+// test_31: the queue admission latch
 //
 // A forceStop() / forceStopAndNewPosition() sets a latch that makes
 // addQueueEntry() refuse every command. Before the fix the latch:

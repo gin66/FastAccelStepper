@@ -1259,10 +1259,12 @@ Recorded because they change what the tests mean.
   refuses only *later* `addQueueEntry()` calls, which a caller that has already
   stopped feeding never makes. That is why this harness has no scenario for it.
 
-  The admission latch itself is a separate, open defect: it has four writers in
-  two layers, no reader, no public way to clear it, and its refusal returns
-  `AQE_OK`. Tracked as `extras/todo/020_queue_admission_latch.md`, which is also
-  why a scenario cannot currently abort and rearm on one connection.
+  The admission latch itself was a separate defect, since **fixed**: it had
+  four writers in two layers, no accessor and no public way to clear it, and
+  its refusal returned `AQE_OK`. That is also why a scenario could not
+  abort and rearm on one connection — `CONFIG` memsets the queue. `addQueueEntry()`
+  now answers `AQE_ERROR_COMMANDS_SUSPENDED`, `resumeCommands()` rearms, and
+  this harness's `QCLR` calls it.
 
   So the number reported earlier -- 7655 steps left on `i2s_direct`, 7608 on
   `rmt`, both just under the 8160 a 32-deep queue of 255-step commands holds

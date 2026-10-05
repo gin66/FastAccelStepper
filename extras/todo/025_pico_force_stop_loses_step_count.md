@@ -7,10 +7,9 @@ Pico toolchain was available, so the change was unbuilt and unmeasured,
 and unverified PIO register work does not belong in the tree. The A/B
 analysis below is kept because it is the part that does not need
 hardware — but the choice between A and B should be made against the
-board, not in the abstract. Found while working
-[020](020_queue_admission_latch.md), which records it as *"not this
-item's subject"* — a separate defect, on one platform, with its own
-trigger and its own verification.
+board, not in the abstract. Found while fixing the queue admission latch,
+which records it as *"not this item's subject"* — a separate defect, on one
+platform, with its own trigger and its own verification.
 
 ## Verdict
 
@@ -71,14 +70,11 @@ comparable synchronous boundary. On those platforms "abort now, know
 exactly where you stopped" is approximate by construction.
 
 That asymmetry is itself part of why the stop API needs documenting per
-platform — see the closing argument in
-[020](020_queue_admission_latch.md) § *Platform note*, and
-`extras/doc/platforms/pico.md`.
+platform — see `extras/doc/platforms/pico.md`.
 
 ## The fix — two self-consistent options, and a trap
 
-The doc's original snippet in [020](020_queue_admission_latch.md)
-mixes two mutually exclusive designs: it drains RX into `performed`,
+A tempting one-line patch mixes two mutually exclusive designs: it drains RX into `performed`,
 *then* calls `clear_fifos` (which discards RX), *then* computes
 `pos_offset = true_pos - performed`. But `getCurrentStepCount()` reads
 and drains RX itself at `:213-218`, so after a clear it reads ~0 and
@@ -126,19 +122,18 @@ Three things to settle on the board, not in the abstract:
   this function, not derived from the RX FIFO depth. Confirm the depth
   is what it is assumed to be before trusting a 5-iteration read.
 
-## Interaction with 020
+## Interaction with the admission latch
 
-None in code: [020](020_queue_admission_latch.md) changes the queue
-*admission* path and does not touch `forceStop()` or `pos_offset`.
+None in code: the admission-latch fix changes the queue *admission* path
+and does not touch `forceStop()` or `pos_offset`.
 
-One directional note. Today a low-level caller that aborts cannot
-queue again — the latch blocks it — so this path is reachable mainly
-via `forwardStep()`, which clears the latch
-(`FastAccelStepper.cpp:647`). Once 020 lands, any low-level caller can
-re-arm and queue on the same connection, so a wrong position after an
-abort becomes easier to hit. Already reachable, more so afterwards.
-
-Sequence this **after** 020, not before.
+One directional note. Before the admission-latch fix, a low-level caller
+that aborted could not queue again — the latch blocked it — so this path
+was reachable mainly via `forwardStep()`, which cleared the latch
+(`FastAccelStepper.cpp:647`). Now that `resumeCommands()` is public, any
+low-level caller can re-arm and queue on the same connection, so a wrong
+position after an abort is easier to hit than it was. Already reachable,
+more so now.
 
 ## The test
 
@@ -163,9 +158,6 @@ magnitude.
 
 ## References
 
-- [020](020_queue_admission_latch.md) § *Platform note: Pico destroys a
-  count it could keep exactly* — where this was found, and why it was
-  split out
 - `src/pd_pico/pico_queue.cpp:154-169` — `forceStop()`, both halves
 - `src/pd_pico/pico_queue.cpp:179-205` — `getCurrentStepCount()`, read order
 - `src/fas_queue/queue_add_entry.cpp:60` — the `pos_offset` convention

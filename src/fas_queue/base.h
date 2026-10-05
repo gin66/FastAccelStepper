@@ -50,8 +50,7 @@ class StepperQueueBase {
   //
   // It is NOT transient. fill_queue() used to clear it on every active ramp
   // pass, which made it inert for the ramp and permanent for the low-level
-  // addQueueEntry() user, whose ramp is never active. See
-  // extras/todo/020_queue_admission_latch.md.
+  // addQueueEntry() user, whose ramp is never active.
   volatile bool ignore_commands;
 
   void suspendCommands() { ignore_commands = true; }
