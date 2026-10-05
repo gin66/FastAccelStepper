@@ -49,9 +49,9 @@ count: `CONFIG 16 …` is ~144 characters.
   `SALEAE_ARG2_MAX`, not from a literal. `TestStackBudget` and `TestSaleaeFmt`
   in `scripts/tests/test_saleae.py` are the places a fix should show up.
 - **Confirm the 32-stepper path end to end once parsing is fixed.** Note that
-  the other known mux defect — 076, `i2s_mux` in `dir` losing its second slot —
+  the other known mux defect — 022, `i2s_mux` in `dir` losing its second slot —
   blocks the same territory, so the two are worth fixing together and measuring
-  with the same runs. 076 also records the intermittent dropped step, which is
+  with the same runs. 022 also records the intermittent dropped step, which is
   a different thing and stays separate.
 - **Then the claim in the docs can finally be tested.** `nodir` reaching 32 and
   `dir` reaching 16 are assertions about the wire protocol (a 32-bit word, a

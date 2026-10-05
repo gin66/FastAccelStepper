@@ -53,7 +53,7 @@ and I2S** (`pd_config_idf5.h:81-110` sets `SUPPORT_ESP32_RMT` /
 |-------------|---------|------------|------------|--------------|------------|
 | Channel resource | shared (`_i2s_mux_manager`) | one `I2sManager*` per stepper | one channel number per stepper | one channel handle per stepper | one timer/PCNT per stepper |
 | Group key | all mux steppers | none | all RMT steppers | all RMT steppers | none |
-| Max steppers | `QUEUES_I2S_MUX` (32 dynamic) | `QUEUES_I2S_DIRECT` (3 dynamic) | 8/4/2 (ESP32/S3/C3) | 8/4/2/2/2/`CONFIG_SOC_RMT_TX_CANDIDATES_PER_GROUP` | 6/4/2/2 (ESP32/S3/C6/H2) |
+| Max steppers | `QUEUES_I2S_MUX` (32 dynamic) | `QUEUES_I2S_DIRECT` (= `SOC_I2S_NUM`, 2 on the ESP32) | 8/4/2 (ESP32/S3/C3) | 8/4/2/2/2/`CONFIG_SOC_RMT_TX_CANDIDATES_PER_GROUP` | 6/4/2/2 (ESP32/S3/C6/H2) |
 | Shared clock? | yes (one I2S stream) | no | yes (RMT peripheral) | yes (RMT peripheral) | no |
 | Deferred trigger? | yes (DMA `on_sent` ISR) | yes (DMA `on_sent` ISR, per stepper) | no (register write in `startQueue_rmt()`) | no (`rmt_transmit()` in `startQueue_rmt()`) | no (`timer_start = 2` in `startQueue_mcpwm_pcnt()`) |
 

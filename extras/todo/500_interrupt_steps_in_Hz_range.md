@@ -1,4 +1,4 @@
-# 130 Interrupt slow steps (e.g. 1 step/s)
+# 500 Interrupt steps in Hz range (e.g. 1 step/s)
 
 ## Problem
 

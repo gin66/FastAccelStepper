@@ -171,17 +171,20 @@ CONFIG <n> <drv>[,<drv>..] [dir|nodir]
                             false, and the queue would refuse it.
 MAP                         count, mode, stride, the GPIO behind each reachable
                             channel, plus `bus=` (the three I2S channels, or
-                            `-`) and `slots=` (one entry per **stepper**: the bit
+                            `-`), `slots=` (one entry per **stepper**: the bit
                             of the 32-bit word that stepper's STEP signal is, or
                             `-` for a GPIO stepper -- verified on hardware, not
-                            inferred; `CONFIG 2 i2s_mux,i2s_mux dir` answers
-                            `slots=0,2`). Read it as one per channel and every
-                            stepper past the first in `dir` is handed a GPIO
-                            channel it does not own, which measures 0 steps on a
-                            quiet pin. A mux stepper's DIRECTION bit is not
-                            reported at all: it is `step_slot + 1`, which holds
-                            because CONFIG resets the slot cursor and connects
-                            in order, so the pairs are gapless (0/1, 2/3, ...).
+                            inferred) and `dslots=` (the same indexing, holding
+                            that stepper's DIRECTION bit). Read either as one per
+                            channel and every stepper past the first in `dir` is
+                            handed a GPIO channel it does not own, which measures
+                            0 steps on a quiet pin. `dslots` is reported rather
+                            than derived: the host used to compute it as
+                            `step_slot + 1`, which held only because CONFIG
+                            resets the slot cursor and connects in order, so the
+                            pairs came out gapless (0/1, 2/3, ...). A host that
+                            infers it is right by coincidence; a reply with no
+                            `dslots` field is refused, naming the reflashing.
                             The host MUST read the map rather than assume a
                             channel map: in `dir` stepper B is D2, in `nodir` it
                             is D1, and a host that guesses reads a quiet pin and
@@ -527,7 +530,7 @@ reproduced on a pristine checkout:
 so the run is recorded as an **incomplete capture** rather than a quiet stepper.
 `--mode scale --driver i2s_mux --pin-mode nodir` is unaffected and green
 (n=1…8, 64/64). →
-[`076_i2s_mux_dir_second_slot_not_decoded.md`](../../todo/076_i2s_mux_dir_second_slot_not_decoded.md)
+[`022_i2s_mux_dir_second_slot_not_decoded.md`](../../todo/022_i2s_mux_dir_second_slot_not_decoded.md)
 
 ## Capture format
 

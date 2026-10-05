@@ -43,7 +43,13 @@
 #if defined(SUPPORT_DYNAMIC_ALLOCATION)
 #if defined(SUPPORT_ESP32_I2S)
 #define QUEUES_I2S_MUX 32
-#define QUEUES_I2S_DIRECT 3
+// One I2S TX channel per I2sManager (i2s_new_channel(..., &chan, NULL), no RX
+// channel), so the ceiling is the chip's I2S peripheral count -- 2 on the
+// ESP32. Measured: n=1,2 connect and n=3..N are refused inside i2s_new_channel()
+// with ESP_ERR_NO_MEM, on IDF 5.5.3 and 6.1.0 alike. Stating 3 here overstated
+// the capacity, which over-allocated MAX_STEPPER by one and made the third
+// queue fail at connect time rather than being refused up front.
+#define QUEUES_I2S_DIRECT SOC_I2S_NUM
 #else
 #define QUEUES_I2S_MUX 0
 #define QUEUES_I2S_DIRECT 0

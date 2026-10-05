@@ -24,8 +24,8 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
+| **022** | [i2s_mux in `dir`: the second stepper's slot is intermittently not decoded](022_i2s_mux_dir_second_slot_not_decoded.md) | ~200 k | 1–2 d | **High**: a functional defect in the shipped mux driver, not documentation — `CONFIG 2 i2s_mux,i2s_mux dir` loses S2 on both I2S SDKs, so `dir` is not a usable mux mode. `nodir` is green. Suspected `i2s_fill_buffer_mux()` OR-ing into memory the DMA is reading. |
 | **025** | [Pico `forceStop()` discards an exact step count](025_pico_force_stop_loses_step_count.md) | ~30 k | 0.5 d | Medium: `pio_sm_clear_fifos` drops RX, then `pos_offset = 0`. Also a read-before-test in `getCurrentStepCount()`. Not started; an unverified attempt was dropped. |
-| **030** | [Interrupt slow steps](030_interrupt_slow_steps.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
 | **040** | [AVR synchronized start](040_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
@@ -33,9 +33,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **040** | [SAMD51 synchronized start](040_samd51_synchronized_start.md) | ~20 k | 1–2 d | TCC cross-instance release to be identified. |
 | **040** | [Teensy synchronized start](040_teensy_synchronized_start.md) | ~20 k | 1–2 d | TMR within/cross-module release to be decided. |
 | **050** | [Cross-driver start skew — I2S dominates](050_cross_driver_skew.md) | ~100 k | 0.5 d | Medium: characterization. Up to **109 step periods** with an I2S driver; the old "cross-driver is 66% worse" ratio is withdrawn — the same-driver and cross-driver ranges overlap. |
-| **070** | [i2s_direct has 2 channels on ESP32, not 3](070_i2s_direct_channels.md) | ~100 k | 0.5 d | Medium: constant overstates channel count by one. Graceful failure. |
-| **072** | [MAP does not report a multiplexed stepper's direction slot](072_map_does_not_report_mux_direction_slot.md) | ~150 k | 1 d | Medium: the host derives a mux stepper's dir slot as `step_slot + 1`; correct only while allocation stays gapless. |
-| **076** | [i2s_mux in `dir`: the second stepper's slot is intermittently not decoded](076_i2s_mux_dir_second_slot_not_decoded.md) | ~200 k | 1–2 d | Medium: `CONFIG 2 i2s_mux,i2s_mux dir` loses S2 on both I2S SDKs; `nodir` is unaffected and green. |
+
 | **080** | [Cubic start (`s_h`) overlay](080_cubic_start.md) | ~200 k | 1–2 w | Later feature, not v1. |
 | **090** | [Common head speed](090_common_head_speed.md) | ~300 k | 1–2 w | Later planner. One acceleration and one max path speed for an x/y/z/… head. Waypoints are `dx, dy, dz, …, v`. |
 | **100** | [Delta steps](100_delta_steps.md) | ~400 k | 1–2 w | AFAP input variation: `int16_t` chunks instead of absolute waypoints. |
@@ -48,9 +46,41 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
 | **182** | [`i2s_mux` mangles any command from n ≥ 16](182_i2s_mux_command_mangled_from_16_steppers.md) | ~150 k | 1–2 d | High: the mux's 32-stepper claim cannot be tested — the host's own parser refuses `CONFIG 16 …`. Pre-existing. |
+| **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
 | **total** | 24 items | ~6.4 M | 18–26 w | Priorities 025–182. |
 
 ## Done
+
+- **`i2s_direct` has 2 channels on the ESP32, not 3 — fixed.**
+  `QUEUES_I2S_DIRECT` was a hand-copied `3` where the ceiling is the chip's
+  I2S peripheral count. Each `I2sManager` takes one TX channel
+  (`i2s_new_channel(..., &chan, NULL)`, no RX), and `SOC_I2S_NUM` is 2, so the
+  third queue always failed at connect time with IDF's own
+  `ESP_ERR_NO_MEM` — measured n=1,2 pass and n=3..8 refused on IDF 5.5.3 and
+  6.1.0 alike. The constant now reads `SOC_I2S_NUM`, so it states the ceiling
+  instead of a number that has to be kept in step with the hardware.
+  `harness.DRIVER_MAXS` followed; the unit test cross-checking the host table
+  against the library's `QUEUES_*` pins the new value. Found only because R7
+  stopped trusting the constant — `i2s_direct` had until then only ever been
+  measured as a *partner* in a `sync` combination.
+
+- **`MAP` did not report a multiplexed stepper's direction slot — fixed.**
+  `MAP` names each mux stepper's STEP bit (`slots=`, one entry per stepper) but
+  not its DIRECTION bit, which in `dir` mode is a second bit of the same 32-bit
+  word. The host filled the gap with `step_slot + 1`, which held only because
+  `CONFIG` resets the slot cursor and connects in order, so the pairs came out
+  gapless (0/1, 2/3, ...) — a host that inferred the pairing was right by
+  coincidence. The firmware now reports it: `dslots=`, same indexing,
+  `CONFIG 2 i2s_mux,i2s_mux dir` answering `slots=0,2 dslots=1,3`. A reply
+  without the field is refused rather than guessed at.
+
+  The same one-per-channel misreading was also live in
+  `_mux_map_with_slots()`, which built the decoder config with
+  `slots[j * stride]` — so the decoder path and the evaluator path disagreed
+  about what the field meant, and only the `nodir` runs, where the two readings
+  coincide, had ever compared them. Both are on one indexing now, with the
+  non-gapless case (`slots=5,2 dslots=30,3`) pinned by a test, because it is
+  the case the stride arithmetic cannot produce.
 
 - **`stopMove()` does not stop a queued move — closed as a defect, by
   design.** It sets a flag the ramp generator reads for its *next*
@@ -82,8 +112,8 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
     capture shows stepping 64 times. Verified against the board
     (`CONFIG 2 i2s_mux,i2s_mux dir` → `slots=0,2`); the two unit tests that
     encoded the wrong rule were corrected to the measured reply.
-    Tracked as [072](072_map_does_not_report_mux_direction_slot.md) for the
-    direction-slot half of the same gap.
+    The direction-slot half of the same gap is now fixed too — see the
+    `dslots=` entry above.
   - **The I2S mux's 24 MS/s floor keyed off `--driver`, and `sync` has none** —
     so `--imux` sampled the 8 MHz bus at 4 MS/s (0.5 samples/bit) and the
     decode was not a wrong answer but not an answer. The floor now keys off

@@ -434,6 +434,12 @@ struct stepper_slot {
   // `step_pin` on the host side -- it lives inside PIN_I2S_FLAG, which the
   // channel map has no idea about -- so MAP reports it.
   uint8_t mux_slot;
+  // ...and the same for its direction signal, which in `dir` mode is a *second*
+  // bit of the same word and is not `mux_slot + 1` by anything the host can see.
+  // Reported rather than derived: the allocation is gapless today only because
+  // CONFIG resets the cursor and connects in order, so a host that inferred it
+  // would be right by coincidence.
+  uint8_t mux_dir_slot;
   enum saleae_driver driver;
 };
 
@@ -871,6 +877,7 @@ static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
   slots[idx].step_pin = step_pin;
   slots[idx].dir_pin = dir_pin;
   slots[idx].mux_slot = step_slot;
+  slots[idx].mux_dir_slot = dir_slot;
   slots[idx].driver = driver;
   if (step_slot == SAL_NO_MUX_SLOT) {
     chan_used = (uint8_t)(chan_used + (nodir ? 1 : 2));
@@ -1149,10 +1156,11 @@ static void handle_imux(void) {
 #endif
 }
 
-// Without configurable driver type there is no mux, so `bus` and `slots` do not
-// exist and `ch` is the only variable part -- at most two channels on a 328P.
-// The full form's buffer (SALEAE_CHANNELS*4 + SALEAE_MAX_STEPPERS*4 + 96) is
-// 136 bytes there for a reply of at most 66, so this rung keeps only the three
+// Without configurable driver type there is no mux, so `bus`, `slots` and
+// `dslots` do not exist and `ch` is the only variable part -- at most two
+// channels on a 328P.
+// The full form's buffer (SALEAE_CHANNELS*4 + SALEAE_MAX_STEPPERS*8 + 96) is
+// 168 bytes there for a reply of at most 66, so this rung keeps only the three
 // scalars the host needs to build a channel map and spends 32 instead. The pin
 // list is what it gives up: the host keeps deriving the map from count/mode/
 // stride, and only records `pins` for the report.
@@ -1180,14 +1188,17 @@ static void handle_map(void) {
   // multiplexed stepper is in the list, and a host that read eight entries for
   // two mux steppers would be reading bus pins as step pins.
   //
-  // `bus` and `slots` are the mux half of the map, and they are what a decoder
-  // config is built from: which three channels carry the bus, and which bit of
-  // the 32-bit word each stepper is. A mux stepper's step signal is not on a
-  // channel at all, so without `slots` the host would look for stepper A's step
-  // edge on a pin that carries somebody else's, find nothing, and report a
-  // driver that emits nothing. `slots` uses `-` for a GPIO stepper so the field
-  // lines up with the stepper letters one to one.
-  SAL_REPLY_BUF char buf[SALEAE_CHANNELS * 4 + SALEAE_MAX_STEPPERS * 4 + 96];
+  // `bus`, `slots` and `dslots` are the mux half of the map, and they are what
+  // a decoder config is built from: which three channels carry the bus, and
+  // which bit of the 32-bit word each stepper's step and direction signals are.
+  // A mux stepper's step signal is not on a channel at all, so without `slots`
+  // the host would look for stepper A's step edge on a pin that carries
+  // somebody else's, find nothing, and report a driver that emits nothing.
+  // `slots` and `dslots` each use `-` for a GPIO stepper so the fields line up
+  // with the stepper letters one to one. `dslots` is `SALEAE_MAX_STEPPERS * 4`
+  // more buffer, which is why this is the one reply whose size is not a pure
+  // function of the channel budget.
+  SAL_REPLY_BUF char buf[SALEAE_CHANNELS * 4 + SALEAE_MAX_STEPPERS * 8 + 96];
   SAL_REPLY_BUF char mode[SAL_PIN_MODE_MAX];
   pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
   int len = sal_snprintf(buf, sizeof(buf),
@@ -1227,6 +1238,23 @@ static void handle_map(void) {
     } else {
       len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u"),
                           (unsigned)slots[i].mux_slot);
+    }
+  }
+  // The direction bit, one entry per stepper like `slots` and `-` for the same
+  // two cases (a GPIO stepper, or a `nodir` stepper that has no direction pin at
+  // all). It is a separate field rather than a `step,dir` pair per entry so that
+  // a host reading the older one-entry-per-stepper rule still lines up: the
+  // indices are the same, only the arithmetic to get the second bit is gone.
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" dslots="));
+  for (uint8_t i = 0; i < slot_count; i++) {
+    if (i) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(","));
+    }
+    if (slots[i].mux_dir_slot == SAL_NO_MUX_SLOT) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("-"));
+    } else {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u"),
+                          (unsigned)slots[i].mux_dir_slot);
     }
   }
 #endif

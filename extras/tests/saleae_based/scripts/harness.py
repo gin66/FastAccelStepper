@@ -177,9 +177,9 @@ SUPPORTED_RATES = [20000, 25000, 50000, 100000, 200000, 250000, 500000,
 #
 # i2s_mux is 32, and 32 is now the whole of it: a multiplexed stepper spends a
 # slot of the 32-bit word and NOT one of the analyzer's channels, so the channel
-# budget does not cap it -- see scale_bound(). i2s_direct is 3 *channels that are
+# budget does not cap it -- see scale_bound(). i2s_direct is 2 *channels that are
 # not one pin each* -- it is an internal demux, not a separate GPIO -- so it gets
-# one channel per stepper like any other driver and is limited by its own 3.
+# one channel per stepper like any other driver and is limited by its own 2.
 # A 0 is not a missing entry: it is a driver this chip has no queues for
 # (`QUEUES_MCPWM_PCNT 0` on the S2, C3 and P4, which have no MCPWM/PCNT at
 # all). Omitting those would make the table's absence ambiguous between "not
@@ -187,7 +187,7 @@ SUPPORTED_RATES = [20000, 25000, 50000, 100000, 200000, 250000, 500000,
 # silently guesses a bound.
 DRIVER_MAXS = {
     "esp32": {"rmt": 8, "mcpwm_pcnt": 6,
-              "i2s_direct": 3, "i2s_mux": 32},
+              "i2s_direct": 2, "i2s_mux": 32},
     "esp32s2": {"rmt": 4, "mcpwm_pcnt": 0,
                 "i2s_direct": 0, "i2s_mux": 0},
     "esp32s3": {"rmt": 4, "mcpwm_pcnt": 4,

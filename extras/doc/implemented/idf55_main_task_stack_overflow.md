@@ -331,7 +331,7 @@ same gap is why a run that skips everything still reports `failed=0`.
 `CONFIG 2 i2s_direct,i2s_direct nodir` answers `OK` (016's n=2).
 
 The two failures that remain are both pre-existing and tracked elsewhere:
-`i2s_mux+i2s_mux` is an incomplete capture, S2 missing (todo 076, on both I2S
+`i2s_mux+i2s_mux` is an incomplete capture, S2 missing (todo 022, on both I2S
 SDKs), and one `sync rmt+i2s_mux` run hit the known intermittent mux dropped
 pulse (63/64, one 99.92 us off-grid period), which re-measured clean 3/3.
 
@@ -371,7 +371,9 @@ outcome section is the one that was measured.
 `--mode scale --driver i2s_direct --pin-mode nodir` on
 **ESP-IDF 5.5.3** (`esp32_idf_V6_13_0`) does not produce a stable answer. The
 real bound is 2 — `SOC_I2S_NUM` is 2 and one TX channel goes to each controller,
-which is already [070](../../todo/070_i2s_direct_channels.md) — and on IDF 6.1 the sweep
+which was already item 070 (*i2s_direct has 2 channels on ESP32, not
+3*, now fixed — see `extras/todo/README.md` § Done) — and on IDF 6.1 the
+sweep
 says so cleanly. On IDF 5.5.3 the same sweep gives three different answers for
 the same class of point:
 
@@ -460,9 +462,9 @@ those two functions.
 
 ## Note on what this is not
 
-`QUEUE_I2S_DIRECT` is 3 and the hardware allows 2. The constant is the subject
-of [070](../../todo/070_i2s_direct_channels.md) and is unchanged by this item: n = 3
-failing on IDF 6.1 is 070, not this. What is new here is that on IDF 5.5.3 the
+`QUEUES_I2S_DIRECT` was 3 and the hardware allows 2. That constant was item
+070, since fixed to `SOC_I2S_NUM` (see `extras/todo/README.md` § Done); it
+is unchanged *by this item*: n = 3 failing on IDF 6.1 is 070, not this. What is new here is that on IDF 5.5.3 the
 **refusal path itself is not reliable** — the sweep is supposed to answer "where
 is the limit" and on this SDK it answers a different thing each time.
 

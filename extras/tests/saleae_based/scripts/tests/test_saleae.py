@@ -1071,6 +1071,12 @@ class TestChannelMap(unittest.TestCase):
         self.assertEqual(int(m.group(3)), 1)
         self.assertEqual([int(p) for p in m.group(4).split(",")],
                          [2, 0, 4, 16, 17, 5, 18, 19])
+        # Every field after `ch=` is optional, so a board with no mux (AVR, Pico)
+        # answers without them and a board with one answers with all of them.
+        self.assertIsNone(m.group(5))
+        self.assertIsNone(m.group(6))
+        self.assertIsNone(m.group(7))
+        self.assertIsNone(m.group(8))
 
     def test_harness_refuses_a_count_the_channels_cannot_carry(self):
         args = harness.parse_args(["--arch", "esp32", "--count", "5",
@@ -2046,12 +2052,15 @@ class TestModes(unittest.TestCase):
                          queues("ESP32S2", "RMT"))
         self.assertEqual(harness.driver_max("esp32c3", "rmt"),
                          queues("ESP32C3", "RMT"))
-        # Under dynamic allocation I2S mux is 32 and I2S direct 3. A multiplexed
-        # stepper spends a slot of the 32-bit word and no analyzer channel, so
-        # the channel budget no longer caps it -- the word does. That is the
-        # whole reason the decoder exists: 32 steppers on a rig whose steppers
-        # are the analyzer's channels, with three of the eight carrying the bus.
+        # Under dynamic allocation I2S mux is 32 and I2S direct is
+        # SOC_I2S_NUM (2 on the ESP32 -- measured: n=1,2 connect, n=3 is refused
+        # inside i2s_new_channel()). A multiplexed stepper spends a slot of the
+        # 32-bit word and no analyzer channel, so the channel budget no longer
+        # caps it -- the word does. That is the whole reason the decoder exists:
+        # 32 steppers on a rig whose steppers are the analyzer's channels, with
+        # three of the eight carrying the bus.
         self.assertEqual(harness.driver_max("esp32", "i2s_mux"), 32)
+        self.assertEqual(harness.driver_max("esp32", "i2s_direct"), 2)
         self.assertEqual(harness.scale_bound("esp32", "i2s_mux", "nodir")[0], 32)
         self.assertEqual(harness.scale_bound("esp32", "i2s_mux", "dir")[0], 16)
         # A PHYSICAL stepper beside the same bus is still capped by the five
@@ -2277,19 +2286,45 @@ class TestMuxChannelMap(unittest.TestCase):
         # second slot rather than a second channel. That is what caps mux `dir`
         # at 16 steppers and not 32.
         #
-        # `slots=0,2` is what the board actually sends for `CONFIG 2 i2s_mux,
-        # i2s_mux dir` -- two entries, one per STEPPER, being the step bits. It
-        # used to be read here as one entry per CHANNEL (four of them), which
+        # `slots=0,2 dslots=1,3` is what the board sends for `CONFIG 2 i2s_mux,
+        # i2s_mux dir` -- two entries in each field, one per STEPPER. The step
+        # field used to be read as one entry per CHANNEL (four of them), which
         # agrees with itself in `nodir` and runs off the end in `dir`: every
         # stepper past the first was handed a GPIO channel and reported as
-        # emitting nothing.
+        # emitting nothing. The direction bit was then derived as
+        # `step_slot + 1`, which held only while allocation stayed gapless.
         chan_map, pins = self._read(
             f"MAP count=2 mode=dir stride=2 ch= bus=5,6,7 "
-            f"slots=0,2 marker=255\n")
+            f"slots=0,2 dslots=1,3 marker=255\n")
         self.assertEqual(chan_map, {
             "A": {"step": "S0", "dir": "S1"},
             "B": {"step": "S2", "dir": "S3"},
         })
+        self.assertEqual(pins["slots"], [0, 2])
+        self.assertEqual(pins["dslots"], [1, 3])
+
+    def test_the_direction_slot_is_read_not_derived(self):
+        # The point of the `dslots` field: a non-gapless allocation must not be
+        # misread. Here stepper A holds bit 5 and stepper B bit 2 -- B was
+        # connected second but got a lower bit, which is exactly the case
+        # `step_slot + 1` gets wrong (it would claim 6 and 3).
+        chan_map, _ = self._read(
+            "MAP count=2 mode=dir stride=2 ch= bus=5,6,7 "
+            "slots=5,2 dslots=30,3 marker=255\n")
+        self.assertEqual(chan_map, {
+            "A": {"step": "S5", "dir": "S30"},
+            "B": {"step": "S2", "dir": "S3"},
+        })
+
+    def test_a_mux_dir_stepper_on_a_firmware_without_dslots_is_refused(self):
+        # Guessing is what this field removed, so a reply that lacks it has to
+        # stop the run rather than fall back to `step_slot + 1`. The message
+        # names the reflashing, because the alternative reading -- "the host is
+        # wrong" -- is what made the old assumption survive.
+        with self.assertRaises(RuntimeError) as cm:
+            self._read("MAP count=2 mode=dir stride=2 ch= bus=5,6,7 "
+                       "slots=0,2 marker=255\n")
+        self.assertIn("dslots", str(cm.exception))
 
     def test_a_mux_dir_stepper_beside_a_gpio_one(self):
         # The case `sync --imux` runs, and the one that was measured wrong: a
@@ -2302,7 +2337,7 @@ class TestMuxChannelMap(unittest.TestCase):
         # stepper the capture shows stepping 64 times.
         chan_map, pins = self._read(
             "MAP count=2 mode=dir stride=2 ch=2,0 bus=5,6,7 "
-            "slots=-,0 marker=255\n")
+            "slots=-,0 dslots=-,1 marker=255\n")
         self.assertEqual(chan_map, {
             "A": {"step": "D0", "dir": "D1"},
             "B": {"step": "S0", "dir": "S1"},
@@ -2314,7 +2349,7 @@ class TestMuxChannelMap(unittest.TestCase):
         # the same capture, evaluated from one map.
         chan_map, pins = self._read(
             f"MAP count=3 mode=nodir stride=1 ch=2 bus=5,6,7 "
-            f"slots=0,1,- marker=255\n")
+            f"slots=0,1,- dslots=-,-,- marker=255\n")
         self.assertEqual(chan_map, {
             "A": {"step": "S0"}, "B": {"step": "S1"}, "C": {"step": "D0"},
         })
@@ -2335,16 +2370,25 @@ class TestMuxChannelMap(unittest.TestCase):
         self.assertFalse(pins["slots"])
 
     def test_a_mux_dir_stepper_whose_dir_bit_leaves_the_word_is_refused(self):
-        # MAP reports the step bit and not the direction bit, so the direction
-        # slot is derived as step_slot + 1. That is only inside the 32-bit word
-        # while the allocation is gapless -- and a board that reported the last
-        # bit as a step bit would put the direction bit outside the word, where
-        # the decoder has no channel for it. Reading it anyway would have the
-        # direction scenarios measure a channel that does not exist.
+        # `dslots` names a real bit, so a well-formed board cannot put it outside
+        # the 32-bit word. The check stays anyway: a bit the decoder has no
+        # channel for would otherwise make every direction scenario measure a
+        # channel that does not exist, and report it as a direction failure.
         with self.assertRaises(RuntimeError) as cm:
             self._read("MAP count=1 mode=dir stride=2 ch= bus=5,6,7 "
-                       f"slots={run_tests.MUX_SLOT_COUNT - 1} marker=255\n")
+                       f"slots=0 dslots={run_tests.MUX_SLOT_COUNT} "
+                       f"marker=255\n")
         self.assertIn("outside the", str(cm.exception))
+
+    def test_a_mux_stepper_in_dir_with_no_direction_bit_is_refused(self):
+        # `-` in `dslots` for a multiplexed stepper in `dir` mode is a firmware
+        # that allocated no direction bit, and the evaluator would then be handed
+        # a stepper with no dir channel while the mode says every stepper has
+        # one. Reported rather than defaulted.
+        with self.assertRaises(RuntimeError) as cm:
+            self._read("MAP count=1 mode=dir stride=2 ch= bus=5,6,7 "
+                       "slots=0 dslots=- marker=255\n")
+        self.assertIn("no direction bit", str(cm.exception))
 
     def test_the_bus_costs_three_channels_of_the_marker_budget(self):
         # MARK cannot sit on a bus channel: its edges are the bus protocol, not
@@ -2388,6 +2432,33 @@ class TestMuxDecode(unittest.TestCase):
         self.assertEqual(sum(decoded["S1"]), 0)
         self.assertEqual(record["bus_channels"], [5, 6, 7])
         self.assertTrue(Path(record["vcd"]).exists())
+
+    def test_the_decoder_config_indexes_slots_per_stepper(self):
+        # The second half of the one-per-channel misreading: the decoder config
+        # used to index `slots[j * stride]` as well, so in `dir` it handed the
+        # decoder stepper A's bit 0 and stepper B's bit 2 *from the wrong
+        # entries* -- A read entry 0 (correct by luck) and B read entry 2, which
+        # does not exist for two steppers. The decoder and read_map() disagreed
+        # about what the field meant, and only the `nodir` runs, where the two
+        # readings coincide, had ever been compared.
+        pin_map = {"bus": [5, 6, 7], "slots": [0, 2], "dslots": [1, 3],
+                   "mode": "dir", "stride": 2}
+        self.assertEqual(run_tests._mux_map_with_slots(pin_map), {
+            "A": {"slot": 0, "step": "S0", "dir": "S1"},
+            "B": {"slot": 2, "step": "S2", "dir": "S3"},
+        })
+
+    def test_the_decoder_config_carries_a_non_gapless_allocation(self):
+        # The property that killed the `j * stride` indexing: a bit assignment
+        # the stride arithmetic cannot produce. Both step and dir bits have to
+        # come from the reply, or the decoder config and the evaluator's channel
+        # map name different channels for the same stepper.
+        pin_map = {"bus": [5, 6, 7], "slots": [7, 2], "dslots": [8, 3],
+                   "mode": "dir", "stride": 2}
+        self.assertEqual(run_tests._mux_map_with_slots(pin_map), {
+            "A": {"slot": 7, "step": "S7", "dir": "S8"},
+            "B": {"slot": 2, "step": "S2", "dir": "S3"},
+        })
 
     def test_decode_passes_physical_channels_through_untouched(self):
         # A mux run and a physical run in one capture: the physical steppers'

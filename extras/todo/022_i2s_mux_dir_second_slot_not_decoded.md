@@ -1,10 +1,17 @@
-# 076 i2s_mux in `dir`: the second stepper's slot is intermittently not decoded
+# 022 i2s_mux in `dir`: the second stepper's slot is intermittently not decoded
 
 ## Priority
 
-**MEDIUM** — a missing channel in a mux capture, reported correctly by the
-harness as an incomplete capture rather than as a dead driver, but it means
-`CONFIG 2 i2s_mux,i2s_mux dir` is not yet a measurement anyone can rely on.
+**HIGH** — a functional defect in the shipped `i2s_mux` driver, not a
+documentation gap: `CONFIG 2 i2s_mux,i2s_mux dir` loses a whole slot, so `dir`
+is not a mode a user can rely on. The harness reports it correctly (an
+incomplete capture rather than a dead driver), which is why it was not caught
+as a crash — the failure is silent on the wire and only visible in the decoded
+capture. `nodir`, the mode the library documents and exercises, is unaffected.
+
+Renumbered from 076: this was filed as a characterization item next to the two
+other mux findings (070, 072), but it is the only one of the three that is a
+library defect rather than a constant or a protocol gap.
 
 ## Finding
 

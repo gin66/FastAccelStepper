@@ -384,6 +384,7 @@ QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxall=(\d+)"
 MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)"
                       r"(?:\s+bus=([\d,-]+))?"
                       r"(?:\s+slots=([\d,-]*))?"
+                      r"(?:\s+dslots=([\d,-]*))?"
                       r"(?:\s+marker=(\d+))?")
 # "OK DRIVERS mux=0 rmt=1 rmt=1 mcpwm_pcnt=1 i2s_direct=1 i2s_mux=1
 #  mux_init=0". The driver fields are read as a name=value scan rather than by
@@ -478,6 +479,15 @@ def read_map(ser):
             slots = ([int(s) if s != "-" else None
                       for s in slot_field.split(",")]
                      if slot_field else [])
+            # The direction bit of a multiplexed stepper, same indexing as
+            # `slots`. Reported by the firmware rather than inferred, because the
+            # host's `step_slot + 1` was right only while allocation stayed
+            # gapless -- 0/1, 2/3, ... in stepper order -- which is a property of
+            # this firmware's cursor, not a fact the reply carried.
+            dslot_field = m.group(7)
+            dslots = ([int(s) if s != "-" else None
+                       for s in dslot_field.split(",")]
+                      if dslot_field else [])
 
             chan_map = default_channel_map(count, stride)
             # Insertion order, not sorted(). Past 26 steppers the two differ --
@@ -521,27 +531,39 @@ def read_map(ser):
                 chan_map[name] = {"step": f"S{step_slot}"}
                 if stride > 1:
                     # Direction on the mux is a second bit of the same word,
-                    # and MAP does not report it. It is `step_slot + 1` here
-                    # because CONFIG resets the slot cursor and connects the
-                    # steppers in order, so the pairs are allocated gaplessly:
-                    # 0/1, 2/3, ... in stepper order. That is an assumption
-                    # about this firmware's allocation, not a fact from the
-                    # reply, and it stops being true if the cursor is ever
-                    # resumed rather than reset -- which is why this is checked
-                    # against the word width below instead of trusted.
-                    dir_slot = step_slot + 1
-                    if dir_slot >= MUX_SLOT_COUNT:
+                    # and MAP reports it in `dslots`. This used to be
+                    # `step_slot + 1`, which was right only because CONFIG resets
+                    # the slot cursor and connects the steppers in order, so the
+                    # pairs came out gapless: 0/1, 2/3, ... in stepper order.
+                    # That is a property of the allocator, not a fact the reply
+                    # carried, so a host reading it was right by coincidence and
+                    # silently wrong the moment the cursor was ever resumed.
+                    if not dslots:
+                        raise RuntimeError(
+                            f"stepper {name} is multiplexed and in {mode} mode, "
+                            f"so its direction bit is needed, but this MAP reply "
+                            f"has no dslots= field -- the firmware predates it. "
+                            f"Reflashing is required; the alternative "
+                            f"(step_slot + 1) is the assumption this field "
+                            f"exists to remove.")
+                    dir_slot = dslots[j] if j < len(dslots) else None
+                    if dir_slot is None:
                         raise RuntimeError(
                             f"stepper {name} has a direction pin in {mode} mode "
-                            f"and step slot {step_slot}, whose direction bit "
-                            f"would be {dir_slot} -- outside the "
-                            f"{MUX_SLOT_COUNT}-bit word MAP reports on")
+                            f"(step slot {step_slot}) but MAP reports no "
+                            f"direction bit for it")
+                    if not 0 <= dir_slot < MUX_SLOT_COUNT:
+                        raise RuntimeError(
+                            f"stepper {name} has a direction bit at {dir_slot}, "
+                            f"outside the {MUX_SLOT_COUNT}-bit word MAP reports "
+                            f"on")
                     chan_map[name]["dir"] = f"S{dir_slot}"
             # marker=-1 means no channel is designated as the event marker.
-            marker = int(m.group(7)) if m.group(7) else -1
+            marker = int(m.group(8)) if m.group(8) else -1
             physical = chan_used
             return chan_map, {"mode": mode, "stride": stride, "pins": pins,
                               "marker": marker, "bus": bus, "slots": slots,
+                              "dslots": dslots,
                               "physical_channels": physical}
         time.sleep(0.1)
     raise RuntimeError(f"no MAP reply, got: {text!r}")
@@ -802,22 +824,25 @@ def decode_mux_capture(capture_file, channels, sample_rate, pin_map,
 def _mux_map_with_slots(pin_map):
     """letter -> {slot, step, dir} for the multiplexed steppers only.
 
-    `slots` is one entry per *channel*, not per stepper: in `dir` mode a
-    multiplexed stepper owns two of them (its step bit and its direction bit),
-    which is why mux `dir` reaches 16 steppers and not 32.
+    One entry per *stepper*, from `slots` and `dslots` -- the same indexing
+    `read_map()` uses, and for the same reason. This used to index
+    `slots[j * stride]`, treating the field as one entry per channel, which is
+    the misreading that made `read_map()` hand a multiplexed stepper a GPIO
+    channel in `dir` mode; it survived here because the decoder path and the
+    evaluator path disagreed about what the field meant.
     """
     stride = pin_map.get("stride", 2)
     slots = pin_map.get("slots") or []
+    dslots = pin_map.get("dslots") or []
     letters = "ABCDEFGH"
     out = {}
-    for j in range(len(slots) // stride):
-        slot = slots[j * stride]
+    for j, slot in enumerate(slots):
         if slot is None:
             continue
         letter = letters[j] if j < len(letters) else f"S{j}"
         entry = {"slot": slot, "step": f"S{slot}"}
-        if stride > 1:
-            entry["dir"] = f"S{slots[j * stride + 1]}"
+        if stride > 1 and j < len(dslots) and dslots[j] is not None:
+            entry["dir"] = f"S{dslots[j]}"
         out[letter] = entry
     return out
 
