@@ -524,13 +524,55 @@ reproduced on a pristine checkout:
   documented `QSEG … 80` example answers `ERR QE step0 rc=-1`
   (`ErrorTicksTooLow`) on a current build.
 
-### The mux in `dir` mode loses its second slot
+### The mux in `dir` mode: a host bug, and 51 phantom steps left
 
-`CONFIG 2 i2s_mux,i2s_mux dir` decodes S0 and S1 but not S2, on both I2S SDKs,
-so the run is recorded as an **incomplete capture** rather than a quiet stepper.
-`--mode scale --driver i2s_mux --pin-mode nodir` is unaffected and green
-(n=1…8, 64/64). →
-[`022_i2s_mux_dir_second_slot_not_decoded.md`](../../todo/022_i2s_mux_dir_second_slot_not_decoded.md)
+`CONFIG 2 i2s_mux,i2s_mux dir` was recorded as an **incomplete capture, S2
+missing**, on both I2S SDKs, and read as a lost slot in the driver. It is not.
+Measured from the three bus wires with **no slot map in the loop at all** —
+group the bclk rising edges into 32s, read the data at each edge, count which
+positions are high. That involves no slot numbering, so it cannot be wrong the
+way a map can be. Five positions ever carry a bit, counted from the first edge
+of the group:
+
+| wire pos | frames high, of 125 255 | spacing | what it must be |
+|---|---|---|---|
+| 12 | 125 205 | — | a DIRECTION bit, high from t=0 |
+| 14 | 125 205 | — | the other DIRECTION bit |
+| 15 | **64** | mean **24.931 µs** (24/28 on the 4 µs frame grid) | a step signal, 400 ticks |
+| 13 | **64** in the move | mean **49.925 µs** (48/52 on the grid) | a step signal, 800 ticks |
+| 11 | 50 | 8177 µs | nothing — see 023 |
+
+400 ticks at 16 MHz is 25.000 µs and 800 is 50.000 µs, so both step signals sit
+on the commanded periods carried on the frame grid. Positions 15 and 13 are high
+together in exactly 32 frames and otherwise alternate 2:1, with 13 continuing
+alone after 15 stops — two steppers on a shared start at twice the rate, which is
+what the plan commands. `POS 64 64` agrees.
+
+The slot *numbers* do need the decoder's half-swap, and that is the one thing
+that could be wrong, so it is checked rather than assumed: wire position `p`
+maps to slot `15 - p` for `p < 16`, which puts 12 and 14 on slots 3 and 1 and
+15 and 13 on slots 0 and 2 — exactly MAP's `dslots=1,3` and `slots=0,2`, in the
+right roles. Were the swap wrong, the two bits high in *every* frame would not
+land on the two direction slots MAP reported. The one position that lands
+nowhere is 11 → slot 4, which MAP never allocated.
+
+What the run actually measured was our own decoder config naming one stepper
+instead of two: the decoded VCD said so in its own header (`slots: A=S0`, one
+channel), because `_mux_map_with_slots()` built it with `slots[j * stride]` and
+`slots=[0,2]` with `stride=2` is *one* stepper. The same one-entry-per-channel
+misreading `read_map()` had, fixed with it.
+
+With the map right the run is **still red**, for a different reason: position 13
+is high in 51 more frames, 285 ms *before* `QRUN`, and position 11's 50 cannot
+be emitted at all. That is the 24 MS/s floor racing itself (3 samples per bclk
+period, no margin) and it is
+[`023_i2s_mux_dir_phantom_steps_at_24ms.md`](../../todo/023_i2s_mux_dir_phantom_steps_at_24ms.md).
+`--mode scale --driver i2s_mux --pin-mode nodir` is green throughout (n=1...8,
+64/64) because in `nodir` the data line is idle-low and has no transitions to
+race with.
+
+The matrix rows and the recorded `syncdir_i2s_mux*dirn2` results predate both
+fixes; `run_matrix.py` regenerates them.
 
 ## Capture format
 

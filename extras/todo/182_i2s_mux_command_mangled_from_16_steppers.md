@@ -48,11 +48,16 @@ count: `CONFIG 16 …` is ~144 characters.
   `char[]` on the stack — so whatever holds the line must be sized from
   `SALEAE_ARG2_MAX`, not from a literal. `TestStackBudget` and `TestSaleaeFmt`
   in `scripts/tests/test_saleae.py` are the places a fix should show up.
-- **Confirm the 32-stepper path end to end once parsing is fixed.** Note that
-  the other known mux defect — 022, `i2s_mux` in `dir` losing its second slot —
-  blocks the same territory, so the two are worth fixing together and measuring
-  with the same runs. 022 also records the intermittent dropped step, which is
-  a different thing and stays separate.
+- **Confirm the 32-stepper path end to end once parsing is fixed.** The one
+  known mux measurement defect left is
+  [023](023_i2s_mux_dir_phantom_steps_at_24ms.md) — 51 phantom steps per `dir`
+  capture from the 24 MS/s sampling race — which blocks the same territory, so
+  the two are worth fixing together and measuring with the same runs. (What was
+  filed as the mux's second mux defect, "`dir` losing its second slot", was a
+  host bug and is gone; `dir` emits 64 steps on each of two steppers at their
+  own periods.) The intermittent dropped pulse is a different thing again and
+  stays separate, in `extras/tests/saleae_based/AGENTS.md` and
+  [r7_virtual_i2s_mux.md](../doc/implemented/r7_virtual_i2s_mux.md) §5.
 - **Then the claim in the docs can finally be tested.** `nodir` reaching 32 and
   `dir` reaching 16 are assertions about the wire protocol (a 32-bit word, a
   stepper costing one bit and a direction costing the next). Neither has been

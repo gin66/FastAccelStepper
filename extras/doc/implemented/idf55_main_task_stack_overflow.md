@@ -330,10 +330,12 @@ same gap is why a run that skips everything still reports `failed=0`.
 `CONFIG 1 rmt dir` and `CONFIG 2 mcpwm_pcnt,rmt dir` answer `OK`;
 `CONFIG 2 i2s_direct,i2s_direct nodir` answers `OK` (016's n=2).
 
-The two failures that remain are both pre-existing and tracked elsewhere:
-`i2s_mux+i2s_mux` is an incomplete capture, S2 missing (todo 022, on both I2S
-SDKs), and one `sync rmt+i2s_mux` run hit the known intermittent mux dropped
-pulse (63/64, one 99.92 us off-grid period), which re-measured clean 3/3.
+The two failures that remain are both pre-existing and tracked elsewhere: one is
+the mux `dir` phantom-step artefact (todo 023 — 51 spurious steps per capture
+from the 24 MS/s sampling race, on both I2S SDKs; `i2s_mux` itself emits both
+steppers' 64 steps correctly), and one `sync rmt+i2s_mux` run hit the known
+intermittent mux dropped pulse (63/64, one 99.92 us off-grid period), which
+re-measured clean 3/3.
 
 A separate measurement from this work, kept because it would otherwise have
 gone in as a fix: blocking the idle loop for one tick (`vTaskDelay(1)`) does
