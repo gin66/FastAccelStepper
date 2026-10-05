@@ -107,6 +107,12 @@ static FastAccelStepperEngine* fas_engine = NULL;
     EnableOverflowInterrupt(T);                    \
   }
 void StepperQueue::init(uint8_t queue_num, uint8_t step_pin) {
+  // `queue_num` is part of the shared queue interface (protocol.h) and is
+  // genuinely unused here: AVR picks its compare channel from `step_pin`,
+  // because TIMER0 has exactly one compare unit per stepper pin and the pin
+  // already names it. Every other platform needs the index, which is why the
+  // parameter exists at all.
+  (void)queue_num;
   prepareISRtimeMeasurement();
   digitalWrite(step_pin, LOW);
   pinMode(step_pin, OUTPUT);

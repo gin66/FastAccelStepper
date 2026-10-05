@@ -25,8 +25,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
 | **020** | [stopMove() does not stop a queued move](020_stopMove_behavior.md) | ~100 k | 1–2 d | **Critical.** `stopMove()` only sets a flag; queued commands run to completion. Unexpected motion. |
-| **015** | [RMT panics the firmware on ESP-IDF 5.5](015_rmt_panics_on_esp_idf_5_5.md) | ~300 k | 2–3 d | **Critical.** 34 measurements on one SDK die in `connect_rmt()`; `LoadProhibited` inside the allocator, i.e. heap metadata already corrupt. |
-| **016** | [i2s_direct is unstable on ESP-IDF 5.5](016_i2s_direct_stack_overflow_idf55.md) | ~200 k | 1–2 d | **High.** The scale sweep answers refused / failed / stack-overflow for the same point across runs; n=2 fails where IDF 6.1 passes it. |
 | **030** | [Interrupt slow steps](030_interrupt_slow_steps.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
@@ -50,7 +48,9 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
 | **175** | [stopMove() / forceStop() / forceStopAndNewPosition() — three APIs, one harness conflated two](175_stop_api_conflation.md) | ~100 k | 0.5 d | Low: harness bug that was found, fixed, and documented. |
-| **total** | 26 items (22 existing + 4 new) | ~7.2 M | 18–26 w | All priorities 015–175. |
+| **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
+| **182** | [`i2s_mux` mangles any command from n ≥ 16](182_i2s_mux_command_mangled_from_16_steppers.md) | ~150 k | 1–2 d | High: the mux's 32-stepper claim cannot be tested — the host's own parser refuses `CONFIG 16 …`. Pre-existing. |
+| **total** | 26 items | ~6.5 M | 18–26 w | Priorities 020–182. |
 
 ## Done
 
@@ -102,6 +102,58 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   branch tests `ESP_IDF_VERSION` any more. Verified by compiling the AVR,
   Arduino (IDF 4.4.7), IDF 4.4.3 and IDF 5.5.3 builds and by the four
   PC tests that include those sources directly.
+- **015 + 016 — IDF 5.5.3 panicked on RMT and `i2s_direct` was unstable —
+  resolved, and both were the harness overflowing the main task's stack.** One
+  defect, not two: `CONFIG_ESP_MAIN_TASK_STACK_SIZE` is 3584 B and every `CONFIG`
+  constructs its drivers on that task, so `stepperConnectToPin()` ran out of
+  budget before it started. Measured with `uxTaskGetStackHighWaterMark()` on the
+  board: **216 B** left on 5.5.3, **312 B** on 6.1 — both over budget, 6.1
+  merely shallow enough to escape. The overflow runs off the *top* of the stack,
+  which on ESP32 is where the DRAM tlsf pool begins, so it presented as a
+  corrupted free list (`LoadProhibited` in `block_locate_free`) rather than as a
+  stack fault. Confirmed by `CONFIG_ESP_MAIN_TASK_STACK_SIZE=8192` changing
+  nothing in `src/` and making `CONFIG 1 rmt dir` answer `OK`.
+
+  The stack was spent on **reply buffers held as stack locals** (~1900 B — a
+  local array holds its slot for the whole function, so a 1152 B reply buffer was
+  resident while `rmt_new_tx_channel()` allocated) and on **libc `sscanf` (1496 B)
+  and `snprintf` (384 B)** for a protocol that only formats %s/%u/%d. Worth
+  recording that the libc fix alone bought nothing here: the buffers dominate.
+  Peak 4272 B → **2336 B** of the 3584 B default, so the cliff is gone rather
+  than moved and no Kconfig change was needed. `SAL_REPLY_BUF` decides static
+  off AVR and empty on AVR in one place, because on AVR the stack *is* SRAM and
+  `static` would commit ~640 B of a 2048 B part for the program's life.
+
+  Closed by `run_matrix.py --targets idf-6.13.0 --force`: catalogue **26/26**,
+  and in the sync table all four RMT combinations plus both `i2s_direct` pairs
+  went from panic/refused to measured passes. Two findings worth keeping:
+
+  - **The four RMT combinations used to be reported as `refused (bound)` with
+    the Guru Meditation text quoted as the reason** — a panic and a board
+    limit are the same refusal to the classifier, which is why this read as a
+    driver-capability question for as long as it did. Same gap as an all-skip
+    run still reporting `failed=0`.
+  - **`SR_00` ran twice on every catalogue run**, because
+    `if any(t != "SR_00" for t in tests)` is true for the default `--tests`, which
+    already starts with SR_00. The second run FAILED on one rerun, which skipped
+    all 26 scenarios while the run still exited 0 — so the matrix printed the
+    row `ok` having measured nothing.
+
+  Two measurements that did **not** become fixes, kept because the obvious fix is
+  wrong: blocking the idle loop for one tick does not fix the IDF 4.4.3 idle
+  watchdog (it fires with no command outstanding — `QINFO` alone reproduces
+  it, so it is IDF 4.4's own), and it grew trailing pulses on mcpwm_pcnt, so it
+  was reverted. And `MIN_CMD_TICKS` is a *duration* floor (`ticks × steps`),
+  not a floor on `ticks` — `maxspeed*` in `QINFO` is the fastest *period*, usable
+  only on a command long enough to clear it, which is what made the documented
+  `QSEG` example build commands the firmware refuses.
+
+  Full analysis, measurements and guards:
+  [idf55_main_task_stack_overflow.md](../doc/implemented/idf55_main_task_stack_overflow.md).
+  Two new items came out of the acceptance run and are **not** covered by it:
+  [181](181_mcpwm_pcnt_sync_extra_steps.md) and
+  [182](182_i2s_mux_command_mangled_from_16_steppers.md).
+
 - **010 — MCPWM/PCNT emitted continuously on every queue after the first —
   resolved, `pcnt_new_unit()` was clearing the interrupt-enable bit.**
   Measured `PCNT.int_ena == 0x39` with three queues connected (bits 1 and 2

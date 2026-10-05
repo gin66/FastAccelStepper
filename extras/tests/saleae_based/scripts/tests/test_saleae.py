@@ -886,7 +886,7 @@ class TestConfigGrammar(unittest.TestCase):
 class TestStackBudget(unittest.TestCase):
     """No reply or argument buffer may go back on the stack.
 
-    This is the guard for extras/todo/015_rmt_panics_on_esp_idf_5_5.md. Every
+    This is the guard for extras/doc/implemented/idf55_main_task_stack_overflow.md. Every
     CONFIG constructs its drivers from the FreeRTOS `main` task, whose stack is
     `CONFIG_ESP_MAIN_TASK_STACK_SIZE` -- 3584 B on ESP32. A local array reserves
     its slot for the whole function, so `handle_config`'s reply buffer was held
@@ -951,12 +951,13 @@ class TestStackBudget(unittest.TestCase):
 
     def test_the_measured_budget_is_recorded_next_to_the_fix(self):
         # The number above is a measurement, not a derivation, so it belongs in
-        # the repository or it rots silently. Both documents carry it.
-        for doc in ("015_rmt_panics_on_esp_idf_5_5.md",):
-            text = (SCRIPTS.parents[2] / "todo" / doc).read_text()
-            self.assertIn("2336", text,
-                          f"{doc} no longer records the post-fix peak stack "
-                          "usage, so the budget claim cannot be checked")
+        # the repository or it rots silently. It is recorded in the implemented
+        # doc that closed todo 015/016, which is where the analysis lives now.
+        doc = "doc/implemented/idf55_main_task_stack_overflow.md"
+        text = (SCRIPTS.parents[2] / doc).read_text()
+        self.assertIn("2336", text,
+                      f"{doc} no longer records the post-fix peak stack "
+                      "usage, so the budget claim cannot be checked")
 
 
 class TestSaleaeFmt(unittest.TestCase):

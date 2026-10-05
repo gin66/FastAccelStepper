@@ -465,12 +465,12 @@ of budget before it started.
   allocator, reached from `rmt_new_tx_channel`): 34 measurements, `connect_rmt()`
   never returned. The overflow ran off the *top* of the stack into the DRAM tlsf
   pool, so it presented as a corrupted free list rather than a stack fault.
-  → [`extras/todo/015_rmt_panics_on_esp_idf_5_5.md`](../../todo/015_rmt_panics_on_esp_idf_5_5.md)
+  → [`extras/doc/implemented/idf55_main_task_stack_overflow.md`](../../../doc/implemented/idf55_main_task_stack_overflow.md)
 - **`i2s_direct` was unstable**: the `scale` sweep answered refused / failed /
   stack-overflow for the same point across runs. Here FreeRTOS *did* report it
   (`CHECK_STACKOVERFLOW_CANARY` catches downward writes; the RMT row's
   upward-into-heap write is invisible to it).
-  → [`016_i2s_direct_stack_overflow_idf55.md`](../../todo/016_i2s_direct_stack_overflow_idf55.md)
+  → [`idf55_main_task_stack_overflow.md`](../../../doc/implemented/idf55_main_task_stack_overflow.md)
 
 **What the stack was spent on** (measured with
 `uxTaskGetStackHighWaterMark()`, ESP-IDF 5.5.3, peak for `CONFIG 1 rmt dir`):

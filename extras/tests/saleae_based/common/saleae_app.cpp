@@ -516,7 +516,7 @@ static char linebuf[SALEAE_LINE_MAX];
 // and the overflow ran off the top of the stack into the DRAM tlsf pool, where
 // it surfaced much later as a corrupted free list inside tlsf_malloc. Measured
 // peak for `CONFIG 1 rmt dir` on ESP-IDF 5.5.3: 4272 B of 3584 B before, 2336 B
-// after. See extras/todo/015_rmt_panics_on_esp_idf_5_5.md.
+// after. See extras/doc/implemented/idf55_main_task_stack_overflow.md.
 //
 // On AVR it is the other way round: the stack is ordinary SRAM above .bss, so a
 // stack local and a static cost the same *peak*. But a static is committed for
@@ -1941,7 +1941,7 @@ static void handle_line(char* line) {
   // and `snprintf` 384, against a 3584-byte main task that also has to reach
   // the driver constructors -- the overflow runs off the top of the stack into
   // the DRAM heap and surfaces much later as a corrupted free list. See
-  // saleae_str.h and extras/todo/015_rmt_panics_on_esp_idf_5_5.md.
+  // saleae_str.h and extras/doc/implemented/idf55_main_task_stack_overflow.md.
   const struct sal_field fields[] = {
       {cmd, sizeof(cmd) - 1},
       {arg1, sizeof(arg1) - 1},

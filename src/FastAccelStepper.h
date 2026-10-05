@@ -764,7 +764,18 @@ class FastAccelStepper {
   //   enqueue the submitted command
   //
   // Negative values indicate errors (do not retry):
-  // - AQE_ERROR_TICKS_TOO_LOW (-1):        ticks < getMaxSpeedInTicks()
+  // - AQE_ERROR_TICKS_TOO_LOW (-1):        the command is too fast to be
+  //   queued. Two separate checks, and the second is the one that surprises:
+  //   ticks must be >= getMaxSpeedInTicks(), AND the command's total duration
+  //   must be >= MIN_CMD_TICKS (200us, i.e. TICKS_PER_S / 5000). The duration
+  //   is ticks * steps for a multi-step command, so a command of `steps` steps
+  //   at period `ticks` is accepted when ticks * steps >= MIN_CMD_TICKS. A
+  //   pause (steps == 0) and a single-step command have duration == ticks, so
+  //   for those two the period itself must clear MIN_CMD_TICKS: a single step
+  //   cannot be queued faster than 200us, however fast the driver is.
+  //   Consequence: getMaxSpeedInTicks() is the fastest *period*, not the
+  //   fastest value that can appear as `ticks` on its own. To run at that
+  //   period, put enough steps in the command to reach MIN_CMD_TICKS.
   // - AQE_ERROR_EMPTY_QUEUE_TO_START (-2): Empty command with start=true, but
   // queue empty
   // - AQE_ERROR_NO_DIR_PIN_TO_TOGGLE (-3): count_up=false without direction pin

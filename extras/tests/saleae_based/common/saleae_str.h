@@ -124,7 +124,7 @@ static inline void sal_to_ram(char* dst, const char* src, size_t cap) {
 // is 3584 bytes, so most of the task's entire budget went to two library calls,
 // and the overflow runs off the *top* of the stack into the DRAM tlsf pool,
 // where it surfaces much later as a corrupted free list inside
-// `tlsf_malloc`. See extras/todo/015_rmt_panics_on_esp_idf_5_5.md.
+// `tlsf_malloc`. See extras/doc/implemented/idf55_main_task_stack_overflow.md.
 //
 // AVR keeps `snprintf_P`: avr-libc's vfprintf is already small, and the 328P is
 // constrained by SRAM for strings rather than by stack, so there is nothing to

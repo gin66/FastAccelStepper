@@ -98,7 +98,7 @@ extern "C" int saleae_hal_serial_read(void) {
 //
 // So the spin stays: it is the long-standing behaviour, it is what every
 // measurement in the matrix was taken with, and the watchdog it was proposed
-// to fix is someone else's. See extras/todo/015_rmt_panics_on_esp_idf_5_5.md.
+// to fix is someone else's. See extras/doc/implemented/idf55_main_task_stack_overflow.md.
 extern "C" void saleae_hal_idle(void) { saleae_hal_delay_ms(1); }
 
 extern "C" void saleae_hal_serial_write(const char* text) {
