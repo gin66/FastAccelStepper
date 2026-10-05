@@ -90,7 +90,7 @@ class DecoderConfig:
 
     __slots__ = ("source_vcd", "output_vcd", "i2s_channels",
                  "passthrough_channels", "mux_slot_map", "stepper_count",
-                 "pin_mode", "source_comment", "out_comment")
+                 "pin_mode", "include_bus", "source_comment", "out_comment")
 
     def __init__(self, source_vcd=None, output_vcd=None,
                  i2s_channels: Optional[Dict[str, str]] = None,
@@ -98,6 +98,7 @@ class DecoderConfig:
                  mux_slot_map: Optional[Dict[str, dict]] = None,
                  stepper_count: Optional[int] = None,
                  pin_mode: Optional[str] = None,
+                 include_bus: bool = False,
                  source_comment: Optional[List[str]] = None,
                  out_comment: Optional[List[str]] = None):
         self.source_vcd = str(source_vcd) if source_vcd is not None else None
@@ -108,6 +109,7 @@ class DecoderConfig:
         self.mux_slot_map = {k: dict(v) for k, v in (mux_slot_map or {}).items()}
         self.stepper_count = stepper_count
         self.pin_mode = pin_mode
+        self.include_bus = include_bus
         self.source_comment = list(source_comment or [])
         self.out_comment = list(out_comment or [])
         self._validate()
@@ -125,6 +127,7 @@ class DecoderConfig:
             mux_slot_map=raw.get("mux_slot_map"),
             stepper_count=raw.get("stepper_count"),
             pin_mode=raw.get("pin_mode"),
+            include_bus=raw.get("include_bus", False),
         )
 
     @classmethod
@@ -191,6 +194,11 @@ class DecoderConfig:
 
         count_txt = one("stepper_count")
         mode_txt = one("pin_mode")
+        bus_txt = one("include_bus")
+        include_bus = False
+        if bus_txt:
+            val = bus_txt.strip().lower()
+            include_bus = val in ("true", "1", "yes")
         return cls(
             source_vcd=source,
             i2s_channels=i2s or None,
@@ -199,6 +207,7 @@ class DecoderConfig:
             stepper_count=int(count_txt) if count_txt and count_txt.isdigit()
             else None,
             pin_mode=mode_txt.strip() if mode_txt else None,
+            include_bus=include_bus,
             source_comment=list(lines),
         )
 
@@ -392,22 +401,21 @@ def extract_frames(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
     group containing it is the only thing discarded. After the anchor the
     counter alone decides.
 
-    The sample point is the bclk rising edge itself, i.e. the level present at
-    the edge. Two plausible alternatives were tried and both are wrong on this
-    hardware, for measurable reasons:
+    The sample point is **one sample before** the bclk rising edge
+    (``edge - 1``).  At 3 samples/bit (24 MS/s over 8 MHz bclk) the data
+    transition launched half a cell before the observed rising edge means the
+    edge itself sometimes lands on the wrong side of the transition, producing
+    phantom bits (e.g. slot 4, 50 occurrences in the phantom capture).  Reading
+    one sample earlier avoids that race: the impossible word goes away entirely
+    and 64-step runs decode to 64 steps.
 
-      - "sample the middle of the high time, so the value has settled". The
-        ESP32 does not run bclk at 50 %, and not at the same duty at every rate:
-        measured 4 samples high in 6 at 48 MS/s, 1 in 3 at 24 MS/s. At 24 MS/s
-        the middle of the high time is the one sample in three next to the launch
-        edge, and reading it there turned a clean 64-step run into 37 steps.
-      - "sample the last sample of the cell". At 24 MS/s that is the next cell's
-        first sample: the same run decoded to slot 1 instead of slot 0.
-
-    The edge is right because of what the edges *mean*: data is launched half a
-    cell before the observed rising edge (on a 48 MS/s capture the data cell runs
-    208..213 with bclk rises at 211 and 217), so the bit a rising edge names is
-    already stable for a full half cell.
+    The edge itself was tried and turned a clean 64-step run into 37.
+    ``edge + 1`` is worse (19 distinct words in 125 255 frames).  ``edge - 1``
+    is empirically the best of the four phases on this capture, and the reason
+    is the same: data is launched half a cell before the observed rising edge
+    (on a 48 MS/s capture the data cell runs 208..213 with bclk rises at 211
+    and 217), so the bit a rising edge names is already stable for a full half
+    cell — but the edge itself sits on the transition at 3 samples/bit.
 
     Returns [(first_bclk_sample, word), ...].
     """
@@ -462,7 +470,16 @@ def extract_frames(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
     for i, edge in enumerate(bclk_rises):
         if i < anchor:
             continue
-        word = (word << 1) | (1 if data[edge] else 0)
+        # Sample point: use edge - 1 (one sample before the bclk rising edge).
+        # At 3 samples/bit (24 MS/s over 8 MHz bclk) the data transition
+        # launched half a cell before the observed rising edge means the edge
+        # itself sometimes lands on the wrong side of the transition.
+        # Reading one sample earlier avoids that race on this capture:
+        # the impossible word (slot 4, 50 occurrences) goes away entirely.
+        # The edge itself was tried and turned a clean 64-step run into 37;
+        # edge + 1 is worse (19 distinct words in 125 255 frames).
+        sample = edge - 1 if edge > 0 else edge
+        word = (word << 1) | (1 if data[sample] else 0)
         nbits += 1
         if nbits == FRAME_BITS:
             # The two halves arrive low-first, each MSB-first, so the collected
@@ -551,11 +568,17 @@ def synthesize(frames: Sequence[Tuple[int, int]], slots: Iterable[int],
 def decode_channels(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
                     passthrough: Iterable[str],
                     slots: Optional[Iterable[int]] = None,
-                    i2s: Optional[Dict[str, str]] = None) -> Dict[str, bytearray]:
+                    i2s: Optional[Dict[str, str]] = None,
+                    include_bus: bool = False) -> Dict[str, bytearray]:
     """The decoded channel set: the passthrough pins plus one per mux slot.
 
     Every channel is the same length as the capture, because the evaluators
     index them and a short one raises instead of reporting a short waveform.
+
+    When *include_bus* is True, the three I2S bus channels (data, bclk, ws)
+    are also copied into the output alongside the decoded slots, so a single
+    VCD holds both the raw bus signals and the demux output — useful for
+    debugging sampling races.
     """
     names = sorted(channels)
     n = max((len(channels[c]) for c in names), default=0)
@@ -570,6 +593,16 @@ def decode_channels(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
         series = bytearray(n)
         series[:min(n, len(samples))] = samples[:n]
         out[name] = series
+    if include_bus:
+        # Copy the three I2S bus channels into the output so they appear
+        # in the VCD alongside the decoded slots.
+        bus_names = _bus_names(channels, i2s)
+        for role, name in zip((DATA, BCLK, WS), bus_names):
+            samples = channels.get(name)
+            if samples is not None:
+                series = bytearray(n)
+                series[:min(n, len(samples))] = samples[:n]
+                out[name] = series
     frames = extract_frames(channels, sample_rate_hz, i2s)
     out.update(synthesize(frames, list(range(SLOTS)) if slots is None else slots, n))
     return out
@@ -587,14 +620,15 @@ def timescale_for(sample_rate_hz: int) -> str:
     `$timescale * $comment rate`, so the two have to agree or every timestamp
     lands on the wrong sample. Emitting exactly 1e9/rate ns guarantees they do.
     """
-    ns = 1e9 / float(sample_rate_hz)
-    for unit, factor in (("s", 1e9), ("ms", 1e6), ("us", 1e3), ("ns", 1)):
+    ns = round(1e9 / float(sample_rate_hz))
+    for unit, factor in (("s", 1_000_000_000), ("ms", 1_000_000), ("us", 1_000), ("ns", 1)):
         value = ns / factor
         if value >= 1 and abs(value - round(value)) < 1e-9:
             return f"{int(round(value))} {unit}"
-    # Not a whole number of any ns-or-larger unit (48 MS/s is 20.8333 ns).
+    # Not a whole number of any ns-or-larger unit (48 MS/s is 21 ns).
+    # Always emit an integer so the wave file parser (GTKWave) can read it;
     # parse_timescale() reads a float, so one tick is still one sample.
-    return f"{ns:.6f} ns"
+    return f"{ns} ns"
 
 
 def _var_ids(names: Sequence[str]) -> Dict[str, str]:
@@ -685,7 +719,8 @@ def decode(cfg: DecoderConfig, source_rate_hz: Optional[int] = None) -> Path:
         raise ConfigError("no output_vcd")
     channels, rate = sp.load_vcd(cfg.source_vcd, source_rate_hz)
     out = decode_channels(channels, rate, cfg.passthrough_channels,
-                          cfg.slots(), cfg.i2s_channels)
+                          cfg.slots(), cfg.i2s_channels,
+                          cfg.include_bus)
     return write_vcd(cfg.output_vcd, out, rate, cfg.comment_lines())
 
 

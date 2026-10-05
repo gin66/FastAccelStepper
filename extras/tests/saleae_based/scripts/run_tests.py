@@ -809,6 +809,7 @@ def decode_mux_capture(capture_file, channels, sample_rate, pin_map,
             for letter, entry in _mux_map_with_slots(pin_map).items()},
         stepper_count=len(pin_map.get("slots") or []),
         pin_mode=pin_map.get("mode"),
+        include_bus=True,
         out_comment=[f"  captured_from: {Path(capture_file).name}"],
     )
     out = muxdec.decode(cfg, sample_rate)
