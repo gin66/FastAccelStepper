@@ -83,17 +83,26 @@
  *   STOP                       stop move / self-test
  *
  * Two stops, and they differ in what happens to what is already queued:
- *   STOP                       stopMove(): queued motion still runs
+ *   STOP                       stopMove(): decelerates, so queued motion still
+ *                              runs out
  *   XSTOP                      forceStopAndNewPosition(): queue emptied, so the
  *                              queued commands never run
  *
- * There is deliberately no forceStop(). Its only effect on a queue this harness
- * fills itself is `ignore_commands = true`, which refuses *later*
- * addQueueEntry() calls -- and QRUN stops feeding once the fill is in, so there
- * are none and the call could not fail. stopMove() is weaker still: a flag the
- * ramp generator consults for its next command, while this harness drives
- * addQueueEntry() directly and never runs one. Only forceStopAndNewPosition()
- * reaches the queue, so only it has a waveform of its own to assert.
+ * The library has three stops and they differ in *how* they stop and *what
+ * happens to the position*: stopMove() decelerates normally, forceStop() stops
+ * abruptly but lets the queue run out (position kept), forceStopAndNewPosition()
+ * stops as fast as the hardware allows and empties the queue (position lost, the
+ * caller supplies it). They are not three strengths of one operation.
+ *
+ * STOP and XSTOP are those two extremes, and neither of the remaining ones has a
+ * scenario here -- a limit of this harness, not a judgement about them. Both
+ * differ from XSTOP in ways this harness cannot observe: stopMove() is a flag
+ * the ramp generator reads, and this harness drives addQueueEntry() directly and
+ * never runs a ramp; forceStop()'s effect on a harness-filled queue is the
+ * admission latch, which refuses *later* addQueueEntry() calls, and QRUN stops
+ * feeding once the fill is in, so there are none for it to refuse. Only
+ * forceStopAndNewPosition() empties the queue, so only it has a waveform of its
+ * own to assert.
  *
  * Characterization scenarios are assembled from segments, e.g.
  *   QCLR | QSEG 255 80 1 | QSEG 0 1600 1 | QSEG 1 80 1 | QRUN 1
@@ -675,24 +684,30 @@ static void stop_sr00(void) {
 }
 
 // The stops, and the difference between them. The library documents all three
-// (FastAccelStepper.h):
+// (FastAccelStepper.h). They differ along two axes -- how the stepper stops, and
+// what happens to the position -- so they are not three strengths of one
+// operation:
 //
-//   stopMove()                    a flag for the ramp generator's *next*
-//                                 command. It must NOT truncate motion that is
-//                                 already queued -- that is its contract, and
-//                                 this harness is not the ramp's planner, so it
-//                                 has nothing to act on here.
-//   forceStop()                   ignore_commands = true, so nothing further is
-//                                 *added*; what is already queued still runs.
-//   forceStopAndNewPosition()     aborts everything queued: no further step.
+//   stopMove()                    decelerates normally. Just a flag the ramp
+//                                 generator reads for its *next* command. It
+//                                 must NOT truncate motion that is already
+//                                 queued; that is its contract.
+//   forceStop()                   abrupt, no deceleration, but the queue is
+//                                 still processed: what is already queued runs
+//                                 out and the position is kept (~20ms).
+//   forceStopAndNewPosition()     as fast as the hardware allows AND empties the
+//                                 queue, so the position is lost and the caller
+//                                 supplies it. No further step will be issued.
 //
-// Of those, only the third reaches the queue from here. stopMove() sets a flag
-// nothing in this harness reads, and forceStop() refuses later addQueueEntry()
-// calls that are never made: QRUN stops feeding once the fill is in, so there
-// is nothing after the start for it to refuse. Both are no-ops against a
-// directly-fed queue, which is why there is no scenario for either and why the
-// harness's own no_topup cursor is what enforces "nothing further is added" --
-// the harness is the planner, so that guarantee is the harness's to keep.
+// Only the third reaches the queue from here, and that is a limit of this
+// harness rather than a judgement about the other two. stopMove() sets a flag
+// nothing in this harness reads: it drives addQueueEntry() directly and runs no
+// ramp for the flag to act on. forceStop() sets the queue admission latch,
+// which refuses *later* addQueueEntry() calls -- and QRUN stops feeding once the
+// fill is in, so there are none for it to refuse. Hence no scenario for either,
+// and hence the harness's own no_topup cursor is what enforces "nothing further
+// is added": the harness is the planner, so that guarantee is the harness's to
+// keep.
 //
 // The earlier stop_all() conflated the first two: it called stopMove() *and*
 // zeroed the cursor, so it behaved like a partial forceStop while reporting
@@ -710,16 +725,17 @@ static void stop_move_only(void) {
   }
 }
 
-// forceStopAndNewPosition() at the current position: the third stop, and the
-// only one that touches the queue itself.
+// forceStopAndNewPosition() at the current position: the only one of the three
+// that empties the queue.
 //
-// forceStop() sets ignore_commands and leaves everything queued to run out --
+// forceStop() sets the admission latch and leaves everything queued to run out --
 // measured: 4080 of 4080 steps after the marker with a filled queue, identical
 // on rmt, i2s_direct and mcpwm_pcnt. forceStopAndNewPosition() goes on to
 // q->forceStop(), which per driver stops the timer/channel and does
 // read_idx = next_write_idx, so the ring is emptied and the queued commands
-// never run. It is also the only stop whose effect on the wire differs from the
-// other two, which is what makes it a scenario rather than an API detail.
+// never run. That is the difference that puts it on the wire and makes it a
+// scenario; forceStop()'s is on the queue's *admission*, which this harness
+// stops exercising at the moment of the stop.
 //
 // The position is passed through unchanged, so POS keeps reporting where the
 // stepper really is: the point of this stop is the queue, not the coordinate.
@@ -740,6 +756,14 @@ static void stop_all(void) {
   for (uint8_t i = 0; i < slot_count; i++) {
     if (slots[i].stepper) {
       slots[i].stepper->stopMove();
+      // Rearm the queue admission latch. stopMove() does not touch it, but
+      // XSTOP's forceStopAndNewPosition() sets it, and addQueueEntry() then
+      // refuses every command -- so a QCLR followed by QSEG/QRUN on the same
+      // connection used to queue nothing. QCLR is this harness's "back to
+      // idle" verb, so the rearm belongs here rather than in CONFIG: CONFIG
+      // also rearms (via _initVars()), which is exactly why every scenario
+      // used to pass and the one broken case was never run.
+      slots[i].stepper->resumeCommands();
     }
     memset(&slots[i].cur, 0, sizeof(slots[i].cur));
   }

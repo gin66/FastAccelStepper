@@ -206,19 +206,38 @@ MARK <ch> | none             designate an analyzer channel no stepper owns as
                             Send it in the setup phase, never after QRUN: its
                             serial round-trips would otherwise land between the
                             move starting and the stop.
-STOP | XSTOP                STOP is `stopMove()` and MUST NOT truncate already
+STOP | XSTOP                The library has three stops, differing in *how*
+                            they stop and *what happens to the position*:
+                            stopMove() decelerates normally; forceStop() stops
+                            abruptly but lets the queue run out, so the
+                            position is kept; forceStopAndNewPosition() stops
+                            as fast as the hardware allows and empties the
+                            queue, so the position is lost and the caller
+                            supplies it. They are not three strengths of one
+                            operation.
+                            STOP is `stopMove()` and MUST NOT truncate already
                             queued motion -- a run that keeps stepping after it
                             is the contract holding, not a stop failing. XSTOP is
                             `forceStopAndNewPosition()`: the queue is emptied, so
                             the queued commands never run. SR_25 and SR_30 send
                             the same program and assert opposite outcomes.
-                            There is deliberately no `forceStop()`: it only sets
-                            `ignore_commands`, which refuses *later*
-                            addQueueEntry() calls, and this harness stops
-                            feeding after the start, so there are none and a
-                            scenario could not fail. `stopMove()` is weaker
-                            still -- a flag the ramp generator reads, and this
-                            harness drives addQueueEntry() directly.
+                            Neither of the other two stops has a scenario, and
+                            the reason is a limit of this harness rather than a
+                            judgement about them: `stopMove()` is a flag the ramp
+                            generator reads, and this harness drives
+                            addQueueEntry() directly, running no ramp for it to
+                            act on. `forceStop()`'s only effect on a
+                            harness-filled queue is the admission latch, which
+                            refuses *later* addQueueEntry() calls -- and this
+                            harness stops feeding once the fill is in, so there
+                            are none for it to refuse.
+                            That latch is what XSTOP sets too, so `QCLR` rearms
+                            it (`resumeCommands()`): without that, a
+                            `XSTOP` -> `QCLR` -> `QSEG` -> `QRUN` on one
+                            connection queues nothing while reporting
+                            success. `CONFIG` also rearms, via the
+                            `_initVars()` memset -- which is why every
+                            scenario used to pass.
 QFILL <mask> [entries]     queue the program with start = false, `entries`
                             deep (default: the whole queue), and stop there;
                             QRUN then starts exactly what was filled. The reply

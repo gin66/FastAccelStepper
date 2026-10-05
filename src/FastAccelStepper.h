@@ -445,6 +445,30 @@ class FastAccelStepper {
     return (StepperStopCause)_stop_cause;
   }
 
+  // ### resumeCommands()
+  // Rearm the queue after forceStop() or forceStopAndNewPosition().
+  //
+  // Both stops set a queue admission latch: addQueueEntry() then refuses every
+  // command with AQE_ERROR_COMMANDS_SUSPENDED, including
+  // addQueueEntry(NULL, start). The latch is a backstop against a planner whose
+  // own stop flag is wrong, so it stays set until a caller explicitly rearms.
+  //
+  // This is the public key to it, and it is required by the low-level
+  // addQueueEntry() API: without it, a caller that aborted cannot queue again
+  // on the same connection. The high-level API needs no call -- the ramp clears
+  // the latch itself on the next fill_queue() pass.
+  //
+  // Note this does not resume motion. After forceStopAndNewPosition() the queue
+  // was emptied and the position was overwritten, so the caller owns the
+  // coordinate from here (see setCurrentPosition()).
+  //
+  // Not for clearing a stop mid-flight: to abort, use forceStop() or
+  // forceStopAndNewPosition().
+  void resumeCommands();
+
+  // True while commands are refused. See resumeCommands().
+  bool areCommandsSuspended() const;
+
   // get the target position for the current move.
   // As of now, this position is the view of the stepper task.
   // This means, the value will stay unchanged after a move/moveTo until the

@@ -94,7 +94,7 @@ All architecture drivers inherit from `StepperQueueBase` (defined in `fas_queue/
 | `entry[QUEUE_LEN]` | Queue entries array |
 | `read_idx` / `next_write_idx` | Single-producer/single-consumer indices |
 | `queue_end` | Position, direction, count_up state |
-| `ignore_commands` | Commands suspended during `forceStopAndNewPosition()` |
+| `ignore_commands` | Command admission latch. Set by `forceStop()` **and** `forceStopAndNewPosition()`; `addQueueEntry()` refuses every command, including `addQueueEntry(NULL, start)`, with `AQE_ERROR_COMMANDS_SUSPENDED`. Not transient: cleared only by `resumeCommands()`, or by `_initVars()` on reconnect. `fill_queue()` clears it per active ramp pass, which is why a ramp user never observes it. |
 | `dirPin` / `dirHighCountsUp` | Direction pin configuration |
 | `max_speed_in_ticks` | Maximum speed ceiling |
 | `queueEntries()` | Number of entries in queue (inline) |

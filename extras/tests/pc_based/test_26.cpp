@@ -5358,6 +5358,46 @@ static void f22_external_stop() {
   printf("F22 external stop / emergencyStop green\n");
 }
 
+// F23: a re-sync is self-sufficient -- it must not be undone by the next
+// pump(). clear_path() clears _fault but used not to drain the pending stop
+// cause, so pump()'s cause poll re-faulted the plan immediately. The ordering
+// that broke was forceStop() -> syncFromSteppers() -> pump(); it only worked
+// when a pump() happened first, because that pump drained the cause on its way
+// to reporting Stopped.
+//
+// This also pins the rearm: the member queue was suspended by forceStop(), and
+// clear_path() is what re-arms it. Without the rearm the re-planned path would
+// plan slices that queue nothing.
+static void f23_resync_is_self_sufficient() {
+  SimPort px(4000), py(4000);
+  FasNAxisConfig cfg;
+  FasNAxis<2, 64, SimPort, TestFastAccelStepperEngine> path(cfg, sim_engine);
+  test(path.addAxis(0, &px) == true, "F23 addAxis(0)");
+  test(path.addAxis(1, &py) == true, "F23 addAxis(1)");
+  path.setCurrentPosition((const int32_t[]){0, 0});
+  const int32_t t[2] = {10000, 10000};
+  test(path.addWaypoint(t) == true, "F23 addWaypoint");
+  path.endPath();
+  test(path.pump() == PumpStatus::Running, "F23 first pump Running");
+
+  // Stop a member, then re-sync BEFORE any pump() observes the cause.
+  px.forceStop();
+  path.syncFromSteppers();
+  test(!path.isFaulted(), "F23 syncFromSteppers clears the fault");
+
+  // Re-plan and run. If the cause had not been drained, this pump() would
+  // return Stopped again.
+  const int32_t t2[2] = {20000, 20000};
+  test(path.addWaypoint(t2) == true, "F23 re-plan waypoint");
+  path.endPath();
+  PumpStatus st = path.pump();
+  test(st != PumpStatus::Stopped,
+       "F23 a re-sync is not undone by the next pump()");
+  test(st != PumpStatus::Error, "F23 the re-planned path is accepted");
+  test(!path.isFaulted(), "F23 still unfaulted after re-planning");
+  printf("F23 re-sync self-sufficient green\n");
+}
+
 // One turn of the NaxesAFAP example helix (12 chords per quarter, 7.5 deg, not
 // collinear). The master does not reverse at those chords, so the turn
 // cruises. The square-corner stop is a different joint and is not in this
@@ -5532,6 +5572,7 @@ int main() {
 #endif
   f16_skeleton();
   f22_external_stop();
+  f23_resync_is_self_sufficient();
   printf("TEST_26 PASSED\n");
   return 0;
 }

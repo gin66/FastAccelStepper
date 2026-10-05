@@ -383,21 +383,18 @@ class FasNAxis {
   }
 
   // True after a detected external stop (pump() returned Stopped) until the
-  // caller re-syncs (syncFromSteppers()/setCurrentPosition()/clearFault()).
+  // caller re-syncs with syncFromSteppers() or setCurrentPosition(), both of
+  // which go through clear_path().
+  //
+  // There is deliberately no way to clear this without re-syncing. The planner
+  // reads getCurrentPosition() in exactly one place -- syncFromSteppers() -- so
+  // _p[] is otherwise a purely *commanded* model advanced by planned deltas.
+  // An external stop leaves it diverged from the hardware by whatever motion
+  // was lost, and the blocks still queued are deltas from _p[], so feeding them
+  // would resume toward a target offset by that error, silently. A
+  // clearFault() existed for that and has been removed: it could only ever
+  // resume a plan whose position model was known-wrong.
   bool isFaulted() const { return _fault; }
-
-  // Clear the fault without re-syncing positions. Use only when the caller is
-  // certain of the axis positions; otherwise prefer syncFromSteppers().
-  void clearFault() {
-    _fault = false;
-    _underrun = false;
-    _error = false;
-    for (uint8_t i = 0; i < NAXES; i++) {
-      if (_registered[i]) {
-        _s[i]->takeStopCause();
-      }
-    }
-  }
 
   // Group emergency stop: forceStop() every member immediately, abort the plan
   // and mark positions untrusted. Re-entrancy safe: it does not call pump().
@@ -693,10 +690,36 @@ class FasNAxis {
     _slice_open = false;
     _error = false;
     _fault = false;
+    // Rearm the queue admission latches. A member force-stopped outside the
+    // planner left its queue refusing every addQueueEntry() with
+    // AQE_ERROR_COMMANDS_SUSPENDED, so without this a re-planned path would
+    // queue nothing. This is the only place it is safe: clear_path() is
+    // reached solely from syncFromSteppers() / setCurrentPosition(), i.e. the
+    // caller has just re-synced and is about to build a new plan.
+    //
+    // Deliberately NOT in feeder_start(). That is also reachable from a bare
+    // _fault reset, which would resume the *old* blocks with positions the
+    // caller never re-synced; rearming there would make that unsafe recovery
+    // succeed silently instead of failing with PumpStatus::Error.
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_registered[i]) {
+        _s[i]->resumeCommands();
+      }
+    }
     _carve_then_advance = false;
     for (uint8_t i = 0; i < NAXES; i++) {
       _held[i].waiting = false;
       _carve_axis[i].active = false;
+      // Drain any pending stop cause. Without this a re-sync is not
+      // self-sufficient: clear_path() clears _fault, but the cause is still
+      // unread, so the next pump() sees takeStopCause() != None and re-faults
+      // the plan. It only worked because pump() happened to drain the cause on
+      // its way to reporting Stopped -- so the ordering
+      // forceStop() -> syncFromSteppers() -> pump() stayed faulted forever,
+      // while sync-after-pump() recovered.
+      if (_registered[i]) {
+        _s[i]->takeStopCause();
+      }
     }
   }
 

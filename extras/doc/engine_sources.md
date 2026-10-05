@@ -67,16 +67,20 @@ Per-axis and group stop must be first-class, not inferred from timing.
 
 Current state: `forceStop()` / `stopMove()` exist only on
 `FastAccelStepper` (the ramp class); `FastAccelStepperNaxes` has **no**
-stop API. `forceStop()` only sets `q->ignore_commands = true` and calls
-`_rg.forceStop()`; `fill_queue()` clears `ignore_commands`, so it is a
-transient latch, not a queryable event. A planner therefore cannot
-reliably detect a per-axis stop from existing state.
+stop API. `forceStop()` only sets the queue admission latch
+(`q->suspendCommands()`) and calls `_rg.forceStop()`. That latch is not a
+queryable event, but the stop cause now is: `takeStopCause()` reports it
+and clears it, so a planner detects a per-axis stop from existing state.
+Rearming the latch is `resumeCommands()`; `fill_queue()` does it
+implicitly per active ramp pass, which is why a ramp user never observes
+it and why the low-level `addQueueEntry()` user used to be stuck
+permanently after a stop (see `extras/todo/020_queue_admission_latch.md`).
 
 Design:
 
 - Move `forceStop()` / `stopMove()` down to `FastAccelStepperBase` (all
   steppers need a stop path).
-  - `Base::forceStop()` — immediate: `ignore_commands = true`,
+  - `Base::forceStop()` — immediate: `suspendCommands()`,
     `q->forceStop()`, then notify the observer.
   - `FastAccelStepper::stopMove()` — `_rg.initiateStop()` (controlled
     decel). `FastAccelStepperNaxes::stopMove()` — notify the planner,
@@ -145,7 +149,14 @@ Implemented:
   non-None cause aborts the plan and returns `PumpStatus::Stopped`
   (`isFaulted()`), positions untrusted until re-synced. `addAxis()`
   discards a pre-registration cause. `emergencyStop()` force-stops every
-  member (no re-entrancy); `clearFault()` resets without re-syncing.
+  member (no re-entrancy). `clearFault()` is **removed**: the planner's
+  position model is commanded, not measured (`getCurrentPosition()` is
+  read only by `syncFromSteppers()`), so clearing the fault without
+  re-syncing could only resume a plan toward a target offset by the lost
+  motion. `syncFromSteppers()` / `setCurrentPosition()` are the only
+  recoveries; both go through `clear_path()`, which drops the dead
+  blocks, clears the fault, drains the pending cause, and rearms the
+  queue admission latches.
 - Test helper `SimPort` models the hook (`takeStopCause()`, plus
   `setStopCause()`/`forceStop()` injection); `test_26` case F22 exercises
   the injected cause, a member `forceStop()`, and `emergencyStop()`.

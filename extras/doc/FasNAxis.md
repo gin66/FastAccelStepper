@@ -93,7 +93,7 @@ them together. Later calls keep them fed.
 | --- | --- |
 | `Idle` | Nothing left to feed, and the queues are empty. |
 | `Running` | The path is being fed. |
-| `Underrun` | A queue ran dry after the start while the path still has motion. Stays set until `syncFromSteppers`, `setCurrentPosition`, or `clearFault`. |
+| `Underrun` | A queue ran dry after the start while the path still has motion. Stays set until `syncFromSteppers` or `setCurrentPosition`. |
 | `Error` | A queue rejected a command. Fix the cause before continuing. |
 | `Stopped` | A member axis was stopped outside the planner. Positions are untrusted until `syncFromSteppers` or `setCurrentPosition`. |
 
@@ -104,11 +104,24 @@ true once a queue has run dry after the start.
 
 ```cpp
 bool isFaulted() const;
-void clearFault();
 void emergencyStop();
 ```
 
 `emergencyStop` calls `forceStop` on every attached axis and aborts the
-plan. `isFaulted` stays true until `syncFromSteppers`,
-`setCurrentPosition`, or `clearFault`. `clearFault` drops the fault flag
-and leaves the positions as they are.
+plan. `isFaulted` stays true until `syncFromSteppers` or
+`setCurrentPosition`.
+
+There is no way to clear the fault without re-syncing, and that is
+deliberate. `getCurrentPosition` is read in exactly one place --
+`syncFromSteppers` -- so the planner's position model is otherwise purely
+*commanded*, advanced by planned deltas. An external stop leaves it
+diverged by whatever motion was lost, and the blocks still queued are
+deltas from that model, so feeding them would resume toward a target
+offset by the error, silently. A `clearFault` existed for this and has
+been removed: it could only resume a plan whose positions were known to
+be wrong.
+
+Both recovery calls go through `clear_path`, which drops the dead blocks,
+clears the fault, drains any pending stop cause, and rearms the queue
+admission latches. That last part is why a re-sync must follow a stop:
+`forceStop` suspends command admission until something rearms it.

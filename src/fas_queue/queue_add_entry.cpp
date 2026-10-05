@@ -4,6 +4,20 @@
 
 AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
                                           bool start) {
+  // The admission latch gates the whole function, before every side effect.
+  //
+  // It used to sit at the pointer advance, which made it three separate bugs:
+  // a refused command still drove the DIR pin and updated queue_end.dir, still
+  // counted towards the pause statistics, and -- via the cmd == NULL path --
+  // still let a suspended queue be started. It also returned AQE_OK, so the
+  // caller advanced its own position model by steps that were never queued.
+  //
+  // Checked first, before isReadyForCommands(), so the reason reported is the
+  // one that needs acting on: a suspended queue stays suspended until
+  // resumeCommands(), whereas DEVICE_NOT_READY is a retry.
+  if (ignore_commands) {
+    return AQE_ERROR_COMMANDS_SUSPENDED;
+  }
   // Just to check if, if the struct has the correct size
   // if (sizeof(entry) != 6 * QUEUE_LEN) {
   //  return -1;
@@ -95,16 +109,16 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
   next_queue_end.dir = dir;
   next_queue_end.count_up = cmd->count_up;
 
-  // Advance write pointer (wp may have been incremented for a pause entry)
+  // Advance write pointer (wp may have been incremented for a pause entry).
+  // The admission latch was checked at the top, so there is no branch here for
+  // it: a suspended queue never reaches this point.
   fasDisableInterrupts();
-  if (!ignore_commands) {
-    if (isReadyForCommands()) {
-      next_write_idx = wp + 1;
-      queue_end = next_queue_end;
-    } else {
-      fasEnableInterrupts();
-      return AQE_DEVICE_NOT_READY;
-    }
+  if (isReadyForCommands()) {
+    next_write_idx = wp + 1;
+    queue_end = next_queue_end;
+  } else {
+    fasEnableInterrupts();
+    return AQE_DEVICE_NOT_READY;
   }
   fasEnableInterrupts();
 

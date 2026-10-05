@@ -162,7 +162,14 @@ class SimPort {
     kicked_off_ = false;
     read_idx_ = next_write_idx_;
     stop_cause_ = StepperStopCause::ForceStop;
+    // The real queue's admission latch is set by forceStop(); the model has no
+    // refusal path, so track it only so areCommandsSuspended() is meaningful.
+    suspended_ = true;
   }
+  // Duck-type alias for FastAccelStepper::resumeCommands(). FasNAxis calls this
+  // from feeder_start(); the model needs nothing beyond clearing the flag.
+  void resumeCommands() { suspended_ = false; }
+  bool areCommandsSuspended() const { return suspended_; }
 
 #ifdef FAS_PHYSICAL_STEPPER_ENABLED
   // --- opt-in rotordynamic coupling (whitepaper section 3.1 / 13.3) ---
@@ -359,6 +366,7 @@ class SimPort {
   uint16_t dir_after_ticks_;
   uint16_t force_extra_before_;
   StepperStopCause stop_cause_;
+  bool suspended_ = false;
 #ifdef FAS_PHYSICAL_STEPPER_ENABLED
   PhysicalStepper* plant_ = NULL;  // opt-in rotordynamic coupling
 #endif

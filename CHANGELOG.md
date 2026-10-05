@@ -1,4 +1,7 @@
 pre-1.5.0:
+- naxes: FasNAxis::clearFault() removed from API — it could only resume a plan whose position model was stale; use syncFromSteppers()
+- naxes: fix a re-sync undone by the next pump(): clearing the fault left the stop cause pending
+- addQueueEntry() returns AQE_ERROR_COMMANDS_SUSPENDED instead of AQE_OK for a command it refused, so a caller can tell queued from refused; resumeCommands() rearms
 - esp32: Fix the MCPWM/PCNT driver on ESP-IDF 5/6 running away with more than one stepper: every stepper after the first emitted continuously and never stopped, so a second stepper produced unbounded motion. All six queues now work
 - getDirChangeBeforePauseCount() removed from API
 - esp32: Fix the RMT direction change on ESP-IDF 5/6 landing before the previous segment finished stepping: trailing steps of the old segment went out in the new direction, or the first segment of a move went out backwards

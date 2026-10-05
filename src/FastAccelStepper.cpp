@@ -95,10 +95,11 @@ void FastAccelStepper::fill_queue() {
   }
   // check if addition of commands is suspended (due to forceStopAndNewPosition)
   StepperQueue* q = _queue();
-  // if force stop has been called, then ignore_commands is true and ramp
-  // stopped. So the ramp generator will not create a new command, unless new
-  // move command has been given after forceStop..(). So we just clear the flag
-  q->ignore_commands = false;
+  // if force stop has been called, then the queue's admission latch is set and
+  // the ramp is stopped. So the ramp generator will not create a new command,
+  // unless a new move command has been given after forceStop..(). So we just
+  // clear the latch.
+  q->resumeCommands();
 
   // preconditions are fulfilled, so create the command(s)
   NextCommand cmd;
@@ -428,13 +429,19 @@ MoveResultCode FastAccelStepper::moveByAcceleration(int32_t acceleration,
   }
   return res;
 }
+// Defined here rather than inline in the header: StepperQueue is only
+// forward-declared there.
+void FastAccelStepper::resumeCommands() { _queue()->resumeCommands(); }
+bool FastAccelStepper::areCommandsSuspended() const {
+  return _queue()->areCommandsSuspended();
+}
 void FastAccelStepper::forceStop() {
   StepperQueue* q = _queue();
 
   _stop_cause = (uint8_t)StepperStopCause::ForceStop;
 
   // ensure no more commands are added to the queue
-  q->ignore_commands = true;
+  q->suspendCommands();
 
   // inform ramp generator to force stop
   _rg.forceStop();
@@ -445,7 +452,7 @@ void FastAccelStepper::forceStopAndNewPosition(int32_t new_pos) {
   _stop_cause = (uint8_t)StepperStopCause::ForceStopAndNewPosition;
 
   // ensure no more commands are added to the queue
-  q->ignore_commands = true;
+  q->suspendCommands();
 
   // stop ramp generator
   _rg.stopRamp();
@@ -644,7 +651,7 @@ void FastAccelStepper::performOneStep(bool count_up, bool blocking) {
   if (!isRunning()) {
     if (count_up || (_dirPin != PIN_UNDEFINED)) {
       StepperQueue* q = _queue();
-      q->ignore_commands = false;
+      q->resumeCommands();
       struct stepper_command_s cmd = {
           .ticks = MIN_CMD_TICKS, .steps = 1, .count_up = count_up};
       addQueueEntry(&cmd);

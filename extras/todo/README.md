@@ -25,6 +25,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
 | **020** | [The queue admission latch has no lifecycle](020_queue_admission_latch.md) | ~80 k | 1–2 d | **Critical.** `ignore_commands`: 4 writers in 2 layers, no reader, no public clear, refusal returns `AQE_OK`. Low-level callers cannot queue again after a stop. |
+| **025** | [Pico `forceStop()` discards an exact step count](025_pico_force_stop_loses_step_count.md) | ~30 k | 0.5 d | Medium: `pio_sm_clear_fifos` drops RX, then `pos_offset = 0`. Also a read-before-test in `getCurrentStepCount()`. Not started; an unverified attempt was dropped. Split out of [020](020_queue_admission_latch.md). |
 | **030** | [Interrupt slow steps](030_interrupt_slow_steps.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
@@ -48,7 +49,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **170** | [i2s_direct characterization — 23/25 pass, 2 skipped](170_i2s_direct_characterization.md) | ~100 k | 0.5 d | Low: documentation of a characterization result, not a defect. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
 | **182** | [`i2s_mux` mangles any command from n ≥ 16](182_i2s_mux_command_mangled_from_16_steppers.md) | ~150 k | 1–2 d | High: the mux's 32-stepper claim cannot be tested — the host's own parser refuses `CONFIG 16 …`. Pre-existing. |
-| **total** | 24 items | ~6.4 M | 18–26 w | Priorities 020–182. |
+| **total** | 25 items | ~6.5 M | 18–26 w | Priorities 020–182. |
 
 ## Done
 

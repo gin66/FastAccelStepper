@@ -33,7 +33,13 @@ enum class AqeResultCode : int8_t {
   DirChangePauseInjected = 6,
   ErrorTicksTooLow = -1,
   ErrorEmptyQueueToStart = -2,
-  ErrorNoDirPinToToggle = -3
+  ErrorNoDirPinToToggle = -3,
+  // The command-admission latch is set (queue_add_entry.cpp, ignore_commands).
+  // A forceStop() / forceStopAndNewPosition() sets it; only resumeCommands()
+  // clears it. MUST stay -5: MoveTimedResultCode::ErrorMoveTooLarge occupies
+  // -4 and tmrFrom() is a value-preserving cast, so -4 here would report a
+  // suspended queue as MOVE_TIMED_TOO_LARGE_ERROR.
+  ErrorCommandsSuspended = -5
 };
 
 static inline bool aqeRetry(AqeResultCode code) {
@@ -72,6 +78,8 @@ static inline const char* toString(AqeResultCode code) {
       return FAS_PSTR("Error: Empty Queue to Start");
     case AqeResultCode::ErrorNoDirPinToToggle:
       return FAS_PSTR("Error: No Direction Pin to Toggle");
+    case AqeResultCode::ErrorCommandsSuspended:
+      return FAS_PSTR("Error: Commands Suspended");
     default:
       return FAS_PSTR("Unknown Error");
   }
@@ -86,6 +94,7 @@ static inline const char* toString(AqeResultCode code) {
 #define AQE_ERROR_TICKS_TOO_LOW AqeResultCode::ErrorTicksTooLow
 #define AQE_ERROR_EMPTY_QUEUE_TO_START AqeResultCode::ErrorEmptyQueueToStart
 #define AQE_ERROR_NO_DIR_PIN_TO_TOGGLE AqeResultCode::ErrorNoDirPinToToggle
+#define AQE_ERROR_COMMANDS_SUSPENDED AqeResultCode::ErrorCommandsSuspended
 
 // Define the MoveResultCode enum with equivalent values
 enum class MoveResultCode : int8_t {
@@ -124,7 +133,11 @@ static inline const char* toString(MoveResultCode code) {
 
 // MoveTimedResultCode values 0..6 mirror AqeResultCode so that tmrFrom() is a
 // value-preserving cast; MoveBusy/MoveEmpty sit above the AQE range to avoid
-// aliasing AqeResultCode::DirChangePauseInjected.
+// aliasing AqeResultCode::DirChangePauseInjected. Every negative AqeResultCode
+// needs its mirror entry here for the same reason: AqeResultCode reserves -4
+// for nothing, but ErrorCommandsSuspended is -5 precisely because
+// ErrorMoveTooLarge (-4) already sits in this enum, and a -4 AqeResultCode
+// would cast to MOVE_TIMED_TOO_LARGE_ERROR.
 enum class MoveTimedResultCode : int8_t {
   OK = 0,
   QueueFull = 1,
@@ -139,6 +152,7 @@ enum class MoveTimedResultCode : int8_t {
   ErrorEmptyQueueToStart = -2,
   ErrorNoDirPinToToggle = -3,
   ErrorMoveTooLarge = -4,
+  ErrorCommandsSuspended = -5,
 };
 
 static inline bool moveTimedIsOk(MoveTimedResultCode status) {
@@ -177,6 +191,8 @@ static inline const char* toString(MoveTimedResultCode code) {
       return toString(AqeResultCode::ErrorNoDirPinToToggle);
     case MoveTimedResultCode::ErrorMoveTooLarge:
       return FAS_PSTR("Error: Move too large");
+    case MoveTimedResultCode::ErrorCommandsSuspended:
+      return toString(AqeResultCode::ErrorCommandsSuspended);
     default:
       return FAS_PSTR("Unknown Error");
   }
@@ -185,6 +201,7 @@ static inline const char* toString(MoveTimedResultCode code) {
 #define MOVE_TIMED_BUSY MoveTimedResultCode::MoveBusy
 #define MOVE_TIMED_EMPTY MoveTimedResultCode::MoveEmpty
 #define MOVE_TIMED_TOO_LARGE_ERROR MoveTimedResultCode::ErrorMoveTooLarge
+#define MOVE_TIMED_COMMANDS_SUSPENDED MoveTimedResultCode::ErrorCommandsSuspended
 
 enum class DelayResultCode : int8_t { OK = 0, TOO_LOW = -1, TOO_HIGH = -2 };
 

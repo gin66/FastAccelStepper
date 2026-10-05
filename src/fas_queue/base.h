@@ -39,8 +39,25 @@ class StepperQueueBase {
   volatile uint8_t next_write_idx;
   struct queue_end_s queue_end;
 
-  // Commands are suspended during forceStopAndNewPosition()
+  // Queue admission latch. When set, addQueueEntry() refuses every command
+  // with AQE_ERROR_COMMANDS_SUSPENDED -- including addQueueEntry(NULL, start),
+  // so a suspended queue cannot be started either.
+  //
+  // Set by forceStop() and forceStopAndNewPosition() as a backstop against a
+  // planner whose own stop flag is wrong, and cleared by resumeCommands(),
+  // which a caller reaches only through a documented public API (a fresh
+  // coordinated plan, or FastAccelStepper::resumeCommands()).
+  //
+  // It is NOT transient. fill_queue() used to clear it on every active ramp
+  // pass, which made it inert for the ramp and permanent for the low-level
+  // addQueueEntry() user, whose ramp is never active. See
+  // extras/todo/020_queue_admission_latch.md.
   volatile bool ignore_commands;
+
+  void suspendCommands() { ignore_commands = true; }
+  void resumeCommands() { ignore_commands = false; }
+  bool areCommandsSuspended() const { return ignore_commands; }
+
   bool dirHighCountsUp;
   uint8_t dirPin;
   uint16_t max_speed_in_ticks;

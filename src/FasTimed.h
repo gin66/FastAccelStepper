@@ -566,11 +566,30 @@ class FasTimed {
     _underrun = false;
     _error = false;
     _fault = false;
+    // Rearm the queue admission latches. A member force-stopped outside the
+    // planner left its queue refusing every addQueueEntry() with
+    // AQE_ERROR_COMMANDS_SUSPENDED, which flush() reads as a terminal error.
+    // clear_plan() is the recovery boundary -- it is reached solely from
+    // syncFromSteppers() / setCurrentPosition(), where the caller has just
+    // re-synced and is about to plan again -- so this is the one place the
+    // rearm belongs. It is deliberately not in prepare_round(), which runs on
+    // every round of a normal feed rather than at a reset.
+    for (uint8_t i = 0; i < NAXES; i++) {
+      if (_s[i] != NULL) {
+        _s[i]->resumeCommands();
+      }
+    }
     for (uint8_t i = 0; i < NAXES; i++) {
       _ramp_p[i] = 0;
       _sign[i] = 0;
       _count_up[i] = true;
       _held[i].waiting = false;
+      // Drain any pending stop cause, so a re-sync is self-sufficient. Same
+      // ordering trap as FasNAxis::clear_path(): clearing _fault without
+      // draining the cause lets the next pump() re-fault the plan.
+      if (_s[i] != NULL) {
+        _s[i]->takeStopCause();
+      }
     }
   }
 
