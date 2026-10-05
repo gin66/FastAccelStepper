@@ -2916,7 +2916,15 @@ def run(tag_key, tests, args):
 
     # SR_00 is the wiring pre-check. Always run it first (one capture per test),
     # so a later test cannot be measured on dead or mis-wired channels.
-    if any(t != "SR_00" for t in tests):
+    #
+    # Only when it is absent. `any(t != "SR_00" ...)` was true for the default
+    # --tests, which is ALL_TESTS and already starts with SR_00, so SR_00 ran
+    # twice on every catalogue run: a second 1 Hz capture and a second verdict.
+    # It is not merely wasted -- on 2026-10-05 that second run FAILED, which set
+    # sr00_failed and turned all 26 scenarios into SKIP, while the run still
+    # exited 0 and the matrix reported the row "ok". A catalogue that measured
+    # nothing and a catalogue that passed are then indistinguishable.
+    if "SR_00" not in tests:
         tests = ["SR_00"] + tests
 
     sr00_failed = False

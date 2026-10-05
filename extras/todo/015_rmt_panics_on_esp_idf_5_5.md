@@ -210,6 +210,20 @@ it is the RMT case, which is the one that used to crash.
   136 B on a 328P for a reply of at most 66. The pin list is what it gives up;
   the host already parsed `ch=-` into an empty pin list, so `run_tests.py` is
   unchanged. A build with driver selection keeps the full form.
+- **Blocking the idle loop does not fix the IDF 4.4.3 idle watchdog, and was
+  measured and rejected.** `saleae_hal_idle()` was made `vTaskDelay(1)` --
+  StepperDemo's own idiom, which is why StepperDemo never trips it -- and the
+  watchdog still fired, with no command outstanding: `QINFO` alone reproduces
+  it, 43 WDT lines, and it fires identically after a `CONFIG`. `main` now blocks
+  for a whole tick, so IDLE gets the CPU, and the subscription that trips is
+  IDLE's own. 5.5.3 and 6.1 never show it with identical firmware. So this is
+  IDF 4.4's idle-task watchdog, not the harness's loop. It was not free
+  either: the feeder is the same loop, and `sync` mcpwm_pcnt+i2s_direct grew
+  trailing pulses (67 where 64 were commanded, period still exactly 10.0 us) --
+  though that is intermittent under the spin too (1 in 3, against 2 in 2 with
+  the block), so the block is not the cause. The spin is kept and the reason is
+  written down at the call site. The mcpwm_pcnt trailing-pulse flake itself is
+  **not** explained and is worth its own item.
 - **The IDF 4.4.3 idle task watchdog still fires ~5 s into an idle board**, and
   it is *not* the application's spin: the idle path is now `vTaskDelay(1)`
   (`saleae_hal_idle()`, matching `DELAY_MS(10)` in

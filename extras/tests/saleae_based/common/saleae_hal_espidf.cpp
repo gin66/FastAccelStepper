@@ -82,14 +82,24 @@ extern "C" int saleae_hal_serial_read(void) {
   return uart_read_bytes(SALEAE_UART, &c, 1, 0) == 1 ? c : -1;
 }
 
-extern "C" void saleae_hal_idle(void) {
-  // One tick, blocked. See saleae_hal.h for why this is not delay_ms(1): a
-  // sub-tick delay spins, and a spinning idle loop keeps IDLE from ever running,
-  // so the task watchdog fires on a board that is only waiting for a command.
-  // Note the watchdog subscription that fires is IDLE's, so resetting the WDT
-  // from this task would not help -- only blocking lets IDLE reset its own.
-  vTaskDelay(1);
-}
+// Deliberately a sub-tick spin, NOT vTaskDelay(1), even though StepperDemo
+// blocks and never trips the task watchdog. Measured, on ESP-IDF 5.5.3:
+//
+// - Blocking for one whole tick does not fix the IDF 4.4.3 idle watchdog. That
+//   reset fires with no command outstanding at all -- `QINFO` alone reproduces
+//   it, 43 WDT lines -- so it is not this loop, and 5.5.3/6.1 never show it
+//   with identical firmware. Nothing here was fixing it.
+// - It is not free either. The feeder is this same loop, so a one-tick block
+//   changes how promptly a queue is topped up, and `sync` on mcpwm_pcnt grew
+//   trailing pulses (67 where 64 were commanded, period still exactly 10.0 us).
+//   That turned out to be intermittent either way -- 1 failure in 3 runs with
+//   the spin, 2 in 2 with the block -- so the block is not the cause, but it is
+//   not free of suspicion on a path this timing-sensitive.
+//
+// So the spin stays: it is the long-standing behaviour, it is what every
+// measurement in the matrix was taken with, and the watchdog it was proposed
+// to fix is someone else's. See extras/todo/015_rmt_panics_on_esp_idf_5_5.md.
+extern "C" void saleae_hal_idle(void) { saleae_hal_delay_ms(1); }
 
 extern "C" void saleae_hal_serial_write(const char* text) {
   uart_write_bytes(SALEAE_UART, text, strlen(text));
