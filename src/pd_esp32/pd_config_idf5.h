@@ -1,6 +1,42 @@
 #ifndef PD_ESP32_CONFIG_IDF5_H
 #define PD_ESP32_CONFIG_IDF5_H
 
+//--------------------------------------------------------------------------
+// QUEUES_I2S_DIRECT -- one I2S TX channel per I2sManager
+//
+// What this number does: it sizes the pool. MAX_STEPPER bounds
+// `_stepper[MAX_STEPPER]` (FastAccelStepperEngine.h) and fas_queue[NUM_QUEUES]
+// (queue_init.cpp), and tryAllocateQueue() refuses past it -- and both of those
+// exist under SUPPORT_DYNAMIC_ALLOCATION too, which changes the elements from
+// inline queues to pointers but not the array bounds. So the constant is not
+// dead weight under dynamic allocation; it is the sum's upper bound.
+//
+// What it does NOT do: enforce the limit. The i2s_direct path has no
+// _i2s_direct_allocated counter, unlike mcpwm_pcnt and rmt which each keep
+// one. It asks I2sManager::create(), which returns nullptr when
+// i2s_new_channel() fails, and the hardware answers. So overstating this
+// number costs RAM (two pointer arrays, 8 B per slot on ESP32) and buys
+// nothing -- which is the other half of why the old 3 was wrong.
+//
+// Stated per variant rather than read from SOC_I2S_NUM, which this SDK does
+// define and which is why it looks like the obvious source:
+//
+//  - IDF 6 removed it. SOC_I2S_NUM lives in components/soc/<target>/.../
+//    soc_caps.h through IDF 5 and is gone in IDF 6, where the count moved to
+//    the LL layer as I2S_LL_INST_NUM. A constant read from the SDK compiles on
+//    one and not the other, which is exactly what happened: 36d71a12 put it in
+//    the arm both compile, and every IDF 6 build failed on it.
+//
+//  - The hardware does not move, so there is nothing to track. IDF 5's
+//    SOC_I2S_NUM and IDF 6's I2S_LL_INST_NUM agree on every variant (esp32 2,
+//    s3 2, p4 3, s2/c3/c6/h2 1) -- only the spelling changed. A literal per
+//    variant states the number once and compiles on every SDK.
+//
+// Measured, not assumed: on the ESP32, n=1 and n=2 connect and n=3..N are
+// refused inside i2s_new_channel() with ESP_ERR_NO_MEM, on IDF 5.5.3 and 6.1.0
+// alike.
+//--------------------------------------------------------------------------
+
 //==========================================================================
 //
 // ESP32 derivate - the first one
@@ -15,6 +51,7 @@
 #define RMT_SIZE 64
 
 #define QUEUES_MCPWM_PCNT 6
+#define QUEUES_I2S_DIRECT 2
 #define QUEUES_RMT 8
 
 #define NEED_RMT_HEADERS
@@ -33,6 +70,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 64
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 4
 #define NEED_RMT_HEADERS
 #define NEED_PCNT_HEADERS
@@ -51,6 +89,7 @@
 #define RMT_SIZE 48
 
 #define QUEUES_MCPWM_PCNT 4
+#define QUEUES_I2S_DIRECT 2
 #define QUEUES_RMT 4
 #define NEED_RMT_HEADERS
 #define NEED_MCPWM_HEADERS
@@ -66,6 +105,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
 
@@ -81,6 +121,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 2
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
 #define NEED_MCPWM_HEADERS
@@ -98,6 +139,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 2
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
 #define NEED_MCPWM_HEADERS
@@ -114,6 +156,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE CONFIG_SOC_RMT_MEM_WORDS_PER_CHANNEL
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 3
 #define QUEUES_RMT CONFIG_SOC_RMT_TX_CANDIDATES_PER_GROUP
 #define NEED_RMT_HEADERS
 #define NEED_PCNT_HEADERS
@@ -187,7 +230,10 @@
 #undef SUPPORT_ESP32_PULSE_COUNTER
 #endif
 
-#if SOC_I2S_NUM >= 1
+// Gated on the per-variant count above, not on SOC_I2S_NUM. Same value either
+// way on this SDK -- the point is that the gate is then the one number the rest
+// of the file uses, so "has I2S" and "how many I2S queues" cannot disagree.
+#if QUEUES_I2S_DIRECT >= 1
 #define SUPPORT_ESP32_I2S
 #endif
 

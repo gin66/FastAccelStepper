@@ -80,17 +80,33 @@ def run_logged(argv, log, cwd=None, check=False, append=False):
     return rc, time.monotonic() - started
 
 
-def flash(target, port, attempts=2):
+def flash(target, port, attempts=3):
     """Build and flash one matrix row. Returns (ok, seconds, log).
 
-    Retried once, because an upload that reaches esptool and then fails with
-    "Wrong boot mode detected" is the board, not the build: the image is already
+    Retried, because an upload that reaches esptool and then fails with "Wrong
+    boot mode detected" is the board, not the build: the image is already
     compiled and linked at that point, and the DevKitC's DTR/RTS auto-reset
     occasionally does not fire, so the chip is handed to esptool running rather
     than in download mode. It took the arduino-4.4.0 row out of a full matrix
     here, and a matrix row that is lost to a reset costs a whole row of
-    measurements -- so it is worth the retry. The retry is bounded and reported:
-    a row that fails twice is recorded as a failed flash, not retried forever.
+    measurements -- so it is worth the retries. The retry is bounded and
+    reported: a row that fails every attempt is recorded as a failed flash, not
+    retried forever.
+
+    Three attempts rather than two because the reset fault is not reliably fixed
+    by one retry. Each failed attempt costs ~10 s of esptool plus the settle
+    below, against a whole row of measurements, so the third attempt is cheap
+    next to losing the row.
+
+    The retries are insurance, not the fix. Measured on this board: 1 upload in
+    8 succeeded while the fault was active, and 5 in 5 once the board had been
+    power-cycled -- and `lsof` held no reader of the port throughout, so nothing
+    was competing for it. The chip's USB-UART bridge latches into a state where
+    DTR/RTS no longer drives the reset, and only removing power clears it. The
+    board log at the time carried an `esp_core_dump_flash` dump mid-write, which
+    is consistent with the bridge being busy rather than idle. None of that is
+    reachable from here, so a row that still fails every attempt says so and the
+    operator power-cycles; see the report note.
     """
     _tag, proj, env, _rate = target.derive(["--driver", "rmt", "--count", "1"])
     log = log_path(target.id, "flash")
@@ -105,9 +121,12 @@ def flash(target, port, attempts=2):
         if rc == 0:
             print("ok" if attempt == 1 else f"ok (on attempt {attempt})")
             return True, total, str(log)
-        # The build is already done, so the second attempt only re-links if it
-        # must; give the board a moment to settle rather than re-entering
-        # esptool into the same state that just failed.
+        # The build is already done, so a retry only re-links if it must; give
+        # the board a moment to settle rather than re-entering esptool into the
+        # same state that just failed. The wait is flat, because a longer one
+        # was measured not to help: the fault is not a chip that has not woken
+        # up yet, it is the DTR/RTS auto-reset not putting the chip in download
+        # mode at all, and waiting cannot make a line toggle that did not.
         time.sleep(5)
     print(f"FAILED (rc={rc} after {attempts} attempts, see {log})")
     return False, total, str(log)
@@ -145,7 +164,11 @@ def run_target(target, port, baud, force, capture_dir, results_dir):
     row["flash_seconds"] = round(secs, 1)
     row["flash_log"] = log
     if not ok:
-        print("  build or flash failed; no run is possible on this row")
+        print("  build or flash failed; no run is possible on this row\n"
+              "    if the log says 'Wrong boot mode detected', the board's\n"
+              "    USB-UART bridge stopped resetting into download mode:\n"
+              "    power-cycle it and re-run this row. That is measured, not\n"
+              "    guessed -- see flash()'s docstring.")
         row["runs"].append({"label": "flash", "rc": 1,
                             "detail": "build or flash failed"})
         return row
@@ -279,6 +302,11 @@ CAPABILITY = "capability"
 INCOMPLETE = "incomplete"
 DEFECT = "defect"
 
+# The "matrix row" cell for a non-pass no row in THIS run claims. The results
+# directory is cumulative, so a result from a row that did not flash this time
+# lands here rather than being pinned to a row that shares its tag prefix.
+UNATTRIBUTED = "(not measured this run)"
+
 # The firmware's own words for the two non-defect refusals. Matched on the raw
 # reply, not on the note, so classification does not depend on the note
 # rendering.
@@ -374,8 +402,21 @@ def note_of(r):
     verdict = r.get("result")
     if verdict in ("passed", "skipped"):
         return ""
+    # `ok` is a clean success and `POS` is the board's own tally, which agrees
+    # with the capture or it would not be this verdict. Neither is a reason
+    # anything failed, so they are not notes -- see the comment inside.
+    def reports_problem(v):
+        return bool(v) and not re.match(r"\s*(OK|POS)\b", str(v))
+
     for key in ("incomplete_capture", "error", "firmware_reply", "reply"):
-        if r.get(key):
+        # Only a reply that *reports a problem* is a note. A run that failed its
+        # measurement still carries the board's confirmation of the move it did
+        # make -- "OK QRUN / POS 64 64" -- and printing that as the reason puts
+        # the word "OK" in the one column a reader looks at first. Four `defect`
+        # rows read "OK QRUN" before this check. `classify` reads the same
+        # strings and does want the successful ones; that is a different
+        # question and does not go through here.
+        if reports_problem(r.get(key)):
             # An incomplete capture is its own verdict, and it is checked before
             # the generic scan below: the record also carries a `reply` that
             # says "OK QRUN / POS 64 64", which is the board confirming a move
@@ -393,12 +434,49 @@ def note_of(r):
             return one_line(r[key]) if not garbled(one_line(r[key])) \
                 else "(serial output cut off mid-reply -- the board stopped " \
                      "answering)"
-    for key in ("period", "steps", "adherence", "invariants", "per_stepper"):
+    # The measured numbers, which is where a `sync`/`scale` failure actually
+    # lives. `per_stepper` is one level deeper -- {"A": {"steps": {...}}} -- so a
+    # flat "which key is False" scan never sees it and a run whose only failing
+    # sub-measurement is per-stepper fell through to "failed" with no reason.
+    for key in ("period", "steps", "adherence", "invariants"):
         v = r.get(key)
         if isinstance(v, dict):
             bad = [k for k, x in v.items() if x is False]
             if bad:
                 return "failed: " + ", ".join(bad)
+    per = r.get("per_stepper")
+    if isinstance(per, dict):
+        parts = []
+        for letter, sub in per.items():
+            if not isinstance(sub, dict):
+                continue
+            bad = [k for k, x in sub.items()
+                   if isinstance(x, dict) and x.get("ok") is False]
+            if not bad:
+                continue
+            # The measurement, not only the verdict: "period off-grid" says what
+            # to go and look at, "failed: period" does not.
+            how = []
+            for k in bad:
+                m = sub[k]
+                extra = m.get("extra_steps")
+                missing = m.get("missing_steps")
+                got = m.get("steps_measured")
+                want = m.get("steps_expected")
+                if k == "steps" and (extra or missing):
+                    bits = []
+                    if missing:
+                        bits.append(f"{missing} missing")
+                    if extra:
+                        bits.append(f"{extra} extra")
+                    how.append(f"{k} {got}/{want} ({', '.join(bits)})")
+                elif k == "period" and m.get("n_off_grid"):
+                    how.append(f"period {m['n_off_grid']} off-grid")
+                else:
+                    how.append(k)
+            parts.append(f"{letter} " + ", ".join(how))
+        if parts:
+            return "failed: " + "; ".join(parts)
     return verdict or "?"
 
 
@@ -486,12 +564,22 @@ def report(rows, results, args):
                 tags_of[run["tag_key"]] = (row["id"], run["label"])
 
     def row_of(res):
-        """(row id, run label) for one result, or None.
+        """(row id, run label) for one result, or None if this run did not
+        produce it.
 
         A mode point's tag is not the run's tag, so the lookup has to try the
         prefix as well as the exact key -- otherwise every sweep point and every
         driver combination in this report is attributed to a bare tag string,
         which is an index and not a name.
+
+        None is load-bearing and is NOT a licence to fall back to the tag. The
+        results directory accumulates: a row that failed to flash this time still
+        has its results from the time it worked, and matching those against the
+        prefix of some other row's tag put an `idf-6.13.0` finding on a result
+        recorded against `idf-7.1.2` -- a stale measurement presented as one
+        this matrix took. A result no row claims is reported as unattributed
+        (see `unattributed` below) rather than pinned to whichever row happens
+        to share its prefix.
         """
         tag = res.get("tag_key")
         if tag in tags_of:
@@ -549,6 +637,17 @@ def report(rows, results, args):
         if not row["flash_ok"]:
             L.append(f"> **{row['id']}**: build or flash failed "
                      f"({row.get('flash_log')}); nothing was measured.")
+            # Name the recoverable case, because "nothing was measured" reads as
+            # a dead row when the board only needs power-cycling. A build error
+            # is the opposite -- no amount of power-cycling compiles a missing
+            # symbol -- and the log says which it was.
+            L.append(">")
+            L.append("> *If that log says `Wrong boot mode detected`, the row is "
+                     "recoverable without a rebuild: the board's USB-UART "
+                     "bridge stopped resetting into download mode and only "
+                     "removing its power clears it. Power-cycle and re-run this "
+                     "row alone. If it is a compiler error instead, it is a "
+                     "source defect and a power-cycle will not touch it.*")
             L.append("")
 
     # --- catalogue ---------------------------------------------------------
@@ -613,7 +712,10 @@ def report(rows, results, args):
         if kind == BOUND or kind == CAPABILITY:
             continue
         where = row_of(res)
-        bad.append((where[0] if where else res.get("tag_key", "?"),
+        # No row claims it, so this matrix did not measure it. Listed on its own
+        # rather than folded into a row's findings: attributing it to a row would
+        # claim a measurement that row's flash never produced.
+        bad.append(((where[0] if where else UNATTRIBUTED),
                     what_of(res), kind, note_of(res)))
 
     # Grouped before listed, because a driver that fails on *every* scenario of

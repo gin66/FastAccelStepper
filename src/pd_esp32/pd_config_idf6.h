@@ -1,6 +1,34 @@
 #ifndef PD_ESP32_CONFIG_IDF6_H
 #define PD_ESP32_CONFIG_IDF6_H
 
+//--------------------------------------------------------------------------
+// QUEUES_I2S_DIRECT -- one I2S TX channel per I2sManager
+//
+// What this number does: it sizes the pool. MAX_STEPPER bounds
+// `_stepper[MAX_STEPPER]` (FastAccelStepperEngine.h) and fas_queue[NUM_QUEUES]
+// (queue_init.cpp), and tryAllocateQueue() refuses past it -- and both of those
+// exist under SUPPORT_DYNAMIC_ALLOCATION too, which changes the elements from
+// inline queues to pointers but not the array bounds. So the constant is not
+// dead weight under dynamic allocation; it is the sum's upper bound.
+//
+// What it does NOT do: enforce the limit. The i2s_direct path has no
+// _i2s_direct_allocated counter, unlike mcpwm_pcnt and rmt which each keep
+// one. It asks I2sManager::create(), which returns nullptr when
+// i2s_new_channel() fails, and the hardware answers. So overstating this
+// number costs RAM (two pointer arrays, 8 B per slot on ESP32) and buys
+// nothing -- which is the other half of why the old 3 was wrong.
+//
+// Stated per variant, and NOT read from I2S_LL_INST_NUM below even though this
+// SDK defines it and it is the exact number. The count is a property of the
+// silicon and is identical on IDF 5 and IDF 6 -- only the symbol moved
+// (SOC_I2S_NUM -> I2S_LL_INST_NUM). Reading it from the SDK buys nothing and
+// costs a build that only works on one of them.
+//
+// Measured, not assumed: on the ESP32, n=1 and n=2 connect and n=3..N are
+// refused inside i2s_new_channel() with ESP_ERR_NO_MEM, on IDF 5.5.3 and 6.1.0
+// alike.
+//--------------------------------------------------------------------------
+
 //==========================================================================
 //
 // ESP32 derivate - the first one
@@ -15,6 +43,7 @@
 #define RMT_SIZE 64
 
 #define QUEUES_MCPWM_PCNT 6
+#define QUEUES_I2S_DIRECT 2
 #define QUEUES_RMT 8
 
 #define NEED_RMT_HEADERS
@@ -33,6 +62,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 64
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 4
 #define NEED_RMT_HEADERS
 #define NEED_PCNT_HEADERS
@@ -51,6 +81,7 @@
 #define RMT_SIZE 48
 
 #define QUEUES_MCPWM_PCNT 4
+#define QUEUES_I2S_DIRECT 2
 #define QUEUES_RMT 4
 #define NEED_RMT_HEADERS
 #define NEED_MCPWM_HEADERS
@@ -66,6 +97,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
 
@@ -80,6 +112,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
 #define NEED_PCNT_HEADERS
@@ -95,6 +128,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE 48
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 1
 #define QUEUES_RMT 2
 #define NEED_RMT_HEADERS
 #define NEED_PCNT_HEADERS
@@ -110,6 +144,7 @@
 #define HAVE_ESP32_RMT
 #define RMT_SIZE CONFIG_SOC_RMT_MEM_WORDS_PER_CHANNEL
 #define QUEUES_MCPWM_PCNT 0
+#define QUEUES_I2S_DIRECT 3
 #define QUEUES_RMT CONFIG_SOC_RMT_TX_CANDIDATES_PER_GROUP
 #define NEED_RMT_HEADERS
 #define NEED_PCNT_HEADERS
@@ -190,8 +225,12 @@
 #define RMT_DIR_DRAIN_TICKS (RMT_BUFFER_TICKS + RMT_BLOCK_TICKS)
 #endif
 
+// Gated on the per-variant count above, not on I2S_LL_INST_NUM. The two agree
+// on this SDK, and the gate is then the same number QUEUES_I2S_DIRECT is
+// derived from, so "has I2S" and "how many I2S queues" cannot disagree. The LL
+// header is still needed below for the mux's frame timing.
 #include <hal/i2s_ll.h>
-#if I2S_LL_INST_NUM >= 1
+#if QUEUES_I2S_DIRECT >= 1
 #define SUPPORT_ESP32_I2S
 #endif
 
