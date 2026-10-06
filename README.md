@@ -256,13 +256,7 @@ are defined in `pd_*/pd_config.h` files, which are included by
 Open work is one file per item in
 [`extras/todo`](extras/todo/README.md). The filename prefix is the priority,
 three digits wide (`050_name.md`). Numbers step by 10, so a new item can take
-a free number between two existing ones.
-
-The list is library-wide. It currently covers per-platform synchronized
-start, a cubic ramp start, delta-step input for `FasNAxis`, a single-axis
-`moveTo` with an arrival in ticks, and a smooth stop at the end of a path.
-Timed chunks are [FasTimed](extras/doc/FasTimed.md). The n-axis design is the
-[whitepaper](extras/doc/n_axes_whitepaper.md).
+a free number between two existing ones. The list is library-wide. 
 
 ## Star History
 

@@ -39,6 +39,49 @@ The library is tested with different kind of tests:
   [RP2350 platform matrix](../tests/saleae_based/reports/rpipico2_platform_matrix.md);
   the harness itself is documented in
   [saleae_based/README.md](../tests/saleae_based/README.md).
+
+  **Virtual I2S decoder — 32 steppers on 3 wires, decoded by software.** The
+  ESP32 I2S peripheral can multiplex up to 32 stepper signals into one 32-bit
+  word, sent repeatedly on three physical wires (data, bit-clock, word-select).
+  A Saleae logic analyzer captures only those three wires (plus any additional
+  physical stepper channels), and a **software decoder** (`scripts/i2s_mux_decoder.py`)
+  reconstructs the 32 individual stepper channels from the time-multiplexed
+  stream. No extra hardware is needed beyond the three bus wires — the decoding
+  is entirely in software.
+
+  How it works:
+
+  1. The firmware brings up the I2S multiplexer (`IMUX` command). The bus
+     occupies the **last three** analyzer channels (D5 = data, D6 = bclk,
+     D7 = ws); the remaining channels carry any physical steppers.
+  2. The ESP32 sends a 32-bit word every I2S frame: each bit position
+     corresponds to one stepper's STEP signal (and a second bit for DIRECTION
+     when in `dir` mode). The word is two 16-bit halves, low half first.
+  3. `i2s_mux_decoder.py` reads the 8-channel `.sr` capture, extracts the
+     bclk rising edges, samples the data line one sample before each edge
+     (to avoid the ESP32's non-50 % clock duty), and reconstructs the 32
+     slot values. It writes a VCD with 37 channels — 5 passthrough + 32
+     decoded slots — which the ordinary evaluators read with no mux-specific
+     code.
+
+  Key constraints (measured on hardware):
+
+  * **Sample rate:** 24 MS/s is the floor (3 samples per 8 MHz bit-clock
+    period). 48 MS/s is unusable on this analyzer because it truncates an
+    8-channel capture to 0.18 ms.
+  * **Channel budget:** a multiplexed stepper costs a **bit of the 32-bit
+    word, not an analyzer channel**. In `nodir` mode up to 32 steppers can
+    be tested on 8 analyzer channels (5 physical + 3 bus); in `dir` mode
+    up to 16 (a direction bit uses a second bit of the same word).
+  * **Frame-quantized periods:** a multiplexed step can only start on an
+    I2S frame boundary, so its period is a discrete set of frame counts
+    rather than a continuous value. The decoder and evaluators handle this
+    via `signal_parser.grid_period_defects()`.
+
+  The full design and measured results are in
+  [r7_virtual_i2s_mux.md](../implemented/r7_virtual_i2s_mux.md). The harness
+  integrates it through `--driver i2s_mux --imux` on `harness.py` and
+  `--mode scale --driver i2s_mux --pin-mode nodir` for a full 1…32 sweep.
 * manual tests using examples/StepperDemo
 
   These are unstructured tests with listening to the motor and observing the behavior
