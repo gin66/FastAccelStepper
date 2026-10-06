@@ -815,7 +815,13 @@ def report(rows, results, args):
              "latency at that instant, not a correctness property of the queue — "
              "so read the ratio in step periods, which is the only comparable "
              "form of it. What *is* asserted per stepper is its own commanded "
-             "step count and period.")
+             "step count and period — counted over the *commanded move*, not "
+             "over the capture: a capture starts before the test is triggered "
+             "over serial and outlives it, so it holds the host's own round "
+             "trip and the board's idle afterwards. A pulse outside the move is "
+             "not evidence about a driver; it is still recorded, as "
+             "`window.steps_outside` and each pulse's offset, and "
+             "`report.py` prints the count beside the step count.")
     L.append("")
     for rid in ids:
         row = by_row.get(rid)

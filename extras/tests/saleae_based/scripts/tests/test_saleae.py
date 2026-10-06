@@ -3521,6 +3521,72 @@ class TestMuxDecode(unittest.TestCase):
         self.assertEqual(detail["steps"]["steps_measured"], 4)
         self.assertEqual(detail["adherence"]["mean_period_us"], 40.0)
 
+    def test_a_pulse_before_a_multiplexed_move_is_outside_it(self):
+        # The 023 shape, on the driver it was found on. One step bit set far
+        # ahead of the move, then the move itself. On a 24 MS/s capture of `dir`
+        # the data line toggles in every frame, the decode races with the
+        # transition, and bits appear where the plan has none -- 285 ms of them
+        # before the move on the recorded capture. They are a property of the
+        # sampling, not of the driver, and counting them reported a driver
+        # emitting 51 steps it did not emit.
+        # 640 ticks at 16 MHz is 40 us, ten frames, so the move is nine idle
+        # frames then one carrying slot 0.
+        path, (channels, rate), _ = self._capture([1] + [0] * 9
+                                                  + ([0] * 9 + [1]) * 4)
+        pin_map = {"bus": [5, 6, 7], "slots": [0], "mode": "nodir",
+                   "stride": 1}
+        decoded, decoded_rate, record = run_tests.decode_mux_capture(
+            path, channels, rate, pin_map)
+        passed, detail = run_tests.evaluate(
+            "SR_01", decoded, decoded_rate, [(4, 640, True)],
+            dict(vf.Dut().info()), {"A": {"step": "S0"}})
+
+        self.assertTrue(passed, detail)
+        self.assertEqual(detail["steps"]["steps_measured"], 4)
+        win = detail["window"]
+        self.assertTrue(win["anchored"], detail)
+        self.assertEqual(win["steps_in_window"], 4)
+        # Recorded, not discarded: the phantom is still in the result, with how
+        # far before the move it landed. Tens of frames away, which is what lets
+        # the window tell it from the move -- a pulse one commanded period ahead
+        # is the case it cannot, and that one fails the run (TestMoveWindow).
+        self.assertEqual(win["steps_outside"], 1)
+        self.assertLess(win["outside_before_us"][0], -40.0)
+        # The decode's own account of how far it could trust the capture travels
+        # with the result, which is what lets a red run say so next to the step
+        # count that read it as a driver defect.
+        self.assertIn("frame_faults", record)
+        self.assertIn("frame_fault_examples", record)
+
+    def test_the_decoders_frame_faults_reach_the_result(self):
+        # A capture that ends mid-frame leaves `extract_frames()` with bits it
+        # cannot place. The decoder always said so (`report_faults=True`) and the
+        # production path dropped it, so a run could not distinguish a capture
+        # that decoded cleanly from one whose frames did not land on the bus's
+        # own grid -- and reported a driver defect either way. On the recorded
+        # 24 MS/s `dir` captures the count is 100 and 101.
+        bus = MuxBus([1] * 5)
+        waves = {k: bytearray(v)[:-40] for k, v in bus.channels().items()}
+        path = write_mux_bus_vcd(self.tmp / "cut.vcd", waves=waves)
+        channels, rate = sp.load_vcd(str(path))
+        pin_map = {"bus": [5, 6, 7], "slots": [0], "mode": "nodir",
+                   "stride": 1}
+        _, _, record = run_tests.decode_mux_capture(
+            path, channels, rate, pin_map)
+        self.assertGreater(record["frame_faults"], 0, record)
+        self.assertTrue(record["frame_fault_examples"])
+
+    def test_a_clean_bus_decodes_without_a_single_fault(self):
+        # The other half, and it is a real risk: a sink that reported something
+        # for every capture would make the count meaningless. Zero faults has to
+        # mean zero.
+        path, (channels, rate), _ = self._capture([1] * 8)
+        pin_map = {"bus": [5, 6, 7], "slots": [0], "mode": "nodir",
+                   "stride": 1}
+        _, _, record = run_tests.decode_mux_capture(
+            path, channels, rate, pin_map)
+        self.assertEqual(record["frame_faults"], 0, record)
+
 
 class TestMuxFrameGrid(unittest.TestCase):
     """A multiplexed step cannot start between frames, so its period is a set.
@@ -3627,6 +3693,270 @@ class TestMuxFrameGrid(unittest.TestCase):
         src = (SCRIPTS / "run_tests.py").read_text()
         self.assertIn('info.get("frame_grid_ticks")', src)
         self.assertIn("info = dict(info, frame_grid_ticks=", src)
+
+
+class TestMoveWindow(unittest.TestCase):
+    """A capture is not the move; only the commanded move is measured. (023)
+
+    A capture starts before the test is triggered over serial and outlives it,
+    so it holds however long the host took to send the command and however long
+    the board idled afterwards. Nothing the driver did is in that stretch, and
+    counting it reported a driver that emitted steps it did not emit -- the one
+    failure this harness exists to catch.
+
+    So the evaluators measure the move, and the move is found in the waveform:
+    the first contiguous run of as many steps as the plan commands whose gaps
+    all match the command. These tests are mostly about what that must NOT do,
+    because a window that can make a bad run look good is worse than no window:
+
+      * a dropped or an extra step next to the move is still a defect;
+      * a driver running at the wrong rate cannot place its move, and is then
+        measured whole and reported;
+      * a capture with nothing outside the move measures exactly as it did.
+    """
+
+    # 1 sample == 1 us and a tick is a sample, so 160 ticks is a 160 us period.
+    INFO = {"ticks_per_s": 1_000_000, "min_cmd_ticks": 100,
+            "max_speed_ticks": 160, "queue_len": 32, "per_stepper_floor": 160}
+    SEGMENTS = [(40, 160, True)]
+    MAP = {"A": {"step": "D0", "dir": "D1"},
+           "B": {"step": "D2", "dir": "D3"}}
+
+    def dense(self, events, n):
+        s = [0] * n
+        for i, (t, v) in enumerate(events):
+            end = events[i + 1][0] if i + 1 < len(events) else n
+            for j in range(t, min(end, n)):
+                s[j] = v
+        return s
+
+    def square(self, period, n, offset=1000, high=8):
+        out = []
+        for i in range(n):
+            out.append((i * period + offset, 1))
+            out.append((i * period + offset + high, 0))
+        return out
+
+    def capture(self, a_events=None, b_events=None, n=20000):
+        ch = {f"D{i}": [0] * n for i in range(8)}
+        ch["D0"] = self.dense(self.square(160, 40) if a_events is None
+                              else a_events, n)
+        ch["D2"] = self.dense(self.square(160, 40) if b_events is None
+                              else b_events, n)
+        return ch
+
+    def eval16(self, ch):
+        return run_tests.evaluate(run_tests.EVALUATORS["SR_16"], ch, 1_000_000,
+                                  self.SEGMENTS, self.INFO, self.MAP)
+
+    def test_a_pulse_before_the_move_is_not_a_step(self):
+        # Idle, then one pulse, then the 40 commanded steps. What the capture
+        # says is 41 steps; what the driver did is 40 -- and on the recorded
+        # 24 MS/s capture of `i2s_mux` in `dir` the difference was 51 of 115.
+        stray = [(400, 1), (408, 0)]
+        ok, detail = self.eval16(self.capture(
+            a_events=stray + self.square(160, 40)))
+
+        self.assertTrue(ok, detail)
+        a = detail["per_stepper"]["A"]
+        self.assertEqual(a["steps"]["steps_measured"], 40)
+        self.assertEqual(a["steps"]["extra_steps"], 0)
+        win = a["window"]
+        self.assertTrue(win["anchored"])
+        self.assertEqual(win["steps_in_window"], 40)
+        self.assertEqual(win["steps_outside"], 1)
+
+    def test_the_pulses_outside_the_move_are_recorded_with_their_distance(self):
+        # Not discarded. A reader has to be able to see that a capture held a
+        # pulse the plan did not ask for and how far from the move it was --
+        # which is the evidence that distinguishes a sampling race from a
+        # driver defect, and the number a future run is compared against.
+        ch = self.capture(a_events=[(400, 1), (408, 0)] + self.square(160, 40))
+        _, detail = self.eval16(ch)
+        win = detail["per_stepper"]["A"]["window"]
+        self.assertEqual(win["measured_steps"], 41)
+        self.assertEqual(win["outside_before_us"], [-600.0])
+        self.assertEqual(win["outside_after_us"], [])
+        self.assertEqual(win["window_start_us"], 1000.0)
+
+    def test_a_capture_with_nothing_outside_measures_exactly_as_before(self):
+        # The no-op case, and the one that keeps every other test in this file
+        # meaningful: a clean capture has nothing to trim, so the window is the
+        # whole capture and the numbers are what they always were.
+        ok, detail = self.eval16(self.capture())
+        a = detail["per_stepper"]["A"]
+        self.assertTrue(ok, detail)
+        self.assertEqual(a["steps"]["steps_measured"], 40)
+        self.assertEqual(a["mean_period_us"], 160.0)
+        self.assertEqual(a["window"]["steps_outside"], 0)
+        self.assertEqual(a["window"]["steps_in_window"], 40)
+
+    def test_a_dropped_step_is_still_a_defect(self):
+        # The window cannot manufacture a pass: with 39 edges there is no run of
+        # 40, so nothing anchors and the capture is measured whole.
+        ch = self.capture(a_events=self.square(160, 39))
+        ok, detail = self.eval16(ch)
+        a = detail["per_stepper"]["A"]
+        self.assertFalse(ok, detail)
+        self.assertFalse(a["window"]["anchored"])
+        self.assertEqual(a["steps"]["steps_measured"], 39)
+        self.assertEqual(a["steps"]["missing_steps"], 1)
+        self.assertIn("reason", a["window"])
+
+    def test_an_extra_step_next_to_the_move_is_still_a_defect(self):
+        # 41 steps where 40 were commanded, evenly spaced. The first 40 anchor
+        # the move, and the 41st lands one commanded tick after the last one --
+        # inside the move's span, because the move ends when its last *pulse*
+        # ends. A step there is unexplained output from the driver, and it is
+        # counted; only pulses outside the span are set aside.
+        ch = self.capture(a_events=self.square(160, 41))
+        ok, detail = self.eval16(ch)
+        a = detail["per_stepper"]["A"]
+        self.assertFalse(ok, detail)
+        self.assertTrue(a["window"]["anchored"])
+        self.assertEqual(a["window"]["steps_in_window"], 41)
+        self.assertEqual(a["steps"]["extra_steps"], 1)
+
+    def test_a_driver_at_the_wrong_rate_cannot_place_its_move(self):
+        # Every step at 2x the commanded period. No run of gaps matches the
+        # command, so nothing anchors, the whole capture is measured as it was
+        # before the window existed, and the rate error is reported. A window
+        # loose enough to place this would be a window that can hide a rate
+        # error, which is the whole thing it is not allowed to be.
+        ch = self.capture(a_events=self.square(320, 40))
+        ok, detail = self.eval16(ch)
+        a = detail["per_stepper"]["A"]
+        self.assertFalse(ok, detail)
+        self.assertFalse(a["window"]["anchored"])
+        self.assertEqual(a["window"]["steps_in_window"], 40)
+        self.assertTrue(a["period"]["long_periods_us"], detail)
+
+    def test_the_skew_is_measured_from_the_move_and_not_the_first_edge(self):
+        # Two steppers whose moves start together, one of which has a stray
+        # pulse in the pre-move idle. Measured on the first edge in the capture
+        # the skew was the stray's distance -- 40 ms of a "start skew" between
+        # two steppers that started on the same frame.
+        ch = self.capture(a_events=[(400, 1), (408, 0)] + self.square(160, 40))
+        programs = {0: self.SEGMENTS, 1: self.SEGMENTS}
+        ok, detail = run_tests.evaluate(run_tests.eval_sync, ch, 1_000_000,
+                                        self.SEGMENTS, self.INFO, self.MAP,
+                                        programs)
+        self.assertTrue(ok, detail)
+        self.assertEqual(detail["first_step_skew_us"], 0.0)
+        self.assertEqual(sorted(detail["first_step_us"].values()),
+                         [1000.0, 1000.0])
+        self.assertEqual(detail["per_stepper"]["A"]["window"]["steps_outside"], 1)
+
+    def test_a_pause_inside_the_program_still_places_the_move(self):
+        # The gaps of a program with a pause are not all the same value: the
+        # step after a pause is one pause plus one period away. A window placed
+        # by a single period would not find this move, and every scenario with a
+        # pause (SR_09, SR_18, SR_20, SR_26) would silently measure its whole
+        # capture instead.
+        segments = [(5, 160, True), (0, 320, True), (5, 160, True)]
+        events = []
+        at = 1000
+        for _ in range(5):                       # 5 steps, one period apart
+            events += [(at, 1), (at + 8, 0)]
+            at += 160
+        at += 320                                # the pause
+        for _ in range(5):
+            events += [(at, 1), (at + 8, 0)]
+            at += 160
+        ch = self.capture(a_events=events)
+        ok, detail = run_tests.evaluate(
+            run_tests.eval_counts_and_gap, ch, 1_000_000, segments,
+            self.INFO, self.MAP)
+
+        self.assertTrue(ok, detail)
+        win = detail["window"]
+        self.assertTrue(win["anchored"], detail)
+        self.assertEqual(win["steps_in_window"], 10)
+        self.assertEqual(win["steps_outside"], 0)
+        self.assertTrue(detail["pause_found"])
+
+    def test_the_one_case_the_window_cannot_decide_fails_the_run(self):
+        # A pulse exactly one commanded period ahead of the move's first step
+        # has the same gaps behind it as the move, so nothing in the waveform
+        # tells the two apart. The window takes the earliest candidate and
+        # absorbs it, so the move then holds one step more than the plan
+        # commands and the run fails -- deliberately: the capture holds a pulse
+        # the harness cannot account for, and which of two equally plausible
+        # readings it happens to prefer is not a reason to report a driver as
+        # clean. `steps_outside` is 0, which is how the record says "no pulse was
+        # set aside here".
+        ch = self.capture(a_events=[(840, 1), (848, 0)] + self.square(160, 40))
+        ok, detail = self.eval16(ch)
+        a = detail["per_stepper"]["A"]
+        self.assertFalse(ok, detail)
+        self.assertEqual(a["steps"]["extra_steps"], 1)
+        self.assertTrue(a["window"]["anchored"])
+        self.assertEqual(a["window"]["first_step_sample"], 840)
+        self.assertEqual(a["window"]["steps_outside"], 0)
+
+    def test_an_extra_step_continuing_the_move_is_still_a_defect(self):
+        # Todo 181's signature, measured on IDF 5.5.3: `mcpwm_pcnt` emits one
+        # step more than it was given, at the commanded period, immediately
+        # after the run -- and its own tally says 64. So the extra pulse lands
+        # one commanded period past the last commanded step, which is exactly
+        # where a window cut at "the last commanded pulse ends" would put its
+        # boundary: to within a sample at 24 MS/s. The window extends through a
+        # pulse that continues the move's rhythm instead, which is what makes
+        # this count rather than be set aside.
+        ch = self.capture(a_events=self.square(160, 41, offset=1000))
+        ok, detail = self.eval16(ch)
+        a = detail["per_stepper"]["A"]
+        self.assertFalse(ok, detail)
+        self.assertEqual(a["steps"]["extra_steps"], 1)
+        self.assertEqual(a["window"]["anchored"], True)
+        self.assertEqual(a["window"]["steps_in_window"], 41)
+        self.assertEqual(a["window"]["steps_outside"], 0)
+        # The period check cannot see this one -- every gap is the commanded
+        # period -- so the count is the only thing that catches it.
+        self.assertEqual(a["period"]["n_short"], 0)
+        self.assertEqual(a["period"]["n_long"], 0)
+        self.assertTrue(a["period"]["ok"])
+
+    def test_several_extra_steps_continuing_the_move_are_all_counted(self):
+        # The same defect at three steps over: the extension follows the rhythm
+        # as far as it goes rather than absorbing exactly one step and stopping.
+        ch = self.capture(a_events=self.square(160, 43, offset=1000))
+        ok, detail = self.eval16(ch)
+        self.assertFalse(ok, detail)
+        self.assertEqual(detail["per_stepper"]["A"]["steps"]["extra_steps"], 3)
+
+    def test_a_pulse_far_after_the_move_is_outside_it(self):
+        # The other side of the same rule, and the reason it is a rhythm and not
+        # a fixed margin: 12 ms of idle after the move is not the driver still
+        # stepping, it is the capture running on. Set aside, and recorded.
+        ch = self.capture(a_events=self.square(160, 40)
+                          + [(16900, 1), (16908, 0)])
+        ok, detail = self.eval16(ch)
+        a = detail["per_stepper"]["A"]
+        self.assertTrue(ok, detail)
+        self.assertEqual(a["steps"]["steps_measured"], 40)
+        self.assertEqual(a["window"]["steps_outside"], 1)
+        self.assertGreater(a["window"]["outside_after_us"][0], 1000.0)
+
+    def test_the_commanded_timeline_is_the_plan_and_not_a_constant_period(self):
+        # The window's own arithmetic, stated directly: 2 steps, then a pause of
+        # one period, then 2 steps -- offsets 0, 160, 800, 960 ticks, so the
+        # middle gap is a pause plus a period and the last step's own pulse runs
+        # for 160 ticks past its edge.
+        tl = run_tests.commanded_timeline(
+            [(2, 160, True), (0, 160, True), (2, 160, True)],
+            {"ticks_per_s": 1_000_000})
+        self.assertEqual(tl["steps_ticks"], [0, 160, 480, 640])
+        self.assertEqual(tl["gaps_ticks"], [160, 320, 160])
+        self.assertEqual(tl["last_ticks"], 160)
+        self.assertEqual(tl["span_ticks"], 640)
+        # `limit` takes the first N steps, which is what an evaluator judging
+        # one segment's worth does.
+        self.assertEqual(
+            run_tests.commanded_timeline([(4, 160, True), (4, 320, True)],
+                                        {"ticks_per_s": 1_000_000}, limit=4),
+            {"steps_ticks": [0, 160, 320, 480], "gaps_ticks": [160, 160, 160],
+             "last_ticks": 160, "span_ticks": 480})
 
 
 class TestPins(unittest.TestCase):

@@ -102,3 +102,51 @@ The useful new datum is that the *good* case is exactly right — 64/64 on both
 SDKs, periods on grid, no drift — so this is not a boundary condition that
 sometimes resolves. Something occasionally emits three extra pulses at precisely
 the commanded spacing, and otherwise the driver is exact.
+
+## 2026-10-06 — 3 failures in 3 runs, one extra step, always the last one
+
+Re-measured while closing [023](../doc/implemented/i2s_mux_dir_phantom_steps.md),
+because the run that verifies 023's fix is the run that lands on this row. Three
+back-to-back `--mode sync … --pin-mode dir --imux` sweeps on the same board,
+ESP-IDF **5.5.3**: `mcpwm_pcnt+i2s_direct` failed **3 times in 3**. Both other
+`mcpwm_pcnt` combinations in each of those sweeps (`rmt+mcpwm_pcnt`,
+`mcpwm_pcnt+mcpwm_pcnt`, `mcpwm_pcnt+i2s_mux`) passed every time.
+
+So the "roughly 1 in 3" above and the "0 of 16" recorded after it are both
+understated for this combination: three for three, with nothing changed in the
+driver in between. The honest reading is that the rate is combination-dependent
+and this measurement says nothing about the others — a defect that appears in a
+third of runs, in none of sixteen, and then in three of three is the same defect
+described with three different denominators.
+
+**One extra step, not three, and it is the last one.** Every occurrence:
+
+```
+A ch=D0 ticks=160  steps 65/64  extra 1
+   period: 64 periods, n_short 0, n_long 0, ok=True, mean 9.9915 us
+   window: anchored, steps_in_window 65, steps_outside 0
+   step offsets from the first: 0, 10, 20, 29.958, … 629.5, 639.5
+   commanded span 630 us, measured span 639.5 us -- exactly one period more
+B ch=D2 ticks=320  steps 64/64, exact, in the same capture
+reply: OK QRUN / POS 64 64 64 64
+```
+
+That answers **"Where are the 3 steps?"** for these observations, and it is the
+most useful thing in this entry: the extra pulse is not scattered through the run,
+it is *after* it, at the commanded spacing, and the queue's own tally says 64 —
+so nothing over-fed the queue, and the extra pulse is emitted after the command
+the queue believes it has finished. That is the "already handed to hardware"
+shape the item hypothesises, at one step rather than 67.
+
+It also settles a harness question that was open until today: an extra step that
+continues the move's rhythm past its last commanded step must be **counted**, not
+set aside as pre-move idle. At 24 MS/s the pulse lands on the tick boundary to
+within a sample, so a move window cut at "the last commanded pulse ends" would
+have hidden this defect half the time. The window now extends through any pulse
+whose gap is one the command could have produced
+(`run_tests.move_window()`, and `TestMoveWindow`'s two continuation tests).
+
+**Still to do** — unchanged by this: whether it needs `sync` (every observation
+is two steppers, `dir`, 160/320 ticks), and the MCPWM/PCNT invariants in
+`extras/doc/platforms/esp32.md`. The `POS` disagreement above narrows the search
+to the driver, not the feeder.

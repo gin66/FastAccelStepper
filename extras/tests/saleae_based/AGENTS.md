@@ -420,6 +420,44 @@ sets `no_topup` and the queue drains exactly what `QFILL` reported.
   adherence per stepper. A refused point is recorded and the plan continues.
 - Characterization scenarios above are runnable by hand with `control.py`.
 
+### The move, not the capture
+
+Every evaluator that asserts a step count measures **the commanded move**
+(`run_tests.move_window()`), not the capture. A capture is not the move: it
+starts before the test is triggered over serial and outlives it, so it holds
+however long the host took to send the command and however long the board idled
+afterwards — on a recorded `i2s_mux` `dir` capture, 285 ms of a 500 ms file.
+
+No ramp is in the way (`addQueueEntry()` is driven directly), so the plan fixes
+the move's timeline exactly: a segment of `steps` at `ticks` occupies
+`steps * ticks`, a pause occupies `ticks`, and steps land at the start of their
+own tick. The window is the **first contiguous run of as many steps as the plan
+commands whose gaps all match the command** — per gap, so a program with a pause
+still places its move; on a grid (the mux) a whole number of frames, off one a
+quarter of the commanded gap, which is deliberately looser than the rule that
+*judges* periods because this one only has to locate the move.
+
+Four things it deliberately does not do, each a test in `TestMoveWindow`:
+
+- **It cannot hide a dropped step.** Fewer steps than commanded and no window
+  exists, so the whole capture is measured and the shortfall is reported.
+- **It cannot hide an extra step the driver keeps producing.** The window ends
+  at the last commanded pulse *and extends through any pulse whose gap from the
+  one before it is one the command could have produced* — the anchor's own rule,
+  applied forwards. `mcpwm_pcnt` on IDF 5.5.3 emits one step more than it was
+  given, at the commanded period, immediately after the run (todo 181), and at
+  24 MS/s that lands on the tick boundary to within a sample: a window cut at the
+  last commanded pulse would have set it aside half the time.
+- **A driver at the wrong rate cannot place its own move**, so nothing anchors,
+  the capture is measured whole and the rate error is reported.
+- **It discards nothing.** Every result carries `window`: `anchored`,
+  `steps_in_window`, `steps_outside`, and each outside pulse's offset from the
+  move's own start. The first-step skew is measured on the move's first step.
+
+`SR_13` (a rejected command must emit nothing at all) and the marker-relative
+`SR_25`/`SR_30` deliberately keep the whole capture: there a pulse anywhere is
+the measurement.
+
 ### SR_31: the maximum stepper count
 
 `SCENARIOS["SR_31"]` is the one entry whose stepper count is **not a literal**.
@@ -472,26 +510,31 @@ steppers, D0…D7) — the fixture and report path only; a hardware run uses the
 board's own `MAP`. A 2-stepper map here would score A and B and report the run
 done with six channels unread.
 
-**Two known reasons a mux row may record red,** both pre-existing and both
-recorded rather than worked around:
+**One known reason a mux row may record red,** pre-existing and recorded rather
+than worked around:
 
-- [023](../../todo/023_i2s_mux_dir_phantom_steps_at_24ms.md) — the 24 MS/s
-  sampling race makes the mux decode unreliable at high n. `nodir` is the clean
-  case (the data line is idle-low and has no transitions to race with), which is
-  one more reason this scenario does not use `dir`.
 - the intermittent dropped pulse (`r7_virtual_i2s_mux.md` §5). Observed while
   measuring this item's premise: a forced 32-point `--mode scale --driver i2s_mux
   --pin-mode nodir` sweep passed 31 of 32, with n = 3 reporting **63 of 64 steps**
   and one off-grid period; an immediate re-run of n = 1…4 passed all four. A
   max-count scenario inherits it — at n = 32 the expected cost is one flake per
   few runs, which is a different trade from a scenario that is red every time.
+  The 24 MS/s sampling race was the *other* one and is closed: the evaluators
+  measure the commanded move rather than the whole capture, and the decoder's
+  frame faults now travel with the result (see *The race is not fixed; the
+  measurement of it is* below). `nodir` remains the clean case — the data line
+  is idle-low and has no transitions to race with — which is one more reason this
+  scenario does not use `dir`. A dropped step is still caught by the window: a
+  swallowed step leaves no run of gaps for it to anchor on, so the whole capture
+  is measured and the shortfall is reported.
 
-**Measured on hardware** (ESP32-DevKitC, ESP-IDF 5.5.3, `--pin-mode dir`, the
-catalogue re-run in full after the watchdog fix below). Each stepper's own step
-count and period, all within tolerance:
+**Measured on hardware** (ESP32-DevKitC, `--pin-mode dir`, the catalogue
+re-run in full after the watchdog fix below; the `i2s_mux` row on ESP-IDF 5.5.3).
+Each stepper's own step count and period, all within tolerance:
 
 | driver | max steppers | probe | notes |
 |---|---|---|---|
+| `i2s_mux` | **32** | `CONFIG 32 i2s_mux,… nodir` accepted first try | the 32-bit word is the budget and it is not the analyzer's: a multiplexed stepper costs a slot, not a channel. All 32 at 64/64, mean period spread **0.0000 µs** |
 | `rmt` | **8** | `CONFIG 8 rmt,… nodir` accepted first try | 8 queues, 8 channels — the analyzer is the binding constraint and the driver happens to match it |
 | `mcpwm_pcnt` | **6** | 8 and 7 refused `ERR connect step 6`, 6 accepted | `QUEUES_MCPWM_PCNT` = 6 confirmed by the board |
 | `i2s_direct` | **2** | 8 down to 3 refused, 2 accepted | `SOC_I2S_NUM` = 2; the refusals name `i2s_new_channel(): no available channel found` |
@@ -522,9 +565,11 @@ numbers above mean anything:
 - **The board's own task watchdog reset it mid-capture, and SR_00 called that
   eight dead pins.** See below.
 
-**Not yet measured on hardware:** `i2s_mux` (32). The 32-stepper decode is
-024-untested and the intermittent dropped pulse is expected to show at that
-count.
+The `i2s_mux` row is green **once**: the intermittent dropped pulse is what
+bounds how often it stays that way, and a dropped step is still caught by the
+move window (see *The move, not the capture*). The 24 MS/s sampling race is no
+longer a reason for it to go red at all — see *The race is not fixed; the
+measurement of it is* below.
 
 ### The ESP-IDF task watchdog, and why SR_00 failed
 
@@ -681,10 +726,12 @@ names, 32 `maxspeedN` fields), `MAP` reports `slots=0…31`, n=33 is refused, an
 `dir` reaches 16 and refuses 17. Both of the mux's documented claims now hold.
 The reported `ERR unknown '2s_mux,i2s_mux'` was head-loss (the `cmd` field is 15
 characters wide and that token is exactly 15), and the suspected 256-byte RX
-ring was already 1024 before the report was filed. What is actually unmeasured is
-the direction slots on the wire, which 023's sampling race blocks.
+ring was already 1024 before the report was filed. The direction slots on the
+wire were unmeasured at the time because of the sampling race below; the
+`syncdir_i2s_mux*dirn2` rows re-evaluate as passing with `slots` and `dslots`
+agreeing on every one.
 
-### The mux in `dir` mode: a host bug, and 51 phantom steps left
+### The mux in `dir` mode: a host bug, and the sampling race
 
 `CONFIG 2 i2s_mux,i2s_mux dir` was recorded as an **incomplete capture, S2
 missing**, on both I2S SDKs, and read as a lost slot in the driver. It is not.
@@ -700,7 +747,7 @@ of the group:
 | 14 | 125 205 | — | the other DIRECTION bit |
 | 15 | **64** | mean **24.931 µs** (24/28 on the 4 µs frame grid) | a step signal, 400 ticks |
 | 13 | **64** in the move | mean **49.925 µs** (48/52 on the grid) | a step signal, 800 ticks |
-| 11 | 50 | 8177 µs | nothing — see 023 |
+| 11 | 50 | 8177 µs | nothing — a sampling race, see below |
 
 400 ticks at 16 MHz is 25.000 µs and 800 is 50.000 µs, so both step signals sit
 on the commanded periods carried on the frame grid. Positions 15 and 13 are high
@@ -722,17 +769,67 @@ channel), because `_mux_map_with_slots()` built it with `slots[j * stride]` and
 `slots=[0,2]` with `stride=2` is *one* stepper. The same one-entry-per-channel
 misreading `read_map()` had, fixed with it.
 
-With the map right the run is **still red**, for a different reason: position 13
+With the map right the run was **still red**, for a different reason: position 13
 is high in 51 more frames, 285 ms *before* `QRUN`, and position 11's 50 cannot
 be emitted at all. That is the 24 MS/s floor racing itself (3 samples per bclk
-period, no margin) and it is
-[`023_i2s_mux_dir_phantom_steps_at_24ms.md`](../../todo/023_i2s_mux_dir_phantom_steps_at_24ms.md).
-`--mode scale --driver i2s_mux --pin-mode nodir` is green throughout (n=1...8,
-64/64) because in `nodir` the data line is idle-low and has no transitions to
-race with.
+period, no margin). `--mode scale --driver i2s_mux --pin-mode nodir` was green
+throughout (n=1...8, 64/64) because in `nodir` the data line is idle-low and has
+no transitions to race with.
 
-The matrix rows and the recorded `syncdir_i2s_mux*dirn2` results predate both
-fixes; `run_matrix.py` regenerates them.
+### The race is not fixed; the measurement of it is
+
+Those 51 frames were 51 extra steps in the result, because **every evaluator
+counted the whole capture** and a capture is not the move: it starts before the
+test is triggered over serial and outlives it, so it holds 285 ms of pre-move
+idle on a 500 ms capture. Nothing the driver did is in that stretch. `dir` is
+the mode where it shows because the direction bits are held high, so the data
+line toggles in **every** frame and every frame is a race.
+
+The evaluators now measure the **commanded move** (`run_tests.move_window()`):
+the first contiguous run of as many steps as the plan commands whose gaps all
+match the command, with the gaps derived per gap (so a program with a pause
+still places its move) and judged on the frame grid in `dir`/mux. Steps outside
+the window are **recorded** in the result — `window.steps_outside` with each
+pulse's offset from the move — never discarded. The first-step skew is measured
+on the move's first step too, which is why `i2s_mux+i2s_mux` reads 0.0 us
+against the 242 334 us it reported (44.9 step periods, from a phantom 242 ms
+early). Nothing the window can do makes a bad run pass: a dropped step, an extra
+step inside the move's span, and a driver at the wrong rate are each still a
+failure, and each is a test in `TestMoveWindow`.
+
+`extract_frames()`'s frame-alignment diagnostics travel with the result now
+(`decoded_from.frame_faults`): **98–103 on every 24 MS/s `dir` capture**, and
+**102 on the `nodir` capture at 32 steppers** as well — so the faults belong to
+three samples per bit period and not to `dir`. One capture in 1250 decodes wrong,
+and the run says so next to the step count instead of the step count being the
+only evidence. Recorded, never gated: a threshold high enough to be meaningful
+is one every mux run at this rate fails.
+
+**Measured on hardware**, `--mode sync --pin-mode dir --imux`, one sweep per I2S
+SDK — all eight rows that were red:
+
+| SDK | `i2s_direct+i2s_mux` | `mcpwm_pcnt+i2s_mux` | `rmt+i2s_mux` | `i2s_mux+i2s_mux` |
+|---|---|---|---|---|
+| IDF 5.5.3 | **passed** | **passed** | **passed** | **passed** |
+| IDF 6.1.0 | **passed** | **passed** | **passed** | **passed** |
+
+Each stepper 64/64 at its own commanded period, `first_step_skew_us` **0.0** on
+both `i2s_mux+i2s_mux` rows against the 242 334 us they reported, and one to
+three pulses per capture set aside — the closest to the move 4.5 ms, against a
+move 1.575 ms long. Before the hardware was attached, every recorded capture was
+re-run through the new code offline, as a check that nothing else moved: **212 SR
+catalogue, 16 `scale` and 28 non-mux `sync` verdicts unchanged**, and the seven
+then-red mux rows evaluating as passed. Full record, measurements and the
+invariants:
+[`extras/doc/implemented/i2s_mux_dir_phantom_steps.md`](../../../doc/implemented/i2s_mux_dir_phantom_steps.md).
+
+The one red row in those sweeps is `mcpwm_pcnt+i2s_direct` on IDF 5.5.3, **three
+sweeps in three**, and it is
+[181](../../todo/181_mcpwm_pcnt_sync_extra_steps.md). It is also what found this
+item's own trailing knife-edge — the extra pulse lands on the tick boundary to
+within a sample at 24 MS/s, so the window now extends through a pulse that
+continues the move's rhythm rather than being cut at the last commanded pulse.
+See "The move, not the capture" above.
 
 ## Capture format
 

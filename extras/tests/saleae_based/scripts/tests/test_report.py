@@ -326,6 +326,34 @@ class TestModeTables(unittest.TestCase):
         self.assertIn("x10883/64", row)
         self.assertIn("+10819", row)
 
+    def test_pulses_the_window_set_aside_are_visible_in_the_cell(self):
+        """A count that reads `x64/64` with three pulses elsewhere in the
+        capture says less than the run does.
+
+        The evaluators measure the commanded move, so a pulse in a capture's
+        pre-move idle is not evidence about a driver and does not fail the run.
+        It is still in the capture, and the cell has to say so: a number that
+        exists only in the result JSON is a number nobody reads.
+        """
+        record = mode_record(
+            drivers=["i2s_mux", "i2s_mux"],
+            first_step_skew_us=0.0, skew_periods=0.0,
+            per_stepper={
+                "A": {**mode_record()["per_stepper"]["A"],
+                      "window": {"anchored": True, "steps_in_window": 64,
+                                 "steps_outside": 3}},
+                "B": {**mode_record()["per_stepper"]["B"],
+                      "window": {"anchored": True, "steps_in_window": 64,
+                                 "steps_outside": 0}},
+            })
+        text = report.as_mode_tables(self.write([record]))
+        row = [ln for ln in text.splitlines()
+               if ln.startswith("| i2s_mux+i2s_mux")][0]
+        self.assertIn("x64/64 (3 outside)", row)
+        # Zero is not printed: a cell is already wide, and "0 outside" says
+        # nothing a reader did not assume.
+        self.assertNotIn("(0 outside)", row)
+
     def test_the_target_comes_from_the_record_not_the_tag_key(self):
         """Grouping by architecture must not mean parsing one.
 

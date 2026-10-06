@@ -24,7 +24,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **023** | [i2s_mux in `dir`: phantom steps from the 24 MS/s sampling race](023_i2s_mux_dir_phantom_steps_at_24ms.md) | ~150 k | 1 d | Medium: `sync --imux --pin-mode dir` reports 51 extra steps on stepper B — 201 corrupt words of 125 255, one of which sets slot 4 that no code path can set. 24 MS/s is exactly 3 samples per bclk period, so there is no margin. |
 | **025** | [Pico `forceStop()` discards an exact step count](025_pico_force_stop_loses_step_count.md) | ~30 k | 0.5 d | Medium: `pio_sm_clear_fifos` drops RX, then `pos_offset = 0`. Also a read-before-test in `getCurrentStepCount()`. Not started; an unverified attempt was dropped. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
@@ -45,9 +44,60 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 20 items | ~6.3 M | 18–26 w | Priorities 023–181, plus 500. |
+| **total** | 19 items | ~6.1 M | 17–26 w | Priorities 025–181, plus 500. |
 
 ## Done
+
+- **023 — `i2s_mux` in `dir`: the harness counted the capture, not the move.**
+  `sync --imux --pin-mode dir` reported a driver emitting 51 steps it did not
+  emit: **every evaluator counted the whole capture**, and a capture starts
+  before the test is triggered over serial and outlives it, so it holds 285 ms
+  of pre-move idle on a 500 ms capture. 24 MS/s over an 8 MHz bclk is exactly
+  three samples per bit period and `dir` holds the direction bits high, so the
+  data line toggles in every frame and the decode races with those transitions —
+  a race no rate on this analyzer fixes, since 48 MS/s truncates an eight-channel
+  capture to 0.18 ms.
+
+  The race was not "fixed"; the harness stopped asking the wrong question. The
+  plan fixes the move's timeline exactly (`addQueueEntry()` is driven directly,
+  no ramp in the way), so `move_window()` measures **the first contiguous run of
+  as many steps as the plan commands whose gaps all match the command** — gaps
+  per gap, so a program with a pause still places its move, and derived from the
+  grid on a mux and from a quarter-period off one elsewhere. The five ways that
+  could have become a way to pass a bad run are each a test: a dropped step, an
+  extra step inside the move's span, a driver at the wrong rate, a clean capture
+  (unchanged numbers), and SR_13's zero-step assertion (untouched). Trimmed
+  pulses are **recorded** with their offsets from the move, never discarded; the
+  first-step skew is measured on the move's first step, which is why
+  `i2s_mux+i2s_mux` now reads 0.0 µs against the 242 334 µs it reported.
+
+  `extract_frames()`'s frame-alignment diagnostics were computed and thrown
+  away, so a run could not say the capture was at fault; they now travel in the
+  result as `decoded_from.frame_faults` — **98–103 on every 24 MS/s `dir`
+  capture, and 102 on a `nodir` one**, so the faults belong to three samples per
+  bit period and not to `dir`. One capture in 1250 decodes wrong, now stated
+  rather than counted as steps. Recorded, not gated: a threshold high enough to
+  be meaningful is one every mux run at this rate fails.
+
+  **Measured on hardware**, `--mode sync --pin-mode dir --imux`, one sweep per
+  I2S SDK: **all eight `i2s_mux` rows that were red now pass** on both, every
+  stepper 64/64 at its own period, `first_step_skew_us` 0.0 on the two
+  `i2s_mux`+`i2s_mux` rows against the 242 334 µs they reported, and 1–3 pulses
+  per capture recorded outside the move (the closest 4.5 ms, against a move
+  1.575 ms long). Before that, every recorded capture was re-run through the new
+  code as a check that nothing else moved: **212 SR catalogue, 16 `scale` and 28
+  non-mux `sync` verdicts unchanged**.
+
+  The hardware run also did two things the offline pass could not. It found the
+  window's **trailing knife-edge** — 181's `mcpwm_pcnt` extra step lands on the
+  tick boundary to within a sample, so a window cut at the last commanded pulse
+  would have hidden a real defect half the time; the window now extends through
+  any pulse that continues the move's rhythm. And it closed the **`i2s_mux` at
+  n = 32** row that had been "not yet measured on hardware": 32 accepted on the
+  first probe attempt, all 32 at 64/64, mean period spread **0.0000 µs**.
+
+  Full record, with the measurements:
+  [i2s_mux_dir_phantom_steps.md](../doc/implemented/i2s_mux_dir_phantom_steps.md).
 
 - **184 — the mux decoder's fixture launched its data at the wrong instant.**
   11 unit-test failures, all correct to fail. `Bus._render()` drew each bit's
@@ -64,8 +114,8 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   recorded results. Worth keeping: the first diagnosis blamed the decoder and was
   built on a word read with bclk and data swapped, then "verified" with arithmetic
   derived from it. The item records that, because the three confirmations were all
-  the same circular step. 023 (the 24 MS/s race in `dir`) is separate and open;
-  `i2s_mux` at n = 32 is still unmeasured, but the decoder is no longer why.
+  the same circular step. 023 (the 24 MS/s race in `dir`) was separate and is
+  now closed — see Done, which is also where `i2s_mux` at n = 32 got measured.
 
 - **183 — the catalogue now asks how many steppers a driver drives (SR_31).**
   The gap was real and it had a mechanism: the catalogue's largest case was three
@@ -105,9 +155,9 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   **Measured on hardware** (ESP32-DevKitC, ESP-IDF 5.5.3): `rmt` **8**,
   `mcpwm_pcnt` **6**, `i2s_direct` **2** — each stepper's own step count and
   period, period spread 0.000–0.004 µs, and the full 28-scenario catalogue green
-  on all three after the watchdog fix below. `i2s_mux` (32) is not yet measured;
-  023's 24 MS/s sampling race and the intermittent dropped pulse are why that row
-  is not simply assumed green.
+  on all three after the watchdog fix below. `i2s_mux` **32** was added later, by
+  the run that closed 023: 32 accepted on the first probe attempt, all 32 at
+  64/64, period spread 0.0000 µs.
 
   **The first hardware run found two defects, and the second is the more
   interesting one.**
@@ -171,8 +221,10 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   The item's *goal* — make the 32-stepper claim testable — was real and became
   **183**, now **SR_31** (see Done), because the blocker was never the parser:
   **no catalogue scenario stepped more than three steppers**, and `--mode scale`
-  was outside `ALL_TESTS`. What remains genuinely unmeasured is the direction
-  slots on the wire, which 023's 24 MS/s sampling race blocks.
+  was outside `ALL_TESTS`. What remained unmeasured at the time — the direction
+  slots on the wire, which 023's 24 MS/s sampling race blocked — is measured now:
+  the eight `syncdir_i2s_mux*dirn2` rows re-evaluate as passing, `dslots` and
+  `slots` agreeing on every one. See 023 in Done.
 
 - **`i2s_mux` in `dir` "loses the second stepper's slot" — closed, and it was
   our own decoder config.** Filed HIGH as a functional defect in the shipped
@@ -194,11 +246,14 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   MAP's reported direction slots under the wire order, which a wrong half-swap
   would not.
 
-  What remains is 51 phantom steps per `dir` capture from the 24 MS/s sampling
-  race, one of which sets a bit no code path in `src/` can set:
-  [023](023_i2s_mux_dir_phantom_steps_at_24ms.md). The matrix report rows and
-  the four recorded `syncdir_i2s_mux*dirn2` results are stale for the same
-  reason and are regenerated by `run_matrix.py`.
+  What remained was 51 phantom steps per `dir` capture from the 24 MS/s sampling
+  race, one of which set a bit no code path in `src/` can set. That was
+  [023](i2s_mux_dir_phantom_steps.md), now in
+  [Done](#done): the race is unchanged and the harness now measures the
+  commanded move rather than the capture, which is what those 51 steps were
+  being added to. The matrix report rows and the recorded
+  `syncdir_i2s_mux*dirn2` results are still the pre-fix ones and are regenerated
+  by `run_matrix.py`.
 
 - **`i2s_direct` has 2 channels on the ESP32, not 3 — fixed.**
   `QUEUES_I2S_DIRECT` was a hand-copied `3` where the ceiling is the chip's

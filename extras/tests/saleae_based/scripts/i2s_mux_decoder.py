@@ -569,7 +569,8 @@ def decode_channels(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
                     passthrough: Iterable[str],
                     slots: Optional[Iterable[int]] = None,
                     i2s: Optional[Dict[str, str]] = None,
-                    include_bus: bool = False) -> Dict[str, bytearray]:
+                    include_bus: bool = False,
+                    faults: Optional[List[str]] = None) -> Dict[str, bytearray]:
     """The decoded channel set: the passthrough pins plus one per mux slot.
 
     Every channel is the same length as the capture, because the evaluators
@@ -579,6 +580,13 @@ def decode_channels(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
     are also copied into the output alongside the decoded slots, so a single
     VCD holds both the raw bus signals and the demux output — useful for
     debugging sampling races.
+
+    `faults`, when given, is filled with the frame-alignment diagnostics
+    `extract_frames()` computes. They are the decoder's own account of how far
+    it could trust its output, and a caller that drops them cannot tell a
+    capture that decoded cleanly from one whose frames did not land on the
+    bus's own grid — which is the difference between a driver defect and a
+    sampling race, and the run's result has to be able to state it.
     """
     names = sorted(channels)
     n = max((len(channels[c]) for c in names), default=0)
@@ -603,7 +611,10 @@ def decode_channels(channels: Dict[str, Sequence[int]], sample_rate_hz: int,
                 series = bytearray(n)
                 series[:min(n, len(samples))] = samples[:n]
                 out[name] = series
-    frames = extract_frames(channels, sample_rate_hz, i2s)
+    frames, found = extract_frames(channels, sample_rate_hz, i2s,
+                                   report_faults=True)
+    if faults is not None:
+        faults.extend(found)
     out.update(synthesize(frames, list(range(SLOTS)) if slots is None else slots, n))
     return out
 
@@ -711,8 +722,13 @@ def read_comment(path) -> List[str]:
 # ---------------------------------------------------------------------------
 
 
-def decode(cfg: DecoderConfig, source_rate_hz: Optional[int] = None) -> Path:
-    """Decode cfg.source_vcd into cfg.output_vcd and return the output path."""
+def decode(cfg: DecoderConfig, source_rate_hz: Optional[int] = None,
+           faults: Optional[List[str]] = None) -> Path:
+    """Decode cfg.source_vcd into cfg.output_vcd and return the output path.
+
+    `faults`, when given, collects the frame-alignment diagnostics -- see
+    `decode_channels`.
+    """
     if not cfg.source_vcd:
         raise ConfigError("no source_vcd")
     if not cfg.output_vcd:
@@ -720,7 +736,7 @@ def decode(cfg: DecoderConfig, source_rate_hz: Optional[int] = None) -> Path:
     channels, rate = sp.load_vcd(cfg.source_vcd, source_rate_hz)
     out = decode_channels(channels, rate, cfg.passthrough_channels,
                           cfg.slots(), cfg.i2s_channels,
-                          cfg.include_bus)
+                          cfg.include_bus, faults)
     return write_vcd(cfg.output_vcd, out, rate, cfg.comment_lines())
 
 
@@ -763,12 +779,19 @@ def main(argv=None) -> int:
     if not cfg.output_vcd:
         ap.error("no output VCD: pass --output or set output_vcd in the config")
 
+    faults: List[str] = []
     try:
-        out = decode(cfg, args.sample_rate)
+        out = decode(cfg, args.sample_rate, faults)
     except (ConfigError, DecodeError) as exc:
         print(f"i2s_mux_decoder: {exc}", file=sys.stderr)
         return 2
     print(out)
+    # On stderr, so the path on stdout stays pipeable, and unconditionally: a
+    # capture that decoded with faults on it is a capture whose step count should
+    # be read with that in hand. The decode itself is not refused for it.
+    if faults:
+        print(f"i2s_mux_decoder: {len(faults)} frame-alignment fault(s); "
+              f"first: {faults[0]}", file=sys.stderr)
     return 0
 
 

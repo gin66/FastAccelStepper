@@ -40,6 +40,7 @@ Usage:
 """
 
 import argparse
+import dataclasses
 import json
 import re
 import subprocess
@@ -910,14 +911,26 @@ def decode_mux_capture(capture_file, channels, sample_rate, pin_map,
         include_bus=True,
         out_comment=[f"  captured_from: {Path(capture_file).name}"],
     )
-    out = muxdec.decode(cfg, sample_rate)
+    faults = []
+    out = muxdec.decode(cfg, sample_rate, faults)
     decoded, rate = sp.load_vcd(str(out))
     # Only the slots this run used, so the decoded file is 5 + n channels rather
     # than 37. The count is recorded in the result either way; what a reader wants
     # is the waveform of the steppers that were actually connected.
     return decoded, rate, {"vcd": str(out), "source": str(capture_file),
                            "bus_channels": bus,
-                           "channels": len(decoded)}
+                           "channels": len(decoded),
+                           # How many frames the decoder could not place on the
+                           # bus's own frame grid. Recorded rather than acted on:
+                           # 24 MS/s over an 8 MHz bclk is three samples per bit,
+                           # and in `dir` the data line toggles every frame, so
+                           # faults are expected there and gating on them would
+                           # fail every `dir` mux run for a property of the
+                           # analyzer. What it buys is that a red run can say
+                           # "this capture decoded N misaligned words" next to
+                           # the step count that read it as a driver defect.
+                           "frame_faults": len(faults),
+                           "frame_fault_examples": faults[:8]}
 
 
 def _mux_map_with_slots(pin_map):
@@ -2003,6 +2016,247 @@ def check_periods(periods_us, ticks, info, with_adherence=False):
     return (sp.period_defects(periods_us, expect_us),
             sp.rate_adherence(periods_us, expect_us) if with_adherence else None)
 
+
+# How close a measured inter-step gap must sit to its commanded value for the
+# pair to be *placed inside the commanded move*. Deliberately looser than
+# check_periods(), because this rule locates and that one judges: an anchoring
+# tolerance tighter than the judging one would refuse to anchor a run that
+# check_periods() then has something to say about, and the run would fall back to
+# measuring the whole capture. Loose is safe here because the only thing it has
+# to separate is a gap the command could have produced from the gap to a pulse
+# that was never commanded at all -- which is orders of magnitude apart. A rate
+# error small enough to sit inside this band is left to check_periods(), which
+# judges it on its own tolerance.
+MOVE_ANCHOR_TOL = 0.25
+# ...and an absolute floor, because a quarter of a commanded period can be less
+# than the capture's own sample quantisation.
+MOVE_ANCHOR_TOL_ABS_US = 1.0
+
+
+def commanded_timeline(segments, info, limit=None):
+    """The timeline a program commands, in ticks since the move started.
+
+    A segment of `steps` at `ticks` occupies `steps * ticks`, and a pause
+    (`steps == 0`) occupies `ticks`. Steps land at the *start* of their own tick,
+    because the last step's pulse occupies the last tick of its segment -- which
+    is what makes a scenario's duration `steps * ticks` rather than
+    `(steps - 1) * ticks`.
+
+    `limit` takes the first N commanded steps, which is what the evaluators that
+    judge one segment's worth of steps need: they assert against
+    `segments[0][0]` steps, so the window has to be the same N steps and not the
+    whole program.
+    """
+    offsets = []
+    last_ticks = segments[0][1] if segments else 0
+    cursor = 0
+    for steps, ticks, _up in segments:
+        if steps > 0:
+            want = steps if limit is None else min(steps, limit - len(offsets))
+            for k in range(max(0, want)):
+                offsets.append(cursor + k * ticks)
+                # The last step's own tick count, which is the move's final
+                # pulse duration and the last step *inside* the limit rather
+                # than the last step of the program when the caller asked for
+                # fewer.
+                last_ticks = ticks
+        if limit is not None and len(offsets) >= limit:
+            break
+        cursor += (steps if steps > 0 else 1) * ticks
+    gaps = [offsets[i + 1] - offsets[i] for i in range(len(offsets) - 1)]
+    return {
+        "steps_ticks": offsets,
+        "gaps_ticks": gaps,
+        "last_ticks": last_ticks,
+        "span_ticks": (offsets[-1] - offsets[0]) if len(offsets) > 1 else 0,
+    }
+
+
+def gap_is_legal(measured_us, gap_ticks, info):
+    """Is this measured gap the one the command asked for, closely enough to
+    place the move?
+
+    On a grid the legal gaps are whole frames and the quarter-frame slack is the
+    one `grid_period_defects()` uses, so a step can only be placed on a frame
+    boundary its command could have produced. Off a grid it is a quarter of the
+    commanded gap, and loose on purpose: it has to tell a gap the command could
+    have produced from the gap to a pulse that was never commanded, which are
+    orders of magnitude apart, and it must not refuse to anchor a driver whose
+    steps arrive late. An ISR-driven architecture does sag systematically
+    (`rate_adherence` measures the sag); `check_periods()` is what judges it, on
+    its own tolerance.
+    """
+    tps = info["ticks_per_s"]
+    grid = info.get("frame_grid_ticks")
+    if grid:
+        frame_us = grid * 1e6 / tps
+        q = gap_ticks // grid
+        frames = [q] if gap_ticks % grid == 0 else [q, q + 1]
+        return min(abs(measured_us - f * frame_us) for f in frames) \
+            <= frame_us * 0.25
+    want_us = gap_ticks * 1e6 / tps
+    return abs(measured_us - want_us) <= max(want_us * MOVE_ANCHOR_TOL,
+                                             MOVE_ANCHOR_TOL_ABS_US)
+
+
+def move_window(edges, rate, info, segments, expected):
+    """(the step edges of the commanded move, what was outside it).
+
+    A capture is not the move. It starts before the test is triggered over
+    serial and outlives it, so it holds however long the host took to send the
+    command and however long the board idled afterwards -- on the recorded
+    `i2s_mux` `dir` captures, 285 ms of it before the first commanded step.
+    Nothing the driver did is in that stretch, and counting it anyway reports a
+    driver that emitted steps it did not emit, which is the failure this
+    harness exists to catch. The plan fixes where the move is: no ramp is in
+    the way (`addQueueEntry()` is driven directly), so the program says
+    exactly how many steps come out and how far apart.
+
+    The window is the **first contiguous run of `expected` steps whose gaps all
+    match the command**. First, because an unexplained pulse next to the move
+    cannot be told apart from the move's own first step by the gaps that follow
+    it, and the earliest run that matches the command is the one the plan
+    described; a pulse *after* the run is inside the move's span and is counted.
+
+    Three gaps decide the search -- the first, the middle and the last -- and
+    only a candidate that passes all of them is checked gap by gap. A window
+    that begins on an unexplained pulse fails the very first gap by orders of
+    magnitude, so the probe rejects it in constant time and the full check runs
+    on the one candidate that can be the move.
+
+    **Fails open.** No window found means the capture is measured whole, exactly
+    as it was before this existed, and the record says so: a driver running at
+    the wrong rate cannot place its own move, and the whole-capture measurement
+    is the one that reports it.
+
+    **The one case it cannot decide, resolved conservatively.** A pulse exactly
+    one commanded period ahead of the move's first step has the same gaps behind
+    it as the move does, so nothing in the waveform tells the two apart. The
+    window takes the *earliest* candidate, which absorbs that pulse into the
+    move -- and a move then holds one step more than the plan commands, which
+    fails. That is the intended outcome: the capture holds a pulse the harness
+    cannot account for, and a run that has seen one does not report the driver
+    as clean on the strength of which of two equally-plausible readings it
+    happened to prefer. A pulse further out, whose gap to the move is not one
+    the command could produce, is outside the window and is recorded.
+    """
+    us = 1e6 / rate
+    rec = {
+        "expected_steps": expected,
+        "measured_steps": len(edges),
+        "anchored": False,
+    }
+    if expected <= 0 or len(edges) < expected:
+        # Nothing to place: fewer steps than the plan commands is the
+        # measurement, and the evaluators judge it.
+        rec["steps_in_window"] = len(edges)
+        rec["reason"] = ("the capture holds {} of the {} commanded steps, so "
+                         "there is no move to place".format(len(edges), expected))
+        return list(edges), rec
+
+    tl = commanded_timeline(segments, info, limit=expected)
+    gaps_ticks = tl["gaps_ticks"]
+    if not gaps_ticks:
+        return list(edges), rec
+    n = expected - 1
+    probe = sorted({0, n // 2, n - 1})
+
+    start = None
+    for j in range(len(edges) - expected + 1):
+        ok = True
+        for i in probe:
+            g = (edges[j + i + 1] - edges[j + i]) * us
+            if not gap_is_legal(g, gaps_ticks[i], info):
+                ok = False
+                break
+        if not ok:
+            continue
+        if all(gap_is_legal((edges[j + i + 1] - edges[j + i]) * us,
+                            gaps_ticks[i], info) for i in range(n)):
+            start = j
+            break
+
+    if start is None:
+        rec["steps_in_window"] = len(edges)
+        rec["reason"] = ("no run of {} steps matches the commanded gaps; the "
+                         "whole capture was measured".format(expected))
+        return list(edges), rec
+
+    first = edges[start]
+    end = edges[start + expected - 1] + round(tl["last_ticks"] * rate
+                                              / info["ticks_per_s"])
+    # The move ends when its last commanded pulse ends, one commanded tick later
+    # -- but a pulse that *continues* the move's rhythm past that is still the
+    # driver stepping, so the boundary must not be drawn where such a pulse
+    # lands. Measured on IDF 5.5.3: `mcpwm_pcnt` emits one step more than it was
+    # given, at the commanded period, immediately after the run (todo 181), and
+    # at 24 MS/s that lands on the tick boundary to within a sample. So the same
+    # rule the anchor uses is applied forwards: the window extends through every
+    # edge whose gap from the one before it is one the command could have
+    # produced. A pulse further out has no such gap -- 12 ms of idle in a mux
+    # `dir` capture, 60 ms on a GPIO one -- and stays outside, recorded.
+    last_gap = gaps_ticks[-1]
+    i = start + expected
+    while i < len(edges) and gap_is_legal((edges[i] - edges[i - 1]) * us,
+                                          last_gap, info):
+        i += 1
+        end = edges[i - 1] + round(tl["last_ticks"] * rate / info["ticks_per_s"])
+    inside = [e for e in edges if first <= e <= end]
+    before = [e for e in edges if e < first]
+    after = [e for e in edges if e > end]
+    rec.update({
+        "anchored": True,
+        # The move's first step as a sample index, which is what the skew is
+        # measured on: the earliest edge in the capture is not necessarily the
+        # first step of the move.
+        "first_step_sample": first,
+        "window_start_us": round(first * us, 4),
+        "window_end_us": round(end * us, 4),
+        "commanded_span_us": round(tl["span_ticks"] * 1e6 / info["ticks_per_s"], 4),
+        "steps_in_window": len(inside),
+        "steps_outside": len(before) + len(after),
+        # Offsets from the move's own start, so a pre-move pulse reads as how
+        # far before the move it landed rather than as a wall-clock time.
+        "outside_before_us": [round((e - first) * us, 4) for e in before[:16]],
+        "outside_after_us": [round((e - first) * us, 4) for e in after[:16]],
+    })
+    return inside, rec
+
+
+def moved_edges(wave, rate, info, segments, expected=None):
+    """(step edges inside the commanded move, the window record).
+
+    `expected` defaults to every step the program commands.
+    """
+    edges = sp.rising_edges(wave)
+    if expected is None:
+        expected = sum(n for n, _, _ in segments)
+    return move_window(edges, rate, info, segments, expected)
+
+
+def moved_metrics(wave, rate, info, segments, expected=None):
+    """`channel_metrics` with the step count and periods of the move alone.
+
+    The pin's own numbers -- pulse widths, duty, the idle level -- stay
+    properties of the whole capture, because they are: a step is as wide before
+    the move as during it. The count and the inter-step periods are not, so
+    those two come from the window and the rest is untouched.
+    """
+    edges = sp.rising_edges(wave)
+    if expected is None:
+        expected = sum(n for n, _, _ in segments)
+    inside, rec = move_window(edges, rate, info, segments, expected)
+    m = sp.channel_metrics(wave, rate, rising=edges)
+    em = sp.edge_metrics(inside, rate)
+    avg = (sum(em.inter_step_us) / len(em.inter_step_us)
+           if em.inter_step_us else 0.0)
+    return dataclasses.replace(
+        m,
+        step_count=em.step_count,
+        inter_step_us=em.inter_step_us,
+        frequency_hz=(1e6 / avg) if avg > 0 else 0.0,
+    ), rec
+
 def evaluate(evaluator, channels, rate, segments, info, chan_map=None,
              extra=None, frame_grid_ticks=None):
     """Run an evaluator, then the global invariants.
@@ -2069,7 +2323,8 @@ def eval_period_exact(channels, rate, segments, info, pins):
     """Inter-step period must equal the commanded ticks, in microseconds."""
     ticks = segments[0][1]
     expect_us = ticks * 1e6 / info["ticks_per_s"]
-    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
+    m, win = moved_metrics(pins.step_wave(channels, "A"), rate, info,
+                           segments, segments[0][0])
     counts = sp.step_count_defects(m.step_count, segments[0][0])
     # ISR-driven architectures set the step pin from inside a timer interrupt,
     # so the achieved rate is systematically below the commanded one. That is
@@ -2081,6 +2336,7 @@ def eval_period_exact(channels, rate, segments, info, pins):
         "ticks_per_s": info["ticks_per_s"],
         "period": detail,
         "steps": counts,
+        "window": win,
         "adherence": adherence,
     }
 
@@ -2090,12 +2346,13 @@ def eval_step_count(channels, rate, segments, info, pins):
     expect_us = ticks * 1e6 / info["ticks_per_s"]
     n = sum(steps for steps, _, _ in segments)
     step = pins.step_wave(channels, "A")
-    m = sp.channel_metrics(step, rate)
+    m, win = moved_metrics(step, rate, info, segments, n)
     counts = sp.step_count_defects(m.step_count, n)
     detail, _ = check_periods(m.inter_step_us, ticks, info)
     return counts["ok"] and detail["ok"], {
         "ticks": ticks,
         "steps": counts,
+        "window": win,
         "period": detail,
     }
 
@@ -2125,7 +2382,8 @@ def eval_scale(channels, rate, segments, info, pins):
     for letter, ch_name in pins.items():
         if ch_name not in channels:
             continue
-        m = sp.channel_metrics(channels[ch_name], rate)
+        m, win = moved_metrics(channels[ch_name], rate, info, segments,
+                               expected)
         counts = sp.step_count_defects(m.step_count, expected)
         # A multiplexed stepper can only be stepped on a frame boundary, so its
         # period is one of two values rather than one; check_periods() reads the
@@ -2139,6 +2397,7 @@ def eval_scale(channels, rate, segments, info, pins):
         per_stepper[letter] = {
             "channel": ch_name,
             "steps": counts,
+            "window": win,
             "period": detail,
             "mean_period_us": round(mean, 4) if mean is not None else None,
         }
@@ -2154,22 +2413,19 @@ def eval_scale(channels, rate, segments, info, pins):
     }
 
 
-def first_step_skew_us(channels, rate, pins):
-    """(skew in us, first-step time per stepper) across every mapped stepper.
+def skew_of_first_steps(firsts, rate):
+    """Skew in us across the steppers' first steps, given as sample indices.
 
-    The skew is max(first) - min(first): it says how far apart the *extremes*
-    are, so one straggler is not hidden by the others being close together.
+    max - min, so one straggler is not hidden by the others being close
+    together.
+
+    Takes the first steps rather than the channels: the first step of a capture
+    is not the first step of the move, and on a capture whose pre-move idle
+    holds an unexplained pulse the difference is milliseconds.
     """
-    firsts = {}
-    for letter, ch_name in pins.items():
-        if ch_name not in channels:
-            continue
-        edges = sp.rising_edges(channels[ch_name])
-        if edges:
-            firsts[letter] = edges[0]
-    skew = ((max(firsts.values()) - min(firsts.values())) * 1e6 / rate
-            if len(firsts) > 1 else 0.0)
-    return skew, firsts
+    if len(firsts) < 2:
+        return 0.0
+    return (max(firsts.values()) - min(firsts.values())) * 1e6 / rate
 
 
 def eval_sync(channels, rate, segments, info, pins, programs):
@@ -2198,10 +2454,15 @@ def eval_sync(channels, rate, segments, info, pins, programs):
 
     The step counts are asserted too, on the same reasoning as SR_14: a
     swallowed or spurious step is a real defect on any platform.
+
+    Every stepper is measured against **its own** program, including for the
+    window: stepper A at 400 ticks and stepper B at 800 cannot be placed by the
+    same gaps, and a shared one would anchor B on nothing and report its whole
+    capture.
     """
-    skew_us, firsts = first_step_skew_us(channels, rate, pins)
     ok = True
     per_stepper = {}
+    firsts = {}
     for letter, ch_name in pins.items():
         idx = pins.index_of(letter)
         wave = pins.step_wave(channels, letter)
@@ -2211,19 +2472,23 @@ def eval_sync(channels, rate, segments, info, pins, programs):
         ticks = segs[0][1]
         expected = sum(n for n, _, _ in segs)
         expect_us = ticks * 1e6 / info["ticks_per_s"]
-        m = sp.channel_metrics(wave, rate)
+        m, win = moved_metrics(wave, rate, info, segs, expected)
         counts = sp.step_count_defects(m.step_count, expected)
         period, _ = check_periods(m.inter_step_us, ticks, info)
         ok = ok and counts["ok"] and period["ok"]
+        if win["anchored"]:
+            firsts[letter] = win["first_step_sample"]
         per_stepper[letter] = {
             "channel": ch_name,
             "ticks": ticks,
             "steps": counts,
             "period": period,
+            "window": win,
             "mean_period_us": round(sum(m.inter_step_us)
                                     / len(m.inter_step_us), 4)
                               if m.inter_step_us else None,
         }
+    skew_us = skew_of_first_steps(firsts, rate)
     return ok and bool(per_stepper), {
         "per_stepper": per_stepper,
         "first_step_skew_us": round(skew_us, 4),
@@ -2257,7 +2522,8 @@ def eval_multi_stepper_periods(channels, rate, segments, info, pins):
     for letter, ch_name in pins.items():
         if ch_name not in channels:
             continue
-        m = sp.channel_metrics(channels[ch_name], rate)
+        m, win = moved_metrics(channels[ch_name], rate, info, segments,
+                               expected)
         counts = sp.step_count_defects(m.step_count, expected)
         detail, _ = check_periods(m.inter_step_us, t, info)
         ok = ok and counts["ok"] and detail["ok"]
@@ -2267,6 +2533,7 @@ def eval_multi_stepper_periods(channels, rate, segments, info, pins):
             "channel": ch_name,
             "steps": counts,
             "period": detail,
+            "window": win,
             "mean_period_us": round(sum(m.inter_step_us) / len(m.inter_step_us), 4)
                               if m.inter_step_us else None,
             "min_period_us": round(min(m.inter_step_us), 4) if m.inter_step_us else None,
@@ -2292,8 +2559,11 @@ def eval_direction_phases(channels, rate, segments, info, pins):
     """
     step = pins.step_wave(channels, "A")
     dir_ch = pins.dir_wave(channels, "A")
-    rises = sp.rising_edges(step)
     expected_steps = sum(steps for steps, _, _ in segments)
+    # Only the steps of the move are phases. An unexplained pulse in the
+    # capture's pre-move idle is not a direction phase, and letting it in would
+    # add a phase the plan never commanded.
+    rises, win = moved_edges(step, rate, info, segments, expected_steps)
     counts = sp.step_count_defects(len(rises), expected_steps)
 
     # One phase per commanded segment, split at *every* dir change rather than
@@ -2350,6 +2620,7 @@ def eval_direction_phases(channels, rate, segments, info, pins):
 
     return (counts["ok"] and per_phase_ok and dir_ok and dir_per_phase_ok), {
         "steps": counts,
+        "window": win,
         "phases": len(phases),
         "phases_expected": want_phases,
         "steps_per_phase": phases,
@@ -2393,8 +2664,9 @@ def eval_counts_and_gap(channels, rate, segments, info, pins):
     The inter-step period check is deliberately not applied across the pause,
     which is a stretch of silence and not a period.
     """
-    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
     expected = sum(steps for steps, _, _ in segments)
+    m, win = moved_metrics(pins.step_wave(channels, "A"), rate, info, segments,
+                           expected)
     counts = sp.step_count_defects(m.step_count, expected)
     pause_us = None
     gap_ok = True
@@ -2407,6 +2679,7 @@ def eval_counts_and_gap(channels, rate, segments, info, pins):
             break
     return counts["ok"] and gap_ok, {
         "steps": counts,
+        "window": win,
         "pause_found": gap_ok,
         "expected_gap_us": round(pause_us, 4) if pause_us else None,
     }
@@ -2416,7 +2689,8 @@ def eval_pulse_width(channels, rate, segments, info, pins):
     """The primary characterization output: high time and duty at one speed."""
     ticks = segments[0][1]
     expect_us = ticks * 1e6 / info["ticks_per_s"]
-    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
+    m, win = moved_metrics(pins.step_wave(channels, "A"), rate, info,
+                           segments, segments[0][0])
     counts = sp.step_count_defects(m.step_count, segments[0][0])
     detail, adherence = check_periods(m.inter_step_us, ticks, info,
                                       with_adherence=True)
@@ -2431,6 +2705,7 @@ def eval_pulse_width(channels, rate, segments, info, pins):
         "duty_percent": round(m.duty_cycle_percent, 2),
         "frequency_hz": round(m.frequency_hz, 2),
         "steps": counts,
+        "window": win,
         "period": detail,
         "adherence": adherence,
     }
@@ -2459,7 +2734,8 @@ def eval_independent_speeds(channels, rate, segments, info, pins):
         ticks = per[idx][0][1]
         expect_us = ticks * 1e6 / info["ticks_per_s"]
         expected = sum(n for n, _, _ in per[idx])
-        m = sp.channel_metrics(channels[ch_name], rate)
+        m, win = moved_metrics(channels[ch_name], rate, info, per[idx],
+                               expected)
         counts = sp.step_count_defects(m.step_count, expected)
         period, _ = check_periods(m.inter_step_us, ticks, info)
         ok = ok and counts["ok"] and period["ok"]
@@ -2467,16 +2743,18 @@ def eval_independent_speeds(channels, rate, segments, info, pins):
             "ticks": ticks,
             "steps": counts,
             "period": period,
+            "window": win,
             "mean_period_us": round(sum(m.inter_step_us)
                                     / len(m.inter_step_us), 4)
                               if m.inter_step_us else None,
         }
 
     skew = None
-    a_rises = sp.rising_edges(pins.step_wave(channels, "A"))
-    b_rises = sp.rising_edges(pins.step_wave(channels, "B"))
-    if a_rises and b_rises:
-        skew = round(abs(a_rises[0] - b_rises[0]) * 1e6 / rate, 4)
+    # The move's first step, not the first edge in the capture.
+    firsts = {k: v["window"]["first_step_sample"] for k, v in detail.items()
+              if isinstance(v, dict) and v["window"]["anchored"]}
+    if len(firsts) > 1:
+        skew = round(skew_of_first_steps(firsts, rate), 4)
     detail["first_step_skew_us"] = skew
     # Also in step periods. A skew of 29 us means nothing on its own -- it is
     # three quarters of a period at 640 ticks and three thousandths of one at
@@ -2684,7 +2962,9 @@ def eval_pause(channels, rate, segments, info, pins):
     ticks = segments[0][1]
     pause_ticks = segments[1][1]
     pause_us = pause_ticks * 1e6 / info["ticks_per_s"]
-    m = sp.channel_metrics(pins.step_wave(channels, "A"), rate)
+    expected_steps = sum(steps for steps, _, _ in segments)
+    m, win = moved_metrics(pins.step_wave(channels, "A"), rate, info, segments,
+                           expected_steps)
     # A pause shows up as one long inter-step period, not as a wide pulse: it
     # is a stretch of silence, so searching the high widths would be looking in
     # the wrong place entirely.
@@ -2696,7 +2976,6 @@ def eval_pause(channels, rate, segments, info, pins):
     expected_gap_us = (ticks + pause_ticks) * 1e6 / info["ticks_per_s"]
     ok = any(abs(w - expected_gap_us) <= expected_gap_us * 0.05 + 1.0
              for w in m.inter_step_us)
-    expected_steps = sum(steps for steps, _, _ in segments)
     counts = sp.step_count_defects(m.step_count, expected_steps)
     return ok and counts["ok"], {
         "ticks": ticks,
@@ -2707,6 +2986,7 @@ def eval_pause(channels, rate, segments, info, pins):
                              if w > m.avg_high_us + 1.0][:8],
         "pause_found": ok,
         "steps": counts,
+        "window": win,
     }
 
 
@@ -2729,8 +3009,12 @@ def eval_dir_change(channels, rate, segments, info, pins):
     expected_steps = sum(steps for steps, _, _ in segments)
     step = pins.step_wave(channels, "A")
     dir_ch = pins.dir_wave(channels, "A")
-    delays = sp.dir_to_first_step_us(dir_ch, step, rate)
-    counts = sp.step_count_defects(len(sp.rising_edges(step)), expected_steps)
+    # Matched against the move's steps only: a pulse in the pre-move idle would
+    # otherwise be the "next step" for the first dir edge and report a delay to
+    # a pulse that precedes the direction change entirely.
+    rises, win = moved_edges(step, rate, info, segments, expected_steps)
+    delays = sp.dir_to_first_step_us(dir_ch, step, rate, steps=rises)
+    counts = sp.step_count_defects(len(rises), expected_steps)
     sample_us = 1e6 / rate
     dir_edges = sp.detect_edges(dir_ch)
     resolved = [d for d in delays if d >= sample_us]
@@ -2750,6 +3034,7 @@ def eval_dir_change(channels, rate, segments, info, pins):
         "below_capture_resolution": bool(delays) and not resolved,
         "dir_edges": len(dir_edges),
         "steps": counts,
+        "window": win,
     }
 
 
@@ -2779,22 +3064,23 @@ def eval_sync_start(channels, rate, segments, info, pins):
     """
     counts = {}
     firsts = {}
+    windows = {}
+    expected = segments[0][0]
     for name, ch in pins.items():
         if ch not in channels:
             continue
-        edges = sp.rising_edges(channels[ch])
+        edges, win = moved_edges(channels[ch], rate, info, segments, expected)
         counts[name] = len(edges)
-        if edges:
-            firsts[name] = edges[0]
-    skew_us = 0.0
-    if len(firsts) > 1:
-        skew_us = (max(firsts.values()) - min(firsts.values())) * 1e6 / rate
-    expected = segments[0][0]
+        windows[name] = win
+        if win["anchored"]:
+            firsts[name] = win["first_step_sample"]
+    skew_us = skew_of_first_steps(firsts, rate)
     period_us = segments[0][1] * 1e6 / info["ticks_per_s"]
     defects = {k: sp.step_count_defects(v, expected)
                for k, v in counts.items()}
     return all(d["ok"] for d in defects.values()), {
         "steps_per_stepper": defects,
+        "window_per_stepper": windows,
         # Reported, not asserted. See the docstring.
         "first_step_skew_us": round(skew_us, 4),
         "skew_periods": round(skew_us / period_us, 4) if period_us else None,

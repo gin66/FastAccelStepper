@@ -290,6 +290,19 @@ def driver_list_of(record):
     return "+".join(record.get("drivers", [])) or "?"
 
 
+def outside_note(stepper):
+    """How many pulses the move window set aside, in the cell itself.
+
+    Not a fault and not in the verdict: the evaluators measure the commanded
+    move, and a pulse in a capture's pre-move idle is not evidence about a
+    driver. But a cell that reads `x64/64` with three pulses somewhere else in
+    the capture says less than the run does, and a number that exists only in
+    the JSON is a number nobody reads.
+    """
+    outside = (stepper.get("window") or {}).get("steps_outside") or 0
+    return f" ({outside} outside)" if outside else ""
+
+
 def scale_rows(records):
     """One row per parallel-count point: every stepper's period and step count.
 
@@ -308,6 +321,7 @@ def scale_rows(records):
             cell = f"{letter} {period}us" if period is not None else f"{letter} ?"
             if steps is not None:
                 cell += f"x{steps}/{e['steps'].get('steps_expected')}"
+            cell += outside_note(e)
             faults = []
             if (e.get("steps") or {}).get("extra_steps"):
                 faults.append(f"+{e['steps']['extra_steps']}")
@@ -355,6 +369,7 @@ def adherence_of(record):
         measured = steps.get("steps_measured")
         if measured is not None:
             cell += f" x{measured}/{steps.get('steps_expected')}"
+        cell += outside_note(e)
         faults = []
         if steps.get("extra_steps"):
             faults.append(f"+{steps['extra_steps']} extra steps")

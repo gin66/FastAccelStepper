@@ -374,6 +374,31 @@ def falling_edges(samples: Sequence[int]) -> List[int]:
 
 
 @dataclass
+class EdgeMetrics:
+    """What a list of step edges says, without the waveform around them.
+
+    Separate from `ChannelMetrics` because the two answer different questions.
+    Channel metrics are properties of the *pin* over the whole capture -- pulse
+    width, duty, the level it idles at -- and a capture's idle stretch before
+    the move is part of that. The step count and the inter-step periods are
+    properties of the *move*, and the move is a bounded stretch of the capture,
+    so a caller measuring a commanded program restricts the edges first and asks
+    for these (`edge_metrics`) rather than the whole capture's metrics.
+    """
+    step_count: int = 0
+    inter_step_us: List[float] = field(default_factory=list)
+
+
+def edge_metrics(rising: Sequence[int], sample_rate_hz: int) -> EdgeMetrics:
+    """Step count and inter-step periods of an explicit list of step edges."""
+    m = EdgeMetrics(step_count=len(rising))
+    us_per_sample = 1_000_000.0 / sample_rate_hz
+    m.inter_step_us = [(rising[i] - rising[i - 1]) * us_per_sample
+                       for i in range(1, len(rising))]
+    return m
+
+
+@dataclass
 class ChannelMetrics:
     edge_count: int = 0
     step_count: int = 0
@@ -387,8 +412,14 @@ class ChannelMetrics:
     max_pulse_width_us: float = 0.0
 
 
-def channel_metrics(samples: Sequence[int], sample_rate_hz: int) -> ChannelMetrics:
-    """Compute the per-channel timing metrics."""
+def channel_metrics(samples: Sequence[int], sample_rate_hz: int,
+                    rising: Optional[Sequence[int]] = None) -> ChannelMetrics:
+    """Compute the per-channel timing metrics.
+
+    `rising` supplies the step edges for a caller that already has them -- a
+    multiplexed capture holds 12 million samples per channel, so a second full
+    pass to rediscover the edges is not free.
+    """
     us_per_sample = 1_000_000.0 / sample_rate_hz
     m = ChannelMetrics()
 
@@ -404,10 +435,10 @@ def channel_metrics(samples: Sequence[int], sample_rate_hz: int) -> ChannelMetri
         else:
             m.low_widths_us.append(width_us)
 
-    risings = rising_edges(samples)
-    m.step_count = len(risings)
-    for i in range(1, len(risings)):
-        m.inter_step_us.append((risings[i] - risings[i - 1]) * us_per_sample)
+    risings = rising_edges(samples) if rising is None else list(rising)
+    em = edge_metrics(risings, sample_rate_hz)
+    m.step_count = em.step_count
+    m.inter_step_us = em.inter_step_us
 
     if m.inter_step_us:
         avg_inter = sum(m.inter_step_us) / len(m.inter_step_us)
@@ -586,7 +617,8 @@ def step_count_defects(measured, expected):
 
 
 def dir_to_first_step_us(
-    dir_samples: Sequence[int], step_samples: Sequence[int], sample_rate_hz: int
+    dir_samples: Sequence[int], step_samples: Sequence[int], sample_rate_hz: int,
+    steps: Optional[Sequence[int]] = None,
 ) -> List[float]:
     """For every DIR change, time until the next step pulse (us).
 
@@ -595,10 +627,15 @@ def dir_to_first_step_us(
     absent. Skipping such a step and matching the next one instead would report
     a full step period and hide the Pico case entirely, where the PIO sets DIR
     and STEP from adjacent instructions.
+
+    `steps` overrides the step edges, for a caller that has already restricted
+    them to the commanded move: matching a DIR change against a step that
+    happened before the move would report a delay to a pulse that has nothing
+    to do with the direction change.
     """
     us_per_sample = 1_000_000.0 / sample_rate_hz
     dir_changes = detect_edges(dir_samples)
-    steps = rising_edges(step_samples)
+    steps = rising_edges(step_samples) if steps is None else list(steps)
 
     delays: List[float] = []
     j = 0
