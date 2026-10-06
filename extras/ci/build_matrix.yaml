@@ -430,6 +430,15 @@ workflows:
       - samd51
       - rpipico
       - rpipico2
+    # Example directories built by build-pio-dirs.sh that this workflow must
+    # not compile. The Saleae characterization app is written for a few targets
+    # only and its compilation is not guaranteed for every environment the
+    # example matrix covers (e.g. nanoatmega168 runs out of RAM), so building
+    # it here turns an unsupported target into a red example. It is built
+    # through its own project instead:
+    #   bash extras/tests/saleae_based/scripts/link_app.sh
+    #   pio run -d extras/tests/saleae_based/apps/arduino -e saleae_avr
+    exclude_examples: [saleae]
     script: build-platformio.sh
 
   idf:
@@ -456,4 +465,8 @@ workflows:
         min_version: "6.8.1"
       - versioned_groups: esp32s3_idf
         min_version: "6.8.1"
+    # See the arduino workflow: the Saleae app is not part of the example
+    # matrix. build-pio-dirs.sh still creates pio_espidf/saleae, so it has to
+    # be dropped before build-idf-platformio.sh iterates the directory.
+    exclude_examples: [saleae]
     script: build-idf-platformio.sh

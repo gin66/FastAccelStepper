@@ -266,6 +266,28 @@ def generate_workflow_yml(
             "      uses: actions/checkout@v7",
             "    - name: Make directories",
             "      run: bash extras/scripts/build-pio-dirs.sh",
+        ]
+    )
+
+    # Example directories this workflow must not compile. build-pio-dirs.sh
+    # creates them unconditionally, so they are removed before the build script
+    # walks pio_dirs/* / pio_espidf/*.
+    exclude_examples = workflow_config.get("exclude_examples", [])
+    if exclude_examples:
+        dirs = " ".join(
+            d
+            for example in exclude_examples
+            for d in (f"pio_dirs/{example}", f"pio_espidf/{example}")
+        )
+        lines.extend(
+            [
+                "    - name: Exclude examples from the matrix",
+                f"      run: rm -rf {dirs}",
+            ]
+        )
+
+    lines.extend(
+        [
             "    - name: Build on PlatformIO",
             f"      run: bash extras/scripts/{workflow_config['script']} ${{{{ matrix.version }}}}",
             "",

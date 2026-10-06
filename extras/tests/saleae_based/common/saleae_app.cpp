@@ -984,9 +984,15 @@ static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
     case SA_RMT:
       fd = DRIVER_RMT;
       break;
+    // A chip with no MCPWM/PCNT queues has no FasDriver::MCPWM_PCNT at all
+    // (pd_config.h omits the enumerator), so naming the driver is a compile
+    // error there -- and parse_driver() already refuses the name on that build,
+    // so this case is unreachable. The S2/C3/C6/H2/P4 rows are exactly those.
+#if defined(SUPPORT_ESP32_MCPWM_PCNT)
     case SA_MCPWM:
       fd = DRIVER_MCPWM_PCNT;
       break;
+#endif
 #if defined(SUPPORT_ESP32_I2S)
     case SA_I2S:
       fd = DRIVER_I2S_DIRECT;

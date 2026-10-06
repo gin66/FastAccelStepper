@@ -94,5 +94,7 @@ jobs:
       uses: actions/checkout@v7
     - name: Make directories
       run: bash extras/scripts/build-pio-dirs.sh
+    - name: Exclude examples from the matrix
+      run: rm -rf pio_dirs/saleae pio_espidf/saleae
     - name: Build on PlatformIO
       run: bash extras/scripts/build-platformio.sh ${{ matrix.version }}
