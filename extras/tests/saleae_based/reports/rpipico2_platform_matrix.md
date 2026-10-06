@@ -1,6 +1,6 @@
 # Saleae harness — RP2350 (Pico 2) platform matrix
 
-- **Generated:** 2026-10-06 19:18  _(rebuilt from the recorded results; the board became unresponsive during a refresh re-run and needed a replug, so SR_00..SR_07 and the SR_25/SR_30 abort rows are the current firmware; the rest are from the previous run)_
+- **Generated:** 2026-10-06 21:41  _(re-measured in full on the current firmware: catalogue + `scale` sweep, no replay)_
 - **Board:** RP2350 (Pico 2), native USB, GPIO2..GPIO9 = D0..D7
 - **Firmware:** arduino-pico, driver `pio`; tag key `rpipico2_arduino_pio_pio2_dir`
 - **Scenarios:** 27 recorded
@@ -34,7 +34,7 @@
 | SR_25 | PASS | 4080/4080 | period 10.0 us, 0 long / 0 short gaps |
 | SR_26 | PASS | 2/2 | pause 4095.9375 us, gap 8191.75 vs 8191.875 us |
 | SR_27 | PASS | 1/1 | period 200.0 us, 0 long / 0 short gaps |
-| SR_30 | PASS | 1280/1280 | stopped at 1280 of 16320, partial pulses 0 |
+| SR_30 | PASS | 1272/1272 | stopped at 1272 of 16320, partial pulses 0; `POS` asserted against the wire (delta 0-3) |
 | SR_31 | PASS | - | 8 stepper(s) on pio (searched down from 8); 0 count(s) above it refused |
 
 ## Parallel stepper count (`scale`)
@@ -44,8 +44,8 @@ Each row is one point of the count sweep: what every stepper measured, not just 
 | driver list | n | pins | steppers: period x steps | spread us | result |
 |---|---|---|---|---|---|
 | pio | 1 | nodir | A 9.9841usx64/64 | 0.0 | passed |
-| pio+pio | 2 | nodir | A 9.9841usx64/64 B 9.9881usx64/64 | 0.004 | passed |
-| pio+pio+pio | 3 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 C 9.9841usx64/64 | 0.004 | passed |
+| pio+pio | 2 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 | 0.0 | passed |
+| pio+pio+pio | 3 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 C 9.9881usx64/64 | 0.0 | passed |
 | pio+pio+pio+pio | 4 | nodir | A 9.9881usx64/64 B 9.9841usx64/64 C 9.9881usx64/64 D 9.9841usx64/64 | 0.004 | passed |
 | pio+pio+pio+pio+pio | 5 | nodir | A 9.9881usx64/64 B 9.9841usx64/64 C 9.9881usx64/64 D 9.9841usx64/64 E 9.9881usx64/64 | 0.004 | passed |
 | pio+pio+pio+pio+pio+pio | 6 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 C 9.9841usx64/64 D 9.9841usx64/64 E 9.9881usx64/64 F 9.9841usx64/64 | 0.004 | passed |
