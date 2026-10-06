@@ -1,4 +1,5 @@
-pre-1.5.0:
+2.0.0:
+- Breaking: `FasNAxis::clearFault()` and `getDirChangeBeforePauseCount()` removed; `addQueueEntry()` now returns `AQE_ERROR_COMMANDS_SUSPENDED` for a refused command instead of `AQE_OK` (see the individual entries below)
 - pico: `addQueueEntry(cmd, start=false)` no longer starts an idle queue (the PIO feeder was started unconditionally), so "fill the queue, then start it" — `QFILL`, `FasNAxis` → `synchronizedStart()` — works on RP2040/RP2350
 - pico: `getCurrentStepCount()` no longer reads the PIO RX FIFO before testing it, and no longer treats a stale sample as current: the PIO's non-blocking position push leaves old samples in the FIFO once it fills, so `getCurrentPosition()` returned 0 during a run (measured `POS 0` in 15 of 40 RP2350 SR_30 aborts against ~1270 steps on the wire). A running read now discards the stale samples and waits for a current push; a stopped queue returns `queue_end.pos`, since `forceStop()` restarts the SM and clears the position in the shift register
 - naxes: FasNAxis::clearFault() removed from API — it could only resume a plan whose position model was stale; use syncFromSteppers()
