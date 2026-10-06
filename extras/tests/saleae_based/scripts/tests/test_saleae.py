@@ -4394,5 +4394,85 @@ class TestPins(unittest.TestCase):
                 self.assertEqual(rec["pin_mode"], "nodir")
 
 
+class TestPositionCheck(unittest.TestCase):
+    """SR_30's frozen `POS` is judged against the wire, not just recorded.
+
+    The defect this gates: on RP2350 PIO, `getCurrentPosition()` read the
+    position out of the PIO RX FIFO, whose entries go stale once the non-blocking
+    push fills it, so `XSTOP` replied `POS 0` in 15 of 40 runs while the capture
+    carried ~1270 steps. SR_30 asserts the pulses on purpose and would pass
+    either way, so the reply needed its own gate.
+    """
+
+    PICO = "rpipico2_arduino_pio1_dir"
+
+    def test_a_position_matching_the_wire_passes(self):
+        detail = {"reply": "OK QRUN\nOK XSTOP abortqueue\nDONE 1270\nPOS 1270",
+                  "steps_before_stop": 1270}
+        self.assertTrue(run_tests.check_commanded_position(
+            self.PICO, "SR_30", detail, True))
+        self.assertTrue(detail["position_check"]["ok"])
+        self.assertEqual(detail["position_check"]["delta_steps"], 0)
+
+    def test_the_zero_position_regression_fails(self):
+        # The measured defect, exactly: a full run on the wire and a firmware
+        # position of 0. This must turn a would-be `passed` run red.
+        detail = {"reply": "OK QRUN\nOK XSTOP abortqueue\nDONE 0\nPOS 0",
+                  "steps_before_stop": 1270}
+        self.assertFalse(run_tests.check_commanded_position(
+            self.PICO, "SR_30", detail, True))
+        self.assertFalse(detail["position_check"]["ok"])
+        self.assertEqual(detail["position_check"]["firmware_pos"], 0)
+
+    def test_a_driver_tail_within_tolerance_is_allowed(self):
+        # The stop call takes a little time, so the frozen position and the wire
+        # count are legitimately a few steps apart; a scheduling hiccup can push
+        # that to ~10. Both must pass.
+        for delta in (0, 3, 10):
+            detail = {"reply": f"POS {1270 - delta}", "steps_before_stop": 1270}
+            self.assertTrue(run_tests.check_commanded_position(
+                self.PICO, "SR_30", detail, True), delta)
+            self.assertEqual(detail["position_check"]["delta_steps"], delta)
+
+    def test_a_large_gap_still_fails(self):
+        detail = {"reply": "POS 1200", "steps_before_stop": 1270}
+        self.assertFalse(run_tests.check_commanded_position(
+            self.PICO, "SR_30", detail, True))
+
+    def test_a_missing_position_line_is_a_failure_not_a_pass(self):
+        # A firmware that stops answering POS must not read as "no violation".
+        detail = {"reply": "OK XSTOP abortqueue", "steps_before_stop": 1270}
+        self.assertFalse(run_tests.check_commanded_position(
+            self.PICO, "SR_30", detail, True))
+        self.assertIn("reason", detail["position_check"])
+
+    def test_a_pipelined_driver_is_not_judged(self):
+        # `POS` and the wire are different quantities on a driver with a
+        # pipeline, by design: measured, `rmt` leads the pin and `i2s_direct`
+        # lags it. The gate is Pico-only so neither is turned red by it.
+        for tag, before, pos in (("esp32_arduino4_4_0_rmt1_dir", 1258, 1275),
+                                 ("esp32_idf6_13_0_i2s_direct1_dir", 1182, 1020)):
+            detail = {"reply": f"POS {pos}", "steps_before_stop": before}
+            self.assertTrue(run_tests.check_commanded_position(
+                tag, "SR_30", detail, True), tag)
+            self.assertNotIn("position_check", detail, tag)
+
+    def test_scenarios_that_do_not_freeze_a_position_are_untouched(self):
+        # Only SR_30 asserts it; an earlier verdict for anything else must come
+        # through unchanged, with no position_check block invented.
+        for scenario in ("SR_01", "SR_25", None):
+            detail = {"reply": "POS 0", "steps_before_stop": 1270}
+            self.assertTrue(run_tests.check_commanded_position(
+                self.PICO, scenario, detail, True), scenario)
+            self.assertNotIn("position_check", detail)
+
+    def test_the_reply_parser_reads_one_value_per_stepper(self):
+        self.assertEqual(run_tests.parse_position_reply("POS 10 20 30"),
+                         [10, 20, 30])
+        self.assertEqual(run_tests.parse_position_reply("DONE 5\nPOS -7\n"),
+                         [-7])
+        self.assertIsNone(run_tests.parse_position_reply("DONE 5"))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

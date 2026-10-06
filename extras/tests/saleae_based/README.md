@@ -304,10 +304,10 @@ exist, but no capture has been recorded for it.
 | SAM (atmelsam) | Arduino / timer | — | | | | |
 | SAMD51 (samd51) | Arduino / timer | — | | | | |
 
-\* RP2350 (GPIO2–9) catalogue: SR_00–16, 21, 26, 27, 31 pass; SR_17–20 and
-SR_23 are **skipped** (they name ESP32-only drivers — `rmt`, `mcpwm_pcnt`,
-`i2s_direct` — which this build does not have); SR_25 and SR_30 are open
-(todo/126, todo/127). `scale --pin-mode nodir` n=1…8 passes on every channel.
+\* RP2350 (GPIO2–9) catalogue: SR_00–16, 21, 25, 26, 27, 30, 31 pass; SR_17–20
+and SR_23 are **skipped** (they name ESP32-only drivers — `rmt`, `mcpwm_pcnt`,
+`i2s_direct` — which this build does not have). `scale --pin-mode nodir`
+n=1…8 passes on every channel.
 
 ## Capture notes (sample-rate restrictions)
 

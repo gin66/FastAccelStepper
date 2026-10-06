@@ -179,20 +179,47 @@ bool StepperQueue::isRunning() const {
 int32_t StepperQueue::getCurrentStepCount() const {
   bool running = isRunning();
   uint32_t pos = 0;
-  if (!running) {
-    for (uint8_t i = 0; i <= 4; i++) {
-      if (pio_sm_is_rx_fifo_empty(pio, sm)) {
-        break;
-      }
+  if (running) {
+    // A running queue cannot use the samples already in the RX FIFO. The PIO
+    // pushes the position with a *non-blocking* push, so once the FIFO is full
+    // the push stops updating it: a queue nobody has read since it started
+    // holds samples from the run's beginning -- 0 before the first step -- and
+    // reading one of those reports a position the stepper left long ago.
+    //
+    // Measured on RP2350, SR_30 (XSTOP ~25 % into a 4080-step fill): `POS`
+    // and `DONE` were 0 in 3 of 8 runs while the wire carried the full run,
+    // and the FIFO was full (`rxl=4`) at the read with all four entries stale.
+    // The read-order fix only made the empty case deterministic; it does not
+    // make the position current.
+    //
+    // So discard the stale samples and wait for the SM to push a current one.
+    // The wait is short: the period loop reaches its push every 3 cycles, and
+    // the longest gap before it (the step and position-update section) is tens
+    // of cycles. If the SM is instead stalled on a `pull` there is no
+    // meaningful position to report, and the move's own target is the honest
+    // fallback.
+    while (!pio_sm_is_rx_fifo_empty(pio, sm)) {
       pio_sm_get(pio, sm);
     }
-    uint32_t entry = pio_make_fifo_entry(queue_end.dir, 0, 0, LOOPS_FOR_1US);
-    pio_sm_put(pio, sm, entry);
-
-    while (isRunning()) {
-      if (!pio_sm_is_tx_fifo_empty(pio, sm)) {
-        break;
+    for (uint16_t spin = 0; spin < 256; spin++) {
+      if (!pio_sm_is_rx_fifo_empty(pio, sm)) {
+        return (int32_t)pio_sm_get(pio, sm);
       }
+    }
+    return queue_end.pos - pos_offset;
+  }
+  for (uint8_t i = 0; i <= 4; i++) {
+    if (pio_sm_is_rx_fifo_empty(pio, sm)) {
+      break;
+    }
+    pio_sm_get(pio, sm);
+  }
+  uint32_t entry = pio_make_fifo_entry(queue_end.dir, 0, 0, LOOPS_FOR_1US);
+  pio_sm_put(pio, sm, entry);
+
+  while (isRunning()) {
+    if (!pio_sm_is_tx_fifo_empty(pio, sm)) {
+      break;
     }
   }
   for (uint8_t i = 0; i <= 4; i++) {
@@ -285,6 +312,17 @@ void StepperTask(void* parameter) {
 }
 
 int32_t StepperQueue::getCurrentPosition() const {
+  // A stopped queue has no live hardware count worth reading. forceStop()
+  // restarts the SM, which clears the input shift register the PIO keeps the
+  // position in, so the sample path then reads 0 -- and it sets `pos_offset` to
+  // 0 as well, so the whole thing reports 0 even though
+  // forceStopAndNewPosition() just stored the real position in queue_end.pos.
+  // The queue's own bookkeeping already has it: for a stopped queue
+  // queue_end.pos *is* the position, which is what the generic
+  // getCurrentPosition() returns for an empty queue.
+  if (!isRunning()) {
+    return queue_end.pos;
+  }
   return getCurrentStepCount() + pos_offset;
 }
 

@@ -1,10 +1,18 @@
 # 026 Pico `getCurrentPosition()` intermittently returns 0 during a run
 
-Priority: **026**. Effort: ~40 k tokens, 1 d.
+Status: **CLOSED** — fixed and measured on RP2350. Record:
+[pico_position_read_returns_zero.md](../doc/implemented/pico_position_read_returns_zero.md).
 
-Status: found while closing the Pico `start=false` item
-([pico_start_false.md](../doc/implemented/pico_start_false.md)); not started.
-Not asserted by any catalogue scenario — SR_30 passes either way.
+The defect was the RX-FIFO read treating a **stale** sample as current: the PIO
+pushes the position with a non-blocking push, so once the 4-entry FIFO is full it
+stops updating and holds samples from the run's beginning. Measured `POS 0` in
+15 of 40 SR_30 runs against ~1270 steps on the wire; 0 of 70 after the fix. The
+running read now discards the stale samples and waits for a current push, and the
+stopped path returns `queue_end.pos` (the SM restart clears the position in the
+shift register and `pos_offset`). SR_30 now asserts `POS` against the wire
+(`check_commanded_position`), where before it was recorded and never read.
+
+Priority it had: **026**. Effort: ~40 k tokens, 1 d.
 
 ## The defect
 

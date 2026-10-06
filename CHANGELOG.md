@@ -1,6 +1,6 @@
 pre-1.5.0:
 - pico: `addQueueEntry(cmd, start=false)` no longer starts an idle queue (the PIO feeder was started unconditionally), so "fill the queue, then start it" — `QFILL`, `FasNAxis` → `synchronizedStart()` — works on RP2040/RP2350
-- pico: `getCurrentStepCount()` tests the RX FIFO before reading it and initialises the result, instead of reading a value from an empty FIFO. `getCurrentPosition()` can still return 0 on a running queue when the FIFO is momentarily empty — tracked separately, not fixed here
+- pico: `getCurrentStepCount()` no longer reads the PIO RX FIFO before testing it, and no longer treats a stale sample as current: the PIO's non-blocking position push leaves old samples in the FIFO once it fills, so `getCurrentPosition()` returned 0 during a run (measured `POS 0` in 15 of 40 RP2350 SR_30 aborts against ~1270 steps on the wire). A running read now discards the stale samples and waits for a current push; a stopped queue returns `queue_end.pos`, since `forceStop()` restarts the SM and clears the position in the shift register
 - naxes: FasNAxis::clearFault() removed from API — it could only resume a plan whose position model was stale; use syncFromSteppers()
 - naxes: fix a re-sync undone by the next pump(): clearing the fault left the stop cause pending
 - addQueueEntry() returns AQE_ERROR_COMMANDS_SUSPENDED instead of AQE_OK for a command it refused, so a caller can tell queued from refused; resumeCommands() rearms

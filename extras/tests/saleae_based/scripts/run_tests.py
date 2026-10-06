@@ -2987,6 +2987,81 @@ def eval_stop_move_contract(channels, rate, segments, info, pins,
 # nothing in flight, while a driver with its own transmit buffer can.
 ABORT_TAIL_ENTRIES = 2
 
+# The scenarios whose firmware `POS` is judged against the waveform, and the
+# architectures the judgement is valid on.
+#
+# SR_30 is the scenario that can: it empties the queue at the marker, so the
+# frozen position and the pulses before the marker describe the same number.
+#
+# Pico only, and that is not a convenience. On a driver with a pipeline the two
+# do *not* describe the same number, by design: measured on ESP32, `rmt` reports
+# a position ~17 steps *ahead* of the pin (its committed symbols) and
+# `i2s_direct` ~162 *behind* it (its DMA buffer), while `mcpwm_pcnt`, which takes
+# one entry at a time, matches to 2. The Pico PIO has no such pipeline between
+# the counter and the pin, so for it `POS` and the wire are the same quantity.
+#
+# It is judged at all because a driver can reply `POS 0` after a stop that
+# emitted the whole run, and nothing else would notice -- SR_30 asserts the
+# pulses on purpose, so `POS` was recorded and never read. Measured on RP2350
+# PIO: 15 of 40 XSTOP runs replied `DONE 0 / POS 0` while the wire carried
+# ~1270 steps. The scenario passes either way, which is exactly the shape of a
+# measurement that needs its own gate. See
+# extras/doc/implemented/pico_position_read_returns_zero.md.
+POSITION_SCENARIOS = {"SR_30": ("rpipico", "rpipico2")}
+
+# The frozen position is taken just before the queue is emptied and the marker
+# just after, so the two are a few steps apart at most: the SM keeps emitting
+# while the stop call runs. Measured on RP2350 PIO, the delta is 0..3 steps in
+# almost every run, with the odd scheduling hiccup near 10. The tolerance is
+# that stop-call latency budget, not the position's accuracy -- the defect it
+# gates is off by the whole run (`POS 0` against ~1270 steps), so anything up to
+# a small fraction of the move still catches it.
+POSITION_TOLERANCE_STEPS = 16
+
+
+def parse_position_reply(reply):
+    """The `POS` line's values, one per stepper, or None if there is no line."""
+    for line in reply.splitlines():
+        if line.startswith("POS"):
+            try:
+                return [int(tok) for tok in line.split()[1:]]
+            except ValueError:
+                return None
+    return None
+
+
+def check_commanded_position(tag_key, scenario, detail, passed):
+    """Judge `POS` for the scenarios in POSITION_SCENARIOS on their arches.
+
+    A separate check from the evaluator rather than part of it, because the
+    evaluator is given the capture and this needs both the capture's wire count
+    (`steps_before_stop`, which the evaluator measured) and the firmware's own
+    reply. It is ANDed into the verdict, so `POS 0` is a failed run and not a
+    record to be read afterwards.
+    """
+    arches = POSITION_SCENARIOS.get(scenario)
+    if arches is None:
+        return passed
+    if not any(tag_key.startswith(arch + "_") for arch in arches):
+        return passed
+    pos = parse_position_reply(detail.get("reply", ""))
+    before = detail.get("steps_before_stop")
+    if pos is None or before is None or len(pos) != 1:
+        detail["position_check"] = {
+            "ok": False,
+            "reason": "no POS reply, or no wire count to compare it to"}
+        return False
+    delta = before - pos[0]
+    ok = -POSITION_TOLERANCE_STEPS <= delta <= POSITION_TOLERANCE_STEPS
+    detail["position_check"] = {
+        "ok": ok,
+        "firmware_pos": pos[0],
+        "wire_steps_before_stop": before,
+        "delta_steps": delta,
+        "tolerance_steps": POSITION_TOLERANCE_STEPS,
+    }
+    return passed and ok
+
 
 def eval_abort_queue(channels, rate, segments, info, pins, marker_channel=None):
     """SR_30: `forceStopAndNewPosition()` empties the queue.
@@ -3643,6 +3718,7 @@ def measure(tag_key, name, wire, mask, builder, evaluator, args,
     # be rediscovered from a capture by hand.
     detail["entries_below_min_cmd_ticks"] = sub_min_entries(
         segments if not programs else None, info, programs)
+    passed = check_commanded_position(tag_key, scenario, detail, passed)
     return ("passed" if passed else "failed"), detail
 
 

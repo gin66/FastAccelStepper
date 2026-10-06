@@ -60,6 +60,12 @@ Read from the board by the `DRIVERS` command, not from a host table. A host tabl
 |---|---|---|
 | rpipico2 / arduino / sdk latest | pio, timer | not reported (no I2S on this target) |
 
-## Open item
+## Closed: `POS` after `XSTOP`
 
-SR_30 passes on the wire (`steps_after_stop = 0`, queue discarded), but `POS`/`DONE` after `XSTOP` were `0` in 3 of 8 runs while the wire carried the full step count — see `extras/todo/026_pico_position_read_returns_zero.md`.
+SR_30 passes on the wire (`steps_after_stop = 0`, queue discarded). Its `POS`
+after `XSTOP` was `0` in 15 of 40 runs while the wire carried the full step
+count — the PIO's non-blocking position push leaves stale samples in the RX
+FIFO, and the read used one as current. Fixed in `src/pd_pico/pico_queue.cpp`
+and now asserted by the harness (`check_commanded_position`): `POS 0` in 0 of 70
+runs after the fix. See
+[`extras/doc/implemented/pico_position_read_returns_zero.md`](../../../doc/implemented/pico_position_read_returns_zero.md).

@@ -24,7 +24,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **026** | [Pico `getCurrentPosition()` returns 0 during a run](026_pico_position_read_returns_zero.md) | ~40 k | 1 d | Medium: on a running queue the position is read out of the PIO RX FIFO, so an empty FIFO returns 0 (measured 3 of 8 aborts on RP2350). `POS` after XSTOP, not asserted by any scenario. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
 | **040** | [AVR synchronized start](040_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
@@ -43,9 +42,25 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 18 items | ~6.0 M | 17–25 w | Priorities 026–160, plus 500. |
+| **total** | 17 items | ~5.96 M | 16–24 w | Priorities 040–160, plus 500. |
 
 ## Done
+
+- **026 — Pico `getCurrentPosition()` returned 0 during a run — fixed and
+  measured.** The PIO pushes the running position into its RX FIFO with a
+  *non-blocking* push, so once the 4-entry FIFO is full the push stops updating
+  it and the FIFO holds samples from the run's beginning — including 0 before
+  the first step. `getCurrentStepCount()` treated a stale sample as current, so
+  `XSTOP` (`forceStopAndNewPosition(getCurrentPosition())`) latched 0: measured
+  **`POS 0` in 15 of 40** RP2350 SR_30 runs while the wire carried ~1270 steps.
+  SR_30 asserts the pulses on purpose, so it passed either way; the position was
+  recorded and never read. The running read now discards the stale samples and
+  waits for a current push; the stopped path returns `queue_end.pos`, because
+  `forceStop()` restarts the SM (clearing the position in the shift register)
+  and zeroes `pos_offset`. SR_30 now asserts `POS` against the wire via
+  `check_commanded_position()`, and `TestPositionCheck` pins it. **0 of 70** runs
+  after the fix. Record:
+  [pico_position_read_returns_zero.md](../doc/implemented/pico_position_read_returns_zero.md).
 
 - **Pico ignored `addQueueEntry(cmd, start=false)` — fixed and measured.**
   The PIO port's feeder was started unconditionally in the `SUPPORT_RP_PICO`
@@ -60,10 +75,9 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   `getCurrentStepCount()`'s read-before-test order was corrected. Measured on
   RP2350: **SR_25 passes** (`steps_measured = 4080` = fill, stop interrupts the
   run) and **SR_30 passes** (`steps_after_stop = 0`, `queue_discarded`).
-  Record: [pico_start_false.md](../doc/implemented/pico_start_false.md) — which
-  also records a still-open item: `getCurrentPosition()` on Pico intermittently
-  returns 0 during a run (`POS`/`DONE` 0 in 3 of 8 aborts), not asserted by
-  SR_30 — now tracked as **026** in the table above.
+  Record: [pico_start_false.md](../doc/implemented/pico_start_false.md) — whose
+  still-open item (`getCurrentPosition()` on Pico intermittently returned 0
+  during a run) is now closed as **026** above.
 
 - **181 — MCPWM/PCNT overrun: by design, within limits (closed as not a defect).**
   `mcpwm_pcnt` free-runs and is stopped from the PCNT interrupt, so a delayed ISR
