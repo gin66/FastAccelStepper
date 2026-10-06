@@ -28,6 +28,20 @@
  * Protocol
  * --------
  *   SR00                       SR_00 connection self-test (8 pins, 1 Hz)
+ *   PING                       liveness probe; replies "OK PING". The host
+ *                              uses it to identify a board that does not reset
+ *                              on port open (RP2040/RP2350 native USB, whose
+ *                              one-shot READY at boot is gone by the time the
+ *                              host reconnects). A reply proves the harness
+ *                              firmware is running.
+ *   RESET                      full chip reset (RP2040/RP2350 only; replies
+ *                              "OK RESET" then reboots). The host sends it
+ *                              before each test on native USB, replacing the
+ *                              reset a USB-serial bridge does on port open.
+ *                              A chip reset is the only way back to an empty
+ *                              engine: a queue is allocated once and the
+ *                              engine has no release, so a *different* CONFIG
+ *                              is refused until the board comes up empty.
  *   CONFIG <n> <drv>[,<drv>...] [dir|nodir]
  *                              connect <n> steppers, one driver NAMED per
  *                              stepper. There is no automatic choice: a result
@@ -139,6 +153,13 @@
 #include "saleae_hal.h"
 #include "saleae_str.h"
 #include "saleae_test.h"
+
+// `rp2040.reboot()` (RESET) lives in the arduino-pico core's RP2040Support.h,
+// which Arduino.h pulls in. Only the Pico build needs it, so only that build
+// includes it.
+#if defined(ARDUINO_ARCH_RP2040)
+#include <Arduino.h>
+#endif
 
 #define SALEAE_SERIAL_BAUD 115200
 
@@ -1161,17 +1182,35 @@ static void handle_imux(void) {
 // channels on a 328P.
 // The full form's buffer (SALEAE_CHANNELS*4 + SALEAE_MAX_STEPPERS*8 + 96) is
 // 168 bytes there for a reply of at most 66, so this rung keeps only the three
-// scalars the host needs to build a channel map and spends 32 instead. The pin
-// list is what it gives up: the host keeps deriving the map from count/mode/
-// stride, and only records `pins` for the report.
+// scalars the host needs to build a channel map. The pin list is what it gives
+// up: the host keeps deriving the map from count/mode/stride, and only records
+// `pins` for the report.
+//
+// The buffer was 32, which is *smaller than the fixed prefix alone*: the
+// shortest legal reply, "MAP count=0 mode=dir stride=2 ch=-\n", is 36 bytes,
+// so every reply on a target without SUPPORT_SELECT_DRIVER_TYPE was truncated
+// to "...stride=2 c" and the host's MAP_RE (which requires `ch=`) refused it
+// with "no MAP reply". That is why the only MAP-measured rows were ESP32. The
+// static_assert below pins the size to the widest reply so it cannot regress.
+// `marker` is not optional even on this rung: SR_25/SR_30 put the STOP instant
+// on a free channel and read it back from MAP, so a reply without it left the
+// host thinking no channel was free and failing the two stop scenarios on every
+// non-ESP32 board. The marker channel is one scalar, not the pin list, so it
+// costs nothing to keep.
+#define SAL_MAP_SHORT_REPLY_MAX 64
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 static void handle_map(void) {
-  SAL_REPLY_BUF char buf[32];
+  SAL_REPLY_BUF char buf[SAL_MAP_SHORT_REPLY_MAX];
+  static_assert(SAL_MAP_SHORT_REPLY_MAX >=
+                    sizeof("MAP count=8 mode=nodir stride=1 ch=- marker=255\n"),
+                "short MAP reply buffer too small for the widest reply");
   SAL_REPLY_BUF char mode[SAL_PIN_MODE_MAX];
   pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
   sal_snprintf(buf, sizeof(buf),
-               SAL_PSTR("MAP count=%u mode=%s stride=%u ch=-\n"),
-               (unsigned)slot_count, mode, (unsigned)chan_stride);
+               SAL_PSTR("MAP count=%u mode=%s stride=%u ch=- marker=%u\n"),
+               (unsigned)slot_count, mode, (unsigned)chan_stride,
+               marker_channel == SALEAE_NO_MARKER ? 0xFFu
+                                                  : (unsigned)marker_channel);
   reply(buf);
 }
 #else
@@ -1330,16 +1369,35 @@ static void handle_config(char* count_text, char* driver_list,
     return;
   }
 
-  // The delimiter is a two-byte array rather than the literal "," because on
-  // AVR a string literal is an SRAM allocation -- and one comma does not earn
-  // two bytes of a 328P's RAM. Char constants are immediates, so this costs
-  // nothing. strtok() is kept rather than hand-rolled: its treatment of a run
-  // of commas is exactly what makes "CONFIG 1 timer," and "CONFIG 1 timer" the
-  // same request, and reimplementing that is where a protocol would quietly
-  // change.
-  const char comma[2] = {',', '\0'};
+  // Hand-rolled rather than `strtok`, and the delimiter is a char constant
+  // rather than the literal "," because on AVR a string literal is an SRAM
+  // allocation -- and one comma does not earn two bytes of a 328P's RAM.
+  //
+  // The reason it is not `strtok` is a measured RP2040/RP2350 (newlib) defect:
+  // the *first* `strtok` after `rp2040.reboot()` returns one token too few for
+  // a three-token list -- `got=2` for "pio,pio,pio", with the delimiter and the
+  // string both verified intact at the call site, and every subsequent call
+  // correct. A warm reboot is the trigger, so it is newlib static-state, not
+  // the string. This splitter keeps the one strtok semantic the protocol
+  // depends on: runs of commas (including a trailing one) are skipped, so
+  // "CONFIG 1 timer," and "CONFIG 1 timer" stay the same request.
+  const char comma = ',';
   uint8_t got = 0;
-  for (char* tok = strtok(driver_list, comma); tok; tok = strtok(NULL, comma)) {
+  char* scan = driver_list;
+  while (true) {
+    while (*scan == comma) {
+      scan++;
+    }
+    if (*scan == '\0') {
+      break;
+    }
+    char* tok = scan;
+    while (*scan != '\0' && *scan != comma) {
+      scan++;
+    }
+    if (*scan == comma) {
+      *scan++ = '\0';
+    }
     enum saleae_driver d;
     if (!parse_driver(tok, &d)) {
       reply_p(SAL_PSTR("ERR CONFIG no such driver\n"));
@@ -2046,6 +2104,24 @@ static void handle_line(char* line) {
     saleae_test_setup();
     sr00_active = true;
     reply_p(SAL_PSTR("OK SR00\n"));
+  } else if (!sal_strcmp(cmd, SAL_PSTR("PING"))) {
+    // Liveness probe. The host uses it to identify a board that does not
+    // reset when the port is opened -- RP2040/RP2350 native USB -- where the
+    // one-shot READY printed at boot is gone by the time the host reconnects.
+    reply_p(SAL_PSTR("OK PING\n"));
+  } else if (!sal_strcmp(cmd, SAL_PSTR("RESET"))) {
+    // Full chip reset. A queue is allocated once and the engine has no
+    // release, so a *different* CONFIG cannot be honoured while steppers are
+    // connected; on a bridge board the port-open reset is what returns to an
+    // empty engine, and this command is the equivalent for native USB, where
+    // no port-open reset exists. The reply is best-effort -- USB drops as the
+    // chip reboots -- so the host just waits for the port to come back.
+#if defined(ARDUINO_ARCH_RP2040)
+    reply_p(SAL_PSTR("OK RESET\n"));
+    rp2040.reboot();
+#else
+    reply_p(SAL_PSTR("ERR RESET only on RP2040/RP2350\n"));
+#endif
   } else if (!sal_strcmp(cmd, SAL_PSTR("CONFIG"))) {
     if (n < 2) {
       reply_p(SAL_PSTR("ERR CONFIG needs <count> <driver>[,<driver>...]\n"));

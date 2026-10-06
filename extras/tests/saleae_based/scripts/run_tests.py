@@ -42,6 +42,7 @@ Usage:
 import argparse
 import dataclasses
 import json
+import os
 import re
 import subprocess
 import sys
@@ -372,6 +373,27 @@ SR00_SETTLE_S = 1.5
 # ---------------------------------------------------------------------------
 
 
+def native_usb_port(port):
+    """True for a port that is the MCU's own USB, not a USB-serial bridge.
+
+    RP2040/RP2350 and other native-USB parts do **not** reset the target when
+    the host opens the port, and there is no DTR/RTS toggle to force one (the
+    only reset the arduino-pico core offers is the 1200 bps jump to the UF2
+    bootloader). So the firmware's `READY`, printed once at boot, is already
+    gone by the time the host reconnects -- and a real reset would re-enumerate
+    USB and lose it all over again.
+
+    The distinction is load-bearing: the `PING` fallback in `open_board()` must
+    only apply where a reset is impossible. On a bridge board (ESP32-DevKitC,
+    AVR nano) a missing READY means the DTR/RTS toggle did not fire, and
+    probing past that would silently measure a stale board -- the exact failure
+    `open_board()` exists to make loud. macOS names native ports `cu.usbmodem*`,
+    Linux `ttyACM*`; a bridge is `usbserial*` / `SLAB_USBtoUART` / `ttyUSB*`.
+    """
+    base = os.path.basename(port)
+    return base.startswith(("cu.usbmodem", "usbmodem", "ttyACM"))
+
+
 def open_board(port, baud, timeout=6.0, require_ready=True):
     """Open the serial port (which resets the board) and wait for READY.
 
@@ -395,8 +417,14 @@ def open_board(port, baud, timeout=6.0, require_ready=True):
     the old loop simply fell through after `timeout` and handed back a stale
     board that answered commands from the previous test. It now raises, because
     a run against an unreset board measures that board's leftovers.
+
+    Native USB (RP2040/RP2350) is the one board this cannot work on, because
+    the port open does not reset it at all and no toggle can. There the reset is
+    requested over the protocol instead -- see `_open_native_usb()`.
     """
     import serial
+    if native_usb_port(port):
+        return _open_native_usb(port, baud, timeout, require_ready)
     ser = serial.Serial(port, baud, timeout=0.1)
     deadline = time.time() + timeout
     buf = b""
@@ -414,6 +442,88 @@ def open_board(port, baud, timeout=6.0, require_ready=True):
             f"Measuring a stale board would report the previous run's state "
             f"as this one's. Saw {len(buf)} byte(s) of boot output; unplug and "
             f"replug the board, or pass a longer --baud-timeout.")
+    ser.reset_input_buffer()
+    return ser
+
+
+def _open_native_usb(port, baud, timeout, require_ready):
+    """Reset a native-USB board over the protocol, then wait for `PING`.
+
+    RP2040/RP2350 do not reset on port open and expose no DTR/RTS reset, so the
+    reset is requested with the `RESET` command (firmware `rp2040.reboot()`).
+    That is not cosmetic: a queue is allocated once and the engine has no
+    release, so a board that was **not** reset refuses a *different* CONFIG --
+    which is every second scenario in a catalogue or a `scale` sweep. On a
+    bridge board the port-open reset is what clears that; this is its stand-in.
+
+    The chip re-enumerates USB when it reboots, so the boot-time `READY` is a
+    race and is not awaited. `PING` proves the board came back and is the right
+    firmware. A port that does not answer within `max(timeout, 10)` raises,
+    because a run against a board that did not reset measures its leftovers.
+    """
+    import serial
+
+    def try_open():
+        try:
+            return serial.Serial(port, baud, timeout=0.1)
+        except (OSError, serial.SerialException):
+            return None
+
+    # Ask for the reboot. The reply is best-effort: USB drops as the chip
+    # resets, so it may be cut off before it is read.
+    ser = try_open()
+    if ser is not None:
+        try:
+            ser.write(b"RESET\n")
+            ser.flush()
+        except (OSError, serial.SerialException):
+            pass
+        time.sleep(0.5)
+        try:
+            ser.close()
+        except OSError:
+            pass
+
+    # Wait for the port to come back and answer PING.
+    window = max(timeout, 10.0)
+    deadline = time.time() + window
+    buf = b""
+    ser = None
+    while time.time() < deadline:
+        ser = try_open()
+        if ser is None:
+            time.sleep(0.1)
+            continue
+        try:
+            ser.write(b"PING\n")
+        except (OSError, serial.SerialException):
+            ser.close()
+            ser = None
+            time.sleep(0.1)
+            continue
+        end = time.time() + 1.0
+        while time.time() < end:
+            data = ser.read(256)
+            if data:
+                buf += data
+                if b"OK PING" in buf:
+                    ser.reset_input_buffer()
+                    return ser
+        ser.close()
+        ser = None
+
+    if ser is not None:
+        ser.close()
+    if require_ready:
+        raise BoardError(
+            f"{port} did not answer PING within {window:.0f}s of a RESET, so "
+            f"the board did not reset or is not running the harness firmware. "
+            f"Saw {len(buf)} byte(s); if the port name changed across the "
+            f"reboot, pass the new one. A stale board would report the "
+            f"previous run's state as this one's.")
+    ser = try_open()
+    if ser is None:
+        raise BoardError(f"{port} is not present after RESET")
     ser.reset_input_buffer()
     return ser
 
@@ -480,7 +590,14 @@ def reply_of(ser, line):
 # shape the two generic modes produce.
 QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxall=(\d+)"
                       r"(?: maxspeed\d+=(\d+))*")
-MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,]*)"
+# `ch=` may be empty, a pin list, or the single `-` a build without
+# SUPPORT_SELECT_DRIVER_TYPE emits (it gives up the pin list). The `-` has to be
+# consumed by the class -- with `[\d,]*` it was left in the string, and because
+# it sits immediately after `ch=` with no whitespace, every following optional
+# field (bus/slots/dslots/`marker`) failed to match against it. `marker` then
+# defaulted to -1 and SR_25/SR_30 reported "no marker channel free" on every
+# non-ESP32 board even though MARK had just succeeded.
+MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,-]*)"
                       r"(?:\s+bus=([\d,-]+))?"
                       r"(?:\s+slots=([\d,-]*))?"
                       r"(?:\s+dslots=([\d,-]*))?"
@@ -569,7 +686,9 @@ def read_map(ser):
         m = MAP_RE.search(text)
         if m:
             count, mode, stride = int(m.group(1)), m.group(2), int(m.group(3))
-            pins = [int(p) for p in m.group(4).split(",") if p]
+            # `-` (no pin list) and empty fields are skipped: this build may
+            # report `ch=-`, so a bare int() on it would raise.
+            pins = [int(p) for p in m.group(4).split(",") if p.isdigit()]
             # bus= is "-" when the multiplexer is not up; the fields are only
             # present on an ESP32 build, hence the None guards.
             bus_field = m.group(5)
@@ -3570,9 +3689,45 @@ def ensure_mux(ser, wire, args):
         "initI2sMux() has to succeed before any mux stepper connects")
 
 
+def unsupported_scenario_drivers(scenario, board_drivers, native_driver):
+    """Drivers a named scenario asks for that this build does not have.
+
+    A scenario may name a driver only some architectures provide -- SR_17 asks
+    for `rmt`+`mcpwm_pcnt`, SR_18..20 for `mcpwm_pcnt`, SR_23 for `i2s_direct`,
+    none of which exist on a Pico. Asking a board for a capability it was never
+    supposed to have must read as **skipped**, not failed: a FAIL is a
+    statement about the hardware, and "this ARM core has no RMT peripheral" is
+    not a defect in it.
+
+    Returns [] when every named driver is present, and also when the board's
+    driver list was not read (`board_drivers` is None for a bare
+    `run_tests.py` invocation) -- there the `ERR CONFIG no such driver`
+    refusal in `run_scenario()` is the fallback signal.
+    """
+    if not board_drivers:
+        return []
+    drivers = config_drivers(SCENARIOS[scenario][0], native_driver)
+    return [d for d in drivers if not board_drivers.get(d)]
+
+
 def run_scenario(tag_key, test_id, args):
     """Program a scenario, capture it, and evaluate the waveform."""
     _config, builder, mask, _desc = SCENARIOS[test_id]
+
+    # A driver this build does not have is skipped before a capture is even
+    # opened: there is no measurement to make, and the board's refusal would
+    # otherwise be recorded as a failure of the board.
+    unsupported = unsupported_scenario_drivers(
+        test_id, getattr(args, "board_drivers", None), args.dut_driver)
+    if unsupported:
+        return "skipped", {
+            "reason": "driver(s) this build does not have: "
+                      + ", ".join(unsupported),
+            "scenario_drivers": config_drivers(SCENARIOS[test_id][0],
+                                               args.dut_driver),
+            "board_drivers": args.board_drivers,
+        }
+
     # A probed scenario's CONFIG is the probe's to send -- it is what finds the
     # count -- so it is handed no wire at all. Every other scenario's is built
     # from its own pin mode, which is `dir` for all of them but one.
@@ -3584,10 +3739,18 @@ def run_scenario(tag_key, test_id, args):
                              builder, test_id, args,
                              per_stepper_builder(test_id),
                              scenario=test_id, probe=probe)
-    # A named scenario that the board refuses is a wiring fault, not a finding,
-    # so it is reported as a failure even though the shared path calls it
-    # `refused` for the modes.
-    return ("failed" if status == "refused" else status), detail
+    # A named scenario the board refuses is a wiring fault, not a finding, so it
+    # is reported as a failure even though the shared path calls it `refused`
+    # for the modes -- with one exception: a CONFIG naming a driver this build
+    # has no driver for is the same unsupported-capability case as above, which
+    # the direct `run_tests.py` path (no board_drivers read ahead of time) can
+    # only learn from the refusal itself.
+    if status == "refused":
+        if "no such driver" in (detail or {}).get("error", ""):
+            return "skipped", dict(detail or {},
+                                   reason="driver(s) this build does not have")
+        return "failed", detail
+    return status, detail
 
 
 def run_modes(tag_key, plans, args, mode):

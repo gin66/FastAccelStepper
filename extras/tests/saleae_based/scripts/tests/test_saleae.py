@@ -1585,6 +1585,12 @@ class TestResetBeforeEachTest(unittest.TestCase):
     self-test then reports the truncated pattern as eight dead cables -- which
     is the fault it exists to catch, so the pre-check becomes indistinguishable
     from the thing it is for.
+
+    Native-USB boards (RP2040/RP2350) are the one exception: opening the port
+    does not reset the chip and no toggle can, so `READY` is unrecoverable. There
+    the missing reset is replaced by a `PING` liveness probe, gated on the port
+    being native USB -- a bridge board still raises, because there a missing
+    READY is a reset that did not fire, not a hardware impossibility.
     """
 
     def test_open_board_raises_when_the_board_did_not_reset(self):
@@ -1639,6 +1645,83 @@ class TestResetBeforeEachTest(unittest.TestCase):
         with mock.patch("serial.Serial", FakeSerial):
             ser = run_tests.open_board("/dev/null", 115200, timeout=1.0)
         self.assertIsInstance(ser, FakeSerial)
+
+    def test_open_board_resets_and_pings_a_native_usb_board(self):
+        # RP2040/RP2350: the port open does not reset the chip, so READY is
+        # gone by the time the host reconnects. The reset is requested over the
+        # protocol (RESET), and PING proves the firmware came back. The reset
+        # matters beyond identity: without it a different CONFIG is refused.
+        written = []
+
+        class FakeSerial:
+            def __init__(self, *a, **k):
+                self._pinged = False
+
+            def read(self, _n):
+                return b"OK PING\n" if self._pinged else b""
+
+            def write(self, data):
+                written.append(data)
+                if data == b"PING\n":
+                    self._pinged = True
+                return len(data)
+
+            def flush(self):
+                pass
+
+            def reset_input_buffer(self):
+                pass
+
+            def close(self):
+                pass
+
+        clock = itertools.count(0, 0.5)
+
+        def now():
+            return next(clock)
+
+        with mock.patch("serial.Serial", FakeSerial), \
+                mock.patch.object(run_tests.time, "time", now), \
+                mock.patch.object(run_tests.time, "sleep", lambda _s: None):
+            ser = run_tests.open_board("/dev/cu.usbmodem833201", 115200,
+                                       timeout=2.0)
+        self.assertIsInstance(ser, FakeSerial)
+        self.assertEqual(written, [b"RESET\n", b"PING\n"])
+
+    def test_open_board_does_not_probe_a_bridge_board(self):
+        # On a USB-serial bridge a missing READY means the DTR/RTS reset did
+        # not fire -- a stale board -- so it must stay loud. The PING fallback
+        # is scoped to native USB for exactly this reason.
+        written = []
+
+        class FakeSerial:
+            def __init__(self, *a, **k):
+                pass
+
+            def read(self, _n):
+                return b""
+
+            def write(self, data):
+                written.append(data)
+                return len(data)
+
+            def reset_input_buffer(self):
+                pass
+
+            def close(self):
+                pass
+
+        clock = itertools.count(0, 0.5)
+
+        def now():
+            return next(clock)
+
+        with mock.patch("serial.Serial", FakeSerial), \
+                mock.patch.object(run_tests.time, "time", now):
+            with self.assertRaises(run_tests.BoardError):
+                run_tests.open_board("/dev/cu.usbserial-0001", 115200,
+                                     timeout=1.0)
+        self.assertEqual(written, [])
 
     def test_every_path_that_talks_to_a_board_goes_through_open_board(self):
         # One reset point, or the guarantee is only as good as the call site
@@ -2228,6 +2311,54 @@ class TestMaxStepperCount(unittest.TestCase):
             mode = run_tests.scenario_pin_mode(scenario)
             self.assertIn(mode, run_tests.CHANNELS_PER_STEPPER, scenario)
             self.assertIn(mode, run_tests.MAX_STEPPERS_PER_MODE, scenario)
+
+
+class TestUnsupportedDriverSkip(unittest.TestCase):
+    """A scenario naming a driver the build lacks is skipped, never failed.
+
+    SR_17..20 and SR_23 name ESP32-only drivers (`rmt`, `mcpwm_pcnt`,
+    `i2s_direct`). A Pico has only `pio`, so the board refuses the CONFIG with
+    `ERR CONFIG no such driver`. Recording that as `failed` blames the board for
+    a peripheral it was never meant to have; the run must read as `skipped`.
+    """
+
+    def _args(self, board_drivers, native="pio"):
+        return argparse.Namespace(board_drivers=board_drivers,
+                                  dut_driver=native)
+
+    def test_named_esp32_drivers_are_reported_as_unsupported(self):
+        board = {"timer": True, "pio": True}
+        self.assertEqual(
+            run_tests.unsupported_scenario_drivers("SR_17", board, "pio"),
+            ["rmt", "mcpwm_pcnt"])
+        self.assertEqual(
+            run_tests.unsupported_scenario_drivers("SR_18", board, "pio"),
+            ["mcpwm_pcnt"])
+        self.assertEqual(
+            run_tests.unsupported_scenario_drivers("SR_23", board, "pio"),
+            ["i2s_direct"])
+
+    def test_a_supported_scenario_is_not_skipped(self):
+        board = {"rmt": True, "mcpwm_pcnt": True}
+        self.assertEqual(
+            run_tests.unsupported_scenario_drivers("SR_01", board, "rmt"), [])
+        self.assertEqual(
+            run_tests.unsupported_scenario_drivers("SR_17", board, "rmt"), [])
+
+    def test_no_board_driver_list_falls_back_to_the_refusal(self):
+        # A bare run_tests.py invocation does not read DRIVERS first, so the
+        # host cannot invent an unsupported verdict here; the CONFIG refusal is
+        # the fallback signal inside run_scenario().
+        self.assertEqual(
+            run_tests.unsupported_scenario_drivers("SR_17", None, "rmt"), [])
+
+    def test_run_scenario_skips_rather_than_failing(self):
+        args = self._args({"timer": True, "pio": True})
+        result, detail = run_tests.run_scenario(
+            "rpipico2_arduino_pio_pio2_dir", "SR_17", args)
+        self.assertEqual(result, "skipped")
+        self.assertIn("rmt", detail["reason"])
+        self.assertEqual(detail["board_drivers"], {"timer": True, "pio": True})
 
 
 class TestModes(unittest.TestCase):

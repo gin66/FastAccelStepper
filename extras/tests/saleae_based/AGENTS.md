@@ -168,6 +168,12 @@ recompile.
 
 ```
 SR00                        SR_00 pin self-test (8 pins, 1 Hz)
+PING                        liveness probe; replies "OK PING". How the host
+                            identifies a native-USB board (RP2040/RP2350) whose
+                            one-shot READY at boot is gone by the time the host
+                            reconnects -- there is no port-open reset there.
+RESET                       full chip reset (RP2040/RP2350 only), then reboots;
+                            see "Native USB needs a protocol reset" below.
 CONFIG <n> <drv>[,<drv>..] [dir|nodir]
                             connect <n> steppers, one driver NAMED per stepper.
                             There is no `auto`: an unknown driver, an absent
@@ -658,6 +664,57 @@ non-obvious and both load-bearing — see the MCPWM/PCNT section of
 `rmt+mcpwm_pcnt` and `rmt+rmt` are unaffected either way.
 
 ## Target/driver notes
+
+### Native USB needs a protocol reset (RP2040/RP2350)
+
+**The harness runs on a Pico 2** (`--arch rpipico2 --driver pio`), but native
+USB breaks the reset the whole harness is built on, so it needed a second
+mechanism.
+
+Every other board here is a **USB-serial bridge**: opening the port toggles
+DTR/RTS and resets the MCU, the boot prints `READY`, and `open_board()` waits
+for it. **A queue is allocated once and the engine has no release**, so that
+reset is load-bearing: a *different* `CONFIG` on a board that was not reset is
+refused (`ERR CONFIG already n=1 ... asked n=2`). Between scenarios the reset is
+what returns to an empty engine.
+
+RP2040/RP2350 do not do this. Opening the port does not reset the chip, the
+DTR/RTS toggle is ignored, and the only reset the arduino-pico core offers is
+the 1200 bps jump to the UF2 bootloader. `READY` is printed once at boot, so by
+the time the host reconnects it is gone -- and a *real* reset re-enumerates USB
+and loses it again.
+
+The fix is two firmware commands and a host path (`_open_native_usb()` in
+`scripts/run_tests.py`):
+
+- `PING` — side-effect-free liveness. `open_board()` identifies the board with
+  it instead of `READY`. `native_usb_port()` gates this to `cu.usbmodem*` /
+  `ttyACM*`, so a bridge board that did not reset still fails loudly.
+- `RESET` — replies `OK RESET` then `rp2040.reboot()`. The host sends it, the
+  chip re-enumerates with the **same port name** (measured), and the host waits
+  until `PING` answers. This is the stand-in for the port-open reset.
+
+**A scenario naming a driver the build lacks is SKIPPED, not failed.**
+`unsupported_scenario_drivers()` uses the board's own `DRIVERS` list: SR_17 asks
+for RMT+MCPWM, SR_18–20 for MCPWM/PCNT, SR_23 for I2S; none exist on a Pico, so
+they are recorded `skipped` with the driver list, because "this core has no RMT"
+is not a defect in the board. A bare `run_tests.py` that did not read `DRIVERS`
+first falls back to the `ERR CONFIG no such driver` refusal.
+
+Three defects were fixed to get there, all latent because only ESP32 had ever
+been measured:
+
+- **The short `MAP` reply buffer was 32 bytes for a 36-byte reply**
+  (`handle_map()` under `!SUPPORT_SELECT_DRIVER_TYPE`), so `MAP` truncated to
+  `...stride=2 c` on every AVR/Pico/SAM build and `read_map()` always failed.
+  The buffer is sized by a `static_assert` on the widest reply now.
+- **That reply also omitted `marker=`**, so SR_25/SR_30 could not find a marker
+  channel; and `MAP_RE` did not consume `ch=-`, which stopped the optional
+  `marker` group from matching. Both fixed.
+- **`strtok()` returns one token too few on the first call after
+  `rp2040.reboot()`** (newlib static state), so the first `CONFIG` with 3+
+  drivers was refused. Replaced with an explicit splitter that keeps strtok's
+  skip-runs-of-commas semantics.
 
 ### Which drivers a build has, measured per SDK
 

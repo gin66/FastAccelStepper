@@ -209,13 +209,28 @@ python3 -m unittest discover -s scripts/tests -v
 ```
 
 RP2040/RP2350 use the same Arduino entry point. The CI envs are `rpipico` and
-`rpipico2` (see `.github/workflows/build_arduino_examples_matrix.yml`); the same
-GPIO map (2, 0, 4, 16, 17, 5, 18, 19) is valid on Pico:
+`rpipico2` (see `.github/workflows/build_arduino_examples_matrix.yml`).
+
+**Pico pin map:** the fallback channel table (`SAL_CHAN_PINS`, non-ESP32 /
+non-AVR) is `D0..D7 = GPIO2..GPIO9`, and SR_00's table is the same, so
+`GPIO2→CH1 … GPIO9→CH8`. It deliberately avoids GPIO0/1 (UART0) and needs all
+eight — SR_00 checks every channel. GPIO2..9 are safe on both RP2040 and
+RP2350:
 
 ```bash
-pio run -d pio_dirs/saleae -e rpipico
-pio run -d pio_dirs/saleae -e rpipico2
+python3 scripts/harness.py --arch rpipico2 --driver pio --count 2 --flash
+python3 scripts/harness.py --arch rpipico --mode scale --driver pio \
+    --pin-mode nodir
 ```
+
+**Native USB (RP2040/RP2350) needs a protocol reset.** These boards do not reset
+on port open and expose no DTR/RTS reset, so the harness asks the firmware for a
+chip reset (`RESET` → `rp2040.reboot()`) and identifies the board with `PING`
+instead of the boot-time `READY`. This is required rather than cosmetic: a
+queue is allocated once and cannot be freed, so a *different* `CONFIG` is
+refused until the board comes back up empty. A scenario that names a driver the
+build lacks (`rmt`, `mcpwm_pcnt`, `i2s_direct` on Pico) is recorded **skipped**,
+not failed.
 
 ## Proven: ESP32 hardware pinning
 
@@ -285,9 +300,14 @@ exist, but no capture has been recorded for it.
 | AVR ATmega2560 (atmega2560) | Arduino / timer | — | | | | |
 | AVR ATmega32U4 (atmega32u4) | Arduino / timer | — | | | | |
 | RP2040 (rpipico) | Arduino / pio | — | | | | |
-| RP2350 (rpipico2) | Arduino / pio | — | | | | |
+| RP2350 (rpipico2) | Arduino / pio | — | pass\* | pass | | 2026-10-06 |
 | SAM (atmelsam) | Arduino / timer | — | | | | |
 | SAMD51 (samd51) | Arduino / timer | — | | | | |
+
+\* RP2350 (GPIO2–9) catalogue: SR_00–16, 21, 26, 27, 31 pass; SR_17–20 and
+SR_23 are **skipped** (they name ESP32-only drivers — `rmt`, `mcpwm_pcnt`,
+`i2s_direct` — which this build does not have); SR_25 and SR_30 are open
+(todo/126, todo/127). `scale --pin-mode nodir` n=1…8 passes on every channel.
 
 ## Capture notes (sample-rate restrictions)
 
