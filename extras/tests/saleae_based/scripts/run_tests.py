@@ -597,7 +597,14 @@ QINFO_RE = re.compile(r"tps=(\d+) mincmd=(\d+) qlen=(\d+) maxall=(\d+)"
 # field (bus/slots/dslots/`marker`) failed to match against it. `marker` then
 # defaulted to -1 and SR_25/SR_30 reported "no marker channel free" on every
 # non-ESP32 board even though MARK had just succeeded.
+# `steps=` (group 5) and `dirs=` (group 6) are one entry per *stepper*: the
+# analyzer channel each stepper's step and direction pin landed on, which is
+# what a fixed cable needs. They are reported by the short MAP rung (AVR, Pico)
+# and absent on the mux-capable rung, where the stride-derived map is correct.
+# The full-rung groups therefore start at bus= (group 7).
 MAP_RE = re.compile(r"MAP count=(\d+) mode=(\w+) stride=(\d+) ch=([\d,-]*)"
+                      r"(?:\s+steps=([\d,-]*))?"
+                      r"(?:\s+dirs=([\d,-]*))?"
                       r"(?:\s+bus=([\d,-]+))?"
                       r"(?:\s+slots=([\d,-]*))?"
                       r"(?:\s+dslots=([\d,-]*))?"
@@ -689,11 +696,23 @@ def read_map(ser):
             # `-` (no pin list) and empty fields are skipped: this build may
             # report `ch=-`, so a bare int() on it would raise.
             pins = [int(p) for p in m.group(4).split(",") if p.isdigit()]
+            # The channel each stepper's step/dir pin is on, one entry per
+            # stepper, or `-`. Present on the short MAP rung (AVR, Pico), absent
+            # on the mux-capable one -- so an empty list means "derive from the
+            # stride" and the two paths below stay compatible.
+            step_field = m.group(5)
+            steps = ([int(s) if s != "-" else None
+                      for s in step_field.split(",")]
+                     if step_field else [])
+            dir_field = m.group(6)
+            dirs = ([int(s) if s != "-" else None
+                     for s in dir_field.split(",")]
+                    if dir_field else [])
             # bus= is "-" when the multiplexer is not up; the fields are only
             # present on an ESP32 build, hence the None guards.
-            bus_field = m.group(5)
+            bus_field = m.group(7)
             bus = [int(b) for b in bus_field.split(",")] if bus_field and bus_field != "-" else []
-            slot_field = m.group(6)
+            slot_field = m.group(8)
             slots = ([int(s) if s != "-" else None
                       for s in slot_field.split(",")]
                      if slot_field else [])
@@ -702,7 +721,7 @@ def read_map(ser):
             # host's `step_slot + 1` was right only while allocation stayed
             # gapless -- 0/1, 2/3, ... in stepper order -- which is a property of
             # this firmware's cursor, not a fact the reply carried.
-            dslot_field = m.group(7)
+            dslot_field = m.group(9)
             dslots = ([int(s) if s != "-" else None
                        for s in dslot_field.split(",")]
                       if dslot_field else [])
@@ -737,6 +756,29 @@ def read_map(ser):
                 # 64 for a stepper the capture shows stepping 64 times on S0.
                 step_slot = slots[j] if j < len(slots) else None
                 if step_slot is None:
+                    # A GPIO stepper. The firmware reports the channel its pins
+                    # are on (`steps`/`dirs`) when the rung carries them, and
+                    # that is authoritative: on AVR the fixed cable puts the
+                    # Timer1 compare outputs on channels that are not the
+                    # stride-derived ones. Fall back to the cursor only when the
+                    # reply has no `steps=` field (the mux-capable rung, whose
+                    # GPIO steppers do follow the stride).
+                    step_chan = steps[j] if j < len(steps) else None
+                    if step_chan is None and steps:
+                        raise RuntimeError(
+                            f"stepper {name} has no reported step channel in a "
+                            f"MAP reply whose steps= field is present: {steps!r}")
+                    if step_chan is not None:
+                        chan_map[name] = {"step": STEP_CHANNEL_ORDER[step_chan]}
+                        if stride > 1:
+                            dir_chan = dirs[j] if j < len(dirs) else None
+                            if dir_chan is None:
+                                raise RuntimeError(
+                                    f"stepper {name} is in {mode} mode but MAP "
+                                    f"reports no direction channel for it: "
+                                    f"{dirs!r}")
+                            chan_map[name]["dir"] = STEP_CHANNEL_ORDER[dir_chan]
+                        continue
                     if chan_used + stride > count * stride:
                         raise RuntimeError(
                             f"stepper {name} maps to a channel outside the "
@@ -777,9 +819,14 @@ def read_map(ser):
                             f"on")
                     chan_map[name]["dir"] = f"S{dir_slot}"
             # marker=-1 means no channel is designated as the event marker.
-            marker = int(m.group(8)) if m.group(8) else -1
-            physical = chan_used
+            marker = int(m.group(10)) if m.group(10) else -1
+            # How many analyzer channels the steppers claimed. `ch=` names the
+            # pin behind each claimed channel, so its length is that count and is
+            # authoritative when present; the cursor is the fallback for a reply
+            # that reports `ch=-`.
+            physical = len(pins) if pins else chan_used
             return chan_map, {"mode": mode, "stride": stride, "pins": pins,
+                              "steps": steps, "dirs": dirs,
                               "marker": marker, "bus": bus, "slots": slots,
                               "dslots": dslots,
                               "physical_channels": physical}
@@ -3402,7 +3449,12 @@ def run_sr00(tag_key, args):
     # firmware fault.
     fault = firmware_fault(replies)
     channels, sample_rate = load_capture_for_eval(capture_file)
-    passed, channel_results = analyze_csv.evaluate_sr00(channels, sample_rate)
+    # The ESP32-DevKitC GPIO labels are for the record only; the verdict is the
+    # duty and width of each channel. A non-ESP32 board gets the channel name
+    # instead of a GPIO it does not own (an AVR Nano's D0 is not GPIO 2).
+    gpio_map = analyze_csv.GPIO_MAP if tag_key.startswith("esp32") else {}
+    passed, channel_results = analyze_csv.evaluate_sr00(
+        channels, sample_rate, gpio_map)
     if fault:
         return "error", {
             "sample_rate_hz": sample_rate,

@@ -65,8 +65,17 @@ EXPECTED_DUTY = {
 }
 
 
-def evaluate_sr00(channels, sample_rate_hz):
-    """Return (all_passed, per_channel_results) for an SR_00 capture."""
+def evaluate_sr00(channels, sample_rate_hz, gpio_map=None):
+    """Return (all_passed, per_channel_results) for an SR_00 capture.
+
+    `gpio_map` names the pin behind each channel for the *record* only -- the
+    verdict is the duty and width of channel i, whatever board is wired. It
+    defaults to the ESP32-DevKitC map; a caller that knows the board (an AVR
+    Nano, a Pico) passes its own or `{}` so the result does not claim an ESP32
+    GPIO on a different board.
+    """
+    if gpio_map is None:
+        gpio_map = GPIO_MAP
     all_passed = True
     channel_results = {}
 
@@ -103,7 +112,7 @@ def evaluate_sr00(channels, sample_rate_hz):
 
         all_passed = all_passed and passed
         channel_results[ch_name] = {
-            "gpio": GPIO_MAP.get(ch_name, ch_name),
+            "gpio": gpio_map.get(ch_name, ch_name),
             "frequency_hz": round(metrics.frequency_hz, 2),
             "duty_cycle_percent": round(metrics.duty_cycle_percent, 1),
             "expected_duty_percent": exp_duty,

@@ -33,8 +33,10 @@
 #define EDGE_GRID_MS 50
 
 // 8 identification pins. On ESP32 these match the white paper §3.3 channel
-// map. On other targets use a contiguous, always-valid range that avoids the
-// UART pins (0/1 on AVR) so the serial control channel keeps working.
+// map. On AVR they are the fixed Nano cable, whose Timer1 compare pins (D9/D10)
+// sit on channels 3/2. On other targets use a contiguous, always-valid range
+// that avoids the UART pins (0/1 on AVR) so the serial control channel keeps
+// working.
 //
 // PROGMEM because `const` is not free on AVR: the linker script copies
 // `.rodata` into SRAM to initialise it at reset, so a 22-byte lookup table is
@@ -46,6 +48,14 @@
 #if defined(SALEAE_TARGET_ESP32)
 static const int saleae_pins[SALEAE_PIN_COUNT] SAL_PROGMEM = {2,  0, 4,  16,
                                                               17, 5, 18, 19};
+#elif defined(ARDUINO_ARCH_AVR)
+// The same fixed cable as SAL_CHAN_PINS in saleae_app.cpp, in analyzer-channel
+// order: a 328P Nano where D9/D10 (Timer1's compare outputs) are on channels 3
+// and 2. SR_00 proves this wiring by toggling channel i with duty i, so a cable
+// that does not match the firmware's map fails the pre-check rather than being
+// silently mis-measured.
+static const int saleae_pins[SALEAE_PIN_COUNT] SAL_PROGMEM = {12, 11, 10, 9,
+                                                              5,  4,  3,  2};
 #else
 static const int saleae_pins[SALEAE_PIN_COUNT] SAL_PROGMEM = {2, 3, 4, 5,
                                                               6, 7, 8, 9};

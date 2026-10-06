@@ -38,6 +38,7 @@ scripts/
   control.py               send serial commands and read replies
   capture.py               reliable sigrok-cli wrapper (.sr capture, --vcd, rate/time)
   report.py                markdown + csv view of a run; mode tables
+  report_avr.py            the AVR platform-matrix report, from recorded results
   analyze_csv.py           SR_00 evaluation
   signal_parser.py         edges/metrics core (shared)
   i2s_mux_decoder.py       8-channel VCD -> 37-channel VCD (ESP32 I2S mux)
@@ -136,6 +137,13 @@ python3 scripts/run_matrix.py --report-only
 # parallel-count and sync tables come from.
 python3 scripts/report.py /tmp/cap/hw --results-dir /tmp/results
 
+# the AVR platform report. AVR is not a row in RELEASE_MATRIX (one driver, no
+# driver selection), so it has its own path: no build, flash, capture or serial
+# port -- it reads the recorded results and writes reports/. Tag keys are built
+# the same way harness.py builds them, so it reads the files that were written.
+python3 scripts/report_avr.py                 # -> reports/nanoatmega328_platform_matrix.md
+python3 scripts/report_avr.py --out -         # print instead of writing
+
 # manual serial: read the limits, then run a program
 python3 scripts/control.py --send "CONFIG 1 timer" --read 2
 python3 scripts/control.py --send "QINFO" --read 1
@@ -205,6 +213,17 @@ MAP                         count, mode, stride, the GPIO behind each reachable
                             pairs came out gapless (0/1, 2/3, ...). A host that
                             infers it is right by coincidence; a reply with no
                             `dslots` field is refused, naming the reflashing.
+                            On the more constrained platforms (AVR, Pico) MAP also carries
+                            `steps=`/`dirs=`: one entry per **stepper**, the
+                            analyzer channel its step/dir pin is on. They exist
+                            because an AVR cable is fixed: on a 328P the step
+                            pins can only be Timer1's compare outputs, so
+                            `connect_stepper()` claims the compare pin by
+                            identity and the channel it landed on is wherever
+                            the cable put it -- not the `stride * i` position.
+                            The host reads the reported channel and ignores the
+                            stride whenever `steps=` is present. See "AVR Nano
+                            pin map" below.
                             The host MUST read the map rather than assume a
                             channel map: in `dir` stepper B is D2, in `nodir` it
                             is D1, and a host that guesses reads a quiet pin and
@@ -1108,6 +1127,26 @@ GPIO0 is a boot-strapping pin (must be HIGH at boot).
 The GPIO-to-channel table is **per board and per cable** -- the ESP32-S3 map is not
 the ESP32-DevKitC one. That is why `IMUX` names no pins and why the mux's channel
 allocation is a constant here rather than a host argument.
+
+## Hardware pin map (AVR Nano, ATmega328P)
+
+```
+Saleae D0..D7 -> Nano pin D12, D11, D10, D9, D5, D4, D3, D2
+2 steppers    : A step = D9 (OC1A, channel 3), A dir = D12 (channel 0)
+                B step = D10 (OC1B, channel 2), B dir = D11 (channel 1)
+```
+
+This is a **fixed cable**: the analyzer channel each Nano pin is wired to cannot
+be changed from the host, and the two Timer1 compare outputs (D9/D10) land on
+channels 3 and 2 rather than the harness's default 0 and 2. So the AVR step pin
+is claimed **by identity** -- `connect_stepper()` asks for `stepPinStepperA/B`
+and lets `channel_of_pin()` find the channel the cable put it on -- and MAP
+reports `steps=`/`dirs=`. `SAL_CHAN_PINS` (`common/saleae_app.cpp`) and SR_00's
+`saleae_pins` (`common/saleae_test.cpp`) are the same eight-pin cable list and a
+test asserts they cannot drift. Direction pins are the lowest channels that are
+neither a compare pin nor already claimed: 0 and 1 here.
+
+Pins 0/1 are the serial port and 13 is the LED, so neither is in the cable.
 
 ## References
 

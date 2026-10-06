@@ -269,6 +269,17 @@ class TestSR00(unittest.TestCase):
         passed, _ = analyze_csv.evaluate_sr00(channels, 1000)
         self.assertFalse(passed)
 
+    def test_the_gpio_label_is_per_board_and_not_gated(self):
+        # The recorded pin label must not claim an ESP32 GPIO on another board.
+        channels = self._channels()
+        passed, results = analyze_csv.evaluate_sr00(channels, 1000, {})
+        self.assertTrue(passed)
+        self.assertEqual(results["D0"]["gpio"], "D0")
+        passed, results = analyze_csv.evaluate_sr00(
+            channels, 1000, {"D0": "Nano D12"})
+        self.assertTrue(passed)
+        self.assertEqual(results["D0"]["gpio"], "Nano D12")
+
 
 # Every CONFIG the harness can emit, as (logical config, native driver) pairs.
 # The firmware's grammar is not exercised by any unit test -- it needs a board --
@@ -1148,6 +1159,67 @@ class TestChannelMap(unittest.TestCase):
         self.assertIsNone(m.group(6))
         self.assertIsNone(m.group(7))
         self.assertIsNone(m.group(8))
+
+    def test_map_re_parses_the_reported_step_and_dir_channels(self):
+        line = ("MAP count=2 mode=dir stride=2 ch=12,11,10,9 "
+                "steps=3,2 dirs=0,1 marker=255\n")
+        m = run_tests.MAP_RE.search(line)
+        self.assertEqual(m.group(5), "3,2")
+        self.assertEqual(m.group(6), "0,1")
+        self.assertEqual(m.group(10), "255")
+
+    def test_a_reported_step_channel_overrides_the_stride(self):
+        # A fixed AVR cable puts the Timer1 compare outputs on channels 3 and 2,
+        # so the board reports them and the host must read those rather than the
+        # stride-derived D0/D2 -- otherwise it measures a quiet pin and calls the
+        # driver dead.
+        reply = ("MAP count=2 mode=dir stride=2 ch=12,11,10,9 "
+                 "steps=3,2 dirs=0,1 marker=255\n")
+        with mock.patch.object(run_tests, "reply_of", lambda ser, line: reply):
+            chan_map, pins = run_tests.read_map(object())
+        self.assertEqual(chan_map, {
+            "A": {"step": "D3", "dir": "D0"},
+            "B": {"step": "D2", "dir": "D1"},
+        })
+        self.assertEqual(pins["steps"], [3, 2])
+        self.assertEqual(pins["dirs"], [0, 1])
+        # Four channels are claimed (0..3), which the pinned `ch=` confirms.
+        self.assertEqual(pins["physical_channels"], 4)
+
+    def test_reported_step_channels_work_in_nodir(self):
+        reply = ("MAP count=2 mode=nodir stride=1 ch=12,11,10,9 "
+                 "steps=3,2 dirs=-,- marker=255\n")
+        with mock.patch.object(run_tests, "reply_of", lambda ser, line: reply):
+            chan_map, _ = run_tests.read_map(object())
+        self.assertEqual(chan_map, {"A": {"step": "D3"}, "B": {"step": "D2"}})
+
+    def test_a_dir_stepper_without_a_reported_direction_channel_is_refused(self):
+        # The strides and the reported channels cannot disagree silently: a
+        # `dir` reply that names step channels but no direction channels has
+        # nothing to read the direction from, so it stops the run.
+        reply = ("MAP count=2 mode=dir stride=2 ch=12,11,10,9 "
+                 "steps=3,2 dirs=0,- marker=255\n")
+        with mock.patch.object(run_tests, "reply_of", lambda ser, line: reply):
+            with self.assertRaises(RuntimeError) as cm:
+                run_tests.read_map(object())
+        self.assertIn("direction channel", str(cm.exception))
+
+    def test_the_avr_cable_matches_between_sr00_and_the_app(self):
+        # SR_00 and the scenario tables are two copies of the same fixed cable;
+        # if they drift, the pin the self-test proves is not the pin a scenario
+        # measures. Assert the AVR lists are byte-identical.
+        app = (COMMON / "saleae_app.cpp").read_text()
+        test = (COMMON / "saleae_test.cpp").read_text()
+        m_app = re.search(
+            r"ARDUINO_ARCH_AVR\)\n.*?#define SAL_CHAN_PINS \{([^}]*)\}", app,
+            re.S)
+        self.assertIsNotNone(m_app, "no AVR SAL_CHAN_PINS in saleae_app.cpp")
+        m_test = re.search(
+            r"ARDUINO_ARCH_AVR\)\n.*?saleae_pins\[SALEAE_PIN_COUNT\] SAL_PROGMEM"
+            r" = \{([^}]*)\}", test, re.S)
+        self.assertIsNotNone(m_test, "no AVR saleae_pins in saleae_test.cpp")
+        norm = lambda s: [p.strip() for p in s.replace("\n", " ").split(",")]
+        self.assertEqual(norm(m_app.group(1)), norm(m_test.group(1)))
 
     def test_harness_refuses_a_count_the_channels_cannot_carry(self):
         args = harness.parse_args(["--arch", "esp32", "--count", "5",

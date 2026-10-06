@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import known_limitations
 import report                     # noqa: E402
+import report_avr                 # noqa: E402
 import run_matrix                 # noqa: E402
 import run_tests as rt            # noqa: E402
 import vcd_fixtures as vf         # noqa: E402
@@ -779,6 +780,75 @@ class TestMatrixFindingClassification(unittest.TestCase):
                                       "missing_steppers": ["B"]}}
         self.assertIn("S2", run_matrix.note_of(rec))
         self.assertNotIn("OK QRUN", run_matrix.note_of(rec))
+
+
+class TestAvrReport(unittest.TestCase):
+    """`report_avr.py` reads recorded results, so the tag it looks up has to be
+    the tag the harness wrote -- a report that scans the wrong filename reports
+    "no results" for a matrix that was measured in full."""
+
+    def test_tags_match_the_harness_convention(self):
+        self.assertEqual(
+            report_avr.catalogue_tag("nanoatmega328", "arduino", "timer", 2,
+                                     "dir"),
+            "nanoatmega328_arduino_timer_timer2_dir")
+        self.assertEqual(
+            report_avr.scale_tag_prefix("nanoatmega328", "arduino", "timer",
+                                        "nodir"),
+            "nanoatmega328_arduino_timer_scalenodir")
+
+    def test_build_renders_catalogue_and_scale_from_records(self):
+        results = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, results, ignore_errors=True)
+        tag = "nanoatmega328_arduino_timer_timer2_dir"
+
+        def write(name, record):
+            (results / name).write_text(json.dumps(record))
+
+        write(f"{tag}_SR_00.json",
+              {"test_id": "SR_00", "result": "passed",
+               "timestamp": "2026-10-06T22:44:20.000Z", "channels": {}})
+        write(f"{tag}_SR_01.json",
+              {"test_id": "SR_01", "result": "passed",
+               "timestamp": "2026-10-06T22:45:00.000Z",
+               "steps": {"steps_expected": 8, "steps_measured": 8,
+                         "ok": True},
+               "period": {"expected_period_us": 20.0, "n_long": 0,
+                          "n_short": 0, "ok": True}})
+        scale = "nanoatmega328_arduino_timer_scalenodir"
+        write(f"{scale}_timernodirn1.json",
+              {"stepper_count": 1, "result": "passed", "pin_mode": "nodir",
+               "drivers": ["timer"], "arch": "nanoatmega328",
+               "framework": "arduino", "board_drivers": {"timer": True},
+               "period_spread_us": 0.0,
+               "per_stepper": {"A": {"mean_period_us": 20.0,
+                                     "steps": {"steps_measured": 64,
+                                               "steps_expected": 64,
+                                               "ok": True},
+                                     "period": {"ok": True}}}})
+
+        args = argparse.Namespace(
+            results_dir=str(results), arch="nanoatmega328",
+            framework="arduino", driver="timer", count=2, pin_mode="dir",
+            board="Arduino Nano, ATmega328P", board_detail="16 MHz",
+            cable="Nano D12, D11", generated=None)
+        text, cat = report_avr.build(args)
+
+        self.assertEqual(sorted(cat), ["SR_00", "SR_01"])
+        self.assertIn("AVR (Arduino Nano, ATmega328P) platform matrix", text)
+        self.assertIn("| SR_01 | PASS | 8/8 |", text)
+        self.assertIn("A 20.0usx64/64", text)
+        self.assertIn("nanoatmega328 / arduino", text)
+
+    def test_build_refuses_when_no_records_exist(self):
+        results = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, results, ignore_errors=True)
+        args = argparse.Namespace(
+            results_dir=str(results), arch="nanoatmega328",
+            framework="arduino", driver="timer", count=2, pin_mode="dir",
+            board="x", board_detail="x", cable="x", generated=None)
+        with self.assertRaises(SystemExit):
+            report_avr.build(args)
 
 
 if __name__ == "__main__":

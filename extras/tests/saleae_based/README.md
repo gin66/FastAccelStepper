@@ -191,7 +191,7 @@ python3 scripts/control.py --port /dev/cu.usbserial-0001 --send "SR01 400 400" -
 | `POS` | reply `POS <position>` |
 | `STOP` | stop move / self-test |
 | `IMUX` | bring the ESP32 I2S multiplexer up; no arguments (see above) |
-| `MAP` | the board's own channel map — count, mode, stride, the GPIO behind each channel, and `bus=`/`slots=` for the mux. The host reads this rather than assuming a map. |
+| `MAP` | the board's own channel map — count, mode, stride, the GPIO behind each channel, `steps=`/`dirs=` (the channel each stepper's pins are on, for a fixed AVR cable), and `bus=`/`slots=` for the mux. The host reads this rather than assuming a map. |
 
 `run_tests.py` drives this itself for SR_01 (serial + capture + analysis):
 

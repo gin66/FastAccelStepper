@@ -325,10 +325,16 @@ static_assert(SALEAE_ARG2_MAX >= 12 * SALEAE_MAX_STEPPERS,
 #if defined(SALEAE_TARGET_ESP32)
 #define SAL_CHAN_PINS {2, 0, 4, 16, 17, 5, 18, 19}
 #elif defined(ARDUINO_ARCH_AVR)
-// 8 and 12 are the dir pins: pin 9 and 10 are the Timer1 compare outputs
-// (OC1A/OC1B) and are already the step pins; 0 and 1 are the serial port; 13 is
-// the LED. Anything left that is not a compare pin is fine for a plain output.
-#define SAL_CHAN_PINS {stepPinStepperA, 8, stepPinStepperB, 12, 0, 0, 0, 0}
+// The fixed cable: analyzer channel 0..7 is wired to these Nano pins. It is the
+// physical wiring, in channel order, and SR_00's table (common/saleae_test.cpp)
+// must be the same list so the self-test proves the channel a scenario measures.
+//
+// The step pins are NOT picked by position here. On a 328P they can only be
+// Timer1's compare outputs (D9/D10) and this cable puts them on channels 3 and
+// 2, so connect_stepper() claims the compare pin by identity and MAP reports the
+// channel it landed on. See `channel_of_pin()` and `steps=`/`dirs=`. Pins 0/1
+// are the serial port and are deliberately absent; 13 is the LED.
+#define SAL_CHAN_PINS {12, 11, 10, 9, 5, 4, 3, 2}
 #else
 // Neither an ESP32 nor an AVR: a plain contiguous range that avoids the UART
 // pins. The ESP32 map above is chosen by SALEAE_TARGET_ESP32 rather than
@@ -344,6 +350,32 @@ static constexpr uint8_t kChanPinConst[SALEAE_CHANNELS] = SAL_CHAN_PINS;
 // The runtime read. `static_assert` cannot use this (it is not a constant
 // expression), which is exactly why kChanPinConst exists.
 #define CHAN_PIN(i) (sal_pgm_read_byte(&kChanPin[i]))
+
+#define SAL_NO_CHANNEL 0xFF
+
+// The analyzer channel whose pin is `pin`, or SAL_NO_CHANNEL. This is the
+// inverse of CHAN_PIN() and the reason MAP can report a channel a cable puts a
+// step pin on rather than a stride it happens to follow.
+//
+// Linear scan over eight entries. It is O(channels) and called a handful of
+// times per CONFIG and once per stepper in MAP, so it costs nothing that matters
+// and it keeps the table the single source of truth: a second pin -> channel
+// table is a second thing to keep in step.
+//
+// Only the builds that report a per-stepper channel use it: AVR (its compare
+// pins are wherever the cable put them) and the short MAP rung generally. On a
+// driver-selectable build the stride-derived map is correct and this is not
+// compiled, which also keeps it from being an unused static function.
+#if defined(ARDUINO_ARCH_AVR) || !defined(SUPPORT_SELECT_DRIVER_TYPE)
+static uint8_t channel_of_pin(uint8_t pin) {
+  for (uint8_t c = 0; c < SALEAE_CHANNELS; c++) {
+    if (CHAN_PIN(c) == pin) {
+      return c;
+    }
+  }
+  return SAL_NO_CHANNEL;
+}
+#endif
 
 // A pin cannot be a step output and a direction output at once, and two
 // steppers cannot share a pin. On AVR the step pins are the timer compare pins,
@@ -816,6 +848,58 @@ static bool mux_next_slot(uint8_t* slot_out) {
 }
 #endif  // SUPPORT_ESP32_I2S
 
+#if defined(ARDUINO_ARCH_AVR)
+// The channels this CONFIG has claimed on AVR, and the subset that is a Timer1
+// compare pin and so can only ever be a STEP output. Both are masks because the
+// claims are no longer a contiguous run from channel 0: the cable decides where
+// the compare pins are, and a direction pin may only take a channel that is
+// neither a compare pin nor already claimed.
+static uint8_t avr_chan_used = 0;
+static uint8_t avr_step_mask = 0;
+
+// The idx-th Timer1 compare output, or false past the last one. A switch rather
+// than a table: a namespace-scope `const` array is an SRAM allocation on AVR
+// (see saleae_str.h), and this is two or three pins.
+static bool avr_step_pin_for(uint8_t idx, uint8_t* pin_out) {
+  switch (idx) {
+    case 0:
+      *pin_out = stepPinStepperA;
+      return true;
+    case 1:
+      *pin_out = stepPinStepperB;
+      return true;
+#ifdef stepPinStepperC
+    case 2:
+      *pin_out = stepPinStepperC;
+      return true;
+#endif
+    default:
+      return false;
+  }
+}
+
+static uint8_t avr_step_count(void) {
+#ifdef stepPinStepperC
+  return 3;
+#else
+  return 2;
+#endif
+}
+
+static void avr_reset_channels(void) {
+  avr_chan_used = 0;
+  avr_step_mask = 0;
+  for (uint8_t i = 0; i < avr_step_count(); i++) {
+    uint8_t pin = 0;
+    avr_step_pin_for(i, &pin);
+    const uint8_t ch = channel_of_pin(pin);
+    if (ch != SAL_NO_CHANNEL) {
+      avr_step_mask |= (uint8_t)(1u << ch);
+    }
+  }
+}
+#endif
+
 static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
                             bool nodir) {
   // A multiplexed stepper spends a bit of the mux word and no analyzer channel;
@@ -843,12 +927,52 @@ static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
   } else
 #endif
   {
+#if defined(ARDUINO_ARCH_AVR)
+    // The step pin is picked by identity -- the idx-th Timer1 compare output --
+    // and not by channel position, because a 328P cable is fixed and the
+    // compare pins can land on any channels. `avr_step_mask` is precomputed so
+    // a direction pin never steals a channel another stepper's compare output
+    // lives on, and `avr_chan_used` so two steppers cannot share one.
+    if (!avr_step_pin_for(idx, &step_pin)) {
+      return false;
+    }
+    const uint8_t step_ch = channel_of_pin(step_pin);
+    if (step_ch == SAL_NO_CHANNEL) {
+      return false;
+    }
+    avr_chan_used |= (uint8_t)(1u << step_ch);
+    uint8_t high = (uint8_t)(step_ch + 1);
+    if (!nodir) {
+      uint8_t dir_ch = SAL_NO_CHANNEL;
+      for (uint8_t c = 0; c < SALEAE_CHANNELS; c++) {
+        const uint8_t bit = (uint8_t)(1u << c);
+        if (!(avr_step_mask & bit) && !(avr_chan_used & bit)) {
+          dir_ch = c;
+          break;
+        }
+      }
+      if (dir_ch == SAL_NO_CHANNEL) {
+        return false;
+      }
+      avr_chan_used |= (uint8_t)(1u << dir_ch);
+      dir_pin = CHAN_PIN(dir_ch);
+      if ((uint8_t)(dir_ch + 1) > high) {
+        high = (uint8_t)(dir_ch + 1);
+      }
+    }
+    // `chan_used` is the high-water channel the marker/free-channel accounting
+    // reads, and it is no longer `idx * stride` once the cable decides.
+    if (high > chan_used) {
+      chan_used = high;
+    }
+#else
     step_pin = CHAN_PIN(chan_used);
     // A step-only stepper gets no dir pin at all rather than a repeated one, so
     // setDirectionPin() is not called and nothing on that pin can be mistaken
     // for a direction. The `nodir` consequence is that count_up is always
     // driven true (see qe_feed), because there is no pin to toggle for a false.
     dir_pin = nodir ? 0 : CHAN_PIN(chan_used + 1);
+#endif
   }
 
   FastAccelStepper* s;
@@ -900,9 +1024,11 @@ static bool connect_stepper(uint8_t idx, enum saleae_driver driver,
   slots[idx].mux_slot = step_slot;
   slots[idx].mux_dir_slot = dir_slot;
   slots[idx].driver = driver;
+#if !defined(ARDUINO_ARCH_AVR)
   if (step_slot == SAL_NO_MUX_SLOT) {
     chan_used = (uint8_t)(chan_used + (nodir ? 1 : 2));
   }
+#endif
   return true;
 }
 
@@ -1197,18 +1323,73 @@ static void handle_imux(void) {
 // host thinking no channel was free and failing the two stop scenarios on every
 // non-ESP32 board. The marker channel is one scalar, not the pin list, so it
 // costs nothing to keep.
-#define SAL_MAP_SHORT_REPLY_MAX 64
+// Sized for the widest short-rung reply, which now carries three per-channel
+// or per-stepper lists instead of one: `ch=` (pins), `steps=` and `dirs=`
+// (channels). The 8-stepper `nodir` case is
+// "MAP count=8 mode=nodir stride=1 ch=2,3,4,5,6,7,8,9 steps=0,...,7
+//  dirs=-,...,- marker=255\n", 106 bytes with the NUL, so 128 covers every
+// short-rung target with room to spare. On AVR this is a stack local (see
+// SAL_REPLY_BUF) and 128 bytes is well inside the free SRAM.
+#define SAL_MAP_SHORT_REPLY_MAX 128
 #if !defined(SUPPORT_SELECT_DRIVER_TYPE)
 static void handle_map(void) {
   SAL_REPLY_BUF char buf[SAL_MAP_SHORT_REPLY_MAX];
-  static_assert(SAL_MAP_SHORT_REPLY_MAX >=
-                    sizeof("MAP count=8 mode=nodir stride=1 ch=- marker=255\n"),
+  static_assert(SAL_MAP_SHORT_REPLY_MAX >= 112,
                 "short MAP reply buffer too small for the widest reply");
   SAL_REPLY_BUF char mode[SAL_PIN_MODE_MAX];
   pin_mode_name(chan_stride == SALEAE_STRIDE_NODIR, mode);
-  sal_snprintf(buf, sizeof(buf),
-               SAL_PSTR("MAP count=%u mode=%s stride=%u ch=- marker=%u\n"),
-               (unsigned)slot_count, mode, (unsigned)chan_stride,
+  // `ch` is the GPIO behind each channel the steppers claimed, in channel
+  // order. `steps` and `dirs` are the inverse -- one entry per *stepper*, the
+  // channel its step and direction pins landed on -- and they are what lets a
+  // fixed cable work: on AVR the Timer1 compare outputs are wherever the cable
+  // put them, so the host reads the channel the board reports rather than a
+  // stride the cable does not follow. `-` is a multiplexed stepper (never on
+  // this rung) or, for `dirs`, a stepper with no direction pin.
+  int len = sal_snprintf(buf, sizeof(buf),
+                         SAL_PSTR("MAP count=%u mode=%s stride=%u ch="),
+                         (unsigned)slot_count, mode, (unsigned)chan_stride);
+  for (uint8_t c = 0; c < chan_used && c < SALEAE_CHANNELS; c++) {
+    if (c) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(",%u"),
+                          (unsigned)CHAN_PIN(c));
+    } else {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u"),
+                          (unsigned)CHAN_PIN(c));
+    }
+  }
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" steps="));
+  for (uint8_t i = 0; i < slot_count; i++) {
+    if (i) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(","));
+    }
+    const uint8_t ch = slots[i].mux_slot == SAL_NO_MUX_SLOT
+                           ? channel_of_pin(slots[i].step_pin)
+                           : SAL_NO_CHANNEL;
+    if (ch == SAL_NO_CHANNEL) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("-"));
+    } else {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u"),
+                          (unsigned)ch);
+    }
+  }
+  len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" dirs="));
+  for (uint8_t i = 0; i < slot_count; i++) {
+    if (i) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(","));
+    }
+    uint8_t ch = SAL_NO_CHANNEL;
+    if (chan_stride != SALEAE_STRIDE_NODIR &&
+        slots[i].mux_slot == SAL_NO_MUX_SLOT) {
+      ch = channel_of_pin(slots[i].dir_pin);
+    }
+    if (ch == SAL_NO_CHANNEL) {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("-"));
+    } else {
+      len += sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR("%u"),
+                          (unsigned)ch);
+    }
+  }
+  sal_snprintf(buf + len, sizeof(buf) - len, SAL_PSTR(" marker=%u\n"),
                marker_channel == SALEAE_NO_MARKER ? 0xFFu
                                                   : (unsigned)marker_channel);
   reply(buf);
@@ -1521,6 +1702,9 @@ static void handle_config(char* count_text, char* driver_list,
   slot_count = n;
   chan_used = 0;
   mux_slots_used = 0;
+#if defined(ARDUINO_ARCH_AVR)
+  avr_reset_channels();
+#endif
   for (uint8_t i = 0; i < n; i++) {
     if (!connect_stepper(i, drivers[i], nodir)) {
       slot_count = i;
