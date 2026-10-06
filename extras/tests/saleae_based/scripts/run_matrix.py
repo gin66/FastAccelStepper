@@ -49,6 +49,7 @@ sys.path.insert(0, str(SCRIPTS))
 
 import capture  # noqa: E402
 import harness  # noqa: E402
+import known_limitations  # noqa: E402
 import run_tests  # noqa: E402
 
 LOG_DIR = Path("/tmp/saleae_matrix")
@@ -322,11 +323,16 @@ def junk_line(line):
 #              applicable -- SR_23 on every row without I2S.
 #   INCOMPLETE the measurement could not be made: a channel the stepper needs
 #              was not captured. A hole in the harness, not a wrong step.
+#   LIMITATION a measured failure that is the target working as designed, scoped
+#              to one architecture family and driver. The registry in
+#              `known_limitations.py` decides, not this file: the MCPWM/PCNT
+#              free-running overrun is the one that exists. Not a finding.
 #   DEFECT     anything else. A panic, a stack overflow, a step count or a
 #              period that is wrong. This is the only class that is a finding.
 BOUND = "bound"
 CAPABILITY = "capability"
 INCOMPLETE = "incomplete"
+LIMITATION = "limitation"
 DEFECT = "defect"
 
 # The "matrix row" cell for a non-pass no row in THIS run claims. The results
@@ -360,6 +366,12 @@ def classify(res):
     if res.get("result") == "refused":
         # A refusal is the board declining, whatever its wording. Not a defect.
         return BOUND
+    if known_limitations.match(res) is not None:
+        # A documented platform limitation the registry recognises by shape and
+        # scope, not by verdict word. Checked before DEFECT because it is a
+        # measured failure; the registry keeps it narrow so a real defect that
+        # merely looks similar still falls through.
+        return LIMITATION
     return DEFECT
 
 
@@ -415,7 +427,7 @@ def garbled(text):
     return junk_line(t)
 
 
-def note_of(r):
+def _measured_note(r):
     """One line explaining a non-pass, from whatever the record carries.
 
     A `refused` gets a line too, not only a `failed`: the refusal text is the
@@ -507,6 +519,22 @@ def note_of(r):
     return verdict or "?"
 
 
+def note_of(r):
+    """`_measured_note`, with a known limitation named as one.
+
+    The measurement is still shown -- "failed: A steps 65/64 (1 extra)" is what
+    was seen -- and the registry's id is appended so the reader knows why it is
+    not a finding. `_measured_note` decides *what* was measured; this decides
+    how to frame it, which is the same division `classify` uses.
+    """
+    note = _measured_note(r)
+    lim = known_limitations.match(r) if r else None
+    if lim is None:
+        return note
+    return f"{note} (known limitation: {lim.id})" if note \
+        else f"known limitation: {lim.id}"
+
+
 def cell(r):
     """One matrix cell: the verdict.
 
@@ -529,6 +557,10 @@ def cell(r):
     kind = classify(r)
     if kind == CAPABILITY:
         return "n/a (no such driver)"
+    if kind == LIMITATION:
+        # Not a **FAIL**: the registry recognised the shape as the target
+        # working as designed. The Known limitations section names it.
+        return "known"
     if kind == INCOMPLETE:
         mark = "**incomplete**"
     else:
@@ -743,16 +775,32 @@ def report(rows, results, args):
              "the sweep tables below where they read as a bound. The one "
              "exception is a scenario that names a driver the build does not "
              "have; that is a capability answer, not a failure, and it is "
-             "counted at the bottom of this section rather than tabulated.")
+             "counted at the bottom of this section rather than tabulated. A "
+             "measured failure the registry recognises as a documented platform "
+             "limitation is not here either — see Known limitations.")
     L.append("")
     bad = []
-    counts = {BOUND: 0, CAPABILITY: 0, INCOMPLETE: 0, DEFECT: 0}
+    counts = {BOUND: 0, CAPABILITY: 0, INCOMPLETE: 0, LIMITATION: 0, DEFECT: 0}
+    limitations_seen = {}
     for res in results:
         if res.get("result") in ("passed", "skipped"):
             continue
         kind = classify(res)
         counts[kind] += 1
         if kind == BOUND or kind == CAPABILITY:
+            continue
+        if kind == LIMITATION:
+            # Counted and named, never a finding. Kept per (id, arch, driver) so
+            # the section says *what* the limitation is scoped to, not just that
+            # something happened.
+            lim = known_limitations.match(res)
+            key = (lim.id, lim.arch_family, lim.driver)
+            entry = limitations_seen.setdefault(
+                key, {"lim": lim, "count": 0, "rows": set()})
+            entry["count"] += 1
+            where = row_of(res)
+            if where:
+                entry["rows"].add(where[0])
             continue
         where = row_of(res)
         # No row claims it, so this matrix did not measure it. Listed on its own
@@ -792,18 +840,43 @@ def report(rows, results, args):
         L.append("_Nothing._")
     L.append("")
 
-    # The two classes that are not findings are counted, not tabulated, so the
+    # The classes that are not findings are counted, not tabulated, so the
     # report cannot be read as having hidden them and cannot be read as having
     # 60 defects either.
     L.append(f"Not findings, and not listed above: "
              f"**{counts[BOUND]}** refusal(s), which are the measured limits "
-             f"in the sweep tables below, and **{counts[CAPABILITY]}** "
+             f"in the sweep tables below, **{counts[CAPABILITY]}** "
              f"`no such driver` answer(s), which are scenarios this build has "
-             f"no queues for. A full accounting of every result, including "
-             f"the ones this file does not tabulate, is in the local "
+             f"no queues for, and **{counts[LIMITATION]}** known limitation(s) "
+             f"(see Known limitations). A full accounting of every result, "
+             f"including the ones this file does not tabulate, is in the local "
              f"`results/` directory (git-ignored), indexed by "
              f"`results/tag_index.json`.")
     L.append("")
+
+    # --- known limitations -------------------------------------------------
+    #
+    # Generated, never hand-written: the list comes from the registry applied to
+    # the recorded results, so re-running `--report-only` keeps it true. A
+    # limitation is scoped to the architecture family and driver it is a
+    # property of, which is why it is not a blanket exemption in `classify`.
+    if limitations_seen:
+        L.append("## Known limitations")
+        L.append("")
+        L.append("Measured failures that are the target working as designed, "
+                 "not defects. Each is scoped to the architecture and driver it "
+                 "is a property of, and the reference is where it is "
+                 "documented. The result is still recorded `failed` in "
+                 "`results/`; this section is the report saying why that is not "
+                 "a finding.")
+        L.append("")
+        L.append("| id | architecture / driver | measurements | matrix rows | reference |")
+        L.append("|---|---|---|---|---|")
+        for (ident, family, driver), entry in sorted(limitations_seen.items()):
+            rows_txt = ", ".join(sorted(entry["rows"])) or "–"
+            L.append(f"| `{ident}` | {family} / `{driver}` | {entry['count']} | "
+                     f"{rows_txt} | `{entry['lim'].doc}` |")
+        L.append("")
 
     # --- scale sweeps ------------------------------------------------------
     L.append("## Driver scale sweeps (how many steppers in parallel)")
@@ -866,7 +939,10 @@ def report(rows, results, args):
              "trip and the board's idle afterwards. A pulse outside the move is "
              "not evidence about a driver; it is still recorded, as "
              "`window.steps_outside` and each pulse's offset, and "
-             "`report.py` prints the count beside the step count.")
+             "`report.py` prints the count beside the step count. A `known` "
+             "verdict is a measured failure the registry recognises as a "
+             "documented platform limitation (see Known limitations), not a "
+             "defect; the raw result still says `failed`.")
     L.append("")
     for rid in ids:
         row = by_row.get(rid)

@@ -279,6 +279,9 @@ See [ESP32 I2S Output Driver](../esp32_i2s_driver.md) for the full design.
 
 ### Both ESP-IDF versions
 
+<a id="mcpwm-pcnt-overrun"></a>
+#### MCPWM/PCNT overrun
+
 A note to `MIN_CMD_TICKS` using mcpwm/pcnt: The current implementation uses one
 interrupt per command in the command queue. This is much less interrupt rate
 than for avr. Nevertheless at 200kSteps/s the switch from one command to the
@@ -288,6 +291,27 @@ to deduct the overrun pulses from the next command. The overrun pulses will then
 be run at the former command's tick rate. For real life stepper application, this
 should be ok. To be considered for raw access: Do not run many steps at high rate
 e.g. 200kSteps/s followed by a pause.
+
+**Measured confirmation (ESP-IDF 5.5.3, step pin).** A command of **64 steps at
+160 ticks followed by 64 steps at 320 ticks** emits **65 + 63 = 128** pulses:
+the first command overran by one (its 65th pulse at the fast spacing) and the
+second was reduced to 63 -- the overrun is deducted, exactly as designed. The
+deduction needs a **following command with steps**. `steps == 0` (a pause) takes
+the other branch of `apply_command()` and does not deduct, and the **last command
+of a program has no successor at all**, so a fast packet that is final -- or
+followed by a pause -- can still emit one extra pulse before the free-running
+timer is stopped. That is the limit of the remedy, and it is why the note above
+warns about "many steps at high rate followed by a pause".
+
+The trigger for the delay is interrupt load: `i2s_direct`'s DMA fill, and RMT's
+fill, hold the CPU in an ISR long enough that the PCNT stop for the MCPWM timer
+lands late. It is intermittent and load-dependent -- measured at 6 failures in 8
+runs on `mcpwm_pcnt` (first timer) + `i2s_direct`, 0 in 8 on the second timer,
+and 0 with a single stepper. A logic-analyzer capture shows a real, full-width
+pulse (5.000 us at 4 MS/s, 4.917 us at 24 MS/s) at the commanded spacing, so it
+is a genuine extra step and not a measurement artefact. The harness classifies
+this exact shape as a scoped **known limitation** rather than a defect
+(`extras/tests/saleae_based/scripts/known_limitations.py`).
 
 What are the differences between mcpwm/pcnt, rmt, i2s mux, and i2s direct?
 

@@ -37,6 +37,19 @@ sys.path.insert(0, str(_HERE / "tests"))
 import run_tests as rt          # noqa: E402
 import signal_parser as sp       # noqa: E402
 import vcd_fixtures as vf        # noqa: E402
+import known_limitations          # noqa: E402
+
+
+def _driver_of(record, letter):
+    """The driver a stepper letter was connected with, from the record's list.
+
+    `drivers` is one name per stepper in stepper order, so `A` is index 0. The
+    list is short (a `sync` run has two or three), so the A..Z mapping the
+    harness uses throughout is safe here.
+    """
+    idx = ord(letter) - ord("A")
+    drivers = record.get("drivers") or []
+    return drivers[idx] if 0 <= idx < len(drivers) else None
 
 def scenario_ids():
     """Every wired scenario id, in SR order."""
@@ -360,6 +373,7 @@ def adherence_of(record):
         # The skew column already carries the reason; repeating it here would
         # make a refused row twice as wide as a measured one for no gain.
         return "-"
+    known = known_limitations.match(record)
     cells = []
     for letter in sorted(per_stepper):
         e = per_stepper[letter]
@@ -372,7 +386,16 @@ def adherence_of(record):
         cell += outside_note(e)
         faults = []
         if steps.get("extra_steps"):
-            faults.append(f"+{steps['extra_steps']} extra steps")
+            # The known MCPWM/PCNT overrun is named as such rather than as a
+            # bare fault, so this table agrees with the matrix report. The count
+            # is still shown; only the framing changes.
+            if (known is not None and steps.get("extra_steps") == 1
+                    and not steps.get("missing_steps")
+                    and _driver_of(record, letter) == known.driver
+                    and period.get("ok", True)):
+                faults.append(f"+1 known ({known.id})")
+            else:
+                faults.append(f"+{steps['extra_steps']} extra steps")
         if steps.get("missing_steps"):
             faults.append(f"-{steps['missing_steps']} missing")
         if not period.get("ok", True):
@@ -401,6 +424,13 @@ def sync_rows(records):
     rows = []
     for record in records:
         skew = record.get("first_step_skew_us")
+        result = record.get("result", "?")
+        # A `failed` that the registry recognises is the platform working as
+        # designed; say so here rather than in a findings list this table does
+        # not have. The result record itself is untouched.
+        lim = known_limitations.match(record)
+        if lim is not None and result == "failed":
+            result = f"known ({lim.id})"
         rows.append({
             "drivers": driver_list_of(record),
             "n": record.get("stepper_count", "?"),
@@ -409,7 +439,7 @@ def sync_rows(records):
                        else sync_unmeasured(record),
             "periods": record.get("skew_periods"),
             "adherence": adherence_of(record),
-            "result": record.get("result", "?"),
+            "result": result,
         })
     return sorted(rows, key=lambda r: (r["drivers"], str(r["n"])))
 

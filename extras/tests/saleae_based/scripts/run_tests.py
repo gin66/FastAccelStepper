@@ -2189,7 +2189,8 @@ def move_window(edges, rate, info, segments, expected):
     # -- but a pulse that *continues* the move's rhythm past that is still the
     # driver stepping, so the boundary must not be drawn where such a pulse
     # lands. Measured on IDF 5.5.3: `mcpwm_pcnt` emits one step more than it was
-    # given, at the commanded period, immediately after the run (todo 181), and
+    # given, at the commanded period, immediately after the run (the MCPWM/PCNT
+    # overrun, `extras/doc/platforms/esp32.md`), and
     # at 24 MS/s that lands on the tick boundary to within a sample. So the same
     # rule the anchor uses is applied forwards: the window extends through every
     # edge whose gap from the one before it is one the command could have

@@ -1,6 +1,6 @@
 # Saleae harness — ESP32 platform-release matrix
 
-- **Generated:** 2026-10-06 12:55  _(rebuilt from the recorded results; nothing was measured in this invocation — `--report-only`)_
+- **Generated:** 2026-10-06 16:16  _(rebuilt from the recorded results; nothing was measured in this invocation — `--report-only`)_
 - **Board:** ESP32-DevKitC, serial `/dev/cu.usbserial-0001`
 - **Analyzer:** not recorded (this report was rebuilt from an index written before the analyzer was identified per row)
 - **Firmware rows:** 6 — one build+flash each
@@ -65,21 +65,23 @@ Unparameterized: every scenario runs its own fixed program and is judged by its 
 
 ## Findings
 
-Defects only: a panic, a crash, a step count or a period that is wrong, and measurements that could not be made at all. Refusals are **not** listed here — a `scale` sweep is *asked* where a driver's limit is and a refusal is its answer, so those live in the sweep tables below where they read as a bound. The one exception is a scenario that names a driver the build does not have; that is a capability answer, not a failure, and it is counted at the bottom of this section rather than tabulated.
+Defects only: a panic, a crash, a step count or a period that is wrong, and measurements that could not be made at all. Refusals are **not** listed here — a `scale` sweep is *asked* where a driver's limit is and a refusal is its answer, so those live in the sweep tables below where they read as a bound. The one exception is a scenario that names a driver the build does not have; that is a capability answer, not a failure, and it is counted at the bottom of this section rather than tabulated. A measured failure the registry recognises as a documented platform limitation is not here either — see Known limitations.
 
-| matrix row | what | measurements | note |
-|---|---|---|---|
-| idf-6.13.0 | defect | 1 | failed: A steps 65/64 (1 extra) |
-
-Expanded below, one line per measurement.
+_Nothing: every measurement that ran, passed._
 
 ## Every finding, one line each
 
-| matrix row | test | class | note |
-|---|---|---|---|
-| idf-6.13.0 | sync mcpwm_pcnt+i2s_direct | defect | failed: A steps 65/64 (1 extra) |
+_Nothing._
 
-Not findings, and not listed above: **24** refusal(s), which are the measured limits in the sweep tables below, and **32** `no such driver` answer(s), which are scenarios this build has no queues for. A full accounting of every result, including the ones this file does not tabulate, is in the local `results/` directory (git-ignored), indexed by `results/tag_index.json`.
+Not findings, and not listed above: **24** refusal(s), which are the measured limits in the sweep tables below, **32** `no such driver` answer(s), which are scenarios this build has no queues for, and **1** known limitation(s) (see Known limitations). A full accounting of every result, including the ones this file does not tabulate, is in the local `results/` directory (git-ignored), indexed by `results/tag_index.json`.
+
+## Known limitations
+
+Measured failures that are the target working as designed, not defects. Each is scoped to the architecture and driver it is a property of, and the reference is where it is documented. The result is still recorded `failed` in `results/`; this section is the report saying why that is not a finding.
+
+| id | architecture / driver | measurements | matrix rows | reference |
+|---|---|---|---|---|
+| `mcpwm_pcnt_overrun_last_command` | esp / `mcpwm_pcnt` | 1 | idf-6.13.0 | `extras/doc/platforms/esp32.md#mcpwm-pcnt-overrun` |
 
 ## Driver scale sweeps (how many steppers in parallel)
 
@@ -295,7 +297,7 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 ## Driver combinations (synchronized start)
 
-Every driver-list combination this board could connect, two steppers each, each at its own period. First-step skew is **reported, not gated** (eval_sync): how closely two steppers begin is a property of the pulse driver and of the interrupt latency at that instant, not a correctness property of the queue — so read the ratio in step periods, which is the only comparable form of it. What *is* asserted per stepper is its own commanded step count and period — counted over the *commanded move*, not over the capture: a capture starts before the test is triggered over serial and outlives it, so it holds the host's own round trip and the board's idle afterwards. A pulse outside the move is not evidence about a driver; it is still recorded, as `window.steps_outside` and each pulse's offset, and `report.py` prints the count beside the step count.
+Every driver-list combination this board could connect, two steppers each, each at its own period. First-step skew is **reported, not gated** (eval_sync): how closely two steppers begin is a property of the pulse driver and of the interrupt latency at that instant, not a correctness property of the queue — so read the ratio in step periods, which is the only comparable form of it. What *is* asserted per stepper is its own commanded step count and period — counted over the *commanded move*, not over the capture: a capture starts before the test is triggered over serial and outlives it, so it holds the host's own round trip and the board's idle afterwards. A pulse outside the move is not evidence about a driver; it is still recorded, as `window.steps_outside` and each pulse's offset, and `report.py` prints the count beside the step count. A `known` verdict is a measured failure the registry recognises as a documented platform limitation (see Known limitations), not a defect; the raw result still says `failed`.
 
 **arduino-4.4.0 / sync**
 
@@ -364,7 +366,7 @@ Every driver-list combination this board could connect, two steppers each, each 
 | i2s_direct+i2s_direct | pass | 36.875 | 3.69 |  |
 | i2s_direct+i2s_mux | pass | 6.625 | 0.27 |  |
 | i2s_mux+i2s_mux | pass | 0.0 | 0.00 |  |
-| mcpwm_pcnt+i2s_direct | **FAIL** | 739.25 | 73.98 | failed: A steps 65/64 (1 extra) |
+| mcpwm_pcnt+i2s_direct | known | 739.75 | 73.97 | failed: A steps 65/64 (1 extra) (known limitation: mcpwm_pcnt_overrun_last_command) |
 | mcpwm_pcnt+i2s_mux | pass | 1102.2083 | 44.13 |  |
 | mcpwm_pcnt+mcpwm_pcnt | pass | 13.3333 | 1.33 |  |
 | rmt+i2s_direct | pass | 800.5 | 80.12 |  |

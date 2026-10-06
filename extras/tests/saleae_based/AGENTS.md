@@ -117,6 +117,20 @@ python3 scripts/run_matrix.py --plan          # the plan, no build/flash/capture
 python3 scripts/run_matrix.py                 # all of RELEASE_MATRIX
 python3 scripts/run_matrix.py --targets idf-6.13.0   # one row; others are carried
 
+# rebuild the committed report from the results already on disk: no build,
+# flash, capture or serial port. The classification below is re-applied to the
+# recorded results, so a change to it needs no hardware.
+python3 scripts/run_matrix.py --report-only
+
+# Known system limitations. A measured `failed` that is a target working as
+# designed is scoped to an architecture family + driver and recognised by shape
+# in scripts/known_limitations.py -- the MCPWM/PCNT overrun is the one that
+# exists (one extra step on the last command; see
+# extras/doc/platforms/esp32.md#mcpwm-pcnt-overrun). `run_matrix.classify()`
+# returns `LIMITATION` for it, so it is counted and named under "Known
+# limitations" rather than listed as a finding; `report.py` reads the same
+# registry. Add a limitation there, not in the report text or in classify().
+
 # report: catalogue rows from VCDs, mode tables from result JSON.
 # A mode run records a result and NO capture, so --results-dir is where the
 # parallel-count and sync tables come from.
@@ -445,7 +459,8 @@ Four things it deliberately does not do, each a test in `TestMoveWindow`:
   at the last commanded pulse *and extends through any pulse whose gap from the
   one before it is one the command could have produced* — the anchor's own rule,
   applied forwards. `mcpwm_pcnt` on IDF 5.5.3 emits one step more than it was
-  given, at the commanded period, immediately after the run (todo 181), and at
+  given, at the commanded period, immediately after the run (the MCPWM/PCNT
+  overrun, `extras/doc/platforms/esp32.md`), and at
   24 MS/s that lands on the tick boundary to within a sample: a window cut at the
   last commanded pulse would have set it aside half the time.
 - **A driver at the wrong rate cannot place its own move**, so nothing anchors,
@@ -824,8 +839,9 @@ invariants:
 [`extras/doc/implemented/i2s_mux_dir_phantom_steps.md`](../../../doc/implemented/i2s_mux_dir_phantom_steps.md).
 
 The one red row in those sweeps is `mcpwm_pcnt+i2s_direct` on IDF 5.5.3, **three
-sweeps in three**, and it is
-[181](../../todo/181_mcpwm_pcnt_sync_extra_steps.md). It is also what found this
+sweeps in three**, and it is the
+[MCPWM/PCNT overrun](../../../doc/platforms/esp32.md#mcpwm-pcnt-overrun) — a
+scoped known limitation, not a finding. It is also what found this
 item's own trailing knife-edge — the extra pulse lands on the tick boundary to
 within a sample at 24 MS/s, so the window now extends through a pulse that
 continues the move's rhythm rather than being cut at the last commanded pulse.

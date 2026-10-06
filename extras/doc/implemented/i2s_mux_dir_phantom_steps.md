@@ -92,8 +92,9 @@ window could otherwise have introduced:
 | **`nodir`'s zero-step assertion is untouched** | SR_13 is the one scenario about absence; a pulse anywhere in that capture is still the failure. Same for the marker-relative SR_25/SR_30. |
 
 The one still-open item this could have masked is
-[181](../todo/181_mcpwm_pcnt_sync_extra_steps.md) — `mcpwm_pcnt` emitting more
-steps than were commanded in `sync`, at the commanded period. Those extra steps
+the MCPWM/PCNT overrun (`../platforms/esp32.md#mcpwm-pcnt-overrun`) — `mcpwm_pcnt`
+emitting more steps than were commanded in `sync`, at the commanded period. Those
+extra steps
 land inside the move's span (the span ends one commanded tick after the last
 step's edge, and one more period is further) and are counted, which is the case
 `test_an_extra_step_next_to_the_move_is_still_a_defect` pins.
@@ -179,9 +180,10 @@ and it is no longer blocked by the sampling race.
 A (`mcpwm_pcnt`, D0, 160 ticks) emitting **65 steps where 64 were commanded**:
 the extra pulse is the last one, one commanded period after the run, every
 inter-step period legal, `POS 64 64`. That is
-[todo 181](../todo/181_mcpwm_pcnt_sync_extra_steps.md), which was open before
-this item was started and which the hardware run reproduced three times. It is
-recorded there, with the "where are the steps" answer this run produced.
+the [MCPWM/PCNT overrun](../platforms/esp32.md#mcpwm-pcnt-overrun), which was open
+before this item was started and which the hardware run reproduced three times,
+and which was later verified to be the driver deducting the overrun from the next
+command (a system limitation, not a defect). It is recorded there.
 
 It also found a knife-edge in this item's own window, which the offline
 re-evaluation could not: at 24 MS/s the extra pulse lands on the tick boundary

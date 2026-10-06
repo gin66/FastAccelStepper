@@ -25,6 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import known_limitations
 import report                     # noqa: E402
 import run_matrix                 # noqa: E402
 import run_tests as rt            # noqa: E402
@@ -675,6 +676,98 @@ class TestMatrixFindingClassification(unittest.TestCase):
             "incomplete_capture": {"missing_channels": ["S2"],
                                    "missing_steppers": ["B"]},
         }), run_matrix.INCOMPLETE)
+
+    def _overrun_record(self):
+        """The MCPWM/PCNT overrun exactly as eval_sync records it.
+
+        Stepper A on `mcpwm_pcnt` emitted one extra step, period on spec; B on
+        `i2s_direct` exact. The shape is what the registry recognises, not the
+        verdict word, so a fixture is the right test input.
+        """
+        return {
+            "test_id": "MODE", "mode": "sync", "result": "failed",
+            "arch": "esp32", "framework": "idf", "sdk_version": "6.13.0",
+            "drivers": ["mcpwm_pcnt", "i2s_direct"], "stepper_count": 2,
+            "pin_mode": "dir",
+            "per_stepper": {
+                "A": {"steps": {"steps_measured": 65, "steps_expected": 64,
+                                "extra_steps": 1, "missing_steps": 0,
+                                "ok": False},
+                      "period": {"ok": True}},
+                "B": {"steps": {"steps_measured": 64, "steps_expected": 64,
+                                "extra_steps": 0, "missing_steps": 0,
+                                "ok": True},
+                      "period": {"ok": True}},
+            },
+        }
+
+    def test_the_mcpwm_overrun_is_a_scoped_known_limitation(self):
+        rec = self._overrun_record()
+        self.assertEqual(run_matrix.classify(rec), run_matrix.LIMITATION)
+        # Not a bold **FAIL** in a sync cell: the report names it as known.
+        self.assertEqual(run_matrix.cell(rec), "known")
+
+    def test_a_known_limitation_is_not_a_finding(self):
+        row = {"id": "idf-6.13.0", "framework": "idf", "version": "6.13.0",
+               "esp_idf": "5.5.3", "note": "", "env": "esp32_idf_V6_13_0",
+               "flash_ok": True, "drivers": ["mcpwm_pcnt", "i2s_direct"],
+               "runs": [{"label": "sync", "driver": None, "rc": 0,
+                         "tag_key": "esp32_idf6_13_0_rmt_syncdir"}],
+               "analyzer": "fx2lafw:conn=8.95",
+               "measured_at": "2026-10-06 11:00:00"}
+        rec = dict(self._overrun_record(),
+                   tag_key="esp32_idf6_13_0_rmt_syncdir_"
+                           "mcpwm_pcnt+i2s_directdirn2")
+        text = run_matrix.report([row], [rec], argparse.Namespace(
+            port="/dev/cu.usbserial-0001", report_only=True))
+        self.assertIn("## Known limitations", text)
+        self.assertIn("mcpwm_pcnt_overrun_last_command", text)
+        self.assertIn("known limitation", text)
+        self.assertNotIn("| idf-6.13.0 | defect |", text)
+
+    def test_a_second_extra_step_is_not_the_known_limitation(self):
+        # The overrun is one pulse; two is a different failure.
+        rec = self._overrun_record()
+        rec["per_stepper"]["A"]["steps"]["extra_steps"] = 2
+        self.assertEqual(run_matrix.classify(rec), run_matrix.DEFECT)
+
+    def test_a_missing_step_on_mcpwm_is_a_defect(self):
+        rec = self._overrun_record()
+        rec["per_stepper"]["A"]["steps"].update(
+            extra_steps=0, missing_steps=1, steps_measured=63)
+        self.assertEqual(run_matrix.classify(rec), run_matrix.DEFECT)
+
+    def test_an_extra_step_on_another_driver_is_a_defect(self):
+        # Same +1 shape, but on i2s_direct: only the scoped driver is excused.
+        rec = self._overrun_record()
+        rec["per_stepper"]["A"] = {"steps": {"extra_steps": 0,
+                                             "missing_steps": 0, "ok": True},
+                                   "period": {"ok": True}}
+        rec["per_stepper"]["B"] = {"steps": {"extra_steps": 1,
+                                             "missing_steps": 0, "ok": False},
+                                   "period": {"ok": True}}
+        self.assertEqual(run_matrix.classify(rec), run_matrix.DEFECT)
+
+    def test_every_known_limitation_doc_anchor_exists(self):
+        # A registry reference that points at nothing is worse than none: the
+        # report would say "see <doc>" and the doc would not explain it.
+        import re
+
+        def slug(heading):
+            s = re.sub(r"[^\w\s-]", "", heading.strip().lower())
+            return re.sub(r"\s+", "-", s)
+
+        for lim in known_limitations.LIMITATIONS:
+            path = known_limitations.ROOT / lim.doc_path
+            self.assertTrue(path.exists(), f"{lim.id}: {lim.doc_path} missing")
+            text = path.read_text()
+            anchor = lim.doc_anchor
+            found = (f'id="{anchor}"' in text
+                     or anchor in {slug(ln.lstrip("#").strip())
+                                   for ln in text.splitlines()
+                                   if ln.startswith("#")})
+            self.assertTrue(found, f"{lim.id}: anchor '{anchor}' not in "
+                                   f"{lim.doc_path}")
 
     def test_a_note_is_not_taken_from_a_reply_the_board_confirmed(self):
         # An incomplete capture also carries `reply: "OK QRUN / POS 64 64"` --

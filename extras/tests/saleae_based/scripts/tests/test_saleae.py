@@ -3895,8 +3895,8 @@ class TestMoveWindow(unittest.TestCase):
         self.assertEqual(a["window"]["steps_outside"], 0)
 
     def test_an_extra_step_continuing_the_move_is_still_a_defect(self):
-        # Todo 181's signature, measured on IDF 5.5.3: `mcpwm_pcnt` emits one
-        # step more than it was given, at the commanded period, immediately
+        # The MCPWM/PCNT overrun signature, measured on IDF 5.5.3: `mcpwm_pcnt`
+        # emits one step more than it was given, at the commanded period, immediately
         # after the run -- and its own tally says 64. So the extra pulse lands
         # one commanded period past the last commanded step, which is exactly
         # where a window cut at "the last commanded pulse ends" would put its

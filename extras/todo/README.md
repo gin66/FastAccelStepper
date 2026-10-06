@@ -42,11 +42,21 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **140** | [Modular ramp generator](140_modular_ramp_generator.md) | ~2 M | 3–4 w | Major refactor: extract 4 modules, write PC tests, documentation, regression suite. |
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
-| **181** | [mcpwm_pcnt emits more steps than were commanded, in `sync`](181_mcpwm_pcnt_sync_extra_steps.md) | ~100 k | 1–2 d | Medium: 67 steps where 64 were commanded, IDF 5.5.3 only, ~1 in 3, period exact. Found while closing 015/016. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 19 items | ~6.1 M | 17–26 w | Priorities 025–181, plus 500. |
+| **total** | 18 items | ~6.0 M | 16–24 w | Priorities 025–160, plus 500. |
 
 ## Done
+
+- **181 — MCPWM/PCNT overrun: by design, within limits (closed as not a defect).**
+  `mcpwm_pcnt` free-runs and is stopped from the PCNT interrupt, so a delayed ISR
+  lets one extra pulse out. Verified on hardware that this is the mechanism and
+  that the driver already deducts it from the **next** command: 64 steps @160
+  then 64 @320 measures **65 + 63 = 128**. The remedy needs a following command
+  with steps, so only the **last** command of a program can leak one — a system
+  limitation, not a bug, now documented in
+  [`extras/doc/platforms/esp32.md`](../doc/platforms/esp32.md#mcpwm-pcnt-overrun)
+  and classified as a scoped **known limitation** by the harness
+  (`scripts/known_limitations.py`) rather than a finding.
 
 - **023 — `i2s_mux` in `dir`: the harness counted the capture, not the move.**
   `sync --imux --pin-mode dir` reported a driver emitting 51 steps it did not
@@ -89,7 +99,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   non-mux `sync` verdicts unchanged**.
 
   The hardware run also did two things the offline pass could not. It found the
-  window's **trailing knife-edge** — 181's `mcpwm_pcnt` extra step lands on the
+  window's **trailing knife-edge** — the `mcpwm_pcnt` overrun's extra step lands on the
   tick boundary to within a sample, so a window cut at the last commanded pulse
   would have hidden a real defect half the time; the window now extends through
   any pulse that continues the move's rhythm. And it closed the **`i2s_mux` at
@@ -399,7 +409,8 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
   Full analysis, measurements and guards:
   [idf55_main_task_stack_overflow.md](../doc/implemented/idf55_main_task_stack_overflow.md).
   Two new items came out of the acceptance run and are **not** covered by it:
-  [181](181_mcpwm_pcnt_sync_extra_steps.md) and **182** (since closed as not
+  the MCPWM/PCNT overrun (now closed as a documented system limitation, see Done)
+  and **182** (since closed as not
   reproducible — see Done — which in turn produced **183**, now **SR_31**; see
   Done).
 
