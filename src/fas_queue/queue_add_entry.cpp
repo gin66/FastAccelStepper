@@ -130,9 +130,18 @@ AqeResultCode StepperQueue::addQueueEntry(const struct stepper_command_s* cmd,
     startQueue();
   } else {
 #if defined(SUPPORT_RP_PICO)
-    // with pio using interrupts, the queue may not be full
-    // and then the interrupts are disabled.
-    startQueue();
+    // With PIO the feeder runs from the FIFO-not-full interrupt, which disables
+    // itself once the ring drains. Re-arm it here for a queue that is already
+    // running -- but only then. This branch is reached for start=false too, and
+    // an unconditional startQueue() made start=false a lie on Pico: a queue
+    // that was not running began stepping, so "fill the queue, then start it
+    // later" (QFILL, FasNAxis prefill -> synchronizedStart) could not work.
+    // start=false on an idle queue must leave it idle (FastAccelStepper.h:
+    // "If the queue is not running, then the start parameter defines starting
+    // it or not").
+    if (isRunning()) {
+      startQueue();
+    }
 #endif
 #ifdef TRACE
     // WHY IS start 0 in seq_01c

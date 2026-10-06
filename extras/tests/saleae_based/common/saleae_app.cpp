@@ -1688,7 +1688,14 @@ static void qe_pump(void) {
 
   for (uint8_t i = 0; i < slot_count; i++) {
     struct qe_cursor* c = &slots[i].cur;
-    if (!c->active || c->started || c->fill_only) {
+    // `no_topup` counts here as well as in the top-up loop below. QRUN clears
+    // `fill_only` and sets `no_topup` for a QFILLed cursor; checking only
+    // `fill_only` let this loop refill a queue that QFILL had already put at a
+    // known depth, and `qe_feed(cap=0)` fills to capacity, so the run grew past
+    // the depth the board reported. It stayed hidden on drivers whose QFILLed
+    // queue was still full at QRUN -- `queueEntries() >= QE_PREFILL` skipped the
+    // loop body -- and surfaced on Pico, where the queue had drained.
+    if (!c->active || c->started || c->fill_only || c->no_topup) {
       continue;
     }
     bool err = false;

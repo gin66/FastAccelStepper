@@ -24,7 +24,7 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **025** | [Pico `forceStop()` discards an exact step count](025_pico_force_stop_loses_step_count.md) | ~30 k | 0.5 d | Medium: `pio_sm_clear_fifos` drops RX, then `pos_offset = 0`. Also a read-before-test in `getCurrentStepCount()`. Not started; an unverified attempt was dropped. |
+| **026** | [Pico `getCurrentPosition()` returns 0 during a run](026_pico_position_read_returns_zero.md) | ~40 k | 1 d | Medium: on a running queue the position is read out of the PIO RX FIFO, so an empty FIFO returns 0 (measured 3 of 8 aborts on RP2350). `POS` after XSTOP, not asserted by any scenario. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
 | **040** | [AVR synchronized start](040_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
@@ -43,9 +43,27 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 18 items | ~6.0 M | 16–24 w | Priorities 025–160, plus 500. |
+| **total** | 18 items | ~6.0 M | 17–25 w | Priorities 026–160, plus 500. |
 
 ## Done
+
+- **Pico ignored `addQueueEntry(cmd, start=false)` — fixed and measured.**
+  The PIO port's feeder was started unconditionally in the `SUPPORT_RP_PICO`
+  branch of `queue_add_entry.cpp`, so a `start=false` add began stepping an idle
+  queue. That made "fill the queue, then start it" impossible on RP2040/RP2350:
+  it broke `FasNAxis::pump()` → `synchronizedStart()` and the harness's `QFILL`,
+  which is why SR_25 and SR_30 failed on the RP2350 (the run started before
+  `QRUN`, so the stop landed after the fill and measured nothing). The re-arm is
+  now gated on `isRunning()`. Two companion fixes: `qe_pump()`'s prefill loop now
+  honours `no_topup` (it refilled a `QFILL`ed queue and overshot the reported
+  depth — latent on ESP32, exposed on Pico), and
+  `getCurrentStepCount()`'s read-before-test order was corrected. Measured on
+  RP2350: **SR_25 passes** (`steps_measured = 4080` = fill, stop interrupts the
+  run) and **SR_30 passes** (`steps_after_stop = 0`, `queue_discarded`).
+  Record: [pico_start_false.md](../doc/implemented/pico_start_false.md) — which
+  also records a still-open item: `getCurrentPosition()` on Pico intermittently
+  returns 0 during a run (`POS`/`DONE` 0 in 3 of 8 aborts), not asserted by
+  SR_30 — now tracked as **026** in the table above.
 
 - **181 — MCPWM/PCNT overrun: by design, within limits (closed as not a defect).**
   `mcpwm_pcnt` free-runs and is stopped from the PCNT interrupt, so a delayed ISR

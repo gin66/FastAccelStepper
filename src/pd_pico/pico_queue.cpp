@@ -178,7 +178,7 @@ bool StepperQueue::isRunning() const {
 
 int32_t StepperQueue::getCurrentStepCount() const {
   bool running = isRunning();
-  uint32_t pos;
+  uint32_t pos = 0;
   if (!running) {
     for (uint8_t i = 0; i <= 4; i++) {
       if (pio_sm_is_rx_fifo_empty(pio, sm)) {
@@ -196,10 +196,14 @@ int32_t StepperQueue::getCurrentStepCount() const {
     }
   }
   for (uint8_t i = 0; i <= 4; i++) {
-    pos = pio_sm_get(pio, sm);
+    // Test before read, like the drain loop above. Reading first consumed a
+    // value from an empty RX FIFO and then used it, so on a stopped, drained
+    // queue -- the normal state after forceStop() -- the count reported was
+    // whatever the read returned rather than nothing.
     if (pio_sm_is_rx_fifo_empty(pio, sm)) {
       break;
     }
+    pos = pio_sm_get(pio, sm);
   }
   return (int32_t)pos;
 }

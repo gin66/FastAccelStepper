@@ -537,6 +537,13 @@ class TestConfigGrammar(unittest.TestCase):
         start: qe_pump() prefills and then feeds, and both loops have to skip a
         cursor that is waiting for its QRUN, or the depth QFILL reported is
         stale before the first step.
+
+        And it must skip it after QRUN too, via `no_topup`. QRUN clears
+        `fill_only` and sets `no_topup`; a prefill loop that checked only
+        `fill_only` then refilled a queue QFILL had just put at a known depth,
+        and `qe_feed(cap=0)` fills to capacity, so the run grew past the depth
+        the board reported. Every loop that can add to a QFILLed cursor must
+        honour `no_topup`, not just the top-up loop.
         """
         source = (COMMON / "saleae_app.cpp").read_text()
         self.assertIn("!fill_only && c->fill_only", source,
@@ -546,6 +553,11 @@ class TestConfigGrammar(unittest.TestCase):
         self.assertEqual(pump.count("c->fill_only"), 2,
                          "qe_pump must skip a fill_only cursor in both loops: "
                          "the prefill and the top-up")
+        self.assertEqual(pump.count("c->no_topup"), 2,
+                         "both qe_pump feed paths must honour no_topup, or a "
+                         "QFILLed queue is refilled after QRUN")
+        self.assertIn("|| c->fill_only || c->no_topup) {", pump,
+                      "the prefill loop must skip a no_topup cursor")
         # QFILL reports the depth it reached, never the one it was asked for:
         # QUEUE_LEN is 16 on AVR and 32 on ESP32, and QE_ROOM_RESERVE holds
         # entries back, so a request for 16 cannot be met everywhere.

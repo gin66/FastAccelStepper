@@ -392,4 +392,4 @@ four need all 8. Wiring and the full rationale are in white paper §10.
 | Design reference | `white_paper_saleae_test_harness.md` — what is built, how, why |
 | Task list and status | [`extras/todo/120_saleae_based_test_harness.md`](../../../todo/120_saleae_based_test_harness.md) — the only one |
 | Test catalogue | white paper §5, `SR_00`–`SR_31` |
-| Measured results | [`reports/esp32_platform_matrix.md`](reports/esp32_platform_matrix.md) — the ESP32 release matrix, rebuilt from the recorded results |
+| Measured results | [`reports/esp32_platform_matrix.md`](reports/esp32_platform_matrix.md) — the ESP32 release matrix, rebuilt from the recorded results · [`reports/rpipico2_platform_matrix.md`](reports/rpipico2_platform_matrix.md) — the RP2350 (Pico 2) catalogue and scale sweep |
