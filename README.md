@@ -215,6 +215,7 @@ void loop() {
 | Future work | [extras/todo/README.md](extras/todo/README.md) |
 | Physical stepper simulation | [physical_stepper_whitepaper.md](extras/doc/physical_stepper_whitepaper.md) |
 | Test strategy | [testing.md](extras/doc/testing.md) |
+| Hardware test reports (Saleae) | [ESP32 platform matrix](extras/tests/saleae_based/reports/esp32_platform_matrix.md) · [RP2350 platform matrix](extras/tests/saleae_based/reports/rpipico2_platform_matrix.md) |
 | Troubleshooting | [troubleshooting.md](extras/doc/troubleshooting.md) |
 | Showcase (videos) | [showcase.md](extras/doc/showcase.md) |
 | Contributors & supporters | [contributors.md](extras/doc/contributors.md) |

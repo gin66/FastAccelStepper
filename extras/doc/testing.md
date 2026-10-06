@@ -27,6 +27,18 @@ The library is tested with different kind of tests:
 * esp32 hw tests
 
   These tests live under sub folder `../tests/esp32_hw_based`
+* Saleae-based hardware verification (sub folder `../tests/saleae_based`)
+
+  Captures the step and dir pins with a logic analyzer as the oracle, so what is
+  measured is the waveform that comes out of the MCU on real silicon: pulse
+  high time, dir→step timing, spurious or swallowed steps, cross-stepper skew,
+  and how closely the emitted step rate follows the commanded one. Runs on
+  ESP32, AVR and RP2040/RP2350. The measured results are
+  [ESP32 platform matrix](../tests/saleae_based/reports/esp32_platform_matrix.md)
+  and
+  [RP2350 platform matrix](../tests/saleae_based/reports/rpipico2_platform_matrix.md);
+  the harness itself is documented in
+  [saleae_based/README.md](../tests/saleae_based/README.md).
 * manual tests using examples/StepperDemo
 
   These are unstructured tests with listening to the motor and observing the behavior
