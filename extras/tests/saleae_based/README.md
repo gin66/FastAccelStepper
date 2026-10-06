@@ -238,6 +238,57 @@ capture/analysis chain can be trusted.
 
 Result: `sr_00_passed: true` (see `results/`).
 
+## Test matrix — ESP32 pairings and every other controller
+
+The catalogue (SR_00…SR_31) and the two generic modes (`scale`, `sync`) have been
+measured across the **whole ESP32 platform-release matrix** on an
+**ESP32-DevKitC**, captured with a **Saleae-clone** logic analyzer (sigrok's
+`fx2lafw`; 24 MS/s where the I2S-mux bus has to be decoded). Each row is one
+firmware built and flashed **once**; every driver the board admits and every
+driver-list combination is then measured against that one flash, so a column
+that is absent is a driver this SDK has no queues for.
+
+The full report — per-scenario verdicts, the driver scale sweeps, the
+synchronized-start combinations and the findings — is
+[`reports/esp32_platform_matrix.md`](reports/esp32_platform_matrix.md). It is
+**rebuilt from the recorded results and links to nothing outside git**: the
+`.sr` captures, the `.vcd`s derived from them and the result JSON live under the
+git-ignored `capture/` and `results/`, so the report can be committed while they
+are not. Refresh it without a board or an analyzer:
+
+```bash
+python3 scripts/run_matrix.py --report-only   # no build, no flash, no capture
+```
+
+The same harness runs on every architecture (`scripts/harness.py --arch ...`).
+The table below is the status of **all** controller variants; the ESP32 row is
+split by SDK/framework pairing (the axis the release matrix varies). **An empty
+row is a variant that has not been measured yet** — the build and the run rule
+exist, but no capture has been recorded for it.
+
+| architecture / controller | framework / SDK | ESP-IDF | catalogue | scale | sync | measured |
+|---|---|---|---|---|---|---|
+| ESP32 (ESP32-DevKitC) | Arduino / espressif32 4.4.0 | 4.4.7 | pass | pass | pass | 2026-10-06 |
+| ESP32 (ESP32-DevKitC) | Arduino / espressif32 5.3.0 | 4.4.7 | pass | pass | pass | 2026-10-06 |
+| ESP32 (ESP32-DevKitC) | Arduino / espressif32 6.13.0 | 4.4.7 | pass | pass | pass | 2026-10-05 |
+| ESP32 (ESP32-DevKitC) | ESP-IDF / espressif32 5.3.0 | 4.4.3 | pass | pass | pass | 2026-10-05 |
+| ESP32 (ESP32-DevKitC) | ESP-IDF / espressif32 6.13.0 | 5.5.3 | pass | pass | pass | 2026-10-05 |
+| ESP32 (ESP32-DevKitC) | ESP-IDF / espressif32 7.1.2 | 6.1.0 | pass | pass | pass | 2026-10-06 |
+| ESP32-S2 | Arduino / esp32s2 | | | | | |
+| ESP32-S3 | Arduino / esp32s3 | | | | | |
+| ESP32-C3 | Arduino / esp32c3 | | | | | |
+| ESP32-C6 | Arduino / esp32c6 | | | | | |
+| ESP32-H2 | Arduino / esp32h2 | | | | | |
+| ESP32-P4 | Arduino / esp32p4 | | | | | |
+| AVR ATmega328P (nanoatmega328) | Arduino / timer | — | | | | |
+| AVR ATmega168 (nanoatmega168) | Arduino / timer | — | | | | |
+| AVR ATmega2560 (atmega2560) | Arduino / timer | — | | | | |
+| AVR ATmega32U4 (atmega32u4) | Arduino / timer | — | | | | |
+| RP2040 (rpipico) | Arduino / pio | — | | | | |
+| RP2350 (rpipico2) | Arduino / pio | — | | | | |
+| SAM (atmelsam) | Arduino / timer | — | | | | |
+| SAMD51 (samd51) | Arduino / timer | — | | | | |
+
 ## Capture notes (sample-rate restrictions)
 
 `sigrok-cli` takes the sample rate as a device option. Logic analyzers derive
@@ -320,4 +371,5 @@ four need all 8. Wiring and the full rationale are in white paper §10.
 |---|---|
 | Design reference | `white_paper_saleae_test_harness.md` — what is built, how, why |
 | Task list and status | [`extras/todo/120_saleae_based_test_harness.md`](../../../todo/120_saleae_based_test_harness.md) — the only one |
-| Test catalogue | white paper §5, `SR_00`–`SR_26` |
+| Test catalogue | white paper §5, `SR_00`–`SR_31` |
+| Measured results | [`reports/esp32_platform_matrix.md`](reports/esp32_platform_matrix.md) — the ESP32 release matrix, rebuilt from the recorded results |

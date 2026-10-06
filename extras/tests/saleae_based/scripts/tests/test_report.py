@@ -10,6 +10,7 @@ The runs here are built from fixtures rather than from hardware captures on
 purpose. A hardware VCD is ~53M samples of pure-Python waveform and would make
 this suite take minutes; the fixtures are the same shape in miniature.
 """
+import argparse
 import csv
 import io
 import json
@@ -562,6 +563,63 @@ class TestMatrixFindingClassification(unittest.TestCase):
     also shipped two *empty* tables (mode points key as `{run_tag}_{point}`, and
     the report compared for equality) without a single test noticing.
     """
+
+    def test_the_report_links_to_nothing_outside_git(self):
+        """The report is committed; the captures it describes are not.
+
+        A `[vcd](capture/...)` in this file is a dead link in every checkout
+        that has not just run the matrix -- `capture/` and `results/` are
+        git-ignored, and a mux `dir` capture is a 100 MB VCD. There were thirty
+        of them per report before this test existed, all of them pointing at
+        files git does not have.
+
+        So the rule is asserted rather than remembered: a report built from
+        results that carry capture paths contains no link at all, and names no
+        capture file. It says where the waveforms are instead.
+        """
+        row = {"id": "idf-6.13.0", "framework": "idf", "version": "6.13.0",
+               "esp_idf": "5.5.3", "note": "", "env": "esp32_idf_V6_13_0",
+               "flash_ok": True, "drivers": ["rmt"], "runs": [
+                   {"label": "catalogue", "driver": "rmt", "rc": 0,
+                    "tag_key": "esp32_idf6_13_0_rmt1_dir"}],
+               "analyzer": "fx2lafw:conn=8.95",
+               "measured_at": "2026-10-06 11:00:00"}
+        result = {"test_id": "SR_01", "tag_key": "esp32_idf6_13_0_rmt1_dir",
+                  "result": "passed", "capture": "/tmp/cap/sr_01_rmt.sr",
+                  "invariants": {"ok": True}, "steps": {"ok": True}}
+        text = run_matrix.report([row], [result], argparse.Namespace(
+            port="/dev/cu.usbserial-0001", report_only=True))
+        self.assertNotIn("](", text, "the report links to something")
+        self.assertNotIn("sr_01_rmt", text,
+                         "the report names a capture file")
+        self.assertNotIn(".vcd", text.replace("`.vcd` sigrok derives", ""))
+        # ...and it still says where a reader would find the waveform.
+        self.assertIn("git-ignored", text)
+
+    def test_the_report_names_the_analyzer_the_row_was_measured_on(self):
+        """A Saleae Logic 8 and a clone enumerate differently.
+
+        A header naming one analyzer over a table whose other column came off
+        the other is a header that lies, and the whole point of recording it per
+        row is that a matrix is not necessarily one sitting.
+        """
+        def row(rid, analyzer):
+            return {"id": rid, "framework": "idf", "version": rid,
+                    "esp_idf": "x", "note": "", "env": "e", "flash_ok": True,
+                    "drivers": [], "runs": [], "analyzer": analyzer,
+                    "measured_at": "2026-10-06 11:00:00"}
+        text = run_matrix.report([row("idf-6.13.0", "fx2lafw:conn=8.95")],
+                                 [], argparse.Namespace(
+                                     port="/dev/cu.usbserial-0001",
+                                     report_only=True))
+        self.assertIn("fx2lafw:conn=8.95", text)
+        # Nothing recorded: say so, rather than falling back to a hardcoded
+        # analyzer that may not be the one the numbers came off.
+        text = run_matrix.report([row("idf-6.13.0", None)], [],
+                                 argparse.Namespace(
+                                     port="/dev/cu.usbserial-0001",
+                                     report_only=True))
+        self.assertIn("not recorded", text)
 
     def test_a_connect_refusal_is_the_measured_bound(self):
         # `scale` finding where MCPWM/PCNT stops. This is the answer the mode

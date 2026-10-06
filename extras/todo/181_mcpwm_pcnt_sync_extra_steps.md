@@ -150,3 +150,53 @@ whose gap is one the command could have produced
 is two steppers, `dir`, 160/320 ticks), and the MCPWM/PCNT invariants in
 `extras/doc/platforms/esp32.md`. The `POS` disagreement above narrows the search
 to the driver, not the feeder.
+
+## 2026-10-06 (later) — retest on the clone, and the analyzer is ruled out
+
+Re-measured on a freshly flashed `esp32_idf_V6_13_0` (ESP-IDF **5.5.3**) with
+the **Saleae clone** attached, after the question "is this an analyzer issue?".
+It is not: the extra pulse is a real step on the pin, and the finding is
+intermittent and tied to the first MCPWM timer.
+
+**It is a real pin pulse.** Read the raw `.sr`, not the VCD: D0 has **65** rising
+edges. The extra pulse is a full-width step — **4.917 us** at 24 MS/s and
+**5.000 us** at **4 MS/s**, 10.000 us after the last commanded pulse in both
+captures, i.e. rate-independent and indistinguishable in shape from the other 64.
+An analyzer or sampling artefact is a sub-microsecond edge near the resolution
+limit, not a clean 5 us pulse at the commanded spacing.
+
+**It is intermittent and configuration-specific**, each point re-run:
+
+| configuration (64 steps, `sync`, `dir`) | failures |
+|---|---|
+| `mcpwm_pcnt` (timer 0 / D0) 160 ticks + `i2s_direct` 320 ticks | **6 of 8** |
+| the same line, re-run back to back | passed, then failed |
+| `mcpwm_pcnt` (timer 1 / D2) 160 ticks + `i2s_direct` 320 ticks | **0 of 8** |
+| `mcpwm_pcnt` alone on D0, 160 ticks | 0 |
+
+So the rate depends on the load and the sample: the "1 in 3", "0 of 16" and
+"3 of 3" recorded above are the same defect measured with three different
+denominators, and the only stable statement is "intermittent, high, and only
+with `i2s_direct` running".
+
+**What that narrows it to.** The extra pulse needs *both* the fastest period on
+the **first** MCPWM timer *and* `i2s_direct` active. A single `mcpwm_pcnt` never
+reproduces it, and the same 160-tick program on the *second* timer (D2) stayed
+clean 8 of 8 even with `i2s_direct` on D0. That is the signature of the timer
+being stopped one period late when its end-of-count ISR is delayed by
+`i2s_direct`'s DMA interrupts: the stop (`init_stop()` in
+`StepperISR_idf5_esp32_mcpwm_pcnt.cpp`) runs in software off the PCNT interrupt,
+so a late ISR lets one more compare/TEZ pulse out. The IDF5 and IDF6 driver
+sources are otherwise identical — only API shims differ — which is why the same
+logic is exact on IDF 6.1.0 (where the interrupt load/timing differs). The
+analyzer is faithfully reporting a real, if intermittent, position error.
+
+**Visual check.** `extras/tests/saleae_based/capture/issue_181_extra_step.vcd`
+(git-ignored) is a trimmed copy of the failing 4 MS/s capture, `t=0` at stepper
+A's first step, with a channel `ANNOT_extra_65th_step` high over exactly the
+extra pulse at **640.000 us** (A's 64 commanded pulses are at 0, 10, ..., 630 us;
+`i2s_direct` B's first pulse is at 739.750 us).
+
+**Still to do.** The root cause is not fixed: instrument the stop path (or move
+the stop into hardware) and confirm the fixed build runs this pair clean across
+many repeats — a single pass proves nothing at 6-in-8.

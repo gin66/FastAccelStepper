@@ -1,12 +1,15 @@
 # Saleae harness — ESP32 platform-release matrix
 
-- **Generated:** 2026-10-06 10:45
-- **Board:** ESP32-DevKitC, Saleae Logic 8ch (`fx2lafw:conn=8.88`), serial `/dev/cu.usbserial-0001`
+- **Generated:** 2026-10-06 12:55  _(rebuilt from the recorded results; nothing was measured in this invocation — `--report-only`)_
+- **Board:** ESP32-DevKitC, serial `/dev/cu.usbserial-0001`
+- **Analyzer:** not recorded (this report was rebuilt from an index written before the analyzer was identified per row)
 - **Firmware rows:** 6 — one build+flash each
 - **Matrix definition:** `scripts/harness.py` (`RELEASE_MATRIX`, `release_runs()`)
-- **Raw results:** `results/` (git-ignored), captures in `capture/`; per-run logs under `/tmp/saleae_matrix`
+- **Where the waveforms are:** captures and result records are **local and git-ignored** — `capture/<tag>.sr` plus the `.vcd` sigrok derives beside it, and `results/<tag>.json`, per-run logs under `/tmp/saleae_matrix` — so nothing in this file links to them and a fresh checkout has none of them. A measurement is named by its tag key, which is what those filenames are built from.
 
 Every row is a firmware flashed **once**; all driver and combination runs below were measured against that one flash. Drivers come from asking the board what it accepts, so a column that is absent is a driver this SDK has no queues for.
+
+> **This file was rebuilt from the recorded results, not measured.** The verdicts below are re-evaluations of captures already on disk, which is what makes it possible to refresh the report when the board is busy or absent — and it is why the *measured* column, not the *generated* one above, is the date to read: it is when each row's firmware was flashed.
 
 ## Firmware matrix
 
@@ -28,35 +31,35 @@ Unparameterized: every scenario runs its own fixed program and is judged by its 
 | test | arduino-4.4.0 | arduino-5.3.0 | arduino-6.13.0 | idf-5.3.0 | idf-6.13.0 | idf-7.1.2 |
 |---|---|---|---|---|---|---|
 | SR_00 | pass | pass | pass | pass | pass | pass |
-| SR_01 | pass [vcd](capture/sr_01_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_01_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_01_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_01_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_01_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_01_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_02 | pass [vcd](capture/sr_02_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_02_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_02_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_02_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_02_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_02_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_03 | pass [vcd](capture/sr_03_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_03_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_03_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_03_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_03_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_03_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_04 | pass [vcd](capture/sr_04_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_04_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_04_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_04_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_04_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_04_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_05 | pass [vcd](capture/sr_05_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_05_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_05_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_05_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_05_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_05_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_06 | pass [vcd](capture/sr_06_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_06_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_06_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_06_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_06_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_06_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_07 | pass [vcd](capture/sr_07_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_07_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_07_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_07_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_07_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_07_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_08 | pass [vcd](capture/sr_08_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_08_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_08_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_08_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_08_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_08_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_09 | pass [vcd](capture/sr_09_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_09_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_09_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_09_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_09_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_09_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_10 | pass [vcd](capture/sr_10_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_10_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_10_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_10_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_10_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_10_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_11 | pass [vcd](capture/sr_11_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_11_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_11_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_11_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_11_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_11_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_12 | pass [vcd](capture/sr_12_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_12_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_12_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_12_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_12_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_12_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_13 | pass [vcd](capture/sr_13_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_13_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_13_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_13_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_13_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_13_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_14 | pass [vcd](capture/sr_14_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_14_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_14_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_14_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_14_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_14_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_15 | pass [vcd](capture/sr_15_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_15_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_15_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_15_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_15_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_15_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_16 | pass [vcd](capture/sr_16_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_16_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_16_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_16_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_16_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_16_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_17 | pass [vcd](capture/sr_17_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_17_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_17_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_17_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_17_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_17_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_18 | pass [vcd](capture/sr_18_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_18_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_18_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_18_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_18_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_18_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_19 | pass [vcd](capture/sr_19_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_19_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_19_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_19_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_19_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_19_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_20 | pass [vcd](capture/sr_20_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_20_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_20_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_20_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_20_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_20_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_21 | pass [vcd](capture/sr_21_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_21_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_21_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_21_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_21_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_21_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_23 | n/a (no such driver) | n/a (no such driver) | n/a (no such driver) | n/a (no such driver) | pass [vcd](capture/sr_23_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_23_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_25 | pass [vcd](capture/sr_25_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_25_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_25_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_25_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_25_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_25_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_26 | pass [vcd](capture/sr_26_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_26_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_26_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_26_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_26_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_26_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_27 | pass [vcd](capture/sr_27_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_27_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_27_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_27_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_27_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_27_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_30 | pass [vcd](capture/sr_30_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_30_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_30_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_30_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_30_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_30_esp32_idf7_1_2_rmt1_dir.vcd) |
-| SR_31 | pass [vcd](capture/sr_31_esp32_arduino4_4_0_rmt1_dir.vcd) | pass [vcd](capture/sr_31_esp32_arduino5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_31_esp32_arduino6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_31_esp32_idf5_3_0_rmt1_dir.vcd) | pass [vcd](capture/sr_31_esp32_idf6_13_0_rmt1_dir.vcd) | pass [vcd](capture/sr_31_esp32_idf7_1_2_rmt1_dir.vcd) |
+| SR_01 | pass | pass | pass | pass | pass | pass |
+| SR_02 | pass | pass | pass | pass | pass | pass |
+| SR_03 | pass | pass | pass | pass | pass | pass |
+| SR_04 | pass | pass | pass | pass | pass | pass |
+| SR_05 | pass | pass | pass | pass | pass | pass |
+| SR_06 | pass | pass | pass | pass | pass | pass |
+| SR_07 | pass | pass | pass | pass | pass | pass |
+| SR_08 | pass | pass | pass | pass | pass | pass |
+| SR_09 | pass | pass | pass | pass | pass | pass |
+| SR_10 | pass | pass | pass | pass | pass | pass |
+| SR_11 | pass | pass | pass | pass | pass | pass |
+| SR_12 | pass | pass | pass | pass | pass | pass |
+| SR_13 | pass | pass | pass | pass | pass | pass |
+| SR_14 | pass | pass | pass | pass | pass | pass |
+| SR_15 | pass | pass | pass | pass | pass | pass |
+| SR_16 | pass | pass | pass | pass | pass | pass |
+| SR_17 | pass | pass | pass | pass | pass | pass |
+| SR_18 | pass | pass | pass | pass | pass | pass |
+| SR_19 | pass | pass | pass | pass | pass | pass |
+| SR_20 | pass | pass | pass | pass | pass | pass |
+| SR_21 | pass | pass | pass | pass | pass | pass |
+| SR_23 | n/a (no such driver) | n/a (no such driver) | n/a (no such driver) | n/a (no such driver) | pass | pass |
+| SR_25 | pass | pass | pass | pass | pass | pass |
+| SR_26 | pass | pass | pass | pass | pass | pass |
+| SR_27 | pass | pass | pass | pass | pass | pass |
+| SR_30 | pass | pass | pass | pass | pass | pass |
+| SR_31 | pass | pass | pass | pass | pass | pass |
 
-`pass` / `FAIL` / `incomplete` / `refused (bound)` / `n/a` / `skip` are the recorded verdicts; a capture link opens the VCD the verdict came from. `skip` is either *not implemented* (SR_22, SR_24, SR_28, SR_29) or *SR_00 failed*, which is the harness refusing to measure on dead channels. **`FAIL` and `incomplete` are the only cells here that are findings** — see Findings.
+`pass` / `FAIL` / `incomplete` / `refused (bound)` / `n/a` / `skip` are the recorded verdicts, and there is no link on them: the waveform a verdict came from is a capture in `capture/`, which is git-ignored (a mux `dir` capture is a 100 MB VCD), so a link here would be dead in every checkout that has not just run the matrix. `skip` is either *not implemented* (SR_22, SR_24, SR_28, SR_29) or *SR_00 failed*, which is the harness refusing to measure on dead channels. **`FAIL` and `incomplete` are the only cells here that are findings** — see Findings.
 
 `n/a` means this build has no queues for the driver the scenario CONFIGS (`ERR CONFIG no such driver`), so the scenario was never applicable to this row and its `failed` verdict is not a defect. `refused (bound)` is the board declining a CONFIG at a limit, which is what `scale` and `sync` exist to find.
 
@@ -66,10 +69,6 @@ Defects only: a panic, a crash, a step count or a period that is wrong, and meas
 
 | matrix row | what | measurements | note |
 |---|---|---|---|
-| idf-6.13.0 | defect | 2 | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| idf-7.1.2 | defect | 2 | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| idf-7.1.2 | defect | 2 | failed: B steps 66/64 (2 extra), period 2 off-grid |
-| idf-6.13.0 | defect | 1 | failed: A steps 67/64 (3 extra), period 3 off-grid |
 | idf-6.13.0 | defect | 1 | failed: A steps 65/64 (1 extra) |
 
 Expanded below, one line per measurement.
@@ -78,16 +77,9 @@ Expanded below, one line per measurement.
 
 | matrix row | test | class | note |
 |---|---|---|---|
-| idf-6.13.0 | sync i2s_mux+i2s_mux | defect | failed: A steps 67/64 (3 extra), period 3 off-grid |
 | idf-6.13.0 | sync mcpwm_pcnt+i2s_direct | defect | failed: A steps 65/64 (1 extra) |
-| idf-6.13.0 | sync mcpwm_pcnt+i2s_mux | defect | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| idf-6.13.0 | sync rmt+i2s_mux | defect | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| idf-7.1.2 | sync i2s_direct+i2s_mux | defect | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| idf-7.1.2 | sync i2s_mux+i2s_mux | defect | failed: B steps 66/64 (2 extra), period 2 off-grid |
-| idf-7.1.2 | sync mcpwm_pcnt+i2s_mux | defect | failed: B steps 66/64 (2 extra), period 2 off-grid |
-| idf-7.1.2 | sync rmt+i2s_mux | defect | failed: B steps 65/64 (1 extra), period 1 off-grid |
 
-Not findings, and not listed above: **24** refusal(s), which are the measured limits in the sweep tables below, and **32** `no such driver` answer(s), which are scenarios this build has no queues for. A full accounting of every result is in `results/` and in `results/tag_index.json`.
+Not findings, and not listed above: **24** refusal(s), which are the measured limits in the sweep tables below, and **32** `no such driver` answer(s), which are scenarios this build has no queues for. A full accounting of every result, including the ones this file does not tabulate, is in the local `results/` directory (git-ignored), indexed by `results/tag_index.json`.
 
 ## Driver scale sweeps (how many steppers in parallel)
 
@@ -97,25 +89,25 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_rmt_nodir_n1_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_rmt_nodir_n2_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_rmt_nodir_n3_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_rmt_nodir_n4_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_rmt_nodir_n5_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_rmt_nodir_n6_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn6.vcd) | 64/64 | 10.00 |  |
-| 7 | pass [vcd](capture/scale_rmt_nodir_n7_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn7.vcd) | 64/64 | 10.00 |  |
-| 8 | pass [vcd](capture/scale_rmt_nodir_n8_esp32_arduino4_4_0_rmt_scalenodir_rmtnodirn8.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
+| 7 | pass | 64/64 | 10.00 |  |
+| 8 | pass | 64/64 | 10.00 |  |
 
 **arduino-4.4.0 / scale:mcpwm_pcnt**
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n1_esp32_arduino4_4_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n2_esp32_arduino4_4_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n3_esp32_arduino4_4_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n4_esp32_arduino4_4_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n5_esp32_arduino4_4_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n6_esp32_arduino4_4_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn6.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
 | 7 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 | 8 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 
@@ -123,25 +115,25 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_rmt_nodir_n1_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_rmt_nodir_n2_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_rmt_nodir_n3_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_rmt_nodir_n4_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_rmt_nodir_n5_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_rmt_nodir_n6_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn6.vcd) | 64/64 | 10.00 |  |
-| 7 | pass [vcd](capture/scale_rmt_nodir_n7_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn7.vcd) | 64/64 | 10.00 |  |
-| 8 | pass [vcd](capture/scale_rmt_nodir_n8_esp32_arduino5_3_0_rmt_scalenodir_rmtnodirn8.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
+| 7 | pass | 64/64 | 10.00 |  |
+| 8 | pass | 64/64 | 10.00 |  |
 
 **arduino-5.3.0 / scale:mcpwm_pcnt**
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n1_esp32_arduino5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n2_esp32_arduino5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n3_esp32_arduino5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n4_esp32_arduino5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n5_esp32_arduino5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n6_esp32_arduino5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn6.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
 | 7 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 | 8 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 
@@ -149,25 +141,25 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_rmt_nodir_n1_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_rmt_nodir_n2_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_rmt_nodir_n3_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_rmt_nodir_n4_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_rmt_nodir_n5_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_rmt_nodir_n6_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn6.vcd) | 64/64 | 10.00 |  |
-| 7 | pass [vcd](capture/scale_rmt_nodir_n7_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn7.vcd) | 64/64 | 10.00 |  |
-| 8 | pass [vcd](capture/scale_rmt_nodir_n8_esp32_arduino6_13_0_rmt_scalenodir_rmtnodirn8.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
+| 7 | pass | 64/64 | 10.00 |  |
+| 8 | pass | 64/64 | 10.00 |  |
 
 **arduino-6.13.0 / scale:mcpwm_pcnt**
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n1_esp32_arduino6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n2_esp32_arduino6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n3_esp32_arduino6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n4_esp32_arduino6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n5_esp32_arduino6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n6_esp32_arduino6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn6.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
 | 7 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 | 8 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 
@@ -175,25 +167,25 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_rmt_nodir_n1_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_rmt_nodir_n2_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_rmt_nodir_n3_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_rmt_nodir_n4_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_rmt_nodir_n5_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_rmt_nodir_n6_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn6.vcd) | 64/64 | 10.00 |  |
-| 7 | pass [vcd](capture/scale_rmt_nodir_n7_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn7.vcd) | 64/64 | 10.00 |  |
-| 8 | pass [vcd](capture/scale_rmt_nodir_n8_esp32_idf5_3_0_rmt_scalenodir_rmtnodirn8.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
+| 7 | pass | 64/64 | 10.00 |  |
+| 8 | pass | 64/64 | 10.00 |  |
 
 **idf-5.3.0 / scale:mcpwm_pcnt**
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n1_esp32_idf5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n2_esp32_idf5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n3_esp32_idf5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n4_esp32_idf5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n5_esp32_idf5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n6_esp32_idf5_3_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn6.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
 | 7 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 | 8 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 
@@ -201,25 +193,25 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_rmt_nodir_n1_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_rmt_nodir_n2_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_rmt_nodir_n3_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_rmt_nodir_n4_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_rmt_nodir_n5_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_rmt_nodir_n6_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn6.vcd) | 64/64 | 10.00 |  |
-| 7 | pass [vcd](capture/scale_rmt_nodir_n7_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn7.vcd) | 64/64 | 10.00 |  |
-| 8 | pass [vcd](capture/scale_rmt_nodir_n8_esp32_idf6_13_0_rmt_scalenodir_rmtnodirn8.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
+| 7 | pass | 64/64 | 10.00 |  |
+| 8 | pass | 64/64 | 10.00 |  |
 
 **idf-6.13.0 / scale:mcpwm_pcnt**
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n1_esp32_idf6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n2_esp32_idf6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n3_esp32_idf6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n4_esp32_idf6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n5_esp32_idf6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n6_esp32_idf6_13_0_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn6.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
 | 7 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 | 8 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 
@@ -227,8 +219,8 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_i2s_direct_nodir_n1_esp32_idf6_13_0_i2s_direct_scalenodir_i2s_directnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_i2s_direct_nodir_n2_esp32_idf6_13_0_i2s_direct_scalenodir_i2s_directnodirn2.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
 | 3 | refused (bound) | – | – | ERR connect step 2 n=2 drv=i2s_direct nodir=1 |
 | 4 | refused (bound) | – | – | ERR connect step 2 n=2 drv=i2s_direct nodir=1 |
 | 5 | refused (bound) | – | – | ERR connect step 2 n=2 drv=i2s_direct nodir=1 |
@@ -240,38 +232,38 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_i2s_mux_nodir_n1_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn1.vcd) | 64/64 | 24.93 |  |
-| 2 | pass [vcd](capture/scale_i2s_mux_nodir_n2_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn2.vcd) | 64/64 | 24.93 |  |
-| 3 | pass [vcd](capture/scale_i2s_mux_nodir_n3_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn3.vcd) | 64/64 | 24.93 |  |
-| 4 | pass [vcd](capture/scale_i2s_mux_nodir_n4_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn4.vcd) | 64/64 | 24.93 |  |
-| 5 | pass [vcd](capture/scale_i2s_mux_nodir_n5_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn5.vcd) | 64/64 | 24.93 |  |
-| 6 | pass [vcd](capture/scale_i2s_mux_nodir_n6_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn6.vcd) | 64/64 | 24.93 |  |
-| 7 | pass [vcd](capture/scale_i2s_mux_nodir_n7_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn7.vcd) | 64/64 | 24.93 |  |
-| 8 | pass [vcd](capture/scale_i2s_mux_nodir_n8_esp32_idf6_13_0_i2s_mux_scalenodir_i2s_muxnodirn8.vcd) | 64/64 | 24.93 |  |
+| 1 | pass | 64/64 | 24.93 |  |
+| 2 | pass | 64/64 | 24.93 |  |
+| 3 | pass | 64/64 | 24.93 |  |
+| 4 | pass | 64/64 | 24.93 |  |
+| 5 | pass | 64/64 | 24.93 |  |
+| 6 | pass | 64/64 | 24.93 |  |
+| 7 | pass | 64/64 | 24.93 |  |
+| 8 | pass | 64/64 | 24.93 |  |
 
 **idf-7.1.2 / scale:rmt**
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_rmt_nodir_n1_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_rmt_nodir_n2_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_rmt_nodir_n3_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_rmt_nodir_n4_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_rmt_nodir_n5_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_rmt_nodir_n6_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn6.vcd) | 64/64 | 10.00 |  |
-| 7 | pass [vcd](capture/scale_rmt_nodir_n7_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn7.vcd) | 64/64 | 10.00 |  |
-| 8 | pass [vcd](capture/scale_rmt_nodir_n8_esp32_idf7_1_2_rmt_scalenodir_rmtnodirn8.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
+| 7 | pass | 64/64 | 10.00 |  |
+| 8 | pass | 64/64 | 10.00 |  |
 
 **idf-7.1.2 / scale:mcpwm_pcnt**
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n1_esp32_idf7_1_2_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n2_esp32_idf7_1_2_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn2.vcd) | 64/64 | 10.00 |  |
-| 3 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n3_esp32_idf7_1_2_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn3.vcd) | 64/64 | 10.00 |  |
-| 4 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n4_esp32_idf7_1_2_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn4.vcd) | 64/64 | 10.00 |  |
-| 5 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n5_esp32_idf7_1_2_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn5.vcd) | 64/64 | 10.00 |  |
-| 6 | pass [vcd](capture/scale_mcpwm_pcnt_nodir_n6_esp32_idf7_1_2_mcpwm_pcnt_scalenodir_mcpwm_pcntnodirn6.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
+| 3 | pass | 64/64 | 10.00 |  |
+| 4 | pass | 64/64 | 10.00 |  |
+| 5 | pass | 64/64 | 10.00 |  |
+| 6 | pass | 64/64 | 10.00 |  |
 | 7 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 | 8 | refused (bound) | – | – | ERR connect step 6 n=6 drv=mcpwm_pcnt nodir=1 |
 
@@ -279,8 +271,8 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_i2s_direct_nodir_n1_esp32_idf7_1_2_i2s_direct_scalenodir_i2s_directnodirn1.vcd) | 64/64 | 10.00 |  |
-| 2 | pass [vcd](capture/scale_i2s_direct_nodir_n2_esp32_idf7_1_2_i2s_direct_scalenodir_i2s_directnodirn2.vcd) | 64/64 | 10.00 |  |
+| 1 | pass | 64/64 | 10.00 |  |
+| 2 | pass | 64/64 | 10.00 |  |
 | 3 | refused (bound) | – | – | ERR connect step 2 n=2 drv=i2s_direct nodir=1 |
 | 4 | refused (bound) | – | – | ERR connect step 2 n=2 drv=i2s_direct nodir=1 |
 | 5 | refused (bound) | – | – | ERR connect step 2 n=2 drv=i2s_direct nodir=1 |
@@ -292,18 +284,18 @@ Not findings, and not listed above: **24** refusal(s), which are the measured li
 
 | n | verdict | steps each | period us | note |
 |---|---|---|---|---|
-| 1 | pass [vcd](capture/scale_i2s_mux_nodir_n1_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn1.vcd) | 64/64 | 24.93 |  |
-| 2 | pass [vcd](capture/scale_i2s_mux_nodir_n2_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn2.vcd) | 64/64 | 24.93 |  |
-| 3 | pass [vcd](capture/scale_i2s_mux_nodir_n3_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn3.vcd) | 64/64 | 24.93 |  |
-| 4 | pass [vcd](capture/scale_i2s_mux_nodir_n4_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn4.vcd) | 64/64 | 24.93 |  |
-| 5 | pass [vcd](capture/scale_i2s_mux_nodir_n5_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn5.vcd) | 64/64 | 24.93 |  |
-| 6 | pass [vcd](capture/scale_i2s_mux_nodir_n6_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn6.vcd) | 64/64 | 24.93 |  |
-| 7 | pass [vcd](capture/scale_i2s_mux_nodir_n7_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn7.vcd) | 64/64 | 24.93 |  |
-| 8 | pass [vcd](capture/scale_i2s_mux_nodir_n8_esp32_idf7_1_2_i2s_mux_scalenodir_i2s_muxnodirn8.vcd) | 64/64 | 24.93 |  |
+| 1 | pass | 64/64 | 24.93 |  |
+| 2 | pass | 64/64 | 24.93 |  |
+| 3 | pass | 64/64 | 24.93 |  |
+| 4 | pass | 64/64 | 24.93 |  |
+| 5 | pass | 64/64 | 24.93 |  |
+| 6 | pass | 64/64 | 24.93 |  |
+| 7 | pass | 64/64 | 24.93 |  |
+| 8 | pass | 64/64 | 24.93 |  |
 
 ## Driver combinations (synchronized start)
 
-Every driver-list combination this board could connect, two steppers each, each at its own period. First-step skew is **reported, not gated** (eval_sync): how closely two steppers begin is a property of the pulse driver and of the interrupt latency at that instant, not a correctness property of the queue — so read the ratio in step periods, which is the only comparable form of it. What *is* asserted per stepper is its own commanded step count and period.
+Every driver-list combination this board could connect, two steppers each, each at its own period. First-step skew is **reported, not gated** (eval_sync): how closely two steppers begin is a property of the pulse driver and of the interrupt latency at that instant, not a correctness property of the queue — so read the ratio in step periods, which is the only comparable form of it. What *is* asserted per stepper is its own commanded step count and period — counted over the *commanded move*, not over the capture: a capture starts before the test is triggered over serial and outlives it, so it holds the host's own round trip and the board's idle afterwards. A pulse outside the move is not evidence about a driver; it is still recorded, as `window.steps_outside` and each pulse's offset, and `report.py` prints the count beside the step count.
 
 **arduino-4.4.0 / sync**
 
@@ -314,11 +306,11 @@ Every driver-list combination this board could connect, two steppers each, each 
 | i2s_mux+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 3.25 | 0.33 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass | 3.25 | 0.33 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 18.0 | 1.80 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino4_4_0_rmt_syncdir_rmtdirn2.vcd) | 17.25 | 1.73 |  |
+| rmt+mcpwm_pcnt | pass | 18.0 | 1.80 |  |
+| rmt+rmt | pass | 17.25 | 1.73 |  |
 
 **arduino-5.3.0 / sync**
 
@@ -329,11 +321,11 @@ Every driver-list combination this board could connect, two steppers each, each 
 | i2s_mux+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 3.25 | 0.33 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass | 3.25 | 0.33 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 23.5 | 2.35 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino5_3_0_rmt_syncdir_rmtdirn2.vcd) | 17.25 | 1.73 |  |
+| rmt+mcpwm_pcnt | pass | 23.5 | 2.35 |  |
+| rmt+rmt | pass | 17.25 | 1.73 |  |
 
 **arduino-6.13.0 / sync**
 
@@ -344,11 +336,11 @@ Every driver-list combination this board could connect, two steppers each, each 
 | i2s_mux+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 3.25 | 0.33 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass | 3.25 | 0.33 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 35.25 | 3.52 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_arduino6_13_0_rmt_syncdir_rmtdirn2.vcd) | 17.25 | 1.73 |  |
+| rmt+mcpwm_pcnt | pass | 35.25 | 3.52 |  |
+| rmt+rmt | pass | 17.25 | 1.73 |  |
 
 **idf-5.3.0 / sync**
 
@@ -359,41 +351,41 @@ Every driver-list combination this board could connect, two steppers each, each 
 | i2s_mux+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | mcpwm_pcnt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_idf5_3_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 4.5 | 0.45 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass | 4.5 | 0.45 |  |
 | rmt+i2s_direct | n/a (no such driver) | – | – | ERR CONFIG no such driver |
 | rmt+i2s_mux | n/a (no such driver) | – | – | ERR CONFIG no such driver |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf5_3_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 28.5 | 2.85 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf5_3_0_rmt_syncdir_rmtdirn2.vcd) | 27.25 | 2.73 |  |
+| rmt+mcpwm_pcnt | pass | 28.5 | 2.85 |  |
+| rmt+rmt | pass | 27.25 | 2.73 |  |
 
 **idf-6.13.0 / sync**
 
 | drivers | verdict | first-step skew us | in step periods | note |
 |---|---|---|---|---|
-| i2s_direct+i2s_direct | pass [vcd](capture/sync_i2s_direct+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_directdirn2.vcd) | 36.875 | 3.69 |  |
-| i2s_direct+i2s_mux | pass [vcd](capture/sync_i2s_direct+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_direct+i2s_muxdirn2.vcd) | 6.625 | 0.27 |  |
-| i2s_mux+i2s_mux | **FAIL** [vcd](capture/sync_i2s_mux+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_i2s_muxdirn2.vcd) | 242334.9167 | 44.87 | failed: A steps 67/64 (3 extra), period 3 off-grid |
-| mcpwm_pcnt+i2s_direct | **FAIL** [vcd](capture/sync_mcpwm_pcnt+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcnt+i2s_directdirn2.vcd) | 739.2083 | 73.98 | failed: A steps 65/64 (1 extra) |
-| mcpwm_pcnt+i2s_mux | **FAIL** [vcd](capture/sync_mcpwm_pcnt+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcnt+i2s_muxdirn2.vcd) | 127584.875 | 5107.58 | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_idf6_13_0_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 13.2917 | 1.33 |  |
-| rmt+i2s_direct | pass [vcd](capture/sync_rmt+i2s_direct_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+i2s_directdirn2.vcd) | 800.4583 | 80.11 |  |
-| rmt+i2s_mux | **FAIL** [vcd](capture/sync_rmt+i2s_mux_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+i2s_muxdirn2.vcd) | 163512.6667 | 6546.06 | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 60.75 | 6.08 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf6_13_0_rmt_syncdir_rmtdirn2.vcd) | 66.0 | 6.61 |  |
+| i2s_direct+i2s_direct | pass | 36.875 | 3.69 |  |
+| i2s_direct+i2s_mux | pass | 6.625 | 0.27 |  |
+| i2s_mux+i2s_mux | pass | 0.0 | 0.00 |  |
+| mcpwm_pcnt+i2s_direct | **FAIL** | 739.25 | 73.98 | failed: A steps 65/64 (1 extra) |
+| mcpwm_pcnt+i2s_mux | pass | 1102.2083 | 44.13 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass | 13.3333 | 1.33 |  |
+| rmt+i2s_direct | pass | 800.5 | 80.12 |  |
+| rmt+i2s_mux | pass | 1000.0833 | 40.04 |  |
+| rmt+mcpwm_pcnt | pass | 60.7917 | 6.08 |  |
+| rmt+rmt | pass | 65.9583 | 6.60 |  |
 
 **idf-7.1.2 / sync**
 
 | drivers | verdict | first-step skew us | in step periods | note |
 |---|---|---|---|---|
-| i2s_direct+i2s_direct | pass [vcd](capture/sync_i2s_direct+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_directdirn2.vcd) | 75.4583 | 7.55 |  |
-| i2s_direct+i2s_mux | **FAIL** [vcd](capture/sync_i2s_direct+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_direct+i2s_muxdirn2.vcd) | 213672.5417 | 8553.92 | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| i2s_mux+i2s_mux | **FAIL** [vcd](capture/sync_i2s_mux+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_i2s_muxdirn2.vcd) | 270838.75 | 10863.45 | failed: B steps 66/64 (2 extra), period 2 off-grid |
-| mcpwm_pcnt+i2s_direct | pass [vcd](capture/sync_mcpwm_pcnt+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcnt+i2s_directdirn2.vcd) | 914.7917 | 91.56 |  |
-| mcpwm_pcnt+i2s_mux | **FAIL** [vcd](capture/sync_mcpwm_pcnt+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcnt+i2s_muxdirn2.vcd) | 880.5833 | 35.25 | failed: B steps 66/64 (2 extra), period 2 off-grid |
-| mcpwm_pcnt+mcpwm_pcnt | pass [vcd](capture/sync_mcpwm_pcnt+mcpwm_pcnt_dir_n2_esp32_idf7_1_2_rmt_syncdir_mcpwm_pcntdirn2.vcd) | 13.3333 | 1.33 |  |
-| rmt+i2s_direct | pass [vcd](capture/sync_rmt+i2s_direct_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+i2s_directdirn2.vcd) | 703.3333 | 70.39 |  |
-| rmt+i2s_mux | **FAIL** [vcd](capture/sync_rmt+i2s_mux_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+i2s_muxdirn2.vcd) | 771.9583 | 30.90 | failed: B steps 65/64 (1 extra), period 1 off-grid |
-| rmt+mcpwm_pcnt | pass [vcd](capture/sync_rmt+mcpwm_pcnt_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmt+mcpwm_pcntdirn2.vcd) | 76.625 | 7.67 |  |
-| rmt+rmt | pass [vcd](capture/sync_rmt+rmt_dir_n2_esp32_idf7_1_2_rmt_syncdir_rmtdirn2.vcd) | 62.1667 | 6.22 |  |
+| i2s_direct+i2s_direct | pass | 75.5 | 7.56 |  |
+| i2s_direct+i2s_mux | pass | 222.4167 | 8.90 |  |
+| i2s_mux+i2s_mux | pass | 0.0 | 0.00 |  |
+| mcpwm_pcnt+i2s_direct | pass | 914.7917 | 91.55 |  |
+| mcpwm_pcnt+i2s_mux | pass | 880.625 | 35.25 |  |
+| mcpwm_pcnt+mcpwm_pcnt | pass | 13.3333 | 1.33 |  |
+| rmt+i2s_direct | pass | 703.2917 | 70.39 |  |
+| rmt+i2s_mux | pass | 771.875 | 30.90 |  |
+| rmt+mcpwm_pcnt | pass | 76.6667 | 7.67 |  |
+| rmt+rmt | pass | 62.125 | 6.22 |  |
 
 ## Reading this
 

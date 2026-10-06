@@ -24,6 +24,10 @@ place and the report cannot disagree with it.
     # the plan and nothing else: no build, no flash, no capture
     python3 scripts/run_matrix.py --plan
 
+    # the report again, from results already on disk: no build, no flash, no
+    # capture, no serial port -- for when the board is busy or absent
+    python3 scripts/run_matrix.py --report-only
+
 Results and captures land in the harness's own directories
 (extras/tests/saleae_based/results, .../capture) whatever the working directory
 is; the report lands in extras/tests/saleae_based/reports/.
@@ -43,6 +47,7 @@ HARNESS = SCRIPTS.parent
 ROOT = HARNESS.parents[2]
 sys.path.insert(0, str(SCRIPTS))
 
+import capture  # noqa: E402
 import harness  # noqa: E402
 import run_tests  # noqa: E402
 
@@ -78,6 +83,24 @@ def run_logged(argv, log, cwd=None, check=False, append=False):
         rc = subprocess.call(argv, cwd=cwd or ROOT, stdout=fh,
                              stderr=subprocess.STDOUT)
     return rc, time.monotonic() - started
+
+
+def analyzer_ident():
+    """The connected logic analyzer as sigrok names it, or None.
+
+    Recorded per row rather than printed once, because it is not a constant:
+    this harness has been run against a Saleae Logic 8 and against a **clone**,
+    and the two enumerate with different `conn=` firmware strings and different
+    channel counts. A report that names one analyzer in its header while a
+    column of its numbers came off the other is a report that cannot be read.
+
+    Read-only (`sigrok-cli --scan`); it touches no board and no serial port.
+    """
+    try:
+        _devices, driver = capture.detect_analyzer()
+    except (SystemExit, OSError):
+        return None
+    return driver or None
 
 
 def flash(target, port, attempts=3):
@@ -155,6 +178,10 @@ def run_target(target, port, baud, force, capture_dir, results_dir):
            "version": target.version, "esp_idf": target.esp_idf,
            "note": target.note, "env": target.env, "flash_ok": False,
            "drivers": [], "runs": [],
+           # Which analyzer this row's numbers came off, read once per row
+           # rather than once per matrix: a clone and a real Saleae Logic
+           # enumerate differently and the report has to say which.
+           "analyzer": analyzer_ident(),
            # Seconds, and a space rather than a T: the backfill below writes a
            # space, and one column is not worth a second date format.
            "measured_at": datetime.now().isoformat(timespec="seconds")
@@ -480,25 +507,15 @@ def note_of(r):
     return verdict or "?"
 
 
-def capture_link(r):
-    p = r.get("capture")
-    if not p:
-        return ""
-    # capture.py derives the VCD beside the .sr with the extension REPLACED, not
-    # appended: foo.sr -> foo.vcd. Appending gave "foo.sr.vcd", which never
-    # exists, so every cell in the report rendered without its capture link
-    # while the legend promised one.
-    vcd = Path(str(p)).with_suffix(".vcd")
-    if vcd.exists():
-        try:
-            return f"[vcd]({vcd.relative_to(HARNESS)})"
-        except ValueError:
-            return f"[vcd]({vcd})"
-    return ""
-
-
 def cell(r):
-    """One matrix cell: the verdict, and a capture link when there is one.
+    """One matrix cell: the verdict.
+
+    **No link to the capture, on purpose.** This file is in git and the
+    captures are not: a mux `dir` capture is a 100 MB VCD and `capture/` is
+    ignored by design, so a `[vcd](capture/...)` in a committed report is a dead
+    link in every checkout that has not just run the matrix. There were 30 of
+    them per report. The verdict stands alone, and the header says where the
+    waveform is and how to name it.
 
     The mark follows the *class*, not just the verdict word. A scenario whose
     CONFIG names a driver this build has no queues for is recorded `failed` --
@@ -519,8 +536,7 @@ def cell(r):
         mark = {"passed": "pass", "failed": "**FAIL**",
                 "refused": "refused (bound)", "error": "**error**",
                 "skipped": "skip"}.get(res, res)
-    link = capture_link(r)
-    return f"{mark} {link}".strip()
+    return mark
 
 
 def report(rows, results, args):
@@ -593,19 +609,43 @@ def report(rows, results, args):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     L.append("# Saleae harness — ESP32 platform-release matrix")
     L.append("")
-    L.append(f"- **Generated:** {now}")
-    L.append(f"- **Board:** ESP32-DevKitC, Saleae Logic 8ch (`fx2lafw:conn=8.88`), "
-             f"serial `{args.port}`")
+    L.append(f"- **Generated:** {now}"
+             + ("  _(rebuilt from the recorded results; nothing was measured in "
+                "this invocation — `--report-only`)_"
+                if getattr(args, "report_only", False) else ""))
+    # The analyzer is named per row from what sigrok reported at the time, not
+    # from a constant in this file: a Saleae Logic 8 and a clone enumerate with
+    # different `conn=` strings, and a header that names one of them over a table
+    # whose other column came off the other is a header that lies.
+    analyzers = sorted({r.get("analyzer") for r in rows if r.get("analyzer")})
+    board = ("ESP32-DevKitC, serial `" + args.port + "`")
+    L.append(f"- **Board:** {board}")
+    L.append(f"- **Analyzer:** {', '.join('`' + a + '`' for a in analyzers)}"
+             if analyzers else
+             "- **Analyzer:** not recorded (this report was rebuilt from an "
+             "index written before the analyzer was identified per row)")
     L.append(f"- **Firmware rows:** {len(rows)} — one build+flash each")
     L.append(f"- **Matrix definition:** `scripts/harness.py` "
              f"(`RELEASE_MATRIX`, `release_runs()`)")
-    L.append(f"- **Raw results:** `results/` (git-ignored), captures in "
-             f"`capture/`; per-run logs under `{LOG_DIR}`")
+    L.append("- **Where the waveforms are:** captures and result records are "
+             "**local and git-ignored** — `capture/<tag>.sr` plus the `.vcd` "
+             "sigrok derives beside it, and `results/<tag>.json`, per-run logs "
+             f"under `{LOG_DIR}` — so nothing in this file links to them and a "
+             "fresh checkout has none of them. A measurement is named by its "
+             "tag key, which is what those filenames are built from.")
     L.append("")
     L.append("Every row is a firmware flashed **once**; all driver and "
              "combination runs below were measured against that one flash. "
              "Drivers come from asking the board what it accepts, so a column "
              "that is absent is a driver this SDK has no queues for.")
+    if getattr(args, "report_only", False):
+        L.append("")
+        L.append("> **This file was rebuilt from the recorded results, not "
+                 "measured.** The verdicts below are re-evaluations of captures "
+                 "already on disk, which is what makes it possible to refresh "
+                 "the report when the board is busy or absent — and it is why "
+                 "the *measured* column, not the *generated* one above, is the "
+                 "date to read: it is when each row's firmware was flashed.")
     L.append("")
 
     # --- targets -----------------------------------------------------------
@@ -677,8 +717,11 @@ def report(rows, results, args):
         L.append(f"| {test} | " + " | ".join(row_cells) + " |")
     L.append("")
     L.append("`pass` / `FAIL` / `incomplete` / `refused (bound)` / `n/a` / `skip` "
-             "are the recorded verdicts; a capture link opens the VCD the "
-             "verdict came from. `skip` is either *not implemented* (SR_22, "
+             "are the recorded verdicts, and there is no link on them: the "
+             "waveform a verdict came from is a capture in `capture/`, which is "
+             "git-ignored (a mux `dir` capture is a 100 MB VCD), so a link here "
+             "would be dead in every checkout that has not just run the matrix. "
+             "`skip` is either *not implemented* (SR_22, "
              "SR_24, SR_28, SR_29) or *SR_00 failed*, which is the harness "
              "refusing to measure on dead channels. **`FAIL` and `incomplete` "
              "are the only cells here that are findings** — see Findings.")
@@ -756,8 +799,10 @@ def report(rows, results, args):
              f"**{counts[BOUND]}** refusal(s), which are the measured limits "
              f"in the sweep tables below, and **{counts[CAPABILITY]}** "
              f"`no such driver` answer(s), which are scenarios this build has "
-             f"no queues for. A full accounting of every result is in "
-             f"`results/` and in `results/tag_index.json`.")
+             f"no queues for. A full accounting of every result, including "
+             f"the ones this file does not tabulate, is in the local "
+             f"`results/` directory (git-ignored), indexed by "
+             f"`results/tag_index.json`.")
     L.append("")
 
     # --- scale sweeps ------------------------------------------------------
@@ -903,6 +948,9 @@ def main():
                    help="re-measure even where a passed result exists")
     p.add_argument("--plan", action="store_true",
                    help="print the plan and exit: no build, no flash, no capture")
+    p.add_argument("--report-only", action="store_true",
+                   help="rebuild the report from the results and the recorded "
+                        "index: no build, no flash, no capture, no serial port")
     args = p.parse_args()
 
     targets = harness.release_targets(
@@ -922,14 +970,55 @@ def main():
                 print(f"  {run.label:16} {' '.join(run.argv)}")
         return 0
 
-    if not Path("/dev").exists():
-        raise SystemExit("no /dev; this is a hardware run")
+    # --- report-only -------------------------------------------------------
+    #
+    # Rebuild the report from what is already on disk, touching neither the
+    # board nor the analyzer. It exists because the report is generated from two
+    # things that have very different lifetimes -- a firmware build, and a
+    # results directory -- and only the second one has to be current: after a
+    # change to the *evaluators*, every recorded result re-evaluates to a new
+    # verdict and the report on disk is stale until something re-runs it. Doing
+    # that with the board attached costs a flash per row and buys no
+    # measurement; doing it with the board *elsewhere* -- mid-test, mid-session
+    # -- costs the board its state.
+    #
+    # So this path reads the recorded index for the rows and the results for the
+    # measurements, and writes exactly what a measuring run would have written
+    # from the same two. It says so in the header: a report that rebuilt itself
+    # from disk must not read like one that measured everything just now, and
+    # the *measured* column is what tells the reader which measurements are
+    # current.
+    if args.report_only:
+        index_file = Path(args.results_dir) / INDEX
+        if not index_file.exists():
+            raise SystemExit(
+                f"--report-only needs {index_file}, which a measuring run "
+                f"writes. There is nothing recorded to report on.")
+        recorded = json.loads(index_file.read_text()).get("rows", [])
+        if args.targets:
+            want = {t.strip() for t in args.targets.split(",")}
+            recorded = [r for r in recorded if r.get("id") in want]
+            missing = want - {r.get("id") for r in recorded}
+            if missing:
+                raise SystemExit(
+                    f"--report-only: no recorded row for {', '.join(sorted(missing))}"
+                    f"; --targets selects which rows to REPORT, and a row that "
+                    f"was never measured is not one of them")
+        rows = recorded
+        print(f"report-only: {len(rows)} recorded row(s), "
+              f"{sum(len(r.get('runs', [])) for r in rows)} recorded run(s); "
+              f"no build, no flash, no capture, no serial")
+    else:
+        rows = None
+        if not Path("/dev").exists():
+            raise SystemExit("no /dev; this is a hardware run")
 
-    # The generated PlatformIO projects (pio_dirs/saleae, pio_espidf/saleae)
-    # hold the versioned envs, and they are symlink farms the build script
-    # recreates. Once per matrix, not once per row.
-    print("\nlinking the PlatformIO projects ...")
-    run_logged(["bash", "extras/scripts/build-pio-dirs.sh"], LOG_DIR / "pio_dirs.log")
+        # The generated PlatformIO projects (pio_dirs/saleae, pio_espidf/saleae)
+        # hold the versioned envs, and they are symlink farms the build script
+        # recreates. Once per matrix, not once per row.
+        print("\nlinking the PlatformIO projects ...")
+        run_logged(["bash", "extras/scripts/build-pio-dirs.sh"],
+                   LOG_DIR / "pio_dirs.log")
 
     # Rows measured by an EARLIER invocation, kept so a resumed matrix is still
     # a matrix.
@@ -958,28 +1047,31 @@ def main():
         print(f"carrying {len(carried)} row(s) from an earlier run: "
               f"{', '.join(r['id'] for r in carried)}")
 
-    rows = list(carried)
-    for t in targets:
-        try:
-            rows.append(run_target(t, args.port, args.baud, args.force,
-                                   args.capture_dir, args.results_dir))
-        except Exception as exc:  # a board that stops answering is a row, not
-            # a lost matrix: record it and go on to the next firmware
-            print(f"  {t.id}: aborted: {exc}")
-            rows.append({"id": t.id, "framework": t.framework,
-                         "version": t.version, "esp_idf": t.esp_idf,
-                         "note": t.note, "env": "?", "flash_ok": False,
-                         "drivers": [], "flash_seconds": 0,
-                         "flash_log": "",
-                         "runs": [{"label": "matrix", "rc": 1,
-                                   "detail": f"aborted: {exc}"}]})
-        finally:
-            # After every row, so an interrupted matrix can be resumed from the
-            # result index rather than from nothing.
-            Path(args.results_dir).mkdir(parents=True, exist_ok=True)
-            index_file.write_text(
-                json.dumps({"generated": datetime.now().isoformat(),
-                            "port": args.port, "rows": rows}, indent=2))
+    if not args.report_only:
+        rows = list(carried)
+        for t in targets:
+            try:
+                rows.append(run_target(t, args.port, args.baud, args.force,
+                                       args.capture_dir, args.results_dir))
+            except Exception as exc:  # a board that stops answering is a row,
+                # not a lost matrix: record it and go on to the next firmware
+                print(f"  {t.id}: aborted: {exc}")
+                rows.append({"id": t.id, "framework": t.framework,
+                             "version": t.version, "esp_idf": t.esp_idf,
+                             "note": t.note, "env": "?", "flash_ok": False,
+                             "drivers": [], "flash_seconds": 0,
+                             "flash_log": "", "analyzer": None,
+                             "runs": [{"label": "matrix", "rc": 1,
+                                       "detail": f"aborted: {exc}"}]})
+            finally:
+                # After every row, so an interrupted matrix can be resumed from
+                # the result index rather than from nothing. Skipped entirely by
+                # --report-only, which measured nothing and must not restamp the
+                # record of what was.
+                Path(args.results_dir).mkdir(parents=True, exist_ok=True)
+                index_file.write_text(
+                    json.dumps({"generated": datetime.now().isoformat(),
+                                "port": args.port, "rows": rows}, indent=2))
 
     # Matrix order is applied in report(), so a row resumed into this list out
     # of order still lands where RELEASE_MATRIX puts it.
