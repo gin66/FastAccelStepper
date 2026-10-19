@@ -14,30 +14,14 @@ templates:
     platform: espressif32
     board: esp32dev
     framework: arduino
-    build_flags: ["-Wall"]
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
-
-  esp32_arduino_werror:
-    platform: espressif32
-    board: esp32dev
-    framework: arduino
-    build_flags: ["-Werror", "-Wall"]
-    board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   esp32_idf:
     platform: espressif32
     board: esp32dev
     framework: espidf
-    build_flags:
-      - "-Werror"
-      - "-Wall"
-      - "-Wno-deprecated-declarations"
-      - "-Wno-error=incompatible-pointer-types"
-      - "-Wno-unused-function"
-      - "-Wno-attributes"
-      - "-Wno-error=missing-field-initializers"
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
 
@@ -45,38 +29,29 @@ templates:
     platform: espressif32
     board: esp32-c3-devkitm-1
     framework: arduino
-    build_flags: ["-Wall", "-DARDUINO_USB_CDC_ON_BOOT=1", "-DARDUINO_USB_MODE=1"]
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
+    build_flags: ["-DARDUINO_USB_CDC_ON_BOOT=1", "-DARDUINO_USB_MODE=1"]
     board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   esp32s2_arduino:
     platform: espressif32
     board: esp32-s2-saola-1
     framework: arduino
-    build_flags: ["-Wall"]
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   esp32s3_arduino:
     platform: espressif32
     board: esp32-s3-devkitc-1
     framework: arduino
-    build_flags: ["-Wall"]
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   esp32c3_idf:
     platform: espressif32
     board: esp32-c3-devkitm-1
     framework: espidf
-    build_flags:
-      - "-Werror"
-      - "-Wall"
-      - "-Wno-deprecated-declarations"
-      - "-Wno-error=incompatible-pointer-types"
-      - "-Wno-unused-function"
-      - "-Wno-attributes"
-      - "-Wno-error=missing-field-initializers"
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
 
@@ -84,14 +59,7 @@ templates:
     platform: espressif32
     board: esp32-s2-saola-1
     framework: espidf
-    build_flags:
-      - "-Werror"
-      - "-Wall"
-      - "-Wno-deprecated-declarations"
-      - "-Wno-error=incompatible-pointer-types"
-      - "-Wno-unused-function"
-      - "-Wno-attributes"
-      - "-Wno-error=missing-field-initializers"
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
 
@@ -99,14 +67,7 @@ templates:
     platform: espressif32
     board: esp32-s3-devkitc-1
     framework: espidf
-    build_flags:
-      - "-Werror"
-      - "-Wall"
-      - "-Wno-deprecated-declarations"
-      - "-Wno-error=incompatible-pointer-types"
-      - "-Wno-unused-function"
-      - "-Wno-attributes"
-      - "-Wno-error=missing-field-initializers"
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
 
@@ -114,14 +75,7 @@ templates:
     platform: espressif32
     board: esp32-c6-devkitm-1
     framework: espidf
-    build_flags:
-      - "-Werror"
-      - "-Wall"
-      - "-Wno-deprecated-declarations"
-      - "-Wno-error=incompatible-pointer-types"
-      - "-Wno-unused-function"
-      - "-Wno-attributes"
-      - "-Wno-error=missing-field-initializers"
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
 
@@ -129,93 +83,68 @@ templates:
     platform: espressif32
     board: esp32-h2-devkitm-1
     framework: espidf
-    build_flags:
-      - "-Werror"
-      - "-Wall"
-      - "-Wno-deprecated-declarations"
-      - "-Wno-error=incompatible-pointer-types"
-      - "-Wno-unused-function"
-      - "-Wno-attributes"
-      - "-Wno-error=missing-field-initializers"
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
     board_build_f_cpu: 240000000L
     lib_extra_dirs: .
 
   avr:
     platform: atmelavr
     framework: arduino
-    build_flags: ["-Werror", "-Wall", "-Wno-deprecated-declarations"]
-    lib_extra_dirs: .
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
 
   sam:
     platform: atmelsam
     board: due
     framework: arduino
-    build_flags: ["-Wall", "-Wno-deprecated-declarations"]
-    lib_extra_dirs: .
+    # -Wextra trips -Wexpansion-to-defined in the SAM framework's chip.h.
+    build_src_flags: ["-Werror", "-Wall"]
 
   samd51:
     platform: atmelsam
     board: adafruit_feather_m4
     framework: arduino
-    build_flags: ["-Wall", "-Wno-deprecated-declarations"]
-    lib_extra_dirs: .
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
 
   rp2040:
     platform: https://github.com/maxgerhardt/platform-raspberrypi.git
     framework: arduino
-    lib_extra_dirs: .
+    build_src_flags: ["-Werror", "-Wall", "-Wextra"]
 
 environments:
   esp32:
     template: esp32_arduino
 
   esp32_pioarduino_V53_03_11:
+    template: esp32_arduino
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32dev
-    framework: arduino
-    build_flags: ["-Wall"]
-    board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   esp32s2_pioarduino_V53_03_11:
+    template: esp32_arduino
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32-s2-saola-1
-    framework: arduino
-    build_flags: ["-Wall"]
-    board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   esp32s3_pioarduino_V53_03_11:
+    template: esp32_arduino
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32-s3-devkitc-1
-    framework: arduino
-    build_flags: ["-Wall"]
-    board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   esp32c6_pioarduino_V53_03_11:
+    template: esp32_arduino
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32-c6-devkitm-1
-    framework: arduino
-    build_flags: ["-Wall"]
     board_build_f_cpu: 160000000L
-    lib_extra_dirs: .
 
   esp32h2_pioarduino_V53_03_11:
+    template: esp32_arduino
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32-h2-devkitm-1
-    framework: arduino
-    build_flags: ["-Wall"]
     board_build_f_cpu: 96000000L
-    lib_extra_dirs: .
 
   esp32p4:
+    template: esp32_arduino
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32-p4-evboard
-    framework: arduino
-    build_flags: ["-Wall"]
-    board_build_f_cpu: 240000000L
-    lib_extra_dirs: .
 
   nanoatmega168:
     template: avr
@@ -232,7 +161,6 @@ environments:
   atmega32u4:
     template: avr
     board: leonardo
-    build_flags_extra: ["-Wno-error=incompatible-pointer-types"]
 
   atmelsam:
     template: sam
@@ -261,7 +189,7 @@ environments:
   rpipico:
     template: rp2040
     board: rpipico
-    build_flags: ["-Wall", "-Wextra", "-D__FREERTOS=1", "-Wno-missing-field-initializers", "-Wno-unused-parameter"]
+    build_flags: ["-D__FREERTOS=1"]
 
   adafruit_feather:
     template: rp2040
@@ -309,19 +237,17 @@ versioned_environments:
 
   esp32_werror:
     prefix: esp32
-    template: esp32_arduino_werror
+    template: esp32_arduino
     versions: ["6.4.0", "6.3.2", "6.2.0", "6.1.0", "6.0.1", "5.3.0", "5.2.0", "5.1.1"]
 
   esp32_werror_unused_var:
     prefix: esp32
-    template: esp32_arduino_werror
-    build_flags_extra: ["-Wno-unused-variable"]
+    template: esp32_arduino
     versions: ["5.0.0", "4.4.0", "4.3.0", "4.2.0"]
 
   esp32_werror_deprecated:
     prefix: esp32
-    template: esp32_arduino_werror
-    build_flags_extra: ["-Wno-unused-variable", "-Wno-deprecated-declarations"]
+    template: esp32_arduino
     versions: ["4.1.0"]
 
   esp32s2:

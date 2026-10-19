@@ -23,10 +23,11 @@ do
 	do
 		(mkdir -p pio_dirs/$i/src
 		cd pio_dirs/$i
-	        mkdir FastAccelStepper
-	        ln -s $ROOT/src FastAccelStepper
 		ln -s ../../extras/ci/platformio.ini .
 		cd src
+		# FastAccelStepper is project source, so build_src_flags (strict
+		# warnings) apply to the library without affecting framework/SDK code.
+		for f in $ROOT/src/*;do ln -s "$f" .;done
 		FILES=`cd ../../../$SRC/$i;find . -type f`
 		for f in $FILES;do ln -s ../../../$SRC/$i/$f .;done
 		)
@@ -94,10 +95,9 @@ cd ../../..
 mkdir pio_dirs/LOG2_test
 mkdir pio_dirs/LOG2_test/src
 cd pio_dirs/LOG2_test
-mkdir FastAccelStepper
-ln -s $ROOT/src FastAccelStepper
 ln -s ../../extras/ci/platformio.ini .
 cd src
+for f in $ROOT/src/*;do ln -s "$f" .;done
 #sed  -e 's/%d/%ld/g' <../../../tests/test_03.h >test_03.h
 ln -s ../../../extras/tests/pc_based/test_03.h .
 ln -s ../../../extras/tests/pc_based/LOG2_test.ino LOG2_test.ino
@@ -107,9 +107,8 @@ cd ../../..
 mkdir -p pio_dirs/saleae/src
 cd pio_dirs/saleae
 ln -s ../../extras/ci/platformio.ini .
-mkdir FastAccelStepper
-ln -s $ROOT/src FastAccelStepper
 cd src
+for f in $ROOT/src/*;do ln -s "$f" .;done
 ln -s ../../../extras/tests/saleae_based/common/* .
 ln -s ../../../extras/tests/saleae_based/apps/arduino/src/saleae_main.ino .
 cd ../../..

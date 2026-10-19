@@ -104,7 +104,7 @@ void moveStepper(FastAccelStepper *stepper, struct control_s *control) {
     case MOVE_TIMED_EMPTY:
       Serial.print("Empty:");
       Serial.println(stepper->getStepPin() == dirPinStepperX ? 'X' : 'Y');
-      /* fallthrough */
+      __attribute__((fallthrough));
     case MOVE_TIMED_OK:
       control->drift = duration - actual;
       control->time += actual;
@@ -121,6 +121,7 @@ void moveStepper(FastAccelStepper *stepper, struct control_s *control) {
       Serial.print(duration / steps);
       Serial.print(" steps:");
       Serial.println(steps);
+      __attribute__((fallthrough));
     default:
       Serial.println(toString(rc));
   }

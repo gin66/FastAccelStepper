@@ -8,3 +8,8 @@ idf_component_register(
         esp_driver_pcnt
         esp_driver_i2s
 )
+
+option(FAS_STRICT_WARNINGS "Treat warnings in FastAccelStepper as errors" ON)
+if(FAS_STRICT_WARNINGS)
+    target_compile_options(${COMPONENT_LIB} PRIVATE -Wall -Wextra -Werror)
+endif()

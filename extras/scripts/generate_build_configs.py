@@ -133,6 +133,13 @@ def generate_platformio_ini(data: dict[str, Any]) -> str:
                 flags_str = " ".join(flags)
                 lines.append(f"build_flags = {flags_str}")
 
+        if "build_src_flags" in resolved or "build_src_flags_extra" in resolved:
+            flags = list(resolved.get("build_src_flags", []))
+            flags.extend(resolved.get("build_src_flags_extra", []))
+            if flags:
+                flags_str = " ".join(flags)
+                lines.append(f"build_src_flags = {flags_str}")
+
         if "board_build_f_cpu" in resolved:
             lines.append(f"board_build.f_cpu = {resolved['board_build_f_cpu']}")
 

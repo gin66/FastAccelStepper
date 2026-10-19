@@ -3,7 +3,7 @@
 // u32_1 shall be number of steps
 
 bool test_seq_02(FastAccelStepper* stepper, struct test_seq_s* seq,
-                 uint32_t time_ms) {
+                 uint32_t) {
   int32_t steps = seq->u32_1;
   switch (seq->state) {
     case 0:  // INIT

@@ -4,7 +4,7 @@
 // This test sequence is to reproduce issue #68
 
 bool test_seq_11(FastAccelStepper* stepper, struct test_seq_s* seq,
-                 uint32_t time_ms) {
+                 uint32_t) {
   uint32_t prev_pos;
   switch (seq->state) {
     case 0:  // INIT

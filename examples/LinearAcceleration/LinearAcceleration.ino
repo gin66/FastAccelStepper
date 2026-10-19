@@ -119,6 +119,7 @@ void loop() {
     switch (modes[mode_i]) {
       case modes_e::start_with_linear:
         need_clear_linear = true;
+        __attribute__((fallthrough));
       case modes_e::start_stop_with_linear:
         // 100 steps linear, then constant acceleration
         stepper->setLinearAcceleration(100);

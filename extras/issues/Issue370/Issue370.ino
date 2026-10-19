@@ -252,8 +252,8 @@ static void dumpPattern() {
   int16_t step_cnt = 0;
   for (uint16_t i = 0; i < patternLen; i++) {
     step_cnt += pattern[i].steps;
-    Serial.printf("%2d: steps=%d ticks=%d => %d steps\n", i, pattern[i].steps,
-                  pattern[i].ticks, step_cnt);
+    Serial.printf("%2d: steps=%d ticks=%lu => %d steps\n", i,
+                  pattern[i].steps, (unsigned long)pattern[i].ticks, step_cnt);
   }
 }
 
