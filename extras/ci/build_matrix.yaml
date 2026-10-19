@@ -119,10 +119,7 @@ environments:
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32dev
 
-  esp32s2_pioarduino_V53_03_11:
-    template: esp32_arduino
-    platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
-    board: esp32-s2-saola-1
+
 
   esp32s3_pioarduino_V53_03_11:
     template: esp32_arduino
@@ -253,7 +250,7 @@ versioned_environments:
   esp32s2:
     prefix: esp32s2
     template: esp32s2_arduino
-    versions: ["7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
+    versions: ["8.0.0", "7.0.1", "6.13.0", "6.12.0", "6.11.0", "6.10.0", "6.9.0", "6.8.1", "6.8.0", "6.7.0", "6.6.0", "6.5.0"]
 
   esp32s3:
     prefix: esp32s3
@@ -337,7 +334,7 @@ workflows:
           - esp32
         exclude_versions: ["6.1.0", "6.8.0"]
       - esp32_pioarduino_V53_03_11
-      - esp32s2_pioarduino_V53_03_11
+      - esp32s2_V8_0_0
       - esp32s3_pioarduino_V53_03_11
       - esp32c6_pioarduino_V53_03_11
       - esp32h2_pioarduino_V53_03_11
