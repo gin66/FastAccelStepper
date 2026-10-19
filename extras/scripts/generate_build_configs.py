@@ -75,10 +75,15 @@ def expand_versioned_environments(data: dict[str, Any]) -> dict[str, Any]:
 
         name_prefix = group_config.get("prefix", group_name)
 
+        version_specific_extra = group_config.get("version_specific_extra", {})
+
         for version in group_config.get("versions", []):
             env_name = f"{name_prefix}{version_to_suffix(version)}"
             env_config = dict(base_config)
             env_config["platform_version"] = version
+            # Merge version-specific overrides (e.g. version-specific build flags)
+            if version in version_specific_extra:
+                env_config.update(version_specific_extra[version])
             environments[env_name] = env_config
 
     return environments
