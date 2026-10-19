@@ -33,38 +33,24 @@ I2sManager* I2sManager::create(gpio_num_t data_pin, gpio_num_t bclk_pin,
     return nullptr;
   }
 
-  i2s_std_config_t std_cfg = {
-      .clk_cfg = {.sample_rate_hz = I2S_SAMPLE_RATE_HZ,
-                  .clk_src = I2S_CLK_SRC_DEFAULT,
-                  .mclk_multiple = I2S_MCLK_MULTIPLE_128,
-                  // Plain uint32_t wherever it exists, and only takes
-                  // effect in slave role, so 0 is the right master-mode value.
-                  // Named explicitly so it is never left to implicit
-                  // zero-fill, which is the warning this file used to emit on
-                  // IDF 5.x. The field was added in ESP-IDF 5.5 -- the
-                  // Arduino-as-ESP-IDF builds ship a 5.3 SDK, where naming it
-                  // does not compile. Compared by MAJOR/MINOR because
-                  // ESP_IDF_VERSION is not visible in every build this library
-                  // compiles in; pd_config_idf5.h uses the same pair.
+  i2s_std_config_t std_cfg = {};
+  std_cfg.clk_cfg.sample_rate_hz = I2S_SAMPLE_RATE_HZ;
+  std_cfg.clk_cfg.clk_src = I2S_CLK_SRC_DEFAULT;
+  std_cfg.clk_cfg.mclk_multiple = I2S_MCLK_MULTIPLE_128;
 #if (ESP_IDF_VERSION_MAJOR > 5) ||                                    \
     (ESP_IDF_VERSION_MAJOR == 5 && ESP_IDF_VERSION_MINOR >= 5)
-                  .bclk_div = 0
+  std_cfg.clk_cfg.bclk_div = 0;
 #endif
-      },
-      .slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
-                                                  I2S_SLOT_MODE_STEREO),
-      .gpio_cfg = {.mclk = I2S_GPIO_UNUSED,
-                   .bclk = bclk_pin,
-                   .ws = ws_pin,
-                   .dout = data_pin,
-                   .din = I2S_GPIO_UNUSED,
-                   .invert_flags =
-                       {
-                           .mclk_inv = false,
-                           .bclk_inv = false,
-                           .ws_inv = false,
-                       }},
-  };
+  std_cfg.slot_cfg = I2S_STD_MSB_SLOT_DEFAULT_CONFIG(I2S_DATA_BIT_WIDTH_16BIT,
+                                                     I2S_SLOT_MODE_STEREO);
+  std_cfg.gpio_cfg.mclk = I2S_GPIO_UNUSED;
+  std_cfg.gpio_cfg.bclk = bclk_pin;
+  std_cfg.gpio_cfg.ws = ws_pin;
+  std_cfg.gpio_cfg.dout = data_pin;
+  std_cfg.gpio_cfg.din = I2S_GPIO_UNUSED;
+  std_cfg.gpio_cfg.invert_flags.mclk_inv = false;
+  std_cfg.gpio_cfg.invert_flags.bclk_inv = false;
+  std_cfg.gpio_cfg.invert_flags.ws_inv = false;
 
   rc = i2s_channel_init_std_mode(chan, &std_cfg);
   if (rc != ESP_OK) {
