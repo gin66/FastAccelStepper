@@ -1,6 +1,6 @@
 #!/bin/sh
 
-TARGETS=${1:-nanoatmega168 nanoatmega328 atmega2560 esp32 esp32s2 esp32c3 atmelsam samd51 atmega32u4}
+TARGETS=${1:-nanoatmega328 atmega2560 esp32 esp32s2 esp32c3 atmelsam samd51 atmega32u4}
 echo "execute for ${TARGETS}"
 
 if [ "$GITHUB_WORKSPACE" != "" ]
@@ -33,26 +33,6 @@ for i in pio_dirs/*
 do
 	for p in ${TARGETS}
 	do
-		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/StepperDemo" ]; then
-		  echo $p: Skipping $i for $p due to space constraints
-		  continue
-		fi
-		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/MoveTimed" ]; then
-		  echo $p: Skipping $i for $p due to space constraints
-		  continue
-		fi
-		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/TeensyMultiStepperTest" ]; then
-		  echo $p: Skipping $i for $p due to space constraints
-		  continue
-		fi
-		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/NaxesAFAP" ]; then
-		  echo $p: Skipping $i for $p due to space constraints
-		  continue
-		fi
-		if [ "$p" = "nanoatmega168" ] && [ "$i" = "pio_dirs/NaxesTimed" ]; then
-		  echo $p: Skipping $i for $p due to space constraints
-		  continue
-		fi
 		if [ "$p" = "atmega32u4" ] && [ "$i" = "pio_dirs/NaxesAFAP" ]; then
 		  echo $p: Skipping $i for $p due to space constraints
 		  continue

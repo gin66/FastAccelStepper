@@ -16,7 +16,6 @@ the ones the general report prints. A report that recomputed its numbers would
 be able to disagree with the tests, and then nobody would know which was right.
 
     python3 scripts/report_avr.py                     # nanoatmega328, 2x timer, dir
-    python3 scripts/report_avr.py --arch nanoatmega168
     python3 scripts/report_avr.py --out -             # stdout, do not write
 
 The catalogue tag and the scale tag are built exactly as `harness.py` builds

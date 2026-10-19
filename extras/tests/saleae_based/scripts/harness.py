@@ -52,7 +52,7 @@ import run_tests  # noqa: E402
 
 ESP_ARCHS = ["esp32", "esp32s2", "esp32s3", "esp32c3", "esp32c6", "esp32h2",
              "esp32p4"]
-AVR_ARCHS = ["nanoatmega168", "nanoatmega328", "atmega2560", "atmega32u4"]
+AVR_ARCHS = ["nanoatmega328", "atmega2560", "atmega32u4"]
 PICO_ARCHS = ["rpipico", "rpipico2"]
 SAM_ARCHS = ["atmelsam", "samd51"]
 ARCHS = ESP_ARCHS + AVR_ARCHS + PICO_ARCHS + SAM_ARCHS
@@ -204,7 +204,6 @@ DRIVER_MAXS = {
     "esp32p4": {"rmt": 8, "mcpwm_pcnt": 0,
                 "i2s_direct": 0, "i2s_mux": 0},
     "nanoatmega328": {"timer": 2},
-    "nanoatmega168": {"timer": 2},
     "atmega2560": {"timer": 3},
     "atmega32u4": {"timer": 3},
     # Pico: NUM_QUEUES = 4 * NUM_PIOS, and NUM_PIOS is the PIO block count --

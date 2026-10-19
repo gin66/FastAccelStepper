@@ -143,10 +143,6 @@ environments:
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
     board: esp32-p4-evboard
 
-  nanoatmega168:
-    template: avr
-    board: nanoatmega168
-
   nanoatmega328:
     template: avr
     board: nanoatmega328
@@ -345,7 +341,6 @@ workflows:
       - versioned_groups: esp32s3
         exclude_versions: ["6.8.0"]
       - esp32p4
-      - nanoatmega168
       - nanoatmega328
       - atmega2560
       - atmega32u4
@@ -356,7 +351,7 @@ workflows:
     # Example directories built by build-pio-dirs.sh that this workflow must
     # not compile. The Saleae characterization app is written for a few targets
     # only and its compilation is not guaranteed for every environment the
-    # example matrix covers (e.g. nanoatmega168 runs out of RAM), so building
+    # example matrix covers (e.g. small-flash targets run out of RAM), so building
     # it here turns an unsupported target into a red example. It is built
     # through its own project instead:
     #   bash extras/tests/saleae_based/scripts/link_app.sh
