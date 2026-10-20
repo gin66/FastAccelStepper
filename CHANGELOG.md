@@ -1,3 +1,6 @@
+2.0.1:
+- esp32: Add missing `IRAM_ATTR` to I2S driver functions (`fill_i2s_buffer`, `i2sMuxSetBit`, `i2sMuxGetBit`) and RMT v1 header declarations (`stop_rmt`, `rmt_fill_buffer`, `rmt_apply_command`) — functions called from ISR context must reside in IRAM to avoid cache-miss-induced timing errors.
+
 2.0.0:
 - Breaking: `FasNAxis::clearFault()` and `getDirChangeBeforePauseCount()` removed; `addQueueEntry()` now returns `AQE_ERROR_COMMANDS_SUSPENDED` for a refused command instead of `AQE_OK` (see the individual entries below)
 - pico: `addQueueEntry(cmd, start=false)` no longer starts an idle queue (the PIO feeder was started unconditionally), so "fill the queue, then start it" — `QFILL`, `FasNAxis` → `synchronizedStart()` — works on RP2040/RP2350
