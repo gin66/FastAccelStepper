@@ -5,6 +5,6 @@
 # Platform versions: https://github.com/platformio/platform-espressif32/releases
 
 HW_DEFAULT_COMPILE := esp32_V6_8_1
-HW_ARDUINO_ENVS := esp32_V6_8_1 esp32_pioarduino_V53_03_11 esp32_V7_1_2
+HW_ARDUINO_ENVS := esp32_V6_8_1 esp32_V8_0_0 esp32_V7_1_2
 HW_IDF_ENVS := esp32_idf_V5_3_0 esp32_idf_V6_9_0 esp32_idf_V7_1_2
-HW_TEST_ALL_ENVS := esp32_V6_8_1 esp32_pioarduino_V53_03_11 esp32_idf_V6_9_0 esp32_V7_1_2
+HW_TEST_ALL_ENVS := esp32_V6_8_1 esp32_V8_0_0 esp32_idf_V6_9_0 esp32_V7_1_2

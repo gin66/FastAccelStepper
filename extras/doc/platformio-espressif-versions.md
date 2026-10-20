@@ -6,7 +6,8 @@ Version mapping extracted from https://github.com/platformio/platform-espressif3
 
 | PlatformIO | ESP-IDF | Arduino Core | Arduino's underlying IDF | Key Notes |
 |---|---|---|---|---|
-| **7.1.x** | — | v2.0.17 | v4.4.7 | Bug fixes only |
+| **8.0.0** | **v6.1** | **v3.3.12** | **v5.5.5** | 72 new boards, Arduino 3.x (major API break), esptool 5.4, Arduino toolchain 14.2.0+20260121 |
+| **7.1.x** | v6.1.0 | v2.0.17 | v4.4.7 | 7.1.1–7.1.3 bug fixes only |
 | **7.1.0** | **v6.1.0** | v2.0.17 | v4.4.7 | First IDF 6.1 support |
 | **7.0.1** | **v6.0.1** | v2.0.17 | v4.4.7 | |
 | **7.0.0** | **v6.0.0** | v2.0.17 | v4.4.7 | Major IDF 6.0, toolchain 15.2.0 |
@@ -57,21 +58,24 @@ Version mapping extracted from https://github.com/platformio/platform-espressif3
 
 ## Key Observations
 
-1. **Arduino always runs on ESP-IDF v4.4.7** regardless of which ESP-IDF version
-   the platform uses directly. When you select `framework = arduino`, you get
-   Arduino core on top of IDF v4.4.7, even if the platform's native ESP-IDF is
-   v6.x.
+1. **Arduino 2.x runs on ESP-IDF v4.4.7** regardless of which ESP-IDF version
+   the platform uses directly. When you select `framework = arduino` with
+   Arduino core 2.x, you get Arduino on top of IDF v4.4.7, even if the
+   platform's native ESP-IDF is v6.x. Arduino core 3.x (8.0.0+) is instead
+   based on IDF v5.5.5.
 
 2. **IDF version jumps** (major platform releases):
    - **6.0.0** → ESP-IDF 5.0 (major API break)
    - **7.0.0** → ESP-IDF 6.0 (major API break)
    - **7.1.0** → ESP-IDF 6.1
+   - **8.0.0** → still ESP-IDF 6.1, but switches to Arduino core v3.3.12
+     (IDF v5.5.5) — a major Arduino API break. No ESP-IDF 7.x yet.
 
-3. **Arduino core versions** progressed from v1.0.x → v2.0.x, with v2.0.17
-   being the latest as of 7.1.x.
+3. **Arduino core versions** progressed from v1.0.x → v2.0.x → v3.3.x, with
+   v3.3.12 being the latest as of 8.0.0.
 
 4. **Toolchain progression**: GCC toolchains went from 8.4.0 → 13.2.0 → 14.2.0 →
-   15.2.0 across the releases.
+    15.2.0 across the releases. 8.0.0 uses 14.2.0+20260121 for Arduino.
 
 5. **ESP32 chip support expansion**:
    - Original ESP32 → ESP32-S2 (3.0.0) → ESP32-C3 (3.3.0) → ESP32-C6

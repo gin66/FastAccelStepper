@@ -365,7 +365,14 @@ void StepperQueue::connect_mcpwm_pcnt() {
 
   int signal =
       pcnt_periph_signals.groups[0].units[pcnt_unit_id].channels[0].pulse_sig;
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 5, 0)
+  // gpio_iomux_in() is deprecated in IDF 5.5. Do the same two register
+  // writes inline to keep the IO_MUX routing and avoid any extra overhead.
+  gpio_ll_set_input_signal_from(&GPIO, signal, false);
+  gpio_ll_input_enable(&GPIO, step_pin);
+#else
   gpio_iomux_in(step_pin, signal);
+#endif
 
 #if SOC_MCPWM_GROUPS > 1
   if (mapping->mcpwm == &MCPWM0) {

@@ -1,3 +1,7 @@
+pre-V2.0.2:
+- esp32: Fix the `gpio_iomux_in()` deprecation warning on ESP-IDF >= 5.5.0 (IDF 5 branch) with the equivalent inline GPIO LL writes. RISK: the IDF 5.5+ behavior has not been retested on hardware yet (build-only verification so far)
+- ci: Test Arduino core 3.x via `espressif32 @ 8.0.0` for ESP32/S3/C6 instead of pioarduino 53.03.11; H2 stays on pioarduino 55.03.312 (Arduino 3.3.12) because platform-espressif32 8.0.0 ships no H2 board
+
 2.0.1:
 - esp32: Add missing `IRAM_ATTR` to I2S driver functions (`fill_i2s_buffer`, `i2sMuxSetBit`, `i2sMuxGetBit`) and RMT v1 header declarations (`stop_rmt`, `rmt_fill_buffer`, `rmt_apply_command`) — functions called from ISR context must reside in IRAM to avoid cache-miss-induced timing errors.
 

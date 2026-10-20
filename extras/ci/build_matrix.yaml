@@ -114,27 +114,26 @@ environments:
   esp32:
     template: esp32_arduino
 
-  esp32_pioarduino_V53_03_11:
+  esp32_V8_0_0:
     template: esp32_arduino
-    platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
+    platform_version: "8.0.0"
     board: esp32dev
 
+  esp32s3_V8_0_0:
+    template: esp32s3_arduino
+    platform_version: "8.0.0"
 
-
-  esp32s3_pioarduino_V53_03_11:
+  esp32c6_V8_0_0:
     template: esp32_arduino
-    platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
-    board: esp32-s3-devkitc-1
-
-  esp32c6_pioarduino_V53_03_11:
-    template: esp32_arduino
-    platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
+    platform_version: "8.0.0"
     board: esp32-c6-devkitm-1
     board_build_f_cpu: 160000000L
 
-  esp32h2_pioarduino_V53_03_11:
+  # platform-espressif32 does not ship an H2 board (8.0.0 included), so H2
+  # stays on pioarduino. 55.03.312 ships the same Arduino core 3.3.12 as 8.0.0.
+  esp32h2_pioarduino_V55_03_312:
     template: esp32_arduino
-    platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
+    platform: https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312/platform-espressif32.zip
     board: esp32-h2-devkitm-1
     board_build_f_cpu: 96000000L
 
@@ -321,14 +320,14 @@ hw_tests:
   default_compile: esp32_V6_8_1
   compile:
     - esp32_V6_8_1
-    - esp32_pioarduino_V53_03_11
+    - esp32_V8_0_0
     - esp32_V7_1_2
     - esp32_idf_V5_3_0
     - esp32_idf_V6_9_0
     - esp32_idf_V7_1_2
   test_all:
     - esp32_V6_8_1
-    - esp32_pioarduino_V53_03_11
+    - esp32_V8_0_0
     - esp32_idf_V6_9_0
     - esp32_V7_1_2
 
@@ -347,11 +346,11 @@ workflows:
           - esp32_werror
           - esp32
         exclude_versions: ["6.1.0", "6.8.0"]
-      - esp32_pioarduino_V53_03_11
+      - esp32_V8_0_0
       - esp32s2_V8_0_0
-      - esp32s3_pioarduino_V53_03_11
-      - esp32c6_pioarduino_V53_03_11
-      - esp32h2_pioarduino_V53_03_11
+      - esp32s3_V8_0_0
+      - esp32c6_V8_0_0
+      - esp32h2_pioarduino_V55_03_312
       - versioned_groups: esp32c3
         exclude_versions: ["6.8.0"]
       - versioned_groups: esp32s2
