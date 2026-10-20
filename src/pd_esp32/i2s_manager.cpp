@@ -101,7 +101,7 @@ void IRAM_ATTR I2sManager::init_mux_buffer(uint8_t* buf) {
   } while (i);
 }
 
-void I2sManager::i2sMuxSetBit(uint8_t slot, bool value) {
+void IRAM_ATTR I2sManager::i2sMuxSetBit(uint8_t slot, bool value) {
   if (slot >= 32) {
     return;
   }
@@ -113,7 +113,7 @@ void I2sManager::i2sMuxSetBit(uint8_t slot, bool value) {
   }
 }
 
-bool I2sManager::i2sMuxGetBit(uint8_t slot) {
+bool IRAM_ATTR I2sManager::i2sMuxGetBit(uint8_t slot) {
   if (slot >= 32) {
     return false;
   }
