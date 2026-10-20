@@ -11,14 +11,14 @@ class I2sManager {
   static I2sManager* create(gpio_num_t data_pin, gpio_num_t bclk_pin,
                             gpio_num_t ws_pin);
 
-  void IRAM_ATTR handleTxDone(uint8_t* buf);
+  void handleTxDone(uint8_t* buf);
 
   bool _is_mux = false;
 
   volatile uint32_t _callback_count = 0;
 
-  void IRAM_ATTR i2sMuxSetBit(uint8_t slot, bool value);
-  bool IRAM_ATTR i2sMuxGetBit(uint8_t slot);
+  void i2sMuxSetBit(uint8_t slot, bool value);
+  bool i2sMuxGetBit(uint8_t slot);
 
  private:
   I2sManager() {}

@@ -107,7 +107,7 @@ class StepperQueue : public StepperQueueBase {
   void init_rmt(uint8_t channel_num, uint8_t step_pin);
   void startQueue_rmt();
 #if ESP_IDF_VERSION_MAJOR == 4
-  void IRAM_ATTR stop_rmt(bool both);
+  void stop_rmt(bool both);
 #endif
   void forceStop_rmt();
   uint16_t _getPerformedPulses_rmt() const;
@@ -126,7 +126,7 @@ class StepperQueue : public StepperQueueBase {
   void forceStop_i2s();
   bool isReadyForCommands_i2s() const;
   uint16_t _getPerformedPulses_i2s() const;
-  void IRAM_ATTR fill_i2s_buffer(uint8_t* buf);
+  void fill_i2s_buffer(uint8_t* buf);
   void syncStart_arm_i2s();
 #endif
 
@@ -166,10 +166,8 @@ class StepperQueue : public StepperQueueBase {
 };
 
 #if defined(SUPPORT_ESP32_RMT_V1)
-void IRAM_ATTR rmt_fill_buffer(StepperQueue* q, bool fill_part_one,
-                               uint32_t* data);
-void IRAM_ATTR rmt_apply_command(StepperQueue* q, bool fill_part_one,
-                                 uint32_t* data);
+void rmt_fill_buffer(StepperQueue* q, bool fill_part_one, uint32_t* data);
+void rmt_apply_command(StepperQueue* q, bool fill_part_one, uint32_t* data);
 #endif
 #if defined(SUPPORT_ESP32_RMT_V2)
 // F2 read-ahead bound encoder: walks the queue and emits the low phase
