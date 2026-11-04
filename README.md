@@ -273,7 +273,7 @@ That said, I still take pride in hand-writing the Pico PIO code. There is someth
 
 Perhaps there is also a little nostalgia in this. It feels like one of those moments when a craft that has shaped the way you have worked throughout your lifetime is slowly becoming obsolete — not because it has lost its value, but because there is now a faster and more powerful way of achieving the same result. Like the expert typist who could produce flawless pages at remarkable speed, the old skills don't necessarily become less beautiful; they simply become less necessary.
 
-Those 50 words of PIO code are perhaps one of the last pieces of FastAccelStepper where I can say, quite honestly, *I wrote every word myself.*
+Those 32 words of PIO code are perhaps one of the last pieces of FastAccelStepper where I can say, quite honestly, *I wrote every word myself.*
 
 ## Contributing
 
