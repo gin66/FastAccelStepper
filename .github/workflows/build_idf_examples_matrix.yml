@@ -79,5 +79,11 @@ jobs:
       run: bash extras/scripts/build-pio-dirs.sh
     - name: Exclude examples from the matrix
       run: rm -rf pio_dirs/saleae pio_espidf/saleae
+    # ubuntu-latest ships Python 3.14. ESP-IDF 5.5 installs pydantic-core
+    # against that interpreter, and its PyO3 0.24 stops at Python 3.13.
+    - name: Setup Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.12"
     - name: Build on PlatformIO
       run: bash extras/scripts/build-idf-platformio.sh ${{ matrix.version }}

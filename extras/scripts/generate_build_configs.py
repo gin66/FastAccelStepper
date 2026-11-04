@@ -300,6 +300,12 @@ def generate_workflow_yml(
 
     lines.extend(
         [
+            "    # ubuntu-latest ships Python 3.14. ESP-IDF 5.5 installs pydantic-core",
+            "    # against that interpreter, and its PyO3 0.24 stops at Python 3.13.",
+            "    - name: Setup Python",
+            "      uses: actions/setup-python@v7",
+            "      with:",
+            '        python-version: "3.12"',
             "    - name: Build on PlatformIO",
             f"      run: bash extras/scripts/{workflow_config['script']} ${{{{ matrix.version }}}}",
             "",
