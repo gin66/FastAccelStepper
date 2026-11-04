@@ -129,14 +129,6 @@ environments:
     board: esp32-c6-devkitm-1
     board_build_f_cpu: 160000000L
 
-  # platform-espressif32 does not ship an H2 board (8.0.0 included), so H2
-  # stays on pioarduino. 55.03.312 ships the same Arduino core 3.3.12 as 8.0.0.
-  esp32h2_pioarduino_V55_03_312:
-    template: esp32_arduino
-    platform: https://github.com/pioarduino/platform-espressif32/releases/download/55.03.312/platform-espressif32.zip
-    board: esp32-h2-devkitm-1
-    board_build_f_cpu: 96000000L
-
   esp32p4:
     template: esp32_arduino
     platform: https://github.com/pioarduino/platform-espressif32/releases/download/53.03.11/platform-espressif32.zip
@@ -350,7 +342,6 @@ workflows:
       - esp32s2_V8_0_0
       - esp32s3_V8_0_0
       - esp32c6_V8_0_0
-      - esp32h2_pioarduino_V55_03_312
       - versioned_groups: esp32c3
         exclude_versions: ["6.8.0"]
       - versioned_groups: esp32s2
