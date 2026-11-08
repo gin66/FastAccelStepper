@@ -52,7 +52,7 @@ mask write enables them. Machines already running stay out of the mask.
 - Keep the interrupt disable around the mask writes. An empty member
   still does not cancel the others.
 - A block that already holds the cycle-counter program
-  ([032](032_pico_cycle_counter_pio.md)) is one FastAccelStepper does
+  ([032](../doc/implemented/pico_cycle_counter_pio.md)) is one FastAccelStepper does
   not claim. The mask is over FastAccelStepper's own blocks.
 
 ## References

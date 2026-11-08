@@ -1,7 +1,7 @@
 # Pico — claim a whole PIO block before writing the program
 
 Priority: **033**. Follows
-[032](032_pico_cycle_counter_pio.md). The length-32 occupancy test in
+[032](../doc/implemented/pico_cycle_counter_pio.md). The length-32 occupancy test in
 the Pico SDK is wrong on RISC-V, so a stepper program can be written
 over the cycle counter.
 

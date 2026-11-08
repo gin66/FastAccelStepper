@@ -24,7 +24,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **032** | [Pico cycle-counter PIO](032_pico_cycle_counter_pio.md) | — | measured | Pico 4, Pico 2 Cortex 8, both with `-D__FREERTOS=1`. RISC-V without that flag also has the 2-word block. A length-32 fit test is a zero mask on that compiler. |
 | **033** | [Pico whole-block claim](033_pico_pio_block_claim.md) | ~30 k | 1 d | Claim all four state machines before writing the 32-word program. Alternative: move the five direction words to the FIFO filler so the program is 27 words and the SDK check works. |
 | **034** | [Pico registry platform](034_pico_registry_platform.md) | ~40 k | 1 d | `platform = raspberrypi` is still the warned path (#339). Resolve the core it selects now, then SR_01 and SR_16. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
@@ -45,9 +44,15 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 20 items | ~6.10 M | 17–25 w | Priorities 032–160, plus 500. |
+| **total** | 19 items | ~6.10 M | 17–25 w | Priorities 033–160, plus 500. |
 
 ## Done
+
+- **032 — Pico cycle counter occupies one PIO block — measured.**
+  With `-D__FREERTOS=1` the Pico connects 4 and the Pico 2 connects 8.
+  RISC-V loads the same 2-word program. The length-32 SDK check is a
+  zero mask on that compiler. Record:
+  [pico_cycle_counter_pio.md](../doc/implemented/pico_cycle_counter_pio.md).
 
 - **030 — Pico PIO loop timing — measured.** `0f53d4a2` matches the
   150 MHz budget. A 30-command one-step train was 13 samples at 24 MS/s
