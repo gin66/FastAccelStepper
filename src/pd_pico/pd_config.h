@@ -27,6 +27,17 @@
 
 #define DEBUG_LED_HALF_PERIOD 50
 
+// One command is already in flight and the TX FIFO holds four more. Four
+// old-direction pauses ahead of the new command fill those FIFO slots. The
+// filler writes DIR only after the following command itself has entered the
+// FIFO: that put needs one more pull, and the pull takes a pause.
+#define SUPPORT_PAUSE_CMD_COUNTING
+#define PICO_DIR_DRAIN_WORDS 4
+// Tick length of those four pauses. A planner that emits one pause of this
+// length has queued one word; the driver still adds the missing words.
+#define BEFORE_DIR_CHANGE_DELAY_TICKS(q) \
+  ((uint16_t)(PICO_DIR_DRAIN_WORDS * MIN_CMD_TICKS))
+
 #define noop_or_wait vTaskDelay(1)
 
 #define SUPPORT_TASK_RATE_CHANGE

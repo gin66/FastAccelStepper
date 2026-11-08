@@ -2,8 +2,8 @@
 
 Closes todo **032**. The user-facing account is
 [pico.md](../platforms/pico.md), section "Cycle-counter state machine".
-The code change is still open as
-[033](../../todo/033_pico_pio_block_claim.md).
+The follow-up is implemented as
+[033](pico_pio_block_claim.md).
 
 ## Result
 

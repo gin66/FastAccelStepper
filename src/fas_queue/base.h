@@ -74,12 +74,15 @@ class StepperQueueBase {
   // driver drain pause in front of it, and -- because that pause makes the
   // queue non-empty -- lost the empty-queue path in addQueueEntry() that sets
   // the dir pin directly, so the driver had to *toggle* it at encode time
-  // instead. _nr_of_pauses is left alone: only the ESP32 drain reads it.
+  // instead. ESP32 reads _last_pause_ticks. _nr_of_pauses stays 0: Pico counts
+  // pause words still ahead of the next command, and a drained pipeline is
+  // not four of those words.
   inline void markPipelineDrained() { _last_pause_ticks = 65535; }
 #endif
 
-  // ticks of the pause(s) injected for the current moveTimed() call
-  uint16_t _injected_pause_ticks;
+  // Ticks of the pause(s) injected for the current moveTimed() call.
+  // Pico sums the drain pauses and the user delay; that sum exceeds 65535.
+  uint32_t _injected_pause_ticks;
 
   void _base_initVars() {
     queue_end.dir = true;

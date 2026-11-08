@@ -24,7 +24,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **033** | [Pico whole-block claim](033_pico_pio_block_claim.md) | ~30 k | 1 d | Claim all four state machines before writing the 32-word program. Alternative: move the five direction words to the FIFO filler so the program is 27 words and the SDK check works. |
 | **034** | [Pico registry platform](034_pico_registry_platform.md) | ~40 k | 1 d | `platform = raspberrypi` is still the warned path (#339). Resolve the core it selects now, then SR_01 and SR_16. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | One item. can2040's single CTRL write is the example; FAS enables only the caller's steppers, per PIO block. |
@@ -44,9 +43,15 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 19 items | ~6.10 M | 17–25 w | Priorities 033–160, plus 500. |
+| **total** | 18 items | ~6.07 M | 17–25 w | Priorities 034–160, plus 500. |
 
 ## Done
+
+- **033 — Pico whole-block claim — implemented and measured.** The program
+  is 27 words and relocatable, `claim_pio_resources()` claims every free
+  state machine, and DIR is a CPU GPIO written by the FIFO filler. An RP2350
+  connects **11** steppers with step pins 16..31; the twelfth is refused.
+  Record: [pico_pio_block_claim.md](../doc/implemented/pico_pio_block_claim.md).
 
 - **032 — Pico cycle counter occupies one PIO block — measured.**
   With `-D__FREERTOS=1` the Pico connects 4 and the Pico 2 connects 8.

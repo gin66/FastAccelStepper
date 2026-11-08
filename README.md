@@ -41,8 +41,8 @@ For memory footprint information across supported architectures, see the
 | ESP32-C3 | 200 [1] | 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
 | ESP32-C6 | 200 [1] | 2 MCPWM/PCNT + 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
 | ESP32-P4 | 200 [1] | 4 RMT + 32 I2S * [2] | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| Raspberry Pi Pico | 200 | 4 | 32 | [pico.md](extras/doc/platforms/pico.md) |
-| Raspberry Pi Pico 2 | 200 | 8 | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Raspberry Pi Pico | 200 | 7 [3] | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Raspberry Pi Pico 2 | 200 | 11 | 32 | [pico.md](extras/doc/platforms/pico.md) |
 | Atmel SAM Due | 50 | 6 | 32 | [sam.md](extras/doc/platforms/sam.md) |
 | Microchip SAMD51 | 100 | 3-5 | 32 | [samd51.md](extras/doc/platforms/samd51.md) |
 | Teensy 4.0/4.1 (exp.) | 200 | 16 | 32 | [teensy.md](extras/doc/platforms/teensy.md) |
@@ -54,6 +54,10 @@ Notes:
 2. The ESP32-P4 hardware provides 2 MCPWM groups and 4 PCNT units, but
    MCPWM/PCNT is not implemented for P4 yet. ESP32-S2 has PCNT but no MCPWM,
    ESP32-C3 has neither, so only RMT/I2S are available there.
+3. The Pico 2 count is measured: 11 connect and the twelfth is refused. The
+   Pico count is expected from the same 27-word relocatable program (the
+   cycle-counter block keeps three free state machines) but has not been
+   re-measured. Step pins 16..31 reach all three Pico 2 PIO blocks.
 
 \* The 32 I2S steppers require an external demultiplexer (e.g. 74HC154, or a
 74HC138 cascade / 74HC595 shift registers) on the I2S data line. Using I2S

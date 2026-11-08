@@ -6,13 +6,18 @@
 
 * allows up to 200000 generated steps per second
 * RP2040 has two PIO blocks and RP2350 has three. Each block has four state
-  machines, and one loaded stepper program serves all four. The builds offer
-  8 steppers on the Pico and 12 on the Pico 2.
+  machines, and one loaded stepper program serves that block's free machines.
+  The builds offer 8 queues on the Pico and 12 on the Pico 2.
 * RISC-V is the Pico 2 only. The RP2040 has no RISC-V core.
-* Measured with `-D__FREERTOS=1` on 2026-11-08. The Pico connects 4 of 8.
-  The Pico 2 Cortex image connects 8 of 12. On both boards one PIO block
-  already holds the core's 2-word cycle counter, and the next connect fails.
-  The mechanism is in the next section.
+* Measured on 2026-11-08 with `-D__FREERTOS=1` on a Pico 2: **11 steppers
+  connect and the twelfth is refused**. One PIO block holds the core's 2-word
+  cycle counter and still serves three steppers, so the count is 4 + 4 + 3.
+  The Pico (RP2040) has not been re-measured; the same mechanism should give
+  7 of its 8 queues.
+* On the Pico 2 the step pins must be in 16..31 to reach all three blocks:
+  PIO0/PIO1 cover 0..31 and PIO2's window starts at 16. Below 16 the first two
+  blocks take every pin and PIO2 is never reached. The count probe is
+  `extras/tests/pico_stepper_count`.
 * Steppers' command queue depth: 32
 * Step signal can be any GPIO up to 31.
 * Direction delay is recommended.
@@ -21,12 +26,13 @@
 
 Uses the pio module. Pico (rp2040) offers two pios and pico 2 (rp2350) offers
 three pios. Each pio contains four state machines and every state machine can
-drive one stepper. So in theory can allocate 8 steppers for pico and 12 steppers
-for pico 2.
+drive one stepper. `claim_pio_resources()` claims every free state machine of a
+block and loads the 27-word program once, so all claimed machines share it.
 
-SoftwareSerial is implemented via pio, too. Another program that has already
-used instruction words in a block leaves that block unusable for
-FastAccelStepper.
+SoftwareSerial is implemented via pio, too. The program is relocatable, so a
+block that already holds another program is still usable when 27 free words
+remain. The cycle counter holds 2 words, so its block still serves three
+steppers.
 
 ## Cycle-counter state machine
 
@@ -56,10 +62,9 @@ No flag in `begin()` skips the program when `__riscv` is set.
 `core1_disable_systick` only skips `begin(1)` on core 1.
 
 `PIOProgram::prepare()` (`cores/rp2040/PIOProgram.cpp`) adds those 2 words
-with `pio_add_program` at a free origin. A later 32-word program fails
-`pio_can_add_program` on that block, so the block is gone, not one state
-machine. `add_step()` in `src/pd_pico/pico_pio.cpp` stores at most 32 words,
-and the stepper program is loaded at origin 0.
+with `pio_add_program` at a free origin. The stepper program is 27 words and
+relocatable, so it fits beside them (29 of 32 words) and the block keeps its
+three free state machines for steppers.
 
 Every Pico environment in `extras/ci/platformio.ini` passes
 `build_flags = -D__FREERTOS=1`. On 6.1.0 that macro is the preprocessor
@@ -80,45 +85,43 @@ in the core package says 125 MHz for `rpipico2`; the PlatformIO board
 the saleae env resolves overrides that to 150 MHz. One PIO cycle on this
 firmware is 1/150 MHz.
 
-**Measured on a Pico (RP2040), 2026-11-08.** Env `rpipico` with
-`-D__FREERTOS=1`, port `/dev/cu.usbmodem4101`. No logic analyzer. The
-sketch called `stepperConnectToPin()` for GPIO 0 through 7. Pins 0
-through 3 succeeded and pins 4 through 7 failed: 4 steppers. Before any
-connect, PIO0 was empty. PIO1 had one state machine claimed. A 30-word
-program still fit there and a 31-word program did not, so that block
-held 2 instruction words. After the four connects, PIO0 had four state
-machines claimed and accepted no further program. PIO1 was unchanged.
-
-**Measured on a Pico 2, Cortex, 2026-11-08.** Env `rpipico2` with
-`-D__FREERTOS=1`, port `/dev/cu.usbmodem833201`. A throwaway sketch called
+**Measured on a Pico 2, Cortex, 2026-11-08, before the 27-word program.**
+Env `rpipico2` with `-D__FREERTOS=1`. A throwaway sketch called
 `stepperConnectToPin()` for GPIO 0 through 11. Pins 0 through 7 succeeded
 and pins 8 through 11 failed: 8 steppers. Before any connect, PIO0 and
-PIO1 were empty (`pio_can_add_program` accepted 32 words). PIO2 had one
-state machine claimed. A 30-word program still fit there and a 31-word
-program did not, so that block held 2 instruction words. After the eight
-connects, PIO0 and PIO1 each had four state machines claimed and accepted
-no further program. PIO2 was unchanged. Instruction memory reads back as
-zero, so the word count is this fit test, not a read of `instr_mem`.
+PIO1 were empty. PIO2 had one state machine claimed and held 2 instruction
+words. The 32-word program at origin 0 could not be loaded there, so the
+counter's block was lost. The Pico (RP2040) measured 4 of 8 for the same
+reason.
+
+**Measured on a Pico 2, Cortex, 2026-11-08, with the 27-word relocatable
+program.** `extras/tests/pico_stepper_count` connects GPIO 16 through 31 and
+reports **11 connected, first failure at 27**. The counter's block contributes
+three state machines and the other two blocks four each. GPIO 16..31 is the
+range inside all three PIO windows: PIO0/PIO1 cover 0..31 and PIO2 starts at
+16. Below 16 the first two blocks take every pin, PIO2 is never reached, and
+the count is 8.
 
 The Saleae firmware cannot make this count: `SALEAE_STEPPER_BOUND` in
-`extras/tests/saleae_based/common/saleae_app.cpp` is 8, so `CONFIG 9` is
-refused by the test app.
+`extras/tests/saleae_based/common/saleae_app.cpp` is 8 and the analyzer has 8
+channels, so `CONFIG 9` is refused by the test app. That is why the count
+probe exists.
 
 **Measured on a Pico 2, RISC-V, without `-D__FREERTOS=1`, 2026-11-08.**
 USB comes up on that image. The image built with `-D__FREERTOS=1` still
 does not. Before any stepper program is added, PIO2 has one state
 machine claimed. A 30-word program fits there and a 31-word program
 does not, so that block holds 2 instruction words. PIO0 and PIO1 are
-empty. The stepper program is 32 words at origin 0, so it cannot be
-loaded into the block that holds the cycle counter.
+empty. This measurement predates the 27-word relocatable program.
 
 `pio_can_add_program` builds its occupancy mask with `1u << length`.
 A shift of 32 is undefined. This RISC-V compiler emits `bset` of bit
-`length & 31`, so a length of 32 produces a mask of 0. The 32-word
+`length & 31`, so a length of 32 produces a mask of 0. The old 32-word
 program is then reported as fitting, and the write is not recorded as
 used. A probe that trusted that check claimed 11 state machines and
-wrote the 32-word image over the counter. Those 11 do not coexist with
-the counter.
+wrote the 32-word image over the counter. Those 11 did not coexist with
+the counter. A length of 27 uses a defined shift on both cores, so the
+relocatable program does not depend on that check being correct.
 
 Upstream arduino-pico master, which this tree does not build, tests a
 runtime `__isFreeRTOS` on Cortex and still always takes the PIO path on
@@ -170,21 +173,23 @@ firmware's `QINFO` line does not report `clock_get_hz(clk_sys)`. Read the
 clock from the board, or from `-DF_CPU` on the compile line, before turning
 a capture into nanoseconds. One PIO cycle is `1/clk_sys` either way.
 
-Integration with applications using pio: FastAccelStepper claims always a complete
-pio. This means all four state machines are not available for the app. With every
-block free, the second pio is claimed for the fifth stepper, and on pico 2 the
-third is claimed for the ninth. When the cycle-counter program above already
-holds one block, the ninth connect fails and pico 2 stops at eight. Unused state
-machines of a claimed pio cannot be used, because FastAccelStepper's pio code
-needs 100% of the available program space (32 words - none left).
+Integration with applications using pio: `claim_pio_resources()` claims every
+free state machine of a block and keeps the ones it does not use, so another
+PIO caller cannot be told the block is empty. With every block free the first
+block serves four steppers and the second the next four; on the Pico 2 the
+third serves the next four. The cycle-counter block keeps three free machines
+and serves three. All claimed machines on a block share one 27-word
+relocatable program, so 5 of the 32 words remain free on that block.
 
 ## Loop budget, measured
 
 The command duration matches the requested time. `pio_calc_loops()`
 subtracts the 3-cycle preamble, solves for the period, and adds the
 preamble back into `actual_cycles`. That is the time the state machine
-spends: the preamble once, then `loop_cnt` passes of `26 + 3*period`.
-`adjust_80MHz` keeps `requested - actual_cycles` for the next command.
+spends: the preamble once, then `loop_cnt` passes of `22 + 3*period` for
+the 27-word program. The capture below was taken with the previous
+32-word program, where a pass was `26 + 3*period`. `adjust_80MHz` keeps
+`requested - actual_cycles` for the next command.
 
 The period moves in steps of 3 cycles, and a step is two passes, so one
 command lands on a 6-cycle grid. A single command can be a few cycles
@@ -202,8 +207,10 @@ executed it, so the adjustment was taken from a short budget. The same
 six commands there are 18 cycles long, and thirty commands are 90
 cycles long.
 
-The loaded 32-word program is unchanged. `add_step()` stores nothing
-past word 32.
+That capture compared `pio_calc_loops()` against tag 2.0.1 with the same
+32-word program loaded on both sides. The 27-word program is a later,
+separate change; the `rpipico2` catalogue rerun with it still reports the
+requested periods (SR_08, SR_25).
 
 Measured 2026-11-08 on the Pico 2 saleae firmware, env `rpipico2`,
 `-DF_CPU=150000000L`. GPIO2 (analyzer D0), 30 one-step commands of 3200

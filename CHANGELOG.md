@@ -1,4 +1,5 @@
 pre-V2.0.2:
+- pico: claim every free state machine of a PIO block and load the relocatable program once, so RP2350 connects 11 steppers instead of 8 (measured) and RP2040 7 instead of 4. A direction change inserts four old-direction pauses so the FIFO pipeline drains before DIR changes
 - esp32: Fix the `gpio_iomux_in()` deprecation warning on ESP-IDF >= 5.5.0 (IDF 5 branch) with the equivalent inline GPIO LL writes. RISK: the IDF 5.5+ behavior has not been retested on hardware yet (build-only verification so far)
 - ci: Test Arduino core 3.x via `espressif32 @ 8.0.0` for ESP32/S3/C6 instead of pioarduino 53.03.11; H2 stays on pioarduino 55.03.312 (Arduino 3.3.12) because platform-espressif32 8.0.0 ships no H2 board
 - pico: fix loop timing in pio code and remove the dropped instruction. Verified on hardware.
