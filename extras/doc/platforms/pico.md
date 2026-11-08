@@ -147,7 +147,13 @@ that way: the hook that exists today requires FreeRTOS, and no such platform
 is packaged here.
 
 `platform = raspberrypi` from the PlatformIO registry is a separate failure
-(issue #339). It does not avoid the cycle counter.
+(issue #339). Version 1.20.0 ships only the Arduino **mbed** core
+(`framework-arduino-mbed`) and two boards, `pico` and `nanorp2040connect`: it
+has no `framework-arduinopico`, no `rpipico2`, and no `bigtreetech_SKR_Pico`.
+The mbed core also does not define `PICO_RP2040` / `PICO_RP2350`, which is what
+`fas_arch/common.h` selects the PIO port on. It does not avoid the cycle
+counter, and it cannot run the PIO driver. Record:
+[pico_registry_platform.md](../implemented/pico_registry_platform.md).
 
 ## Cortex-M33 and Hazard3
 
@@ -240,8 +246,13 @@ Important: Without direction delay set up, the time between a direction transiti
 to step low to high transition can be 50ns @ 80 MHz. Best to call
 `setDirectionPin()` with time parameter for delay.
 
-Important to note: The standard pico platform appears to not work with pio
-(#339). So please use an alternative platform for rp2040 like:
+Important to note: `platform = raspberrypi` from the PlatformIO registry does
+not work with the PIO driver (#339). It is the Arduino **mbed** core: version
+1.20.0 has no `framework-arduinopico`, and its board list is only `pico` and
+`nanorp2040connect` — `rpipico2` and `bigtreetech_SKR_Pico` are `UnknownBoard`,
+and the mbed core defines neither `PICO_RP2040`/`PICO_RP2350` nor the
+arduino-pico `rp2040` object. So please use an alternative platform for rp2040
+like:
 
 ```
 [env:rpipico]
@@ -260,6 +271,12 @@ framework = arduino
 board = rpipico2
 build_flags = -Wall -Wextra -D__FREERTOS=1
 ```
+
+If the fork is already installed globally, a new `platform = raspberrypi` env
+silently reuses it and builds; test what the registry actually provides only
+with `PLATFORMIO_CORE_DIR` pointed at a clean directory. Measurements and the
+board/framework lists are in
+[pico_registry_platform.md](../implemented/pico_registry_platform.md).
 
 See [pico PIO program flow](../pico_pio.md) for the generated state machine
 diagram.

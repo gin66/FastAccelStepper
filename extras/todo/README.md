@@ -24,7 +24,6 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
-| **034** | [Pico registry platform](034_pico_registry_platform.md) | ~40 k | 1 d | `platform = raspberrypi` is still the warned path (#339). Resolve the core it selects now, then SR_01 and SR_16. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
 | **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | One item. can2040's single CTRL write is the example; FAS enables only the caller's steppers, per PIO block. |
 | **040** | [AVR synchronized start](040_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
@@ -43,9 +42,24 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 18 items | ~6.07 M | 17–25 w | Priorities 034–160, plus 500. |
+| **total** | 17 items | ~6.03 M | 17–25 w | Priorities 040–160, plus 500. |
 
 ## Done
+
+- **034 — Pico registry `platform = raspberrypi` — resolved: it is the mbed
+  core, and the warning stands.** Registry `platformio/raspberrypi` **1.20.0**
+  declares only `framework-arduino-mbed` and ships only the `pico` and
+  `nanorp2040connect` boards, so `board = rpipico2` and
+  `board = bigtreetech_SKR_Pico` are `UnknownBoard`. The only RP2040 board
+  builds on mbed and then has no PIO port: the mbed core defines neither
+  `PICO_RP2040`/`PICO_RP2350` nor the arduino-pico `rp2040` object. Registry
+  1.18.0 (2025-10-23) is the same, so #339's SKR Pico board cannot have come
+  from the registry alone — the environment must have reused the fork or a
+  local board definition. The fork
+  (`maxgerhardt/platform-raspberrypi`, `framework-arduinopico@fd65f6d4`) builds
+  `rpipico`, `rpipico2` and `bigtreetech_SKR_Pico`; the RP2350 build passed
+  SR_01 and SR_16. The warning in `pico.md` now names the core and the boards.
+  Record: [pico_registry_platform.md](../doc/implemented/pico_registry_platform.md).
 
 - **033 — Pico whole-block claim — implemented and measured.** The program
   is 27 words and relocatable, `claim_pio_resources()` claims every free
