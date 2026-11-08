@@ -7,13 +7,19 @@
 * allows up to 200000 generated steps per second
 * RP2040 has two PIO blocks and RP2350 has three. Each block has four state
   machines, and one loaded stepper program serves that block's free machines.
-  The builds offer 8 queues on the Pico and 12 on the Pico 2.
+  The builds offer up to 8 queues on the Pico and 12 on the Pico 2; a
+  `__FREERTOS` build gives 7 and 11 because the core's PIO cycle counter
+  holds one machine.
 * RISC-V is the Pico 2 only. The RP2040 has no RISC-V core.
-* Measured on 2026-11-08 with `-D__FREERTOS=1` on a Pico 2: **11 steppers
-  connect and the twelfth is refused**. One PIO block holds the core's 2-word
-  cycle counter and still serves three steppers, so the count is 4 + 4 + 3.
-  The Pico (RP2040) has not been re-measured; the same mechanism should give
-  7 of its 8 queues.
+* Measured on 2026-11-08 on a Pico 2: **12 steppers connect and the
+  thirteenth is refused** without `__FREERTOS`, because the core takes its
+  SysTick cycle counter and spends no PIO state machine on it. With
+  `-D__FREERTOS=1` the core's 2-word PIO `ccount` program holds one machine;
+  the relocatable stepper program fits beside it, so that block still serves
+  three and the count is 11. The Pico (RP2040) no-`__FREERTOS` count is
+  expected to be 8; with `__FREERTOS` it is expected to be 7 (4 was measured
+  before the 27-word program). RISC-V has no SysTick path, so a RISC-V Pico 2
+  connects 11 either way.
 * On the Pico 2 the step pins must be in 16..31 to reach all three blocks:
   PIO0/PIO1 cover 0..31 and PIO2's window starts at 16. Below 16 the first two
   blocks take every pin and PIO2 is never reached. The count probe is
@@ -29,10 +35,15 @@ three pios. Each pio contains four state machines and every state machine can
 drive one stepper. `claim_pio_resources()` claims every free state machine of a
 block and loads the 27-word program once, so all claimed machines share it.
 
+The Pico driver runs with or without the core's FreeRTOS SMP. With
+`__FREERTOS` defined, a FreeRTOS task calls `manageSteppers()`; without it, a
+Pico repeating timer (alarm pool) calls the same function at the same rate.
+The choice also decides the cycle counter, see below.
+
 SoftwareSerial is implemented via pio, too. The program is relocatable, so a
 block that already holds another program is still usable when 27 free words
-remain. The cycle counter holds 2 words, so its block still serves three
-steppers.
+remain. In a `__FREERTOS` build the cycle counter holds 2 words, so its block
+still serves three steppers; without `__FREERTOS` no block is reserved.
 
 ## Cycle-counter state machine
 
@@ -63,27 +74,28 @@ No flag in `begin()` skips the program when `__riscv` is set.
 
 `PIOProgram::prepare()` (`cores/rp2040/PIOProgram.cpp`) adds those 2 words
 with `pio_add_program` at a free origin. The stepper program is 27 words and
-relocatable, so it fits beside them (29 of 32 words) and the block keeps its
-three free state machines for steppers.
+relocatable, so in the `__FREERTOS` build it fits beside them (29 of 32 words)
+and the block keeps its three free state machines for steppers. Without
+`__FREERTOS` on Cortex the `#if` takes the SysTick branch, no ccount program
+is loaded, and all four machines on every block stay free.
 
-Every Pico environment in `extras/ci/platformio.ini` passes
-`build_flags = -D__FREERTOS=1`. On 6.1.0 that macro is the preprocessor
-symbol in the `#if` above (the core's own FreeRTOS menu uses `-D__FREERTOS`).
-Cortex with the macro defined takes the PIO path. RISC-V takes it because
-`__riscv` is set. RISC-V exists on the RP2350 only. The RP2040 image is
-Cortex. With the counter loaded it connects 4 steppers, measured on
-`/dev/cu.usbmodem4101`.
+The CI has both variants. `rpipico` and `rpipico2` define
+`-D__FREERTOS=1`; `rpipico2_nofreertos` does not. On 6.1.0 the macro in the
+`#if` above is exactly `__FREERTOS` (the core's FreeRTOS menu also sets
+`-D__FREERTOS`). Cortex with the macro defined takes the PIO path; without it
+it takes SysTick. RISC-V takes the PIO path because `__riscv` is set, with or
+without `__FREERTOS`. RISC-V exists on the RP2350 only; the RP2040 is Cortex.
 
 The previous wording on this page said the Arduino core allocates one PIO
 when the build is not RISC-V, and that a RISC-V build can use every stepper.
 That wording does not match `begin()` in 6.1.0.
 
-**Verified on the `rpipico2` compile line (2026-11-08).**
-`RP2040Support.cpp` is compiled with `-D__FREERTOS=1`. `build_flags` does
-reach the core. The same command has `-DF_CPU=150000000L`. `boards.txt`
-in the core package says 125 MHz for `rpipico2`; the PlatformIO board
-the saleae env resolves overrides that to 150 MHz. One PIO cycle on this
-firmware is 1/150 MHz.
+**Verified on the compile lines (2026-11-08).** `rpipico2` compiles
+`RP2040Support.cpp` with `-D__FREERTOS=1`; `rpipico2_nofreertos` does not.
+`build_flags` reaches the core either way. Both commands have
+`-DF_CPU=150000000L`. `boards.txt` in the core package says 125 MHz for
+`rpipico2`; the PlatformIO board the saleae env resolves overrides that to
+150 MHz. One PIO cycle on that firmware is 1/150 MHz.
 
 **Measured on a Pico 2, Cortex, 2026-11-08, before the 27-word program.**
 Env `rpipico2` with `-D__FREERTOS=1`. A throwaway sketch called
@@ -95,12 +107,13 @@ counter's block was lost. The Pico (RP2040) measured 4 of 8 for the same
 reason.
 
 **Measured on a Pico 2, Cortex, 2026-11-08, with the 27-word relocatable
-program.** `extras/tests/pico_stepper_count` connects GPIO 16 through 31 and
-reports **11 connected, first failure at 27**. The counter's block contributes
-three state machines and the other two blocks four each. GPIO 16..31 is the
-range inside all three PIO windows: PIO0/PIO1 cover 0..31 and PIO2 starts at
-16. Below 16 the first two blocks take every pin, PIO2 is never reached, and
-the count is 8.
+program.** `extras/tests/pico_stepper_count` connects GPIO 16 through 31.
+Without `__FREERTOS` it reports **12 connected, first failure at 28**: all
+three blocks serve four state machines. With `-D__FREERTOS=1` it reports
+**11 connected, first failure at 27**: the ccount block contributes three
+machines and the other two blocks four each. GPIO 16..31 is the range inside
+all three PIO windows: PIO0/PIO1 cover 0..31 and PIO2 starts at 16. Below 16
+the first two blocks take every pin, PIO2 is never reached, and the count is 8.
 
 The Saleae firmware cannot make this count: `SALEAE_STEPPER_BOUND` in
 `extras/tests/saleae_based/common/saleae_app.cpp` is 8 and the analyzer has 8
@@ -112,7 +125,10 @@ USB comes up on that image. The image built with `-D__FREERTOS=1` still
 does not. Before any stepper program is added, PIO2 has one state
 machine claimed. A 30-word program fits there and a 31-word program
 does not, so that block holds 2 instruction words. PIO0 and PIO1 are
-empty. This measurement predates the 27-word relocatable program.
+empty. This measurement predates the 27-word relocatable program. RISC-V
+has no SysTick branch, so it takes this PIO path with or without
+`__FREERTOS`; with the 27-word program the block keeps three machines and
+the count should be 11 (not re-measured on RISC-V).
 
 `pio_can_add_program` builds its occupancy mask with `1u << length`.
 A shift of 32 is undefined. This RISC-V compiler emits `bset` of bit
@@ -134,17 +150,18 @@ No Pico environment in this tree uses a `framework` other than `arduino`.
 `src/fas_arch/common.h` also has a branch on `PICO_SDK_RP2350`. That macro
 is not defined by pico-sdk or by framework-arduinopico 6.1.0 (it occurs only
 in this repository). The header it selects, `src/fas_arch/pico_sdk_rp_pico.h`,
-calls FreeRTOS `portENTER_CRITICAL` / `portEXIT_CRITICAL`, and
-`src/pd_pico/pd_config.h` includes `FreeRTOS.h`. That branch is not a
-bare-metal port, and it is not built in CI.
+calls FreeRTOS `portENTER_CRITICAL` / `portEXIT_CRITICAL`, and has no
+bare-metal task source. That branch still requires FreeRTOS, and it is not
+built in CI. (The Arduino branch now builds either way.)
 
 The cycle counter is started by the Arduino class `RP2040::begin()`. A
 pico-sdk image does not call it. In the pico-sdk shipped inside
 framework-arduinopico 6.1.0, the only `pio_add_program` is the implementation
 in `hardware_pio/pio.c`. A non-Arduino image therefore keeps every PIO block,
 on Cortex and on RISC-V. FastAccelStepper still has to be ported to build
-that way: the hook that exists today requires FreeRTOS, and no such platform
-is packaged here.
+that way: the `PICO_SDK_RP2350` hook uses FreeRTOS critical sections and
+requires FreeRTOS, and no such platform is packaged here. (The Arduino hook
+now builds with or without `__FREERTOS`; see the section above.)
 
 `platform = raspberrypi` from the PlatformIO registry is a separate failure
 (issue #339). Version 1.20.0 ships only the Arduino **mbed** core
@@ -163,7 +180,9 @@ not run at the same time.
 Step edges are produced by the PIO at `clk_sys`. Comparing step periods
 between `rpipico2` and `rpipico2-riscv` on a logic analyzer measures the PIO
 clock, which is the same clock. It does not measure which CPU is faster.
-The comparison that tests this page is how many steppers connect.
+The comparison that tests this page is how many steppers connect: 12 for the
+no-`__FREERTOS` Cortex build, 11 for the FreeRTOS build and 11 for RISC-V
+(which always takes the PIO cycle counter).
 
 Which core finishes a given integer workload first depends on that code.
 A secondary CoreMark table (kreier.github.io/benchmark/CoreMark, update
@@ -183,8 +202,9 @@ Integration with applications using pio: `claim_pio_resources()` claims every
 free state machine of a block and keeps the ones it does not use, so another
 PIO caller cannot be told the block is empty. With every block free the first
 block serves four steppers and the second the next four; on the Pico 2 the
-third serves the next four. The cycle-counter block keeps three free machines
-and serves three. All claimed machines on a block share one 27-word
+third serves the next four, for 12 in the no-`__FREERTOS` build. In a
+`__FREERTOS` build the cycle-counter block keeps three free machines and
+serves three, for 11. All claimed machines on a block share one 27-word
 relocatable program, so 5 of the 32 words remain free on that block.
 
 ## Loop budget, measured

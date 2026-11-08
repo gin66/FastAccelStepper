@@ -1,10 +1,15 @@
 // Probe the RP2350 stepper allocation count.
 //
 // An RP2350 has three PIO blocks with four state machines each. The Arduino
-// core's cycle counter occupies one state machine (two instruction words) on
-// one block. The stepper program is 27 words and relocatable, so it fits
-// beside the counter and that block still serves three steppers:
-// 4 + 4 + 3 = 11.
+// core's cycle counter decides how many are free:
+//
+// - Without __FREERTOS the core uses ARM SysTick and allocates no PIO state
+//   machine: 4 + 4 + 4 = 12 steppers connect.
+// - With __FREERTOS the core loads its 2-word ccount program on one state
+//   machine. The stepper program is 27 words and relocatable, so it fits
+//   beside the counter and that block still serves three: 4 + 4 + 3 = 11.
+// - RISC-V has no SysTick path, so it always takes the PIO ccount and
+//   reports 11 even without __FREERTOS.
 //
 // The step pins must be in 16..31 so all three PIO windows cover them:
 // PIO0/PIO1 cover 0..31, PIO2's window starts at 16. Below 16 the first two

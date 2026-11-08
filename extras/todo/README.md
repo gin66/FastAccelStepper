@@ -64,7 +64,9 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 - **033 — Pico whole-block claim — implemented and measured.** The program
   is 27 words and relocatable, `claim_pio_resources()` claims every free
   state machine, and DIR is a CPU GPIO written by the FIFO filler. An RP2350
-  connects **11** steppers with step pins 16..31; the twelfth is refused.
+  connects **12** steppers with step pins 16..31 without `__FREERTOS`, and
+  **11** with it because the core's PIO ccount holds one machine. Without
+  `__FREERTOS` the Pico driver runs `manageSteppers()` from a repeating timer.
   Record: [pico_pio_block_claim.md](../doc/implemented/pico_pio_block_claim.md).
 
 - **032 — Pico cycle counter occupies one PIO block — measured.**

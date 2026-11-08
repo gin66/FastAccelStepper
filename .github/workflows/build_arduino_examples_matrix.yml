@@ -85,6 +85,7 @@ jobs:
           - samd51
           - rpipico
           - rpipico2
+          - rpipico2_nofreertos
 
     runs-on: ubuntu-latest
 

@@ -2,7 +2,7 @@
 
 - **Generated:** 2026-11-08 22:47  _(re-measured on the 27-word PIO program: catalogue + `scale` sweep; SR_10–SR_12 re-run)_
 - **Board:** RP2350 (Pico 2), native USB, GPIO2..GPIO9 = D0..D7
-- **Firmware:** arduino-pico, driver `pio`; tag key `rpipico2_arduino_pio_pio2_dir`
+- **Firmware:** arduino-pico, driver `pio`; tag key `rpipico2_arduino_pio_pio2_dir`; `-D__FREERTOS=1` (the 11-stepper variant; the no-`__FREERTOS` build reaches 12, above the analyzer's 8-channel count bound)
 - **Scenarios:** 27 recorded
 
 ## Catalogue

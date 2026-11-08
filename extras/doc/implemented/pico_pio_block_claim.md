@@ -5,10 +5,11 @@ Priority: **033**. Follows
 the Pico SDK is wrong on RISC-V, so a stepper program can be written
 over the cycle counter.
 
-Status: **implemented** (2026-11-08). Measured on an RP2350: 11 steppers
-connect. The Saleae catalogue and scale sweep pass, and the loop and
-direction timing analyses are recorded below. The platform docs and the
-changelog are updated.
+Status: **implemented** (2026-11-08). Measured on an RP2350: 12 steppers
+connect without `__FREERTOS`, and 11 with it, because the core then spends a
+PIO state machine on the cycle counter. The Saleae catalogue and scale sweep
+pass, and the loop and direction timing analyses are recorded below. The
+platform docs and the changelog are updated.
 
 ## Implementation
 
@@ -33,15 +34,22 @@ full FIFO leaves the pin unchanged.
 of that length is one word; the driver still adds the missing words.
 
 The sentence in Alternative that a 27-word program does not fit beside
-2 used words is the origin-0 case. This load is relocatable and 29 of 32
-words are used, so the counter's block keeps its three free machines.
+2 used words is the origin-0 case. This load is relocatable: in a
+`__FREERTOS` build 29 of 32 words are used and the counter's block keeps its
+three free machines; without `__FREERTOS` the block keeps all four.
 
 ## Verification
 
-`extras/tests/pico_stepper_count` connects GPIO 16 through 31 and reports
-`connected=11 first_failed=27`: two blocks serve four steppers each and the
-cycle counter's block serves three. The pins must be in 16..31, the range
-inside all three PIO windows.
+`extras/tests/pico_stepper_count` connects GPIO 16 through 31. The
+no-`__FREERTOS` build reports `connected=12 first_failed=28`: all three blocks
+serve four steppers. The `rpipico2_freertos` build reports `connected=11
+first_failed=27`: two blocks serve four each and the cycle-counter block
+serves three. The pins must be in 16..31, the range inside all three PIO
+windows.
+
+The driver no longer requires the core's FreeRTOS SMP. With `__FREERTOS` a
+FreeRTOS task calls `manageSteppers()`; without it a Pico repeating timer
+(alarm pool) calls the same function at the same rate.
 
 The `rpipico2` Saleae catalogue passed every implemented scenario, including
 the direction-change tests SR_10–SR_12, and `--mode scale --pin-mode nodir`

@@ -10,8 +10,15 @@
 #ifndef PD_PICO_CONFIG_H
 #define PD_PICO_CONFIG_H
 
+#if defined(__FREERTOS)
 #include <FreeRTOS.h>
 #include <task.h>
+#define noop_or_wait vTaskDelay(1)
+#else
+// No RTOS: the Pico alarm pool calls manageSteppers() at the same rate.
+#include <pico/time.h>
+#define noop_or_wait sleep_us(100)
+#endif
 
 #define SUPPORT_UNSAFE_ABS_SPEED_LIMIT_SETTING
 
@@ -37,8 +44,6 @@
 // length has queued one word; the driver still adds the missing words.
 #define BEFORE_DIR_CHANGE_DELAY_TICKS(q) \
   ((uint16_t)(PICO_DIR_DRAIN_WORDS * MIN_CMD_TICKS))
-
-#define noop_or_wait vTaskDelay(1)
 
 #define SUPPORT_TASK_RATE_CHANGE
 

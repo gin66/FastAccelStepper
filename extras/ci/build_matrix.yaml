@@ -201,6 +201,10 @@ environments:
     board: rpipico2
     build_flags: ["-D__FREERTOS=1"]
 
+  rpipico2_nofreertos:
+    template: rp2040
+    board: rpipico2
+
   rpipico2-riscv:
     template: rp2040
     board: rpipico2
@@ -356,6 +360,7 @@ workflows:
       - samd51
       - rpipico
       - rpipico2
+      - rpipico2_nofreertos
     # Example directories built by build-pio-dirs.sh that this workflow must
     # not compile. The Saleae characterization app is written for a few targets
     # only and its compilation is not guaranteed for every environment the

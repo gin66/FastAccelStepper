@@ -1,8 +1,12 @@
 #include "fas_queue/stepper_queue.h"
 
 #if defined(SUPPORT_RP_PICO)
+#if defined(__FREERTOS)
 #include <FreeRTOS.h>
 #include <task.h>
+#else
+#include <pico/time.h>
+#endif
 
 #include "hardware/gpio.h"
 #include "hardware/irq.h"
@@ -415,6 +419,7 @@ static void pio1_fifo_irq_handler() { pio_fifo_irq_handler(pio1); }
 static void pio2_fifo_irq_handler() { pio_fifo_irq_handler(pio2); }
 #endif
 
+#if defined(__FREERTOS)
 void StepperTask(void* parameter) {
   FastAccelStepperEngine* engine =
       static_cast<FastAccelStepperEngine*>(parameter);
@@ -425,6 +430,12 @@ void StepperTask(void* parameter) {
     vTaskDelay(delay_time);
   }
 }
+#else
+static bool stepper_timer_callback(repeating_timer_t* timer) {
+  static_cast<FastAccelStepperEngine*>(timer->user_data)->manageSteppers();
+  return true;
+}
+#endif
 
 int32_t StepperQueue::getCurrentPosition() const {
   // A stopped queue has no live hardware count worth reading. forceStop()
@@ -447,10 +458,16 @@ void fas_init_engine(FastAccelStepperEngine* engine) {
     fas_queue[i]._isActive = true;
   }
   s_block_count = 0;
+  engine->task_rate(DELAY_MS_BASE);
+#if defined(__FREERTOS)
 #define STACK_SIZE 3000
 #define PRIORITY (configMAX_PRIORITIES - 1)
-  engine->task_rate(DELAY_MS_BASE);
   xTaskCreate(StepperTask, "StepperTask", STACK_SIZE, engine, PRIORITY, NULL);
+#else
+  static repeating_timer_t stepper_timer;
+  add_repeating_timer_us(-(int64_t)engine->_task_rate() * 1000,
+                         stepper_timer_callback, engine, &stepper_timer);
+#endif
 
   program = stepper_make_program();
 }
