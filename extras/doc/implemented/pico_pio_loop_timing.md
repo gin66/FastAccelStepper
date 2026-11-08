@@ -29,3 +29,26 @@ after that word was already dropped. What changed is
 `pio_calc_loops()`: HEAD counts the 3-cycle preamble in
 `actual_cycles`. Tag 2.0.1 leaves it out of the value stored in
 `adjust_80MHz`, while the state machine still executes it.
+
+## 27-word program (033)
+
+Re-measured 2026-11-08 on the same RP2350 and rig after the five
+direction words left the program (`1795e306`). Same procedure:
+`CONFIG 1 pio nodir`, thirty-two `QSEG 1 3200 1`, `QFILL` kept 30,
+`QRUN`; the capture is armed on `D0=r` at 24 MS/s. Two runs:
+
+| Run | Interval sum | Histogram |
+|---|---|---|
+| 1 | 139196 | 6×4799, 21×4800, 2×4801 |
+| 2 | 139197 | 7×4799, 18×4800, 4×4801 |
+
+29 × 200 us is 139200 samples at 24 MS/s. The 27-word pass is
+`22 + 3*period` instead of `26 + 3*period`, and `pio_calc_loops()`
+still hits the same request: both sums are within one sample of the
+32-word capture above. The remainder is carried in `adjust_80MHz`;
+the 6-cycle grid is unchanged.
+
+Direction changes are outside this budget. Moving DIR to the FIFO
+filler and draining four `MIN_CMD_TICKS` words makes the Saleae SR_10
+dir→first-step measurement 785.75 us (790.25 us on the re-run), where
+the 32-word program changed DIR and STEP from adjacent instructions.

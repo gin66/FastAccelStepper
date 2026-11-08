@@ -193,9 +193,11 @@ The command duration matches the requested time. `pio_calc_loops()`
 subtracts the 3-cycle preamble, solves for the period, and adds the
 preamble back into `actual_cycles`. That is the time the state machine
 spends: the preamble once, then `loop_cnt` passes of `22 + 3*period` for
-the 27-word program. The capture below was taken with the previous
-32-word program, where a pass was `26 + 3*period`. `adjust_80MHz` keeps
-`requested - actual_cycles` for the next command.
+the 27-word program. The 32-word capture below was a pass of
+`26 + 3*period`; the 27-word program was re-measured with the same
+procedure and sums to 139196 and 139197 samples over the 29 intervals,
+against 139200 requested (139197 for the 32-word program). `adjust_80MHz`
+keeps `requested - actual_cycles` for the next command.
 
 The period moves in steps of 3 cycles, and a step is two passes, so one
 command lands on a 6-cycle grid. A single command can be a few cycles
@@ -205,18 +207,22 @@ stays in front of the first pass, so the first step of a multi-step
 command is 3 cycles longer than each later step. Those 3 cycles are
 inside the command length.
 
-One step of 3200 ticks is 200 µs, 30000 cycles at 150 MHz. This tree
-emits 29995 cycles, then 30001 five times. Those six commands are
-180000 cycles, and thirty of them are exactly 30 × 200 µs. Tag 2.0.1
-left the preamble out of `actual_cycles` while the machine still
-executed it, so the adjustment was taken from a short budget. The same
-six commands there are 18 cycles long, and thirty commands are 90
-cycles long.
+One step of 3200 ticks is 200 µs, 30000 cycles at 150 MHz. The 32-word
+program emitted 29995 cycles, then 30001 five times. Those six commands
+are 180000 cycles, and thirty of them are exactly 30 × 200 µs. The
+27-word program emits 29999 five times, then 30005; the six-command sum
+and average are the same. Tag 2.0.1 left the preamble out of
+`actual_cycles` while the machine still executed it, so the adjustment
+was taken from a short budget. The same six commands there are 18 cycles
+long, and thirty commands are 90 cycles long.
 
 That capture compared `pio_calc_loops()` against tag 2.0.1 with the same
 32-word program loaded on both sides. The 27-word program is a later,
-separate change; the `rpipico2` catalogue rerun with it still reports the
-requested periods (SR_08, SR_25).
+separate change. Its own capture, armed on `D0=r` at 24 MS/s, summed to
+139196 samples (6×4799, 21×4800, 2×4801) and 139197 samples
+(7×4799, 18×4800, 4×4801) over the same 29 intervals. That is one
+sample from the 32-word result, so the 26→22 change is absorbed by
+`adjust_80MHz`.
 
 Measured 2026-11-08 on the Pico 2 saleae firmware, env `rpipico2`,
 `-DF_CPU=150000000L`. GPIO2 (analyzer D0), 30 one-step commands of 3200
@@ -230,7 +236,7 @@ the extra cycle.
 
 | Firmware | Sum of the 29 intervals |
 |---|---|
-| this tree | 139197 samples |
+| this tree, 32-word program | 139197 samples |
 | `pico_pio.cpp` / `pico_pio.h` from tag 2.0.1, rest of the tree at HEAD | 139210 samples |
 
 139197 samples is 125 ns under 29 × 200 µs. The tag capture is 10
@@ -242,9 +248,16 @@ and the catalogue line `period 10.0 us`, do not show it: one short
 command is about one sample at 24 MS/s. The capture record is
 [pico_pio_loop_timing.md](../implemented/pico_pio_loop_timing.md).
 
-Important: Without direction delay set up, the time between a direction transition
-to step low to high transition can be 50ns @ 80 MHz. Best to call
-`setDirectionPin()` with time parameter for delay.
+Direction changes no longer use the PIO program. The FIFO filler writes
+DIR after the four old-direction commands have drained, and
+`addDirChangePauseToQueue()` inserts four `MIN_CMD_TICKS` pause words
+between them and the direction-changing command. A Saleae SR_10 capture
+measures **dir→first step 790.25 us** (785.75 us on an earlier run), i.e.
+up to 4 × 200 us, where the 32-word program changed DIR and STEP from
+adjacent instructions (~50 ns). That delay is the drain, not a defect:
+the first step in the new direction cannot start until the old commands
+have finished. `setDirectionPin()` adds a further planner pause at the
+new level.
 
 Important to note: `platform = raspberrypi` from the PlatformIO registry does
 not work with the PIO driver (#339). It is the Arduino **mbed** core: version

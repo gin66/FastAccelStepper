@@ -1,6 +1,6 @@
 # Saleae harness — RP2350 (Pico 2) platform matrix
 
-- **Generated:** 2026-10-06 21:41  _(re-measured in full on the current firmware: catalogue + `scale` sweep, no replay)_
+- **Generated:** 2026-11-08 22:47  _(re-measured on the 27-word PIO program: catalogue + `scale` sweep; SR_10–SR_12 re-run)_
 - **Board:** RP2350 (Pico 2), native USB, GPIO2..GPIO9 = D0..D7
 - **Firmware:** arduino-pico, driver `pio`; tag key `rpipico2_arduino_pio_pio2_dir`
 - **Scenarios:** 27 recorded
@@ -18,13 +18,13 @@
 | SR_07 | PASS | 2000/2000 | period 10.0 us, 0 long / 0 short gaps |
 | SR_08 | PASS | 4000/4000 | period 10.0 us, 0 long / 0 short gaps |
 | SR_09 | PASS | 10/10 | pause 800.0 us, gap 40.0 vs 840.0 us |
-| SR_10 | PASS | 40/40 |  |
+| SR_10 | PASS | 40/40 | dir→first step 790.25 us |
 | SR_11 | PASS | 40/40 | dir 01 vs 01, steps [20, 20] |
 | SR_12 | PASS | 30/30 | dir 101 vs 101, steps [10, 10, 10] |
 | SR_13 | PASS | 0 | 0 pulses for a rejected command (8 requested) |
-| SR_14 | PASS(reported) | - | skew 172.25 us (reported) |
-| SR_15 | PASS(reported) | - | skew 50.0 us (reported) |
-| SR_16 | PASS | - | A 9.9881 us; B 9.9881 us |
+| SR_14 | PASS(reported) | - | skew 10.25 us (reported) |
+| SR_15 | PASS(reported) | - | skew 6.75 us (reported) |
+| SR_16 | PASS | - | A 9.9762 us; B 9.9722 us |
 | SR_17 | SKIP | - | skipped: driver not in this build |
 | SR_18 | SKIP | - | skipped: driver not in this build |
 | SR_19 | SKIP | - | skipped: driver not in this build |
@@ -32,10 +32,28 @@
 | SR_21 | PASS | 200/200 | period 10.0 us, 0 long / 0 short gaps |
 | SR_23 | SKIP | - | skipped: driver not in this build |
 | SR_25 | PASS | 4080/4080 | period 10.0 us, 0 long / 0 short gaps |
-| SR_26 | PASS | 2/2 | pause 4095.9375 us, gap 8191.75 vs 8191.875 us |
+| SR_26 | PASS | 2/2 | pause 4095.9375 us, gap 8191.5 vs 8191.875 us |
 | SR_27 | PASS | 1/1 | period 200.0 us, 0 long / 0 short gaps |
-| SR_30 | PASS | 1272/1272 | stopped at 1272 of 16320, partial pulses 0; `POS` asserted against the wire (delta 0-3) |
+| SR_30 | PASS | 1321/1321 | stopped at 1321 of 16320, partial pulses 0; `POS` asserted against the wire (delta 0-3) |
 | SR_31 | PASS | - | 8 stepper(s) on pio (searched down from 8); 0 count(s) above it refused |
+
+SR_10 measures the direction edge to the first step edge: **790.25 us** (785.75 us
+on an earlier run). That is the four `MIN_CMD_TICKS` old-direction pauses
+`addDirChangePauseToQueue()` queues ahead of a direction-changing command
+(4 x 200 us). The previous 32-word PIO program set DIR and STEP from adjacent
+instructions, so this delay was about 50 ns; the ~0.8 ms is the cost of moving DIR
+to the FIFO filler.
+
+## Loop budget
+
+Thirty one-step commands of 3200 ticks (200 us each), captured at 24 MS/s on
+GPIO2 (D0), give 30 rising edges and 29 intervals. Two runs summed **139196**
+and **139197** samples against the 139200-sample request, so the 27-word program
+keeps the command duration the 32-word program had (139197 samples). The
+correction lives in `adjust_80MHz`; the 22-cycle pass overhead is absorbed by
+the same 6-cycle grid. Histograms: 6 x 4799 / 21 x 4800 / 2 x 4801 and
+7 x 4799 / 18 x 4800 / 4 x 4801 samples. Record:
+[`../../../doc/implemented/pico_pio_loop_timing.md`](../../../doc/implemented/pico_pio_loop_timing.md).
 
 ## Parallel stepper count (`scale`)
 
@@ -43,14 +61,14 @@ Each row is one point of the count sweep: what every stepper measured, not just 
 
 | driver list | n | pins | steppers: period x steps | spread us | result |
 |---|---|---|---|---|---|
-| pio | 1 | nodir | A 9.9841usx64/64 | 0.0 | passed |
-| pio+pio | 2 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 | 0.0 | passed |
-| pio+pio+pio | 3 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 C 9.9881usx64/64 | 0.0 | passed |
-| pio+pio+pio+pio | 4 | nodir | A 9.9881usx64/64 B 9.9841usx64/64 C 9.9881usx64/64 D 9.9841usx64/64 | 0.004 | passed |
-| pio+pio+pio+pio+pio | 5 | nodir | A 9.9881usx64/64 B 9.9841usx64/64 C 9.9881usx64/64 D 9.9841usx64/64 E 9.9881usx64/64 | 0.004 | passed |
-| pio+pio+pio+pio+pio+pio | 6 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 C 9.9841usx64/64 D 9.9841usx64/64 E 9.9881usx64/64 F 9.9841usx64/64 | 0.004 | passed |
-| pio+pio+pio+pio+pio+pio+pio | 7 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 C 9.9841usx64/64 D 9.9841usx64/64 E 9.9841usx64/64 F 9.9881usx64/64 G 9.9881usx64/64 | 0.004 | passed |
-| pio+pio+pio+pio+pio+pio+pio+pio | 8 | nodir | A 9.9881usx64/64 B 9.9881usx64/64 C 9.9881usx64/64 D 9.9881usx64/64 E 9.9881usx64/64 F 9.9841usx64/64 G 9.9841usx64/64 H 9.9881usx64/64 | 0.004 | passed |
+| pio | 1 | nodir | A 9.9762usx64/64 | 0.0 | passed |
+| pio+pio | 2 | nodir | A 9.9722usx64/64 B 9.9762usx64/64 | 0.004 | passed |
+| pio+pio+pio | 3 | nodir | A 9.9722usx64/64 B 9.9722usx64/64 C 9.9722usx64/64 | 0.0 | passed |
+| pio+pio+pio+pio | 4 | nodir | A 9.9722usx64/64 B 9.9722usx64/64 C 9.9762usx64/64 D 9.9722usx64/64 | 0.004 | passed |
+| pio+pio+pio+pio+pio | 5 | nodir | A 9.9762usx64/64 B 9.9722usx64/64 C 9.9722usx64/64 D 9.9762usx64/64 E 9.9722usx64/64 | 0.004 | passed |
+| pio+pio+pio+pio+pio+pio | 6 | nodir | A 9.9722usx64/64 B 9.9762usx64/64 C 9.9722usx64/64 D 9.9722usx64/64 E 9.9722usx64/64 F 9.9722usx64/64 | 0.004 | passed |
+| pio+pio+pio+pio+pio+pio+pio | 7 | nodir | A 9.9722usx64/64 B 9.9762usx64/64 C 9.9722usx64/64 D 9.9722usx64/64 E 9.9722usx64/64 F 9.9722usx64/64 G 9.9722usx64/64 | 0.004 | passed |
+| pio+pio+pio+pio+pio+pio+pio+pio | 8 | nodir | A 9.9722usx64/64 B 9.9722usx64/64 C 9.9722usx64/64 D 9.9762usx64/64 E 9.9722usx64/64 F 9.9722usx64/64 G 9.9722usx64/64 H 9.9722usx64/64 | 0.004 | passed |
 
 ## Driver capability
 

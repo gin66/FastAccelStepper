@@ -6,8 +6,9 @@ the Pico SDK is wrong on RISC-V, so a stepper program can be written
 over the cycle counter.
 
 Status: **implemented** (2026-11-08). Measured on an RP2350: 11 steppers
-connect. The Saleae catalogue and scale sweep pass. The platform docs and
-the changelog are updated.
+connect. The Saleae catalogue and scale sweep pass, and the loop and
+direction timing analyses are recorded below. The platform docs and the
+changelog are updated.
 
 ## Implementation
 
@@ -46,6 +47,25 @@ The `rpipico2` Saleae catalogue passed every implemented scenario, including
 the direction-change tests SR_10–SR_12, and `--mode scale --pin-mode nodir`
 passed at 1..8 steppers. All PC tests passed. `pio run -d pio_dirs/saleae -e
 rpipico2` builds with `-Werror`.
+
+Two timing analyses were run on the Pico 2 Saleae firmware, env `rpipico2`.
+
+**Loop budget.** Thirty one-step commands of 3200 ticks (200 us each) at
+24 MS/s gave 30 rising edges and 29 intervals. Two runs summed to 139196
+and 139197 samples against the 139200-sample request; the 32-word program
+measured 139197. The 27-word pass is `22 + 3*period` instead of
+`26 + 3*period`, so `adjust_80MHz` absorbs the 4-cycle difference and the
+command duration is unchanged. Histograms: 6×4799 / 21×4800 / 2×4801 and
+7×4799 / 18×4800 / 4×4801 samples. Record:
+[pico_pio_loop_timing.md](pico_pio_loop_timing.md).
+
+**Direction timing.** SR_10 measures 790.25 us from the DIR edge to the
+first STEP edge (785.75 us on the earlier run), which is the four
+`MIN_CMD_TICKS` old-direction pause words (4 × 200 us). The previous
+32-word program set DIR and STEP from adjacent PIO instructions (~50 ns).
+The delay is the cost of draining the FIFO before the new direction
+starts; SR_11 and SR_12 confirm the direction level is stable within each
+phase and no DIR edge falls inside a step pulse.
 
 ## Problem
 
