@@ -53,6 +53,11 @@ application with these error types.
 
 ## Lessons learned
 
+* On the Pico, `pio_can_add_program` builds its free-space mask with
+  `1u << length`. A shift of 32 is undefined. The RISC-V compiler makes that
+  mask 0, so the call returns success and the 32-word stepper program
+  overwrites the 2-word cycle counter. A length of 31 or less is checked
+  correctly. The usable count stays 8 on the Pico 2 and 4 on the Pico.
 * Spent more than half a day debugging the esp32-code, till I have found out, that
   just the cable to the stepper was broken.
 * In one setup, operating A4988 without microsteps has led to erratic behaviour at

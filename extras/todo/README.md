@@ -24,8 +24,11 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 
 | Priority | Item | Tokens | Effort | Why now |
 |----------|------|--------|--------|---------|
+| **032** | [Pico cycle-counter PIO](032_pico_cycle_counter_pio.md) | — | measured | Pico 4, Pico 2 Cortex 8, both with `-D__FREERTOS=1`. RISC-V without that flag also has the 2-word block. A length-32 fit test is a zero mask on that compiler. |
+| **033** | [Pico whole-block claim](033_pico_pio_block_claim.md) | ~30 k | 1 d | Claim all four state machines before writing the 32-word program. Alternative: move the five direction words to the FIFO filler so the program is 27 words and the SDK check works. |
+| **034** | [Pico registry platform](034_pico_registry_platform.md) | ~40 k | 1 d | `platform = raspberrypi` is still the warned path (#339). Resolve the core it selects now, then SR_01 and SR_16. |
 | **040** | [ESP32 synchronized start](040_esp32_synchronized_start.md) | ~20 k | 1–2 d | Native per-driver release (I2S group, RMT group start, MCPWM/PCNT) pending. |
-| **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | PIO block-start HW sync for multiple steppers to be verified. |
+| **040** | [Pico synchronized start](040_pico_synchronized_start.md) | ~20 k | 1–2 d | One item. can2040's single CTRL write is the example; FAS enables only the caller's steppers, per PIO block. |
 | **040** | [AVR synchronized start](040_avr_synchronized_start.md) | ~10 k | 0.5 d | Shared-timer start likely final; verify and close. |
 | **040** | [SAM synchronized start](040_sam_synchronized_start.md) | ~20 k | 1–2 d | PWM/TC common release point to be identified. |
 | **040** | [SAMD51 synchronized start](040_samd51_synchronized_start.md) | ~20 k | 1–2 d | TCC cross-instance release to be identified. |
@@ -42,9 +45,14 @@ timer/PWM/PIO registers, and the ramp generator's log2 fixed-point math.
 | **150** | [GPIO set support (#316)](150_gpio_set_support.md) | ~300 k | 1 w | Audit toggle vs. set per platform, add `SUPPORT_GPIO_SET` flag, benchmark, test. |
 | **160** | [16-bit GPIO encoding](160_16bit_gpio_encoding.md) | ~800 k | 2–3 w | Cross-cutting type change: `pin_t` in every API, queue struct, platform init; 8-bit retained for AVR. |
 | **500** | [Interrupt steps in Hz range](500_interrupt_steps_in_Hz_range.md) | ~500 k | 1–2 w | Bug: slow steps (e.g. 1 step/s) are not interruptible — `abort()` / `reset()` effectively non-functional. |
-| **total** | 17 items | ~5.96 M | 16–24 w | Priorities 040–160, plus 500. |
+| **total** | 20 items | ~6.10 M | 17–25 w | Priorities 032–160, plus 500. |
 
 ## Done
+
+- **030 — Pico PIO loop timing — measured.** `0f53d4a2` matches the
+  150 MHz budget. A 30-command one-step train was 13 samples at 24 MS/s
+  shorter than tag 2.0.1; the budget says 13.4. Record:
+  [pico_pio_loop_timing.md](../doc/implemented/pico_pio_loop_timing.md).
 
 - **026 — Pico `getCurrentPosition()` returned 0 during a run — fixed and
   measured.** The PIO pushes the running position into its RX FIFO with a

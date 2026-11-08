@@ -41,8 +41,8 @@ For memory footprint information across supported architectures, see the
 | ESP32-C3 | 200 [1] | 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
 | ESP32-C6 | 200 [1] | 2 MCPWM/PCNT + 2 RMT + 32 I2S * | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
 | ESP32-P4 | 200 [1] | 4 RMT + 32 I2S * [2] | 32 | [esp32.md](extras/doc/platforms/esp32.md) |
-| Raspberry Pi Pico | 200 | 4 (8 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
-| Raspberry Pi Pico 2 | 200 | 8 (12 w/ riscv) | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Raspberry Pi Pico | 200 | 4 | 32 | [pico.md](extras/doc/platforms/pico.md) |
+| Raspberry Pi Pico 2 | 200 | 8 | 32 | [pico.md](extras/doc/platforms/pico.md) |
 | Atmel SAM Due | 50 | 6 | 32 | [sam.md](extras/doc/platforms/sam.md) |
 | Microchip SAMD51 | 100 | 3-5 | 32 | [samd51.md](extras/doc/platforms/samd51.md) |
 | Teensy 4.0/4.1 (exp.) | 200 | 16 | 32 | [teensy.md](extras/doc/platforms/teensy.md) |
@@ -269,11 +269,13 @@ For FastAccelStepper, the way software is developed is changing fundamentally. I
 
 Nowadays, coding agents can understand the existing code base surprisingly well and carry out most of the required modifications. This makes implementing new features significantly faster.
 
-That said, I still take pride in hand-writing the Pico PIO code. There is something deeply satisfying about getting all the required functionality for a step/direction pin into just 50 words of PIO code. That kind of low-level optimization and craftsmanship is something I value.
+That said, I still take pride in hand-writing the Pico PIO code. There is something deeply satisfying about getting all the required functionality for a step/direction pin into just 32 words of PIO code. That kind of low-level optimization and craftsmanship is something I value.
 
 Perhaps there is also a little nostalgia in this. It feels like one of those moments when a craft that has shaped the way you have worked throughout your lifetime is slowly becoming obsolete — not because it has lost its value, but because there is now a faster and more powerful way of achieving the same result. Like the expert typist who could produce flawless pages at remarkable speed, the old skills don't necessarily become less beautiful; they simply become less necessary.
 
 Those 32 words of PIO code are perhaps one of the last pieces of FastAccelStepper where I can say, quite honestly, *I wrote every word myself.*
+
+But even this will soon be history. Further changes to those 32 words will be made by an LLM, too.
 
 ## Contributing
 

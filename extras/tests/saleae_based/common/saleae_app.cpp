@@ -188,9 +188,15 @@
 #define SALEAE_BUS_BASE (SALEAE_CHANNELS - 3)
 #define SALEAE_BUS_COUNT 3
 
-// Bounded program: 8 segments is 8 * 6 bytes = 48 bytes of RAM, shared by all
-// steppers. Every characterization scenario needs fewer.
+// Bounded program. Eight segments cover the catalogue. Pico keeps 32, one
+// queue entry each, so a QFILL of one-step commands is long enough to see
+// the PIO loop budget (extras/doc/implemented/pico_pio_loop_timing.md).
+// AVR stays at 8: the 328P comment at the top of this file is the RAM limit.
+#if defined(SUPPORT_RP_PICO)
+#define QE_MAX_SEG 32
+#else
 #define QE_MAX_SEG 8
+#endif
 
 // The I2S mux word is 32 bits wide and every frame carries all of it, so a
 // multiplexed stepper costs a *slot*, not an analyzer channel: the three bus
@@ -1543,7 +1549,7 @@ static void handle_config(char* count_text, char* driver_list,
     reply_p(SAL_PSTR("ERR CONFIG needs <n> <drv>[,<driver>]\n"));
     return;
   }
-  if (count > SALEAE_MAX_STEPPERS) {
+  if (count > (long)SALEAE_MAX_STEPPERS) {
     // The array bound, which is the only one a driver list cannot dodge: a
     // 4-entry list filled into a 2-entry array scribbles past it.
     reply_too_many(count, stride);
